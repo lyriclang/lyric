@@ -369,7 +369,8 @@ public static class ModuleLowerer
         var late = new List<(FunctionId Id, IrFunction Function)>();
         try
         {
-            for (var pass = 0; pass < MaxLoweringRounds; pass++)
+            var settled = false;
+            for (var pass = 0; pass < MaxLoweringRounds && !settled; pass++)
             {
                 var typesBefore = typeTable.Interned.Count();
 
@@ -380,7 +381,21 @@ public static class ModuleLowerer
                 DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
                     typeTable, globals);
 
-                if (typeTable.Interned.Count() == typesBefore) break;
+                settled = typeTable.Interned.Count() == typesBefore;
+            }
+
+            // Still growing when the passes ran out: the set of instantiations this program asks
+            // for is not finite, and monomorphization only terminates when it is. Saying so is the
+            // whole point — without it the module goes on incomplete and the VERIFIER reports a
+            // missing vtable row, which is true and useless: it names a type nobody wrote.
+            if (!settled)
+            {
+                de.Report(LoweringDiagnostics.NotSupported, Severity.Error, default,
+                    "the monomorphization does not terminate: every round asks for further type "
+                    + "instances. A method whose result type is built from its own element type "
+                    + "demands an instance for the next one, and so on without end — write it as a "
+                    + "free function, which is instantiated per use rather than per instance");
+                return null;
             }
         }
         catch (UnsupportedConstructException ex)

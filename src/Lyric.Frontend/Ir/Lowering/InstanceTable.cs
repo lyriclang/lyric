@@ -30,6 +30,20 @@ internal sealed class InstanceTable
 
     private readonly List<Pending> _pending = new();
 
+    /// <summary>
+    /// How many instances one module may produce before the lowering calls it a runaway.
+    ///
+    /// <para>Monomorphization terminates only when the set of instantiations is finite, and a
+    /// program can ask for one that is not: a method returning a type built from its own — an
+    /// interface method answering <c>Iterator&lt;T[]&gt;</c> — demands the instance for the next
+    /// element type, and that one for the one after. Without a cap the compiler does not fail, it
+    /// simply never finishes, which is the worst of the three outcomes.</para>
+    ///
+    /// <para>The number is far above anything a real module reaches; what it buys is a message
+    /// with a name in it instead of a process to kill.</para>
+    /// </summary>
+    private const int MaxInstances = 20_000;
+
     /// <summary>What has already been requested, so two calls of <c>id(7)</c> get the same instance
     /// rather than producing two identical functions.</summary>
     private readonly Dictionary<string, FunctionId> _byKey = new(StringComparer.Ordinal);
@@ -94,10 +108,25 @@ internal sealed class InstanceTable
         for (var i = 0; i < symbol.Generics.Length; i++)
             substitution[symbol.Generics[i]] = typeArguments[i];
 
+        Guard(name, span);
+
         var id = _ids.Next();
         _byKey[name] = id;
         _pending.Add(new Pending(decl, name, id, receiver, substitution, owner));
         return id;
+    }
+
+    /// <summary>Stops a monomorphization that does not terminate, and names the instance it was
+    /// asked for when it gave up — that name is the shape of the recursion.</summary>
+    private void Guard(string name, Core.Span span)
+    {
+        if (_pending.Count < MaxInstances) return;
+
+        throw new UnsupportedConstructException(
+            $"the monomorphization does not terminate: {_pending.Count} instances and still "
+            + $"asking for '{name}'. A method whose result type is built from its own element "
+            + "type demands an instance for the next one, and so on without end — write it as a "
+            + "free function, which is instantiated per use rather than per instance", span);
     }
 
     /// <summary>
@@ -119,6 +148,8 @@ internal sealed class InstanceTable
             ReferenceEqualityComparer.Instance);
         for (var i = 0; i < owner.Definition.Generics.Length && i < owner.Arguments.Length; i++)
             substitution[owner.Definition.Generics[i]] = owner.Arguments[i];
+
+        Guard(name, span);
 
         var id = _ids.Next();
         _byKey[name] = id;

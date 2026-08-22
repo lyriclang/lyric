@@ -95,6 +95,39 @@ both families side by side:
 the answer is `clampInt` rather than a conversion there and back. The same rule shapes
 `fromInt`/`fromFloat` and `parseInt`/`parseFloat` in `std.string`.
 
+## Iterators chain
+
+Since 2.17 the adapters are METHODS, so a pipeline reads left to right instead of inside out:
+
+```lyr
+import std.iter { collectArray };
+import std.collections { List };
+
+fn main(): int {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+
+    let out = collectArray<int>(
+        xs.iter().map<int>((n: int) => n * 2).filter((n: int) => n > 2).take(2));
+
+    return out.length;
+}
+```
+
+`map`, `filter`, `take`, `skip`, `takeWhile`, `zip`, `chain` and `flatMap` are methods on
+`Iterator<T>`; the free forms still work, warn, and go with 3.0.
+
+Two families stay free, each for a reason worth knowing:
+
+- **`sum`, `sumFloat`, `minValue`, `maxValue`** ask something of the ELEMENT type — that it is a
+  number, that it is ordered — and an interface cannot require that of its own parameter.
+- **`enumerate` and `chunks`** change the element type without being generic, and a method like
+  that would ask the compiler to build `Iterator<(int, T)>`, then `Iterator<(int, (int, T))>`,
+  without end. `map` and `flatMap` change it safely because they are generic: they are built per
+  use rather than per instance.
+
 ## Files answer two ways, and each says which
 
 Since 2.14 `std.io.file` has exactly two shapes, and the choice between them is not a taste:
