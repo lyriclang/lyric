@@ -168,9 +168,21 @@ parent costs turned out to be one rule about NAMES, the second half of one that 
 The suite lost the case that pinned the old rule and gained three, one of them the exact shape
 the old reasoning said would break.
 
-Still ahead of the major: iterator chaining (M33). Then the design round — overloading included,
-and it has to answer what overloading means for a language whose whole dispatch story is generics
-plus constraints.
+**M33 is done and shipped as v2.17.0**: iterator chaining, the last documented No this project
+carried. The answer was one design decision — a member with type parameters of its own gets NO
+vtable slot, because a slot holds one function and such a member is one per instantiation — and
+everything else followed from it: it must have a body, it may not be overridden, and it works
+through an interface VALUE, which is what a chain needs.
+
+**Three findings worth keeping.** (1) The documented No named two walls; the real ones were
+different and one of them was a missing CALL, not missing machinery — `RequestMethod` had done
+this job for `Box<int>.get` all along. (2) A non-generic method that changes the element type
+makes monomorphization diverge; that is now a diagnostic instead of a hang, and it is why
+`enumerate` and `chunks` stay free functions. (3) The vtable rows needed a fixed point: a row can
+request a method whose body interns types that need rows of their own.
+
+Ahead of the major: the design round — overloading included, and it has to answer what overloading
+means for a language whose whole dispatch story is generics plus constraints.
 
 ## The gate: a register bytecode is NOT worth a major
 
@@ -387,9 +399,9 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4598 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **2.16.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 94 cases, and the toolchain's own CI runs it against the
+4618 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **2.17.0**; the specification in `lyriclang/lyric-spec` is
+**NORMATIVE**, its suite stands at 97 cases, and the toolchain's own CI runs it against the
 working tree.
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
@@ -914,6 +926,12 @@ answer yet, and it belongs asked before E4 starts.
   keep-everything behavior for bare snippets, pinned in ExportRootTests. It waited for 2.0
   because it is observable: a host calling a function the surface does not reach finds it
   missing.
+- **Iterator method chaining: DELIVERED in 2.17** (M33), and the entry below is kept because it
+  was wrong in an instructive way: it named the two walls as "interface-instance layout work plus
+  monomorphized defaults" and called the vtable question open. The real walls were a missing
+  instance in three lifting sites and a missing branch before the slot lookup, and the vtable
+  question answered itself — a generic member gets no slot at all. The original entry:
+
 - **Iterator method chaining: documented No for now** (M24 probe). `xs.iter().map(f).take(3)`
   wants generic default methods on `Iterator<T>`. The sema ACCEPTS them already; the lowering
   refuses on both paths — an interface VALUE fails at instance interning (`fn(T) -> U` in the

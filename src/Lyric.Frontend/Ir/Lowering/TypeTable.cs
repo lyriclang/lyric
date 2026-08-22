@@ -269,6 +269,55 @@ internal sealed class TypeTable
     /// <summary>The type of a value addressed through an interface.</summary>
     public IrInterfaceType InterfaceOf(TypeSymbol symbol) => new(Intern(symbol));
 
+    /// <summary>
+    /// The interface as a concrete type DECLARES it: for <c>class C :: [Iterator&lt;int&gt;]</c>
+    /// and the provider <c>Iterator</c>, the entry of <c>Iterator&lt;int&gt;</c>.
+    ///
+    /// <para>Needed wherever a receiver is lifted to reach an interface default: a generic
+    /// interface has no entry of its own, so lifting into the definition throws. Falls back to the
+    /// bare symbol when the type does not name it directly — a non-generic interface, or one
+    /// reached through a parent, where the definition IS the entry.</para>
+    /// </summary>
+    public IrInterfaceType InterfaceAsDeclared(TypeSymbol concrete, TypeSymbol iface, Core.Span span)
+    {
+        var declared = concrete.Declaration switch
+        {
+            ClassDecl c => c.Interfaces,
+            StructDecl v => v.Interfaces,
+            EnumDecl e => e.Interfaces,
+            _ => (TypeNode[])[],
+        };
+
+        foreach (var node in declared)
+            if (Conformance.InterfaceOf(node, _binding) is { } written
+                && ReferenceEquals(written, iface))
+                return InterfaceOf(node, span);
+
+        return InterfaceOf(iface);
+    }
+
+    /// <summary>
+    /// The interface as it is WRITTEN at a constraint: <c>Source&lt;int&gt;</c> rather than
+    /// <c>Source</c>.
+    ///
+    /// <para>A generic interface has no entry of its own — only its instances do, exactly as for a
+    /// generic class. Interning the definition throws, which is what a default method of a
+    /// generic interface used to run into: the constraint path lifts its receiver into an
+    /// interface value, and the value needs a type that exists.</para>
+    /// </summary>
+    public IrInterfaceType InterfaceOf(TypeNode node, Core.Span span)
+    {
+        if (node is NamedType { TypeArguments.Length: > 0 } written
+            && Conformance.InterfaceOf(node, _binding) is { } definition)
+            return new IrInterfaceType(Intern(definition,
+                written.TypeArguments.Select(a => Resolve(a, span)).ToArray()));
+
+        return Conformance.InterfaceOf(node, _binding) is { } plain
+            ? InterfaceOf(plain)
+            : throw new UnsupportedConstructException(
+                "a constraint that is not an interface reached the lowering", span);
+    }
+
     /// <summary>The type of a <c>struct</c> value: the same layout as a class, but value
     /// semantics.</summary>
     public IrStructType StructOf(TypeSymbol symbol) => new(Intern(symbol));
@@ -614,8 +663,15 @@ internal sealed class TypeTable
                         slots.Add(name);
 
         foreach (var member in decl.Members)
+        {
+            // A GENERIC member gets no slot, and cannot: a slot holds one function, and a method
+            // with type parameters of its own is one function per instantiation. It is reached by
+            // monomorphization instead — which is what makes it unavailable through an interface
+            // VALUE, the trade Rust makes for the same reason.
+            if (member.Generics.Length > 0) continue;
             if (!slots.Contains(member.Name))
                 slots.Add(member.Name);
+        }
 
         return slots.ToArray();
     }

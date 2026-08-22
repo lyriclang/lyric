@@ -10,6 +10,59 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v2.17.0 — 2026-08-22
+
+**M33 — iterator chaining.** The last thing this project had written down as a documented No.
+
+```lyr
+xs.iter().map<int>((n: int) => n * 2).filter((n: int) => n > 4).take(2)
+```
+
+### Added
+
+- **An interface member may have type parameters of its own**, and it is not dispatched: a method
+  table holds one function per slot, and such a member is one function per instantiation. It gets
+  **no slot** and is monomorphized, like a generic function. Three rules follow, and they are one
+  fact seen from three sides (`LYR-SEM0082`):
+
+  - it must have a **body** — an abstract one would promise a dispatch nothing can perform;
+  - it may not be **overridden** — without a slot the target is chosen by the receiver's static
+    type, so an override would be reached through the concrete type and the default through the
+    interface: one name, two functions;
+  - it is reachable through a **constraint AND through an interface value** — which is what a
+    chain needs, and is sound *because* of the first two.
+
+  The same trade Rust makes for a provided method with type parameters of its own.
+
+- **A default method of a GENERIC interface is lowered at all.** `interface Source<T> { fn twice():
+  T { … } }` did not compile: three places lifted a receiver into the interface DEFINITION, which
+  has no entry, and reported that `Source` needs a type argument — at the interface's own
+  declaration, which is not where the program was wrong. All three take the instance now.
+
+- **`std.iter` adapters are methods**: `map`, `filter`, `take`, `skip`, `takeWhile`, `zip`,
+  `chain`, `flatMap`. The free forms delegate to them — one implementation — and carry
+  `until = "3.0"`.
+
+### The two that stay free, and why
+
+- `sum`, `sumFloat`, `minValue`, `maxValue` ask something of the ELEMENT type, and an interface
+  cannot require that of its own parameter.
+- `enumerate` and `chunks` change the element type without being generic. A method like that has a
+  slot every instance must fill, so `Iterator<T>` would demand `Iterator<(int, T)>`, and that one
+  the next — **the monomorphization does not terminate**. It was tried; the compiler stopped
+  answering. `map` and `flatMap` change the element type safely because they are generic: built
+  per use rather than per instance.
+
+### Fixed
+
+- **A non-terminating monomorphization is a diagnostic instead of a hang.** The lowering now
+  reports it with the advice that fixes it — write the method as a free function — where it
+  previously ran until the machine gave up, or produced a module the verifier rejected by naming a
+  type nobody wrote.
+
+- **The vtable rows are built to a fixed point.** A row can request a method whose body interns
+  further types; one pass left those types without rows of their own.
+
 ## v2.16.0 — 2026-08-22
 
 An interface may declare several parents. The rule that said otherwise rested on a claim about the
