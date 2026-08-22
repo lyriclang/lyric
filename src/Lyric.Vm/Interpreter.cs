@@ -420,12 +420,15 @@ public static class Interpreter
                     {
                         var count = callee.Source.ParamCount;
                         var slots = arguments.Rent(count);
-                        for (var i = count - 1; i >= 0; i--) slots[i] = frame.Pop();
+
+                        // The local stack pointer, for the reason spelled out at the callvirt
+                        // below: 'frame.Sp' is a copy that is only refreshed where it is read.
+                        for (var i = count - 1; i >= 0; i--) slots[i] = stack[--sp];
 
                         var answer = code(jit, slots);
                         arguments.Recycle(slots);
 
-                        if (callee.Source.ReturnType.Tag != TypeTag.Void) frame.Push(answer);
+                        if (callee.Source.ReturnType.Tag != TypeTag.Void) stack[sp++] = answer;
                         break;
                     }
 
@@ -597,12 +600,18 @@ public static class Interpreter
                     {
                         var count = callee.Source.ParamCount;
                         var slots = arguments.Rent(count);
-                        for (var i = count - 1; i >= 0; i--) slots[i] = frame.Pop();
+
+                        // Through the LOCAL stack pointer, not through the frame: since the hot
+                        // state moved into locals, 'frame.Sp' is only written back where
+                        // something can observe it, so 'frame.Pop()' here would decrement a stale
+                        // copy and leave the real stack untouched. The two halves of this VM were
+                        // built on separate branches, and this line is where they disagreed.
+                        for (var i = count - 1; i >= 0; i--) slots[i] = stack[--sp];
 
                         var answer = virtualCode(jit, slots);
                         arguments.Recycle(slots);
 
-                        if (callee.Source.ReturnType.Tag != TypeTag.Void) frame.Push(answer);
+                        if (callee.Source.ReturnType.Tag != TypeTag.Void) stack[sp++] = answer;
                         break;
                     }
 
