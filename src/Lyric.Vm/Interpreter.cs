@@ -448,6 +448,25 @@ public static class Interpreter
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 
                     var callee = prepared[index - natives.Length];
+
+                    // The same hand-off as an ordinary call, and it matters more here than there:
+                    // this is how an object layer reaches its methods. Erato drives its actors
+                    // through an interface, so without this every compiled onUpdate would still
+                    // be reached by building a frame and interpreting it.
+                    if (jit is not null && TPolicy.AllowsCompiledCode
+                        && jit.CodeFor(callee) is { } virtualCode)
+                    {
+                        var count = callee.Source.ParamCount;
+                        var slots = arguments.Rent(count);
+                        for (var i = count - 1; i >= 0; i--) slots[i] = frame.Pop();
+
+                        var answer = virtualCode(jit, slots);
+                        arguments.Recycle(slots);
+
+                        if (callee.Source.ReturnType.Tag != TypeTag.Void) frame.Push(answer);
+                        break;
+                    }
+
                     var next = callee.Rent();
                     for (var i = callee.Source.ParamCount - 1; i >= 0; i--) next.Slots[i] = frame.Pop();
 

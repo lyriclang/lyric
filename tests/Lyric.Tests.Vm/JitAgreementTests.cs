@@ -575,6 +575,115 @@ public class JitAgreementTests
             "run", LyrValue.FromI64(100));
     }
 
+    // ---------------------------------------------------------------- optionals, and 'for'
+
+    [Fact]
+    public void A_for_loop_agrees()
+    {
+        // The loop everybody writes, and the reason optionals had to be supported at all: a
+        // 'for' over a range lowers to a RangeIterator that hands its value out as a '?int'.
+        // Before that shape compiled, every function containing an idiomatic loop was declined.
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): int {
+                var acc = 0;
+                for (i in 0..n) {
+                    acc = acc + i * 2;
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(500));
+    }
+
+    [Fact]
+    public void A_for_loop_over_an_array_agrees()
+    {
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): float {
+                let data = [0.5] * 32;
+                var acc = 0.0;
+
+                for (_ in 0..n) {
+                    for (i in 0..data.length) {
+                        acc = acc + data[i];
+                    }
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(20));
+    }
+
+    [Fact]
+    public void Optionals_agree()
+    {
+        Agree(
+            """
+            fn maybe(n: int): ?int {
+                if (n % 3 == 0) { return null; }
+                return n * 2;
+            }
+
+            @Hook
+            pub fn run(n: int): int {
+                var acc = 0;
+                for (i in 0..n) {
+                    // Unwrapped WITHOUT a null check, so the compiler cannot narrow the type away
+                    // and an 'optget' really is emitted.
+                    if (i % 3 == 0) {
+                        acc = acc + 1;
+                    } else {
+                        acc = acc + maybe(i)!;
+                    }
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(200));
+    }
+
+    [Fact]
+    public void A_force_unwrap_of_nothing_fails_the_same_way()
+    {
+        var module = Compile(
+            """
+            fn maybe(n: int): ?int {
+                if (n < 0) { return null; }
+                return n;
+            }
+
+            @Hook
+            pub fn run(n: int): int { return maybe(n)!; }
+
+            fn main(): int { return 0; }
+            """);
+
+        var interpreted = LoadedProgram.Load(module);
+        var compiled = LoadedProgram.Load(module, jit: true);
+        var index = Find(module, "run");
+
+        var a = Assert.Throws<LyricPanic>(
+            () => interpreted.Invoke(index, LyrValue.FromI64(-1)));
+        var c = Assert.Throws<LyricPanic>(
+            () => compiled.Invoke(index, LyrValue.FromI64(-1)));
+
+        Assert.Equal(a.Code, c.Code);
+        Assert.Equal(a.Message, c.Message);
+    }
+
     [Fact]
     public void A_refused_function_still_runs()
     {

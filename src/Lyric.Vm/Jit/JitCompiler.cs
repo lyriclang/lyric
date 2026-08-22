@@ -30,9 +30,9 @@ internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 /// <para><b>What it refuses.</b> Everything it does not understand, per function, and the
 /// interpreter keeps those. That is the whole safety story: a refusal costs speed, never
 /// correctness, and the set grows one opcode at a time with the differential tests holding the
-/// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields, and
-/// calls — to a native, or to another function that compiles. Still declined: closures,
-/// exceptions, optionals, interfaces, enums, conversions, division (which panics), object
+/// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields,
+/// optionals, and calls — to a native, or to another function that compiles. Still declined:
+/// closures, exceptions, interfaces, enums, conversions, division (which panics), object
 /// construction (which needs the type table), recursion, and the narrow integer widths (which
 /// need re-normalising after every operation).</para>
 /// </summary>
@@ -376,6 +376,57 @@ internal static class JitCompiler
 
                 case Op.Call:
                     return EmitCall((int)op.Immediate);
+
+                // ------------------------------------------------------------ optionals
+
+                case Op.OptNone:
+                {
+                    il.Emit(OpCodes.Call, typeof(LyrValue)
+                        .GetProperty(nameof(LyrValue.None))!.GetGetMethod()!);
+
+                    // No element type is knowable here, and none is needed: an empty optional is
+                    // stored into a slot that has one, and every read comes from that slot.
+                    _stack.Push(new BytecodeType(TypeTag.Optional, -1));
+                    return true;
+                }
+
+                case Op.OptSome:
+                {
+                    if (_stack.Count == 0) return false;
+                    var inner = _stack.Pop();
+                    if (!EmitPack(il, inner)) return false;
+
+                    il.Emit(OpCodes.Call, typeof(LyrValue)
+                        .GetMethod(nameof(LyrValue.Some), [typeof(LyrValue)])!);
+
+                    _stack.Push(new BytecodeType(TypeTag.Optional, -1) { Element = inner });
+                    return true;
+                }
+
+                case Op.OptIsSome:
+                {
+                    if (_stack.Count == 0) return false;
+                    if (_stack.Pop().Tag != TypeTag.Optional) return false;
+
+                    il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.HasValue)));
+                    _stack.Push(BytecodeType.Scalar(TypeTag.Bool));
+                    return true;
+                }
+
+                case Op.OptGet:
+                {
+                    if (_stack.Count == 0) return false;
+                    var option = _stack.Pop();
+                    if (option.Tag != TypeTag.Optional) return false;
+                    if (option.Element is not { } inner) return false;
+
+                    il.Emit(OpCodes.Ldstr, function.Name);
+                    il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.Unwrap)));
+                    if (!EmitUnpack(il, inner)) return false;
+
+                    _stack.Push(inner);
+                    return true;
+                }
 
                 // ------------------------------------------------------------ fields
 
@@ -734,6 +785,18 @@ internal static class JitCompiler
         TypeTag.F32 => typeof(float),
         TypeTag.Array or TypeTag.Ref => typeof(LyrValue[]),
         TypeTag.String => typeof(string),
+
+        // An optional stays a LyrValue, and that is the whole trick. It is the one shape that
+        // needs BOTH halves of a value -- the bits and a marker in the reference field -- so
+        // there is no machine type to unpack it into. There does not have to be: a slot may hold
+        // the value itself, exactly as the interpreter does, and everything around it stays
+        // typed. Packing and unpacking are then the identity.
+        //
+        // This is what lets a 'for' loop compile. 'for (i in 0..n)' lowers to a RangeIterator
+        // handing its value out as a '?int', so before this every function containing an
+        // idiomatic loop was declined -- which is nearly every function anyone writes.
+        TypeTag.Optional => typeof(LyrValue),
+
         _ => null,
     };
 
@@ -750,6 +813,9 @@ internal static class JitCompiler
     private static bool EmitUnpack(ILGenerator il, BytecodeType type)
     {
         if (Machine(type) is null) return false;
+
+        // An optional is already what it is meant to be.
+        if (type.Tag == TypeTag.Optional) return true;
 
         il.Emit(OpCodes.Call, type.Tag switch
         {
@@ -768,6 +834,8 @@ internal static class JitCompiler
     private static bool EmitPack(ILGenerator il, BytecodeType type)
     {
         if (Machine(type) is null) return false;
+
+        if (type.Tag == TypeTag.Optional) return true;
 
         il.Emit(OpCodes.Call, type.Tag switch
         {

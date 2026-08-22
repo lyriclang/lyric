@@ -74,6 +74,20 @@ internal static class JitRuntime
 
     public static string AsText(LyrValue value) => value.Ref as string ?? string.Empty;
 
+    /// <summary>The value inside an optional, or the interpreter's panic when there is none —
+    /// same code, same wording, and the function name baked in because compiled code has no frame
+    /// to read it off.</summary>
+    public static LyrValue Unwrap(LyrValue option, string function)
+    {
+        if (option.IsSome) return option.Unwrap();
+
+        throw new LyricPanic(VmDiagnostics.NullDereference,
+            $"force-unwrapped a '?T' that had no value in '{function}'");
+    }
+
+    /// <summary>Whether an optional holds anything, as the 0-or-1 a Lyric bool is here.</summary>
+    public static long HasValue(LyrValue option) => option.IsSome ? 1L : 0L;
+
     // The scalar unpackers exist as STATIC methods rather than as the properties on LyrValue,
     // because a property on a struct needs a managed pointer -- and a value that has just come
     // back from a call sits on the stack, where there is none to take.
