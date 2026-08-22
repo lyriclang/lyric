@@ -902,6 +902,82 @@ public class JitAgreementTests
     }
 
     [Fact]
+    public void A_virtual_call_agrees()
+    {
+        Agree(
+            """
+            interface Shape { fn area(): float; }
+
+            class Square :: [Shape] {
+                side: float = 2.0,
+
+                fn area(): float { return this.side * this.side; }
+            }
+
+            class Circle :: [Shape] {
+                r: float = 1.0,
+
+                fn area(): float { return this.r * this.r * 3.14159; }
+            }
+
+            @Hook
+            pub fn run(n: int): float {
+                var acc = 0.0;
+                for (i in 0..n) {
+                    let s: Shape =
+                        if (i % 2 == 0) Square { side = i as float }
+                        else Circle { r = i as float };
+
+                    acc = acc + s.area();
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(200));
+    }
+
+    [Fact]
+    public void One_uncompilable_implementation_declines_the_whole_call()
+    {
+        // A virtual call cannot know its target until it runs, so the compiler has to be sure of
+        // ALL of them -- otherwise a throw below a compiled frame could not find a catch above it.
+        // Here one implementation recurses, which never compiles, and the caller must therefore
+        // stay interpreted and still answer correctly.
+        Agree(
+            """
+            interface Step { fn go(n: int): int; }
+
+            class Plain :: [Step] {
+                fn go(n: int): int { return n + 1; }
+            }
+
+            class Deep :: [Step] {
+                fn go(n: int): int {
+                    if (n < 2) { return n; }
+                    return this.go(n - 1) + this.go(n - 2);
+                }
+            }
+
+            @Hook
+            pub fn run(n: int): int {
+                var acc = 0;
+                for (i in 0..n) {
+                    let s: Step = if (i % 2 == 0) Plain { } else Deep { };
+                    acc = acc + s.go(i % 12);
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(60));
+    }
+
+    [Fact]
     public void A_refused_function_still_runs()
     {
         // Arrays are not compiled yet, so this one stays on the interpreter -- and the point of

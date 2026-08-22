@@ -95,6 +95,17 @@ internal sealed class JitContext
     public LyrValue NewObject(int typeIndex) =>
         LyrValue.FromObject(Interpreter.NewInstance(Types[typeIndex]));
 
+    /// <summary>
+    /// Calls through an interface: the receiver is argument zero and its concrete type chooses
+    /// the target, exactly as the interpreter resolves it.
+    ///
+    /// <para>The emitter has already checked that every implementation of this slot compiles, so
+    /// the target found here has code. That check is what keeps a Lyric exception able to find
+    /// its handler — see the comment on the direct call.</para>
+    /// </summary>
+    public LyrValue CallVirtual(int interfaceType, int slot, LyrValue[] args) =>
+        Call(Dispatch.Resolve(args[0].ConcreteType, interfaceType, slot), args);
+
     /// <summary>A buffer for a call's arguments, from the same pool the interpreter uses.
     /// </summary>
     public LyrValue[] RentArgs(int arity) => Arguments.Rent(arity);

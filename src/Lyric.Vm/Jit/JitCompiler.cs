@@ -33,7 +33,7 @@ internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 /// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields,
 /// optionals, interface values, object construction, string constants and comparison, and calls —
 /// to a native, or to another function that compiles. Still declined: closures, exceptions,
-/// virtual calls, enums, recursion, and the narrow integer widths (which need re-normalising after every operation).</para>
+/// enums, recursion, and the narrow integer widths (which need re-normalising after every operation).</para>
 /// </summary>
 internal static class JitCompiler
 {
@@ -418,6 +418,9 @@ internal static class JitCompiler
                 case Op.Call:
                     return EmitCall((int)op.Immediate);
 
+                case Op.CallVirt:
+                    return EmitCallVirt((int)op.Immediate, (int)op.Immediate2);
+
                 case Op.Convert:
                 {
                     if (op.Type is not { } from || op.ToType is not { } to) return false;
@@ -680,6 +683,97 @@ internal static class JitCompiler
             il.Emit(OpCodes.Ldc_I4, index);
             il.Emit(OpCodes.Ldloc, buffer);
             il.Emit(OpCodes.Call, ContextCall(nameof(JitContext.Call)));
+
+            if (returns.Tag == TypeTag.Void)
+            {
+                il.Emit(OpCodes.Pop);
+            }
+            else
+            {
+                if (!EmitUnpack(il, returns)) return false;
+                _stack.Push(returns);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// A call through an interface — the language's only dynamic dispatch, and the way an
+        /// object layer reaches its methods.
+        ///
+        /// <para><b>Every implementation has to compile, not just the one this call happens to
+        /// reach.</b> A direct call can check its single callee; a virtual one does not know its
+        /// callee until it runs, so the check is over the whole column of the dispatch table. The
+        /// reason is the same and is not about speed: a Lyric exception unwinds along the
+        /// interpreter's frame stack, and a compiled frame between a throw and its handler breaks
+        /// the chain. One interpreted implementation would be enough to do it.</para>
+        ///
+        /// <para>Every implementation of a slot shares its signature, so the arity and the return
+        /// type are read off whichever comes first.</para>
+        /// </summary>
+        private bool EmitCallVirt(int interfaceType, int slot)
+        {
+            int arity;
+            try
+            {
+                arity = context.Dispatch.ArityOf(interfaceType, slot);
+            }
+            catch (LyricRuntimeException)
+            {
+                return false;
+            }
+
+            if (arity <= 0 || arity > MaxCallArgs || _stack.Count < arity) return false;
+
+            BytecodeType? returns = null;
+            var any = false;
+
+            foreach (var target in context.Dispatch.Targets(interfaceType, slot))
+            {
+                any = true;
+
+                if (target < context.Natives.Length)
+                {
+                    if (target >= context.Imports.Count) return false;
+                    returns ??= context.Imports[target].ReturnType;
+                    continue;
+                }
+
+                var at = target - context.Natives.Length;
+                if (at < 0 || at >= context.Prepared.Length) return false;
+                if (context.CodeFor(context.Prepared[at]) is null) return false;
+
+                returns ??= context.Prepared[at].Source.ReturnType;
+            }
+
+            if (!any || returns is null) return false;
+            if (returns.Tag != TypeTag.Void && Machine(returns) is null) return false;
+
+            for (var i = arity - 1; i >= 0; i--)
+            {
+                if (!EmitPack(il, _stack.Pop())) return false;
+                il.Emit(OpCodes.Stloc, ValueSlot(i));
+            }
+
+            var buffer = il.DeclareLocal(typeof(LyrValue[]));
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4, arity);
+            il.Emit(OpCodes.Call, ContextCall(nameof(JitContext.RentArgs)));
+            il.Emit(OpCodes.Stloc, buffer);
+
+            for (var i = 0; i < arity; i++)
+            {
+                il.Emit(OpCodes.Ldloc, buffer);
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Ldloc, _scratch[i]);
+                il.Emit(OpCodes.Stelem, typeof(LyrValue));
+            }
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4, interfaceType);
+            il.Emit(OpCodes.Ldc_I4, slot);
+            il.Emit(OpCodes.Ldloc, buffer);
+            il.Emit(OpCodes.Call, ContextCall(nameof(JitContext.CallVirtual)));
 
             if (returns.Tag == TypeTag.Void)
             {
