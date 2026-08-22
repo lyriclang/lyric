@@ -95,6 +95,38 @@ both families side by side:
 the answer is `clampInt` rather than a conversion there and back. The same rule shapes
 `fromInt`/`fromFloat` and `parseInt`/`parseFloat` in `std.string`.
 
+## Files answer two ways, and each says which
+
+Since 2.14 `std.io.file` has exactly two shapes, and the choice between them is not a taste:
+
+```lyr
+import std.io.file as file;
+
+fn main(): int {
+    let path = "notes.txt";
+
+    let content = file.text(path) ?? "";        // a READ answers ?T
+    let saved = file.writeText(path, content);  // an OPERATION answers bool
+
+    return if (saved) 0 else 1;
+}
+```
+
+A **read** answers `?T`: `null` means the file could not be read, and an empty result means an
+empty file. A **write, a remove, a copy** answers `bool` — whether it happened; it carries no
+value, so nothing is lost by saying only that. A **predicate** (`exists`, `isFile`,
+`isDirectory`) answers `bool` too, and there `false` is an answer rather than a failure.
+
+Before 2.14 there were three shapes, and the third one lied: `readBytes` and `readLines` answered
+an **empty array** both for an empty file and for a file that is not there. No caller could tell
+those apart, and the advice was to ask `exists` first — which is a race, not an answer. The three
+old names still work and warn (`readText`, `readBytes`, `readLines`); they go with 3.0, and the
+compiler will say so on the day.
+
+What none of the shapes carries is a REASON: a missing file and a permission denied look the
+same. That gap is known and left open on purpose — carrying reasons means an error type and a
+decision about `throws` that this module should not make on its own.
+
 ## Capabilities
 
 `std.io.file`, `std.io.net` and `std.os` require a capability. A standalone run grants

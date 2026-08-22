@@ -149,8 +149,14 @@ the major. **v2.13.0 is the first link**, and it is the mechanism the rest write
 decision names — they arrive WITH v3.0.0, so they carry a promise through v3.5 instead of being
 removed in the release that first offers their replacement.
 
-Still ahead of the major, in this order: the file-error API (three conventions today, none of
-which carries a reason), iterator chaining, member-`@Deprecated` on interface members, the
+**v2.14.0 is the second**: `std.io.file` reads answer `?T`, so an empty file and a missing one
+stop being the same answer — the third convention was the one that lied, and the two that remain
+each say what they are for. The old names carry `until = "3.0"`, which is 2.13 doing its job on
+the first thing that needed it. What is still missing is a REASON: a missing file and a
+permission denied look alike, and closing that means an error type and a `throws` decision — the
+larger question, still open.
+
+Still ahead of the major, in this order: iterator chaining, member-`@Deprecated` on interface members, the
 ignored non-interface entries in a `::` list, multiple interface parents. Then the design round —
 overloading included, and it has to answer what overloading means for a language whose whole
 dispatch story is generics plus constraints.
@@ -370,8 +376,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4575 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **2.13.0**; the specification in `lyriclang/lyric-spec` is
+4593 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **2.14.0**; the specification in `lyriclang/lyric-spec` is
 **NORMATIVE**, its suite stands at 90 cases, and the toolchain's own CI runs it against the
 working tree.
 

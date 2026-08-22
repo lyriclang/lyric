@@ -1674,13 +1674,35 @@
       "Items": [
         {
           "Kind": "Function",
-          "Name": "readText",
-          "Signature": "pub fn readText(path: string): ?string",
-          "Doc": "The whole content as text, decoded as UTF-8 — bytes that are not valid UTF-8 become\nU+FFFD. For binary data use `readBytes`. `null` when the file does not exist or is not\nreadable.",
+          "Name": "text",
+          "Signature": "pub fn text(path: string): ?string",
+          "Doc": "The whole content as text, decoded as UTF-8 — bytes that are not valid UTF-8 become\nU+FFFD. For binary data use `bytes`. `null` when the file does not exist or is not readable.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 21
+            "Line": 40
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "bytes",
+          "Signature": "pub fn bytes(path: string): ?uint8[]",
+          "Doc": "The raw bytes, undecoded — what `text` cannot give: its UTF-8 decoding turns invalid bytes\ninto U+FFFD. `null` when the file is not readable; an EMPTY array is an empty file.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 44
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "lines",
+          "Signature": "pub fn lines(path: string): ?string[]",
+          "Doc": "The lines of a file, terminators removed, so whether the file used CRLF or LF is no longer\nvisible. `null` when the file is not readable; an EMPTY array is an empty file.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 48
           }
         },
         {
@@ -1691,7 +1713,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 24
+            "Line": 51
           }
         },
         {
@@ -1702,7 +1724,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 27
+            "Line": 54
           }
         },
         {
@@ -1713,7 +1735,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 30
+            "Line": 57
           }
         },
         {
@@ -1724,18 +1746,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 33
+            "Line": 60
           }
         },
         {
           "Kind": "Function",
           "Name": "readBytes",
           "Signature": "pub fn readBytes(path: string): uint8[]",
-          "Doc": "The raw bytes, undecoded — what `readText` cannot give: its UTF-8 decoding turns invalid\nbytes into U+FFFD. An unreadable file reads as empty, the `readLines` convention; a caller\nthat needs the difference asks `exists` first.",
+          "Doc": "Deprecated: use `bytes`, which distinguishes an empty file from an unreadable one.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 38
+            "Line": 63
           }
         },
         {
@@ -1746,7 +1768,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 42
+            "Line": 70
           }
         },
         {
@@ -1757,18 +1779,29 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 45
+            "Line": 73
           }
         },
         {
           "Kind": "Function",
           "Name": "readLines",
           "Signature": "pub fn readLines(path: string): string[]",
-          "Doc": "The lines of a file, or an empty array when it is not readable. Terminators are removed,\nso whether the file used CRLF or LF is no longer visible.",
+          "Doc": "Deprecated: use `lines`, which distinguishes an empty file from an unreadable one.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 49
+            "Line": 76
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readText",
+          "Signature": "pub fn readText(path: string): ?string",
+          "Doc": "Deprecated: use `text`. Same answer, one name for the same idea across the module.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 82
           }
         },
         {
@@ -1779,7 +1812,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 59
+            "Line": 92
           }
         },
         {
@@ -1790,7 +1823,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 61
+            "Line": 94
           }
         },
         {
@@ -1801,7 +1834,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 63
+            "Line": 96
           }
         },
         {
@@ -1812,7 +1845,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 66
+            "Line": 99
           }
         },
         {
@@ -1823,7 +1856,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 69
+            "Line": 102
           }
         },
         {
@@ -1834,7 +1867,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 72
+            "Line": 105
           }
         },
         {
@@ -1845,7 +1878,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 75
+            "Line": 108
           }
         },
         {
@@ -1856,7 +1889,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 79
+            "Line": 112
           }
         },
         {
@@ -1867,7 +1900,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 85
+            "Line": 118
           }
         },
         {
@@ -1878,7 +1911,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 88
+            "Line": 121
           }
         },
         {
@@ -1889,7 +1922,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 102
+            "Line": 135
           }
         },
         {
@@ -1900,7 +1933,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 135
+            "Line": 168
           }
         },
         {
@@ -1911,7 +1944,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 141
+            "Line": 174
           }
         },
         {
@@ -1922,7 +1955,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 157
+            "Line": 190
           }
         },
         {
@@ -1933,7 +1966,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 173
+            "Line": 206
           }
         },
         {
@@ -1944,7 +1977,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 183
+            "Line": 216
           }
         },
         {
@@ -1955,7 +1988,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 191
+            "Line": 224
           }
         }
       ]
@@ -3941,7 +3974,7 @@
           "Kind": "Function",
           "Name": "utf8Decode",
           "Signature": "pub fn utf8Decode(bytes: uint8[]): ?string",
-          "Doc": "The bytes as a string, STRICTLY: invalid UTF-8 answers `null` rather than a U+FFFD quietly\nstanding in for the data — the difference to `readText`, whose replacement decoding is\ndocumented there.",
+          "Doc": "The bytes as a string, STRICTLY: invalid UTF-8 answers `null` rather than a U+FFFD quietly\nstanding in for the data — the difference to `std.io.file.text`, whose replacement decoding is\ndocumented there.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
