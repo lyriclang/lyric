@@ -11,8 +11,8 @@
 
 ## Current milestone
 
-**M32 — "die Zaehlung" — is RUNNING** (started 2026-08-22, branch
-`feature/m32-instruction-count`, ships as v2.12.0, format 3.5 -> 3.6).
+**M32 — "die Zaehlung" — SHIPPED as v2.12.0** (2026-08-22, format 3.5 → 3.6). The delivery list
+below is the record; the verdict it was built to produce is under §The gate.
 
 **The baseline it starts from**, from `tools/Bench` (Release, two iteration counts differenced
 so nothing that happens once is in the figure, instructions per iteration read from an
