@@ -11,8 +11,8 @@
 
 ## Current milestone
 
-**M32 — "die Zaehlung" — is RUNNING** (started 2026-08-22, branch
-`feature/m32-instruction-count`, ships as v2.12.0, format 3.5 -> 3.6).
+**M32 — "die Zaehlung" — SHIPPED as v2.12.0** (2026-08-22, format 3.5 → 3.6). The delivery list
+below is the record; the verdict it was built to produce is under §The gate.
 
 **The baseline it starts from**, from `tools/Bench` (Release, two iteration counts differenced
 so nothing that happens once is in the figure, instructions per iteration read from an
@@ -156,10 +156,21 @@ the first thing that needed it. What is still missing is a REASON: a missing fil
 permission denied look alike, and closing that means an error type and a `throws` decision — the
 larger question, still open.
 
-Still ahead of the major, in this order: iterator chaining, member-`@Deprecated` on interface members, the
-ignored non-interface entries in a `::` list, multiple interface parents. Then the design round —
-overloading included, and it has to answer what overloading means for a language whose whole
-dispatch story is generics plus constraints.
+**v2.15.0 is the third**: a `::` list takes interfaces only — it used to SKIP a wrong entry, so a
+declaration could claim a conformance nothing checked — and an interface member may carry
+`@Deprecated`, with the conformance question answered at last: an implementation does NOT inherit
+the clock, because it is not a use and a conforming type has no choice about it.
+
+**v2.16.0 is the fourth**: several interface parents. The rule against them rested on a claim
+about the runtime, and the claim was false — the dispatch table is keyed by (concrete type,
+interface), so every ancestor keeps its own numbering and nothing is remapped. What a second
+parent costs turned out to be one rule about NAMES, the second half of one that already existed.
+The suite lost the case that pinned the old rule and gained three, one of them the exact shape
+the old reasoning said would break.
+
+Still ahead of the major: iterator chaining (M33). Then the design round — overloading included,
+and it has to answer what overloading means for a language whose whole dispatch story is generics
+plus constraints.
 
 ## The gate: a register bytecode is NOT worth a major
 
@@ -376,9 +387,9 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4589 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **2.14.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 90 cases, and the toolchain's own CI runs it against the
+4598 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **2.16.0**; the specification in `lyriclang/lyric-spec` is
+**NORMATIVE**, its suite stands at 94 cases, and the toolchain's own CI runs it against the
 working tree.
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
@@ -883,12 +894,15 @@ answer yet, and it belongs asked before E4 starts.
   criterion alone.** M5 and M6 each silently failed to deliver part of their items; the gap disguised
   itself as a clean diagnostic. For the same reason **six** gates were re-cut in M7, because they
   required language features of later slices.
-- **Interface inheritance is single-parent and implication-only** (M22) — **and the reason for
-  the single parent did not survive a probe (2026-08-22)**: the dispatch table is keyed by
-  (concrete type, interface), so several parents need no thunks. What they need is frontend work;
-  see §What we are working on. The entry as written: a parent's default method
-  runs behind a child-typed receiver, and only the chain-prefix slot layout keeps the parent's slot
-  indexes valid there — several parents would need thunks. Redeclaring a chain member is refused
+- **Interface inheritance is implication-only, and SEVERAL parents are allowed since 2.16.** The
+  single-parent rule this entry carried from M22 is gone: it rested on the claim that a parent's
+  default method needs its own slot indexes to remain valid behind a child-typed receiver, and the
+  claim was false — the dispatch table is keyed by (concrete type, interface) and the lowering
+  emits a row per interface in the closure, so nothing is ever remapped. **The lesson is not about
+  interfaces**: the entry stood for months, it read as a conclusion, and one probe disproved it. A
+  design note that explains a restriction is worth re-testing on the day the restriction starts to
+  cost something. Two parents contributing one NAME are refused (`LYR-SEM0079`), a diamond is not.
+  Redeclaring a chain member is refused
   instead of getting override semantics: without vtable overriding, the same call would dispatch
   differently through the child and through the parent. A child interface VALUE does not convert to
   the parent's type; implication holds for implementing types. `std.core` adopted
