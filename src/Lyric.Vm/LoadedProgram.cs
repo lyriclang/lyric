@@ -56,8 +56,21 @@ public sealed class LoadedProgram
     /// <exception cref="LyricRuntimeException">A missing capability, or an import that cannot be
     /// bound.</exception>
     /// <exception cref="LyricPanic">The initializer panicked, or spent the budget.</exception>
+    /// <param name="jit">
+    /// Whether functions may be compiled to .NET IL instead of interpreted.
+    ///
+    /// <para><b>Off by default, and that is the useful default.</b> Compiled code has no
+    /// instruction boundaries: a debugger cannot stop inside it and a budget cannot count it.
+    /// So the shape a host wants is develop on the interpreter -- where breakpoints, stepping and
+    /// hot reload all work -- and ship with this on.</para>
+    ///
+    /// <para>It does not have to be weighed call by call. A run under a
+    /// <see cref="DebugController"/> or an <see cref="ExecutionBudget"/> stays interpreted even
+    /// when this is set, so a host may turn it on for a whole program and still meter the foreign
+    /// code inside it.</para>
+    /// </param>
     public static LoadedProgram Load(BytecodeModule module, NativeRegistry? natives = null,
-        Capability granted = Capability.All, ExecutionBudget? budget = null)
+        Capability granted = Capability.All, ExecutionBudget? budget = null, bool jit = false)
     {
         // First of all: a module requiring more than this VM grants never starts. The requirement
         // is recorded in the module, so a host loading foreign bytes checks the same thing.
@@ -82,7 +95,10 @@ public sealed class LoadedProgram
         for (var i = 0; i < globals.Length; i++)
             if (module.Globals[i].Tag == TypeTag.String) globals[i] = LyrValue.FromString(string.Empty);
 
-        var program = new LoadedProgram(module, prepared, dispatch, bound, globals);
+        var program = new LoadedProgram(module, prepared, dispatch, bound, globals)
+        {
+            Jit = jit || Forced,
+        };
 
         // The initializer runs before everything else and exactly once. It is void; what counts
         // are the slots it leaves behind.
@@ -91,6 +107,25 @@ public sealed class LoadedProgram
 
         return program;
     }
+
+    /// <summary>Whether this program may run compiled code. See the <c>jit</c> parameter of
+    /// <see cref="Load"/>.</summary>
+    public bool Jit { get; private init; }
+
+    /// <summary>
+    /// <c>LYRIC_JIT=1</c> turns compilation on for every program in the process.
+    ///
+    /// <para>It exists for ONE purpose, and it is the purpose that makes a compiler trustworthy:
+    /// running the whole test suite twice, once interpreted and once compiled, and demanding the
+    /// same answers. Without a switch of this shape that comparison would have to be written into
+    /// every test by hand, which means it would cover whichever tests somebody remembered.</para>
+    ///
+    /// <para>It cannot make a debugged or metered run compile — those decide per call, further in
+    /// — so it is safe to leave set while working.</para>
+    /// </summary>
+    private static readonly bool Forced =
+        string.Equals(
+            Environment.GetEnvironmentVariable("LYRIC_JIT"), "1", StringComparison.Ordinal);
 
     /// <summary>Does this module have an entry point?</summary>
     public bool HasEntryPoint => _module.Start is not null;
@@ -199,5 +234,5 @@ public sealed class LoadedProgram
     private LyrValue Execute(int index, LyrValue[]? arguments = null,
         DebugController? debug = null, ExecutionBudget? budget = null) =>
         Interpreter.Execute(_prepared, index, _module.Strings, _module.Types, _dispatch,
-            _natives, _globals, _arguments, arguments, _module.SourceMap, debug, budget);
+            _natives, _globals, _arguments, arguments, _module.SourceMap, debug, budget, Jit);
 }

@@ -15,6 +15,20 @@ namespace Lyric.Vm;
 /// </summary>
 internal interface IExecutionPolicy
 {
+    /// <summary>
+    /// Whether a call may go to COMPILED code instead of to a frame.
+    ///
+    /// <para>False for both policies that watch a running program, and for the same reason in two
+    /// shapes: compiled code has no instruction boundaries. A debugger cannot stop inside it, and
+    /// a budget cannot count it. So a debugged run and a metered run -- which is every mod -- stay
+    /// on the interpreter, and that is not a limitation to be worked around later but the
+    /// contract: a budget is a safety promise, and a promise that only sometimes holds is not one.
+    /// </para>
+    ///
+    /// <para>Static, so specializing the loop for a policy STRUCT folds the check away.</para>
+    /// </summary>
+    static abstract bool AllowsCompiledCode { get; }
+
     /// <summary>Called before each instruction. <c>frame.Ip</c> still points AT the instruction
     /// about to execute; <c>frames.Count</c> is the call depth below it.</summary>
     void BeforeInstruction(Stack<Interpreter.Frame> frames, Interpreter.Frame frame);
@@ -24,6 +38,8 @@ internal interface IExecutionPolicy
 /// time.</summary>
 internal readonly struct ReleasePolicy : IExecutionPolicy
 {
+    public static bool AllowsCompiledCode => true;
+
     public void BeforeInstruction(Stack<Interpreter.Frame> frames, Interpreter.Frame frame) { }
 }
 
@@ -31,6 +47,10 @@ internal readonly struct ReleasePolicy : IExecutionPolicy
 /// checks breakpoints, stepping and pause requests there.</summary>
 internal readonly struct DebugPolicy(DebugController controller) : IExecutionPolicy
 {
+    /// <summary>No: a breakpoint needs instruction boundaries, and compiled code has none.
+    /// </summary>
+    public static bool AllowsCompiledCode => false;
+
     public void BeforeInstruction(Stack<Interpreter.Frame> frames, Interpreter.Frame frame) =>
         controller.OnInstruction(frames, frame);
 }
@@ -40,6 +60,9 @@ internal readonly struct DebugPolicy(DebugController controller) : IExecutionPol
 /// unmetered run keeps the loop it had before budgets existed.</summary>
 internal readonly struct BudgetPolicy(ExecutionBudget budget) : IExecutionPolicy
 {
+    /// <summary>No: the budget counts instructions, and compiled code executes none.</summary>
+    public static bool AllowsCompiledCode => false;
+
     public void BeforeInstruction(Stack<Interpreter.Frame> frames, Interpreter.Frame frame) =>
         budget.Charge();
 }
@@ -92,8 +115,14 @@ public static class Interpreter
         DispatchTable dispatch, NativeRegistry.BoundNative[] natives, LyrValue[] globals,
         ArgumentPool arguments, LyrValue[]? entryArguments = null,
         BytecodeSourceMap? sourceMap = null, DebugController? debug = null,
-        ExecutionBudget? budget = null)
+        ExecutionBudget? budget = null, bool jit = false)
     {
+        // Compiled code IS the whole call and needs no frame. Only an unwatched run reaches it:
+        // a debugger or a budget means the interpreter, per IExecutionPolicy.
+        if (jit && debug is null && budget is null
+            && CompiledCode(prepared[startIndex]) is { } entryCode)
+            return entryCode(globals, entryArguments ?? []);
+
         var frames = new Stack<Frame>();
         var frame = prepared[startIndex].Rent();
 
@@ -110,13 +139,13 @@ public static class Interpreter
             // toolchain combines them — the debugger runs a program, a budget runs foreign code.
             if (debug is not null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
-                    ref frame, new DebugPolicy(debug));
+                    ref frame, new DebugPolicy(debug), jit);
 
             return budget is null
                 ? Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
-                    ref frame, default(ReleasePolicy))
+                    ref frame, default(ReleasePolicy), jit)
                 : Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
-                    ref frame, new BudgetPolicy(budget));
+                    ref frame, new BudgetPolicy(budget), jit);
         }
         catch (LyricPanic panic) when (panic.CallStack.Count == 0)
         {
@@ -154,7 +183,7 @@ public static class Interpreter
     private static LyrValue Loop<TPolicy>(Prepared[] prepared, IReadOnlyList<string> strings,
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
         NativeRegistry.BoundNative[] natives, LyrValue[] globals, ArgumentPool arguments,
-        Stack<Frame> frames, ref Frame frame, TPolicy policy)
+        Stack<Frame> frames, ref Frame frame, TPolicy policy, bool jit)
         where TPolicy : struct, IExecutionPolicy
     {
         while (true)
@@ -251,6 +280,22 @@ public static class Interpreter
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 
                     var callee = prepared[index - natives.Length];
+
+                    // A compiled callee is called the way a native is: arguments off the stack,
+                    // result back onto it, no frame in between.
+                    if (jit && TPolicy.AllowsCompiledCode && CompiledCode(callee) is { } code)
+                    {
+                        var count = callee.Source.ParamCount;
+                        var slots = arguments.Rent(count);
+                        for (var i = count - 1; i >= 0; i--) slots[i] = frame.Pop();
+
+                        var answer = code(globals, slots);
+                        arguments.Recycle(slots);
+
+                        if (callee.Source.ReturnType.Tag != TypeTag.Void) frame.Push(answer);
+                        break;
+                    }
+
                     var next = callee.Rent();
                     // Arguments lie on the stack in call order, the first lowest.
                     for (var i = callee.Source.ParamCount - 1; i >= 0; i--) next.Slots[i] = frame.Pop();
@@ -554,6 +599,19 @@ public static class Interpreter
     }
 
     // ------------------------------------------------------------------ Operationen
+
+    /// <summary>This function's compiled form, compiling it the first time it is asked for.
+    /// </summary>
+    private static Jit.Compiled? CompiledCode(Prepared function)
+    {
+        if (function.JitTried) return function.Compiled;
+
+        function.JitTried = true;
+        function.Compiled = Jit.JitCompiler.TryCompile(
+            function.Source, function.Instructions, function.BlockStart);
+
+        return function.Compiled;
+    }
 
     /// <summary>
     /// A fresh instance: one slot per field, each at the zero value of its type.
@@ -914,6 +972,18 @@ public static class Interpreter
 
         /// <summary>The protected regions of this function, innermost first.</summary>
         public BytecodeHandler[] Handlers { get; init; } = [];
+
+        /// <summary>
+        /// This function as .NET IL, or <c>null</c> when the compiler declined it or has not been
+        /// asked yet -- <see cref="JitTried"/> tells the two apart.
+        /// </summary>
+        public Jit.Compiled? Compiled;
+
+        /// <summary>Whether the compiler has already looked at this function. A refusal is cached
+        /// as firmly as a success: most functions in a game touch the engine and will never
+        /// compile, and re-analysing them per call would cost more than the interpreter saves.
+        /// </summary>
+        public bool JitTried;
 
         /// <summary>Which block the instruction at index <c>i</c> belongs to.
         ///
