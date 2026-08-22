@@ -181,8 +181,29 @@ makes monomorphization diverge; that is now a diagnostic instead of a hang, and 
 `enumerate` and `chunks` stay free functions. (3) The vtable rows needed a fixed point: a row can
 request a method whose body interns types that need rows of their own.
 
-Ahead of the major: the design round — overloading included, and it has to answer what overloading
-means for a language whose whole dispatch story is generics plus constraints.
+**The design round is done and decided** (see §Design decisions): multi-conformance for the
+operator case in 3.0.0, free overloading as its own feature in 3.1.0, the JIT opt-in.
+
+**The JIT is in the 3.0.0 scope, and its first step is not the JIT.** The branch stands on
+`e8465d7` — the commit before v2.12.0 — and 25 commits separate it from main, four releases among
+them. In those releases the interpreter learned four fused opcodes, and the emitter has never
+heard of them:
+
+| | |
+|---|---:|
+| `brcmp`, `brcmpk`, `binll`, `binlk` in `JitCompiler` | **0** |
+
+After a rebase it would refuse exactly the hot functions — correctly, since refusing is its safety
+mechanism, and uselessly, since almost every loop now carries one. The fused forms are EASIER for
+an IL emitter than the pairs they replace (`binlk add f64 l1 = l1, 1.5` is four IL instructions
+with no evaluation stack; `brcmpk lt i64 l0, k -> t, f` is a `blt`), so this is four cases, not new
+machinery — but it comes first, or the next measurement measures a compiler that compiles nothing.
+
+**Verified before any of that**: the branch as it stands passes its whole suite with `LYRIC_JIT=1`
+— 4546 tests, no failures. The compiler agrees with the interpreter everywhere the tests reach,
+which is the number that makes a second execution engine trustworthy.
+
+Then: #73, the removals, the attribute roots.
 
 ## The gate: a register bytecode is NOT worth a major
 
@@ -978,7 +999,44 @@ answer yet, and it belongs asked before E4 starts.
   budget is wrong that is a measurement and a constant, not a keyword, and it would make the
   second compiler-read attribute out of a mechanism that is supposed to describe and do nothing.
 
-- **Heterogeneous operator arithmetic: documented No** (M22 probe). Two facts cap it below
+- **THE DESIGN ROUND, DECIDED** (maintainer, 2026-08-22). Three answers, and the third one is a
+  deliberate exception rather than a drift, which is why it is written here rather than noticed
+  later.
+
+  1. **Heterogeneous arithmetic comes as MULTI-CONFORMANCE, not as overloading** — door B of the
+     round. A type may conform to `Mul<Vec2>` and `Mul<float>`, and the operator picks the
+     conformance by the right-hand type; the implementation for each comes from its own `extend`
+     block, so no type declares two `mul`. The machinery is half there already: the conformance
+     dedup has keyed on the INSTANCE since M22. It extends the mechanism that exists instead of
+     adding one beside it. **v3.0.0.**
+
+  2. **The JIT stays OPT-IN in 3.0.0.** It changes no language and no format, so it needs no
+     major on compatibility grounds; it ships with the major because that is where the maintainer
+     wants it. Reversing the default would be the change that needs a major, and that is not this
+     release. What must be answered first stands under §What we are working on.
+
+  3. **FREE OVERLOADING lands in v3.1.0 — as a language feature, knowing it softens Rule 2**
+     (maintainer, asked and reaffirmed after the objection). The objection, so that nobody has to
+     reconstruct it: Lyric then has TWO answers to "one name, several types" — generics plus
+     constraints, and overloading — and every later question (which wins, what a constraint sees,
+     what inference does) has to be answered twice. That is the shape Oil died of.
+
+     It is a decision, not an oversight, and the reason it is defensible: overloading is a
+     CAPABILITY, not a convenience, and the maintainer wants the language to have it. What follows
+     from that is a duty rather than a doubt — the second mechanism has to be given its rules
+     explicitly, in the spec, at the same time as the feature. A mechanism admitted deliberately
+     and specified is a different thing from one that arrives by accident.
+
+     **Measured, so the estimate is not a guess**: the lowering already reads a call's target from
+     the TYPE side table 30 times against 7 from the binding, and `TypeResult.BindRef` exists —
+     the checker is already the authority for what a call refers to. The resolver would bind a
+     CANDIDATE SET, the checker select and record the winner, and seven lowering sites move over.
+     "Architectural inversion" is what the old entry implied; three quarters of it has already
+     happened.
+
+- **Heterogeneous operator arithmetic: documented No** (M22 probe) — *superseded by the entry
+  above; door B answers it. The original reasoning is kept because its second half still holds:
+  a two-parameter `Mul<Rhs, Out>` would break every existing conformance.* Two facts cap it below
   usefulness: a type conforms to `Mul` ONCE (`Mul<Vec2>` beside `Mul<float>` fails the signature
   check — one `mul`, two wanted signatures), and Lyric has no overloading, so `mul(other: float)`
   beside `mul(other: Vec2)` cannot exist either. A two-parameter `Mul<Rhs, Out>` would break every
