@@ -234,5 +234,6 @@ public sealed class LoadedProgram
     private LyrValue Execute(int index, LyrValue[]? arguments = null,
         DebugController? debug = null, ExecutionBudget? budget = null) =>
         Interpreter.Execute(_prepared, index, _module.Strings, _module.Types, _dispatch,
-            _natives, _globals, _arguments, arguments, _module.SourceMap, debug, budget, Jit);
+            _natives, _globals, _module.Globals, _arguments, arguments, _module.SourceMap,
+            debug, budget, Jit);
 }

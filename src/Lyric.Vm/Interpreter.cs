@@ -113,6 +113,7 @@ public static class Interpreter
     internal static LyrValue Execute(Prepared[] prepared, int startIndex,
         IReadOnlyList<string> strings, IReadOnlyList<BytecodeTypeDef> types,
         DispatchTable dispatch, NativeRegistry.BoundNative[] natives, LyrValue[] globals,
+        IReadOnlyList<BytecodeType> globalTypes,
         ArgumentPool arguments, LyrValue[]? entryArguments = null,
         BytecodeSourceMap? sourceMap = null, DebugController? debug = null,
         ExecutionBudget? budget = null, bool jit = false)
@@ -120,8 +121,24 @@ public static class Interpreter
         // Compiled code IS the whole call and needs no frame. Only an unwatched run reaches it:
         // a debugger or a budget means the interpreter, per IExecutionPolicy.
         if (jit && debug is null && budget is null
-            && CompiledCode(prepared[startIndex]) is { } entryCode)
-            return entryCode(globals, entryArguments ?? []);
+            && CompiledCode(prepared[startIndex], types, globalTypes) is { } entryCode)
+        {
+            try
+            {
+                return entryCode(globals, entryArguments ?? []);
+            }
+            catch (LyricPanic panic) when (panic.CallStack.Count == 0)
+            {
+                // A BACKTRACE OF ONE LINE, and that is the honest cost of compiling. The
+                // interpreter builds one from its frames; compiled code keeps none, and the
+                // position within the function is gone with them. The name survives because the
+                // emitter bakes it into the calls that can fail.
+                //
+                // Which is the other half of the arrangement this exists for: develop on the
+                // interpreter, where a panic points at a line, and ship compiled.
+                throw panic.WithCallStack([prepared[startIndex].Source.Name]);
+            }
+        }
 
         var frames = new Stack<Frame>();
         var frame = prepared[startIndex].Rent();
@@ -138,13 +155,13 @@ public static class Interpreter
             // breakpoint would otherwise spend a budget on standing still, and nothing in the
             // toolchain combines them — the debugger runs a program, a budget runs foreign code.
             if (debug is not null)
-                return Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
+                return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
                     ref frame, new DebugPolicy(debug), jit);
 
             return budget is null
-                ? Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
+                ? Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
                     ref frame, default(ReleasePolicy), jit)
-                : Loop(prepared, strings, types, dispatch, natives, globals, arguments, frames,
+                : Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
                     ref frame, new BudgetPolicy(budget), jit);
         }
         catch (LyricPanic panic) when (panic.CallStack.Count == 0)
@@ -182,7 +199,8 @@ public static class Interpreter
 
     private static LyrValue Loop<TPolicy>(Prepared[] prepared, IReadOnlyList<string> strings,
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
-        NativeRegistry.BoundNative[] natives, LyrValue[] globals, ArgumentPool arguments,
+        NativeRegistry.BoundNative[] natives, LyrValue[] globals,
+        IReadOnlyList<BytecodeType> globalTypes, ArgumentPool arguments,
         Stack<Frame> frames, ref Frame frame, TPolicy policy, bool jit)
         where TPolicy : struct, IExecutionPolicy
     {
@@ -283,7 +301,7 @@ public static class Interpreter
 
                     // A compiled callee is called the way a native is: arguments off the stack,
                     // result back onto it, no frame in between.
-                    if (jit && TPolicy.AllowsCompiledCode && CompiledCode(callee) is { } code)
+                    if (jit && TPolicy.AllowsCompiledCode && CompiledCode(callee, types, globalTypes) is { } code)
                     {
                         var count = callee.Source.ParamCount;
                         var slots = arguments.Rent(count);
@@ -602,13 +620,14 @@ public static class Interpreter
 
     /// <summary>This function's compiled form, compiling it the first time it is asked for.
     /// </summary>
-    private static Jit.Compiled? CompiledCode(Prepared function)
+    private static Jit.Compiled? CompiledCode(Prepared function,
+        IReadOnlyList<BytecodeTypeDef> types, IReadOnlyList<BytecodeType> globalTypes)
     {
         if (function.JitTried) return function.Compiled;
 
         function.JitTried = true;
         function.Compiled = Jit.JitCompiler.TryCompile(
-            function.Source, function.Instructions, function.BlockStart);
+            function.Source, function.Instructions, function.BlockStart, types, globalTypes);
 
         return function.Compiled;
     }
