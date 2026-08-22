@@ -10,6 +10,48 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v2.14.0 — 2026-08-22
+
+The second link of the patch train. `std.io.file` had three conventions for "it did not work",
+and one of them could not be told from success.
+
+### Added
+
+- **A read answers `?T`.** `text`, `bytes` and `lines` replace `readText`, `readBytes` and
+  `readLines`:
+
+  | | before | now |
+  |---|---|---|
+  | the file is empty | `[]` | `[]` |
+  | the file is not there | `[]` | **`null`** |
+
+  `readBytes` and `readLines` answered an empty array to both, so no caller could tell them
+  apart — and the documentation said to ask `exists` first, which is a race dressed up as advice.
+  `readText` was already `?string`; it is renamed only so the module has one word for one idea.
+
+  The three old names still work, warn, and carry `until = "3.0"` — the compiler will stop the
+  build on the day they are due, which is the mechanism 2.13 shipped for exactly this.
+
+- **A native may return `?T[]`** (`RegisterOptionalArrayReturning`). Nothing about the VALUE
+  needed building — an optional over a reference IS the reference — but the binder now checks
+  three levels of type, because only the element below the optional and the array separates
+  `?string[]` from `?uint8[]`. Without it a host could hand back bytes where the module expects
+  lines, and the mistake would surface somewhere else entirely.
+
+### The rule, written down
+
+Two shapes, and each says what it is for:
+
+- a **read** answers `?T` — `null` is "could not", an empty result is an empty file;
+- an **operation** answers `bool` — whether it happened. It carries no value, so nothing is lost.
+
+A predicate (`exists`, `isFile`, `isDirectory`) answers `bool` as well, and there `false` is an
+answer rather than a failure.
+
+**What none of them carries is a REASON**: a missing file and a permission denied look the same.
+That gap is real and left open deliberately — carrying reasons means an error type and a decision
+about `throws`, which is the larger question this release deliberately did not answer.
+
 ## v2.13.0 — 2026-08-22
 
 The first link of the train that runs ahead of v3.0.0: everything that does not need a major
