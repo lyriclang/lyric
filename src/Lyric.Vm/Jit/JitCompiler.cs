@@ -33,8 +33,7 @@ internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 /// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields,
 /// optionals, interface values, object construction, string constants and comparison, and calls —
 /// to a native, or to another function that compiles. Still declined: closures, exceptions,
-/// virtual calls, enums, division (which panics), recursion, and the narrow integer
-/// widths (which need re-normalising after every operation).</para>
+/// virtual calls, enums, recursion, and the narrow integer widths (which need re-normalising after every operation).</para>
 /// </summary>
 internal static class JitCompiler
 {
@@ -142,7 +141,7 @@ internal static class JitCompiler
         var labels = new Label[blockStart.Length];
         for (var b = 0; b < labels.Length; b++) labels[b] = il.DefineLabel();
 
-        var emitter = new Emitter(il, function, locals, globals, labels, context);
+        var emitter = new Emitter(il, function, prepared.Index, locals, globals, labels, context);
         if (!emitter.EmitBlocks(code, blockStart))
         {
             reason = emitter.Reason;
@@ -167,6 +166,7 @@ internal static class JitCompiler
     private sealed class Emitter(
         ILGenerator il,
         BytecodeFunction function,
+        int functionIndex,
         LocalBuilder[] locals,
         LocalBuilder globals,
         Label[] labels,
@@ -297,13 +297,13 @@ internal static class JitCompiler
                     il.Emit(OpCodes.Pop);
                     return true;
 
-                case Op.Add or Op.Sub or Op.Mul or Op.Shl or Op.Shr or
+                case Op.Add or Op.Sub or Op.Mul or Op.Div or Op.Rem or Op.Shl or Op.Shr or
                      Op.BitAnd or Op.BitOr or Op.BitXor:
                 {
                     if (op.Type is not { } tag || _stack.Count < 2) return false;
                     _stack.Pop();
                     _stack.Pop();
-                    if (!EmitBinary(op.Opcode, tag)) return false;
+                    if (!EmitBinary(op, tag)) return false;
                     _stack.Push(BytecodeType.Scalar(tag));
                     return true;
                 }
@@ -776,9 +776,25 @@ internal static class JitCompiler
             }
         }
 
-        private bool EmitBinary(Op op, TypeTag tag)
+        /// <summary>
+        /// This instruction's place, in the form a backtrace line takes: the function's name and,
+        /// when the module carries a source map, the position.
+        ///
+        /// <para>Worked out at COMPILE time and baked into the call as a literal, because that is
+        /// the only moment when the offset and the map are both at hand — at run time there is no
+        /// frame to read either off.</para>
+        /// </summary>
+        private string Where(BytecodeInstruction op)
+        {
+            var at = context.SourceMap?.Locate(functionIndex, op.Offset);
+            return at is null ? function.Name : $"{function.Name} ({at})";
+        }
+
+        private bool EmitBinary(BytecodeInstruction instruction, TypeTag tag)
         {
             if (tag is not (TypeTag.I64 or TypeTag.U64 or TypeTag.F64 or TypeTag.F32)) return false;
+
+            var op = instruction.Opcode;
 
             switch (op)
             {
@@ -787,7 +803,35 @@ internal static class JitCompiler
                 case Op.Mul: il.Emit(OpCodes.Mul); return true;
             }
 
-            if (tag is TypeTag.F64 or TypeTag.F32) return false;
+            // Floating point divides and takes a remainder the way IL does -- IEEE, no error, a
+            // zero divisor gives an infinity or a NaN. Integers do neither, so they go through a
+            // helper; see JitRuntime.DivI64.
+            if (tag is TypeTag.F64 or TypeTag.F32)
+            {
+                switch (op)
+                {
+                    case Op.Div: il.Emit(OpCodes.Div); return true;
+                    case Op.Rem: il.Emit(OpCodes.Rem); return true;
+                    default: return false;
+                }
+            }
+
+            switch (op)
+            {
+                case Op.Div:
+                    il.Emit(OpCodes.Ldstr, Where(instruction));
+                    il.Emit(OpCodes.Call, Runtime(tag == TypeTag.I64
+                        ? nameof(JitRuntime.DivI64)
+                        : nameof(JitRuntime.DivU64)));
+                    return true;
+
+                case Op.Rem:
+                    il.Emit(OpCodes.Ldstr, Where(instruction));
+                    il.Emit(OpCodes.Call, Runtime(tag == TypeTag.I64
+                        ? nameof(JitRuntime.RemI64)
+                        : nameof(JitRuntime.RemU64)));
+                    return true;
+            }
 
             switch (op)
             {

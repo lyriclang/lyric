@@ -838,6 +838,70 @@ public class JitAgreementTests
     }
 
     [Fact]
+    public void Division_and_remainder_agree()
+    {
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): int {
+                var acc = 0;
+                for (i in 1..n) {
+                    acc = acc + (n / i) + (n % i) + ((0 - n) / i) + ((0 - n) % i);
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(200));
+    }
+
+    [Fact]
+    public void The_edges_of_integer_division_agree()
+    {
+        // Lyric WRAPS on MinValue / -1, where .NET raises an overflow, and answers zero for the
+        // remainder that .NET declines to compute. An emitted IL div would throw on both.
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): int {
+                let least = 0 - 9223372036854775807 - 1;
+                return (least / (0 - 1)) + (least % (0 - 1)) + n;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(0));
+    }
+
+    [Fact]
+    public void Dividing_by_zero_fails_the_same_way_and_names_the_same_place()
+    {
+        // Both halves matter. The message is a script error rather than a .NET exception, and the
+        // backtrace names the line -- which compiled code can only do because the emitter works
+        // the place out while it still has the offset and the source map.
+        var module = Compile(
+            """
+            @Hook
+            pub fn run(n: int): int { return 10 / n; }
+
+            fn main(): int { return 0; }
+            """);
+
+        var interpreted = LoadedProgram.Load(module);
+        var compiled = LoadedProgram.Load(module, jit: true);
+        var index = Find(module, "run");
+
+        var a = Assert.Throws<LyricPanic>(() => interpreted.Invoke(index, LyrValue.FromI64(0)));
+        var c = Assert.Throws<LyricPanic>(() => compiled.Invoke(index, LyrValue.FromI64(0)));
+
+        Assert.Equal(a.Code, c.Code);
+        Assert.Equal(a.Message, c.Message);
+        Assert.Equal(a.CallStack, c.CallStack);
+    }
+
+    [Fact]
     public void A_refused_function_still_runs()
     {
         // Arrays are not compiled yet, so this one stays on the interpreter -- and the point of

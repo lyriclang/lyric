@@ -86,6 +86,59 @@ internal static class JitRuntime
     }
 
     /// <summary>
+    /// Signed division, with Lyric's two departures from what IL would do.
+    ///
+    /// <para>Division by zero is a PANIC with a message, not a .NET exception — a script error,
+    /// reported like one. And <c>MinValue / -1</c> WRAPS: the true result has no representation in
+    /// two's complement, .NET raises an overflow for it, and Lyric wraps as it does for every
+    /// other integer operation. An emitted <c>div</c> would throw on both, in the wrong shape and
+    /// with the wrong text.</para>
+    /// </summary>
+    public static long DivI64(long left, long right, string where)
+    {
+        if (right == 0) throw Panic("division by zero", where);
+
+        return right == -1 ? unchecked(-left) : left / right;
+    }
+
+    /// <summary>Signed remainder. <c>MinValue % -1</c> is zero, which is the mathematical answer
+    /// and the one .NET declines to compute.</summary>
+    public static long RemI64(long left, long right, string where)
+    {
+        if (right == 0) throw Panic("remainder by zero", where);
+
+        return right == -1 ? 0L : left % right;
+    }
+
+    /// <summary>Unsigned division. The machine type here is <c>long</c> for every integer, so the
+    /// operands are reinterpreted rather than converted.</summary>
+    public static long DivU64(long left, long right, string where)
+    {
+        if (right == 0) throw Panic("division by zero", where);
+
+        return unchecked((long)((ulong)left / (ulong)right));
+    }
+
+    public static long RemU64(long left, long right, string where)
+    {
+        if (right == 0) throw Panic("remainder by zero", where);
+
+        return unchecked((long)((ulong)left % (ulong)right));
+    }
+
+    /// <summary>
+    /// A division panic that knows where it happened.
+    ///
+    /// <para>The interpreter builds a backtrace from its frames, and compiled code has none — so
+    /// the place is worked out when the code is EMITTED, where the instruction's source offset and
+    /// the module's source map are both still at hand, and travels to the panic as a baked-in
+    /// literal. One frame, exactly the innermost one, which for an inlined callee is what the
+    /// interpreter reports too.</para>
+    /// </summary>
+    private static LyricPanic Panic(string message, string where) =>
+        new LyricPanic(VmDiagnostics.DivisionByZero, message).WithCallStack([where]);
+
+    /// <summary>
     /// A numeric conversion, done by the INTERPRETER's own routine rather than by IL.
     ///
     /// <para>Not laziness -- a matter of not being able to. Float to integer is defined as
