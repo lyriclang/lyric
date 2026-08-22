@@ -56,9 +56,33 @@ internal sealed class JitContext
         if (function.JitTried) return function.Compiled;
 
         function.JitTried = true;
-        function.Compiled = JitCompiler.TryCompile(function, this);
+        function.Compiled = JitCompiler.TryCompile(function, this, out var reason);
+
+        if (function.Compiled is null) _refusals.Add((function.Source.Name, reason));
+        else _compiled++;
+
         return function.Compiled;
     }
+
+    private readonly List<(string Function, string Reason)> _refusals = [];
+
+    private int _compiled;
+
+    /// <summary>
+    /// Which functions were declined, and what stopped each one.
+    ///
+    /// <para>A host asking "why is this not faster" has no other way to find out: a refusal is
+    /// silent by design, because it costs speed and never correctness. Counting them is how the
+    /// next opcode to support gets CHOSEN rather than guessed at — which matters, because the
+    /// obvious guess has already been wrong once here.</para>
+    ///
+    /// <para>Only functions that were reached: compilation is lazy, so a function nobody calls is
+    /// in neither list.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, string Reason)> Refusals => _refusals;
+
+    /// <summary>How many were compiled.</summary>
+    public int CompiledCount => _compiled;
 
     /// <summary>A buffer for a call's arguments, from the same pool the interpreter uses.
     /// </summary>

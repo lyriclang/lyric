@@ -55,27 +55,45 @@ internal static class JitCompiler
     /// Compiles a function, or answers <c>null</c> when it contains something this pass does not
     /// handle. Refusal is normal and is not an error.
     /// </summary>
-    public static Compiled? TryCompile(Interpreter.Prepared prepared, JitContext context)
+    /// <param name="reason">Why the function was declined, when it was. A short, countable
+    /// phrase rather than a sentence: what a host wants from this is a histogram — which opcode
+    /// stands between it and a compiled game — and prose does not tally.</param>
+    public static Compiled? TryCompile(
+        Interpreter.Prepared prepared, JitContext context, out string reason)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         ArgumentNullException.ThrowIfNull(context);
+
+        reason = string.Empty;
 
         var function = prepared.Source;
         var code = prepared.Instructions;
         var blockStart = prepared.BlockStart;
 
-        if (function.ParamCount > MaxParameters || blockStart.Length == 0) return null;
+        if (function.ParamCount > MaxParameters || blockStart.Length == 0)
+        {
+            reason = "shape";
+            return null;
+        }
 
         var slotTypes = new Type[function.SlotTypes.Count];
         for (var i = 0; i < slotTypes.Length; i++)
         {
             var mapped = Machine(function.SlotTypes[i]);
-            if (mapped is null) return null;
+            if (mapped is null)
+            {
+                reason = "slot " + function.SlotTypes[i].Tag;
+                return null;
+            }
+
             slotTypes[i] = mapped;
         }
 
         if (function.ReturnType.Tag != TypeTag.Void && Machine(function.ReturnType) is null)
+        {
+            reason = "return " + function.ReturnType.Tag;
             return null;
+        }
 
         DynamicMethod method;
         try
@@ -89,6 +107,7 @@ internal static class JitCompiler
         }
         catch (PlatformNotSupportedException)
         {
+            reason = "no runtime code generation";
             // NativeAOT has no runtime code generation. Refusing is exactly right: the program
             // runs interpreted and nothing else changes. It is worth knowing which way round that
             // is, though -- publishing a game ahead-of-time and compiling its scripts at run time
@@ -124,7 +143,11 @@ internal static class JitCompiler
         for (var b = 0; b < labels.Length; b++) labels[b] = il.DefineLabel();
 
         var emitter = new Emitter(il, function, locals, globals, labels, context);
-        if (!emitter.EmitBlocks(code, blockStart)) return null;
+        if (!emitter.EmitBlocks(code, blockStart))
+        {
+            reason = emitter.Reason;
+            return null;
+        }
 
         try
         {
@@ -132,6 +155,7 @@ internal static class JitCompiler
         }
         catch (InvalidProgramException)
         {
+            reason = "unverifiable IL";
             // The IL did not verify. That is a bug here rather than in the module, but a shipped
             // game should limp on the interpreter rather than fall over — and the differential
             // tests are what turn this into a red build instead of a silent slowdown.
@@ -162,6 +186,10 @@ internal static class JitCompiler
 
         private bool _terminated;
 
+        /// <summary>What stopped it. Set once, at the first refusal — later ones are consequences
+        /// of the first and would only blur the count.</summary>
+        public string Reason { get; private set; } = "unknown";
+
         public bool EmitBlocks(BytecodeInstruction[] code, int[] blockStart)
         {
             for (var block = 0; block < blockStart.Length; block++)
@@ -175,14 +203,27 @@ internal static class JitCompiler
 
                 for (var i = from; i < upTo; i++)
                 {
-                    if (_terminated) return false;
-                    if (!Emit(code[i])) return false;
+                    if (_terminated)
+                    {
+                        Reason = "unreachable code after a terminator";
+                        return false;
+                    }
+
+                    if (!Emit(code[i]))
+                    {
+                        Reason = code[i].Opcode.ToString();
+                        return false;
+                    }
                 }
 
                 // A block that runs off its end would leave the IL stack in a state the next
                 // block does not expect. Lyric's lowering always terminates a block; a module
                 // where one does not is one this pass declines rather than guesses about.
-                if (!_terminated || _stack.Count != 0) return false;
+                if (!_terminated || _stack.Count != 0)
+                {
+                    Reason = "block does not end cleanly";
+                    return false;
+                }
             }
 
             return true;

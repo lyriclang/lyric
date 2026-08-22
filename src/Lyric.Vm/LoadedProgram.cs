@@ -130,6 +130,19 @@ public sealed class LoadedProgram
     private Jit.JitContext? _jit;
 
     /// <summary>
+    /// Which functions the compiler declined, and why — empty when compilation is off.
+    ///
+    /// <para>Lazily filled: a function is compiled the first time it is called, so this answers
+    /// for the code that has actually run. Reading it after a few seconds of play is the honest
+    /// way to ask which opcode is standing between a game and its speed.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, string Reason)> JitRefusals =>
+        _jit?.Refusals ?? [];
+
+    /// <summary>How many functions were compiled.</summary>
+    public int JitCompiled => _jit?.CompiledCount ?? 0;
+
+    /// <summary>
     /// <c>LYRIC_JIT=1</c> turns compilation on for every program in the process.
     ///
     /// <para>It exists for ONE purpose, and it is the purpose that makes a compiler trustworthy:
