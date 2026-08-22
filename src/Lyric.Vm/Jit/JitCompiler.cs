@@ -31,10 +31,10 @@ internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 /// interpreter keeps those. That is the whole safety story: a refusal costs speed, never
 /// correctness, and the set grows one opcode at a time with the differential tests holding the
 /// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields,
-/// optionals, and calls — to a native, or to another function that compiles. Still declined:
-/// closures, exceptions, interfaces, enums, conversions, division (which panics), object
-/// construction (which needs the type table), recursion, and the narrow integer widths (which
-/// need re-normalising after every operation).</para>
+/// optionals, interface values, object construction, string constants and comparison, and calls —
+/// to a native, or to another function that compiles. Still declined: closures, exceptions,
+/// virtual calls, enums, conversions, division (which panics), recursion, and the narrow integer
+/// widths (which need re-normalising after every operation).</para>
 /// </summary>
 internal static class JitCompiler
 {
@@ -418,6 +418,35 @@ internal static class JitCompiler
                 case Op.Call:
                     return EmitCall((int)op.Immediate);
 
+                case Op.NewObject:
+                {
+                    var index = (int)op.Immediate;
+                    if (index < 0 || index >= types.Count) return false;
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, index);
+                    il.Emit(OpCodes.Call, typeof(JitContext)
+                        .GetMethod(nameof(JitContext.NewObject))!);
+                    il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.AsArray)));
+
+                    _stack.Push(new BytecodeType(TypeTag.Ref, index));
+                    return true;
+                }
+
+                case Op.MakeInterface:
+                {
+                    if (_stack.Count == 0) return false;
+                    var instance = _stack.Pop();
+                    if (!EmitPack(il, instance)) return false;
+
+                    il.Emit(OpCodes.Ldc_I4, (int)op.Immediate);
+                    il.Emit(OpCodes.Call, typeof(LyrValue)
+                        .GetMethod(nameof(LyrValue.FromInterface))!);
+
+                    _stack.Push(new BytecodeType(TypeTag.Interface, (int)op.Immediate));
+                    return true;
+                }
+
                 // ------------------------------------------------------------ optionals
 
                 case Op.OptNone:
@@ -711,6 +740,18 @@ internal static class JitCompiler
                     il.Emit(OpCodes.Ldc_I8, unchecked((long)op.Immediate));
                     return true;
 
+                // The commonest refusal there was, counted across two real games: nine of the
+                // Springer's functions stopped at a literal. A game logs, formats and names its
+                // events, so a string constant is not an edge case -- it is what game code is
+                // made of.
+                case TypeTag.String:
+                {
+                    var index = (int)op.Immediate;
+                    if (index < 0 || index >= context.Strings.Count) return false;
+                    il.Emit(OpCodes.Ldstr, context.Strings[index]);
+                    return true;
+                }
+
                 default:
                     return false;
             }
@@ -768,6 +809,26 @@ internal static class JitCompiler
         /// </summary>
         private bool EmitCompare(Op op, TypeTag tag)
         {
+            // Strings compare by content, ordinally, as they do in the interpreter -- and only
+            // for equality, which is all the verifier lets through.
+            if (tag == TypeTag.String)
+            {
+                if (op is not (Op.Eq or Op.Ne)) return false;
+
+                il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.TextEquals)));
+                if (op == Op.Ne)
+                {
+                    il.Emit(OpCodes.Ldc_I8, 0L);
+                    il.Emit(OpCodes.Ceq);
+                    return true;
+                }
+
+                // TextEquals already answers 0 or 1; the caller widens it, so hand back an int32
+                // the way the compare opcodes do.
+                il.Emit(OpCodes.Conv_I4);
+                return true;
+            }
+
             if (LyrValue.IsFloat(tag))
             {
                 switch (op)
@@ -838,6 +899,12 @@ internal static class JitCompiler
         // idiomatic loop was declined -- which is nearly every function anyone writes.
         TypeTag.Optional => typeof(LyrValue),
 
+        // And an interface value, for the same reason and by the same trick. It is a fat pointer:
+        // the instance in the reference field, its concrete type index in the bits, because an
+        // object carries no type tag and a virtual call has to recover one. Both halves, so no
+        // machine type -- so it stays the value it is.
+        TypeTag.Interface => typeof(LyrValue),
+
         _ => null,
     };
 
@@ -855,8 +922,8 @@ internal static class JitCompiler
     {
         if (Machine(type) is null) return false;
 
-        // An optional is already what it is meant to be.
-        if (type.Tag == TypeTag.Optional) return true;
+        // An optional and an interface value are already what they are meant to be.
+        if (type.Tag is TypeTag.Optional or TypeTag.Interface) return true;
 
         il.Emit(OpCodes.Call, type.Tag switch
         {
@@ -876,7 +943,7 @@ internal static class JitCompiler
     {
         if (Machine(type) is null) return false;
 
-        if (type.Tag == TypeTag.Optional) return true;
+        if (type.Tag is TypeTag.Optional or TypeTag.Interface) return true;
 
         il.Emit(OpCodes.Call, type.Tag switch
         {

@@ -684,6 +684,114 @@ public class JitAgreementTests
         Assert.Equal(a.Message, c.Message);
     }
 
+    // ---------------------------------------------------------------- strings and objects
+
+    [Fact]
+    public void String_constants_and_comparison_agree()
+    {
+        // The commonest refusal there was, counted across two real games: a literal. Game code
+        // logs, formats and names its events, so nine of the Springer's functions stopped here.
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): int {
+                let a = "coin";
+                let b = "spark";
+                var acc = 0;
+
+                for (i in 0..n) {
+                    let pick = if (i % 2 == 0) a else b;
+                    if (pick == "coin") { acc = acc + 1; }
+                    if (pick != "coin") { acc = acc + 2; }
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(100));
+    }
+
+    [Fact]
+    public void A_string_returned_from_compiled_code_agrees()
+    {
+        var module = Compile(
+            """
+            @Hook
+            pub fn run(n: int): string {
+                if (n > 3) { return "many"; }
+                return "few";
+            }
+
+            fn main(): int { return 0; }
+            """);
+
+        var interpreted = LoadedProgram.Load(module);
+        var compiled = LoadedProgram.Load(module, jit: true);
+        var index = Find(module, "run");
+
+        foreach (var n in new[] { 1L, 9L })
+            Assert.Equal(
+                interpreted.Invoke(index, LyrValue.FromI64(n)).AsString,
+                compiled.Invoke(index, LyrValue.FromI64(n)).AsString);
+    }
+
+    [Fact]
+    public void Constructing_objects_agrees()
+    {
+        Agree(
+            """
+            class Point { x: float = 0.0, y: float = 0.0 }
+
+            @Hook
+            pub fn run(n: int): float {
+                var acc = 0.0;
+                for (i in 0..n) {
+                    let p = Point { x = i as float * 0.5, y = 1.5 };
+                    acc = acc + p.x + p.y;
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(200));
+    }
+
+    [Fact]
+    public void An_interface_value_held_in_a_slot_agrees()
+    {
+        // An interface value is a fat pointer -- the instance in the reference field, its concrete
+        // type in the bits -- so it stays a whole value rather than being unpacked into a machine
+        // type. Calling THROUGH one is still declined; holding one is not.
+        Agree(
+            """
+            interface Shape { fn area(): float; }
+
+            class Square :: [Shape] {
+                side: float = 2.0,
+
+                fn area(): float { return this.side * this.side; }
+            }
+
+            @Hook
+            pub fn run(n: int): float {
+                var acc = 0.0;
+                for (i in 0..n) {
+                    let s: Shape = Square { side = i as float };
+                    acc = acc + 1.0;
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(50));
+    }
+
     [Fact]
     public void A_refused_function_still_runs()
     {

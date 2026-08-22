@@ -85,6 +85,13 @@ internal static class JitRuntime
             $"force-unwrapped a '?T' that had no value in '{function}'");
     }
 
+    /// <summary>Ordinal string equality, as the interpreter compares them — and as the 0-or-1 a
+    /// Lyric bool is here.</summary>
+    public static long TextEquals(string? left, string? right) =>
+        string.Equals(left ?? string.Empty, right ?? string.Empty, StringComparison.Ordinal)
+            ? 1L
+            : 0L;
+
     /// <summary>Whether an optional holds anything, as the 0-or-1 a Lyric bool is here.</summary>
     public static long HasValue(LyrValue option) => option.IsSome ? 1L : 0L;
 

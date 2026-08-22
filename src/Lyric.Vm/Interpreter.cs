@@ -770,7 +770,7 @@ public static class Interpreter
     private static string TypeName(IReadOnlyList<BytecodeTypeDef> types, int index) =>
         index >= 0 && index < types.Count ? types[index].Name : $"ty{index}";
 
-    private static LyrValue[] NewInstance(BytecodeTypeDef type)
+    internal static LyrValue[] NewInstance(BytecodeTypeDef type)
     {
         var slots = new LyrValue[type.FieldTypes.Count];
         for (var i = 0; i < slots.Length; i++)

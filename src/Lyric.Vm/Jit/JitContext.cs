@@ -84,6 +84,17 @@ internal sealed class JitContext
     /// <summary>How many were compiled.</summary>
     public int CompiledCount => _compiled;
 
+    /// <summary>
+    /// A fresh instance of the type at this index — one slot per field, each at the zero value of
+    /// its type.
+    ///
+    /// <para>Through the context because the emitter cannot bake an object reference into a
+    /// dynamic method: it has the type INDEX at compile time and nothing to hold the layout with,
+    /// so the index travels in the instruction stream and the lookup happens here.</para>
+    /// </summary>
+    public LyrValue NewObject(int typeIndex) =>
+        LyrValue.FromObject(Interpreter.NewInstance(Types[typeIndex]));
+
     /// <summary>A buffer for a call's arguments, from the same pool the interpreter uses.
     /// </summary>
     public LyrValue[] RentArgs(int arity) => Arguments.Rent(arity);
