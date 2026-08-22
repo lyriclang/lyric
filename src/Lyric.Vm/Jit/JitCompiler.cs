@@ -303,7 +303,7 @@ internal static class JitCompiler
                     if (op.TypeOrNull is not { } tag || _stack.Count < 2) return false;
                     _stack.Pop();
                     _stack.Pop();
-                    if (!EmitBinary(op, tag)) return false;
+                    if (!EmitBinary(op.Opcode, tag, op)) return false;
                     _stack.Push(BytecodeType.Scalar(tag));
                     return true;
                 }
@@ -319,6 +319,80 @@ internal static class JitCompiler
                     // every other integer here.
                     il.Emit(OpCodes.Conv_I8);
                     _stack.Push(BytecodeType.Scalar(TypeTag.Bool));
+                    return true;
+                }
+
+                // --- the fused forms of 3.6 -----------------------------------------------
+                //
+                // Easier to compile than the pairs they replace, not harder: they carry their
+                // operands as SLOTS, so nothing crosses the evaluation stack and there is no
+                // stack discipline to track. 'binlk add f64 l1 = l1, 1.5' is a load, a constant,
+                // an add and a store.
+                //
+                // They matter more than their number suggests: since 3.6 every 'while' in the
+                // language carries a brcmp and every accumulator a binlk, so an emitter without
+                // these four cases refuses exactly the functions worth compiling.
+                case Op.BinLocals or Op.BinConst:
+                {
+                    if (op.TypeOrNull is not { } tag) return false;
+                    if (!InSlots(op.SlotDest, op.SlotA)) return false;
+
+                    il.Emit(OpCodes.Ldloc, locals[op.SlotA]);
+                    if (op.Opcode == Op.BinLocals)
+                    {
+                        if (!InSlots(op.SlotB)) return false;
+                        il.Emit(OpCodes.Ldloc, locals[op.SlotB]);
+                    }
+                    else if (!EmitFusedConst(tag, op))
+                    {
+                        return false;
+                    }
+
+                    if (IsComparison(op.Fused))
+                    {
+                        // A comparison leaves IL's int32; a Lyric bool is a 64-bit 0 or 1, as
+                        // everywhere else here.
+                        if (!EmitCompare(op.Fused, tag)) return false;
+                        il.Emit(OpCodes.Conv_I8);
+                    }
+                    else if (!EmitBinary(op.Fused, tag, op))
+                    {
+                        return false;
+                    }
+
+                    il.Emit(OpCodes.Stloc, locals[op.SlotDest]);
+                    return true;
+                }
+
+                case Op.BranchCompare or Op.BranchCompareConst:
+                {
+                    if (op.TypeOrNull is not { } tag) return false;
+                    if (!InSlots(op.SlotA)) return false;
+
+                    var whenTrue = (int)op.Immediate;
+                    var whenFalse = (int)op.Immediate2;
+                    if (whenTrue < 0 || whenTrue >= labels.Length) return false;
+                    if (whenFalse < 0 || whenFalse >= labels.Length) return false;
+
+                    // A block boundary, so the evaluation stack is empty and stays so: the fused
+                    // branch reads slots and jumps.
+                    if (_stack.Count != 0) return false;
+
+                    il.Emit(OpCodes.Ldloc, locals[op.SlotA]);
+                    if (op.Opcode == Op.BranchCompare)
+                    {
+                        if (!InSlots(op.SlotB)) return false;
+                        il.Emit(OpCodes.Ldloc, locals[op.SlotB]);
+                    }
+                    else if (!EmitFusedConst(tag, op))
+                    {
+                        return false;
+                    }
+
+                    if (!EmitCompare(op.Fused, tag)) return false;
+                    il.Emit(OpCodes.Brtrue, labels[whenTrue]);
+                    il.Emit(OpCodes.Br, labels[whenFalse]);
+                    _terminated = true;
                     return true;
                 }
 
@@ -841,6 +915,45 @@ internal static class JitCompiler
             return index >= 0 && index < layout.FieldTypes.Count ? layout.FieldTypes[index] : null;
         }
 
+        /// <summary>Are all of these real slots of this function? A fused form addresses up to
+        /// three, and one out of range is a module the loader should have refused — here it is a
+        /// refusal, which costs speed and never correctness.</summary>
+        private bool InSlots(params int[] slots)
+        {
+            foreach (var slot in slots)
+                if (slot < 0 || slot >= locals.Length)
+                    return false;
+            return true;
+        }
+
+        private static bool IsComparison(Op op) =>
+            op is Op.Lt or Op.Le or Op.Gt or Op.Ge or Op.Eq or Op.Ne;
+
+        /// <summary>
+        /// The immediate of a fused constant shape.
+        ///
+        /// <para>Its own reader rather than <see cref="EmitConst"/>: the bits live in a field of
+        /// their own, because a fused BRANCH keeps its two targets where an ordinary instruction
+        /// keeps its immediate. Only the scalars occur here — the emitter of the fused forms
+        /// refuses anything else, as the format does.</para>
+        /// </summary>
+        private bool EmitFusedConst(TypeTag tag, in VmInstruction op)
+        {
+            switch (tag)
+            {
+                case TypeTag.F64: il.Emit(OpCodes.Ldc_R8, op.FloatValue); return true;
+                case TypeTag.F32: il.Emit(OpCodes.Ldc_R4, (float)op.FloatValue); return true;
+                case TypeTag.Bool: il.Emit(OpCodes.Ldc_I8, op.BoolValue ? 1L : 0L); return true;
+
+                case TypeTag.I64 or TypeTag.U64 or TypeTag.Char:
+                    il.Emit(OpCodes.Ldc_I8, unchecked((long)op.ConstBits));
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         private bool EmitConst(TypeTag tag, in VmInstruction op)
         {
             switch (tag)
@@ -884,11 +997,12 @@ internal static class JitCompiler
             return at is null ? function.Name : $"{function.Name} ({at})";
         }
 
-        private bool EmitBinary(in VmInstruction instruction, TypeTag tag)
+        /// <param name="op">The operation, which for a FUSED form is not the instruction's own
+        /// opcode but the one it carries.</param>
+        /// <param name="at">Where this stands, for the panic message a division may need.</param>
+        private bool EmitBinary(Op op, TypeTag tag, in VmInstruction at)
         {
             if (tag is not (TypeTag.I64 or TypeTag.U64 or TypeTag.F64 or TypeTag.F32)) return false;
-
-            var op = instruction.Opcode;
 
             switch (op)
             {
@@ -913,14 +1027,14 @@ internal static class JitCompiler
             switch (op)
             {
                 case Op.Div:
-                    il.Emit(OpCodes.Ldstr, Where(instruction));
+                    il.Emit(OpCodes.Ldstr, Where(at));
                     il.Emit(OpCodes.Call, Runtime(tag == TypeTag.I64
                         ? nameof(JitRuntime.DivI64)
                         : nameof(JitRuntime.DivU64)));
                     return true;
 
                 case Op.Rem:
-                    il.Emit(OpCodes.Ldstr, Where(instruction));
+                    il.Emit(OpCodes.Ldstr, Where(at));
                     il.Emit(OpCodes.Call, Runtime(tag == TypeTag.I64
                         ? nameof(JitRuntime.RemI64)
                         : nameof(JitRuntime.RemU64)));
