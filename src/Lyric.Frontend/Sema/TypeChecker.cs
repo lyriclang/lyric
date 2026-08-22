@@ -314,6 +314,17 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
+
+            // A GENERIC interface member must have a body (2.17). It gets no vtable slot — a slot
+            // holds one function and this is one per instantiation — so it is reached by
+            // monomorphization alone, and an abstract one would promise a dispatch nothing can
+            // perform. As a DEFAULT it is complete in itself and needs no dispatch at all.
+            if (isInterface && fn.Generics.Length > 0 && fn.Body is null)
+                _de.Report("LYR-SEM0082", Severity.Error, fn.Span,
+                    $"'{typeName}.{fn.Name}' has type parameters of its own and no body — such a "
+                    + "member is reached by monomorphization rather than through the method table, "
+                    + "so it has to bring its own implementation");
+
             CheckMemberModifiers(fn);
 
             // A static member has no receiver, so 'this' is not bound there; CheckExpr reports it as
@@ -466,6 +477,28 @@ public sealed class TypeChecker
         // once, while two instances of one interface are still two conformances to check.
         var seen = new List<LyrType>();
 
+        // A GENERIC member of an interface may not be overridden (2.17). It has no slot, so a call
+        // picks its target by the receiver's STATIC type: through the interface it would find the
+        // default, through the concrete type the override — one name, two functions, chosen by
+        // where the caller happens to stand. That is the failure SEM0079 refuses inside a chain,
+        // and it is the same one here.
+        foreach (var node in interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
+            foreach (var contributed in Conformance.WithParents(iface, _binding))
+                foreach (var symbol in contributed.Members.Symbols)
+                    if (symbol is FunctionSymbol { Generics.Length: > 0 } generic
+                        && candidates.TryGetValue(generic.Name, out var own)
+                        && own.Declaration is { } ownDeclaration)
+                        _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
+                            $"'{name}.{generic.Name}' overrides a generic member of "
+                            + $"'{contributed.Name}', which cannot be overridden — it has no slot "
+                            + "to dispatch through, so the two would be chosen by the static type "
+                            + "of the receiver rather than by the value",
+                            new DiagnosticNote(generic.Declaration?.Span ?? default,
+                                $"'{generic.Name}' is declared here"));
+        }
+
         foreach (var node in interfaces)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } direct)
@@ -490,6 +523,13 @@ public sealed class TypeChecker
 
                 foreach (var im in idecl.Members)
                 {
+                    // A GENERIC member is not part of the contract: it always has a body, it
+                    // cannot be overridden, and it is reached by monomorphization rather than
+                    // through the table. Comparing signatures here would compare two different
+                    // U's that print identically, which is a confusing way to say what
+                    // LYR-SEM0082 says plainly.
+                    if (im.Generics.Length > 0) continue;
+
                     var impl = candidates.TryGetValue(im.Name, out var c) ? c : null;
                     if (impl is null)
                     {

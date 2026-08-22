@@ -34,6 +34,39 @@ pub interface Iterator<T> {
     fn take(count: int): Iterator<T> {
         return TakeIterator<T> { source = this, remaining = count };
     }
+
+    /// Everything after the first `count` elements.
+    fn skip(count: int): Iterator<T> {
+        return SkipIterator<T> { source = this, pending = count };
+    }
+
+    /// Elements while `keep` accepts, then the end — unlike `filter`, which keeps looking.
+    fn takeWhile(keep: fn(T) -> bool): Iterator<T> {
+        return TakeWhileIterator<T> { source = this, keep = keep };
+    }
+
+    /// Pairs, ending when either side does.
+    fn zip<B>(right: Iterator<B>): Iterator<(T, B)> {
+        return ZipIterator<T, B> { left = this, right = right };
+    }
+
+    /// This sequence, then `second`.
+    fn chain(second: Iterator<T>): Iterator<T> {
+        return ChainIterator<T> { first = this, second = second };
+    }
+
+    /// Each element into an iterator of its own, flattened.
+    fn flatMap<U>(f: fn(T) -> Iterator<U>): Iterator<U> {
+        return FlatMapIterator<T, U> { source = this, f = f };
+    }
+
+    // 'enumerate' and 'chunks' are NOT methods, and the reason is a rule worth stating: a
+    // chainable method may not change the element type unless it is GENERIC. A non-generic method
+    // has a slot, every implementing instance must fill it, and one returning 'Iterator<(int, T)>'
+    // or 'Iterator<T[]>' would demand an instance for the next element type, and that one for the
+    // one after — the monomorphization does not terminate. A generic method has no slot and is
+    // instantiated on demand, so 'map<U>' and 'flatMap<U>' change the element type safely. Both
+    // stay available as free functions, which is where an unbounded family belongs.
 }
 
 /// An exclusive numeric range, `a..b`. The inclusive form has its own adapter below: folding
@@ -283,7 +316,7 @@ pub class SkipIterator<T> :: [Iterator<T>] {
 
 /// Everything after the first `count` elements, lazily. A negative `count` skips nothing.
 pub fn skip<T>(source: Iterator<T>, count: int): Iterator<T> {
-    return SkipIterator<T> { source = source, pending = count };
+    return source.skip(count);
 }
 
 /// The lazy machinery behind `takeWhile`.
@@ -319,7 +352,7 @@ pub class TakeWhileIterator<T> :: [Iterator<T>] {
 /// The longest front `keep` accepts; it ends at the FIRST refusal, even if `true` would come
 /// again — that is what separates it from `filter`.
 pub fn takeWhile<T>(source: Iterator<T>, keep: fn(T) -> bool): Iterator<T> {
-    return TakeWhileIterator<T> { source = source, keep = keep };
+    return source.takeWhile(keep);
 }
 
 /// The lazy machinery behind `enumerate`.
@@ -372,7 +405,7 @@ pub class ZipIterator<A, B> :: [Iterator<(A, B)>] {
 /// The one surplus call on `left` is the price of both sides sharing the same interface; avoiding
 /// it would need a `peek` on `Iterator<T>` that exists nowhere else.
 pub fn zip<A, B>(left: Iterator<A>, right: Iterator<B>): Iterator<(A, B)> {
-    return ZipIterator<A, B> { left = left, right = right };
+    return left.zip<B>(right);
 }
 
 /// The lazy machinery behind `chain`.
@@ -399,7 +432,7 @@ pub class ChainIterator<T> :: [Iterator<T>] {
 
 /// First everything of `first`, then everything of `second`, lazily.
 pub fn chain<T>(first: Iterator<T>, second: Iterator<T>): Iterator<T> {
-    return ChainIterator<T> { first = first, second = second };
+    return first.chain(second);
 }
 
 /// The lazy machinery behind `flatMap`.

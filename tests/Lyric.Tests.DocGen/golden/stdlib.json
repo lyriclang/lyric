@@ -2046,6 +2046,61 @@
                 "File": "stdlib/std/iter.lyr",
                 "Line": 34
               }
+            },
+            {
+              "Kind": "Method",
+              "Name": "skip",
+              "Signature": "fn skip(count: int): Iterator<T>",
+              "Doc": "Everything after the first `count` elements.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 39
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "takeWhile",
+              "Signature": "fn takeWhile(keep: fn(T) -> bool): Iterator<T>",
+              "Doc": "Elements while `keep` accepts, then the end — unlike `filter`, which keeps looking.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 44
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "zip",
+              "Signature": "fn zip<B>(right: Iterator<B>): Iterator<(T, B)>",
+              "Doc": "Pairs, ending when either side does.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 49
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "chain",
+              "Signature": "fn chain(second: Iterator<T>): Iterator<T>",
+              "Doc": "This sequence, then `second`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 54
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "flatMap",
+              "Signature": "fn flatMap<U>(f: fn(T) -> Iterator<U>): Iterator<U>",
+              "Doc": "Each element into an iterator of its own, flattened.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 59
+              }
             }
           ],
           "Source": {
@@ -2067,7 +2122,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 44
+                "Line": 77
               }
             },
             {
@@ -2078,7 +2133,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 46
+                "Line": 79
               }
             },
             {
@@ -2089,13 +2144,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 49
+                "Line": 82
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 42
+            "Line": 75
           }
         },
         {
@@ -2112,7 +2167,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 136
+                "Line": 169
               }
             },
             {
@@ -2123,7 +2178,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 138
+                "Line": 171
               }
             },
             {
@@ -2134,13 +2189,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 141
+                "Line": 174
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 134
+            "Line": 167
           }
         },
         {
@@ -2157,7 +2212,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 155
+                "Line": 188
               }
             },
             {
@@ -2168,7 +2223,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 157
+                "Line": 190
               }
             },
             {
@@ -2179,13 +2234,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 160
+                "Line": 193
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 153
+            "Line": 186
           }
         },
         {
@@ -2202,13 +2257,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 177
+                "Line": 210
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 175
+            "Line": 208
           }
         },
         {
@@ -2225,7 +2280,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 195
+                "Line": 228
               }
             },
             {
@@ -2236,7 +2291,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 197
+                "Line": 230
               }
             },
             {
@@ -2247,13 +2302,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 200
+                "Line": 233
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 193
+            "Line": 226
           }
         },
         {
@@ -2264,7 +2319,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 211
+            "Line": 244
           }
         },
         {
@@ -2281,7 +2336,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 218
+                "Line": 251
               }
             },
             {
@@ -2292,7 +2347,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 220
+                "Line": 253
               }
             },
             {
@@ -2303,13 +2358,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 223
+                "Line": 256
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 216
+            "Line": 249
           }
         },
         {
@@ -2320,7 +2375,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 237
+            "Line": 270
           }
         },
         {
@@ -2337,7 +2392,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 244
+                "Line": 277
               }
             },
             {
@@ -2348,7 +2403,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 246
+                "Line": 279
               }
             },
             {
@@ -2359,13 +2414,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 249
+                "Line": 282
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 242
+            "Line": 275
           }
         },
         {
@@ -2376,7 +2431,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 260
+            "Line": 293
           }
         },
         {
@@ -2393,7 +2448,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 267
+                "Line": 300
               }
             },
             {
@@ -2404,7 +2459,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 269
+                "Line": 302
               }
             },
             {
@@ -2415,13 +2470,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 272
+                "Line": 305
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 265
+            "Line": 298
           }
         },
         {
@@ -2432,7 +2487,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 285
+            "Line": 318
           }
         },
         {
@@ -2449,7 +2504,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 292
+                "Line": 325
               }
             },
             {
@@ -2460,7 +2515,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 294
+                "Line": 327
               }
             },
             {
@@ -2471,7 +2526,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 296
+                "Line": 329
               }
             },
             {
@@ -2482,13 +2537,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 299
+                "Line": 332
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 290
+            "Line": 323
           }
         },
         {
@@ -2499,7 +2554,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 321
+            "Line": 354
           }
         },
         {
@@ -2516,7 +2571,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 328
+                "Line": 361
               }
             },
             {
@@ -2527,7 +2582,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 330
+                "Line": 363
               }
             },
             {
@@ -2538,13 +2593,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 333
+                "Line": 366
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 326
+            "Line": 359
           }
         },
         {
@@ -2555,7 +2610,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 345
+            "Line": 378
           }
         },
         {
@@ -2572,7 +2627,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 352
+                "Line": 385
               }
             },
             {
@@ -2583,7 +2638,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 354
+                "Line": 387
               }
             },
             {
@@ -2594,13 +2649,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 357
+                "Line": 390
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 350
+            "Line": 383
           }
         },
         {
@@ -2611,7 +2666,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 374
+            "Line": 407
           }
         },
         {
@@ -2628,7 +2683,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 381
+                "Line": 414
               }
             },
             {
@@ -2639,7 +2694,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 383
+                "Line": 416
               }
             },
             {
@@ -2650,7 +2705,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 385
+                "Line": 418
               }
             },
             {
@@ -2661,13 +2716,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 388
+                "Line": 421
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 379
+            "Line": 412
           }
         },
         {
@@ -2678,7 +2733,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 401
+            "Line": 434
           }
         },
         {
@@ -2695,7 +2750,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 408
+                "Line": 441
               }
             },
             {
@@ -2706,7 +2761,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 410
+                "Line": 443
               }
             },
             {
@@ -2717,7 +2772,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 412
+                "Line": 445
               }
             },
             {
@@ -2728,13 +2783,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 415
+                "Line": 448
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 406
+            "Line": 439
           }
         },
         {
@@ -2745,7 +2800,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 436
+            "Line": 469
           }
         },
         {
@@ -2762,7 +2817,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 443
+                "Line": 476
               }
             },
             {
@@ -2773,7 +2828,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 445
+                "Line": 478
               }
             },
             {
@@ -2784,13 +2839,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 451
+                "Line": 484
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 441
+            "Line": 474
           }
         },
         {
@@ -2801,7 +2856,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 466
+            "Line": 499
           }
         },
         {
@@ -2818,13 +2873,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 478
+                "Line": 511
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 476
+            "Line": 509
           }
         },
         {
@@ -2835,7 +2890,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 496
+            "Line": 529
           }
         },
         {
@@ -2846,7 +2901,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 509
+            "Line": 542
           }
         },
         {
@@ -2857,7 +2912,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 525
+            "Line": 558
           }
         },
         {
@@ -2868,7 +2923,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 530
+            "Line": 563
           }
         },
         {
@@ -2879,7 +2934,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 542
+            "Line": 575
           }
         },
         {
@@ -2890,7 +2945,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 553
+            "Line": 586
           }
         },
         {
@@ -2901,7 +2956,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 564
+            "Line": 597
           }
         },
         {
@@ -2912,7 +2967,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 578
+            "Line": 611
           }
         },
         {
@@ -2923,7 +2978,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 591
+            "Line": 624
           }
         },
         {
@@ -2934,7 +2989,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 596
+            "Line": 629
           }
         },
         {
@@ -2945,7 +3000,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 610
+            "Line": 643
           }
         },
         {
@@ -2956,7 +3011,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 629
+            "Line": 662
           }
         },
         {
@@ -2967,7 +3022,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 640
+            "Line": 673
           }
         },
         {
@@ -2978,7 +3033,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 656
+            "Line": 689
           }
         }
       ]
