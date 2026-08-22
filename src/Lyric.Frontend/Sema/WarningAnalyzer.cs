@@ -177,6 +177,9 @@ internal sealed class WarningAnalyzer
         ClassDecl c => c.Members,
         EnumDecl e => e.Methods,
         ExtendDecl x => x.Methods,
+        // Since 2.15. A use that resolves to the interface's member warns; an IMPLEMENTATION
+        // does not, because it is not a use and a conforming type has no choice about it.
+        InterfaceDecl i => i.Members,
         _ => [],
     };
 

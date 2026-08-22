@@ -507,7 +507,7 @@ public sealed partial class Parser
 
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
-        ParseMethodSequence(members, allowStatic: false, allowAttributes: false);
+        ParseMethodSequence(members, allowStatic: false);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
             { NameSpan = name.Span };
@@ -535,10 +535,16 @@ public sealed partial class Parser
     /// </summary>
     /// <param name="allowStatic">False in an interface body, where a member is dispatched on a
     /// receiver and a static one has none.</param>
-    /// <param name="allowAttributes">False in an interface body: deprecating an abstract member
-    /// would raise conformance questions (do implementations inherit the clock?) nobody has
-    /// answered — refused until someone needs it. Extend and enum methods carry attributes
-    /// since 2.1, the sema admitting only '@Deprecated'.</param>
+    /// <param name="allowAttributes">True everywhere since 2.15, the sema admitting only
+    /// '@Deprecated' (the Member target). It was false in an interface body until then, because
+    /// deprecating an abstract member raised a conformance question nobody had answered: do
+    /// implementations inherit the clock?
+    ///
+    /// <para>They do NOT. The deprecation reaches every use that resolves to the interface's
+    /// member — which is the population that has to move — and an implementation is not a use. A
+    /// conforming type MUST implement what the interface requires, so a warning there would be
+    /// one nobody can act on without breaking conformance, and an unactionable warning is the
+    /// thing this project keeps refusing to ship.</para></param>
     private void ParseMethodSequence(List<FunctionDecl> methods, bool allowStatic,
         bool allowAttributes = true)
     {

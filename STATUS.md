@@ -376,7 +376,7 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4593 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+4589 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
 plus `lyrembed.dll`, version **2.14.0**; the specification in `lyriclang/lyric-spec` is
 **NORMATIVE**, its suite stands at 90 cases, and the toolchain's own CI runs it against the
 working tree.
@@ -883,7 +883,10 @@ answer yet, and it belongs asked before E4 starts.
   criterion alone.** M5 and M6 each silently failed to deliver part of their items; the gap disguised
   itself as a clean diagnostic. For the same reason **six** gates were re-cut in M7, because they
   required language features of later slices.
-- **Interface inheritance is single-parent and implication-only** (M22): a parent's default method
+- **Interface inheritance is single-parent and implication-only** (M22) — **and the reason for
+  the single parent did not survive a probe (2026-08-22)**: the dispatch table is keyed by
+  (concrete type, interface), so several parents need no thunks. What they need is frontend work;
+  see §What we are working on. The entry as written: a parent's default method
   runs behind a child-typed receiver, and only the chain-prefix slot layout keeps the parent's slot
   indexes valid there — several parents would need thunks. Redeclaring a chain member is refused
   instead of getting override semantics: without vtable overriding, the same call would dispatch
