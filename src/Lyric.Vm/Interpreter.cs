@@ -116,16 +116,16 @@ public static class Interpreter
         IReadOnlyList<BytecodeType> globalTypes,
         ArgumentPool arguments, LyrValue[]? entryArguments = null,
         BytecodeSourceMap? sourceMap = null, DebugController? debug = null,
-        ExecutionBudget? budget = null, bool jit = false)
+        ExecutionBudget? budget = null, Jit.JitContext? jit = null)
     {
         // Compiled code IS the whole call and needs no frame. Only an unwatched run reaches it:
         // a debugger or a budget means the interpreter, per IExecutionPolicy.
-        if (jit && debug is null && budget is null
-            && CompiledCode(prepared[startIndex], types, globalTypes) is { } entryCode)
+        if (jit is not null && debug is null && budget is null
+            && jit.CodeFor(prepared[startIndex]) is { } entryCode)
         {
             try
             {
-                return entryCode(globals, entryArguments ?? []);
+                return entryCode(jit, entryArguments ?? []);
             }
             catch (LyricPanic panic) when (panic.CallStack.Count == 0)
             {
@@ -201,7 +201,7 @@ public static class Interpreter
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
         NativeRegistry.BoundNative[] natives, LyrValue[] globals,
         IReadOnlyList<BytecodeType> globalTypes, ArgumentPool arguments,
-        Stack<Frame> frames, ref Frame frame, TPolicy policy, bool jit)
+        Stack<Frame> frames, ref Frame frame, TPolicy policy, Jit.JitContext? jit)
         where TPolicy : struct, IExecutionPolicy
     {
         while (true)
@@ -301,13 +301,13 @@ public static class Interpreter
 
                     // A compiled callee is called the way a native is: arguments off the stack,
                     // result back onto it, no frame in between.
-                    if (jit && TPolicy.AllowsCompiledCode && CompiledCode(callee, types, globalTypes) is { } code)
+                    if (jit is not null && TPolicy.AllowsCompiledCode && jit.CodeFor(callee) is { } code)
                     {
                         var count = callee.Source.ParamCount;
                         var slots = arguments.Rent(count);
                         for (var i = count - 1; i >= 0; i--) slots[i] = frame.Pop();
 
-                        var answer = code(globals, slots);
+                        var answer = code(jit, slots);
                         arguments.Recycle(slots);
 
                         if (callee.Source.ReturnType.Tag != TypeTag.Void) frame.Push(answer);
@@ -617,20 +617,6 @@ public static class Interpreter
     }
 
     // ------------------------------------------------------------------ Operationen
-
-    /// <summary>This function's compiled form, compiling it the first time it is asked for.
-    /// </summary>
-    private static Jit.Compiled? CompiledCode(Prepared function,
-        IReadOnlyList<BytecodeTypeDef> types, IReadOnlyList<BytecodeType> globalTypes)
-    {
-        if (function.JitTried) return function.Compiled;
-
-        function.JitTried = true;
-        function.Compiled = Jit.JitCompiler.TryCompile(
-            function.Source, function.Instructions, function.BlockStart, types, globalTypes);
-
-        return function.Compiled;
-    }
 
     /// <summary>
     /// A fresh instance: one slot per field, each at the zero value of its type.

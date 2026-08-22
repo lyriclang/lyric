@@ -95,10 +95,25 @@ public sealed class LoadedProgram
         for (var i = 0; i < globals.Length; i++)
             if (module.Globals[i].Tag == TypeTag.String) globals[i] = LyrValue.FromString(string.Empty);
 
-        var program = new LoadedProgram(module, prepared, dispatch, bound, globals)
-        {
-            Jit = jit || Forced,
-        };
+        var program = new LoadedProgram(module, prepared, dispatch, bound, globals);
+
+        // One context per program, made only when compilation is on. It carries the module's
+        // tables so the emitter can read types, and the SAME globals array the interpreter uses --
+        // a copy would pass every single-engine test and quietly lose a game's state.
+        if (jit || Forced)
+            program._jit = new Jit.JitContext
+            {
+                Prepared = prepared,
+                Natives = bound,
+                Globals = globals,
+                GlobalTypes = module.Globals,
+                Types = module.Types,
+                Imports = module.Imports,
+                Strings = module.Strings,
+                Dispatch = dispatch,
+                Arguments = program._arguments,
+                SourceMap = module.SourceMap,
+            };
 
         // The initializer runs before everything else and exactly once. It is void; what counts
         // are the slots it leaves behind.
@@ -110,7 +125,9 @@ public sealed class LoadedProgram
 
     /// <summary>Whether this program may run compiled code. See the <c>jit</c> parameter of
     /// <see cref="Load"/>.</summary>
-    public bool Jit { get; private init; }
+    public bool Jit => _jit is not null;
+
+    private Jit.JitContext? _jit;
 
     /// <summary>
     /// <c>LYRIC_JIT=1</c> turns compilation on for every program in the process.
@@ -235,5 +252,5 @@ public sealed class LoadedProgram
         DebugController? debug = null, ExecutionBudget? budget = null) =>
         Interpreter.Execute(_prepared, index, _module.Strings, _module.Types, _dispatch,
             _natives, _globals, _module.Globals, _arguments, arguments, _module.SourceMap,
-            debug, budget, Jit);
+            debug, budget, _jit);
 }

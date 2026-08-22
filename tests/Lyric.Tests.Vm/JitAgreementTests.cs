@@ -462,6 +462,119 @@ public class JitAgreementTests
         Assert.Equal(12L, compiled.Invoke(Find(module, "read"), LyrValue.FromI64(0)).AsI64);
     }
 
+    // ---------------------------------------------------------------- calls
+
+    [Fact]
+    public void A_call_between_two_compiled_functions_agrees()
+    {
+        Agree(
+            """
+            fn square(x: int): int { return x * x; }
+
+            fn sum(upTo: int): int {
+                var acc = 0;
+                var i = 0;
+                while (i < upTo) {
+                    acc = acc + square(i);
+                    i = i + 1;
+                }
+
+                return acc;
+            }
+
+            @Hook
+            pub fn run(n: int): int { return sum(n); }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(300));
+    }
+
+    [Fact]
+    public void A_recursive_function_still_answers_correctly()
+    {
+        // Recursion REFUSES to compile -- a function reached again while it is still being
+        // compiled has no delegate to bind -- so this runs interpreted under 'jit: true'. What
+        // matters is that it runs, and answers the same.
+        Agree(
+            """
+            fn fib(n: int): int {
+                if (n < 2) { return n; }
+                return fib(n - 1) + fib(n - 2);
+            }
+
+            @Hook
+            pub fn run(n: int): int { return fib(n); }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(18));
+    }
+
+    [Fact]
+    public void An_exception_thrown_below_compiled_code_reaches_its_handler()
+    {
+        // The first thing the differential run caught, and the reason a compiled function may
+        // only call functions that compile too.
+        //
+        // A Lyric exception unwinds along the INTERPRETER's frame stack. A compiled frame in the
+        // middle of that chain has none, so a throw below could not find a catch above and became
+        // an uncaught panic -- a program that worked interpreted and died compiled, which is
+        // precisely the failure this whole arrangement exists to prevent.
+        Agree(
+            """
+            class Boom :: [Throwable] {
+                fn message(): string { return "boom"; }
+            }
+
+            fn thrower(n: int): int throws Boom {
+                if (n > 3) { throw Boom { }; }
+                return n;
+            }
+
+            fn middle(n: int): int throws Boom { return thrower(n) + 1; }
+
+            @Hook
+            pub fn run(n: int): int {
+                try {
+                    return middle(n);
+                } catch (e: Boom) {
+                    return 0 - 1;
+                }
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(9));
+    }
+
+    [Fact]
+    public void A_call_that_returns_nothing_agrees()
+    {
+        Agree(
+            """
+            class Box { total: int = 0 }
+
+            let box = Box { };
+
+            fn bump(by: int): void { box.total = box.total + by; }
+
+            @Hook
+            pub fn run(n: int): int {
+                var i = 0;
+                while (i < n) {
+                    bump(i);
+                    i = i + 1;
+                }
+
+                return box.total;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(100));
+    }
+
     [Fact]
     public void A_refused_function_still_runs()
     {

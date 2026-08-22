@@ -6,9 +6,9 @@ using Lyric.Bytecode;
 namespace Lyric.Vm.Jit;
 
 /// <summary>A compiled function: its parameters in, its result out.</summary>
-/// <param name="globals">The program's global slots, shared with the interpreter — a compiled
-/// function and an interpreted one must see the same module state.</param>
-internal delegate LyrValue Compiled(LyrValue[] globals, LyrValue[] args);
+/// <param name="context">The program around it — globals, the tables, and the way to call
+/// anything else. See <see cref="JitContext"/>.</param>
+internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 
 /// <summary>
 /// Turns a function's bytecode into .NET IL.
@@ -30,10 +30,11 @@ internal delegate LyrValue Compiled(LyrValue[] globals, LyrValue[] args);
 /// <para><b>What it refuses.</b> Everything it does not understand, per function, and the
 /// interpreter keeps those. That is the whole safety story: a refusal costs speed, never
 /// correctness, and the set grows one opcode at a time with the differential tests holding the
-/// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays and fields.
-/// Still declined — calls, closures, exceptions, optionals, interfaces, enums, conversions,
-/// division (which panics), object construction (which needs the type table), and the narrow
-/// integer widths (which need re-normalising after every operation).</para>
+/// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields, and
+/// calls — to a native, or to another function that compiles. Still declined: closures,
+/// exceptions, optionals, interfaces, enums, conversions, division (which panics), object
+/// construction (which needs the type table), recursion, and the narrow integer widths (which
+/// need re-normalising after every operation).</para>
 /// </summary>
 internal static class JitCompiler
 {
@@ -46,17 +47,22 @@ internal static class JitCompiler
     /// element. Long literals are setup code, not hot code; the interpreter keeps them.</summary>
     private const int MaxArrayLiteral = 16;
 
+    /// <summary>How many arguments a CALL may carry, for the same reason. Lyric's own natives
+    /// stop at eight and hand-written signatures are short.</summary>
+    private const int MaxCallArgs = 8;
+
     /// <summary>
     /// Compiles a function, or answers <c>null</c> when it contains something this pass does not
     /// handle. Refusal is normal and is not an error.
     /// </summary>
-    public static Compiled? TryCompile(BytecodeFunction function, BytecodeInstruction[] code,
-        int[] blockStart, IReadOnlyList<BytecodeTypeDef> types,
-        IReadOnlyList<BytecodeType> globalTypes)
+    public static Compiled? TryCompile(Interpreter.Prepared prepared, JitContext context)
     {
-        ArgumentNullException.ThrowIfNull(function);
-        ArgumentNullException.ThrowIfNull(code);
-        ArgumentNullException.ThrowIfNull(blockStart);
+        ArgumentNullException.ThrowIfNull(prepared);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var function = prepared.Source;
+        var code = prepared.Instructions;
+        var blockStart = prepared.BlockStart;
 
         if (function.ParamCount > MaxParameters || blockStart.Length == 0) return null;
 
@@ -71,17 +77,37 @@ internal static class JitCompiler
         if (function.ReturnType.Tag != TypeTag.Void && Machine(function.ReturnType) is null)
             return null;
 
-        var method = new DynamicMethod(
-            "lyrjit_" + function.Name,
-            typeof(LyrValue),
-            [typeof(LyrValue[]), typeof(LyrValue[])],
-            typeof(JitCompiler).Module,
-            skipVisibility: true);
+        DynamicMethod method;
+        try
+        {
+            method = new DynamicMethod(
+                "lyrjit_" + function.Name,
+                typeof(LyrValue),
+                [typeof(JitContext), typeof(LyrValue[])],
+                typeof(JitCompiler).Module,
+                skipVisibility: true);
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // NativeAOT has no runtime code generation. Refusing is exactly right: the program
+            // runs interpreted and nothing else changes. It is worth knowing which way round that
+            // is, though -- publishing a game ahead-of-time and compiling its scripts at run time
+            // are alternatives, not a pair.
+            return null;
+        }
 
         var il = method.GetILGenerator();
 
         var locals = new LocalBuilder[slotTypes.Length];
         for (var i = 0; i < slotTypes.Length; i++) locals[i] = il.DeclareLocal(slotTypes[i]);
+
+        // The globals array is read once, here, rather than through the context on every access.
+        // It is the same array the interpreter holds and is never replaced.
+        var globals = il.DeclareLocal(typeof(LyrValue[]));
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(JitContext).GetProperty(nameof(JitContext.Globals))!
+            .GetGetMethod()!);
+        il.Emit(OpCodes.Stloc, globals);
 
         // Arguments arrive as LyrValue and are unpacked once, here. Everything after this point
         // works on machine types.
@@ -90,15 +116,15 @@ internal static class JitCompiler
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4, i);
             il.Emit(OpCodes.Ldelem, typeof(LyrValue));
-            EmitUnpack(il, function.SlotTypes[i]);
+            if (!EmitUnpack(il, function.SlotTypes[i])) return null;
             il.Emit(OpCodes.Stloc, locals[i]);
         }
 
         var labels = new Label[blockStart.Length];
         for (var b = 0; b < labels.Length; b++) labels[b] = il.DefineLabel();
 
-        var context = new Emitter(il, function, locals, labels, types, globalTypes);
-        if (!context.EmitBlocks(code, blockStart)) return null;
+        var emitter = new Emitter(il, function, locals, globals, labels, context);
+        if (!emitter.EmitBlocks(code, blockStart)) return null;
 
         try
         {
@@ -118,10 +144,14 @@ internal static class JitCompiler
         ILGenerator il,
         BytecodeFunction function,
         LocalBuilder[] locals,
+        LocalBuilder globals,
         Label[] labels,
-        IReadOnlyList<BytecodeTypeDef> types,
-        IReadOnlyList<BytecodeType> globalTypes)
+        JitContext context)
     {
+        private IReadOnlyList<BytecodeType> globalTypes => context.GlobalTypes;
+
+        private IReadOnlyList<BytecodeTypeDef> types => context.Types;
+
         /// <summary>The type of every value on the IL evaluation stack. The bytecode says what
         /// each operation produces, so this is bookkeeping rather than inference.</summary>
         private readonly Stack<BytecodeType> _stack = new();
@@ -192,10 +222,10 @@ internal static class JitCompiler
                     var slot = (int)op.Immediate;
                     if (slot < 0 || slot >= globalTypes.Count) return false;
 
-                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldloc, globals);
                     il.Emit(OpCodes.Ldc_I4, slot);
                     il.Emit(OpCodes.Ldelem, typeof(LyrValue));
-                    EmitUnpack(il, globalTypes[slot]);
+                    if (!EmitUnpack(il, globalTypes[slot])) return false;
                     _stack.Push(globalTypes[slot]);
                     return true;
                 }
@@ -207,15 +237,15 @@ internal static class JitCompiler
 
                     // The value is already on the stack and the array and index have to go
                     // UNDER it, which IL cannot do -- so it goes into a temporary first.
-                    var held = Scratch(0, Machine(globalTypes[slot]));
+                    var held = Temp(Machine(globalTypes[slot]));
                     if (held is null) return false;
 
                     _stack.Pop();
                     il.Emit(OpCodes.Stloc, held);
-                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldloc, globals);
                     il.Emit(OpCodes.Ldc_I4, slot);
                     il.Emit(OpCodes.Ldloc, held);
-                    EmitPack(il, globalTypes[slot]);
+                    if (!EmitPack(il, globalTypes[slot])) return false;
                     il.Emit(OpCodes.Stelem, typeof(LyrValue));
                     return true;
                 }
@@ -293,7 +323,7 @@ internal static class JitCompiler
 
                     il.Emit(OpCodes.Ldstr, function.Name);
                     il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.Element)));
-                    EmitUnpack(il, element);
+                    if (!EmitUnpack(il, element)) return false;
                     _stack.Push(element);
                     return true;
                 }
@@ -306,7 +336,7 @@ internal static class JitCompiler
                     var array = _stack.Pop();
                     if (array.Element is null) return false;
 
-                    EmitPack(il, value);
+                    if (!EmitPack(il, value)) return false;
                     il.Emit(OpCodes.Ldstr, function.Name);
                     il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.SetElement)));
                     return true;
@@ -344,6 +374,9 @@ internal static class JitCompiler
                 case Op.NewArray:
                     return EmitNewArray((int)op.Immediate);
 
+                case Op.Call:
+                    return EmitCall((int)op.Immediate);
+
                 // ------------------------------------------------------------ fields
 
                 case Op.LoadField:
@@ -355,7 +388,7 @@ internal static class JitCompiler
                     il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.Field)));
                     il.Emit(OpCodes.Ldc_I4, (int)op.Immediate2);
                     il.Emit(OpCodes.Ldelem, typeof(LyrValue));
-                    EmitUnpack(il, field);
+                    if (!EmitUnpack(il, field)) return false;
                     _stack.Push(field);
                     return true;
                 }
@@ -369,14 +402,14 @@ internal static class JitCompiler
 
                     // The reference lies UNDER the value and the store wants it on top, so the
                     // value waits in a temporary.
-                    var held = Scratch(0, Machine(value));
+                    var held = Temp(Machine(value));
                     if (held is null) return false;
 
                     il.Emit(OpCodes.Stloc, held);
                     il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.Field)));
                     il.Emit(OpCodes.Ldc_I4, (int)op.Immediate2);
                     il.Emit(OpCodes.Ldloc, held);
-                    EmitPack(il, value);
+                    if (!EmitPack(il, value)) return false;
                     il.Emit(OpCodes.Stelem, typeof(LyrValue));
                     return true;
                 }
@@ -420,7 +453,7 @@ internal static class JitCompiler
                 case Op.ReturnValue:
                 {
                     if (_stack.Count != 1) return false;
-                    EmitPack(il, _stack.Pop());
+                    if (!EmitPack(il, _stack.Pop())) return false;
                     il.Emit(OpCodes.Ret);
                     _terminated = true;
                     return true;
@@ -429,6 +462,96 @@ internal static class JitCompiler
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// A call, to a native or to another Lyric function — the shared index space decides
+        /// which, and <see cref="JitContext.Call"/> decides it again at run time.
+        ///
+        /// <para><b>Late-bound on purpose.</b> Binding the callee's delegate here would need a
+        /// cycle analysis for recursion and a way to patch a caller whose callee later refuses.
+        /// Asking the context costs one indirection, which sits beside a native's own cost and is
+        /// invisible next to it.</para>
+        /// </summary>
+        private bool EmitCall(int index)
+        {
+            if (index < 0) return false;
+
+            var natives = context.Natives.Length;
+            int arity;
+            BytecodeType returns;
+
+            if (index < natives)
+            {
+                if (index >= context.Imports.Count) return false;
+                arity = context.Imports[index].ParamTypes.Count;
+                returns = context.Imports[index].ReturnType;
+            }
+            else
+            {
+                var at = index - natives;
+                if (at >= context.Prepared.Length) return false;
+
+                // THE CALLEE HAS TO COMPILE TOO, and this is not about speed.
+                //
+                // A Lyric exception unwinds along the interpreter's frame stack. Compiled code
+                // keeps no frames, so a compiled function sitting between a 'throw' and the
+                // 'catch' meant to receive it breaks the chain: the throw finds no handler and
+                // becomes an uncaught panic. Refusing here keeps every compiled call inside
+                // compiled code, where nothing can throw a Lyric exception in the first place --
+                // 'throw' is one of the opcodes this pass declines.
+                //
+                // Recursion refuses itself, and correctly. 'CodeFor' marks a function as tried
+                // BEFORE compiling it, so a function reached again while it is still being
+                // compiled answers "no code" and the caller declines. Both ends stay interpreted,
+                // which is right but not free: a recursive helper does not compile today.
+                if (context.CodeFor(context.Prepared[at]) is null) return false;
+
+                arity = context.Prepared[at].Source.ParamCount;
+                returns = context.Prepared[at].Source.ReturnType;
+            }
+
+            if (arity > MaxCallArgs || _stack.Count < arity) return false;
+            if (returns.Tag != TypeTag.Void && Machine(returns) is null) return false;
+
+            // The arguments are on the stack and the buffer they belong in does not exist yet,
+            // so they come off into temporaries -- the same shape as an array literal.
+            for (var i = arity - 1; i >= 0; i--)
+            {
+                if (!EmitPack(il, _stack.Pop())) return false;
+                il.Emit(OpCodes.Stloc, ValueSlot(i));
+            }
+
+            var buffer = il.DeclareLocal(typeof(LyrValue[]));
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4, arity);
+            il.Emit(OpCodes.Call, ContextCall(nameof(JitContext.RentArgs)));
+            il.Emit(OpCodes.Stloc, buffer);
+
+            for (var i = 0; i < arity; i++)
+            {
+                il.Emit(OpCodes.Ldloc, buffer);
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Ldloc, _scratch[i]);
+                il.Emit(OpCodes.Stelem, typeof(LyrValue));
+            }
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4, index);
+            il.Emit(OpCodes.Ldloc, buffer);
+            il.Emit(OpCodes.Call, ContextCall(nameof(JitContext.Call)));
+
+            if (returns.Tag == TypeTag.Void)
+            {
+                il.Emit(OpCodes.Pop);
+            }
+            else
+            {
+                if (!EmitUnpack(il, returns)) return false;
+                _stack.Push(returns);
+            }
+
+            return true;
         }
 
         /// <summary>An array literal: the elements are already on the stack, and the array they
@@ -441,12 +564,8 @@ internal static class JitCompiler
 
             for (var i = count - 1; i >= 0; i--)
             {
-                var value = _stack.Pop();
-                var held = Scratch(i, typeof(LyrValue));
-                if (held is null) return false;
-
-                EmitPack(il, value);
-                il.Emit(OpCodes.Stloc, held);
+                if (!EmitPack(il, _stack.Pop())) return false;
+                il.Emit(OpCodes.Stloc, ValueSlot(i));
             }
 
             il.Emit(OpCodes.Ldc_I4, count);
@@ -464,18 +583,20 @@ internal static class JitCompiler
             return true;
         }
 
-        /// <summary>A temporary of a given type at a given depth, made once and reused.</summary>
-        private LocalBuilder? Scratch(int depth, Type? type)
+        /// <summary>A <see cref="LyrValue"/> temporary at a given depth, made once and shared by
+        /// every site that needs one that deep.</summary>
+        private LocalBuilder ValueSlot(int depth)
         {
-            if (type is null) return null;
-
             while (_scratch.Count <= depth) _scratch.Add(il.DeclareLocal(typeof(LyrValue)));
-
-            // A slot already made for LyrValue serves any packed value; one asked for as a
-            // machine type needs its own, so those get a fresh local each time. They are cheap
-            // and the JIT coalesces what it can.
-            return type == typeof(LyrValue) ? _scratch[depth] : il.DeclareLocal(type);
+            return _scratch[depth];
         }
+
+        /// <summary>A fresh temporary of a machine type. Cheap: RyuJIT coalesces what it can.
+        /// </summary>
+        private LocalBuilder? Temp(Type? type) => type is null ? null : il.DeclareLocal(type);
+
+        private static System.Reflection.MethodInfo ContextCall(string name) =>
+            typeof(JitContext).GetMethod(name)!;
 
         private BytecodeType? FieldType(BytecodeType owner, int index)
         {
@@ -616,8 +737,20 @@ internal static class JitCompiler
         _ => null,
     };
 
-    /// <summary>A <see cref="LyrValue"/> on the stack becomes a machine value.</summary>
-    private static void EmitUnpack(ILGenerator il, BytecodeType type) =>
+    /// <summary>
+    /// A <see cref="LyrValue"/> on the stack becomes a machine value, or the function is refused.
+    ///
+    /// <para><b>The refusal lives HERE rather than at each site, and that is the point.</b> An
+    /// earlier version checked the mapping where it was convenient and trusted it where it was
+    /// not — and a module-level constant holding a HOST OBJECT went through the integer path,
+    /// read its bits, and dropped the reference. Nothing failed: the value simply became zero,
+    /// and the host got a null where its own object should have been. Every conversion now passes
+    /// through one gate that can say no.</para>
+    /// </summary>
+    private static bool EmitUnpack(ILGenerator il, BytecodeType type)
+    {
+        if (Machine(type) is null) return false;
+
         il.Emit(OpCodes.Call, type.Tag switch
         {
             TypeTag.F64 => Runtime(nameof(JitRuntime.ToF64)),
@@ -627,8 +760,15 @@ internal static class JitCompiler
             _ => Runtime(nameof(JitRuntime.ToI64)),
         });
 
-    /// <summary>And back: a machine value becomes a <see cref="LyrValue"/>.</summary>
-    private static void EmitPack(ILGenerator il, BytecodeType type) =>
+        return true;
+    }
+
+    /// <summary>And back: a machine value becomes a <see cref="LyrValue"/>, or the function is
+    /// refused.</summary>
+    private static bool EmitPack(ILGenerator il, BytecodeType type)
+    {
+        if (Machine(type) is null) return false;
+
         il.Emit(OpCodes.Call, type.Tag switch
         {
             TypeTag.F64 => Factory(nameof(LyrValue.FromF64), typeof(double)),
@@ -637,6 +777,9 @@ internal static class JitCompiler
                 Runtime(nameof(JitRuntime.Reference)),
             _ => Factory(nameof(LyrValue.FromI64), typeof(long)),
         });
+
+        return true;
+    }
 
     private static MethodInfo PackBits { get; } =
         Factory(nameof(LyrValue.FromBits), typeof(ulong));
