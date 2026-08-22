@@ -387,9 +387,9 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4589 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **2.14.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 90 cases, and the toolchain's own CI runs it against the
+4598 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **2.16.0**; the specification in `lyriclang/lyric-spec` is
+**NORMATIVE**, its suite stands at 94 cases, and the toolchain's own CI runs it against the
 working tree.
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
