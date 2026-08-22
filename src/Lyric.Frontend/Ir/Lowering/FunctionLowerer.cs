@@ -3498,6 +3498,53 @@ internal sealed class FunctionLowerer
     /// same reason.</para>
     /// </summary>
     /// <summary>
+    /// A generic method of an interface, monomorphized: <c>Iterator&lt;int&gt;.map&lt;string&gt;</c>.
+    ///
+    /// <para>Not a <c>callvirt</c>, because there is no slot to call: a slot holds one function
+    /// and this is one per instantiation. The receiver is lifted all the same — the method's
+    /// <c>this</c> is the interface type, exactly as for an ordinary default — and what follows is
+    /// a direct call to the instance.</para>
+    ///
+    /// <para>The same trade Rust makes for a provided method with type parameters of its own: it
+    /// exists where the concrete type is known and is unavailable through a dynamic value. What is
+    /// bought with it is chaining — <c>xs.iter().map(f).take(3)</c> — and what is paid is that such
+    /// a method can never be dispatched dynamically.</para>
+    /// </summary>
+    private TempId? LowerGenericInterfaceMethod(MemberExpr member, CallExpr expr, TypeSymbol iface,
+        FunctionSymbol method, TypeId interfaceId, TempId receiver)
+    {
+        if (method.Declaration is not FunctionDecl declaration)
+            throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
+
+        // The type arguments the sema inferred, with any that are still parameters of the CALLING
+        // instance resolved through its substitution — the same step an ordinary generic call takes.
+        var typeArguments = _types.TypeArgumentsOf(expr)
+            .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
+                ? bound : t)
+            .ToArray();
+
+        var target = _instances.Request(method, declaration, $"{iface.Name}.{method.Name}",
+            iface, typeArguments, _typeTable, expr.Span, _typeTable.InstanceOf(interfaceId));
+
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        var args = new TempId[supplied.Length + 1];
+        args[0] = receiver;
+        Array.Copy(supplied, 0, args, 1, supplied.Length);
+
+        var returns = TypeOfExpr(expr);
+        if (IsVoid(returns))
+        {
+            _b.Emit(new Call(null, target, args, expr.Span));
+            return null;
+        }
+
+        var result = _slots.NewTemp(returns);
+        _b.Emit(new Call(result, target, args, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
+    /// <summary>
     /// A method call on an instance of a generic type.
     ///
     /// <para>The method is monomorphized PER TYPE INSTANCE: <c>Box&lt;int&gt;.get</c> and
@@ -4121,6 +4168,17 @@ internal sealed class FunctionLowerer
         // because it comes from the declaration and holds for all instances.
         var interfaceId = instanceType ?? _typeTable.InterfaceOf(iface).Type;
 
+        // A GENERIC member is not dispatched: it has no slot and cannot have one, because a slot
+        // holds one function and a method with type parameters of its own is one function per
+        // instantiation. It is monomorphized and called directly — which is sound precisely
+        // because such a member may not be overridden (LYR-SEM0082), so the default IS the
+        // implementation for every receiver. Both routes here end up in the same place: a
+        // constrained receiver arrives lifted, an interface value arrives as itself.
+        if (iface.Members.LookupLocal(member.Member) is FunctionSymbol generic
+            && generic.Generics.Length > 0)
+            return LowerGenericInterfaceMethod(member, expr, iface, generic, interfaceId,
+                receiver ?? LowerExprAs(member.Target, new IrInterfaceType(interfaceId)));
+
         // Read the slot from the entry of THIS instance: going through the symbol would intern 'Src'
         // without type arguments, and that has no entry.
         var slots = _typeTable.MethodSlotsOf(interfaceId);
@@ -4140,9 +4198,17 @@ internal sealed class FunctionLowerer
             ? method.Declaration as FunctionDecl
             : null;
 
+        // The parameter types are written against the interface's OWN type parameters, so for an
+        // instance they have to be read under its substitution: 'fn(T) -> bool' on an
+        // 'Iterator<int>' is 'fn(int) -> bool'. Without it the lowering meets a bare T, which is
+        // no type at all — the wall every default of a generic interface ran into.
+        var owning = _typeTable.InstanceOf(interfaceId);
+
         for (var i = 0; i < expr.Arguments.Length; i++)
             args[i + 1] = declaration is not null && i < declaration.Parameters.Length
-                ? LowerExprAs(expr.Arguments[i], _typeTable.Lower(declaration.Parameters[i].Type))
+                ? LowerExprAs(expr.Arguments[i], owning is { } instance
+                    ? LowerWithOwner(declaration.Parameters[i].Type, instance, expr.Span)
+                    : _typeTable.Lower(declaration.Parameters[i].Type))
                 : LowerExpr(expr.Arguments[i]);
 
         var returnType = TypeOfExpr(expr);

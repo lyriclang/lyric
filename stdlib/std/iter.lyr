@@ -19,6 +19,21 @@ pub interface Iterator<T> {
     /// The next value, or `null` at the end. `mut`, because an iterator advances its own
     /// position.
     mut fn next(): ?T;
+
+    /// Each element through `f`, lazily: nothing runs before someone asks.
+    fn map<U>(f: fn(T) -> U): Iterator<U> {
+        return MapIterator<T, U> { source = this, f = f };
+    }
+
+    /// The elements `keep` accepts, lazily.
+    fn filter(keep: fn(T) -> bool): Iterator<T> {
+        return FilterIterator<T> { source = this, keep = keep };
+    }
+
+    /// At most `count` elements, then the end.
+    fn take(count: int): Iterator<T> {
+        return TakeIterator<T> { source = this, remaining = count };
+    }
 }
 
 /// An exclusive numeric range, `a..b`. The inclusive form has its own adapter below: folding
@@ -194,7 +209,7 @@ pub class MapIterator<T, U> :: [Iterator<U>] {
 
 /// Each element through `f`, lazily: nothing runs before someone asks.
 pub fn map<T, U>(source: Iterator<T>, f: fn(T) -> U): Iterator<U> {
-    return MapIterator<T, U> { source = source, f = f };
+    return source.map<U>(f);
 }
 
 /// The lazy machinery behind `filter`.
@@ -220,7 +235,7 @@ pub class FilterIterator<T> :: [Iterator<T>] {
 
 /// Only the elements `keep` accepts, lazily.
 pub fn filter<T>(source: Iterator<T>, keep: fn(T) -> bool): Iterator<T> {
-    return FilterIterator<T> { source = source, keep = keep };
+    return source.filter(keep);
 }
 
 /// The lazy machinery behind `take`.
@@ -243,7 +258,7 @@ pub class TakeIterator<T> :: [Iterator<T>] {
 /// The first `count` elements, lazily. A negative `count` yields nothing rather than
 /// panicking: it is an empty selection, not a broken promise.
 pub fn take<T>(source: Iterator<T>, count: int): Iterator<T> {
-    return TakeIterator<T> { source = source, remaining = count };
+    return source.take(count);
 }
 
 /// The lazy machinery behind `skip`.

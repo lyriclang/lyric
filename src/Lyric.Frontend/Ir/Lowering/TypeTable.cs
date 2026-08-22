@@ -636,8 +636,15 @@ internal sealed class TypeTable
                         slots.Add(name);
 
         foreach (var member in decl.Members)
+        {
+            // A GENERIC member gets no slot, and cannot: a slot holds one function, and a method
+            // with type parameters of its own is one function per instantiation. It is reached by
+            // monomorphization instead — which is what makes it unavailable through an interface
+            // VALUE, the trade Rust makes for the same reason.
+            if (member.Generics.Length > 0) continue;
             if (!slots.Contains(member.Name))
                 slots.Add(member.Name);
+        }
 
         return slots.ToArray();
     }

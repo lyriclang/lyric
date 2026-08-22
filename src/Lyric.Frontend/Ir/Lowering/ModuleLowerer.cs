@@ -354,25 +354,33 @@ public static class ModuleLowerer
         // The vtable rows FIRST, because they can request an extension nobody has called yet:
         // 'extend A :: [I]' is needed as soon as an A lands in an I slot, even when the method appears
         // nowhere directly in the source.
-        var impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances,
-            de, ref failed);
-        if (failed) return null;
-
+        // A FIXED POINT over the rows and what they pull in, not one pass. A row may request a
+        // method that interns further types while it is lowered — the default of a generic
+        // interface builds its adapter ('Iterator<int>.where' constructs a FilterIterator<int>)
+        // and lifts it into the interface — and those types need rows of their own. One pass left
+        // them without, which the verifier caught as "no impl row says it implements it".
+        //
+        // Rebuilding rather than appending: BuildImpls reads the tables and produces the whole
+        // list, and every request behind it is idempotent, so a second round costs a walk and
+        // yields the rows the first one could not know about. The type table only grows and the
+        // set of reachable instantiations is finite, so this terminates on its own; the round
+        // count is the same belt the other worklists wear.
+        var impls = new List<IrImpl>();
         var late = new List<(FunctionId Id, IrFunction Function)>();
         try
         {
-            for (var round = 0; round < MaxLoweringRounds; round++)
+            for (var pass = 0; pass < MaxLoweringRounds; pass++)
             {
-                var before = late.Count;
-                // All three, not only two: a vtable row for a generic instance requests its method
-                // (ListIterator<int>.next), and that arises only through the monomorphization. With
-                // 'instances' missing here, the row points at a FunctionId nobody filled, which the
-                // verifier reports as "targets f7, which is out of range".
-                late.AddRange(instances.LowerAll(types, ids, imports, typeTable, globals, lambdas));
-                late.AddRange(extensions.LowerAll(types, ids, imports, typeTable, globals,
-                    lambdas, instances));
-                late.AddRange(lambdas.LowerAll(types, ids, imports, typeTable, globals, instances));
-                if (late.Count == before) break;
+                var typesBefore = typeTable.Interned.Count();
+
+                impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances,
+                    de, ref failed);
+                if (failed) return null;
+
+                DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
+                    typeTable, globals);
+
+                if (typeTable.Interned.Count() == typesBefore) break;
             }
         }
         catch (UnsupportedConstructException ex)
@@ -380,6 +388,7 @@ public static class ModuleLowerer
             de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
             return null;
         }
+
 
         // ONE merge over both downstream batches, by id. A gap would shift every function after
         // it under a wrong id — the inliner and the vtable rows index the list by id — so a hole
@@ -911,6 +920,34 @@ public static class ModuleLowerer
                 }
         }
         return found;
+    }
+
+    /// <summary>
+    /// Drains everything the vtable rows pulled in, until nothing more arrives.
+    ///
+    /// <para>All FOUR kinds, not two: a row for a generic instance requests its method
+    /// (<c>ListIterator&lt;int&gt;.next</c>), which arises only through the monomorphization; a
+    /// default of a generic interface requests a lambda and further instances behind it. A kind
+    /// missing here leaves a row pointing at a FunctionId nobody filled, which the verifier
+    /// reports as "targets f7, which is out of range".</para>
+    /// </summary>
+    private static void DrainLate(List<(FunctionId Id, IrFunction Function)> late,
+        CoroutineTable coroutines, InstanceTable instances, LambdaTable lambdas,
+        ExtensionTable extensions, TypeResult types,
+        Dictionary<FunctionSymbol, FunctionId> ids, ImportTable imports, TypeTable typeTable,
+        GlobalTable globals)
+    {
+        for (var round = 0; round < MaxLoweringRounds; round++)
+        {
+            var before = late.Count;
+            late.AddRange(coroutines.LowerAll(types, ids, imports, typeTable, globals, lambdas,
+                instances));
+            late.AddRange(instances.LowerAll(types, ids, imports, typeTable, globals, lambdas));
+            late.AddRange(extensions.LowerAll(types, ids, imports, typeTable, globals, lambdas,
+                instances));
+            late.AddRange(lambdas.LowerAll(types, ids, imports, typeTable, globals, instances));
+            if (late.Count == before) return;
+        }
     }
 
     /// <summary>The method of a generic instance, requested through the monomorphization. <c>null</c>
