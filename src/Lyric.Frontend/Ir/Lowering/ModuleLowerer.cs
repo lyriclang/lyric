@@ -857,7 +857,13 @@ public static class ModuleLowerer
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions)
                                  ?? Conformance.WithParents(iface, binding)
                                      .Select(p => Resolve(p, slots[i], ids))
-                                     .FirstOrDefault(f => f is not null);
+                                     .FirstOrDefault(f => f is not null)
+                                 // The default of a GENERIC interface, which lives on the
+                                 // instance: 'Source<int>.twice' is its own function, exactly as
+                                 // 'Box<int>.get' is. Pass 1 cannot lower it — a default of
+                                 // 'Source<T>' has no T until an instance names one — so the
+                                 // request happens here, where the row that needs it is built.
+                                 ?? ResolveInInstance(typeTable, ifaceId, slots[i], instances);
                     if (target is { } id) { methods[i] = id; continue; }
 
                     // The sema already checked conformance. If something is missing here all the same, it

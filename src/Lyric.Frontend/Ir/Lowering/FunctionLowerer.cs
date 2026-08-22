@@ -3671,8 +3671,19 @@ internal sealed class FunctionLowerer
                         // The receiver is available as a class reference and 'callvirt' needs an interface
                         // value: lift first (mkiface), then call. The same as at every other place where
                         // a class moves into an interface slot.
-                        var lifted = LowerExprAs(member.Target, _typeTable.InterfaceOf(iface));
-                        return LowerVirtualCall(member, iface, expr, receiver: lifted);
+                        //
+                        // From the WRITTEN constraint rather than from the symbol when the member
+                        // comes from the constrained interface itself: a generic interface has no
+                        // entry of its own, only 'Source<int>' does, and lifting into the
+                        // definition is what a default method of a generic interface used to die
+                        // on. The same id then carries the callvirt, whose slot table also hangs
+                        // on the instance.
+                        var lift = ReferenceEquals(iface, constrained)
+                            ? _typeTable.InterfaceOf(constraint, expr.Span)
+                            : _typeTable.InterfaceOf(iface);
+
+                        var lifted = LowerExprAs(member.Target, lift);
+                        return LowerVirtualCall(member, iface, expr, lift.Type, lifted);
                     }
 
             throw NotSupported(
