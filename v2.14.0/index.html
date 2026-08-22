@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v2.14.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v2.14.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v2.14.0 — 2026-08-22</h2>
+<p>The second link of the patch train. <code>std.io.file</code> had three conventions for &quot;it did not work&quot;,
+and one of them could not be told from success.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>A read answers <code>?T</code>.</strong> <code>text</code>, <code>bytes</code> and <code>lines</code> replace <code>readText</code>, <code>readBytes</code> and
+<code>readLines</code>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>before</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the file is empty</td>
+<td><code>[]</code></td>
+<td><code>[]</code></td>
+</tr>
+<tr>
+<td>the file is not there</td>
+<td><code>[]</code></td>
+<td><strong><code>null</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>readBytes</code> and <code>readLines</code> answered an empty array to both, so no caller could tell them
+apart — and the documentation said to ask <code>exists</code> first, which is a race dressed up as advice.
+<code>readText</code> was already <code>?string</code>; it is renamed only so the module has one word for one idea.</p>
+<p>The three old names still work, warn, and carry <code>until = &quot;3.0&quot;</code> — the compiler will stop the
+build on the day they are due, which is the mechanism 2.13 shipped for exactly this.</p>
+</li>
+<li><p><strong>A native may return <code>?T[]</code></strong> (<code>RegisterOptionalArrayReturning</code>). Nothing about the VALUE
+needed building — an optional over a reference IS the reference — but the binder now checks
+three levels of type, because only the element below the optional and the array separates
+<code>?string[]</code> from <code>?uint8[]</code>. Without it a host could hand back bytes where the module expects
+lines, and the mistake would surface somewhere else entirely.</p>
+</li>
+</ul>
+<h3 id="the-rule-written-down">The rule, written down</h3>
+<p>Two shapes, and each says what it is for:</p>
+<ul>
+<li>a <strong>read</strong> answers <code>?T</code> — <code>null</code> is &quot;could not&quot;, an empty result is an empty file;</li>
+<li>an <strong>operation</strong> answers <code>bool</code> — whether it happened. It carries no value, so nothing is lost.</li>
+</ul>
+<p>A predicate (<code>exists</code>, <code>isFile</code>, <code>isDirectory</code>) answers <code>bool</code> as well, and there <code>false</code> is an
+answer rather than a failure.</p>
+<p><strong>What none of them carries is a REASON</strong>: a missing file and a permission denied look the same.
+That gap is real and left open deliberately — carrying reasons means an error type and a decision
+about <code>throws</code>, which is the larger question this release deliberately did not answer.</p>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
