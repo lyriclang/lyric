@@ -55,6 +55,27 @@ internal readonly struct DebugPolicy(DebugController controller) : IExecutionPol
         controller.OnInstruction(frames, frame);
 }
 
+/// <summary>
+/// The measuring policy: one instruction, one tally mark, against the function it belongs to.
+///
+/// <para>It exists to answer one question a refusal count cannot: WHICH declined function is
+/// actually costing anything. Run a game with compilation on and this on, and a compiled function
+/// executes no instructions at all — so whatever stands at the top of the tally is, by
+/// construction, interpreted code that runs a lot.</para>
+///
+/// <para>Its own specialization rather than a flag, for the same reason the budget has one: an
+/// ordinary run keeps the loop it had before anybody wanted to measure it.</para>
+/// </summary>
+internal readonly struct ProfilePolicy : IExecutionPolicy
+{
+    /// <summary>Yes — and that is the point. What runs compiled must stay compiled, or the tally
+    /// would measure the interpreter running everything.</summary>
+    public static bool AllowsCompiledCode => true;
+
+    public void BeforeInstruction(Stack<Interpreter.Frame> frames, Interpreter.Frame frame) =>
+        frame.Fn.Executed++;
+}
+
 /// <summary>The metered policy: one instruction, one unit, and the run stops when the host's
 /// budget is spent. Its own specialization rather than a flag in the release one, so an
 /// unmetered run keeps the loop it had before budgets existed.</summary>
@@ -110,6 +131,17 @@ public static class Interpreter
         return LyrValue.FromObject(values);
     }
 
+    /// <summary>
+    /// <c>LYRIC_PROFILE=1</c> counts executed instructions per function, for the whole process.
+    ///
+    /// <para>A diagnostic switch of the same kind as <c>LYRIC_JIT</c>: it exists so that a
+    /// question can be answered from outside without every host growing a knob for it. It costs
+    /// an increment per instruction, so it is off unless asked for.</para>
+    /// </summary>
+    private static readonly bool Profiling =
+        string.Equals(
+            Environment.GetEnvironmentVariable("LYRIC_PROFILE"), "1", StringComparison.Ordinal);
+
     internal static LyrValue Execute(Prepared[] prepared, int startIndex,
         IReadOnlyList<string> strings, IReadOnlyList<BytecodeTypeDef> types,
         DispatchTable dispatch, NativeRegistry.BoundNative[] natives, LyrValue[] globals,
@@ -157,6 +189,10 @@ public static class Interpreter
             if (debug is not null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
                     ref frame, new DebugPolicy(debug), jit);
+
+            if (Profiling && budget is null)
+                return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes,
+                    arguments, frames, ref frame, default(ProfilePolicy), jit);
 
             return budget is null
                 ? Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
@@ -1008,6 +1044,10 @@ public static class Interpreter
         /// compile, and re-analysing them per call would cost more than the interpreter saves.
         /// </summary>
         public bool JitTried;
+
+        /// <summary>How many instructions this function has executed IN THE INTERPRETER, when
+        /// something was counting. Zero for a function that compiled.</summary>
+        public long Executed;
 
         /// <summary>Which block the instruction at index <c>i</c> belongs to.
         ///

@@ -143,6 +143,22 @@ public sealed class LoadedProgram
     public int JitCompiled => _jit?.CompiledCount ?? 0;
 
     /// <summary>
+    /// How many instructions each function executed in the INTERPRETER, heaviest first. Empty
+    /// unless <c>LYRIC_PROFILE=1</c>.
+    ///
+    /// <para>Read it from a run that had compilation on and the answer is precise: a compiled
+    /// function executes no instructions, so this is a list of what is still being interpreted,
+    /// ordered by how much it costs. That is the question a refusal count cannot answer — a
+    /// function can be declined and never run.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, long Instructions)> Hotspots =>
+        _prepared
+            .Where(p => p.Executed > 0)
+            .OrderByDescending(p => p.Executed)
+            .Select(p => (p.Source.Name, p.Executed))
+            .ToArray();
+
+    /// <summary>
     /// <c>LYRIC_JIT=1</c> turns compilation on for every program in the process.
     ///
     /// <para>It exists for ONE purpose, and it is the purpose that makes a compiler trustworthy:
