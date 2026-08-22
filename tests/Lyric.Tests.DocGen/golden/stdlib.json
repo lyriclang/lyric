@@ -1144,93 +1144,93 @@
         {
           "Kind": "Interface",
           "Name": "Add",
-          "Signature": "pub interface Add<T>",
+          "Signature": "pub interface Add<T, R>",
           "Doc": "Values of this type can be added: `a + b` is `a.add(b)`.",
           "Members": [
             {
               "Kind": "Method",
               "Name": "add",
-              "Signature": "fn add(other: T): T",
+              "Signature": "fn add(other: T): R",
               "Doc": "The sum of this value and `other`.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 349
+                "Line": 354
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 347
+            "Line": 352
           }
         },
         {
           "Kind": "Interface",
           "Name": "Sub",
-          "Signature": "pub interface Sub<T>",
+          "Signature": "pub interface Sub<T, R>",
           "Doc": "Values of this type can be subtracted: `a - b` is `a.sub(b)`.",
           "Members": [
             {
               "Kind": "Method",
               "Name": "sub",
-              "Signature": "fn sub(other: T): T",
+              "Signature": "fn sub(other: T): R",
               "Doc": "This value minus `other`.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 355
+                "Line": 360
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 353
+            "Line": 358
           }
         },
         {
           "Kind": "Interface",
           "Name": "Mul",
-          "Signature": "pub interface Mul<T>",
+          "Signature": "pub interface Mul<T, R>",
           "Doc": "Values of this type can be multiplied: `a * b` is `a.mul(b)`.",
           "Members": [
             {
               "Kind": "Method",
               "Name": "mul",
-              "Signature": "fn mul(other: T): T",
+              "Signature": "fn mul(other: T): R",
               "Doc": "The product of this value and `other`.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 361
+                "Line": 366
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 359
+            "Line": 364
           }
         },
         {
           "Kind": "Interface",
           "Name": "Div",
-          "Signature": "pub interface Div<T>",
+          "Signature": "pub interface Div<T, R>",
           "Doc": "Values of this type can be divided: `a / b` is `a.div(b)`.",
           "Members": [
             {
               "Kind": "Method",
               "Name": "div",
-              "Signature": "fn div(other: T): T",
+              "Signature": "fn div(other: T): R",
               "Doc": "This value divided by `other`. What a division by zero does is the type's own business;\nthe built-in numerics panic.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 368
+                "Line": 373
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 365
+            "Line": 370
           }
         },
         {
@@ -1247,13 +1247,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 464
+                "Line": 469
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 462
+            "Line": 467
           }
         },
         {
@@ -1264,7 +1264,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 472
+            "Line": 477
           }
         },
         {
@@ -1275,7 +1275,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 475
+            "Line": 480
           }
         },
         {
@@ -1286,7 +1286,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 478
+            "Line": 483
           }
         },
         {
@@ -1303,7 +1303,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 485
+                "Line": 490
               }
             },
             {
@@ -1314,13 +1314,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 492
+                "Line": 497
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 483
+            "Line": 488
           }
         }
       ]

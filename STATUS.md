@@ -241,6 +241,30 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
+**THE v3.0.0 BASKET — in progress.** Everything that needs the major bump, collected on one
+line of work; the tree keeps claiming 2.17.0 until the basket is complete, so the suite's
+`//! since: 3.0.0` cases are skipped rather than failing in CI. The list:
+
+- [x] **multi-conformance** (branch `feature/multi-conformance`, 2026-08-23) — door B of the
+      design round, plus the part the round had not seen: the interfaces needed a SECOND type
+      argument. `Add<T, R>` says what stands on the right and what comes back; without it
+      `Mul<float, Vec2>` demands `fn mul(other: float): float` and `Vec2 * 2.0` cannot exist.
+      A type may now name one of the four several times, the operator picks by the right
+      operand, and the pieces that stopped identifying a method by NAME were: conformance
+      checking (matches by signature, not by first hit), the vtable rows (per interface
+      INSTANCE, so an interface value dispatches to the conformance it names), and the
+      constrained call in the lowering (through that row, so the constraint decides). New
+      `LYR-SEM0083` for two conformances taking one operand. Spec: §5.1, §6.1, appendix A,
+      four suite cases — `lyriclang/lyric-spec`, branch of the same name, **merges with this
+      one**.
+- [ ] #73 `Coroutine<T> throws E`
+- [ ] every 2.x deprecation removed — the `until = "3.0"` promises come due with the bump, and
+      `LYR-SEM0081` turns the build red the moment `<Version>` says 3.0.0
+- [ ] attribute roots for reachability pruning
+- [ ] the JIT's remaining obligations: default stays off (decided), an AOT line in the
+      embedding contract, "a metered run gets no JIT" in the guide, the refusal list
+      documented, `LYRIC_JIT=1` in CI
+
 **v1.0.0 through v2.0.0 are released** — annotated tags on the remote, each with a release page.
 M0–M10 are finished and tagged (`m0`–`m10-complete`, `v0.1.0`/`v0.5.0`/`v0.9.0`). Releases
 v1.8.0 through v1.9.1 carried the three toolchain archives plus two installables; since the org
@@ -1004,11 +1028,18 @@ answer yet, and it belongs asked before E4 starts.
   later.
 
   1. **Heterogeneous arithmetic comes as MULTI-CONFORMANCE, not as overloading** — door B of the
-     round. A type may conform to `Mul<Vec2>` and `Mul<float>`, and the operator picks the
-     conformance by the right-hand type; the implementation for each comes from its own `extend`
-     block, so no type declares two `mul`. The machinery is half there already: the conformance
-     dedup has keyed on the INSTANCE since M22. It extends the mechanism that exists instead of
-     adding one beside it. **v3.0.0.**
+     round. A type may conform to `Mul` twice, and the operator picks the conformance by the
+     right-hand type; the implementation for each comes from its own `extend` block, so no type
+     declares two `mul`. The machinery is half there already: the conformance dedup has keyed on
+     the INSTANCE since M22. It extends the mechanism that exists instead of adding one beside
+     it. **v3.0.0.**
+
+     *BUILT 2026-08-23, and the round had one thing wrong:* door B alone does not carry it. The
+     interfaces are `Mul<T>` with `fn mul(other: T): T` — the result is the OPERAND — so
+     `Mul<float, …>` on a `Vec2` demands a `mul` returning `float`, and multi-conformance
+     changes nothing about that. The second type argument is not an alternative to door B, it is
+     its prerequisite, and it is what makes the change breaking. The old "documented No" below
+     had that half right and drew the opposite conclusion from it.
 
   2. **The JIT stays OPT-IN in 3.0.0.** It changes no language and no format, so it needs no
      major on compatibility grounds; it ships with the major because that is where the maintainer
@@ -1034,9 +1065,11 @@ answer yet, and it belongs asked before E4 starts.
      "Architectural inversion" is what the old entry implied; three quarters of it has already
      happened.
 
-- **Heterogeneous operator arithmetic: documented No** (M22 probe) — *superseded by the entry
-  above; door B answers it. The original reasoning is kept because its second half still holds:
-  a two-parameter `Mul<Rhs, Out>` would break every existing conformance.* Two facts cap it below
+- **Heterogeneous operator arithmetic: documented No** (M22 probe) — *SUPERSEDED, shipped in the
+  v3.0.0 basket. Kept for one sentence of it that held and one that did not: a two-parameter
+  `Mul<Rhs, Out>` does break every existing conformance (true, and that is the breaking change),
+  but it buys only one right-hand type per type only WITHOUT multi-conformance. With it, the two
+  halves that were each useless alone are the whole feature.* Two facts cap it below
   usefulness: a type conforms to `Mul` ONCE (`Mul<Vec2>` beside `Mul<float>` fails the signature
   check — one `mul`, two wanted signatures), and Lyric has no overloading, so `mul(other: float)`
   beside `mul(other: Vec2)` cannot exist either. A two-parameter `Mul<Rhs, Out>` would break every

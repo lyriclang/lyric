@@ -3664,6 +3664,33 @@ internal sealed class FunctionLowerer
     /// (<c>let p: P = item;</c>) still goes through <c>callvirt</c>; those are two different questions
     /// and therefore two paths.</para>
     /// </summary>
+    /// <summary>The interface entry a constrained receiver is lifted into.
+    ///
+    /// <para>The constraint stands in the GENERIC function's terms and may name its own type
+    /// parameter: <c>T :: [Mul&lt;int, T&gt;]</c>. In an instance that <c>T</c> is settled, and
+    /// the entry is <c>Mul&lt;int, Vec2&gt;</c> — resolving the node as written would look for a
+    /// type called <c>T</c> and report "this type argument is not supported".</para></summary>
+    private IrInterfaceType LiftTargetOf(TypeNode constraint, Core.Span span)
+    {
+        if (_substitution.Count == 0) return _typeTable.InterfaceOf(constraint, span);
+        using var scope = _typeTable.PushSubstitution(NamedSubstitution());
+        return _typeTable.InterfaceOf(constraint, span);
+    }
+
+    /// <summary>Does the receiver's constraint name an interface the concrete type conforms to
+    /// more than once? Then the member name does not identify the implementation and the call has
+    /// to go through the instance-keyed dispatch table.</summary>
+    private bool ConstraintNeedsTheInstance(MemberExpr member, TypeSymbol owner)
+    {
+        if (ReceiverType(member.Target) is not TypeParamType parameter) return false;
+        foreach (var constraint in parameter.Param.Constraints)
+            if (_typeTable.ConstraintInterface(constraint) is { } constrained
+                && _typeTable.InterfaceInChainProviding(constrained, member.Member) is not null
+                && _typeTable.ConformsSeveralTimes(owner, constrained))
+                return true;
+        return false;
+    }
+
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
@@ -3706,8 +3733,15 @@ internal sealed class FunctionLowerer
         // default from the interface, and its 'this' is the interface type. No direct call leads there:
         // the receiver has to be lifted first, which is exactly what 'callvirt' does. The constraint
         // names the interface, so it is known.
+        //
+        // SEVERAL conformances to one interface take the same route, for a related reason: the
+        // type then has two methods of one name, and an own member no longer identifies which
+        // conformance it serves. The dispatch table is keyed by the interface INSTANCE and does
+        // know, so the receiver is lifted and the row answers — after which the devirtualizer
+        // turns it back into a direct call, to the target the constraint actually named.
         if (owner.Members.LookupLocal(member.Member) is not FunctionSymbol method
-            || method.Declaration is not FunctionDecl declaration)
+            || method.Declaration is not FunctionDecl declaration
+            || ConstraintNeedsTheInstance(member, owner))
         {
             if (ReceiverType(member.Target) is TypeParamType parameter)
                 foreach (var constraint in parameter.Param.Constraints)
@@ -3726,7 +3760,7 @@ internal sealed class FunctionLowerer
                         // on. The same id then carries the callvirt, whose slot table also hangs
                         // on the instance.
                         var lift = ReferenceEquals(iface, constrained)
-                            ? _typeTable.InterfaceOf(constraint, expr.Span)
+                            ? LiftTargetOf(constraint, expr.Span)
                             : _typeTable.InterfaceOf(iface);
 
                         var lifted = LowerExprAs(member.Target, lift);

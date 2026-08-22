@@ -62,7 +62,7 @@ public class CompoundOperatorTests
         """
         import std.core { Add };
 
-        struct Vec2 :: [Add<Vec2>] {
+        struct Vec2 :: [Add<Vec2, Vec2>] {
             x: int,
             y: int,
 
