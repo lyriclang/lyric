@@ -10,6 +10,37 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v2.16.0 — 2026-08-22
+
+An interface may declare several parents. The rule that said otherwise rested on a claim about the
+runtime, and the claim was wrong.
+
+### Added
+
+- **Several parent interfaces**: `interface Item :: [Counted, Scaled]`. Conforming to the child
+  implies conforming to every ancestor, as before.
+
+  The old rule read: *a parent's default method needs its own slot indexes to remain valid behind
+  a child-typed receiver, so several parents would need thunks.* **They do not.** A vtable is
+  keyed by the pair (concrete type, interface), and an implementing type gets a row for every
+  interface in the transitive closure — every ancestor keeps its own numbering and nothing is
+  remapped. The rule went when the reasoning was measured instead of repeated: lifted
+  experimentally, probed, then built.
+
+- **What a second parent actually costs**, and it is the second half of a rule that already
+  existed (`LYR-SEM0079`): two parents may not contribute the same member name from DIFFERENT
+  declarations. One slot holds one method, and no rule picks correctly between two. Before the
+  check they were silently merged, which is worse than either answer.
+
+  A name reached twice through a **diamond** is neither ambiguous nor refused: both paths lead to
+  one declaration, so there is nothing to pick, and an implementation supplies it once.
+
+### Changed
+
+- `LYR-SEM0078` no longer includes "more than one parent"; `LYR-SEM0079` gains the clash. Three
+  conformance cases replace the one that pinned the old rule — including a default on the SECOND
+  parent running behind a child receiver, which is the case the old reasoning said would break.
+
 ## v2.15.0 — 2026-08-22
 
 Two small things off the list before v3, both of the same kind: something written in the source

@@ -210,7 +210,7 @@ public class InterfaceInheritanceTests
     // --- shape rules ---
 
     [Fact]
-    public void A_second_parent_is_refused_toward_constraints()
+    public void Several_parents_are_allowed_since_2_16()
     {
         var de = Check(
             """
@@ -230,9 +230,97 @@ public class InterfaceInheritanceTests
                 return 0;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0078");
-        Assert.Contains("at most one parent", error.Message, StringComparison.Ordinal);
-        Assert.Contains("<T :: [A, B]>", error.Message, StringComparison.Ordinal);
+        // This pinned the refusal until 2.16. The reason given for it — that a parent default
+        // needs its slot indexes to survive a child-typed receiver — did not survive a probe:
+        // the dispatch table is keyed by (concrete type, interface), so each parent keeps its
+        // own numbering and nothing is remapped. What a second parent really costs is a name
+        // clash, and that is refused on its own.
+        Assert.False(de.HasErrors);
+    }
+
+    [Fact]
+    public void Two_parents_contributing_one_name_are_refused()
+    {
+        // The one thing a second parent genuinely costs. A slot holds one method, and a call
+        // through the child would have to pick between two declarations — there is no rule that
+        // picks correctly, so this is refused rather than resolved.
+        var de = Check(
+            """
+            interface A {
+                fn go(): int;
+            }
+
+            interface B {
+                fn go(): int;
+            }
+
+            interface C :: [A, B] {
+            }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0079");
+        Assert.Contains("'A'", error.Message, StringComparison.Ordinal);
+        Assert.Contains("'B'", error.Message, StringComparison.Ordinal);
+        Assert.Equal(2, error.Notes.Count); // both declarations, so the choice is visible
+    }
+
+    [Fact]
+    public void The_same_name_reached_twice_through_a_diamond_is_not_a_clash()
+    {
+        // Two paths to ONE declaration. Refusing this would refuse the shape that makes several
+        // parents worth having, and there is nothing to pick between: it is the same member.
+        var de = Check(
+            """
+            interface Base {
+                fn id(): int;
+            }
+
+            interface Left :: [Base] {
+            }
+
+            interface Right :: [Base] {
+            }
+
+            interface Both :: [Left, Right] {
+            }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        Assert.False(de.HasErrors);
+    }
+
+    [Fact]
+    public void A_child_still_may_not_redeclare_an_inherited_member()
+    {
+        // Unchanged by 2.16, and for its own reason: without vtable overriding the same call
+        // would dispatch differently through the child and through the parent.
+        var de = Check(
+            """
+            interface A {
+                fn go(): int;
+            }
+
+            interface B {
+                fn other(): int;
+            }
+
+            interface C :: [A, B] {
+                fn go(): int;
+            }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0079");
     }
 
     [Fact]

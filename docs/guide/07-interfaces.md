@@ -78,9 +78,9 @@ fn main(): int {
 
 ## Interface inheritance
 
-An interface may name one **parent**. Conforming to the child implies conforming to the parent:
-the implementing type provides the abstract members of the whole chain, inherits its default
-methods, and satisfies a constraint on the parent wherever one is required.
+An interface may name **parents**. Conforming to the child implies conforming to all of them:
+the implementing type provides the abstract members of the whole graph, inherits its default
+methods, and satisfies a constraint on any ancestor wherever one is required.
 
 ```lyr
 import std.io.console { println };
@@ -111,9 +111,23 @@ fn main(): int {
 }
 ```
 
-The parent list holds exactly one entry — several requirements side by side are what constraints
-are for (`<T :: [A, B]>`). The chain cannot be circular, and a member of the chain cannot be
-redeclared: an inherited member keeps its declaring interface.
+Since 2.16 the list may hold several entries: `interface Item :: [Counted, Scaled]`. The rules
+are about NAMES, and both halves say the same thing — an inherited member keeps its declaring
+interface, so nothing may make one name mean two:
+
+- a child cannot redeclare a member it inherits;
+- two parents cannot contribute the same member name from different declarations. One slot holds
+  one method, and there is no rule that picks correctly between two.
+
+A **diamond** is neither of those and is fine: if `Left` and `Right` both inherit `Base`, the name
+reaches the child along two paths and leads to one declaration, so an implementation supplies it
+once.
+
+The list cannot be circular.
+
+*(Until 2.16 exactly one parent was allowed, on the reasoning that a parent's default method needs
+its own slot numbers to survive a child-typed receiver. It does not — every ancestor keeps its own
+method table — and the rule went when the reasoning was measured instead of repeated.)*
 
 A value of interface type reaches the members of its whole chain (`Labeled` values answer
 `name()`). What it does not do is convert to the parent's type: `Named` in the example is built

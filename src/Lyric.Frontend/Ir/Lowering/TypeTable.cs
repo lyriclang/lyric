@@ -588,17 +588,36 @@ internal sealed class TypeTable
         return id;
     }
 
-    /// <summary>Chain-prefix layout: the parent's slots first, own members after. A parent's
-    /// default method runs with a CHILD's method table behind <c>this</c>; the prefix keeps the
-    /// parent's slot indexes valid there — the reason the parent list holds at most one entry.
-    /// Names are unique along a chain (LYR-SEM0079), so the name-to-index lookup stays exact.</summary>
+    /// <summary>
+    /// The slot list: every parent's slots in the order the parent list writes them, own members
+    /// after.
+    ///
+    /// <para>Deduplicated BY NAME, which is exact rather than approximate because the sema has
+    /// already refused the only way two different declarations could share one
+    /// (<c>LYR-SEM0079</c>). What remains is the diamond — one ancestor reached along two
+    /// paths — and there the two names are the same member, so collapsing them is the whole
+    /// point.</para>
+    ///
+    /// <para>Each parent keeps its OWN row in the dispatch table, keyed by (concrete type,
+    /// interface), so this list is not a remapping of anything: it names what a call through the
+    /// CHILD addresses. Which is why several parents cost no thunks — the reason the list held
+    /// one entry until 2.16.</para>
+    /// </summary>
     private string[] SlotNames(TypeSymbol symbol, InterfaceDecl decl)
     {
-        var own = decl.Members.Select(m => m.Name);
-        if (Conformance.ParentsOf(symbol, _binding).FirstOrDefault() is
-            { Declaration: InterfaceDecl parentDecl } parent)
-            return [.. SlotNames(parent, parentDecl), .. own];
-        return own.ToArray();
+        var slots = new List<string>();
+
+        foreach (var parent in Conformance.ParentsOf(symbol, _binding))
+            if (parent.Declaration is InterfaceDecl parentDecl)
+                foreach (var name in SlotNames(parent, parentDecl))
+                    if (!slots.Contains(name))
+                        slots.Add(name);
+
+        foreach (var member in decl.Members)
+            if (!slots.Contains(member.Name))
+                slots.Add(member.Name);
+
+        return slots.ToArray();
     }
 
     private TypeId InternVariant(string ownerName, EnumVariant variant)
