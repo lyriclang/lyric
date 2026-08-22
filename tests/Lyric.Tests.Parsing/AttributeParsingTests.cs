@@ -124,13 +124,17 @@ public class AttributeParsingTests
     }
 
     [Fact]
-    public void An_attribute_on_an_interface_member_stays_rejected()
+    public void An_attribute_on_an_interface_member_parses_since_2_15()
     {
         var module = Parse("interface I { @A\nfn f(): int; }", out var diagnostics);
 
-        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0042");
+        // The parser lets it through and the SEMA decides which attribute may stay —
+        // the same division as for a struct member, and the same one attribute.
+        Assert.DoesNotContain(diagnostics, d => d.Code == "LYR-PAR0042");
         var i = Assert.IsType<InterfaceDecl>(module.Declarations[0]);
-        Assert.Equal("f", Assert.Single(i.Members).Name); // the member survives the rejection
+        var member = Assert.Single(i.Members);
+        Assert.Equal("f", member.Name);
+        Assert.Equal("A", Assert.Single(member.Attributes).Path[^1]);
     }
 
     [Fact]

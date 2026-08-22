@@ -10,6 +10,37 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v2.15.0 — 2026-08-22
+
+Two small things off the list before v3, both of the same kind: something written in the source
+that the compiler looked past.
+
+### Fixed
+
+- **A `::` list takes interfaces only.** `struct S :: [Vec2]` was SKIPPED — the entry resolved to
+  something that is not an interface, and the check moved on. The declaration claimed a
+  conformance nothing verified and nothing reported, which is the quietest way for a mistake to
+  survive a compiler. It is `LYR-SEM0078` now, on struct, class, enum and `extend` alike; the code
+  already meant exactly this for an interface's parent list, so the catalogue entry is widened
+  rather than a second number spent on the same sentence.
+
+### Added
+
+- **An interface member may carry `@Deprecated`.** It was refused because a conformance question
+  had no answer: *do implementations inherit the clock?*
+
+  **They do not.** A use that resolves to the interface's member warns; an implementation does
+  not — an implementation is not a use, and a conforming type MUST implement what the interface
+  requires, so a warning there could not be acted on without breaking conformance. A call on a
+  concrete receiver resolves to the concrete method, which is its own declaration and carries its
+  own deprecation or none.
+
+  The member restriction is unchanged: only `@Deprecated`, because the module format has no member
+  rows. An attribute on the interface DECLARATION is still refused.
+
+  Two tests that pinned the old refusal now pin the new rule. They were right to exist: that is
+  what a pin is for — it made the change a decision instead of a drift.
+
 ## v2.14.0 — 2026-08-22
 
 The second link of the patch train. `std.io.file` had three conventions for "it did not work",

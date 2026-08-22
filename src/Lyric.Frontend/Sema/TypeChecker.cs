@@ -281,8 +281,8 @@ public sealed class TypeChecker
         foreach (var m in members)
         {
             // Member attributes (2.1): the list parses on struct/class members; only the
-            // row-less '@Deprecated' passes (the Member target above). Interface members
-            // never carry one — the parser rejected the list.
+            // row-less '@Deprecated' passes (the Member target above). Interface members carry
+            // one since 2.15, under the same restriction and through this same path.
             var memberAttributes = m switch
             {
                 FunctionDecl mf => mf.Attributes,
@@ -468,7 +468,21 @@ public sealed class TypeChecker
 
         foreach (var node in interfaces)
         {
-            if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
+            if (Conformance.InterfaceOf(node, _binding) is not { } direct)
+            {
+                // An unknown name was the resolver's error already; a known one that is not an
+                // interface is this one. Until 2.15 it was NOTHING: the entry was skipped, so
+                // 'struct S :: [Vec2]' declared a conformance nobody ever checked and nobody
+                // reported — the quietest way for a mistake to survive a compiler.
+                var written = node is NamedType nt ? _binding.Resolve(nt) : null;
+                if (written is ImportBindingSymbol imported) written = imported.Target;
+                if (written is not null and not ErrorSymbol)
+                    _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                        $"only an interface can stand in the conformance list of '{name}' — "
+                        + $"'{written.Name}' is not one");
+                continue;
+            }
+
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
             {
                 if (iface.Declaration is not InterfaceDecl idecl) continue;
