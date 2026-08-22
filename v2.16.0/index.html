@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v2.16.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v2.16.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v2.16.0 — 2026-08-22</h2>
+<p>An interface may declare several parents. The rule that said otherwise rested on a claim about the
+runtime, and the claim was wrong.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Several parent interfaces</strong>: <code>interface Item :: [Counted, Scaled]</code>. Conforming to the child
+implies conforming to every ancestor, as before.</p>
+<p>The old rule read: <em>a parent's default method needs its own slot indexes to remain valid behind
+a child-typed receiver, so several parents would need thunks.</em> <strong>They do not.</strong> A vtable is
+keyed by the pair (concrete type, interface), and an implementing type gets a row for every
+interface in the transitive closure — every ancestor keeps its own numbering and nothing is
+remapped. The rule went when the reasoning was measured instead of repeated: lifted
+experimentally, probed, then built.</p>
+</li>
+<li><p><strong>What a second parent actually costs</strong>, and it is the second half of a rule that already
+existed (<code>LYR-SEM0079</code>): two parents may not contribute the same member name from DIFFERENT
+declarations. One slot holds one method, and no rule picks correctly between two. Before the
+check they were silently merged, which is worse than either answer.</p>
+<p>A name reached twice through a <strong>diamond</strong> is neither ambiguous nor refused: both paths lead to
+one declaration, so there is nothing to pick, and an implementation supplies it once.</p>
+</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li><code>LYR-SEM0078</code> no longer includes &quot;more than one parent&quot;; <code>LYR-SEM0079</code> gains the clash. Three
+conformance cases replace the one that pinned the old rule — including a default on the SECOND
+parent running behind a child receiver, which is the case the old reasoning said would break.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
