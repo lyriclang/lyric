@@ -925,7 +925,7 @@ public static class Interpreter
             $"unary opcode {op} is not implemented"),
     };
 
-    private static LyrValue Convert(TypeTag from, TypeTag to, LyrValue value)
+    internal static LyrValue Convert(TypeTag from, TypeTag to, LyrValue value)
     {
         if (LyrValue.IsInteger(from) && LyrValue.IsInteger(to))
             return LyrValue.FromBits(LyrValue.Normalize(to, value.Bits));

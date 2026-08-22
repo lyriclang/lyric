@@ -85,6 +85,20 @@ internal static class JitRuntime
             $"force-unwrapped a '?T' that had no value in '{function}'");
     }
 
+    /// <summary>
+    /// A numeric conversion, done by the INTERPRETER's own routine rather than by IL.
+    ///
+    /// <para>Not laziness -- a matter of not being able to. Float to integer is defined as
+    /// WASM trunc_sat: truncate towards zero, clamp at the ends, NaN to zero. IL's conv leaves
+    /// an out-of-range float to the platform, so emitting one would be a wrong answer on the
+    /// values that are hardest to notice and easiest to hit.</para>
+    ///
+    /// <para>The tags are compile-time constants baked into the call, so what remains at run time
+    /// is one call rather than a decision.</para>
+    /// </summary>
+    public static LyrValue Convert(LyrValue value, int from, int to) =>
+        Interpreter.Convert((Lyric.Bytecode.TypeTag)from, (Lyric.Bytecode.TypeTag)to, value);
+
     /// <summary>Ordinal string equality, as the interpreter compares them — and as the 0-or-1 a
     /// Lyric bool is here.</summary>
     public static long TextEquals(string? left, string? right) =>

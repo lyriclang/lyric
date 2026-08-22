@@ -793,6 +793,51 @@ public class JitAgreementTests
     }
 
     [Fact]
+    public void Conversions_agree()
+    {
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): float {
+                var acc = 0.0;
+                for (i in 0..n) {
+                    let f = i as float * 1.7;
+                    acc = acc + f + (f as int) as float;
+                }
+
+                return acc;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(300));
+    }
+
+    [Fact]
+    public void The_edges_of_float_to_int_agree()
+    {
+        // The reason the emitter calls the interpreter rather than emitting an IL conversion.
+        // Lyric defines float-to-int as WASM trunc_sat -- truncate, clamp, NaN to zero -- and
+        // IL leaves an out-of-range float to the platform. These are the values where an emitted
+        // conv would answer something else, and nobody would notice until it shipped.
+        Agree(
+            """
+            @Hook
+            pub fn run(n: int): int {
+                let big = 1.0e30;
+                let small = 0.0 - 1.0e30;
+                let nan = 0.0 / 0.0;
+
+                return (big as int) + (small as int) + (nan as int)
+                    + ((0.0 - 2.7) as int) + (2.7 as int) + n;
+            }
+
+            fn main(): int { return 0; }
+            """,
+            "run", LyrValue.FromI64(0));
+    }
+
+    [Fact]
     public void A_refused_function_still_runs()
     {
         // Arrays are not compiled yet, so this one stays on the interpreter -- and the point of

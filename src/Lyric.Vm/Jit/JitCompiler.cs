@@ -33,7 +33,7 @@ internal delegate LyrValue Compiled(JitContext context, LyrValue[] args);
 /// line. Standing today: arithmetic, comparisons, branches, locals, globals, arrays, fields,
 /// optionals, interface values, object construction, string constants and comparison, and calls —
 /// to a native, or to another function that compiles. Still declined: closures, exceptions,
-/// virtual calls, enums, conversions, division (which panics), recursion, and the narrow integer
+/// virtual calls, enums, division (which panics), recursion, and the narrow integer
 /// widths (which need re-normalising after every operation).</para>
 /// </summary>
 internal static class JitCompiler
@@ -417,6 +417,25 @@ internal static class JitCompiler
 
                 case Op.Call:
                     return EmitCall((int)op.Immediate);
+
+                case Op.Convert:
+                {
+                    if (op.Type is not { } from || op.ToType is not { } to) return false;
+                    if (_stack.Count == 0) return false;
+
+                    var source = _stack.Pop();
+                    var target = BytecodeType.Scalar(to);
+                    if (Machine(target) is null) return false;
+                    if (!EmitPack(il, source)) return false;
+
+                    il.Emit(OpCodes.Ldc_I4, (int)from);
+                    il.Emit(OpCodes.Ldc_I4, (int)to);
+                    il.Emit(OpCodes.Call, Runtime(nameof(JitRuntime.Convert)));
+                    if (!EmitUnpack(il, target)) return false;
+
+                    _stack.Push(target);
+                    return true;
+                }
 
                 case Op.NewObject:
                 {
