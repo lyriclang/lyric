@@ -95,6 +95,71 @@ both families side by side:
 the answer is `clampInt` rather than a conversion there and back. The same rule shapes
 `fromInt`/`fromFloat` and `parseInt`/`parseFloat` in `std.string`.
 
+## Iterators chain
+
+Since 2.17 the adapters are METHODS, so a pipeline reads left to right instead of inside out:
+
+```lyr
+import std.iter { collectArray };
+import std.collections { List };
+
+fn main(): int {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+
+    let out = collectArray<int>(
+        xs.iter().map<int>((n: int) => n * 2).filter((n: int) => n > 2).take(2));
+
+    return out.length;
+}
+```
+
+`map`, `filter`, `take`, `skip`, `takeWhile`, `zip`, `chain` and `flatMap` are methods on
+`Iterator<T>`; the free forms still work, warn, and go with 3.0.
+
+Two families stay free, each for a reason worth knowing:
+
+- **`sum`, `sumFloat`, `minValue`, `maxValue`** ask something of the ELEMENT type — that it is a
+  number, that it is ordered — and an interface cannot require that of its own parameter.
+- **`enumerate` and `chunks`** change the element type without being generic, and a method like
+  that would ask the compiler to build `Iterator<(int, T)>`, then `Iterator<(int, (int, T))>`,
+  without end. `map` and `flatMap` change it safely because they are generic: they are built per
+  use rather than per instance.
+
+## Files answer two ways, and each says which
+
+Since 2.14 `std.io.file` has exactly two shapes, and the choice between them is not a taste:
+
+```lyr
+import std.io.file as file;
+
+fn main(): int {
+    let path = "notes.txt";
+
+    let content = file.text(path) ?? "";        // a READ answers ?T
+    let saved = file.writeText(path, content);  // an OPERATION answers bool
+
+    return if (saved) 0 else 1;
+}
+```
+
+A **read** answers `?T`: `null` means the file could not be read, and an empty result means an
+empty file. A **write, a remove, a copy** answers `bool` — whether it happened; it carries no
+value, so nothing is lost by saying only that. A **predicate** (`exists`, `isFile`,
+`isDirectory`) answers `bool` too, and there `false` is an answer rather than a failure.
+
+Before 2.14 there were three shapes, and the third one lied: `readBytes` and `readLines` answered
+an **empty array** both for an empty file and for a file that is not there. No caller could tell
+those apart, and the advice was to ask `exists` first — which is a race, not an answer. The three
+old names still work and warn (`readText`, `readBytes`, `readLines`); they go with 3.0, and the
+compiler will say so on the day.
+
+What none of the shapes carries is a REASON: a missing file and a permission denied look the
+same. That gap is known and left open on purpose — carrying reasons means an error type and a
+decision about `throws` that this module should not make on its own.
+
 ## Capabilities
 
 `std.io.file`, `std.io.net` and `std.os` require a capability. A standalone run grants

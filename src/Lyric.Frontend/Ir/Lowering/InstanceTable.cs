@@ -30,6 +30,20 @@ internal sealed class InstanceTable
 
     private readonly List<Pending> _pending = new();
 
+    /// <summary>
+    /// How many instances one module may produce before the lowering calls it a runaway.
+    ///
+    /// <para>Monomorphization terminates only when the set of instantiations is finite, and a
+    /// program can ask for one that is not: a method returning a type built from its own — an
+    /// interface method answering <c>Iterator&lt;T[]&gt;</c> — demands the instance for the next
+    /// element type, and that one for the one after. Without a cap the compiler does not fail, it
+    /// simply never finishes, which is the worst of the three outcomes.</para>
+    ///
+    /// <para>The number is far above anything a real module reaches; what it buys is a message
+    /// with a name in it instead of a process to kill.</para>
+    /// </summary>
+    private const int MaxInstances = 20_000;
+
     /// <summary>What has already been requested, so two calls of <c>id(7)</c> get the same instance
     /// rather than producing two identical functions.</summary>
     private readonly Dictionary<string, FunctionId> _byKey = new(StringComparer.Ordinal);
@@ -52,9 +66,13 @@ internal sealed class InstanceTable
     /// recursion possible: <c>fn depth&lt;T&gt;(n: int): int { return depth&lt;T&gt;(n - 1); }</c>
     /// requests itself and finds its own id already there.</para>
     /// </summary>
+    /// <param name="owner">The generic instance the method belongs to, when it has one:
+    /// <c>Iterator&lt;int&gt;.map&lt;string&gt;</c> takes its <c>T</c> from the interface instance
+    /// and its <c>U</c> from the call, and needs BOTH bound to lower a body that mentions each.
+    /// </param>
     public FunctionId Request(FunctionSymbol symbol, FunctionDecl decl, string baseName,
         TypeSymbol? receiver, IReadOnlyList<LyrType> typeArguments, TypeTable typeTable,
-        Core.Span span)
+        Core.Span span, GenericInstance? owner = null)
     {
         if (symbol.Generics.Length != typeArguments.Count)
             throw new UnsupportedConstructException(
@@ -63,7 +81,10 @@ internal sealed class InstanceTable
 
         // The name IS the key: it contains the type arguments, is therefore unique, and a human can read
         // off a disassembly which instance is in front of them.
-        var name = $"{baseName}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
+        var name = owner is { } owning
+            ? $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(TypeFacts.Display))}>"
+              + $".{symbol.Name}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>"
+            : $"{baseName}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
         if (_byKey.TryGetValue(name, out var existing)) return existing;
 
         // A type parameter still open means the inference did not get through at the call site, and then
@@ -76,13 +97,36 @@ internal sealed class InstanceTable
 
         var substitution = new Dictionary<GenericParamSymbol, LyrType>(
             ReferenceEqualityComparer.Instance);
+
+        // The OWNER's parameters first, so a body may mention both: in 'Iterator<int>.map<string>'
+        // the T comes from the instance and the U from the call. A method's own parameter wins a
+        // name collision, which is the scoping the source has.
+        if (owner is { } instance)
+            for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
+                substitution[instance.Definition.Generics[i]] = instance.Arguments[i];
+
         for (var i = 0; i < symbol.Generics.Length; i++)
             substitution[symbol.Generics[i]] = typeArguments[i];
 
+        Guard(name, span);
+
         var id = _ids.Next();
         _byKey[name] = id;
-        _pending.Add(new Pending(decl, name, id, receiver, substitution));
+        _pending.Add(new Pending(decl, name, id, receiver, substitution, owner));
         return id;
+    }
+
+    /// <summary>Stops a monomorphization that does not terminate, and names the instance it was
+    /// asked for when it gave up — that name is the shape of the recursion.</summary>
+    private void Guard(string name, Core.Span span)
+    {
+        if (_pending.Count < MaxInstances) return;
+
+        throw new UnsupportedConstructException(
+            $"the monomorphization does not terminate: {_pending.Count} instances and still "
+            + $"asking for '{name}'. A method whose result type is built from its own element "
+            + "type demands an instance for the next one, and so on without end — write it as a "
+            + "free function, which is instantiated per use rather than per instance", span);
     }
 
     /// <summary>
@@ -104,6 +148,8 @@ internal sealed class InstanceTable
             ReferenceEqualityComparer.Instance);
         for (var i = 0; i < owner.Definition.Generics.Length && i < owner.Arguments.Length; i++)
             substitution[owner.Definition.Generics[i]] = owner.Arguments[i];
+
+        Guard(name, span);
 
         var id = _ids.Next();
         _byKey[name] = id;

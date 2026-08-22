@@ -281,8 +281,8 @@ public sealed class TypeChecker
         foreach (var m in members)
         {
             // Member attributes (2.1): the list parses on struct/class members; only the
-            // row-less '@Deprecated' passes (the Member target above). Interface members
-            // never carry one — the parser rejected the list.
+            // row-less '@Deprecated' passes (the Member target above). Interface members carry
+            // one since 2.15, under the same restriction and through this same path.
             var memberAttributes = m switch
             {
                 FunctionDecl mf => mf.Attributes,
@@ -314,6 +314,17 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
+
+            // A GENERIC interface member must have a body (2.17). It gets no vtable slot — a slot
+            // holds one function and this is one per instantiation — so it is reached by
+            // monomorphization alone, and an abstract one would promise a dispatch nothing can
+            // perform. As a DEFAULT it is complete in itself and needs no dispatch at all.
+            if (isInterface && fn.Generics.Length > 0 && fn.Body is null)
+                _de.Report("LYR-SEM0082", Severity.Error, fn.Span,
+                    $"'{typeName}.{fn.Name}' has type parameters of its own and no body — such a "
+                    + "member is reached by monomorphization rather than through the method table, "
+                    + "so it has to bring its own implementation");
+
             CheckMemberModifiers(fn);
 
             // A static member has no receiver, so 'this' is not bound there; CheckExpr reports it as
@@ -466,9 +477,45 @@ public sealed class TypeChecker
         // once, while two instances of one interface are still two conformances to check.
         var seen = new List<LyrType>();
 
+        // A GENERIC member of an interface may not be overridden (2.17). It has no slot, so a call
+        // picks its target by the receiver's STATIC type: through the interface it would find the
+        // default, through the concrete type the override — one name, two functions, chosen by
+        // where the caller happens to stand. That is the failure SEM0079 refuses inside a chain,
+        // and it is the same one here.
         foreach (var node in interfaces)
         {
-            if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
+            if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
+            foreach (var contributed in Conformance.WithParents(iface, _binding))
+                foreach (var symbol in contributed.Members.Symbols)
+                    if (symbol is FunctionSymbol { Generics.Length: > 0 } generic
+                        && candidates.TryGetValue(generic.Name, out var own)
+                        && own.Declaration is { } ownDeclaration)
+                        _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
+                            $"'{name}.{generic.Name}' overrides a generic member of "
+                            + $"'{contributed.Name}', which cannot be overridden — it has no slot "
+                            + "to dispatch through, so the two would be chosen by the static type "
+                            + "of the receiver rather than by the value",
+                            new DiagnosticNote(generic.Declaration?.Span ?? default,
+                                $"'{generic.Name}' is declared here"));
+        }
+
+        foreach (var node in interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } direct)
+            {
+                // An unknown name was the resolver's error already; a known one that is not an
+                // interface is this one. Until 2.15 it was NOTHING: the entry was skipped, so
+                // 'struct S :: [Vec2]' declared a conformance nobody ever checked and nobody
+                // reported — the quietest way for a mistake to survive a compiler.
+                var written = node is NamedType nt ? _binding.Resolve(nt) : null;
+                if (written is ImportBindingSymbol imported) written = imported.Target;
+                if (written is not null and not ErrorSymbol)
+                    _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                        $"only an interface can stand in the conformance list of '{name}' — "
+                        + $"'{written.Name}' is not one");
+                continue;
+            }
+
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
             {
                 if (iface.Declaration is not InterfaceDecl idecl) continue;
@@ -476,6 +523,13 @@ public sealed class TypeChecker
 
                 foreach (var im in idecl.Members)
                 {
+                    // A GENERIC member is not part of the contract: it always has a body, it
+                    // cannot be overridden, and it is reached by monomorphization rather than
+                    // through the table. Comparing signatures here would compare two different
+                    // U's that print identically, which is a confusing way to say what
+                    // LYR-SEM0082 says plainly.
+                    if (im.Generics.Length > 0) continue;
+
                     var impl = candidates.TryGetValue(im.Name, out var c) ? c : null;
                     if (impl is null)
                     {
@@ -504,13 +558,11 @@ public sealed class TypeChecker
         if (decl.Interfaces.Length == 0) return;
         if (module.Members.LookupLocal(decl.Name) is not TypeSymbol self) return;
 
-        // At most one parent: a parent's default method runs against the child's method table, and
-        // only a single chain keeps the parent's slot indexes valid there (the prefix layout).
-        // Several requirements side by side are what constraints are for.
-        for (var i = 1; i < decl.Interfaces.Length; i++)
-            _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(decl.Interfaces[i]),
-                $"'{decl.Name}' can have at most one parent interface — "
-                + "require several where you use them: '<T :: [A, B]>'");
+        // SEVERAL parents since 2.16. The rule before it said one, on the grounds that a parent's
+        // default method needs its own slot indexes to stay valid behind a child-typed receiver.
+        // Measured: they do. The dispatch table is keyed by (concrete type, interface) and the
+        // lowering emits a row per interface in the closure, so every parent keeps its own slot
+        // numbering and nothing is remapped. What a second parent really costs is the rule below.
 
         foreach (var node in decl.Interfaces)
         {
@@ -533,14 +585,40 @@ public sealed class TypeChecker
         }
 
         // Seeding with 'self' keeps a cyclic chain from presenting the declaring interface's own
-        // members as inherited ones.
+        // members as inherited ones. The set is shared across the parents, which is what makes a
+        // DIAMOND cost nothing: a shared ancestor is walked once, so its members arrive once and
+        // the two paths to it are indistinguishable afterwards — as they should be, since they
+        // lead to the same declaration.
         var seen = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance) { self };
         var inherited = new Dictionary<string, (TypeSymbol Iface, FunctionSymbol Fn)>(StringComparer.Ordinal);
-        foreach (var parent in Conformance.ParentsOf(self, _binding))
+
+        // Per NODE rather than per symbol, so the clash can be reported at the entry that brought
+        // the second one rather than at the whole declaration.
+        foreach (var node in decl.Interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } parent) continue;
+
             foreach (var iface in Conformance.WithParents(parent, _binding, seen))
                 foreach (var sym in iface.Members.Symbols)
-                    if (sym is FunctionSymbol fn)
-                        inherited.TryAdd(fn.Name, (iface, fn));
+                {
+                    if (sym is not FunctionSymbol fn) continue;
+                    if (inherited.TryAdd(fn.Name, (iface, fn))) continue;
+
+                    // Two parents, one name, two declarations — the one thing several parents
+                    // genuinely cost. A slot holds one method, and a call through the child would
+                    // have to pick; there is no rule that picks correctly, so this is refused
+                    // rather than resolved. (The same name reached twice through a diamond does
+                    // not land here: the set above walked that ancestor once.)
+                    var first = inherited[fn.Name];
+                    _de.Report("LYR-SEM0079", Severity.Error, NodeSpan(node),
+                        $"'{decl.Name}' inherits '{fn.Name}' from both '{first.Iface.Name}' and "
+                        + $"'{iface.Name}' — one slot cannot hold two methods; rename one of them",
+                        new DiagnosticNote(first.Fn.Declaration?.Span ?? default,
+                            $"'{fn.Name}' is declared here"),
+                        new DiagnosticNote(fn.Declaration?.Span ?? default,
+                            $"and here"));
+                }
+        }
 
         foreach (var m in decl.Members)
             if (inherited.TryGetValue(m.Name, out var have))

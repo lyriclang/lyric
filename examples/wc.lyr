@@ -10,7 +10,7 @@
 // A deliberate deviation from POSIX: `wc -l` counts LINE BREAKS rather than lines, so a file with
 // text but without a trailing break has zero lines for POSIX. Here it has one.
 
-import std.io.file { readText };
+import std.io.file { text };
 // For the string METHODS alone: the extensions come with the module, and the alias
 // avoids shadowing the builtin type name.
 import std.string as strings;
@@ -39,8 +39,8 @@ fn countWords(line: string): int {
 }
 
 fn count(content: string): Counts {
-    // Walking the lines rather than taking `readLines`: the characters have to count the FILE,
-    // including the line breaks. `readLines` throws them away, and `chars` would then be smaller
+    // Walking the lines rather than taking `lines`: the characters have to count the FILE,
+    // including the line breaks. `lines` throws them away, and `chars` would then be smaller
     // than the file is.
     let lines = content.split("\n");
 
@@ -52,7 +52,7 @@ fn count(content: string): Counts {
     }
 
     // A file ending in a break has no empty last line after it. `split` yields one anyway, the same
-    // rule as in `std.io.file.readLines`.
+    // rule as in `std.io.file.lines`.
     lineCount = lines.length;
     if (lines.length > 0 && lines[lines.length - 1].length() == 0) {
         lineCount = lineCount - 1;
@@ -77,7 +77,7 @@ fn main(args: string[]): int {
     var missing = 0;
 
     for (path in args) {
-        let content = readText(path);
+        let content = text(path);
         if (content == null) {
             eprintln(f"wc: {path}: cannot read");
             missing = missing + 1;

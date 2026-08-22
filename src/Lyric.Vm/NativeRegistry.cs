@@ -28,7 +28,8 @@ public sealed class NativeRegistry
         TypeTag[] ParamTypes, TypeTag ReturnType, Func<LyrValue[], LyrValue> Implementation,
         TypeTag? ReturnElement = null,
         BytecodeType[]? FullParamTypes = null, BytecodeType? FullReturnType = null,
-        TypeTag[]? StructResult = null, TypeTag?[]? ParamElements = null);
+        TypeTag[]? StructResult = null, TypeTag?[]? ParamElements = null,
+        TypeTag? ReturnInnerElement = null);
 
     public void Register(string name, TypeTag[] paramTypes, TypeTag returnType,
         Func<LyrValue[], LyrValue> implementation) =>
@@ -60,6 +61,21 @@ public sealed class NativeRegistry
     public void RegisterOptionalReturning(string name, TypeTag[] paramTypes, TypeTag inner,
         Func<LyrValue[], LyrValue> implementation) =>
         _natives[name] = new Native(paramTypes, TypeTag.Optional, implementation, inner);
+
+    /// <summary>
+    /// A native returning a <c>?T[]</c> (v2.14) — the shape a read has when an empty result and a
+    /// failure are different answers.
+    ///
+    /// <para>Nothing about the VALUE needs saying: an optional over a reference IS the reference,
+    /// and "no value" is an empty one. What needs saying is the TYPE, twice: the tag says
+    /// optional, its inner says array, and only the element below that distinguishes
+    /// <c>?string[]</c> from <c>?uint8[]</c>. Without the third level the binder would accept a
+    /// host handing back bytes where the module expects lines.</para>
+    /// </summary>
+    public void RegisterOptionalArrayReturning(string name, TypeTag[] paramTypes, TypeTag element,
+        Func<LyrValue[], LyrValue> implementation) =>
+        _natives[name] = new Native(paramTypes, TypeTag.Optional, implementation, TypeTag.Array,
+            ReturnInnerElement: element);
 
     /// <summary>A native with array PARAMETERS (v1.14) — an array crossing the boundary INTO the
     /// host, the direction <c>readBytes</c> never needed. The implementation reads the argument
@@ -148,6 +164,14 @@ public sealed class NativeRegistry
                 throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
                     $"native '{import.Name}' returns a different array element type than the "
                     + "module expects");
+
+            // And one level deeper for a '?T[]' (v2.14): the optional's inner is the array, so
+            // the element that tells 'lines' from 'bytes' sits below both.
+            if (native.ReturnInnerElement is { } inner
+                && import.ReturnType.Element?.Element?.Tag != inner)
+                throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
+                    $"native '{import.Name}' returns an optional array of a different element "
+                    + "type than the module expects");
 
             // The same ambiguity for array PARAMETERS (v1.14): the element tag has to match too.
             if (native.ParamElements is { } elements)
@@ -423,6 +447,21 @@ public sealed class NativeRegistry
         var f1 = new[] { TypeTag.F64 };
         var f2 = new[] { TypeTag.F64, TypeTag.F64 };
 
+        // --- std.random (ungated) --------------------------------------------------------
+        //
+        // One xorshift64 round. In Lyric it was 53 instructions -- three shifts, three exclusive
+        // ors, and the loads and stores between them -- and every one of them costs what a
+        // crossing costs. The shift semantics have to match the language exactly: '>>' on a
+        // signed integer is arithmetic here as it is there, and '<<' wraps.
+        registry.Register("std.random.xorshift", new[] { TypeTag.I64 }, TypeTag.I64, args =>
+        {
+            var x = args[0].AsI64;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            return LyrValue.FromI64(x);
+        });
+
         registry.Register("std.math.sqrt", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Sqrt(args[0].AsF64)));
         registry.Register("std.math.abs", f1, TypeTag.F64,
@@ -521,6 +560,25 @@ public sealed class NativeRegistry
         // Failures are return values, not exceptions: a file that does not exist is an ordinary
         // state. The catch is deliberately broad (IO errors, permissions, invalid paths); to the
         // caller they are the same answer.
+        // The three READS answer '?T' since 2.14: null is "could not", and an empty result is an
+        // empty file. Before that a read had three conventions between them -- an optional, an
+        // empty array, a bool -- and the empty array was the one that lied: an unreadable file
+        // and an empty one gave the same answer.
+        registry.RegisterOptionalReturning("std.io.file.text", str, TypeTag.String,
+            args => Optional(TryIo(() => File.ReadAllText(args[0].AsString))));
+
+        registry.RegisterOptionalArrayReturning("std.io.file.lines", str, TypeTag.String,
+            args => OptionalLines(TryIo(() => File.ReadAllText(args[0].AsString))));
+
+        // The raw bytes, undecoded -- the answer 'text' cannot give: its UTF-8 decoding turns
+        // invalid bytes into U+FFFD.
+        registry.RegisterOptionalArrayReturning("std.io.file.bytes", str, TypeTag.U8,
+            args => OptionalBytes(TryIoBytes(() => File.ReadAllBytes(args[0].AsString))));
+
+        // The names before 2.14, kept bound although the shipped stdlib no longer declares them.
+        // The set a runtime must implement is what the stdlib declares (spec §11), but a MODULE
+        // compiled before 2.14 carries these in its import table, and a '.lyrbc' that loaded
+        // yesterday has to load today.
         registry.RegisterOptionalReturning("std.io.file.readText", str, TypeTag.String,
             args => Optional(TryIo(() => File.ReadAllText(args[0].AsString))));
 
@@ -881,6 +939,16 @@ public sealed class NativeRegistry
         for (var i = 0; i < values.Length; i++) bytes[i] = (byte)values[i].Bits;
         return bytes;
     }
+
+    /// <summary>The 2.14 shape of a read: nothing at all, or the lines. The difference to
+    /// <see cref="Lines"/> is the whole point of the change — that one answers an empty array to
+    /// both "empty file" and "no file".</summary>
+    private static LyrValue OptionalLines(string? content) =>
+        content is null ? LyrValue.None : Lines(content);
+
+    /// <summary>As <see cref="OptionalLines"/>, for the undecoded bytes.</summary>
+    private static LyrValue OptionalBytes(byte[]? content) =>
+        content is null ? LyrValue.None : Bytes(content);
 
     private static LyrValue Lines(string? content)
     {

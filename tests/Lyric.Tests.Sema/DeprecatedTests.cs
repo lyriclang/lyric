@@ -199,12 +199,17 @@ public class DeprecatedTests
     }
 
     [Fact]
-    public void An_interface_member_still_carries_no_attribute()
+    public void An_interface_member_carries_Deprecated_since_2_15()
     {
         var de = Check(Import
             + "interface I {\n    @Deprecated\n    fn f(): int;\n}\n\n"
             + "fn main(): int {\n    return 0;\n}\n");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0042");
+        // This pinned the opposite until 2.15, when the question it waited on was
+        // answered: an implementation does not inherit the clock, so allowing the
+        // attribute costs a conforming type nothing. The rule is in
+        // ConformanceListTests.
+        Assert.False(de.HasErrors);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-PAR0042");
     }
 
     [Fact]

@@ -1,9 +1,20 @@
 import std.test { Test, assertEq, assertTrue };
-import std.io.file { writeBytes, appendBytes, readBytes, remove, exists, tempDir, joinPath };
+import std.io.file {
+    writeBytes,
+    appendBytes,
+    bytes,
+    lines,
+    text,
+    writeText,
+    remove,
+    exists,
+    tempDir,
+    joinPath,
+};
 import std.string { utf8Decode };
 
 // The byte bridge (v1.14): bytes out, bytes in, and the strict decode that refuses what
-// readText would silently replace.
+// 'text' would silently replace.
 
 @Test
 pub fn bytes_round_trip_through_a_file(): void {
@@ -14,14 +25,44 @@ pub fn bytes_round_trip_through_a_file(): void {
     assertTrue(writeBytes(path, data), "writeBytes must succeed in the temp directory");
     assertTrue(appendBytes(path, [255 as uint8]), "appendBytes must succeed");
 
-    let back = readBytes(path);
+    let back = bytes(path) ?? [];
     assertEq(back.length, 8);
     assertTrue(remove(path), "the probe file must go away");
     assertTrue(!exists(path), "the probe file must be gone");
 }
 
+/// An empty file and a file that is not there are different answers.
+///
+/// The reason this module has two names for reading bytes: until 2.14 both were an empty array,
+/// so no caller could tell them apart, and the documentation said to ask `exists` first — which
+/// is a race dressed up as advice. The deprecated `readBytes` and `readLines` still answer the
+/// old way, and that is what the last two lines here hold.
 @Test
-pub fn utf8Decode_is_strict_where_readText_replaces(): void {
+pub fn an_empty_file_reads_differently_from_a_missing_one(): void {
+    let path = joinPath(tempDir(), "lyric_stdlib_empty_probe.txt");
+    let gone = joinPath(tempDir(), "lyric_stdlib_no_such_file_2b7f.txt");
+
+    assertTrue(writeText(path, ""), "the empty probe must be writable");
+
+    let empty = bytes(path);
+    assertTrue(empty != null, "an empty file reads as an empty array, not as nothing");
+    assertEq((empty ?? [255 as uint8]).length, 0);
+
+    let emptyLines = lines(path);
+    assertTrue(emptyLines != null, "an empty file has no lines, which is not the same as no file");
+    assertEq((emptyLines ?? ["x"]).length, 0);
+
+    assertTrue(text(path) != null, "an empty file reads as an empty string");
+
+    assertTrue(bytes(gone) == null, "a missing file reads as nothing");
+    assertTrue(lines(gone) == null, "a missing file has no lines at all");
+    assertTrue(text(gone) == null, "a missing file has no text at all");
+
+    assertTrue(remove(path), "the probe file must go away");
+}
+
+@Test
+pub fn utf8Decode_is_strict_where_text_replaces(): void {
     assertEq(utf8Decode("Grüße 👋".utf8Encode()) ?? "(invalid)", "Grüße 👋");
     assertTrue(utf8Decode([255 as uint8]) == null, "0xFF alone is not UTF-8");
 }

@@ -190,7 +190,7 @@ internal static class JitCompiler
         /// of the first and would only blur the count.</summary>
         public string Reason { get; private set; } = "unknown";
 
-        public bool EmitBlocks(BytecodeInstruction[] code, int[] blockStart)
+        public bool EmitBlocks(VmInstruction[] code, int[] blockStart)
         {
             for (var block = 0; block < blockStart.Length; block++)
             {
@@ -229,13 +229,13 @@ internal static class JitCompiler
             return true;
         }
 
-        private bool Emit(BytecodeInstruction op)
+        private bool Emit(in VmInstruction op)
         {
             switch (op.Opcode)
             {
                 case Op.Const:
                 {
-                    if (op.Type is not { } tag || !EmitConst(tag, op)) return false;
+                    if (op.TypeOrNull is not { } tag || !EmitConst(tag, op)) return false;
                     _stack.Push(BytecodeType.Scalar(tag));
                     return true;
                 }
@@ -300,7 +300,7 @@ internal static class JitCompiler
                 case Op.Add or Op.Sub or Op.Mul or Op.Div or Op.Rem or Op.Shl or Op.Shr or
                      Op.BitAnd or Op.BitOr or Op.BitXor:
                 {
-                    if (op.Type is not { } tag || _stack.Count < 2) return false;
+                    if (op.TypeOrNull is not { } tag || _stack.Count < 2) return false;
                     _stack.Pop();
                     _stack.Pop();
                     if (!EmitBinary(op, tag)) return false;
@@ -310,7 +310,7 @@ internal static class JitCompiler
 
                 case Op.Lt or Op.Le or Op.Gt or Op.Ge or Op.Eq or Op.Ne:
                 {
-                    if (op.Type is not { } tag || _stack.Count < 2) return false;
+                    if (op.TypeOrNull is not { } tag || _stack.Count < 2) return false;
                     _stack.Pop();
                     _stack.Pop();
                     if (!EmitCompare(op.Opcode, tag)) return false;
@@ -324,7 +324,7 @@ internal static class JitCompiler
 
                 case Op.Neg:
                 {
-                    if (op.Type is not { } tag || _stack.Count == 0) return false;
+                    if (op.TypeOrNull is not { } tag || _stack.Count == 0) return false;
                     if (tag is not (TypeTag.I64 or TypeTag.F64 or TypeTag.F32)) return false;
                     _stack.Pop();
                     il.Emit(OpCodes.Neg);
@@ -345,7 +345,7 @@ internal static class JitCompiler
 
                 case Op.BitNot:
                 {
-                    if (op.Type is not { } tag || _stack.Count == 0) return false;
+                    if (op.TypeOrNull is not { } tag || _stack.Count == 0) return false;
                     if (tag is not (TypeTag.I64 or TypeTag.U64)) return false;
                     _stack.Pop();
                     il.Emit(OpCodes.Not);
@@ -423,7 +423,7 @@ internal static class JitCompiler
 
                 case Op.Convert:
                 {
-                    if (op.Type is not { } from || op.ToType is not { } to) return false;
+                    if (op.TypeOrNull is not { } from || op.ToTypeOrNull is not { } to) return false;
                     if (_stack.Count == 0) return false;
 
                     var source = _stack.Pop();
@@ -841,7 +841,7 @@ internal static class JitCompiler
             return index >= 0 && index < layout.FieldTypes.Count ? layout.FieldTypes[index] : null;
         }
 
-        private bool EmitConst(TypeTag tag, BytecodeInstruction op)
+        private bool EmitConst(TypeTag tag, in VmInstruction op)
         {
             switch (tag)
             {
@@ -878,13 +878,13 @@ internal static class JitCompiler
         /// the only moment when the offset and the map are both at hand — at run time there is no
         /// frame to read either off.</para>
         /// </summary>
-        private string Where(BytecodeInstruction op)
+        private string Where(in VmInstruction op)
         {
             var at = context.SourceMap?.Locate(functionIndex, op.Offset);
             return at is null ? function.Name : $"{function.Name} ({at})";
         }
 
-        private bool EmitBinary(BytecodeInstruction instruction, TypeTag tag)
+        private bool EmitBinary(in VmInstruction instruction, TypeTag tag)
         {
             if (tag is not (TypeTag.I64 or TypeTag.U64 or TypeTag.F64 or TypeTag.F32)) return false;
 

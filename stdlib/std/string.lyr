@@ -51,7 +51,7 @@ pub fn fromChars(chars: char[]): string;
 // bytecode specification); the registry and this module simply never used it before.
 
 /// The bytes as a string, STRICTLY: invalid UTF-8 answers `null` rather than a U+FFFD quietly
-/// standing in for the data — the difference to `readText`, whose replacement decoding is
+/// standing in for the data — the difference to `std.io.file.text`, whose replacement decoding is
 /// documented there.
 pub fn utf8Decode(bytes: uint8[]): ?string;
 

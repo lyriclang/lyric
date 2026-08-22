@@ -517,15 +517,17 @@ public class LoweringTests
         AssertNotSupported(source, expected);
 
     /// <summary>
-    /// The M24 probe result, pinned: a GENERIC default method on an interface is sema-legal and
-    /// refused by the lowering — a default body with its own type parameters has no
-    /// monomorphization path yet, and an interface value's instance interning cannot carry the
-    /// <c>fn(T) -&gt; U</c> slot signature either. This is why iterator method chaining is a
-    /// documented No (STATUS §Design decisions): both walls are milestone-sized. The pin keeps
-    /// today's refusal a visible decision instead of an accident.
+    /// The M24 probe result, turned around by M33: a GENERIC default method on an interface is
+    /// sema-legal AND lowerable since 2.17. It is monomorphized like any generic function and
+    /// gets no vtable slot — a slot holds one function, and a method with type parameters of its
+    /// own is one per instantiation.
+    ///
+    /// <para>This case pinned the refusal for three releases and was right to: it made the
+    /// refusal a visible decision instead of an accident, and it is what said where to start.
+    /// </para>
     /// </summary>
     [Fact]
-    public void A_generic_interface_default_is_refused_by_the_lowering_not_the_sema()
+    public void A_generic_interface_default_is_lowered_by_monomorphization()
     {
         var (ir, de) = TryLower("""
             interface Producer {
@@ -555,8 +557,12 @@ public class LoweringTests
             }
             """);
 
-        Assert.Null(ir);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-IR0001");
+        Assert.False(de.HasErrors);
+        Assert.NotNull(ir);
+
+        // One function per instantiation, named after it — and no slot: the interface's table
+        // holds 'next' alone.
+        Assert.Contains(ir!.Functions, f => f.Name.Contains("firstMapped", StringComparison.Ordinal));
     }
 
     /// <summary>What the lowering does not handle is valid Lyric, so it is a DIAGNOSTIC with file, line

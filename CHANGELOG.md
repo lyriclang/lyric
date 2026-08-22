@@ -10,6 +10,275 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v2.17.0 — 2026-08-22
+
+**M33 — iterator chaining.** The last thing this project had written down as a documented No.
+
+```lyr
+xs.iter().map<int>((n: int) => n * 2).filter((n: int) => n > 4).take(2)
+```
+
+### Added
+
+- **An interface member may have type parameters of its own**, and it is not dispatched: a method
+  table holds one function per slot, and such a member is one function per instantiation. It gets
+  **no slot** and is monomorphized, like a generic function. Three rules follow, and they are one
+  fact seen from three sides (`LYR-SEM0082`):
+
+  - it must have a **body** — an abstract one would promise a dispatch nothing can perform;
+  - it may not be **overridden** — without a slot the target is chosen by the receiver's static
+    type, so an override would be reached through the concrete type and the default through the
+    interface: one name, two functions;
+  - it is reachable through a **constraint AND through an interface value** — which is what a
+    chain needs, and is sound *because* of the first two.
+
+  The same trade Rust makes for a provided method with type parameters of its own.
+
+- **A default method of a GENERIC interface is lowered at all.** `interface Source<T> { fn twice():
+  T { … } }` did not compile: three places lifted a receiver into the interface DEFINITION, which
+  has no entry, and reported that `Source` needs a type argument — at the interface's own
+  declaration, which is not where the program was wrong. All three take the instance now.
+
+- **`std.iter` adapters are methods**: `map`, `filter`, `take`, `skip`, `takeWhile`, `zip`,
+  `chain`, `flatMap`. The free forms delegate to them — one implementation — and carry
+  `until = "3.0"`.
+
+### The two that stay free, and why
+
+- `sum`, `sumFloat`, `minValue`, `maxValue` ask something of the ELEMENT type, and an interface
+  cannot require that of its own parameter.
+- `enumerate` and `chunks` change the element type without being generic. A method like that has a
+  slot every instance must fill, so `Iterator<T>` would demand `Iterator<(int, T)>`, and that one
+  the next — **the monomorphization does not terminate**. It was tried; the compiler stopped
+  answering. `map` and `flatMap` change the element type safely because they are generic: built
+  per use rather than per instance.
+
+### Fixed
+
+- **A non-terminating monomorphization is a diagnostic instead of a hang.** The lowering now
+  reports it with the advice that fixes it — write the method as a free function — where it
+  previously ran until the machine gave up, or produced a module the verifier rejected by naming a
+  type nobody wrote.
+
+- **The vtable rows are built to a fixed point.** A row can request a method whose body interns
+  further types; one pass left those types without rows of their own.
+
+## v2.16.0 — 2026-08-22
+
+An interface may declare several parents. The rule that said otherwise rested on a claim about the
+runtime, and the claim was wrong.
+
+### Added
+
+- **Several parent interfaces**: `interface Item :: [Counted, Scaled]`. Conforming to the child
+  implies conforming to every ancestor, as before.
+
+  The old rule read: *a parent's default method needs its own slot indexes to remain valid behind
+  a child-typed receiver, so several parents would need thunks.* **They do not.** A vtable is
+  keyed by the pair (concrete type, interface), and an implementing type gets a row for every
+  interface in the transitive closure — every ancestor keeps its own numbering and nothing is
+  remapped. The rule went when the reasoning was measured instead of repeated: lifted
+  experimentally, probed, then built.
+
+- **What a second parent actually costs**, and it is the second half of a rule that already
+  existed (`LYR-SEM0079`): two parents may not contribute the same member name from DIFFERENT
+  declarations. One slot holds one method, and no rule picks correctly between two. Before the
+  check they were silently merged, which is worse than either answer.
+
+  A name reached twice through a **diamond** is neither ambiguous nor refused: both paths lead to
+  one declaration, so there is nothing to pick, and an implementation supplies it once.
+
+### Changed
+
+- `LYR-SEM0078` no longer includes "more than one parent"; `LYR-SEM0079` gains the clash. Three
+  conformance cases replace the one that pinned the old rule — including a default on the SECOND
+  parent running behind a child receiver, which is the case the old reasoning said would break.
+
+## v2.15.0 — 2026-08-22
+
+Two small things off the list before v3, both of the same kind: something written in the source
+that the compiler looked past.
+
+### Fixed
+
+- **A `::` list takes interfaces only.** `struct S :: [Vec2]` was SKIPPED — the entry resolved to
+  something that is not an interface, and the check moved on. The declaration claimed a
+  conformance nothing verified and nothing reported, which is the quietest way for a mistake to
+  survive a compiler. It is `LYR-SEM0078` now, on struct, class, enum and `extend` alike; the code
+  already meant exactly this for an interface's parent list, so the catalogue entry is widened
+  rather than a second number spent on the same sentence.
+
+### Added
+
+- **An interface member may carry `@Deprecated`.** It was refused because a conformance question
+  had no answer: *do implementations inherit the clock?*
+
+  **They do not.** A use that resolves to the interface's member warns; an implementation does
+  not — an implementation is not a use, and a conforming type MUST implement what the interface
+  requires, so a warning there could not be acted on without breaking conformance. A call on a
+  concrete receiver resolves to the concrete method, which is its own declaration and carries its
+  own deprecation or none.
+
+  The member restriction is unchanged: only `@Deprecated`, because the module format has no member
+  rows. An attribute on the interface DECLARATION is still refused.
+
+  Two tests that pinned the old refusal now pin the new rule. They were right to exist: that is
+  what a pin is for — it made the change a decision instead of a drift.
+
+## v2.14.0 — 2026-08-22
+
+The second link of the patch train. `std.io.file` had three conventions for "it did not work",
+and one of them could not be told from success.
+
+### Added
+
+- **A read answers `?T`.** `text`, `bytes` and `lines` replace `readText`, `readBytes` and
+  `readLines`:
+
+  | | before | now |
+  |---|---|---|
+  | the file is empty | `[]` | `[]` |
+  | the file is not there | `[]` | **`null`** |
+
+  `readBytes` and `readLines` answered an empty array to both, so no caller could tell them
+  apart — and the documentation said to ask `exists` first, which is a race dressed up as advice.
+  `readText` was already `?string`; it is renamed only so the module has one word for one idea.
+
+  The three old names still work, warn, and carry `until = "3.0"` — the compiler will stop the
+  build on the day they are due, which is the mechanism 2.13 shipped for exactly this.
+
+- **A native may return `?T[]`** (`RegisterOptionalArrayReturning`). Nothing about the VALUE
+  needed building — an optional over a reference IS the reference — but the binder now checks
+  three levels of type, because only the element below the optional and the array separates
+  `?string[]` from `?uint8[]`. Without it a host could hand back bytes where the module expects
+  lines, and the mistake would surface somewhere else entirely.
+
+### The rule, written down
+
+Two shapes, and each says what it is for:
+
+- a **read** answers `?T` — `null` is "could not", an empty result is an empty file;
+- an **operation** answers `bool` — whether it happened. It carries no value, so nothing is lost.
+
+A predicate (`exists`, `isFile`, `isDirectory`) answers `bool` as well, and there `false` is an
+answer rather than a failure.
+
+**What none of them carries is a REASON**: a missing file and a permission denied look the same.
+That gap is real and left open deliberately — carrying reasons means an error type and a decision
+about `throws`, which is the larger question this release deliberately did not answer.
+
+## v2.13.0 — 2026-08-22
+
+The first link of the train that runs ahead of v3.0.0: everything that does not need a major
+ships first, on its own, and deprecates what it replaces. This is the mechanism those
+deprecations will be written with.
+
+### Added
+
+- **A deprecation may name the version that removes it.** `@Deprecated` carries a second field:
+
+  ```lyr
+  @Deprecated { message = "use renew", until = "3.5" }
+  pub fn old(): int { return 1; }
+  ```
+
+  Building with a toolchain that has reached that version is an error (`LYR-SEM0081`), as is a
+  version the compiler cannot read. A deprecation makes two promises — use something else, and
+  this will disappear — and only the first was ever written where anyone could see it; the second
+  lived in a release note, which is another way of saying it lived in somebody's memory.
+
+  Three decisions in it, each of which could have gone the other way:
+
+  - **The named version is the one that removes it.** `until = "3.5"` fails AT 3.5, not one
+    release later, so the failure lands on whoever is preparing that release.
+  - **The check sits at the declaration, not at a use.** A form kept past its date is wrong
+    whether or not anything still calls it, and dead code would never trip a use-site warning.
+  - **It stops the build rather than warning.** A warning about a removal that should already
+    have happened is a warning nobody acts on — the same reasoning as the documentation ratchet
+    and the corpus-silence invariant.
+
+  Not a second attribute: an `@Sunset` beside `@Deprecated` would be a second mechanism for "this
+  is going away", and the two would eventually disagree about a declaration carrying one and not
+  the other. An empty `until` is the ordinary policy — warn now, remove at the next major.
+
+## v2.12.0 — 2026-08-22
+
+Bytecode format **3.6**. The interpreter runs the same programs in a third of the instructions,
+and the release is about why that is the number that mattered.
+
+### The measurement it started from
+
+An instruction on this VM costs ~6 ns — and costs it **regardless of what it does**. A `br`, an
+`add f64` and an `and i64` lie within twenty percent of each other. That is the normal price of a
+switch-dispatch stack machine, not a slow interpreter: the dispatch is the whole bill. So nothing
+that makes an instruction cheaper moves a program's time, and the only lever is executing fewer.
+
+The loop test of every `while` in the language was four instructions, of which three existed to
+move a value onto the operand stack and off it again.
+
+### Added
+
+- **Fused instructions** (format 3.6). Four opcodes that read local slots and write local slots,
+  touching the operand stack not at all:
+
+  | | |
+  |---|---|
+  | `brcmp`, `brcmpk` | compare two slots, or a slot and a constant, and branch |
+  | `binll`, `binlk` | `dest = a op b` and `dest = a op k`, for any binary operation |
+
+  A comparison in the arithmetic form writes a `bool`, exactly as the unfused pair leaves one on
+  the stack; the destination may be one of the sources, which is what makes `i = i + 1` a single
+  instruction. Instruction selection is in the emitter, not in the IR — a fused instruction is a
+  property of the encoding, and the IR is the machine-independent form every pass reads.
+
+  ```
+  brcmpk lt i64 l0, 10000000 -> bb2, bb3
+  binlk add f64 l1 = l1, 1.5
+  binlk add i64 l0 = l0, 1
+  br bb1
+  ```
+
+- **`std.random` draws in a native round.** Three shifts and three exclusive ors written in Lyric
+  were 53 instructions, and on this VM a crossing into the host costs about what one instruction
+  costs. The state stays in the script: one integer crosses, the next comes back. **The sequence
+  is unchanged**, including the replaced zero seed, and it is pinned by a test now — the one
+  beside it compared two generators with each other and would have held for any algorithm at all.
+
+### Measured
+
+Same harness, same machine, same session; the baseline is a build with selection switched off and
+the old `nextInt`. Two iteration counts differenced, so nothing that happens once is in the
+figure, and the instruction counts are read from an `ExecutionBudget` rather than counted by hand.
+
+| case | instr | ns/iter | instr | ns/iter | |
+|---|---:|---:|---:|---:|---:|
+| | *2.11* | *2.11* | *2.12* | *2.12* | |
+| a counting loop | 9 | 44.3 | **3** | **18.2** | **2.4×** |
+| an integer accumulator | 13 | 59.2 | **4** | **27.6** | **2.1×** |
+| a float accumulator | 13 | 68.7 | **4** | **24.8** | **2.8×** |
+| a masked accumulator | 15 | 88.7 | **9** | **61.2** | 1.4× |
+| a native call | 14 | 82.4 | **8** | **56.9** | 1.4× |
+| `Random.nextFloat()` | 70 | 395.4 | **42** | **199.2** | **2.0×** |
+| an array read | 19 | 91.6 | **13** | **65.8** | 1.4× |
+
+The time fell WITH the count rather than beside it, which is the claim the release rests on. What
+rose is the average price per instruction (≈4.9 → ≈6.3 ns), and that is the healthy direction:
+the instructions the fusion removed were the cheapest ones, the moves.
+
+The rows that gain least say where the remaining work is: a nested expression keeps its
+intermediate on the stack, and neither fused form can reach a value that is not in a slot.
+
+### Format
+
+**3.6 against 3.5**: four new opcodes. A producer may emit the unfused sequences instead, and one
+that never emits a fused form writes a module any 3.5 runtime accepts; a module that uses one
+needs a 3.6 runtime, named at load time.
+
+The §Versioning rule was corrected in the same round. It read "a minor version may only add
+skippable sections", which 3.4 was not — the note beside that version said as much, so the
+document had contradicted itself since the day it shipped. It now states the compatibility the
+format has actually delivered: per MODULE, not per version.
+
 ## v2.11.0 — 2026-08-22
 
 Bytecode format **3.5**. One new section, and the whole release is about a name that used to get
