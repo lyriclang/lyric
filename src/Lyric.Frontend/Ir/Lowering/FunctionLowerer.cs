@@ -3893,8 +3893,14 @@ internal sealed class FunctionLowerer
                          or TypeSymbolKind.Enum } concrete }
                      && concrete.Members.LookupLocal(member.Member) is not FunctionSymbol
                      && _typeTable.InterfaceProviding(concrete, member.Member) is { } provider:
-                return LowerVirtualCall(member, provider, expr,
-                    receiver: LowerExprAs(member.Target, _typeTable.InterfaceOf(provider)));
+            {
+                // As the concrete type DECLARES it: 'Iterator<int>', not 'Iterator'. A generic
+                // interface has no entry of its own, and lifting into the definition is what a
+                // default of one used to die on.
+                var into = _typeTable.InterfaceAsDeclared(concrete, provider, expr.Span);
+                return LowerVirtualCall(member, provider, expr, into.Type,
+                    LowerExprAs(member.Target, into));
+            }
 
             case MemberExpr member
                 when ReceiverType(member.Target) is NamedRef

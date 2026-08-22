@@ -270,6 +270,33 @@ internal sealed class TypeTable
     public IrInterfaceType InterfaceOf(TypeSymbol symbol) => new(Intern(symbol));
 
     /// <summary>
+    /// The interface as a concrete type DECLARES it: for <c>class C :: [Iterator&lt;int&gt;]</c>
+    /// and the provider <c>Iterator</c>, the entry of <c>Iterator&lt;int&gt;</c>.
+    ///
+    /// <para>Needed wherever a receiver is lifted to reach an interface default: a generic
+    /// interface has no entry of its own, so lifting into the definition throws. Falls back to the
+    /// bare symbol when the type does not name it directly — a non-generic interface, or one
+    /// reached through a parent, where the definition IS the entry.</para>
+    /// </summary>
+    public IrInterfaceType InterfaceAsDeclared(TypeSymbol concrete, TypeSymbol iface, Core.Span span)
+    {
+        var declared = concrete.Declaration switch
+        {
+            ClassDecl c => c.Interfaces,
+            StructDecl v => v.Interfaces,
+            EnumDecl e => e.Interfaces,
+            _ => (TypeNode[])[],
+        };
+
+        foreach (var node in declared)
+            if (Conformance.InterfaceOf(node, _binding) is { } written
+                && ReferenceEquals(written, iface))
+                return InterfaceOf(node, span);
+
+        return InterfaceOf(iface);
+    }
+
+    /// <summary>
     /// The interface as it is WRITTEN at a constraint: <c>Source&lt;int&gt;</c> rather than
     /// <c>Source</c>.
     ///

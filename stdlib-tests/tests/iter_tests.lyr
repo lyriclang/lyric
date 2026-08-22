@@ -1,24 +1,8 @@
 import std.test { Test, assertEq, assertTrue };
-import std.iter {
-    map,
-    filter,
-    take,
-    skip,
-    zip,
-    chain,
-    fold,
-    count,
-    sum,
-    any,
-    all,
-    find,
-    minValue,
-    maxValue,
-    flatMap,
-    chunks,
-    reduce,
-    first,
-};
+// The adapters are METHODS since 2.17 and need no import; what is imported here are the forms
+// that stay free — the terminals, and the two that would make the monomorphization diverge as
+// methods (see the note in std.iter).
+import std.iter { fold, count, sum, any, all, find, minValue, maxValue, chunks, reduce, first };
 import std.collections { List, collect };
 
 fn upTo(n: int): List<int> {
@@ -34,7 +18,7 @@ fn upTo(n: int): List<int> {
 @Test
 pub fn adapters_compose_lazily(): void {
     let doubledEvens = collect<int>(
-        map<int, int>(filter<int>(upTo(6).iter(), (n: int) => n % 2 == 0), (n: int) => n * 10)
+        upTo(6).iter().filter((n: int) => n % 2 == 0).map<int>((n: int) => n * 10)
     );
     assertEq(doubledEvens.length(), 3);
     assertEq(doubledEvens.get(0), 20);
@@ -43,20 +27,20 @@ pub fn adapters_compose_lazily(): void {
 
 @Test
 pub fn take_and_skip_split_a_sequence(): void {
-    assertEq(sum(take<int>(upTo(10).iter(), 3)), 6);
-    assertEq(sum(skip<int>(upTo(10).iter(), 7)), 27);
-    assertEq(count<int>(take<int>(upTo(3).iter(), -1)), 0);
+    assertEq(sum(upTo(10).iter().take(3)), 6);
+    assertEq(sum(upTo(10).iter().skip(7)), 27);
+    assertEq(count<int>(upTo(3).iter().take(0 - 1)), 0);
 }
 
 @Test
 pub fn zip_ends_with_the_shorter_side(): void {
-    let pairs = collect<(int, int)>(zip<int, int>(upTo(2).iter(), upTo(5).iter()));
+    let pairs = collect<(int, int)>(upTo(2).iter().zip<int>(upTo(5).iter()));
     assertEq(pairs.length(), 2);
 }
 
 @Test
 pub fn chain_walks_both_in_order(): void {
-    assertEq(sum(chain<int>(upTo(2).iter(), upTo(3).iter())), 9);
+    assertEq(sum(upTo(2).iter().chain(upTo(3).iter())), 9);
 }
 
 @Test
@@ -83,7 +67,7 @@ pub fn min_and_max_answer_null_on_empty(): void {
 @Test
 pub fn flatMap_runs_the_sequences_back_to_back(): void {
     let total = fold<int, int>(
-        flatMap<int, int>(upTo(3).iter(), (n: int) => pairOf(n).iter()),
+        upTo(3).iter().flatMap<int>((n: int) => pairOf(n).iter()),
         0,
         (acc: int, v: int) => acc + v
     );
