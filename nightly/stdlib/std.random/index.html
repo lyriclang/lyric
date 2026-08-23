@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../../grammar/">Lyric Grammar</a></li>
-<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -92,19 +92,19 @@ plausible input.</p>
 <p>Normally distributed, mean 0 and deviation 1 (Box–Muller).</p>
 </div>
 </div>
-<p class="source">stdlib/std/random.lyr:20</p>
+<p class="source">stdlib/std/random.lyr:28</p>
 </section>
 <section class="item" id="function-shuffle">
 <h2><a href="#function-shuffle">shuffle</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn shuffle&lt;T&gt;(random: Random, xs: List&lt;T&gt;): void</code></pre>
 <p>Shuffles in place, Fisher–Yates: every permutation equally likely, one draw per element.</p>
-<p class="source">stdlib/std/random.lyr:78</p>
+<p class="source">stdlib/std/random.lyr:83</p>
 </section>
 <section class="item" id="function-choice">
 <h2><a href="#function-choice">choice</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn choice&lt;T&gt;(random: Random, xs: List&lt;T&gt;): ?T</code></pre>
 <p>One element drawn uniformly, or <code>null</code> from an empty list.</p>
-<p class="source">stdlib/std/random.lyr:88</p>
+<p class="source">stdlib/std/random.lyr:93</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.os/">std.os</a>

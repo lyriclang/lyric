@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../../grammar/">Lyric Grammar</a></li>
-<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -191,52 +191,52 @@ first — as <code>strcmp</code>.</p>
 </section>
 <section class="item" id="interface-add">
 <h2><a href="#interface-add">Add</a> <span class="kind">interface</span></h2>
-<pre class="signature"><code class="language-lyr">pub interface Add&lt;T&gt;</code></pre>
+<pre class="signature"><code class="language-lyr">pub interface Add&lt;T, R&gt;</code></pre>
 <p>Values of this type can be added: <code>a + b</code> is <code>a.add(b)</code>.</p>
 <div class="members">
 <div class="member">
-<pre class="signature"><code class="language-lyr">fn add(other: T): T</code></pre>
+<pre class="signature"><code class="language-lyr">fn add(other: T): R</code></pre>
 <p>The sum of this value and <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:347</p>
+<p class="source">stdlib/std/core.lyr:352</p>
 </section>
 <section class="item" id="interface-sub">
 <h2><a href="#interface-sub">Sub</a> <span class="kind">interface</span></h2>
-<pre class="signature"><code class="language-lyr">pub interface Sub&lt;T&gt;</code></pre>
+<pre class="signature"><code class="language-lyr">pub interface Sub&lt;T, R&gt;</code></pre>
 <p>Values of this type can be subtracted: <code>a - b</code> is <code>a.sub(b)</code>.</p>
 <div class="members">
 <div class="member">
-<pre class="signature"><code class="language-lyr">fn sub(other: T): T</code></pre>
+<pre class="signature"><code class="language-lyr">fn sub(other: T): R</code></pre>
 <p>This value minus <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:353</p>
+<p class="source">stdlib/std/core.lyr:358</p>
 </section>
 <section class="item" id="interface-mul">
 <h2><a href="#interface-mul">Mul</a> <span class="kind">interface</span></h2>
-<pre class="signature"><code class="language-lyr">pub interface Mul&lt;T&gt;</code></pre>
+<pre class="signature"><code class="language-lyr">pub interface Mul&lt;T, R&gt;</code></pre>
 <p>Values of this type can be multiplied: <code>a * b</code> is <code>a.mul(b)</code>.</p>
 <div class="members">
 <div class="member">
-<pre class="signature"><code class="language-lyr">fn mul(other: T): T</code></pre>
+<pre class="signature"><code class="language-lyr">fn mul(other: T): R</code></pre>
 <p>The product of this value and <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:359</p>
+<p class="source">stdlib/std/core.lyr:364</p>
 </section>
 <section class="item" id="interface-div">
 <h2><a href="#interface-div">Div</a> <span class="kind">interface</span></h2>
-<pre class="signature"><code class="language-lyr">pub interface Div&lt;T&gt;</code></pre>
+<pre class="signature"><code class="language-lyr">pub interface Div&lt;T, R&gt;</code></pre>
 <p>Values of this type can be divided: <code>a / b</code> is <code>a.div(b)</code>.</p>
 <div class="members">
 <div class="member">
-<pre class="signature"><code class="language-lyr">fn div(other: T): T</code></pre>
+<pre class="signature"><code class="language-lyr">fn div(other: T): R</code></pre>
 <p>This value divided by <code>other</code>. What a division by zero does is the type's own business;
 the built-in numerics panic.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:365</p>
+<p class="source">stdlib/std/core.lyr:370</p>
 </section>
 <section class="item" id="interface-into">
 <h2><a href="#interface-into">Into</a> <span class="kind">interface</span></h2>
@@ -252,25 +252,25 @@ belongs in a named function returning an optional.</p>
 <p>This value as a <code>T</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:462</p>
+<p class="source">stdlib/std/core.lyr:467</p>
 </section>
 <section class="item" id="interface-onmodule">
 <h2><a href="#interface-onmodule">OnModule</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnModule</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before the module header.</p>
-<p class="source">stdlib/std/core.lyr:472</p>
+<p class="source">stdlib/std/core.lyr:477</p>
 </section>
 <section class="item" id="interface-ontype">
 <h2><a href="#interface-ontype">OnType</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnType</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before a struct, class or enum declaration.</p>
-<p class="source">stdlib/std/core.lyr:475</p>
+<p class="source">stdlib/std/core.lyr:480</p>
 </section>
 <section class="item" id="interface-onfunction">
 <h2><a href="#interface-onfunction">OnFunction</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnFunction</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before a top-level function.</p>
-<p class="source">stdlib/std/core.lyr:478</p>
+<p class="source">stdlib/std/core.lyr:483</p>
 </section>
 <section class="item" id="struct-deprecated">
 <h2><a href="#struct-deprecated">Deprecated</a> <span class="kind">struct</span></h2>
@@ -283,8 +283,15 @@ nothing else, so a program that ignores the warning runs unchanged.</p>
 <pre class="signature"><code class="language-lyr">message: string</code></pre>
 <p>What to use instead; shown in the warning at every use site.</p>
 </div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">until: string</code></pre>
+<p>The version this is kept until, as <code>&quot;3.5&quot;</code> — and it is a PROMISE the compiler enforces:
+building with a toolchain that has reached that version is an error (<code>LYR-SEM0081</code>), so
+the removal happens because the build stops, not because somebody remembered.</p>
+<p>Empty means the ordinary policy: warn now, remove at the next major.</p>
 </div>
-<p class="source">stdlib/std/core.lyr:483</p>
+</div>
+<p class="source">stdlib/std/core.lyr:488</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.collections/">std.collections</a>

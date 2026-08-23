@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Lyric .lyrbc Bytecode Format 3.3 — Lyric nightly</title>
+<title>Lyric .lyrbc Bytecode Format 3.6 — Lyric nightly</title>
 <link rel="stylesheet" href="../site.css" />
 </head>
 <body>
@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../grammar/">Lyric Grammar</a></li>
-<li><a href="../bytecode/" class="here">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../bytecode/" class="here">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -47,7 +47,7 @@
 </ul>
 </nav>
 <main>
-<h1>Lyric .lyrbc Bytecode Format 3.3</h1>
+<h1>Lyric .lyrbc Bytecode Format 3.6</h1>
 <nav class="contents">
 <ul>
 <li><a href="#encoding">1. Encoding</a></li>
@@ -71,10 +71,33 @@ marker against the canonical body. Edit it there, mirror it here.</p>
 or a second runtime can be written from this document alone.</p>
 <p>Before Lyric v1.0 the format may change incompatibly with a major version bump and without a
 migration path. A stability promise begins at v1.0.</p>
-<p>Format version <strong>3.3</strong> covers: scalars, locals, module-internal and native calls, structured
+<p>Format version <strong>3.6</strong> covers: scalars, locals, module-internal and native calls, structured
 control flow, classes, arrays, optionals, enums, interfaces with vtable dispatch, structs with
 value semantics, exceptions, global constants, closures, host objects, source positions,
-attributes, and debug information.</p>
+attributes, debug information, the names of opaque field types, and fused compare-and-branch.</p>
+<p><strong>3.6 against 3.5</strong>: four new opcodes. <code>brcmp</code> and <code>brcmpk</code> (§Calls and control flow) do in one
+instruction what a comparison followed by <code>condbr</code> does in four; <code>binll</code> and <code>binlk</code>
+(§Arithmetic and bit operations) do the same for an operation whose operands are slots and whose
+result goes into one. A module that uses one needs
+a runtime of 3.6 or newer; a module that does not is unchanged, which is the compatibility
+§Versioning describes. Nothing else moves: the fused forms compute what the instructions they
+replace computed, in the same order, with the same overflow and comparison rules — a producer may
+emit either.</p>
+<p><strong>3.5 against 3.4</strong>: one new section — OpaqueFields (id 14), the name of the <code>opaque type</code> a
+field was declared with. It is skippable, and in the plainest way: no other section refers to it,
+it says nothing about how the program runs, and a reader that ignores it is a reader that knows
+what it knew before. A 3.4 reader therefore loads a 3.5 module unchanged, and a 3.5 reader loads
+a 3.4 module — the only difference is whether a host can tell a handle from the number it is
+made of.</p>
+<p><em>(The rule above was written as &quot;a minor may only add skippable sections&quot; and stood that way
+through 3.4, which is not one — the note below says so in its own words. The wording was
+corrected to what the format has actually done since; no version's contents changed with it.)</em></p>
+<p><strong>3.4 against 3.3</strong>: one new <code>ConstValue</code> form — an attribute value of enum type, written as the
+variant's tag. It is the first change to this format that a 3.3 reader cannot ignore: the
+Attributes section is skippable as a whole, but a reader that DOES read it meets a tag it has no
+case for and rejects the module. A 3.4 module whose attribute rows use no enum value loads on a
+3.3 reader unchanged, which is the same forward path the language's own additions take — the
+module that uses the new thing is the module that needs the new runtime.</p>
 <p><strong>3.3 against 3.2</strong>: one new section — DebugInfo (id 13), the names of local and global
 slots — and one loosened producer rule: Names (id 12) may carry field names for any type, where
 3.2 allowed entries only for types an Attributes row references. Both directions stay compatible:
@@ -142,8 +165,17 @@ payload          byteLength bytes
 </code></pre>
 <p>A reader must skip a section with an unknown id and must reject a file whose section ids do not
 strictly ascend.</p>
-<p><strong>Versioning</strong>: an unknown major version is rejected. An unknown minor version is tolerated; a new
-minor version may only add skippable sections.</p>
+<p><strong>Versioning</strong>: an unknown major version is rejected. An unknown minor version is tolerated.</p>
+<p>A new MINOR version may add anything a module can decline to use: a skippable section, a value
+form inside one, an opcode. What it may not do is change the meaning or the shape of something a
+reader of the previous minor already reads — that is a major. The compatibility this buys is
+per MODULE rather than per version: a module that uses nothing new loads on the older reader
+unchanged, and a module that uses something new needs a runtime of that minor or newer, the same
+forward path the language's own additions take.</p>
+<p>Two consequences worth stating, because they are what the rule is for. A reader must not reject a
+file merely for carrying a higher minor. And a producer must not silently downgrade: if it emits
+a new form, the minor in the header says so, so the failure is &quot;this runtime is too old&quot;, named
+at load time, instead of a misread instruction.</p>
 <h3 id="section-ids">Section ids</h3>
 <table>
 <thead>
@@ -232,6 +264,12 @@ minor version may only add skippable sections.</p>
 <td>DebugInfo</td>
 <td>no</td>
 <td>strippable: local and global slot names</td>
+</tr>
+<tr>
+<td>14</td>
+<td>OpaqueFields</td>
+<td>no</td>
+<td>the <code>opaque type</code> a field was declared with</td>
 </tr>
 </tbody>
 </table>
@@ -391,9 +429,9 @@ reports for it.</p>
 format: it presupposes that a runtime decodes the code into an array before running it. A runtime
 that walks the bytes directly would have to count instructions to answer a question the format can
 answer in its own coordinates.</p>
-<p><strong>The row carries no column.</strong> A minor version may only add skippable sections, so the shape of this
-one is fixed until a major: a column cannot be added here later, and adding it beside this section
-would be a second mechanism for the same thing.</p>
+<p><strong>The row carries no column.</strong> The shape of an existing row is fixed until a major (§Versioning):
+a column cannot be added here later, and adding it beside this section would be a second mechanism
+for the same thing.</p>
 <p>A reader must reject: a <code>functionCount</code> that differs from the Functions section, a file index outside
 the file table, a string index outside the pool, an offset that does not lie inside that function's
 <code>code</code> — a row marks where an instruction begins, so <code>offset == codeLength</code> is already outside — and
@@ -468,7 +506,15 @@ ConstValue       = tag u8, then by tag:
                    f32 / f64          4 / 8 bytes IEEE-754 bit pattern, little-endian
                    bool               u8
                    string             uleb128    index into the string pool
+                   enum (3.4)         uleb128    the variant's tag: its index in the enum's
+                                                 variantTypes list
 </code></pre>
+<p><strong>An enum value names no enum.</strong> The field's own type does, and the enum's entry names its
+variants, so the tag is the whole payload — a second copy could disagree with the first. A reader
+resolves the variant name through the field type when it wants one; the value itself is the
+number slot 0 of that variant carries at runtime. The tag must be within the enum's variant list,
+and only a variant WITHOUT a payload may be written: a row holds one value per field, and a
+payload is values of its own.</p>
 <p><strong>A row is complete</strong>: one value per field of the attribute type, in field declaration order — a
 field the source did not write carries the field's literal default, filled in by the compiler. The
 position IS the field index, which is why no index is stored, and each value's tag must equal the
@@ -534,6 +580,36 @@ the same way a panic without a SourceMap names a function instead of a line.</p>
 <p>A reader must reject: a <code>functionCount</code> differing from the Functions section, a <code>nameCount</code> that
 is neither <code>0</code> nor that function's slot count, a <code>globalNameCount</code> that is neither <code>0</code> nor the
 Globals count, and a string index outside the pool.</p>
+<h3 id="opaquefields-id-14">OpaqueFields (Id 14)</h3>
+<p>New in 3.5. The name of the <code>opaque type</code> a field was declared with, for types that have at least
+one such field.</p>
+<p>An opaque alias is a distinct type in the language and its underlying type everywhere below the
+checker: <code>opaque type Entity = int</code> is an <code>i64</code> in every layout, signature and instruction, which
+is what lets a handle cross a native boundary for nothing. The consequence is that a consumer
+reading the shape of a type — a host deciding what it may write to disk, a debugger labelling a
+value — sees a number where the source wrote a handle, and the two demand different treatment.
+This section is the name it lost, and nothing more: it does not change what the field IS.</p>
+<pre><code>count            uleb128
+entries          count × {
+                   type         uleb128   index into Types
+                   nameCount    uleb128   must equal that type's fieldCount
+                   names        nameCount × string
+                 }
+</code></pre>
+<p>The names stand in field order, as in Names (§Names): <code>names[i]</code> belongs to the field
+<code>fieldTypes[i]</code> describes. A field whose type is not opaque carries the <strong>empty string</strong> — the
+position is the index, so every field of an entry's type answers or none does. A type no field of
+which is opaque has no entry at all.</p>
+<p>The name is the alias's own, unqualified, as every name in the tables is. It names the LEAF
+through arrays and optionals: a field declared <code>Entity[]</code> carries <code>Entity</code>, and its entry in the
+Types section still says the field is an array. A transparent alias resolves through to what it
+names, because a transparent alias is a name for a type rather than a type of its own — only an
+opaque one is distinct.</p>
+<p><strong>Skippable and metadata-only.</strong> No other section refers to it, nothing in it affects execution,
+and a producer may leave it out entirely. A producer that writes it SHOULD write it for the types
+Names covers, which is where a consumer asks.</p>
+<p>A reader must reject: a type index outside the table, the same type twice, and a name count
+differing from that type's field count.</p>
 <hr />
 <h2 id="type-tags">3. Type tags</h2>
 <p>One byte.</p>
@@ -811,6 +887,42 @@ operand type.</p>
 <p><code>add</code> through <code>rem</code> require a numeric type, <code>shl</code> through <code>xor</code> an integer type. Signed and
 unsigned are distinct operations. There is no string concatenation instruction; it lowers to a
 call.</p>
+<p><strong>The fused forms</strong> (3.6). Two more opcodes do the same arithmetic over LOCAL SLOTS, in one
+instruction instead of four:</p>
+<table>
+<thead>
+<tr>
+<th>Opcode</th>
+<th>Mnemonic</th>
+<th>Operands</th>
+<th>Stack</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x1A</code></td>
+<td><code>binll</code></td>
+<td><code>op</code>, <code>T</code>, <code>uleb128</code> dest, <code>uleb128</code> a, <code>uleb128</code> b</td>
+<td>0</td>
+<td><code>dest = a op b</code></td>
+</tr>
+<tr>
+<td><code>0x1B</code></td>
+<td><code>binlk</code></td>
+<td><code>op</code>, <code>T</code>, <code>uleb128</code> dest, <code>uleb128</code> a, immediate</td>
+<td>0</td>
+<td><code>dest = a op k</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>op</code> is one byte holding one of the binary opcodes — <code>0x10</code>..<code>0x19</code> or a comparison
+<code>0x20</code>..<code>0x25</code>; the fused forms carry the operation they perform rather than introducing an
+enumeration of their own. <code>T</code> is the tag of the OPERANDS, and the rules above apply to it
+unchanged; when <code>op</code> is a comparison, <code>dest</code> receives a <code>bool</code>, exactly as the unfused form leaves
+one on the stack. <code>binlk</code> encodes its constant as <code>const</code> encodes a value of <code>T</code>.</p>
+<p>The destination may be one of the sources: both operands are read before it is written.</p>
+<p>Neither touches the operand stack, and both are optional for a producer — see §Versioning.</p>
 <h3 id="comparisons">Comparisons</h3>
 <p>Two values of the same type produce a <code>bool</code> (−2 +1). The tag names the operand type, not the
 result type.</p>
@@ -948,13 +1060,37 @@ result type.</p>
 <td>0</td>
 <td>must never be reached</td>
 </tr>
+<tr>
+<td><code>0x46</code></td>
+<td><code>brcmp</code></td>
+<td><code>cmp</code>, <code>T</code>, <code>uleb128</code> a, <code>uleb128</code> b, <code>uleb128</code> ifTrue, <code>uleb128</code> ifFalse</td>
+<td>0</td>
+<td>compare two slots and branch</td>
+</tr>
+<tr>
+<td><code>0x47</code></td>
+<td><code>brcmpk</code></td>
+<td><code>cmp</code>, <code>T</code>, <code>uleb128</code> a, immediate, <code>uleb128</code> ifTrue, <code>uleb128</code> ifFalse</td>
+<td>0</td>
+<td>compare a slot with a constant and branch</td>
+</tr>
 </tbody>
 </table>
 <p><code>call</code> takes <code>paramCount</code> values off the stack, the first parameter lowest, and leaves one value
 exactly when the return type is not <code>void</code>.</p>
 <p>The index addresses a shared index space: all imports first, then all defined functions.</p>
 <p><code>ret</code> and <code>retval</code> must match the function's return type. Every block ends with exactly one of
-<code>ret</code>, <code>retval</code>, <code>br</code>, <code>condbr</code>, <code>unreachable</code>, <code>throw</code> or <code>endfinally</code>.</p>
+<code>ret</code>, <code>retval</code>, <code>br</code>, <code>condbr</code>, <code>brcmp</code>, <code>brcmpk</code>, <code>unreachable</code>, <code>throw</code> or <code>endfinally</code>.</p>
+<p><strong>The fused branches</strong> (3.6). <code>brcmp</code> and <code>brcmpk</code> are <code>condbr</code> with the comparison folded in.
+<code>cmp</code> is one byte holding one of the comparison opcodes (<code>0x20</code>..<code>0x25</code>) — the fused forms carry
+the operation they perform rather than introducing an enumeration of their own — and <code>T</code> is the
+tag of the OPERANDS, as on the comparison itself. <code>brcmpk</code> encodes its right-hand operand exactly
+as <code>const</code> encodes a value of <code>T</code>.</p>
+<p>Both read local slots and branch to block indices; <strong>neither touches the operand stack</strong>, which is
+where the saving comes from. The comparison rules of §Comparisons apply unchanged, minus <code>string</code>:
+these forms compare one machine word.</p>
+<p>A producer is free to emit the unfused sequence instead — the two are equivalent by construction,
+and a producer that never emits the fused forms writes a module any 3.5 runtime accepts.</p>
 <h3 id="objects">Objects</h3>
 <table>
 <thead>
@@ -1359,6 +1495,10 @@ safety checks.</p>
 <p>For <code>newobj</code>, <code>ldfld</code> and <code>stfld</code>, load-time checking means: the type index lies within the Types
 section, and for <code>ldfld</code> and <code>stfld</code> the field index lies within the field count of that exact
 type. Field access at runtime is then an unchecked array access.</p>
+<p>For the fused forms it means: the operation byte is one the form admits — a comparison for
+<code>brcmp</code> and <code>brcmpk</code>, any binary opcode for <code>binll</code> and <code>binlk</code> — every slot lies within the slot
+table, every branch target within the block table, and <code>T</code> is one that operation accepts. Their
+operands are read and written at runtime without a check, exactly as <code>ldloc</code>'s slot is.</p>
 <p>The reader stops at the first finding.</p>
 <hr />
 <h2 id="example">7. Example</h2>

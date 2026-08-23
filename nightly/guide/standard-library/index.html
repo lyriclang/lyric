@@ -50,6 +50,8 @@
 <li><a href="#collections">Collections</a></li>
 <li><a href="#iteration">Iteration</a></li>
 <li><a href="#one-name-per-type-not-overloads">One name per type, not overloads</a></li>
+<li><a href="#iterators-chain">Iterators chain</a></li>
+<li><a href="#files-answer-two-ways-and-each-says-which">Files answer two ways, and each says which</a></li>
 <li><a href="#capabilities">Capabilities</a></li>
 <li><a href="#strings-have-methods">Strings have methods</a></li>
 <li><a href="#constructors-live-on-the-types">Constructors live on the types</a></li>
@@ -200,6 +202,59 @@ both families side by side:</p>
 <p><code>clamp(index, 0, count - 1)</code> on three <code>int</code>s is therefore <code>cannot assign 'int' to 'float'</code>, and
 the answer is <code>clampInt</code> rather than a conversion there and back. The same rule shapes
 <code>fromInt</code>/<code>fromFloat</code> and <code>parseInt</code>/<code>parseFloat</code> in <code>std.string</code>.</p>
+<h2 id="iterators-chain">Iterators chain</h2>
+<p>Since 2.17 the adapters are METHODS, so a pipeline reads left to right instead of inside out:</p>
+<pre><code class="language-lyr">import std.iter { collectArray };
+import std.collections { List };
+
+fn main(): int {
+    let xs = List&lt;int&gt;.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+
+    let out = collectArray&lt;int&gt;(
+        xs.iter().map&lt;int&gt;((n: int) =&gt; n * 2).filter((n: int) =&gt; n &gt; 2).take(2));
+
+    return out.length;
+}
+</code></pre>
+<p><code>map</code>, <code>filter</code>, <code>take</code>, <code>skip</code>, <code>takeWhile</code>, <code>zip</code>, <code>chain</code> and <code>flatMap</code> are methods on
+<code>Iterator&lt;T&gt;</code>; the free forms still work, warn, and go with 3.0.</p>
+<p>Two families stay free, each for a reason worth knowing:</p>
+<ul>
+<li><strong><code>sum</code>, <code>sumFloat</code>, <code>minValue</code>, <code>maxValue</code></strong> ask something of the ELEMENT type — that it is a
+number, that it is ordered — and an interface cannot require that of its own parameter.</li>
+<li><strong><code>enumerate</code> and <code>chunks</code></strong> change the element type without being generic, and a method like
+that would ask the compiler to build <code>Iterator&lt;(int, T)&gt;</code>, then <code>Iterator&lt;(int, (int, T))&gt;</code>,
+without end. <code>map</code> and <code>flatMap</code> change it safely because they are generic: they are built per
+use rather than per instance.</li>
+</ul>
+<h2 id="files-answer-two-ways-and-each-says-which">Files answer two ways, and each says which</h2>
+<p>Since 2.14 <code>std.io.file</code> has exactly two shapes, and the choice between them is not a taste:</p>
+<pre><code class="language-lyr">import std.io.file as file;
+
+fn main(): int {
+    let path = &quot;notes.txt&quot;;
+
+    let content = file.text(path) ?? &quot;&quot;;        // a READ answers ?T
+    let saved = file.writeText(path, content);  // an OPERATION answers bool
+
+    return if (saved) 0 else 1;
+}
+</code></pre>
+<p>A <strong>read</strong> answers <code>?T</code>: <code>null</code> means the file could not be read, and an empty result means an
+empty file. A <strong>write, a remove, a copy</strong> answers <code>bool</code> — whether it happened; it carries no
+value, so nothing is lost by saying only that. A <strong>predicate</strong> (<code>exists</code>, <code>isFile</code>,
+<code>isDirectory</code>) answers <code>bool</code> too, and there <code>false</code> is an answer rather than a failure.</p>
+<p>Before 2.14 there were three shapes, and the third one lied: <code>readBytes</code> and <code>readLines</code> answered
+an <strong>empty array</strong> both for an empty file and for a file that is not there. No caller could tell
+those apart, and the advice was to ask <code>exists</code> first — which is a race, not an answer. The three
+old names (<code>readText</code>, <code>readBytes</code>, <code>readLines</code>) warned through the 2.x line and went with 3.0;
+<code>text</code>, <code>bytes</code> and <code>lines</code> are what is left.</p>
+<p>What none of the shapes carries is a REASON: a missing file and a permission denied look the
+same. That gap is known and left open on purpose — carrying reasons means an error type and a
+decision about <code>throws</code> that this module should not make on its own.</p>
 <h2 id="capabilities">Capabilities</h2>
 <p><code>std.io.file</code>, <code>std.io.net</code> and <code>std.os</code> require a capability. A standalone run grants
 everything; a host grants explicitly, and a module that requires more than it is granted is

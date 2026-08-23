@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../../grammar/">Lyric Grammar</a></li>
-<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -50,15 +50,15 @@
 <h1>std.io.file</h1>
 <nav class="contents">
 <ul>
-<li><a href="#function-readtext">readText</a></li>
+<li><a href="#function-text">text</a></li>
+<li><a href="#function-bytes">bytes</a></li>
+<li><a href="#function-lines">lines</a></li>
 <li><a href="#function-writetext">writeText</a></li>
 <li><a href="#function-appendtext">appendText</a></li>
 <li><a href="#function-exists">exists</a></li>
 <li><a href="#function-remove">remove</a></li>
-<li><a href="#function-readbytes">readBytes</a></li>
 <li><a href="#function-writebytes">writeBytes</a></li>
 <li><a href="#function-appendbytes">appendBytes</a></li>
-<li><a href="#function-readlines">readLines</a></li>
 <li><a href="#function-size">size</a></li>
 <li><a href="#function-isfile">isFile</a></li>
 <li><a href="#function-isdirectory">isDirectory</a></li>
@@ -78,114 +78,112 @@
 <li><a href="#function-isabsolute">isAbsolute</a></li>
 </ul>
 </nav>
-<section class="item" id="function-readtext">
-<h2><a href="#function-readtext">readText</a> <span class="kind">function</span></h2>
-<pre class="signature"><code class="language-lyr">pub fn readText(path: string): ?string</code></pre>
+<section class="item" id="function-text">
+<h2><a href="#function-text">text</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn text(path: string): ?string</code></pre>
 <p>The whole content as text, decoded as UTF-8 — bytes that are not valid UTF-8 become
-U+FFFD. For binary data use <code>readBytes</code>. <code>null</code> when the file does not exist or is not
-readable.</p>
-<p class="source">stdlib/std/io/file.lyr:21</p>
+U+FFFD. For binary data use <code>bytes</code>. <code>null</code> when the file does not exist or is not readable.</p>
+<p class="source">stdlib/std/io/file.lyr:40</p>
+</section>
+<section class="item" id="function-bytes">
+<h2><a href="#function-bytes">bytes</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn bytes(path: string): ?uint8[]</code></pre>
+<p>The raw bytes, undecoded — what <code>text</code> cannot give: its UTF-8 decoding turns invalid bytes
+into U+FFFD. <code>null</code> when the file is not readable; an EMPTY array is an empty file.</p>
+<p class="source">stdlib/std/io/file.lyr:44</p>
+</section>
+<section class="item" id="function-lines">
+<h2><a href="#function-lines">lines</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn lines(path: string): ?string[]</code></pre>
+<p>The lines of a file, terminators removed, so whether the file used CRLF or LF is no longer
+visible. <code>null</code> when the file is not readable; an EMPTY array is an empty file.</p>
+<p class="source">stdlib/std/io/file.lyr:48</p>
 </section>
 <section class="item" id="function-writetext">
 <h2><a href="#function-writetext">writeText</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn writeText(path: string, content: string): bool</code></pre>
 <p>Writes text (UTF-8), replacing an existing file. <code>true</code> on success.</p>
-<p class="source">stdlib/std/io/file.lyr:24</p>
+<p class="source">stdlib/std/io/file.lyr:51</p>
 </section>
 <section class="item" id="function-appendtext">
 <h2><a href="#function-appendtext">appendText</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn appendText(path: string, content: string): bool</code></pre>
 <p>Appends to an existing file or creates it. <code>true</code> on success.</p>
-<p class="source">stdlib/std/io/file.lyr:27</p>
+<p class="source">stdlib/std/io/file.lyr:54</p>
 </section>
 <section class="item" id="function-exists">
 <h2><a href="#function-exists">exists</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn exists(path: string): bool</code></pre>
 <p>Whether something — file or directory — exists at the path.</p>
-<p class="source">stdlib/std/io/file.lyr:30</p>
+<p class="source">stdlib/std/io/file.lyr:57</p>
 </section>
 <section class="item" id="function-remove">
 <h2><a href="#function-remove">remove</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn remove(path: string): bool</code></pre>
 <p><code>true</code> when the file is gone afterwards, including when it never existed.</p>
-<p class="source">stdlib/std/io/file.lyr:33</p>
-</section>
-<section class="item" id="function-readbytes">
-<h2><a href="#function-readbytes">readBytes</a> <span class="kind">function</span></h2>
-<pre class="signature"><code class="language-lyr">pub fn readBytes(path: string): uint8[]</code></pre>
-<p>The raw bytes, undecoded — what <code>readText</code> cannot give: its UTF-8 decoding turns invalid
-bytes into U+FFFD. An unreadable file reads as empty, the <code>readLines</code> convention; a caller
-that needs the difference asks <code>exists</code> first.</p>
-<p class="source">stdlib/std/io/file.lyr:38</p>
+<p class="source">stdlib/std/io/file.lyr:60</p>
 </section>
 <section class="item" id="function-writebytes">
 <h2><a href="#function-writebytes">writeBytes</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn writeBytes(path: string, data: uint8[]): bool</code></pre>
 <p>Writes raw bytes, replacing an existing file. <code>true</code> on success — the <code>writeText</code>
 convention. (v1.14: the first native whose parameter is an array.)</p>
-<p class="source">stdlib/std/io/file.lyr:42</p>
+<p class="source">stdlib/std/io/file.lyr:64</p>
 </section>
 <section class="item" id="function-appendbytes">
 <h2><a href="#function-appendbytes">appendBytes</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn appendBytes(path: string, data: uint8[]): bool</code></pre>
 <p>Appends raw bytes to an existing file or creates it. <code>true</code> on success.</p>
-<p class="source">stdlib/std/io/file.lyr:45</p>
-</section>
-<section class="item" id="function-readlines">
-<h2><a href="#function-readlines">readLines</a> <span class="kind">function</span></h2>
-<pre class="signature"><code class="language-lyr">pub fn readLines(path: string): string[]</code></pre>
-<p>The lines of a file, or an empty array when it is not readable. Terminators are removed,
-so whether the file used CRLF or LF is no longer visible.</p>
-<p class="source">stdlib/std/io/file.lyr:49</p>
+<p class="source">stdlib/std/io/file.lyr:67</p>
 </section>
 <section class="item" id="function-size">
 <h2><a href="#function-size">size</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn size(path: string): ?int</code></pre>
 <p>The size in bytes, or <code>null</code> when the file does not exist.</p>
-<p class="source">stdlib/std/io/file.lyr:59</p>
+<p class="source">stdlib/std/io/file.lyr:74</p>
 </section>
 <section class="item" id="function-isfile">
 <h2><a href="#function-isfile">isFile</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isFile(path: string): bool</code></pre>
 <p>Whether the path names an existing FILE.</p>
-<p class="source">stdlib/std/io/file.lyr:61</p>
+<p class="source">stdlib/std/io/file.lyr:76</p>
 </section>
 <section class="item" id="function-isdirectory">
 <h2><a href="#function-isdirectory">isDirectory</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isDirectory(path: string): bool</code></pre>
 <p>Whether the path names an existing DIRECTORY.</p>
-<p class="source">stdlib/std/io/file.lyr:63</p>
+<p class="source">stdlib/std/io/file.lyr:78</p>
 </section>
 <section class="item" id="function-copy">
 <h2><a href="#function-copy">copy</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn copy(from: string, to: string): bool</code></pre>
 <p>Copies. <code>false</code> when the source is missing or the target is not writable.</p>
-<p class="source">stdlib/std/io/file.lyr:66</p>
+<p class="source">stdlib/std/io/file.lyr:81</p>
 </section>
 <section class="item" id="function-move">
 <h2><a href="#function-move">move</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn move(from: string, to: string): bool</code></pre>
 <p>Moves or renames; the same operation on every file system.</p>
-<p class="source">stdlib/std/io/file.lyr:69</p>
+<p class="source">stdlib/std/io/file.lyr:84</p>
 </section>
 <section class="item" id="function-createdir">
 <h2><a href="#function-createdir">createDir</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn createDir(path: string): bool</code></pre>
 <p>Creates one directory; the parent must exist. <code>createDirAll</code> creates the chain.</p>
-<p class="source">stdlib/std/io/file.lyr:72</p>
+<p class="source">stdlib/std/io/file.lyr:87</p>
 </section>
 <section class="item" id="function-createdirall">
 <h2><a href="#function-createdirall">createDirAll</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn createDirAll(path: string): bool</code></pre>
 <p>Creates missing parent directories too. An existing directory counts as success.</p>
-<p class="source">stdlib/std/io/file.lyr:75</p>
+<p class="source">stdlib/std/io/file.lyr:90</p>
 </section>
 <section class="item" id="function-removedir">
 <h2><a href="#function-removedir">removeDir</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn removeDir(path: string): bool</code></pre>
 <p>Deletes an EMPTY directory. There is no recursive delete; a caller that needs one writes
 the loop visibly.</p>
-<p class="source">stdlib/std/io/file.lyr:79</p>
+<p class="source">stdlib/std/io/file.lyr:94</p>
 </section>
 <section class="item" id="function-listdir">
 <h2><a href="#function-listdir">listDir</a> <span class="kind">function</span></h2>
@@ -193,31 +191,31 @@ the loop visibly.</p>
 <p>The entries of a directory: names rather than paths, sorted alphabetically.</p>
 <p>An empty array for an unreadable directory rather than a <code>?string[]</code>, as in <code>readLines</code>. A
 caller that needs the difference asks <code>isDirectory</code> first.</p>
-<p class="source">stdlib/std/io/file.lyr:85</p>
+<p class="source">stdlib/std/io/file.lyr:100</p>
 </section>
 <section class="item" id="function-tempdir">
 <h2><a href="#function-tempdir">tempDir</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn tempDir(): string</code></pre>
 <p>A path in the system's temporary directory. Does NOT create the file.</p>
-<p class="source">stdlib/std/io/file.lyr:88</p>
+<p class="source">stdlib/std/io/file.lyr:103</p>
 </section>
 <section class="item" id="function-joinpath">
 <h2><a href="#function-joinpath">joinPath</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn joinPath(left: string, right: string): string</code></pre>
 <p>Joins two path parts, with neither a doubled nor a missing separator.</p>
-<p class="source">stdlib/std/io/file.lyr:102</p>
+<p class="source">stdlib/std/io/file.lyr:117</p>
 </section>
 <section class="item" id="function-filename">
 <h2><a href="#function-filename">fileName</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fileName(path: string): string</code></pre>
 <p>The last component. <code>&quot;a/b/c.txt&quot;</code> becomes <code>&quot;c.txt&quot;</code>.</p>
-<p class="source">stdlib/std/io/file.lyr:135</p>
+<p class="source">stdlib/std/io/file.lyr:150</p>
 </section>
 <section class="item" id="function-parentdir">
 <h2><a href="#function-parentdir">parentDir</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parentDir(path: string): string</code></pre>
 <p>Everything before the last separator, or <code>&quot;&quot;</code> when there is none.</p>
-<p class="source">stdlib/std/io/file.lyr:141</p>
+<p class="source">stdlib/std/io/file.lyr:156</p>
 </section>
 <section class="item" id="function-extension">
 <h2><a href="#function-extension">extension</a> <span class="kind">function</span></h2>
@@ -225,25 +223,25 @@ caller that needs the difference asks <code>isDirectory</code> first.</p>
 <p>The extension WITHOUT the dot. <code>&quot;&quot;</code> when there is none.</p>
 <p>A leading dot does not count: <code>&quot;.gitignore&quot;</code> has no extension, that is its name. This rule
 differs between languages, so it is stated here.</p>
-<p class="source">stdlib/std/io/file.lyr:157</p>
+<p class="source">stdlib/std/io/file.lyr:172</p>
 </section>
 <section class="item" id="function-stem">
 <h2><a href="#function-stem">stem</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn stem(path: string): string</code></pre>
 <p>The name without its extension. <code>&quot;a/b/c.txt&quot;</code> becomes <code>&quot;c&quot;</code>.</p>
-<p class="source">stdlib/std/io/file.lyr:173</p>
+<p class="source">stdlib/std/io/file.lyr:188</p>
 </section>
 <section class="item" id="function-withextension">
 <h2><a href="#function-withextension">withExtension</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn withExtension(path: string, ext: string): string</code></pre>
 <p>Replaces the extension. An empty extension removes it.</p>
-<p class="source">stdlib/std/io/file.lyr:183</p>
+<p class="source">stdlib/std/io/file.lyr:198</p>
 </section>
 <section class="item" id="function-isabsolute">
 <h2><a href="#function-isabsolute">isAbsolute</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isAbsolute(path: string): bool</code></pre>
 <p>Does the path start at the root? Recognises <code>/x</code> and <code>C:\x</code>.</p>
-<p class="source">stdlib/std/io/file.lyr:191</p>
+<p class="source">stdlib/std/io/file.lyr:206</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.io.console/">std.io.console</a>

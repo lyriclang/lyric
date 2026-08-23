@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../grammar/" class="here">Lyric Grammar</a></li>
-<li><a href="../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -161,7 +161,7 @@ this
 </tr>
 <tr>
 <td><code>throws</code></td>
-<td>after the return type of a function signature</td>
+<td>after the return type of a function signature, and after a coroutine type</td>
 </tr>
 </tbody>
 </table>
@@ -325,7 +325,8 @@ static member has none. Declare it on the implementing type instead.</p>
 </code></pre>
 <hr />
 <h2 id="type-expressions">4. Type expressions</h2>
-<pre><code class="language-ebnf">TypeExpr        = TypePrefix TypeAtom { TypeSuffix } .
+<pre><code class="language-ebnf">TypeExpr        = TypePrefix TypeAtom { TypeSuffix } [ ThrowsSuffix ] .
+ThrowsSuffix    = 'throws' [ TypeExpr ] .                            (* coroutine types only *)
 TypePrefix      = [ '?' ] .
 TypeAtom        = BuiltinType
                 | ModulePath [ '&lt;' TypeExpr { ',' TypeExpr } '&gt;' ]
@@ -345,6 +346,13 @@ BuiltinType     = 'int' | 'uint' | 'float'
 </code></pre>
 <p>A function type extends as far to the right as possible: <code>fn(int) -&gt; void[]</code> is a function
 returning <code>void[]</code>. An array of function values is written <code>(fn(int) -&gt; void)[]</code>.</p>
+<p><code>ThrowsSuffix</code> says what pulling a coroutine may throw: <code>Coroutine&lt;int&gt; throws Exception</code>, or
+<code>throws</code> alone for any <code>Throwable</code>. It is valid on a coroutine type and nowhere else — every other
+value runs at its call, where the callee's own clause already says what it throws.</p>
+<p>It is <strong>not</strong> parsed after a function's return type: the <code>throws</code> there is the FUNCTION's clause
+and remains so. A coroutine function needs none, because that clause has always described the same
+thing — <code>fn gen(): Coroutine&lt;int&gt; throws Exception</code> declares a coroutine whose pull may throw. The
+suffix exists for the positions a clause cannot reach: a field, a parameter, a binding.</p>
 <p><code>?</code> binds to the atom together with its suffixes: <code>?T[]</code> is an optional array. An array of
 optionals is written <code>(?T)[]</code>.</p>
 <p><code>?</code> does not nest: <code>??T</code> is not a type.</p>
@@ -583,7 +591,7 @@ RangePattern    = Literal ( '..' | '..=' ) Literal .
 <p><code>Literal</code> is an integer, float, string, char, bool or null literal. A <code>FieldPattern</code> without <code>=</code>
 binds the field to its own name.</p>
 <nav class="neighbours">
-<a class="next" href="../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a>
+<a class="next" href="../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a>
 </nav>
 </main>
 </div>

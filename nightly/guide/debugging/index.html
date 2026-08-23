@@ -130,6 +130,31 @@ What never arrives is an <code>Exited</code> event — nothing ended, the host s
 event stream stays open, which is the honest answer while a game is still running.</p>
 <p>There is no overload taking a debugger and a budget together: a session parked at a breakpoint
 would spend a budget on standing still.</p>
+<h3 id="letting-an-editor-in">Letting an editor in</h3>
+<p>The commands can come from an editor rather than from your own code: <code>DapServer</code> has a second
+constructor that serves a controller you already hold, and the client sends <code>attach</code> where it
+would otherwise send <code>launch</code>.</p>
+<pre><code class="language-csharp">var controller = DebugController.Create(program);
+
+// a socket your host accepted, or any pair of streams
+var adapter = new DapServer(input, output, controller, scriptDirectory);
+_ = adapter.RunAsync();
+</code></pre>
+<p>Everything after <code>attach</code> is the protocol as it always was — breakpoints, stepping, stack,
+variables, evaluate. What differs is the two ends of a session:</p>
+<ul>
+<li><strong>Nothing is compiled or started.</strong> The program is already running; a breakpoint set here binds
+against it immediately and takes effect at the next instruction that reaches the line.</li>
+<li><strong>Disconnecting gives the program back.</strong> <code>DebugController.Detach()</code> runs: breakpoints go, a
+parked thread is released, and the event stream ends. Without it a game whose editor crashed
+would stand at its breakpoint for good, and the breakpoints nobody reads any more would park it
+again on the next frame. A detached controller is spent — attaching again means a new one.</li>
+</ul>
+<p>One server per controller, which is also the answer to a question a host with several scripts
+would otherwise have to invent: which program a <code>setBreakpoints</code> is about is decided by the
+connection it arrived on.</p>
+<p>The debuggee's output does not travel as output events here. Your host owns the program's writers
+and already has somewhere to put them.</p>
 <p>What this does not do is keep the window drawing. The parked thread is the one the game runs on,
 so the picture stands still until a resume arrives. Drawing through a breakpoint would need an
 interpreter that can return to its host mid-instruction and be resumed later; this one keeps its

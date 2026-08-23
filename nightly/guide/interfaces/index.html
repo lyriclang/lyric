@@ -119,9 +119,9 @@ fn main(): int {
 }
 </code></pre>
 <h2 id="interface-inheritance">Interface inheritance</h2>
-<p>An interface may name one <strong>parent</strong>. Conforming to the child implies conforming to the parent:
-the implementing type provides the abstract members of the whole chain, inherits its default
-methods, and satisfies a constraint on the parent wherever one is required.</p>
+<p>An interface may name <strong>parents</strong>. Conforming to the child implies conforming to all of them:
+the implementing type provides the abstract members of the whole graph, inherits its default
+methods, and satisfies a constraint on any ancestor wherever one is required.</p>
 <pre><code class="language-lyr">import std.io.console { println };
 
 interface Named {
@@ -149,9 +149,21 @@ fn main(): int {
     return 0;
 }
 </code></pre>
-<p>The parent list holds exactly one entry — several requirements side by side are what constraints
-are for (<code>&lt;T :: [A, B]&gt;</code>). The chain cannot be circular, and a member of the chain cannot be
-redeclared: an inherited member keeps its declaring interface.</p>
+<p>Since 2.16 the list may hold several entries: <code>interface Item :: [Counted, Scaled]</code>. The rules
+are about NAMES, and both halves say the same thing — an inherited member keeps its declaring
+interface, so nothing may make one name mean two:</p>
+<ul>
+<li>a child cannot redeclare a member it inherits;</li>
+<li>two parents cannot contribute the same member name from different declarations. One slot holds
+one method, and there is no rule that picks correctly between two.</li>
+</ul>
+<p>A <strong>diamond</strong> is neither of those and is fine: if <code>Left</code> and <code>Right</code> both inherit <code>Base</code>, the name
+reaches the child along two paths and leads to one declaration, so an implementation supplies it
+once.</p>
+<p>The list cannot be circular.</p>
+<p><em>(Until 2.16 exactly one parent was allowed, on the reasoning that a parent's default method needs
+its own slot numbers to survive a child-typed receiver. It does not — every ancestor keeps its own
+method table — and the rule went when the reasoning was measured instead of repeated.)</em></p>
 <p>A value of interface type reaches the members of its whole chain (<code>Labeled</code> values answer
 <code>name()</code>). What it does not do is convert to the parent's type: <code>Named</code> in the example is built
 from the concrete <code>Tag</code>, not from a <code>Labeled</code> value. Where a parent-typed value is needed, take
@@ -258,13 +270,14 @@ fn main(): int {
 <p><code>string</code> conforms to <code>Ordered&lt;string&gt;</code> in the standard library, so <code>&quot;apple&quot; &lt; &quot;banana&quot;</code> works out of
 the box — lexicographic over code points, the same order <code>compare</code> defines.</p>
 <p>Arithmetic follows the same rule, through one interface per operator: <code>Add</code>, <code>Sub</code>, <code>Mul</code> and <code>Div</code>
-from <code>std.core</code>, each with a single method of the same name. The operands are homogeneous — <code>T</code> with
-<code>T</code>, giving <code>T</code>:</p>
+from <code>std.core</code>, each with a single method of the same name. They take two type arguments — what
+stands on the right of the operator, and what comes out — so <code>Add&lt;Vec2, Vec2&gt;</code> reads &quot;a Vec2 plus a
+Vec2 gives a Vec2&quot;:</p>
 <pre><code class="language-lyr">import std.core { Add, Sub };
 import std.io.console { println };
 import std.string { fromInt };
 
-struct Vec2 :: [Add&lt;Vec2&gt;, Sub&lt;Vec2&gt;] {
+struct Vec2 :: [Add&lt;Vec2, Vec2&gt;, Sub&lt;Vec2, Vec2&gt;] {
     x: int,
     y: int,
     fn add(other: Vec2): Vec2 {
@@ -288,7 +301,7 @@ fn main(): int {
 serves them and your types alike:</p>
 <pre><code class="language-lyr">import std.core { Add };
 
-fn total&lt;T :: [Add&lt;T&gt;]&gt;(a: T, b: T): T {
+fn total&lt;T :: [Add&lt;T, T&gt;]&gt;(a: T, b: T): T {
     return a + b;
 }
 
@@ -296,12 +309,47 @@ fn main(): int {
     return total(40, 2) - 42;
 }
 </code></pre>
-<p>A mixed form such as <code>Vec2 * float</code> does not exist, by decision: a type conforms to <code>Mul</code> once,
-and without overloading a second <code>mul</code> for a second right-hand type cannot exist either — the
-form would buy one fixed partner type and nothing more. <code>%</code> stays numeric-only. Compound
-assignment (<code>v += w</code>) reaches through the interfaces for variable targets since v1.13; a field or
-element target stays written out (<code>p.v = p.v + w</code>), because the shorthand would evaluate the
-object or the index twice.</p>
+<p>Both arguments are yours to choose, and a type may name one of these interfaces MORE than once.
+That is what makes <code>Vec2 * 2.0</code> a thing you can write: scaling is a second conformance, with its
+own right-hand type and its own implementation in its own <code>extend</code> block.</p>
+<pre><code class="language-lyr">import std.core { Mul };
+import std.io.console { println };
+import std.string { fromFloat };
+
+struct Vec2 :: [Mul&lt;Vec2, Vec2&gt;] {
+    x: float,
+    y: float,
+    fn mul(other: Vec2): Vec2 {
+        return Vec2 { x = this.x * other.x, y = this.y * other.y };
+    }
+}
+
+extend Vec2 :: [Mul&lt;float, Vec2&gt;] {
+    fn mul(other: float): Vec2 {
+        return Vec2 { x = this.x * other, y = this.y * other };
+    }
+}
+
+fn main(): int {
+    let v = Vec2 { x = 3.0, y = 4.0 };
+    println(fromFloat((v * v).x));    // 9   — Mul&lt;Vec2, Vec2&gt;
+    println(fromFloat((v * 2.0).y));  // 8   — Mul&lt;float, Vec2&gt;
+    return 0;
+}
+</code></pre>
+<p>The operator picks the conformance by the type on its right, and nothing else: both methods are
+called <code>mul</code>, so the name never decides. That is also the limit of it — <code>v.mul(2.0)</code> written out is
+ambiguous, because a written call has only the name to go on. A constraint names the conformance it
+wants the same way: <code>fn twice&lt;T :: [Mul&lt;float, T&gt;]&gt;</code> promises scaling, <code>fn square&lt;T :: [Mul&lt;T, T&gt;]&gt;</code>
+promises multiplication by one's own kind, and the two are different promises.</p>
+<p>Two conformances that take the SAME right-hand type and disagree on the result are refused where
+the operator is used (<code>LYR-SEM0083</code>): nothing in <code>v * 2.0</code> says which was meant. This is the one
+place in the language where a type may conform to an interface twice — everywhere else, a second
+conformance is a mistake.</p>
+<p><code>%</code> stays numeric-only. Compound assignment (<code>v += w</code>) reaches through the interfaces for variable
+targets since v1.13 — and picks its conformance by the right operand, exactly as the plain form
+does; a field or element target stays written out (<code>p.v = p.v + w</code>), because the shorthand would
+evaluate the object or the index twice.</p>
 <p>The last operator is <code>as</code>. Beyond the numeric casts, which keep their built-in meaning, a cast is a
 conversion the operand's type declared through <code>Into</code>:</p>
 <pre><code class="language-lyr">import std.core { Into };

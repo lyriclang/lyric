@@ -294,6 +294,21 @@ attribute references, and for nothing else.</li>
 </ul>
 <p>Attribute names are unqualified: <code>System</code>, not <code>engine.ecs.System</code>. An SDK owns its attribute
 names the way it owns its native names.</p>
+<h3 id="a-field-that-is-a-handle">A field that is a handle</h3>
+<p>A field carries one more answer, and it exists for a decision a host has to make rather than for
+tidiness. An <code>opaque type Entity = int</code> is a distinct type in the script and an <code>i64</code> in the
+module, so a save writer walking the fields of an attributed class sees a handle and a level
+number as the same thing — and a handle is exactly what must not be written down, because the
+slot it names belongs to something else after a restart.</p>
+<pre><code class="language-csharp">foreach (var field in module.Attributes.FieldsOf(saved.Target)!)
+    if (field.OpaqueName is { } opaque)
+        throw new InvalidOperationException(
+            $&quot;{field.Name} is a '{opaque}' handle and does not survive a restart&quot;);
+</code></pre>
+<p><code>OpaqueName</code> is <code>null</code> for every ordinary field, and for every module a compiler before 2.11
+wrote. It is the LEAF name: a field of type <code>Entity[]</code> answers <code>Entity</code>, and <code>field.Type</code> still
+says it is an array. What the host does with the answer is its own business — the language keeps
+refusing to say what an attribute means.</p>
 <h2 id="errors">Errors</h2>
 <p>A script that fails throws on the host side:</p>
 <table>

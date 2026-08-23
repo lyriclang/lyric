@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../../grammar/">Lyric Grammar</a></li>
-<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.3</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
 <li><a href="../../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -128,7 +128,7 @@ one call instead of one string per character.</p>
 <h2><a href="#function-utf8decode">utf8Decode</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn utf8Decode(bytes: uint8[]): ?string</code></pre>
 <p>The bytes as a string, STRICTLY: invalid UTF-8 answers <code>null</code> rather than a U+FFFD quietly
-standing in for the data — the difference to <code>readText</code>, whose replacement decoding is
+standing in for the data — the difference to <code>std.io.file.text</code>, whose replacement decoding is
 documented there.</p>
 <p class="source">stdlib/std/string.lyr:56</p>
 </section>

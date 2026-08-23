@@ -136,6 +136,25 @@ fn main(): int { return 0; }
 exports its event names, whoever handles them imports the module, and a typo is <code>unknown identifier</code> at compile time rather than a handler nobody ever calls. The name may be imported
 selectively or written module-qualified, it may point at another such <code>let</code>, and a <code>static let</code>
 on a type works the same way.</p>
+<p>Since v2.10 an argument may also be a <strong>unit variant of an enum</strong>, and for a vocabulary that is
+the form to reach for:</p>
+<pre><code class="language-lyr">import std.core { OnFunction };
+
+pub enum Layout { Packed, Separate }
+
+pub struct Saved :: [OnFunction] { layout: Layout = Layout.Packed }
+
+@Saved { layout = Layout.Separate }
+pub fn store(): void { }
+
+fn main(): int { return 0; }
+</code></pre>
+<p><code>Layout.Seperate</code> is then a compile error rather than a row nobody matches — the type system
+checks the spelling, which a string could never do. A host reads the variant's name and its tag:
+the compiled module carries the tag, and the enum's own entry carries the names, so nothing is
+written twice.</p>
+<p>A variant WITH a payload is refused, and the message says why: a row holds one value per field,
+and a payload is values of its own. <code>Shape.Circle(1.0)</code> has nowhere to put its <code>1.0</code>.</p>
 <p>Two edges worth knowing in advance. A name is resolved, not COMPUTED: <code>let LIMIT = 1 + 2;</code> stays
 rejected, because the value would have to be worked out and there is no constant folding to work
 it out with — the value has to stand in the source. And the named form is slightly stricter than
@@ -214,6 +233,28 @@ fn main(): int {
 <p>It changes diagnostics and nothing else — a program that ignores the warning compiles to the
 same module, and a deprecated function may keep calling itself and its deprecated siblings
 without the compiler nagging the one place allowed not to care.</p>
+<h3 id="saying-when-it-goes">Saying when it goes</h3>
+<p>A deprecation makes two promises: use something else, and this will disappear. Since 2.13 the
+second one can be written down where the compiler can keep it:</p>
+<pre><code class="language-lyr">import std.core { Deprecated };
+
+@Deprecated { message = &quot;use renew&quot;, until = &quot;99.0&quot; }
+pub fn old(): int {
+    return 1;
+}
+
+fn main(): int {
+    return 0;
+}
+</code></pre>
+<p><code>until</code> names the version that <strong>removes</strong> the declaration, and building with a toolchain that
+has reached it is an error (<code>LYR-SEM0081</code>) — <code>until = &quot;3.5&quot;</code> fails at 3.5, not one release later.
+(The snippet above says <code>99.0</code> for the obvious reason: every snippet in this guide is compiled by
+the test suite, and one promising 3.5 would stop the build the day 3.5 arrives.)
+The check sits at the declaration, so it fires whether or not anything still calls the function:
+a form kept past its date is wrong either way, and dead code would never trip a use-site warning.</p>
+<p>Leave <code>until</code> out for the ordinary policy — warn now, remove at the next major. Write it when the
+date is a commitment somebody is entitled to rely on.</p>
 <p>Since 2.1 the same attribute — and only it — may sit on a MEMBER: a method, a field or a
 <code>static let</code> of a struct, class or enum, and on an extend method. Every other attribute
 there is refused, because the compiled module has no metadata rows for members and
