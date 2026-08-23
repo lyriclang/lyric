@@ -56,6 +56,34 @@ is.
   value always was. It surfaced when the free adapters went: `zip` as a method had never been
   reachable in a test.
 
+- **Scripts can run compiled.** `HostOptions.Compile = true` and each function is compiled to IL
+  the first time it is called; a loop over `float`s stops being limited by the VM and starts being
+  limited by the CPU.
+
+  ```csharp
+  var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
+  ```
+
+  **Off by default, and opt-in is the whole design.** Compiled code has no instruction boundaries:
+  a debugger cannot stop inside it and a budget cannot count it. So the shape is develop on the
+  interpreter — breakpoints, stepping and hot reload all work there — and ship with this on.
+
+  It is not a decision per call. A call carrying an `ExecutionBudget`, and any call under a
+  debugger, stays interpreted even with the option set, so a host may turn it on for a whole VM and
+  still meter the foreign code inside it. Compilation is per function and refusal is normal: what
+  the compiler does not understand the interpreter keeps, which costs speed and never correctness.
+  `ScriptInstance.CompiledFunctions` and `ScriptInstance.Refusals` say what happened, the second as
+  short phrases meant to be tallied rather than read.
+
+  Compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
+  interface values, object construction, string constants and comparison, and calls — to a native,
+  or to another function that compiles. Declined: closures, exceptions, enums, recursion, and the
+  narrow integer widths.
+
+  **Ahead-of-time publishing and this are alternatives, not a pair**: emitting IL at run time needs
+  a runtime that can, and a NativeAOT build cannot. There every function is declined with `no
+  runtime code generation` and every script is interpreted — nothing else changes.
+
 ### Fixed
 
 - **A coroutine's throwability is part of its TYPE** (#73). `fn gen(): Coroutine<int> throws

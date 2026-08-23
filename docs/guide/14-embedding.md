@@ -221,6 +221,63 @@ Three things worth knowing before you rely on it:
 An instance whose call was stopped is left mid-computation: its globals hold whatever the
 interrupted code had written. Treat it the way you would treat one that panicked.
 
+## Running scripts compiled
+
+Scripts are interpreted by default. A host that wants the hot paths as machine code sets one
+option:
+
+```csharp
+var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
+```
+
+Each function is then compiled to IL the first time it is called, and the runtime's own compiler
+turns that into machine code. A loop over `float`s stops being limited by the VM and starts being
+limited by the CPU.
+
+**Off by default, and that is the useful default.** Compiled code has no instruction boundaries: a
+debugger cannot stop inside it, and a budget cannot count it. So the shape this serves is *develop
+on the interpreter — where breakpoints, stepping and hot reload all work — and ship with this on*.
+
+**A metered call is never compiled.** A call carrying an `ExecutionBudget`, and any call under a
+debugger, stays interpreted even with `Compile = true`. That is not a limitation to work around;
+it is what makes the option safe to set for a whole VM:
+
+```csharp
+var vm = new LangVm(new HostOptions { Compile = true });
+
+instance.CallVoid("onUpdate", 0.016);            // compiled — your own code, your own frame
+instance.CallVoid("modUpdate", budget, 0.016);   // interpreted — counted to the instruction
+```
+
+The budget's promise is the reason: it counts instructions so that the same script under the same
+limit stops at the same instruction on every machine. Compiled code cannot make that promise, so
+it is not used where the promise was made.
+
+**Refusal is normal.** Compilation is per function, and what the compiler does not understand it
+declines — the interpreter keeps that function, which costs speed and never correctness. What is
+compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
+interface values, object construction, string constants and comparison, and calls — to a native,
+or to another function that compiles. Still declined: closures, exceptions, enums, recursion, and
+the narrow integer widths, which need re-normalising after every operation.
+
+Two properties say what happened, and they are worth reading after a few seconds of real work
+rather than at startup — a function is compiled when it is first called:
+
+```csharp
+Console.WriteLine($"{instance.CompiledFunctions} compiled");
+foreach (var (function, reason) in instance.Refusals)
+    Console.WriteLine($"  {function}: {reason}");
+```
+
+The reasons are short phrases (`enum`, `closure`, `call arity`) rather than sentences, because
+what a host wants from them is a histogram: which construct stands between it and a compiled hot
+path.
+
+**Ahead-of-time publishing and this are alternatives, not a pair.** Compiling a script at run time
+needs a runtime that can emit IL, and a NativeAOT build has none. There `Compile = true` is
+ignored — every function is declined with `no runtime code generation`, every script is
+interpreted, and nothing else about the host changes.
+
 ## Registering types
 
 `RegisterType` exposes a C# class to scripts. Scripts receive such an object and pass it on; they

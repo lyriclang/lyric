@@ -284,7 +284,8 @@ public sealed class LangVm
         try
         {
             return new ScriptInstance(this, module,
-                LoadedProgram.Load(module.Loaded, _natives, _options.Capabilities, budget));
+                LoadedProgram.Load(module.Loaded, _natives, _options.Capabilities, budget,
+                    jit: _options.Compile));
         }
         catch (LyricPanic panic)
         {

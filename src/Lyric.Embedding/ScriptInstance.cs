@@ -27,6 +27,20 @@ public sealed class ScriptInstance
     /// <summary>The module this instance came from.</summary>
     public ScriptModule Module { get; }
 
+    /// <summary>How many functions of this instance run as compiled code. Zero unless
+    /// <see cref="HostOptions.Compile"/> is set, and zero under a runtime that cannot emit
+    /// IL.</summary>
+    public int CompiledFunctions => _program.JitCompiled;
+
+    /// <summary>
+    /// Why a function was not compiled, one short phrase per refusal.
+    ///
+    /// <para>A histogram rather than prose, because the question it answers is which construct
+    /// stands between a host and a compiled hot path. A refusal is normal — the interpreter keeps
+    /// that function — so this is a tuning aid, never an error list.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, string Reason)> Refusals => _program.JitRefusals;
+
     /// <summary>
     /// Reads the source file again, compiles it and returns a new instance.
     ///

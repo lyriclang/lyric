@@ -39,6 +39,25 @@ public sealed record HostOptions
     /// </summary>
     public string? SourceRoot { get; init; }
 
+    /// <summary>
+    /// Whether scripts of this VM may run COMPILED. Default: no, they are interpreted.
+    ///
+    /// <para>Compiled code has no instruction boundaries — a debugger cannot stop inside it and a
+    /// budget cannot count it — so the shape this default serves is: develop on the interpreter,
+    /// where breakpoints, stepping and hot reload all work, and ship with this on.</para>
+    ///
+    /// <para>It is not a decision per call. A call that carries an <see cref="ExecutionBudget"/>
+    /// or runs under a debugger stays interpreted even here, so a host may turn it on for the
+    /// whole VM and still meter the foreign code inside it. Compilation is per FUNCTION and
+    /// refusal is normal: what the compiler does not understand the interpreter keeps, which
+    /// costs speed and never correctness. <c>ScriptInstance.CompiledFunctions</c> and
+    /// <c>Refusals</c> say what happened.</para>
+    ///
+    /// <para>It needs a runtime that can emit IL. Under NativeAOT there is none, and the setting
+    /// is ignored: every script is interpreted, and nothing else about the host changes.</para>
+    /// </summary>
+    public bool Compile { get; init; }
+
     /// <summary>Where a script writes. Defaults to <see cref="TextWriter.Null"/>.</summary>
     public TextWriter? Output { get; init; }
 
