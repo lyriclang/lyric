@@ -273,7 +273,16 @@ suite gates its cases by that number. The list:
       `//! until:` for that — the mirror of `since:`, which retires a case a major left behind.
       One old bug fell out: a generic interface member on a generic-class receiver
       (`ArrayIterator<int>.zip<string>`) never worked; the free adapters had covered it
-- [ ] attribute roots for reachability pruning
+- [x] **attribute roots for reachability pruning — ALREADY DELIVERED, found by checking**
+      (2026-08-23). The basket carried it as open; it landed with format 3.2 on 2026-08-18, and
+      the spec has stated it since (§4.6, §4.7). An attributed function is a root because the row
+      in section 11 is a promise to a host that calls it by index — a caller no call graph shows —
+      and the rows follow the renumbering. Verified end to end: a non-pub `@Test` in a library
+      survives the prune, and `lyrtest` still names the right function after a prune shifts the
+      indices. A type attribute needs no method rooting: a host reads such a row for the type's
+      SHAPE (`FieldsOf`), never to call into it. What was genuinely missing was the PIN — the only
+      coverage was an inliner test about surviving inlining, which says nothing about library
+      pruning or renumbering. Two tests in `ExportRootTests` now hold both
 - [ ] the JIT's remaining obligations: default stays off (decided), an AOT line in the
       embedding contract, "a metered run gets no JIT" in the guide, the refusal list
       documented, `LYRIC_JIT=1` in CI
