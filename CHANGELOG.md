@@ -118,6 +118,40 @@ is.
 
 ### Added
 
+- **Overloading**: several functions may share a name, told apart by their parameters.
+
+  ```lyr
+  fn describe(n: int): string { … }
+  fn describe(s: string): string { … }
+  fn describe(a: int, b: int): string { … }
+  ```
+
+  The second answer this language has to "one name, several types" — generics with constraints
+  being the first — and admitted deliberately, which is why its rules are written out in the
+  specification (§4.3a) rather than left to be discovered.
+
+  **The arguments choose, and only the arguments.** Not the result type: a call has to mean one
+  thing before anyone looks at where it goes. Where several fit, the one that needs least wins, in
+  this order: an exact type beats a literal that adapts; a concrete parameter beats a type
+  parameter; no defaults beats defaults; non-variadic beats variadic; and a type's own method beats
+  an extension that fits equally well — the rule that predates overloading, last so it decides
+  nothing a parameter could decide. Nothing fitting is `LYR-SEM0087`, a tie is `LYR-SEM0086`, and
+  both name every candidate they weighed.
+
+  Functions, methods and extension methods overload. **Interface members do not** (`LYR-SEM0088`):
+  a method table holds one function per slot and finds it by name. Two functions with the SAME
+  parameters are a redeclaration however their results differ (`LYR-SEM0085`). A lambda argument
+  takes no part in choosing, having no type until a parameter gives it one.
+
+  Used as a VALUE rather than called, an overloaded name is picked by the type it is wanted as —
+  `twice(describe, 7)` takes the `fn(int) -> string` one — and refused where nothing says which
+  (`LYR-SEM0089`).
+
+  In the compiled module the overloads carry their parameters in the name (`main.show(int)` beside
+  `main.show(string)`), because function names are unique there. A name declared once is unchanged,
+  so a program without overloads compiles to the bytes it always did. A host calling by name
+  matches on the argument count and says so when that is not enough.
+
 - **A type may conform to one arithmetic interface several times**, and the operator picks the
   conformance by the type of its **right operand**. This is the one exception to "one conformance
   per interface" in the language:

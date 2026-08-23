@@ -32,7 +32,40 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
 
     public void Report(Diagnostic diagnostic)
     {
+        if (_muted > 0) return;
         _diagnostics.Add(diagnostic);
+    }
+
+    private int _muted;
+
+    /// <summary>
+    /// Stops recording until the returned scope is disposed. For a SPECULATIVE check — one whose
+    /// question is "would this fit", asked so that something else can be decided.
+    ///
+    /// <para>Overload resolution is the case it exists for: the argument types have to be known
+    /// before a candidate can be chosen, and typing them against the wrong candidate would report
+    /// mismatches the program does not have. The chosen candidate is checked again afterwards,
+    /// for real, and reports what it finds.</para>
+    ///
+    /// <para>Nested scopes count, so a speculative check inside a speculative check stays quiet
+    /// until both are done.</para>
+    /// </summary>
+    public IDisposable Mute()
+    {
+        _muted++;
+        return new MuteScope(this);
+    }
+
+    private sealed class MuteScope(DiagnosticEngine owner) : IDisposable
+    {
+        private bool _done;
+
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            owner._muted--;
+        }
     }
 
     public IReadOnlyList<Diagnostic> SortedSnapshot()

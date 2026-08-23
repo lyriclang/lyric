@@ -249,6 +249,17 @@ release itself: a date on the CHANGELOG heading, the tag, the archives.
 
 The list:
 
+- [x] **free overloading — MOVED INTO 3.0.0** (maintainer, 2026-08-23; branch
+      `feature/overloading`). The design round had it as 3.1.0; the maintainer pulled it into the
+      major so that v3 carries everything deferred. Functions, methods and extensions overload;
+      interface members cannot, and the reason is structural — one slot per name. The five rules
+      that decide a call are in the spec (§4.3a) rather than in the implementation, which was the
+      DUTY the round attached to admitting a second mechanism. What the build turned up: the
+      lowering resolved declarations by NAME in four places, which with two functions of a name
+      hands the second one's body to the first one's symbol — `FunctionFor(name, declaration)`
+      now asks by declaration. Overloads carry their parameters in the compiled name, a name
+      declared once is unchanged, and the diagnostic engine learned a MUTE so a speculative
+      type-check reports nothing
 - [x] **multi-conformance** (branch `feature/multi-conformance`, 2026-08-23) — door B of the
       design round, plus the part the round had not seen: the interfaces needed a SECOND type
       argument. `Add<T, R>` says what stands on the right and what comes back; without it
@@ -1088,7 +1099,10 @@ answer yet, and it belongs asked before E4 starts.
      wants it. Reversing the default would be the change that needs a major, and that is not this
      release. What must be answered first stands under §What we are working on.
 
-  3. **FREE OVERLOADING lands in v3.1.0 — as a language feature, knowing it softens Rule 2**
+  3. **FREE OVERLOADING — decided for v3.1.0, then moved into v3.0.0** (maintainer, 2026-08-23:
+     "dann sind wir mit v3 fertig"). *Built in the major, with the duty below discharged in the
+     same change: the rules stand in spec §4.3a and guide 3, not in the implementation.*
+     **As a language feature, knowing it softens Rule 2**
      (maintainer, asked and reaffirmed after the objection). The objection, so that nobody has to
      reconstruct it: Lyric then has TWO answers to "one name, several types" — generics plus
      constraints, and overloading — and every later question (which wins, what a constraint sees,

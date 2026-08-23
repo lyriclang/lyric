@@ -1,0 +1,11 @@
+fn foo(): int {
+    return 0;
+}
+
+fn foo(n: int): int {
+    return n;
+}
+
+fn foo(s: string): int {
+    return 1;
+}

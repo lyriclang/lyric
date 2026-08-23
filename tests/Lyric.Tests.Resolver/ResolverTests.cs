@@ -51,8 +51,22 @@ public class ResolverTests
     [Fact]
     public void Duplicate_top_level_declaration_reports()
     {
-        var (_, de, _) = Resolve(("m", "fn f(): int { return 0; } fn f(): int { return 1; }"));
+        // A function beside a TYPE of the same name: one module scope, one name, and nothing to
+        // tell them apart — a call site could not choose, because only one of them is callable.
+        var (_, de, _) = Resolve(("m", "fn f(): int { return 0; } struct f { x: int, }"));
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-RES0001");
+    }
+
+    [Fact]
+    public void Two_functions_of_one_name_are_an_overload_set()
+    {
+        // Since 3.0 the resolver keeps both and the name answers with a SET. Whether the two can
+        // actually be told apart is a question about their parameter TYPES, which this pass does
+        // not know — the sema asks it (LYR-SEM0085).
+        var (comp, de, _) = Resolve(("m", "fn f(): int { return 0; } fn f(n: int): int { return n; }"));
+
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-RES0001");
+        Assert.Equal(2, comp.Modules[0].Members.OverloadsLocal("f").Count);
     }
 
     [Fact]

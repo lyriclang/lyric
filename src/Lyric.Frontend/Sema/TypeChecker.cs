@@ -195,6 +195,7 @@ public sealed class TypeChecker
             var ast = _comp.AstOf(module);
             CheckAttributes(ast.Attributes, AttributeTarget.Module, targetIsGeneric: false,
                 module.Members, "the module header");
+            CheckOverloadSets(module.Members, $"module '{module.FullName}'", inInterface: false);
             foreach (var decl in ast.Declarations)
                 CheckDecl(decl, module);
         }
@@ -238,6 +239,65 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>
+    /// The two rules a set of same-named functions has to keep.
+    ///
+    /// <para>ONE: they must be told apart by their parameters, because that is the only thing a
+    /// call site offers. Two with the same list are a redeclaration however their results differ —
+    /// a call cannot choose by what it gets back, and a rule that sometimes could would be one
+    /// nobody can hold in their head (LYR-SEM0085).</para>
+    ///
+    /// <para>TWO: an INTERFACE member may not be overloaded at all. A method table holds one
+    /// function per slot and the slot is found by name; two of a name would need two slots, and
+    /// every implementing type would owe both. The same structural reason that gives generic
+    /// members no slot (LYR-SEM0088).</para>
+    /// </summary>
+    private void CheckOverloadSets(SymbolTable scope, string what, bool inInterface)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var symbol in scope.Symbols)
+        {
+            if (symbol is not FunctionSymbol fn || !seen.Add(fn.Name)) continue;
+
+            var overloads = scope.OverloadsLocal(fn.Name);
+            if (overloads.Count < 2) continue;
+
+            if (inInterface)
+            {
+                for (var i = 1; i < overloads.Count; i++)
+                    _de.Report("LYR-SEM0088", Severity.Error,
+                        overloads[i].Declaration?.Span ?? default,
+                        $"'{fn.Name}' cannot be overloaded in {what} — a method table holds one "
+                        + "function per slot and finds it by name; give the two distinct names",
+                        new DiagnosticNote(overloads[0].Declaration?.Span ?? default,
+                            $"'{fn.Name}' is already declared here"));
+                continue;
+            }
+
+            for (var i = 0; i < overloads.Count; i++)
+                for (var j = i + 1; j < overloads.Count; j++)
+                    if (SameParameters(overloads[i], overloads[j]))
+                        _de.Report("LYR-SEM0085", Severity.Error,
+                            overloads[j].Declaration?.Span ?? default,
+                            $"'{fn.Name}' is declared twice in {what} with the same parameters "
+                            + $"({DisplayParameters(overloads[j])}) — overloads are told apart by "
+                            + "what they TAKE, never by what they give back",
+                            new DiagnosticNote(overloads[i].Declaration?.Span ?? default,
+                                "the other one is here"));
+        }
+    }
+
+    private bool SameParameters(FunctionSymbol a, FunctionSymbol b)
+    {
+        var left = FnTypeOf(a).Parameters;
+        var right = FnTypeOf(b).Parameters;
+        if (left.Length != right.Length) return false;
+        for (var i = 0; i < left.Length; i++)
+            if (!LyrType.Equal(left[i], right[i]))
+                return false;
+        return true;
+    }
+
     private void CheckDecl(Decl decl, ModuleSymbol module)
     {
         switch (decl)
@@ -252,23 +312,31 @@ public sealed class TypeChecker
                 CheckAttributes(s.Attributes, AttributeTarget.Type, s.Generics.Length > 0,
                     module.Members, "a struct");
                 CheckStructIsFinite(s, module);
+                if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
+                    CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false);
                 CheckMethods(s.Name, s.Members, module);
                 CheckTypeConformance(s.Name, s.Interfaces, module);
                 break;
             case ClassDecl c:
                 CheckAttributes(c.Attributes, AttributeTarget.Type, c.Generics.Length > 0,
                     module.Members, "a class");
+                if (module.Members.LookupLocal(c.Name) is TypeSymbol cType)
+                    CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false);
                 CheckMethods(c.Name, c.Members, module);
                 CheckTypeConformance(c.Name, c.Interfaces, module);
                 break;
             case EnumDecl e:
                 CheckAttributes(e.Attributes, AttributeTarget.Type, e.Generics.Length > 0,
                     module.Members, "an enum");
+                if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
+                    CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
                 CheckEnumMethods(e, module);
                 CheckTypeConformance(e.Name, e.Interfaces, module);
                 break;
             case InterfaceDecl i:
                 CheckInterfaceParents(i, module);
+                if (module.Members.LookupLocal(i.Name) is TypeSymbol iface)
+                    CheckOverloadSets(iface.Members, $"interface '{i.Name}'", inInterface: true);
                 CheckMethods(i.Name, i.Members, module);
                 break;
             // ExtendDecl goes to CheckExtensionBlocks after all types; GlobalBindingDecl to ComputeGlobals.
@@ -740,7 +808,7 @@ public sealed class TypeChecker
         var scope = new SymbolTable(outerScope);
         // The function's own type parameters (fn map<U>) go into the body scope. Signature types are
         // already bound by the resolver, but body types (let x: U) resolve through this scope only.
-        if (outerScope.LookupLocal(fn.Name) is FunctionSymbol fsym)
+        if (outerScope.FunctionFor(fn.Name, fn) is { } fsym)
             foreach (var g in fsym.Generics) scope.TryDeclare(g);
         foreach (var p in fn.Parameters)
         {
@@ -1181,7 +1249,7 @@ public sealed class TypeChecker
             case CharLiteralExpr: return LyrType.Char;
             case BoolLiteralExpr: return LyrType.Bool;
             case NullLiteralExpr: return LyrType.Null;
-            case IdentifierExpr id: return CheckIdentifier(id, scope);
+            case IdentifierExpr id: return CheckIdentifier(id, scope, expected);
             case ThisExpr t:
                 if (_currentThis is not null) return _currentThis;
                 return Report(t.Span, "LYR-SEM0008", "'this' is only valid inside a method");
@@ -1259,8 +1327,36 @@ public sealed class TypeChecker
             + "imports");
     }
 
-    private LyrType CheckIdentifier(IdentifierExpr id, SymbolTable scope)
+    private LyrType CheckIdentifier(IdentifierExpr id, SymbolTable scope, LyrType? expected = null)
     {
+        // A name that means SEVERAL functions, standing where a value is wanted rather than in
+        // callee position. Nothing about the expression chooses, so the expected type has to: a
+        // parameter of type 'fn(int) -> string' picks the overload with that shape, and without
+        // one there is nothing to pick by.
+        if (scope.Overloads(id.Name) is { Count: > 1 } overloads)
+        {
+            var wanted = expected as FnType;
+            var matching = wanted is null
+                ? []
+                : overloads.Where(f => LyrType.Equal(FnTypeOf(f), wanted)).ToArray();
+
+            if (matching.Length != 1)
+            {
+                _de.Report("LYR-SEM0089", Severity.Error, id.Span,
+                    $"'{id.Name}' names {overloads.Count} functions, and "
+                    + (wanted is null
+                        ? "nothing here says which — a call chooses by its arguments, a value by "
+                          + "the type it is wanted as"
+                        : $"none of them is a '{TypeFacts.Display(wanted)}'"),
+                    overloads.Select(f => new DiagnosticNote(f.Declaration?.Span ?? default,
+                        $"this one is a '{TypeFacts.Display(FnTypeOf(f))}'")).ToArray());
+                return LyrType.Error;
+            }
+
+            _result.BindRef(id, matching[0]);
+            return FnTypeOf(matching[0]);
+        }
+
         var sym = scope.Lookup(id.Name);
         if (sym is null)
             return Report(id.Span, "LYR-SEM0002", $"unknown identifier '{id.Name}'",
@@ -1323,6 +1419,186 @@ public sealed class TypeChecker
             : ResolveType(written, scope);
 
     /// <summary>
+    /// Every function a call's callee could mean. One entry — the ordinary case — is not an
+    /// overload set and the caller does nothing with it.
+    ///
+    /// <para>Read off the tables the lookup itself used, and AFTER the callee was checked, so the
+    /// receiver of a method call is already typed and nothing is checked twice.</para>
+    /// </summary>
+    private IReadOnlyList<OverloadCandidate> OverloadCandidates(Expr callee, SymbolTable scope)
+    {
+        switch (callee)
+        {
+            case IdentifierExpr id:
+                return scope.Overloads(id.Name)
+                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+
+            // A method or an extension. Both scopes contribute, because both are searched when a
+            // member is looked up: own members first, then the visible extensions.
+            case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
+            {
+                var found = ts.Members.OverloadsLocal(mem.Member)
+                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
+                foreach (var ext in _comp.Extensions.MethodsFor(ts))
+                    if (ext.Symbol.Name == mem.Member
+                        && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
+                        && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
+                        found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
+                return found;
+            }
+
+            default:
+                return [];
+        }
+    }
+
+    /// <summary>One function a call could mean, and whether it came from an <c>extend</c> block
+    /// rather than from the type itself. The second half decides only where the first cannot: an
+    /// own member and an extension that fit a call EQUALLY well are not an ambiguity, because the
+    /// member has won that since extensions existed.</summary>
+    private readonly record struct OverloadCandidate(FunctionSymbol Fn, bool FromExtension);
+
+    /// <summary>The receiver's type as the checker recorded it a moment ago, with an optional
+    /// receiver unwrapped the way the member lookup unwraps it.</summary>
+    private LyrType ReceiverTypeOf(MemberExpr mem)
+    {
+        var target = _result.TypeOf(mem.Target);
+        return mem.IsOptional && target is Optional opt ? opt.Inner : target ?? LyrType.Error;
+    }
+
+    /// <summary>The chosen overload's type, seen from the call site: through the receiver's
+    /// instance for a method of a generic type, plain otherwise.</summary>
+    private LyrType OverloadTypeOf(FunctionSymbol chosen, Expr callee) =>
+        callee is MemberExpr mem && ReceiverTypeOf(mem) is GenericInstance gi
+            ? Substitute(FnTypeOf(chosen), SubstMap(gi))
+            : FnTypeOf(chosen);
+
+    /// <summary>
+    /// Which overload a call means.
+    ///
+    /// <para><b>The arguments decide, and only the arguments.</b> Not the return type — a call
+    /// site does not always have one to offer, and a rule that sometimes reads the context and
+    /// sometimes does not is a rule nobody can hold in their head.</para>
+    ///
+    /// <para>A LAMBDA argument takes no part: it has no type until a parameter gives it one, so
+    /// letting it choose would be circular. Candidates are separated by the other arguments, and
+    /// when they are not, the call is ambiguous and says so.</para>
+    /// </summary>
+    /// <returns><c>null</c> when nothing fits or too much does; the diagnostic is already
+    /// reported.</returns>
+    private FunctionSymbol? SelectOverload(CallExpr call, IReadOnlyList<OverloadCandidate> candidates,
+        SymbolTable scope)
+    {
+        // Trial types, quietly: typing an argument against the WRONG candidate reports mismatches
+        // the program does not have. The winner is checked again for real by the caller.
+        var argumentTypes = new LyrType?[call.Arguments.Length];
+        using (_de.Mute())
+            for (var i = 0; i < call.Arguments.Length; i++)
+                if (call.Arguments[i] is not LambdaExpr)
+                    argumentTypes[i] = CheckExpr(call.Arguments[i], scope);
+
+        List<(FunctionSymbol Fn, OverloadFit Fit)> fitting = new();
+        foreach (var candidate in candidates)
+            if (FitOf(candidate, call, argumentTypes) is { } fit)
+                fitting.Add((candidate.Fn, fit));
+
+        if (fitting.Count == 0)
+        {
+            _de.Report("LYR-SEM0087", Severity.Error, call.Span,
+                $"no '{candidates[0].Fn.Name}' takes ({DisplayArguments(call, argumentTypes)})",
+                candidates.Select(c => new DiagnosticNote(c.Fn.Declaration?.Span ?? default,
+                    $"this one takes ({DisplayParameters(c.Fn)})")).ToArray());
+            return null;
+        }
+
+        fitting.Sort((a, b) => a.Fit.CompareTo(b.Fit));
+        if (fitting.Count > 1 && fitting[0].Fit.CompareTo(fitting[1].Fit) == 0)
+        {
+            _de.Report("LYR-SEM0086", Severity.Error, call.Span,
+                $"'{candidates[0].Fn.Name}' is ambiguous for ({DisplayArguments(call, argumentTypes)})"
+                + " — no candidate fits better than another",
+                fitting.Where(f => f.Fit.CompareTo(fitting[0].Fit) == 0)
+                    .Select(f => new DiagnosticNote(f.Fn.Declaration?.Span ?? default,
+                        $"this one takes ({DisplayParameters(f.Fn)})")).ToArray());
+            return null;
+        }
+
+        return fitting[0].Fn;
+    }
+
+    /// <summary>How well a candidate fits, as a tuple that orders: fewer conversions first, then
+    /// fewer type parameters, then the one that needs no defaults, then the one that is not
+    /// variadic. Lower is better, and equal is ambiguous.</summary>
+    private readonly record struct OverloadFit(
+        int Converted, int Generic, int Defaulted, int Variadic, int Extension)
+        : IComparable<OverloadFit>
+    {
+        public int CompareTo(OverloadFit other)
+        {
+            if (Converted != other.Converted) return Converted - other.Converted;
+            if (Generic != other.Generic) return Generic - other.Generic;
+            if (Defaulted != other.Defaulted) return Defaulted - other.Defaulted;
+            if (Variadic != other.Variadic) return Variadic - other.Variadic;
+
+            // Last, so it decides nothing a parameter could decide: an extension that fits BETTER
+            // still wins, and only a tie goes to the type's own member.
+            return Extension - other.Extension;
+        }
+    }
+
+    /// <summary>Does this candidate take these arguments, and how exactly?</summary>
+    private OverloadFit? FitOf(OverloadCandidate candidate, CallExpr call, LyrType?[] argumentTypes)
+    {
+        if (candidate.Fn.Declaration is not FunctionDecl decl) return null;
+        var fn = FnTypeOf(candidate.Fn);
+        var parameters = decl.Parameters;
+        var variadic = parameters.Length > 0 && parameters[^1].IsParams;
+
+        var required = parameters.Count(p => p.Default is null) - (variadic ? 1 : 0);
+        if (argumentTypes.Length < required) return null;
+        if (!variadic && argumentTypes.Length > parameters.Length) return null;
+
+        var converted = 0;
+        var generic = 0;
+        for (var i = 0; i < argumentTypes.Length; i++)
+        {
+            if (argumentTypes[i] is not { } argument) continue;   // a lambda: no vote
+
+            var wanted = ParameterAt(fn, parameters, variadic, i);
+            if (wanted is null) return null;
+
+            // A type parameter takes anything, and takes it LAST: a candidate written for this
+            // exact type is more specific than one written for every type.
+            if (ContainsTypeParam(wanted)) { generic++; continue; }
+
+            if (LyrType.Equal(argument, wanted)) continue;
+            if (!IsAssignable(call.Arguments[i], argument, wanted)) return null;
+            converted++;
+        }
+
+        return new OverloadFit(converted, generic,
+            argumentTypes.Length < parameters.Length ? 1 : 0, variadic ? 1 : 0,
+            candidate.FromExtension ? 1 : 0);
+    }
+
+    /// <summary>The parameter an argument lands in: the one at its index, or the ELEMENT type of a
+    /// variadic tail once the fixed parameters are used up.</summary>
+    private static LyrType? ParameterAt(FnType fn, Param[] parameters, bool variadic, int index)
+    {
+        if (index < fn.Parameters.Length && (!variadic || index < parameters.Length - 1))
+            return fn.Parameters[index];
+        if (!variadic) return null;
+        return fn.Parameters[^1] is ArrayOf tail ? tail.Element : null;
+    }
+
+    private string DisplayArguments(CallExpr call, LyrType?[] argumentTypes) =>
+        string.Join(", ", argumentTypes.Select((t, i) =>
+            t is null ? (call.Arguments[i] is LambdaExpr ? "a lambda" : "?") : TypeFacts.Display(t)));
+
+    private string DisplayParameters(FunctionSymbol candidate) =>
+        string.Join(", ", FnTypeOf(candidate).Parameters.Select(TypeFacts.Display));
+
+    /// <summary>
     /// The callee of a call, checked with the expected RESULT type behind it.
     ///
     /// <para>Needed at exactly one place: an enum variant without written type arguments.
@@ -1332,8 +1608,20 @@ public sealed class TypeChecker
     /// <para>The expected type belongs to the call, not to the callee; it is therefore used ONLY for
     /// resolving the instance and is not passed on as an expectation about the function type.</para>
     /// </summary>
-    private LyrType CheckTargetOfCall(Expr callee, SymbolTable scope, LyrType? expected) =>
-        callee is MemberExpr mem ? CheckExpr(mem, scope, expected) : CheckExpr(callee, scope);
+    private LyrType CheckTargetOfCall(Expr callee, SymbolTable scope, LyrType? expected)
+    {
+        // A name meaning SEVERAL functions is not ambiguous here, and must not be reported as
+        // though it were: this is the one position where something else chooses — the arguments,
+        // a moment later in CheckCall. The first candidate is bound so the ordinary path has a
+        // shape to work with, and the selection rebinds it.
+        if (callee is IdentifierExpr id && scope.Overloads(id.Name) is { Count: > 1 } set)
+        {
+            _result.BindRef(id, set[0]);
+            return FnTypeOf(set[0]);
+        }
+
+        return callee is MemberExpr mem ? CheckExpr(mem, scope, expected) : CheckExpr(callee, scope);
+    }
 
     private LyrType CheckUnary(UnaryExpr u, SymbolTable scope)
     {
@@ -2048,6 +2336,17 @@ public sealed class TypeChecker
     private LyrType CheckCall(CallExpr call, SymbolTable scope, LyrType? expected = null)
     {
         var calleeType = CheckTargetOfCall(call.Callee, scope, expected);
+
+        // OVERLOADING: the lookup above answered with the first function of the name, which is the
+        // right answer whenever there is only one. With several, the arguments decide, and the
+        // decision is recorded by rebinding the callee — from here on everything downstream, the
+        // lowering included, reads one target and knows nothing of the set.
+        if (OverloadCandidates(call.Callee, scope) is { Count: > 1 } candidates)
+        {
+            if (SelectOverload(call, candidates, scope) is not { } chosen) return LyrType.Error;
+            _result.BindRef(call.Callee, chosen);
+            calleeType = OverloadTypeOf(chosen, call.Callee);
+        }
 
         // 'b?.get()' — optional chaining with a CALL. 'b?.get' is a '?fn() -> int', and without this
         // case the sema reports '"?fn() -> int" is not callable': a statement about an intermediate
