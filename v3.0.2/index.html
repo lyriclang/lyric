@@ -47,6 +47,9 @@ driver had already read.</p>
 instance; the stub publish is invoked explicitly before the listing, which orders it; and the
 target now <strong>fails the build</strong> when the stub did not arrive, rather than leaving it to be
 discovered by a packing test half a minute later.</p>
+<p>That last part earned itself immediately: the first derived path forgot that a publish FOR a
+platform writes to <code>bin/&lt;config&gt;/&lt;tfm&gt;/&lt;rid&gt;/</code>, so the release build copied nothing — and said
+so, in the build, instead of shipping an archive whose driver could not pack.</p>
 </li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>
