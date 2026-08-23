@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.1.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.1.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.1.0 — 2026-08-23</h2>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Packed programs run on macOS</strong> (#54). <code>lyric pack</code> produced a working executable on Windows
+and Linux and a dead one on macOS: a Mach-O declares its own extent in its load commands, and
+bytes beyond it make the file fail strict validation — the loader killed it before it started.</p>
+<p>The payload is now folded into the file instead of following it. The stub's signature is
+dropped and its load command removed, the payload takes that space, <code>__LINKEDIT</code> — the segment
+that ends every Mach-O — is grown so its extent reaches the new end, and
+<code>/usr/bin/codesign --force --sign -</code> signs the result ad-hoc. The signature says the file has
+not changed since packing, which is what the loader asks; distributing to other people's
+machines remains a question of notarisation with your own identity.</p>
+<p>Two consequences worth knowing:</p>
+<ul>
+<li><strong>the footer is no longer last on macOS</strong> — the signature follows it. The reader tries the
+end of the file first, as before, and otherwise scans backwards for the magic within a
+bounded window, checking each candidate whole;</li>
+<li><strong>packing a macOS program needs macOS.</strong> The signature is the half only that platform can
+make, so packing one elsewhere is refused with that reason rather than writing a file the
+loader would kill. Packing ON macOS FOR another platform works as it always did.</li>
+</ul>
+<p>The pack-and-run gate in both workflows now runs the packed program on macOS too, and verifies
+its signature — the part no test elsewhere can answer.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
