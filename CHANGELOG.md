@@ -10,6 +10,24 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.2.0 — 2026-08-23
+
+### Added
+
+- **A host can read and write a module's globals**: `LoadedProgram.GlobalCount`, `ReadGlobal(int)`
+  and `WriteGlobal(int, LyrValue)`.
+
+  For a TOOL. A program reaches its own globals with an instruction and needs none of this; a
+  debugger's Globals scope, or an editor showing a running game what it is holding, had no way in
+  at all. The names and types were already there — `GlobalNames` from the debug section, `Globals`
+  for the types, `FieldNames` for what is inside an object — so this is the one piece that was
+  missing.
+
+  **Nothing checks the type on write.** A slot is a bit pattern and the program reads it as
+  whatever its instructions expect, so writing a float where an integer stands produces a number
+  nobody can explain rather than an error. `Module.Globals` carries the types; a tool is expected
+  to have looked.
+
 ## v3.1.0 — 2026-08-23
 
 ### Added
