@@ -56,6 +56,38 @@ is.
   value always was. It surfaced when the free adapters went: `zip` as a method had never been
   reachable in a test.
 
+### Fixed
+
+- **A coroutine's throwability is part of its TYPE** (#73). `fn gen(): Coroutine<int> throws
+  Exception` produces a `Coroutine<int> throws Exception`, and that type keeps its demand through
+  a field, an optional, a parameter and a return:
+
+  ```lyr
+  class Runner {
+      current: ?Coroutine<int> throws Exception = null,
+  }
+  ```
+
+  The clause was checked at the **call** until 3.0 — the one event that runs no body and therefore
+  cannot throw. It looked right while the coroutine stayed a local beside its `try`, and the demand
+  vanished the moment it reached a field or an optional; the exception then left the entry point
+  and ended the program with `LYR-VM0010`. A coroutine held in a field is the idiom coroutines were
+  built for.
+
+  What changed for a program that compiled before:
+
+  - the **call** of a coroutine function demands nothing;
+  - every **pull** — `resume` and `next()` alike — of a throwing coroutine is a throw site
+    (`LYR-SEM0034`). `next()` is lenient about exhaustion, never about throwing;
+  - a throwing coroutine no longer fits a plain `Coroutine<T>` slot. The other direction is fine: a
+    coroutine that cannot throw keeps the promise a `throws` slot makes;
+  - the type is written with a suffix wherever a type is written — `?Coroutine<int> throws
+    Exception` — and `throws` alone means any `Throwable`. On anything but a coroutine it is
+    refused (`LYR-SEM0084`): every other value runs at its call, where the callee's own clause
+    already says what it throws.
+
+  Purely static — the IR, the bytecode and the runtime are untouched.
+
 ### Added
 
 - **A type may conform to one arithmetic interface several times**, and the operator picks the

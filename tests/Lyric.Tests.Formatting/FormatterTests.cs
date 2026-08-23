@@ -468,4 +468,22 @@ public class FormatterTests
             "enum Rarity{Common,Rare}\n"
             + "fn price(price:int,rarity:Rarity):int{"
             + "return price*match(rarity){Common=>1,Rare=>3,};}"));
+
+    [Fact]
+    public void A_coroutine_type_keeps_its_throws()
+    {
+        // The suffix is part of the TYPE, so it has to survive a field, a parameter and a
+        // binding — and the typeless form has no trailing space to lose.
+        var formatted = Format("""
+            class Runner {
+                co:  ?Coroutine<int>   throws  Exception = null,
+                any: ?Coroutine<int> throws = null,
+                fn take(c: Coroutine<int> throws Exception, n: int): int { return n; }
+            }
+            """);
+
+        Assert.Contains("co: ?Coroutine<int> throws Exception = null,", formatted, StringComparison.Ordinal);
+        Assert.Contains("any: ?Coroutine<int> throws = null,", formatted, StringComparison.Ordinal);
+        Assert.Contains("fn take(c: Coroutine<int> throws Exception, n: int): int", formatted, StringComparison.Ordinal);
+    }
 }

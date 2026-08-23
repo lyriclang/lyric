@@ -555,6 +555,12 @@ public static class ModuleLowerer
             case ArrayType arr:
                 var element = ResolveLocalAliases(arr.Element, aliases, binding)!;
                 return ReferenceEquals(element, arr.Element) ? node : arr with { Element = element };
+            case ThrowingType th:
+                var carried = ResolveLocalAliases(th.Inner, aliases, binding)!;
+                var thrown = ResolveLocalAliases(th.Thrown, aliases, binding);
+                return ReferenceEquals(carried, th.Inner) && ReferenceEquals(thrown, th.Thrown)
+                    ? node
+                    : th with { Inner = carried, Thrown = thrown };
             default:
                 return node;
         }

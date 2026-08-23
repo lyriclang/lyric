@@ -389,6 +389,10 @@ public sealed class Resolver
                 foreach (var a in n.TypeArguments) BindType(a, scope);
                 break;
             case NullableType nn: BindType(nn.Inner, scope); break;
+            case ThrowingType th:
+                BindType(th.Inner, scope);
+                if (th.Thrown is not null) BindType(th.Thrown, scope);
+                break;
             case ArrayType a: BindType(a.Element, scope); break;
             case TupleType t: foreach (var e in t.Elements) BindType(e, scope); break;
             case FunctionType f:

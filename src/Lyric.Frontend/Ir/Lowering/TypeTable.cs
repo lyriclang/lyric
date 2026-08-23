@@ -882,6 +882,13 @@ internal sealed class TypeTable
         if (node is NullableType option)
             return new IrOptionalType(Lower(option.Inner, option.Inner.Span));
 
+        // 'Coroutine<int> throws E' is the same coroutine at runtime. What may come out of a pull
+        // is a question the compiler answers and the machine never asks: the frame, its state and
+        // its resume protocol are identical, and an exception leaves it the way it leaves any
+        // other frame. Purely static, so it stops here.
+        if (node is ThrowingType throwing)
+            return Lower(throwing.Inner, throwing.Inner.Span);
+
         // '(A, B)' — a tuple written as a field, parameter or return type.
         if (node is AST.TupleType written)
             return TupleOf(written.Elements.Select(e => Lower(e, e.Span)).ToArray());
@@ -1034,6 +1041,7 @@ internal sealed class TypeTable
 
         if (node is ArrayType { Size: null } array) return new ArrayOf(Resolve(array.Element, span), null);
         if (node is NullableType option) return new Optional(Resolve(option.Inner, span));
+        if (node is ThrowingType throwing) return Resolve(throwing.Inner, span);
 
         // A tuple as a type argument: 'Iterator<(int, T)>'. That is the signature of 'enumerate' and
         // 'zip'.

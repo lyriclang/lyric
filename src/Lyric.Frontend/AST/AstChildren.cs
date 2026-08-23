@@ -367,6 +367,11 @@ public static class AstChildren
                 yield return n.Inner;
                 break;
 
+            case ThrowingType n:
+                yield return n.Inner;
+                if (n.Thrown is not null) yield return n.Thrown;
+                break;
+
             case NamedType n:
                 foreach (var a in n.TypeArguments) yield return a;
                 break;

@@ -26,6 +26,10 @@ public sealed class TypeChecker
     private readonly HashSet<TypeSymbol> _expanding = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<TypeSymbol> _cyclic = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The type nodes whose misplaced <c>throws</c> has already been reported. A signature
+    /// is resolved once per declaration and once per call site; the mistake is one.</summary>
+    private readonly HashSet<TypeNode> _reportedThrows = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     /// What an operator desugar has already decided, keyed by the synthetic member node.
     ///
@@ -1291,8 +1295,32 @@ public sealed class TypeChecker
         var ps = fn.Parameters.Select(p => ResolveType(p.Type, _comp.Builtins)).ToArray();
         var ret = IsPanic(f) ? LyrType.Never // panic has the unnameable type never
             : fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
-        return new FnType(ps, ret);
+        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins));
     }
+
+    /// <summary>
+    /// Where a coroutine function's <c>throws</c> clause belongs: on the COROUTINE it returns.
+    ///
+    /// <para><c>fn gen(): Coroutine&lt;int&gt; throws Exception</c> has one clause and it has always
+    /// described one thing — that pulling this coroutine may throw. The call cannot: it runs no
+    /// body, it builds a suspended frame. Until 3.0 the clause was checked at the call anyway,
+    /// which is why the demand appeared to follow the local variable and vanished at the first
+    /// field or optional (#73).</para>
+    ///
+    /// <para>Only when the return type IS a coroutine. A function returning <c>?Coroutine&lt;T&gt;</c>
+    /// is not a coroutine function — it cannot yield — so its clause stays its own.</para>
+    /// </summary>
+    private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
+        fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null
+            ? co with { Throws = ThrownTypeOf(clause.Type, scope) }
+            : declared;
+
+    /// <summary>What a <c>throws</c> names: the written type, or the builtin <c>Throwable</c> when
+    /// it names none — the same "anything" the typeless clause has always meant.</summary>
+    private LyrType? ThrownTypeOf(TypeNode? written, SymbolTable scope) =>
+        written is null
+            ? _throwable is { } any ? new NamedRef(any) : null
+            : ResolveType(written, scope);
 
     /// <summary>
     /// The callee of a call, checked with the expected RESULT type behind it.
@@ -2276,6 +2304,11 @@ public sealed class TypeChecker
         // refused — a null result would mean two different things there.
         if (baseType is CoroutineOf co && mem.Member == "next")
         {
+            // A PULL, so a throw site. 'next()' is lenient about EXHAUSTION — it answers null for
+            // a finished coroutine — and says nothing about an exception from the body, which
+            // passes straight through it.
+            if (co.Throws is { } pulled) _result.MarkThrowingPull(mem, pulled);
+
             if (co.Yield is Optional)
                 return Report(mem.Span, "LYR-SEM0080",
                     $"'next()' on '{TypeFacts.Display(baseType)}' cannot tell an exhausted "
@@ -2371,7 +2404,7 @@ public sealed class TypeChecker
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
-            CoroutineOf co => new CoroutineOf(Substitute(co.Yield, map)),
+            CoroutineOf co => co with { Yield = Substitute(co.Yield, map) },
             _ => type // primitive, NamedRef, error, null
         };
     }
@@ -3945,6 +3978,7 @@ public sealed class TypeChecker
     private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
     {
         var t = CheckExpr(re.Coroutine, scope);
+        if (t is CoroutineOf { Throws: { } thrown }) _result.MarkThrowingPull(re, thrown);
         return t switch
         {
             CoroutineOf co => co.Yield,
@@ -4299,6 +4333,14 @@ public sealed class TypeChecker
         if (to is Optional inner)                          // T to ?T, widening
             return from is NullType || IsAssignable(expr, from, inner.Inner);
         if (from is NullType) return false;
+
+        // A coroutine that cannot throw fits where one that may is expected: the target promises
+        // its readers a 'try', and a value that never throws keeps that promise. The way back is
+        // the hole this rule exists for and stays refused — a throwing coroutine in a plain slot
+        // is exactly how the demand used to disappear (#73).
+        if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
+            return LyrType.Equal(given.Yield, wanted.Yield);
+
         if (to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         return false;
@@ -4402,6 +4444,25 @@ public sealed class TypeChecker
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))
                     return MakeGenericInstance(gts, n, scope);
                 return SymbolToType(sym, scope, n.Span);
+            case ThrowingType tt:
+            {
+                var carried = ResolveType(tt.Inner, scope);
+                if (carried.IsError) return carried;
+
+                // Only a coroutine. Everything else runs at its CALL, and a function's own
+                // 'throws' already says so there; a type-level one would be a second spelling for
+                // the same fact — and on a value that never runs anything, no spelling at all.
+                // Once per node: a parameter or field type is resolved both while its declaration
+                // is checked and again through the function type at every call, and the reader
+                // does not need the same sentence twice.
+                if (carried is not CoroutineOf co)
+                    return _reportedThrows.Add(tt) ? Report(tt.Span, "LYR-SEM0084",
+                        $"'throws' belongs to a coroutine type, and '{TypeFacts.Display(carried)}' "
+                        + "is not one — a call declares what it throws in its own signature")
+                        : LyrType.Error;
+
+                return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };
+            }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope), a.Size is { } sz ? (int)sz.Value : null);
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());
