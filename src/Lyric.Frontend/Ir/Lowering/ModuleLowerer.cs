@@ -87,7 +87,7 @@ public static class ModuleLowerer
             {
                 if (decl is not FunctionDecl function) continue;
                 if (function.Generics.Length > 0) continue;
-                if (module.Members.LookupLocal(function.Name) is not FunctionSymbol symbol) continue;
+                if (module.Members.FunctionFor(function.Name, function) is not { } symbol) continue;
 
                 // Bodyless in a stdlib module means a native declaration. The signature is in Lyric, the
                 // implementation lives in the host and is bound by name at load time. In user code the
@@ -135,7 +135,8 @@ public static class ModuleLowerer
 
                 var id = new FunctionId(pending.Count);
                 ids[symbol] = id;
-                pending.Add((function, NameMangling.ForFunction(module, function.Name), null, null));
+                pending.Add((function, NameMangling.ForFunction(module, function.Name)
+                    + OverloadSuffixFor(module.Members, function), null, null));
 
                 // A library's surface: the pub functions of the COMPILED modules, never the standard
                 // library's — its pubs rooting would keep every program whole. Ids in 'pending' are
@@ -191,7 +192,7 @@ public static class ModuleLowerer
                 {
                     if (member is not FunctionDecl method) continue;
                     if (method.Generics.Length > 0) continue;
-                    if (type.Members.LookupLocal(method.Name) is not FunctionSymbol symbol) continue;
+                    if (type.Members.FunctionFor(method.Name, method) is not { } symbol) continue;
 
                     // A bodyless method on a HOST type is a native with the receiver as parameter 0, the
                     // same convention as for every other method, except that the implementation lives at
@@ -222,7 +223,8 @@ public static class ModuleLowerer
                     }
 
                     ids[symbol] = new FunctionId(pending.Count);
-                    pending.Add((method, NameMangling.ForMethod(module, typeName, method.Name),
+                    pending.Add((method, NameMangling.ForMethod(module, typeName, method.Name)
+                            + OverloadSuffixFor(type.Members, method),
                         method.IsStatic ? null : type, null));
                 }
             }
@@ -692,7 +694,7 @@ public static class ModuleLowerer
 
                     case FunctionDecl { Attributes.Length: > 0 } fn:
                         if (!fn.Attributes.Any(EmitsRow)) break; // @Deprecated only: no row, no root
-                        if (module.Members.LookupLocal(fn.Name) is not FunctionSymbol fs
+                        if (module.Members.FunctionFor(fn.Name, fn) is not { } fs
                             || !ids.TryGetValue(fs, out var fid))
                             throw new InternalCompilationException(
                                 $"ir: attributed function '{fn.Name}' has no lowered id");
@@ -961,6 +963,27 @@ public static class ModuleLowerer
     /// <summary>Every site that names this interface DIRECTLY, in declaration order — the type's
     /// own list first, then the extend blocks. A conformance reached through a parent is not one:
     /// its instance stands on the child, and the row for it resolves through the chain.</summary>
+    /// <summary>The suffix that separates one declaration from its overloads, empty when the name
+    /// is declared once. The ordinal is the declaration's position among them, used only when the
+    /// written parameter types are not enough to tell two apart.</summary>
+    private static string OverloadSuffixFor(SymbolTable scope, FunctionDecl function)
+    {
+        var overloads = scope.OverloadsLocal(function.Name);
+        if (overloads.Count < 2) return "";
+
+        var ordinal = 0;
+        var clashes = 0;
+        var mine = NameMangling.OverloadSuffix(function.Parameters, 0);
+        for (var i = 0; i < overloads.Count; i++)
+        {
+            if (overloads[i].Declaration is not FunctionDecl other) continue;
+            if (ReferenceEquals(other, function)) { ordinal = clashes; break; }
+            if (NameMangling.OverloadSuffix(other.Parameters, 0) == mine) clashes++;
+        }
+
+        return NameMangling.OverloadSuffix(function.Parameters, ordinal);
+    }
+
     private static List<ConformanceSite> ConformanceSites(Compilation compilation, TypeSymbol type,
         TypeSymbol iface, BindingResult binding)
     {

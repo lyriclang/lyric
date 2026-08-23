@@ -168,9 +168,7 @@ public sealed class ScriptInstance
         ArgumentException.ThrowIfNullOrWhiteSpace(function);
 
         var index = _program.IndexOfFunction(_prefix + function);
-        if (index < 0)
-            throw new ScriptException("LYR-EMB0006",
-                $"'{Module.Name}' has no function '{function}'", null);
+        if (index < 0) return ResolveOverload(function, argumentCount);
 
         var signature = _program.Module.Functions[index];
         if (signature.ParamCount != argumentCount)
@@ -179,6 +177,39 @@ public sealed class ScriptInstance
                 null);
 
         return (index, signature);
+    }
+
+    /// <summary>
+    /// A function the script OVERLOADED: several of one name, and the compiled module tells them
+    /// apart by a signature suffix — <c>main.show(int)</c> beside <c>main.show(string)</c>.
+    ///
+    /// <para>A host calls by name and has runtime values rather than declared types, so the
+    /// ARGUMENT COUNT is what can be matched here. One candidate of that arity is the answer; two
+    /// are an ambiguity only the host can settle, by passing the full name the disassembly
+    /// shows.</para>
+    /// </summary>
+    private (int Index, BytecodeFunction Signature) ResolveOverload(string function, int argumentCount)
+    {
+        var prefix = _prefix + function + "(";
+        List<(int Index, BytecodeFunction Signature)> found = new();
+        for (var i = 0; i < _program.Module.Functions.Count; i++)
+        {
+            var candidate = _program.Module.Functions[i];
+            if (!candidate.Name.StartsWith(prefix, StringComparison.Ordinal)) continue;
+            if (candidate.ParamCount == argumentCount) found.Add((i, candidate));
+        }
+
+        if (found.Count == 1) return found[0];
+
+        if (found.Count > 1)
+            throw new ScriptException("LYR-EMB0008",
+                $"'{function}' has {found.Count} overloads taking {argumentCount} argument(s) — "
+                + "call the one you mean by its full name: "
+                + string.Join(", ", found.Select(f => f.Signature.Name)), null);
+
+        throw new ScriptException("LYR-EMB0006",
+            $"'{Module.Name}' has no function '{function}'"
+            + (argumentCount > 0 ? $" taking {argumentCount} argument(s)" : ""), null);
     }
 
     private static LyrValue[] MarshalArguments(string function, BytecodeFunction signature,

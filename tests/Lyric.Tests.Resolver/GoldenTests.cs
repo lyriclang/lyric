@@ -49,7 +49,8 @@ public class GoldenTests
     [InlineData("imports")]         // three import forms, external because this is a single file
     [InlineData("enum_interface")]  // enum variants and methods, interface members
     [InlineData("visibility")]      // pub vs. modul-privat
-    [InlineData("duplicate_decl")]  // Duplikat (LYR-RES0001)
+    [InlineData("duplicate_decl")]  // Duplikat, das keins sein kann: fn neben struct (LYR-RES0001)
+    [InlineData("overload_set")]    // drei fn eines Namens: eine Menge, kein Duplikat
     [InlineData("unresolved_type")] // unbekannter Typ (LYR-RES0002)
     public void Golden_symbols_match_snapshot(string name)
     {

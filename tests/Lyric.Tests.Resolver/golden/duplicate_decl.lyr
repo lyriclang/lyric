@@ -2,6 +2,6 @@ fn foo(): int {
     return 0;
 }
 
-fn foo(): int {
-    return 1;
+struct foo {
+    x: int,
 }

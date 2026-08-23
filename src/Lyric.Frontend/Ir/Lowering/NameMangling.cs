@@ -1,3 +1,4 @@
+using Lyric.AST;
 using Lyric.Resolver;
 
 namespace Lyric.Ir.Lowering;
@@ -41,4 +42,38 @@ internal static class NameMangling
     /// producible in source. The same convention as for <c>&lt;globals&gt;</c>.</para></summary>
     public static string ForExtension(ModuleSymbol declaringModule, string targetName, string methodName) =>
         $"{declaringModule.FullName}.<extend>.{targetName}.{methodName}";
+
+    /// <summary>
+    /// The suffix that tells OVERLOADS apart: <c>main.show(int)</c> beside <c>main.show(string)</c>.
+    ///
+    /// <para>Empty for a name declared once, which is nearly every name — so a program without
+    /// overloads compiles to the same bytes it always did, and a disassembly of one keeps reading
+    /// the way it always read.</para>
+    ///
+    /// <para>The parameter types come from what was WRITTEN rather than from the lowered types: a
+    /// disassembly is read beside the source, and <c>?Item[]</c> says more there than the layout
+    /// it becomes. Two different types whose written forms print alike would collide, so the
+    /// caller passes an ordinal that breaks the tie.</para>
+    /// </summary>
+    public static string OverloadSuffix(Param[] parameters, int ordinal)
+    {
+        var written = string.Join(", ", parameters.Select(p => Written(p.Type)));
+        return ordinal == 0 ? $"({written})" : $"({written})#{ordinal}";
+    }
+
+    /// <summary>A written type as one short token. Not a full printer: it separates signatures,
+    /// which is all a name has to do.</summary>
+    private static string Written(TypeNode node) => node switch
+    {
+        NamedType named => named.TypeArguments.Length == 0
+            ? named.Path[^1]
+            : named.Path[^1] + "<" + string.Join(", ", named.TypeArguments.Select(Written)) + ">",
+        NullableType option => "?" + Written(option.Inner),
+        ArrayType array => Written(array.Element) + "[]",
+        TupleType tuple => "(" + string.Join(", ", tuple.Elements.Select(Written)) + ")",
+        ThrowingType throwing => Written(throwing.Inner) + " throws",
+        FunctionType fn => "fn(" + string.Join(", ", fn.Parameters.Select(Written)) + ") -> "
+                           + Written(fn.ReturnType),
+        _ => "?",
+    };
 }

@@ -166,13 +166,13 @@ public sealed class Resolver
     }
 
     /// <summary>
-    /// Two functions of the same name are an attempt to overload rather than a slip, and that is a
-    /// deliberate rule rather than a plain name collision. Without the addition the message reads
-    /// as if the author had made a mistake.
+    /// A name collision that involves a FUNCTION is worth a word, because since 3.1 two functions
+    /// of one name are legal — they are told apart by their parameter lists — and the collision is
+    /// then with something that is not a function at all.
     /// </summary>
     private static string OverloadHint(SymbolTable scope, Symbol sym) =>
-        sym is FunctionSymbol && scope.LookupLocal(sym.Name) is FunctionSymbol
-            ? " — Lyric has no overloading; give the functions distinct names"
+        sym is FunctionSymbol || scope.LookupLocal(sym.Name) is FunctionSymbol
+            ? " — only two FUNCTIONS may share a name, told apart by their parameters"
             : "";
 
     // --- Pass 2: Imports ---
@@ -209,7 +209,8 @@ public sealed class Resolver
             }
             case ImportSelective sel: // import a.b { x, y };
                 foreach (var name in sel.Names)
-                    DeclareImport(module, ResolveSelective(name, target, imp), imp);
+                    foreach (var imported in ResolveSelective(name, target, imp))
+                        DeclareImport(module, imported, imp);
                 break;
             case ImportAlias alias: // import a.b as C;
                 DeclareImport(module, target is not null
@@ -219,19 +220,30 @@ public sealed class Resolver
         }
     }
 
-    private Symbol ResolveSelective(string name, ModuleSymbol? target, ImportDecl imp)
+    /// <returns>One binding, or SEVERAL when the name is an overload set: importing a name
+    /// imports what it means, and since 3.0 a name may mean more than one function. The set stays
+    /// a set here, so the call site chooses among the same candidates it would have at home.
+    /// </returns>
+    private IReadOnlyList<Symbol> ResolveSelective(string name, ModuleSymbol? target, ImportDecl imp)
     {
-        if (target is null) return new ExternalSymbol(name, imp.Path, imp); // extern/opak
+        if (target is null) return [new ExternalSymbol(name, imp.Path, imp)]; // extern/opak
 
         var found = target.Members.LookupLocal(name);
         if (found is null)
         {
             _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"module '{target.FullName}' has no exported '{name}'");
-            return new ErrorSymbol(name);
+            return [new ErrorSymbol(name)];
         }
         if (!IsPublic(found))
             _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"'{name}' is not public in '{target.FullName}'");
-        return new ImportBindingSymbol(name, found, imp); // recovery: bind even when not public
+
+        var overloads = target.Members.OverloadsLocal(name);
+        if (overloads.Count < 2)
+            return [new ImportBindingSymbol(name, found, imp)]; // recovery: bind even when not public
+
+        // A non-public member of the set is reported once, above, and imported all the same: the
+        // recovery is the same one a single import gets.
+        return overloads.Select(Symbol (fn) => new ImportBindingSymbol(name, fn, imp)).ToArray();
     }
 
     private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp)
@@ -341,7 +353,7 @@ public sealed class Resolver
     {
         // A generic function binds its signature against a scope holding the type parameters — the
         // same symbol instances that sit on the FunctionSymbol, so the sema sees them as identical.
-        var fsym = scope.LookupLocal(fn.Name) as FunctionSymbol;
+        var fsym = scope.FunctionFor(fn.Name, fn);
         var sig = fsym is { Generics.Length: > 0 } ? WithGenerics(scope, fsym.Generics) : scope;
         foreach (var p in fn.Parameters) BindType(p.Type, sig);
         if (fn.ReturnType is not null) BindType(fn.ReturnType, sig);
