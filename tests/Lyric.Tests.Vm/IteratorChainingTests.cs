@@ -148,21 +148,27 @@ public class IteratorChainingTests
     }
 
     [Fact]
-    public void A_free_adapter_and_the_method_agree()
+    public void A_generic_member_works_on_a_concrete_instance_receiver()
     {
-        // The free forms delegate to the methods, so there is one implementation; this holds them
-        // to the same answer while both spellings exist.
-        var program = Compile(Source + """
-            import std.iter { take };
+        // Not through an Iterator<T> value but on the ARRAY ITERATOR itself, which is an instance
+        // of a generic class. That receiver took the instance path, where the member''s own type
+        // parameters are unbound: ''zip<B>'' returns ''Iterator<(T, B)>'' and reported an
+        // unsupported type argument at the interface''s own declaration. Free adapters covered it
+        // up until they went with 3.0.
+        var program = Compile("""
+            import std.iter { ArrayIterator, count, sum };
 
             pub fn go(): int {
-                let viaFree = sum(take<int>(upTo(10).iter(), 3));
-                let viaMethod = sum(upTo(10).iter().take(3));
-                return if (viaFree == viaMethod) viaMethod else 0 - 1;
+                let a = ArrayIterator<int> { source = [1, 2, 3], index = 0 };
+                let b = ArrayIterator<string> { source = ["x", "y"], index = 0 };
+                let paare = count<(int, string)>(a.zip(b));
+
+                let c = ArrayIterator<int> { source = [1, 2, 3], index = 0 };
+                return paare * 100 + sum(c.map<int>((n: int) => n * 2));
             }
             """);
 
-        Assert.Equal(6, Call(program, "main.go"));
+        Assert.Equal(2 * 100 + 12, Call(program, "main.go"));
     }
 
     [Fact]

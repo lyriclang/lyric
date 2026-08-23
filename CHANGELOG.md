@@ -29,6 +29,33 @@ is.
 
   The result could not be read off the operand, or `Vec2 * 2.0` would have to give a `float`.
 
+- **Every deprecation whose promise named 3.0 is gone.** The `until` field is a commitment, and
+  this is the release it comes due in. Eleven forms:
+
+  | gone | use |
+  |---|---|
+  | `std.io.file.readText` | `text` |
+  | `std.io.file.readBytes` | `bytes` |
+  | `std.io.file.readLines` | `lines` |
+  | `std.iter.map/filter/take/skip/takeWhile/zip/chain/flatMap` (free) | the methods of `Iterator<T>` |
+
+  The free iterator adapters have been the methods' delegates since 2.17; `enumerate` and `chunks`
+  stay free, and the comment in `std/iter.lyr` says why (a non-generic method changing the element
+  type does not monomorphize).
+
+- **The toolchain calls itself 3.0.0.** The tree carries the version the language it speaks
+  belongs to, so the specification suite runs the right cases against it.
+
+### Fixed
+
+- **A generic interface member called on an instance of a generic class.**
+  `ArrayIterator<int>.zip<string>(…)` did not compile: the receiver took the instance path, which
+  binds the OWNER's type parameters and not the member's own, so `Iterator<(T, B)>` reported "this
+  type argument is not supported" — at the interface's declaration, which is not where the program
+  was wrong. Such a call is lifted into the interface now, as the same call on an `Iterator<T>`
+  value always was. It surfaced when the free adapters went: `zip` as a method had never been
+  reachable in a test.
+
 ### Added
 
 - **A type may conform to one arithmetic interface several times**, and the operator picks the

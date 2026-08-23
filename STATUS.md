@@ -242,8 +242,8 @@ the moves. Any future optimization argument on this VM starts from those three n
 ## What we are working on
 
 **THE v3.0.0 BASKET — in progress.** Everything that needs the major bump, collected on one
-line of work; the tree keeps claiming 2.17.0 until the basket is complete, so the suite's
-`//! since: 3.0.0` cases are skipped rather than failing in CI. The list:
+line of work; the tree claims **3.0.0** from the first breaking item on, because the
+suite gates its cases by that number. The list:
 
 - [x] **multi-conformance** (branch `feature/multi-conformance`, 2026-08-23) — door B of the
       design round, plus the part the round had not seen: the interfaces needed a SECOND type
@@ -258,8 +258,13 @@ line of work; the tree keeps claiming 2.17.0 until the basket is complete, so th
       four suite cases — `lyriclang/lyric-spec`, branch of the same name, **merges with this
       one**.
 - [ ] #73 `Coroutine<T> throws E`
-- [ ] every 2.x deprecation removed — the `until = "3.0"` promises come due with the bump, and
-      `LYR-SEM0081` turns the build red the moment `<Version>` says 3.0.0
+- [x] **every 2.x deprecation removed and `<Version>` at 3.0.0** (2026-08-23, same branch) —
+      eleven forms: three in `std.io.file`, the eight free iterator adapters. The bump had to come
+      WITH multi-conformance rather than after it: the suite gates cases by the toolchain version,
+      and a tree that speaks 3.0 while claiming 2.17 cannot be tested by it. The runner learned
+      `//! until:` for that — the mirror of `since:`, which retires a case a major left behind.
+      One old bug fell out: a generic interface member on a generic-class receiver
+      (`ArrayIterator<int>.zip<string>`) never worked; the free adapters had covered it
 - [ ] attribute roots for reachability pruning
 - [ ] the JIT's remaining obligations: default stays off (decided), an AOT line in the
       embedding contract, "a metered run gets no JIT" in the guide, the refusal list
@@ -1033,6 +1038,15 @@ answer yet, and it belongs asked before E4 starts.
      declares two `mul`. The machinery is half there already: the conformance dedup has keyed on
      the INSTANCE since M22. It extends the mechanism that exists instead of adding one beside
      it. **v3.0.0.**
+
+     *The SHAPE was asked again once it was built (maintainer, 2026-08-23) and confirmed:*
+     `Add<T, R>` stays. The one-parameter spelling `Mul<float>` is nicer to write and is not a
+     smaller change but a larger one — it needs a `Self` type in interface signatures, and with
+     it an object-safety rule, because behind a fat pointer nobody knows what a `Self`-returning
+     member gives back. Two arguments keep the interfaces plain generics: usable as VALUES,
+     with any result type (`Mul<Vec2, float>` is a dot product). The price is `Add<Vec2, Vec2>`
+     in the homogeneous case, paid once per declaration. Asked before the release rather than
+     after, because changing it later would be a SECOND break of the same interfaces.
 
      *BUILT 2026-08-23, and the round had one thing wrong:* door B alone does not carry it. The
      interfaces are `Mul<T>` with `fn mul(other: T): T` — the result is the OPERAND — so

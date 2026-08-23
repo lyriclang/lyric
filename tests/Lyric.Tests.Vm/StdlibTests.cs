@@ -137,11 +137,11 @@ public class StdlibTests : IDisposable
     {
         var path = Path.Combine(_dir, "round.txt").Replace("\\", "\\\\");
         var result = Run($$"""
-            import std.io.file { writeText, readText };
+            import std.io.file { writeText, text };
             import std.io.console { println };
             fn main(): int {
                 let ok = writeText("{{path}}", "hallo");
-                println(readText("{{path}}") ?? "<nichts>");
+                println(text("{{path}}") ?? "<nichts>");
                 return 0;
             }
             """);
@@ -156,9 +156,9 @@ public class StdlibTests : IDisposable
         // programming error; here `?T` parts from `panic`.
         var path = Path.Combine(_dir, "gibtsnicht.txt").Replace("\\", "\\\\");
         Assert.Equal(5, Run($$"""
-            import std.io.file { readText };
+            import std.io.file { text };
             fn main(): int {
-                if (readText("{{path}}") == null) { return 5; }
+                if (text("{{path}}") == null) { return 5; }
                 return 0;
             }
             """).Exit);
@@ -189,10 +189,10 @@ public class StdlibTests : IDisposable
         // written text file would count one line too many.
         var path = Path.Combine(_dir, "lines.txt").Replace("\\", "\\\\");
         Assert.Equal(3, Run($$"""
-            import std.io.file { writeText, readLines };
+            import std.io.file { writeText, lines };
             fn main(): int {
                 let w = writeText("{{path}}", "a\nb\nc\n");
-                return readLines("{{path}}").length;
+                return (lines("{{path}}") ?? []).length;
             }
             """).Exit);
     }
@@ -202,8 +202,8 @@ public class StdlibTests : IDisposable
     {
         var path = Path.Combine(_dir, "nichtda.txt").Replace("\\", "\\\\");
         Assert.Equal(0, Run($$"""
-            import std.io.file { readLines };
-            fn main(): int { return readLines("{{path}}").length; }
+            import std.io.file { lines };
+            fn main(): int { return (lines("{{path}}") ?? []).length; }
             """).Exit);
     }
 
@@ -212,11 +212,11 @@ public class StdlibTests : IDisposable
     {
         var path = Path.Combine(_dir, "app.txt").Replace("\\", "\\\\");
         Assert.Equal(2, Run($$"""
-            import std.io.file { writeText, appendText, readLines };
+            import std.io.file { writeText, appendText, lines };
             fn main(): int {
                 let w = writeText("{{path}}", "eins\n");
                 let a = appendText("{{path}}", "zwei\n");
-                return readLines("{{path}}").length;
+                return (lines("{{path}}") ?? []).length;
             }
             """).Exit);
     }

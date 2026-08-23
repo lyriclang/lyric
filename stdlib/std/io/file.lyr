@@ -59,30 +59,12 @@ pub fn exists(path: string): bool;
 /// `true` when the file is gone afterwards, including when it never existed.
 pub fn remove(path: string): bool;
 
-/// Deprecated: use `bytes`, which distinguishes an empty file from an unreadable one.
-@Deprecated { message = "use 'bytes', which answers null for an unreadable file", until = "3.0" }
-pub fn readBytes(path: string): uint8[] {
-    return bytes(path) ?? [];
-}
-
 /// Writes raw bytes, replacing an existing file. `true` on success — the `writeText`
 /// convention. (v1.14: the first native whose parameter is an array.)
 pub fn writeBytes(path: string, data: uint8[]): bool;
 
 /// Appends raw bytes to an existing file or creates it. `true` on success.
 pub fn appendBytes(path: string, data: uint8[]): bool;
-
-/// Deprecated: use `lines`, which distinguishes an empty file from an unreadable one.
-@Deprecated { message = "use 'lines', which answers null for an unreadable file", until = "3.0" }
-pub fn readLines(path: string): string[] {
-    return lines(path) ?? [];
-}
-
-/// Deprecated: use `text`. Same answer, one name for the same idea across the module.
-@Deprecated { message = "use 'text'", until = "3.0" }
-pub fn readText(path: string): ?string {
-    return text(path);
-}
 
 // ------------------------------------------------------------------------------------------
 //

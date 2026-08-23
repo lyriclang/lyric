@@ -153,8 +153,8 @@ value, so nothing is lost by saying only that. A **predicate** (`exists`, `isFil
 Before 2.14 there were three shapes, and the third one lied: `readBytes` and `readLines` answered
 an **empty array** both for an empty file and for a file that is not there. No caller could tell
 those apart, and the advice was to ask `exists` first — which is a race, not an answer. The three
-old names still work and warn (`readText`, `readBytes`, `readLines`); they go with 3.0, and the
-compiler will say so on the day.
+old names (`readText`, `readBytes`, `readLines`) warned through the 2.x line and went with 3.0;
+`text`, `bytes` and `lines` are what is left.
 
 What none of the shapes carries is a REASON: a missing file and a permission denied look the
 same. That gap is known and left open on purpose — carrying reasons means an error type and a
