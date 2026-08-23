@@ -158,9 +158,12 @@ public sealed class ArchitectureTests
         // ReplaceLineEndings() first: the project files in the repository have mixed line endings, and a
         // split on Environment.NewLine would find nothing on Windows in an LF file — the test would then
         // be silently green, because the list is empty rather than right.
+        // The line has to BE a reference, not mention one: a comment explaining why the tools are
+        // referenced the way they are contains the word too, and counting it would make this test
+        // fail on prose. Starting with the element is what separates an edge from a sentence.
         var referenced = project.ReplaceLineEndings()
             .Split(Environment.NewLine, StringSplitOptions.TrimEntries)
-            .Where(line => line.Contains("ProjectReference")
+            .Where(line => line.StartsWith("<ProjectReference", StringComparison.Ordinal)
                            && !line.Contains("ReferenceOutputAssembly"))
             .ToArray();
 

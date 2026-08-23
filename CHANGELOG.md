@@ -10,6 +10,27 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.0.2 — 2026-08-23
+
+### Fixed
+
+- **The build sometimes produced a `lyric pack` that could not pack** (#101). Intermittent on
+  Linux, on an unchanged tree, and the message pointed at the packer — where nothing was wrong.
+
+  The driver copies the tools into its own output directory so that "beside itself" means the same
+  during development as after an install. It learned their directories by BUILDING them a second
+  time (`<MSBuild Targets="Build">` with its own set of global properties), then listing what came
+  out. Two things were wrong with that. A second build under different properties is a second
+  project INSTANCE, writing the same output directory as the first. And the listing was not ordered
+  against the stub: `lyrpack` publishes its single-file stub from an `AfterTargets`, which in the
+  failing run landed **169 ms after the driver had finished building** — into a directory the
+  driver had already read.
+
+  The directories are now derived by convention instead of asked for, which removes the second
+  instance; the stub publish is invoked explicitly before the listing, which orders it; and the
+  target now **fails the build** when the stub did not arrive, rather than leaving it to be
+  discovered by a packing test half a minute later.
+
 ## v3.0.1 — 2026-08-23
 
 **The first sweep after the major**, and the reason the pipeline now has one: four defects, none
