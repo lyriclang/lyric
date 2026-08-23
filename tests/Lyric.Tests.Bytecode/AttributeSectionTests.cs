@@ -163,6 +163,28 @@ public class AttributeSectionTests
         Assert.DoesNotContain((byte)SectionId.Names, RawSectionIds(bytes));
     }
 
+    [Fact]
+    public void An_attribute_on_an_alias_reaches_no_row()
+    {
+        // The reason the alias target cost no format change (Lyric 3.3): the section has target
+        // kinds for a function, a type and the module, and an alias is none of them. Its attribute
+        // is read by the compiler and written down nowhere — the same route the canonical
+        // '@Deprecated' takes.
+        var bytes = BytecodeWriter.Write(Lower("""
+            module app;
+            import std.core { OnTypeAlias };
+
+            pub struct Open :: [OnTypeAlias] { }
+
+            @Open
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """), debugInfo: false);
+
+        Assert.DoesNotContain((byte)SectionId.Attributes, RawSectionIds(bytes));
+    }
+
     /// <summary>The reachability interplay: the attributed function is a root, its unattributed
     /// neighbour is pruned, and after the renumbering the row still names the right function — the
     /// test reads the NAME, because an off-by-one in the index would keep the numbers plausible.

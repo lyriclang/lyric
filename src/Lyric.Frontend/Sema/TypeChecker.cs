@@ -130,9 +130,10 @@ public sealed class TypeChecker
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
+        _onTypeAlias = core?.LookupLocal("OnTypeAlias") as TypeSymbol;
     }
 
-    /// <summary>The three attribute markers, under the same rules as <see cref="_equatable"/>:
+    /// <summary>The four attribute markers, under the same rules as <see cref="_equatable"/>:
     /// which of them an attribute struct declares decides where it may sit.</summary>
     private readonly TypeSymbol? _onModule;
 
@@ -141,6 +142,9 @@ public sealed class TypeChecker
 
     /// <inheritdoc cref="_onModule"/>
     private readonly TypeSymbol? _onFunction;
+
+    /// <inheritdoc cref="_onModule"/>
+    private readonly TypeSymbol? _onTypeAlias;
 
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
@@ -348,6 +352,12 @@ public sealed class TypeChecker
                     CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
                 CheckEnumMethods(e, module);
                 CheckTypeConformance(e.Name, e.Interfaces, module);
+                break;
+            case TypeAliasDecl a:
+                // An alias carries no generics (see the grammar), so the one-row-many-instances
+                // rule cannot bite here.
+                CheckAttributes(a.Attributes, AttributeTarget.Alias, targetIsGeneric: false,
+                    module.Members, a.IsOpaque ? "an opaque type alias" : "a type alias");
                 break;
             case InterfaceDecl i:
                 CheckInterfaceParents(i, module);
@@ -3265,12 +3275,13 @@ public sealed class TypeChecker
 
     // --- attributes ---
 
-    private enum AttributeTarget { Module, Type, Function, Member }
+    private enum AttributeTarget { Module, Type, Function, Member, Alias }
 
     private static string MarkerName(AttributeTarget target) => target switch
     {
         AttributeTarget.Module => "OnModule",
         AttributeTarget.Type => "OnType",
+        AttributeTarget.Alias => "OnTypeAlias",
         _ => "OnFunction",
     };
 
@@ -3361,6 +3372,7 @@ public sealed class TypeChecker
             {
                 AttributeTarget.Module => _onModule,
                 AttributeTarget.Type => _onType,
+                AttributeTarget.Alias => _onTypeAlias,
                 _ => _onFunction,
             };
             if (marker is null || !Satisfies(new NamedRef(ts), marker, new NamedRef(marker)))

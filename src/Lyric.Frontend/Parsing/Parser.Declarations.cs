@@ -157,17 +157,13 @@ public sealed partial class Parser
 
             default:
                 if (AtContextual("type"))
-                {
-                    RejectAttributes(attributes, "a type alias");
-                    return ParseTypeAlias(isPublic, isOpaque: false, start);
-                }
+                    return WithAttributes(ParseTypeAlias(isPublic, isOpaque: false, start), attributes);
                 // 'opaque type X = int;' — contextual like 'type' itself: neither word is a
                 // keyword, so neither is taken from anyone's identifiers.
                 if (AtContextual("opaque") && PeekContextual(1, "type"))
                 {
-                    RejectAttributes(attributes, "a type alias");
                     _buffer.Advance(); // 'opaque'
-                    return ParseTypeAlias(isPublic, isOpaque: true, start);
+                    return WithAttributes(ParseTypeAlias(isPublic, isOpaque: true, start), attributes);
                 }
                 if (attributes.Length > 0)
                 {
@@ -185,15 +181,15 @@ public sealed partial class Parser
         }
     }
 
-    /// <summary>An attribute may precede a function, a struct, a class, an enum or the module
-    /// header. Everywhere else the list is reported and dropped; the declaration itself parses
-    /// on unharmed.</summary>
+    /// <summary>An attribute may precede a function, a struct, a class, an enum, a type alias or
+    /// the module header. Everywhere else the list is reported and dropped; the declaration itself
+    /// parses on unharmed.</summary>
     private void RejectAttributes(AttributeNode[] attributes, string what)
     {
         if (attributes.Length == 0) return;
         _de.Report("LYR-PAR0042", Severity.Error, attributes[0].Span,
             $"an attribute cannot sit on {what} — a function, a struct, a class, an enum, "
-            + "a member of one, or the module header carries one");
+            + "a type alias, a member of one, or the module header carries one");
     }
 
     private static Decl WithAttributes(Decl decl, AttributeNode[] attributes) => decl switch
@@ -202,6 +198,7 @@ public sealed partial class Parser
         StructDecl s => s with { Attributes = attributes },
         ClassDecl c => c with { Attributes = attributes },
         EnumDecl e => e with { Attributes = attributes },
+        TypeAliasDecl a => a with { Attributes = attributes },
         _ => decl, // recovery produced an ErrorDecl; the list is lost with the declaration
     };
 

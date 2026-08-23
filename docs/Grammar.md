@@ -160,11 +160,11 @@ TopLevelDecl    = ImportDecl
                 | { Attribute } [ 'pub' ] ( FunctionDecl
                                           | StructDecl
                                           | ClassDecl
-                                          | EnumDecl )
+                                          | EnumDecl
+                                          | TypeAlias )
                 | [ 'pub' ] ( InterfaceDecl
                             | ExtendDecl
-                            | GlobalBinding
-                            | TypeAlias ) .
+                            | GlobalBinding ) .
 
 GlobalBinding   = BindingStmt .                   (* 'let' only *)
 TypeAlias       = [ 'opaque' ] 'type' IDENTIFIER '=' TypeExpr ';' .

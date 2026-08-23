@@ -176,4 +176,65 @@ public class AttributeParsingTests
 
         Assert.Contains(module.Attributes[0], AstChildren.Of(module));
     }
+
+    // ------------------------------------------------------- aliases as a target (3.3, slice 1)
+
+    [Fact]
+    public void An_attribute_binds_to_an_opaque_alias()
+    {
+        var module = ParseClean("""
+            module m;
+            @Open
+            pub opaque type Ticket = int;
+            """);
+
+        var alias = Assert.IsType<TypeAliasDecl>(Assert.Single(module.Declarations));
+        Assert.True(alias.IsOpaque);
+        Assert.Equal(["Open"], Assert.Single(alias.Attributes).Path);
+    }
+
+    [Fact]
+    public void An_attribute_binds_to_a_plain_alias_too()
+    {
+        var module = ParseClean("""
+            module m;
+            @Tag
+            type Id = int;
+            """);
+
+        var alias = Assert.IsType<TypeAliasDecl>(Assert.Single(module.Declarations));
+        Assert.False(alias.IsOpaque);
+        Assert.Single(alias.Attributes);
+    }
+
+    [Fact]
+    public void The_span_of_an_attributed_alias_starts_at_the_attribute()
+    {
+        // The same rule the other targets follow: an attribute precedes 'pub', so the declaration
+        // begins where the list does — which is what a rename or a doc hover selects.
+        var module = ParseClean("""
+            module m;
+            @Open
+            pub opaque type Ticket = int;
+            """);
+
+        var alias = Assert.Single(module.Declarations);
+        Assert.Equal(Assert.IsType<TypeAliasDecl>(alias).Attributes[0].Span.Start, alias.Span.Start);
+    }
+
+    [Fact]
+    public void An_attribute_still_cannot_sit_on_an_interface()
+    {
+        // The alias moved into the attributed branch; the other three did not, and the message
+        // names what may carry one.
+        Parse("""
+            module m;
+            @Tag
+            pub interface Shape { }
+            """, out var diagnostics);
+
+        var error = Assert.Single(diagnostics);
+        Assert.Equal("LYR-PAR0042", error.Code);
+        Assert.Contains("a type alias", error.Message);
+    }
 }

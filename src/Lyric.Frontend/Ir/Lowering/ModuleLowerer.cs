@@ -692,6 +692,15 @@ public static class ModuleLowerer
                     case EnumDecl { Attributes.Length: > 0, Generics.Length: > 0 }:
                         break;
 
+                    // An ALIAS emits no row either, and for a sturdier reason than the generic
+                    // case: the format has no target kind for one. That is what made the target
+                    // addable in Lyric 3.3 without touching the format at all — an alias attribute is
+                    // read by the compiler and never written down. Giving hosts access to one
+                    // would mean a new IrAttributeTarget, which a minor may add when something
+                    // wants it.
+                    case TypeAliasDecl:
+                        break;
+
                     case FunctionDecl { Attributes.Length: > 0 } fn:
                         if (!fn.Attributes.Any(EmitsRow)) break; // @Deprecated only: no row, no root
                         if (module.Members.FunctionFor(fn.Name, fn) is not { } fs

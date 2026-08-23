@@ -482,6 +482,14 @@ pub interface OnType { }
 /// A struct declaring this may stand as `@Name` before a top-level function.
 pub interface OnFunction { }
 
+/// A struct declaring this may stand as `@Name` before a `type` or `opaque type` alias.
+///
+/// Separate from [OnType] rather than folded into it: that one reads "struct, class or enum", and
+/// an alias is none of the three — it names a type instead of declaring one. The split also keeps
+/// the two apart where it matters, since an alias attribute is read by the compiler and never
+/// written to a metadata row: the module format has no row kind for an alias.
+pub interface OnTypeAlias { }
+
 /// Marks its target as deprecated: the compiler warns at every use, and `message` says what to
 /// use instead. The first attribute the compiler itself reads — it changes diagnostics and
 /// nothing else, so a program that ignores the warning runs unchanged.

@@ -513,4 +513,105 @@ public class AttributeTests
 
             fn main(): int { return 0; }
             """);
+
+    // ———————————————————————————- aliases as a target (3.3, slice 1)
+
+    [Fact]
+    public void An_attribute_sits_on_an_opaque_alias_when_it_declares_the_marker() =>
+        AssertClean("""
+            import std.core { OnTypeAlias };
+
+            struct Open :: [OnTypeAlias] { }
+
+            @Open
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_plain_alias_takes_one_too() =>
+        // The target is the ALIAS, not opacity: nothing about the marker mentions a wall, and a
+        // rule that applied to only half the production would be a second concept.
+        AssertClean("""
+            import std.core { OnTypeAlias };
+
+            struct Open :: [OnTypeAlias] { }
+
+            @Open
+            type Id = int;
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void An_alias_refuses_an_attribute_that_declares_only_OnType() =>
+        // OnType reads "a struct, class or enum". An alias names a type instead of declaring one,
+        // so the marker it needs is its own — and the message says which.
+        AssertReports("LYR-SEM0065", "declare 'Component' with ':: [OnTypeAlias]'", """
+            import std.core { OnType };
+
+            struct Component :: [OnType] { }
+
+            @Component
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_struct_refuses_an_attribute_that_declares_only_OnTypeAlias() =>
+        // The other direction, which is what makes the marker a wall rather than a label.
+        AssertReports("LYR-SEM0065", "declare 'Open' with ':: [OnType]'", """
+            import std.core { OnTypeAlias };
+
+            struct Open :: [OnTypeAlias] { }
+
+            @Open
+            struct Point { x: int, y: int }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void An_alias_attribute_may_carry_arguments_like_any_other() =>
+        AssertClean("""
+            import std.core { OnTypeAlias };
+
+            struct Since :: [OnTypeAlias] { version: string }
+
+            @Since { version = "3.3" }
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void An_alias_attribute_is_still_checked_for_a_complete_row() =>
+        // Nothing about the new target loosens the argument rules: the same completeness the
+        // other targets get, even though this one never reaches a row.
+        AssertReports("LYR-SEM0069", "leaves 'version' without a value", """
+            import std.core { OnTypeAlias };
+
+            struct Since :: [OnTypeAlias] { version: string }
+
+            @Since
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void Two_of_the_same_attribute_on_an_alias_are_refused() =>
+        AssertReports("LYR-SEM0068", "twice", """
+            import std.core { OnTypeAlias };
+
+            struct Open :: [OnTypeAlias] { }
+
+            @Open
+            @Open
+            pub opaque type Ticket = int;
+
+            fn main(): int { return 0; }
+            """);
 }

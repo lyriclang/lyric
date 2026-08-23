@@ -343,6 +343,18 @@ public class FormatterTests
     }
 
     [Fact]
+    public void An_attributed_alias_keeps_its_attribute()
+    {
+        // The formatter renders from the AST, so a target it does not know about loses the list
+        // silently — and `lyrfmt --check` in CI would then rewrite everyone's sealed aliases open.
+        Assert.Equal("""
+            @Open
+            pub opaque type Ticket = int;
+
+            """, Format("@Open" + "\n" + "pub opaque   type Ticket=int;"));
+    }
+
+    [Fact]
     public void An_opaque_type_alias_round_trips()
     {
         Assert.Equal("""

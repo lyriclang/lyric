@@ -140,6 +140,11 @@ public sealed record GlobalBindingDecl(bool IsPublic, BindingStmt Binding, Span 
 public sealed record TypeAliasDecl(bool IsPublic, bool IsOpaque, string Name, TypeNode Aliased, Span Span) : Decl(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary>Attributes on an alias, since v3.3. An alias is the one target whose attributes the
+    /// compiler reads and never writes down: the module format has no row kind for an alias, which
+    /// is exactly why the target could be added without touching the format.</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 public sealed record ErrorDecl(Span Span) : Decl(Span); // recovery placeholder

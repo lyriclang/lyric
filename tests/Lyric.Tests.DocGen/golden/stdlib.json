@@ -1290,6 +1290,17 @@
           }
         },
         {
+          "Kind": "Interface",
+          "Name": "OnTypeAlias",
+          "Signature": "pub interface OnTypeAlias",
+          "Doc": "A struct declaring this may stand as `@Name` before a `type` or `opaque type` alias.\n\nSeparate from [OnType] rather than folded into it: that one reads \"struct, class or enum\", and\nan alias is none of the three — it names a type instead of declaring one. The split also keeps\nthe two apart where it matters, since an alias attribute is read by the compiler and never\nwritten to a metadata row: the module format has no row kind for an alias.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 491
+          }
+        },
+        {
           "Kind": "Struct",
           "Name": "Deprecated",
           "Signature": "pub struct Deprecated :: [OnModule, OnType, OnFunction]",
@@ -1303,7 +1314,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 490
+                "Line": 498
               }
             },
             {
@@ -1314,13 +1325,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 497
+                "Line": 505
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 488
+            "Line": 496
           }
         }
       ]

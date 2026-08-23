@@ -32,8 +32,14 @@ marker interface it declares:
 | `OnFunction` | a top-level function |
 | `OnType` | a struct, class or enum |
 | `OnModule` | the module header |
+| `OnTypeAlias` | a `type` or `opaque type` alias (since v3.3) |
 
-All three live in `std.core` and are empty — nothing is dispatched through them, so they cost
+`OnTypeAlias` is separate from `OnType` because an alias names a type instead of declaring one,
+and because the two differ in where they end up: an attribute on an alias is read by the compiler
+and never written to a metadata row, since the module format has no row kind for an alias. That is
+what let the target arrive without a format change.
+
+All four live in `std.core` and are empty — nothing is dispatched through them, so they cost
 nothing. Conformance decides, not the name: a struct that never declares `:: [OnFunction]` cannot
 sit on a function, however plausible it sounds. That is the same nominal rule the operators
 follow, and it exists for the same reason — nothing becomes an attribute by accident.
