@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.0.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.0.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.0.0 — 2026-08-23</h2>
+<p><strong>The major.</strong> Everything the 2.x line had deferred, in one release: heterogeneous arithmetic,
+throwability that survives being stored, overloading, and a compiler that turns hot functions into
+machine code. The <code>.lyrbc</code> format is unchanged at <strong>3.6</strong> — a 3.0.0 module loads in a 2.12 runtime
+and the other way round, as far as the language allows.</p>
+<p><strong>Migrating from 2.x</strong>, in the order the compiler will tell you:</p>
+<ol>
+<li>every <code>Add&lt;T&gt;</code> / <code>Sub&lt;T&gt;</code> / <code>Mul&lt;T&gt;</code> / <code>Div&lt;T&gt;</code> gains a second type argument, the RESULT:
+<code>Add&lt;Vec2, Vec2&gt;</code>. The compiler names the count (<code>LYR-SEM0026</code>);</li>
+<li>a coroutine whose body may throw is a different TYPE now — <code>Coroutine&lt;int&gt; throws Exception</code> —
+and a field or optional holding one says so;</li>
+<li>the eleven forms whose <code>@Deprecated</code> promised removal at 3.0 are gone: <code>readText</code>, <code>readBytes</code>,
+<code>readLines</code> and the eight free iterator adapters. Their replacements have been there since
+2.14 and 2.17.</li>
+</ol>
+<p>Nothing else in a 2.x program changes meaning.</p>
+<h3 id="changed-breaking">Changed — breaking</h3>
+<ul>
+<li><p><strong>The arithmetic interfaces take two type arguments.</strong> <code>Add&lt;T&gt;</code> is now <code>Add&lt;T, R&gt;</code>, likewise
+<code>Sub</code>, <code>Mul</code> and <code>Div</code>: what stands on the right of the operator, and what the operation gives
+back. Every existing conformance and constraint gains a second argument, and the compiler names
+the count (<code>LYR-SEM0026</code>):</p>
+<pre><code class="language-lyr">struct Vec2 :: [Add&lt;Vec2, Vec2&gt;] { … }        // was: [Add&lt;Vec2&gt;]
+fn total&lt;T :: [Add&lt;T, T&gt;]&gt;(a: T, b: T): T     // was: &lt;T :: [Add&lt;T&gt;]&gt;
+</code></pre>
+<p>The result could not be read off the operand, or <code>Vec2 * 2.0</code> would have to give a <code>float</code>.</p>
+</li>
+<li><p><strong>Every deprecation whose promise named 3.0 is gone.</strong> The <code>until</code> field is a commitment, and
+this is the release it comes due in. Eleven forms:</p>
+<table>
+<thead>
+<tr>
+<th>gone</th>
+<th>use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>std.io.file.readText</code></td>
+<td><code>text</code></td>
+</tr>
+<tr>
+<td><code>std.io.file.readBytes</code></td>
+<td><code>bytes</code></td>
+</tr>
+<tr>
+<td><code>std.io.file.readLines</code></td>
+<td><code>lines</code></td>
+</tr>
+<tr>
+<td><code>std.iter.map/filter/take/skip/takeWhile/zip/chain/flatMap</code> (free)</td>
+<td>the methods of <code>Iterator&lt;T&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>The free iterator adapters have been the methods' delegates since 2.17; <code>enumerate</code> and <code>chunks</code>
+stay free, and the comment in <code>std/iter.lyr</code> says why (a non-generic method changing the element
+type does not monomorphize).</p>
+</li>
+<li><p><strong>The toolchain calls itself 3.0.0.</strong> The tree carries the version the language it speaks
+belongs to, so the specification suite runs the right cases against it.</p>
+</li>
+</ul>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Overloading</strong>: several functions may share a name, told apart by their parameters.</p>
+<pre><code class="language-lyr">fn describe(n: int): string { … }
+fn describe(s: string): string { … }
+fn describe(a: int, b: int): string { … }
+</code></pre>
+<p>The second answer this language has to &quot;one name, several types&quot; — generics with constraints
+being the first — and admitted deliberately, which is why its rules are written out in the
+specification (§4.3a) rather than left to be discovered.</p>
+<p><strong>The arguments choose, and only the arguments.</strong> Not the result type: a call has to mean one
+thing before anyone looks at where it goes. Where several fit, the one that needs least wins, in
+this order: an exact type beats a literal that adapts; a concrete parameter beats a type
+parameter; no defaults beats defaults; non-variadic beats variadic; and a type's own method beats
+an extension that fits equally well — the rule that predates overloading, last so it decides
+nothing a parameter could decide. Nothing fitting is <code>LYR-SEM0087</code>, a tie is <code>LYR-SEM0086</code>, and
+both name every candidate they weighed.</p>
+<p>Functions, methods and extension methods overload. <strong>Interface members do not</strong> (<code>LYR-SEM0088</code>):
+a method table holds one function per slot and finds it by name. Two functions with the SAME
+parameters are a redeclaration however their results differ (<code>LYR-SEM0085</code>). A lambda argument
+takes no part in choosing, having no type until a parameter gives it one.</p>
+<p>Used as a VALUE rather than called, an overloaded name is picked by the type it is wanted as —
+<code>twice(describe, 7)</code> takes the <code>fn(int) -&gt; string</code> one — and refused where nothing says which
+(<code>LYR-SEM0089</code>).</p>
+<p>In the compiled module the overloads carry their parameters in the name (<code>main.show(int)</code> beside
+<code>main.show(string)</code>), because function names are unique there. A name declared once is unchanged,
+so a program without overloads compiles to the bytes it always did. A host calling by name
+matches on the argument count and says so when that is not enough.</p>
+</li>
+<li><p><strong>A type may conform to one arithmetic interface several times</strong>, and the operator picks the
+conformance by the type of its <strong>right operand</strong>. This is the one exception to &quot;one conformance
+per interface&quot; in the language:</p>
+<pre><code class="language-lyr">struct Vec2 :: [Mul&lt;Vec2, Vec2&gt;] {
+    x: float, y: float,
+    fn mul(other: Vec2): Vec2 { … }
+}
+
+extend Vec2 :: [Mul&lt;float, Vec2&gt;] {
+    fn mul(other: float): Vec2 { … }          // scaling, its own conformance
+}
+
+let scaled = v * 2.0;                          // Mul&lt;float, Vec2&gt;
+let square = v * v;                            // Mul&lt;Vec2, Vec2&gt;
+</code></pre>
+<p>Both implementations are called <code>mul</code>, so the NAME never decides — which is also the limit of
+it: a written <code>v.mul(2.0)</code> stays ambiguous, because a call has only the name to go on. Free
+overloading is a separate feature and comes in v3.1.0.</p>
+<p>What this touches, since a name no longer identifies a method: conformance checking asks whether
+ANY visible method matches the signature the conformance demands; vtable rows are built per
+interface INSTANCE rather than per interface, so <code>Mul&lt;float, Vec2&gt;</code> and <code>Mul&lt;Vec2, Vec2&gt;</code> get
+their own row and an interface value dispatches to the one it names; and a call under a
+constraint goes through that row, so the constraint decides which conformance a generic body
+means.</p>
+</li>
+<li><p><strong>An untyped integer literal adapts to the conformance's operand type</strong>: with <code>Mul&lt;float, Vec2&gt;</code>
+in reach, <code>v * 2</code> multiplies by <code>2.0</code>, under the same literal rule as everywhere else. An exact
+conformance wins over an adapted one.</p>
+</li>
+<li><p><strong><code>LYR-SEM0083</code></strong> — two conformances taking the same operand and disagreeing on what to call.
+Reported where the operator is used, not at the declaration: a conformance another module's
+<code>extend</code> block adds first meets the others where both are visible.</p>
+</li>
+</ul>
+<hr />
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A generic interface member called on an instance of a generic class.</strong>
+<code>ArrayIterator&lt;int&gt;.zip&lt;string&gt;(…)</code> did not compile: the receiver took the instance path, which
+binds the OWNER's type parameters and not the member's own, so <code>Iterator&lt;(T, B)&gt;</code> reported &quot;this
+type argument is not supported&quot; — at the interface's declaration, which is not where the program
+was wrong. Such a call is lifted into the interface now, as the same call on an <code>Iterator&lt;T&gt;</code>
+value always was. It surfaced when the free adapters went: <code>zip</code> as a method had never been
+reachable in a test.</p>
+</li>
+<li><p><strong>Scripts can run compiled.</strong> <code>HostOptions.Compile = true</code> and each function is compiled to IL
+the first time it is called; a loop over <code>float</code>s stops being limited by the VM and starts being
+limited by the CPU.</p>
+<pre><code class="language-csharp">var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
+</code></pre>
+<p><strong>Off by default, and opt-in is the whole design.</strong> Compiled code has no instruction boundaries:
+a debugger cannot stop inside it and a budget cannot count it. So the shape is develop on the
+interpreter — breakpoints, stepping and hot reload all work there — and ship with this on.</p>
+<p>It is not a decision per call. A call carrying an <code>ExecutionBudget</code>, and any call under a
+debugger, stays interpreted even with the option set, so a host may turn it on for a whole VM and
+still meter the foreign code inside it. Compilation is per function and refusal is normal: what
+the compiler does not understand the interpreter keeps, which costs speed and never correctness.
+<code>ScriptInstance.CompiledFunctions</code> and <code>ScriptInstance.Refusals</code> say what happened, the second as
+short phrases meant to be tallied rather than read.</p>
+<p>Compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
+interface values, object construction, string constants and comparison, and calls — to a native,
+or to another function that compiles. Declined: closures, exceptions, enums, recursion, and the
+narrow integer widths.</p>
+<p><strong>Ahead-of-time publishing and this are alternatives, not a pair</strong>: emitting IL at run time needs
+a runtime that can, and a NativeAOT build cannot. There every function is declined with <code>no runtime code generation</code> and every script is interpreted — nothing else changes.</p>
+</li>
+<li><p><strong>A coroutine's throwability is part of its TYPE</strong> (#73). <code>fn gen(): Coroutine&lt;int&gt; throws Exception</code> produces a <code>Coroutine&lt;int&gt; throws Exception</code>, and that type keeps its demand through
+a field, an optional, a parameter and a return:</p>
+<pre><code class="language-lyr">class Runner {
+    current: ?Coroutine&lt;int&gt; throws Exception = null,
+}
+</code></pre>
+<p>The clause was checked at the <strong>call</strong> until 3.0 — the one event that runs no body and therefore
+cannot throw. It looked right while the coroutine stayed a local beside its <code>try</code>, and the demand
+vanished the moment it reached a field or an optional; the exception then left the entry point
+and ended the program with <code>LYR-VM0010</code>. A coroutine held in a field is the idiom coroutines were
+built for.</p>
+<p>What changed for a program that compiled before:</p>
+<ul>
+<li>the <strong>call</strong> of a coroutine function demands nothing;</li>
+<li>every <strong>pull</strong> — <code>resume</code> and <code>next()</code> alike — of a throwing coroutine is a throw site
+(<code>LYR-SEM0034</code>). <code>next()</code> is lenient about exhaustion, never about throwing;</li>
+<li>a throwing coroutine no longer fits a plain <code>Coroutine&lt;T&gt;</code> slot. The other direction is fine: a
+coroutine that cannot throw keeps the promise a <code>throws</code> slot makes;</li>
+<li>the type is written with a suffix wherever a type is written — <code>?Coroutine&lt;int&gt; throws Exception</code> — and <code>throws</code> alone means any <code>Throwable</code>. On anything but a coroutine it is
+refused (<code>LYR-SEM0084</code>): every other value runs at its call, where the callee's own clause
+already says what it throws.</li>
+</ul>
+<p>Purely static — the IR, the bytecode and the runtime are untouched.</p>
+</li>
+</ul>
+<hr />
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
