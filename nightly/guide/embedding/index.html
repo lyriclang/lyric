@@ -53,6 +53,7 @@
 <li><a href="#an-sdk-of-your-own">An SDK of your own</a></li>
 <li><a href="#value-types-across-the-boundary">Value types across the boundary</a></li>
 <li><a href="#bounding-what-a-script-may-spend">Bounding what a script may spend</a></li>
+<li><a href="#running-scripts-compiled">Running scripts compiled</a></li>
 <li><a href="#registering-types">Registering types</a></li>
 <li><a href="#attributes-what-a-script-says-about-itself">Attributes: what a script says about itself</a></li>
 <li><a href="#errors">Errors</a></li>
@@ -223,6 +224,47 @@ and calls, which is where a mod runs away.</li>
 </ul>
 <p>An instance whose call was stopped is left mid-computation: its globals hold whatever the
 interrupted code had written. Treat it the way you would treat one that panicked.</p>
+<h2 id="running-scripts-compiled">Running scripts compiled</h2>
+<p>Scripts are interpreted by default. A host that wants the hot paths as machine code sets one
+option:</p>
+<pre><code class="language-csharp">var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
+</code></pre>
+<p>Each function is then compiled to IL the first time it is called, and the runtime's own compiler
+turns that into machine code. A loop over <code>float</code>s stops being limited by the VM and starts being
+limited by the CPU.</p>
+<p><strong>Off by default, and that is the useful default.</strong> Compiled code has no instruction boundaries: a
+debugger cannot stop inside it, and a budget cannot count it. So the shape this serves is <em>develop
+on the interpreter — where breakpoints, stepping and hot reload all work — and ship with this on</em>.</p>
+<p><strong>A metered call is never compiled.</strong> A call carrying an <code>ExecutionBudget</code>, and any call under a
+debugger, stays interpreted even with <code>Compile = true</code>. That is not a limitation to work around;
+it is what makes the option safe to set for a whole VM:</p>
+<pre><code class="language-csharp">var vm = new LangVm(new HostOptions { Compile = true });
+
+instance.CallVoid(&quot;onUpdate&quot;, 0.016);            // compiled — your own code, your own frame
+instance.CallVoid(&quot;modUpdate&quot;, budget, 0.016);   // interpreted — counted to the instruction
+</code></pre>
+<p>The budget's promise is the reason: it counts instructions so that the same script under the same
+limit stops at the same instruction on every machine. Compiled code cannot make that promise, so
+it is not used where the promise was made.</p>
+<p><strong>Refusal is normal.</strong> Compilation is per function, and what the compiler does not understand it
+declines — the interpreter keeps that function, which costs speed and never correctness. What is
+compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
+interface values, object construction, string constants and comparison, and calls — to a native,
+or to another function that compiles. Still declined: closures, exceptions, enums, recursion, and
+the narrow integer widths, which need re-normalising after every operation.</p>
+<p>Two properties say what happened, and they are worth reading after a few seconds of real work
+rather than at startup — a function is compiled when it is first called:</p>
+<pre><code class="language-csharp">Console.WriteLine($&quot;{instance.CompiledFunctions} compiled&quot;);
+foreach (var (function, reason) in instance.Refusals)
+    Console.WriteLine($&quot;  {function}: {reason}&quot;);
+</code></pre>
+<p>The reasons are short phrases (<code>enum</code>, <code>closure</code>, <code>call arity</code>) rather than sentences, because
+what a host wants from them is a histogram: which construct stands between it and a compiled hot
+path.</p>
+<p><strong>Ahead-of-time publishing and this are alternatives, not a pair.</strong> Compiling a script at run time
+needs a runtime that can emit IL, and a NativeAOT build has none. There <code>Compile = true</code> is
+ignored — every function is declined with <code>no runtime code generation</code>, every script is
+interpreted, and nothing else about the host changes.</p>
 <h2 id="registering-types">Registering types</h2>
 <p><code>RegisterType</code> exposes a C# class to scripts. Scripts receive such an object and pass it on; they
 cannot construct one and cannot read its fields.</p>
