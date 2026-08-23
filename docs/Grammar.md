@@ -80,7 +80,7 @@ Contextual; reserved only in the position shown, an identifier everywhere else:
 | Word | Position |
 |---|---|
 | `type` | first token of a top-level declaration, before an identifier |
-| `throws` | after the return type of a function signature |
+| `throws` | after the return type of a function signature, and after a coroutine type |
 
 Built-in type names (`int`, `string`, …) are identifiers, not keywords.
 
@@ -290,7 +290,8 @@ ExtendDecl      = 'extend' TypeExpr [ '::' InterfaceList ]
 ## 4. Type expressions
 
 ```ebnf
-TypeExpr        = TypePrefix TypeAtom { TypeSuffix } .
+TypeExpr        = TypePrefix TypeAtom { TypeSuffix } [ ThrowsSuffix ] .
+ThrowsSuffix    = 'throws' [ TypeExpr ] .                            (* coroutine types only *)
 TypePrefix      = [ '?' ] .
 TypeAtom        = BuiltinType
                 | ModulePath [ '<' TypeExpr { ',' TypeExpr } '>' ]
@@ -311,6 +312,15 @@ BuiltinType     = 'int' | 'uint' | 'float'
 
 A function type extends as far to the right as possible: `fn(int) -> void[]` is a function
 returning `void[]`. An array of function values is written `(fn(int) -> void)[]`.
+
+`ThrowsSuffix` says what pulling a coroutine may throw: `Coroutine<int> throws Exception`, or
+`throws` alone for any `Throwable`. It is valid on a coroutine type and nowhere else — every other
+value runs at its call, where the callee's own clause already says what it throws.
+
+It is **not** parsed after a function's return type: the `throws` there is the FUNCTION's clause
+and remains so. A coroutine function needs none, because that clause has always described the same
+thing — `fn gen(): Coroutine<int> throws Exception` declares a coroutine whose pull may throw. The
+suffix exists for the positions a clause cannot reach: a field, a parameter, a binding.
 
 `?` binds to the atom together with its suffixes: `?T[]` is an optional array. An array of
 optionals is written `(?T)[]`.

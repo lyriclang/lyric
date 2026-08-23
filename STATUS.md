@@ -257,7 +257,15 @@ suite gates its cases by that number. The list:
       `LYR-SEM0083` for two conformances taking one operand. Spec: §5.1, §6.1, appendix A,
       four suite cases — `lyriclang/lyric-spec`, branch of the same name, **merges with this
       one**.
-- [ ] #73 `Coroutine<T> throws E`
+- [x] **#73 `Coroutine<T> throws E`** (branch `feature/coroutine-throws`, 2026-08-23) — the
+      throwability moved from the call to the TYPE, which is the only place that survives a field.
+      The issue's own measurement was the design: a call runs no body, so checking it there checked
+      the one event that cannot throw. A coroutine function's clause now describes the coroutine it
+      returns; `resume` and `next()` are the throw sites; the type is written with a suffix
+      (`?Coroutine<int> throws Exception`) wherever a type is written, refused on anything else
+      (`LYR-SEM0084`). Assignment is one-directional — plain fits a throwing slot, not the reverse.
+      Purely static: no IR, no bytecode, no runtime change. Spec §10 stops recording a gap, §2 gains
+      the suffix, three suite cases
 - [x] **every 2.x deprecation removed and `<Version>` at 3.0.0** (2026-08-23, same branch) —
       eleven forms: three in `std.io.file`, the eight free iterator adapters. The bump had to come
       WITH multi-conformance rather than after it: the suite gates cases by the toolchain version,

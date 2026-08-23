@@ -43,7 +43,11 @@ public abstract record LyrType
         (TupleOf x, TupleOf y) => SameSequence(x.Elements, y.Elements),
         (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters),
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
-        (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield),
+        // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
+        // the second would pass for the first and the demand would be lost again at the binding.
+        (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield)
+                                          && (x.Throws is null) == (y.Throws is null)
+                                          && (x.Throws is null || Equal(x.Throws, y.Throws!)),
         (ErrorType, ErrorType) => true,
         (NullType, NullType) => true,
         (NeverType, NeverType) => true,
@@ -76,7 +80,14 @@ public sealed record ArrayOf(LyrType Element, int? Size) : LyrType;  // T[] and 
 public sealed record TupleOf(LyrType[] Elements) : LyrType;
 public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType;
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type
-public sealed record CoroutineOf(LyrType Yield) : LyrType;           // Coroutine<T>, an internal type like RangeOf
+/// <param name="Throws">What a PULL of this coroutine may throw: null when it cannot, the
+/// builtin <c>Throwable</c> for a typeless <c>throws</c>, otherwise the declared type.
+///
+/// <para>Part of the TYPE since 3.0, and it has to be: the call of a coroutine function runs no
+/// body and cannot throw, so a check at the call is a check at the wrong event. Riding on the
+/// local instead — which is what it did until 3.0 — meant the demand vanished at the first field
+/// or optional, and a coroutine held in a field is the idiom this exists for.</para></param>
+public sealed record CoroutineOf(LyrType Yield, LyrType? Throws = null) : LyrType;
 /// <summary>
 /// The recovery sentinel. It means "a diagnostic has already been reported here" — not "unknown",
 /// not "not computed yet", not "do not care".

@@ -728,7 +728,12 @@ public sealed partial class Parser
     // Type expressions.
     // ---------------------------------------------------------------------
 
-    private TypeNode ParseType()
+    /// <param name="allowThrows">Whether a trailing <c>throws</c> belongs to the TYPE. False in a
+    /// function's return position, where the clause is the FUNCTION's and has been since 1.0:
+    /// reading 'fn f(): MyType throws E' as a throwing type would silently retype every existing
+    /// signature. A coroutine function needs nothing there — the checker moves its clause into the
+    /// coroutine type, which is what that clause has always meant.</param>
+    private TypeNode ParseType(bool allowThrows = true)
     {
         var qTok = _buffer.Current;
         var nullable = _buffer.Match(TokenKind.Question);
@@ -749,8 +754,23 @@ public sealed partial class Parser
             type = new ArrayType(type, size, Span.Union(type.Span, close.Span));
         }
 
+        // 'Coroutine<int> throws Exception'. Binds tighter than '?', so '?Coroutine<int> throws E'
+        // is an optional of the throwing coroutine rather than the other way round — the throwing
+        // is a property of the coroutine, and an optional of it is still one value or none.
+        if (allowThrows && AtContextual("throws"))
+        {
+            var tk = _buffer.Advance();
+            var thrown = StartsType() ? ParseType() : null;
+            type = new ThrowingType(type, thrown, Span.Union(type.Span, thrown?.Span ?? tk.Span));
+        }
+
         return nullable ? new NullableType(type, Span.Union(qTok.Span, type.Span)) : type;
     }
+
+    /// <summary>Does a type start here? Asked after a type-level <c>throws</c>, which may stand
+    /// alone: <c>Coroutine&lt;int&gt; throws</c> before a ',', a ')' or an '=' throws anything.</summary>
+    private bool StartsType() => _buffer.Current.TokenKind
+        is TokenKind.Identifier or TokenKind.Fn or TokenKind.LParen or TokenKind.Question;
 
     private TypeNode ParseTypeAtom()
     {

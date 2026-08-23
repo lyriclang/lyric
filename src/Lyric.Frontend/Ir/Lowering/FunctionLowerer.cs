@@ -4716,7 +4716,7 @@ internal sealed class FunctionLowerer
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()),
         FnType f => new FnType(
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
-        CoroutineOf c => new CoroutineOf(SubstituteType(c.Yield)),
+        CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },
         GenericInstance g => new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteType).ToArray()),
         _ => type,

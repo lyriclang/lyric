@@ -283,7 +283,10 @@ public sealed partial class Parser
         var parameters = ParseParamList();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after parameters");
 
-        TypeNode? returnType = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        // allowThrows: false — a trailing 'throws' here is the FUNCTION's clause, as it has been
+        // since 1.0. For a coroutine function the checker moves it into the returned type, which
+        // is what it has always described: the body runs at the pull, not at the call.
+        TypeNode? returnType = _buffer.Match(TokenKind.Colon) ? ParseType(allowThrows: false) : null;
 
         ThrowsClause? throws = null;
         if (AtContextual("throws"))

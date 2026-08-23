@@ -948,6 +948,9 @@ public sealed class AstFormatter
     {
         NamedType n => Doc.Of(Doc.From(string.Join(".", n.Path)), TypeArgsDoc(n.TypeArguments)),
         NullableType n => Doc.Of(Doc.From("?"), TypeDoc(n.Inner)),
+        ThrowingType n => n.Thrown is { } thrown
+            ? Doc.Of(TypeDoc(n.Inner), Doc.From(" throws "), TypeDoc(thrown))
+            : Doc.Of(TypeDoc(n.Inner), Doc.From(" throws")),
         // '(?T)[]' and '(fn(..) -> R)[]': without the parentheses the suffix would rebind.
         ArrayType a => Doc.Of(
             a.Element is NullableType or FunctionType

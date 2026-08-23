@@ -17,6 +17,13 @@ public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Spa
     public required Span NameSpan { get; init; }
 }
 public sealed record ArrayType(TypeNode Element, IntLiteralExpr? Size, Span Span) : TypeNode(Span);    // T[] and T[N]; the parser requires an integer literal as the size
+
+/// <remarks><c>Coroutine&lt;int&gt; throws Exception</c> — throwability as part of the TYPE, so it
+/// survives a field, an optional and a parameter. <see cref="Thrown"/> is null for the typeless
+/// form (<c>throws</c> alone), which stands for any Throwable; the absence of this node means the
+/// coroutine cannot throw. Only a coroutine type may carry it (<c>LYR-SEM0084</c>): everything else
+/// runs at its call, where the function's own clause already says so.</remarks>
+public sealed record ThrowingType(TypeNode Inner, TypeNode? Thrown, Span Span) : TypeNode(Span);
 public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span);                       // (A, B[, C])
 public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span); // fn(A, B) -> R
 
