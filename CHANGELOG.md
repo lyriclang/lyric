@@ -10,10 +10,24 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v3.0.0 — unreleased
+## v3.0.0 — 2026-08-23
 
-**The major bump.** Collected here as it is built; the release notes are complete when the basket
-is.
+**The major.** Everything the 2.x line had deferred, in one release: heterogeneous arithmetic,
+throwability that survives being stored, overloading, and a compiler that turns hot functions into
+machine code. The `.lyrbc` format is unchanged at **3.6** — a 3.0.0 module loads in a 2.12 runtime
+and the other way round, as far as the language allows.
+
+**Migrating from 2.x**, in the order the compiler will tell you:
+
+1. every `Add<T>` / `Sub<T>` / `Mul<T>` / `Div<T>` gains a second type argument, the RESULT:
+   `Add<Vec2, Vec2>`. The compiler names the count (`LYR-SEM0026`);
+2. a coroutine whose body may throw is a different TYPE now — `Coroutine<int> throws Exception` —
+   and a field or optional holding one says so;
+3. the eleven forms whose `@Deprecated` promised removal at 3.0 are gone: `readText`, `readBytes`,
+   `readLines` and the eight free iterator adapters. Their replacements have been there since
+   2.14 and 2.17.
+
+Nothing else in a 2.x program changes meaning.
 
 ### Changed — breaking
 
@@ -45,76 +59,6 @@ is.
 
 - **The toolchain calls itself 3.0.0.** The tree carries the version the language it speaks
   belongs to, so the specification suite runs the right cases against it.
-
-### Fixed
-
-- **A generic interface member called on an instance of a generic class.**
-  `ArrayIterator<int>.zip<string>(…)` did not compile: the receiver took the instance path, which
-  binds the OWNER's type parameters and not the member's own, so `Iterator<(T, B)>` reported "this
-  type argument is not supported" — at the interface's declaration, which is not where the program
-  was wrong. Such a call is lifted into the interface now, as the same call on an `Iterator<T>`
-  value always was. It surfaced when the free adapters went: `zip` as a method had never been
-  reachable in a test.
-
-- **Scripts can run compiled.** `HostOptions.Compile = true` and each function is compiled to IL
-  the first time it is called; a loop over `float`s stops being limited by the VM and starts being
-  limited by the CPU.
-
-  ```csharp
-  var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
-  ```
-
-  **Off by default, and opt-in is the whole design.** Compiled code has no instruction boundaries:
-  a debugger cannot stop inside it and a budget cannot count it. So the shape is develop on the
-  interpreter — breakpoints, stepping and hot reload all work there — and ship with this on.
-
-  It is not a decision per call. A call carrying an `ExecutionBudget`, and any call under a
-  debugger, stays interpreted even with the option set, so a host may turn it on for a whole VM and
-  still meter the foreign code inside it. Compilation is per function and refusal is normal: what
-  the compiler does not understand the interpreter keeps, which costs speed and never correctness.
-  `ScriptInstance.CompiledFunctions` and `ScriptInstance.Refusals` say what happened, the second as
-  short phrases meant to be tallied rather than read.
-
-  Compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
-  interface values, object construction, string constants and comparison, and calls — to a native,
-  or to another function that compiles. Declined: closures, exceptions, enums, recursion, and the
-  narrow integer widths.
-
-  **Ahead-of-time publishing and this are alternatives, not a pair**: emitting IL at run time needs
-  a runtime that can, and a NativeAOT build cannot. There every function is declined with `no
-  runtime code generation` and every script is interpreted — nothing else changes.
-
-### Fixed
-
-- **A coroutine's throwability is part of its TYPE** (#73). `fn gen(): Coroutine<int> throws
-  Exception` produces a `Coroutine<int> throws Exception`, and that type keeps its demand through
-  a field, an optional, a parameter and a return:
-
-  ```lyr
-  class Runner {
-      current: ?Coroutine<int> throws Exception = null,
-  }
-  ```
-
-  The clause was checked at the **call** until 3.0 — the one event that runs no body and therefore
-  cannot throw. It looked right while the coroutine stayed a local beside its `try`, and the demand
-  vanished the moment it reached a field or an optional; the exception then left the entry point
-  and ended the program with `LYR-VM0010`. A coroutine held in a field is the idiom coroutines were
-  built for.
-
-  What changed for a program that compiled before:
-
-  - the **call** of a coroutine function demands nothing;
-  - every **pull** — `resume` and `next()` alike — of a throwing coroutine is a throw site
-    (`LYR-SEM0034`). `next()` is lenient about exhaustion, never about throwing;
-  - a throwing coroutine no longer fits a plain `Coroutine<T>` slot. The other direction is fine: a
-    coroutine that cannot throw keeps the promise a `throws` slot makes;
-  - the type is written with a suffix wherever a type is written — `?Coroutine<int> throws
-    Exception` — and `throws` alone means any `Throwable`. On anything but a coroutine it is
-    refused (`LYR-SEM0084`): every other value runs at its call, where the callee's own clause
-    already says what it throws.
-
-  Purely static — the IR, the bytecode and the runtime are untouched.
 
 ### Added
 
@@ -188,6 +132,77 @@ is.
 - **`LYR-SEM0083`** — two conformances taking the same operand and disagreeing on what to call.
   Reported where the operator is used, not at the declaration: a conformance another module's
   `extend` block adds first meets the others where both are visible.
+
+---
+
+### Fixed
+
+- **A generic interface member called on an instance of a generic class.**
+  `ArrayIterator<int>.zip<string>(…)` did not compile: the receiver took the instance path, which
+  binds the OWNER's type parameters and not the member's own, so `Iterator<(T, B)>` reported "this
+  type argument is not supported" — at the interface's declaration, which is not where the program
+  was wrong. Such a call is lifted into the interface now, as the same call on an `Iterator<T>`
+  value always was. It surfaced when the free adapters went: `zip` as a method had never been
+  reachable in a test.
+
+- **Scripts can run compiled.** `HostOptions.Compile = true` and each function is compiled to IL
+  the first time it is called; a loop over `float`s stops being limited by the VM and starts being
+  limited by the CPU.
+
+  ```csharp
+  var vm = new LangVm(new HostOptions { Capabilities = Capability.None, Compile = true });
+  ```
+
+  **Off by default, and opt-in is the whole design.** Compiled code has no instruction boundaries:
+  a debugger cannot stop inside it and a budget cannot count it. So the shape is develop on the
+  interpreter — breakpoints, stepping and hot reload all work there — and ship with this on.
+
+  It is not a decision per call. A call carrying an `ExecutionBudget`, and any call under a
+  debugger, stays interpreted even with the option set, so a host may turn it on for a whole VM and
+  still meter the foreign code inside it. Compilation is per function and refusal is normal: what
+  the compiler does not understand the interpreter keeps, which costs speed and never correctness.
+  `ScriptInstance.CompiledFunctions` and `ScriptInstance.Refusals` say what happened, the second as
+  short phrases meant to be tallied rather than read.
+
+  Compiled today: arithmetic, comparisons, branches, locals, globals, arrays, fields, optionals,
+  interface values, object construction, string constants and comparison, and calls — to a native,
+  or to another function that compiles. Declined: closures, exceptions, enums, recursion, and the
+  narrow integer widths.
+
+  **Ahead-of-time publishing and this are alternatives, not a pair**: emitting IL at run time needs
+  a runtime that can, and a NativeAOT build cannot. There every function is declined with `no
+  runtime code generation` and every script is interpreted — nothing else changes.
+
+
+- **A coroutine's throwability is part of its TYPE** (#73). `fn gen(): Coroutine<int> throws
+  Exception` produces a `Coroutine<int> throws Exception`, and that type keeps its demand through
+  a field, an optional, a parameter and a return:
+
+  ```lyr
+  class Runner {
+      current: ?Coroutine<int> throws Exception = null,
+  }
+  ```
+
+  The clause was checked at the **call** until 3.0 — the one event that runs no body and therefore
+  cannot throw. It looked right while the coroutine stayed a local beside its `try`, and the demand
+  vanished the moment it reached a field or an optional; the exception then left the entry point
+  and ended the program with `LYR-VM0010`. A coroutine held in a field is the idiom coroutines were
+  built for.
+
+  What changed for a program that compiled before:
+
+  - the **call** of a coroutine function demands nothing;
+  - every **pull** — `resume` and `next()` alike — of a throwing coroutine is a throw site
+    (`LYR-SEM0034`). `next()` is lenient about exhaustion, never about throwing;
+  - a throwing coroutine no longer fits a plain `Coroutine<T>` slot. The other direction is fine: a
+    coroutine that cannot throw keeps the promise a `throws` slot makes;
+  - the type is written with a suffix wherever a type is written — `?Coroutine<int> throws
+    Exception` — and `throws` alone means any `Throwable`. On anything but a coroutine it is
+    refused (`LYR-SEM0084`): every other value runs at its call, where the callee's own clause
+    already says what it throws.
+
+  Purely static — the IR, the bytecode and the runtime are untouched.
 
 ---
 

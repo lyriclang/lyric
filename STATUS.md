@@ -241,11 +241,11 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
-**THE v3.0.0 BASKET — COMPLETE, unreleased** (2026-08-23). Everything that needs the major bump,
+**v3.0.0 IS RELEASED** (2026-08-23). Everything that needs the major bump,
 collected on one line of work; the tree claims **3.0.0** from the first breaking item on, because
-the suite gates its cases by that number. Every item below is on main, both engines green
-(4714 interpreted, 4714 compiled) and the specification suite at 104/104. What is left is the
-release itself: a date on the CHANGELOG heading, the tag, the archives.
+the suite gates its cases by that number. Six items, all on main, both engines green and the
+specification suite at 108/108. Free overloading was moved in from 3.1.0 by the maintainer, so
+the major carries everything the 2.x line had deferred.
 
 The list:
 
