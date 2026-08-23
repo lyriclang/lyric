@@ -10,6 +10,33 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.1.0 — 2026-08-23
+
+### Added
+
+- **Packed programs run on macOS** (#54). `lyric pack` produced a working executable on Windows
+  and Linux and a dead one on macOS: a Mach-O declares its own extent in its load commands, and
+  bytes beyond it make the file fail strict validation — the loader killed it before it started.
+
+  The payload is now folded into the file instead of following it. The stub's signature is
+  dropped and its load command removed, the payload takes that space, `__LINKEDIT` — the segment
+  that ends every Mach-O — is grown so its extent reaches the new end, and
+  `/usr/bin/codesign --force --sign -` signs the result ad-hoc. The signature says the file has
+  not changed since packing, which is what the loader asks; distributing to other people's
+  machines remains a question of notarisation with your own identity.
+
+  Two consequences worth knowing:
+
+  - **the footer is no longer last on macOS** — the signature follows it. The reader tries the
+    end of the file first, as before, and otherwise scans backwards for the magic within a
+    bounded window, checking each candidate whole;
+  - **packing a macOS program needs macOS.** The signature is the half only that platform can
+    make, so packing one elsewhere is refused with that reason rather than writing a file the
+    loader would kill. Packing ON macOS FOR another platform works as it always did.
+
+  The pack-and-run gate in both workflows now runs the packed program on macOS too, and verifies
+  its signature — the part no test elsewhere can answer.
+
 ## v3.0.2 — 2026-08-23
 
 ### Fixed

@@ -74,13 +74,27 @@ Three answers when the stub inspects its own file, and they are deliberately dis
   and packs in one step.
 - **Not linking.** The module travels whole, the stub travels whole. There is no dead-code step
   beyond what the compiler already did, and two packed programs share nothing.
-- **Not macOS-runnable — yet.** A Mach-O declares its own extent in its load commands, and
-  appended bytes put the file beyond it: the existing ad-hoc signature stops validating, and
-  `codesign` refuses to write a new one over the layout ("main executable failed strict
-  validation") — measured by the release pipeline, which is how this limit was found. Packing
-  WORKS on macOS; running the result does not, until the payload becomes a real Mach-O segment
-  the way deno and Node's SEA do it. Windows (PE) and Linux (ELF) do not validate the file
-  tail and are unaffected.
+- **Not a plain append on macOS.** A Mach-O declares its own extent in its load commands, and
+  bytes beyond it make the file fail strict validation. Windows (PE) and Linux (ELF) do not
+  look at the tail, so there the pack is exactly the byte copy above. On macOS three things
+  happen instead, in this order:
+
+  1. the stub's existing signature is dropped and its load command removed — the payload is
+     written where the signature stood, and a command left pointing there would make `codesign`
+     truncate the file at the payload;
+  2. `__LINKEDIT`, the segment that ends every Mach-O, is grown so its extent reaches the new
+     end of the file;
+  3. `/usr/bin/codesign --force --sign -` signs the result ad-hoc, which appends the new
+     signature and writes its load command back into the space freed in step 1.
+
+  **The footer is therefore not last on macOS**: the signature follows it. The reader
+  (`PackFooter.TryRead`) tries the end of the file first and otherwise scans backwards for the
+  magic within a bounded window, checking each candidate whole — the version it knows, and a
+  payload that fits entirely in front of it.
+
+  The signature is the half that needs macOS. Packing a macOS program elsewhere is refused with
+  that reason, because an unsigned Mach-O is killed on launch and a file that cannot start is
+  worse than a pack that says why it did not happen.
 
 ## Failure duties
 
