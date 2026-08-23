@@ -129,14 +129,60 @@ fn main(): int {
 }
 ```
 
-**Wrap the pull, not only the call.** The compiler asks for handling where a `throws` coroutine
-function is CALLED, and that is the one place nothing can be thrown yet. It does not ask again at
-the pull — and when the coroutine reaches the pull through a field or an optional, it asks
-nothing at all. An exception thrown there is then uncaught: the program ends with exit code 101,
-the same way an uncaught exception ends any program.
+**The throwability is part of the type.** `steps()` above does not produce a `Coroutine<int>`
+but a `Coroutine<int> throws Exception`, and the two are different types. The call demands
+nothing — it builds a suspended frame and runs no body — while every **pull** of that value is a
+throw site: handled by a `try` around it, or declared by the function doing the pulling.
 
-So a driver that holds coroutines and steps them — a cutscene runner, a task list — puts its own
-`try` around the pull if the bodies it drives can throw. `next()` does not help here: it is
-lenient about the END of a body, not about a body that throws.
+That is what lets it survive being stored. A driver holding coroutines — a cutscene runner, a
+task list — writes the throwability into the field, and the compiler keeps asking at every pull:
+
+```lyr
+import std.core { Exception };
+import std.io.console { println };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    throw Exception { text = "the second step failed" };
+}
+
+class Runner {
+    current: ?Coroutine<int> throws Exception = null,
+
+    fn load() {
+        this.current = steps();
+    }
+
+    fn step(): bool throws Exception {
+        let co = this.current;
+        if (co == null) { return false; }
+        println(f"{resume co}");   // demands handling, so this method declares 'throws'
+        return true;
+    }
+}
+
+fn main(): int {
+    let r = Runner { };
+    r.load();
+    try {
+        while (r.step()) { }
+    } catch (e: Exception) {
+        println(e.message());
+    }
+    return 0;
+}
+```
+
+Write `throws` alone (`Coroutine<int> throws`) when the body may throw anything. A coroutine that
+cannot throw fits a slot declared `throws` — the slot promises a handler and a value that never
+throws keeps that promise — but not the other way round: a throwing coroutine in a plain
+`Coroutine<int>` field would be a pull nobody was asked to handle.
+
+`next()` is no way around it: it is lenient about the END of a body, not about a body that
+throws, and an exception passes straight through it.
+
+*Before 3.0 the demand was checked at the CALL, which is the one event that cannot throw. It
+looked right as long as the coroutine stayed a local beside its `try`, and vanished the moment it
+reached a field or an optional — where an exception ended the program with exit code 101.*
 
 Send values (`resume c, v`) do not exist.

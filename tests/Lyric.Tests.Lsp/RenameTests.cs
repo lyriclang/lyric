@@ -145,7 +145,7 @@ public sealed class RenameTests : IDisposable
         // synthesized. The rename must edit the declaration and the WRITTEN call — and must not
         // touch the operator expression, whose text contains no 'add' to replace.
         var text = "import std.core { Add };\n\n"
-            + "struct Vec :: [Add<Vec>] {\n"
+            + "struct Vec :: [Add<Vec, Vec>] {\n"
             + "    x: int,\n"
             + "    fn add(other: Vec): Vec {\n"
             + "        return Vec { x = this.x + other.x };\n"

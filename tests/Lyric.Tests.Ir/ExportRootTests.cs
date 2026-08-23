@@ -18,16 +18,30 @@ namespace Lyric.Tests.Ir;
 /// </summary>
 public class ExportRootTests
 {
+    private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string thisFile = "")
+        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", ".."));
+
     private static IrModule Lower(string source, bool libraryRoots)
     {
         var sm = new SourceManager();
         var id = sm.AddVirtual("lib.lyr", source);
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
+
+        // With the stdlib: an attribute marker comes from 'std.core', and the pub-roots cases do
+        // not mind carrying a loader they never reach for.
+        var comp = new Compilation(sm, de)
+        {
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+        };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();
         var types = Semantics.Analyze(comp, binding, de);
-        Assert.False(de.HasErrors);
+        if (de.HasErrors)
+        {
+            var writer = new StringWriter();
+            de.RenderText(writer);
+            Assert.Fail("source did not compile: " + writer);
+        }
 
         // optimize:false — these tests pin WHICH functions survive, and the inliner folding a
         // single-caller helper into its caller would blur exactly that.
@@ -64,6 +78,46 @@ public class ExportRootTests
         // into the pre-prune numbering would name an arbitrary survivor.
         var root = Assert.Single(module.ExportRoots);
         Assert.EndsWith(".surface", module.Functions[root.Value].Name);
+    }
+
+    /// <summary>An attributed function is a root of its own — the SECOND root rule, and the one a
+    /// library needs: a host finds such a function through the row in section 11 and calls it by
+    /// that index, a caller no call graph shows.</summary>
+    private const string Attributed = """
+        import std.core { OnFunction };
+
+        pub struct Hook :: [OnFunction] { }
+
+        fn dead_before(): int { return 41; }
+
+        @Hook
+        fn hooked(): int { return 42; }
+
+        pub fn surface(): int { return 7; }
+        """;
+
+    [Fact]
+    public void An_attributed_function_survives_without_being_pub()
+    {
+        var module = Lower(Attributed, libraryRoots: true);
+
+        // Not pub, called by nobody, and it ships all the same. 'dead_before' is the control: it
+        // is neither, and it does not.
+        Assert.Contains(module.Functions, f => f.Name.EndsWith(".hooked"));
+        Assert.DoesNotContain(module.Functions, f => f.Name.EndsWith(".dead_before"));
+    }
+
+    [Fact]
+    public void An_attribute_row_follows_the_renumbering()
+    {
+        var module = Lower(Attributed, libraryRoots: true);
+
+        // 'dead_before' stood in front of 'hooked' and is gone, so every index behind it moved.
+        // A row left in the old numbering would hand the host an arbitrary survivor — here
+        // 'surface', which is the neighbour and answers a different question entirely.
+        var row = Assert.Single(module.Attributes,
+            a => a.TargetKind == IrAttributeTarget.Function);
+        Assert.EndsWith(".hooked", module.Functions[row.Target].Name);
     }
 
     [Fact]

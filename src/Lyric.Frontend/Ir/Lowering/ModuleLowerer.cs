@@ -555,6 +555,12 @@ public static class ModuleLowerer
             case ArrayType arr:
                 var element = ResolveLocalAliases(arr.Element, aliases, binding)!;
                 return ReferenceEquals(element, arr.Element) ? node : arr with { Element = element };
+            case ThrowingType th:
+                var carried = ResolveLocalAliases(th.Inner, aliases, binding)!;
+                var thrown = ResolveLocalAliases(th.Thrown, aliases, binding);
+                return ReferenceEquals(carried, th.Inner) && ReferenceEquals(thrown, th.Thrown)
+                    ? node
+                    : th with { Inner = carried, Thrown = thrown };
             default:
                 return node;
         }
@@ -859,6 +865,34 @@ public static class ModuleLowerer
                 if (!Conformance.Implements(type, iface, binding) && viaExtension.Count == 0)
                     continue;
 
+                // SEVERAL conformances to one interface — 'Mul<Vec2, Vec2>' beside
+                // 'Mul<float, Vec2>' — are several ROWS, one per interned instance, and each has
+                // to find its own implementation. Resolving by name would give both rows the same
+                // method: the name is what the two share.
+                //
+                // Only then. With a single conformance the sites below are the ones the chain
+                // would have walked anyway, and the resolution stays exactly what it was.
+                var sites = ConformanceSites(compilation, type, iface, binding);
+                var ownDeclares = true;
+                if (sites.Count > 1)
+                {
+                    var span = type.Declaration?.Span ?? default;
+                    var exact = sites
+                        .Where(site => typeTable.InterfaceOf(site.Node, span).Type == ifaceId)
+                        .ToList();
+
+                    // Nothing matched exactly: the conformance is reached through a parent, where
+                    // the instance stands on the child. Left to the chain, as before.
+                    if (exact.Count > 0)
+                    {
+                        ownDeclares = exact.Any(site => site.Block is null);
+                        viaExtension = exact.Where(site => site.Block is not null)
+                            .Select(site => site.Block!)
+                            .Distinct()
+                            .ToList();
+                    }
+                }
+
                 var slots = typeTable.MethodSlotsOf(ifaceId);
                 var methods = new FunctionId[slots.Length];
                 var complete = true;
@@ -877,7 +911,7 @@ public static class ModuleLowerer
                     // chain-prefix slot layout keeps the parent's own dispatches valid through a
                     // child-typed receiver.
                     var target = ResolveInInstance(typeTable, typeId, slots[i], instances)
-                                 ?? Resolve(type, slots[i], ids)
+                                 ?? (ownDeclares ? Resolve(type, slots[i], ids) : null)
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions)
                                  ?? Conformance.WithParents(iface, binding)
                                      .Select(p => Resolve(p, slots[i], ids))
@@ -920,6 +954,39 @@ public static class ModuleLowerer
 
     /// <summary>The visible <c>extend T :: [I]</c> blocks that establish exactly this conformance. Empty
     /// means that if it holds at all, it is declared.</summary>
+    /// <summary>One place a conformance to an interface was written: a node in the type's own
+    /// <c>::</c> list, or one in an <c>extend</c> block together with that block.</summary>
+    private readonly record struct ConformanceSite(TypeNode Node, ExtensionBlock? Block);
+
+    /// <summary>Every site that names this interface DIRECTLY, in declaration order — the type's
+    /// own list first, then the extend blocks. A conformance reached through a parent is not one:
+    /// its instance stands on the child, and the row for it resolves through the chain.</summary>
+    private static List<ConformanceSite> ConformanceSites(Compilation compilation, TypeSymbol type,
+        TypeSymbol iface, BindingResult binding)
+    {
+        var sites = new List<ConformanceSite>();
+        var declared = type.Declaration switch
+        {
+            ClassDecl c => c.Interfaces,
+            StructDecl v => v.Interfaces,
+            EnumDecl e => e.Interfaces,
+            _ => (TypeNode[])[],
+        };
+
+        foreach (var node in declared)
+            if (ReferenceEquals(Conformance.InterfaceOf(node, binding), iface))
+                sites.Add(new ConformanceSite(node, null));
+
+        foreach (var block in compilation.Extensions.Blocks)
+        {
+            if (!ReferenceEquals(block.Target, type)) continue;
+            foreach (var node in block.Decl.Interfaces)
+                if (ReferenceEquals(Conformance.InterfaceOf(node, binding), iface))
+                    sites.Add(new ConformanceSite(node, block));
+        }
+        return sites;
+    }
+
     private static List<ExtensionBlock> ExtendBlocksFor(Compilation compilation, TypeSymbol type,
         TypeSymbol iface, BindingResult binding)
     {

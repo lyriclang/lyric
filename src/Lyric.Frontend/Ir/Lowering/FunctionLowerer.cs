@@ -3523,10 +3523,25 @@ internal sealed class FunctionLowerer
                 ? bound : t)
             .ToArray();
 
+        var owning = _typeTable.InstanceOf(interfaceId);
         var target = _instances.Request(method, declaration, $"{iface.Name}.{method.Name}",
-            iface, typeArguments, _typeTable, expr.Span, _typeTable.InstanceOf(interfaceId));
+            iface, typeArguments, _typeTable, expr.Span, owning);
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        // The arguments are written in the member''s terms and need BOTH sides bound: the
+        // interface''s T from the instance, the member''s own B from the call. Without them a
+        // parameter such as ''right: Iterator<B>'' lowers to an unsubstituted type, and the value
+        // arrives as the class reference it is rather than lifted into the interface — which the
+        // verifier catches one step later, at the field the body stores it into.
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        if (owning is { } instance)
+            for (var i = 0; i < Math.Min(instance.Definition.Generics.Length,
+                     instance.Arguments.Length); i++)
+                mapping[instance.Definition.Generics[i].Name] = instance.Arguments[i];
+        for (var i = 0; i < Math.Min(method.Generics.Length, typeArguments.Length); i++)
+            mapping[method.Generics[i].Name] = typeArguments[i];
+
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            mapping);
         var args = new TempId[supplied.Length + 1];
         args[0] = receiver;
         Array.Copy(supplied, 0, args, 1, supplied.Length);
@@ -3664,6 +3679,50 @@ internal sealed class FunctionLowerer
     /// (<c>let p: P = item;</c>) still goes through <c>callvirt</c>; those are two different questions
     /// and therefore two paths.</para>
     /// </summary>
+    /// <summary>The interface entry an instance of a generic type is lifted into, as the type
+    /// DECLARES it: for <c>ArrayIterator&lt;T&gt; :: [Iterator&lt;T&gt;]</c> and the instance
+    /// <c>ArrayIterator&lt;string&gt;</c>, the entry of <c>Iterator&lt;string&gt;</c>. The written
+    /// node stands in the definition's terms, so the instance's arguments have to be in scope
+    /// while it is resolved.</summary>
+    private IrInterfaceType InterfaceAsDeclaredBy(GenericInstance owner, TypeSymbol iface,
+        Core.Span span)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        var n = Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length);
+        for (var i = 0; i < n; i++)
+            mapping[owner.Definition.Generics[i].Name] = SubstituteType(owner.Arguments[i]);
+
+        using var scope = _typeTable.PushSubstitution(mapping);
+        return _typeTable.InterfaceAsDeclared(owner.Definition, iface, span);
+    }
+
+    /// <summary>The interface entry a constrained receiver is lifted into.
+    ///
+    /// <para>The constraint stands in the GENERIC function's terms and may name its own type
+    /// parameter: <c>T :: [Mul&lt;int, T&gt;]</c>. In an instance that <c>T</c> is settled, and
+    /// the entry is <c>Mul&lt;int, Vec2&gt;</c> — resolving the node as written would look for a
+    /// type called <c>T</c> and report "this type argument is not supported".</para></summary>
+    private IrInterfaceType LiftTargetOf(TypeNode constraint, Core.Span span)
+    {
+        if (_substitution.Count == 0) return _typeTable.InterfaceOf(constraint, span);
+        using var scope = _typeTable.PushSubstitution(NamedSubstitution());
+        return _typeTable.InterfaceOf(constraint, span);
+    }
+
+    /// <summary>Does the receiver's constraint name an interface the concrete type conforms to
+    /// more than once? Then the member name does not identify the implementation and the call has
+    /// to go through the instance-keyed dispatch table.</summary>
+    private bool ConstraintNeedsTheInstance(MemberExpr member, TypeSymbol owner)
+    {
+        if (ReceiverType(member.Target) is not TypeParamType parameter) return false;
+        foreach (var constraint in parameter.Param.Constraints)
+            if (_typeTable.ConstraintInterface(constraint) is { } constrained
+                && _typeTable.InterfaceInChainProviding(constrained, member.Member) is not null
+                && _typeTable.ConformsSeveralTimes(owner, constrained))
+                return true;
+        return false;
+    }
+
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
@@ -3706,8 +3765,15 @@ internal sealed class FunctionLowerer
         // default from the interface, and its 'this' is the interface type. No direct call leads there:
         // the receiver has to be lifted first, which is exactly what 'callvirt' does. The constraint
         // names the interface, so it is known.
+        //
+        // SEVERAL conformances to one interface take the same route, for a related reason: the
+        // type then has two methods of one name, and an own member no longer identifies which
+        // conformance it serves. The dispatch table is keyed by the interface INSTANCE and does
+        // know, so the receiver is lifted and the row answers — after which the devirtualizer
+        // turns it back into a direct call, to the target the constraint actually named.
         if (owner.Members.LookupLocal(member.Member) is not FunctionSymbol method
-            || method.Declaration is not FunctionDecl declaration)
+            || method.Declaration is not FunctionDecl declaration
+            || ConstraintNeedsTheInstance(member, owner))
         {
             if (ReceiverType(member.Target) is TypeParamType parameter)
                 foreach (var constraint in parameter.Param.Constraints)
@@ -3726,7 +3792,7 @@ internal sealed class FunctionLowerer
                         // on. The same id then carries the callvirt, whose slot table also hangs
                         // on the instance.
                         var lift = ReferenceEquals(iface, constrained)
-                            ? _typeTable.InterfaceOf(constraint, expr.Span)
+                            ? LiftTargetOf(constraint, expr.Span)
                             : _typeTable.InterfaceOf(iface);
 
                         var lifted = LowerExprAs(member.Target, lift);
@@ -3910,6 +3976,30 @@ internal sealed class FunctionLowerer
                 bound = _types.RefOf(member);
                 receiver = LowerExpr(member.Target);
                 break;
+
+            // A GENERIC interface member on an instance of a generic type:
+            // 'ArrayIterator<int>.zip<string>()'. It is not a member of the instance at all — it is
+            // a default of 'Iterator<T>', monomorphized per (interface instance, type arguments) —
+            // and the case below would ask the CLASS instance for it. What breaks there is the
+            // member's own parameters: 'Iterator<(T, B)>' has a B the receiver's substitution never
+            // mentions, and resolving the return type reports an unsupported type argument at the
+            // interface's own declaration, which is not where the program is wrong.
+            //
+            // Restricted to GENERIC members on purpose. A non-generic default reaches the instance
+            // path today and works there, and moving it would change the code generated for every
+            // existing program without answering a question anybody asked.
+            case MemberExpr member
+                when SubstituteType(ReceiverType(member.Target)) is GenericInstance instanced
+                     && instanced.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct
+                     && instanced.Definition.Members.LookupLocal(member.Member) is not FunctionSymbol
+                     && _types.RefOf(member) is FunctionSymbol { Generics.Length: > 0 }
+                     && _typeTable.InterfaceProviding(instanced.Definition, member.Member)
+                         is { } providing:
+            {
+                var into = InterfaceAsDeclaredBy(instanced, providing, expr.Span);
+                return LowerVirtualCall(member, providing, expr, into.Type,
+                    LowerExprAs(member.Target, into));
+            }
 
             // The receiver is an instance of a generic type: 'Box<int>.get()'. The method belongs to the
             // INSTANCE rather than to the definition, and its return type may be T.
@@ -4626,7 +4716,7 @@ internal sealed class FunctionLowerer
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()),
         FnType f => new FnType(
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
-        CoroutineOf c => new CoroutineOf(SubstituteType(c.Yield)),
+        CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },
         GenericInstance g => new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteType).ToArray()),
         _ => type,

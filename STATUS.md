@@ -241,6 +241,52 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
+**THE v3.0.0 BASKET — in progress.** Everything that needs the major bump, collected on one
+line of work; the tree claims **3.0.0** from the first breaking item on, because the
+suite gates its cases by that number. The list:
+
+- [x] **multi-conformance** (branch `feature/multi-conformance`, 2026-08-23) — door B of the
+      design round, plus the part the round had not seen: the interfaces needed a SECOND type
+      argument. `Add<T, R>` says what stands on the right and what comes back; without it
+      `Mul<float, Vec2>` demands `fn mul(other: float): float` and `Vec2 * 2.0` cannot exist.
+      A type may now name one of the four several times, the operator picks by the right
+      operand, and the pieces that stopped identifying a method by NAME were: conformance
+      checking (matches by signature, not by first hit), the vtable rows (per interface
+      INSTANCE, so an interface value dispatches to the conformance it names), and the
+      constrained call in the lowering (through that row, so the constraint decides). New
+      `LYR-SEM0083` for two conformances taking one operand. Spec: §5.1, §6.1, appendix A,
+      four suite cases — `lyriclang/lyric-spec`, branch of the same name, **merges with this
+      one**.
+- [x] **#73 `Coroutine<T> throws E`** (branch `feature/coroutine-throws`, 2026-08-23) — the
+      throwability moved from the call to the TYPE, which is the only place that survives a field.
+      The issue's own measurement was the design: a call runs no body, so checking it there checked
+      the one event that cannot throw. A coroutine function's clause now describes the coroutine it
+      returns; `resume` and `next()` are the throw sites; the type is written with a suffix
+      (`?Coroutine<int> throws Exception`) wherever a type is written, refused on anything else
+      (`LYR-SEM0084`). Assignment is one-directional — plain fits a throwing slot, not the reverse.
+      Purely static: no IR, no bytecode, no runtime change. Spec §10 stops recording a gap, §2 gains
+      the suffix, three suite cases
+- [x] **every 2.x deprecation removed and `<Version>` at 3.0.0** (2026-08-23, same branch) —
+      eleven forms: three in `std.io.file`, the eight free iterator adapters. The bump had to come
+      WITH multi-conformance rather than after it: the suite gates cases by the toolchain version,
+      and a tree that speaks 3.0 while claiming 2.17 cannot be tested by it. The runner learned
+      `//! until:` for that — the mirror of `since:`, which retires a case a major left behind.
+      One old bug fell out: a generic interface member on a generic-class receiver
+      (`ArrayIterator<int>.zip<string>`) never worked; the free adapters had covered it
+- [x] **attribute roots for reachability pruning — ALREADY DELIVERED, found by checking**
+      (2026-08-23). The basket carried it as open; it landed with format 3.2 on 2026-08-18, and
+      the spec has stated it since (§4.6, §4.7). An attributed function is a root because the row
+      in section 11 is a promise to a host that calls it by index — a caller no call graph shows —
+      and the rows follow the renumbering. Verified end to end: a non-pub `@Test` in a library
+      survives the prune, and `lyrtest` still names the right function after a prune shifts the
+      indices. A type attribute needs no method rooting: a host reads such a row for the type's
+      SHAPE (`FieldsOf`), never to call into it. What was genuinely missing was the PIN — the only
+      coverage was an inliner test about surviving inlining, which says nothing about library
+      pruning or renumbering. Two tests in `ExportRootTests` now hold both
+- [ ] the JIT's remaining obligations: default stays off (decided), an AOT line in the
+      embedding contract, "a metered run gets no JIT" in the guide, the refusal list
+      documented, `LYRIC_JIT=1` in CI
+
 **v1.0.0 through v2.0.0 are released** — annotated tags on the remote, each with a release page.
 M0–M10 are finished and tagged (`m0`–`m10-complete`, `v0.1.0`/`v0.5.0`/`v0.9.0`). Releases
 v1.8.0 through v1.9.1 carried the three toolchain archives plus two installables; since the org
@@ -1004,11 +1050,27 @@ answer yet, and it belongs asked before E4 starts.
   later.
 
   1. **Heterogeneous arithmetic comes as MULTI-CONFORMANCE, not as overloading** — door B of the
-     round. A type may conform to `Mul<Vec2>` and `Mul<float>`, and the operator picks the
-     conformance by the right-hand type; the implementation for each comes from its own `extend`
-     block, so no type declares two `mul`. The machinery is half there already: the conformance
-     dedup has keyed on the INSTANCE since M22. It extends the mechanism that exists instead of
-     adding one beside it. **v3.0.0.**
+     round. A type may conform to `Mul` twice, and the operator picks the conformance by the
+     right-hand type; the implementation for each comes from its own `extend` block, so no type
+     declares two `mul`. The machinery is half there already: the conformance dedup has keyed on
+     the INSTANCE since M22. It extends the mechanism that exists instead of adding one beside
+     it. **v3.0.0.**
+
+     *The SHAPE was asked again once it was built (maintainer, 2026-08-23) and confirmed:*
+     `Add<T, R>` stays. The one-parameter spelling `Mul<float>` is nicer to write and is not a
+     smaller change but a larger one — it needs a `Self` type in interface signatures, and with
+     it an object-safety rule, because behind a fat pointer nobody knows what a `Self`-returning
+     member gives back. Two arguments keep the interfaces plain generics: usable as VALUES,
+     with any result type (`Mul<Vec2, float>` is a dot product). The price is `Add<Vec2, Vec2>`
+     in the homogeneous case, paid once per declaration. Asked before the release rather than
+     after, because changing it later would be a SECOND break of the same interfaces.
+
+     *BUILT 2026-08-23, and the round had one thing wrong:* door B alone does not carry it. The
+     interfaces are `Mul<T>` with `fn mul(other: T): T` — the result is the OPERAND — so
+     `Mul<float, …>` on a `Vec2` demands a `mul` returning `float`, and multi-conformance
+     changes nothing about that. The second type argument is not an alternative to door B, it is
+     its prerequisite, and it is what makes the change breaking. The old "documented No" below
+     had that half right and drew the opposite conclusion from it.
 
   2. **The JIT stays OPT-IN in 3.0.0.** It changes no language and no format, so it needs no
      major on compatibility grounds; it ships with the major because that is where the maintainer
@@ -1034,9 +1096,11 @@ answer yet, and it belongs asked before E4 starts.
      "Architectural inversion" is what the old entry implied; three quarters of it has already
      happened.
 
-- **Heterogeneous operator arithmetic: documented No** (M22 probe) — *superseded by the entry
-  above; door B answers it. The original reasoning is kept because its second half still holds:
-  a two-parameter `Mul<Rhs, Out>` would break every existing conformance.* Two facts cap it below
+- **Heterogeneous operator arithmetic: documented No** (M22 probe) — *SUPERSEDED, shipped in the
+  v3.0.0 basket. Kept for one sentence of it that held and one that did not: a two-parameter
+  `Mul<Rhs, Out>` does break every existing conformance (true, and that is the breaking change),
+  but it buys only one right-hand type per type only WITHOUT multi-conformance. With it, the two
+  halves that were each useless alone are the whole feature.* Two facts cap it below
   usefulness: a type conforms to `Mul` ONCE (`Mul<Vec2>` beside `Mul<float>` fails the signature
   check — one `mul`, two wanted signatures), and Lyric has no overloading, so `mul(other: float)`
   beside `mul(other: Vec2)` cannot exist either. A two-parameter `Mul<Rhs, Out>` would break every

@@ -48,7 +48,7 @@ public class OperatorArithmeticTests
     private const string Vec2 = """
         import std.core { Add, Sub, Mul };
 
-        struct Vec2 :: [Add<Vec2>, Sub<Vec2>, Mul<Vec2>] {
+        struct Vec2 :: [Add<Vec2, Vec2>, Sub<Vec2, Vec2>, Mul<Vec2, Vec2>] {
             x: int,
             y: int,
             fn add(other: Vec2): Vec2 {
@@ -118,7 +118,7 @@ public class OperatorArithmeticTests
         Assert.Equal(6, Run("""
             import std.core { Div };
 
-            struct Ratio :: [Div<Ratio>] {
+            struct Ratio :: [Div<Ratio, Ratio>] {
                 n: int,
                 fn div(other: Ratio): Ratio { return Ratio { n = this.n / other.n }; }
             }
@@ -156,7 +156,7 @@ public class OperatorArithmeticTests
         Assert.Equal(1, Run(Vec2 + """
             import std.string as strings;
 
-            fn total<T :: [Add<T>]>(a: T, b: T, c: T): T {
+            fn total<T :: [Add<T, T>]>(a: T, b: T, c: T): T {
                 return a + b + c;
             }
 

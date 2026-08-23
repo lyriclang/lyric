@@ -120,6 +120,39 @@ internal sealed class TypeTable
     /// than the constrained one: its slot index and its default's <c>this</c> then agree, which is what
     /// keeps the lifted value usable for both the dispatch and, afterwards, the devirtualizer.</para>
     /// </summary>
+    /// <summary>Does this type name one interface SEVERAL times in its conformances — its own
+    /// <c>::</c> list and every visible <c>extend</c> block together?
+    ///
+    /// <para>Only the arithmetic interfaces allow it, and only with different type arguments:
+    /// <c>Mul&lt;int, Vec2&gt;</c> beside <c>Mul&lt;Vec2, Vec2&gt;</c>. Then the method NAME stops
+    /// identifying the implementation — both are called <c>mul</c> — and a caller that resolves
+    /// by name picks whichever comes first. Whoever asks this takes the route that goes by the
+    /// interface INSTANCE instead.</para></summary>
+    public bool ConformsSeveralTimes(TypeSymbol ts, TypeSymbol iface)
+    {
+        var count = 0;
+        foreach (var node in DeclaredNodesOf(ts))
+            if (ReferenceEquals(Conformance.InterfaceOf(node, _binding), iface)) count++;
+
+        if (Compilation is { } comp)
+            foreach (var block in comp.Extensions.Blocks)
+            {
+                if (!ReferenceEquals(block.Target, ts)) continue;
+                foreach (var node in block.Decl.Interfaces)
+                    if (ReferenceEquals(Conformance.InterfaceOf(node, _binding), iface)) count++;
+            }
+
+        return count > 1;
+    }
+
+    private static TypeNode[] DeclaredNodesOf(TypeSymbol ts) => ts.Declaration switch
+    {
+        ClassDecl c => c.Interfaces,
+        StructDecl v => v.Interfaces,
+        EnumDecl e => e.Interfaces,
+        _ => [],
+    };
+
     public TypeSymbol? InterfaceInChainProviding(TypeSymbol iface, string member)
     {
         foreach (var candidate in Conformance.WithParents(iface, _binding))
@@ -849,6 +882,13 @@ internal sealed class TypeTable
         if (node is NullableType option)
             return new IrOptionalType(Lower(option.Inner, option.Inner.Span));
 
+        // 'Coroutine<int> throws E' is the same coroutine at runtime. What may come out of a pull
+        // is a question the compiler answers and the machine never asks: the frame, its state and
+        // its resume protocol are identical, and an exception leaves it the way it leaves any
+        // other frame. Purely static, so it stops here.
+        if (node is ThrowingType throwing)
+            return Lower(throwing.Inner, throwing.Inner.Span);
+
         // '(A, B)' — a tuple written as a field, parameter or return type.
         if (node is AST.TupleType written)
             return TupleOf(written.Elements.Select(e => Lower(e, e.Span)).ToArray());
@@ -1001,6 +1041,7 @@ internal sealed class TypeTable
 
         if (node is ArrayType { Size: null } array) return new ArrayOf(Resolve(array.Element, span), null);
         if (node is NullableType option) return new Optional(Resolve(option.Inner, span));
+        if (node is ThrowingType throwing) return Resolve(throwing.Inner, span);
 
         // A tuple as a type argument: 'Iterator<(int, T)>'. That is the signature of 'enumerate' and
         // 'zip'.

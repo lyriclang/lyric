@@ -26,6 +26,23 @@ public sealed class TypeChecker
     private readonly HashSet<TypeSymbol> _expanding = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<TypeSymbol> _cyclic = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The type nodes whose misplaced <c>throws</c> has already been reported. A signature
+    /// is resolved once per declaration and once per call site; the mistake is one.</summary>
+    private readonly HashSet<TypeNode> _reportedThrows = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// What an operator desugar has already decided, keyed by the synthetic member node.
+    ///
+    /// <para>A type may conform to <c>Mul&lt;Vec2, Vec2&gt;</c> and <c>Mul&lt;float, Vec2&gt;</c> at
+    /// once — the one place in the language where two instances of one interface stand on a single
+    /// type. Both are called <c>mul</c>, so a lookup BY NAME cannot pick between them; the operator
+    /// picks by the type of its right operand and leaves the answer here. The member lookup reads it
+    /// instead of searching, which is also what keeps the two out of SEM0044: they are not an
+    /// ambiguity, they are a choice already made.</para>
+    /// </summary>
+    private readonly Dictionary<MemberExpr, (LyrType Type, Symbol Symbol)> _operatorTarget =
+        new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     /// Is a global initializer running? Then a global that has not been computed yet is an ERROR
     /// rather than merely an unknown type.
@@ -488,15 +505,18 @@ public sealed class TypeChecker
             foreach (var contributed in Conformance.WithParents(iface, _binding))
                 foreach (var symbol in contributed.Members.Symbols)
                     if (symbol is FunctionSymbol { Generics.Length: > 0 } generic
-                        && candidates.TryGetValue(generic.Name, out var own)
-                        && own.Declaration is { } ownDeclaration)
-                        _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
-                            $"'{name}.{generic.Name}' overrides a generic member of "
-                            + $"'{contributed.Name}', which cannot be overridden — it has no slot "
-                            + "to dispatch through, so the two would be chosen by the static type "
-                            + "of the receiver rather than by the value",
-                            new DiagnosticNote(generic.Declaration?.Span ?? default,
-                                $"'{generic.Name}' is declared here"));
+                        && candidates.TryGetValue(generic.Name, out var owns))
+                        foreach (var own in owns)
+                        {
+                            if (own.Declaration is not { } ownDeclaration) continue;
+                            _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
+                                $"'{name}.{generic.Name}' overrides a generic member of "
+                                + $"'{contributed.Name}', which cannot be overridden — it has no "
+                                + "slot to dispatch through, so the two would be chosen by the "
+                                + "static type of the receiver rather than by the value",
+                                new DiagnosticNote(generic.Declaration?.Span ?? default,
+                                    $"'{generic.Name}' is declared here"));
+                        }
         }
 
         foreach (var node in interfaces)
@@ -530,8 +550,8 @@ public sealed class TypeChecker
                     // LYR-SEM0082 says plainly.
                     if (im.Generics.Length > 0) continue;
 
-                    var impl = candidates.TryGetValue(im.Name, out var c) ? c : null;
-                    if (impl is null)
+                    var found = candidates.TryGetValue(im.Name, out var c) ? c : null;
+                    if (found is null)
                     {
                         if (im.Body is null) // abstract and not implemented
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
@@ -540,7 +560,23 @@ public sealed class TypeChecker
                         continue; // a default method is inherited
                     }
                     var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), subst);
-                    if (SignatureMismatch(want, im, impl) is { } reason)
+
+                    // With several candidates the CONFORMANCE decides which one is meant, so a
+                    // match anywhere in the list satisfies it. Only when none fits is there
+                    // something to report, and then the single-candidate case reports as before:
+                    // one name, one implementation, one reason it does not match.
+                    if (found.Any(candidate => SignatureMismatch(want, im, candidate) is null)) continue;
+
+                    var impl = found[0];
+                    if (found.Count > 1)
+                        _de.Report("LYR-SEM0042", Severity.Error, NodeSpan(node),
+                            $"'{name}' has {found.Count} '{im.Name}', and none of them matches "
+                            + $"interface '{iface.Name}'{implied}: expected "
+                            + $"'{TypeFacts.Display(want)}'",
+                            found.Select(candidate => new DiagnosticNote(
+                                candidate.Declaration?.Span ?? default,
+                                $"this one is '{TypeFacts.Display(FnTypeOf(candidate))}'")).ToArray());
+                    else if (SignatureMismatch(want, im, impl) is { } reason)
                         _de.Report("LYR-SEM0042", Severity.Error, impl.Declaration?.Span ?? NodeSpan(node),
                             $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {reason}");
                 }
@@ -629,14 +665,25 @@ public sealed class TypeChecker
                         $"'{m.Name}' is declared here"));
     }
 
-    // Own methods plus visible extension methods, by name; own ones win.
-    private Dictionary<string, FunctionSymbol> CandidateMethods(TypeSymbol ts, ModuleSymbol module)
+    /// <summary>Own methods plus visible extension methods, by name; the own one first.
+    ///
+    /// <para>ALL of them per name, not one: a type conforming to <c>Mul&lt;Vec2, Vec2&gt;</c> and
+    /// <c>Mul&lt;float, Vec2&gt;</c> has two <c>mul</c>, and each conformance is served by the one
+    /// whose signature it demands. Keeping a single candidate per name would report the other
+    /// conformance as unimplemented against an implementation standing right there.</para></summary>
+    private Dictionary<string, List<FunctionSymbol>> CandidateMethods(TypeSymbol ts, ModuleSymbol module)
     {
-        var map = new Dictionary<string, FunctionSymbol>();
+        var map = new Dictionary<string, List<FunctionSymbol>>();
+        void Add(FunctionSymbol fn)
+        {
+            if (!map.TryGetValue(fn.Name, out var list)) map[fn.Name] = list = new List<FunctionSymbol>();
+            if (!list.Any(f => ReferenceEquals(f, fn))) list.Add(fn);
+        }
+
         foreach (var s in ts.Members.Symbols)
-            if (s is FunctionSymbol fn) map[fn.Name] = fn;
+            if (s is FunctionSymbol fn) Add(fn);
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
-            if (_comp.Sees(module, ext.Module)) map.TryAdd(ext.Symbol.Name, ext.Symbol);
+            if (_comp.Sees(module, ext.Module)) Add(ext.Symbol);
         return map;
     }
 
@@ -1248,8 +1295,32 @@ public sealed class TypeChecker
         var ps = fn.Parameters.Select(p => ResolveType(p.Type, _comp.Builtins)).ToArray();
         var ret = IsPanic(f) ? LyrType.Never // panic has the unnameable type never
             : fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
-        return new FnType(ps, ret);
+        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins));
     }
+
+    /// <summary>
+    /// Where a coroutine function's <c>throws</c> clause belongs: on the COROUTINE it returns.
+    ///
+    /// <para><c>fn gen(): Coroutine&lt;int&gt; throws Exception</c> has one clause and it has always
+    /// described one thing — that pulling this coroutine may throw. The call cannot: it runs no
+    /// body, it builds a suspended frame. Until 3.0 the clause was checked at the call anyway,
+    /// which is why the demand appeared to follow the local variable and vanished at the first
+    /// field or optional (#73).</para>
+    ///
+    /// <para>Only when the return type IS a coroutine. A function returning <c>?Coroutine&lt;T&gt;</c>
+    /// is not a coroutine function — it cannot yield — so its clause stays its own.</para>
+    /// </summary>
+    private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
+        fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null
+            ? co with { Throws = ThrownTypeOf(clause.Type, scope) }
+            : declared;
+
+    /// <summary>What a <c>throws</c> names: the written type, or the builtin <c>Throwable</c> when
+    /// it names none — the same "anything" the typeless clause has always meant.</summary>
+    private LyrType? ThrownTypeOf(TypeNode? written, SymbolTable scope) =>
+        written is null
+            ? _throwable is { } any ? new NamedRef(any) : null
+            : ResolveType(written, scope);
 
     /// <summary>
     /// The callee of a call, checked with the expected RESULT type behind it.
@@ -1453,13 +1524,15 @@ public sealed class TypeChecker
     /// returned before the operator was examined — so their second pass through the checker
     /// reproduces the same table entries.</para>
     /// </summary>
-    private LyrType DesugarToMethodCall(BinaryExpr b, string method, SymbolTable scope)
+    private LyrType DesugarToMethodCall(BinaryExpr b, string method, SymbolTable scope,
+        (LyrType Type, Symbol Symbol)? target = null)
     {
         // MemberSpan stays invalid: this node is synthesized, the operator text carries no member
         // name an editor could point at or edit.
         var member = new MemberExpr(b.Left, method, IsOptional: false, b.Span)
             { MemberSpan = default };
         var call = new CallExpr(member, [b.Right], b.Span);
+        if (target is { } t) _operatorTarget[member] = t;
 
         var type = CheckExpr(call, scope);
         if (type.IsError) return LyrType.Error;
@@ -1546,18 +1619,190 @@ public sealed class TypeChecker
     private LyrType? DesugarArithmetic(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope,
         TypeSymbol? iface, string method, string opText)
     {
-        if (!LyrType.Equal(l, r) || !CanConform(l)) return null;
+        if (!CanConform(l) || iface is null) return null;
 
-        if (iface is not null && Satisfies(l, iface, new GenericInstance(iface, [l])))
-            return DesugarToMethodCall(b, method, scope);
+        // The conformance is picked by the RIGHT operand: 'Mul<float, Vec2>' is what 'v * 2.0'
+        // asks for, and its SECOND argument is the result type. Homogeneous arithmetic is the
+        // case where both arguments are the receiver's own type, and takes no separate rule.
+        if (ArithmeticConformance(b, l, iface, r, method) is { } chosen)
+            return DesugarToMethodCall(b, method, scope, chosen);
 
-        var name = iface?.Name ?? method;
+        var lt = TypeFacts.Display(l);
+        var rt = TypeFacts.Display(r);
         _de.Report("LYR-SEM0003", Severity.Error, b.Span,
-            $"'{opText}' is not defined for '{TypeFacts.Display(l)}' — it comes from '{name}': "
-            + $"declare the type with ':: [{name}<{TypeFacts.Display(l)}>]' and a "
-            + $"'fn {method}(other: {TypeFacts.Display(l)}): {TypeFacts.Display(l)}'");
+            $"'{opText}' is not defined for '{lt}' and '{rt}' — it comes from '{iface.Name}': "
+            + $"declare the type with ':: [{iface.Name}<{rt}, {lt}>]' and a "
+            + $"'fn {method}(other: {rt}): {lt}'"
+            + (LyrType.Equal(l, r) ? "" : $", or write the operand as a '{lt}'"));
         return LyrType.Error;
     }
+
+    /// <summary>
+    /// The implementation behind <c>a op b</c>: the conformance of <c>a</c>'s type to
+    /// <paramref name="iface"/> whose first argument is <c>b</c>'s type, and the method the site
+    /// that declared it provides.
+    ///
+    /// <para>Resolved HERE rather than by the member lookup because the name does not decide: two
+    /// conformances contribute two <c>mul</c>, and only the operand type tells them apart. What
+    /// comes back is bound to the synthetic member node, so the call — and the lowering after it
+    /// — sees one target and no ambiguity.</para>
+    /// </summary>
+    /// <returns><c>null</c> when no conformance matches; the caller reports.</returns>
+    private (LyrType Type, Symbol Symbol)? ArithmeticConformance(
+        BinaryExpr b, LyrType receiver, TypeSymbol iface, LyrType argument, string method)
+    {
+        var candidates = ArithmeticCandidates(receiver, iface, method).ToList();
+
+        // The written type first, an ADAPTED literal second. Two passes rather than one rule,
+        // because an exact conformance has to win: a type carrying both 'Mul<int, T>' and
+        // 'Mul<float, T>' multiplies by '2' through the int one, and the float one would be just
+        // as reachable if a single pass took whatever matched first.
+        if (Pick(candidates.Where(c => LyrType.Equal(c.Operand, argument))) is { } exact)
+            return exact;
+
+        var adapting = candidates
+            .Where(c => c.Operand is PrimitiveType prim && LiteralAdaptsTo(b.Right, prim))
+            .ToList();
+        if (Pick(adapting) is not { } fitted) return null;
+
+        AdaptLiteralType(b.Right, (PrimitiveType)adapting[0].Operand);
+        return fitted;
+
+        (LyrType Type, Symbol Symbol)? Pick(IEnumerable<ArithmeticCandidate> matching)
+        {
+            (LyrType Type, Symbol Symbol)? found = null;
+            var ambiguous = false;
+            foreach (var c in matching)
+            {
+                if (found is null) found = (c.Type, c.Implementation);
+                else if (!ReferenceEquals(found.Value.Symbol, c.Implementation)) ambiguous = true;
+            }
+
+            // Two conformances agreeing on the operand and differing in what they call: '*' would
+            // have two meanings on one pair of types, and nothing in the expression says which.
+            // Refused rather than resolved by declaration order, which is not a rule anybody
+            // could rely on.
+            if (ambiguous)
+                _de.Report("LYR-SEM0083", Severity.Error, b.Span,
+                    $"'{TypeFacts.Display(receiver)}' conforms to '{iface.Name}' with "
+                    + $"'{TypeFacts.Display(argument)}' more than once, and the two do not agree "
+                    + "on what to call — one of them has to go");
+            return found;
+        }
+    }
+
+    /// <summary>One way to satisfy <c>a op b</c>: what the conformance takes on the right, and the
+    /// function that serves it with its type in the receiver's terms.</summary>
+    private readonly record struct ArithmeticCandidate(
+        LyrType Operand, LyrType Type, FunctionSymbol Implementation);
+
+    /// <summary>Everything the receiver's type could multiply (add, …) with, one entry per
+    /// conformance to <paramref name="iface"/>.</summary>
+    private IEnumerable<ArithmeticCandidate> ArithmeticCandidates(
+        LyrType receiver, TypeSymbol iface, string method)
+    {
+        // A TYPE PARAMETER carries its conformance in a constraint, and there is no implementation
+        // to point at: the call goes to the interface member and monomorphization fills it in per
+        // instantiation. Which constraint, though, is the same question — 'T :: [Mul<float, T>]'
+        // and 'T :: [Mul<T, T>]' both provide 'mul', and the operand tells them apart.
+        if (receiver is TypeParamType tp)
+        {
+            foreach (var constraint in tp.Param.Constraints)
+            {
+                if (constraint is not NamedType nt) continue;
+                foreach (var (it, subst) in ClosureOfNode(nt))
+                {
+                    if (!ReferenceEquals(it, iface) || it.Generics.Length != 2) continue;
+                    if (!subst.TryGetValue(it.Generics[0], out var operand)) continue;
+                    if (it.Members.LookupLocal(method) is not FunctionSymbol member) continue;
+                    yield return new ArithmeticCandidate(
+                        operand, Substitute(FnTypeOf(member), subst), member);
+                }
+            }
+            yield break;
+        }
+
+        if (TypeSymbolOf(receiver) is not { } ts) yield break;
+        var ofInstance = receiver is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+
+        foreach (var (instance, site) in ConformancesTo(ts, iface, ofInstance))
+        {
+            // Only the two-parameter form takes part. An interface of another shape reaching this
+            // path is a stdlib mismatch, not a program error; it simply matches nothing.
+            if (instance is not GenericInstance { Arguments.Length: 2 } inst) continue;
+            if (ImplementationOf(ts, site, method, inst.Arguments[0], ofInstance) is not { } impl)
+                continue;
+
+            yield return new ArithmeticCandidate(
+                inst.Arguments[0], Substitute(FnTypeOf(impl), ofInstance), impl);
+        }
+    }
+
+    /// <summary>Every conformance of a type to ONE interface, with the site that declared it:
+    /// <c>null</c> for the type's own <c>::</c> list, otherwise the <c>extend</c> block.
+    ///
+    /// <para>Unlike <see cref="InterfacesOf"/> this does NOT deduplicate by instance — the whole
+    /// point is that a type may name the same interface twice with different arguments.</para>
+    /// </summary>
+    private IEnumerable<(LyrType Instance, ExtensionBlock? Site)> ConformancesTo(
+        TypeSymbol ts, TypeSymbol iface, Dictionary<GenericParamSymbol, LyrType> ofInstance)
+    {
+        foreach (var node in DeclaredInterfaceNodes(ts))
+            foreach (var instance in InstancesOfNode(node, ts, iface, ofInstance))
+                yield return (instance, null);
+
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!ReferenceEquals(block.Target, ts)) continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            foreach (var node in block.Decl.Interfaces)
+                foreach (var instance in InstancesOfNode(node, ts, iface, ofInstance))
+                    yield return (instance, block);
+        }
+    }
+
+    // What one conformance node contributes for 'iface' — itself when it names it, and every
+    // parent that reaches it — in the conforming type's terms.
+    private IEnumerable<LyrType> InstancesOfNode(TypeNode node, TypeSymbol ts, TypeSymbol iface,
+        Dictionary<GenericParamSymbol, LyrType> ofInstance)
+    {
+        if (Conformance.InterfaceOf(node, _binding) is not { } direct) yield break;
+        foreach (var (p, instance) in InterfaceClosure(direct, ResolveType(node, DeclarationScope(ts))))
+            if (ReferenceEquals(p, iface))
+                yield return Substitute(instance, ofInstance);
+    }
+
+    /// <summary>The method one conformance site provides: the block's own, or — for a conformance
+    /// in the type's own list — its member, else a visible extension method that fits the
+    /// operand.</summary>
+    private FunctionSymbol? ImplementationOf(TypeSymbol ts, ExtensionBlock? site, string method,
+        LyrType parameter, Dictionary<GenericParamSymbol, LyrType> ofInstance)
+    {
+        if (site is not null) return site.MethodScope.LookupLocal(method) as FunctionSymbol;
+        if (ts.Members.LookupLocal(method) is FunctionSymbol own) return own;
+
+        // The conformance stands on the type, the implementation in an extension — allowed since
+        // extensions exist. With several of them the parameter type decides, which is the same
+        // question the conformance check answers with SEM0042.
+        foreach (var ext in _comp.Extensions.MethodsFor(ts))
+        {
+            if (ext.Symbol.Name != method) continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
+            if (Substitute(FnTypeOf(ext.Symbol), ofInstance) is FnType { Parameters.Length: 1 } fn
+                && LyrType.Equal(fn.Parameters[0], parameter))
+                return ext.Symbol;
+        }
+        return null;
+    }
+
+    /// <summary>The declaring symbol behind a conforming type, for the two forms that carry a
+    /// conformance list of their own.</summary>
+    private static TypeSymbol? TypeSymbolOf(LyrType t) => t switch
+    {
+        NamedRef nr => nr.Symbol,
+        GenericInstance gi => gi.Definition,
+        _ => null,
+    };
 
     /// <summary>
     /// Gives an EMPTY array literal its element type from the context.
@@ -2023,6 +2268,11 @@ public sealed class TypeChecker
         // CheckTarget rather than CheckExpr: a type or module name is allowed here.
         var targetType = CheckTarget(mem.Target, scope);
 
+        // An operator that already resolved its target says so here; see _operatorTarget. The
+        // receiver is still checked above, because it is the operand and has to be typed.
+        if (_operatorTarget.TryGetValue(mem, out var chosen))
+            return targetType.IsError ? LyrType.Error : BindMember(mem, chosen);
+
         // Whether the receiver NAMES something or produces a value is what CheckTarget has just
         // decided: a NonValueType is a name, everything else is a value. Asking the reference table
         // instead is a second answer to that question and the weaker one — the table knows that
@@ -2054,6 +2304,11 @@ public sealed class TypeChecker
         // refused — a null result would mean two different things there.
         if (baseType is CoroutineOf co && mem.Member == "next")
         {
+            // A PULL, so a throw site. 'next()' is lenient about EXHAUSTION — it answers null for
+            // a finished coroutine — and says nothing about an exception from the body, which
+            // passes straight through it.
+            if (co.Throws is { } pulled) _result.MarkThrowingPull(mem, pulled);
+
             if (co.Yield is Optional)
                 return Report(mem.Span, "LYR-SEM0080",
                     $"'next()' on '{TypeFacts.Display(baseType)}' cannot tell an exhausted "
@@ -2149,7 +2404,7 @@ public sealed class TypeChecker
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
-            CoroutineOf co => new CoroutineOf(Substitute(co.Yield, map)),
+            CoroutineOf co => co with { Yield = Substitute(co.Yield, map) },
             _ => type // primitive, NamedRef, error, null
         };
     }
@@ -3723,6 +3978,7 @@ public sealed class TypeChecker
     private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
     {
         var t = CheckExpr(re.Coroutine, scope);
+        if (t is CoroutineOf { Throws: { } thrown }) _result.MarkThrowingPull(re, thrown);
         return t switch
         {
             CoroutineOf co => co.Yield,
@@ -4077,6 +4333,14 @@ public sealed class TypeChecker
         if (to is Optional inner)                          // T to ?T, widening
             return from is NullType || IsAssignable(expr, from, inner.Inner);
         if (from is NullType) return false;
+
+        // A coroutine that cannot throw fits where one that may is expected: the target promises
+        // its readers a 'try', and a value that never throws keeps that promise. The way back is
+        // the hole this rule exists for and stays refused — a throwing coroutine in a plain slot
+        // is exactly how the demand used to disappear (#73).
+        if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
+            return LyrType.Equal(given.Yield, wanted.Yield);
+
         if (to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         return false;
@@ -4180,6 +4444,25 @@ public sealed class TypeChecker
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))
                     return MakeGenericInstance(gts, n, scope);
                 return SymbolToType(sym, scope, n.Span);
+            case ThrowingType tt:
+            {
+                var carried = ResolveType(tt.Inner, scope);
+                if (carried.IsError) return carried;
+
+                // Only a coroutine. Everything else runs at its CALL, and a function's own
+                // 'throws' already says so there; a type-level one would be a second spelling for
+                // the same fact — and on a value that never runs anything, no spelling at all.
+                // Once per node: a parameter or field type is resolved both while its declaration
+                // is checked and again through the function type at every call, and the reader
+                // does not need the same sentence twice.
+                if (carried is not CoroutineOf co)
+                    return _reportedThrows.Add(tt) ? Report(tt.Span, "LYR-SEM0084",
+                        $"'throws' belongs to a coroutine type, and '{TypeFacts.Display(carried)}' "
+                        + "is not one — a call declares what it throws in its own signature")
+                        : LyrType.Error;
+
+                return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };
+            }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope), a.Size is { } sz ? (int)sz.Value : null);
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());

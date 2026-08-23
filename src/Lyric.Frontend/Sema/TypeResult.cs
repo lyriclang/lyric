@@ -30,6 +30,19 @@ public sealed class TypeResult
     public LyrType TypeOf(Expr expr) => _types.TryGetValue(expr, out var t) ? t : LyrType.Error;
 
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
+
+    /// <summary>The pulls — a <c>resume</c> or a <c>next()</c> — whose coroutine may throw.
+    ///
+    /// <para>Recorded by the checker because it is the pass that knows the receiver's TYPE, and
+    /// read by the exception analysis, which is the pass that knows what handles it. The throw
+    /// site of a coroutine is the pull, never the call: a call builds a suspended frame and runs
+    /// nothing.</para></summary>
+    private readonly Dictionary<Node, LyrType> _throwingPulls = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkThrowingPull(Node pull, LyrType thrown) => _throwingPulls[pull] = thrown;
+
+    public LyrType? ThrownByPull(Node pull) =>
+        _throwingPulls.TryGetValue(pull, out var t) ? t : null;
     public Symbol? RefOf(Node node) => _refs.TryGetValue(node, out var s) ? s : null;
 
     /// <summary>

@@ -1149,6 +1149,67 @@ public class VmTests
             """).AsI64);
 
     [Fact]
+    public void A_throwing_coroutine_held_in_a_field_is_caught_at_the_pull()
+    {
+        // The shape of #73, running: the driver holds the coroutine across calls, the exception
+        // leaves the body at the second pull, and the try around the PULL catches it. Before 3.0
+        // the demand was checked at the call and this program aborted with LYR-VM0010.
+        Assert.Equal(43, Coroutine("""
+            import std.core { Exception };
+
+            fn gen(): Coroutine<int> throws Exception {
+                yield 42;
+                throw Exception { text = "mid" };
+            }
+
+            class Driver {
+                co: ?Coroutine<int> throws Exception = null,
+                fn start() { this.co = gen(); }
+            }
+
+            fn main(): int {
+                let d = Driver { };
+                d.start();
+                let c = d.co!;
+                var total = 0;
+                try {
+                    total = resume c;
+                    resume c;
+                } catch (e: Exception) {
+                    total = total + 1;
+                }
+                return total;
+            }
+            """).AsI64);
+    }
+
+    [Fact]
+    public void The_safe_pull_lets_a_throw_through()
+    {
+        // 'next()' answers null for an exhausted coroutine and nothing at all for a throwing one:
+        // the exception passes through it like through any other call.
+        Assert.Equal(7, Coroutine("""
+            import std.core { Exception };
+
+            fn gen(): Coroutine<int> throws Exception {
+                yield 1;
+                throw Exception { text = "mid" };
+            }
+
+            fn main(): int {
+                let c = gen();
+                try {
+                    let first = c.next();
+                    let second = c.next();
+                    return 0;
+                } catch (e: Exception) {
+                    return 7;
+                }
+            }
+            """).AsI64);
+    }
+
+    [Fact]
     public void Resuming_a_finished_coroutine_is_an_error()
     {
         // The resume on which the body runs out has no value to deliver and says so.

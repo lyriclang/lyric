@@ -149,7 +149,13 @@ internal sealed class ExceptionAnalyzer
             case CallExpr call:
                 AnalyzeCallee(call.Callee);
                 foreach (var a in call.Arguments) AnalyzeExpr(a);
-                if (ThrowsOf(call.Callee) is { } thrown)
+
+                // 'c.next()' — a PULL, and the throw site of a coroutine. Marked by the checker,
+                // which is the pass that knows the receiver's type; the safe pull is lenient about
+                // exhaustion, never about throwing.
+                if (_types.ThrownByPull(call.Callee) is { } pulled)
+                    CheckSite(ThrownOf(pulled), call.Span, "'next()'");
+                else if (ThrowsOf(call.Callee) is { } thrown)
                     CheckSite(thrown, call.Span, $"call to '{CalleeName(call.Callee)}'");
                 break;
             case IdentifierExpr or MemberExpr:
@@ -158,7 +164,11 @@ internal sealed class ExceptionAnalyzer
                 break;
             case LambdaExpr lam: AnalyzeLambda(lam); break;
             case UnaryExpr u: AnalyzeExpr(u.Operand); break;
-            case ResumeExpr re: AnalyzeExpr(re.Coroutine); break;
+            case ResumeExpr re:
+                AnalyzeExpr(re.Coroutine);
+                if (_types.ThrownByPull(re) is { } resumed)
+                    CheckSite(ThrownOf(resumed), re.Span, "'resume'");
+                break;
             case PostfixExpr p: AnalyzeExpr(p.Operand); break;
             case BinaryExpr b: AnalyzeExpr(b.Left); AnalyzeExpr(b.Right); break;
             case AssignExpr a: AnalyzeExpr(a.Target); AnalyzeExpr(a.Value); break;
@@ -220,6 +230,12 @@ internal sealed class ExceptionAnalyzer
     {
         if (_types.RefOf(callee) is not FunctionSymbol { Declaration: FunctionDecl decl } fn) return null;
         if (decl.Throws is null) return null;
+
+        // A COROUTINE function's clause is not about its call. The call builds a suspended frame
+        // and runs no body, so it cannot throw what the clause names; the clause rode along here
+        // until 3.0 and made the demand look like it followed the local variable (#73). It belongs
+        // to the returned type now, and the pull is where it is asked for.
+        if (_types.TypeOf(callee) is FnType { Return: CoroutineOf }) return null;
         if (decl.Throws.Type is null) return (true, null);
         var sym = _types.RefOf(decl.Throws) as TypeSymbol;
         if (sym is null || ReferenceEquals(sym, _throwable)) return (true, null);
