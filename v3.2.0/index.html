@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.2.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.2.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.2.0 — 2026-08-23</h2>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>A host can read and write a module's globals</strong>: <code>LoadedProgram.GlobalCount</code>, <code>ReadGlobal(int)</code>
+and <code>WriteGlobal(int, LyrValue)</code>.</p>
+<p>For a TOOL. A program reaches its own globals with an instruction and needs none of this; a
+debugger's Globals scope, or an editor showing a running game what it is holding, had no way in
+at all. The names and types were already there — <code>GlobalNames</code> from the debug section, <code>Globals</code>
+for the types, <code>FieldNames</code> for what is inside an object — so this is the one piece that was
+missing.</p>
+<p><strong>Nothing checks the type on write.</strong> A slot is a bit pattern and the program reads it as
+whatever its instructions expect, so writing a float where an integer stands produces a number
+nobody can explain rather than an error. <code>Module.Globals</code> carries the types; a tool is expected
+to have looked.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
