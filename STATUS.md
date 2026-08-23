@@ -241,7 +241,14 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
-**v3.0.0 IS RELEASED, and v3.0.1 behind it** (2026-08-23). The first pass of the sweep the new
+**v3.0.0 IS RELEASED, with v3.0.1 and v3.0.2 behind it** (2026-08-23). v3.0.2 closes #101, the
+Linux CI flake: the driver learned its tools' output directories by BUILDING them a second time
+under its own properties — a second project instance writing one output directory — and listed
+that directory before the stub publish had run. The failing log dated it: the driver finished at
+07:16:19.208 and the stub landed at 07:16:19.377. Derived paths instead of a second build, the
+publish invoked explicitly, and the invariant now fails the BUILD rather than a packing test half
+a minute later.
+ The first pass of the sweep the new
 pipeline prescribes found **four defects and two stale guide claims** — every one of them in what
 the new features do to each other, and none in what any single feature does alone. The one worth
 remembering: two conformances satisfied by two overloads compiled to the wrong call, because the

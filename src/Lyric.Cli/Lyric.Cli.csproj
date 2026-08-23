@@ -54,20 +54,60 @@
     for its tools beside itself, and "beside itself" has to mean the same in both cases.
   -->
   <Target Name="CopyToolsNextToDriver" AfterTargets="Build">
-    <MSBuild Projects="..\Lyrc\Lyrc.csproj;..\Lyrvm\Lyrvm.csproj;..\Lyrrepl\Lyrrepl.csproj;..\Lyrbuild\Lyrbuild.csproj;..\Lyrpack\Lyrpack.csproj;..\Lyrfmt\Lyrfmt.csproj"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)">
-      <Output TaskParameter="TargetOutputs" ItemName="ToolAssembly" />
-    </MSBuild>
+    <!--
+      The tools are NOT built here. They are built by the ProjectReferences above, during
+      ResolveProjectReferences, which is strictly before this target runs.
+
+      This target used to call <MSBuild Targets="Build"> on them again, to learn their output
+      directories from TargetOutputs. That second call carries its own set of global properties
+      (`Configuration` alone), and where those differ from the ones the reference build used,
+      MSBuild treats it as a DIFFERENT project instance and builds the project a second time —
+      concurrently with the first, into one output directory. Lyrpack publishes its stub from an
+      AfterTargets, so two instances of it publish the same single file into the same place while
+      this target is listing that directory. The listing then sometimes missed the stub, and
+      `lyric pack` failed with "no stub runtime found" on a tree where nothing was wrong (#101).
+
+      So the directories are derived rather than asked for. It is the same convention every other
+      consumer of this repository already assumes, including the test harness.
+    -->
+    <!--
+      And the stub, explicitly, BEFORE the directory below is listed.
+
+      This is the half that made #101 intermittent. Lyrpack publishes its stub from an
+      AfterTargets="Build", and a ProjectReference does not order that against this target: in the
+      failing run the driver finished building at 07:16:19.208 and the stub appeared at
+      07:16:19.377 — 169 ms later, into a directory this target had already read. Calling the
+      target here BLOCKS until it has run, whichever instance serves it, and running it twice
+      costs one publish of one small file.
+    -->
+    <MSBuild Projects="..\Lyrpack\Lyrpack.csproj"
+             Targets="PublishStubNextToPacker"
+             Properties="Configuration=$(Configuration)" />
+
+    <ItemGroup>
+      <ToolProject Include="..\Lyrc\;..\Lyrvm\;..\Lyrrepl\;..\Lyrbuild\;..\Lyrpack\;..\Lyrfmt\" />
+    </ItemGroup>
 
     <ItemGroup>
       <!-- The stdlib included: it belongs next to the compiler, and "next to" is a directory here. -->
-      <ToolFile Include="%(ToolAssembly.RootDir)%(ToolAssembly.Directory)**\*.*" />
+      <ToolFile Include="%(ToolProject.Identity)bin\$(Configuration)\$(TargetFramework)\**\*.*" />
     </ItemGroup>
 
     <Copy SourceFiles="@(ToolFile)"
           DestinationFiles="@(ToolFile->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+
+    <!--
+      And the invariant, checked rather than hoped for. Without this a miss is silent here and
+      surfaces much later as a packer that cannot find its stub — which is a message about the
+      packer, at a place where nothing is wrong with it.
+    -->
+    <PropertyGroup>
+      <_DriverStubDir>$(OutDir)stubs\$(NETCoreSdkPortableRuntimeIdentifier)\</_DriverStubDir>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_DriverStubDir)lyrstub') AND !Exists('$(_DriverStubDir)lyrstub.exe')"
+           Text="the stub runtime did not reach the driver at $(_DriverStubDir). It is published by Lyrpack's PublishStubNextToPacker target and copied here; a build that gets this far without it produces a 'lyric pack' that cannot pack." />
   </Target>
 
 </Project>
