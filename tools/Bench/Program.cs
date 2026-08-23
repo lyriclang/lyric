@@ -415,7 +415,7 @@ internal static class Program
         yield return new Case("operator", 100_000, "scalar", """
             import std.core { Add };
 
-            struct Vec2 :: [Add<Vec2>] {
+            struct Vec2 :: [Add<Vec2, Vec2>] {
                 x: float,
                 y: float,
                 fn add(other: Vec2): Vec2 {

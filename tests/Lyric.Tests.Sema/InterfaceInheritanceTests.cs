@@ -402,14 +402,15 @@ public class InterfaceInheritanceTests
     [Fact]
     public void Two_instances_of_one_interface_are_still_two_conformances()
     {
-        // The dedup across a conformance list keys on the INSTANCE, not the symbol: 'Mul<Vec2>'
-        // beside 'Mul<float>' must reach the signature check that refuses the second — the pin
-        // against a closure walk that would skip it as "already seen".
+        // The dedup across a conformance list keys on the INSTANCE, not the symbol: two
+        // instances of 'Mul' are two conformances, and each needs its own implementation. Here
+        // the second has none — the pin against a closure walk that would skip it as
+        // "already seen" and report nothing.
         var de = Check(
             """
             import std.core { Mul };
 
-            struct Vec2 :: [Mul<Vec2>, Mul<float>] {
+            struct Vec2 :: [Mul<Vec2, Vec2>, Mul<float, Vec2>] {
                 x: float,
 
                 fn mul(other: Vec2): Vec2 {

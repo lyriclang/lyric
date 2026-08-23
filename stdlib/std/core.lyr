@@ -340,108 +340,113 @@ extend uint :: [Hashable<uint>] {
 // `extend`, user types through `::`. `+` on a conforming type IS `add`, and monomorphization makes
 // the operator cost exactly what the method costs.
 //
-// Homogeneous by design: `T op T -> T`. A mixed form such as `Vec2 * float` needs a two-parameter
-// interface and an answer to multiple conformances of one generic interface; neither exists yet.
+// Two parameters since 3.0: `Mul<T, R>` is "multiplied by a T, gives an R". The homogeneous case
+// writes both — `Mul<Vec2, Vec2>` — and the mixed one differs in them: `Mul<float, Vec2>` scales a
+// vector. The result cannot be read off `T`, or `Vec2 * 2.0` would have to give a `float`.
+//
+// A type may carry SEVERAL instances of one of these interfaces, which no other interface allows.
+// The operator picks the conformance by the type of its right operand, so the two never compete for
+// one name from the same site — each implementation stands in its own `extend` block.
 
 /// Values of this type can be added: `a + b` is `a.add(b)`.
-pub interface Add<T> {
+pub interface Add<T, R> {
     /// The sum of this value and `other`.
-    fn add(other: T): T;
+    fn add(other: T): R;
 }
 
 /// Values of this type can be subtracted: `a - b` is `a.sub(b)`.
-pub interface Sub<T> {
+pub interface Sub<T, R> {
     /// This value minus `other`.
-    fn sub(other: T): T;
+    fn sub(other: T): R;
 }
 
 /// Values of this type can be multiplied: `a * b` is `a.mul(b)`.
-pub interface Mul<T> {
+pub interface Mul<T, R> {
     /// The product of this value and `other`.
-    fn mul(other: T): T;
+    fn mul(other: T): R;
 }
 
 /// Values of this type can be divided: `a / b` is `a.div(b)`.
-pub interface Div<T> {
+pub interface Div<T, R> {
     /// This value divided by `other`. What a division by zero does is the type's own business;
     /// the built-in numerics panic.
-    fn div(other: T): T;
+    fn div(other: T): R;
 }
 
-extend int :: [Add<int>] {
+extend int :: [Add<int, int>] {
     fn add(other: int): int {
         return this + other;
     }
 }
 
-extend int :: [Sub<int>] {
+extend int :: [Sub<int, int>] {
     fn sub(other: int): int {
         return this - other;
     }
 }
 
-extend int :: [Mul<int>] {
+extend int :: [Mul<int, int>] {
     fn mul(other: int): int {
         return this * other;
     }
 }
 
-extend int :: [Div<int>] {
+extend int :: [Div<int, int>] {
     fn div(other: int): int {
         return this / other;
     }
 }
 
-extend uint :: [Add<uint>] {
+extend uint :: [Add<uint, uint>] {
     fn add(other: uint): uint {
         return this + other;
     }
 }
 
-extend uint :: [Sub<uint>] {
+extend uint :: [Sub<uint, uint>] {
     fn sub(other: uint): uint {
         return this - other;
     }
 }
 
-extend uint :: [Mul<uint>] {
+extend uint :: [Mul<uint, uint>] {
     fn mul(other: uint): uint {
         return this * other;
     }
 }
 
-extend uint :: [Div<uint>] {
+extend uint :: [Div<uint, uint>] {
     fn div(other: uint): uint {
         return this / other;
     }
 }
 
-extend float :: [Add<float>] {
+extend float :: [Add<float, float>] {
     fn add(other: float): float {
         return this + other;
     }
 }
 
-extend float :: [Sub<float>] {
+extend float :: [Sub<float, float>] {
     fn sub(other: float): float {
         return this - other;
     }
 }
 
-extend float :: [Mul<float>] {
+extend float :: [Mul<float, float>] {
     fn mul(other: float): float {
         return this * other;
     }
 }
 
-extend float :: [Div<float>] {
+extend float :: [Div<float, float>] {
     fn div(other: float): float {
         return this / other;
     }
 }
 
 // `Add` alone: a string concatenates and does nothing else arithmetic.
-extend string :: [Add<string>] {
+extend string :: [Add<string, string>] {
     fn add(other: string): string {
         return this + other;
     }

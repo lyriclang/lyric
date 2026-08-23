@@ -143,7 +143,7 @@ public sealed class SemanticTokenTests
         // expression would paint 'a + b' as a method.
         const string program = "import std.core { Add };\n"
             + "\n"
-            + "struct Vec :: [Add<Vec>] {\n"
+            + "struct Vec :: [Add<Vec, Vec>] {\n"
             + "    x: int,\n"
             + "    fn add(other: Vec): Vec {\n"
             + "        return Vec { x = this.x + other.x };\n"

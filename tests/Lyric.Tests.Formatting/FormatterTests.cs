@@ -251,7 +251,7 @@ public class FormatterTests
     public void Members_with_bodies_get_air_and_fields_sit_together()
     {
         Assert.Equal("""
-            pub struct Vec2 :: [Add<Vec2>] {
+            pub struct Vec2 :: [Add<Vec2, Vec2>] {
                 x: float,
                 y: float,
 
@@ -261,7 +261,7 @@ public class FormatterTests
             }
 
             """, Format("""
-            pub struct Vec2::[Add<Vec2>] { x: float, y: float,
+            pub struct Vec2::[Add<Vec2, Vec2>] { x: float, y: float,
             fn add(other: Vec2): Vec2 { return Vec2 { x = this.x + other.x, y = this.y + other.y }; } }
             """));
     }
@@ -325,7 +325,7 @@ public class FormatterTests
     public void Generic_constraints_and_type_arguments_round_trip()
     {
         var formatted = Format("""
-            fn total<T :: [Add<T>]>(values: T[], zero: T): T {
+            fn total<T :: [Add<T, T>]>(values: T[], zero: T): T {
                 var sum = zero;
                 for (v in values) {
                     sum = sum + v;
@@ -338,7 +338,7 @@ public class FormatterTests
             }
             """);
 
-        Assert.Contains("fn total<T :: [Add<T>]>(values: T[], zero: T): T", formatted);
+        Assert.Contains("fn total<T :: [Add<T, T>]>(values: T[], zero: T): T", formatted);
         Assert.Contains("total<int>([1, 2, 3], 0)", formatted);
     }
 

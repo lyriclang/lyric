@@ -255,15 +255,16 @@ fn main(): int {
 the box — lexicographic over code points, the same order `compare` defines.
 
 Arithmetic follows the same rule, through one interface per operator: `Add`, `Sub`, `Mul` and `Div`
-from `std.core`, each with a single method of the same name. The operands are homogeneous — `T` with
-`T`, giving `T`:
+from `std.core`, each with a single method of the same name. They take two type arguments — what
+stands on the right of the operator, and what comes out — so `Add<Vec2, Vec2>` reads "a Vec2 plus a
+Vec2 gives a Vec2":
 
 ```lyr
 import std.core { Add, Sub };
 import std.io.console { println };
 import std.string { fromInt };
 
-struct Vec2 :: [Add<Vec2>, Sub<Vec2>] {
+struct Vec2 :: [Add<Vec2, Vec2>, Sub<Vec2, Vec2>] {
     x: int,
     y: int,
     fn add(other: Vec2): Vec2 {
@@ -290,7 +291,7 @@ serves them and your types alike:
 ```lyr
 import std.core { Add };
 
-fn total<T :: [Add<T>]>(a: T, b: T): T {
+fn total<T :: [Add<T, T>]>(a: T, b: T): T {
     return a + b;
 }
 
@@ -299,12 +300,52 @@ fn main(): int {
 }
 ```
 
-A mixed form such as `Vec2 * float` does not exist, by decision: a type conforms to `Mul` once,
-and without overloading a second `mul` for a second right-hand type cannot exist either — the
-form would buy one fixed partner type and nothing more. `%` stays numeric-only. Compound
-assignment (`v += w`) reaches through the interfaces for variable targets since v1.13; a field or
-element target stays written out (`p.v = p.v + w`), because the shorthand would evaluate the
-object or the index twice.
+Both arguments are yours to choose, and a type may name one of these interfaces MORE than once.
+That is what makes `Vec2 * 2.0` a thing you can write: scaling is a second conformance, with its
+own right-hand type and its own implementation in its own `extend` block.
+
+```lyr
+import std.core { Mul };
+import std.io.console { println };
+import std.string { fromFloat };
+
+struct Vec2 :: [Mul<Vec2, Vec2>] {
+    x: float,
+    y: float,
+    fn mul(other: Vec2): Vec2 {
+        return Vec2 { x = this.x * other.x, y = this.y * other.y };
+    }
+}
+
+extend Vec2 :: [Mul<float, Vec2>] {
+    fn mul(other: float): Vec2 {
+        return Vec2 { x = this.x * other, y = this.y * other };
+    }
+}
+
+fn main(): int {
+    let v = Vec2 { x = 3.0, y = 4.0 };
+    println(fromFloat((v * v).x));    // 9   — Mul<Vec2, Vec2>
+    println(fromFloat((v * 2.0).y));  // 8   — Mul<float, Vec2>
+    return 0;
+}
+```
+
+The operator picks the conformance by the type on its right, and nothing else: both methods are
+called `mul`, so the name never decides. That is also the limit of it — `v.mul(2.0)` written out is
+ambiguous, because a written call has only the name to go on. A constraint names the conformance it
+wants the same way: `fn twice<T :: [Mul<float, T>]>` promises scaling, `fn square<T :: [Mul<T, T>]>`
+promises multiplication by one's own kind, and the two are different promises.
+
+Two conformances that take the SAME right-hand type and disagree on the result are refused where
+the operator is used (`LYR-SEM0083`): nothing in `v * 2.0` says which was meant. This is the one
+place in the language where a type may conform to an interface twice — everywhere else, a second
+conformance is a mistake.
+
+`%` stays numeric-only. Compound assignment (`v += w`) reaches through the interfaces for variable
+targets since v1.13 — and picks its conformance by the right operand, exactly as the plain form
+does; a field or element target stays written out (`p.v = p.v + w`), because the shorthand would
+evaluate the object or the index twice.
 
 The last operator is `as`. Beyond the numeric casts, which keep their built-in meaning, a cast is a
 conversion the operand's type declared through `Into`:

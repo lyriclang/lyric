@@ -221,8 +221,8 @@ public class OptionTests
             fn main(): int {
                 let v: ?int = 8;
                 let leer: ?int = null;
-                return if (iter.sum(iter.map(option.iter(v), (n: int) => n * 2)) == 16
-                        && iter.sum(iter.map(option.iter(leer), (n: int) => n * 2)) == 0) 1 else 0;
+                return if (iter.sum(option.iter(v).map<int>((n: int) => n * 2)) == 16
+                        && iter.sum(option.iter(leer).map<int>((n: int) => n * 2)) == 0) 1 else 0;
             }
             """));
 

@@ -10,6 +10,93 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.0.0 — unreleased
+
+**The major bump.** Collected here as it is built; the release notes are complete when the basket
+is.
+
+### Changed — breaking
+
+- **The arithmetic interfaces take two type arguments.** `Add<T>` is now `Add<T, R>`, likewise
+  `Sub`, `Mul` and `Div`: what stands on the right of the operator, and what the operation gives
+  back. Every existing conformance and constraint gains a second argument, and the compiler names
+  the count (`LYR-SEM0026`):
+
+  ```lyr
+  struct Vec2 :: [Add<Vec2, Vec2>] { … }        // was: [Add<Vec2>]
+  fn total<T :: [Add<T, T>]>(a: T, b: T): T     // was: <T :: [Add<T>]>
+  ```
+
+  The result could not be read off the operand, or `Vec2 * 2.0` would have to give a `float`.
+
+- **Every deprecation whose promise named 3.0 is gone.** The `until` field is a commitment, and
+  this is the release it comes due in. Eleven forms:
+
+  | gone | use |
+  |---|---|
+  | `std.io.file.readText` | `text` |
+  | `std.io.file.readBytes` | `bytes` |
+  | `std.io.file.readLines` | `lines` |
+  | `std.iter.map/filter/take/skip/takeWhile/zip/chain/flatMap` (free) | the methods of `Iterator<T>` |
+
+  The free iterator adapters have been the methods' delegates since 2.17; `enumerate` and `chunks`
+  stay free, and the comment in `std/iter.lyr` says why (a non-generic method changing the element
+  type does not monomorphize).
+
+- **The toolchain calls itself 3.0.0.** The tree carries the version the language it speaks
+  belongs to, so the specification suite runs the right cases against it.
+
+### Fixed
+
+- **A generic interface member called on an instance of a generic class.**
+  `ArrayIterator<int>.zip<string>(…)` did not compile: the receiver took the instance path, which
+  binds the OWNER's type parameters and not the member's own, so `Iterator<(T, B)>` reported "this
+  type argument is not supported" — at the interface's declaration, which is not where the program
+  was wrong. Such a call is lifted into the interface now, as the same call on an `Iterator<T>`
+  value always was. It surfaced when the free adapters went: `zip` as a method had never been
+  reachable in a test.
+
+### Added
+
+- **A type may conform to one arithmetic interface several times**, and the operator picks the
+  conformance by the type of its **right operand**. This is the one exception to "one conformance
+  per interface" in the language:
+
+  ```lyr
+  struct Vec2 :: [Mul<Vec2, Vec2>] {
+      x: float, y: float,
+      fn mul(other: Vec2): Vec2 { … }
+  }
+
+  extend Vec2 :: [Mul<float, Vec2>] {
+      fn mul(other: float): Vec2 { … }          // scaling, its own conformance
+  }
+
+  let scaled = v * 2.0;                          // Mul<float, Vec2>
+  let square = v * v;                            // Mul<Vec2, Vec2>
+  ```
+
+  Both implementations are called `mul`, so the NAME never decides — which is also the limit of
+  it: a written `v.mul(2.0)` stays ambiguous, because a call has only the name to go on. Free
+  overloading is a separate feature and comes in v3.1.0.
+
+  What this touches, since a name no longer identifies a method: conformance checking asks whether
+  ANY visible method matches the signature the conformance demands; vtable rows are built per
+  interface INSTANCE rather than per interface, so `Mul<float, Vec2>` and `Mul<Vec2, Vec2>` get
+  their own row and an interface value dispatches to the one it names; and a call under a
+  constraint goes through that row, so the constraint decides which conformance a generic body
+  means.
+
+- **An untyped integer literal adapts to the conformance's operand type**: with `Mul<float, Vec2>`
+  in reach, `v * 2` multiplies by `2.0`, under the same literal rule as everywhere else. An exact
+  conformance wins over an adapted one.
+
+- **`LYR-SEM0083`** — two conformances taking the same operand and disagreeing on what to call.
+  Reported where the operator is used, not at the declaration: a conformance another module's
+  `extend` block adds first meets the others where both are visible.
+
+---
+
 ## v2.17.0 — 2026-08-22
 
 **M33 — iterator chaining.** The last thing this project had written down as a documented No.
