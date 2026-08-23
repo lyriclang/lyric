@@ -376,7 +376,7 @@ public static class ModuleLowerer
             {
                 var typesBefore = typeTable.Interned.Count();
 
-                impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances,
+                impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances, types,
                     de, ref failed);
                 if (failed) return null;
 
@@ -847,7 +847,8 @@ public static class ModuleLowerer
     /// </summary>
     private static List<IrImpl> BuildImpls(TypeTable typeTable, BindingResult binding,
         Compilation compilation, Dictionary<FunctionSymbol, FunctionId> ids,
-        ExtensionTable extensions, InstanceTable instances, DiagnosticEngine de, ref bool failed)
+        ExtensionTable extensions, InstanceTable instances, TypeResult types,
+        DiagnosticEngine de, ref bool failed)
     {
         var impls = new List<IrImpl>();
         var interned = typeTable.Interned.ToList();
@@ -912,7 +913,17 @@ public static class ModuleLowerer
                     // and its default then lives on the parent, not on 'iface' itself. The
                     // chain-prefix slot layout keeps the parent's own dispatches valid through a
                     // child-typed receiver.
-                    var target = ResolveInInstance(typeTable, typeId, slots[i], instances)
+                    // What the CONFORMANCE CHECK settled, where a name no longer settles it: two
+                    // overloads of one name satisfying two instances of one interface. Asked
+                    // first, because the lookups below go by name and would give both rows the
+                    // same function.
+                    var chosen = types.ConformanceImpl(type, iface, slots[i],
+                        typeTable.InstanceOf(ifaceId));
+
+                    var target = (chosen is not null && ids.TryGetValue(chosen, out var chosenId)
+                                     ? (FunctionId?)chosenId
+                                     : null)
+                                 ?? ResolveInInstance(typeTable, typeId, slots[i], instances)
                                  ?? (ownDeclares ? Resolve(type, slots[i], ids) : null)
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions)
                                  ?? Conformance.WithParents(iface, binding)

@@ -241,7 +241,13 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
-**v3.0.0 IS RELEASED** (2026-08-23). Everything that needs the major bump,
+**v3.0.0 IS RELEASED, and v3.0.1 behind it** (2026-08-23). The first pass of the sweep the new
+pipeline prescribes found **four defects and two stale guide claims** — every one of them in what
+the new features do to each other, and none in what any single feature does alone. The one worth
+remembering: two conformances satisfied by two overloads compiled to the wrong call, because the
+vtable rows resolved their method by NAME. The sema had already decided it; the lowering was
+asking the wrong question. Caught by the IR verifier, which is the only reason it was not silent.
+ Everything that needs the major bump,
 collected on one line of work; the tree claims **3.0.0** from the first breaking item on, because
 the suite gates its cases by that number. Six items, all on main, both engines green and the
 specification suite at 108/108. Free overloading was moved in from 3.1.0 by the maintainer, so
@@ -985,6 +991,26 @@ answer yet, and it belongs asked before E4 starts.
 - **Line endings are a test contract, not a taste**: `.gitattributes` forces `eol=lf` in the working
   tree as well, because the goldens compare span offsets. **Do not remove it** — without it 14 golden
   tests fail in every fresh clone and the `windows-latest` job breaks.
+- **THE DEVELOPMENT PIPELINE** (maintainer, 2026-08-23, standing from here on). One feature at a
+  time, and a feature is not done when it compiles:
+
+  ```
+  feature  ->  guide update  ->  feature release
+                                      |
+                                      v
+                         [ bug search & fixes  ->  guide update  ->  patch release ]
+                                      |                                    |
+                                      +------- as long as bugs are found --+
+                                      |
+                                      v
+                            plan the next feature
+  ```
+
+  Two things this settles. The GUIDE is part of the feature, not of the release notes: a feature
+  whose chapter still describes the old language is unfinished. And a release is followed by a
+  deliberate **hunt**, not by waiting for a bug report — the loop exits only when a sweep finds
+  nothing, and only then is the next feature planned.
+
 - **Working mode** (scope check 2026-08-02, still in force): Claude plans *and* implements, the
   maintainer reviews — a deliberate deviation from `CLAUDE.md` §Collaboration, where the plan comes
   from Claude and the code from the user. **`CLAUDE.md` names this entry as the one that overrides

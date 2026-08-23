@@ -10,6 +10,48 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.0.1 — 2026-08-23
+
+**The first sweep after the major**, and the reason the pipeline now has one: four defects, none
+of which a test had asked about, all in what the new features do to EACH OTHER.
+
+### Fixed
+
+- **Static methods did not overload.** `Id.of(7)` beside `Id.of("seven")` took the first
+  declaration and then failed to type the argument. A static call names the type rather than
+  standing on a value of it, and the candidate lookup read the receiver as a value type — finding
+  nothing, so no choice was ever made.
+
+- **Two conformances satisfied by two overloads compiled to the wrong call.** A type may conform
+  to `Equatable<Tag>` and `Equatable<int>` and satisfy both with two `equals`; the vtable rows are
+  built per instance, and both resolved the method by NAME, so both rows pointed at the first one.
+  The conformance check had already decided which implementation belongs to which conformance, and
+  the lowering now reads that answer instead of asking the name. Caught by the IR verifier as a
+  type mismatch, which is not what it looks like — without it, a silent wrong call through an
+  interface value.
+
+- **A broken argument in an overloaded call hid its own error.** Choosing an overload means typing
+  the arguments before a candidate is known, and that typing is muted so that mismatches against
+  the wrong candidate are not reported. An argument that does not type at ALL was muted with them,
+  and the reader got "no overload takes (`<error>`)" — a consequence, with the cause swallowed.
+  Such an argument is now re-checked out loud and nothing else is reported: the poison rule the
+  rest of the checker follows.
+
+- **Two overloaded extension methods were an ambiguity.** `LYR-SEM0044` fired whenever two visible
+  extensions shared a member name, which was right before overloading and wrong after it. It now
+  fires when two of them share a name AND their parameters, which is the case nothing can tell
+  apart.
+
+### Documentation
+
+- Guide 13 no longer says the language has no overloading. The `minInt`/`clampInt` family keeps
+  its names — they were chosen when that was true — and the chapter says so rather than pretending
+  the reason still holds.
+- Guide 19 listed `LYR-SEM0074` among the warnings and promised it would become an error "in a
+  future major version". It became one in 2.0.
+- Guide 3 gains where overloading works (statics and extensions included), that an import brings
+  the whole set, and that `@Deprecated` sits on one overload rather than on the name.
+
 ## v3.0.0 — 2026-08-23
 
 **The major.** Everything the 2.x line had deferred, in one release: heterogeneous arithmetic,

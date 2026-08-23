@@ -287,6 +287,22 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>The interface instance a conformance names, rebuilt from the substitution the
+    /// closure walk produced: <c>Equatable&lt;int&gt;</c> rather than bare <c>Equatable</c>. A
+    /// non-generic interface is its own instance.</summary>
+    private static LyrType InstanceOfConformance(TypeSymbol iface,
+        Dictionary<GenericParamSymbol, LyrType> subst)
+    {
+        if (iface.Generics.Length == 0) return new NamedRef(iface);
+
+        var arguments = new LyrType[iface.Generics.Length];
+        for (var i = 0; i < arguments.Length; i++)
+            arguments[i] = subst.TryGetValue(iface.Generics[i], out var bound)
+                ? bound
+                : new TypeParamType(iface.Generics[i]);
+        return new GenericInstance(iface, arguments);
+    }
+
     private bool SameParameters(FunctionSymbol a, FunctionSymbol b)
     {
         var left = FnTypeOf(a).Parameters;
@@ -633,7 +649,16 @@ public sealed class TypeChecker
                     // match anywhere in the list satisfies it. Only when none fits is there
                     // something to report, and then the single-candidate case reports as before:
                     // one name, one implementation, one reason it does not match.
-                    if (found.Any(candidate => SignatureMismatch(want, im, candidate) is null)) continue;
+                    if (found.FirstOrDefault(candidate => SignatureMismatch(want, im, candidate) is null)
+                        is { } satisfying)
+                    {
+                        // The lowering builds one vtable row per instance and cannot tell two
+                        // overloads apart by name; this is the comparison it would otherwise have
+                        // to repeat.
+                        _result.RecordConformanceImpl(implementer, iface, im.Name,
+                            InstanceOfConformance(iface, subst), satisfying);
+                        continue;
+                    }
 
                     var impl = found[0];
                     if (found.Count > 1)
@@ -1433,6 +1458,13 @@ public sealed class TypeChecker
                 return scope.Overloads(id.Name)
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
 
+            // A STATIC method or an enum's, where the receiver NAMES the type rather than being
+            // a value of it: 'Id.of(7)'. The members are the same table; only the way in differs,
+            // and reading the receiver's type as a value type finds nothing here.
+            case MemberExpr mem when ReceiverTypeOf(mem) is NonValueType { Symbol: TypeSymbol named }:
+                return named.Members.OverloadsLocal(mem.Member)
+                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+
             // A method or an extension. Both scopes contribute, because both are searched when a
             // member is looked up: own members first, then the visible extensions.
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
@@ -1496,6 +1528,18 @@ public sealed class TypeChecker
             for (var i = 0; i < call.Arguments.Length; i++)
                 if (call.Arguments[i] is not LambdaExpr)
                     argumentTypes[i] = CheckExpr(call.Arguments[i], scope);
+
+        // An argument that does not type at all was silenced by the mute, and its error is the one
+        // the reader needs — not "no overload takes (<error>)", which describes a consequence and
+        // hides the cause. Check those again out loud and stop: the poison rule, which is why
+        // nothing is reported here afterwards.
+        if (argumentTypes.Any(t => t is not null && t.IsError))
+        {
+            for (var i = 0; i < call.Arguments.Length; i++)
+                if (argumentTypes[i] is { IsError: true })
+                    CheckExpr(call.Arguments[i], scope);
+            return null;
+        }
 
         List<(FunctionSymbol Fn, OverloadFit Fit)> fitting = new();
         foreach (var candidate in candidates)
@@ -3006,23 +3050,34 @@ public sealed class TypeChecker
                 .Select(candidate => candidate.Symbol.Name))), null);
     }
 
-    // A visible extension method of this name, meaning the declaring module is the current one or is
-    // imported. Several visible candidates give SEM0044 for ambiguity, and the first one wins.
+    /// <summary>A visible extension method of this name, meaning the declaring module is the
+    /// current one or is imported. The first one wins.
+    ///
+    /// <para>Several of a name are an OVERLOAD SET since 3.0, not an ambiguity: the call site
+    /// chooses among them by its arguments, and reports for itself when they do not separate.
+    /// What stays ambiguous here is two extensions offering the same member with the SAME
+    /// parameters — nothing could ever tell those apart (LYR-SEM0044).</para></summary>
     private FunctionSymbol? ExtensionMember(TypeSymbol ts, string member, Span span)
     {
-        FunctionSymbol? found = null;
-        var ambiguous = false;
+        List<FunctionSymbol> visible = new();
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
         {
             if (ext.Symbol.Name != member) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
-            if (found is null) found = ext.Symbol;
-            else if (!ReferenceEquals(found, ext.Symbol)) ambiguous = true;
+            if (!visible.Any(f => ReferenceEquals(f, ext.Symbol))) visible.Add(ext.Symbol);
         }
-        if (ambiguous)
-            _de.Report("LYR-SEM0044", Severity.Error, span,
-                $"ambiguous member '{member}' on '{ts.Name}': provided by more than one visible extension");
-        return found;
+
+        for (var i = 0; i < visible.Count; i++)
+            for (var j = i + 1; j < visible.Count; j++)
+                if (SameParameters(visible[i], visible[j]))
+                {
+                    _de.Report("LYR-SEM0044", Severity.Error, span,
+                        $"ambiguous member '{member}' on '{ts.Name}': two visible extensions "
+                        + $"provide it with the same parameters ({DisplayParameters(visible[j])})");
+                    return visible[0];
+                }
+
+        return visible.Count > 0 ? visible[0] : null;
     }
 
     // An interface default method, one with a body, through the type's interfaces, declared or via

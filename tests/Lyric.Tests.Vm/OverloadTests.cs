@@ -172,6 +172,51 @@ public class OverloadTests
     }
 
     [Fact]
+    public void Two_conformances_satisfied_by_two_overloads_get_their_own_rows()
+    {
+        // Found by the post-3.0.0 sweep. A type may conform to one interface twice, and since
+        // overloading it can satisfy both with two methods of ONE name — at which point a vtable
+        // row resolved by name gives both instances the same function. The verifier caught it as
+        // a type mismatch, which is not what it looks like; without it, a silent wrong call.
+        Assert.Equal(10, Run("""
+            import std.core { Equatable };
+
+            struct Tag :: [Equatable<Tag>, Equatable<int>] {
+                v: int,
+                fn equals(other: Tag): bool { return this.v == other.v; }
+                fn equals(other: int): bool { return false; }
+            }
+
+            fn viaTag(e: Equatable<Tag>, other: Tag): int { return if (e.equals(other)) 10 else 0; }
+            fn viaInt(e: Equatable<int>, other: int): int { return if (e.equals(other)) 5 else 0; }
+
+            fn main(): int {
+                let a = Tag { v = 1 };
+                let b = Tag { v = 1 };
+                return viaTag(a, b) + viaInt(a, 1);
+            }
+            """));
+    }
+
+    [Fact]
+    public void Static_methods_overload()
+    {
+        // Also from the sweep: the receiver NAMES the type here rather than being a value of it,
+        // and reading it as a value type found no candidates at all.
+        Assert.Equal(106, Run("""
+            struct Id {
+                v: int,
+                static fn of(n: int): Id { return Id { v = n }; }
+                static fn of(s: string): Id { return Id { v = 99 }; }
+            }
+
+            fn main(): int {
+                return Id.of(7).v + Id.of("x").v;
+            }
+            """));
+    }
+
+    [Fact]
     public void Overloads_keep_their_own_names_in_the_module()
     {
         // The bytecode carries one name per function and the verifier refuses duplicates, so the
