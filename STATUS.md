@@ -241,9 +241,13 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
-**THE v3.0.0 BASKET — in progress.** Everything that needs the major bump, collected on one
-line of work; the tree claims **3.0.0** from the first breaking item on, because the
-suite gates its cases by that number. The list:
+**THE v3.0.0 BASKET — COMPLETE, unreleased** (2026-08-23). Everything that needs the major bump,
+collected on one line of work; the tree claims **3.0.0** from the first breaking item on, because
+the suite gates its cases by that number. Every item below is on main, both engines green
+(4714 interpreted, 4714 compiled) and the specification suite at 104/104. What is left is the
+release itself: a date on the CHANGELOG heading, the tag, the archives.
+
+The list:
 
 - [x] **multi-conformance** (branch `feature/multi-conformance`, 2026-08-23) — door B of the
       design round, plus the part the round had not seen: the interfaces needed a SECOND type
