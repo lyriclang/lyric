@@ -1302,6 +1302,17 @@
         },
         {
           "Kind": "Struct",
+          "Name": "Open",
+          "Signature": "pub struct Open :: [OnTypeAlias]",
+          "Doc": "Reopens an opaque alias: `as` to and from it is allowed outside the declaring module again.\n\nAn `opaque type` is a wall, and since 3.3 the wall holds — the `as` that crosses it belongs to\nthe module that declares the alias, so a handle can be held and returned everywhere but made\nnowhere else. That is what the grammar has promised since v1.15 and what it did not do: any\nmodule could write `3 as Ticket` and invent one.\n\nThis attribute takes the wall back down, for the alias that wants it. The case it exists for\nis code that crossed before 3.3 and has a reason to keep crossing — a test that builds handles\nby hand, two halves of one library that the module system cannot see as one. Reaching for it\nto silence a warning is the wrong move: the warning is usually pointing at a missing function\non the declaring side.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 505
+          }
+        },
+        {
+          "Kind": "Struct",
           "Name": "Deprecated",
           "Signature": "pub struct Deprecated :: [OnModule, OnType, OnFunction]",
           "Doc": "Marks its target as deprecated: the compiler warns at every use, and `message` says what to\nuse instead. The first attribute the compiler itself reads — it changes diagnostics and\nnothing else, so a program that ignores the warning runs unchanged.",
@@ -1314,7 +1325,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 498
+                "Line": 512
               }
             },
             {
@@ -1325,13 +1336,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 505
+                "Line": 519
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 496
+            "Line": 510
           }
         }
       ]

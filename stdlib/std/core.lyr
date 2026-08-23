@@ -490,6 +490,20 @@ pub interface OnFunction { }
 /// written to a metadata row: the module format has no row kind for an alias.
 pub interface OnTypeAlias { }
 
+/// Reopens an opaque alias: `as` to and from it is allowed outside the declaring module again.
+///
+/// An `opaque type` is a wall, and since 3.3 the wall holds — the `as` that crosses it belongs to
+/// the module that declares the alias, so a handle can be held and returned everywhere but made
+/// nowhere else. That is what the grammar has promised since v1.15 and what it did not do: any
+/// module could write `3 as Ticket` and invent one.
+///
+/// This attribute takes the wall back down, for the alias that wants it. The case it exists for
+/// is code that crossed before 3.3 and has a reason to keep crossing — a test that builds handles
+/// by hand, two halves of one library that the module system cannot see as one. Reaching for it
+/// to silence a warning is the wrong move: the warning is usually pointing at a missing function
+/// on the declaring side.
+pub struct Open :: [OnTypeAlias] { }
+
 /// Marks its target as deprecated: the compiler warns at every use, and `message` says what to
 /// use instead. The first attribute the compiler itself reads — it changes diagnostics and
 /// nothing else, so a program that ignores the warning runs unchanged.

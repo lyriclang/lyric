@@ -2297,8 +2297,16 @@ public sealed class TypeChecker
         // An opaque alias converts to EXACTLY its underlying and back — the one door in its
         // wall, and it is explicit by construction: this cast is the only way through. At
         // runtime the value is untouched; the lowering emits nothing for it.
-        if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target)) return target;
-        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying)) return target;
+        if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target))
+        {
+            CheckOpaqueCrossing(from.Symbol, c.Span, unwrapping: true);
+            return target;
+        }
+        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying))
+        {
+            CheckOpaqueCrossing(to.Symbol, c.Span, unwrapping: false);
+            return target;
+        }
 
         if (_into is { } into && (CanConform(op) || op is PrimitiveType)
             && Satisfies(op, into, new GenericInstance(into, [target])))
@@ -4933,6 +4941,76 @@ public sealed class TypeChecker
 
     /// <summary>Whether this is THE <c>Deprecated</c> struct of <c>std.core</c> — by identity,
     /// the same rule the WarningAnalyzer applies when it reads the attribute.</summary>
+    /// <summary>
+    /// The door in an opaque wall belongs to the module that declares the alias (3.3).
+    ///
+    /// <para>Before this, <c>3 as Ticket</c> compiled in any module that could name <c>Ticket</c> —
+    /// so the wall stopped implicit conversion, arithmetic and constraints, and did not stop the
+    /// deliberate reach. The grammar promised otherwise and an SDK believed it: Erato writes "this
+    /// module's constants are the only source" over an opaque <c>Key</c>.</para>
+    ///
+    /// <para>BOTH directions are confined, not just the forging one. Unwrapping alone cannot invent
+    /// a handle, but it publishes the representation — and an alias whose underlying type everyone
+    /// reads is an alias whose underlying type can never change. A declaring module that wants to
+    /// hand out the number writes a function that does; that is the wall doing its job rather than
+    /// leaking by default.</para>
+    /// </summary>
+    private void CheckOpaqueCrossing(TypeSymbol alias, Span span, bool unwrapping)
+    {
+        if (_currentModule is null) return;
+        if (ReferenceEquals(ModuleDeclaring(alias), _currentModule)) return;
+        if (IsOpenAlias(alias)) return;
+
+        var owner = ModuleDeclaring(alias)?.FullName;
+        var where = owner is null ? "the module that declares it" : $"'{owner}'";
+
+        _de.Report("LYR-SEM0090", EncapsulationPolicy.Level(), span,
+            unwrapping
+                ? $"'{alias.Name}' is opaque, so reading the value inside it belongs to {where} — "
+                  + $"call a function there that hands the value out, or mark the alias '@Open'. "
+                  + $"This is an error from {EncapsulationPolicy.Enforced}."
+                : $"'{alias.Name}' is opaque, so making one belongs to {where} — call a function "
+                  + $"there that issues one, or mark the alias '@Open'. This is an error from "
+                  + $"{EncapsulationPolicy.Enforced}.");
+    }
+
+    /// <summary>Whether the alias carries the canonical <c>@Open</c>.
+    ///
+    /// <para>Reading the bound reference is safe here for the reason the attribute DEFAULTS rely
+    /// on: declarations are checked in dependency order, so a module naming this alias was reached
+    /// through an import and the declaring module is already done.</para></summary>
+    private bool IsOpenAlias(TypeSymbol alias)
+    {
+        if (alias.Declaration is not TypeAliasDecl decl) return false;
+        var open = _comp.FindModule(["std", "core"])?.Members.LookupLocal("Open");
+        if (open is null) return false;
+
+        foreach (var attribute in decl.Attributes)
+            if (ReferenceEquals(_result.RefOf(attribute), open))
+                return true;
+        return false;
+    }
+
+    /// <summary>Which module declares a type, by identity. Cached: the answer cannot change within
+    /// one compilation, and the scan is otherwise repeated at every crossing.</summary>
+    private ModuleSymbol? ModuleDeclaring(TypeSymbol type)
+    {
+        if (_declaringModule.TryGetValue(type, out var known)) return known;
+
+        ModuleSymbol? found = null;
+        foreach (var module in _comp.Modules)
+            if (ReferenceEquals(module.Members.LookupLocal(type.Name), type))
+            {
+                found = module;
+                break;
+            }
+
+        _declaringModule[type] = found;
+        return found;
+    }
+
+    private readonly Dictionary<TypeSymbol, ModuleSymbol?> _declaringModule = new();
+
     private bool IsCanonicalDeprecated(TypeSymbol ts) =>
         ReferenceEquals(ts,
             _comp.FindModule(["std", "core"])?.Members.LookupLocal("Deprecated"));

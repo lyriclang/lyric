@@ -191,3 +191,36 @@ script holds and returns the handle — and can neither forge one from a literal
 arithmetic. On the wire the handle is its underlying number. The wall spans modules: an SDK of
 several files declares the handle once and imports it wherever a native signature names it —
 selectively or module-qualified, in scalar and array positions alike.
+
+**The door belongs to the declaring module.** Since 3.3 the `as` above works where `Ticket` is
+declared and nowhere else — that is what makes "cannot forge one" true, and until 3.3 it was not:
+any module could write `3 as Ticket`. Holding a handle, storing it in a field, putting it in an
+array and passing it back all stay free, because none of them is a crossing. What changes is that
+a script cannot invent one, and cannot read the number out either: an alias whose representation
+every caller reads is an alias whose representation can never change.
+
+An SDK that wants to hand the number out writes a function that does — which is the wall doing its
+job rather than leaking by default:
+
+```lyr
+module sdk;
+
+pub opaque type Ticket = int;
+
+pub fn issue(raw: int): Ticket { return raw as Ticket; }
+pub fn number(t: Ticket): int { return t as int; }
+```
+
+If crossing elsewhere is genuinely wanted — a test that builds handles by hand, two halves of one
+library the module system cannot see as one — the alias says so:
+
+```lyr
+import std.core { Open };
+
+@Open
+pub opaque type Ticket = int;
+```
+
+Reaching for `@Open` to silence the warning is usually the wrong move: it is pointing at a missing
+function on the declaring side. Through the 3.x line the crossing is a warning; from 4.0 it is an
+error.

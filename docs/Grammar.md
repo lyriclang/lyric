@@ -178,8 +178,14 @@ IDENTITY over the same layout: nothing converts implicitly in either direction, 
 to exactly the underlying type and back is the one crossing, `==`/`!=` compare within one alias,
 and everything else — arithmetic, ordering, constraint satisfaction, f-string rendering — is
 refused. At runtime an opaque value is its underlying value; in a native signature the alias
-resolves to the underlying, which is how a handle crosses the host boundary as a plain number
-while scripts cannot forge one.
+resolves to the underlying, which is how a handle crosses the host boundary as a plain number.
+
+**The crossing belongs to the declaring module** (since 3.3). `as` to or from an opaque alias is
+allowed only where the alias is declared, so a handle may be held, stored and passed anywhere and
+made nowhere else — which is what makes the sentence above about forging true. It was not before:
+until 3.3 any module could write `3 as Ticket`, and the wall stopped only the implicit crossings.
+A module that has a reason to cross marks the alias `@Open` (`std.core`, `OnTypeAlias`). Reported
+as a warning through the 3.x line and an error from 4.0.
 
 The module header is optional. In an entry file the name then comes from the file name; in a file
 reached through an `import`, the name is the imported path, and a header that disagrees with it is
