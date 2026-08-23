@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.0.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.0.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.0.1 — 2026-08-23</h2>
+<p><strong>The first sweep after the major</strong>, and the reason the pipeline now has one: four defects, none
+of which a test had asked about, all in what the new features do to EACH OTHER.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>Static methods did not overload.</strong> <code>Id.of(7)</code> beside <code>Id.of(&quot;seven&quot;)</code> took the first
+declaration and then failed to type the argument. A static call names the type rather than
+standing on a value of it, and the candidate lookup read the receiver as a value type — finding
+nothing, so no choice was ever made.</p>
+</li>
+<li><p><strong>Two conformances satisfied by two overloads compiled to the wrong call.</strong> A type may conform
+to <code>Equatable&lt;Tag&gt;</code> and <code>Equatable&lt;int&gt;</code> and satisfy both with two <code>equals</code>; the vtable rows are
+built per instance, and both resolved the method by NAME, so both rows pointed at the first one.
+The conformance check had already decided which implementation belongs to which conformance, and
+the lowering now reads that answer instead of asking the name. Caught by the IR verifier as a
+type mismatch, which is not what it looks like — without it, a silent wrong call through an
+interface value.</p>
+</li>
+<li><p><strong>A broken argument in an overloaded call hid its own error.</strong> Choosing an overload means typing
+the arguments before a candidate is known, and that typing is muted so that mismatches against
+the wrong candidate are not reported. An argument that does not type at ALL was muted with them,
+and the reader got &quot;no overload takes (<code>&lt;error&gt;</code>)&quot; — a consequence, with the cause swallowed.
+Such an argument is now re-checked out loud and nothing else is reported: the poison rule the
+rest of the checker follows.</p>
+</li>
+<li><p><strong>Two overloaded extension methods were an ambiguity.</strong> <code>LYR-SEM0044</code> fired whenever two visible
+extensions shared a member name, which was right before overloading and wrong after it. It now
+fires when two of them share a name AND their parameters, which is the case nothing can tell
+apart.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 13 no longer says the language has no overloading. The <code>minInt</code>/<code>clampInt</code> family keeps
+its names — they were chosen when that was true — and the chapter says so rather than pretending
+the reason still holds.</li>
+<li>Guide 19 listed <code>LYR-SEM0074</code> among the warnings and promised it would become an error &quot;in a
+future major version&quot;. It became one in 2.0.</li>
+<li>Guide 3 gains where overloading works (statics and extensions included), that an import brings
+the whole set, and that <code>@Deprecated</code> sits on one overload rather than on the name.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
