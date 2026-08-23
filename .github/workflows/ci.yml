@@ -58,6 +58,34 @@ jobs:
           path: '**/TestResults/*.trx'
           retention-days: 7
 
+  compiled:
+    # The SECOND execution engine, held to the answers of the first. LYRIC_JIT=1 compiles every
+    # function the emitter accepts, in every test, and the suite has to give the same results as
+    # interpreted — which is the only thing that makes a compiler trustworthy. Without a job of
+    # this shape the comparison would have to be written into each test by hand, and would cover
+    # whichever tests somebody remembered.
+    #
+    # Linux only, and deliberately: the emitter is platform-independent IL and a second OS would
+    # buy a runtime difference, not a Lyric one. A debugged or metered run stays interpreted even
+    # here, so the tests that pin THOSE keep pinning them.
+    name: Build and test (compiled)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test with the compiler on
+        env:
+          LYRIC_JIT: '1'
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
   spec-sync:
     # docs/Grammar.md and docs/Bytecode.md are MIRRORS of the spec repository's chapters 02
     # and 13: everything below the '<!-- sync:body -->' marker must be byte-identical. This
@@ -124,7 +152,9 @@ jobs:
   publish:
     # Runs after the tests so no artifact is produced from a red build.
     name: Publish toolchain
-    needs: build-and-test
+    # Both engines, not one: an artifact whose compiled run disagrees with its interpreted one
+    # is an artifact nobody should install.
+    needs: [build-and-test, compiled]
     runs-on: ubuntu-latest
 
     steps:

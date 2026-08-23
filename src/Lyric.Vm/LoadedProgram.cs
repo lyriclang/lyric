@@ -56,8 +56,21 @@ public sealed class LoadedProgram
     /// <exception cref="LyricRuntimeException">A missing capability, or an import that cannot be
     /// bound.</exception>
     /// <exception cref="LyricPanic">The initializer panicked, or spent the budget.</exception>
+    /// <param name="jit">
+    /// Whether functions may be compiled to .NET IL instead of interpreted.
+    ///
+    /// <para><b>Off by default, and that is the useful default.</b> Compiled code has no
+    /// instruction boundaries: a debugger cannot stop inside it and a budget cannot count it.
+    /// So the shape a host wants is develop on the interpreter -- where breakpoints, stepping and
+    /// hot reload all work -- and ship with this on.</para>
+    ///
+    /// <para>It does not have to be weighed call by call. A run under a
+    /// <see cref="DebugController"/> or an <see cref="ExecutionBudget"/> stays interpreted even
+    /// when this is set, so a host may turn it on for a whole program and still meter the foreign
+    /// code inside it.</para>
+    /// </param>
     public static LoadedProgram Load(BytecodeModule module, NativeRegistry? natives = null,
-        Capability granted = Capability.All, ExecutionBudget? budget = null)
+        Capability granted = Capability.All, ExecutionBudget? budget = null, bool jit = false)
     {
         // First of all: a module requiring more than this VM grants never starts. The requirement
         // is recorded in the module, so a host loading foreign bytes checks the same thing.
@@ -84,6 +97,24 @@ public sealed class LoadedProgram
 
         var program = new LoadedProgram(module, prepared, dispatch, bound, globals);
 
+        // One context per program, made only when compilation is on. It carries the module's
+        // tables so the emitter can read types, and the SAME globals array the interpreter uses --
+        // a copy would pass every single-engine test and quietly lose a game's state.
+        if (jit || Forced)
+            program._jit = new Jit.JitContext
+            {
+                Prepared = prepared,
+                Natives = bound,
+                Globals = globals,
+                GlobalTypes = module.Globals,
+                Types = module.Types,
+                Imports = module.Imports,
+                Strings = module.Strings,
+                Dispatch = dispatch,
+                Arguments = program._arguments,
+                SourceMap = module.SourceMap,
+            };
+
         // The initializer runs before everything else and exactly once. It is void; what counts
         // are the slots it leaves behind.
         if (module.GlobalInit is { } init && init >= module.Imports.Count)
@@ -91,6 +122,56 @@ public sealed class LoadedProgram
 
         return program;
     }
+
+    /// <summary>Whether this program may run compiled code. See the <c>jit</c> parameter of
+    /// <see cref="Load"/>.</summary>
+    public bool Jit => _jit is not null;
+
+    private Jit.JitContext? _jit;
+
+    /// <summary>
+    /// Which functions the compiler declined, and why — empty when compilation is off.
+    ///
+    /// <para>Lazily filled: a function is compiled the first time it is called, so this answers
+    /// for the code that has actually run. Reading it after a few seconds of play is the honest
+    /// way to ask which opcode is standing between a game and its speed.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, string Reason)> JitRefusals =>
+        _jit?.Refusals ?? [];
+
+    /// <summary>How many functions were compiled.</summary>
+    public int JitCompiled => _jit?.CompiledCount ?? 0;
+
+    /// <summary>
+    /// How many instructions each function executed in the INTERPRETER, heaviest first. Empty
+    /// unless <c>LYRIC_PROFILE=1</c>.
+    ///
+    /// <para>Read it from a run that had compilation on and the answer is precise: a compiled
+    /// function executes no instructions, so this is a list of what is still being interpreted,
+    /// ordered by how much it costs. That is the question a refusal count cannot answer — a
+    /// function can be declined and never run.</para>
+    /// </summary>
+    public IReadOnlyList<(string Function, long Instructions)> Hotspots =>
+        _prepared
+            .Where(p => p.Executed > 0)
+            .OrderByDescending(p => p.Executed)
+            .Select(p => (p.Source.Name, p.Executed))
+            .ToArray();
+
+    /// <summary>
+    /// <c>LYRIC_JIT=1</c> turns compilation on for every program in the process.
+    ///
+    /// <para>It exists for ONE purpose, and it is the purpose that makes a compiler trustworthy:
+    /// running the whole test suite twice, once interpreted and once compiled, and demanding the
+    /// same answers. Without a switch of this shape that comparison would have to be written into
+    /// every test by hand, which means it would cover whichever tests somebody remembered.</para>
+    ///
+    /// <para>It cannot make a debugged or metered run compile — those decide per call, further in
+    /// — so it is safe to leave set while working.</para>
+    /// </summary>
+    private static readonly bool Forced =
+        string.Equals(
+            Environment.GetEnvironmentVariable("LYRIC_JIT"), "1", StringComparison.Ordinal);
 
     /// <summary>Does this module have an entry point?</summary>
     public bool HasEntryPoint => _module.Start is not null;
@@ -199,5 +280,6 @@ public sealed class LoadedProgram
     private LyrValue Execute(int index, LyrValue[]? arguments = null,
         DebugController? debug = null, ExecutionBudget? budget = null) =>
         Interpreter.Execute(_prepared, index, _module.Strings, _module.Types, _dispatch,
-            _natives, _globals, _arguments, arguments, _module.SourceMap, debug, budget);
+            _natives, _globals, _module.Globals, _arguments, arguments, _module.SourceMap,
+            debug, budget, _jit);
 }

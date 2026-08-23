@@ -90,6 +90,10 @@ internal readonly struct VmInstruction
 
 
 
-    /// <summary>The tag as an optional again, for the one caller that wants it that way.</summary>
+    /// <summary>The tag as an optional again, for the callers that want it that way — the
+    /// emitters, which refuse an instruction whose tag is absent where they need one.</summary>
     public TypeTag? TypeOrNull => HasType ? Type : null;
+
+    /// <summary><c>convert</c>'s target tag as an optional, for the same reason.</summary>
+    public TypeTag? ToTypeOrNull => HasToType ? ToType : null;
 }

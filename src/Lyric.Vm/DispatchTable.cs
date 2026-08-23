@@ -77,6 +77,22 @@ internal sealed class DispatchTable
     }
 
     /// <summary>
+    /// Every function this slot can dispatch to, across all implementing types.
+    ///
+    /// <para>A virtual call chooses its target at run time, so a compiler that wants to know
+    /// whether that target is safe has to ask about ALL of them. Enumerating the column is the
+    /// only honest answer to "where could this go".</para>
+    /// </summary>
+    public IEnumerable<int> Targets(int interfaceType, int slot)
+    {
+        if (interfaceType < 0 || interfaceType >= _rows.GetLength(1)) yield break;
+
+        for (var type = 0; type < _rows.GetLength(0); type++)
+            if (_rows[type, interfaceType] is { } methods && slot >= 0 && slot < methods.Length)
+                yield return methods[slot];
+    }
+
+    /// <summary>
     /// The function index in the shared space (imports first, then functions).
     ///
     /// <para>Throws only when load-time validation was bypassed, which the message says.</para>

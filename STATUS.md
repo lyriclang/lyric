@@ -283,9 +283,16 @@ suite gates its cases by that number. The list:
       SHAPE (`FieldsOf`), never to call into it. What was genuinely missing was the PIN — the only
       coverage was an inliner test about surviving inlining, which says nothing about library
       pruning or renumbering. Two tests in `ExportRootTests` now hold both
-- [ ] the JIT's remaining obligations: default stays off (decided), an AOT line in the
-      embedding contract, "a metered run gets no JIT" in the guide, the refusal list
-      documented, `LYRIC_JIT=1` in CI
+- [x] **the JIT's remaining obligations** (branch `feature/jit-obligations`, 2026-08-23) — and
+      one that was not on the list: the embedding API had no way to turn it on. `HostOptions` had
+      no switch and `LangVm.Instantiate` never passed one, so the audience the JIT is FOR could
+      not reach it. `HostOptions.Compile` now wires through, and `ScriptInstance` exposes
+      `CompiledFunctions` and `Refusals` — a host cannot tune what it cannot read. Guide 14 gains
+      the section: the default and why, the metered-call rule, the refusal list, and the AOT line
+      (emitting IL at run time and publishing ahead-of-time are alternatives, not a pair; under
+      NativeAOT every function is declined with `no runtime code generation`). CI runs the whole
+      suite a second time with `LYRIC_JIT=1`, and publishing needs both engines green.
+      **The branch is current with main and passes both**: 4714 interpreted, 4714 compiled
 
 **v1.0.0 through v2.0.0 are released** — annotated tags on the remote, each with a release page.
 M0–M10 are finished and tagged (`m0`–`m10-complete`, `v0.1.0`/`v0.5.0`/`v0.9.0`). Releases
