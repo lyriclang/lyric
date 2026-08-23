@@ -502,9 +502,9 @@ where it was declared, a program followed across its files, documentation on hov
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
 4618 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **2.17.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 97 cases, and the toolchain's own CI runs it against the
-working tree.
+plus `lyrembed.dll`, version **3.2.0**; the specification in `lyriclang/lyric-spec` is
+**NORMATIVE**, its suite stands at 117 cases pinned to 3.2.0, and the toolchain's own CI runs it
+against the working tree. *(The test count is the one last counted, at 2.17.0.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
 that largely carries itself (`Map`, `Set`, merge sort, all iterator adapters and the string hash are
@@ -520,6 +520,13 @@ out of them and hands its own functions, types and value structs in.
 > else stands in `git log`.
 
 ## Recently finished
+
+- [x] **The specification caught up with 3.0.1 through 3.2.0** (2026-08-23,
+  `lyriclang/lyric-spec` PR #18, one commit per version). It was pinned to 3.0.0 and still said
+  it describes Lyric 2.0. What the four releases owed the document was not evenly spread: 3.0.2
+  nothing at all, 3.1.0 one diagnostic cause, 3.2.0 one sentence — and 3.0.0 two claims its own
+  features had made FALSE. The pin stands at 3.2.0, the suite at 117 cases, and chapters 02 and
+  13 were untouched, so the mirrors held.
 
 - [x] **A18 — an opaque type leaves a name in the module** (2026-08-22,
   `feature/a18-opaque-field-names`, v2.11.0, format 3.5). The first format change since 3.1 that
@@ -960,6 +967,21 @@ answer yet, and it belongs asked before E4 starts.
   Retrofitting them would mean extending the model with provenance data — a decision of its own.
 - **Measure the verifier share in a Release profile** — the Debug numbers are riddled with JIT
   warm-up and serve only as an order of magnitude.
+- **A conformance written twice at the SAME arguments is accepted in silence.**
+  `S :: [Equatable<S>, Equatable<S>]` compiles: the instance list dedups it, so it means one
+  conformance and nothing goes wrong downstream. It is still a program saying something it
+  cannot mean, and it is the one shape of multi-conformance with nothing to select by — the
+  case `LYR-SEM0083` refuses for the arithmetic interfaces, unreported everywhere else. Found
+  while writing spec §5.1, which describes the dedup rather than blessing the form, so a
+  diagnostic is still available as the answer.
+- **`UnifyThroughConformance` still assumes one conformance per generic interface.** The comment
+  above the `GenericInstance` case in `TypeChecker.cs` justifies the mapping with "a type cannot
+  satisfy the same generic interface twice with different arguments: the method would have two
+  signatures, and LYR-SEM0042 rejects that" — which stopped being true the day overloading
+  landed. Inference through an interface-typed parameter therefore binds from whichever
+  conformance it meets first where two fit. Nothing has hit it yet, and the failure shape is
+  the bad one: a `T` bound from the wrong instance is a wrong monomorphization, not a
+  diagnostic.
 
 ## Design decisions (context)
 
@@ -1153,6 +1175,20 @@ answer yet, and it belongs asked before E4 starts.
      CANDIDATE SET, the checker select and record the winner, and seven lowering sites move over.
      "Architectural inversion" is what the old entry implied; three quarters of it has already
      happened.
+
+- **"ONE INTERFACE, ONCE" IS GONE — multi-conformance is general since 3.0** (found 2026-08-23,
+  written into the specification with `lyric-spec` PR #18). The design round decided
+  heterogeneous arithmetic as multi-conformance and framed the four arithmetic interfaces as the
+  single exception to the rule. That framing did not survive the release it shipped in. The rule
+  was never a CHECK: before overloading, two conformances wanted two methods of one name on one
+  type and `LYR-SEM0042` refused the second, which made a consequence look like an enforced
+  rule. Overloading removed that barrier for every interface at once —
+  `Tag :: [Equatable<Tag>, Equatable<int>]` compiles, runs, and is pinned by the test the 3.0.1
+  sweep left behind. What stays true of `Add`/`Sub`/`Mul`/`Div` is only that theirs is the
+  selection an OPERATOR performs; a member call selects by its arguments, an interface value by
+  the instance it carries. **The lesson is the single-parent entry's again**: a restriction that
+  rests on another mechanism's absence expires the moment that mechanism arrives, silently, with
+  no test failing — and this one expired in the same release that added it.
 
 - **Heterogeneous operator arithmetic: documented No** (M22 probe) — *SUPERSEDED, shipped in the
   v3.0.0 basket. Kept for one sentence of it that held and one that did not: a two-parameter
