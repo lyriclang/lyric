@@ -31,6 +31,10 @@ bytecode format, the command line and the embedding API. Compiler internals are 
   target now **fails the build** when the stub did not arrive, rather than leaving it to be
   discovered by a packing test half a minute later.
 
+  That last part earned itself immediately: the first derived path forgot that a publish FOR a
+  platform writes to `bin/<config>/<tfm>/<rid>/`, so the release build copied nothing — and said
+  so, in the build, instead of shipping an archive whose driver could not pack.
+
 ## v3.0.1 — 2026-08-23
 
 **The first sweep after the major**, and the reason the pipeline now has one: four defects, none
