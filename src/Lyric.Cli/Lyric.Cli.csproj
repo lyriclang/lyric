@@ -88,9 +88,20 @@
       <ToolProject Include="..\Lyrc\;..\Lyrvm\;..\Lyrrepl\;..\Lyrbuild\;..\Lyrpack\;..\Lyrfmt\" />
     </ItemGroup>
 
+    <!--
+      The RID belongs in the path when the build has one. A publish for a platform writes to
+      bin\<config>\<tfm>\<rid>\, and a derived path that leaves it out points at a directory the
+      release build never fills. The check at the end of this target is what caught that, on the
+      first release after the paths stopped being asked for.
+    -->
+    <PropertyGroup>
+      <_ToolBin>bin\$(Configuration)\$(TargetFramework)\</_ToolBin>
+      <_ToolBin Condition="'$(RuntimeIdentifier)' != ''">bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</_ToolBin>
+    </PropertyGroup>
+
     <ItemGroup>
       <!-- The stdlib included: it belongs next to the compiler, and "next to" is a directory here. -->
-      <ToolFile Include="%(ToolProject.Identity)bin\$(Configuration)\$(TargetFramework)\**\*.*" />
+      <ToolFile Include="%(ToolProject.Identity)$(_ToolBin)**\*.*" />
     </ItemGroup>
 
     <Copy SourceFiles="@(ToolFile)"
