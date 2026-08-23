@@ -881,10 +881,10 @@ runs an example on every platform before an archive exists.
 that platform's stub out of its archive — no `--target` until someone needs it); the stub ships
 untrimmed (measured 73.5 → 13.0 MB, decision material above); capability narrowing at pack time
 is a footer field for a future minor. **And one limit the release gate found rather than the
-plan**: a packed Mach-O fails codesign's strict validation, so macOS cannot RUN packed programs
-yet — the payload has to become a real Mach-O segment (deno's route). The pipeline documents
-the state honestly: macOS verifies pack-succeeds plus the signed bare stub, Windows and Linux
-run the packed result.
+plan**: a packed Mach-O failed codesign's strict validation, so macOS could not RUN packed
+programs. *Closed in 3.1.0 (#54): the payload is folded into `__LINKEDIT` and the result signed
+ad-hoc through `codesign`, which macOS ships — the header arithmetic is ours and unit-tested, the
+signature is not. Both workflows run the packed program on macOS now and verify its signature.*
 
 **M18's deliberate limits**: precedence-redundant parentheses vanish (the AST has no node for
 them — keeping them means a parser change, material for the scope check if it itches); a

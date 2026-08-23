@@ -64,6 +64,7 @@ public static class Program
                 $"refusing to overwrite '{output}': it is an input of this pack", ExitCodes.Usage);
 
         long moduleLength;
+        var signed = false;
         try
         {
             // Both inputs open BEFORE the output exists, and a failed write deletes it: a pack
@@ -75,10 +76,44 @@ public static class Program
 
             try
             {
-                using var result = new FileStream(output, FileMode.Create, FileAccess.Write);
-                template.CopyTo(result);
-                module.CopyTo(result);
-                PackFooter.Write(result, moduleLength);
+                using (var result = new FileStream(output, FileMode.Create, FileAccess.ReadWrite))
+                {
+                    template.CopyTo(result);
+
+                    // Decided by the FILE, not by the host: a Mach-O describes where it ends, so
+                    // the payload cannot simply follow it. The existing signature is dropped first
+                    // — the payload takes its place — and 'codesign' writes a new one at the end
+                    // afterwards. See MachO.
+                    var mach = MachO.Looks(result, out var refusal);
+                    if (refusal is not null)
+                        throw new InvalidOperationException($"cannot pack this stub: {refusal}");
+
+                    // The signature is the half only macOS can do, and an unsigned Mach-O is killed
+                    // on launch. Refused here rather than written: a packed program that cannot
+                    // start is worse than a pack that says why it did not happen.
+                    if (mach && !OperatingSystem.IsMacOS())
+                        throw new InvalidOperationException(
+                            "cannot pack a macOS program on this system: the executable has to be "
+                            + "signed, and only macOS carries the signer. Pack it on macOS.");
+
+                    if (mach)
+                    {
+                        if (MachO.SignatureOffset(result) is { } signature)
+                            result.SetLength(signature);
+                        MachO.RemoveSignatureCommand(result);
+                    }
+
+                    result.Seek(0, SeekOrigin.End);
+                    module.CopyTo(result);
+                    PackFooter.Write(result, moduleLength);
+
+                    if (mach) MachO.GrowLinkEditToEnd(result);
+                    signed = mach;
+                }
+
+                // Signed last, over the finished file: macOS kills an executable whose signature
+                // does not match, and everything before this line changed the bytes it covers.
+                if (signed) CodeSign.AdHoc(output);
             }
             catch
             {
@@ -90,6 +125,13 @@ public static class Program
         {
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.OutputUnwritable,
                 $"cannot pack {input}: {ex.Message}", ExitCodes.Failure);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The Mach-O half: a stub this packer cannot edit, a host that cannot sign, or a
+            // signer that refused. Its own words carry through.
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.OutputUnwritable,
+                ex.Message, ExitCodes.Failure);
         }
 
         // What the OS needs to run it. The stub's own execute bit does not survive the byte copy.

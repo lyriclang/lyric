@@ -29,6 +29,52 @@ public class PackFooterTests
     }
 
     [Fact]
+    public void A_footer_with_a_signature_behind_it_is_still_found()
+    {
+        // macOS (#54): the file has to be signed to run, and the signature is written after
+        // everything the packer put in. The footer is then no longer last.
+        using var stream = Packed(stubBytes: 100, payloadBytes: 40);
+        stream.Write(new byte[3000]);   // where a code signature would stand
+
+        Assert.Equal(PackFooterState.Present, PackFooter.TryRead(stream, out var payload));
+        Assert.Equal(100, payload.Offset);
+        Assert.Equal(40, payload.Length);
+    }
+
+    [Fact]
+    public void The_last_footer_wins_when_one_appears_twice()
+    {
+        // A signature is bytes, and bytes can spell anything. What settles it is that the scan
+        // runs backwards and every candidate is checked whole: the packer's own footer is the
+        // last one that holds together.
+        using var stream = Packed(stubBytes: 100, payloadBytes: 40);
+        var again = stream.ToArray();
+
+        using var twice = new MemoryStream();
+        twice.Write(again);          // a first, older pack
+        twice.Write(new byte[10]);
+        twice.Write(again);          // and the real one behind it
+        twice.Write(new byte[500]);  // signed afterwards
+
+        Assert.Equal(PackFooterState.Present, PackFooter.TryRead(twice, out var payload));
+        Assert.Equal(again.Length + 10 + 100, payload.Offset);
+        Assert.Equal(40, payload.Length);
+    }
+
+    [Fact]
+    public void A_file_that_merely_contains_the_magic_is_absent()
+    {
+        // The magic alone decides nothing: the version has to be one this reader knows and the
+        // payload has to fit in front of it, or the candidate is passed over.
+        using var stream = new MemoryStream();
+        stream.Write(new byte[64]);
+        stream.Write("LYRPACK1"u8);
+        stream.Write(new byte[64]);
+
+        Assert.Equal(PackFooterState.Absent, PackFooter.TryRead(stream, out _));
+    }
+
+    [Fact]
     public void The_footer_is_exactly_its_declared_size()
     {
         using var stream = Packed(stubBytes: 10, payloadBytes: 5);

@@ -60,11 +60,16 @@ the operating system, the way every executable does.
   explicitly.
 - **Size.** The stub contains the whole runtime, so even `return 0;` is megabytes. The program
   on top costs what the module costs — usually kilobytes.
-- **macOS cannot run packed programs yet.** A Mach-O declares its own size, appended bytes put
-  the file beyond it, and `codesign` refuses to bless the result — so the packed file is killed
-  on start and cannot be re-signed either. Pack FOR macOS is planned (the payload has to become
-  a real Mach-O segment); pack ON macOS for the other platforms works today, with their stubs
-  and `--stub`.
+- **macOS packs on macOS.** A Mach-O declares its own size, so the payload cannot simply follow
+  it: the packer folds it into the `__LINKEDIT` segment and signs the result ad-hoc through
+  `codesign`, which macOS ships. That signature is the half that can only be made there, so
+  packing a macOS program on another system is refused with that reason rather than producing a
+  file the loader would kill. Packing ON macOS FOR another platform works as everywhere, with
+  that platform's stub and `--stub`.
+
+  An ad-hoc signature says the file has not changed since packing, not who made it — which is
+  what the loader asks for. Distributing to other people's machines is a question of notarisation,
+  on the finished file, with your own identity.
 - **Packing is not verification.** `lyrpack` copies bytes and does not look inside the module;
   a broken module packs fine and reports at first start. `lyrvm verify` answers ahead of time.
 
