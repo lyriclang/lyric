@@ -142,6 +142,39 @@ public sealed class LoadedProgram
     /// <summary>How many functions were compiled.</summary>
     public int JitCompiled => _jit?.CompiledCount ?? 0;
 
+    /// <summary>How many global slots this module has.</summary>
+    public int GlobalCount => _globals.Length;
+
+    /// <summary>
+    /// Reads a module global.
+    ///
+    /// <para>For a TOOL. A program reads its own globals with an instruction and needs nothing
+    /// here; a host that wants to show a running program what it is holding has no other way in.
+    /// The names and types stand in <see cref="Module"/> already — <c>GlobalNames</c> from the
+    /// debug section, <c>Globals</c> for the types, <c>FieldNames</c> for what is inside an
+    /// object — so this is the one piece that was missing.</para>
+    /// </summary>
+    public LyrValue ReadGlobal(int index) =>
+        index >= 0 && index < _globals.Length
+            ? _globals[index]
+            : throw new ArgumentOutOfRangeException(nameof(index));
+
+    /// <summary>
+    /// Writes a module global.
+    ///
+    /// <para><b>Nothing checks the type.</b> The slot is a bit pattern and the program will read
+    /// it as whatever its instructions expect, so a caller writing a float where an integer stands
+    /// produces a number nobody can explain rather than an error. The types are in
+    /// <c>Module.Globals</c>; a tool is expected to have looked.</para>
+    /// </summary>
+    public void WriteGlobal(int index, LyrValue value)
+    {
+        if (index < 0 || index >= _globals.Length)
+            throw new ArgumentOutOfRangeException(nameof(index));
+
+        _globals[index] = value;
+    }
+
     /// <summary>
     /// How many instructions each function executed in the INTERPRETER, heaviest first. Empty
     /// unless <c>LYRIC_PROFILE=1</c>.
