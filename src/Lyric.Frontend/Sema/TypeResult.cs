@@ -31,6 +31,45 @@ public sealed class TypeResult
 
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
 
+    /// <summary>
+    /// Which function satisfied which conformance: keyed by (implementing type, interface,
+    /// member), holding one entry per INSTANCE.
+    ///
+    /// <para>Recorded because since 3.0 the answer is not readable from the name. A type may
+    /// conform to one interface twice — <c>Equatable&lt;Tag&gt;</c> and <c>Equatable&lt;int&gt;</c>
+    /// — and satisfy the two with two overloaded <c>equals</c>. The vtable rows are per instance
+    /// and each needs ITS one; resolving by name gives both rows the first, which is a silent
+    /// wrong call. The conformance check has already compared the signatures, so the lowering
+    /// reads its answer instead of comparing again.</para>
+    /// </summary>
+    private readonly Dictionary<(TypeSymbol, TypeSymbol, string), List<(LyrType Instance, FunctionSymbol Impl)>>
+        _conformanceImpls = new();
+
+    public void RecordConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
+        LyrType instance, FunctionSymbol impl)
+    {
+        var key = (implementer, iface, member);
+        if (!_conformanceImpls.TryGetValue(key, out var entries))
+            _conformanceImpls[key] = entries = new List<(LyrType, FunctionSymbol)>();
+        if (!entries.Any(e => LyrType.Equal(e.Instance, instance))) entries.Add((instance, impl));
+    }
+
+    /// <summary>The implementation for one conformance, or <c>null</c> when the name was never
+    /// ambiguous and the ordinary lookup answers just as well.</summary>
+    public FunctionSymbol? ConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
+        LyrType? instance)
+    {
+        if (!_conformanceImpls.TryGetValue((implementer, iface, member), out var entries))
+            return null;
+        if (entries.Count == 1) return entries[0].Impl;
+        if (instance is null) return null;
+
+        foreach (var entry in entries)
+            if (LyrType.Equal(entry.Instance, instance))
+                return entry.Impl;
+        return null;
+    }
+
     /// <summary>The pulls — a <c>resume</c> or a <c>next()</c> — whose coroutine may throw.
     ///
     /// <para>Recorded by the checker because it is the pass that knows the receiver's TYPE, and

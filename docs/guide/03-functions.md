@@ -84,9 +84,17 @@ The rules, in the order they apply — you rarely need them, and when you do you
 If nothing fits, or two fit exactly as well, the compiler says so and names every candidate it
 weighed.
 
+**Where it works.** Free functions, methods of a struct, class or enum, **static** methods
+(`Id.of(7)` beside `Id.of("seven")`) and **extension** methods — including two in one `extend`
+block, which used to be an ambiguity and is an overload set now.
+
 **What may not be overloaded.** Interface members: a method table holds one function per slot and
 finds it by name, so two of a name would have nowhere to go. Two functions whose parameters are
 the SAME are a redeclaration, even when the results differ.
+
+Overloading is per SCOPE, and a name that means several functions can be imported as a whole:
+`import geometry { area };` brings every `area` the module exports. `@Deprecated` sits on one
+overload rather than on the name, so the warning fires only where that one is called.
 
 A lambda passed as an argument does not take part in choosing — it has no type until a parameter
 gives it one — so the other arguments have to separate the candidates.
