@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.0.2</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.0.2</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.0.2 — 2026-08-23</h2>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>The build sometimes produced a <code>lyric pack</code> that could not pack</strong> (#101). Intermittent on
+Linux, on an unchanged tree, and the message pointed at the packer — where nothing was wrong.</p>
+<p>The driver copies the tools into its own output directory so that &quot;beside itself&quot; means the same
+during development as after an install. It learned their directories by BUILDING them a second
+time (<code>&lt;MSBuild Targets=&quot;Build&quot;&gt;</code> with its own set of global properties), then listing what came
+out. Two things were wrong with that. A second build under different properties is a second
+project INSTANCE, writing the same output directory as the first. And the listing was not ordered
+against the stub: <code>lyrpack</code> publishes its single-file stub from an <code>AfterTargets</code>, which in the
+failing run landed <strong>169 ms after the driver had finished building</strong> — into a directory the
+driver had already read.</p>
+<p>The directories are now derived by convention instead of asked for, which removes the second
+instance; the stub publish is invoked explicitly before the listing, which orders it; and the
+target now <strong>fails the build</strong> when the stub did not arrive, rather than leaving it to be
+discovered by a packing test half a minute later.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
