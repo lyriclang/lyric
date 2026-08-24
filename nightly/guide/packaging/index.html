@@ -93,18 +93,26 @@ belongs to hosts that embed the runtime; a program someone ships as an executabl
 the operating system, the way every executable does.</p>
 <h2 id="what-to-know-before-shipping">What to know before shipping</h2>
 <ul>
-<li><strong>One platform per file.</strong> The stub is a native executable, so a pack is for one platform.
+<li><p><strong>One platform per file.</strong> The stub is a native executable, so a pack is for one platform.
 The toolchain archive carries stubs under <code>stubs/&lt;rid&gt;/</code>, and <code>--stub</code> points at any of them
-explicitly.</li>
-<li><strong>Size.</strong> The stub contains the whole runtime, so even <code>return 0;</code> is megabytes. The program
-on top costs what the module costs — usually kilobytes.</li>
-<li><strong>macOS cannot run packed programs yet.</strong> A Mach-O declares its own size, appended bytes put
-the file beyond it, and <code>codesign</code> refuses to bless the result — so the packed file is killed
-on start and cannot be re-signed either. Pack FOR macOS is planned (the payload has to become
-a real Mach-O segment); pack ON macOS for the other platforms works today, with their stubs
-and <code>--stub</code>.</li>
-<li><strong>Packing is not verification.</strong> <code>lyrpack</code> copies bytes and does not look inside the module;
-a broken module packs fine and reports at first start. <code>lyrvm verify</code> answers ahead of time.</li>
+explicitly.</p>
+</li>
+<li><p><strong>Size.</strong> The stub contains the whole runtime, so even <code>return 0;</code> is megabytes. The program
+on top costs what the module costs — usually kilobytes.</p>
+</li>
+<li><p><strong>macOS packs on macOS.</strong> A Mach-O declares its own size, so the payload cannot simply follow
+it: the packer folds it into the <code>__LINKEDIT</code> segment and signs the result ad-hoc through
+<code>codesign</code>, which macOS ships. That signature is the half that can only be made there, so
+packing a macOS program on another system is refused with that reason rather than producing a
+file the loader would kill. Packing ON macOS FOR another platform works as everywhere, with
+that platform's stub and <code>--stub</code>.</p>
+<p>An ad-hoc signature says the file has not changed since packing, not who made it — which is
+what the loader asks for. Distributing to other people's machines is a question of notarisation,
+on the finished file, with your own identity.</p>
+</li>
+<li><p><strong>Packing is not verification.</strong> <code>lyrpack</code> copies bytes and does not look inside the module;
+a broken module packs fine and reports at first start. <code>lyrvm verify</code> answers ahead of time.</p>
+</li>
 </ul>
 <p>The byte-level layout — the footer, its versioning, and what the stub does in which failure —
 is specified in <a href="/nightly/pack/">Pack.md</a>.</p>

@@ -144,19 +144,35 @@ stderr.</li>
 </ul>
 <h2 id="what-packing-is-not">What packing is not</h2>
 <ul>
-<li><strong>Not compilation.</strong> <code>lyrpack</code> takes a <code>.lyrbc</code> and does not look inside it beyond the
+<li><p><strong>Not compilation.</strong> <code>lyrpack</code> takes a <code>.lyrbc</code> and does not look inside it beyond the
 extension; a file of garbage packs successfully and fails at first start, with the loader's
 diagnostics. <code>lyrvm verify</code> answers the question ahead of time. <code>lyric pack app.lyr</code> compiles
-and packs in one step.</li>
-<li><strong>Not linking.</strong> The module travels whole, the stub travels whole. There is no dead-code step
-beyond what the compiler already did, and two packed programs share nothing.</li>
-<li><strong>Not macOS-runnable — yet.</strong> A Mach-O declares its own extent in its load commands, and
-appended bytes put the file beyond it: the existing ad-hoc signature stops validating, and
-<code>codesign</code> refuses to write a new one over the layout (&quot;main executable failed strict
-validation&quot;) — measured by the release pipeline, which is how this limit was found. Packing
-WORKS on macOS; running the result does not, until the payload becomes a real Mach-O segment
-the way deno and Node's SEA do it. Windows (PE) and Linux (ELF) do not validate the file
-tail and are unaffected.</li>
+and packs in one step.</p>
+</li>
+<li><p><strong>Not linking.</strong> The module travels whole, the stub travels whole. There is no dead-code step
+beyond what the compiler already did, and two packed programs share nothing.</p>
+</li>
+<li><p><strong>Not a plain append on macOS.</strong> A Mach-O declares its own extent in its load commands, and
+bytes beyond it make the file fail strict validation. Windows (PE) and Linux (ELF) do not
+look at the tail, so there the pack is exactly the byte copy above. On macOS three things
+happen instead, in this order:</p>
+<ol>
+<li>the stub's existing signature is dropped and its load command removed — the payload is
+written where the signature stood, and a command left pointing there would make <code>codesign</code>
+truncate the file at the payload;</li>
+<li><code>__LINKEDIT</code>, the segment that ends every Mach-O, is grown so its extent reaches the new
+end of the file;</li>
+<li><code>/usr/bin/codesign --force --sign -</code> signs the result ad-hoc, which appends the new
+signature and writes its load command back into the space freed in step 1.</li>
+</ol>
+<p><strong>The footer is therefore not last on macOS</strong>: the signature follows it. The reader
+(<code>PackFooter.TryRead</code>) tries the end of the file first and otherwise scans backwards for the
+magic within a bounded window, checking each candidate whole — the version it knows, and a
+payload that fits entirely in front of it.</p>
+<p>The signature is the half that needs macOS. Packing a macOS program elsewhere is refused with
+that reason, because an unsigned Mach-O is killed on launch and a file that cannot start is
+worse than a pack that says why it did not happen.</p>
+</li>
 </ul>
 <h2 id="failure-duties">Failure duties</h2>
 <p><code>lyrpack</code> refuses to overwrite either of its inputs, and a pack that fails midway deletes its

@@ -30,26 +30,20 @@
 </a>
 </nav>
 <section class="changes">
-<h2>What changed in v3.0.2 — 2026-08-23</h2>
-<h3 id="fixed">Fixed</h3>
+<h2>What changed in v3.2.0 — 2026-08-23</h2>
+<h3 id="added">Added</h3>
 <ul>
-<li><p><strong>The build sometimes produced a <code>lyric pack</code> that could not pack</strong> (#101). Intermittent on
-Linux, on an unchanged tree, and the message pointed at the packer — where nothing was wrong.</p>
-<p>The driver copies the tools into its own output directory so that &quot;beside itself&quot; means the same
-during development as after an install. It learned their directories by BUILDING them a second
-time (<code>&lt;MSBuild Targets=&quot;Build&quot;&gt;</code> with its own set of global properties), then listing what came
-out. Two things were wrong with that. A second build under different properties is a second
-project INSTANCE, writing the same output directory as the first. And the listing was not ordered
-against the stub: <code>lyrpack</code> publishes its single-file stub from an <code>AfterTargets</code>, which in the
-failing run landed <strong>169 ms after the driver had finished building</strong> — into a directory the
-driver had already read.</p>
-<p>The directories are now derived by convention instead of asked for, which removes the second
-instance; the stub publish is invoked explicitly before the listing, which orders it; and the
-target now <strong>fails the build</strong> when the stub did not arrive, rather than leaving it to be
-discovered by a packing test half a minute later.</p>
-<p>That last part earned itself immediately: the first derived path forgot that a publish FOR a
-platform writes to <code>bin/&lt;config&gt;/&lt;tfm&gt;/&lt;rid&gt;/</code>, so the release build copied nothing — and said
-so, in the build, instead of shipping an archive whose driver could not pack.</p>
+<li><p><strong>A host can read and write a module's globals</strong>: <code>LoadedProgram.GlobalCount</code>, <code>ReadGlobal(int)</code>
+and <code>WriteGlobal(int, LyrValue)</code>.</p>
+<p>For a TOOL. A program reaches its own globals with an instruction and needs none of this; a
+debugger's Globals scope, or an editor showing a running game what it is holding, had no way in
+at all. The names and types were already there — <code>GlobalNames</code> from the debug section, <code>Globals</code>
+for the types, <code>FieldNames</code> for what is inside an object — so this is the one piece that was
+missing.</p>
+<p><strong>Nothing checks the type on write.</strong> A slot is a bit pattern and the program reads it as
+whatever its instructions expect, so writing a float where an integer stands produces a number
+nobody can explain rather than an error. <code>Module.Globals</code> carries the types; a tool is expected
+to have looked.</p>
 </li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>
