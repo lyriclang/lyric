@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.5.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.5.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.5.0 — 2026-08-24</h2>
+<p>The standard library learns structured data: JSON in and out, and the binary-to-text encodings
+beside it. Both modules are written in Lyric; no language change, no format change — with one
+exception underneath, where <code>std.string.parseFloat</code> had to become native to make the numbers
+honest.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong><code>std.json</code> — reading and writing JSON (RFC 8259).</strong> One value type carries a whole document:</p>
+<pre><code class="language-lyr">import std.json { JsonValue, parse, serialize };
+</code></pre>
+<p><code>JsonValue</code> is an enum over the six JSON shapes, with arrays as <code>List&lt;JsonValue&gt;</code> and objects
+as <code>Map&lt;string, JsonValue&gt;</code> — the existing collections, not a second container API. Accessors
+(<code>asString</code>, <code>asInt</code>, <code>asFloat</code>, <code>asBool</code>, <code>asArray</code>, <code>asObject</code>, <code>at</code>, <code>field</code>, <code>isNull</code>)
+answer <code>null</code> off-shape, <code>serialize</code> writes compact JSON, <code>serializePretty(value, indent)</code> the
+readable form.</p>
+<p>What the contracts pin down, each with a test:</p>
+<ul>
+<li><code>parse</code> answers <code>?JsonValue</code> — the library's absence convention, as <code>parseInt</code> and
+<code>utf8Decode</code> answer. Strict RFC 8259: no comments, no trailing commas, no <code>NaN</code>, no lone
+surrogate escapes, no raw control characters in strings. Trailing content refuses the
+document.</li>
+<li><strong>Numbers keep the distinction the text had.</strong> No fraction, no exponent → <code>Int</code>, exact over
+the whole <code>int</code> range, so 64-bit ids survive a round trip; everything else → <code>Float</code>. An
+integer past <code>int</code> falls back to <code>Float</code> — magnitude over exactness — rather than wrapping
+into a silently wrong value.</li>
+<li><strong>An integral <code>Float</code> serializes as <code>3.0</code></strong>, so it comes back as the float it was; NaN and
+the infinities have no JSON spelling and serialize as <code>null</code>, the answer <code>JSON.stringify</code>
+settled on long ago.</li>
+<li><strong>Hostile nesting answers <code>null</code>.</strong> Containers deeper than 128 levels refuse rather than
+running into the runtime's call-depth panic — input is data, and data that is not JSON
+comes back as <code>null</code>, not as a crash.</li>
+<li>Duplicate object keys take the last value, as in JavaScript. Object member order follows
+the map: unspecified, as <code>Map</code> documents.</li>
+</ul>
+</li>
+<li><p><strong><code>std.encoding</code> — hex and base64 over raw bytes</strong> (RFC 4648), on the same <code>uint8[]</code> that
+<code>utf8Encode</code> and <code>file.bytes</code> speak. <code>hexEncode</code>/<code>base64Encode</code> are total; <code>hexDecode</code>/
+<code>base64Decode</code> answer <code>?uint8[]</code> and are strict — no whitespace, no missing padding, no
+characters outside the alphabet, and base64 refuses padding whose unused bits are not zero,
+so accepted input is exactly what the encoder produces.</p>
+</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li><p><strong><code>std.string.parseFloat</code> is native now — correctly rounded, exponent-capable.</strong> The Lyric
+predecessor summed fractional digits one by one, which drifts by an ulp on long fractions,
+and it knew no exponent notation at all (its own doc said so): <code>parseFloat(&quot;1e-6&quot;)</code> was
+<code>null</code>, and <code>parseFloat(fromFloat(x))</code> did not reliably answer <code>x</code>. Both halves matter the
+moment JSON numbers flow through, and correct rounding is runtime-class work — the worst
+cases need arbitrary-precision arithmetic, the same reason <code>fromFloat</code> has always been
+native. The contract is unchanged where it existed (<code>&quot;3.5&quot;</code>, <code>&quot;.5&quot;</code>, <code>&quot;42&quot;</code>, junk → <code>null</code>;
+no whitespace, no <code>NaN</code>/<code>Infinity</code> words) and wider where it was missing: exponents parse,
+and a magnitude beyond <code>float</code> rounds to the infinities as IEEE 754 prescribes.</p>
+<p>Like every new compiler-bound native, a module compiled against this library binds
+<code>std.string.parseFloat</code> by name: an older runtime refuses such a module at binding with that
+name — the designed forward path, as with <code>co.next()</code> in 2.2.0 — and a module that never
+calls <code>parseFloat</code> loads everywhere it always did.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 13 gains the two module sections and their rows in the module table, and its
+capabilities line stops naming <code>std.io.net</code> — a module that does not exist.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
