@@ -197,6 +197,29 @@ public class WarningAnalyzerTests
             withStdlib: true));
     }
 
+    [Fact]
+    public void An_alias_used_only_as_a_type_qualifier_counts_as_used()
+    {
+        // The qualifier of a type path has no node of its own, so neither reference table
+        // carries it; the resolver records the step-through instead. Without that, this alias
+        // warns while the same alias in an expression does not.
+        AssertSilent(Check(
+            "import std.core as base;\n\n"
+            + "fn describe(e: base.Exception): string {\n    return e.message();\n}\n"
+            + "fn main(): int {\n    return 0;\n}\n",
+            withStdlib: true));
+    }
+
+    [Fact]
+    public void An_alias_mentioned_nowhere_still_warns()
+    {
+        // The negative beside the case above: marking qualifiers used must not blunt the warning.
+        var de = Check("import std.core as base;\n\nfn main(): int {\n    return 0;\n}\n",
+            withStdlib: true);
+        AssertWarns(de, "LYR-SEM0072");
+        Assert.Contains(de.Diagnostics, d => d.Message.Contains("import 'base'"));
+    }
+
     // ─── builtin-shadowing imports (LYR-SEM0077) ───────────────────────────
 
     [Fact]

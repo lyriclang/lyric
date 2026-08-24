@@ -11,6 +11,11 @@ namespace Lyric.Tests.Cli;
 /// <para>The two are compared rather than pinned to a code, so the test keeps holding as limits are
 /// closed one by one. A gap that gets fixed makes both sides succeed and the test stays green; a gap
 /// that gets reintroduced on one side only turns it red.</para>
+///
+/// <para>One question stayed unanswered until <c>--emit</c>: whether the BYTES load. A module can
+/// pass the sema, lower in silence, and still be refused by the loader — that happened, and it
+/// surfaced two layers away in a test that opened a window. <c>check</c> without the flag stops at
+/// the IR and cannot see it; with the flag it emits and reads back, writing nothing.</para>
 /// </summary>
 public sealed class CheckAgreesWithBuildTests
 {
@@ -74,6 +79,58 @@ public sealed class CheckAgreesWithBuildTests
         Assert.Equal(0, check.ExitCode);
         Assert.Equal(0, build.ExitCode);
         Assert.Contains("ok", check.StdOut + check.StdErr);
+    }
+
+    /// <summary>
+    /// The shape that broke: an interface, a class calling through it, and the implementing left to
+    /// whoever imports the module. Compiling every file of a project on its own is the ordinary way
+    /// to meet it, and the module it produced was refused by its own loader.
+    /// </summary>
+    private const string CallsThroughAnUnimplementedInterface = """
+        interface Ground {
+            fn plantable(column: int, row: int): bool;
+            fn changed(column: int, row: int, standing: bool): void;
+        }
+
+        class Field {
+            ground: Ground,
+            standing: bool[],
+            width: int,
+
+            pub fn put(column: int, row: int): bool {
+                if (!this.ground.plantable(column, row)) { return false; }
+                this.standing[row * this.width + column] = true;
+                this.ground.changed(column, row, true);
+                return true;
+            }
+        }
+        """;
+
+    [Fact]
+    public void A_library_that_only_calls_through_an_interface_survives_emit()
+    {
+        using var file = Toolchain.Temp(".lyr");
+        File.WriteAllText(file.Path, CallsThroughAnUnimplementedInterface);
+
+        var check = Toolchain.Lyric("check", file.Path, "--emit");
+
+        Assert.Equal(0, check.ExitCode);
+        Assert.Contains("ok", check.StdOut + check.StdErr);
+    }
+
+    [Fact]
+    public void Only_emit_reaches_the_emit_phase()
+    {
+        // The counter-check for the flag itself: without it the timing table has no 'emit' row, so
+        // a --emit that quietly did nothing would pass the test above.
+        using var file = Toolchain.Temp(".lyr");
+        File.WriteAllText(file.Path, CallsThroughAnUnimplementedInterface);
+
+        var plain = Toolchain.Lyric("check", file.Path, "--verbose");
+        var emitting = Toolchain.Lyric("check", file.Path, "--emit", "--verbose");
+
+        Assert.DoesNotContain("emit ", plain.StdOut + plain.StdErr);
+        Assert.Contains("emit ", emitting.StdOut + emitting.StdErr);
     }
 
     [Fact]

@@ -142,8 +142,10 @@ public static class SourceCompiler
             report?.EndPhase();
         }
 
-        // Everything a build does except turning the IR into bytes. Writing them is mechanical and
-        // cannot fail on the program, so stopping here answers the same question a build answers.
+        // Everything a build does except turning the IR into bytes. That step is mechanical, but
+        // "mechanical" is not "cannot go wrong": a module whose loader refused it type-checked in
+        // silence for two milestones, because nothing in this pipeline ever read back what it had
+        // written. 'check --emit' runs the stage below for exactly that reason.
         if (stage == Stage.Check)
             return new CompileResult(sources, diagnostics, ir, null, model);
 
@@ -151,9 +153,35 @@ public static class SourceCompiler
         var bytes = BytecodeWriter.Write(ir, options.SourceMap
             ? new SourceMapContext(sources, source.BaseDirectory)
             : null, options.DebugInfo);
+        ReadBack(bytes, source.DisplayName);
         report?.EndPhase();
 
         return new CompileResult(sources, diagnostics, ir, bytes, model);
+    }
+
+    /// <summary>
+    /// The bytes, read with the loader that will read them for real.
+    ///
+    /// <para>Part of emitting rather than a phase of its own: a writer whose output its own reader
+    /// refuses has not finished writing. It runs in release too, unlike the IR verifier — the one
+    /// time this happened, the compiler and the runtime were the same released build, and the
+    /// finding surfaced two layers away in a test that opened a window.</para>
+    ///
+    /// <para>Not a diagnostic. A malformed module is not something the source did wrong, so it
+    /// belongs in the class <see cref="IrVerifier"/> uses: the compiler is broken, and the message
+    /// carries the loader's own words.</para>
+    /// </summary>
+    private static void ReadBack(byte[] bytes, string what)
+    {
+        try
+        {
+            BytecodeReader.ReadOrThrow(bytes);
+        }
+        catch (MalformedBytecodeException ex)
+        {
+            throw new InternalCompilationException(
+                $"emit: the module written for '{what}' cannot be read back — {ex.Message}", ex);
+        }
     }
 
     /// <summary>

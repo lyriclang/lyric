@@ -958,9 +958,16 @@ public sealed class TypeChecker
         _result.BindRef(bnd, local); // for definite-assignment analysis
     }
 
+    /// <summary>The one <c>RangeExpr</c> that may stand as a value: the iterable of the
+    /// <c>for-in</c> currently being checked. See <see cref="CheckRange"/>.</summary>
+    private Expr? _rangeInPosition;
+
     private void CheckForIn(ForInStmt fo, SymbolTable scope)
     {
+        var outerRange = _rangeInPosition;
+        _rangeInPosition = fo.Iterable;
         var iterType = CheckExpr(fo.Iterable, scope);
+        _rangeInPosition = outerRange;
         var elem = iterType switch
         {
             // The three built-in forms. They have no declaration a conformance could hang on, so the
@@ -985,8 +992,22 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(iterType)}' is not iterable — it must implement "
                      + "'Iterable<T>' or 'Iterator<T>' from std.iter")
         };
+        // An OPTIONAL element cannot be walked, and the reason is the protocol rather than the
+        // container: 'next()' answers '?T' and uses null to mean "the end", so an element that is
+        // itself optional would need '??T' to be told apart from it — and '?' does not nest.
+        // Refused here, where the source position is, rather than in the lowering: it produced
+        // '??i64' in the IR, which crashed the verifier in debug and, in release, wrote a module
+        // the loader refuses. 'check' answered 'ok' either way.
+        if (elem is Optional)
+            _de.Report("LYR-SEM0091", Severity.Error, fo.Iterable.Span,
+                $"iterating this yields '{TypeFacts.Display(elem)}', and an iterator already "
+                + "answers null to mean the end — an optional element cannot be told apart from it",
+                new DiagnosticNote(
+                    "walk the indices instead: 'for (i in 0..xs.length) { let x = xs[i]; ... }'"));
+
         var loopScope = new SymbolTable(scope);
-        var loopVar = new LocalSymbol(fo.Variable, elem, false, fo);
+        var loopVar = new LocalSymbol(fo.Variable, elem is Optional ? LyrType.Error : elem,
+            false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
         CheckBlock(fo.Body, loopScope);
@@ -2254,6 +2275,21 @@ public sealed class TypeChecker
         _ => null
     };
 
+    /// <summary>
+    /// <c>a..b</c>, which is a loop head and not a value.
+    ///
+    /// <para>The grammar has no range expression — <c>RangePattern</c> in a <c>match</c> and the
+    /// iterable of a <c>for-in</c> are the two places <c>..</c> occurs — and
+    /// <see cref="RangeOf"/> says of itself that it is the internal type of <c>0..9</c> and not a
+    /// spec type. Nothing lowers it, so a range that escapes into a value position reached the
+    /// backend and crashed there: <c>let r = 1..5;</c> and <c>[1..3]</c> both did, because an
+    /// INFERRED type is the one case nothing checks it against. Where a type is written down the
+    /// assignment already refused it.</para>
+    ///
+    /// <para>Refused here rather than turned into a lowering limit, because it is a rule and not a
+    /// gap: a range has no representation to give it, and giving it one would be a language
+    /// decision.</para>
+    /// </summary>
     private LyrType CheckRange(RangeExpr r, SymbolTable scope)
     {
         var lo = CheckExpr(r.Low, scope);
@@ -2261,6 +2297,21 @@ public sealed class TypeChecker
         var elem = UnifyNumeric(r.Low, lo, r.High, hi);
         if (elem is null && !lo.IsError && !hi.IsError)
             _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
+
+        if (!ReferenceEquals(r, _rangeInPosition))
+        {
+            _de.Report("LYR-SEM0090", Severity.Error, r.Span,
+                "a range is a loop head, not a value — it can stand in 'for (x in a..b)' and "
+                + "nowhere else",
+                new DiagnosticNote("to keep the numbers, write them as an array or as two "
+                    + "bindings; to walk them, put the range in the loop"));
+
+            // ErrorType, so whatever the range was handed to says nothing more: 'cannot assign
+            // range<int> to int' names a type the language does not have, and the sentence above
+            // is the one to act on.
+            return LyrType.Error;
+        }
+
         return new RangeOf(elem ?? LyrType.Error);
     }
 
@@ -4956,8 +5007,16 @@ public sealed class TypeChecker
     private void BadOp(Span span, string op, LyrType t) =>
         _de.Report("LYR-SEM0003", Severity.Error, span, $"operator '{op}' is not applicable to '{TypeFacts.Display(t)}'");
 
+    /// <summary>
+    /// The operator did not apply. Silent when either side CARRIES an error — the operand's own
+    /// diagnostic is the one to act on, and '<error>[]' in a sentence about an operator is noise
+    /// following it. <see cref="LyrType.IsError"/> alone is not enough: an error inside an array
+    /// or a tuple reaches here as a whole type that is not itself the error.
+    /// </summary>
     private LyrType BadBinary(BinaryExpr b, LyrType l, LyrType r)
     {
+        if (ContainsError(l) || ContainsError(r)) return LyrType.Error;
+
         _de.Report("LYR-SEM0003", Severity.Error, b.Span, $"operator '{b.Operator}' is not applicable to '{TypeFacts.Display(l)}' and '{TypeFacts.Display(r)}'");
         return LyrType.Error;
     }

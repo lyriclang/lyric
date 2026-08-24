@@ -47,7 +47,7 @@ internal static class DeclaredTypes
             return new IrArrayType(TypeLowering.Lower(elementPrimitive));
 
         throw new UnsupportedConstructException(
-            "non-primitive type in a declared signature is not supported by this compiler version yet",
+            "a declared signature takes primitive types only, and this one is not",
             node.Span);
     }
 }

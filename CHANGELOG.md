@@ -10,6 +10,87 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## Unreleased
+
+### Fixed
+
+- **A module that only CALLS through an interface no longer fails to load.** A library — an
+  interface, a class calling through it, and the implementing left to whoever imports it —
+  produced a `.lyrbc` its own loader refused:
+
+  ```
+  function 'kit.props.Field.take' at 70: stack depth 5 exceeds the declared maximum of 4
+  ```
+
+  The bytecode was correct. The loader reads a `callvirt`'s argument count off an Impls row,
+  because every implementation of a slot shares its signature and the Types section carries slot
+  names alone; with nothing implementing the interface there is no row, and the missing count was
+  answered with "no arguments, no result". A two-argument call then looked as though it left its
+  arguments on the stack, which is why the message named a function far from the call and moved
+  when unrelated statements were deleted.
+
+  Such a call cannot execute — `mkiface` is already refused without a row for exactly that pair,
+  so no value of the interface can exist — and the loader now says so by stopping rather than
+  guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
+  Where a row exists nothing changes.
+
+- **Iterating an array of optionals is a message, not a crash** (`LYR-SEM0091`).
+  `for (h in houses)` over a `(?House)[]` — an ordinary table shape — crashed the compiler in
+  debug (`optnone of ?i64 — optionals do not nest`, with a stack trace and no position) and, in
+  release, made `check` answer "ok" for a program `build` could not finish.
+
+  The cause is the protocol, not the container: `next()` answers `?T` and uses null to mean "the
+  end", so an optional element would need `??T` to be told apart from it, and `?` does not nest.
+  The message says that and points at the loop that does work — over the indices. It fires the
+  same way for an iterator of optionals handed in directly, because the reason is the same.
+
+- **An operator whose operand already reported stays silent.** `<error>[]` appeared in sentences
+  about operators: `IsError` was consulted where the error sat INSIDE an array or a tuple, so the
+  type was not itself the error and the check went on to complain about it.
+
+- **A range outside a loop head is a message, not a crash** (`LYR-SEM0090`). `let r = 1..5;` and
+  `[1..3]` threw an internal exception out of the lowering, with a stack trace and no source
+  position. A range is a loop head and not a value — the grammar has no range expression among its
+  primaries and there is no range type — but nothing said so where the type was INFERRED; where it
+  was written down, the assignment had refused it all along. The grammar now names the form and
+  its one legal position.
+
+- **The compiler reads back every module it writes.** The emit step was taken for mechanical, so
+  nothing checked it: a `.lyrbc` its own loader refuses was found by a golden-image test that
+  opened a window, two layers from the change. The bytes now go through the loader before a build
+  writes them, in release as in debug — the one time it mattered, compiler and runtime were the
+  same released build. A module that fails is a compiler bug and is reported as one, with the
+  loader's own words.
+
+- **An aliased import used only as a TYPE is no longer reported as unused.** `import kit.eye as
+  look;` mentioned once, as `eye: look.Eye`, warned `LYR-SEM0072` — a build error under
+  `--deny-warnings`. The qualifier of a type path has no node of its own, so neither reference
+  table carried it; the resolver records the step-through now. A plain import used as a type and
+  an alias used in an expression were already counted, which is what made the gap read as
+  arbitrary.
+
+- **`LYR-IR0001` says one sentence instead of two grown together.** The category was appended as a
+  clause, and where a message ended in a subordinate one the result was
+  *"initializer omits field 'wood', which has no default is not supported by this compiler version
+  yet"*. The message names the construct; the category is a note beneath it.
+
+- **A keyword written where a name belongs says so.** `keep.resume();` reported `expected member
+  name after '.', got Resume` — the way a parser talks about a typo, which costs a reader a look at
+  the spelling before they suspect the word. The identifier expectations now carry a note:
+
+  ```
+  note: 'resume' is a keyword and cannot be used as a name
+  ```
+
+  Only those: `got Return` where a `;` was expected is not a naming problem.
+
+### Added
+
+- **`lyric check <file> --emit`** answers the question plain `check` cannot: not "does this
+  program compile" but "does the module it produces LOAD". It emits, reads back, and writes
+  nothing. For a project that compiles every one of its files as an entry — to read each file's
+  attributes — that was the missing invariant.
+
 ## v3.2.0 — 2026-08-23
 
 ### Added

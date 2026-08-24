@@ -29,8 +29,12 @@ The return value of `main` becomes the process exit code, masked with `& 0xFF`.
 | `lyric disasm <file>` | print the bytecode |
 | `lyric repl` | interactive prompt |
 
-`lyric check` stops after semantic analysis. A program it accepts can still be rejected by the
-code generator for a construct that is not lowered yet; `lyric run` is the full pipeline.
+`lyric check` goes as far as the intermediate representation, so a construct the code generator
+cannot lower is reported there rather than at the build. It stops before the bytes: a module can
+pass everything above and still be one the loader refuses. `lyric check <file> --emit` runs that
+last step too — the bytes are produced, loaded and dropped, and no file is written. It is the
+answer for a project that compiles each of its files on its own and wants to know they will all
+load.
 
 ## Arguments
 

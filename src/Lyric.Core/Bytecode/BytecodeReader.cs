@@ -1122,6 +1122,14 @@ public static class BytecodeReader
     /// The format's invariant: the operand stack is empty at every block boundary, and values that
     /// cross blocks travel through local slots. Depth is therefore statically determined, so the
     /// VM sizes its frame at load time and needs no runtime overflow check.
+    ///
+    /// <para>One thing here is checked as far as it goes and no further. A <c>callvirt</c> on an
+    /// interface with no Impls row has no derivable argument count (see
+    /// <see cref="CalleeShape"/>), and from that instruction on the depth of its block is unknown.
+    /// The walk stops there rather than continuing on an assumption — everything before it has
+    /// been checked, and the rest cannot be. It costs nothing that was ever reachable: a value of
+    /// such an interface cannot exist, because <c>mkiface</c> is refused above without a row for
+    /// exactly that pair.</para>
     /// </summary>
     private static void ValidateStack(BytecodeModule module, BytecodeFunction function,
         IReadOnlyList<BytecodeInstruction> instructions)
@@ -1135,7 +1143,10 @@ public static class BytecodeReader
             for (var i = byOffset[start]; i < instructions.Count; i++)
             {
                 var instruction = instructions[i];
-                var (arity, returnsValue) = CalleeShape(module, instruction);
+                // Unknown shape: the depth from here on is not derivable, so this block's walk
+                // ends rather than continuing on a guess.
+                if (CalleeShape(module, instruction) is not { } shape) break;
+                var (arity, returnsValue) = shape;
 
                 // newvariant takes its variant's payload fields; slot 0 is the tag and does not
                 // come off the stack.
@@ -1167,7 +1178,22 @@ public static class BytecodeReader
         }
     }
 
-    private static (int Arity, bool ReturnsValue) CalleeShape(BytecodeModule module,
+    /// <summary>
+    /// What a call takes off the stack and whether it puts one back, or <c>null</c> when the
+    /// module does not say.
+    ///
+    /// <para>The unknown case is a <c>callvirt</c> on an interface no type in this module
+    /// implements. A LIBRARY module compiled on its own is the ordinary way to reach it: the
+    /// interface is declared, a class calls through it, and whoever implements it is in another
+    /// compilation. Nothing in the module carries the slot's signature — the Types section names
+    /// the slots and no more — so the argument count is genuinely absent.</para>
+    ///
+    /// <para>It used to answer <c>(0, false)</c> there, which is a guess dressed as an answer: a
+    /// two-argument call then appeared to leave its arguments on the stack, and the block was
+    /// rejected for ending two values deep. The module was correct and its own loader refused
+    /// it.</para>
+    /// </summary>
+    private static (int Arity, bool ReturnsValue)? CalleeShape(BytecodeModule module,
         BytecodeInstruction instruction)
     {
         // callvirt: the signature belongs to the interface slot. Every implementation shares it,
@@ -1177,7 +1203,7 @@ public static class BytecodeReader
             var iface = (int)instruction.Immediate;
             var slot = (int)instruction.Immediate2;
             var row = module.Impls.FirstOrDefault(i => i.Interface == iface);
-            if (row is null || slot >= row.Methods.Count) return (0, false);
+            if (row is null) return null;
 
             var target = row.Methods[slot];
             if (target < module.Imports.Count)

@@ -154,11 +154,26 @@ namespace Lyric.Parsing
             var c = Current;
             if (!Check(kind))
             {
-                _de.Report(new Diagnostic(code, Severity.Error, Current.Span, message));
+                _de.Report(new Diagnostic(code, Severity.Error, Current.Span, message,
+                    ReservedWordNote(kind, c.TokenKind)));
                 return c;
             }
             return Advance();
         }
+
+        /// <summary>
+        /// Why a NAME was refused, when the reason is that the word is reserved.
+        ///
+        /// <para>Without it the message names the token kind — "expected member name after '.',
+        /// got Resume" — which is how a parser talks about a typo, and a reader checks the
+        /// spelling before suspecting the word itself. Only the identifier expectations get it:
+        /// "got Return" where a ';' was expected is not a naming problem, and a note there would
+        /// be noise on every unterminated statement.</para>
+        /// </summary>
+        private static DiagnosticNote[]? ReservedWordNote(TokenKind expected, TokenKind found) =>
+            expected == TokenKind.Identifier && Lexer.KeywordSpelling(found) is { } word
+                ? [new DiagnosticNote($"'{word}' is a keyword and cannot be used as a name")]
+                : null;
 
         public bool AtEnd => Current.TokenKind == TokenKind.Eof;
 

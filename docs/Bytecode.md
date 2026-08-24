@@ -351,6 +351,14 @@ All implementations of the same slot share a signature. A runtime may derive the
 from any row of the interface, and must, because `callvirt` takes its receiver off the stack
 before the target function is known.
 
+**An interface may have no row at all.** A module that declares an interface, calls through it,
+and leaves the implementing to a module that imports it is well-formed — a library is exactly
+that shape. Nothing then carries the argument count of its slots, and a `callvirt` naming such an
+interface is **unreachable**: `mkiface` requires a row for the pair it names (§Calls and control
+flow), so no value of the interface can come into existence. A validator must not assume a count
+for such a call; where it cannot derive the depth it may check no further, and it must not report
+a violation derived from an assumed one.
+
 ### Handlers (Id 9)
 
 The protected regions: which block range of a function is covered by which handler.

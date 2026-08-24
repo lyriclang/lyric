@@ -494,7 +494,7 @@ internal sealed class TypeTable
 
         if (symbol.Kind is not (TypeSymbolKind.Class or TypeSymbolKind.Struct))
             throw new UnsupportedConstructException(
-                $"type '{symbol.Name}' ({Describe(symbol.Kind)}) is not supported by this compiler version yet",
+                $"type '{symbol.Name}' is a {Describe(symbol.Kind)}",
                 SpanOf(symbol));
 
 
@@ -727,7 +727,7 @@ internal sealed class TypeTable
             {
                 if (field.Default is not null)
                     throw new UnsupportedConstructException(
-                        "a field default is not supported by this compiler version yet", field.Span);
+                        "a field default", field.Span);
                 names.Add(field.Name);
                 types.Add(Lower(field.Type, field.Span));
             }
@@ -746,8 +746,7 @@ internal sealed class TypeTable
         if (index >= 0) return new FieldId(index);
 
         throw new UnsupportedConstructException(
-            $"member '{name}' of '{symbol.Name}' is not a field; only field access is supported " +
-            "by this compiler version yet",
+            $"member '{name}' of '{symbol.Name}' is not a field; only field access is lowered",
             span);
     }
 
@@ -856,8 +855,7 @@ internal sealed class TypeTable
     private static IrType OptionalOf(IrType inner, Core.Span span) =>
         inner is IrOptionalType
             ? throw new UnsupportedConstructException(
-                "a nested optional '??T' (optionals do not nest) is not supported by this compiler " +
-                "version yet", span)
+                "a nested optional '??T' — optionals do not nest", span)
             : new IrOptionalType(inner);
 
     /// <summary>
@@ -953,7 +951,7 @@ internal sealed class TypeTable
         }
 
         throw new UnsupportedConstructException(
-            "a non-primitive field type is not supported by this compiler version yet", node.Span);
+            "a non-primitive field type", node.Span);
     }
 
     /// <summary>
@@ -1055,7 +1053,7 @@ internal sealed class TypeTable
                 Resolve(fn.ReturnType, span));
 
         throw new UnsupportedConstructException(
-            "this type argument is not supported by this compiler version yet", span);
+            "this type argument", span);
     }
 
     private static Core.Span SpanOf(TypeSymbol symbol) => symbol.Declaration?.Span ?? default;

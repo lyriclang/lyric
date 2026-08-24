@@ -391,7 +391,7 @@ public sealed class Resolver
         switch (type)
         {
             case NamedType n:
-                var sym = ResolveTypePath(n.Path, scope);
+                var sym = ResolveTypePath(n.Path, scope, n.Span.File);
                 if (sym is null)
                 {
                     _de.Report("LYR-RES0002", Severity.Error, n.Span, $"unresolved type '{string.Join('.', n.Path)}'");
@@ -415,7 +415,7 @@ public sealed class Resolver
         }
     }
 
-    private Symbol? ResolveTypePath(string[] path, SymbolTable scope)
+    private Symbol? ResolveTypePath(string[] path, SymbolTable scope, FileId file)
     {
         var head = scope.Lookup(path[0]);
         if (head is null) return null;
@@ -427,9 +427,12 @@ public sealed class Resolver
             switch (head)
             {
                 case ExternalSymbol: return head; // everything behind an external module is external
-                case ImportBindingSymbol { Target: ModuleSymbol mod }:
+                case ImportBindingSymbol { Target: ModuleSymbol mod } qualifier:
                     var next = mod.Members.LookupLocal(path[i]);
                     if (next is null) return null;
+                    // The qualifier is a mention of the import and the only one in this path;
+                    // nothing else records it, because it has no node to be bound to.
+                    _binding.MarkQualifier(file, qualifier);
                     head = next;
                     break;
                 default:

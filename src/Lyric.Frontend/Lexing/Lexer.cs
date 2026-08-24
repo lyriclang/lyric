@@ -118,6 +118,18 @@ public sealed class Lexer
         { "this", TokenKind.This }
     };
 
+    /// <summary>The reverse of <see cref="Keywords"/>: how a keyword kind was written, or null for
+    /// every other kind. Built from the same table, because a second list of the words would be a
+    /// second answer to one question and would drift the day a keyword is added.</summary>
+    private static readonly Dictionary<TokenKind, string> KeywordSpellings =
+        Keywords.ToDictionary(entry => entry.Value, entry => entry.Key);
+
+    /// <summary>The source word behind a keyword token, or null when the kind is not a keyword.
+    /// The parser uses it to say WHY a name was refused: a token kind on its own ("got Resume")
+    /// reads like a typo, which is how a reader spends two round trips on a reserved word.</summary>
+    public static string? KeywordSpelling(TokenKind kind) =>
+        KeywordSpellings.GetValueOrDefault(kind);
+
     private static readonly HashSet<string> ValidIntSuffixes =
         ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"];
 
