@@ -664,12 +664,20 @@ public static class ModuleLowerer
     private static List<IrAttribute> CollectAttributes(Compilation compilation, TypeResult types,
         Dictionary<FunctionSymbol, FunctionId> ids, TypeTable typeTable)
     {
-        // The canonical @Deprecated emits NO row: its consumer is the sema, and the promise is
-        // that it changes diagnostics and nothing else. A row would also make the pruner keep
-        // the deprecated declaration — every program importing the module would carry dead code
-        // exactly because it was marked for removal.
-        var deprecated = compilation.FindModule(["std", "core"])?.Members.LookupLocal("Deprecated");
-        bool EmitsRow(AttributeNode a) => !ReferenceEquals(types.RefOf(a), deprecated);
+        // A COMPILER-READ attribute emits no row: its consumer is the sema, and the promise is
+        // that it changes diagnostics and nothing else. A row would also make the pruner keep the
+        // declaration — every program importing the module would carry dead code exactly because
+        // it was marked for removal.
+        //
+        // Two of them, and the set is the whole line between the kinds. '@Deprecated' since 2.0
+        // and '@MustUse' since 3.3; '@Test' is NOT one, because 'lyrtest' finds its tests through
+        // the rows, and neither is '@Open', which sits on an alias the format has no row kind for.
+        // Getting this wrong is not subtle: a native declaration has no lowered id, so marking one
+        // brought the lowering down with "attributed function 'setEnv' has no lowered id".
+        var core = compilation.FindModule(["std", "core"])?.Members;
+        var compilerRead = new[] { core?.LookupLocal("Deprecated"), core?.LookupLocal("MustUse") };
+        bool EmitsRow(AttributeNode a) =>
+            !compilerRead.Any(known => known is not null && ReferenceEquals(types.RefOf(a), known));
 
         var rows = new List<IrAttribute>();
         foreach (var module in compilation.Modules)

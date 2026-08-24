@@ -325,6 +325,7 @@ public sealed class TypeChecker
             case FunctionDecl fn:
                 CheckAttributes(fn.Attributes, AttributeTarget.Function, fn.Generics.Length > 0,
                     module.Members, "a function");
+                CheckMarkedShape(fn, module);
                 RequireBody(fn, module);
                 CheckFunction(fn, module.Members, thisType: null);
                 break;
@@ -912,7 +913,10 @@ public sealed class TypeChecker
                 else if (!TypeFacts.IsVoid(_currentReturn) && !_currentReturn.IsError)
                     _de.Report("LYR-SEM0001", Severity.Error, r.Span, "return without a value in a non-void function");
                 break;
-            case ExprStmt es: CheckExpr(es.Expr, scope); break;
+            case ExprStmt es:
+                CheckExpr(es.Expr, scope);
+                CheckResultUsed(es.Expr);
+                break;
             case ThrowStmt t:
                 var thrown = CheckExpr(t.Value, scope);
                 if (!Conformance.IsThrowable(thrown, _throwable, _binding))
@@ -5059,6 +5063,78 @@ public sealed class TypeChecker
     }
 
     private readonly Dictionary<TypeSymbol, ModuleSymbol?> _declaringModule = new();
+
+    /// <summary>
+    /// What the two compiler-read attributes of 3.3 require of the function they sit on.
+    ///
+    /// <para><b><c>@Test</c> takes nothing and returns nothing.</b> <c>std.test</c> said this in
+    /// prose and left it to the runner, on the stated ground that "the attribute describes, the
+    /// RUNNER acts". The runner cannot act on all of it: it calls through <c>CallVoid</c>, so a
+    /// test with parameters does fail loudly — but a test that RETURNS a value passes. A function
+    /// written as <c>fn checks(): bool { return false; }</c> and marked <c>@Test</c> reports PASS
+    /// today, which is the "I wrote a predicate instead of an assertion" mistake reporting success.
+    /// An error rather than a warning, and not on the version cycle the other 3.3 rules use: this
+    /// breaks no working code, it breaks code that was already silently broken.</para>
+    ///
+    /// <para><b><c>@MustUse</c> needs a result to insist on.</b> On a <c>void</c> function it can
+    /// never fire, so it is a statement about the code that is not true of it.</para>
+    /// </summary>
+    private void CheckMarkedShape(FunctionDecl fn, ModuleSymbol module)
+    {
+        foreach (var attribute in fn.Attributes)
+        {
+            var target = _result.RefOf(attribute);
+
+            if (ReferenceEquals(target, _comp.FindModule(["std", "test"])?.Members.LookupLocal("Test")))
+            {
+                if (fn.Parameters.Length > 0)
+                    _de.Report("LYR-SEM0092", Severity.Error, fn.Parameters[0].Span,
+                        $"a test takes no parameters, and '{fn.Name}' takes "
+                        + $"{fn.Parameters.Length} — the runner calls it with none");
+
+                if (fn.ReturnType is { } returned && !TypeFacts.IsVoid(ResolveType(returned, module.Members)))
+                    _de.Report("LYR-SEM0092", Severity.Error, returned.Span,
+                        $"a test returns nothing, and '{fn.Name}' returns "
+                        + $"'{TypeFacts.Display(ResolveType(returned, module.Members))}'. A test "
+                        + "reports by asserting; a returned value is dropped, so a test that "
+                        + "answers 'false' would pass");
+            }
+            else if (ReferenceEquals(target, CanonicalAttribute("MustUse"))
+                     && (fn.ReturnType is null
+                         || TypeFacts.IsVoid(ResolveType(fn.ReturnType, module.Members))))
+            {
+                _de.Report("LYR-SEM0093", Severity.Error, attribute.PathSpan,
+                    $"'@MustUse' needs a result to insist on, and '{fn.Name}' returns nothing");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A call to a <c>@MustUse</c> function standing alone as a statement (3.3).
+    ///
+    /// <para>The result is the only report of what happened — <c>writeText</c> answers
+    /// <c>bool</c> because disks fill up — and a statement that drops it has silently decided the
+    /// call cannot fail. Reported at the call, not at the declaration, because that is where the
+    /// decision was made.</para>
+    ///
+    /// <para>No escape hatch, deliberately: <c>let _ = write(…);</c> already says "I meant to drop
+    /// this", in a form that greps.</para>
+    /// </summary>
+    private void CheckResultUsed(Expr expr)
+    {
+        if (expr is not CallExpr call) return;
+        if (TargetSymbol(call.Callee) is not FunctionSymbol { Declaration: FunctionDecl fd } fs) return;
+        if (!fd.Attributes.Any(a => ReferenceEquals(_result.RefOf(a), CanonicalAttribute("MustUse")))) return;
+
+        _de.Report("LYR-SEM0093", Severity.Warning, call.Span,
+            $"the result of '{fs.Name}' is dropped, and it is marked '@MustUse' — it carries "
+            + "what the call is reporting. Bind it, or write 'let _ = …' to say the drop is meant.");
+    }
+
+    /// <summary>One of <c>std.core</c>'s own attribute structs, by identity rather than by name:
+    /// a user type called <c>MustUse</c> is an ordinary attribute and means nothing here.</summary>
+    private Symbol? CanonicalAttribute(string name) =>
+        _comp.FindModule(["std", "core"])?.Members.LookupLocal(name);
 
     private bool IsCanonicalDeprecated(TypeSymbol ts) =>
         ReferenceEquals(ts,

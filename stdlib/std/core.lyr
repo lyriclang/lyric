@@ -504,6 +504,22 @@ pub interface OnTypeAlias { }
 /// on the declaring side.
 pub struct Open :: [OnTypeAlias] { }
 
+/// Marks a function whose result must not be dropped: calling it as a statement warns.
+///
+/// For a result that carries the only report of what happened. `std.io.file.writeText` answers
+/// `bool` because a disk fills up and a path turns out to be read-only, and a call that ignores
+/// the answer has silently decided the write cannot fail. The same holds for a value that IS the
+/// work — a builder returning a new value rather than mutating, an iterator adapter that computes
+/// nothing until it is consumed.
+///
+/// Not for every non-void function. A getter whose result a caller may reasonably want to discard
+/// should not carry this, or the warning stops meaning anything and gets switched off wholesale.
+///
+/// Deliberately absent: a way to say "I meant to drop it". A binding does that already, and
+/// `let _ = write(…);` reads as what it is. A second mechanism for silencing would be one more
+/// thing to learn and one more thing to grep for.
+pub struct MustUse :: [OnFunction] { }
+
 /// Marks its target as deprecated: the compiler warns at every use, and `message` says what to
 /// use instead. The first attribute the compiler itself reads — it changes diagnostics and
 /// nothing else, so a program that ignores the warning runs unchanged.

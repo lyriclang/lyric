@@ -44,6 +44,50 @@ nothing. Conformance decides, not the name: a struct that never declares `:: [On
 sit on a function, however plausible it sounds. That is the same nominal rule the operators
 follow, and it exists for the same reason — nothing becomes an attribute by accident.
 
+## What the compiler reads
+
+Most attributes are metadata: the compiler checks that they are well formed, writes them into the
+module, and a host or a tool decides what they mean. A few it acts on itself, and it is worth
+knowing which — an attribute that changes compilation and one that changes nothing look the same
+on the page.
+
+| Attribute | What the compiler does |
+|---|---|
+| `@Deprecated` | warns at every use; `until` fails the build once that version arrives |
+| `@Open` | lets `as` cross an opaque alias from other modules (3.3) |
+| `@MustUse` | warns when a call's result is dropped (3.3) |
+| `@Test` | checks that the function takes nothing and returns nothing (3.3) |
+
+The first three are read by the compiler and written down nowhere — they carry no metadata row, so
+nothing downstream sees them. `@Test` is the exception: `lyric test` finds its tests through the
+rows, so that one is both.
+
+### `@MustUse`
+
+For a result that carries the only report of what happened:
+
+```lyr
+import std.core { MustUse };
+
+@MustUse
+fn save(path: string): bool { return true; }
+
+fn main(): int {
+    save("out.txt");            // warns: the answer is the whole report
+    let _ = save("out.txt");    // says the drop is meant
+    let ok = save("out.txt");
+    return if (ok) 0 else 1;
+}
+```
+
+`std.io.file` marks everything that writes or removes — `writeText`, `remove`, `copy`, `createDir`
+and their neighbours all answer `bool` because disks fill up and paths turn out to be read-only,
+and a call that ignores the answer has quietly decided writing cannot fail. `std.os.setEnv` too.
+
+There is no `@AllowUnused` to switch it off, on purpose: `let _ = …` already says "I know", in a
+form you can grep for. And the attribute is not for every non-void function — put it on a getter
+whose result a caller may reasonably discard and the warning stops meaning anything.
+
 A struct may declare more than one marker and then sits on both kinds of target:
 
 ```lyr
@@ -191,11 +235,11 @@ pub fn hunt(dt: float): void { }
 Attribute names are unqualified in the compiled module: `System`, not `engine.ecs.System`. An SDK
 owns its attribute names the way it owns its native names.
 
-## The one attribute the compiler reads
+## `@Deprecated`
 
-Exactly one attribute means something to the compiler itself: `@Deprecated`, from `std.core`.
-It marks a function, a type or a module, and every use of the marked thing warns
-(`LYR-SEM0076`) with the message naming the way forward:
+The oldest of the compiler-read attributes, and until 3.3 the only one. It marks a function, a
+type or a module, and every use of the marked thing warns (`LYR-SEM0076`) with the message naming
+the way forward:
 
 ```lyr
 import std.core { Deprecated };

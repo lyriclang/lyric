@@ -31,7 +31,7 @@ module std.io.file;
 import std.string as strings;
 
 // For the deprecation promises on the three names this module used before 2.14.
-import std.core { Deprecated };
+import std.core { Deprecated, MustUse };
 
 // For the path helpers below. 'std.string' imports nothing, so there is no cycle.
 
@@ -48,22 +48,27 @@ pub fn bytes(path: string): ?uint8[];
 pub fn lines(path: string): ?string[];
 
 /// Writes text (UTF-8), replacing an existing file. `true` on success.
+@MustUse
 pub fn writeText(path: string, content: string): bool;
 
 /// Appends to an existing file or creates it. `true` on success.
+@MustUse
 pub fn appendText(path: string, content: string): bool;
 
 /// Whether something — file or directory — exists at the path.
 pub fn exists(path: string): bool;
 
 /// `true` when the file is gone afterwards, including when it never existed.
+@MustUse
 pub fn remove(path: string): bool;
 
 /// Writes raw bytes, replacing an existing file. `true` on success — the `writeText`
 /// convention. (v1.14: the first native whose parameter is an array.)
+@MustUse
 pub fn writeBytes(path: string, data: uint8[]): bool;
 
 /// Appends raw bytes to an existing file or creates it. `true` on success.
+@MustUse
 pub fn appendBytes(path: string, data: uint8[]): bool;
 
 // ------------------------------------------------------------------------------------------
@@ -78,19 +83,24 @@ pub fn isFile(path: string): bool;
 pub fn isDirectory(path: string): bool;
 
 /// Copies. `false` when the source is missing or the target is not writable.
+@MustUse
 pub fn copy(from: string, to: string): bool;
 
 /// Moves or renames; the same operation on every file system.
+@MustUse
 pub fn move(from: string, to: string): bool;
 
 /// Creates one directory; the parent must exist. `createDirAll` creates the chain.
+@MustUse
 pub fn createDir(path: string): bool;
 
 /// Creates missing parent directories too. An existing directory counts as success.
+@MustUse
 pub fn createDirAll(path: string): bool;
 
 /// Deletes an EMPTY directory. There is no recursive delete; a caller that needs one writes
 /// the loop visibly.
+@MustUse
 pub fn removeDir(path: string): bool;
 
 /// The entries of a directory: names rather than paths, sorted alphabetically.

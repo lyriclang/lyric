@@ -164,6 +164,31 @@ public class AttributeSectionTests
     }
 
     [Fact]
+    public void A_compiler_read_attribute_reaches_no_row_and_no_root()
+    {
+        // '@MustUse' is read by the sema and written down nowhere, like '@Deprecated'. Getting
+        // that wrong is not subtle: the lowering treats an attributed function as a row's target
+        // and demands its id, and a NATIVE declaration has none — marking 'std.io.file.writeText'
+        // brought the compiler down with "attributed function has no lowered id" until the set of
+        // no-row attributes grew to hold both.
+        var bytes = BytecodeWriter.Write(Lower("""
+            module app;
+            import std.core { MustUse };
+            import std.io.file { writeText };
+
+            @MustUse
+            fn save(): bool { return writeText("out.txt", "hi"); }
+
+            fn main(): int {
+                let ok = save();
+                return if (ok) 0 else 1;
+            }
+            """), debugInfo: false);
+
+        Assert.DoesNotContain((byte)SectionId.Attributes, RawSectionIds(bytes));
+    }
+
+    [Fact]
     public void An_attribute_on_an_alias_reaches_no_row()
     {
         // The reason the alias target cost no format change (Lyric 3.3): the section has target
