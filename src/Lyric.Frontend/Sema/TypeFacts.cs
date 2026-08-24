@@ -135,8 +135,8 @@ public static class TypeFacts
             // reported "cannot assign 'fn(int) -> void[]' to '(fn(int) -> void)[]'" — two displays
             // for types that ARE different but looked the same.
             case ArrayOf { Element: FnType } fnArray:
-                return $"({Display(fnArray.Element)})" + (fnArray.Size is null ? "[]" : $"[{fnArray.Size}]");
-            case ArrayOf a: return Display(a.Element) + (a.Size is null ? "[]" : $"[{a.Size}]");
+                return $"({Display(fnArray.Element)})[]";
+            case ArrayOf a: return Display(a.Element) + "[]";
             case TupleOf tu: return "(" + string.Join(", ", tu.Elements.Select(Display)) + ")";
             case FnType f: return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> " + Display(f.Return);
             case RangeOf r: return "range<" + Display(r.Element) + ">";

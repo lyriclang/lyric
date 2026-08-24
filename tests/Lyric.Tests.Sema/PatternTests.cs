@@ -513,6 +513,6 @@ public class PatternTests
     {
         var (t, de) = LastInit("fn u() { let xs: int[] = []; }");
         AssertClean(de);
-        AssertType(new ArrayOf(LyrType.Int, null), t);
+        AssertType(new ArrayOf(LyrType.Int), t);
     }
 }

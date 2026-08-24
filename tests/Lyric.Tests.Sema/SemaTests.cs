@@ -58,7 +58,7 @@ public class SemaTests
     }
 
     private static LyrType Prim(PrimitiveKind k) => new PrimitiveType(k);
-    private static LyrType IntArr => new ArrayOf(LyrType.Int, null);
+    private static LyrType IntArr => new ArrayOf(LyrType.Int);
     private static void AssertType(LyrType expected, LyrType actual) =>
         Assert.True(LyrType.Equal(expected, actual), $"expected '{TypeFacts.Display(expected)}', got '{TypeFacts.Display(actual)}'");
 

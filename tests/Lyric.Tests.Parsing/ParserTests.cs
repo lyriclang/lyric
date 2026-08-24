@@ -138,13 +138,16 @@ public class ParserTests
     }
 
     [Fact]
-    public void Fixed_size_array_type_keeps_the_size()
+    public void Array_type_with_a_length_is_refused()
     {
-        var (expr, _) = Parse("a as int[8]");
+        // Grammar §4: TypeSuffix is '[' ']' — the length belongs to the value. The size used to
+        // parse into a type nothing could ever produce, ending in "cannot assign 'int[]' to
+        // 'int[3]'" or a lowering exception, depending on the route.
+        var (expr, diag) = Parse("a as int[8]");
         var cast = Assert.IsType<CastExpr>(expr);
-        var arr = Assert.IsType<ArrayType>(cast.Type);
-        Assert.NotNull(arr.Size);
-        Assert.Equal(8UL, arr.Size!.Value);
+        Assert.IsType<ArrayType>(cast.Type);
+        Assert.True(diag.HasErrors);
+        Assert.Equal("LYR-PAR0043", diag.Diagnostics[0].Code);
     }
 
     // --- f-Strings ---

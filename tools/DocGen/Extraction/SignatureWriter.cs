@@ -109,7 +109,7 @@ public static class SignatureWriter
         NamedType n => string.Join(".", n.Path) + Arguments(n.TypeArguments),
         // '?' is a prefix over everything that follows, so its inner type never needs parentheses.
         NullableType n => "?" + Type(n.Inner),
-        ArrayType a => Element(a.Element) + (a.Size is null ? "[]" : $"[{a.Size.Value}]"),
+        ArrayType a => Element(a.Element) + "[]",
         TupleType t2 => "(" + string.Join(", ", t2.Elements.Select(Type)) + ")",
         FunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Type))}) -> {Type(f.ReturnType)}",
         ErrorType => "<error>",

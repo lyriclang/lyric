@@ -126,7 +126,6 @@ public class SignatureWriterTests
     [InlineData("Map<K, V>", "Map<K, V>")]
     [InlineData("Map<K, List<V>>", "Map<K, List<V>>")]
     [InlineData("int[]", "int[]")]
-    [InlineData("int[4]", "int[4]")]
     [InlineData("int[][]", "int[][]")]
     [InlineData("?int", "?int")]
     [InlineData("?int[]", "?int[]")]
@@ -167,7 +166,7 @@ public class SignatureWriterTests
         NamedType n => $"named({string.Join(".", n.Path)}{(n.TypeArguments.Length == 0
             ? "" : "[" + string.Join(",", n.TypeArguments.Select(Shape)) + "]")})",
         NullableType n => $"opt({Shape(n.Inner)})",
-        ArrayType a => $"arr({Shape(a.Element)},{a.Size?.Value.ToString() ?? "-"})",
+        ArrayType a => $"arr({Shape(a.Element)})",
         TupleType t2 => $"tup({string.Join(",", t2.Elements.Select(Shape))})",
         FunctionType f => $"fn({string.Join(",", f.Parameters.Select(Shape))}->{Shape(f.ReturnType)})",
         _ => "error",

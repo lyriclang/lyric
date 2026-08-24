@@ -113,7 +113,7 @@ public class GenericsTests
     {
         var (t, de) = LastInit("fn u(v: Vec<int>) { let xs = v.items; }");
         Assert.False(de.HasErrors);
-        AssertType(new ArrayOf(LyrType.Int, null), t); // Vec<T>.items: T[]  →  int[]
+        AssertType(new ArrayOf(LyrType.Int), t); // Vec<T>.items: T[]  →  int[]
     }
 
     [Fact]

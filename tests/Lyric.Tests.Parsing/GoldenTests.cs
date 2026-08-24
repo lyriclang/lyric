@@ -107,7 +107,7 @@ public class GoldenTests
     [InlineData("type_generics")]     // a NamedType with type arguments
     [InlineData("type_nested_generics")] // the '>>' split for nested generics
     [InlineData("type_function")]     // FunctionType fn(...) -> R
-    [InlineData("type_array")]        // ArrayType T[N]
+    [InlineData("type_array")]        // ArrayType T[][]
     [InlineData("type_nullable")]     // NullableType ?T
     [InlineData("type_tuple")]        // TupleType (A, B, C)
     // Negative cases: the snapshot holds the AST dump, possibly an ErrorExpr, AND rendered diagnostics.

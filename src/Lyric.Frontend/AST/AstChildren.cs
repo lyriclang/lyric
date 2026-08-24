@@ -378,7 +378,6 @@ public static class AstChildren
 
             case ArrayType a:
                 yield return a.Element;
-                if (a.Size is not null) yield return a.Size;
                 break;
 
             case TupleType t:

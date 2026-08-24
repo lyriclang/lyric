@@ -866,16 +866,10 @@ internal sealed class TypeTable
 
     private IrType Lower(TypeNode node, Core.Span span)
     {
-        // T[]. There is no size in the type: the length is a property of the value.
+        // T[]. There is no size in the type: the length is a property of the value, and the
+        // parser refuses a written one (LYR-PAR0043).
         if (node is ArrayType array)
-        {
-            if (array.Size is not null)
-                throw new UnsupportedConstructException(
-                    "a length in the array type ('T[N]') does not exist; the length belongs to the " +
-                    "value — use 'T[]' and build it with '[x] * n'", node.Span);
-
             return new IrArrayType(Lower(array.Element, array.Element.Span));
-        }
 
         if (node is NullableType option)
             return new IrOptionalType(Lower(option.Inner, option.Inner.Span));
@@ -1037,7 +1031,7 @@ internal sealed class TypeTable
                     generic.TypeArguments.Select(argument => Resolve(argument, span)).ToArray());
         }
 
-        if (node is ArrayType { Size: null } array) return new ArrayOf(Resolve(array.Element, span), null);
+        if (node is ArrayType array) return new ArrayOf(Resolve(array.Element, span));
         if (node is NullableType option) return new Optional(Resolve(option.Inner, span));
         if (node is ThrowingType throwing) return Resolve(throwing.Inner, span);
 

@@ -93,7 +93,7 @@ public class LambdaTests
     {
         var (t, de) = LastInit("fn u(xs: int[]) { let ys = map(xs, (x) => x * 2); }");
         AssertClean(de);
-        AssertType(new ArrayOf(LyrType.Int, null), t);
+        AssertType(new ArrayOf(LyrType.Int), t);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class LambdaTests
     {
         var (t, de) = LastInit("""fn u(xs: int[]) { let ys = map(xs, (x) => f"{x}"); }""");
         AssertClean(de);
-        AssertType(new ArrayOf(LyrType.String, null), t); // U = string from the lambda body
+        AssertType(new ArrayOf(LyrType.String), t); // U = string from the lambda body
     }
 
     [Fact]
