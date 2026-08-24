@@ -10,7 +10,61 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v3.4.0 — 2026-08-24
+## v3.4.1 — 2026-08-24
+
+A ground-up bug sweep through the pipeline. Every fix carries a failing test written first, and
+none changes the behaviour of a correct, documented program — what they change is that malformed
+input, whether hand-written source or crafted bytecode, is now refused with a message instead of
+crashing, corrupting, or slipping through.
+
+### Fixed
+
+- **A Unicode escape past the last scalar no longer crashes the compiler.** `"\u{80000000}"` —
+  eight hex digits with the high bit set — wrapped to a negative number and took the compiler
+  down with an unhandled exception instead of reporting `LYR-LEX0007`. A surrogate escape
+  (`\u{D800}`) passed the lexer too and was then dropped from the string. Both are refused now.
+
+- **An oversized array is a panic, not a process crash.** `[0] * n` and array concatenation with
+  a result too large to fit an array reached the allocator as an overflowed length and aborted
+  the whole runtime — the escape a `Capability.None` sandbox exists to prevent. They panic
+  (`LYR-VM0006`) now, on the interpreter and the JIT alike.
+
+- **A module that under-declares its capabilities is refused.** Binding trusted the capabilities
+  a module declared: one that called `std.io.file` while declaring nothing was handed the native
+  and ran it, even under `Capability.None`. A gated native can no longer be bound without its
+  capability declared (`LYR-CAP0001`), so a host loading foreign bytes is protected as the
+  capability model promises.
+
+- **The bytecode loader closes four gaps in what it rejects.** A function whose code ends without
+  a terminator, a `ret` in a valued function or a `retval` in a void one, a `throw` naming a type
+  outside the table, an entry point whose signature is neither empty nor a single `string[]`, a
+  reference index out of range inside a function-type signature, and an attribute value naming an
+  enum's payload variant or an out-of-range `char` — each passed validation before and could
+  crash or misexecute; each is refused now. `lyrvm verify` catches them without running a byte.
+
+- **An array type carries no length.** `int[3]` parsed into a type nothing could produce; the
+  parser reports `LYR-PAR0043` with the advice to build the array with `[x] * n`.
+
+- **A pattern literal must be a literal.** `-y` and `3..y` parsed with an identifier where the
+  grammar has a literal — and the lowering *evaluated* it, a pattern quietly matching a runtime
+  value. Both are refused (`LYR-PAR0033`).
+
+- **A selective import names at least one item.** `import a { };` was accepted as an import of
+  nothing; it reports now.
+
+- **An f-string format spec runs to its matching brace.** `{x:a{b}c}` stopped at the first `}`,
+  leaking the tail into the surrounding text; nested braces, parentheses and brackets are tracked
+  as the grammar has always said.
+
+- **A supplementary char crosses the host boundary without truncation.** A Lyric `char` is a full
+  Unicode scalar; a .NET `char` is UTF-16. The embedding boundary silently masked an astral code
+  point to sixteen bits. It now crosses as its code-point integer — a host asking for `char` gets
+  a checked error, one asking for `int` gets the whole code point.
+
+### Docs
+
+- The guide called `int` an alias for `int64`; both are distinct types of the same width, as the
+  specification says. A literal adapts to either, a variable crosses with `as`.
 
 ### Added
 
