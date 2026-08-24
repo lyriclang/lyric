@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.3.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.3.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.3.0 — 2026-08-24</h2>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A module that only CALLS through an interface no longer fails to load.</strong> A library — an
+interface, a class calling through it, and the implementing left to whoever imports it —
+produced a <code>.lyrbc</code> its own loader refused:</p>
+<pre><code>function 'kit.props.Field.take' at 70: stack depth 5 exceeds the declared maximum of 4
+</code></pre>
+<p>The bytecode was correct. The loader reads a <code>callvirt</code>'s argument count off an Impls row,
+because every implementation of a slot shares its signature and the Types section carries slot
+names alone; with nothing implementing the interface there is no row, and the missing count was
+answered with &quot;no arguments, no result&quot;. A two-argument call then looked as though it left its
+arguments on the stack, which is why the message named a function far from the call and moved
+when unrelated statements were deleted.</p>
+<p>Such a call cannot execute — <code>mkiface</code> is already refused without a row for exactly that pair,
+so no value of the interface can exist — and the loader now says so by stopping rather than
+guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
+Where a row exists nothing changes.</p>
+</li>
+<li><p><strong>Iterating an array of optionals is a message, not a crash</strong> (<code>LYR-SEM0091</code>).
+<code>for (h in houses)</code> over a <code>(?House)[]</code> — an ordinary table shape — crashed the compiler in
+debug (<code>optnone of ?i64 — optionals do not nest</code>, with a stack trace and no position) and, in
+release, made <code>check</code> answer &quot;ok&quot; for a program <code>build</code> could not finish.</p>
+<p>The cause is the protocol, not the container: <code>next()</code> answers <code>?T</code> and uses null to mean &quot;the
+end&quot;, so an optional element would need <code>??T</code> to be told apart from it, and <code>?</code> does not nest.
+The message says that and points at the loop that does work — over the indices. It fires the
+same way for an iterator of optionals handed in directly, because the reason is the same.</p>
+</li>
+<li><p><strong>An operator whose operand already reported stays silent.</strong> <code>&lt;error&gt;[]</code> appeared in sentences
+about operators: <code>IsError</code> was consulted where the error sat INSIDE an array or a tuple, so the
+type was not itself the error and the check went on to complain about it.</p>
+</li>
+<li><p><strong>A range outside a loop head is a message, not a crash</strong> (<code>LYR-SEM0090</code>). <code>let r = 1..5;</code> and
+<code>[1..3]</code> threw an internal exception out of the lowering, with a stack trace and no source
+position. A range is a loop head and not a value — the grammar has no range expression among its
+primaries and there is no range type — but nothing said so where the type was INFERRED; where it
+was written down, the assignment had refused it all along. The grammar now names the form and
+its one legal position.</p>
+</li>
+<li><p><strong>The compiler reads back every module it writes.</strong> The emit step was taken for mechanical, so
+nothing checked it: a <code>.lyrbc</code> its own loader refuses was found by a golden-image test that
+opened a window, two layers from the change. The bytes now go through the loader before a build
+writes them, in release as in debug — the one time it mattered, compiler and runtime were the
+same released build. A module that fails is a compiler bug and is reported as one, with the
+loader's own words.</p>
+</li>
+<li><p><strong>An aliased import used only as a TYPE is no longer reported as unused.</strong> <code>import kit.eye as look;</code> mentioned once, as <code>eye: look.Eye</code>, warned <code>LYR-SEM0072</code> — a build error under
+<code>--deny-warnings</code>. The qualifier of a type path has no node of its own, so neither reference
+table carried it; the resolver records the step-through now. A plain import used as a type and
+an alias used in an expression were already counted, which is what made the gap read as
+arbitrary.</p>
+</li>
+<li><p><strong><code>LYR-IR0001</code> says one sentence instead of two grown together.</strong> The category was appended as a
+clause, and where a message ended in a subordinate one the result was
+<em>&quot;initializer omits field 'wood', which has no default is not supported by this compiler version
+yet&quot;</em>. The message names the construct; the category is a note beneath it.</p>
+</li>
+<li><p><strong>A keyword written where a name belongs says so.</strong> <code>keep.resume();</code> reported <code>expected member name after '.', got Resume</code> — the way a parser talks about a typo, which costs a reader a look at
+the spelling before they suspect the word. The identifier expectations now carry a note:</p>
+<pre><code>note: 'resume' is a keyword and cannot be used as a name
+</code></pre>
+<p>Only those: <code>got Return</code> where a <code>;</code> was expected is not a naming problem.</p>
+</li>
+</ul>
+<h3 id="added">Added</h3>
+<ul>
+<li><strong><code>lyric check &lt;file&gt; --emit</code></strong> answers the question plain <code>check</code> cannot: not &quot;does this
+program compile&quot; but &quot;does the module it produces LOAD&quot;. It emits, reads back, and writes
+nothing. For a project that compiles every one of its files as an entry — to read each file's
+attributes — that was the missing invariant.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
