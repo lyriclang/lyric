@@ -676,13 +676,21 @@ public sealed class Lexer
 
         if (hexCount > 0)
         {
-            var hexVal = Int32.Parse(_source.Substring(unicodeStart + 2, hexCount),
-                System.Globalization.NumberStyles.HexNumber);
+            // UInt32, not Int32: eight hex digits with the high bit set would wrap to a
+            // negative number under HexNumber parsing and slip past the range check.
+            var hexVal = UInt32.Parse(_source.Substring(unicodeStart + 2, hexCount),
+                System.Globalization.NumberStyles.AllowHexSpecifier);
             if (hexVal > 0x10FFFF)
             {
                 _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
                     new Span(_file, unicodeStart - 1, _pos),
                     "unicode value out of range (max: 0x10FFFF)"));
+            }
+            else if (hexVal is >= 0xD800 and <= 0xDFFF)
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
+                    new Span(_file, unicodeStart - 1, _pos),
+                    "unicode value is a surrogate (0xD800-0xDFFF), not a scalar value"));
             }
         }
 

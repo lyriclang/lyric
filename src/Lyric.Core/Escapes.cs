@@ -67,11 +67,13 @@ public static class Escapes
     /// </summary>
     private static int HexEscape(string content, int i, StringBuilder result)
     {
+        // AllowHexSpecifier alone: HexNumber would also accept surrounding whitespace.
         if (i + 3 <= content.Length
-            && int.TryParse(content.AsSpan(i + 1, 2), NumberStyles.HexNumber, null, out var value))
+            && byte.TryParse(content.AsSpan(i + 1, 2), NumberStyles.AllowHexSpecifier, null,
+                out var value))
             result.Append((char)value);
 
-        return Math.Min(i + 3, content.Length); // auch im Fehlerfall weiterlaufen
+        return Math.Min(i + 3, content.Length); // keep going on the error path too
     }
 
     /// <summary><c>u{H…}</c> — any number of hex digits in braces. <paramref name="i"/> points at
@@ -82,10 +84,13 @@ public static class Escapes
         var end = content.IndexOf('}', start);
         if (end < 0) end = content.Length;
 
-        if (int.TryParse(content.AsSpan(start, end - start), NumberStyles.HexNumber, null,
-                out var codePoint)
+        // UInt32, not Int32: eight hex digits with the high bit set would wrap to a negative
+        // number and crash ConvertFromUtf32. AllowHexSpecifier alone: HexNumber would also
+        // accept surrounding whitespace.
+        if (uint.TryParse(content.AsSpan(start, end - start), NumberStyles.AllowHexSpecifier,
+                null, out var codePoint)
             && codePoint <= 0x10FFFF && codePoint is < 0xD800 or > 0xDFFF)
-            result.Append(char.ConvertFromUtf32(codePoint));
+            result.Append(char.ConvertFromUtf32((int)codePoint));
 
         return Math.Min(end + 1, content.Length);
     }

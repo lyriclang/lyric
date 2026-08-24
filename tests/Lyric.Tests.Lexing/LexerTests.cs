@@ -1090,6 +1090,8 @@ public class LexerTests
     [InlineData("\"\\u{0}\"",       7)]
     [InlineData("\"\\u{1F30D}\"",  11)]    // 🌍
     [InlineData("\"\\u{10FFFF}\"", 12)]    // max valid
+    [InlineData("\"\\u{D7FF}\"",   10)]    // last scalar before the surrogate range
+    [InlineData("\"\\u{E000}\"",   10)]    // first scalar after the surrogate range
     public void String_with_valid_unicode_escape(string input, int expectedEnd)
     {
         // Regression: the loop count and Int32.Parse without HexNumber.
@@ -1146,6 +1148,29 @@ public class LexerTests
     public void Unicode_escape_out_of_range_emits_LEX0007()
     {
         var (_, diag) = Tokenize("\"\\u{110000}\"");
+        Assert.True(diag.ErrorCount >= 1);
+        Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
+    }
+
+    [Theory]
+    [InlineData("\"\\u{D800}\"")]    // first surrogate
+    [InlineData("\"\\u{DFFF}\"")]    // last surrogate
+    public void Unicode_escape_surrogate_emits_LEX0007(string input)
+    {
+        // A surrogate is not a Unicode scalar value; the escape must name one.
+        var (_, diag) = Tokenize(input);
+        Assert.True(diag.ErrorCount >= 1);
+        Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
+    }
+
+    [Theory]
+    [InlineData("\"\\u{80000000}\"")]
+    [InlineData("\"\\u{FFFFFFFF}\"")]
+    public void Unicode_escape_eight_digits_with_high_bit_emits_LEX0007(string input)
+    {
+        // Regression: Int32.Parse wraps eight hex digits with the high bit set to a negative
+        // number, which slipped past the range check and crashed the escape resolution.
+        var (_, diag) = Tokenize(input);
         Assert.True(diag.ErrorCount >= 1);
         Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
     }
