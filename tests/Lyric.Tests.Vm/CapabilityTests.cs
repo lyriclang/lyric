@@ -120,6 +120,57 @@ public class CapabilityTests
             NativeRegistry.CreateDefault(TextWriter.Null, TextWriter.Null),
             Capability.None).AsI64);
 
+    private const string UsesFile = """
+        import std.io.file { exists };
+        fn main(): int { if (exists("x")) { return 1; } return 0; }
+        """;
+
+    [Fact]
+    public void A_module_that_under_declares_a_gated_native_is_refused_even_under_full_grant()
+    {
+        // The attacker's module: it calls std.io.file but its capabilities section says it needs
+        // nothing. Binding used to trust the declaration and hand it the native anyway — so the
+        // guarantee the capability comment makes ("a host loading foreign bytes is protected too")
+        // did not hold for a module that lies. Now a gated native cannot be bound without the
+        // declaration, so the lie is caught at load even where everything is granted.
+        var honest = BytecodeWriter.Write(Lower(UsesFile));
+
+        // The capabilities section is section 1, first after the 8-byte header: id 0x01, length
+        // 0x01, then the one-byte bitset 0x01 (fileAccess). Zero the bitset to forge the lie.
+        Assert.Equal(0x01, honest[8]);   // section id 1
+        Assert.Equal(0x01, honest[9]);   // payload length 1
+        Assert.Equal(0x01, honest[10]);  // bitset: fileAccess
+        var forged = (byte[])honest.Clone();
+        forged[10] = 0x00;
+
+        var module = BytecodeReader.ReadOrThrow(forged);
+        Assert.Equal(0UL, module.Capabilities);
+
+        var refused = Assert.Throws<LyricRuntimeException>(() => Interpreter.Run(module, [],
+            NativeRegistry.CreateDefault(TextWriter.Null, TextWriter.Null),
+            Capability.All));
+        Assert.Equal("LYR-CAP0001", refused.Code);
+        Assert.Contains("fileAccess", refused.Message);
+    }
+
+    private static Lyric.Ir.IrModule Lower(string source)
+    {
+        var sm = new SourceManager();
+        var id = sm.AddVirtual("test.lyr", source);
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de)
+        {
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+        };
+        comp.AddModule(new Parser(sm, id, de).ParseModule());
+        var binding = comp.Resolve();
+        var types = Semantics.Analyze(comp, binding, de);
+        Assert.False(de.HasErrors);
+        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true);
+        Assert.NotNull(ir);
+        return ir!;
+    }
+
     // ------------------------------------------------------------------ die Tabelle
 
     [Fact]

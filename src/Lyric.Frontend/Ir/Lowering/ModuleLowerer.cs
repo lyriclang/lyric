@@ -152,7 +152,7 @@ public static class ModuleLowerer
                 // There are two forms: 'fn main(): int' and 'fn main(args: string[]): int'. The second
                 // gets its array from the runtime, which reads the form from the entry's signature; the
                 // function table carries it anyway, so the format needs no flag for it.
-                if (function.Parameters is [{ Type: ArrayType { Element: NamedType arg, Size: null } }]
+                if (function.Parameters is [{ Type: ArrayType { Element: NamedType arg } }]
                     && arg.Path[^1] == "string")
                 {
                     entry = id;

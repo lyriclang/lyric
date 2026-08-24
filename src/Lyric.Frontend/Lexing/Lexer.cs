@@ -676,13 +676,21 @@ public sealed class Lexer
 
         if (hexCount > 0)
         {
-            var hexVal = Int32.Parse(_source.Substring(unicodeStart + 2, hexCount),
-                System.Globalization.NumberStyles.HexNumber);
+            // UInt32, not Int32: eight hex digits with the high bit set would wrap to a
+            // negative number under HexNumber parsing and slip past the range check.
+            var hexVal = UInt32.Parse(_source.Substring(unicodeStart + 2, hexCount),
+                System.Globalization.NumberStyles.AllowHexSpecifier);
             if (hexVal > 0x10FFFF)
             {
                 _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
                     new Span(_file, unicodeStart - 1, _pos),
                     "unicode value out of range (max: 0x10FFFF)"));
+            }
+            else if (hexVal is >= 0xD800 and <= 0xDFFF)
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
+                    new Span(_file, unicodeStart - 1, _pos),
+                    "unicode value is a surrogate (0xD800-0xDFFF), not a scalar value"));
             }
         }
 
@@ -737,8 +745,28 @@ public sealed class Lexer
 
     private Token ScanFStringFormatSpec()
     {
+        // The spec runs to the MATCHING '}' (grammar §1.5): a '}' closing a nested brace, or
+        // standing inside open parentheses or brackets, belongs to the spec text. A closing
+        // bracket without an opening one does not count negative, as in the interpolation.
         var specStart = _pos;
-        while (Current is not ('}' or '\0' or '\n')) _pos++;
+        var braceDepth = 0;
+        var parenDepth = 0;
+        var bracketDepth = 0;
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '}' && braceDepth == 0 && parenDepth == 0 && bracketDepth == 0)
+                break;
+            switch (Current)
+            {
+                case '{': braceDepth++; break;
+                case '}': if (braceDepth > 0) braceDepth--; break;
+                case '(': parenDepth++; break;
+                case ')': if (parenDepth > 0) parenDepth--; break;
+                case '[': bracketDepth++; break;
+                case ']': if (bracketDepth > 0) bracketDepth--; break;
+            }
+            _pos++;
+        }
         if (Current is '\0' or '\n') return HandleUnterminatedFString();
         _modeStack.Pop();
         return new Token(TokenKind.FStringFormatSpec, new Span(_file, specStart, _pos));

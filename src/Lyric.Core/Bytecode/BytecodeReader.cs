@@ -265,6 +265,14 @@ public static class BytecodeReader
                         $"attribute row {row}: variant {variant} of '{declaration.Name}' points "
                         + $"outside the type table");
 
+                // Only a variant WITHOUT a payload may be written (§Attributes): a row holds one
+                // value per field, and a payload is values of its own. Slot 0 is the tag, so a
+                // payload-free variant's layout has exactly one field.
+                if (types[entry].FieldTypes.Count > 1)
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                        $"attribute row {row}: variant '{types[entry].Name}' of "
+                        + $"'{declaration.Name}' carries a payload and cannot be a value");
+
                 return new BytecodeConstValue(tag)
                 {
                     Bits = (ulong)variant,
@@ -293,9 +301,19 @@ public static class BytecodeReader
                 {
                     Bits = BitConverter.DoubleToUInt64Bits(payload.F64()),
                 };
+            case TypeTag.Char:
+            {
+                // A char is a Unicode scalar value (§3), the same rule the runtime enforces on a
+                // conversion and the lexer on an escape. Unchecked, a crafted value crashed the
+                // disassembler when it rendered the char with ConvertFromUtf32.
+                var codepoint = payload.ULeb();
+                if (codepoint > 0x10FFFF || codepoint is >= 0xD800 and <= 0xDFFF)
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                        $"attribute row {row}: char value {codepoint} is not a Unicode scalar");
+                return new BytecodeConstValue(tag) { Bits = codepoint };
+            }
             case TypeTag.I8 or TypeTag.I16 or TypeTag.I32 or TypeTag.I64
-                or TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64
-                or TypeTag.Char:
+                or TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64:
                 return new BytecodeConstValue(tag) { Bits = payload.ULeb() };
             default:
                 throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
@@ -740,6 +758,20 @@ public static class BytecodeReader
                 $"start function {start} is outside the callable index space " +
                 $"({module.Imports.Count + module.Functions.Count})");
 
+        // §8.5: the entry point takes nothing, or exactly one string[]. The runner reads which
+        // form is present from this signature, so an unchecked one would hand a string[] to a
+        // parameter slot of another type.
+        if (module.Start is { } entry && entry >= module.Imports.Count)
+        {
+            var main = module.Functions[entry - module.Imports.Count];
+            var okay = main.ParamCount == 0
+                       || (main.ParamCount == 1
+                           && main.SlotTypes[0] is { Tag: TypeTag.Array, Element.Tag: TypeTag.String });
+            if (!okay)
+                throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                    $"entry point '{main.Name}' must take nothing or a single string[]");
+        }
+
         ValidateTypeReferences(module);
         ValidateImpls(module);
         ValidateHandlers(module);
@@ -774,9 +806,18 @@ public static class BytecodeReader
             // table like a direct one.
             while ((type.IsArray || type.IsOptional) && type.Element is { } inner) type = inner;
 
-            if (type.IsRef && (type.TypeIndex < 0 || type.TypeIndex >= module.Types.Count))
+            // Every table-indexed form, not IsRef alone: an interface or struct tag carries an
+            // index the same way, and a function type carries indexed types inline.
+            if (type.Tag is TypeTag.Ref or TypeTag.Enum or TypeTag.Interface or TypeTag.Struct
+                && (type.TypeIndex < 0 || type.TypeIndex >= module.Types.Count))
                 throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
                     $"{where}: type index {type.TypeIndex} is outside {module.Types.Count} type(s)");
+
+            if (type.Tag == TypeTag.Fn)
+            {
+                foreach (var parameter in type.Parameters) Check(parameter, where);
+                if (type.Element is { } ret) Check(ret, where);
+            }
         }
 
         for (var i = 0; i < module.Types.Count; i++)
@@ -825,6 +866,25 @@ public static class BytecodeReader
 
             switch (instruction.Opcode)
             {
+                // ret and retval must match the function's return type (§5). A retval from a
+                // void function hands the caller a value it never pops; a ret from a valued one
+                // leaves the caller popping a value that never arrives.
+                case Op.Return when function.ReturnType.Tag != TypeTag.Void:
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                        $"function '{function.Name}' at {instruction.Offset}: ret without a value " +
+                        $"in a function returning {function.ReturnType.Tag}");
+
+                case Op.ReturnValue when function.ReturnType.Tag == TypeTag.Void:
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                        $"function '{function.Name}' at {instruction.Offset}: retval in a " +
+                        "function returning void");
+
+                // throw carries the thrown type as index + 1, or 0 for "carried by the value".
+                case Op.Throw when instruction.Immediate > (ulong)module.Types.Count:
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
+                        $"function '{function.Name}' at {instruction.Offset}: throw names type " +
+                        $"{instruction.Immediate - 1}, outside {module.Types.Count} type(s)");
+
                 case Op.LoadLocal or Op.StoreLocal when instruction.Immediate >= (ulong)function.SlotTypes.Count:
                     throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
                         $"function '{function.Name}' at {instruction.Offset}: local slot " +
@@ -1140,12 +1200,13 @@ public static class BytecodeReader
         foreach (var start in function.BlockOffsets)
         {
             var depth = 0;
+            var closed = false;
             for (var i = byOffset[start]; i < instructions.Count; i++)
             {
                 var instruction = instructions[i];
                 // Unknown shape: the depth from here on is not derivable, so this block's walk
                 // ends rather than continuing on a guess.
-                if (CalleeShape(module, instruction) is not { } shape) break;
+                if (CalleeShape(module, instruction) is not { } shape) { closed = true; break; }
                 var (arity, returnsValue) = shape;
 
                 // newvariant takes its variant's payload fields; slot 0 is the tag and does not
@@ -1173,8 +1234,16 @@ public static class BytecodeReader
                     throw new MalformedBytecodeException(BytecodeDiagnostics.StackDiscipline,
                         $"function '{function.Name}': block at {start} ends with {depth} value(s) " +
                         "on the stack, expected 0");
+                closed = true;
                 break;
             }
+
+            // A walk that ran out of instructions never met a terminator, and at runtime the
+            // interpreter would run past the end of the code.
+            if (!closed)
+                throw new MalformedBytecodeException(BytecodeDiagnostics.StackDiscipline,
+                    $"function '{function.Name}': the code ends inside the block at {start} " +
+                    "without a terminator");
         }
     }
 

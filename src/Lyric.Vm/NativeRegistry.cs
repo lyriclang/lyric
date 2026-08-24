@@ -151,6 +151,18 @@ public sealed class NativeRegistry
                 throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
                     $"no native implementation for '{import.Name}'");
 
+            // A gated native may only be bound when the module DECLARED the capability it needs.
+            // The load-time check (LoadedProgram.Load) refuses a module that declares more than
+            // the grant; this refuses one that USES more than it declares. Together they make the
+            // declared bitset a verified bound rather than a trusted one — which is what lets a
+            // host loading foreign bytes rely on the declaration, as the capability contract
+            // promises. The compiler always declares correctly, so no honest module trips this.
+            var needed = CapabilityTable.RequiredForImport(import.Name);
+            if (((Capability)module.Capabilities & needed) != needed)
+                throw new LyricRuntimeException(VmDiagnostics.CapabilityDenied,
+                    $"native '{import.Name}' requires capability "
+                    + $"'{CapabilityTable.Describe(needed)}', which the module does not declare");
+
             // Tags first; elements where a tag alone is ambiguous. A reference signature is
             // rejected because no native declares one.
             if (!native.ParamTypes.SequenceEqual(import.ParamTypes.Select(p => p.Tag)) ||

@@ -684,6 +684,10 @@ public static class Interpreter
                 {
                     var right = stack[--sp].AsObject;
                     var left = stack[--sp].AsObject;
+                    if ((long)left.Length + right.Length > int.MaxValue)
+                        throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                            $"array concatenation of {left.Length} and {right.Length} element(s) "
+                            + "exceeds the array size limit");
                     var joined = new LyrValue[left.Length + right.Length];
                     left.CopyTo(joined, 0);
                     right.CopyTo(joined, left.Length);
@@ -699,7 +703,20 @@ public static class Interpreter
                         throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
                             $"array repetition count {count} is negative");
 
-                    var repeated = new LyrValue[source.Length * count];
+                    // The result must fit an array. Without the guard a large count reached the
+                    // allocator as an overflowed length — an unhandled OverflowException instead
+                    // of a panic — and an EMPTY source spun the copy loop count times for nothing.
+                    if (source.Length == 0 || count == 0)
+                    {
+                        stack[sp++] = LyrValue.FromObject([]);
+                        break;
+                    }
+                    if (count > int.MaxValue / source.Length)
+                        throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                            $"array repetition of {source.Length} element(s) x {count} exceeds "
+                            + "the array size limit");
+
+                    var repeated = new LyrValue[source.Length * (int)count];
                     for (var i = 0; i < count; i++) source.CopyTo(repeated, i * source.Length);
                     stack[sp++] = LyrValue.FromObject(repeated);
                     break;

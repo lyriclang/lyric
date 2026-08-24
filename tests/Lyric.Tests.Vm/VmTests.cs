@@ -530,6 +530,27 @@ public class VmTests
         Assert.Equal(VmDiagnostics.IndexOutOfRange, panic.Code);
     }
 
+    [Fact]
+    public void A_repetition_beyond_the_array_limit_panics()
+    {
+        // Used to reach the allocator as an overflowed length: an unhandled OverflowException
+        // where the runner contract promises a panic.
+        var panic = RunExpectingPanic(
+            "fn main(): int { let n = 4611686018427387904; let xs = [0] * n; return 0; }");
+        Assert.Equal(VmDiagnostics.IndexOutOfRange, panic.Code);
+        Assert.Contains("array size limit", panic.Message);
+    }
+
+    [Fact]
+    public void Repeating_an_empty_array_by_a_huge_count_returns_empty()
+    {
+        // The copy loop used to spin count times over nothing, with an int counter against a
+        // long bound.
+        Assert.Equal(0L, Run(
+            "fn main(): int { let e: int[] = []; let n = 9223372036854775807; "
+            + "let xs = e * n; return xs.length; }").AsI64);
+    }
+
     // ------------------------------------------------------------------ 4e) Optionals (§7)
 
     private const string Find = "fn find(x: int): ?int { if (x > 0) { return x; } return null; }\n";

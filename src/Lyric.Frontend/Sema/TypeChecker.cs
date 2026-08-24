@@ -1947,7 +1947,7 @@ public sealed class TypeChecker
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
         if (TypeFacts.IsString(l) && TypeFacts.IsString(r)) return LyrType.String;      // "a" + "b"
         if (l is ArrayOf la && r is ArrayOf ra && LyrType.Equal(la.Element, ra.Element)) // [..] + [..]
-            return new ArrayOf(la.Element, null);
+            return new ArrayOf(la.Element);
         return DesugarArithmetic(b, l, r, scope, _add, "add", "+") ?? BadBinary(b, l, r);
     }
 
@@ -1956,8 +1956,8 @@ public sealed class TypeChecker
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r)) return LyrType.String;   // "x" * 3
         if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l)) return LyrType.String;   // 3 * "x"
-        if (l is ArrayOf la && TypeFacts.IsInteger(r)) return new ArrayOf(la.Element, null); // [0] * 5
-        if (r is ArrayOf ra && TypeFacts.IsInteger(l)) return new ArrayOf(ra.Element, null);
+        if (l is ArrayOf la && TypeFacts.IsInteger(r)) return new ArrayOf(la.Element); // [0] * 5
+        if (r is ArrayOf ra && TypeFacts.IsInteger(l)) return new ArrayOf(ra.Element);
         return DesugarArithmetic(b, l, r, scope, _mul, "mul", "*") ?? BadBinary(b, l, r);
     }
 
@@ -2398,7 +2398,7 @@ public sealed class TypeChecker
     {
         var elemExpected = expected is ArrayOf ea ? ea.Element : null;
         if (arr.Elements.Length == 0)
-            return new ArrayOf(elemExpected ?? LyrType.Error, null); // empty: the element type comes from the context alone
+            return new ArrayOf(elemExpected ?? LyrType.Error); // empty: the element type comes from the context alone
         // With a context the elements check AGAINST it (§3.1 since 2.1): an unsuffixed literal
         // adapts, a misfit is the ordinary assignment error per element, and the array has the
         // context's element type. Without one the elements unify among themselves, as always.
@@ -2407,7 +2407,7 @@ public sealed class TypeChecker
             foreach (var element in arr.Elements)
                 CheckAssignable(element, CheckExpr(element, scope, elemExpected), elemExpected,
                     element.Span);
-            return new ArrayOf(elemExpected, null);
+            return new ArrayOf(elemExpected);
         }
 
         var first = CheckExpr(arr.Elements[0], scope, elemExpected);
@@ -2418,7 +2418,7 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0009", Severity.Error, arr.Elements[i].Span,
                     $"array elements must share a type: '{TypeFacts.Display(first)}' vs '{TypeFacts.Display(t)}'");
         }
-        return new ArrayOf(first, null);
+        return new ArrayOf(first);
     }
 
     // --- calls, members, struct initializers, composites ---
@@ -2793,7 +2793,7 @@ public sealed class TypeChecker
         {
             TypeParamType tp => map.TryGetValue(tp.Param, out var m) ? m : tp,
             Optional o => new Optional(Substitute(o.Inner, map)),
-            ArrayOf a => new ArrayOf(Substitute(a.Element, map), a.Size),
+            ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()),
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
@@ -4869,7 +4869,7 @@ public sealed class TypeChecker
                 return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };
             }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
-            case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope), a.Size is { } sz ? (int)sz.Value : null);
+            case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());
             case FunctionType f: return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope));
             default: return LyrType.Error; // ErrorType

@@ -138,13 +138,16 @@ public class ParserTests
     }
 
     [Fact]
-    public void Fixed_size_array_type_keeps_the_size()
+    public void Array_type_with_a_length_is_refused()
     {
-        var (expr, _) = Parse("a as int[8]");
+        // Grammar §4: TypeSuffix is '[' ']' — the length belongs to the value. The size used to
+        // parse into a type nothing could ever produce, ending in "cannot assign 'int[]' to
+        // 'int[3]'" or a lowering exception, depending on the route.
+        var (expr, diag) = Parse("a as int[8]");
         var cast = Assert.IsType<CastExpr>(expr);
-        var arr = Assert.IsType<ArrayType>(cast.Type);
-        Assert.NotNull(arr.Size);
-        Assert.Equal(8UL, arr.Size!.Value);
+        Assert.IsType<ArrayType>(cast.Type);
+        Assert.True(diag.HasErrors);
+        Assert.Equal("LYR-PAR0043", diag.Diagnostics[0].Code);
     }
 
     // --- f-Strings ---
@@ -368,6 +371,16 @@ public class ParserTests
     }
 
     [Fact]
+    public void Empty_selective_import_is_refused()
+    {
+        // Grammar §2: the list holds at least one name. 'import a { };' parsed silently into an
+        // import of nothing.
+        var (_, de) = ParseModule("import a { };");
+        Assert.True(de.HasErrors);
+        Assert.Equal("LYR-PAR0026", de.Diagnostics[0].Code);
+    }
+
+    [Fact]
     public void Function_captures_generics_params_return_throws()
     {
         var (m, de) = ParseModule("fn f<T>(x: T): int throws E { return 0; }");
@@ -513,6 +526,20 @@ public class ParserTests
     public void Inclusive_range_pattern()
     {
         Assert.True(Assert.IsType<RangePattern>(ParsePattern("0..=9").pattern).IsInclusive);
+    }
+
+    [Theory]
+    [InlineData("-y")]      // negated identifier
+    [InlineData("-true")]
+    [InlineData("3..y")]    // identifier as a range bound
+    [InlineData("-x..=9")]
+    public void Non_literal_in_a_literal_pattern_is_refused(string input)
+    {
+        // Grammar §7: a pattern literal is a literal. '-y' used to parse — and the lowering
+        // EVALUATED it, a pattern quietly matching a runtime value.
+        var (_, de) = ParsePattern(input);
+        Assert.True(de.HasErrors);
+        Assert.Equal("LYR-PAR0033", de.Diagnostics[0].Code);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Spa
 {
     public required Span NameSpan { get; init; }
 }
-public sealed record ArrayType(TypeNode Element, IntLiteralExpr? Size, Span Span) : TypeNode(Span);    // T[] and T[N]; the parser requires an integer literal as the size
+public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span);    // T[]; the length belongs to the value, not the type
 
 /// <remarks><c>Coroutine&lt;int&gt; throws Exception</c> — throwability as part of the TYPE, so it
 /// survives a field, an optional and a parameter. <see cref="Thrown"/> is null for the typeless

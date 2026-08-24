@@ -43,6 +43,11 @@ internal static class JitRuntime
         var a = Slots(left);
         var b = Slots(right);
 
+        if ((long)a.Length + b.Length > int.MaxValue)
+            throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                $"array concatenation of {a.Length} and {b.Length} element(s) "
+                + "exceeds the array size limit");
+
         var joined = new LyrValue[a.Length + b.Length];
         a.CopyTo(joined, 0);
         b.CopyTo(joined, a.Length);
@@ -57,7 +62,15 @@ internal static class JitRuntime
             throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
                 $"array repetition count {count} is negative");
 
-        var repeated = new LyrValue[slots.Length * count];
+        // Same guards as the interpreter, wording included: the result must fit an array, and an
+        // empty source must not spin the copy loop.
+        if (slots.Length == 0 || count == 0) return [];
+        if (count > int.MaxValue / slots.Length)
+            throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                $"array repetition of {slots.Length} element(s) x {count} exceeds "
+                + "the array size limit");
+
+        var repeated = new LyrValue[slots.Length * (int)count];
         for (var i = 0; i < count; i++) slots.CopyTo(repeated, i * slots.Length);
         return repeated;
     }

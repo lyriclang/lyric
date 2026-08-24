@@ -4711,7 +4711,7 @@ internal sealed class FunctionLowerer
     private LyrType SubstituteType(LyrType type) => type switch
     {
         TypeParamType p when _substitution.TryGetValue(p.Param, out var bound) => bound,
-        ArrayOf a => new ArrayOf(SubstituteType(a.Element), a.Size),
+        ArrayOf a => new ArrayOf(SubstituteType(a.Element)),
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()),
         FnType f => new FnType(

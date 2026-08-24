@@ -39,7 +39,7 @@ public abstract record LyrType
         (TypeParamType x, TypeParamType y) => ReferenceEquals(x.Param, y.Param),
         (GenericInstance x, GenericInstance y) => ReferenceEquals(x.Definition, y.Definition) && SameSequence(x.Arguments, y.Arguments),
         (Optional x, Optional y) => Equal(x.Inner, y.Inner),
-        (ArrayOf x, ArrayOf y) => x.Size == y.Size && Equal(x.Element, y.Element),
+        (ArrayOf x, ArrayOf y) => Equal(x.Element, y.Element),
         (TupleOf x, TupleOf y) => SameSequence(x.Elements, y.Elements),
         (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters),
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
@@ -76,7 +76,7 @@ public sealed record OpaqueRef(TypeSymbol Symbol, LyrType Underlying) : LyrType;
 public sealed record TypeParamType(GenericParamSymbol Param) : LyrType; // T inside a generic definition
 public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments) : LyrType; // Stack<int>
 public sealed record Optional(LyrType Inner) : LyrType;              // ?T
-public sealed record ArrayOf(LyrType Element, int? Size) : LyrType;  // T[] and T[N]
+public sealed record ArrayOf(LyrType Element) : LyrType;             // T[]
 public sealed record TupleOf(LyrType[] Elements) : LyrType;
 public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType;
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type

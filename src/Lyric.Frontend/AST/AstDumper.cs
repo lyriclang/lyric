@@ -153,7 +153,7 @@ public static class AstDumper
                 foreach (var a in n.TypeArguments) Write(a, indent + 1, sb);
                 break;
             case ArrayType n:
-                Line(sb, indent, $"ArrayType{(n.Size is null ? "" : $" [{n.Size.Value}]")}", n.Span);
+                Line(sb, indent, "ArrayType", n.Span);
                 Write(n.Element, indent + 1, sb);
                 break;
             case TupleType n:

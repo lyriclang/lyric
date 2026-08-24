@@ -41,7 +41,7 @@ internal static class DeclaredTypes
 
         // 'T[]' in a native signature. The element type stays primitive: an array of objects would
         // require the host to know a module layout.
-        if (node is ArrayType { Size: null } array
+        if (node is ArrayType array
             && array.Element is NamedType { Path.Length: 1, TypeArguments.Length: 0 } element
             && TypeFacts.FromBuiltinName(element.Path[0]) is { } elementPrimitive)
             return new IrArrayType(TypeLowering.Lower(elementPrimitive));
