@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.4.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.4.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.4.1 — 2026-08-24</h2>
+<p>A ground-up bug sweep through the pipeline. Every fix carries a failing test written first, and
+none changes the behaviour of a correct, documented program — what they change is that malformed
+input, whether hand-written source or crafted bytecode, is now refused with a message instead of
+crashing, corrupting, or slipping through.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A Unicode escape past the last scalar no longer crashes the compiler.</strong> <code>&quot;\u{80000000}&quot;</code> —
+eight hex digits with the high bit set — wrapped to a negative number and took the compiler
+down with an unhandled exception instead of reporting <code>LYR-LEX0007</code>. A surrogate escape
+(<code>\u{D800}</code>) passed the lexer too and was then dropped from the string. Both are refused now.</p>
+</li>
+<li><p><strong>An oversized array is a panic, not a process crash.</strong> <code>[0] * n</code> and array concatenation with
+a result too large to fit an array reached the allocator as an overflowed length and aborted
+the whole runtime — the escape a <code>Capability.None</code> sandbox exists to prevent. They panic
+(<code>LYR-VM0006</code>) now, on the interpreter and the JIT alike.</p>
+</li>
+<li><p><strong>A module that under-declares its capabilities is refused.</strong> Binding trusted the capabilities
+a module declared: one that called <code>std.io.file</code> while declaring nothing was handed the native
+and ran it, even under <code>Capability.None</code>. A gated native can no longer be bound without its
+capability declared (<code>LYR-CAP0001</code>), so a host loading foreign bytes is protected as the
+capability model promises.</p>
+</li>
+<li><p><strong>The bytecode loader closes four gaps in what it rejects.</strong> A function whose code ends without
+a terminator, a <code>ret</code> in a valued function or a <code>retval</code> in a void one, a <code>throw</code> naming a type
+outside the table, an entry point whose signature is neither empty nor a single <code>string[]</code>, a
+reference index out of range inside a function-type signature, and an attribute value naming an
+enum's payload variant or an out-of-range <code>char</code> — each passed validation before and could
+crash or misexecute; each is refused now. <code>lyrvm verify</code> catches them without running a byte.</p>
+</li>
+<li><p><strong>An array type carries no length.</strong> <code>int[3]</code> parsed into a type nothing could produce; the
+parser reports <code>LYR-PAR0043</code> with the advice to build the array with <code>[x] * n</code>.</p>
+</li>
+<li><p><strong>A pattern literal must be a literal.</strong> <code>-y</code> and <code>3..y</code> parsed with an identifier where the
+grammar has a literal — and the lowering <em>evaluated</em> it, a pattern quietly matching a runtime
+value. Both are refused (<code>LYR-PAR0033</code>).</p>
+</li>
+<li><p><strong>A selective import names at least one item.</strong> <code>import a { };</code> was accepted as an import of
+nothing; it reports now.</p>
+</li>
+<li><p><strong>An f-string format spec runs to its matching brace.</strong> <code>{x:a{b}c}</code> stopped at the first <code>}</code>,
+leaking the tail into the surrounding text; nested braces, parentheses and brackets are tracked
+as the grammar has always said.</p>
+</li>
+<li><p><strong>A supplementary char crosses the host boundary without truncation.</strong> A Lyric <code>char</code> is a full
+Unicode scalar; a .NET <code>char</code> is UTF-16. The embedding boundary silently masked an astral code
+point to sixteen bits. It now crosses as its code-point integer — a host asking for <code>char</code> gets
+a checked error, one asking for <code>int</code> gets the whole code point.</p>
+</li>
+</ul>
+<h3 id="docs">Docs</h3>
+<ul>
+<li>The guide called <code>int</code> an alias for <code>int64</code>; both are distinct types of the same width, as the
+specification says. A literal adapts to either, a variable crosses with <code>as</code>.</li>
+</ul>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>A chain can be started from an array, a range, or a table with holes in it.</strong> <code>std.iter</code>
+gains four entrances:</p>
+<pre><code class="language-lyr">over(xs).map(f)                 // an array
+range(1, 4)                     // what '1..4' walks in a loop
+rangeInclusive(1, 4)            // what '1..=4' walks
+compact(slots).map(f)           // the non-null values of a '(?T)[]'
+</code></pre>
+<p>The adapters have been methods since 2.17, but the three built-in forms could not start a
+pipeline: an array and a string have no declaration to hang an <code>Iterable</code> conformance on, and a
+range is not a value at all — <code>a..b</code> is a loop head, so <code>(a..b).iter()</code> is not something that
+could exist. Naming the machinery by hand was the alternative, and a class literal with two
+fields reads worse than the loop it replaces.</p>
+<p><strong><code>rangeInclusive</code> is its own function rather than <code>range(low, high + 1)</code></strong>, for the reason the
+two adapters behind it are separate: at the type's maximum that <code>+ 1</code> wraps and the chain
+yields nothing.</p>
+<p><strong><code>compact</code> takes an ARRAY, not an iterator</strong>, and that is the whole design. An <code>Iterator&lt;?T&gt;</code>
+cannot exist — <code>next()</code> answers <code>?T</code> and spends <code>null</code> on &quot;the end&quot;, so an optional element
+would need <code>??T</code>, and <code>?</code> does not nest. Reading the slots directly is what makes the
+distinction available. It is lazy like every other adapter.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
