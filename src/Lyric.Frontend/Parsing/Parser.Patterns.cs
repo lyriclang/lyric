@@ -75,9 +75,33 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Minus))
         {
             var minus = _buffer.Advance();
+
+            // Only a NUMBER may be negated here. ParsePrimary would happily read '-y' — an
+            // identifier — and the lowering would evaluate it: a pattern that quietly matches a
+            // runtime value, which grammar §7 does not have.
+            if (_buffer.Current.TokenKind is not (TokenKind.IntLiteral or TokenKind.FloatLiteral))
+            {
+                _de.Report("LYR-PAR0033", Severity.Error, _buffer.Current.Span,
+                    $"expected a numeric literal after '-' in a pattern, got {_buffer.Current.TokenKind}");
+                return new ErrorExpr(Span.Union(minus.Span, _buffer.Current.Span));
+            }
+
             var atom = ParsePrimary();
             return new UnaryExpr(UnaryOp.Neg, atom, Span.Union(minus.Span, atom.Span));
         }
+
+        // The same guard for the unsigned side: a range's high bound arrives here with the
+        // token unchecked, so '3..y' would otherwise read an identifier as its limit.
+        if (_buffer.Current.TokenKind is not (TokenKind.IntLiteral or TokenKind.FloatLiteral
+            or TokenKind.StringLiteral or TokenKind.CharLiteral or TokenKind.True
+            or TokenKind.False or TokenKind.Null))
+        {
+            _de.Report("LYR-PAR0033", Severity.Error, _buffer.Current.Span,
+                $"expected a literal in a pattern, got {_buffer.Current.TokenKind}");
+            var span = _buffer.Current.Span;
+            return new ErrorExpr(span);
+        }
+
         return ParsePrimary();
     }
 

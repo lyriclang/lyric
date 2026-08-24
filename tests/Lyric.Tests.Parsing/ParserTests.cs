@@ -528,6 +528,20 @@ public class ParserTests
         Assert.True(Assert.IsType<RangePattern>(ParsePattern("0..=9").pattern).IsInclusive);
     }
 
+    [Theory]
+    [InlineData("-y")]      // negated identifier
+    [InlineData("-true")]
+    [InlineData("3..y")]    // identifier as a range bound
+    [InlineData("-x..=9")]
+    public void Non_literal_in_a_literal_pattern_is_refused(string input)
+    {
+        // Grammar §7: a pattern literal is a literal. '-y' used to parse — and the lowering
+        // EVALUATED it, a pattern quietly matching a runtime value.
+        var (_, de) = ParsePattern(input);
+        Assert.True(de.HasErrors);
+        Assert.Equal("LYR-PAR0033", de.Diagnostics[0].Code);
+    }
+
     [Fact]
     public void Qualified_path_is_variant_not_binding()
     {
