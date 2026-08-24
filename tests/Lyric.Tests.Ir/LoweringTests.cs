@@ -644,6 +644,31 @@ public class LoweringTests
         Assert.Single(ir!.Functions, f => f.Name == "id<int>");
     }
 
+    /// <summary>
+    /// The message names the construct and stops there; the category hangs beneath it as a note.
+    ///
+    /// <para>It used to be appended as a clause, and where the message ended in a subordinate one
+    /// the two grew together: "initializer omits field 'wood', which has no default is not
+    /// supported by this compiler version yet" is one sentence made of two, and a reader takes it
+    /// apart before answering it.</para>
+    /// </summary>
+    [Fact]
+    public void The_lowering_limit_says_the_construct_and_notes_the_category()
+    {
+        var (ir, de) = TryLower("""
+            struct Store { wood: int, stone: int }
+            fn main(): int { let s = Store { stone = 1 }; return s.stone; }
+            """);
+
+        Assert.Null(ir);
+        var diagnostic = Assert.Single(de.Diagnostics);
+        Assert.Equal("LYR-IR0001", diagnostic.Code);
+        Assert.Equal("initializer omits field 'wood', which has no default", diagnostic.Message);
+
+        Assert.NotNull(diagnostic.Notes);
+        Assert.Contains(diagnostic.Notes!, n => n.Message.Contains("cannot lower it yet"));
+    }
+
     [Fact]
     public void All_scope_limits_of_a_program_are_reported_in_one_run()
     {

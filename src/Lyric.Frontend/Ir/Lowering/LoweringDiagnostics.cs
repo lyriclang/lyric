@@ -17,6 +17,20 @@ internal static class LoweringDiagnostics
 {
     /// <summary>A construct or type this compiler build cannot lower yet.</summary>
     public const string NotSupported = "LYR-IR0001";
+
+    /// <summary>
+    /// The category, carried as a note rather than as a clause. A message names the construct and
+    /// often says what to do about it; appending "is not supported by this compiler version yet"
+    /// to such a sentence splices two together — "initializer omits field 'wood', which has no
+    /// default is not supported by this compiler version yet" — and a reader has to take it apart
+    /// again. On its own line it reads as the aside it is.
+    /// </summary>
+    private const string Category = "this compiler version cannot lower it yet";
+
+    /// <summary>Reports the one lowering code. Every site goes through here, so the note hangs in
+    /// a single place and no message has to carry the category in its own text.</summary>
+    public static void ReportUnsupported(DiagnosticEngine de, Span span, string message) =>
+        de.Report(NotSupported, Severity.Error, span, message, new DiagnosticNote(Category));
 }
 
 /// <summary>

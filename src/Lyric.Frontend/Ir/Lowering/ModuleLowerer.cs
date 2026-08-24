@@ -126,8 +126,7 @@ public static class ModuleLowerer
                     }
                     catch (UnsupportedConstructException ex)
                     {
-                        de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span,
-                            ex.Message);
+                        LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
                         failed = true;
                     }
                     continue;
@@ -160,7 +159,7 @@ public static class ModuleLowerer
                     continue;
                 }
 
-                de.Report(LoweringDiagnostics.NotSupported, Severity.Error, function.Span,
+                LoweringDiagnostics.ReportUnsupported(de, function.Span,
                     "'main' takes either no parameters or exactly one 'string[]'");
                 failed = true;
             }
@@ -214,8 +213,7 @@ public static class ModuleLowerer
                         }
                         catch (UnsupportedConstructException ex)
                         {
-                            de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span,
-                                ex.Message);
+                            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
                             failed = true;
                         }
 
@@ -242,7 +240,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
             return null;
         }
 
@@ -296,7 +294,7 @@ public static class ModuleLowerer
                 // reported once: the user should see all the MISSING CONSTRUCTS of their program, not
                 // every place the same one is missing.
                 if (reported.Add((ex.Span, ex.Message)))
-                    de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
+                    LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
                 failed = true;
             }
         }
@@ -319,7 +317,7 @@ public static class ModuleLowerer
             }
             catch (UnsupportedConstructException ex)
             {
-                de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
+                LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
                 return null;
             }
         }
@@ -344,7 +342,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
             return null;
         }
 
@@ -392,7 +390,7 @@ public static class ModuleLowerer
             // missing vtable row, which is true and useless: it names a type nobody wrote.
             if (!settled)
             {
-                de.Report(LoweringDiagnostics.NotSupported, Severity.Error, default,
+                LoweringDiagnostics.ReportUnsupported(de, default,
                     "the monomorphization does not terminate: every round asks for further type "
                     + "instances. A method whose result type is built from its own element type "
                     + "demands an instance for the next one, and so on without end — write it as a "
@@ -402,7 +400,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            de.Report(LoweringDiagnostics.NotSupported, Severity.Error, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
             return null;
         }
 
@@ -939,10 +937,10 @@ public static class ModuleLowerer
 
                     // The sema already checked conformance. If something is missing here all the same, it
                     // is a lowering gap — a generic or bodyless implementation pass 1 skipped.
-                    de.Report(LoweringDiagnostics.NotSupported, Severity.Error,
+                    LoweringDiagnostics.ReportUnsupported(de,
                         type.Declaration?.Span ?? default,
                         $"'{type.Name}' implements '{iface.Name}', but its '{slots[i]}' is not "
-                        + "lowerable by this compiler version yet (generic or bodiless)");
+                        + "lowerable (generic or bodiless)");
                     complete = false;
                     break;
                 }

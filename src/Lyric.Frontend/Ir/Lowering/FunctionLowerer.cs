@@ -4783,9 +4783,10 @@ internal sealed class FunctionLowerer
 
     /// <summary>A scope boundary: valid Lyric for which the backend part is still missing. Turned by
     /// <see cref="ModuleLowerer"/> into a <c>LYR-IR0001</c> diagnostic with file, line and column, so no
-    /// position is written into the text here; the DiagnosticEngine renders it.</summary>
+    /// position is written into the text here; the DiagnosticEngine renders it. The text names the
+    /// construct and nothing else — the category is a note the report attaches.</summary>
     private static UnsupportedConstructException NotSupported(string what, Span span) =>
-        new($"{what} is not supported by this compiler version yet", span);
+        new(what, span);
 
     /// <summary>An internal inconsistency: the compiler is broken, not the source.</summary>
     private InternalCompilationException Bug(string message) =>
