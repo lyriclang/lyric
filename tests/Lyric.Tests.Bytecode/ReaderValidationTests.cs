@@ -190,6 +190,29 @@ public class ReaderValidationTests
     }
 
     [Fact]
+    public void An_attribute_char_value_outside_the_scalar_range_is_rejected()
+    {
+        // A struct 'A' with one char field, and a row giving it 0x110000 — past the last scalar.
+        // Unchecked, the disassembler crashed rendering it with ConvertFromUtf32.
+        var types = new Bytes()
+            .Leb(1)
+            .Leb(0).U8(3).Leb(1).U8(0x0C)   // 'A': struct, one char field
+            .Data;
+        var attributes = new Bytes()
+            .Leb(1)
+            .U8(2).Leb(0)       // module target
+            .Leb(0)             // attribute type: 'A'
+            .Leb(1)             // one value
+            .U8(0x0C).Leb(0x110000)   // char value out of range
+            .Data;
+        var ex = Rejects(Module(
+            (2, Strings("A")),
+            (3, types),
+            (11, attributes)));
+        Assert.Contains("scalar", ex.Message);
+    }
+
+    [Fact]
     public void An_enum_attribute_value_naming_a_payload_free_variant_loads()
     {
         // The same module with a payload-free variant: slot 0 is the tag and nothing follows.

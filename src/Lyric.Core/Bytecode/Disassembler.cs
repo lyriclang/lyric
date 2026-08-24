@@ -307,7 +307,11 @@ public static class Disassembler
         TypeTag.Enum => value.Text ?? value.AsInt.ToString(CultureInfo.InvariantCulture),
         TypeTag.Bool => value.AsBool ? "true" : "false",
         TypeTag.F32 or TypeTag.F64 => Floats.Render(value.AsFloat),
-        TypeTag.Char => $"'{char.ConvertFromUtf32((int)value.Bits)}'",
+        // A renderer stays total even on a value the reader would reject: an out-of-range char
+        // (from an in-memory module the reader never saw) shows its number rather than throwing.
+        TypeTag.Char => value.Bits <= 0x10FFFF && value.Bits is < 0xD800 or > 0xDFFF
+            ? $"'{char.ConvertFromUtf32((int)value.Bits)}'"
+            : $"char({N(value.Bits)})",
         TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64 => N(value.Bits),
         _ => value.AsInt.ToString(CultureInfo.InvariantCulture),
     };

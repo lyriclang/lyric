@@ -301,9 +301,19 @@ public static class BytecodeReader
                 {
                     Bits = BitConverter.DoubleToUInt64Bits(payload.F64()),
                 };
+            case TypeTag.Char:
+            {
+                // A char is a Unicode scalar value (§3), the same rule the runtime enforces on a
+                // conversion and the lexer on an escape. Unchecked, a crafted value crashed the
+                // disassembler when it rendered the char with ConvertFromUtf32.
+                var codepoint = payload.ULeb();
+                if (codepoint > 0x10FFFF || codepoint is >= 0xD800 and <= 0xDFFF)
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
+                        $"attribute row {row}: char value {codepoint} is not a Unicode scalar");
+                return new BytecodeConstValue(tag) { Bits = codepoint };
+            }
             case TypeTag.I8 or TypeTag.I16 or TypeTag.I32 or TypeTag.I64
-                or TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64
-                or TypeTag.Char:
+                or TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64:
                 return new BytecodeConstValue(tag) { Bits = payload.ULeb() };
             default:
                 throw new MalformedBytecodeException(BytecodeDiagnostics.UnknownEncoding,
