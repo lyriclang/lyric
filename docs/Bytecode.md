@@ -209,6 +209,11 @@ A `uleb128` bitset stating what the module requires.
 Enforcement happens at load time. A module that requires more than the runtime grants is rejected
 (`LYR-CAP0001`) before any instruction runs.
 
+The bitset also bounds USE: a reader must reject the binding of a gated native inside a module
+whose bitset does not cover it, with the same code. A compiler records the bits its imports
+imply, so the bound can only be violated by hand-built bytes — which is who the check exists
+for.
+
 ### Strings (Id 2)
 
 ```
@@ -454,7 +459,9 @@ point.
 A reader must reject: an unknown target kind, a target or type index outside its table, a nonzero
 target for a module row, a type that is not a struct, the same (targetKind, target, type) triple
 twice, a value count differing from the struct's field count, a value tag differing from the field
-tag at its position, a string index outside the pool, and a value of a non-literal type.
+tag at its position, a `char` value that is not a Unicode scalar, an enum tag outside the variant
+list or naming a variant with a payload, a string index outside the pool, and a value of a
+non-literal type.
 
 ### Names (Id 12)
 
@@ -783,7 +790,9 @@ element index is a runtime value and is not checkable at load time.
 
 An array does not grow; its length is fixed at creation. `arrcat` and `arrrep` each produce a new
 array and leave their operands unchanged. `arrrep` with count `0` yields an empty array; a negative
-count is a panic.
+count is a panic. So is a count, or an `arrcat` result length, the implementation cannot
+allocate: the bound is the implementation's, but the refusal is a panic (`LYR-VM0006`), never a
+process abort — a sandboxed program must not be able to kill its host with a length.
 
 ### Optionals
 
@@ -864,7 +873,8 @@ A reader must reject `structcopy` on a type that is not a struct entry.
 | `0x74` | `endfinally` | — | 0 | end of a `finally` region; terminator |
 
 `throw` carries the concrete type of the thrown value as type index + 1, or `0` when the type is
-known only at runtime — the value is then interface-typed and carries its type with it.
+known only at runtime — the value is then interface-typed and carries its type with it. A nonzero
+operand names a Types entry; a reader must reject one outside the table.
 
 The type comparison while unwinding is equality, not a subtype test: the language has no
 inheritance, so the type at the throw site is the type a `catch` compares against.
