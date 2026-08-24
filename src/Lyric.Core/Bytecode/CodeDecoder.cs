@@ -318,6 +318,10 @@ public static class CodeDecoder
             $"no stack effect defined for opcode {instruction.Opcode}"),
     };
 
+    /// <summary>The nine ways a block ends, exactly as §5 of the format lists them. The stack
+    /// validator leans on this: an opcode missing here lets its walk run across a block boundary
+    /// and blame the wrong block — or notice nothing at all.</summary>
     public static bool IsTerminator(Op opcode) => opcode is
-        Op.Return or Op.ReturnValue or Op.Branch or Op.CondBranch or Op.Unreachable;
+        Op.Return or Op.ReturnValue or Op.Branch or Op.CondBranch or Op.Unreachable
+        or Op.BranchCompare or Op.BranchCompareConst or Op.Throw or Op.EndFinally;
 }
