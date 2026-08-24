@@ -1,5 +1,6 @@
 import std.test { Test, assertEq, assertTrue };
-import std.string { join, parseInt, StringBuilder };
+import std.string { join, parseInt, parseFloat, fromFloat, StringBuilder };
+import std.math { isInfinite };
 
 @Test
 pub fn trim_takes_both_ends(): void {
@@ -83,4 +84,46 @@ pub fn join_weaves_the_separator_between_all_parts(): void {
 pub fn replace_leaves_a_string_without_matches_untouched(): void {
     assertEq("abc".replace("zz", "y"), "abc");
     assertEq("start middle end".replace("middle", ""), "start  end");
+}
+
+@Test
+pub fn parseFloat_reads_every_decimal_shape(): void {
+    assertEq(parseFloat("3.5") ?? -1.0, 3.5);
+    assertEq(parseFloat("-0.25") ?? -1.0, -0.25);
+    assertEq(parseFloat("42") ?? -1.0, 42.0);
+    assertEq(parseFloat("+42") ?? -1.0, 42.0);
+    assertEq(parseFloat(".5") ?? -1.0, 0.5);
+    assertEq(parseFloat("-.5") ?? 1.0, -0.5);
+    assertEq(parseFloat("1e2") ?? -1.0, 100.0);
+    assertEq(parseFloat("2.5E-1") ?? -1.0, 0.25);
+    assertEq(parseFloat("1e+3") ?? -1.0, 1000.0);
+}
+
+/// Correct rounding is the contract: what `fromFloat` writes comes back as the same value, and
+/// a seventeen-digit fraction lands on the exact float it names.
+@Test
+pub fn parseFloat_is_the_exact_inverse_of_fromFloat(): void {
+    let awkward = 0.1 + 0.2;
+    assertEq(parseFloat(fromFloat(awkward)) ?? -1.0, awkward);
+    assertEq(parseFloat("0.30000000000000004") ?? -1.0, awkward);
+    assertEq(parseFloat(fromFloat(1.0e300)) ?? -1.0, 1.0e300);
+    // A magnitude beyond the type rounds to infinity rather than failing.
+    assertTrue(isInfinite(parseFloat("1e999") ?? 0.0), "overflow rounds to infinity");
+}
+
+@Test
+pub fn parseFloat_refuses_what_spells_no_number(): void {
+    assertTrue(parseFloat("") == null, "the empty string");
+    assertTrue(parseFloat("-") == null, "a sign alone");
+    assertTrue(parseFloat("1.") == null, "a point without digits behind it");
+    assertTrue(parseFloat(".") == null, "a point alone");
+    assertTrue(parseFloat("1e") == null, "an exponent without digits");
+    assertTrue(parseFloat("1e+") == null, "an exponent sign without digits");
+    assertTrue(parseFloat(" 3.5") == null, "leading whitespace");
+    assertTrue(parseFloat("3.5 ") == null, "trailing whitespace");
+    assertTrue(parseFloat("1,5") == null, "a comma is not a decimal point");
+    assertTrue(parseFloat("NaN") == null, "the word NaN");
+    assertTrue(parseFloat("Infinity") == null, "the word Infinity");
+    assertTrue(parseFloat("0x10") == null, "hex is not decimal");
+    assertTrue(parseFloat("1.2.3") == null, "a second point");
 }

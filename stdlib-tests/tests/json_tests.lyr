@@ -1,7 +1,7 @@
 import std.test { Test, assertEq, assertTrue };
-import std.json { JsonValue, serialize, serializePretty };
+import std.json { JsonValue, parse, serialize, serializePretty };
 import std.collections { List, Map };
-import std.string { fromChar };
+import std.string { fromChar, repeat };
 
 @Test
 pub fn scalars_serialize_to_their_json_spelling(): void {
@@ -104,4 +104,115 @@ pub fn at_and_field_reach_into_the_tree(): void {
     assertTrue(doc.field("missing") == null, "an absent member is null");
     assertTrue(doc.at(0) == null, "an object has no elements");
     assertTrue(JsonValue.Int(1).field("x") == null, "a scalar has no members");
+}
+
+// ------------------------------------------------------------------ the parser
+
+// Serializing the parse result compares the whole tree in one string, with the serializer
+// tests above establishing that the spelling is trustworthy.
+fn reparsed(text: string): string {
+    return serialize(parse(text) ?? JsonValue.Null);
+}
+
+@Test
+pub fn a_document_with_every_shape_round_trips(): void {
+    let text = "{\"a\":[1,2.5,true,null,\"x\"]}";
+    assertEq(reparsed(text), text);
+    assertEq(reparsed("  [ 1 , 2 ]  "), "[1,2]");
+    assertEq(reparsed("\"top-level string\""), "\"top-level string\"");
+    assertEq(reparsed("true"), "true");
+    assertEq(reparsed("null"), "null");
+}
+
+@Test
+pub fn numbers_keep_their_variant_and_their_value(): void {
+    assertEq(reparsed("42"), "42");
+    assertEq(reparsed("-0"), "0");
+    assertEq(reparsed("42.0"), "42.0");
+    assertEq(reparsed("1e2"), "100.0");
+    assertEq(reparsed("2.5e-1"), "0.25");
+    assertEq(reparsed("0.30000000000000004"), "0.30000000000000004");
+    assertEq(reparsed("9223372036854775807"), "9223372036854775807");
+    assertEq(reparsed("-9223372036854775808"), "-9223372036854775808");
+}
+
+/// The two int boundaries: past `int` the value becomes `Float` rather than wrapping — a
+/// wrapped id would be a silently wrong value — and a magnitude past `float` becomes the
+/// infinity IEEE rounding prescribes, which serializes as `null` like every non-finite float.
+@Test
+pub fn numbers_past_the_types_fall_predictably(): void {
+    let big = parse("9223372036854775808");
+    assertTrue(big != null, "the overflowing integer still parses");
+    if (big != null) {
+        assertTrue(big.asInt() == null, "it is not an Int");
+        assertTrue(big.asFloat() != null, "it is a Float");
+    }
+    let bigNegative = parse("-9223372036854775809");
+    assertTrue(
+        bigNegative != null && bigNegative.asInt() == null,
+        "the negative boundary falls the same way"
+    );
+    assertEq(reparsed("1e999"), "null");
+}
+
+@Test
+pub fn strings_unescape_including_surrogate_pairs(): void {
+    let named = parse("\"a\\n\\t\\\"\\\\\\/b\"");
+    assertTrue(named != null, "the named escapes parse");
+    if (named != null) {
+        assertEq(named.asString() ?? "?", "a\n\t\"\\/b");
+    }
+    let unicode = parse("\"\\u0041\\u00e9\"");
+    assertTrue(unicode != null, "unicode escapes parse");
+    if (unicode != null) {
+        assertEq(unicode.asString() ?? "?", "Aé");
+    }
+    let pair = parse("\"\\ud83d\\ude00\"");
+    assertTrue(pair != null, "a surrogate pair parses");
+    if (pair != null) {
+        assertEq((pair.asString() ?? "").length(), 1);
+    }
+}
+
+@Test
+pub fn duplicate_keys_take_the_last_value(): void {
+    assertEq(reparsed("{\"k\":1,\"k\":2}"), "{\"k\":2}");
+}
+
+/// What must come back as `null`, grouped by which rule refuses it. Every case is valid input
+/// to a lenient parser somewhere, which is exactly why each is pinned.
+@Test
+pub fn what_is_not_json_answers_null(): void {
+    assertTrue(parse("") == null, "an empty text is no value");
+    assertTrue(parse("   ") == null, "whitespace alone is no value");
+    assertTrue(parse("1 2") == null, "trailing content is refused");
+    assertTrue(parse("[1,]") == null, "no trailing comma in an array");
+    assertTrue(parse("{\"a\":1,}") == null, "no trailing comma in an object");
+    assertTrue(parse("truth") == null, "a word is checked to its end");
+    assertTrue(parse("'a'") == null, "single quotes are not JSON");
+    assertTrue(parse("0123") == null, "no leading zeros");
+    assertTrue(parse("-") == null, "a sign alone is no number");
+    assertTrue(parse("1.") == null, "a point needs digits behind it");
+    assertTrue(parse(".5") == null, "and digits before it");
+    assertTrue(parse("1e") == null, "an exponent needs digits");
+    assertTrue(parse("NaN") == null, "NaN has no JSON spelling");
+    assertTrue(parse("\"abc") == null, "an unterminated string");
+    assertTrue(parse("\"a\nb\"") == null, "a raw control character in a string");
+    assertTrue(parse("\"\\q\"") == null, "an unknown escape");
+    assertTrue(parse("\"\\u12g4\"") == null, "a broken unicode escape");
+    assertTrue(parse("\"\\ud83d\"") == null, "a lone high surrogate");
+    assertTrue(parse("\"\\ude00\"") == null, "a lone low surrogate");
+    assertTrue(parse("{\"a\" 1}") == null, "a missing colon");
+    assertTrue(parse("{a:1}") == null, "an unquoted key");
+    assertTrue(parse("[1") == null, "an unterminated array");
+}
+
+/// The depth bound is the module's own answer for hostile nesting: `null`, not a panic about
+/// call depth — input is data.
+@Test
+pub fn nesting_beyond_the_bound_answers_null(): void {
+    let fine = repeat("[", 128) + "1" + repeat("]", 128);
+    assertTrue(parse(fine) != null, "128 levels parse");
+    let past = repeat("[", 129) + "1" + repeat("]", 129);
+    assertTrue(parse(past) == null, "129 levels answer null");
 }

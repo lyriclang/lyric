@@ -351,6 +351,20 @@ public sealed class NativeRegistry
         Both("fromChar", new[] { TypeTag.Char }, TypeTag.String,
             args => LyrValue.FromString(char.ConvertFromUtf32((int)args[0].Bits)));
 
+        // The inverse of fromFloat, and native for the same reason fromFloat is: a correctly
+        // rounded conversion needs arbitrary-precision arithmetic in its worst cases, and an
+        // approximate parser hands back a float the text did not say. The shape check runs
+        // first — the runtime's own parser would also take whitespace and the words
+        // "NaN"/"Infinity", which this contract refuses. A magnitude beyond the type rounds to
+        // the infinities, as IEEE 754 rounding prescribes (so no finiteness check after).
+        registry.RegisterOptionalReturning("std.string.parseFloat",
+            new[] { TypeTag.String }, TypeTag.F64,
+            args => FloatShaped(args[0].AsString)
+                && double.TryParse(args[0].AsString, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var parsed)
+                ? LyrValue.Some(LyrValue.FromF64(parsed))
+                : LyrValue.None);
+
         // --- queries --------------------------------------------------------------------
         //
         // Every position and length counts CODE POINTS, not UTF-16 units and not bytes, matching
@@ -882,6 +896,39 @@ public sealed class NativeRegistry
     /// one means <c>null</c>.</summary>
     private static LyrValue Optional(string? value) =>
         value is null ? default : LyrValue.FromString(value);
+
+    /// <summary>The shape <c>std.string.parseFloat</c> accepts: an optional sign, digits with at
+    /// most one point among them — at least one digit in the mantissa, and at least one behind a
+    /// point when there is one — and an optional exponent with its own optional sign and at least
+    /// one digit. Nothing before, between or after.</summary>
+    private static bool FloatShaped(string text)
+    {
+        var i = 0;
+        if (i < text.Length && (text[i] == '+' || text[i] == '-')) i++;
+
+        var mantissaDigits = 0;
+        while (i < text.Length && text[i] >= '0' && text[i] <= '9') { mantissaDigits++; i++; }
+
+        if (i < text.Length && text[i] == '.')
+        {
+            i++;
+            var fractionDigits = 0;
+            while (i < text.Length && text[i] >= '0' && text[i] <= '9') { fractionDigits++; i++; }
+            if (fractionDigits == 0) return false;
+            mantissaDigits += fractionDigits;
+        }
+        if (mantissaDigits == 0) return false;
+
+        if (i < text.Length && (text[i] == 'e' || text[i] == 'E'))
+        {
+            i++;
+            if (i < text.Length && (text[i] == '+' || text[i] == '-')) i++;
+            var exponentDigits = 0;
+            while (i < text.Length && text[i] >= '0' && text[i] <= '9') { exponentDigits++; i++; }
+            if (exponentDigits == 0) return false;
+        }
+        return i == text.Length;
+    }
 
     /// <summary>A code point from a <see cref="TextReader"/>, combining surrogate pairs.</summary>
     /// <remarks>.NET's <c>Read()</c> yields UTF-16 units while a Lyric <c>char</c> is a code

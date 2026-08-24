@@ -534,63 +534,15 @@ pub fn parseBool(value: string): ?bool {
     return null;
 }
 
-/// `"3.5"`, `"-0.25"` and `"42"` become floating point; everything else is `null`.
+/// The closest `float` to the decimal the text spells — `"3.5"`, `"-0.25"`, `".5"`, `"42"`,
+/// exponent notation included (`"1e-6"`, `"2.5E3"`) — or `null` when the text spells none.
+/// Strict about shape: no whitespace, no separators, and the words `NaN` and `Infinity` are not
+/// numbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 prescribes.
 ///
-/// Without exponent notation (`1e9`), which would need a state machine of its own.
-pub fn parseFloat(value: string): ?float {
-    let dot = rawIndexOf(value, ".");
-    if (dot < 0) {
-        let whole = parseInt(value);
-        if (whole == null) {
-            return null;
-        }
-        return whole as float;
-    }
-
-    let head = rawSubstring(value, 0, dot);
-    let tail = rawSubstring(value, dot + 1, rawLength(value) - dot - 1);
-    if (rawLength(tail) == 0) {
-        return null;
-    }
-
-    var wholePart = 0;
-    var negative = false;
-    if (rawLength(head) > 0) {
-        if (head == "-") {
-            negative = true;
-        } else {
-            let g = parseInt(head);
-            if (g == null) {
-                return null;
-            }
-            wholePart = g;
-            negative = rawCharAt(head, 0) == '-';
-        }
-    }
-
-    // The fractional digits one at a time, so no sign gets into them.
-    let tailChars = rawToChars(tail);
-    var fraction = 0.0;
-    var divisor = 1.0;
-    var i = 0;
-    while (i < tailChars.length) {
-        let digit = charToDigit(tailChars[i]);
-        if (digit == null) {
-            return null;
-        }
-        divisor = divisor * 10.0;
-        fraction = fraction + digit as float / divisor;
-        i = i + 1;
-    }
-
-    let magnitude = absFloat(wholePart as float) + fraction;
-    return if (negative) 0.0 - magnitude else magnitude;
-}
-
-// Local, so this module need not import `std.math`.
-fn absFloat(value: float): float {
-    return if (value < 0.0) 0.0 - value else value;
-}
+/// Native because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision
+/// arithmetic in the worst cases; an approximate parser hands back a float the text did not
+/// say. `parseFloat(fromFloat(x))` is `x` again, for every finite `x`.
+pub fn parseFloat(value: string): ?float;
 
 // ------------------------------------------------------------------ building
 

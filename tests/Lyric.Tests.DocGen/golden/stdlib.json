@@ -1326,6 +1326,56 @@
       ]
     },
     {
+      "Path": "std.encoding",
+      "Doc": null,
+      "Items": [
+        {
+          "Kind": "Function",
+          "Name": "hexEncode",
+          "Signature": "pub fn hexEncode(bytes: uint8[]): string",
+          "Doc": "Bytes as lowercase hexadecimal, two characters per byte, no separators. Empty bytes are the\nempty string.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 44
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "hexDecode",
+          "Signature": "pub fn hexDecode(text: string): ?uint8[]",
+          "Doc": "The bytes a hexadecimal string spells, or `null` when it spells none: an odd length or a\ncharacter outside `0-9`, `a-f`, `A-F`. The empty string is an empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 58
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "base64Encode",
+          "Signature": "pub fn base64Encode(bytes: uint8[]): string",
+          "Doc": "Bytes as base64 (RFC 4648 §4: `A-Za-z0-9+/`), padded with `=` to a multiple of four\ncharacters. Empty bytes are the empty string.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 80
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "base64Decode",
+          "Signature": "pub fn base64Decode(text: string): ?uint8[]",
+          "Doc": "The bytes a base64 string spells, or `null` when it spells none. Strict: the length must be a\nmultiple of four, `=` may appear only as the final one or two characters, characters outside\nthe alphabet are refused, and so is padding whose unused bits are not zero — accepted input is\nexactly what `base64Encode` produces. The empty string is an empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 128
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.fmt",
       "Doc": null,
       "Items": [
@@ -3007,6 +3057,233 @@
       ]
     },
     {
+      "Path": "std.json",
+      "Doc": null,
+      "Items": [
+        {
+          "Kind": "Enum",
+          "Name": "JsonValue",
+          "Signature": "pub enum JsonValue",
+          "Doc": "One JSON value — the tree `parse` answers and `serialize` writes.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "Null",
+              "Signature": "Null",
+              "Doc": "The literal `null`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 29
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Bool",
+              "Signature": "Bool(bool)",
+              "Doc": "`true` or `false`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 31
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Int",
+              "Signature": "Int(int)",
+              "Doc": "A number the text wrote without fraction or exponent, exact in the `int` range.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 33
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Float",
+              "Signature": "Float(float)",
+              "Doc": "A number with a fraction or an exponent — or an integer too large for `Int`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 35
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Str",
+              "Signature": "Str(string)",
+              "Doc": "A string.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 37
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Arr",
+              "Signature": "Arr(List<JsonValue>)",
+              "Doc": "An array.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 39
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Obj",
+              "Signature": "Obj(Map<string, JsonValue>)",
+              "Doc": "An object. Member order is the map's: unspecified.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 41
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "isNull",
+              "Signature": "pub fn isNull(): bool",
+              "Doc": "Whether this is the JSON `null` — the value, not an absent optional.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 44
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asBool",
+              "Signature": "pub fn asBool(): ?bool",
+              "Doc": "The boolean, or `null` when this is not one.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 52
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asInt",
+              "Signature": "pub fn asInt(): ?int",
+              "Doc": "The integer, or `null` when this is not `Int`. A `Float` with an integral value stays\n`null`: which of the two a number is was decided by the text it came from.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 61
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asFloat",
+              "Signature": "pub fn asFloat(): ?float",
+              "Doc": "The number as a float — `Float` directly, `Int` widened — or `null` when this is not a\nnumber. JSON has one number type; two variants is this module keeping precision, not two\nkinds of JSON value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 71
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asString",
+              "Signature": "pub fn asString(): ?string",
+              "Doc": "The string, or `null` when this is not one.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 80
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asArray",
+              "Signature": "pub fn asArray(): ?List<JsonValue>",
+              "Doc": "The elements, or `null` when this is not an array. The list is the value's own — changing\nit changes the value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 89
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "asObject",
+              "Signature": "pub fn asObject(): ?Map<string, JsonValue>",
+              "Doc": "The members, or `null` when this is not an object. The map is the value's own — changing\nit changes the value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 98
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "at",
+              "Signature": "pub fn at(index: int): ?JsonValue",
+              "Doc": "The element at `index`, or `null` when this is not an array or the index is outside it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 106
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "field",
+              "Signature": "pub fn field(name: string): ?JsonValue",
+              "Doc": "The member named `name`, or `null` when this is not an object or has no such member.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 114
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 27
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "serialize",
+          "Signature": "pub fn serialize(value: JsonValue): string",
+          "Doc": "The value as compact JSON: no whitespace anywhere.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 123
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "serializePretty",
+          "Signature": "pub fn serializePretty(value: JsonValue, indent: int): string",
+          "Doc": "The value as JSON with a newline per element and `indent` spaces per nesting level, the shape\na person reads. An `indent` below zero is treated as zero.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 131
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parse",
+          "Signature": "pub fn parse(text: string): ?JsonValue",
+          "Doc": "The value a JSON document spells, or `null` when the text spells none: a syntax error\nanywhere, anything after the value, a lone surrogate escape, a raw control character in a\nstring, or containers nested more than 128 deep. Strict RFC 8259 — no comments, no trailing\ncommas, no `NaN`, no single quotes. The whole document is one value; leading and trailing\nwhitespace around it is fine.\n\nDuplicate object keys follow `Map.set`: the last one wins, as in JavaScript.\n\nThe depth bound is the module's own, not the runtime's: input is data, and data that is not\nJSON must come back as `null` rather than as a panic about call depth.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 310
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.math",
       "Doc": null,
       "Items": [
@@ -4173,11 +4450,11 @@
           "Kind": "Function",
           "Name": "parseFloat",
           "Signature": "pub fn parseFloat(value: string): ?float",
-          "Doc": "`\"3.5\"`, `\"-0.25\"` and `\"42\"` become floating point; everything else is `null`.\n\nWithout exponent notation (`1e9`), which would need a state machine of its own.",
+          "Doc": "The closest `float` to the decimal the text spells — `\"3.5\"`, `\"-0.25\"`, `\".5\"`, `\"42\"`,\nexponent notation included (`\"1e-6\"`, `\"2.5E3\"`) — or `null` when the text spells none.\nStrict about shape: no whitespace, no separators, and the words `NaN` and `Infinity` are not\nnumbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 prescribes.\n\nNative because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision\narithmetic in the worst cases; an approximate parser hands back a float the text did not\nsay. `parseFloat(fromFloat(x))` is `x` again, for every finite `x`.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 540
+            "Line": 545
           }
         },
         {
@@ -4194,7 +4471,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 606
+                "Line": 558
               }
             },
             {
@@ -4205,7 +4482,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 608
+                "Line": 560
               }
             },
             {
@@ -4216,7 +4493,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 611
+                "Line": 563
               }
             },
             {
@@ -4227,7 +4504,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 616
+                "Line": 568
               }
             },
             {
@@ -4238,7 +4515,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 631
+                "Line": 583
               }
             },
             {
@@ -4249,7 +4526,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 637
+                "Line": 589
               }
             },
             {
@@ -4260,13 +4537,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 645
+                "Line": 597
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 604
+            "Line": 556
           }
         }
       ]
