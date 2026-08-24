@@ -382,7 +382,14 @@ public sealed class AstFormatter
 
     private Doc FieldDoc(FieldDecl decl)
     {
-        var parts = new List<Doc> { Doc.From($"{decl.Name}: "), TypeDoc(decl.Type) };
+        // 'pub' since 3.3. A formatter that renders from the AST drops silently what it does not
+        // know about, and 'lyrfmt --check' in CI would then quietly unpublish every field it
+        // reformatted. An enum variant's payload never carries one — the parser takes no 'pub'
+        // there — so the conditional is safe for both callers.
+        var parts = new List<Doc>
+        {
+            Doc.From($"{(decl.IsPublic ? "pub " : "")}{decl.Name}: "), TypeDoc(decl.Type),
+        };
         if (decl.Default is { } fallback)
         {
             parts.Add(Doc.From(" = "));

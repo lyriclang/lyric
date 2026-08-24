@@ -37,6 +37,36 @@ fn main(): int {
 }
 ```
 
+## Who may reach a field
+
+A field belongs to its module. Outside it, reading, writing and naming it in an initializer all
+need `pub` on the field:
+
+```lyr
+pub struct Account {
+    pub owner: string,
+    balance: int,
+
+    pub fn shows(): int { return this.balance; }
+}
+
+pub fn opened(owner: string): Account {
+    return Account { owner = owner, balance = 0 };
+}
+```
+
+Another module reads `owner` and calls `shows()`, and cannot touch `balance` — not to read it, and
+not to write a value the type would never have produced. Inside this module everything is reachable
+as before: the unit is the MODULE, not the type, so a helper beside a type needs no permission.
+
+This arrived in 3.3, and until then fields had no visibility at all — they were the last member
+kind without it, while types, functions, globals and constants all took `pub`. Through the 3.x
+line an out-of-module reach is a warning; from 4.0 it is an error. If a field was meant to be read
+from elsewhere, say so with `pub`; if it was not, the warning is pointing at a missing method.
+
+The fields of an enum variant take no `pub` and stay visible everywhere: they are what `match`
+reads, so a private one could not be matched at all.
+
 ## Methods
 
 Members are separated by `,`. A method that writes to `this` is marked `mut`.

@@ -3025,7 +3025,7 @@ public sealed class TypeChecker
         if (ts.Members.LookupLocal(member) is { } own)
             return own switch
             {
-                FieldSymbol fs => (FieldType(fs), fs),
+                FieldSymbol fs => (FieldTypeVisible(ts, fs, span), fs),
 
                 // A static member belongs to the type, not to the instance.
                 FunctionSymbol { IsStatic: true } fn => (Report(span, "LYR-SEM0055",
@@ -3281,6 +3281,44 @@ public sealed class TypeChecker
 
     private LyrType FieldType(FieldSymbol fs) => ResolveType(((FieldDecl)fs.Declaration!).Type, _comp.Builtins);
 
+    /// <summary>The field's type, having first said whether this module was entitled to ask.</summary>
+    private LyrType FieldTypeVisible(TypeSymbol owner, FieldSymbol fs, Span span)
+    {
+        CheckFieldVisibility(owner, fs, span);
+        return FieldType(fs);
+    }
+
+    /// <summary>
+    /// A field belongs to its module unless it says <c>pub</c> (3.3).
+    ///
+    /// <para>Until now fields had no visibility at all — they were the one member kind without it,
+    /// while types, globals, functions and static bindings all had <c>pub</c>. So every field of
+    /// every type was readable and WRITABLE from anywhere, and a type could not keep an invariant:
+    /// <c>Random { state = 99 }</c> compiles from any module, and a seed of 0 is a fixed point the
+    /// constructor deliberately avoids.</para>
+    ///
+    /// <para>The unit is the MODULE, not the type. A module is what a person writes and reviews as
+    /// one thing, and helpers next to a type are the ordinary way to build one — per-type privacy
+    /// would push every such helper into the type itself.</para>
+    ///
+    /// <para>Reported wherever the field is reached: reading, writing and initialising it in a
+    /// literal are all the same reach, and singling out one of them would just move the workaround
+    /// to the others.</para>
+    /// </summary>
+    private void CheckFieldVisibility(TypeSymbol owner, FieldSymbol fs, Span span)
+    {
+        if (_currentModule is null) return;
+        if (fs.Declaration is not FieldDecl { IsPublic: false }) return;
+        if (ReferenceEquals(ModuleDeclaring(owner), _currentModule)) return;
+
+        var where = ModuleDeclaring(owner)?.FullName;
+        _de.Report("LYR-SEM0091", EncapsulationPolicy.Level(), span,
+            $"'{fs.Name}' is not public; it belongs to "
+            + (where is null ? "the module that declares it" : $"'{where}'")
+            + $" — mark the field 'pub' there, or reach it through a method. This is an error "
+            + $"from {EncapsulationPolicy.Enforced}.");
+    }
+
     // --- attributes ---
 
     private enum AttributeTarget { Module, Type, Function, Member, Alias }
@@ -3409,6 +3447,12 @@ public sealed class TypeChecker
 
             if (ts.Members.LookupLocal(field.Name) is FieldSymbol fs)
             {
+                // NOT subject to the field-visibility rule of 3.3, deliberately. An attribute
+                // struct exists to be written from somewhere else — '@Deprecated { message = \"\" }'
+                // at a use site is the whole point of one — so requiring 'pub' here would put the
+                // keyword on every field of every attribute in every codebase, where it could
+                // never mean anything else. Where an attribute may sit is already governed, by the
+                // marker interface it declares.
                 var ft = FieldType(fs);
                 CheckAssignable(field.Value, CheckExpr(field.Value, scope, ft), ft, field.Span);
                 // AFTER the check, which is what binds the name this may be resolving through.
@@ -3558,6 +3602,11 @@ public sealed class TypeChecker
                 // resolved and dropped — 'x = 1' is a use of 'x' the same way the initializer's
                 // head is a use of the type, and every-place-this-name-occurs was blind to it.
                 _result.BindRef(field, fs);
+
+                // Writing a field in a literal is reaching into the type exactly as reading one is,
+                // and it is the half the wall was built for: 'Random { state = 99 }' is how a
+                // foreign module fabricates an instance the type would never have produced.
+                CheckFieldVisibility(ts, fs, field.Span);
 
                 var ft = Substitute(FieldType(fs), subst);
                 CheckAssignable(field.Value, CheckExpr(field.Value, scope, ft), ft, field.Span);

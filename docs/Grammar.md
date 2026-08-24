@@ -228,8 +228,16 @@ InterfaceList   = '[' TypeExpr { ',' TypeExpr } ']' .
 StructBody      = { StructMember [ ',' ] } .
 StructMember    = Field | FunctionDecl | StaticBinding .
 StaticBinding   = [ 'pub' ] 'static' BindingStmt .
-Field           = IDENTIFIER ':' TypeExpr [ '=' Expr ] .
+Field           = [ 'pub' ] IDENTIFIER ':' TypeExpr [ '=' Expr ] .
 ```
+
+A field is visible outside its module only with `pub` (since 3.3); without it, reading, writing
+and naming it in a struct initializer all belong to the declaring module. Fields were the last
+member kind without visibility, which is why no type could hold an invariant against another
+module. Reported as a warning through the 3.x line and an error from 4.0.
+
+The fields of an ENUM VARIANT take no `pub` and are always visible: they are what `match` reads,
+so a private one could not be matched anywhere the variant itself can be named.
 
 Members are separated by `,`. Only a field requires it: a member that closes itself — a block body
 ending in `}`, a bodiless method or a `static let` ending in `;` — may omit it.

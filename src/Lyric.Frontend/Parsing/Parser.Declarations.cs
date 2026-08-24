@@ -393,14 +393,14 @@ public sealed partial class Parser
     {
         var start = _buffer.Current.Span;
 
-        // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  a field.
+        // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  [pub] field.
         // 'static' precedes 'mut', so the order is unambiguous; 'mut static fn' does not exist.
         // The sema rejects the combination anyway: a static member has no receiver for 'mut' to
         // apply to.
-        var isPublic = _buffer.Check(TokenKind.Pub)
-                       && _buffer.Peek(1).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static
-            ? _buffer.Match(TokenKind.Pub)
-            : false;
+        //
+        // Since 3.3 a FIELD carries it too, so the check no longer looks at what follows: before
+        // that, 'pub' on a field meant nothing and was left for ExpectNamed to fail on.
+        var isPublic = _buffer.Match(TokenKind.Pub);
 
         if (_buffer.Check(TokenKind.Static))
         {
@@ -416,17 +416,20 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Fn) || _buffer.Check(TokenKind.Mut))
             return ParseFunctionDecl(isPublic, start);
 
-        return ParseField();
+        return ParseField(isPublic, start);
     }
 
-    private FieldDecl ParseField()
+    /// <param name="isPublic">Whether a 'pub' was consumed before this field. A variant's payload
+    /// takes none: the fields of an enum variant are what 'match' reads, so a private one could
+    /// not be matched from anywhere the variant is visible.</param>
+    private FieldDecl ParseField(bool isPublic = false, Span? head = null)
     {
-        var start = _buffer.Current.Span;
+        var start = head ?? _buffer.Current.Span;
         var name = ExpectNamed("LYR-PAR0026", "field name");
         _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after field name");
         var type = ParseType();
         Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
-        return new FieldDecl(name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
+        return new FieldDecl(isPublic, name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
             { NameSpan = name.Span };
     }
 

@@ -343,6 +343,21 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_pub_field_keeps_its_pub()
+    {
+        // Same trap as the attributed alias: the formatter renders from the AST, so a modifier it
+        // does not print is a modifier `lyrfmt` silently removes — here turning a published field
+        // private across a whole codebase.
+        Assert.Equal("""
+            struct Account {
+                pub owner: string,
+                balance: int = 0,
+            }
+
+            """, Format("struct Account{pub owner:string,balance:int=0,}"));
+    }
+
+    [Fact]
     public void An_attributed_alias_keeps_its_attribute()
     {
         // The formatter renders from the AST, so a target it does not know about loses the list

@@ -86,7 +86,7 @@ public sealed record StaticBindingDecl(bool IsPublic, BindingStmt Binding, Span 
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
-public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span Span) : Decl(Span), INamedDecl
+public sealed record FieldDecl(bool IsPublic, string Name, TypeNode Type, Expr? Default, Span Span) : Decl(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
 

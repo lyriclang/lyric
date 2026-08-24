@@ -237,4 +237,37 @@ public class AttributeParsingTests
         Assert.Equal("LYR-PAR0042", error.Code);
         Assert.Contains("a type alias", error.Message);
     }
+
+    // ------------------------------------------------------------ pub on a field (3.3, slice 3)
+
+    [Fact]
+    public void A_field_carries_its_visibility()
+    {
+        var module = ParseClean("""
+            module m;
+            struct Account {
+                pub owner: string,
+                balance: int,
+            }
+            """);
+
+        var type = Assert.IsType<StructDecl>(Assert.Single(module.Declarations));
+        var fields = type.Members.OfType<FieldDecl>().ToArray();
+
+        Assert.True(fields[0].IsPublic);
+        Assert.False(fields[1].IsPublic);
+    }
+
+    [Fact]
+    public void A_variant_payload_takes_no_pub()
+    {
+        // Deliberately still a parse error: a variant's fields are what 'match' reads, so there is
+        // no such thing as a private one, and accepting the word would suggest otherwise.
+        Parse("""
+            module m;
+            enum Shape { Circle { pub radius: int } }
+            """, out var diagnostics);
+
+        Assert.NotEmpty(diagnostics);
+    }
 }

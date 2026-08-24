@@ -212,7 +212,7 @@ public static class AstDumper
                 if (n.Body is not null) Write(n.Body, indent + 1, sb);
                 break;
             case FieldDecl n:
-                Line(sb, indent, $"Field {n.Name}", n.Span);
+                Line(sb, indent, $"Field {n.Name}{Vis(n.IsPublic)}", n.Span);
                 Write(n.Type, indent + 1, sb);
                 if (n.Default is not null) Write(n.Default, indent + 1, sb);
                 break;
