@@ -745,8 +745,28 @@ public sealed class Lexer
 
     private Token ScanFStringFormatSpec()
     {
+        // The spec runs to the MATCHING '}' (grammar §1.5): a '}' closing a nested brace, or
+        // standing inside open parentheses or brackets, belongs to the spec text. A closing
+        // bracket without an opening one does not count negative, as in the interpolation.
         var specStart = _pos;
-        while (Current is not ('}' or '\0' or '\n')) _pos++;
+        var braceDepth = 0;
+        var parenDepth = 0;
+        var bracketDepth = 0;
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '}' && braceDepth == 0 && parenDepth == 0 && bracketDepth == 0)
+                break;
+            switch (Current)
+            {
+                case '{': braceDepth++; break;
+                case '}': if (braceDepth > 0) braceDepth--; break;
+                case '(': parenDepth++; break;
+                case ')': if (parenDepth > 0) parenDepth--; break;
+                case '[': bracketDepth++; break;
+                case ']': if (bracketDepth > 0) bracketDepth--; break;
+            }
+            _pos++;
+        }
         if (Current is '\0' or '\n') return HandleUnterminatedFString();
         _modeStack.Pop();
         return new Token(TokenKind.FStringFormatSpec, new Span(_file, specStart, _pos));

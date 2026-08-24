@@ -1569,6 +1569,29 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
+    [Fact]
+    public void Format_spec_tracks_nested_braces()
+    {
+        // Grammar §1.5: the spec runs to the MATCHING '}', tracking nested braces. The spec
+        // of f"{x:a{b}c}" is "a{b}c", not "a{b" with a stray tail.
+        var (tokens, diag) = Tokenize("f\"{x:a{b}c}\"");
+        var spec = tokens.First(t => t.TokenKind == TokenKind.FStringFormatSpec);
+        Assert.Equal(5, spec.Span.Length);   // "a{b}c"
+        Assert.Equal(TokenKind.FStringInterpEnd,
+            tokens[tokens.IndexOf(spec) + 1].TokenKind);
+        Assert.False(diag.HasErrors);
+    }
+
+    [Fact]
+    public void Format_spec_tracks_parentheses_and_brackets()
+    {
+        // A '}' inside open parentheses or brackets does not end the spec either.
+        var (tokens, diag) = Tokenize("f\"{x:(})[}]}\"");
+        var spec = tokens.First(t => t.TokenKind == TokenKind.FStringFormatSpec);
+        Assert.Equal(6, spec.Span.Length);   // "(})[}]"
+        Assert.False(diag.HasErrors);
+    }
+
     // ─── Brace Depth in Interp ─────────────────────────────────────────────
 
     [Fact]
