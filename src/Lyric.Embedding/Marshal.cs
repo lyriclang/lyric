@@ -94,7 +94,12 @@ internal static class Marshal
         {
             TypeTag.String => value.AsString,
             TypeTag.Bool => value.AsBool,
-            TypeTag.Char => (char)value.AsI64,
+            // A Lyric char is a full Unicode scalar (up to 0x10FFFF); a .NET char is UTF-16 and
+            // holds only the BMP. A supplementary code point is boxed as its code-point INTEGER
+            // rather than truncated to a .NET char: a host wanting 'char' then gets a checked
+            // OverflowException below (never a silently wrapped character), and a host wanting
+            // 'int' gets the whole code point.
+            TypeTag.Char => value.AsI64 is >= 0 and <= 0xFFFF ? (char)value.AsI64 : value.AsI64,
             TypeTag.F32 => value.AsF32,
             TypeTag.F64 => value.AsF64,
             TypeTag.U8 or TypeTag.U16 or TypeTag.U32 or TypeTag.U64 => value.AsU64,

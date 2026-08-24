@@ -309,6 +309,23 @@ public class CallTests
             .Call<double>("doppelt", 3));
 
     /// <summary>
+    /// A supplementary Lyric char (U+1F30D 🌍, past the BMP) cannot fit a .NET <c>char</c>. The
+    /// boundary refuses it as <c>char</c> rather than truncating to a wrapped character — but a
+    /// host that asks for the whole code point as <c>int</c> gets it. Before the fix the value was
+    /// silently masked to 16 bits.
+    /// </summary>
+    [Fact]
+    public void A_supplementary_char_refuses_a_dotnet_char_but_crosses_as_an_int()
+    {
+        var instance = Instance("pub fn astral(): char { return 127757 as char; }");
+
+        var thrown = Assert.Throws<ScriptException>(() => instance.Call<char>("astral"));
+        Assert.Equal("LYR-EMB0003", thrown.Code);
+
+        Assert.Equal(127757, instance.Call<int>("astral"));
+    }
+
+    /// <summary>
     /// What this layer cannot do it says as well: arrays, optionals and objects stay outside. An object
     /// would have a layout, and handing that outwards would make the field order a public contract — the
     /// reachability analysis could then delete nothing.
