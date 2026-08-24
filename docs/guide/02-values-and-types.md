@@ -20,9 +20,9 @@ just cannot be pointed at something else.
 
 | Type | Width | Notes |
 |---|---|---|
-| `int` | 64 bit, signed | alias for `int64` |
-| `uint` | 64 bit, unsigned | alias for `uint64` |
-| `float` | 64 bit | alias for `float64` |
+| `int` | 64 bit, signed | the default; same width as `int64`, a distinct type |
+| `uint` | 64 bit, unsigned | the default; same width as `uint64`, a distinct type |
+| `float` | 64 bit | the default; same width as `float64`, a distinct type |
 | `int8` … `int64` | sized | |
 | `uint8` … `uint64` | sized | |
 | `float32`, `float64` | sized | |
@@ -31,6 +31,10 @@ just cannot be pointed at something else.
 | `string` | immutable UTF-8 | |
 
 Numeric literals take a suffix when the default is not wanted: `7i32`, `9u8`, `1.5f32`.
+
+Distinct means distinct: a **literal** adapts to the annotated type (`let n: int64 = 7;`
+works), but a **variable** of `int` does not assign to `int64` or back — the widths agree
+and the types still differ, and `as` is the crossing, as for any other pair.
 
 ## Conversion
 
