@@ -1167,6 +1167,17 @@ public static class BytecodeReader
         }
     }
 
+    private static (int, bool) ShapeOfTarget(BytecodeModule module, int target)
+    {
+        if (target < module.Imports.Count)
+        {
+            var native = module.Imports[target];
+            return (native.ParamTypes.Count, native.ReturnType.Tag != TypeTag.Void);
+        }
+        var implementation = module.Functions[target - module.Imports.Count];
+        return (implementation.ParamCount, implementation.ReturnType.Tag != TypeTag.Void);
+    }
+
     private static (int Arity, bool ReturnsValue) CalleeShape(BytecodeModule module,
         BytecodeInstruction instruction)
     {
@@ -1176,18 +1187,20 @@ public static class BytecodeReader
         {
             var iface = (int)instruction.Immediate;
             var slot = (int)instruction.Immediate2;
-            var row = module.Impls.FirstOrDefault(i => i.Interface == iface);
-            if (row is null || slot >= row.Methods.Count) return (0, false);
+            // Any row for this interface answers, because every implementation of a slot shares
+            // its signature. What must NOT happen is answering anyway when there is no row: the
+            // old code returned (0, false) there, so the check went on with an arity of zero,
+            // under-popped every argument, and reported the resulting drift as a stack-depth
+            // violation somewhere further on — blaming a function that was fine. A verifier that
+            // cannot determine a shape has to say that, not guess one.
+            var row = module.Impls.FirstOrDefault(i => i.Interface == iface && slot < i.Methods.Count);
+            if (row is null)
+                throw new MalformedBytecodeException(BytecodeDiagnostics.StackDiscipline,
+                    $"callvirt at {instruction.Offset} names slot {slot} of type {iface}, and "
+                    + "the module has no Impls row for it — the "
+                    + "signature cannot be determined, so the stack cannot be checked");
 
-            var target = row.Methods[slot];
-            if (target < module.Imports.Count)
-            {
-                var native = module.Imports[target];
-                return (native.ParamTypes.Count, native.ReturnType.Tag != TypeTag.Void);
-            }
-
-            var implementation = module.Functions[target - module.Imports.Count];
-            return (implementation.ParamCount, implementation.ReturnType.Tag != TypeTag.Void);
+            return ShapeOfTarget(module, row.Methods[slot]);
         }
 
         if (instruction.Opcode != Op.Call) return (0, false);
