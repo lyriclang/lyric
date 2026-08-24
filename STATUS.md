@@ -501,8 +501,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4618 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **3.2.0**; the specification in `lyriclang/lyric-spec` is
+4764 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **3.3.0**; the specification in `lyriclang/lyric-spec` is
 **NORMATIVE**, its suite stands at 117 cases pinned to 3.2.0, and the toolchain's own CI runs it
 against the working tree. *(The test count is the one last counted, at 2.17.0.)*
 
@@ -521,6 +521,21 @@ out of them and hands its own functions, types and value structs in.
 
 ## Recently finished
 
+- [x] **The Erato bug sweep** (2026-08-24, `fix/erato-a21-a25`, PR #109, released as v3.3.0).
+  Six findings: four from the register (A21, A22, A23, A25) and two found while probing what A24
+  would need. **The two nobody reported are the worse pair** — `for (h in houses)` over a
+  `(?House)[]` and `let r = 1..5;` both CRASHED the compiler, and in Release, where the IR
+  verifier does not run, the first of them let `check` answer ok for a program `build` could not
+  finish.
+
+  **The lesson outlives the fixes, and it is A23's.** The loader read a `callvirt`'s arity off an
+  Impls row and guessed `(0, false)` where a module had none — which a library that calls
+  through an interface it does not implement always does. Its `.lyrbc` was refused by its own
+  loader, and it took a golden-image test opening a window to find out, because nothing in this
+  pipeline had ever read back what it wrote. It does now, in Release too, and
+  `lyric check --emit` asks that question without writing a file. It caught the optional-array
+  bug on the day it was added.
+
 - [x] **The specification caught up with 3.0.1 through 3.2.0** (2026-08-23,
   `lyriclang/lyric-spec` PR #18, one commit per version). It was pinned to 3.0.0 and still said
   it describes Lyric 2.0. What the four releases owed the document was not evenly spread: 3.0.2
@@ -538,12 +553,6 @@ out of them and hands its own functions, types and value structs in.
   `fix/a17-attribute-default-across-modules`, v2.10.1). One line, and the second time in two
   days that a bug was "checked in the wrong order". The pattern is now explicit in the code: the
   sema walks modules in dependency order, twice, and both places say why.
-
-- [x] **An enum variant is an attribute argument** (2026-08-22,
-  `feature/enum-attribute-arguments`, v2.10.0, format 3.4). Worth keeping for the estimate rather
-  than the code: when A11 landed I wrote this off as "much bigger" on two grounds, and only one
-  of them held. The cheap half was the one I had called expensive — a host needs no variant
-  table, because the module already carries the names.
 
 ## Measurements
 
@@ -944,18 +953,12 @@ answer yet, and it belongs asked before E4 starts.
   promises does not hold for the one release before it. `--no-source-map` produces a module those
   runtimes accept. Nothing can be done on their side; it is recorded so the next format addition is
   not mistaken for the same bug.
-- **A module without `main` keeps the whole well-known standard library.** Measured 2026-08-15: a
-  library module exporting one `int` function compiles to **7886 bytes and ~54 functions** from
-  `std.string`, `std.core`, `std.iter`, `std.fmt` and `std.collections`, none of which it uses. The
-  same file with a `main` that uses `println` is **315 bytes and one function**.
-  - Not a bug in what the reachability analysis does — it trims from the ENTRY POINT, and a library
-    has none, so nothing is unreachable. `WellKnownModules` loads those five unconditionally because
-    the f-string lowering calls into them.
-  - The roots for a library would sensibly be its `pub` declarations. **Whether that is the right
-    rule is a decision, not a measurement**: it would make a library's surface decide its contents,
-    and a host calling an unexported function through the embedding API would then find it missing.
-  - It is the point at which a binary library would carry half a standard library with it, so it
-    belongs answered before that is ever a goal.
+- **An `extend` block on an ARRAY type compiles and does nothing.**
+  `extend int[] :: [Iterable<int>] { pub fn iter(): Iterator<int> { ... } }` parses, type-checks
+  and is accepted; `xs.iter()` then says *'int[]' has no member 'iter'*. A declaration claiming
+  something nothing checks is the shape 2.15 already fixed once for `::` lists. Found 2026-08-24
+  while probing A24. The useful version cannot be written anyway — `ExtendDecl` has no generic
+  parameters, so `extend T[]` cannot bind an element type; the defect is the SILENCE.
 - **`TypeResult._refs` holds declarations beside uses**, because the definite-assignment
   analysis binds a `BindingStmt`, a `Param`, a `ForInStmt` and the pattern bindings to the symbol
   they themselves declare. Since M19 the separation rule has its first consumer: the
@@ -1109,6 +1112,23 @@ answer yet, and it belongs asked before E4 starts.
   a promise whose version has ARRIVED is an error at build time — the ratchet removes the form
   instead of a person remembering to. NOT a second attribute (`@Sunset`, `@Until`): that would
   be a second mechanism for "this is going away".
+
+- **An iterator of OPTIONALS cannot exist, and that is the protocol's price** (2026-08-24, from
+  the A24 probing). `Iterator<T>.next()` answers `?T` and uses null to mean the end, so an
+  element that is itself optional needs `??T` to be told apart from it — and `?` does not nest.
+  `Iterator<?T>` is therefore a type this language cannot write, however ordinary `(?T)[]` is as
+  a table with empty slots.
+  - **It used to crash instead of saying so**; `LYR-SEM0091` is the sentence, with the loop that
+    does work in a note. What Erato asked for (`filterNotNull` on a chain) is on the far side of
+    this wall, and the answer is an EAGER `compact` over the array instead.
+  - Rust pays for the general case with `Option<Option<T>>`. Lyric decided against nesting, and
+    this is the bill for that decision arriving — worth re-reading the day the iterator protocol
+    is opened for another reason, and not worth opening it for.
+  - **What WOULD be worth doing on its own merits**: lower `for (x in someArray)` as an index
+    loop rather than through an `ArrayIterator`. It drops an allocation per array loop and makes
+    the optional case work as a side effect. `LowerForIn` is built entirely on
+    `next()`/`optissome`/`optget`, so it is a parallel path through a hot function — a slice,
+    not an afternoon.
 
 - **`unsafe` blocks: documented No, with the measurement** (2026-08-22). What an `unsafe` would
   remove — the bounds check in `ldelem`, the panic in `optget` — is a compare and a branch
