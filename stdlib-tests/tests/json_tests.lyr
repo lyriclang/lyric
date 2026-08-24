@@ -1,0 +1,218 @@
+import std.test { Test, assertEq, assertTrue };
+import std.json { JsonValue, parse, serialize, serializePretty };
+import std.collections { List, Map };
+import std.string { fromChar, repeat };
+
+@Test
+pub fn scalars_serialize_to_their_json_spelling(): void {
+    assertEq(serialize(JsonValue.Null), "null");
+    assertEq(serialize(JsonValue.Bool(true)), "true");
+    assertEq(serialize(JsonValue.Bool(false)), "false");
+    assertEq(serialize(JsonValue.Int(42)), "42");
+    assertEq(serialize(JsonValue.Int(-7)), "-7");
+    assertEq(serialize(JsonValue.Str("hi")), "\"hi\"");
+}
+
+/// The two corners of the float rendering: an integral value keeps saying it is a float, and
+/// the values JSON cannot spell become `null` — JavaScript's answer, documented.
+@Test
+pub fn floats_stay_floats_and_the_unspellable_becomes_null(): void {
+    assertEq(serialize(JsonValue.Float(2.5)), "2.5");
+    assertEq(serialize(JsonValue.Float(3.0)), "3.0");
+    assertEq(serialize(JsonValue.Float(-1.0)), "-1.0");
+    assertEq(serialize(JsonValue.Float(0.0 / 0.0)), "null");
+    assertEq(serialize(JsonValue.Float(1.0 / 0.0)), "null");
+    assertEq(serialize(JsonValue.Float(1.0e300)), "1e+300");
+}
+
+@Test
+pub fn strings_escape_what_json_requires_and_nothing_else(): void {
+    assertEq(serialize(JsonValue.Str("a\"b")), "\"a\\\"b\"");
+    assertEq(serialize(JsonValue.Str("a\\b")), "\"a\\\\b\"");
+    assertEq(serialize(JsonValue.Str("a\nb\tc\rd")), "\"a\\nb\\tc\\rd\"");
+    // A control character without a named escape takes the \u00xx form.
+    let ctl = 1 as char;
+    assertEq(serialize(JsonValue.Str("x" + fromChar(ctl))), "\"x\\u0001\"");
+    // Non-ASCII is not escaped: the output is text, not ASCII armor.
+    assertEq(serialize(JsonValue.Str("grün")), "\"grün\"");
+}
+
+@Test
+pub fn arrays_and_objects_nest(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Int(1));
+    items.push(JsonValue.Bool(false));
+    items.push(JsonValue.Null);
+    assertEq(serialize(JsonValue.Arr(items)), "[1,false,null]");
+    assertEq(serialize(JsonValue.Arr(List<JsonValue>.empty())), "[]");
+    assertEq(serialize(JsonValue.Obj(Map<string, JsonValue>.empty())), "{}");
+
+    let inner = Map<string, JsonValue>.empty();
+    inner.set("ok", JsonValue.Bool(true));
+    let outer = List<JsonValue>.empty();
+    outer.push(JsonValue.Obj(inner));
+    assertEq(serialize(JsonValue.Arr(outer)), "[{\"ok\":true}]");
+}
+
+@Test
+pub fn pretty_output_indents_and_compact_does_not(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Int(1));
+    items.push(JsonValue.Int(2));
+    let obj = Map<string, JsonValue>.empty();
+    obj.set("xs", JsonValue.Arr(items));
+    let doc = JsonValue.Obj(obj);
+
+    assertEq(serialize(doc), "{\"xs\":[1,2]}");
+    assertEq(serializePretty(doc, 2), "{\n  \"xs\": [\n    1,\n    2\n  ]\n}");
+    // Empty containers stay on one line even pretty.
+    assertEq(serializePretty(JsonValue.Obj(Map<string, JsonValue>.empty()), 2), "{}");
+}
+
+@Test
+pub fn accessors_answer_their_variant_and_null_otherwise(): void {
+    assertTrue(JsonValue.Null.isNull(), "Null knows itself");
+    assertTrue(!JsonValue.Int(0).isNull(), "a number is not null");
+    assertEq(JsonValue.Bool(true).asBool() ?? false, true);
+    assertEq(JsonValue.Int(9).asInt() ?? -1, 9);
+    assertTrue(JsonValue.Float(9.0).asInt() == null, "an integral float is still not Int");
+    assertEq(JsonValue.Float(2.5).asFloat() ?? -1.0, 2.5);
+    assertEq(JsonValue.Int(2).asFloat() ?? -1.0, 2.0);
+    assertEq(JsonValue.Str("s").asString() ?? "?", "s");
+    assertTrue(JsonValue.Str("s").asBool() == null, "a string is not a bool");
+}
+
+@Test
+pub fn at_and_field_reach_into_the_tree(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Str("first"));
+    let obj = Map<string, JsonValue>.empty();
+    obj.set("xs", JsonValue.Arr(items));
+    let doc = JsonValue.Obj(obj);
+
+    let xs = doc.field("xs");
+    assertTrue(xs != null, "the member exists");
+    if (xs != null) {
+        let head = xs.at(0);
+        assertTrue(head != null, "the element exists");
+        if (head != null) {
+            assertEq(head.asString() ?? "?", "first");
+        }
+        assertTrue(xs.at(1) == null, "past the end is null");
+        assertTrue(xs.at(-1) == null, "before the start is null");
+    }
+    assertTrue(doc.field("missing") == null, "an absent member is null");
+    assertTrue(doc.at(0) == null, "an object has no elements");
+    assertTrue(JsonValue.Int(1).field("x") == null, "a scalar has no members");
+}
+
+// ------------------------------------------------------------------ the parser
+
+// Serializing the parse result compares the whole tree in one string, with the serializer
+// tests above establishing that the spelling is trustworthy.
+fn reparsed(text: string): string {
+    return serialize(parse(text) ?? JsonValue.Null);
+}
+
+@Test
+pub fn a_document_with_every_shape_round_trips(): void {
+    let text = "{\"a\":[1,2.5,true,null,\"x\"]}";
+    assertEq(reparsed(text), text);
+    assertEq(reparsed("  [ 1 , 2 ]  "), "[1,2]");
+    assertEq(reparsed("\"top-level string\""), "\"top-level string\"");
+    assertEq(reparsed("true"), "true");
+    assertEq(reparsed("null"), "null");
+}
+
+@Test
+pub fn numbers_keep_their_variant_and_their_value(): void {
+    assertEq(reparsed("42"), "42");
+    assertEq(reparsed("-0"), "0");
+    assertEq(reparsed("42.0"), "42.0");
+    assertEq(reparsed("1e2"), "100.0");
+    assertEq(reparsed("2.5e-1"), "0.25");
+    assertEq(reparsed("0.30000000000000004"), "0.30000000000000004");
+    assertEq(reparsed("9223372036854775807"), "9223372036854775807");
+    assertEq(reparsed("-9223372036854775808"), "-9223372036854775808");
+}
+
+/// The two int boundaries: past `int` the value becomes `Float` rather than wrapping — a
+/// wrapped id would be a silently wrong value — and a magnitude past `float` becomes the
+/// infinity IEEE rounding prescribes, which serializes as `null` like every non-finite float.
+@Test
+pub fn numbers_past_the_types_fall_predictably(): void {
+    let big = parse("9223372036854775808");
+    assertTrue(big != null, "the overflowing integer still parses");
+    if (big != null) {
+        assertTrue(big.asInt() == null, "it is not an Int");
+        assertTrue(big.asFloat() != null, "it is a Float");
+    }
+    let bigNegative = parse("-9223372036854775809");
+    assertTrue(
+        bigNegative != null && bigNegative.asInt() == null,
+        "the negative boundary falls the same way"
+    );
+    assertEq(reparsed("1e999"), "null");
+}
+
+@Test
+pub fn strings_unescape_including_surrogate_pairs(): void {
+    let named = parse("\"a\\n\\t\\\"\\\\\\/b\"");
+    assertTrue(named != null, "the named escapes parse");
+    if (named != null) {
+        assertEq(named.asString() ?? "?", "a\n\t\"\\/b");
+    }
+    let unicode = parse("\"\\u0041\\u00e9\"");
+    assertTrue(unicode != null, "unicode escapes parse");
+    if (unicode != null) {
+        assertEq(unicode.asString() ?? "?", "Aé");
+    }
+    let pair = parse("\"\\ud83d\\ude00\"");
+    assertTrue(pair != null, "a surrogate pair parses");
+    if (pair != null) {
+        assertEq((pair.asString() ?? "").length(), 1);
+    }
+}
+
+@Test
+pub fn duplicate_keys_take_the_last_value(): void {
+    assertEq(reparsed("{\"k\":1,\"k\":2}"), "{\"k\":2}");
+}
+
+/// What must come back as `null`, grouped by which rule refuses it. Every case is valid input
+/// to a lenient parser somewhere, which is exactly why each is pinned.
+@Test
+pub fn what_is_not_json_answers_null(): void {
+    assertTrue(parse("") == null, "an empty text is no value");
+    assertTrue(parse("   ") == null, "whitespace alone is no value");
+    assertTrue(parse("1 2") == null, "trailing content is refused");
+    assertTrue(parse("[1,]") == null, "no trailing comma in an array");
+    assertTrue(parse("{\"a\":1,}") == null, "no trailing comma in an object");
+    assertTrue(parse("truth") == null, "a word is checked to its end");
+    assertTrue(parse("'a'") == null, "single quotes are not JSON");
+    assertTrue(parse("0123") == null, "no leading zeros");
+    assertTrue(parse("-") == null, "a sign alone is no number");
+    assertTrue(parse("1.") == null, "a point needs digits behind it");
+    assertTrue(parse(".5") == null, "and digits before it");
+    assertTrue(parse("1e") == null, "an exponent needs digits");
+    assertTrue(parse("NaN") == null, "NaN has no JSON spelling");
+    assertTrue(parse("\"abc") == null, "an unterminated string");
+    assertTrue(parse("\"a\nb\"") == null, "a raw control character in a string");
+    assertTrue(parse("\"\\q\"") == null, "an unknown escape");
+    assertTrue(parse("\"\\u12g4\"") == null, "a broken unicode escape");
+    assertTrue(parse("\"\\ud83d\"") == null, "a lone high surrogate");
+    assertTrue(parse("\"\\ude00\"") == null, "a lone low surrogate");
+    assertTrue(parse("{\"a\" 1}") == null, "a missing colon");
+    assertTrue(parse("{a:1}") == null, "an unquoted key");
+    assertTrue(parse("[1") == null, "an unterminated array");
+}
+
+/// The depth bound is the module's own answer for hostile nesting: `null`, not a panic about
+/// call depth — input is data.
+@Test
+pub fn nesting_beyond_the_bound_answers_null(): void {
+    let fine = repeat("[", 128) + "1" + repeat("]", 128);
+    assertTrue(parse(fine) != null, "128 levels parse");
+    let past = repeat("[", 129) + "1" + repeat("]", 129);
+    assertTrue(parse(past) == null, "129 levels answer null");
+}

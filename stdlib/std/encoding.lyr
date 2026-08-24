@@ -1,0 +1,203 @@
+// std.encoding — binary-to-text encodings: hexadecimal and base64.
+//
+// The direction convention is `utf8Encode`/`utf8Decode`'s: ENCODE goes toward the text form and
+// cannot fail; DECODE comes back and answers `?uint8[]`, where `null` means the text is not the
+// encoding's canonical form. Both decoders are strict — no whitespace, no missing padding, no
+// characters outside the alphabet — because a lenient decoder silently accepts what another
+// system will reject, and the caller can always strip decorations before decoding.
+//
+// No capability required: nothing here reaches beyond the values passed in.
+
+module std.encoding;
+
+import std.string as strings;
+
+// The base64 alphabet of RFC 4648 §4, indexed by the six-bit value each character encodes.
+let base64Chars: char[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toChars();
+
+// The character for one hexadecimal digit value in `0..15`, lowercase.
+fn hexDigit(value: int): char {
+    if (value < 10) {
+        return ('0' as int + value) as char;
+    }
+    return ('a' as int + value - 10) as char;
+}
+
+// The value of one hexadecimal digit character, or -1 when the character is none. Both cases are
+// accepted: encoders differ in what they emit, and the value is the same.
+fn hexValue(c: char): int {
+    let code = c as int;
+    if (code >= '0' as int && code <= '9' as int) {
+        return code - '0' as int;
+    }
+    if (code >= 'a' as int && code <= 'f' as int) {
+        return code - 'a' as int + 10;
+    }
+    if (code >= 'A' as int && code <= 'F' as int) {
+        return code - 'A' as int + 10;
+    }
+    return -1;
+}
+
+/// Bytes as lowercase hexadecimal, two characters per byte, no separators. Empty bytes are the
+/// empty string.
+pub fn hexEncode(bytes: uint8[]): string {
+    let sb = strings.StringBuilder.new();
+    var i = 0;
+    while (i < bytes.length) {
+        let b = bytes[i] as int;
+        sb.appendChar(hexDigit(b >> 4));
+        sb.appendChar(hexDigit(b & 15));
+        i = i + 1;
+    }
+    return sb.build();
+}
+
+/// The bytes a hexadecimal string spells, or `null` when it spells none: an odd length or a
+/// character outside `0-9`, `a-f`, `A-F`. The empty string is an empty array.
+pub fn hexDecode(text: string): ?uint8[] {
+    let chars = text.toChars();
+    if (chars.length % 2 != 0) {
+        return null;
+    }
+    let zero: uint8 = 0;
+    var out = [zero] * (chars.length / 2);
+    var i = 0;
+    while (i < out.length) {
+        let hi = hexValue(chars[i * 2]);
+        let lo = hexValue(chars[i * 2 + 1]);
+        if (hi < 0 || lo < 0) {
+            return null;
+        }
+        out[i] = (hi << 4 | lo) as uint8;
+        i = i + 1;
+    }
+    return out;
+}
+
+/// Bytes as base64 (RFC 4648 §4: `A-Za-z0-9+/`), padded with `=` to a multiple of four
+/// characters. Empty bytes are the empty string.
+pub fn base64Encode(bytes: uint8[]): string {
+    let sb = strings.StringBuilder.new();
+    let whole = bytes.length / 3 * 3;
+    var i = 0;
+
+    while (i < whole) {
+        let group = bytes[i] as int << 16 | bytes[i + 1] as int << 8 | bytes[i + 2] as int;
+        sb.appendChar(base64Chars[group >> 18 & 63]);
+        sb.appendChar(base64Chars[group >> 12 & 63]);
+        sb.appendChar(base64Chars[group >> 6 & 63]);
+        sb.appendChar(base64Chars[group & 63]);
+        i = i + 3;
+    }
+
+    let rest = bytes.length - whole;
+    if (rest == 1) {
+        let group = bytes[i] as int << 16;
+        sb.appendChar(base64Chars[group >> 18 & 63]);
+        sb.appendChar(base64Chars[group >> 12 & 63]);
+        sb.append("==");
+    } else if (rest == 2) {
+        let group = bytes[i] as int << 16 | bytes[i + 1] as int << 8;
+        sb.appendChar(base64Chars[group >> 18 & 63]);
+        sb.appendChar(base64Chars[group >> 12 & 63]);
+        sb.appendChar(base64Chars[group >> 6 & 63]);
+        sb.append("=");
+    }
+    return sb.build();
+}
+
+// The six-bit value of one base64 alphabet character, or -1 when the character is none.
+// A linear scan over 64 characters, not a table keyed by code point: decode cost is dominated
+// by neither on the sizes this is for, and the scan cannot be out of step with the alphabet.
+fn base64Value(c: char): int {
+    var i = 0;
+    while (i < base64Chars.length) {
+        if (base64Chars[i] == c) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+/// The bytes a base64 string spells, or `null` when it spells none. Strict: the length must be a
+/// multiple of four, `=` may appear only as the final one or two characters, characters outside
+/// the alphabet are refused, and so is padding whose unused bits are not zero — accepted input is
+/// exactly what `base64Encode` produces. The empty string is an empty array.
+pub fn base64Decode(text: string): ?uint8[] {
+    let chars = text.toChars();
+    if (chars.length % 4 != 0) {
+        return null;
+    }
+    if (chars.length == 0) {
+        let zero: uint8 = 0;
+        return [zero] * 0;
+    }
+
+    // How many `=` end the string; only the last group may carry them.
+    var padding = 0;
+    if (chars[chars.length - 1] == '=') {
+        padding = 1;
+        if (chars[chars.length - 2] == '=') {
+            padding = 2;
+        }
+    }
+
+    let zero: uint8 = 0;
+    var out = [zero] * (chars.length / 4 * 3 - padding);
+    var outAt = 0;
+    var i = 0;
+
+    while (i < chars.length) {
+        let last = i + 4 == chars.length;
+
+        let a = base64Value(chars[i]);
+        let b = base64Value(chars[i + 1]);
+        if (a < 0 || b < 0) {
+            return null;
+        }
+
+        // The third and fourth character may be padding, but only in the final group.
+        var c = 0;
+        var d = 0;
+        if (last && padding == 2) {
+            if (chars[i + 2] != '=' || chars[i + 3] != '=') {
+                return null;
+            }
+        } else if (last && padding == 1) {
+            c = base64Value(chars[i + 2]);
+            if (c < 0 || chars[i + 3] != '=') {
+                return null;
+            }
+        } else {
+            c = base64Value(chars[i + 2]);
+            d = base64Value(chars[i + 3]);
+            if (c < 0 || d < 0) {
+                return null;
+            }
+        }
+
+        let group = a << 18 | b << 12 | c << 6 | d;
+        out[outAt] = (group >> 16 & 255) as uint8;
+        if (!last || padding < 2) {
+            out[outAt + 1] = (group >> 8 & 255) as uint8;
+        }
+        if (!last || padding == 0) {
+            out[outAt + 2] = (group & 255) as uint8;
+        }
+
+        // Unused padding bits must be zero, or the text is not the canonical spelling of any
+        // byte sequence: two strings would decode to the same bytes.
+        if (last && padding == 2 && group & 0xFFFF != 0) {
+            return null;
+        }
+        if (last && padding == 1 && group & 0xFF != 0) {
+            return null;
+        }
+
+        outAt = outAt + 3;
+        i = i + 4;
+    }
+    return out;
+}

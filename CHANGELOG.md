@@ -10,6 +10,74 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.5.0 — 2026-08-24
+
+The standard library learns structured data: JSON in and out, and the binary-to-text encodings
+beside it. Both modules are written in Lyric; no language change, no format change — with one
+exception underneath, where `std.string.parseFloat` had to become native to make the numbers
+honest.
+
+### Added
+
+- **`std.json` — reading and writing JSON (RFC 8259).** One value type carries a whole document:
+
+  ```lyr
+  import std.json { JsonValue, parse, serialize };
+  ```
+
+  `JsonValue` is an enum over the six JSON shapes, with arrays as `List<JsonValue>` and objects
+  as `Map<string, JsonValue>` — the existing collections, not a second container API. Accessors
+  (`asString`, `asInt`, `asFloat`, `asBool`, `asArray`, `asObject`, `at`, `field`, `isNull`)
+  answer `null` off-shape, `serialize` writes compact JSON, `serializePretty(value, indent)` the
+  readable form.
+
+  What the contracts pin down, each with a test:
+
+  - `parse` answers `?JsonValue` — the library's absence convention, as `parseInt` and
+    `utf8Decode` answer. Strict RFC 8259: no comments, no trailing commas, no `NaN`, no lone
+    surrogate escapes, no raw control characters in strings. Trailing content refuses the
+    document.
+  - **Numbers keep the distinction the text had.** No fraction, no exponent → `Int`, exact over
+    the whole `int` range, so 64-bit ids survive a round trip; everything else → `Float`. An
+    integer past `int` falls back to `Float` — magnitude over exactness — rather than wrapping
+    into a silently wrong value.
+  - **An integral `Float` serializes as `3.0`**, so it comes back as the float it was; NaN and
+    the infinities have no JSON spelling and serialize as `null`, the answer `JSON.stringify`
+    settled on long ago.
+  - **Hostile nesting answers `null`.** Containers deeper than 128 levels refuse rather than
+    running into the runtime's call-depth panic — input is data, and data that is not JSON
+    comes back as `null`, not as a crash.
+  - Duplicate object keys take the last value, as in JavaScript. Object member order follows
+    the map: unspecified, as `Map` documents.
+
+- **`std.encoding` — hex and base64 over raw bytes** (RFC 4648), on the same `uint8[]` that
+  `utf8Encode` and `file.bytes` speak. `hexEncode`/`base64Encode` are total; `hexDecode`/
+  `base64Decode` answer `?uint8[]` and are strict — no whitespace, no missing padding, no
+  characters outside the alphabet, and base64 refuses padding whose unused bits are not zero,
+  so accepted input is exactly what the encoder produces.
+
+### Changed
+
+- **`std.string.parseFloat` is native now — correctly rounded, exponent-capable.** The Lyric
+  predecessor summed fractional digits one by one, which drifts by an ulp on long fractions,
+  and it knew no exponent notation at all (its own doc said so): `parseFloat("1e-6")` was
+  `null`, and `parseFloat(fromFloat(x))` did not reliably answer `x`. Both halves matter the
+  moment JSON numbers flow through, and correct rounding is runtime-class work — the worst
+  cases need arbitrary-precision arithmetic, the same reason `fromFloat` has always been
+  native. The contract is unchanged where it existed (`"3.5"`, `".5"`, `"42"`, junk → `null`;
+  no whitespace, no `NaN`/`Infinity` words) and wider where it was missing: exponents parse,
+  and a magnitude beyond `float` rounds to the infinities as IEEE 754 prescribes.
+
+  Like every new compiler-bound native, a module compiled against this library binds
+  `std.string.parseFloat` by name: an older runtime refuses such a module at binding with that
+  name — the designed forward path, as with `co.next()` in 2.2.0 — and a module that never
+  calls `parseFloat` loads everywhere it always did.
+
+### Documentation
+
+- Guide 13 gains the two module sections and their rows in the module table, and its
+  capabilities line stops naming `std.io.net` — a module that does not exist.
+
 ## v3.4.1 — 2026-08-24
 
 A ground-up bug sweep through the pipeline. Every fix carries a failing test written first, and
