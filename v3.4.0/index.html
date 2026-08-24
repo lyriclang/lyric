@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.4.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.4.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.4.0 — 2026-08-24</h2>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>A chain can be started from an array, a range, or a table with holes in it.</strong> <code>std.iter</code>
+gains four entrances:</p>
+<pre><code class="language-lyr">over(xs).map(f)                 // an array
+range(1, 4)                     // what '1..4' walks in a loop
+rangeInclusive(1, 4)            // what '1..=4' walks
+compact(slots).map(f)           // the non-null values of a '(?T)[]'
+</code></pre>
+<p>The adapters have been methods since 2.17, but the three built-in forms could not start a
+pipeline: an array and a string have no declaration to hang an <code>Iterable</code> conformance on, and a
+range is not a value at all — <code>a..b</code> is a loop head, so <code>(a..b).iter()</code> is not something that
+could exist. Naming the machinery by hand was the alternative, and a class literal with two
+fields reads worse than the loop it replaces.</p>
+<p><strong><code>rangeInclusive</code> is its own function rather than <code>range(low, high + 1)</code></strong>, for the reason the
+two adapters behind it are separate: at the type's maximum that <code>+ 1</code> wraps and the chain
+yields nothing.</p>
+<p><strong><code>compact</code> takes an ARRAY, not an iterator</strong>, and that is the whole design. An <code>Iterator&lt;?T&gt;</code>
+cannot exist — <code>next()</code> answers <code>?T</code> and spends <code>null</code> on &quot;the end&quot;, so an optional element
+would need <code>??T</code>, and <code>?</code> does not nest. Reading the slots directly is what makes the
+distinction available. It is lazy like every other adapter.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
