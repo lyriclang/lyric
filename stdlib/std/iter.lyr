@@ -213,6 +213,68 @@ pub interface Iterable<T> {
     fn iter(): Iterator<T>;
 }
 
+// ================================================================================= entrances
+//
+// A chain has to start somewhere, and the three built-in forms cannot start one themselves: an
+// array and a range have no declaration to hang an `Iterable` conformance on, and a range is not
+// even a value — `a..b` is a loop head, so `(a..b).iter()` is not a thing that could exist.
+//
+// These functions are that beginning. Each hands back an `Iterator<T>`, so what follows is the
+// ordinary chain: `over(xs).map(f).filter(g)`.
+
+/// A cursor over an array: `over(xs).map(f)` starts a chain where `for (x in xs)` starts a loop.
+///
+/// The index belongs to the cursor, so two chains over one array do not disturb each other.
+pub fn over<T>(xs: T[]): Iterator<T> {
+    return ArrayIterator<T> { source = xs, index = 0 };
+}
+
+/// The numbers `low` up to but not including `high` — what `low..high` walks in a loop.
+pub fn range(low: int, high: int): Iterator<int> {
+    return RangeIterator { current = low, end = high };
+}
+
+/// The numbers `low` up to and including `high` — what `low..=high` walks in a loop.
+///
+/// A separate function rather than `range(low, high + 1)`, for the reason the two adapters are
+/// separate: at the type's maximum that `+ 1` wraps and the chain yields nothing.
+pub fn rangeInclusive(low: int, high: int): Iterator<int> {
+    return InclusiveRangeIterator { current = low, last = high, done = false };
+}
+
+/// The values of an array of optionals that are not `null`, lazily.
+///
+/// The commonest table with holes in it is a `(?T)[]` — a fixed number of slots, most of them
+/// empty — and this is what makes one chainable: `compact(houses).map(rooms)`.
+///
+/// It takes an ARRAY rather than an iterator, and that is not a convenience. An
+/// `Iterator<?T>` cannot exist: `next()` answers `?T` and spends `null` on "the end", so an
+/// optional element would need `??T` to be told apart from it, and `?` does not nest. Reading the
+/// slots directly is what makes the distinction available at all.
+pub fn compact<T>(xs: (?T)[]): Iterator<T> {
+    return CompactIterator<T> { source = xs };
+}
+
+/// The lazy machinery behind `compact`.
+pub class CompactIterator<T> :: [Iterator<T>] {
+    /// The slots being read.
+    source: (?T)[],
+    /// The next slot to look at.
+    index: int = 0,
+
+    /// The next value that is not `null`, or `null` at the end of the array.
+    pub mut fn next(): ?T {
+        while (this.index < this.source.length) {
+            let value = this.source[this.index];
+            this.index = this.index + 1;
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+}
+
 // ================================================================================== adapters
 //
 // Each adapter is a class holding state plus a function that builds it. The function returns

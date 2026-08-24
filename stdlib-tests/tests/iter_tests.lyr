@@ -3,6 +3,8 @@ import std.test { Test, assertEq, assertTrue };
 // that stay free — the terminals, and the two that would make the monomorphization diverge as
 // methods (see the note in std.iter).
 import std.iter { fold, count, sum, any, all, find, minValue, maxValue, chunks, reduce, first };
+// The entrances: what starts a chain where the built-in forms cannot start one themselves.
+import std.iter { over, range, rangeInclusive, compact };
 import std.collections { List, collect };
 
 fn upTo(n: int): List<int> {
@@ -110,4 +112,74 @@ pub fn reduce_folds_without_a_seed_and_reports_emptiness(): void {
 pub fn first_takes_one_element_or_null(): void {
     assertEq(first<int>(upTo(9).iter()) ?? -1, 1);
     assertTrue(first<int>(upTo(0).iter()) == null, "an empty source has no first");
+}
+
+// ---------------------------------------------------------------------------- the entrances
+
+@Test
+pub fn over_starts_a_chain_from_an_array(): void {
+    assertEq(sum(over<int>([1, 2, 3])), 6);
+    assertEq(sum(over<int>([1, 2, 3]).map<int>((n: int) => n * 10)), 60);
+    assertEq(count<int>(over<int>([])), 0);
+}
+
+@Test
+pub fn two_chains_over_one_array_do_not_disturb_each_other(): void {
+    // The index belongs to the cursor, not to the array. Were it otherwise, the second sum would
+    // find the array already walked.
+    let xs = [1, 2, 3];
+    assertEq(sum(over<int>(xs)), 6);
+    assertEq(sum(over<int>(xs)), 6);
+}
+
+@Test
+pub fn range_walks_up_to_but_not_including_its_end(): void {
+    assertEq(sum(range(1, 4)), 6);
+    assertEq(count<int>(range(0, 0)), 0);
+    assertEq(count<int>(range(5, 1)), 0);
+}
+
+@Test
+pub fn range_inclusive_takes_its_last_value(): void {
+    assertEq(sum(rangeInclusive(1, 4)), 10);
+    assertEq(count<int>(rangeInclusive(3, 3)), 1);
+    assertEq(count<int>(rangeInclusive(4, 3)), 0);
+}
+
+@Test
+pub fn an_inclusive_range_ending_at_the_maximum_still_terminates(): void {
+    // The reason 'rangeInclusive' is its own function rather than 'range(low, high + 1)': at the
+    // maximum that '+ 1' wraps and the chain would yield nothing at all.
+    let top = 9223372036854775807;
+    assertEq(count<int>(rangeInclusive(top - 2, top)), 3);
+}
+
+@Test
+pub fn compact_drops_the_empty_slots(): void {
+    let places: (?int)[] = [10, null, 20, null, 30];
+    assertEq(sum(compact<int>(places)), 60);
+    assertEq(count<int>(compact<int>(places)), 3);
+}
+
+@Test
+pub fn compact_survives_the_edges(): void {
+    let empty: (?int)[] = [];
+    assertEq(count<int>(compact<int>(empty)), 0);
+
+    let allNull: (?int)[] = [null, null];
+    assertEq(count<int>(compact<int>(allNull)), 0);
+
+    let noNull: (?int)[] = [1, 2];
+    assertEq(sum(compact<int>(noNull)), 3);
+
+    // Nulls at both ends, which is where an off-by-one would show.
+    let edged: (?int)[] = [null, 7, null];
+    assertEq(sum(compact<int>(edged)), 7);
+}
+
+@Test
+pub fn compact_composes_like_any_other_source(): void {
+    let places: (?int)[] = [1, null, 2, null, 3];
+    assertEq(sum(compact<int>(places).filter((n: int) => n % 2 == 1)), 4);
+    assertEq(first<int>(compact<int>(places).skip(1)) ?? -1, 2);
 }

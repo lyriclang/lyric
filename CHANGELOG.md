@@ -10,6 +10,35 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## Unreleased
+
+### Added
+
+- **A chain can be started from an array, a range, or a table with holes in it.** `std.iter`
+  gains four entrances:
+
+  ```lyr
+  over(xs).map(f)                 // an array
+  range(1, 4)                     // what '1..4' walks in a loop
+  rangeInclusive(1, 4)            // what '1..=4' walks
+  compact(slots).map(f)           // the non-null values of a '(?T)[]'
+  ```
+
+  The adapters have been methods since 2.17, but the three built-in forms could not start a
+  pipeline: an array and a string have no declaration to hang an `Iterable` conformance on, and a
+  range is not a value at all — `a..b` is a loop head, so `(a..b).iter()` is not something that
+  could exist. Naming the machinery by hand was the alternative, and a class literal with two
+  fields reads worse than the loop it replaces.
+
+  **`rangeInclusive` is its own function rather than `range(low, high + 1)`**, for the reason the
+  two adapters behind it are separate: at the type's maximum that `+ 1` wraps and the chain
+  yields nothing.
+
+  **`compact` takes an ARRAY, not an iterator**, and that is the whole design. An `Iterator<?T>`
+  cannot exist — `next()` answers `?T` and spends `null` on "the end", so an optional element
+  would need `??T`, and `?` does not nest. Reading the slots directly is what makes the
+  distinction available. It is lazy like every other adapter.
+
 ## v3.3.0 — 2026-08-24
 
 ### Fixed

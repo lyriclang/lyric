@@ -9,7 +9,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.fmt` | number formatting, padding, alignment, tables |
 | `std.math` | `sqrt`, `pi`, `abs`, `min`, `max`, rounding, trigonometry |
 | `std.collections` | `List<T>`, `Map<K, V>`, `Set<T>`, `Indexable<T>`, sorting |
-| `std.iter` | `Iterator<T>`, `Iterable<T>`, adapters, `sum` |
+| `std.iter` | `Iterator<T>`, `Iterable<T>`, adapters, the entrances (`over`, `range`, `compact`), `sum` |
 | `std.option` | `map`, `andThen`, `filter`, `zip`, `contains`, `toArray`, `iter`, `expect` |
 | `std.io.console` | `print`, `println`, `readLine` — the writers take any `Display` value: `println(42)` |
 | `std.io.file` | reading and writing files — requires `fileAccess` |
@@ -132,6 +132,42 @@ Two families stay free, each for a reason worth knowing:
   that would ask the compiler to build `Iterator<(int, T)>`, then `Iterator<(int, (int, T))>`,
   without end. `map` and `flatMap` change it safely because they are generic: they are built per
   use rather than per instance.
+
+## A chain has to start somewhere
+
+A `List<T>` hands out a cursor with `iter()`, because it is a type and can declare
+`Iterable<T>`. The three built-in forms cannot: an array and a string have no declaration to hang
+a conformance on, and a range is not a value at all — `a..b` is a loop head, so
+`(a..b).iter()` could not exist. Four functions are the beginning instead:
+
+```lyr
+import std.iter { over, range, rangeInclusive, compact, sum };
+
+fn main(): int {
+    let doubled = sum(over<int>([1, 2, 3]).map<int>((n: int) => n * 2));
+    let counted = sum(range(1, 4));
+    let upTo = sum(rangeInclusive(1, 4));
+
+    let slots: (?int)[] = [10, null, 20];
+    let present = sum(compact<int>(slots));
+
+    return doubled + counted + upTo + present;
+}
+```
+
+`over` walks an array, `range` and `rangeInclusive` walk the numbers that `low..high` and
+`low..=high` walk in a loop, and `compact` walks the slots of an array of optionals that are not
+`null`.
+
+**`rangeInclusive` is its own function rather than `range(low, high + 1)`** for the reason the
+two loop forms are separate: at the type's maximum that `+ 1` wraps, and the chain would yield
+nothing at all.
+
+**`compact` takes an ARRAY and not an iterator**, and that is not a convenience. An
+`Iterator<?T>` cannot exist: `next()` answers `?T` and spends `null` on "the end", so an optional
+element would need `??T` to be told apart from it — and `?` does not nest. The same rule is
+why `for (x in slots)` over a `(?T)[]` is refused with `LYR-SEM0091`. Reading the slots directly
+is what makes the distinction available, and `compact` is where that reading lives.
 
 ## Files answer two ways, and each says which
 
