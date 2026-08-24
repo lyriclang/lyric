@@ -34,6 +34,20 @@ bytecode format, the command line and the embedding API. Compiler internals are 
   guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
   Where a row exists nothing changes.
 
+- **Iterating an array of optionals is a message, not a crash** (`LYR-SEM0091`).
+  `for (h in houses)` over a `(?House)[]` — an ordinary table shape — crashed the compiler in
+  debug (`optnone of ?i64 — optionals do not nest`, with a stack trace and no position) and, in
+  release, made `check` answer "ok" for a program `build` could not finish.
+
+  The cause is the protocol, not the container: `next()` answers `?T` and uses null to mean "the
+  end", so an optional element would need `??T` to be told apart from it, and `?` does not nest.
+  The message says that and points at the loop that does work — over the indices. It fires the
+  same way for an iterator of optionals handed in directly, because the reason is the same.
+
+- **An operator whose operand already reported stays silent.** `<error>[]` appeared in sentences
+  about operators: `IsError` was consulted where the error sat INSIDE an array or a tuple, so the
+  type was not itself the error and the check went on to complain about it.
+
 - **A range outside a loop head is a message, not a crash** (`LYR-SEM0090`). `let r = 1..5;` and
   `[1..3]` threw an internal exception out of the lowering, with a stack trace and no source
   position. A range is a loop head and not a value — the grammar has no range expression among its

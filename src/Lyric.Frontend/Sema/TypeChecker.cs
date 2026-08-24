@@ -992,8 +992,22 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(iterType)}' is not iterable — it must implement "
                      + "'Iterable<T>' or 'Iterator<T>' from std.iter")
         };
+        // An OPTIONAL element cannot be walked, and the reason is the protocol rather than the
+        // container: 'next()' answers '?T' and uses null to mean "the end", so an element that is
+        // itself optional would need '??T' to be told apart from it — and '?' does not nest.
+        // Refused here, where the source position is, rather than in the lowering: it produced
+        // '??i64' in the IR, which crashed the verifier in debug and, in release, wrote a module
+        // the loader refuses. 'check' answered 'ok' either way.
+        if (elem is Optional)
+            _de.Report("LYR-SEM0091", Severity.Error, fo.Iterable.Span,
+                $"iterating this yields '{TypeFacts.Display(elem)}', and an iterator already "
+                + "answers null to mean the end — an optional element cannot be told apart from it",
+                new DiagnosticNote(
+                    "walk the indices instead: 'for (i in 0..xs.length) { let x = xs[i]; ... }'"));
+
         var loopScope = new SymbolTable(scope);
-        var loopVar = new LocalSymbol(fo.Variable, elem, false, fo);
+        var loopVar = new LocalSymbol(fo.Variable, elem is Optional ? LyrType.Error : elem,
+            false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
         CheckBlock(fo.Body, loopScope);
@@ -4993,8 +5007,16 @@ public sealed class TypeChecker
     private void BadOp(Span span, string op, LyrType t) =>
         _de.Report("LYR-SEM0003", Severity.Error, span, $"operator '{op}' is not applicable to '{TypeFacts.Display(t)}'");
 
+    /// <summary>
+    /// The operator did not apply. Silent when either side CARRIES an error — the operand's own
+    /// diagnostic is the one to act on, and '<error>[]' in a sentence about an operator is noise
+    /// following it. <see cref="LyrType.IsError"/> alone is not enough: an error inside an array
+    /// or a tuple reaches here as a whole type that is not itself the error.
+    /// </summary>
     private LyrType BadBinary(BinaryExpr b, LyrType l, LyrType r)
     {
+        if (ContainsError(l) || ContainsError(r)) return LyrType.Error;
+
         _de.Report("LYR-SEM0003", Severity.Error, b.Span, $"operator '{b.Operator}' is not applicable to '{TypeFacts.Display(l)}' and '{TypeFacts.Display(r)}'");
         return LyrType.Error;
     }
