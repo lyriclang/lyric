@@ -548,6 +548,12 @@ out of them and hands its own functions, types and value structs in.
   two slice verdicts leaned on that pipe before it was caught; suite gates read the real exit
   now, redirected to a file instead of piped.
 
+  **The sweep ran the same day and found NOTHING** (`fix/m34-sweep`): 41 adversarial probes —
+  object/mixed nesting at the bound, number and string corners, eleven refusal shapes, the
+  interactions (a `JsonValue` through a coroutine, the REPL, `LYRIC_JIT=1`, capability gating,
+  `lyric pack` of a json program) — no crash, no wrong answer, no guide claim off. The probes
+  with pin value landed as tests; no patch release, per the pipeline the loop exits here.
+
 - [x] **The pipeline bug sweep** (2026-08-24, `fix/pipeline-sweep`, PR #111). Thirteen fixes,
   bottom up through every stage, each with a failing test first. The three worth keeping were
   reachable from plain source or from foreign bytes and ended in a crash rather than a

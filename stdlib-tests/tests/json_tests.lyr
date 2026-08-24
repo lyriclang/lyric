@@ -205,6 +205,18 @@ pub fn what_is_not_json_answers_null(): void {
     assertTrue(parse("{\"a\" 1}") == null, "a missing colon");
     assertTrue(parse("{a:1}") == null, "an unquoted key");
     assertTrue(parse("[1") == null, "an unterminated array");
+    assertTrue(parse("\"\\ud83d\\ud83d\"") == null, "two high surrogates pair with nothing");
+    assertTrue(parse("\"\\ud83d\\u0041\"") == null, "a high surrogate before an ordinary escape");
+    assertTrue(parse("\"\\ud83d\\n\"") == null, "a high surrogate before a named escape");
+    assertTrue(parse("\"\\u00\"") == null, "a unicode escape cut short");
+    assertTrue(parse("\"\\") == null, "an escape at the end of the text");
+    assertTrue(parse("\u{FEFF}{}") == null, "a BOM is not JSON whitespace");
+    assertTrue(parse("{:1}") == null, "a colon without a key");
+    assertTrue(parse("[,1]") == null, "a comma before the first element");
+    assertTrue(parse("[1,,2]") == null, "a double comma");
+    assertTrue(parse("{\"a\":}") == null, "a member without a value");
+    assertTrue(parse("{\"a\":1}x") == null, "trailing content after an object");
+    assertTrue(parse("01e2") == null, "a leading zero stays refused with an exponent behind it");
 }
 
 /// The depth bound is the module's own answer for hostile nesting: `null`, not a panic about
@@ -215,4 +227,53 @@ pub fn nesting_beyond_the_bound_answers_null(): void {
     assertTrue(parse(fine) != null, "128 levels parse");
     let past = repeat("[", 129) + "1" + repeat("]", 129);
     assertTrue(parse(past) == null, "129 levels answer null");
+}
+
+/// The bound counts CONTAINERS, so objects and mixed shapes meet it exactly where arrays do.
+@Test
+pub fn the_nesting_bound_counts_objects_too(): void {
+    var deep = "1";
+    var i = 0;
+    while (i < 128) {
+        deep = "{\"k\":" + deep + "}";
+        i = i + 1;
+    }
+    assertTrue(parse(deep) != null, "128 object levels parse");
+    assertTrue(parse("{\"k\":" + deep + "}") == null, "129 object levels answer null");
+
+    var mixed = "1";
+    i = 0;
+    while (i < 64) {
+        mixed = "[{\"k\":" + mixed + "}]";
+        i = i + 1;
+    }
+    assertTrue(parse(mixed) != null, "64 alternating pairs are 128 containers and parse");
+}
+
+/// Number spellings the first test round did not reach, pinned after the v3.5.0 sweep probed
+/// them: each keeps its variant and its value through a round trip.
+@Test
+pub fn number_spellings_pin_their_variant(): void {
+    assertEq(reparsed("-0.0"), "-0.0");
+    assertEq(reparsed("0e5"), "0.0");
+    assertEq(reparsed("1E+2"), "100.0");
+    assertEq(reparsed("123e65"), "1.23e+67");
+}
+
+/// String corners from the same sweep: the NUL escape, a raw supplementary character, and the
+/// empty key are all ordinary values.
+@Test
+pub fn string_corners_round_trip(): void {
+    assertEq(reparsed("\"a\\u0000b\""), "\"a\\u0000b\"");
+    assertEq(reparsed("\"\u{1F600}\""), "\"\u{1F600}\"");
+    assertEq(reparsed("{\"\":1}"), "{\"\":1}");
+}
+
+/// An `indent` of zero keeps the line structure and drops only the spaces — compact is spelled
+/// `serialize`, not `serializePretty(v, 0)`.
+@Test
+pub fn pretty_indent_zero_keeps_the_lines(): void {
+    let m = Map<string, JsonValue>.empty();
+    m.set("a", JsonValue.Int(1));
+    assertEq(serializePretty(JsonValue.Obj(m), 0), "{\n\"a\": 1\n}");
 }

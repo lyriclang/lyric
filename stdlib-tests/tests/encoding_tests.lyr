@@ -37,6 +37,7 @@ pub fn hex_refuses_what_spells_no_bytes(): void {
     assertTrue(hexDecode("abc") == null, "an odd length is refused");
     assertTrue(hexDecode("zz") == null, "a character outside the digits is refused");
     assertTrue(hexDecode("4 8") == null, "whitespace is not stripped");
+    assertTrue(hexDecode("0xff") == null, "a 0x prefix is not part of the encoding");
     let empty = hexDecode("");
     assertTrue(empty != null, "the empty string is an empty array, not a failure");
     if (empty != null) {
@@ -96,6 +97,8 @@ pub fn base64_refuses_what_spells_no_bytes(): void {
     assertTrue(base64Decode("====") == null, "padding alone spells nothing");
     assertTrue(base64Decode("QR==") == null, "unused padding bits must be zero");
     assertTrue(base64Decode("QUJ=") == null, "unused padding bits must be zero here too");
+    assertTrue(base64Decode("Zg==\n") == null, "a trailing newline is not stripped");
+    assertTrue(base64Decode("a-b_") == null, "the url alphabet is a different encoding");
     let empty = base64Decode("");
     assertTrue(empty != null, "the empty string is an empty array, not a failure");
     if (empty != null) {

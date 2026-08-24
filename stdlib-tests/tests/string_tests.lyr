@@ -97,6 +97,8 @@ pub fn parseFloat_reads_every_decimal_shape(): void {
     assertEq(parseFloat("1e2") ?? -1.0, 100.0);
     assertEq(parseFloat("2.5E-1") ?? -1.0, 0.25);
     assertEq(parseFloat("1e+3") ?? -1.0, 1000.0);
+    assertEq(parseFloat("+.5") ?? -1.0, 0.5);
+    assertEq(parseFloat(".5e3") ?? -1.0, 500.0);
 }
 
 /// Correct rounding is the contract: what `fromFloat` writes comes back as the same value, and
