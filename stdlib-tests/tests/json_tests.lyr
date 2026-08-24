@@ -1,0 +1,107 @@
+import std.test { Test, assertEq, assertTrue };
+import std.json { JsonValue, serialize, serializePretty };
+import std.collections { List, Map };
+import std.string { fromChar };
+
+@Test
+pub fn scalars_serialize_to_their_json_spelling(): void {
+    assertEq(serialize(JsonValue.Null), "null");
+    assertEq(serialize(JsonValue.Bool(true)), "true");
+    assertEq(serialize(JsonValue.Bool(false)), "false");
+    assertEq(serialize(JsonValue.Int(42)), "42");
+    assertEq(serialize(JsonValue.Int(-7)), "-7");
+    assertEq(serialize(JsonValue.Str("hi")), "\"hi\"");
+}
+
+/// The two corners of the float rendering: an integral value keeps saying it is a float, and
+/// the values JSON cannot spell become `null` — JavaScript's answer, documented.
+@Test
+pub fn floats_stay_floats_and_the_unspellable_becomes_null(): void {
+    assertEq(serialize(JsonValue.Float(2.5)), "2.5");
+    assertEq(serialize(JsonValue.Float(3.0)), "3.0");
+    assertEq(serialize(JsonValue.Float(-1.0)), "-1.0");
+    assertEq(serialize(JsonValue.Float(0.0 / 0.0)), "null");
+    assertEq(serialize(JsonValue.Float(1.0 / 0.0)), "null");
+    assertEq(serialize(JsonValue.Float(1.0e300)), "1e+300");
+}
+
+@Test
+pub fn strings_escape_what_json_requires_and_nothing_else(): void {
+    assertEq(serialize(JsonValue.Str("a\"b")), "\"a\\\"b\"");
+    assertEq(serialize(JsonValue.Str("a\\b")), "\"a\\\\b\"");
+    assertEq(serialize(JsonValue.Str("a\nb\tc\rd")), "\"a\\nb\\tc\\rd\"");
+    // A control character without a named escape takes the \u00xx form.
+    let ctl = 1 as char;
+    assertEq(serialize(JsonValue.Str("x" + fromChar(ctl))), "\"x\\u0001\"");
+    // Non-ASCII is not escaped: the output is text, not ASCII armor.
+    assertEq(serialize(JsonValue.Str("grün")), "\"grün\"");
+}
+
+@Test
+pub fn arrays_and_objects_nest(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Int(1));
+    items.push(JsonValue.Bool(false));
+    items.push(JsonValue.Null);
+    assertEq(serialize(JsonValue.Arr(items)), "[1,false,null]");
+    assertEq(serialize(JsonValue.Arr(List<JsonValue>.empty())), "[]");
+    assertEq(serialize(JsonValue.Obj(Map<string, JsonValue>.empty())), "{}");
+
+    let inner = Map<string, JsonValue>.empty();
+    inner.set("ok", JsonValue.Bool(true));
+    let outer = List<JsonValue>.empty();
+    outer.push(JsonValue.Obj(inner));
+    assertEq(serialize(JsonValue.Arr(outer)), "[{\"ok\":true}]");
+}
+
+@Test
+pub fn pretty_output_indents_and_compact_does_not(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Int(1));
+    items.push(JsonValue.Int(2));
+    let obj = Map<string, JsonValue>.empty();
+    obj.set("xs", JsonValue.Arr(items));
+    let doc = JsonValue.Obj(obj);
+
+    assertEq(serialize(doc), "{\"xs\":[1,2]}");
+    assertEq(serializePretty(doc, 2), "{\n  \"xs\": [\n    1,\n    2\n  ]\n}");
+    // Empty containers stay on one line even pretty.
+    assertEq(serializePretty(JsonValue.Obj(Map<string, JsonValue>.empty()), 2), "{}");
+}
+
+@Test
+pub fn accessors_answer_their_variant_and_null_otherwise(): void {
+    assertTrue(JsonValue.Null.isNull(), "Null knows itself");
+    assertTrue(!JsonValue.Int(0).isNull(), "a number is not null");
+    assertEq(JsonValue.Bool(true).asBool() ?? false, true);
+    assertEq(JsonValue.Int(9).asInt() ?? -1, 9);
+    assertTrue(JsonValue.Float(9.0).asInt() == null, "an integral float is still not Int");
+    assertEq(JsonValue.Float(2.5).asFloat() ?? -1.0, 2.5);
+    assertEq(JsonValue.Int(2).asFloat() ?? -1.0, 2.0);
+    assertEq(JsonValue.Str("s").asString() ?? "?", "s");
+    assertTrue(JsonValue.Str("s").asBool() == null, "a string is not a bool");
+}
+
+@Test
+pub fn at_and_field_reach_into_the_tree(): void {
+    let items = List<JsonValue>.empty();
+    items.push(JsonValue.Str("first"));
+    let obj = Map<string, JsonValue>.empty();
+    obj.set("xs", JsonValue.Arr(items));
+    let doc = JsonValue.Obj(obj);
+
+    let xs = doc.field("xs");
+    assertTrue(xs != null, "the member exists");
+    if (xs != null) {
+        let head = xs.at(0);
+        assertTrue(head != null, "the element exists");
+        if (head != null) {
+            assertEq(head.asString() ?? "?", "first");
+        }
+        assertTrue(xs.at(1) == null, "past the end is null");
+        assertTrue(xs.at(-1) == null, "before the start is null");
+    }
+    assertTrue(doc.field("missing") == null, "an absent member is null");
+    assertTrue(doc.at(0) == null, "an object has no elements");
+    assertTrue(JsonValue.Int(1).field("x") == null, "a scalar has no members");
+}

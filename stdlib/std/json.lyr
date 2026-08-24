@@ -1,0 +1,298 @@
+// std.json — reading and writing JSON (RFC 8259).
+//
+// One value type carries a whole document: `JsonValue`, an enum over the six JSON shapes, with
+// arrays as `List<JsonValue>` and objects as `Map<string, JsonValue>` — the collections everyone
+// already has, not a second container API. `parse` answers `?JsonValue` in the standard library's
+// absence convention: `null` means the text is not JSON, the way `parseInt` and `utf8Decode`
+// answer. A parse error carries no position yet for the same reason a file error carries no
+// reason — that is the open error-type question, and this module does not answer it on the side.
+//
+// Numbers keep the distinction the text had. JSON itself has one number type, but a document
+// full of 64-bit ids must round-trip exactly, so a number without fraction or exponent becomes
+// `Int` and everything else `Float`; an integer the `int` range cannot hold falls back to
+// `Float`, keeping magnitude over exactness. `asFloat` answers for both variants.
+//
+// Object member order follows the map: UNSPECIFIED, as `Map` documents. A serialized object
+// lists its members in the map's iteration order, not the order the document had.
+//
+// No capability required: nothing here reaches beyond the values passed in.
+
+module std.json;
+
+import std.collections { List, Map, keys };
+import std.string { StringBuilder, fromInt, fromFloat, parseInt, parseFloat };
+import std.math { isNaN, isInfinite };
+
+/// One JSON value — the tree `parse` answers and `serialize` writes.
+pub enum JsonValue {
+    /// The literal `null`.
+    Null,
+    /// `true` or `false`.
+    Bool(bool),
+    /// A number the text wrote without fraction or exponent, exact in the `int` range.
+    Int(int),
+    /// A number with a fraction or an exponent — or an integer too large for `Int`.
+    Float(float),
+    /// A string.
+    Str(string),
+    /// An array.
+    Arr(List<JsonValue>),
+    /// An object. Member order is the map's: unspecified.
+    Obj(Map<string, JsonValue>);
+
+    /// Whether this is the JSON `null` — the value, not an absent optional.
+    pub fn isNull(): bool {
+        return match (this) {
+            Null => true,
+            _ => false,
+        };
+    }
+
+    /// The boolean, or `null` when this is not one.
+    pub fn asBool(): ?bool {
+        return match (this) {
+            Bool(b) => b,
+            _ => null,
+        };
+    }
+
+    /// The integer, or `null` when this is not `Int`. A `Float` with an integral value stays
+    /// `null`: which of the two a number is was decided by the text it came from.
+    pub fn asInt(): ?int {
+        return match (this) {
+            Int(v) => v,
+            _ => null,
+        };
+    }
+
+    /// The number as a float — `Float` directly, `Int` widened — or `null` when this is not a
+    /// number. JSON has one number type; two variants is this module keeping precision, not two
+    /// kinds of JSON value.
+    pub fn asFloat(): ?float {
+        return match (this) {
+            Float(v) => v,
+            Int(v) => v as float,
+            _ => null,
+        };
+    }
+
+    /// The string, or `null` when this is not one.
+    pub fn asString(): ?string {
+        return match (this) {
+            Str(s) => s,
+            _ => null,
+        };
+    }
+
+    /// The elements, or `null` when this is not an array. The list is the value's own — changing
+    /// it changes the value.
+    pub fn asArray(): ?List<JsonValue> {
+        return match (this) {
+            Arr(items) => items,
+            _ => null,
+        };
+    }
+
+    /// The members, or `null` when this is not an object. The map is the value's own — changing
+    /// it changes the value.
+    pub fn asObject(): ?Map<string, JsonValue> {
+        return match (this) {
+            Obj(members) => members,
+            _ => null,
+        };
+    }
+
+    /// The element at `index`, or `null` when this is not an array or the index is outside it.
+    pub fn at(index: int): ?JsonValue {
+        return match (this) {
+            Arr(items) => if (index >= 0 && index < items.length()) items.get(index) else null,
+            _ => null,
+        };
+    }
+
+    /// The member named `name`, or `null` when this is not an object or has no such member.
+    pub fn field(name: string): ?JsonValue {
+        return match (this) {
+            Obj(members) => members.get(name),
+            _ => null,
+        };
+    }
+}
+
+/// The value as compact JSON: no whitespace anywhere.
+pub fn serialize(value: JsonValue): string {
+    let sb = StringBuilder.new();
+    writeValue(sb, value, -1, 0);
+    return sb.build();
+}
+
+/// The value as JSON with a newline per element and `indent` spaces per nesting level, the shape
+/// a person reads. An `indent` below zero is treated as zero.
+pub fn serializePretty(value: JsonValue, indent: int): string {
+    let sb = StringBuilder.new();
+    writeValue(sb, value, if (indent < 0) 0 else indent, 0);
+    return sb.build();
+}
+
+// The one writer behind both entry points; `indent < 0` means compact.
+fn writeValue(sb: StringBuilder, value: JsonValue, indent: int, depth: int): void {
+    match (value) {
+        Null => {
+            sb.append("null");
+        }
+        Bool(b) => {
+            sb.append(if (b) "true" else "false");
+        }
+        Int(v) => {
+            sb.append(fromInt(v));
+        }
+        Float(v) => {
+            sb.append(renderFloat(v));
+        }
+        Str(s) => {
+            writeString(sb, s);
+        }
+        Arr(items) => {
+            writeArray(sb, items, indent, depth);
+        }
+        Obj(members) => {
+            writeObject(sb, members, indent, depth);
+        }
+    }
+}
+
+// A float as a JSON number. `fromFloat` is shortest-roundtrip and already JSON-shaped, except in
+// two corners: an integral value renders bare (`3`), which would come back as `Int`, so it gains
+// `.0` — and NaN and the infinities have no JSON spelling at all and become `null`, the answer
+// JavaScript's JSON.stringify gave long ago.
+fn renderFloat(value: float): string {
+    if (isNaN(value) || isInfinite(value)) {
+        return "null";
+    }
+    let text = fromFloat(value);
+    if (!text.contains(".") && !text.contains("e") && !text.contains("E")) {
+        return text + ".0";
+    }
+    return text;
+}
+
+fn writeString(sb: StringBuilder, text: string): void {
+    sb.appendChar('"');
+    let chars = text.toChars();
+    var i = 0;
+    while (i < chars.length) {
+        writeEscaped(sb, chars[i]);
+        i = i + 1;
+    }
+    sb.appendChar('"');
+}
+
+// One character into a JSON string: the two that must be escaped, the named controls, `\u00xx`
+// for the remaining controls, everything else as itself — non-ASCII included, the output is text.
+fn writeEscaped(sb: StringBuilder, c: char): void {
+    if (c == '"') {
+        sb.append("\\\"");
+        return;
+    }
+    if (c == '\\') {
+        sb.append("\\\\");
+        return;
+    }
+    let code = c as int;
+    if (code >= 0x20) {
+        sb.appendChar(c);
+        return;
+    }
+    if (c == '\n') {
+        sb.append("\\n");
+        return;
+    }
+    if (c == '\r') {
+        sb.append("\\r");
+        return;
+    }
+    if (c == '\t') {
+        sb.append("\\t");
+        return;
+    }
+    if (code == 8) {
+        sb.append("\\b");
+        return;
+    }
+    if (code == 12) {
+        sb.append("\\f");
+        return;
+    }
+    sb.append("\\u00");
+    sb.appendChar(hexDigit(code >> 4));
+    sb.appendChar(hexDigit(code & 15));
+}
+
+// The character for one hexadecimal digit value in `0..15`, lowercase.
+fn hexDigit(value: int): char {
+    if (value < 10) {
+        return ('0' as int + value) as char;
+    }
+    return ('a' as int + value - 10) as char;
+}
+
+fn writeArray(sb: StringBuilder, items: List<JsonValue>, indent: int, depth: int): void {
+    if (items.isEmpty()) {
+        sb.append("[]");
+        return;
+    }
+    sb.appendChar('[');
+    var i = 0;
+    while (i < items.length()) {
+        if (i > 0) {
+            sb.appendChar(',');
+        }
+        newlineIndent(sb, indent, depth + 1);
+        writeValue(sb, items.get(i), indent, depth + 1);
+        i = i + 1;
+    }
+    newlineIndent(sb, indent, depth);
+    sb.appendChar(']');
+}
+
+fn writeObject(sb: StringBuilder, members: Map<string, JsonValue>, indent: int, depth: int): void {
+    if (members.isEmpty()) {
+        sb.append("{}");
+        return;
+    }
+    sb.appendChar('{');
+    let names = keys<string, JsonValue>(members);
+    var first = true;
+    while (true) {
+        let name = names.next();
+        if (name == null) {
+            break;
+        }
+        if (!first) {
+            sb.appendChar(',');
+        }
+        first = false;
+        newlineIndent(sb, indent, depth + 1);
+        writeString(sb, name);
+        sb.appendChar(':');
+        if (indent >= 0) {
+            sb.appendChar(' ');
+        }
+        writeValue(sb, members.get(name) ?? JsonValue.Null, indent, depth + 1);
+    }
+    newlineIndent(sb, indent, depth);
+    sb.appendChar('}');
+}
+
+// Pretty printing's line structure; compact mode (`indent < 0`) writes nothing here.
+fn newlineIndent(sb: StringBuilder, indent: int, depth: int): void {
+    if (indent < 0) {
+        return;
+    }
+    sb.appendChar('\n');
+    var i = 0;
+    while (i < indent * depth) {
+        sb.appendChar(' ');
+        i = i + 1;
+    }
+}
