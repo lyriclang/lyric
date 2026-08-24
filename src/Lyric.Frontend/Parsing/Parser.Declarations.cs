@@ -258,6 +258,13 @@ public sealed partial class Parser
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close import list");
+
+        // Grammar §2: at least one name. An empty list would be an import of nothing, kept
+        // without a word.
+        if (names.Count == 0)
+            _de.Report("LYR-PAR0026", Severity.Error, Span.Union(open.Span, close.Span),
+                "expected at least one import item — for the whole module, drop the braces");
+
         return new ImportSelective(names.ToArray(), Span.Union(open.Span, close.Span))
             { NameSpans = spans.ToArray() };
     }

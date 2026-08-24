@@ -371,6 +371,16 @@ public class ParserTests
     }
 
     [Fact]
+    public void Empty_selective_import_is_refused()
+    {
+        // Grammar §2: the list holds at least one name. 'import a { };' parsed silently into an
+        // import of nothing.
+        var (_, de) = ParseModule("import a { };");
+        Assert.True(de.HasErrors);
+        Assert.Equal("LYR-PAR0026", de.Diagnostics[0].Code);
+    }
+
+    [Fact]
     public void Function_captures_generics_params_return_throws()
     {
         var (m, de) = ParseModule("fn f<T>(x: T): int throws E { return 0; }");
