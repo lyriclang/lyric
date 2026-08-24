@@ -11,6 +11,17 @@
 
 ## Current milestone
 
+**M34 — "die Datenformate" — SHIPPED as v3.5.0** (2026-08-24, format stays 3.6). The standard
+library learns structured data, in Lyric: `std.json` (RFC 8259 — one recursive `JsonValue` enum
+over `List`/`Map`, strict parse answering `?JsonValue`, serializer with the `3.0`-stays-float
+rule and `null` for the unspellable) and `std.encoding` (hex and base64, RFC 4648, strict
+decoders). One native underneath: `std.string.parseFloat`, because a JSON number needs exponents
+and CORRECT ROUNDING, and the Lyric predecessor had neither — the same reason `fromFloat` was
+always native. Details under §Recently finished; the sweep loop the pipeline prescribes comes
+next.
+
+---
+
 **M32 — "die Zaehlung" — SHIPPED as v2.12.0** (2026-08-22, format 3.5 → 3.6). The delivery list
 below is the record; the verdict it was built to produce is under §The gate.
 
@@ -501,10 +512,11 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4778 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **3.4.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 117 cases pinned to 3.2.0, and the toolchain's own CI runs it
-against the working tree. *(The test count is the one last counted, at 2.17.0.)*
+4855 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **3.5.0**; the specification in `lyriclang/lyric-spec` is
+**NORMATIVE**, its suite stands at 117 cases pinned to 3.2.0 (116/116 against this tree, one
+platform-gated skip), and the toolchain's own CI runs it against the working tree. *(The test
+count is the one last counted, at 3.5.0.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
 that largely carries itself (`Map`, `Set`, merge sort, all iterator adapters and the string hash are
@@ -520,6 +532,21 @@ out of them and hands its own functions, types and value structs in.
 > else stands in `git log`.
 
 ## Recently finished
+
+- [x] **M34 — the data formats** (2026-08-24, `feature/m34-data-formats`, released as v3.5.0).
+  `std.json` and `std.encoding`, both written in Lyric — the first structured-data story the
+  library has. What the milestone turned up outside its scope: `std.string.parseFloat` could not
+  carry a JSON number — no exponent notation (its own doc said so), and the digit-by-digit
+  fraction sum drifted an ulp on long fractions, so `parseFloat(fromFloat(x))` was not reliably
+  `x`. It is NATIVE now, correctly rounded; new-native binding rule as with `co.next()` in 2.2.0.
+
+  **Two decisions worth keeping.** The json parser decides int-fits on the DIGITS before calling
+  `parseInt`, because `parseInt` wraps on overflow by documented design — a wrapped id would be a
+  silently wrong value, the exact shape the sweeps hunt. And the parser carries its own depth cap
+  (128): input is data, and the VM's 1024-frame panic is not an answer a `?JsonValue` contract
+  may give. **One harness lesson**: `dotnet test | tail` reports tail's exit code, not dotnet's —
+  two slice verdicts leaned on that pipe before it was caught; suite gates read the real exit
+  now, redirected to a file instead of piped.
 
 - [x] **The pipeline bug sweep** (2026-08-24, `fix/pipeline-sweep`, PR #111). Thirteen fixes,
   bottom up through every stage, each with a failing test first. The three worth keeping were
@@ -568,13 +595,6 @@ out of them and hands its own functions, types and value structs in.
   pipeline had ever read back what it wrote. It does now, in Release too, and
   `lyric check --emit` asks that question without writing a file. It caught the optional-array
   bug on the day it was added.
-
-- [x] **The specification caught up with 3.0.1 through 3.2.0** (2026-08-23,
-  `lyriclang/lyric-spec` PR #18, one commit per version). It was pinned to 3.0.0 and still said
-  it describes Lyric 2.0. What the four releases owed the document was not evenly spread: 3.0.2
-  nothing at all, 3.1.0 one diagnostic cause, 3.2.0 one sentence — and 3.0.0 two claims its own
-  features had made FALSE. The pin stands at 3.2.0, the suite at 117 cases, and chapters 02 and
-  13 were untouched, so the mirrors held.
 
 ## Measurements
 

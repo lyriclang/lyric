@@ -16,6 +16,8 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.os` | environment, process, exit — requires `osAccess` |
 | `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic, no capability |
 | `std.time` | `Instant`, `Duration`, ISO 8601 — requires `osAccess` |
+| `std.json` | `JsonValue`, `parse`, `serialize`, `serializePretty` — JSON, RFC 8259 |
+| `std.encoding` | `hexEncode`/`hexDecode`, `base64Encode`/`base64Decode` — RFC 4648 |
 | `std.build` | `addExecutable` — only a `build.lyr` run by `lyric build` can use it |
 
 ## Collections
@@ -201,9 +203,86 @@ What none of the shapes carries is a REASON: a missing file and a permission den
 same. That gap is known and left open on purpose — carrying reasons means an error type and a
 decision about `throws` that this module should not make on its own.
 
+## JSON is one value type
+
+`std.json` reads and writes JSON (RFC 8259). A whole document is one `JsonValue` — an enum over
+the six JSON shapes, with arrays as `List<JsonValue>` and objects as `Map<string, JsonValue>`,
+the collections you already have rather than a second container API.
+
+```lyr
+import std.json { JsonValue, parse, serialize, serializePretty };
+import std.io.console { println };
+import std.collections { Map };
+
+fn main(): int {
+    let doc = parse("{\"name\": \"aria\", \"level\": 3}");
+    if (doc == null) {
+        return 1;
+    }
+
+    let name = doc.field("name");
+    if (name != null) {
+        println(name.asString() ?? "?");
+    }
+
+    let members = Map<string, JsonValue>.empty();
+    members.set("saved", JsonValue.Bool(true));
+    println(serializePretty(JsonValue.Obj(members), 2));
+    println(serialize(doc));
+    return 0;
+}
+```
+
+`parse` answers `?JsonValue`, the standard library's absence convention: `null` means the text
+is not JSON — strictly RFC 8259, so no comments, no trailing commas, no `NaN`, and nesting
+deeper than 128 containers answers `null` rather than meeting the runtime's call-depth panic.
+The accessors (`asString`, `asInt`, `asFloat`, `at`, `field`, …) answer `null` when the value
+is not the asked shape, so a walk through a document is null checks — and `match` over the
+variants is there when a walk wants all six.
+
+Three number rules worth knowing. A number without fraction or exponent is `Int` and exact
+across the whole `int` range — ids round-trip untouched; one beyond that range falls back to
+`Float`, keeping magnitude over exactness. An integral `Float` serializes as `3.0`, not `3`, so
+what was a float comes back as one. And NaN and the infinities have no JSON spelling; they
+serialize as `null`, JavaScript's answer. Object member order follows the map — unspecified —
+and duplicate keys in a document take the last value, as in JavaScript.
+
+## Bytes become text and come back
+
+`std.encoding` is the binary-to-text pair: `hexEncode`/`hexDecode` and
+`base64Encode`/`base64Decode` (RFC 4648), over the same `uint8[]` that `utf8Encode` and
+`file.bytes` speak.
+
+```lyr
+import std.encoding { base64Encode, base64Decode, hexEncode };
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let bytes = "Grüße".utf8Encode();
+    println(hexEncode(bytes));
+
+    let packed = base64Encode(bytes);
+    println(packed);
+
+    let back = base64Decode(packed);
+    if (back == null) {
+        return 1;
+    }
+    println(strings.utf8Decode(back) ?? "?");
+    return 0;
+}
+```
+
+The direction convention is `utf8Encode`/`utf8Decode`'s: encoding cannot fail and answers the
+text; decoding answers `?uint8[]`, and `null` means the text is not the encoding's canonical
+form. Both decoders are strict — no whitespace, no missing padding, nothing outside the
+alphabet — because a lenient decoder accepts what the next system rejects; strip decorations
+before decoding.
+
 ## Capabilities
 
-`std.io.file`, `std.io.net` and `std.os` require a capability. A standalone run grants
+`std.io.file`, `std.os` and `std.time` require a capability. A standalone run grants
 everything; a host grants explicitly, and a module that requires more than it is granted is
 rejected before it runs.
 
