@@ -521,6 +521,25 @@ out of them and hands its own functions, types and value structs in.
 
 ## Recently finished
 
+- [x] **The pipeline bug sweep** (2026-08-24, `fix/pipeline-sweep`, PR #111). Thirteen fixes,
+  bottom up through every stage, each with a failing test first. The three worth keeping were
+  reachable from plain source or from foreign bytes and ended in a crash rather than a
+  diagnostic: `"\u{80000000}"` wrapped past `Int32` and took the compiler down with an unhandled
+  exception; `[0] * n` reached the allocator as an overflowed length and took the PROCESS
+  down — the escape `Capability.None` is sold on; and a module that under-declares its
+  capabilities was handed `std.io.file` and ran it, so the "a host loading foreign bytes is
+  protected too" promise the code makes did not hold.
+
+  **The lesson is the reader's.** Its "must reject" catalogue had four holes between §5/§8.5 and
+  the validator — `IsTerminator` knew five of nine terminators, so the stack walk crossed block
+  boundaries; `ret`/`retval`/`throw` and the entry-point signature were checked nowhere. The
+  round-trip tests could never have found them: they only ever show the reader ACCEPTING what the
+  writer produced. What was missing was a negative catalogue of hand-built modules and a
+  totality layer under the front end — both added, seeded, so a crash reproduces. The capability
+  fix is the other half: the load check refused declaring MORE than granted, this refuses USING
+  more than declared, and together the declared bitset is a verified bound rather than a trusted
+  one.
+
 - [x] **A24 — the four entrances a chain can start from** (2026-08-24,
   `feature/a24-chain-entrances`, PR #110, released as v3.4.0). `over`, `range`,
   `rangeInclusive` and `compact` in `std.iter`. The last open entry in Erato's register, and it
@@ -556,12 +575,6 @@ out of them and hands its own functions, types and value structs in.
   nothing at all, 3.1.0 one diagnostic cause, 3.2.0 one sentence — and 3.0.0 two claims its own
   features had made FALSE. The pin stands at 3.2.0, the suite at 117 cases, and chapters 02 and
   13 were untouched, so the mirrors held.
-
-- [x] **A18 — an opaque type leaves a name in the module** (2026-08-22,
-  `feature/a18-opaque-field-names`, v2.11.0, format 3.5). The first format change since 3.1 that
-  is skippable in BOTH directions, and the reason is worth keeping: 3.4 put a new form inside a
-  section a reader already reads, this one put a new section beside them. Same size of addition,
-  opposite compatibility.
 
 ## Measurements
 
