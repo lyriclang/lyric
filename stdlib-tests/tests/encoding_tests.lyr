@@ -1,0 +1,104 @@
+import std.test { Test, assertEq, assertTrue };
+import std.encoding { hexEncode, hexDecode, base64Encode, base64Decode };
+import std.string as strings;
+
+@Test
+pub fn hex_encodes_lowercase_two_chars_per_byte(): void {
+    assertEq(hexEncode("Hello".utf8Encode()), "48656c6c6f");
+    let bytes: uint8[] = [0, 15, 16, 255];
+    assertEq(hexEncode(bytes), "000f10ff");
+    let none: uint8[] = [];
+    assertEq(hexEncode(none), "");
+}
+
+@Test
+pub fn hex_decodes_both_cases_and_round_trips(): void {
+    let upper = hexDecode("48656C6C6F");
+    assertTrue(upper != null, "uppercase digits are accepted");
+    if (upper != null) {
+        assertEq(strings.utf8Decode(upper) ?? "?", "Hello");
+    }
+
+    let bytes: uint8[] = [0, 1, 171, 205, 239, 255];
+    let back = hexDecode(hexEncode(bytes));
+    assertTrue(back != null, "an encoded string decodes");
+    if (back != null) {
+        assertEq(back.length, bytes.length);
+        var i = 0;
+        while (i < back.length) {
+            assertEq(back[i] as int, bytes[i] as int);
+            i = i + 1;
+        }
+    }
+}
+
+@Test
+pub fn hex_refuses_what_spells_no_bytes(): void {
+    assertTrue(hexDecode("abc") == null, "an odd length is refused");
+    assertTrue(hexDecode("zz") == null, "a character outside the digits is refused");
+    assertTrue(hexDecode("4 8") == null, "whitespace is not stripped");
+    let empty = hexDecode("");
+    assertTrue(empty != null, "the empty string is an empty array, not a failure");
+    if (empty != null) {
+        assertEq(empty.length, 0);
+    }
+}
+
+/// The RFC 4648 §10 test vectors, both directions — one for each padding shape.
+@Test
+pub fn base64_matches_the_rfc_vectors(): void {
+    assertEq(base64Encode("".utf8Encode()), "");
+    assertEq(base64Encode("f".utf8Encode()), "Zg==");
+    assertEq(base64Encode("fo".utf8Encode()), "Zm8=");
+    assertEq(base64Encode("foo".utf8Encode()), "Zm9v");
+    assertEq(base64Encode("foob".utf8Encode()), "Zm9vYg==");
+    assertEq(base64Encode("fooba".utf8Encode()), "Zm9vYmE=");
+    assertEq(base64Encode("foobar".utf8Encode()), "Zm9vYmFy");
+
+    let decoded = base64Decode("Zm9vYmFy");
+    assertTrue(decoded != null, "a canonical string decodes");
+    if (decoded != null) {
+        assertEq(strings.utf8Decode(decoded) ?? "?", "foobar");
+    }
+}
+
+@Test
+pub fn base64_round_trips_every_remainder(): void {
+    let sizes = [1, 2, 3, 4, 5, 6];
+    for (n in sizes) {
+        let zero: uint8 = 0;
+        var bytes = [zero] * n;
+        var i = 0;
+        while (i < n) {
+            bytes[i] = ((i * 37 + 250) % 256) as uint8;
+            i = i + 1;
+        }
+        let back = base64Decode(base64Encode(bytes));
+        assertTrue(back != null, "an encoded string decodes");
+        if (back != null) {
+            assertEq(back.length, n);
+            var j = 0;
+            while (j < n) {
+                assertEq(back[j] as int, bytes[j] as int);
+                j = j + 1;
+            }
+        }
+    }
+}
+
+@Test
+pub fn base64_refuses_what_spells_no_bytes(): void {
+    assertTrue(base64Decode("QQ") == null, "a length off the multiple of four is refused");
+    assertTrue(base64Decode("Q Q==") == null, "whitespace is not stripped");
+    assertTrue(base64Decode("QQ=A") == null, "padding before the end is refused");
+    assertTrue(base64Decode("=QQQ") == null, "padding at the start is refused");
+    assertTrue(base64Decode("QQ==AAAA") == null, "padding in a middle group is refused");
+    assertTrue(base64Decode("====") == null, "padding alone spells nothing");
+    assertTrue(base64Decode("QR==") == null, "unused padding bits must be zero");
+    assertTrue(base64Decode("QUJ=") == null, "unused padding bits must be zero here too");
+    let empty = base64Decode("");
+    assertTrue(empty != null, "the empty string is an empty array, not a failure");
+    if (empty != null) {
+        assertEq(empty.length, 0);
+    }
+}
