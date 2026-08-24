@@ -56,6 +56,10 @@ internal sealed class WarningAnalyzer
         CollectUses(_types.AllReferences);
         CollectUses(_binding.All);
 
+        // And the qualifier of a type path, which has no node and so appears in neither: the
+        // 'look' of 'look.Eye' is a mention of the import, exactly as 'look.over(...)' is.
+        foreach (var (file, symbol) in _binding.Qualifiers) MarkUsed(file, symbol);
+
         // The walk first: it reports unreachable statements and collects the reassignments the
         // never-reassigned hint reads.
         foreach (var module in _comp.Modules)
@@ -274,12 +278,16 @@ internal sealed class WarningAnalyzer
             if (symbol.Declaration is not null && ReferenceEquals(symbol.Declaration, node))
                 continue;
 
-            _used.Add(symbol);
-            if (!_usedByFile.TryGetValue(node.Span.File, out var inFile))
-                _usedByFile[node.Span.File] = inFile = new HashSet<Symbol>(
-                    ReferenceEqualityComparer.Instance);
-            inFile.Add(symbol);
+            MarkUsed(node.Span.File, symbol);
         }
+    }
+
+    private void MarkUsed(FileId file, Symbol symbol)
+    {
+        _used.Add(symbol);
+        if (!_usedByFile.TryGetValue(file, out var inFile))
+            _usedByFile[file] = inFile = new HashSet<Symbol>(ReferenceEqualityComparer.Instance);
+        inFile.Add(symbol);
     }
 
     // ─── unused locals ─────────────────────────────────────────────────────
