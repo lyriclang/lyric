@@ -34,6 +34,13 @@ bytecode format, the command line and the embedding API. Compiler internals are 
   guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
   Where a row exists nothing changes.
 
+- **A range outside a loop head is a message, not a crash** (`LYR-SEM0090`). `let r = 1..5;` and
+  `[1..3]` threw an internal exception out of the lowering, with a stack trace and no source
+  position. A range is a loop head and not a value — the grammar has no range expression among its
+  primaries and there is no range type — but nothing said so where the type was INFERRED; where it
+  was written down, the assignment had refused it all along. The grammar now names the form and
+  its one legal position.
+
 - **The compiler reads back every module it writes.** The emit step was taken for mechanical, so
   nothing checked it: a `.lyrbc` its own loader refuses was found by a golden-image test that
   opened a window, two layers from the change. The bytes now go through the loader before a build

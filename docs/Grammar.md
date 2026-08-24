@@ -358,7 +358,8 @@ IfStmt          = 'if' '(' Expr ')' Block [ 'else' ( Block | IfStmt ) ] .
 
 WhileStmt       = 'while' '(' Expr ')' Block .
 DoWhileStmt     = 'do' Block 'while' '(' Expr ')' ';' .
-ForInStmt       = 'for' '(' IDENTIFIER 'in' Expr ')' Block .
+ForInStmt       = 'for' '(' IDENTIFIER 'in' ( RangeExpr | Expr ) ')' Block .
+RangeExpr       = Expr ( '..' | '..=' ) Expr .
 
 MatchStmt       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 MatchArm        = Pattern [ 'if' Expr ] '=>' ( Expr | Block ) .
@@ -381,6 +382,11 @@ ExprStmt        = Expr ';' .
 
 A destructuring binding requires an initializer. Its pattern admits names, `_` and nested tuple
 patterns; no form that can fail.
+
+`RangeExpr` appears in `ForInStmt` and nowhere else — it is a loop head, not a value. There is no
+range type: `0..9` says which numbers the loop walks, and a program that binds one, stores one or
+passes one to a function is refused there rather than at a later stage. `RangePattern` (§Patterns)
+uses the same two tokens for a different purpose and is unrelated to this rule.
 
 `ExprStmt` admits a call, an assignment or `resume`. A statement does not begin with a struct
 initializer: at that position `Name { … }` is a name followed by a block.
