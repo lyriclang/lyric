@@ -34,6 +34,13 @@ bytecode format, the command line and the embedding API. Compiler internals are 
   guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
   Where a row exists nothing changes.
 
+- **The compiler reads back every module it writes.** The emit step was taken for mechanical, so
+  nothing checked it: a `.lyrbc` its own loader refuses was found by a golden-image test that
+  opened a window, two layers from the change. The bytes now go through the loader before a build
+  writes them, in release as in debug — the one time it mattered, compiler and runtime were the
+  same released build. A module that fails is a compiler bug and is reported as one, with the
+  loader's own words.
+
 - **An aliased import used only as a TYPE is no longer reported as unused.** `import kit.eye as
   look;` mentioned once, as `eye: look.Eye`, warned `LYR-SEM0072` — a build error under
   `--deny-warnings`. The qualifier of a type path has no node of its own, so neither reference
@@ -55,6 +62,13 @@ bytecode format, the command line and the embedding API. Compiler internals are 
   ```
 
   Only those: `got Return` where a `;` was expected is not a naming problem.
+
+### Added
+
+- **`lyric check <file> --emit`** answers the question plain `check` cannot: not "does this
+  program compile" but "does the module it produces LOAD". It emits, reads back, and writes
+  nothing. For a project that compiles every one of its files as an entry — to read each file's
+  attributes — that was the missing invariant.
 
 ## v3.2.0 — 2026-08-23
 

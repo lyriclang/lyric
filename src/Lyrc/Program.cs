@@ -81,10 +81,23 @@ public static class Program
         return ExitCodes.Success;
     }
 
-    /// <summary>Everything a build does except writing the file.</summary>
+    /// <summary>
+    /// Everything a build does except writing the file — up to the IR by default, and with
+    /// <c>--emit</c> all the way through the bytes.
+    ///
+    /// <para>The flag exists because the two answers differ. A program can type-check and lower in
+    /// silence and still produce a module the loader refuses; that happened, it was found by a
+    /// test that opened a window, and a project which compiles every one of its files as an entry
+    /// has no other way to ask. <c>--emit</c> writes nothing — the bytes are produced, read back
+    /// and dropped.</para>
+    /// </summary>
     private static int Check(string path, string[] args, TerminalOutput terminal)
     {
-        var result = SourceCompiler.Check(path, Options(path, args, terminal, out var suspect));
+        var options = Options(path, args, terminal, out var suspect);
+        var result = Present(args, "--emit")
+            ? SourceCompiler.Compile(path, options)
+            : SourceCompiler.Check(path, options);
+
         terminal.Render(result.Diagnostics);
         if (!result.Ok) return ExitCodes.Failure;
         if (DeniedWarnings(args, result, suspect) is { } denied) return denied;
@@ -227,13 +240,14 @@ public static class Program
         Console.Out.WriteLine();
         Console.Out.WriteLine("Commands:");
         Console.Out.WriteLine("  build <file> [-o <out>]  Compile .lyr to .lyrbc");
-        Console.Out.WriteLine("  check <file>             Compile without writing a file");
+        Console.Out.WriteLine("  check <file> [--emit]    Compile without writing a file");
         Console.Out.WriteLine("  lower <file>             Print the mid-IR dump (debug)");
         Console.Out.WriteLine("  parse <file>             Print the AST dump (debug)");
         Console.Out.WriteLine("  tokenize <file>          Print the token stream (debug)");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
         Console.Out.WriteLine("  --stdlib <dir>           Where the stdlib lives (beats $LYRIC_STDLIB)");
+        Console.Out.WriteLine("  --emit                   check: emit the bytes and load them, writing neither");
         Console.Out.WriteLine("  --no-source-map          Omit line numbers; a panic names the function");
         Console.Out.WriteLine("  --no-debug-info          Omit slot names; a debugger shows indices");
         Console.Out.WriteLine("  --deny-warnings          Exit nonzero when the run reports warnings (CI)");
