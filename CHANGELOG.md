@@ -10,7 +10,7 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## Unreleased
+## v3.4.0 — 2026-08-24
 
 ### Added
 

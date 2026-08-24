@@ -501,8 +501,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4764 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **3.3.0**; the specification in `lyriclang/lyric-spec` is
+4778 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
+plus `lyrembed.dll`, version **3.4.0**; the specification in `lyriclang/lyric-spec` is
 **NORMATIVE**, its suite stands at 117 cases pinned to 3.2.0, and the toolchain's own CI runs it
 against the working tree. *(The test count is the one last counted, at 2.17.0.)*
 
@@ -520,6 +520,20 @@ out of them and hands its own functions, types and value structs in.
 > else stands in `git log`.
 
 ## Recently finished
+
+- [x] **A24 — the four entrances a chain can start from** (2026-08-24,
+  `feature/a24-chain-entrances`, PR #110, released as v3.4.0). `over`, `range`,
+  `rangeInclusive` and `compact` in `std.iter`. The last open entry in Erato's register, and it
+  cost no language change at all — which is the part worth keeping, because the entry was filed
+  as a request for `iter()` on arrays and ranges and that shape is not available: an `extend`
+  block cannot bind an element type, and a range is not a value, so `(a..b).iter()` could never
+  exist. The fallback the register offered as second best was the only reachable form and it was
+  already writable in user code; what the standard library adds is that everyone has it.
+
+  **`compact` is the one with a design in it.** `filterNotNull` on an ITERATOR cannot be
+  written — `Iterator<?T>` needs `??T` and `?` does not nest, which is the wall `LYR-SEM0091`
+  names. Taking the ARRAY instead dodges it by construction and stays lazy: an array slot can be
+  read as `?T` without the end-marker being in the way.
 
 - [x] **The Erato bug sweep** (2026-08-24, `fix/erato-a21-a25`, PR #109, released as v3.3.0).
   Six findings: four from the register (A21, A22, A23, A25) and two found while probing what A24
@@ -548,11 +562,6 @@ out of them and hands its own functions, types and value structs in.
   is skippable in BOTH directions, and the reason is worth keeping: 3.4 put a new form inside a
   section a reader already reads, this one put a new section beside them. Same size of addition,
   opposite compatibility.
-
-- [x] **A17 — an attribute default holds across a module line** (2026-08-22,
-  `fix/a17-attribute-default-across-modules`, v2.10.1). One line, and the second time in two
-  days that a bug was "checked in the wrong order". The pattern is now explicit in the code: the
-  sema walks modules in dependency order, twice, and both places say why.
 
 ## Measurements
 
@@ -1120,7 +1129,10 @@ answer yet, and it belongs asked before E4 starts.
   a table with empty slots.
   - **It used to crash instead of saying so**; `LYR-SEM0091` is the sentence, with the loop that
     does work in a note. What Erato asked for (`filterNotNull` on a chain) is on the far side of
-    this wall, and the answer is an EAGER `compact` over the array instead.
+    this wall, and `std.iter.compact` (3.4) is the way round it: it takes the ARRAY, so a slot
+    reads as `?T` with no end-marker in the way. **It is LAZY**, which the plan had assumed it
+    could not be — the wall is the iterator SOURCE, not the element type, and taking an array
+    removes the source rather than the optional.
   - Rust pays for the general case with `Option<Option<T>>`. Lyric decided against nesting, and
     this is the bill for that decision arriving — worth re-reading the day the iterator protocol
     is opened for another reason, and not worth opening it for.
