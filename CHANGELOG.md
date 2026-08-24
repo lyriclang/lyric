@@ -10,6 +10,52 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## Unreleased
+
+### Fixed
+
+- **A module that only CALLS through an interface no longer fails to load.** A library — an
+  interface, a class calling through it, and the implementing left to whoever imports it —
+  produced a `.lyrbc` its own loader refused:
+
+  ```
+  function 'kit.props.Field.take' at 70: stack depth 5 exceeds the declared maximum of 4
+  ```
+
+  The bytecode was correct. The loader reads a `callvirt`'s argument count off an Impls row,
+  because every implementation of a slot shares its signature and the Types section carries slot
+  names alone; with nothing implementing the interface there is no row, and the missing count was
+  answered with "no arguments, no result". A two-argument call then looked as though it left its
+  arguments on the stack, which is why the message named a function far from the call and moved
+  when unrelated statements were deleted.
+
+  Such a call cannot execute — `mkiface` is already refused without a row for exactly that pair,
+  so no value of the interface can exist — and the loader now says so by stopping rather than
+  guessing: everything up to the call is checked, and the rest of that block is not claimed to be.
+  Where a row exists nothing changes.
+
+- **An aliased import used only as a TYPE is no longer reported as unused.** `import kit.eye as
+  look;` mentioned once, as `eye: look.Eye`, warned `LYR-SEM0072` — a build error under
+  `--deny-warnings`. The qualifier of a type path has no node of its own, so neither reference
+  table carried it; the resolver records the step-through now. A plain import used as a type and
+  an alias used in an expression were already counted, which is what made the gap read as
+  arbitrary.
+
+- **`LYR-IR0001` says one sentence instead of two grown together.** The category was appended as a
+  clause, and where a message ended in a subordinate one the result was
+  *"initializer omits field 'wood', which has no default is not supported by this compiler version
+  yet"*. The message names the construct; the category is a note beneath it.
+
+- **A keyword written where a name belongs says so.** `keep.resume();` reported `expected member
+  name after '.', got Resume` — the way a parser talks about a typo, which costs a reader a look at
+  the spelling before they suspect the word. The identifier expectations now carry a note:
+
+  ```
+  note: 'resume' is a keyword and cannot be used as a name
+  ```
+
+  Only those: `got Return` where a `;` was expected is not a naming problem.
+
 ## v3.2.0 — 2026-08-23
 
 ### Added
