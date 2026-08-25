@@ -267,9 +267,14 @@ public sealed class AstFormatter
         };
     }
 
-    private Doc AttributeDoc(AttributeNode attribute)
+    private Doc AttributeDoc(AttributeNode attribute) =>
+        Doc.Of(Doc.From("@"), AttributeEntryDoc(attribute));
+
+    private Doc AttributeEntryDoc(AttributeNode attribute)
     {
-        var name = Doc.From("@" + string.Join(".", attribute.Path));
+        var name = Doc.From(string.Join(".", attribute.Path));
+        if (attribute.Positional is { } positional)
+            return Doc.Of(name, Doc.From("("), ExprDoc(positional, Assign), Doc.From(")"));
         if (attribute.Fields.Length == 0) return name;
 
         return Doc.GroupOf(name, Doc.From(" {"),
@@ -283,14 +288,19 @@ public sealed class AstFormatter
     private Doc Attributes(AttributeNode[] attributes)
     {
         if (attributes.Length == 0) return Doc.Nil;
-        var parts = new List<Doc>();
-        foreach (var attribute in attributes)
-        {
-            parts.Add(AttributeDoc(attribute));
-            parts.Add(Doc.NewLine);
-        }
+        if (attributes.Length == 1)
+            return Doc.Of(AttributeDoc(attributes[0]), Doc.NewLine);
 
-        return new Doc.Concat(parts);
+        // Two or more attributes take the GROUP shape — one spelling in the formatted corpus,
+        // however the source wrote them. The parser flattens both spellings to the same list,
+        // which is what keeps this rewrite reparse-identical.
+        return Doc.Of(Doc.GroupOf(Doc.From("@["),
+                Doc.IndentOf(Doc.LineOrNothing,
+                    Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
+                        attributes.Select(AttributeEntryDoc).ToArray()),
+                    Doc.WhenBroken(Doc.From(","))),
+                Doc.LineOrNothing, Doc.From("]")),
+            Doc.NewLine);
     }
 
     private Doc FunctionDoc(FunctionDecl decl)

@@ -513,4 +513,141 @@ public class AttributeTests
 
             fn main(): int { return 0; }
             """);
+
+    // ------------------------------------------------------------------ the 3.9 forms:
+    // one parenthesized value, admitted by WithArg<T>; and the group spelling.
+
+    private const string EventVocabulary = """
+        import std.core { OnFunction, WithArg };
+
+        enum Event { Damage, Heal }
+
+        struct On :: [OnFunction, WithArg<Event>] { event: Event, order: int = 0 }
+        struct Retry :: [OnFunction, WithArg<int>] { limit: int }
+        struct Tag :: [OnFunction] { }
+        """;
+
+    [Fact]
+    public void A_positional_value_fills_the_first_field() =>
+        AssertClean(EventVocabulary + """
+
+            @On(Event.Damage)
+            fn onDamage(): void { }
+
+            @Retry(3)
+            fn fetch(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_positional_value_may_name_its_literal() =>
+        AssertClean(EventVocabulary + """
+
+            let LIMIT = 5;
+
+            @Retry(LIMIT)
+            fn fetch(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void The_positional_form_needs_the_conformance() =>
+        AssertReports("LYR-SEM0094", "WithArg", EventVocabulary + """
+
+            @Tag(3)
+            fn f(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void WithArg_must_name_the_first_fields_type() =>
+        AssertReports("LYR-SEM0095", "first field", """
+            import std.core { OnFunction, WithArg };
+
+            struct Named :: [OnFunction, WithArg<string>] { order: int, label: string = "" }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void WithArg_on_a_fieldless_struct_is_refused() =>
+        AssertReports("LYR-SEM0095", "no field", """
+            import std.core { OnFunction, WithArg };
+
+            struct Bare :: [OnFunction, WithArg<int>] { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_second_witharg_instance_cannot_also_hold() =>
+        // Multi-conformance admits the list entry; the promise check then measures both
+        // against the one first field, and the second cannot fit beside the first.
+        AssertReports("LYR-SEM0095", "first field", """
+            import std.core { OnFunction, WithArg };
+
+            struct Both :: [OnFunction, WithArg<int>, WithArg<string>] { limit: int }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_positional_value_is_a_value_at_compile_time() =>
+        AssertReports("LYR-SEM0066", "value at compile time", EventVocabulary + """
+
+            @Retry(1 + 2)
+            fn f(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_positional_variant_with_a_payload_is_named() =>
+        AssertReports("LYR-SEM0066", "payload", """
+            import std.core { OnFunction, WithArg };
+
+            enum Shape { Dot, Circle(float) }
+
+            struct Drawn :: [OnFunction, WithArg<Shape>] { shape: Shape }
+
+            @Drawn(Shape.Circle(1.0))
+            fn f(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_group_is_the_stacked_list() =>
+        AssertClean(EventVocabulary + """
+
+            @[Tag, Retry(3), On { event = Event.Heal, order = 2 }]
+            fn grouped(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_group_duplicate_is_the_stacked_duplicate() =>
+        AssertReports("LYR-SEM0068", "twice", EventVocabulary + """
+
+            @[Tag, Tag]
+            fn f(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_group_on_a_member_obeys_the_member_rule() =>
+        AssertReports("LYR-SEM0065", "only '@Deprecated'", EventVocabulary + """
+
+            struct Holder {
+                @[Tag]
+                pub fn m(): void { }
+            }
+
+            fn main(): int { return 0; }
+            """);
 }

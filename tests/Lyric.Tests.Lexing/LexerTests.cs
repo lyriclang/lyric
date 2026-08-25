@@ -2286,4 +2286,28 @@ public class LexerTests
         var (_, diag) = Tokenize("+= -= *= /= %= &&= ||= ??= <<= >>= ..= ?. -> =>");
         Assert.False(diag.HasErrors);
     }
+
+    // ─── Attributes ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void At_lbracket_is_one_token()
+    {
+        var (tokens, diag) = Tokenize("@[Tag]");
+        Assert.Equal(
+            new[]
+            {
+                TokenKind.AtLBracket, TokenKind.Identifier, TokenKind.RBracket, TokenKind.Eof
+            },
+            tokens.Select(t => t.TokenKind).ToArray());
+        Assert.Equal((0, 2), (tokens[0].Span.Start, tokens[0].Span.End));
+        Assert.False(diag.HasErrors);
+    }
+
+    [Fact]
+    public void A_bare_at_before_a_spaced_bracket_stays_an_error()
+    {
+        var (tokens, diag) = Tokenize("@ [");
+        Assert.Equal(TokenKind.BadChar, tokens[0].TokenKind);
+        Assert.True(diag.HasErrors); // LYR-LEX0012: the '@[' token is adjacent by definition
+    }
 }

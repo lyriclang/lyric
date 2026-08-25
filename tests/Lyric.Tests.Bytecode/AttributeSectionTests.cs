@@ -423,6 +423,64 @@ public class AttributeSectionTests
         Assert.Equal(BytecodeDiagnostics.UnknownEncoding, error.Code);
     }
 
+    // ------------------------------------------------------------------ the 3.9 forms
+
+    private const string WithArgVocabulary = """
+        module app;
+        import std.core { OnFunction, WithArg };
+
+        pub enum Event { Damage, Heal }
+        pub struct On :: [OnFunction, WithArg<Event>] { event: Event, order: int = 0 }
+        pub struct Meta :: [OnFunction] { }
+        """;
+
+    [Fact]
+    public void A_positional_row_is_its_braces_twin()
+    {
+        var positional = Compile(WithArgVocabulary + """
+
+            @On(Event.Damage)
+            pub fn handle(): void { }
+            """);
+        var braces = Compile(WithArgVocabulary + """
+
+            @On { event = Event.Damage }
+            pub fn handle(): void { }
+            """);
+
+        var p = Assert.Single(positional.Attributes);
+        var b = Assert.Single(braces.Attributes);
+        Assert.Equal(b.TargetKind, p.TargetKind);
+        Assert.Equal(b.Target, p.Target);
+        Assert.Equal(b.Type, p.Type);
+        Assert.Equal(b.Values, p.Values);
+    }
+
+    [Fact]
+    public void A_group_emits_the_stacked_rows()
+    {
+        var grouped = Compile(WithArgVocabulary + """
+
+            @[Meta, On(Event.Heal)]
+            pub fn handle(): void { }
+            """);
+        var stacked = Compile(WithArgVocabulary + """
+
+            @Meta
+            @On { event = Event.Heal }
+            pub fn handle(): void { }
+            """);
+
+        Assert.Equal(stacked.Attributes.Count, grouped.Attributes.Count);
+        for (var i = 0; i < stacked.Attributes.Count; i++)
+        {
+            Assert.Equal(stacked.Attributes[i].TargetKind, grouped.Attributes[i].TargetKind);
+            Assert.Equal(stacked.Attributes[i].Target, grouped.Attributes[i].Target);
+            Assert.Equal(stacked.Attributes[i].Type, grouped.Attributes[i].Type);
+            Assert.Equal(stacked.Attributes[i].Values, grouped.Attributes[i].Values);
+        }
+    }
+
     /// <summary>The section ids in file order, read straight off the byte stream — deliberately
     /// not through the reader, the same reasoning as <c>SectionIds</c> in
     /// <see cref="BytecodeTests"/>.</summary>

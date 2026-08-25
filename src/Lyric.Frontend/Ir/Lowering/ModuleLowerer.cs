@@ -745,12 +745,16 @@ public static class ModuleLowerer
         var fields = decl.Members.OfType<FieldDecl>().ToArray();
 
         // The row is complete by construction: the written value wins, the literal default fills
-        // the rest. The sema rejected every use where neither exists.
+        // the rest. The sema rejected every use where neither exists. A parenthesized value IS
+        // the first field's value (the WithArg promise, checked by the sema), which is why the
+        // row of a positional use is indistinguishable from its braces twin.
         var values = new IrAttributeValue[fields.Length];
         for (var i = 0; i < fields.Length; i++)
         {
             var written = node.Fields.FirstOrDefault(f => f.Name == fields[i].Name);
-            var expr = written?.Value ?? fields[i].Default
+            var expr = written?.Value
+                ?? (i == 0 ? node.Positional : null)
+                ?? fields[i].Default
                 ?? throw new InternalCompilationException(
                     $"ir: attribute field '{fields[i].Name}' has neither a value nor a default");
 

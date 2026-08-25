@@ -10,3 +10,9 @@ class Scheduler { }
 
 @Marked
 enum Phase { Start, End }
+
+@Retry(3)
+pub fn fetch(): void { }
+
+@[Tagged, System { order = 2 }, Retry(9)]
+fn swarm(): void { }
