@@ -10,7 +10,16 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.8.2 — 2026-08-25
+
+**The release 3.8.1 could not be.** The `v3.8.1` tag points at a tree whose README still said
+3.8.0, and the release gate did its job: the version test failed on both platforms and no
+archives were published. This release is that tree with the README telling the truth — nothing
+else changed. There is no v3.8.1 download, and the tag stays as the record of why.
+
 ## v3.8.1 — 2026-08-25
+
+*Tagged, never released — the gate refused it (see v3.8.2, which carries this content).*
 
 **The sweep after 3.8.0.** One finding, one cause, two faces: a global initializer was checked
 as if it stood in no module at all.
