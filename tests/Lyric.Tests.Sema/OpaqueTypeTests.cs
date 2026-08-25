@@ -183,6 +183,8 @@ public class OpaqueInwardPrivilegeTests
 
         pub opaque type Entity = int;
 
+        pub let seed: Entity = 3 as Entity;
+
         pub fn spawn(): Entity {
             return 7 as Entity;
         }
@@ -263,6 +265,55 @@ public class OpaqueInwardPrivilegeTests
             fn main(): int {
                 let forged = 42 as w.Entity;
                 return w.idOf(forged);
+            }
+            """);
+
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+
+    [Fact]
+    public void A_global_initializer_warns_too()
+    {
+        var de = CheckWithWorld("""
+            import world { Entity, idOf };
+
+            let g = 42 as Entity;
+
+            fn main(): int {
+                return idOf(g);
+            }
+            """);
+
+        Assert.False(de.HasErrors,
+            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+
+    [Fact]
+    public void The_declaring_modules_own_global_stays_silent()
+    {
+        var de = CheckWithWorld("""
+            import world { seed, idOf };
+
+            fn main(): int {
+                return idOf(seed);
+            }
+            """);
+
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+
+    [Fact]
+    public void A_transparent_alias_target_warns_too()
+    {
+        var de = CheckWithWorld("""
+            import world { Entity, idOf };
+
+            type E = Entity;
+
+            fn main(): int {
+                let forged = 42 as E;
+                return idOf(forged);
             }
             """);
 

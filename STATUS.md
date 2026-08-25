@@ -28,6 +28,21 @@ of the 2026-08-25 Bestandsaufnahme are delivered; what remains on that plan is t
 (concurrency/net) and the 4.0 clocks now ticking: `listDir`'s removal, and this warning's
 promotion to an error.
 
+**The sweep ran the same day and shipped as v3.8.1**: eleven probes against the warning's
+edges — alias laundering (local transparent alias, import-as), generic laundering (`x as T`,
+refused), opaque-over-opaque, every initializer position, extend bodies, cast chains,
+`--deny-warnings`, the run path. **One finding, one cause, two faces**: a GLOBAL initializer
+was checked with no module context — `ComputeGlobals` runs before the walk that sets it — so
+the privilege never warned at module scope, and the same null let a global initializer call
+extension methods of modules never imported (`let n = "ab".length();` with no import
+compiled). Fixed failing-test-first by giving the globals pass its module; wave 2 over the
+fix: global, static, field-default and parameter-default positions warn exactly once each,
+the import idiom stays intact, 4889 green. Two pre-existing edges went to §Still open rather
+than being fixed, because each needs a decision first (opaque-over-opaque's crossing, extend
+on an opaque). Per the pipeline the loop exits here; **next: the attribute round** (maintainer,
+2026-08-25 — one-value `@On(…)` parameters via `WithArg<T>`, grouped `@[A, B]`, spec-first,
+ships as v3.9.0).
+
 **M35 — "the reason" — SHIPPED as v3.7.0** (2026-08-25, format stays 3.6). Round 2 of the
 Bestandsaufnahme, decided by the maintainer as door C, library-wide: a value answers WHETHER, a
 throw answers WHY (spec §9.0, `lyric-spec#22`). Every silent form whose failure carries a
@@ -1049,6 +1064,20 @@ answer yet, and it belongs asked before E4 starts.
   something nothing checks is the shape 2.15 already fixed once for `::` lists. Found 2026-08-24
   while probing A24. The useful version cannot be written anyway — `ExtendDecl` has no generic
   parameters, so `extend T[]` cannot bind an element type; the defect is the SILENCE.
+- **An `extend` block on an OPAQUE type compiles and its methods are reachable from nowhere.**
+  The array entry's sibling, found by the 3.8.1 sweep: `extend Entity { pub fn again(): … }` on
+  an imported opaque type-checks — the body even carries its SEM0093 warning correctly — but
+  `spawn().again()` answers *'Entity' has no member* and `5.again()` answers *'int' has no
+  member*. Decide whether an opaque takes extends (declaring-module SDK sugar would be the case
+  for it) or is refused; what it must not stay is silent.
+- **Opaque over opaque: the crossing follows the resolved ROOT, against §3.5's word.**
+  `opaque type F = w.Entity;` accepts `42 as F` (F's underlying resolves THROUGH the foreign
+  opaque to `int`; silent — F is local) and refuses `spawn() as F`, with a suggestion that
+  cannot be taken (give `Entity` the conformance `Into<F>` — an opaque satisfies no
+  constraint). §3.5 reads "the explicit `as` to exactly T and back", and T as written is
+  `Entity`. No privilege breach — an F never converts to an Entity in either direction — but
+  the sentence and the tree disagree. Decide: refuse the form, or define the crossing as the
+  WRITTEN underlying. A spec-round candidate. Found by the 3.8.1 sweep.
 - **`TypeResult._refs` holds declarations beside uses**, because the definite-assignment
   analysis binds a `BindingStmt`, a `Param`, a `ForInStmt` and the pattern bindings to the symbol
   they themselves declare. Since M19 the separation rule has its first consumer: the

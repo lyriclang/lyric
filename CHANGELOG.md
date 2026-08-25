@@ -10,6 +10,21 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.8.1 — 2026-08-25
+
+**The sweep after 3.8.0.** One finding, one cause, two faces: a global initializer was checked
+as if it stood in no module at all.
+
+### Fixed
+
+- **The inward privilege reaches global initializers** (`LYR-SEM0093`). `let g = 42 as Entity;`
+  at module scope compiled without the 3.8.0 warning — a global's initializer is checked before
+  the walk that knows the current module, so the privilege check saw the "bare snippet" case
+  and stayed quiet. The same cause let a global initializer call **extension methods of modules
+  never imported**: `let n = "ab".length();` with no import compiled, while the same call in any
+  function body was refused. Both positions now follow the rules the rest of the language
+  follows — the cast warns toward its 4.0 refusal, the extension needs its import.
+
 ## v3.8.0 — 2026-08-25
 
 **Round 3: the opaque clock.** `opaque type` has promised since 1.15 that "a script cannot

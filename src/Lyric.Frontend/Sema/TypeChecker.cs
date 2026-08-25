@@ -214,6 +214,11 @@ public sealed class TypeChecker
 
     private void ComputeGlobals(ModuleSymbol module)
     {
+        // This pass runs before the declaration walk, so the module context is set here as
+        // well: an initializer's expression check reads it — extension visibility, and which
+        // module an inward opaque cast stands in. Null would mean "bare snippet" for every
+        // global of a real module.
+        _currentModule = module;
         foreach (var decl in _comp.AstOf(module).Declarations)
         {
             if (decl is not GlobalBindingDecl g) continue;
