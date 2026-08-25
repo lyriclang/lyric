@@ -2530,7 +2530,7 @@ public sealed class TypeChecker
 
             var n = Math.Min(fn.Parameters.Length, args.Length);
             for (var i = 0; i < n; i++)
-                if (args[i] is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i], map);
+                if (args[i] is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i], map, args[i].Span);
             substituted = (FnType)Substitute(fn, map);
         }
 
@@ -2540,7 +2540,7 @@ public sealed class TypeChecker
             if (args[i] is not LambdaExpr) continue;
             argTypes[i] = CheckExpr(args[i], scope, ExpectedParamAt(substituted, decl, i, args[i]));
             if (map is not null && i < fn.Parameters.Length)
-                UnifyInfer(Substitute(fn.Parameters[i], map), argTypes[i], map);
+                UnifyInfer(Substitute(fn.Parameters[i], map), argTypes[i], map, args[i].Span);
         }
         if (map is not null)
         {
@@ -2818,27 +2818,28 @@ public sealed class TypeChecker
     /// <c>Iterator&lt;int&gt;</c> there is no similarity of shape but a declaration
     /// (<c>class RangeIterator :: [Iterator&lt;int&gt;]</c>). The last case below looks it up.</para>
     /// </remarks>
-    private void UnifyInfer(LyrType param, LyrType arg, Dictionary<GenericParamSymbol, LyrType> map)
+    private void UnifyInfer(LyrType param, LyrType arg, Dictionary<GenericParamSymbol, LyrType> map,
+        Span argSpan)
     {
         switch (param)
         {
             case TypeParamType tp:
                 if (!arg.IsError) map.TryAdd(tp.Param, arg);
                 break;
-            case ArrayOf pa when arg is ArrayOf aa: UnifyInfer(pa.Element, aa.Element, map); break;
-            case Optional po when arg is Optional ao: UnifyInfer(po.Inner, ao.Inner, map); break;
+            case ArrayOf pa when arg is ArrayOf aa: UnifyInfer(pa.Element, aa.Element, map, argSpan); break;
+            case Optional po when arg is Optional ao: UnifyInfer(po.Inner, ao.Inner, map, argSpan); break;
             case TupleOf pt when arg is TupleOf at && pt.Elements.Length == at.Elements.Length:
-                for (var i = 0; i < pt.Elements.Length; i++) UnifyInfer(pt.Elements[i], at.Elements[i], map);
+                for (var i = 0; i < pt.Elements.Length; i++) UnifyInfer(pt.Elements[i], at.Elements[i], map, argSpan);
                 break;
             case GenericInstance pg when arg is GenericInstance ag
                 && ReferenceEquals(pg.Definition, ag.Definition) && pg.Arguments.Length == ag.Arguments.Length:
-                for (var i = 0; i < pg.Arguments.Length; i++) UnifyInfer(pg.Arguments[i], ag.Arguments[i], map);
+                for (var i = 0; i < pg.Arguments.Length; i++) UnifyInfer(pg.Arguments[i], ag.Arguments[i], map, argSpan);
                 break;
             case FnType pf when arg is FnType af && pf.Parameters.Length == af.Parameters.Length:
-                for (var i = 0; i < pf.Parameters.Length; i++) UnifyInfer(pf.Parameters[i], af.Parameters[i], map);
-                UnifyInfer(pf.Return, af.Return, map);
+                for (var i = 0; i < pf.Parameters.Length; i++) UnifyInfer(pf.Parameters[i], af.Parameters[i], map, argSpan);
+                UnifyInfer(pf.Return, af.Return, map, argSpan);
                 break;
-            case CoroutineOf pc when arg is CoroutineOf ac: UnifyInfer(pc.Yield, ac.Yield, map); break;
+            case CoroutineOf pc when arg is CoroutineOf ac: UnifyInfer(pc.Yield, ac.Yield, map, argSpan); break;
 
             // 'Iterator<T>' against 'RangeIterator': the parameter is an instance of an INTERFACE and
             // the argument a type satisfying it. Structurally the two have nothing in common; the
@@ -2847,21 +2848,27 @@ public sealed class TypeChecker
             // Without this case 'T' stays unbound, and silently: the sema reports nothing and only
             // the lowering finds '<error>' as a type argument. Affected is every generic function
             // whose type parameter occurs in the interface parameter ONLY.
-            //
-            // The mapping is unambiguous, because a type cannot satisfy the same generic interface
-            // twice with different arguments: the method would have two signatures, and LYR-SEM0042
-            // rejects that.
             case GenericInstance { Definition.Kind: TypeSymbolKind.Interface } pi:
-                UnifyThroughConformance(pi, arg, map);
+                UnifyThroughConformance(pi, arg, map, argSpan);
                 break;
         }
     }
 
     /// <summary>Looks up the conformance to <paramref name="wanted"/> in the argument type and
-    /// unifies its type arguments against the written ones.</summary>
+    /// unifies its type arguments against the written ones.
+    ///
+    /// <para>SEVERAL conformances to the wanted interface do not choose (LYR-SEM0092, §8.3 rule 4):
+    /// the order of a <c>::</c> list must never decide a call, and it did — the same call compiled
+    /// or failed depending on which conformance stood first. The open type parameters are bound to
+    /// <see cref="ErrorType"/> so the report stays the one sentence: no SEM0060 about the parameter
+    /// behind it, no assignment error about an argument the error already explains.</para></summary>
     private void UnifyThroughConformance(GenericInstance wanted, LyrType arg,
-        Dictionary<GenericParamSymbol, LyrType> map)
+        Dictionary<GenericParamSymbol, LyrType> map, Span argSpan)
     {
+        // Nothing open, nothing to choose: with 'pick<int>(t, …)' the written argument has
+        // already bound T (rule 1), and several conformances stop mattering — the argument is
+        // checked against the substituted parameter like any other.
+        if (!HasOpenParam(wanted, map)) return;
         if (TypeFacts.SymbolOf(arg) is not { } symbol) return;
 
         // If the argument is itself an instance ('ArrayIterator<string>'), its substitution has to go
@@ -2870,19 +2877,75 @@ public sealed class TypeChecker
         // a concrete type.
         var ofInstance = arg is GenericInstance gi ? SubstMap(gi) : EmptySubst;
 
+        // All conformances to the wanted interface, not the first: InterfacesOf deduplicates by
+        // INSTANCE across the type's list and its visible extend blocks, so two hits are genuinely
+        // two different conformances.
+        var hits = new List<Dictionary<GenericParamSymbol, LyrType>>();
         foreach (var (iface, subst) in InterfacesOf(symbol))
-        {
-            if (!ReferenceEquals(iface, wanted.Definition)) continue;
+            if (ReferenceEquals(iface, wanted.Definition))
+                hits.Add(subst);
 
+        if (hits.Count > 1)
+        {
+            var instances = hits.Select(subst => TypeFacts.Display(
+                new GenericInstance(wanted.Definition, wanted.Definition.Generics
+                    .Select(g => subst.TryGetValue(g, out var b) ? Substitute(b, ofInstance) : LyrType.Error)
+                    .ToArray())));
+            var count = hits.Count == 2 ? "twice" : $"{hits.Count} times";
+            _de.Report("LYR-SEM0092", Severity.Error, argSpan,
+                $"'{TypeFacts.Display(arg)}' conforms to '{wanted.Definition.Name}' {count} — as "
+                + string.Join(" and as ", instances.Select(i => $"'{i}'"))
+                + " — and inference through a conformance does not choose; write the type argument "
+                + "explicitly");
+            BindOpenParamsToError(wanted, map);
+            return;
+        }
+
+        if (hits.Count == 1)
+        {
             // 'subst' maps the INTERFACE's generics onto what stood in the '::'. Walking both in the
             // same order, 'Iterator<T>' against '{T_iface -> int}' binds the calling function's T to
             // int.
-            var n = Math.Min(iface.Generics.Length, wanted.Arguments.Length);
+            var subst = hits[0];
+            var n = Math.Min(wanted.Definition.Generics.Length, wanted.Arguments.Length);
             for (var i = 0; i < n; i++)
-                if (subst.TryGetValue(iface.Generics[i], out var bound))
-                    UnifyInfer(wanted.Arguments[i], Substitute(bound, ofInstance), map);
+                if (subst.TryGetValue(wanted.Definition.Generics[i], out var bound))
+                    UnifyInfer(wanted.Arguments[i], Substitute(bound, ofInstance), map, argSpan);
+        }
+    }
 
-            return;
+    /// <summary>Does this type mention a type parameter the mapping has not bound yet?</summary>
+    private static bool HasOpenParam(LyrType t, Dictionary<GenericParamSymbol, LyrType> map) => t switch
+    {
+        TypeParamType tp => !map.ContainsKey(tp.Param),
+        Optional o => HasOpenParam(o.Inner, map),
+        ArrayOf a => HasOpenParam(a.Element, map),
+        TupleOf tu => tu.Elements.Any(e => HasOpenParam(e, map)),
+        FnType f => f.Parameters.Any(p => HasOpenParam(p, map)) || HasOpenParam(f.Return, map),
+        GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
+        RangeOf r => HasOpenParam(r.Element, map),
+        CoroutineOf c => HasOpenParam(c.Yield, map),
+        _ => false,
+    };
+
+    /// <summary>Binds every type parameter still open inside <paramref name="wanted"/> to
+    /// <see cref="ErrorType"/> — the "already reported here" marker that keeps the downstream
+    /// checks quiet.</summary>
+    private static void BindOpenParamsToError(LyrType wanted, Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        switch (wanted)
+        {
+            case TypeParamType tp: map.TryAdd(tp.Param, LyrType.Error); break;
+            case Optional o: BindOpenParamsToError(o.Inner, map); break;
+            case ArrayOf a: BindOpenParamsToError(a.Element, map); break;
+            case TupleOf t: foreach (var e in t.Elements) BindOpenParamsToError(e, map); break;
+            case FnType f:
+                foreach (var p in f.Parameters) BindOpenParamsToError(p, map);
+                BindOpenParamsToError(f.Return, map);
+                break;
+            case GenericInstance g: foreach (var a in g.Arguments) BindOpenParamsToError(a, map); break;
+            case RangeOf r: BindOpenParamsToError(r.Element, map); break;
+            case CoroutineOf c: BindOpenParamsToError(c.Yield, map); break;
         }
     }
 
