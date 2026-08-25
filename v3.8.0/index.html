@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.8.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.8.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.8.0 — 2026-08-25</h2>
+<p><strong>Round 3: the opaque clock.</strong> <code>opaque type</code> has promised since 1.15 that &quot;a script cannot
+forge one&quot; — and any module that could see the alias could: <code>42 as Entity</code> compiled anywhere.
+This release starts the clock that closes the hole, on the warn-then-error path <code>LYR-SEM0074</code>
+took into 2.0. No format change; no correct program changes meaning today.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Making an opaque value is the declaring module's privilege</strong> (<code>LYR-SEM0093</code>, spec §3.5,
+<code>lyric-spec#23</code>). The INWARD cast — <code>value as Entity</code> — warns outside the module that
+declares <code>Entity</code>, and <strong>4.0 refuses it</strong>: a handle is issued, not assembled. The OUTWARD
+cast (<code>e as int</code>) stays free everywhere — reading the number breaks no promise the alias
+makes, and inside the declaring module nothing changes at all.</p>
+<p>The legitimate cross-module pattern — rebuilding a handle from a stored number, the save-load
+shape — is what the warning's message names: the declaring module offers a constructor
+function (<code>pub fn entityFromRaw(raw: int): Entity</code>), and issuing stays an issuer's act. The
+warning now, rather than the error, is what gives running code a line of releases to move.</p>
+</li>
+</ul>
+<h3 id="also-in-this-release">Also in this release</h3>
+<ul>
+<li>The M35 sweep ran and found nothing; its two probes with pin value land as stdlib tests
+(no stale error classification across two failures; <code>removeOrThrow</code> keeps <code>remove</code>'s
+success-when-never-existed semantics). Per the pipeline, the loop exits without a patch.</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 12 stops claiming a script &quot;can neither forge one&quot; — it could, until now — and
+documents the privilege, the clock, and the constructor pattern.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
