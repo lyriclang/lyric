@@ -17,6 +17,7 @@ import std.io.file {
     entries,
     entriesOrThrow,
     copyOrThrow,
+    removeOrThrow,
 };
 import std.io.error { IoError, IoErrorKind };
 import std.string { utf8Decode, fromInt };
@@ -146,4 +147,45 @@ pub fn op_twins_throw_where_the_silent_form_says_false(): void {
         sourceCarried = e.path == missing;
     }
     assertTrue(sourceCarried, "the error must carry the source path");
+}
+
+// M35 sweep pins (the sweep found nothing; these hold what it probed).
+
+@Test
+pub fn a_second_failure_does_not_read_the_first_classification(): void {
+    let missingFile = joinPath(tempDir(), "lyric_sweep_pin_a.txt");
+    let missingDir = joinPath(tempDir(), "lyric_sweep_pin_dir_b");
+
+    var firstIsNotFound = false;
+    try {
+        let t = textOrThrow(missingFile);
+        assertTrue(false, "must throw, got " + t);
+    } catch (e: IoError) {
+        firstIsNotFound = match (e.kind) {
+            IoErrorKind.NotFound => true,
+            _ => false,
+        };
+    }
+
+    var secondPath = "";
+    try {
+        let names = entriesOrThrow(missingDir);
+        assertTrue(false, "must throw, got " + fromInt(names.length));
+    } catch (e: IoError) {
+        secondPath = e.path;
+    }
+
+    assertTrue(firstIsNotFound, "the first failure must classify as NotFound");
+    assertEq(secondPath, missingDir);
+}
+
+@Test
+pub fn removeOrThrow_shares_removes_success_semantics(): void {
+    let missing = joinPath(tempDir(), "lyric_sweep_pin_never.txt");
+    assertTrue(!exists(missing), "the probe path must not exist");
+    try {
+        removeOrThrow(missing);
+    } catch (e: IoError) {
+        assertTrue(false, "a file that never existed is success, as in remove: " + e.message());
+    }
 }
