@@ -43,6 +43,11 @@ public sealed class TypeChecker
     private readonly Dictionary<MemberExpr, (LyrType Type, Symbol Symbol)> _operatorTarget =
         new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The member expressions standing in CALLEE position, marked by
+    /// <see cref="CheckTargetOfCall"/>: only there may a generic function's unsubstituted name
+    /// appear (§8.1) — everywhere else it is refused as a value (LYR-SEM0052).</summary>
+    private readonly HashSet<MemberExpr> _calleePosition = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     /// Is a global initializer running? Then a global that has not been computed yet is an ERROR
     /// rather than merely an unknown type.
@@ -1746,6 +1751,11 @@ public sealed class TypeChecker
             return declared;
         }
 
+        // The member-shaped callee ('m.ident(…)') resolves through CheckMember, which cannot
+        // otherwise tell a call from a value use — the same distinction the identifier gets from
+        // the short circuit above, carried as a per-node mark.
+        if (callee is MemberExpr marked) _calleePosition.Add(marked);
+
         return callee is MemberExpr mem ? CheckExpr(mem, scope, expected) : CheckExpr(callee, scope);
     }
 
@@ -2743,7 +2753,17 @@ public sealed class TypeChecker
                     named.Instance ?? ExpectedInstance(expected, ts)));
 
             case NonValueType { Symbol: ModuleSymbol mod }:
-                return BindMember(mem, MemberOfModule(mod, mem.Member, mem.Span));
+                var moduleMember = MemberOfModule(mod, mem.Member, mem.Span);
+                // The qualified twin of the identifier rule (§8.1): a generic function is not a
+                // value, and only callee position — marked by CheckTargetOfCall — may hold its
+                // unsubstituted name.
+                if (moduleMember is (_, FunctionSymbol { Generics.Length: > 0 } qualifiedGeneric)
+                    && !_calleePosition.Contains(mem))
+                    moduleMember = (Report(mem.Span, "LYR-SEM0052",
+                        $"generic function '{qualifiedGeneric.Name}' is not a value — a function "
+                        + "value is monomorphic; call it, or write a lambda that calls it"),
+                        qualifiedGeneric);
+                return BindMember(mem, moduleMember);
         }
 
         var baseType = mem.IsOptional && targetType is Optional opt ? opt.Inner : targetType;

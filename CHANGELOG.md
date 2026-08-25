@@ -10,6 +10,36 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.6.1 — 2026-08-25
+
+The sweep after 3.6.0, per the pipeline: adversarial probes against what the four changes make
+newly reachable. Two findings, both fixed with a failing test first; a second probe wave over
+the fixes found nothing.
+
+### Fixed
+
+- **`lyric fmt` no longer strips the type from `catch (_: Boom)`.** The clause printer read a
+  null binding name as "the whole binding is `_`" and dropped the annotation — a selective
+  catch became the catch-all, and a clause behind it silently unreachable: the formatter
+  changed what the program means. The form has PARSED since forever but never stood in any
+  corpus, because it crashed the compiler until 3.6.0 fixed #115 — the sweep probed exactly
+  what that fix makes reachable.
+
+- **`let f = m.ident;` is the same sentence as `let f = ident;`** (`LYR-SEM0052`). The 3.6.0
+  refusal covered the bare name; the qualified path went through the module member lookup and
+  handed out the unsubstituted type anyway, ending in an `LYR-IR0001` about a lowering limit
+  that is really a language rule. Both doors now say the same thing, and `m.ident(5)` — callee
+  position — stays untouched.
+
+### Noted, not changed
+
+Three pre-existing edges the sweep recorded in `STATUS.md` rather than fixing, because each
+needs a decision before code: a transparent type alias is refused in a `::` list although §3.5
+says aliases serve everywhere; a fully substituted static method as a VALUE
+(`let f = List<int>.empty;`) is an `LYR-IR0001` whose message names `<?>`; and a duplicate
+CONSTRAINT entry (`<T :: [Ord, Ord]>`) is silently deduplicated — the 3.6.0 list rule
+deliberately covers conformance and parent lists only.
+
 ## v3.6.0 — 2026-08-25
 
 The toolchain twin of the specification round `lyric-spec#21`: the inference rules are written

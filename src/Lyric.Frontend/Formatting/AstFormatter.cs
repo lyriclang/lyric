@@ -573,11 +573,12 @@ public sealed class AstFormatter
         var parts = new List<Doc> { Doc.From("try "), BlockDoc(stmt.Body) };
         foreach (var clause in stmt.Catches)
         {
-            var binding = clause.BindingName is null
-                ? Doc.From("_")
-                : clause.BindingType is null
-                    ? Doc.From(clause.BindingName)
-                    : Doc.Of(Doc.From($"{clause.BindingName}: "), TypeDoc(clause.BindingType));
+            // '_' is "no name", never "no type": 'catch (_: Boom)' selects by its type without
+            // binding, and dropping the annotation would turn it into the catch-all.
+            var name = clause.BindingName ?? "_";
+            var binding = clause.BindingType is null
+                ? Doc.From(name)
+                : Doc.Of(Doc.From($"{name}: "), TypeDoc(clause.BindingType));
             parts.Add(Doc.Of(Doc.From(" catch ("), binding, Doc.From(") "), BlockDoc(clause.Body)));
         }
 
