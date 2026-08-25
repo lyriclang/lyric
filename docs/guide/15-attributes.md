@@ -125,6 +125,67 @@ Two more rules, both diagnosed where they happen: the same attribute may not sit
 twice, and neither a generic attribute struct nor a generic target is allowed — the compiled
 module holds one row, and one row cannot stand for every instance.
 
+## One value, in parentheses
+
+Since 3.9 an attribute can take its value positionally — the shape an event vocabulary wants:
+
+```lyr
+import std.core { OnFunction, WithArg };
+
+pub enum Event { Damage, Heal }
+
+pub struct On :: [OnFunction, WithArg<Event>] { event: Event, order: int = 0 }
+
+@On(Event.Damage)
+pub fn onDamage(): void { }
+
+fn main(): int { return 0; }
+```
+
+The parentheses carry exactly one value, under the same rules as a written field, and it fills
+the attribute's FIRST field — `order` above keeps its default, as if nothing were written. The
+row this produces is indistinguishable from `@On { event = Event.Damage }`; a host reading it
+cannot tell which form the source used, and does not need to.
+
+The form is opted into, not free: `WithArg<Event>` is what admits it, and its type argument
+must be the first field's type, checked where the attribute is **declared**. That is the same
+conformance-decides rule the placement markers follow, and it exists for the same reason —
+nothing becomes positional by accident, and a struct's field order never silently becomes an
+argument order an SDK is stuck with. An attribute that declares no `WithArg` keeps the braces
+form alone (`LYR-SEM0094`), and a conformance whose `T` is not the first field's type is
+refused at the declaration (`LYR-SEM0095`), so the mistake lands with whoever ships the
+attribute, not with everyone who writes it.
+
+One use writes one form or the other; `@On(…) { … }` is not a spelling.
+
+## Several attributes at once
+
+Since 3.9 a list of attributes can stand as one group:
+
+```lyr
+import std.core { OnFunction, WithArg };
+
+pub enum Event { Damage, Heal }
+
+pub struct On :: [OnFunction, WithArg<Event>] { event: Event }
+pub struct Traced :: [OnFunction] { }
+
+@[Traced, On(Event.Damage)]
+pub fn onDamage(): void { }
+
+fn main(): int { return 0; }
+```
+
+`@[Traced, On(Event.Damage)]` declares exactly what stacking `@Traced` and `@On(…)` on two
+lines declares — the same rows, in the same order, under the same rules; the same attribute
+twice in one group is still the same attribute twice. The entries carry no `@` of their own,
+and a group holds at least one.
+
+`lyric fmt` treats the group as *the* shape for two or more attributes: stacked lines fold
+into one group, a single-entry group unfolds to the plain `@Name`, and a group that outgrows
+the line breaks one entry per line. Which spelling you type is taste; what a formatted file
+holds is one shape.
+
 ## The module header
 
 An attribute before `module` describes the file as a whole:

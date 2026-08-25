@@ -58,6 +58,7 @@ IdentStart      = 'a'..'z' | 'A'..'Z' | '_' .
 IdentCont       = IdentStart | '0'..'9' .
 IDENTIFIER      = IdentStart { IdentCont } .        (* unless it is a keyword *)
 AT_IDENT        = '@' IdentStart { IdentCont } .
+AT_LBRACKET     = '@' '[' .                         (* adjacent; opens an attribute group *)
 ```
 
 ### 1.4 Keywords
@@ -148,8 +149,12 @@ Module          = { Attribute } ModuleHeader { TopLevelDecl }
 ModuleHeader    = 'module' ModulePath ';' .
 ModulePath      = IDENTIFIER { '.' IDENTIFIER } .
 
-Attribute       = AT_IDENT { '.' IDENTIFIER }
-                  [ '{' [ AttrArg { ',' AttrArg } [ ',' ] ] '}' ] .
+Attribute       = SingleAttr | AttrGroup .
+SingleAttr      = AT_IDENT { '.' IDENTIFIER } [ AttrArgs ] .
+AttrGroup       = AT_LBRACKET AttrEntry { ',' AttrEntry } [ ',' ] ']' .
+AttrEntry       = IDENTIFIER { '.' IDENTIFIER } [ AttrArgs ] .
+AttrArgs        = '{' [ AttrArg { ',' AttrArg } [ ',' ] ] '}'
+                | '(' Expr ')' .
 AttrArg         = IDENTIFIER '=' Expr .
 
 ImportDecl      = 'import' ModulePath [ ImportClause ] ';' .
@@ -189,7 +194,9 @@ An attribute before the header describes the module; in a file without a header 
 top belongs to the first declaration. The path names a struct type, and an `AttrArg` value must be
 a value at compile time — an integer, float, string, char or bool literal, optionally
 sign-prefixed, or (since v2.4) a name denoting a `let` bound to one — which is a semantic rule,
-not a syntactic one.
+not a syntactic one. A parenthesized argument (since 3.9) carries exactly one such value — which
+attribute admits that form is a semantic rule too (§4.7) — and a GROUP `@[A, B { … }, C(…)]`
+declares the same attribute list the stacked spelling declares.
 
 ---
 

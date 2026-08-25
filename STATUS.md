@@ -11,6 +11,26 @@
 
 ## Current milestone
 
+**The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
+`lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
+design round: `@On(Event.Damage)` — ONE positional value, admitted by `std.core.WithArg<T>`
+(conformance decides, the marker doctrine again: nothing becomes positional by accident, and a
+struct's field order never silently becomes an argument order), filling the FIRST field under
+the 2.4/2.10 value rules (`LYR-SEM0094` without the conformance, `LYR-SEM0095` at a
+declaration whose first field is not `T` — own list and extend alike); and the group
+`@[A, B { … }, C(v)]` behind the one token `@[` — the same list stacking declares, flattened
+by the parser so no consumer downstream learns the spelling. **The row of a positional use is
+byte-identical to its braces twin** (pinned), so no format change and no host change. The
+formatter canonicalizes a declaration's list to the group at two or more; module-header
+attributes stay stacked, because they are sequence items whose comments anchor per attribute.
+Rejected in the round, recorded so nobody re-derives them: n-ary positional by field order
+(field order becomes API, and a declared n-ary contract needs an interface per arity),
+bare variant names in attribute values (patterns are the ONE context that resolves them —
+measured: `let l: Layout = Packed;` is SEM0002 — a third resolution context would be an
+inconsistency), and mixing `(…)` with `{ … }` in one use. Suite 136 → 142, six cases gated
+`since: 3.9.0`. Sweep per pipeline comes next; the v4 design round (concurrency/net) stays
+the next big thing after it.
+
 **Runde 3 — the opaque clock — SHIPS as v3.8.0** (2026-08-25, format stays 3.6). The last of
 the Bestandsaufnahme's spec rounds: making an opaque value becomes the declaring module's
 privilege (spec §3.5, `lyric-spec#23`). Measured first: `42 as Entity` compiled in ANY module
@@ -28,7 +48,12 @@ of the 2026-08-25 Bestandsaufnahme are delivered; what remains on that plan is t
 (concurrency/net) and the 4.0 clocks now ticking: `listDir`'s removal, and this warning's
 promotion to an error.
 
-**The sweep ran the same day and shipped as v3.8.1**: eleven probes against the warning's
+**The sweep ran the same day and shipped as v3.8.2** — and the number is the lesson: the
+3.8.1 release commit bumped the version files and not the README, the tag failed its own
+version test on both platforms, and the release gate refused to publish. Nothing shipped
+broken; no download carries 3.8.1; 3.8.2 is the same content with the README telling the
+truth. **A release commit is version files + README + ratchets + status, together — and the
+tag waits for green CI, not for the local suite.** The sweep itself: eleven probes against the warning's
 edges — alias laundering (local transparent alias, import-as), generic laundering (`x as T`,
 refused), opaque-over-opaque, every initializer position, extend bodies, cast chains,
 `--deny-warnings`, the run path. **One finding, one cause, two faces**: a GLOBAL initializer
@@ -574,10 +599,11 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4886 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
-**eleven** binaries plus `lyrembed.dll`, version **3.8.0**; the specification in
-`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 136 cases pinned to 3.8.0 (135/135
-against this tree, one platform-gated skip; the three 2026-08-25 spec rounds landed spec-first, #21 through #23, each toolchain twin behind its rule), and the toolchain's own CI runs it against the
+4910 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+**eleven** binaries plus `lyrembed.dll`, version **3.9.0**; the specification in
+`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 142 cases pinned to 3.9.0 (141/141
+against this tree, one platform-gated skip; the 2026-08-25 spec rounds landed spec-first, #21
+through #24, each toolchain twin behind its rule), and the toolchain's own CI runs it against the
 working tree. *(The test count is the one last counted, at 3.6.0, Debug.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
