@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.6.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.6.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.6.1 — 2026-08-25</h2>
+<p>The sweep after 3.6.0, per the pipeline: adversarial probes against what the four changes make
+newly reachable. Two findings, both fixed with a failing test first; a second probe wave over
+the fixes found nothing.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong><code>lyric fmt</code> no longer strips the type from <code>catch (_: Boom)</code>.</strong> The clause printer read a
+null binding name as &quot;the whole binding is <code>_</code>&quot; and dropped the annotation — a selective
+catch became the catch-all, and a clause behind it silently unreachable: the formatter
+changed what the program means. The form has PARSED since forever but never stood in any
+corpus, because it crashed the compiler until 3.6.0 fixed #115 — the sweep probed exactly
+what that fix makes reachable.</p>
+</li>
+<li><p><strong><code>let f = m.ident;</code> is the same sentence as <code>let f = ident;</code></strong> (<code>LYR-SEM0052</code>). The 3.6.0
+refusal covered the bare name; the qualified path went through the module member lookup and
+handed out the unsubstituted type anyway, ending in an <code>LYR-IR0001</code> about a lowering limit
+that is really a language rule. Both doors now say the same thing, and <code>m.ident(5)</code> — callee
+position — stays untouched.</p>
+</li>
+</ul>
+<h3 id="noted-not-changed">Noted, not changed</h3>
+<p>Three pre-existing edges the sweep recorded in <code>STATUS.md</code> rather than fixing, because each
+needs a decision before code: a transparent type alias is refused in a <code>::</code> list although §3.5
+says aliases serve everywhere; a fully substituted static method as a VALUE
+(<code>let f = List&lt;int&gt;.empty;</code>) is an <code>LYR-IR0001</code> whose message names <code>&lt;?&gt;</code>; and a duplicate
+CONSTRAINT entry (<code>&lt;T :: [Ord, Ord]&gt;</code>) is silently deduplicated — the 3.6.0 list rule
+deliberately covers conformance and parent lists only.</p>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
