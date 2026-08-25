@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.encoding — Lyric nightly</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">nightly</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/" class="here">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.encoding</h1>
+<nav class="contents">
+<ul>
+<li><a href="#function-hexencode">hexEncode</a></li>
+<li><a href="#function-hexdecode">hexDecode</a></li>
+<li><a href="#function-base64encode">base64Encode</a></li>
+<li><a href="#function-base64decode">base64Decode</a></li>
+</ul>
+</nav>
+<section class="item" id="function-hexencode">
+<h2><a href="#function-hexencode">hexEncode</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn hexEncode(bytes: uint8[]): string</code></pre>
+<p>Bytes as lowercase hexadecimal, two characters per byte, no separators. Empty bytes are the
+empty string.</p>
+<p class="source">stdlib/std/encoding.lyr:44</p>
+</section>
+<section class="item" id="function-hexdecode">
+<h2><a href="#function-hexdecode">hexDecode</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn hexDecode(text: string): ?uint8[]</code></pre>
+<p>The bytes a hexadecimal string spells, or <code>null</code> when it spells none: an odd length or a
+character outside <code>0-9</code>, <code>a-f</code>, <code>A-F</code>. The empty string is an empty array.</p>
+<p class="source">stdlib/std/encoding.lyr:58</p>
+</section>
+<section class="item" id="function-base64encode">
+<h2><a href="#function-base64encode">base64Encode</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn base64Encode(bytes: uint8[]): string</code></pre>
+<p>Bytes as base64 (RFC 4648 §4: <code>A-Za-z0-9+/</code>), padded with <code>=</code> to a multiple of four
+characters. Empty bytes are the empty string.</p>
+<p class="source">stdlib/std/encoding.lyr:80</p>
+</section>
+<section class="item" id="function-base64decode">
+<h2><a href="#function-base64decode">base64Decode</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn base64Decode(text: string): ?uint8[]</code></pre>
+<p>The bytes a base64 string spells, or <code>null</code> when it spells none. Strict: the length must be a
+multiple of four, <code>=</code> may appear only as the final one or two characters, characters outside
+the alphabet are refused, and so is padding whose unused bits are not zero — accepted input is
+exactly what <code>base64Encode</code> produces. The empty string is an empty array.</p>
+<p class="source">stdlib/std/encoding.lyr:128</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.core/">std.core</a>
+<a class="next" href="../../stdlib/std.fmt/">std.fmt</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

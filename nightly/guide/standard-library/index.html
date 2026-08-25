@@ -51,7 +51,10 @@
 <li><a href="#iteration">Iteration</a></li>
 <li><a href="#one-name-per-type-in-the-library">One name per type, in the library</a></li>
 <li><a href="#iterators-chain">Iterators chain</a></li>
+<li><a href="#a-chain-has-to-start-somewhere">A chain has to start somewhere</a></li>
 <li><a href="#files-answer-two-ways-and-each-says-which">Files answer two ways, and each says which</a></li>
+<li><a href="#json-is-one-value-type">JSON is one value type</a></li>
+<li><a href="#bytes-become-text-and-come-back">Bytes become text and come back</a></li>
 <li><a href="#capabilities">Capabilities</a></li>
 <li><a href="#strings-have-methods">Strings have methods</a></li>
 <li><a href="#constructors-live-on-the-types">Constructors live on the types</a></li>
@@ -89,7 +92,7 @@
 </tr>
 <tr>
 <td><code>std.iter</code></td>
-<td><code>Iterator&lt;T&gt;</code>, <code>Iterable&lt;T&gt;</code>, adapters, <code>sum</code></td>
+<td><code>Iterator&lt;T&gt;</code>, <code>Iterable&lt;T&gt;</code>, adapters, the entrances (<code>over</code>, <code>range</code>, <code>compact</code>), <code>sum</code></td>
 </tr>
 <tr>
 <td><code>std.option</code></td>
@@ -114,6 +117,14 @@
 <tr>
 <td><code>std.time</code></td>
 <td><code>Instant</code>, <code>Duration</code>, ISO 8601 — requires <code>osAccess</code></td>
+</tr>
+<tr>
+<td><code>std.json</code></td>
+<td><code>JsonValue</code>, <code>parse</code>, <code>serialize</code>, <code>serializePretty</code> — JSON, RFC 8259</td>
+</tr>
+<tr>
+<td><code>std.encoding</code></td>
+<td><code>hexEncode</code>/<code>hexDecode</code>, <code>base64Encode</code>/<code>base64Decode</code> — RFC 4648</td>
 </tr>
 <tr>
 <td><code>std.build</code></td>
@@ -234,6 +245,35 @@ that would ask the compiler to build <code>Iterator&lt;(int, T)&gt;</code>, then
 without end. <code>map</code> and <code>flatMap</code> change it safely because they are generic: they are built per
 use rather than per instance.</li>
 </ul>
+<h2 id="a-chain-has-to-start-somewhere">A chain has to start somewhere</h2>
+<p>A <code>List&lt;T&gt;</code> hands out a cursor with <code>iter()</code>, because it is a type and can declare
+<code>Iterable&lt;T&gt;</code>. The three built-in forms cannot: an array and a string have no declaration to hang
+a conformance on, and a range is not a value at all — <code>a..b</code> is a loop head, so
+<code>(a..b).iter()</code> could not exist. Four functions are the beginning instead:</p>
+<pre><code class="language-lyr">import std.iter { over, range, rangeInclusive, compact, sum };
+
+fn main(): int {
+    let doubled = sum(over&lt;int&gt;([1, 2, 3]).map&lt;int&gt;((n: int) =&gt; n * 2));
+    let counted = sum(range(1, 4));
+    let upTo = sum(rangeInclusive(1, 4));
+
+    let slots: (?int)[] = [10, null, 20];
+    let present = sum(compact&lt;int&gt;(slots));
+
+    return doubled + counted + upTo + present;
+}
+</code></pre>
+<p><code>over</code> walks an array, <code>range</code> and <code>rangeInclusive</code> walk the numbers that <code>low..high</code> and
+<code>low..=high</code> walk in a loop, and <code>compact</code> walks the slots of an array of optionals that are not
+<code>null</code>.</p>
+<p><strong><code>rangeInclusive</code> is its own function rather than <code>range(low, high + 1)</code></strong> for the reason the
+two loop forms are separate: at the type's maximum that <code>+ 1</code> wraps, and the chain would yield
+nothing at all.</p>
+<p><strong><code>compact</code> takes an ARRAY and not an iterator</strong>, and that is not a convenience. An
+<code>Iterator&lt;?T&gt;</code> cannot exist: <code>next()</code> answers <code>?T</code> and spends <code>null</code> on &quot;the end&quot;, so an optional
+element would need <code>??T</code> to be told apart from it — and <code>?</code> does not nest. The same rule is
+why <code>for (x in slots)</code> over a <code>(?T)[]</code> is refused with <code>LYR-SEM0091</code>. Reading the slots directly
+is what makes the distinction available, and <code>compact</code> is where that reading lives.</p>
 <h2 id="files-answer-two-ways-and-each-says-which">Files answer two ways, and each says which</h2>
 <p>Since 2.14 <code>std.io.file</code> has exactly two shapes, and the choice between them is not a taste:</p>
 <pre><code class="language-lyr">import std.io.file as file;
@@ -259,8 +299,74 @@ old names (<code>readText</code>, <code>readBytes</code>, <code>readLines</code>
 <p>What none of the shapes carries is a REASON: a missing file and a permission denied look the
 same. That gap is known and left open on purpose — carrying reasons means an error type and a
 decision about <code>throws</code> that this module should not make on its own.</p>
+<h2 id="json-is-one-value-type">JSON is one value type</h2>
+<p><code>std.json</code> reads and writes JSON (RFC 8259). A whole document is one <code>JsonValue</code> — an enum over
+the six JSON shapes, with arrays as <code>List&lt;JsonValue&gt;</code> and objects as <code>Map&lt;string, JsonValue&gt;</code>,
+the collections you already have rather than a second container API.</p>
+<pre><code class="language-lyr">import std.json { JsonValue, parse, serialize, serializePretty };
+import std.io.console { println };
+import std.collections { Map };
+
+fn main(): int {
+    let doc = parse(&quot;{\&quot;name\&quot;: \&quot;aria\&quot;, \&quot;level\&quot;: 3}&quot;);
+    if (doc == null) {
+        return 1;
+    }
+
+    let name = doc.field(&quot;name&quot;);
+    if (name != null) {
+        println(name.asString() ?? &quot;?&quot;);
+    }
+
+    let members = Map&lt;string, JsonValue&gt;.empty();
+    members.set(&quot;saved&quot;, JsonValue.Bool(true));
+    println(serializePretty(JsonValue.Obj(members), 2));
+    println(serialize(doc));
+    return 0;
+}
+</code></pre>
+<p><code>parse</code> answers <code>?JsonValue</code>, the standard library's absence convention: <code>null</code> means the text
+is not JSON — strictly RFC 8259, so no comments, no trailing commas, no <code>NaN</code>, and nesting
+deeper than 128 containers answers <code>null</code> rather than meeting the runtime's call-depth panic.
+The accessors (<code>asString</code>, <code>asInt</code>, <code>asFloat</code>, <code>at</code>, <code>field</code>, …) answer <code>null</code> when the value
+is not the asked shape, so a walk through a document is null checks — and <code>match</code> over the
+variants is there when a walk wants all six.</p>
+<p>Three number rules worth knowing. A number without fraction or exponent is <code>Int</code> and exact
+across the whole <code>int</code> range — ids round-trip untouched; one beyond that range falls back to
+<code>Float</code>, keeping magnitude over exactness. An integral <code>Float</code> serializes as <code>3.0</code>, not <code>3</code>, so
+what was a float comes back as one. And NaN and the infinities have no JSON spelling; they
+serialize as <code>null</code>, JavaScript's answer. Object member order follows the map — unspecified —
+and duplicate keys in a document take the last value, as in JavaScript.</p>
+<h2 id="bytes-become-text-and-come-back">Bytes become text and come back</h2>
+<p><code>std.encoding</code> is the binary-to-text pair: <code>hexEncode</code>/<code>hexDecode</code> and
+<code>base64Encode</code>/<code>base64Decode</code> (RFC 4648), over the same <code>uint8[]</code> that <code>utf8Encode</code> and
+<code>file.bytes</code> speak.</p>
+<pre><code class="language-lyr">import std.encoding { base64Encode, base64Decode, hexEncode };
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let bytes = &quot;Grüße&quot;.utf8Encode();
+    println(hexEncode(bytes));
+
+    let packed = base64Encode(bytes);
+    println(packed);
+
+    let back = base64Decode(packed);
+    if (back == null) {
+        return 1;
+    }
+    println(strings.utf8Decode(back) ?? &quot;?&quot;);
+    return 0;
+}
+</code></pre>
+<p>The direction convention is <code>utf8Encode</code>/<code>utf8Decode</code>'s: encoding cannot fail and answers the
+text; decoding answers <code>?uint8[]</code>, and <code>null</code> means the text is not the encoding's canonical
+form. Both decoders are strict — no whitespace, no missing padding, nothing outside the
+alphabet — because a lenient decoder accepts what the next system rejects; strip decorations
+before decoding.</p>
 <h2 id="capabilities">Capabilities</h2>
-<p><code>std.io.file</code>, <code>std.io.net</code> and <code>std.os</code> require a capability. A standalone run grants
+<p><code>std.io.file</code>, <code>std.os</code> and <code>std.time</code> require a capability. A standalone run grants
 everything; a host grants explicitly, and a module that requires more than it is granted is
 rejected before it runs.</p>
 <h2 id="strings-have-methods">Strings have methods</h2>

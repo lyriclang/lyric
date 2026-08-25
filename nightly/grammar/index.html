@@ -33,10 +33,12 @@
 <li><a href="../stdlib/std.build/">std.build</a></li>
 <li><a href="../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../stdlib/std.core/">std.core</a></li>
+<li><a href="../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../stdlib/std.json/">std.json</a></li>
 <li><a href="../stdlib/std.math/">std.math</a></li>
 <li><a href="../stdlib/std.option/">std.option</a></li>
 <li><a href="../stdlib/std.os/">std.os</a></li>
@@ -384,7 +386,8 @@ IfStmt          = 'if' '(' Expr ')' Block [ 'else' ( Block | IfStmt ) ] .
 
 WhileStmt       = 'while' '(' Expr ')' Block .
 DoWhileStmt     = 'do' Block 'while' '(' Expr ')' ';' .
-ForInStmt       = 'for' '(' IDENTIFIER 'in' Expr ')' Block .
+ForInStmt       = 'for' '(' IDENTIFIER 'in' ( RangeExpr | Expr ) ')' Block .
+RangeExpr       = Expr ( '..' | '..=' ) Expr .
 
 MatchStmt       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 MatchArm        = Pattern [ 'if' Expr ] '=&gt;' ( Expr | Block ) .
@@ -406,6 +409,10 @@ ExprStmt        = Expr ';' .
 </code></pre>
 <p>A destructuring binding requires an initializer. Its pattern admits names, <code>_</code> and nested tuple
 patterns; no form that can fail.</p>
+<p><code>RangeExpr</code> appears in <code>ForInStmt</code> and nowhere else — it is a loop head, not a value. There is no
+range type: <code>0..9</code> says which numbers the loop walks, and a program that binds one, stores one or
+passes one to a function is refused there rather than at a later stage. <code>RangePattern</code> (§Patterns)
+uses the same two tokens for a different purpose and is unrelated to this rule.</p>
 <p><code>ExprStmt</code> admits a call, an assignment or <code>resume</code>. A statement does not begin with a struct
 initializer: at that position <code>Name { … }</code> is a name followed by a block.</p>
 <p>An arm whose body is an expression is followed by <code>,</code>, except for the last arm before <code>}</code>. An arm

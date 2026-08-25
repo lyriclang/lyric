@@ -33,10 +33,12 @@
 <li><a href="../../stdlib/std.build/">std.build</a></li>
 <li><a href="../../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
 <li><a href="../../stdlib/std.math/">std.math</a></li>
 <li><a href="../../stdlib/std.option/">std.option</a></li>
 <li><a href="../../stdlib/std.os/">std.os</a></li>
@@ -211,9 +213,14 @@ it would need a division per digit.</p>
 <section class="item" id="function-parsefloat">
 <h2><a href="#function-parsefloat">parseFloat</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseFloat(value: string): ?float</code></pre>
-<p><code>&quot;3.5&quot;</code>, <code>&quot;-0.25&quot;</code> and <code>&quot;42&quot;</code> become floating point; everything else is <code>null</code>.</p>
-<p>Without exponent notation (<code>1e9</code>), which would need a state machine of its own.</p>
-<p class="source">stdlib/std/string.lyr:540</p>
+<p>The closest <code>float</code> to the decimal the text spells — <code>&quot;3.5&quot;</code>, <code>&quot;-0.25&quot;</code>, <code>&quot;.5&quot;</code>, <code>&quot;42&quot;</code>,
+exponent notation included (<code>&quot;1e-6&quot;</code>, <code>&quot;2.5E3&quot;</code>) — or <code>null</code> when the text spells none.
+Strict about shape: no whitespace, no separators, and the words <code>NaN</code> and <code>Infinity</code> are not
+numbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 prescribes.</p>
+<p>Native because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision
+arithmetic in the worst cases; an approximate parser hands back a float the text did not
+say. <code>parseFloat(fromFloat(x))</code> is <code>x</code> again, for every finite <code>x</code>.</p>
+<p class="source">stdlib/std/string.lyr:545</p>
 </section>
 <section class="item" id="class-stringbuilder">
 <h2><a href="#class-stringbuilder">StringBuilder</a> <span class="kind">class</span></h2>
@@ -256,7 +263,7 @@ builder exists to avoid. Reads and never consumes: building twice yields the sam
 string.</p>
 </div>
 </div>
-<p class="source">stdlib/std/string.lyr:604</p>
+<p class="source">stdlib/std/string.lyr:556</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.random/">std.random</a>

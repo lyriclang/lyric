@@ -33,10 +33,12 @@
 <li><a href="../stdlib/std.build/">std.build</a></li>
 <li><a href="../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../stdlib/std.core/">std.core</a></li>
+<li><a href="../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../stdlib/std.json/">std.json</a></li>
 <li><a href="../stdlib/std.math/">std.math</a></li>
 <li><a href="../stdlib/std.option/">std.option</a></li>
 <li><a href="../stdlib/std.os/">std.os</a></li>
@@ -348,6 +350,10 @@ variant is not a layout. A type may name itself as a field type, including forwa
 <p><code>0</code> means the module requires nothing. Submodules inherit: <code>std.os.env</code> requires <code>osAccess</code>.</p>
 <p>Enforcement happens at load time. A module that requires more than the runtime grants is rejected
 (<code>LYR-CAP0001</code>) before any instruction runs.</p>
+<p>The bitset also bounds USE: a reader must reject the binding of a gated native inside a module
+whose bitset does not cover it, with the same code. A compiler records the bits its imports
+imply, so the bound can only be violated by hand-built bytes — which is who the check exists
+for.</p>
 <h3 id="strings-id-2">Strings (Id 2)</h3>
 <pre><code>count            uleb128
 values           count × string
@@ -458,6 +464,13 @@ nor enum must not appear on the left.</p>
 <p>All implementations of the same slot share a signature. A runtime may derive the argument count
 from any row of the interface, and must, because <code>callvirt</code> takes its receiver off the stack
 before the target function is known.</p>
+<p><strong>An interface may have no row at all.</strong> A module that declares an interface, calls through it,
+and leaves the implementing to a module that imports it is well-formed — a library is exactly
+that shape. Nothing then carries the argument count of its slots, and a <code>callvirt</code> naming such an
+interface is <strong>unreachable</strong>: <code>mkiface</code> requires a row for the pair it names (§Calls and control
+flow), so no value of the interface can come into existence. A validator must not assume a count
+for such a call; where it cannot derive the depth it may check no further, and it must not report
+a violation derived from an assumed one.</p>
 <h3 id="handlers-id-9">Handlers (Id 9)</h3>
 <p>The protected regions: which block range of a function is covered by which handler.</p>
 <pre><code>handlerCount     uleb128
@@ -530,7 +543,9 @@ point.</p>
 <p>A reader must reject: an unknown target kind, a target or type index outside its table, a nonzero
 target for a module row, a type that is not a struct, the same (targetKind, target, type) triple
 twice, a value count differing from the struct's field count, a value tag differing from the field
-tag at its position, a string index outside the pool, and a value of a non-literal type.</p>
+tag at its position, a <code>char</code> value that is not a Unicode scalar, an enum tag outside the variant
+list or naming a variant with a payload, a string index outside the pool, and a value of a
+non-literal type.</p>
 <h3 id="names-id-12">Names (Id 12)</h3>
 <p>New in 3.2. Field names, for types an Attributes row references — the attribute types
 themselves and the attributed type targets. Those entries are REQUIRED whenever such a type has
@@ -1194,7 +1209,9 @@ the stack, the first element lowest.</p>
 element index is a runtime value and is not checkable at load time.</p>
 <p>An array does not grow; its length is fixed at creation. <code>arrcat</code> and <code>arrrep</code> each produce a new
 array and leave their operands unchanged. <code>arrrep</code> with count <code>0</code> yields an empty array; a negative
-count is a panic.</p>
+count is a panic. So is a count, or an <code>arrcat</code> result length, the implementation cannot
+allocate: the bound is the implementation's, but the refusal is a panic (<code>LYR-VM0006</code>), never a
+process abort — a sandboxed program must not be able to kill its host with a length.</p>
 <h3 id="optionals">Optionals</h3>
 <table>
 <thead>
@@ -1379,7 +1396,8 @@ value — from <code>newobj</code> or as the result of a call — does not need 
 </tbody>
 </table>
 <p><code>throw</code> carries the concrete type of the thrown value as type index + 1, or <code>0</code> when the type is
-known only at runtime — the value is then interface-typed and carries its type with it.</p>
+known only at runtime — the value is then interface-typed and carries its type with it. A nonzero
+operand names a Types entry; a reader must reject one outside the table.</p>
 <p>The type comparison while unwinding is equality, not a subtype test: the language has no
 inheritance, so the type at the throw site is the type a <code>catch</code> compares against.</p>
 <p><code>endfinally</code> returns control to the point where unwinding was interrupted; the search continues at

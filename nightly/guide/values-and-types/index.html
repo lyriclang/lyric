@@ -79,17 +79,17 @@ just cannot be pointed at something else.</p>
 <tr>
 <td><code>int</code></td>
 <td>64 bit, signed</td>
-<td>alias for <code>int64</code></td>
+<td>the default; same width as <code>int64</code>, a distinct type</td>
 </tr>
 <tr>
 <td><code>uint</code></td>
 <td>64 bit, unsigned</td>
-<td>alias for <code>uint64</code></td>
+<td>the default; same width as <code>uint64</code>, a distinct type</td>
 </tr>
 <tr>
 <td><code>float</code></td>
 <td>64 bit</td>
-<td>alias for <code>float64</code></td>
+<td>the default; same width as <code>float64</code>, a distinct type</td>
 </tr>
 <tr>
 <td><code>int8</code> … <code>int64</code></td>
@@ -124,6 +124,9 @@ just cannot be pointed at something else.</p>
 </tbody>
 </table>
 <p>Numeric literals take a suffix when the default is not wanted: <code>7i32</code>, <code>9u8</code>, <code>1.5f32</code>.</p>
+<p>Distinct means distinct: a <strong>literal</strong> adapts to the annotated type (<code>let n: int64 = 7;</code>
+works), but a <strong>variable</strong> of <code>int</code> does not assign to <code>int64</code> or back — the widths agree
+and the types still differ, and <code>as</code> is the crossing, as for any other pair.</p>
 <h2 id="conversion">Conversion</h2>
 <p>There is no implicit numeric conversion. <code>as</code> converts between numeric types and nothing else:</p>
 <pre><code class="language-lyr">fn main(): int {

@@ -94,8 +94,12 @@ fn main(): int {
 </tr>
 </tbody>
 </table>
-<p><code>lyric check</code> stops after semantic analysis. A program it accepts can still be rejected by the
-code generator for a construct that is not lowered yet; <code>lyric run</code> is the full pipeline.</p>
+<p><code>lyric check</code> goes as far as the intermediate representation, so a construct the code generator
+cannot lower is reported there rather than at the build. It stops before the bytes: a module can
+pass everything above and still be one the loader refuses. <code>lyric check &lt;file&gt; --emit</code> runs that
+last step too — the bytes are produced, loaded and dropped, and no file is written. It is the
+answer for a project that compiles each of its files on its own and wants to know they will all
+load.</p>
 <h2 id="arguments">Arguments</h2>
 <p>To receive command-line arguments, declare <code>main</code> with one parameter of type <code>string[]</code>:</p>
 <pre><code class="language-lyr">import std.io.console { println };
