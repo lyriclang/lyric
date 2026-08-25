@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.9.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.9.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.9.0 — 2026-08-25</h2>
+<p><strong>Attributes: one value in parentheses, and the group spelling.</strong> The twin of <code>lyric-spec#24</code>.
+No format change — the row of a positional use is byte-identical to its braces twin, so
+nothing about the bytecode, its readers or a host changes.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><strong><code>@On(Event.Damage)</code></strong> — an attribute takes its one value positionally (spec §4.7). The
+parenthesized form carries exactly one value under the existing value rules and fills the
+attribute's FIRST field; every other field ends with its default. The form is a conformance,
+not a courtesy: the attribute struct declares <code>std.core.WithArg&lt;T&gt;</code> — new, beside the three
+placement markers — and only then is the form admitted (<code>LYR-SEM0094</code>); <code>T</code> must be the
+first field's type, checked at the attribute's declaration (<code>LYR-SEM0095</code>), so a mismatch
+lands with whoever ships the attribute rather than at every use site.</li>
+<li><strong><code>@[Component, System { order = 10 }, On(Event.Damage)]</code></strong> — several attributes as one
+group, behind the new token <code>@[</code> (spec §1.1, §2). The group is the same list the stacked
+spelling declares: the parser flattens it, the rows land in written order, and the
+one-per-attribute rule counts across both spellings.</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li><strong><code>lyric fmt</code> canonicalizes attribute lists</strong>: two or more attributes on one declaration
+take the group shape, a single-entry group unfolds to <code>@Name</code>, and a group that outgrows
+the line breaks one entry per line. Module-header attributes keep their stacked lines.</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 15 documents both forms; <code>docs/Grammar.md</code> mirrors the amended spec chapter.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>

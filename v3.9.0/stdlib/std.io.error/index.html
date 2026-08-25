@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.io.error — Lyric v3.9.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v3.9.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/" class="here">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.io.error</h1>
+<nav class="contents">
+<ul>
+<li><a href="#enum-ioerrorkind">IoErrorKind</a></li>
+<li><a href="#class-ioerror">IoError</a></li>
+</ul>
+</nav>
+<section class="item" id="enum-ioerrorkind">
+<h2><a href="#enum-ioerrorkind">IoErrorKind</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum IoErrorKind</code></pre>
+<p>What went wrong, as a matchable name. <code>Other</code> carries everything the platform reports that
+has no name here — a locked file, a full disk — and the <code>detail</code> string still says it.
+Only kinds every platform can CLASSIFY reliably get a name; the carrier-plus-kind shape is
+what lets this list grow later without breaking anyone's <code>match</code>.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">NotFound</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">PermissionDenied</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">InvalidPath</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Other</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/io/error.lyr:18</p>
+</section>
+<section class="item" id="class-ioerror">
+<h2><a href="#class-ioerror">IoError</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class IoError :: [Throwable]</code></pre>
+<p>The reason an I/O operation failed: which kind, on which path, and what the platform said.</p>
+<p>§9.0's answer to &quot;why not?&quot; — the silent forms (<code>text</code>, <code>writeText</code>, …) answer only whether.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">kind: IoErrorKind</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">path: string</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">detail: string</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/io/error.lyr:28</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.io.console/">std.io.console</a>
+<a class="next" href="../../stdlib/std.io.file/">std.io.file</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
