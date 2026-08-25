@@ -91,6 +91,56 @@ public class GenericsTests
         Assert.False(de.HasErrors);
     }
 
+    private static DiagnosticEngine CheckWithLibrary(string mainSource)
+    {
+        var sm = new SourceManager();
+        var libId = sm.AddVirtual("m.lyr", "module m;\n\npub fn ident<T>(x: T): T { return x; }\n");
+        var mainId = sm.AddVirtual("test.lyr", mainSource);
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de);
+        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, mainId, de).ParseModule());
+        var binding = comp.Resolve();
+        new TypeChecker(comp, binding, de).Check();
+        return de;
+    }
+
+    [Fact]
+    public void A_generic_function_reached_through_its_module_is_not_a_value_either()
+    {
+        // The unqualified refusal landed with 3.6.0; the QUALIFIED path went through
+        // MemberOfModule and handed out the unsubstituted type anyway — the same disease, one
+        // door further, ending as an IR0001 about a lowering limit that is really a language
+        // rule. Found by the 3.6.0 sweep.
+        var de = CheckWithLibrary("""
+            import m;
+
+            fn main(): int {
+                let f = m.ident;
+                return 0;
+            }
+            """);
+
+        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0052", error.Code);
+        Assert.Contains("ident", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_generic_function_called_through_its_module_is_untouched()
+    {
+        var de = CheckWithLibrary("""
+            import m;
+
+            fn main(): int {
+                return m.ident(5);
+            }
+            """);
+
+        Assert.False(de.HasErrors,
+            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+    }
+
     private static List<BindingStmt> Bindings(IEnumerable<Stmt> stmts)
     {
         var acc = new List<BindingStmt>();
