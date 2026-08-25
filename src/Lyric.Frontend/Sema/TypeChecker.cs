@@ -1456,6 +1456,15 @@ public sealed class TypeChecker
             ParameterSymbol p => p.Type,
             LocalSymbol l => l.Type,
             GlobalSymbol g => TypeOfGlobalReference(g, id.Span),
+
+            // A GENERIC function is not a function value (§8.1): fn values are monomorphic, and
+            // an unsubstituted 'fn(T) -> T' fits no function type — it used to flow anyway and
+            // explode at the use with a cascade about a 'T' nobody wrote. Callee position never
+            // reaches this arm: CheckTargetOfCall short-circuits it, the way it already does for
+            // an overload set.
+            FunctionSymbol { Generics.Length: > 0 } gf => Report(id.Span, "LYR-SEM0052",
+                $"generic function '{gf.Name}' is not a value — a function value is monomorphic; "
+                + "call it, or write a lambda that calls it"),
             FunctionSymbol f => FnTypeOf(f),
 
             // A type or module name is not a value. As a member TARGET it is legitimate all the same,
@@ -1721,6 +1730,20 @@ public sealed class TypeChecker
         {
             _result.BindRef(id, set[0]);
             return FnTypeOf(set[0]);
+        }
+
+        // A GENERIC function is likewise legitimate here and nowhere else as a bare name: as a
+        // VALUE it is refused (fn values are monomorphic, §8.1), as a callee the inference is
+        // about to substitute it. The import shell stays the bound symbol, as CheckIdentifier
+        // binds it, so unused-import accounting sees the same reference either way.
+        if (callee is IdentifierExpr gid && scope.Lookup(gid.Name) is { } found
+            && (found is ImportBindingSymbol ib ? ib.Target : found)
+                is FunctionSymbol { Generics.Length: > 0 } generic)
+        {
+            _result.BindRef(gid, found);
+            var declared = FnTypeOf(generic);
+            _result.SetType(gid, declared); // hover reads the callee's type off the table
+            return declared;
         }
 
         return callee is MemberExpr mem ? CheckExpr(mem, scope, expected) : CheckExpr(callee, scope);
