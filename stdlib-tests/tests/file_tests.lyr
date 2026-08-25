@@ -14,9 +14,12 @@ import std.io.file {
     bytesOrThrow,
     linesOrThrow,
     sizeOrThrow,
+    entries,
+    entriesOrThrow,
+    copyOrThrow,
 };
 import std.io.error { IoError, IoErrorKind };
-import std.string { utf8Decode };
+import std.string { utf8Decode, fromInt };
 
 // The byte bridge (v1.14): bytes out, bytes in, and the strict decode that refuses what
 // 'text' would silently replace.
@@ -108,4 +111,39 @@ pub fn orThrow_carries_the_reason(): void {
     }
     assertTrue(kindIsNotFound, "the kind must be NotFound");
     assertTrue(samePath, "the error must carry the path it was asked about");
+}
+
+@Test
+pub fn entries_answers_null_where_listDir_lied(): void {
+    let missing = joinPath(tempDir(), "lyric_stdlib_no_such_dir_9321");
+    assertTrue(!exists(missing), "the probe directory must not exist");
+    assertTrue(entries(missing) == null, "a missing directory must be null, not empty");
+
+    var kindIsNotFound = false;
+    try {
+        let names = entriesOrThrow(missing);
+        assertTrue(false, "a missing directory must throw, got " + fromInt(names.length));
+    } catch (e: IoError) {
+        kindIsNotFound = match (e.kind) {
+            IoErrorKind.NotFound => true,
+            _ => false,
+        };
+    }
+    assertTrue(kindIsNotFound, "the kind must be NotFound");
+}
+
+@Test
+pub fn op_twins_throw_where_the_silent_form_says_false(): void {
+    let missing = joinPath(tempDir(), "lyric_stdlib_missing_src_9321.txt");
+    let target = joinPath(tempDir(), "lyric_stdlib_copy_target_9321.txt");
+    assertTrue(!exists(missing), "the probe source must not exist");
+
+    var sourceCarried = false;
+    try {
+        copyOrThrow(missing, target);
+        assertTrue(false, "copying a missing source must throw");
+    } catch (e: IoError) {
+        sourceCarried = e.path == missing;
+    }
+    assertTrue(sourceCarried, "the error must carry the source path");
 }

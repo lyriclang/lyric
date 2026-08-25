@@ -126,6 +126,90 @@ pub fn sizeOrThrow(path: string): int throws IoError {
     return result;
 }
 
+/// `entries`, with the reason when it cannot.
+pub fn entriesOrThrow(path: string): string[] throws IoError {
+    let names = entries(path);
+    if (names == null) {
+        throw lastIoError(path);
+    }
+    return names;
+}
+
+// The operations' twins: `void` where the silent form answers `bool`, and the reason where it
+// answers `false`. For the two-path operations the error's `path` carries the SOURCE; the
+// platform's detail names the half that actually failed.
+
+/// `writeText`, with the reason when it cannot.
+pub fn writeTextOrThrow(path: string, content: string): void throws IoError {
+    if (!writeText(path, content)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `appendText`, with the reason when it cannot.
+pub fn appendTextOrThrow(path: string, content: string): void throws IoError {
+    if (!appendText(path, content)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `writeBytes`, with the reason when it cannot.
+pub fn writeBytesOrThrow(path: string, data: uint8[]): void throws IoError {
+    if (!writeBytes(path, data)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `appendBytes`, with the reason when it cannot.
+pub fn appendBytesOrThrow(path: string, data: uint8[]): void throws IoError {
+    if (!appendBytes(path, data)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `remove`, with the reason when it cannot. A file that never existed is still success, as in
+/// `remove` — the twin throws exactly where the silent form answers `false`.
+pub fn removeOrThrow(path: string): void throws IoError {
+    if (!remove(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `copy`, with the reason when it cannot.
+pub fn copyOrThrow(from: string, to: string): void throws IoError {
+    if (!copy(from, to)) {
+        throw lastIoError(from);
+    }
+}
+
+/// `move`, with the reason when it cannot.
+pub fn moveOrThrow(from: string, to: string): void throws IoError {
+    if (!move(from, to)) {
+        throw lastIoError(from);
+    }
+}
+
+/// `createDir`, with the reason when it cannot.
+pub fn createDirOrThrow(path: string): void throws IoError {
+    if (!createDir(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `createDirAll`, with the reason when it cannot.
+pub fn createDirAllOrThrow(path: string): void throws IoError {
+    if (!createDirAll(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `removeDir`, with the reason when it cannot.
+pub fn removeDirOrThrow(path: string): void throws IoError {
+    if (!removeDir(path)) {
+        throw lastIoError(path);
+    }
+}
+
 // ------------------------------------------------------------------------------------------
 //
 // The capability hangs off the module name, so no individual function has to state it.
@@ -153,10 +237,15 @@ pub fn createDirAll(path: string): bool;
 /// the loop visibly.
 pub fn removeDir(path: string): bool;
 
-/// The entries of a directory: names rather than paths, sorted alphabetically.
-///
-/// An empty array for an unreadable directory rather than a `?string[]`, as in `readLines`. A
-/// caller that needs the difference asks `isDirectory` first.
+/// The entries of a directory: names rather than paths, sorted alphabetically. `null` when the
+/// directory cannot be read; an EMPTY array is an empty directory — the 2.14 convention, which
+/// `listDir` predates.
+pub fn entries(path: string): ?string[];
+
+/// The entries of a directory — names, sorted — before 3.7. It answers an empty array to both
+/// "empty" and "unreadable", which no caller can tell apart; `entries` says `null`, and
+/// `entriesOrThrow` says why.
+@Deprecated { message = "use entries — it can say null — or entriesOrThrow", until = "4.0" }
 pub fn listDir(path: string): string[];
 
 /// A path in the system's temporary directory. Does NOT create the file.

@@ -740,6 +740,32 @@ public sealed class NativeRegistry
                 }
             });
 
+        // 'entries' completes the 2.14 line listDir missed: an unreadable directory is null,
+        // an empty one is an empty array — and the failure is classified for entriesOrThrow.
+        registry.RegisterOptionalArrayReturning("std.io.file.entries", str, TypeTag.String,
+            args =>
+            {
+                try
+                {
+                    var names = Directory.EnumerateFileSystemEntries(args[0].AsString)
+                        .Select(Path.GetFileName)
+                        .OfType<string>()
+                        .OrderBy(n => n, StringComparer.Ordinal)   // deterministic
+                        .Select(LyrValue.FromString)
+                        .ToArray();
+
+                    // The array reference itself signals presence, as in OptionalLines — 'Some'
+                    // is for scalars, whose every bit pattern is a valid value.
+                    return LyrValue.FromObject(names);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                              or ArgumentException or NotSupportedException)
+                {
+                    RecordIo(e);
+                    return LyrValue.None;
+                }
+            });
+
         registry.Register("std.io.file.tempDir", none, TypeTag.String,
             _ => LyrValue.FromString(Path.GetTempPath()));
 
