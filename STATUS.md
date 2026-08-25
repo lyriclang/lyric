@@ -561,9 +561,8 @@ file, every place a name occurs, and completion. v1.3.0 shipped the first seven,
 
 4886 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
 **eleven** binaries plus `lyrembed.dll`, version **3.8.0**; the specification in
-`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 135 cases pinned to 3.6.0 (134/134
-against this tree, one platform-gated skip; the 3.6.0 rules landed spec-first in
-`lyric-spec#21`, the toolchain twin followed), and the toolchain's own CI runs it against the
+`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 136 cases pinned to 3.8.0 (135/135
+against this tree, one platform-gated skip; the three 2026-08-25 spec rounds landed spec-first, #21 through #23, each toolchain twin behind its rule), and the toolchain's own CI runs it against the
 working tree. *(The test count is the one last counted, at 3.6.0, Debug.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
