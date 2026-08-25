@@ -10,6 +10,28 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.9.1 — 2026-08-25
+
+**The sweep after 3.9.0** (spec: `lyric-spec#25`). Twelve probes; two real findings and one
+recovery wart, all three fixed failing-test-first.
+
+### Fixed
+
+- **An attribute field no row can hold is refused instead of crashing the compiler**
+  (`LYR-SEM0096`). `struct Odd :: [OnFunction] { n: ?int }` with `@Odd { n = 3 }` passed the
+  sema — the literal adapts to `?int` — and `lyrc build` died on the writer's "not encodable"
+  throw. Reachable since 3.2 with any non-row-shaped field (an optional, an array, a struct);
+  found by probing the new forms. The refusal sits at the USE and names the field: the struct
+  alone is an ordinary struct.
+- **The `WithArg<T>` promise travels the parent chain** (`LYR-SEM0095`). An attribute reaching
+  the conformance through an interface parent (`interface Carries :: [WithArg<int>]`) admitted
+  `@Retry(3)` while the first-field check ran only on direct list entries — the mismatch then
+  surfaced at every use as a plain assignment error. The check runs at the entry that reaches
+  the conformance now, so it lands with whoever ships the attribute.
+- **`@Retry(3, 4)` reports the parenthesis alone.** Recovery now consumes through the
+  parenthesis; before, the leftovers reached the declaration parser, which blamed the
+  attribute for missing its declaration (`LYR-PAR0042`) on top of the real message.
+
 ## v3.9.0 — 2026-08-25
 
 **Attributes: one value in parentheses, and the group spelling.** The twin of `lyric-spec#24`.
