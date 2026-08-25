@@ -4,8 +4,9 @@
 // arrays as `List<JsonValue>` and objects as `Map<string, JsonValue>` — the collections everyone
 // already has, not a second container API. `parse` answers `?JsonValue` in the standard library's
 // absence convention: `null` means the text is not JSON, the way `parseInt` and `utf8Decode`
-// answer. A parse error carries no position yet for the same reason a file error carries no
-// reason — that is the open error-type question, and this module does not answer it on the side.
+// answer. Since 3.7 the REASON has a form too (§9.0): `parseOrThrow` throws a `JsonError` naming
+// the line, the column and what the parser expected there. One parser answers both — it records
+// the FIRST place it refused, `parse` ignores the note, `parseOrThrow` reads it.
 //
 // Numbers keep the distinction the text had. JSON itself has one number type, but a document
 // full of 64-bit ids must round-trip exactly, so a number without fraction or exponent becomes
@@ -297,6 +298,26 @@ fn newlineIndent(sb: StringBuilder, indent: int, depth: int): void {
     }
 }
 
+/// Where and why a document was refused: the first place the parser could not continue, and
+/// what it expected there. `line` and `column` are 1-based and counted in code points.
+pub class JsonError :: [Throwable] {
+    line: int,
+    column: int,
+    /// The 0-based code-point offset of the refusal — `line` and `column`, unfolded.
+    offset: int,
+    /// What the parser expected at that place, as prose: `"a value"`, `"',' or '}'"`, …
+    expected: string,
+
+    pub fn message(): string {
+        return "json: expected "
+            + this.expected
+            + " at line "
+            + fromInt(this.line)
+            + ", column "
+            + fromInt(this.column);
+    }
+}
+
 /// The value a JSON document spells, or `null` when the text spells none: a syntax error
 /// anywhere, anything after the value, a lone surrogate escape, a raw control character in a
 /// string, or containers nested more than 128 deep. Strict RFC 8259 — no comments, no trailing
@@ -321,16 +342,63 @@ pub fn parse(text: string): ?JsonValue {
     return value;
 }
 
+/// `parse`, with the reason when the text spells no value: where the document broke, and what
+/// the parser expected there. The strictness is `parse`'s — the two are one parser.
+pub fn parseOrThrow(text: string): JsonValue throws JsonError {
+    var p = JsonParser { chars = text.toChars(), pos = 0 };
+    p.skipWhitespace();
+    let value = p.parseValue(0);
+    if (value != null) {
+        p.skipWhitespace();
+        if (p.pos == p.chars.length) {
+            return value;
+        }
+        p.fail("end of the document");
+    }
+    throw errorAt(p);
+}
+
+// Line and column are derived from the offset only when someone asks — the happy path never
+// counts newlines.
+fn errorAt(p: JsonParser): JsonError {
+    var line = 1;
+    var column = 1;
+    var i = 0;
+    while (i < p.errPos && i < p.chars.length) {
+        if (p.chars[i] == '\n') {
+            line = line + 1;
+            column = 1;
+        } else {
+            column = column + 1;
+        }
+        i = i + 1;
+    }
+    let what = if (p.errWhat == "") "a value" else p.errWhat;
+    return JsonError { line = line, column = column, offset = p.errPos, expected = what };
+}
+
 // Containers refuse to open beyond this nesting level, so hostile input answers `null` while the
 // VM's own call-depth guard stays far away.
 let maxDepth = 128;
 
 // One pass over the characters, no token stream; `pos` is the next unread character. Every
-// method answers its failure as `null` or `false` and the callers hand it up — the reason a
-// document is refused is not part of the contract (see the module header).
+// method answers its failure as `null` or `false` and the callers hand it up; the LEAF that
+// refused records where and what through `fail`, first come first kept, so the innermost
+// refusal is the one `parseOrThrow` reports and `parse` never looks at.
 class JsonParser {
     chars: char[],
     pos: int,
+    errPos: int = 0,
+    errWhat: string = "",
+
+    // The first refusal wins: a leaf says what it expected, the parents above it just hand the
+    // null up and must not overwrite the precise place with a vaguer one.
+    mut fn fail(what: string): void {
+        if (this.errWhat == "") {
+            this.errPos = this.pos;
+            this.errWhat = what;
+        }
+    }
 
     mut fn skipWhitespace(): void {
         while (this.pos < this.chars.length) {
@@ -368,11 +436,13 @@ class JsonParser {
     mut fn expectWord(word: string): bool {
         let expected = word.toChars();
         if (this.pos + expected.length > this.chars.length) {
+            this.fail("'" + word + "'");
             return false;
         }
         var i = 0;
         while (i < expected.length) {
             if (this.chars[this.pos + i] != expected[i]) {
+                this.fail("'" + word + "'");
                 return false;
             }
             i = i + 1;
@@ -384,6 +454,7 @@ class JsonParser {
     // Dispatch on the first character; the caller has skipped whitespace.
     mut fn parseValue(depth: int): ?JsonValue {
         if (this.pos >= this.chars.length) {
+            this.fail("a value");
             return null;
         }
         let c = this.chars[this.pos];
@@ -412,11 +483,13 @@ class JsonParser {
         if (c == '-' || c >= '0' && c <= '9') {
             return this.parseNumber();
         }
+        this.fail("a value");
         return null;
     }
 
     mut fn parseObject(depth: int): ?JsonValue {
         if (depth >= maxDepth) {
+            this.fail("nesting no deeper than 128");
             return null;
         }
         this.pos = this.pos + 1;
@@ -429,6 +502,7 @@ class JsonParser {
         while (true) {
             this.skipWhitespace();
             if (!this.peekIs('"')) {
+                this.fail("a key in double quotes");
                 return null;
             }
             let key = this.parseString();
@@ -437,6 +511,7 @@ class JsonParser {
             }
             this.skipWhitespace();
             if (!this.peekIs(':')) {
+                this.fail("':'");
                 return null;
             }
             this.pos = this.pos + 1;
@@ -453,6 +528,7 @@ class JsonParser {
                 this.pos = this.pos + 1;
                 return JsonValue.Obj(members);
             } else {
+                this.fail("',' or '}'");
                 return null;
             }
         }
@@ -460,6 +536,7 @@ class JsonParser {
 
     mut fn parseArray(depth: int): ?JsonValue {
         if (depth >= maxDepth) {
+            this.fail("nesting no deeper than 128");
             return null;
         }
         this.pos = this.pos + 1;
@@ -483,6 +560,7 @@ class JsonParser {
                 this.pos = this.pos + 1;
                 return JsonValue.Arr(items);
             } else {
+                this.fail("',' or ']'");
                 return null;
             }
         }
@@ -494,6 +572,7 @@ class JsonParser {
         let sb = StringBuilder.new();
         while (true) {
             if (this.pos >= this.chars.length) {
+                this.fail("the closing '\"'");
                 return null;
             }
             let c = this.chars[this.pos];
@@ -504,6 +583,7 @@ class JsonParser {
             if (c == '\\') {
                 this.pos = this.pos + 1;
                 if (!this.appendEscape(sb)) {
+                    this.fail("a valid escape");
                     return null;
                 }
             } else {
@@ -511,6 +591,7 @@ class JsonParser {
                 // sidesteps `as int <`, which would read as a type argument list.
                 let code = c as int;
                 if (code < 0x20) {
+                    this.fail("an escaped control character");
                     return null;
                 }
                 sb.appendChar(c);
@@ -629,6 +710,7 @@ class JsonParser {
                 this.pos = this.pos + 1;
             }
         } else {
+            this.fail("a digit");
             return null;
         }
         var isFloat = false;
@@ -636,6 +718,7 @@ class JsonParser {
             isFloat = true;
             this.pos = this.pos + 1;
             if (!this.peekDigit()) {
+                this.fail("a digit after '.'");
                 return null;
             }
             while (this.peekDigit()) {
@@ -649,6 +732,7 @@ class JsonParser {
                 this.pos = this.pos + 1;
             }
             if (!this.peekDigit()) {
+                this.fail("a digit in the exponent");
                 return null;
             }
             while (this.peekDigit()) {
@@ -659,6 +743,7 @@ class JsonParser {
         if (!isFloat && intFits(text)) {
             let exact = parseInt(text);
             if (exact == null) {
+                this.fail("a number");
                 return null;
             }
             return JsonValue.Int(exact);
@@ -666,6 +751,7 @@ class JsonParser {
         // A fraction, an exponent, or an integer beyond int64: magnitude over exactness.
         let approximate = parseFloat(text);
         if (approximate == null) {
+            this.fail("a number");
             return null;
         }
         return JsonValue.Float(approximate);
