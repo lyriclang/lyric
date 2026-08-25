@@ -1159,10 +1159,15 @@ public sealed class TypeChecker
         }
         else bt = _throwable is not null ? new NamedRef(_throwable) : LyrType.Error; // a catch-all binds Throwable
 
-        if (clause.BindingName is not null)
+        // A clause with a NAME scopes it; a clause with a TYPE needs the symbol either way,
+        // because the lowering reads the resolved catch type off it — 'catch (_: Boom)' used to
+        // leave the clause unbound and took the lowering down with an internal error (#115),
+        // which was the exact form the SEM0071 note recommends. The '_' symbol is declared
+        // nowhere, so the body cannot reach it, and the warning analyzer skips the name.
+        if (clause.BindingName is not null || clause.BindingType is not null)
         {
-            var local = new LocalSymbol(clause.BindingName, bt, false, clause);
-            catchScope.TryDeclare(local);
+            var local = new LocalSymbol(clause.BindingName ?? "_", bt, false, clause);
+            if (clause.BindingName is not null) catchScope.TryDeclare(local);
             _result.BindRef(clause, local); // for definite-assignment analysis: the catch assigns the binding
         }
         CheckBlock(clause.Body, catchScope);

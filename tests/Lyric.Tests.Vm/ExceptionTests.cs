@@ -62,6 +62,100 @@ public class ExceptionTests
         """;
 
     [Fact]
+    public void An_underscore_catch_with_a_type_catches()
+    {
+        // 'catch (_: Boom)' — the exact form the SEM0071 note recommends for a deliberately
+        // unused binding — crashed the compiler (#115): the parser turns '_' into "no name",
+        // the checker bound nothing, and the typed lowering path demands the binding for its
+        // TYPE. The checker now binds the clause whenever a type is written, scoping the name
+        // only when there is one.
+        Assert.Equal(3, Run(Errors + """
+
+            fn risky(): int throws Boom { throw Boom { code = 7 }; }
+
+            fn main(): int {
+                try {
+                    risky();
+                } catch (_: Boom) {
+                    return 3;
+                }
+                return 0;
+            }
+            """));
+    }
+
+    [Fact]
+    public void An_underscore_catch_selects_by_its_type()
+    {
+        // The type still selects even though nothing is bound: the Other handler must not take
+        // a Boom.
+        Assert.Equal(5, Run(Errors + """
+
+            fn risky(): int throws Boom { throw Boom { code = 7 }; }
+
+            fn main(): int {
+                try {
+                    risky();
+                } catch (_: Other) {
+                    return 1;
+                } catch (_: Boom) {
+                    return 5;
+                }
+                return 0;
+            }
+            """));
+    }
+
+    [Fact]
+    public void An_underscore_catch_does_not_warn()
+    {
+        var (ir, de) = TryLower(Errors + """
+
+            fn risky(): int throws Boom { throw Boom { code = 7 }; }
+
+            fn main(): int {
+                try {
+                    risky();
+                } catch (_: Boom) {
+                    return 3;
+                }
+                return 0;
+            }
+            """);
+
+        Assert.NotNull(ir);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0071");
+    }
+
+    [Fact]
+    public void An_underscore_catch_on_an_interface_is_the_documented_refusal()
+    {
+        // Same boundary as the named form: an interface other than Throwable needs a conformance
+        // test during unwinding, which the handler table cannot express — IR0001, not a crash.
+        var (ir, de) = TryLower("""
+            interface AppError :: [Throwable] { }
+
+            class Boom :: [AppError] {
+                code: int,
+                fn message(): string { return "boom"; }
+            }
+
+            fn risky(): int throws AppError { throw Boom { code = 9 }; }
+
+            fn main(): int {
+                try {
+                    return risky();
+                } catch (_: AppError) {
+                    return 3;
+                }
+            }
+            """);
+
+        Assert.Null(ir);
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-IR0001");
+    }
+
+    [Fact]
     public void A_thrown_value_reaches_the_matching_catch()
     {
         Assert.Equal(7, Run(Errors + """
