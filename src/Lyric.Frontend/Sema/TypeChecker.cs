@@ -654,29 +654,32 @@ public sealed class TypeChecker
             entrySeen.Add((entry, NodeSpan(node)));
 
             // The WithArg promise (3.9, §4.7): the parenthesized value fills the FIRST field,
-            // and the type argument names its type. Checked here — own list and extend block
-            // alike — so a mismatch lands with whoever declared the conformance, not at a use.
-            // Only a struct can be an attribute, so only a struct carries the promise.
-            if (_withArg is not null && entry is GenericInstance { Arguments: [var promised] } wa
-                && ReferenceEquals(wa.Definition, _withArg)
-                && implementer.Declaration is StructDecl attrDecl)
+            // and the type argument names its type. Checked at the entry that REACHES the
+            // conformance — the type's own list, an extend block, or an entry whose interface
+            // parent carries it (3.9.1) — so a mismatch lands with whoever declared it, not at
+            // a use. Only a struct can be an attribute, so only a struct carries the promise.
+            if (_withArg is not null && implementer.Declaration is StructDecl attrDecl)
             {
-                var firstField = attrDecl.Members.OfType<FieldDecl>().FirstOrDefault();
-                var actual = firstField is not null
-                    && implementer.Members.LookupLocal(firstField.Name) is FieldSymbol ffs
-                        ? FieldType(ffs)
-                        : null;
-                if (actual is null)
-                    _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
-                        $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' and has no "
-                        + "field — the parenthesized value fills the first field, so there must "
-                        + "be one");
-                else if (!LyrType.Equal(actual, promised))
-                    _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
-                        $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' but its "
-                        + $"first field '{firstField!.Name}' is "
-                        + $"'{TypeFacts.Display(actual)}' — the conformance names what "
-                        + $"'@{name}(value)' fills");
+                foreach (var reached in InstancesOfNode(node, implementer, _withArg, EmptySubst))
+                {
+                    if (reached is not GenericInstance { Arguments: [var promised] }) continue;
+                    var firstField = attrDecl.Members.OfType<FieldDecl>().FirstOrDefault();
+                    var actual = firstField is not null
+                        && implementer.Members.LookupLocal(firstField.Name) is FieldSymbol ffs
+                            ? FieldType(ffs)
+                            : null;
+                    if (actual is null)
+                        _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
+                            $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' and "
+                            + "has no field — the parenthesized value fills the first field, "
+                            + "so there must be one");
+                    else if (!LyrType.Equal(actual, promised))
+                        _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
+                            $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' but "
+                            + $"its first field '{firstField!.Name}' is "
+                            + $"'{TypeFacts.Display(actual)}' — the conformance names what "
+                            + $"'@{name}(value)' fills");
+                }
             }
 
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
@@ -3630,6 +3633,21 @@ public sealed class TypeChecker
                 "an attribute cannot sit on a generic declaration — there is one metadata row "
                 + "and as many instances as the program creates");
 
+        // A row holds a number, a string, a char, a bool or a variant tag (3.9.1, §4.7): a
+        // field of any other type has no encoding, however writable its literal looks after
+        // adaptation — the writer's total-function throw is what named this place. At the USE,
+        // because the struct alone is an ordinary struct.
+        foreach (var field in (ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? [])
+        {
+            if (ts.Members.LookupLocal(field.Name) is not FieldSymbol rfs) continue;
+            var rft = FieldType(rfs);
+            if (rft.IsError || RowableType(rft)) continue;
+            _de.Report("LYR-SEM0096", Severity.Error, attribute.PathSpan,
+                $"'@{ts.Name}' cannot form a row: field '{field.Name}' is "
+                + $"'{TypeFacts.Display(rft)}', and a row holds a number, a string, a char, a "
+                + "bool or a unit variant");
+        }
+
         var writtenFields = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in attribute.Fields)
         {
@@ -3706,6 +3724,14 @@ public sealed class TypeChecker
             ReportAttributeValueNotLiteral(value);
         return true;
     }
+
+    /// <summary>Can a metadata row hold a value of this type? Scalars, string, char, bool and
+    /// enums — the set §11's ConstValue encodes. Everything else has no encoding.</summary>
+    private static bool RowableType(LyrType t) => t switch
+    {
+        PrimitiveType p => p.Kind != PrimitiveKind.Void,
+        _ => TypeSymbolOf(t) is { Kind: TypeSymbolKind.Enum },
+    };
 
     private void ReportAttributeValueNotLiteral(Expr value) =>
         _de.Report("LYR-SEM0066", Severity.Error, value.Span,

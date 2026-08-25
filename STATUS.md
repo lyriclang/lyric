@@ -28,8 +28,23 @@ Rejected in the round, recorded so nobody re-derives them: n-ary positional by f
 bare variant names in attribute values (patterns are the ONE context that resolves them —
 measured: `let l: Layout = Packed;` is SEM0002 — a third resolution context would be an
 inconsistency), and mixing `(…)` with `{ … }` in one use. Suite 136 → 142, six cases gated
-`since: 3.9.0`. Sweep per pipeline comes next; the v4 design round (concurrency/net) stays
-the next big thing after it.
+`since: 3.9.0`.
+
+**The sweep ran the same day and shipped as v3.9.1** (spec `lyric-spec#25`, suite → 144):
+twelve probes — parent-chain admission, extend-declared WithArg (cross-module and mismatch),
+alias-typed T, module-header groups, mixed spellings, recovery shapes, the optional-field
+row. **Two real findings, one wart, all fixed failing-test-first.** (1) `LYR-SEM0096`: an
+attribute field no row can hold — `n: ?int`, `n = 3` adapting — passed the sema and CRASHED
+`lyrc build` on the writer's not-encodable throw; reachable since 3.2, the total-function
+doctrine named the place, and the refusal now sits at the use. (2) The WithArg promise check
+ran on direct entries only, so a parent chain (`interface Carries :: [WithArg<int>]`) admitted
+the form with the mismatch surfacing per-use as SEM0001 — the check walks the entry's closure
+now, own list and extend alike. (3) `@Retry(3, 4)` recovery consumed into the declaration
+parser and earned a bogus PAR0042 beside the real PAR0018 — recovery goes through the
+parenthesis now. Observed, no action: a comment between two stacked attributes survives fmt's
+group canonicalization but surfaces inside the following body — the positional mechanism's
+pre-existing placement, no loss, the invariant holds. Per the pipeline the loop exits here;
+**the v4 design round (concurrency/net) is next.**
 
 **Runde 3 — the opaque clock — SHIPS as v3.8.0** (2026-08-25, format stays 3.6). The last of
 the Bestandsaufnahme's spec rounds: making an opaque value becomes the declaring module's
@@ -599,11 +614,11 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4910 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+4913 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
 **eleven** binaries plus `lyrembed.dll`, version **3.9.0**; the specification in
-`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 142 cases pinned to 3.9.0 (141/141
+`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 144 cases pinned to 3.9.1 (143/143
 against this tree, one platform-gated skip; the 2026-08-25 spec rounds landed spec-first, #21
-through #24, each toolchain twin behind its rule), and the toolchain's own CI runs it against the
+through #25, each toolchain twin behind its rule), and the toolchain's own CI runs it against the
 working tree. *(The test count is the one last counted, at 3.6.0, Debug.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
