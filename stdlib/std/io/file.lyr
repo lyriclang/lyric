@@ -20,11 +20,15 @@
 // empty array to both "the file is empty" and "there is no file". No caller could tell those
 // apart, and the documentation told them to ask `exists` first — which is a race, not an answer.
 //
-// What none of them carries is a REASON: a missing file and a permission denied look the same.
-// That is a real gap and a deliberate one for now — carrying reasons means an error type and a
-// decision about `throws` that this module should not make alone.
+// Since 3.7 the REASON has a form too (§9.0): every silent form has an `*OrThrow` twin that
+// throws an `IoError` — kind, path, and what the platform said — where the silent one answers
+// `null` or `false`. Both come from ONE implementation: the twin calls the silent form and
+// turns its refusal into the reason the runtime recorded. Which form a caller uses states what
+// they will do with a failure: fall back, or handle the why.
 
 module std.io.file;
+
+import std.io.error { IoError, IoErrorKind };
 
 // For the string METHODS the path helpers below use; the alias avoids shadowing the
 // builtin type name.
@@ -65,6 +69,62 @@ pub fn writeBytes(path: string, data: uint8[]): bool;
 
 /// Appends raw bytes to an existing file or creates it. `true` on success.
 pub fn appendBytes(path: string, data: uint8[]): bool;
+
+// ------------------------------------------------------------------------ the reasons (3.7)
+//
+// The runtime classifies the last failed operation of this module; the OrThrow forms read the
+// classification immediately after a silent form refused. The VM is single-threaded, so nothing
+// runs between the failure and the read. The codes are a contract with the runtime:
+// 1 NotFound, 2 PermissionDenied, 3 InvalidPath, 0 Other.
+
+fn lastErrorKind(): int;
+fn lastErrorDetail(): string;
+
+fn lastIoError(path: string): IoError {
+    let kind = match (lastErrorKind()) {
+        1 => IoErrorKind.NotFound,
+        2 => IoErrorKind.PermissionDenied,
+        3 => IoErrorKind.InvalidPath,
+        _ => IoErrorKind.Other,
+    };
+    return IoError { kind = kind, path = path, detail = lastErrorDetail() };
+}
+
+/// `text`, with the reason when it cannot: the content, or an `IoError` saying why not.
+pub fn textOrThrow(path: string): string throws IoError {
+    let content = text(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `bytes`, with the reason when it cannot.
+pub fn bytesOrThrow(path: string): uint8[] throws IoError {
+    let content = bytes(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `lines`, with the reason when it cannot.
+pub fn linesOrThrow(path: string): string[] throws IoError {
+    let content = lines(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `size`, with the reason when it cannot.
+pub fn sizeOrThrow(path: string): int throws IoError {
+    let result = size(path);
+    if (result == null) {
+        throw lastIoError(path);
+    }
+    return result;
+}
 
 // ------------------------------------------------------------------------------------------
 //

@@ -667,14 +667,22 @@ public sealed class NativeRegistry
                 try
                 {
                     var info = new FileInfo(args[0].AsString);
+                    if (!info.Exists)
+                    {
+                        // Not an exception here — FileInfo answers the question — so the
+                        // classification is set by hand, or sizeOrThrow would read a stale one.
+                        RecordIoNotFound(args[0].AsString);
+                        return LyrValue.None;
+                    }
 
                     // 'Some' rather than 'FromI64': for a '?T' over a scalar the marker in 'Ref'
                     // is what signals presence, since every bit pattern is a valid number.
-                    return info.Exists ? LyrValue.Some(LyrValue.FromI64(info.Length)) : LyrValue.None;
+                    return LyrValue.Some(LyrValue.FromI64(info.Length));
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                               or ArgumentException or NotSupportedException)
                 {
+                    RecordIo(e);
                     return LyrValue.None;
                 }
             });
@@ -734,6 +742,15 @@ public sealed class NativeRegistry
 
         registry.Register("std.io.file.tempDir", none, TypeTag.String,
             _ => LyrValue.FromString(Path.GetTempPath()));
+
+        // The classification of the last failed operation (3.7), for the OrThrow forms. Non-pub
+        // on the Lyric side: nothing outside file.lyr ever reads these. A module that binds them
+        // needs a 3.7 runtime — the parseFloat forward path.
+        registry.Register("std.io.file.lastErrorKind", none, TypeTag.I64,
+            _ => LyrValue.FromI64(_lastIoKind));
+
+        registry.Register("std.io.file.lastErrorDetail", none, TypeTag.String,
+            _ => LyrValue.FromString(_lastIoDetail ?? ""));
 
         // ------------------------------------------------------ std.os, extended
 
@@ -951,6 +968,36 @@ public sealed class NativeRegistry
     ///
     /// <para>The catch is broad: missing file, missing permission, invalid path, device gone.
     /// To the caller they are the same answer.</para></summary>
+    // The classification of the last FAILED std.io.file operation, read by the
+    // lastErrorKind/lastErrorDetail natives — which the OrThrow forms in file.lyr call
+    // immediately after a silent form answered null/false. The interpreter runs an execution on
+    // one thread, so nothing can run between the failure and the read; ThreadStatic rather than
+    // static keeps parallel VMs (the test host) from seeing each other's failures. A SUCCESS
+    // does not clear it: only the null/false branch ever reads.
+    //
+    // The codes are a contract with std/io/file.lyr's kindOf: 1 NotFound, 2 PermissionDenied,
+    // 3 InvalidPath, 0 Other.
+    [ThreadStatic] private static int _lastIoKind;
+    [ThreadStatic] private static string? _lastIoDetail;
+
+    private static void RecordIo(Exception e)
+    {
+        _lastIoKind = e switch
+        {
+            FileNotFoundException or DirectoryNotFoundException => 1,
+            UnauthorizedAccessException or System.Security.SecurityException => 2,
+            PathTooLongException or ArgumentException or NotSupportedException => 3,
+            _ => 0,
+        };
+        _lastIoDetail = e.Message;
+    }
+
+    private static void RecordIoNotFound(string path)
+    {
+        _lastIoKind = 1;
+        _lastIoDetail = $"no file at '{path}'";
+    }
+
     private static string? TryIo(Func<string> operation)
     {
         try
@@ -960,6 +1007,7 @@ public sealed class NativeRegistry
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                        or ArgumentException or NotSupportedException)
         {
+            RecordIo(e);
             return null;
         }
     }
@@ -976,6 +1024,7 @@ public sealed class NativeRegistry
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                        or ArgumentException or NotSupportedException)
         {
+            RecordIo(e);
             return null;
         }
     }

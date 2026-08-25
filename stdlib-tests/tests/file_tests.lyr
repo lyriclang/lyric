@@ -10,7 +10,12 @@ import std.io.file {
     exists,
     tempDir,
     joinPath,
+    textOrThrow,
+    bytesOrThrow,
+    linesOrThrow,
+    sizeOrThrow,
 };
+import std.io.error { IoError, IoErrorKind };
 import std.string { utf8Decode };
 
 // The byte bridge (v1.14): bytes out, bytes in, and the strict decode that refuses what
@@ -65,4 +70,42 @@ pub fn an_empty_file_reads_differently_from_a_missing_one(): void {
 pub fn utf8Decode_is_strict_where_text_replaces(): void {
     assertEq(utf8Decode("Grüße 👋".utf8Encode()) ?? "(invalid)", "Grüße 👋");
     assertTrue(utf8Decode([255 as uint8]) == null, "0xFF alone is not UTF-8");
+}
+
+// The reasons (3.7): every silent form has an OrThrow twin, and the twin says WHY.
+
+@Test
+pub fn orThrow_reads_carry_the_content(): void {
+    let path = joinPath(tempDir(), "lyric_stdlib_file_orthrow.txt");
+    assertTrue(writeText(path, "one\ntwo"), "writeText must succeed in the temp directory");
+    try {
+        assertEq(textOrThrow(path), "one\ntwo");
+        assertEq(linesOrThrow(path).length, 2);
+        assertEq(bytesOrThrow(path).length, 7);
+        assertEq(sizeOrThrow(path), 7);
+    } catch (e: IoError) {
+        assertTrue(false, "no OrThrow read may throw here: " + e.message());
+    }
+    assertTrue(remove(path), "the probe file must go away");
+}
+
+@Test
+pub fn orThrow_carries_the_reason(): void {
+    let path = joinPath(tempDir(), "lyric_stdlib_missing_9321.txt");
+    assertTrue(!exists(path), "the probe path must not exist");
+
+    var kindIsNotFound = false;
+    var samePath = false;
+    try {
+        let content = textOrThrow(path);
+        assertTrue(false, "a missing file must throw, got: " + content);
+    } catch (e: IoError) {
+        kindIsNotFound = match (e.kind) {
+            IoErrorKind.NotFound => true,
+            _ => false,
+        };
+        samePath = e.path == path;
+    }
+    assertTrue(kindIsNotFound, "the kind must be NotFound");
+    assertTrue(samePath, "the error must carry the path it was asked about");
 }

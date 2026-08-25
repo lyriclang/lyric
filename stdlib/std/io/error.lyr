@@ -1,0 +1,43 @@
+// std.io.error — the reason an I/O operation failed.
+//
+// Capability-free: KNOWING the error type costs nothing. Producing one takes the capability of
+// the module whose operation failed — `std.io.file` throws it from every `*OrThrow` form, and a
+// future network module speaks the same type without a move.
+//
+// The carrier-plus-kind shape — a class holding an enum — rather than a throwable enum, twice
+// over: only class values throw (§9.1), and a reason enum BEHIND a class may gain variants
+// without breaking a caller's exhaustive `match` over the kinds it knows — adding a reason must
+// never be a break. (Rust's io::Error and ErrorKind divide the same way, for the same reason.)
+
+module std.io.error;
+
+/// What went wrong, as a matchable name. `Other` carries everything the platform reports that
+/// has no name here — a locked file, a full disk — and the `detail` string still says it.
+/// Only kinds every platform can CLASSIFY reliably get a name; the carrier-plus-kind shape is
+/// what lets this list grow later without breaking anyone's `match`.
+pub enum IoErrorKind {
+    NotFound,
+    PermissionDenied,
+    InvalidPath,
+    Other,
+}
+
+/// The reason an I/O operation failed: which kind, on which path, and what the platform said.
+///
+/// §9.0's answer to "why not?" — the silent forms (`text`, `writeText`, …) answer only whether.
+pub class IoError :: [Throwable] {
+    kind: IoErrorKind,
+    path: string,
+    detail: string,
+
+    pub fn message(): string {
+        let name = match (this.kind) {
+            IoErrorKind.NotFound => "not found",
+            IoErrorKind.PermissionDenied => "permission denied",
+            IoErrorKind.InvalidPath => "invalid path",
+            IoErrorKind.Other => "failed",
+        };
+        let suffix = if (this.detail == "") "" else " — " + this.detail;
+        return name + ": " + this.path + suffix;
+    }
+}
