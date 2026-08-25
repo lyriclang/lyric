@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.7.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.7.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.7.0 — 2026-08-25</h2>
+<p><strong>M35 — the reason.</strong> The gap <code>std.io.file</code> has carried since 2.14 — &quot;a missing file and a
+permission denied look the same&quot; — closes, and it closes as a LIBRARY DOCTRINE rather than a
+one-module patch (spec §9.0, <code>lyric-spec#22</code>): a value answers <em>whether</em>, a throw answers <em>why</em>.
+Everything is additive — no silent form changes, no format change (bytecode stays 3.6) — and
+every twin derives from the same implementation as its silent sibling, so the two can never
+drift.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong><code>std.io.error</code></strong> — <code>IoError</code> and <code>IoErrorKind</code>, the reason an I/O operation failed: which
+kind (<code>NotFound</code>, <code>PermissionDenied</code>, <code>InvalidPath</code>, <code>Other</code> — a matchable enum behind a
+carrier class, so the list can grow without breaking anyone's <code>match</code>), on which path, and
+what the platform said. Capability-free: knowing the type costs nothing, producing one takes
+the capability of the module whose operation failed.</p>
+</li>
+<li><p><strong><code>std.io.file</code> — an <code>OrThrow</code> twin for every silent form.</strong> <code>textOrThrow</code>, <code>bytesOrThrow</code>,
+<code>linesOrThrow</code>, <code>sizeOrThrow</code>, <code>entriesOrThrow</code> answer the value or throw the reason; the ten
+operation twins (<code>writeTextOrThrow</code> … <code>removeDirOrThrow</code>) are <code>void</code> where the silent form
+answers <code>bool</code>, throwing where it answers <code>false</code>. The runtime classifies the last failed
+operation; the twins read the classification immediately — the VM is single-threaded, so
+nothing runs in between. A module that binds the new natives needs a 3.7 runtime (the
+<code>parseFloat</code> forward path); one that does not loads everywhere it always did.</p>
+</li>
+<li><p><strong><code>entries(path): ?string[]</code></strong> completes the 2.14 line <code>listDir</code> missed: <code>null</code> when the
+directory cannot be read, an empty array when it is empty. <code>listDir</code> — which answers an empty
+array to both, with &quot;ask <code>isDirectory</code> first&quot; as its documented race — carries
+<code>@Deprecated { until = &quot;4.0&quot; }</code>.</p>
+</li>
+<li><p><strong><code>std.json.parseOrThrow</code></strong> — a <code>JsonError</code> naming the line, the column (1-based, code
+points), the offset and what the parser expected there. One parser answers both forms: the
+leaf that refuses records the FIRST place, <code>parse</code> ignores the note, <code>parseOrThrow</code> reads it.</p>
+</li>
+<li><p><strong><code>std.encoding.hexDecodeOrThrow</code> / <code>base64DecodeOrThrow</code></strong> — an <code>EncodingError</code> naming the
+character offset and what a canonical string would have had there.</p>
+</li>
+<li><p><strong><code>std.string.utf8DecodeOrThrow</code></strong> — a <code>Utf8Error</code> naming the byte that broke the sequence.</p>
+</li>
+</ul>
+<h3 id="deliberately-unchanged">Deliberately unchanged</h3>
+<p><code>parseInt</code> and <code>parseFloat</code> stay <code>?T</code> alone — the reason of a five-character input is the input.
+<code>std.os</code> stays silent throughout: an unset variable, an unanswered <code>hostName</code> — <code>null</code> IS the
+whole truth there. <code>Map.get</code>, <code>List</code> and the option helpers keep absence as a value, and panics
+keep programming errors.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><strong>An import mentioned only in a PATTERN warned as unused</strong> (<code>LYR-SEM0072</code>). <code>match (e.kind)</code>
+over an imported enum — the exact shape the new convention recommends — left the import
+&quot;unused&quot;, which under <code>--deny-warnings</code> fails the build. The 3.3.0 type-path fix, one node
+kind further: a pattern's path is strings, and its qualifier is recorded now.</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 10 gains &quot;Whether, or why&quot; — both shapes side by side, <code>??</code> for the fallback and
+<code>match (e.kind)</code> for the reason. Guide 13 lists <code>std.io.error</code>, the twin convention, and the
+<code>listDir</code> deprecation.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
