@@ -25,6 +25,16 @@ fn main(): int {
 }
 ```
 
+When a parameter's type is an interface, the argument's declared conformance can carry the
+binding: `fn unwrap<T>(h: Holder<T>): T` learns `T` from `Ints :: [Holder<int>]`. A type that
+conforms to that interface SEVERAL times does not choose — the call is refused (since 3.6.0),
+because the order of a `::` list must never decide a call — and the written type argument
+settles it: `unwrap<int>(x)`.
+
+A generic function is not a function value: `let f = ident;` is refused. A function value is
+monomorphic — call the function, or write a lambda that calls it: `let f = (n: int) =>
+ident(n);`.
+
 ## Generic types
 
 ```lyr
