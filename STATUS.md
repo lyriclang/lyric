@@ -25,6 +25,15 @@ sentences that had outlived 3.0. Bug-sweep loop per pipeline comes next; the pla
 round is the v3/v4 Bestandsaufnahme of 2026-08-25 (Runde 2: the error-reason design round;
 Runde 3: the opaque-`as` clock).
 
+**The sweep ran the same day and shipped as v3.6.1**: ~25 probes against what the four changes
+do to each other and make newly reachable. Two findings, both fixed failing-test-first. The one
+worth remembering: `lyric fmt` turned `catch (_: Boom)` into `catch (_)` — a selective catch
+into the catch-all, the formatter CHANGING MEANING — and could always have done so, because the
+form parses since forever and only 3.6.0 made it compile (#115), so no corpus ever carried one.
+The second was the qualified twin of SEM0052 (`m.ident` as a value went through MemberOfModule
+unrefused). Wave 2 over the fixes found nothing; three pre-existing edges went to §Still open
+instead of being fixed, because each needs a decision first.
+
 ---
 
 **M32 — "die Zaehlung" — SHIPPED as v2.12.0** (2026-08-22, format 3.5 → 3.6). The delivery list
@@ -517,8 +526,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4872 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
-**eleven** binaries plus `lyrembed.dll`, version **3.6.0**; the specification in
+4875 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+**eleven** binaries plus `lyrembed.dll`, version **3.6.1**; the specification in
 `lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 135 cases pinned to 3.6.0 (134/134
 against this tree, one platform-gated skip; the 3.6.0 rules landed spec-first in
 `lyric-spec#21`, the toolchain twin followed), and the toolchain's own CI runs it against the
@@ -1019,6 +1028,19 @@ answer yet, and it belongs asked before E4 starts.
   Retrofitting them would mean extending the model with provenance data — a decision of its own.
 - **Measure the verifier share in a Release profile** — the Debug numbers are riddled with JIT
   warm-up and serve only as an order of magnitude.
+- **A transparent alias is refused in a `::` list, against §3.5's word.** `type E =
+  Equatable<S>; struct S :: [Equatable<S>, E]` reports "'E' is not an interface" — but §3.5
+  says a transparent alias and its type are interchangeable EVERYWHERE, and here the alias
+  appears in a diagnostic where the type serves. Either `Conformance.InterfaceOf` resolves
+  through aliases, or §3.5 names the exception. Found by the 3.6.1 sweep; pre-existing.
+- **A substituted static method as a VALUE is an IR0001 that names `<?>`.**
+  `let f = List<int>.empty;` — the sema accepts, the lowering refuses with "member access
+  '.empty' on '<?>'": the right verdict in the wrong words, and static-method values may
+  simply deserve a lowering one day. Found by the 3.6.1 sweep; pre-existing.
+- **A duplicate CONSTRAINT entry is silently deduplicated.** `<T :: [Ord, Ord]>` compiles;
+  the 3.6.0 repetition rule deliberately covers conformance and parent lists only, and a
+  doubled constraint claims nothing false — it is redundancy, not a lie. Recorded so the
+  asymmetry is a decision, not an oversight; a future spec round may extend §5.1's sentence.
 - **A parent list swallows a second INSTANCE of one interface in silence.**
   `interface Both :: [Sink<int>, Sink<string>]` compiles, and only `Sink<int>` arrives: the
   parent walk in `CheckInterfaceParents`/`InterfaceClosure` deduplicates by SYMBOL, so the
