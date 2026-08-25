@@ -394,11 +394,17 @@ public sealed class NativeRegistry
                         encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
                         .GetString(ToBytes(args[0])));
                 }
-                catch (ArgumentException)
+                catch (ArgumentException e)
                 {
+                    // The decoder names the byte that broke the sequence; utf8DecodeOrThrow
+                    // reads it right after this null, on the same thread.
+                    _lastUtf8ErrorOffset = e is System.Text.DecoderFallbackException d ? d.Index : 0;
                     return default;
                 }
             }, returnElement: TypeTag.String);
+
+        registry.Register("std.string.utf8DecodeErrorOffset", none, TypeTag.I64,
+            _ => LyrValue.FromI64(_lastUtf8ErrorOffset));
 
         // Behind std.string.join and StringBuilder.build: one native call instead of a copy
         // cascade the language cannot avoid without preallocating strings.
@@ -1005,6 +1011,10 @@ public sealed class NativeRegistry
     // 3 InvalidPath, 0 Other.
     [ThreadStatic] private static int _lastIoKind;
     [ThreadStatic] private static string? _lastIoDetail;
+
+    // The byte offset of the last utf8Decode refusal, for std.string.utf8DecodeOrThrow — the
+    // same last-failure contract as the pair above.
+    [ThreadStatic] private static int _lastUtf8ErrorOffset;
 
     private static void RecordIo(Exception e)
     {

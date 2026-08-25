@@ -1,5 +1,13 @@
 import std.test { Test, assertEq, assertTrue };
-import std.encoding { hexEncode, hexDecode, base64Encode, base64Decode };
+import std.encoding {
+    hexEncode,
+    hexDecode,
+    hexDecodeOrThrow,
+    base64Encode,
+    base64Decode,
+    base64DecodeOrThrow,
+    EncodingError,
+};
 import std.string as strings;
 
 @Test
@@ -104,4 +112,40 @@ pub fn base64_refuses_what_spells_no_bytes(): void {
     if (empty != null) {
         assertEq(empty.length, 0);
     }
+}
+
+// The reasons (3.7): one implementation behind both forms; the twin names the offset.
+
+@Test
+pub fn decodeOrThrow_round_trips(): void {
+    try {
+        assertEq(hexDecodeOrThrow("0aff").length, 2);
+        assertEq(base64DecodeOrThrow("AQID").length, 3);
+    } catch (e: EncodingError) {
+        assertTrue(false, "canonical input must not throw: " + e.message());
+    }
+}
+
+@Test
+pub fn decodeOrThrow_names_the_offset(): void {
+    var hexAt = -1;
+    var hexWhat = "";
+    try {
+        let bytes = hexDecodeOrThrow("0aXY");
+        assertTrue(false, "0aXY must refuse, got " + strings.fromInt(bytes.length));
+    } catch (e: EncodingError) {
+        hexAt = e.offset;
+        hexWhat = e.expected;
+    }
+    assertEq(hexAt, 2);
+    assertEq(hexWhat, "a hexadecimal digit");
+
+    var b64At = -1;
+    try {
+        let bytes = base64DecodeOrThrow("AAA!");
+        assertTrue(false, "AAA! must refuse, got " + strings.fromInt(bytes.length));
+    } catch (e: EncodingError) {
+        b64At = e.offset;
+    }
+    assertEq(b64At, 3);
 }

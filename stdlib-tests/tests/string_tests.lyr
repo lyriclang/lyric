@@ -1,5 +1,14 @@
 import std.test { Test, assertEq, assertTrue };
-import std.string { join, parseInt, parseFloat, fromFloat, StringBuilder };
+import std.string {
+    join,
+    parseInt,
+    parseFloat,
+    fromFloat,
+    fromInt,
+    StringBuilder,
+    utf8DecodeOrThrow,
+    Utf8Error,
+};
 import std.math { isInfinite };
 
 @Test
@@ -128,4 +137,16 @@ pub fn parseFloat_refuses_what_spells_no_number(): void {
     assertTrue(parseFloat("Infinity") == null, "the word Infinity");
     assertTrue(parseFloat("0x10") == null, "hex is not decimal");
     assertTrue(parseFloat("1.2.3") == null, "a second point");
+}
+
+@Test
+pub fn utf8DecodeOrThrow_names_the_byte(): void {
+    var at = -1;
+    try {
+        let text = utf8DecodeOrThrow([65 as uint8, 255 as uint8]);
+        assertTrue(false, "0xFF is not UTF-8, got " + text);
+    } catch (e: Utf8Error) {
+        at = e.offset;
+    }
+    assertEq(at, 1);
 }
