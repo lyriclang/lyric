@@ -2410,7 +2410,25 @@ public sealed class TypeChecker
         // wall, and it is explicit by construction: this cast is the only way through. At
         // runtime the value is untouched; the lowering emits nothing for it.
         if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target)) return target;
-        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying)) return target;
+        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying))
+        {
+            // Making one is the declaring module's privilege (3.8, §3.5): elsewhere the inward
+            // cast forges a handle the alias exists to protect, so it warns toward the 4.0
+            // refusal — the LYR-SEM0074 path. The outward cast above stays free everywhere:
+            // reading the number breaks no promise. A null module is a bare snippet, which has
+            // no module line to cross.
+            if (_currentModule is { } here && !DeclaredInModule(to.Symbol, here))
+            {
+                var owner = _comp.Modules.FirstOrDefault(
+                    m => ReferenceEquals(m.Members.LookupLocal(to.Symbol.Name), to.Symbol));
+                var ownerName = owner?.FullName ?? "its declaring module";
+                _de.Report("LYR-SEM0093", Severity.Warning, c.Span,
+                    $"making a '{to.Symbol.Name}' is '{ownerName}''s privilege — this cast "
+                    + $"warns outside it and 4.0 refuses it; let '{ownerName}' offer a "
+                    + "constructor for values rebuilt from a stored number");
+            }
+            return target;
+        }
 
         if (_into is { } into && (CanConform(op) || op is PrimitiveType)
             && Satisfies(op, into, new GenericInstance(into, [target])))
