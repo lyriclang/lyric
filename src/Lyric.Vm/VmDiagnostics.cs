@@ -84,6 +84,12 @@ public static class VmDiagnostics
     /// <summary>A <c>resume</c> of a chain that is suspended mid-resume (4.0, §10a rule 5):
     /// one chain, one driver.</summary>
     public const string CoroutineRunning = "LYR-VM0014";
+
+    /// <summary>A yield whose value's type is not the running chain's element type (4.0, §10a
+    /// rule 3). The site's type is what the expression statically is — which chain it meets is
+    /// a runtime fact, so the meeting is where the check lives; admitted, the value would
+    /// corrupt the puller, whose result type is static.</summary>
+    public const string YieldTypeMismatch = "LYR-VM0015";
 }
 
 /// <summary>

@@ -98,7 +98,7 @@ public class E2ETests
     [InlineData("neg_missing_impl.lyr", "LYR-SEM0020")]
     [InlineData("neg_nonexhaustive.lyr", "LYR-SEM0050")]
     [InlineData("neg_unhandled_throw.lyr", "LYR-SEM0034")]
-    [InlineData("neg_yield_outside.lyr", "LYR-SEM0038")]
+    [InlineData("neg_yield_bare_in_valued.lyr", "LYR-SEM0038")]
     [InlineData("neg_orphan.lyr", "LYR-SEM0041")]
     [InlineData("neg_bad_impl.lyr", "LYR-SEM0042")]
     public void Negative_program_reports(string name, string code)

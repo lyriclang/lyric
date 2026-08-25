@@ -17,7 +17,8 @@ namespace Lyric.Vm;
 /// to the caller's stack, not to the coroutine — which is the wall §10a (stackful, 4.0) exists
 /// to remove.</para>
 /// </summary>
-internal sealed class CoroutineChain(int body, LyrValue[] args, TypeTag yieldTag)
+internal sealed class CoroutineChain(int body, LyrValue[] args, TypeTag yieldTag,
+    byte[] yieldType)
 {
     internal enum ChainState : byte
     {
@@ -44,7 +45,12 @@ internal sealed class CoroutineChain(int body, LyrValue[] args, TypeTag yieldTag
     public LyrValue[]? Args = args;
 
     /// <summary>The chain's element type, by its leading tag. What the lenient pull shapes its
-    /// answer with — <see cref="TypeTag.Void"/> is a bare-yield chain — and what a dynamic
-    /// yield is compared against once §10a rule 3 arrives.</summary>
+    /// answer with — <see cref="TypeTag.Void"/> is a bare-yield chain.</summary>
     public readonly TypeTag YieldTag = yieldTag;
+
+    /// <summary>The chain's element type as its canonical ENCODING, copied from the
+    /// <c>mkcoro</c> that built it. §10a rule 3 compares a yield site's encoded type against
+    /// this — byte equality is type equality within one module, and the runtime needs no type
+    /// model for it.</summary>
+    public readonly byte[] YieldType = yieldType;
 }

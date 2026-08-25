@@ -1833,17 +1833,24 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerYield(YieldStmt stmt)
     {
-        if (!InCoroutine) throw Bug("'yield' outside a coroutine body reached the lowerer");
-
         // One op, and control CONTINUES at the next instruction when the chain is resumed — the
-        // suspension is the interpreter's business, not the CFG's. The value is checked against
-        // the chain's element type here, statically, because inside the body the chain is known;
-        // the annotation the op carries is what §10a rule 3 compares for the yields that are not.
-        var value = stmt.Value is null
-            ? null
-            : (TempId?)LowerExprAs(stmt.Value, _coroutineYield!);
-        _b.Emit(new YieldSuspend(value, _coroutineYield!, stmt.Span));
+        // suspension is the interpreter's business, not the CFG's. Inside a coroutine body the
+        // chain is known, so the value is checked against its element type here, statically;
+        // outside (§10a, 4.0) the value is typed as what the expression IS — there is no
+        // context — and the annotation the op carries is what rule 3 compares against the
+        // running chain at the suspension itself.
+        if (InCoroutine)
+        {
+            var value = stmt.Value is null
+                ? null
+                : (TempId?)LowerExprAs(stmt.Value, _coroutineYield!);
+            _b.Emit(new YieldSuspend(value, _coroutineYield!, stmt.Span));
+            return true;
+        }
 
+        var dynamicValue = stmt.Value is null ? null : (TempId?)LowerExpr(stmt.Value);
+        var siteType = stmt.Value is null ? VoidType : TypeOfExpr(stmt.Value);
+        _b.Emit(new YieldSuspend(dynamicValue, siteType, stmt.Span));
         return true;
     }
 

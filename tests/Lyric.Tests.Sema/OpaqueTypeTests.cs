@@ -170,11 +170,11 @@ public class OpaqueTypeTests
 }
 
 /// <summary>
-/// The inward privilege (3.8, spec §3.5): making an opaque value belongs to the declaring
-/// module. Outside it the inward cast warns (LYR-SEM0093) toward a 4.0 refusal — the
-/// LYR-SEM0074 path — while the outward cast stays free everywhere: reading the number breaks
-/// no promise the alias makes. Cross-module by nature, so the conformance suite pins only the
-/// silent half; the warning is pinned here.
+/// The inward privilege (spec §3.5): making an opaque value belongs to the declaring module.
+/// Outside it the inward cast is an ERROR since 4.0 — 3.8 announced it as a warning, the
+/// LYR-SEM0074 path, and the clock came due — while the outward cast stays free everywhere:
+/// reading the number breaks no promise the alias makes. Cross-module by nature, so the
+/// conformance suite pins only the silent half; the refusal is pinned here.
 /// </summary>
 public class OpaqueInwardPrivilegeTests
 {
@@ -208,7 +208,7 @@ public class OpaqueInwardPrivilegeTests
     }
 
     [Fact]
-    public void A_foreign_inward_cast_warns()
+    public void A_foreign_inward_cast_is_refused()
     {
         var de = CheckWithWorld("""
             import world { Entity, idOf };
@@ -219,12 +219,10 @@ public class OpaqueInwardPrivilegeTests
             }
             """);
 
-        Assert.False(de.HasErrors,
-            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
-        var warning = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
-        Assert.Equal(Severity.Warning, warning.Severity);
-        Assert.Contains("world", warning.Message, StringComparison.Ordinal);
-        Assert.Contains("4.0", warning.Message, StringComparison.Ordinal);
+        var refusal = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+        Assert.Equal(Severity.Error, refusal.Severity);
+        Assert.Contains("world", refusal.Message, StringComparison.Ordinal);
+        Assert.Contains("privilege", refusal.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -257,7 +255,7 @@ public class OpaqueInwardPrivilegeTests
     }
 
     [Fact]
-    public void The_alias_route_warns_too()
+    public void The_alias_route_is_refused_too()
     {
         var de = CheckWithWorld("""
             import world as w;
@@ -272,7 +270,7 @@ public class OpaqueInwardPrivilegeTests
     }
 
     [Fact]
-    public void A_global_initializer_warns_too()
+    public void A_global_initializer_is_refused_too()
     {
         var de = CheckWithWorld("""
             import world { Entity, idOf };
@@ -284,8 +282,6 @@ public class OpaqueInwardPrivilegeTests
             }
             """);
 
-        Assert.False(de.HasErrors,
-            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
         Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
     }
 
@@ -304,7 +300,7 @@ public class OpaqueInwardPrivilegeTests
     }
 
     [Fact]
-    public void A_transparent_alias_target_warns_too()
+    public void A_transparent_alias_target_is_refused_too()
     {
         var de = CheckWithWorld("""
             import world { Entity, idOf };

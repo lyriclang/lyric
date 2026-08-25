@@ -32,9 +32,27 @@ flips the version. A 4.0 reader accepts every 3.x module (a state machine is ord
 could, pinned in `CoroutineChainTests`**: a chain nested in a chain, DONE once a throw crosses
 the pull (the old machine left that edge undefined and nothing pinned it), defers running as
 the throw unwinds the chain, the one-driver panic, a hundred suspensions reusing one capture
-array. Reader rejections for `mkcoro` seeded in the negative catalogue. Next: **slice 2 — the
-dynamic yield** (SEM0038 narrows, the five §10a panics, rule 3's typed check), which activates
-the five 4.0 suite cases and claims 4.0.0.
+array. Reader rejections for `mkcoro` seeded in the negative catalogue.
+
+**Slice 2 — the dynamic yield — is BUILT, and the tree claims 4.0.0.** `yield` is legal in
+every function: the sema's SEM0038 narrowed to its surviving half (bare `yield;` in a valued
+body; the outside-a-body pins retired WITH their rule, replaced by their §10a opposites — a
+lambda's yields are the dynamic kind even inside a coroutine body), the lowering annotates a
+dynamic yield with the expression's own type, and §10a rule 3 is a BYTE COMPARISON in the VM:
+a chain op's encoded type span is recorded at decode (SlotA/SlotB into the code bytes), the
+chain keeps its element type's canonical encoding from `mkcoro`, and byte equality is type
+equality within a module — the runtime needs no type model for it (`LYR-VM0015`; 0013/0014
+landed with slice 1, all three in Appendix A). **The five 4.0 suite cases activate and pass —
+conformance 149/149** — including yield-through-a-helper AND through a lambda, the
+no-resume panic, the typed mismatch, one-driver, throw-at-depth with defers. **The clocks came
+due with the version claim**, because SEM0081 enforces them the moment the tree says 4.0.0:
+`listDir` is REMOVED (guide 13 past tense; the native stays registered for 3.x modules; doc
+floor 450 → 449, deliberately) and `LYR-SEM0093` is an ERROR (guide 12, the privilege tests
+flipped to refusal, the embedding save-fixture moved onto the constructor pattern it always
+should have modelled). Guide 11 gains "Yield from any depth"; CHANGELOG carries the 4.0.0
+Unreleased section. Full suite green at 4.0.0 across all 14 projects, Vm under `LYRIC_JIT=1`
+included. Next: **slice 3 — the contracts** (debugger stack splicing across chains, budget
+pins, embedding pins per the #121 answers), then the basket items as their own features.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

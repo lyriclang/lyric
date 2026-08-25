@@ -102,6 +102,58 @@ or a type argument — a driver that steps a stored `List<Coroutine<float>>` eve
 them like anything else. Copying the value copies a reference to the same suspended state; two
 holders drive one coroutine.
 
+## Yield from any depth
+
+Since 4.0 a coroutine is **stackful**: its frames live on a chain of their own, and a `yield`
+executed at any call depth beneath a running `resume` suspends the whole chain. A helper can
+wait so its callers do not have to:
+
+```lyr
+import std.io.console { println };
+import std.string as strings;
+
+fn firstTwo(): void {
+    yield 1;
+    yield 2;
+}
+
+fn numbers(): Coroutine<int> {
+    firstTwo();
+    yield 3;
+}
+
+fn main(): int {
+    let co = numbers();
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    return 0;
+}
+```
+
+`firstTwo` is an ordinary function — no marker in its signature, and its callers need none
+either, which is the point: waiting composes without colouring anything. What it does when it
+runs is decided by *who is running it*: beneath a resume of `numbers`, its yields arrive at
+`numbers`' puller.
+
+Because the chain is a runtime fact, the failures are **panics**, not compile errors:
+
+- a yield with no resume running it — in `main`, or beneath a host callback — panics;
+- the value's type must *be* the running chain's element type: `yield "x";` reaching a
+  `Coroutine<int>` panics, and the yielded expression is typed as what it is, with no context
+  to adapt against (a `Coroutine<int32>` chain wants an `int32`-typed value, not a bare
+  literal in some helper);
+- a native or JIT-compiled frame between the yield and its resume is a wall — the chain cannot
+  capture it — and the yield panics rather than suspending half a chain;
+- `resume` on a coroutine that is already running — reached through a stored reference from
+  its own chain — panics: one chain, one driver.
+
+Inside a coroutine *body* nothing changes: a yield there still checks its value against `T` at
+compile time, the better error when the chain is statically known. And a `defer` runs when its
+frame exits — by return or by an exception unwinding toward the pull; a chain dropped while
+suspended runs nothing, so cleanup that must happen belongs to whoever drives the coroutine to
+its end.
+
 ## When the body throws
 
 A coroutine body may `throw`, and the exception comes out of the `resume` or `next()` that was

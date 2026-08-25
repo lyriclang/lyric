@@ -2283,24 +2283,13 @@
         },
         {
           "Kind": "Function",
-          "Name": "listDir",
-          "Signature": "pub fn listDir(path: string): string[]",
-          "Doc": "The entries of a directory — names, sorted — before 3.7. It answers an empty array to both\n\"empty\" and \"unreadable\", which no caller can tell apart; `entries` says `null`, and\n`entriesOrThrow` says why.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 248
-          }
-        },
-        {
-          "Kind": "Function",
           "Name": "tempDir",
           "Signature": "pub fn tempDir(): string",
           "Doc": "A path in the system's temporary directory. Does NOT create the file.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 252
+            "Line": 250
           }
         },
         {
@@ -2311,7 +2300,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 266
+            "Line": 264
           }
         },
         {
@@ -2322,7 +2311,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 299
+            "Line": 297
           }
         },
         {
@@ -2333,7 +2322,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 305
+            "Line": 303
           }
         },
         {
@@ -2344,7 +2333,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 321
+            "Line": 319
           }
         },
         {
@@ -2355,7 +2344,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 337
+            "Line": 335
           }
         },
         {
@@ -2366,7 +2355,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 347
+            "Line": 345
           }
         },
         {
@@ -2377,7 +2366,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 355
+            "Line": 353
           }
         }
       ]

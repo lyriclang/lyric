@@ -661,7 +661,9 @@ public static class Interpreter
                     var captured = argc == 0 ? Array.Empty<LyrValue>() : new LyrValue[argc];
                     for (var i = argc - 1; i >= 0; i--) captured[i] = stack[--sp];
                     stack[sp++] = LyrValue.FromCoroutine(new CoroutineChain(
-                        (int)instruction.Immediate - natives.Length, captured, instruction.Type));
+                        (int)instruction.Immediate - natives.Length, captured, instruction.Type,
+                        frame.Fn.Source.Code[instruction.SlotA
+                            .. (instruction.SlotA + instruction.SlotB)]));
                     break;
                 }
 
@@ -740,6 +742,17 @@ public static class Interpreter
 
                     var active = actives.Pop();
                     var chain = active.Chain;
+
+                    // §10a rule 3: the site's type must BE the chain's element type, compared
+                    // as canonical encodings — byte equality is type equality within a module.
+                    // Inside a coroutine body the lowering annotated the chain's own type, so
+                    // this never fires there; it exists for the yields whose chain is a runtime
+                    // fact. Checked before the capture: a panic ends the program, not a chain.
+                    if (!chain.YieldType.AsSpan().SequenceEqual(
+                            frame.Fn.Source.Code.AsSpan(instruction.SlotA, instruction.SlotB)))
+                        throw new LyricPanic(VmDiagnostics.YieldTypeMismatch,
+                            $"yield in '{frame.Fn.Source.Name}' does not match what the running " +
+                            "coroutine yields — the value's type must be the chain's element type");
 
                     frame.Sp = sp;
                     var count = frames.Count - active.Boundary + 1;

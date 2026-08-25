@@ -987,12 +987,17 @@ public sealed class TypeChecker
                     _de.Report("LYR-SEM0030", Severity.Error, t.Span,
                         $"cannot throw '{TypeFacts.Display(thrown)}' — only types implementing 'Throwable' can be thrown");
                 break;
-            case YieldStmt y: // coroutines only; the value is checked against the yield type
+            case YieldStmt y:
+                // Since 4.0 'yield' is legal in EVERY function (§10a): which chain it suspends
+                // is a runtime fact, so outside a coroutine body the value is typed as what it
+                // is — there is no context to adapt against — and the meeting with the chain is
+                // checked where it happens, by panic. Inside a body the chain IS known, so the
+                // static check stays: the better error, kept, and the half of LYR-SEM0038 that
+                // survives the 4.0 narrowing.
                 var yv = y.Value is not null ? CheckExpr(y.Value, scope, _currentYield) : null;
                 if (_currentYield is null)
-                    _de.Report("LYR-SEM0038", Severity.Error, y.Span,
-                        "'yield' is only allowed in a coroutine — declare the return type as 'Coroutine<T>'");
-                else if (yv is null)
+                    break;
+                if (yv is null)
                 {
                     if (!TypeFacts.IsVoid(_currentYield) && !_currentYield.IsError)
                         _de.Report("LYR-SEM0038", Severity.Error, y.Span,
@@ -2452,20 +2457,20 @@ public sealed class TypeChecker
         if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target)) return target;
         if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying))
         {
-            // Making one is the declaring module's privilege (3.8, §3.5): elsewhere the inward
-            // cast forges a handle the alias exists to protect, so it warns toward the 4.0
-            // refusal — the LYR-SEM0074 path. The outward cast above stays free everywhere:
-            // reading the number breaks no promise. A null module is a bare snippet, which has
-            // no module line to cross.
+            // Making one is the declaring module's privilege (§3.5): elsewhere the inward cast
+            // forges a handle the alias exists to protect. An ERROR since 4.0 — 3.8 announced
+            // it as a warning, the LYR-SEM0074 path, and this is the clock coming due. The
+            // outward cast above stays free everywhere: reading the number breaks no promise.
+            // A null module is a bare snippet, which has no module line to cross.
             if (_currentModule is { } here && !DeclaredInModule(to.Symbol, here))
             {
                 var owner = _comp.Modules.FirstOrDefault(
                     m => ReferenceEquals(m.Members.LookupLocal(to.Symbol.Name), to.Symbol));
                 var ownerName = owner?.FullName ?? "its declaring module";
-                _de.Report("LYR-SEM0093", Severity.Warning, c.Span,
-                    $"making a '{to.Symbol.Name}' is '{ownerName}''s privilege — this cast "
-                    + $"warns outside it and 4.0 refuses it; let '{ownerName}' offer a "
-                    + "constructor for values rebuilt from a stored number");
+                _de.Report("LYR-SEM0093", Severity.Error, c.Span,
+                    $"making a '{to.Symbol.Name}' is '{ownerName}''s privilege — a handle is "
+                    + $"issued, not assembled; let '{ownerName}' offer a constructor for values "
+                    + "rebuilt from a stored number");
             }
             return target;
         }
@@ -4673,7 +4678,9 @@ public sealed class TypeChecker
         var savedYield = _currentYield;
         var savedReturn = _currentReturn;
         var savedInference = _returnInference;
-        _currentYield = null; // a lambda is no coroutine, so a yield inside it is an error
+        _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
+                              // (§10a) even when the lambda stands inside a coroutine body —
+                              // which chain it meets is decided by who calls it, at runtime
         _returnInference = null; // this lambda's returns are its own, never the outer collection's
 
         var lambdaScope = new SymbolTable(scope);

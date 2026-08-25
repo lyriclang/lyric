@@ -187,20 +187,25 @@ public static class CodeDecoder
 
     /// <summary>A chain opcode (4.0): one or two uleb128s, then the yield type — which, alone in
     /// the instruction stream, may be top-level VOID: a <c>Coroutine&lt;void&gt;</c> yields
-    /// nothing and still has to say so.</summary>
+    /// nothing and still has to say so. The type's raw span within the code is recorded in
+    /// <c>SlotA</c>/<c>SlotB</c> (start, length): §10a rule 3 compares a yield site's type with
+    /// the chain's by their canonical ENCODING, which spares the runtime a type model.</summary>
     private static BytecodeInstruction DecodeChainOp(ByteReader reader, int offset, Op opcode,
         int immediates)
     {
         var immediate = reader.ULeb();
         var immediate2 = immediates == 2 ? reader.ULeb() : 0UL;
 
+        var typeStart = reader.Position;
         var tag = reader.Tag();
         if (tag != TypeTag.Void) SkipTypeBody(reader, offset, tag);
+        var typeLength = reader.Position - typeStart;
 
         return new BytecodeInstruction
         {
             Offset = offset, Opcode = opcode,
             Immediate = immediate, Immediate2 = immediate2, Type = tag,
+            SlotA = typeStart, SlotB = typeLength,
         };
     }
 
