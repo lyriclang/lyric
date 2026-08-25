@@ -1290,6 +1290,17 @@
           }
         },
         {
+          "Kind": "Interface",
+          "Name": "WithArg",
+          "Signature": "pub interface WithArg<T>",
+          "Doc": "An attribute declaring this takes its one value in parentheses — `@On(Event.Damage)` — and\nthe value fills the attribute's FIRST field, whose type must be `T`. The braces form stays\nopen to every attribute; this one is opted into, so a struct's field order never becomes an\nargument order by accident.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 489
+          }
+        },
+        {
           "Kind": "Struct",
           "Name": "Deprecated",
           "Signature": "pub struct Deprecated :: [OnModule, OnType, OnFunction]",
@@ -1303,7 +1314,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 490
+                "Line": 496
               }
             },
             {
@@ -1314,13 +1325,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 497
+                "Line": 503
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 488
+            "Line": 494
           }
         }
       ]

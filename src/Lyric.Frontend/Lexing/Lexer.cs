@@ -358,6 +358,11 @@ public sealed class Lexer
     private Token ScanAtIdentifier(int start)
     {
         _pos++; //Consume '@'
+        if (Current == '[')
+        {
+            _pos++; // '@[' is one token: it opens an attribute group
+            return new Token(TokenKind.AtLBracket, new Span(_file, start, _pos));
+        }
         if (!IsIdentifierStart(Current))
         {
             _diagnostics.Report((new Diagnostic("LYR-LEX0012", Severity.Error, new Span(_file, start, _pos),

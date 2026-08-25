@@ -178,6 +178,7 @@ public static class AstDumper
             case AttributeNode n:
                 Line(sb, indent, $"Attribute {string.Join('.', n.Path)}", n.Span);
                 foreach (var f in n.Fields) Write(f, indent + 1, sb);
+                if (n.Positional is not null) Write(n.Positional, indent + 1, sb);
                 break;
             case ImportDecl n:
                 Line(sb, indent, $"Import {string.Join('.', n.Path)}", n.Span);

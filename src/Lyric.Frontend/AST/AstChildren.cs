@@ -36,6 +36,7 @@ public static class AstChildren
 
             case AttributeNode at:
                 foreach (var f in at.Fields) yield return f;
+                if (at.Positional is not null) yield return at.Positional;
                 break;
 
             case ImportDecl i:

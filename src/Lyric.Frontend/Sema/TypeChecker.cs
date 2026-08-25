@@ -135,6 +135,7 @@ public sealed class TypeChecker
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
+        _withArg = core?.LookupLocal("WithArg") as TypeSymbol;
     }
 
     /// <summary>The three attribute markers, under the same rules as <see cref="_equatable"/>:
@@ -146,6 +147,11 @@ public sealed class TypeChecker
 
     /// <inheritdoc cref="_onModule"/>
     private readonly TypeSymbol? _onFunction;
+
+    /// <summary>The positional-argument conformance (3.9), under the same rules: an attribute
+    /// declaring <c>WithArg&lt;T&gt;</c> takes one parenthesized value, filling its first
+    /// field.</summary>
+    private readonly TypeSymbol? _withArg;
 
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
@@ -646,6 +652,32 @@ public sealed class TypeChecker
                 continue;
             }
             entrySeen.Add((entry, NodeSpan(node)));
+
+            // The WithArg promise (3.9, §4.7): the parenthesized value fills the FIRST field,
+            // and the type argument names its type. Checked here — own list and extend block
+            // alike — so a mismatch lands with whoever declared the conformance, not at a use.
+            // Only a struct can be an attribute, so only a struct carries the promise.
+            if (_withArg is not null && entry is GenericInstance { Arguments: [var promised] } wa
+                && ReferenceEquals(wa.Definition, _withArg)
+                && implementer.Declaration is StructDecl attrDecl)
+            {
+                var firstField = attrDecl.Members.OfType<FieldDecl>().FirstOrDefault();
+                var actual = firstField is not null
+                    && implementer.Members.LookupLocal(firstField.Name) is FieldSymbol ffs
+                        ? FieldType(ffs)
+                        : null;
+                if (actual is null)
+                    _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
+                        $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' and has no "
+                        + "field — the parenthesized value fills the first field, so there must "
+                        + "be one");
+                else if (!LyrType.Equal(actual, promised))
+                    _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
+                        $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' but its "
+                        + $"first field '{firstField!.Name}' is "
+                        + $"'{TypeFacts.Display(actual)}' — the conformance names what "
+                        + $"'@{name}(value)' fills");
+            }
 
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
             {
@@ -3611,13 +3643,7 @@ public sealed class TypeChecker
                 CheckAssignable(field.Value, CheckExpr(field.Value, scope, ft), ft, field.Span);
                 // AFTER the check, which is what binds the name this may be resolving through.
                 if (AttributeValues.LiteralOf(field.Value, _result) is null)
-                    _de.Report("LYR-SEM0066", Severity.Error, field.Value.Span,
-                        PayloadVariant(field.Value) is { } carried
-                            ? $"'{carried}' carries a payload; a row holds one value per field, "
-                              + "so only a variant without one stands in an attribute"
-                            : "an attribute argument must be a value at compile time — a number, "
-                              + "a string, a char, a bool, a unit enum variant, or a 'let' bound "
-                              + "to one");
+                    ReportAttributeValueNotLiteral(field.Value);
             }
             else
             {
@@ -3626,6 +3652,10 @@ public sealed class TypeChecker
                 CheckExpr(field.Value, scope);
             }
         }
+
+        if (attribute.Positional is { } positional
+            && !CheckPositionalValue(attribute, ts, positional, scope, writtenFields))
+            return ts; // the form itself was refused; completeness would only echo it
 
         // The emitted row is COMPLETE: absent fields are filled from their defaults, so the host
         // never resolves one. A field that is neither written nor literal-defaulted has no value
@@ -3644,6 +3674,47 @@ public sealed class TypeChecker
         }
         return ts;
     }
+
+    /// <summary>The parenthesized value (3.9, §4.7): admitted by the WithArg conformance and
+    /// filling the FIRST field under the same value rules as a written one. False when the
+    /// attribute does not take the form at all.</summary>
+    private bool CheckPositionalValue(AttributeNode attribute, TypeSymbol ts, Expr value,
+        SymbolTable scope, HashSet<string> writtenFields)
+    {
+        var admitted = _withArg is not null && ConformancesTo(ts, _withArg, EmptySubst).Any();
+        if (!admitted)
+        {
+            _de.Report("LYR-SEM0094", Severity.Error, attribute.Span,
+                $"'@{ts.Name}' does not take a parenthesized value — the form belongs to an "
+                + $"attribute declaring ':: [WithArg<T>]'; write the field by name instead");
+            CheckExpr(value, scope);
+            return false;
+        }
+
+        // The value fills the first field; that its type is the declared T is the DECLARATION's
+        // promise (LYR-SEM0095), so here the field itself is the measure — as for a named write.
+        var first = (ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>().FirstOrDefault();
+        if (first is null || ts.Members.LookupLocal(first.Name) is not FieldSymbol fs)
+        {
+            CheckExpr(value, scope);
+            return true; // no field at all: SEM0095 already stands at the declaration
+        }
+        writtenFields.Add(first.Name);
+        var ft = FieldType(fs);
+        CheckAssignable(value, CheckExpr(value, scope, ft), ft, value.Span);
+        if (AttributeValues.LiteralOf(value, _result) is null)
+            ReportAttributeValueNotLiteral(value);
+        return true;
+    }
+
+    private void ReportAttributeValueNotLiteral(Expr value) =>
+        _de.Report("LYR-SEM0066", Severity.Error, value.Span,
+            PayloadVariant(value) is { } carried
+                ? $"'{carried}' carries a payload; a row holds one value per field, "
+                  + "so only a variant without one stands in an attribute"
+                : "an attribute argument must be a value at compile time — a number, "
+                  + "a string, a char, a bool, a unit enum variant, or a 'let' bound "
+                  + "to one");
 
     /// <summary>The variant name when the expression CONSTRUCTS one with a payload — the near
     /// miss of an enum attribute argument, and worth its own sentence: "must be a literal" says

@@ -15,5 +15,5 @@ public static class ToolchainVersion
     /// <para>The editor clients (<c>lyriclang/vscode-lyric</c>, <c>lyriclang/jetbrains-lyric</c>)
     /// version independently, in their own repositories.</para>
     /// </summary>
-    public const string Value = "3.8.2";
+    public const string Value = "3.9.0";
 }

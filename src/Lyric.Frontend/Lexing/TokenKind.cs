@@ -6,6 +6,7 @@ public enum TokenKind
     BadChar,
     Identifier,
     AtIdentifier,
+    AtLBracket,
     
     // Braces
     LParen,

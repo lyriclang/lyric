@@ -10,6 +10,36 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.9.0 — 2026-08-25
+
+**Attributes: one value in parentheses, and the group spelling.** The twin of `lyric-spec#24`.
+No format change — the row of a positional use is byte-identical to its braces twin, so
+nothing about the bytecode, its readers or a host changes.
+
+### Added
+
+- **`@On(Event.Damage)`** — an attribute takes its one value positionally (spec §4.7). The
+  parenthesized form carries exactly one value under the existing value rules and fills the
+  attribute's FIRST field; every other field ends with its default. The form is a conformance,
+  not a courtesy: the attribute struct declares `std.core.WithArg<T>` — new, beside the three
+  placement markers — and only then is the form admitted (`LYR-SEM0094`); `T` must be the
+  first field's type, checked at the attribute's declaration (`LYR-SEM0095`), so a mismatch
+  lands with whoever ships the attribute rather than at every use site.
+- **`@[Component, System { order = 10 }, On(Event.Damage)]`** — several attributes as one
+  group, behind the new token `@[` (spec §1.1, §2). The group is the same list the stacked
+  spelling declares: the parser flattens it, the rows land in written order, and the
+  one-per-attribute rule counts across both spellings.
+
+### Changed
+
+- **`lyric fmt` canonicalizes attribute lists**: two or more attributes on one declaration
+  take the group shape, a single-entry group unfolds to `@Name`, and a group that outgrows
+  the line breaks one entry per line. Module-header attributes keep their stacked lines.
+
+### Documentation
+
+- Guide 15 documents both forms; `docs/Grammar.md` mirrors the amended spec chapter.
+
 ## v3.8.2 — 2026-08-25
 
 **The release 3.8.1 could not be.** The `v3.8.1` tag points at a tree whose README still said

@@ -145,15 +145,42 @@ public class AttributeParsingTests
         Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0042");
     }
 
-    /// <summary>The old expression form <c>@name(args)</c> is out of the grammar: at declaration
-    /// position the '(' no longer belongs to the attribute. What follows fails to open a
-    /// declaration, and the message says what an attribute needs.</summary>
+    /// <summary>Since 3.9 the parenthesized form IS attribute syntax: one positional value,
+    /// filling the first field. Whether an attribute admits it is the checker's rule
+    /// (<c>WithArg&lt;T&gt;</c>), not the parser's — here it only has to parse.</summary>
     [Fact]
-    public void The_reserved_call_form_is_no_longer_attribute_syntax()
+    public void The_call_form_is_the_positional_value()
     {
-        Parse("@deprecated(\"old\")\nfn f(): void { }", out var diagnostics);
+        var module = ParseClean("@Retry(3)\nfn f(): void { }");
+        var fn = (FunctionDecl)module.Declarations[0];
+        var attribute = Assert.Single(fn.Attributes);
 
-        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0042");
+        Assert.NotNull(attribute.Positional);
+        Assert.Empty(attribute.Fields);
+        Assert.Contains(attribute.Positional!, AstChildren.Of(attribute));
+    }
+
+    /// <summary>A group is the stacked list: the parser flattens it, so no consumer downstream
+    /// ever learns which spelling the source used.</summary>
+    [Fact]
+    public void A_group_flattens_to_the_stacked_list()
+    {
+        var module = ParseClean("@[Tag, System { order = 1 }, Retry(9)]\nfn f(): void { }");
+        var fn = (FunctionDecl)module.Declarations[0];
+
+        Assert.Equal(3, fn.Attributes.Length);
+        Assert.Equal(["Tag"], fn.Attributes[0].Path);
+        Assert.Single(fn.Attributes[1].Fields);
+        Assert.NotNull(fn.Attributes[2].Positional);
+    }
+
+    [Fact]
+    public void An_empty_group_is_refused_once()
+    {
+        Parse("@[]\nfn f(): void { }", out var diagnostics);
+
+        var single = Assert.Single(diagnostics);
+        Assert.Equal("LYR-PAR0026", single.Code);
     }
 
     [Fact]

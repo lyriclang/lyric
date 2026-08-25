@@ -29,6 +29,12 @@ public sealed record AttributeNode(string[] Path, StructInitField[] Fields, Span
     /// <summary>The LAST path segment without the <c>@</c> — the name of the struct the attribute
     /// refers to, which is what an editor renaming that struct has to edit.</summary>
     public required Span NameSpan { get; init; }
+
+    /// <summary>The parenthesized argument — <c>@On(Event.Damage)</c> — or <c>null</c>. It fills
+    /// the attribute's first field; which attributes admit the form is the checker's rule
+    /// (<c>WithArg&lt;T&gt;</c>). Grammatically an attribute carries either this or
+    /// <see cref="Fields"/>, never both.</summary>
+    public Expr? Positional { get; init; }
 }
 
 public abstract record Decl(Span Span) : Node(Span);

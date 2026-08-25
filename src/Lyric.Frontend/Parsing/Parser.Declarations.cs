@@ -50,59 +50,103 @@ public sealed partial class Parser
         return new Module(header, decls.ToArray(), Span.Union(start, end)) { Attributes = moduleAttributes };
     }
 
+    private bool AtAttributeStart =>
+        _buffer.Check(TokenKind.AtIdentifier) || _buffer.Check(TokenKind.AtLBracket);
+
     /// <summary>
-    /// Zero or more attributes: <c>@Name</c> or <c>@Name { field = expr, … }</c>, each an
-    /// optionally dotted path. The VALUES are parsed as expressions; that they must be literals is
-    /// a semantic rule, so the message can name the offending expression instead of refusing to
-    /// read it.
+    /// Zero or more attributes: <c>@Name</c>, <c>@Name { field = expr, … }</c>,
+    /// <c>@Name(value)</c>, or a group <c>@[Name, Name { … }, Name(value)]</c> — the group is
+    /// the same list the stacked spelling declares. The VALUES are parsed as expressions; that
+    /// they must be literals is a semantic rule, so the message can name the offending
+    /// expression instead of refusing to read it — and which attribute admits the parenthesized
+    /// form is the checker's rule too (<c>WithArg&lt;T&gt;</c>).
     /// </summary>
     private AttributeNode[] ParseAttributeList()
     {
-        if (!_buffer.Check(TokenKind.AtIdentifier)) return [];
+        if (!AtAttributeStart) return [];
 
         var attributes = new List<AttributeNode>();
-        while (_buffer.Check(TokenKind.AtIdentifier))
+        while (AtAttributeStart)
         {
-            var at = _buffer.Advance();
-            var path = new List<string> { _sm.Slice(at.Span)[1..].ToString() }; // strip the '@'
-            var pathEnd = at.Span;
-
-            // The single-segment case: the name is the token minus its '@'.
-            var nameSpan = new Span(at.Span.File, at.Span.Start + 1, at.Span.End);
-            while (_buffer.Match(TokenKind.Dot))
+            if (_buffer.Check(TokenKind.AtIdentifier))
             {
-                var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                    $"expected attribute name, got {_buffer.Current.TokenKind}");
-                path.Add(_sm.Slice(segment.Span).ToString());
-                nameSpan = segment.Span;
-                pathEnd = segment.Span;
+                var at = _buffer.Advance();
+                // The single-segment case: the name is the token minus its '@'.
+                attributes.Add(ParseAttributeEntry(at,
+                    _sm.Slice(at.Span)[1..].ToString(),
+                    new Span(at.Span.File, at.Span.Start + 1, at.Span.End)));
+                continue;
             }
 
-            var fields = new List<StructInitField>();
-            var end = pathEnd;
-            if (_buffer.Check(TokenKind.LBrace))
+            // '@[A, B { x = 1 }, C(v)]' — the same list the stacked spelling declares. The
+            // entries carry no '@' of their own, and at least one must stand, so '@[]' is
+            // refused here. On a non-name the loop reports once and leaves the token where it
+            // is, rather than building an attribute out of it for the sema to re-refuse.
+            _buffer.Advance(); // '@['
+            do
             {
-                _buffer.Advance();
-                while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
+                if (!_buffer.Check(TokenKind.Identifier))
                 {
-                    var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                        $"expected field name, got {_buffer.Current.TokenKind}");
-                    _buffer.Expect(TokenKind.Equal, "LYR-PAR0037",
-                        "expected '=' in attribute arguments (':' is only for types)");
-                    var value = ParseSubExpr();
-                    fields.Add(new StructInitField(_sm.Slice(nameTok.Span).ToString(), value,
-                        Span.Union(nameTok.Span, value.Span)) { NameSpan = nameTok.Span });
-                    if (!_buffer.Match(TokenKind.Comma)) break;
+                    _de.Report("LYR-PAR0026", Severity.Error, _buffer.Current.Span,
+                        $"expected attribute name, got {_buffer.Current.TokenKind}");
+                    break;
                 }
-                end = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018",
-                    "expected '}' to close attribute arguments").Span;
-            }
-
-            attributes.Add(new AttributeNode(path.ToArray(), fields.ToArray(),
-                Span.Union(at.Span, end))
-                { PathSpan = Span.Union(at.Span, pathEnd), NameSpan = nameSpan });
+                var first = _buffer.Advance();
+                attributes.Add(ParseAttributeEntry(first,
+                    _sm.Slice(first.Span).ToString(), first.Span));
+            } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
+            _buffer.Expect(TokenKind.RBracket, "LYR-PAR0018",
+                "expected ']' to close the attribute group");
         }
         return attributes.ToArray();
+    }
+
+    /// <summary>One attribute, from its already-consumed first token: the rest of the path,
+    /// then the arguments — a braces block of named fields, or one parenthesized value.</summary>
+    private AttributeNode ParseAttributeEntry(Token first, string firstSegment, Span firstNameSpan)
+    {
+        var path = new List<string> { firstSegment };
+        var pathEnd = first.Span;
+        var nameSpan = firstNameSpan;
+        while (_buffer.Match(TokenKind.Dot))
+        {
+            var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
+                $"expected attribute name, got {_buffer.Current.TokenKind}");
+            path.Add(_sm.Slice(segment.Span).ToString());
+            nameSpan = segment.Span;
+            pathEnd = segment.Span;
+        }
+
+        var fields = new List<StructInitField>();
+        Expr? positional = null;
+        var end = pathEnd;
+        if (_buffer.Check(TokenKind.LBrace))
+        {
+            _buffer.Advance();
+            while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
+            {
+                var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
+                    $"expected field name, got {_buffer.Current.TokenKind}");
+                _buffer.Expect(TokenKind.Equal, "LYR-PAR0037",
+                    "expected '=' in attribute arguments (':' is only for types)");
+                var value = ParseSubExpr();
+                fields.Add(new StructInitField(_sm.Slice(nameTok.Span).ToString(), value,
+                    Span.Union(nameTok.Span, value.Span)) { NameSpan = nameTok.Span });
+                if (!_buffer.Match(TokenKind.Comma)) break;
+            }
+            end = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018",
+                "expected '}' to close attribute arguments").Span;
+        }
+        else if (_buffer.Check(TokenKind.LParen))
+        {
+            _buffer.Advance();
+            positional = ParseSubExpr();
+            end = _buffer.Expect(TokenKind.RParen, "LYR-PAR0018",
+                "expected ')' after the attribute value — the parenthesized form carries one").Span;
+        }
+
+        return new AttributeNode(path.ToArray(), fields.ToArray(), Span.Union(first.Span, end))
+            { PathSpan = Span.Union(first.Span, pathEnd), NameSpan = nameSpan, Positional = positional };
     }
 
     private ModulePath ParseModuleHeader()
@@ -117,7 +161,7 @@ public sealed partial class Parser
     {
         // Attributes precede 'pub'. The ones handed down come from the top of a header-less file.
         var attributes = pending;
-        if (_buffer.Check(TokenKind.AtIdentifier))
+        if (AtAttributeStart)
         {
             var parsed = ParseAttributeList();
             attributes = pending.Length == 0 ? parsed : [.. pending, .. parsed];
@@ -333,7 +377,7 @@ public sealed partial class Parser
             // An attribute may not sit ON A PARAMETER. Without this case the parser would read
             // '@noCapture' as a parameter name, then lose the body, and report a message about
             // native declarations to someone writing an attribute.
-            while (_buffer.Check(TokenKind.AtIdentifier))
+            while (_buffer.Check(TokenKind.AtIdentifier) || _buffer.Check(TokenKind.AtLBracket))
             {
                 _de.Report("LYR-PAR0038", Severity.Error, _buffer.Current.Span,
                     "an attribute cannot sit on a parameter — only a function, a struct, a class, "
@@ -379,7 +423,7 @@ public sealed partial class Parser
             // Since 2.1 a member CARRIES its attribute list — the sema admits only the
             // row-less '@Deprecated' there, but which attributes exist where is its call,
             // not the grammar's.
-            var attributes = _buffer.Check(TokenKind.AtIdentifier) ? ParseAttributeList() : [];
+            var attributes = AtAttributeStart ? ParseAttributeList() : [];
 
             var before = _buffer.Position;
             var member = WithMemberAttributes(ParseTypeMember(), attributes);
@@ -560,7 +604,7 @@ public sealed partial class Parser
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
-            var attributes = _buffer.Check(TokenKind.AtIdentifier) ? ParseAttributeList() : [];
+            var attributes = AtAttributeStart ? ParseAttributeList() : [];
             if (attributes.Length > 0 && !allowAttributes)
             {
                 RejectAttributes(attributes, "an interface member");

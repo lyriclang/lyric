@@ -511,4 +511,42 @@ public class FormatterTests
         Assert.Contains("any: ?Coroutine<int> throws = null,", formatted, StringComparison.Ordinal);
         Assert.Contains("fn take(c: Coroutine<int> throws Exception, n: int): int", formatted, StringComparison.Ordinal);
     }
+
+    // ------------------------------------------------------------------ attributes (3.9)
+
+    [Fact]
+    public void A_positional_attribute_keeps_its_parentheses() =>
+        Assert.Contains("@Retry(3)", Format("""
+            @Retry( 3 )
+            fn f(): void { }
+            """), StringComparison.Ordinal);
+
+    [Fact]
+    public void Two_attributes_take_the_group_shape() =>
+        // The one shape: stacked input, grouped output. The parser flattens both spellings to
+        // the same list, which is what keeps the rewrite reparse-identical.
+        Assert.Contains("@[Tag, System { order = 2 }]", Format("""
+            @Tag
+            @System { order = 2 }
+            fn f(): void { }
+            """), StringComparison.Ordinal);
+
+    [Fact]
+    public void A_single_entry_group_becomes_the_plain_spelling() =>
+        Assert.Contains("@Tag\nfn f", Format("""
+            @[Tag]
+            fn f(): void { }
+            """).Replace("\r\n", "\n"), StringComparison.Ordinal);
+
+    [Fact]
+    public void A_wide_group_breaks_one_entry_per_line()
+    {
+        var formatted = Format("""
+            @[Alpha { label = "the first of the long ones, and then some more of it" }, Beta { label = "the second" }, Gamma(9), Delta]
+            fn f(): void { }
+            """).Replace("\r\n", "\n");
+
+        Assert.Contains("@[\n", formatted, StringComparison.Ordinal);
+        Assert.Contains("    Gamma(9),\n    Delta,\n]", formatted, StringComparison.Ordinal);
+    }
 }

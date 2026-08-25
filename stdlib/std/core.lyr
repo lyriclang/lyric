@@ -482,6 +482,12 @@ pub interface OnType { }
 /// A struct declaring this may stand as `@Name` before a top-level function.
 pub interface OnFunction { }
 
+/// An attribute declaring this takes its one value in parentheses — `@On(Event.Damage)` — and
+/// the value fills the attribute's FIRST field, whose type must be `T`. The braces form stays
+/// open to every attribute; this one is opted into, so a struct's field order never becomes an
+/// argument order by accident.
+pub interface WithArg<T> { }
+
 /// Marks its target as deprecated: the compiler warns at every use, and `message` says what to
 /// use instead. The first attribute the compiler itself reads — it changes diagnostics and
 /// nothing else, so a program that ignores the warning runs unchanged.
