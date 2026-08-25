@@ -267,6 +267,31 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_typed_underscore_catch_keeps_its_type()
+    {
+        // 'catch (_: Boom)' selects by its type without binding a name. The formatter printed
+        // the '_' and DROPPED the type, turning a selective catch into a catch-all — the one
+        // thing a formatter must never do: change what the program means. The form never stood
+        // in the corpus because it crashed the compiler until 3.6.0 (#115); it parses since
+        // forever, so the formatter could always be handed one.
+        Assert.Equal("""
+            fn f(): void throws {
+                try {
+                    risky();
+                } catch (_: IoError) {
+                    swallow();
+                } catch (_) {
+                    other();
+                }
+            }
+
+            """, Format("""
+            fn f(): void throws { try { risky(); }
+            catch (_: IoError) { swallow(); } catch (_) { other(); } }
+            """));
+    }
+
+    [Fact]
     public void Coroutines_defer_and_try_round_trip()
     {
         Assert.Equal("""
