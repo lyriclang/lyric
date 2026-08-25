@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v3.6.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v3.6.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v3.6.0 — 2026-08-25</h2>
+<p>The toolchain twin of the specification round <code>lyric-spec#21</code>: the inference rules are written
+down in spec §8.3, and the two places where the compiler silently chose or silently accepted now
+say so out loud. No format change — the bytecode stays <strong>3.6</strong> — and no correct, order-independent
+program changes meaning.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>The order of a <code>::</code> list no longer decides a call</strong> (<code>LYR-SEM0092</code>). Type-argument inference
+through a conformance took the FIRST conformance in declaration order, so with
+<code>Tag :: [Sink&lt;int&gt;, Sink&lt;string&gt;]</code> the call <code>pick(t, 42)</code> compiled — and with the entries
+swapped it failed, complaining about a <code>string</code> nobody wrote. An argument that conforms to the
+wanted interface several times now refuses the inference, names every conformance it found, and
+points at the way out — the written type argument (<code>pick&lt;int&gt;(t, 42)</code>), which already wins over
+inference and needs no new machinery. One conformance, a conformance repeated across
+declarations, and a call with written type arguments behave as before.</p>
+</li>
+<li><p><strong>A <code>::</code> list that repeats itself is refused</strong> (<code>LYR-SEM0078</code> widened, the 2.15 precedent).
+<code>struct S :: [Equatable&lt;S&gt;, Equatable&lt;S&gt;]</code> compiled in silence — the list claimed two
+conformances where one exists. The rule reads the ENTRIES of one list: a parent written out
+beside its child (<code>[Hashable&lt;S&gt;, Equatable&lt;S&gt;]</code>) stays documenting style, and an <code>extend</code>
+restating a conformance the type also declares stays one conformance — the two declarations may
+live in different modules, and an upstream adoption must not break a downstream build. The
+parent list of an interface follows the same rule.</p>
+</li>
+<li><p><strong><code>catch (_: Boom)</code> compiles instead of crashing the compiler</strong> (#115). A typed catch whose
+binding is <code>_</code> — the exact form the unused-binding note recommends — died in the lowering with
+an internal error: the parser turns <code>_</code> into &quot;no name&quot;, the checker bound nothing, and the
+typed lowering path needs the binding for its TYPE. The clause is bound whenever a type is
+written; the name is scoped only when there is one. <code>catch (_: SomeInterface)</code> now reaches the
+documented refusal (<code>LYR-IR0001</code>) instead of the crash.</p>
+</li>
+<li><p><strong>A generic function used as a value is one sentence, not a cascade</strong> (<code>LYR-SEM0052</code>).
+<code>let f = ident;</code> bound <code>f</code> as <code>fn(T) -&gt; T</code> and exploded at the use with &quot;cannot assign 'T' to
+'int'&quot; — a <code>T</code> nobody wrote, reported where nobody wrote it. Function values are monomorphic
+(spec §8.1); the refusal now stands at the expression, with the way out: call it, or write a
+lambda that calls it.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li>Guide 7 stops claiming that <code>v.mul(2.0)</code> is ambiguous (it resolves by the overload rules since
+3.0, exactly where <code>v * 2.0</code> does) and that the arithmetic interfaces are &quot;the one place&quot; a
+type may conform twice (multi-conformance is general since 3.0). Both sentences had outlived
+the release that wrote them.</li>
+<li>Guide 8 gains inference through a conformance, the several-conformances refusal and its
+explicit-argument way out, and the rule that a generic function is not a function value.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
