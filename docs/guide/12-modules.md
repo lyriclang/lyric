@@ -187,7 +187,29 @@ fn main(): int {
 ```
 
 The point is the wall: an SDK declares `pub opaque type Entity = int;` beside its natives, a
-script holds and returns the handle — and can neither forge one from a literal nor leak it into
-arithmetic. On the wire the handle is its underlying number. The wall spans modules: an SDK of
-several files declares the handle once and imports it wherever a native signature names it —
-selectively or module-qualified, in scalar and array positions alike.
+script holds and returns the handle — and cannot leak it into arithmetic. On the wire the handle
+is its underlying number. The wall spans modules: an SDK of several files declares the handle
+once and imports it wherever a native signature names it — selectively or module-qualified, in
+scalar and array positions alike.
+
+**Making one is the declaring module's privilege** (since 3.8). The inward cast — `42 as
+Entity` — used to work from any module that could see the alias, which quietly undid the wall:
+a script could forge the very handle the type exists to protect. Outside the declaring module
+it now warns (`LYR-SEM0093`), and 4.0 refuses it. The outward cast (`e as int`) stays free
+everywhere — reading the number breaks no promise. If a value legitimately has to be rebuilt
+from a stored number — a saved game, a wire message — the declaring module offers a constructor
+function for it; issuing stays an issuer's act:
+
+```lyr
+opaque type Entity = int;
+
+// The issuer's act, offered as API — what a saved game calls instead of forging.
+pub fn entityFromRaw(raw: int): Entity {
+    return raw as Entity;
+}
+
+fn main(): int {
+    let restored = entityFromRaw(42);
+    return restored as int;
+}
+```

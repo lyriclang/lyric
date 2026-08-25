@@ -168,3 +168,104 @@ public class OpaqueTypeTests
         Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
     }
 }
+
+/// <summary>
+/// The inward privilege (3.8, spec §3.5): making an opaque value belongs to the declaring
+/// module. Outside it the inward cast warns (LYR-SEM0093) toward a 4.0 refusal — the
+/// LYR-SEM0074 path — while the outward cast stays free everywhere: reading the number breaks
+/// no promise the alias makes. Cross-module by nature, so the conformance suite pins only the
+/// silent half; the warning is pinned here.
+/// </summary>
+public class OpaqueInwardPrivilegeTests
+{
+    private const string World = """
+        module world;
+
+        pub opaque type Entity = int;
+
+        pub fn spawn(): Entity {
+            return 7 as Entity;
+        }
+
+        pub fn idOf(e: Entity): int {
+            return e as int;
+        }
+        """;
+
+    private static DiagnosticEngine CheckWithWorld(string mainSource)
+    {
+        var sm = new SourceManager();
+        var libId = sm.AddVirtual("world.lyr", World);
+        var mainId = sm.AddVirtual("test.lyr", mainSource);
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de);
+        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, mainId, de).ParseModule());
+        Semantics.Analyze(comp, comp.Resolve(), de);
+        return de;
+    }
+
+    [Fact]
+    public void A_foreign_inward_cast_warns()
+    {
+        var de = CheckWithWorld("""
+            import world { Entity, idOf };
+
+            fn main(): int {
+                let forged = 42 as Entity;
+                return idOf(forged);
+            }
+            """);
+
+        Assert.False(de.HasErrors,
+            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        var warning = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+        Assert.Equal(Severity.Warning, warning.Severity);
+        Assert.Contains("world", warning.Message, StringComparison.Ordinal);
+        Assert.Contains("4.0", warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_declaring_module_stays_silent()
+    {
+        var de = CheckWithWorld("""
+            import world { spawn, idOf };
+
+            fn main(): int {
+                return idOf(spawn());
+            }
+            """);
+
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+
+    [Fact]
+    public void The_outward_cast_stays_free()
+    {
+        var de = CheckWithWorld("""
+            import world { Entity, spawn };
+
+            fn main(): int {
+                let e = spawn();
+                return e as int;
+            }
+            """);
+
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+
+    [Fact]
+    public void The_alias_route_warns_too()
+    {
+        var de = CheckWithWorld("""
+            import world as w;
+
+            fn main(): int {
+                let forged = 42 as w.Entity;
+                return w.idOf(forged);
+            }
+            """);
+
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
+    }
+}

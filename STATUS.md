@@ -11,7 +11,24 @@
 
 ## Current milestone
 
-**M35 — "the reason" — SHIPS as v3.7.0** (2026-08-25, format stays 3.6). Round 2 of the
+**Runde 3 — the opaque clock — SHIPS as v3.8.0** (2026-08-25, format stays 3.6). The last of
+the Bestandsaufnahme's spec rounds: making an opaque value becomes the declaring module's
+privilege (spec §3.5, `lyric-spec#23`). Measured first: `42 as Entity` compiled in ANY module
+that saw the alias, while §3.5 and guide 12 both claimed "a script cannot forge one" — the
+claim was only true of scripts that import nothing. The inward cast now warns outside the
+declaring module (`LYR-SEM0093`) and 4.0 refuses it — the LYR-SEM0074 warn-then-error path —
+with the constructor-function pattern named in the message, which is what keeps Erato's
+save-load scripts legitimate through the transition. Outward stays free; the declaring module
+changes nothing. The warning is cross-module by nature, so the suite pins the privilege half
+and the toolchain's own tests pin the warning (the A9/native-roots precedent). **The M35 sweep
+ran before this round and found NOTHING** — six probes (twin/silent agreement, stale-read,
+remove semantics, hostile nesting, double utf8, defer unwinding); two pins landed as stdlib
+tests, and per the pipeline the loop exited without a patch. With this round, all three rounds
+of the 2026-08-25 Bestandsaufnahme are delivered; what remains on that plan is the v4 question
+(concurrency/net) and the 4.0 clocks now ticking: `listDir`'s removal, and this warning's
+promotion to an error.
+
+**M35 — "the reason" — SHIPPED as v3.7.0** (2026-08-25, format stays 3.6). Round 2 of the
 Bestandsaufnahme, decided by the maintainer as door C, library-wide: a value answers WHETHER, a
 throw answers WHY (spec §9.0, `lyric-spec#22`). Every silent form whose failure carries a
 reason gains an `OrThrow` twin from the SAME implementation — `std.io.error` (IoError, kind
@@ -542,8 +559,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4882 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
-**eleven** binaries plus `lyrembed.dll`, version **3.7.0**; the specification in
+4886 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+**eleven** binaries plus `lyrembed.dll`, version **3.8.0**; the specification in
 `lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 135 cases pinned to 3.6.0 (134/134
 against this tree, one platform-gated skip; the 3.6.0 rules landed spec-first in
 `lyric-spec#21`, the toolchain twin followed), and the toolchain's own CI runs it against the

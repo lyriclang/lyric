@@ -10,6 +10,37 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.8.0 — 2026-08-25
+
+**Round 3: the opaque clock.** `opaque type` has promised since 1.15 that "a script cannot
+forge one" — and any module that could see the alias could: `42 as Entity` compiled anywhere.
+This release starts the clock that closes the hole, on the warn-then-error path `LYR-SEM0074`
+took into 2.0. No format change; no correct program changes meaning today.
+
+### Added
+
+- **Making an opaque value is the declaring module's privilege** (`LYR-SEM0093`, spec §3.5,
+  `lyric-spec#23`). The INWARD cast — `value as Entity` — warns outside the module that
+  declares `Entity`, and **4.0 refuses it**: a handle is issued, not assembled. The OUTWARD
+  cast (`e as int`) stays free everywhere — reading the number breaks no promise the alias
+  makes, and inside the declaring module nothing changes at all.
+
+  The legitimate cross-module pattern — rebuilding a handle from a stored number, the save-load
+  shape — is what the warning's message names: the declaring module offers a constructor
+  function (`pub fn entityFromRaw(raw: int): Entity`), and issuing stays an issuer's act. The
+  warning now, rather than the error, is what gives running code a line of releases to move.
+
+### Also in this release
+
+- The M35 sweep ran and found nothing; its two probes with pin value land as stdlib tests
+  (no stale error classification across two failures; `removeOrThrow` keeps `remove`'s
+  success-when-never-existed semantics). Per the pipeline, the loop exits without a patch.
+
+### Documentation
+
+- Guide 12 stops claiming a script "can neither forge one" — it could, until now — and
+  documents the privilege, the clock, and the constructor pattern.
+
 ## v3.7.0 — 2026-08-25
 
 **M35 — the reason.** The gap `std.io.file` has carried since 2.14 — "a missing file and a
