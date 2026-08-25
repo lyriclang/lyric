@@ -603,6 +603,12 @@ public sealed class TypeChecker
                         }
         }
 
+        // The ENTRIES of this one list, resolved: an entry repeating an earlier one at the same
+        // arguments is refused (3.6.0). Entries, not closures — a parent written out beside its
+        // child is documenting style, and a repetition ACROSS declarations may live in another
+        // module, where refusing it would let an upstream adoption break a downstream build.
+        var entrySeen = new List<(LyrType Type, Span Span)>();
+
         foreach (var node in interfaces)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } direct)
@@ -619,6 +625,17 @@ public sealed class TypeChecker
                         + $"'{written.Name}' is not one");
                 continue;
             }
+
+            var entry = ResolveType(node, _currentModule?.Members ?? _comp.Builtins);
+            if (entrySeen.FirstOrDefault(e => LyrType.Equal(e.Type, entry)) is { Type: not null } first)
+            {
+                _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                    $"'{TypeFacts.Display(entry)}' repeats an earlier entry of this list — one "
+                    + "conformance, declared once",
+                    new DiagnosticNote(first.Span, "the first entry is here"));
+                continue;
+            }
+            entrySeen.Add((entry, NodeSpan(node)));
 
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
             {
@@ -693,6 +710,11 @@ public sealed class TypeChecker
         // lowering emits a row per interface in the closure, so every parent keeps its own slot
         // numbering and nothing is remapped. What a second parent really costs is the rule below.
 
+        // The same repetition rule the conformance list has (3.6.0): the ENTRIES of one parent
+        // list, compared as resolved types, so '[G<int>, G<string>]' stays two entries and
+        // '[P, P]' is one written twice.
+        var entrySeen = new List<(LyrType Type, Span Span)>();
+
         foreach (var node in decl.Interfaces)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } parent)
@@ -707,10 +729,21 @@ public sealed class TypeChecker
                 continue;
             }
             if (Conformance.WithParents(parent, _binding).Any(p => ReferenceEquals(p, self)))
+            {
                 _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
                     ReferenceEquals(parent, self)
                         ? $"interface '{decl.Name}' cannot inherit itself"
                         : $"interface '{decl.Name}' inherits itself through '{parent.Name}' — the parent chain cannot be circular");
+                continue;
+            }
+
+            var entry = ResolveType(node, DeclarationScope(self));
+            if (entrySeen.FirstOrDefault(e => LyrType.Equal(e.Type, entry)) is { Type: not null } first)
+                _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                    $"'{TypeFacts.Display(entry)}' repeats an earlier entry of this list — one "
+                    + "parent, named once",
+                    new DiagnosticNote(first.Span, "the first entry is here"));
+            else entrySeen.Add((entry, NodeSpan(node)));
         }
 
         // Seeding with 'self' keeps a cyclic chain from presenting the declaring interface's own

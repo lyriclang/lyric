@@ -85,6 +85,96 @@ public class ConformanceListTests
         Assert.False(de.HasErrors);
     }
 
+    // ------------------------------------------------------------------ a list may not repeat itself
+
+    [Theory]
+    [InlineData("pub struct S :: [Equatable<S>, Equatable<S>] { x: int, pub fn equals(other: S): bool { return this.x == other.x; } }")]
+    [InlineData("pub extend S2 :: [Equatable<S2>, Equatable<S2>] { pub fn equals(other: S2): bool { return true; } }")]
+    public void A_duplicate_entry_in_one_list_is_refused(string declaration)
+    {
+        // Through 3.5 the duplicate was deduplicated in silence — the 2.15 class of defect: a
+        // declaration saying something it cannot mean, and nothing reporting it.
+        var de = Check("import std.core { Equatable };\n\npub struct S2 { y: int }\n\n" + declaration
+                       + "\n\nfn main(): int {\n    return 0;\n}\n");
+
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0078");
+        Assert.Equal(Severity.Error, error.Severity);
+        Assert.Contains("repeats", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_duplicate_parent_entry_is_refused()
+    {
+        var de = Check("""
+            pub interface P {
+                fn ping(): int;
+            }
+
+            pub interface I :: [P, P] {
+                fn pong(): int;
+            }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0078");
+        Assert.Contains("repeats", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_parent_written_beside_its_child_is_not_a_repetition()
+    {
+        // The rule reads the ENTRIES, not their closures: 'Equatable<S>' is implied by
+        // 'Hashable<S>' and writing it out is documenting style, not a duplicate.
+        var de = Check("""
+            import std.core { Hashable, Equatable };
+
+            pub struct S :: [Hashable<S>, Equatable<S>] {
+                x: int,
+                pub fn equals(other: S): bool {
+                    return this.x == other.x;
+                }
+                pub fn hash(): int {
+                    return this.x;
+                }
+            }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        Assert.False(de.HasErrors);
+    }
+
+    [Fact]
+    public void A_conformance_repeated_across_declarations_is_not_refused()
+    {
+        // The second declaration may stand in another module — a library adopting a conformance
+        // a downstream extend had added must not break the downstream build. Only ONE list
+        // repeating itself is an author's slip.
+        var de = Check("""
+            import std.core { Equatable };
+
+            pub struct S :: [Equatable<S>] {
+                x: int,
+                pub fn equals(other: S): bool {
+                    return this.x == other.x;
+                }
+            }
+
+            pub extend S :: [Equatable<S>] { }
+
+            fn main(): int {
+                return 0;
+            }
+            """);
+
+        Assert.False(de.HasErrors);
+    }
+
     // ------------------------------------------------------------------ @Deprecated on a member
 
     private const string Interface = """
