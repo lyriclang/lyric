@@ -10,6 +10,54 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.6.0 — 2026-08-25
+
+The toolchain twin of the specification round `lyric-spec#21`: the inference rules are written
+down in spec §8.3, and the two places where the compiler silently chose or silently accepted now
+say so out loud. No format change — the bytecode stays **3.6** — and no correct, order-independent
+program changes meaning.
+
+### Fixed
+
+- **The order of a `::` list no longer decides a call** (`LYR-SEM0092`). Type-argument inference
+  through a conformance took the FIRST conformance in declaration order, so with
+  `Tag :: [Sink<int>, Sink<string>]` the call `pick(t, 42)` compiled — and with the entries
+  swapped it failed, complaining about a `string` nobody wrote. An argument that conforms to the
+  wanted interface several times now refuses the inference, names every conformance it found, and
+  points at the way out — the written type argument (`pick<int>(t, 42)`), which already wins over
+  inference and needs no new machinery. One conformance, a conformance repeated across
+  declarations, and a call with written type arguments behave as before.
+
+- **A `::` list that repeats itself is refused** (`LYR-SEM0078` widened, the 2.15 precedent).
+  `struct S :: [Equatable<S>, Equatable<S>]` compiled in silence — the list claimed two
+  conformances where one exists. The rule reads the ENTRIES of one list: a parent written out
+  beside its child (`[Hashable<S>, Equatable<S>]`) stays documenting style, and an `extend`
+  restating a conformance the type also declares stays one conformance — the two declarations may
+  live in different modules, and an upstream adoption must not break a downstream build. The
+  parent list of an interface follows the same rule.
+
+- **`catch (_: Boom)` compiles instead of crashing the compiler** (#115). A typed catch whose
+  binding is `_` — the exact form the unused-binding note recommends — died in the lowering with
+  an internal error: the parser turns `_` into "no name", the checker bound nothing, and the
+  typed lowering path needs the binding for its TYPE. The clause is bound whenever a type is
+  written; the name is scoped only when there is one. `catch (_: SomeInterface)` now reaches the
+  documented refusal (`LYR-IR0001`) instead of the crash.
+
+- **A generic function used as a value is one sentence, not a cascade** (`LYR-SEM0052`).
+  `let f = ident;` bound `f` as `fn(T) -> T` and exploded at the use with "cannot assign 'T' to
+  'int'" — a `T` nobody wrote, reported where nobody wrote it. Function values are monomorphic
+  (spec §8.1); the refusal now stands at the expression, with the way out: call it, or write a
+  lambda that calls it.
+
+### Documentation
+
+- Guide 7 stops claiming that `v.mul(2.0)` is ambiguous (it resolves by the overload rules since
+  3.0, exactly where `v * 2.0` does) and that the arithmetic interfaces are "the one place" a
+  type may conform twice (multi-conformance is general since 3.0). Both sentences had outlived
+  the release that wrote them.
+- Guide 8 gains inference through a conformance, the several-conformances refusal and its
+  explicit-argument way out, and the rule that a generic function is not a function value.
+
 ## v3.5.0 — 2026-08-24
 
 The standard library learns structured data: JSON in and out, and the binary-to-text encodings

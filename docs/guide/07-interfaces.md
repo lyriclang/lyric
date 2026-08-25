@@ -332,15 +332,20 @@ fn main(): int {
 ```
 
 The operator picks the conformance by the type on its right, and nothing else: both methods are
-called `mul`, so the name never decides. That is also the limit of it — `v.mul(2.0)` written out is
-ambiguous, because a written call has only the name to go on. A constraint names the conformance it
-wants the same way: `fn twice<T :: [Mul<float, T>]>` promises scaling, `fn square<T :: [Mul<T, T>]>`
-promises multiplication by one's own kind, and the two are different promises.
+called `mul`, so the name never decides — the arguments do. A written `v.mul(2.0)` resolves
+exactly where `v * 2.0` does, by the overload rules ([chapter 3](03-functions.md)). A constraint
+names the conformance it wants the same way: `fn twice<T :: [Mul<float, T>]>` promises scaling,
+`fn square<T :: [Mul<T, T>]>` promises multiplication by one's own kind, and the two are
+different promises.
 
 Two conformances that take the SAME right-hand type and disagree on the result are refused where
-the operator is used (`LYR-SEM0083`): nothing in `v * 2.0` says which was meant. This is the one
-place in the language where a type may conform to an interface twice — everywhere else, a second
-conformance is a mistake.
+the operator is used (`LYR-SEM0083`): nothing in `v * 2.0` says which was meant. Conforming to
+one interface several times is otherwise general since 3.0 — `Tag :: [Equatable<Tag>,
+Equatable<int>]` works, each conformance satisfied by its own overload. What a list may not do
+is repeat itself: naming one interface at the same arguments twice in one `::` list is refused
+(since 3.6.0), because such a list claims two conformances where one exists. An `extend` block
+restating a conformance the type also declares stays fine — the two declarations may live in
+different modules.
 
 `%` stays numeric-only. Compound assignment (`v += w`) reaches through the interfaces for variable
 targets since v1.13 — and picks its conformance by the right operand, exactly as the plain form

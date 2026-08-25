@@ -11,14 +11,19 @@
 
 ## Current milestone
 
-**M34 — "die Datenformate" — SHIPPED as v3.5.0** (2026-08-24, format stays 3.6). The standard
-library learns structured data, in Lyric: `std.json` (RFC 8259 — one recursive `JsonValue` enum
-over `List`/`Map`, strict parse answering `?JsonValue`, serializer with the `3.0`-stays-float
-rule and `null` for the unspellable) and `std.encoding` (hex and base64, RFC 4648, strict
-decoders). One native underneath: `std.string.parseFloat`, because a JSON number needs exponents
-and CORRECT ROUNDING, and the Lyric predecessor had neither — the same reason `fromFloat` was
-always native. Details under §Recently finished; the sweep loop the pipeline prescribes comes
-next.
+**Spec round 1 and its toolchain twin — SHIPPED as v3.6.0** (2026-08-25, format stays 3.6). The
+post-v3 mode is spec-first: `lyric-spec#21` rewrote §8 (inference as seven rules, probed against
+the tree before being written down), refused the two silences (§5.1 list repetition, §8.3
+conformance-inference ambiguity), corrected three claims about the present (§8.1 polymorphic
+recursion, §5.3 interning limits that fell with 2.17/3.0, §3.3 `T[N]`), and grew the suite 121 →
+135. The twin (PR #116) delivered LYR-SEM0092 (the order of a `::` list must never decide a
+call — measured: it did), the widened LYR-SEM0078 (a list may not repeat itself; entries, not
+closures, so parent-beside-child and cross-declaration stay legal), the #115 crash fix
+(`catch (_: T)` — the form the SEM0071 note recommends), and LYR-SEM0052 for a generic function
+as a value (one sentence instead of a cascade about a `T` nobody wrote). Guide 7 lost two
+sentences that had outlived 3.0. Bug-sweep loop per pipeline comes next; the plan behind the
+round is the v3/v4 Bestandsaufnahme of 2026-08-25 (Runde 2: the error-reason design round;
+Runde 3: the opaque-`as` clock).
 
 ---
 
@@ -512,12 +517,12 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4855 tests green **in Debug and Release**, bytecode format **3.6**, **eleven** binaries
-plus `lyrembed.dll`, version **3.5.0**; the specification in `lyriclang/lyric-spec` is
-**NORMATIVE**, its suite stands at 121 cases pinned to 3.5.0 (120/120 against this tree, one
-platform-gated skip; caught up 3.3.0→3.5.0 in `lyric-spec#20` — 3.4.0 and 3.5.0 owed the
-document nothing), and the toolchain's own CI runs it against the working tree. *(The test
-count is the one last counted, at 3.5.0.)*
+4872 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+**eleven** binaries plus `lyrembed.dll`, version **3.6.0**; the specification in
+`lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 135 cases pinned to 3.6.0 (134/134
+against this tree, one platform-gated skip; the 3.6.0 rules landed spec-first in
+`lyric-spec#21`, the toolchain twin followed), and the toolchain's own CI runs it against the
+working tree. *(The test count is the one last counted, at 3.6.0, Debug.)*
 
 **What this state can do**: the whole language of the grammar compiles and runs; a standard library
 that largely carries itself (`Map`, `Set`, merge sort, all iterator adapters and the string hash are
@@ -533,6 +538,16 @@ out of them and hands its own functions, types and value structs in.
 > else stands in `git log`.
 
 ## Recently finished
+
+- [x] **Spec round 1 + twin** (2026-08-25, `lyric-spec#21` + PR #116, released as v3.6.0).
+  Details under §Current milestone. **Three findings worth keeping.** (1) The inference loch was
+  REAL and order-dependent: the identical call compiled with `[Sink<int>, Sink<string>]` and
+  failed with the entries swapped — pinned as a two-way theory before the fix. (2) Probing spec
+  claims against the tree found four false sentences (two in §5.3, one in §8.1, one in §3.3) and
+  two stale guide claims (guide 7's `v.mul(2.0)`-is-ambiguous and one-place-only) — the
+  spec-first mode pays for itself in corrections, not only in new rules. (3) `catch (_: T)`
+  crashed the compiler while the SEM0071 note RECOMMENDED that form; found by probing catch
+  shapes for the appendix, the class of find sweeps exist for.
 
 - [x] **M34 — the data formats** (2026-08-24, `feature/m34-data-formats`, released as v3.5.0).
   `std.json` and `std.encoding`, both written in Lyric — the first structured-data story the
@@ -587,21 +602,6 @@ out of them and hands its own functions, types and value structs in.
   written — `Iterator<?T>` needs `??T` and `?` does not nest, which is the wall `LYR-SEM0091`
   names. Taking the ARRAY instead dodges it by construction and stays lazy: an array slot can be
   read as `?T` without the end-marker being in the way.
-
-- [x] **The Erato bug sweep** (2026-08-24, `fix/erato-a21-a25`, PR #109, released as v3.3.0).
-  Six findings: four from the register (A21, A22, A23, A25) and two found while probing what A24
-  would need. **The two nobody reported are the worse pair** — `for (h in houses)` over a
-  `(?House)[]` and `let r = 1..5;` both CRASHED the compiler, and in Release, where the IR
-  verifier does not run, the first of them let `check` answer ok for a program `build` could not
-  finish.
-
-  **The lesson outlives the fixes, and it is A23's.** The loader read a `callvirt`'s arity off an
-  Impls row and guessed `(0, false)` where a module had none — which a library that calls
-  through an interface it does not implement always does. Its `.lyrbc` was refused by its own
-  loader, and it took a golden-image test opening a window to find out, because nothing in this
-  pipeline had ever read back what it wrote. It does now, in Release too, and
-  `lyric check --emit` asks that question without writing a file. It caught the optional-array
-  bug on the day it was added.
 
 ## Measurements
 
@@ -1019,21 +1019,15 @@ answer yet, and it belongs asked before E4 starts.
   Retrofitting them would mean extending the model with provenance data — a decision of its own.
 - **Measure the verifier share in a Release profile** — the Debug numbers are riddled with JIT
   warm-up and serve only as an order of magnitude.
-- **A conformance written twice at the SAME arguments is accepted in silence.**
-  `S :: [Equatable<S>, Equatable<S>]` compiles: the instance list dedups it, so it means one
-  conformance and nothing goes wrong downstream. It is still a program saying something it
-  cannot mean, and it is the one shape of multi-conformance with nothing to select by — the
-  case `LYR-SEM0083` refuses for the arithmetic interfaces, unreported everywhere else. Found
-  while writing spec §5.1, which describes the dedup rather than blessing the form, so a
-  diagnostic is still available as the answer.
-- **`UnifyThroughConformance` still assumes one conformance per generic interface.** The comment
-  above the `GenericInstance` case in `TypeChecker.cs` justifies the mapping with "a type cannot
-  satisfy the same generic interface twice with different arguments: the method would have two
-  signatures, and LYR-SEM0042 rejects that" — which stopped being true the day overloading
-  landed. Inference through an interface-typed parameter therefore binds from whichever
-  conformance it meets first where two fit. Nothing has hit it yet, and the failure shape is
-  the bad one: a `T` bound from the wrong instance is a wrong monomorphization, not a
-  diagnostic.
+- **A parent list swallows a second INSTANCE of one interface in silence.**
+  `interface Both :: [Sink<int>, Sink<string>]` compiles, and only `Sink<int>` arrives: the
+  parent walk in `CheckInterfaceParents`/`InterfaceClosure` deduplicates by SYMBOL, so the
+  second instance vanishes — `viaString(b)` answers "cannot assign 'B' to 'Sink<string>'" while
+  the declaration says otherwise. The declaration-side twin of the 3.6.0 list rules: a TYPE may
+  conform at several instances since 3.0, an interface's parent list silently cannot. Probed
+  2026-08-25 while building the duplicate-entry check. Either it works (the closure walks
+  instances, like conformance does since 3.0) or it is refused — what it must not stay is
+  silent.
 
 ## Design decisions (context)
 

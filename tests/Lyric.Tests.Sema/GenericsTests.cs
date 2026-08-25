@@ -42,6 +42,55 @@ public class GenericsTests
         return (types, de, module);
     }
 
+    // ------------------------------------------------------------------ not a function value
+
+    [Fact]
+    public void A_generic_function_is_not_a_value()
+    {
+        // 'let f = ident;' used to bind f as 'fn(T) -> T' and explode at the USE with a cascade
+        // about a 'T' nobody wrote ("cannot assign 'T' to 'int'", and its mirror). §8.1: fn
+        // values are monomorphic, so the refusal belongs at the expression, in one sentence.
+        var (_, de, _) = Check(Prelude + """
+
+            fn main(): int {
+                let f = ident;
+                return 0;
+            }
+            """);
+
+        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0052", error.Code);
+        Assert.Contains("ident", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_generic_function_as_an_argument_is_refused_too()
+    {
+        var (_, de, _) = Check(Prelude + """
+
+            fn applyOnce(f: fn(int) -> int, v: int): int { return f(v); }
+
+            fn main(): int {
+                return applyOnce(ident, 2);
+            }
+            """);
+
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0052");
+    }
+
+    [Fact]
+    public void The_callee_position_is_untouched()
+    {
+        var (_, de, _) = Check(Prelude + """
+
+            fn main(): int {
+                return ident(1);
+            }
+            """);
+
+        Assert.False(de.HasErrors);
+    }
+
     private static List<BindingStmt> Bindings(IEnumerable<Stmt> stmts)
     {
         var acc = new List<BindingStmt>();
