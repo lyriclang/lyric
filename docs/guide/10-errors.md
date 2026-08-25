@@ -6,6 +6,45 @@ Lyric separates two kinds of failure.
   not catchable and ends the process with exit code `101`.
 - An **exception** is an expected condition that a caller may handle.
 
+## Whether, or why
+
+The standard library divides the recoverable world by the QUESTION, not by the operation
+(since 3.7): a value answers *whether* — `?T` for "is it there?", `bool` for "did it happen?" —
+and a throw answers *why not*. Where a failure carries a reason worth acting on, a silent form
+has an `OrThrow` twin that declares a module-specific error type; both come from one
+implementation, so the twin throws exactly where the silent form answers `null` or `false`.
+Which one you call states what you will do with a failure: fall back, or handle the reason.
+
+```lyr
+import std.io.file { text, textOrThrow };
+import std.io.error { IoError, IoErrorKind };
+import std.io.console { println };
+
+fn main(): int {
+    // Falling back: absence is an ordinary answer, no ceremony.
+    let motd = text("motd.txt") ?? "no message today";
+    println(motd);
+
+    // Handling the reason: the twin says which kind, on which path, and what the platform said.
+    try {
+        println(textOrThrow("config.json"));
+    } catch (e: IoError) {
+        println(match (e.kind) {
+            IoErrorKind.NotFound => "no config — using defaults",
+            _ => "config unreadable: " + e.message(),
+        });
+    }
+    return 0;
+}
+```
+
+The twins in 3.7: every read and operation of `std.io.file` (throwing `IoError`, whose `kind`
+is a matchable `IoErrorKind`), `std.json.parseOrThrow` (a `JsonError` naming line and column),
+the `std.encoding` decoders (an `EncodingError` naming the offset), and
+`std.string.utf8DecodeOrThrow` (a `Utf8Error` naming the byte). Where `null` already IS the
+whole truth — an unset environment variable, a key a map does not hold, `parseInt` on a short
+input — the silent form stands alone, deliberately.
+
 ## Panics
 
 ```lyr

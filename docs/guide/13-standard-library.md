@@ -12,6 +12,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.iter` | `Iterator<T>`, `Iterable<T>`, adapters, the entrances (`over`, `range`, `compact`), `sum` |
 | `std.option` | `map`, `andThen`, `filter`, `zip`, `contains`, `toArray`, `iter`, `expect` |
 | `std.io.console` | `print`, `println`, `readLine` — the writers take any `Display` value: `println(42)` |
+| `std.io.error` | `IoError`, `IoErrorKind` — the reason an I/O operation failed; no capability |
 | `std.io.file` | reading and writing files — requires `fileAccess` |
 | `std.os` | environment, process, exit — requires `osAccess` |
 | `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic, no capability |
@@ -19,6 +20,18 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.json` | `JsonValue`, `parse`, `serialize`, `serializePretty` — JSON, RFC 8259 |
 | `std.encoding` | `hexEncode`/`hexDecode`, `base64Encode`/`base64Decode` — RFC 4648 |
 | `std.build` | `addExecutable` — only a `build.lyr` run by `lyric build` can use it |
+
+## Whether, or why: the `OrThrow` twins
+
+Since 3.7 a silent form whose failure carries a REASON has a throwing twin, suffixed `OrThrow`:
+`text`/`textOrThrow`, `writeText`/`writeTextOrThrow`, `parse`/`parseOrThrow`, and so on through
+`std.io.file`, `std.json`, `std.encoding` and `utf8Decode`. Both come from one implementation —
+the twin throws a module-specific error type (`IoError`, `JsonError`, `EncodingError`,
+`Utf8Error`) exactly where the silent form answers `null` or `false`. [Chapter 10](10-errors.md)
+shows both shapes side by side. Where `null` is the whole truth — `env`, `Map.get`, `parseInt` —
+the silent form stands alone. `listDir` is deprecated toward 4.0: it answers an empty array to
+both "empty" and "unreadable", which `entries` (`?string[]`) and `entriesOrThrow` can finally
+tell apart.
 
 ## Collections
 

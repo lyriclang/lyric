@@ -44,6 +44,55 @@ public class WarningAnalyzerTests
             + string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
     }
 
+    [Fact]
+    public void An_import_used_only_in_a_pattern_path_is_used()
+    {
+        // 'Color.Red' in a match arm is a VariantPattern whose path is strings — the qualifier
+        // has no node, exactly like the 'look' of 'look.Eye' (fixed for type paths in 3.3.0).
+        // The fixture isolates the use: the TYPE arrives as the alias 'Hue' and the VALUE from
+        // 'red()', so 'Color' is mentioned in the patterns alone. Found by M35: every
+        // 'match (e.kind)' over an imported error enum warned SEM0072, which under
+        // --deny-warnings breaks the build the new convention recommends.
+        var sm = new SourceManager();
+        var libId = sm.AddVirtual("hues.lyr", """
+            module hues;
+
+            pub enum Color {
+                Red,
+                Blue,
+            }
+
+            pub type Hue = Color;
+
+            pub fn red(): Color {
+                return Color.Red;
+            }
+            """);
+        var mainId = sm.AddVirtual("test.lyr", """
+            import hues { Color, Hue, red };
+
+            fn pick(c: Hue): int {
+                return match (c) {
+                    Color.Red => 1,
+                    Color.Blue => 2,
+                };
+            }
+
+            fn main(): int {
+                return pick(red());
+            }
+            """);
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de);
+        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, mainId, de).ParseModule());
+        Semantics.Analyze(comp, comp.Resolve(), de);
+
+        Assert.False(de.HasErrors,
+            string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0072");
+    }
+
     // ─── unused locals (LYR-SEM0071) ───────────────────────────────────────
 
     [Fact]

@@ -4307,6 +4307,12 @@ public sealed class TypeChecker
                 BindPoison(v, scope);
                 return;
             }
+
+            // A pattern's path is strings, like a NamedType's: its qualifier has no node, so
+            // the import it steps through is recorded the way a type path's is — without this,
+            // an import mentioned only in match arms warned as unused.
+            if (v.Path.Length > 1 && scope.Lookup(v.Path[0]) is { } head)
+                _binding.MarkQualifier(v.Span.File, head);
             if (VariantOf(enumTs, v.Path[^1]) is not { } ev)
             {
                 Report(v.Span, "LYR-SEM0031", $"enum '{enumTs.Name}' has no variant '{v.Path[^1]}'");

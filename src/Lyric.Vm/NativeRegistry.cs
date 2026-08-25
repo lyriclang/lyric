@@ -394,11 +394,17 @@ public sealed class NativeRegistry
                         encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
                         .GetString(ToBytes(args[0])));
                 }
-                catch (ArgumentException)
+                catch (ArgumentException e)
                 {
+                    // The decoder names the byte that broke the sequence; utf8DecodeOrThrow
+                    // reads it right after this null, on the same thread.
+                    _lastUtf8ErrorOffset = e is System.Text.DecoderFallbackException d ? d.Index : 0;
                     return default;
                 }
             }, returnElement: TypeTag.String);
+
+        registry.Register("std.string.utf8DecodeErrorOffset", none, TypeTag.I64,
+            _ => LyrValue.FromI64(_lastUtf8ErrorOffset));
 
         // Behind std.string.join and StringBuilder.build: one native call instead of a copy
         // cascade the language cannot avoid without preallocating strings.
@@ -667,14 +673,22 @@ public sealed class NativeRegistry
                 try
                 {
                     var info = new FileInfo(args[0].AsString);
+                    if (!info.Exists)
+                    {
+                        // Not an exception here — FileInfo answers the question — so the
+                        // classification is set by hand, or sizeOrThrow would read a stale one.
+                        RecordIoNotFound(args[0].AsString);
+                        return LyrValue.None;
+                    }
 
                     // 'Some' rather than 'FromI64': for a '?T' over a scalar the marker in 'Ref'
                     // is what signals presence, since every bit pattern is a valid number.
-                    return info.Exists ? LyrValue.Some(LyrValue.FromI64(info.Length)) : LyrValue.None;
+                    return LyrValue.Some(LyrValue.FromI64(info.Length));
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                               or ArgumentException or NotSupportedException)
                 {
+                    RecordIo(e);
                     return LyrValue.None;
                 }
             });
@@ -732,8 +746,43 @@ public sealed class NativeRegistry
                 }
             });
 
+        // 'entries' completes the 2.14 line listDir missed: an unreadable directory is null,
+        // an empty one is an empty array — and the failure is classified for entriesOrThrow.
+        registry.RegisterOptionalArrayReturning("std.io.file.entries", str, TypeTag.String,
+            args =>
+            {
+                try
+                {
+                    var names = Directory.EnumerateFileSystemEntries(args[0].AsString)
+                        .Select(Path.GetFileName)
+                        .OfType<string>()
+                        .OrderBy(n => n, StringComparer.Ordinal)   // deterministic
+                        .Select(LyrValue.FromString)
+                        .ToArray();
+
+                    // The array reference itself signals presence, as in OptionalLines — 'Some'
+                    // is for scalars, whose every bit pattern is a valid value.
+                    return LyrValue.FromObject(names);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                              or ArgumentException or NotSupportedException)
+                {
+                    RecordIo(e);
+                    return LyrValue.None;
+                }
+            });
+
         registry.Register("std.io.file.tempDir", none, TypeTag.String,
             _ => LyrValue.FromString(Path.GetTempPath()));
+
+        // The classification of the last failed operation (3.7), for the OrThrow forms. Non-pub
+        // on the Lyric side: nothing outside file.lyr ever reads these. A module that binds them
+        // needs a 3.7 runtime — the parseFloat forward path.
+        registry.Register("std.io.file.lastErrorKind", none, TypeTag.I64,
+            _ => LyrValue.FromI64(_lastIoKind));
+
+        registry.Register("std.io.file.lastErrorDetail", none, TypeTag.String,
+            _ => LyrValue.FromString(_lastIoDetail ?? ""));
 
         // ------------------------------------------------------ std.os, extended
 
@@ -951,6 +1000,40 @@ public sealed class NativeRegistry
     ///
     /// <para>The catch is broad: missing file, missing permission, invalid path, device gone.
     /// To the caller they are the same answer.</para></summary>
+    // The classification of the last FAILED std.io.file operation, read by the
+    // lastErrorKind/lastErrorDetail natives — which the OrThrow forms in file.lyr call
+    // immediately after a silent form answered null/false. The interpreter runs an execution on
+    // one thread, so nothing can run between the failure and the read; ThreadStatic rather than
+    // static keeps parallel VMs (the test host) from seeing each other's failures. A SUCCESS
+    // does not clear it: only the null/false branch ever reads.
+    //
+    // The codes are a contract with std/io/file.lyr's kindOf: 1 NotFound, 2 PermissionDenied,
+    // 3 InvalidPath, 0 Other.
+    [ThreadStatic] private static int _lastIoKind;
+    [ThreadStatic] private static string? _lastIoDetail;
+
+    // The byte offset of the last utf8Decode refusal, for std.string.utf8DecodeOrThrow — the
+    // same last-failure contract as the pair above.
+    [ThreadStatic] private static int _lastUtf8ErrorOffset;
+
+    private static void RecordIo(Exception e)
+    {
+        _lastIoKind = e switch
+        {
+            FileNotFoundException or DirectoryNotFoundException => 1,
+            UnauthorizedAccessException or System.Security.SecurityException => 2,
+            PathTooLongException or ArgumentException or NotSupportedException => 3,
+            _ => 0,
+        };
+        _lastIoDetail = e.Message;
+    }
+
+    private static void RecordIoNotFound(string path)
+    {
+        _lastIoKind = 1;
+        _lastIoDetail = $"no file at '{path}'";
+    }
+
     private static string? TryIo(Func<string> operation)
     {
         try
@@ -960,6 +1043,7 @@ public sealed class NativeRegistry
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                        or ArgumentException or NotSupportedException)
         {
+            RecordIo(e);
             return null;
         }
     }
@@ -976,6 +1060,7 @@ public sealed class NativeRegistry
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                        or ArgumentException or NotSupportedException)
         {
+            RecordIo(e);
             return null;
         }
     }

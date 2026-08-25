@@ -11,6 +11,22 @@
 
 ## Current milestone
 
+**M35 — "the reason" — SHIPS as v3.7.0** (2026-08-25, format stays 3.6). Round 2 of the
+Bestandsaufnahme, decided by the maintainer as door C, library-wide: a value answers WHETHER, a
+throw answers WHY (spec §9.0, `lyric-spec#22`). Every silent form whose failure carries a
+reason gains an `OrThrow` twin from the SAME implementation — `std.io.error` (IoError, kind
+behind a carrier class so the list can grow without breaking a match), fifteen file twins plus
+`entries` healing the last pre-2.14 lie (listDir, deprecated until 4.0), `JsonError` with
+line/column via first-refusal-wins leaf recording, `EncodingError` with offsets over a
+DecodeAttempt core, `Utf8Error` via the native-classification route (ThreadStatic last-failure
+fields + non-pub natives, the parseFloat forward path). Deliberately silent-only: parseInt,
+parseFloat, std.os, Map.get — null IS the whole truth there. **Two findings on the way**: an
+import mentioned only in a PATTERN warned as unused (the 3.3.0 qualifier gap one node further,
+fixed failing-test-first — every `match (e.kind)` hit it); and §3.1's context propagation does
+NOT reach tuple elements (`(null, …)` refuses against `(?T, …)` — worked around with a struct,
+filed under §Still open as a spec-round candidate). Sweep per pipeline comes next; then Runde 3
+(the opaque-`as` clock).
+
 **Spec round 1 and its toolchain twin — SHIPPED as v3.6.0** (2026-08-25, format stays 3.6). The
 post-v3 mode is spec-first: `lyric-spec#21` rewrote §8 (inference as seven rules, probed against
 the tree before being written down), refused the two silences (§5.1 list repetition, §8.3
@@ -526,8 +542,8 @@ rejected; the constraint mechanism is this language's overloading.
 where it was declared, a program followed across its files, documentation on hover, the outline of a
 file, every place a name occurs, and completion. v1.3.0 shipped the first seven, v1.4.0 the last.
 
-4875 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
-**eleven** binaries plus `lyrembed.dll`, version **3.6.1**; the specification in
+4882 tests green **on both engines** (interpreted and `LYRIC_JIT=1`), bytecode format **3.6**,
+**eleven** binaries plus `lyrembed.dll`, version **3.7.0**; the specification in
 `lyriclang/lyric-spec` is **NORMATIVE**, its suite stands at 135 cases pinned to 3.6.0 (134/134
 against this tree, one platform-gated skip; the 3.6.0 rules landed spec-first in
 `lyric-spec#21`, the toolchain twin followed), and the toolchain's own CI runs it against the
@@ -1028,6 +1044,18 @@ answer yet, and it belongs asked before E4 starts.
   Retrofitting them would mean extending the model with provenance data — a decision of its own.
 - **Measure the verifier share in a Release profile** — the Debug numbers are riddled with JIT
   warm-up and serve only as an order of magnitude.
+- **§3.1's context does not propagate into TUPLE elements.** `(null, 0, "")` against
+  `(?uint8[], int, string)` is "cannot assign" — the null element gets no context, while an
+  array element or a match arm would adapt (2.1). Hit by M35's decode cores, worked around
+  with a struct (field initializers ARE context positions). The 2.1 sentence says the contexts
+  propagate "structurally"; tuples are the structural case it skipped. A spec-round candidate:
+  additive, the §3.1 list gains one word.
+- **An enum's throwability has three answers.** `enum E :: [Throwable]` with its own
+  `message()` (the `;`-member syntax): the sema ACCEPTS throw/throws/catch, the lowering
+  refuses the catch (`IR0001`, "catching a non-class type"), and the extend-provided
+  conformance is refused by the sema (`SEM0030`) — while §9.1 says "only class values" and
+  names structs alone. Probed 2026-08-25 during the M35 design round. Decide it once and align
+  all three, whichever way.
 - **A transparent alias is refused in a `::` list, against §3.5's word.** `type E =
   Equatable<S>; struct S :: [Equatable<S>, E]` reports "'E' is not an interface" — but §3.5
   says a transparent alias and its type are interchangeable EVERYWHERE, and here the alias

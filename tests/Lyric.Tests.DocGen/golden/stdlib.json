@@ -1330,6 +1330,51 @@
       "Doc": null,
       "Items": [
         {
+          "Kind": "Class",
+          "Name": "EncodingError",
+          "Signature": "pub class EncodingError :: [Throwable]",
+          "Doc": "Where and why a text was refused: the 0-based character offset of the refusal, and what the\ndecoder expected there.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "offset",
+              "Signature": "offset: int",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/encoding.lyr",
+                "Line": 23
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "expected",
+              "Signature": "expected: string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/encoding.lyr",
+                "Line": 24
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/encoding.lyr",
+                "Line": 26
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 22
+          }
+        },
+        {
           "Kind": "Function",
           "Name": "hexEncode",
           "Signature": "pub fn hexEncode(bytes: uint8[]): string",
@@ -1337,7 +1382,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 44
+            "Line": 69
           }
         },
         {
@@ -1348,7 +1393,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 58
+            "Line": 83
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "hexDecodeOrThrow",
+          "Signature": "pub fn hexDecodeOrThrow(text: string): uint8[] throws EncodingError",
+          "Doc": "`hexDecode`, with the reason when the text spells no bytes: where it broke, and what a\nhexadecimal string would have had there.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 89
           }
         },
         {
@@ -1359,7 +1415,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 80
+            "Line": 124
           }
         },
         {
@@ -1370,7 +1426,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 128
+            "Line": 172
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "base64DecodeOrThrow",
+          "Signature": "pub fn base64DecodeOrThrow(text: string): uint8[] throws EncodingError",
+          "Doc": "`base64Decode`, with the reason when the text spells no bytes: where it broke, and what a\nbase64 string would have had there.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 178
           }
         }
       ]
@@ -1719,6 +1786,124 @@
       ]
     },
     {
+      "Path": "std.io.error",
+      "Doc": null,
+      "Items": [
+        {
+          "Kind": "Enum",
+          "Name": "IoErrorKind",
+          "Signature": "pub enum IoErrorKind",
+          "Doc": "What went wrong, as a matchable name. `Other` carries everything the platform reports that\nhas no name here — a locked file, a full disk — and the `detail` string still says it.\nOnly kinds every platform can CLASSIFY reliably get a name; the carrier-plus-kind shape is\nwhat lets this list grow later without breaking anyone's `match`.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "NotFound",
+              "Signature": "NotFound",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 19
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "PermissionDenied",
+              "Signature": "PermissionDenied",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 20
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "InvalidPath",
+              "Signature": "InvalidPath",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 21
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Other",
+              "Signature": "Other",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 22
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/io/error.lyr",
+            "Line": 18
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "IoError",
+          "Signature": "pub class IoError :: [Throwable]",
+          "Doc": "The reason an I/O operation failed: which kind, on which path, and what the platform said.\n\n§9.0's answer to \"why not?\" — the silent forms (`text`, `writeText`, …) answer only whether.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "kind",
+              "Signature": "kind: IoErrorKind",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 29
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "path",
+              "Signature": "path: string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 30
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "detail",
+              "Signature": "detail: string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 31
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 33
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/io/error.lyr",
+            "Line": 28
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.io.file",
       "Doc": null,
       "Items": [
@@ -1730,7 +1915,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 40
+            "Line": 44
           }
         },
         {
@@ -1741,7 +1926,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 44
+            "Line": 48
           }
         },
         {
@@ -1752,7 +1937,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 48
+            "Line": 52
           }
         },
         {
@@ -1763,7 +1948,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 51
+            "Line": 55
           }
         },
         {
@@ -1774,7 +1959,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 54
+            "Line": 58
           }
         },
         {
@@ -1785,7 +1970,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 57
+            "Line": 61
           }
         },
         {
@@ -1796,7 +1981,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 60
+            "Line": 64
           }
         },
         {
@@ -1807,7 +1992,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 64
+            "Line": 68
           }
         },
         {
@@ -1818,7 +2003,172 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 67
+            "Line": 71
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "textOrThrow",
+          "Signature": "pub fn textOrThrow(path: string): string throws IoError",
+          "Doc": "`text`, with the reason when it cannot: the content, or an `IoError` saying why not.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 94
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "bytesOrThrow",
+          "Signature": "pub fn bytesOrThrow(path: string): uint8[] throws IoError",
+          "Doc": "`bytes`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 103
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "linesOrThrow",
+          "Signature": "pub fn linesOrThrow(path: string): string[] throws IoError",
+          "Doc": "`lines`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 112
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sizeOrThrow",
+          "Signature": "pub fn sizeOrThrow(path: string): int throws IoError",
+          "Doc": "`size`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 121
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "entriesOrThrow",
+          "Signature": "pub fn entriesOrThrow(path: string): string[] throws IoError",
+          "Doc": "`entries`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 130
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "writeTextOrThrow",
+          "Signature": "pub fn writeTextOrThrow(path: string, content: string): void throws IoError",
+          "Doc": "`writeText`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 143
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "appendTextOrThrow",
+          "Signature": "pub fn appendTextOrThrow(path: string, content: string): void throws IoError",
+          "Doc": "`appendText`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 150
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "writeBytesOrThrow",
+          "Signature": "pub fn writeBytesOrThrow(path: string, data: uint8[]): void throws IoError",
+          "Doc": "`writeBytes`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 157
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "appendBytesOrThrow",
+          "Signature": "pub fn appendBytesOrThrow(path: string, data: uint8[]): void throws IoError",
+          "Doc": "`appendBytes`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 164
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "removeOrThrow",
+          "Signature": "pub fn removeOrThrow(path: string): void throws IoError",
+          "Doc": "`remove`, with the reason when it cannot. A file that never existed is still success, as in\n`remove` — the twin throws exactly where the silent form answers `false`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 172
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "copyOrThrow",
+          "Signature": "pub fn copyOrThrow(from: string, to: string): void throws IoError",
+          "Doc": "`copy`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 179
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "moveOrThrow",
+          "Signature": "pub fn moveOrThrow(from: string, to: string): void throws IoError",
+          "Doc": "`move`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 186
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "createDirOrThrow",
+          "Signature": "pub fn createDirOrThrow(path: string): void throws IoError",
+          "Doc": "`createDir`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 193
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "createDirAllOrThrow",
+          "Signature": "pub fn createDirAllOrThrow(path: string): void throws IoError",
+          "Doc": "`createDirAll`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 200
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "removeDirOrThrow",
+          "Signature": "pub fn removeDirOrThrow(path: string): void throws IoError",
+          "Doc": "`removeDir`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 207
           }
         },
         {
@@ -1829,7 +2179,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 74
+            "Line": 218
           }
         },
         {
@@ -1840,7 +2190,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 76
+            "Line": 220
           }
         },
         {
@@ -1851,7 +2201,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 78
+            "Line": 222
           }
         },
         {
@@ -1862,7 +2212,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 81
+            "Line": 225
           }
         },
         {
@@ -1873,7 +2223,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 84
+            "Line": 228
           }
         },
         {
@@ -1884,7 +2234,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 87
+            "Line": 231
           }
         },
         {
@@ -1895,7 +2245,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 90
+            "Line": 234
           }
         },
         {
@@ -1906,18 +2256,29 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 94
+            "Line": 238
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "entries",
+          "Signature": "pub fn entries(path: string): ?string[]",
+          "Doc": "The entries of a directory: names rather than paths, sorted alphabetically. `null` when the\ndirectory cannot be read; an EMPTY array is an empty directory — the 2.14 convention, which\n`listDir` predates.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 243
           }
         },
         {
           "Kind": "Function",
           "Name": "listDir",
           "Signature": "pub fn listDir(path: string): string[]",
-          "Doc": "The entries of a directory: names rather than paths, sorted alphabetically.\n\nAn empty array for an unreadable directory rather than a `?string[]`, as in `readLines`. A\ncaller that needs the difference asks `isDirectory` first.",
+          "Doc": "The entries of a directory — names, sorted — before 3.7. It answers an empty array to both\n\"empty\" and \"unreadable\", which no caller can tell apart; `entries` says `null`, and\n`entriesOrThrow` says why.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 100
+            "Line": 248
           }
         },
         {
@@ -1928,7 +2289,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 103
+            "Line": 252
           }
         },
         {
@@ -1939,7 +2300,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 117
+            "Line": 266
           }
         },
         {
@@ -1950,7 +2311,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 150
+            "Line": 299
           }
         },
         {
@@ -1961,7 +2322,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 156
+            "Line": 305
           }
         },
         {
@@ -1972,7 +2333,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 172
+            "Line": 321
           }
         },
         {
@@ -1983,7 +2344,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 188
+            "Line": 337
           }
         },
         {
@@ -1994,7 +2355,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 198
+            "Line": 347
           }
         },
         {
@@ -2005,7 +2366,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 206
+            "Line": 355
           }
         }
       ]
@@ -3074,7 +3435,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 29
+                "Line": 30
               }
             },
             {
@@ -3085,7 +3446,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 31
+                "Line": 32
               }
             },
             {
@@ -3096,7 +3457,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 33
+                "Line": 34
               }
             },
             {
@@ -3107,7 +3468,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 35
+                "Line": 36
               }
             },
             {
@@ -3118,7 +3479,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 37
+                "Line": 38
               }
             },
             {
@@ -3129,7 +3490,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 39
+                "Line": 40
               }
             },
             {
@@ -3140,7 +3501,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 41
+                "Line": 42
               }
             },
             {
@@ -3151,7 +3512,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 44
+                "Line": 45
               }
             },
             {
@@ -3162,7 +3523,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 52
+                "Line": 53
               }
             },
             {
@@ -3173,7 +3534,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 61
+                "Line": 62
               }
             },
             {
@@ -3184,7 +3545,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 71
+                "Line": 72
               }
             },
             {
@@ -3195,7 +3556,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 80
+                "Line": 81
               }
             },
             {
@@ -3206,7 +3567,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 89
+                "Line": 90
               }
             },
             {
@@ -3217,7 +3578,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 98
+                "Line": 99
               }
             },
             {
@@ -3228,7 +3589,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 106
+                "Line": 107
               }
             },
             {
@@ -3239,13 +3600,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 114
+                "Line": 115
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 27
+            "Line": 28
           }
         },
         {
@@ -3256,7 +3617,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 123
+            "Line": 124
           }
         },
         {
@@ -3267,7 +3628,74 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 131
+            "Line": 132
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "JsonError",
+          "Signature": "pub class JsonError :: [Throwable]",
+          "Doc": "Where and why a document was refused: the first place the parser could not continue, and\nwhat it expected there. `line` and `column` are 1-based and counted in code points.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "line",
+              "Signature": "line: int",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 304
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "column",
+              "Signature": "column: int",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 305
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "offset",
+              "Signature": "offset: int",
+              "Doc": "The 0-based code-point offset of the refusal — `line` and `column`, unfolded.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 307
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "expected",
+              "Signature": "expected: string",
+              "Doc": "What the parser expected at that place, as prose: `\"a value\"`, `\"',' or '}'\"`, …",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 309
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/json.lyr",
+                "Line": 311
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 303
           }
         },
         {
@@ -3278,7 +3706,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 310
+            "Line": 331
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parseOrThrow",
+          "Signature": "pub fn parseOrThrow(text: string): JsonValue throws JsonError",
+          "Doc": "`parse`, with the reason when the text spells no value: where the document broke, and what\nthe parser expected there. The strictness is `parse`'s — the two are one parser.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 347
           }
         }
       ]
@@ -4315,6 +4754,51 @@
           }
         },
         {
+          "Kind": "Class",
+          "Name": "Utf8Error",
+          "Signature": "pub class Utf8Error :: [Throwable]",
+          "Doc": "Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "offset",
+              "Signature": "offset: int",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 60
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 62
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 59
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "utf8DecodeOrThrow",
+          "Signature": "pub fn utf8DecodeOrThrow(bytes: uint8[]): string throws Utf8Error",
+          "Doc": "`utf8Decode`, with the reason when the bytes are not UTF-8: which byte broke the sequence.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 72
+          }
+        },
+        {
           "Kind": "Function",
           "Name": "isDigit",
           "Signature": "pub fn isDigit(c: char): bool",
@@ -4322,7 +4806,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 365
+            "Line": 387
           }
         },
         {
@@ -4333,7 +4817,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 371
+            "Line": 393
           }
         },
         {
@@ -4344,7 +4828,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 376
+            "Line": 398
           }
         },
         {
@@ -4355,7 +4839,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 381
+            "Line": 403
           }
         },
         {
@@ -4366,7 +4850,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 386
+            "Line": 408
           }
         },
         {
@@ -4377,7 +4861,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 391
+            "Line": 413
           }
         },
         {
@@ -4388,7 +4872,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 398
+            "Line": 420
           }
         },
         {
@@ -4399,7 +4883,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 406
+            "Line": 428
           }
         },
         {
@@ -4410,7 +4894,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 433
+            "Line": 455
           }
         },
         {
@@ -4421,7 +4905,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 448
+            "Line": 470
           }
         },
         {
@@ -4432,7 +4916,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 482
+            "Line": 504
           }
         },
         {
@@ -4443,7 +4927,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 527
+            "Line": 549
           }
         },
         {
@@ -4454,7 +4938,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 545
+            "Line": 567
           }
         },
         {
@@ -4471,7 +4955,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 558
+                "Line": 580
               }
             },
             {
@@ -4482,7 +4966,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 560
+                "Line": 582
               }
             },
             {
@@ -4493,7 +4977,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 563
+                "Line": 585
               }
             },
             {
@@ -4504,7 +4988,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 568
+                "Line": 590
               }
             },
             {
@@ -4515,7 +4999,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 583
+                "Line": 605
               }
             },
             {
@@ -4526,7 +5010,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 589
+                "Line": 611
               }
             },
             {
@@ -4537,13 +5021,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 597
+                "Line": 619
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 556
+            "Line": 578
           }
         }
       ]

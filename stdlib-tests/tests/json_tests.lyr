@@ -1,5 +1,5 @@
 import std.test { Test, assertEq, assertTrue };
-import std.json { JsonValue, parse, serialize, serializePretty };
+import std.json { JsonValue, JsonError, parse, parseOrThrow, serialize, serializePretty };
 import std.collections { List, Map };
 import std.string { fromChar, repeat };
 
@@ -276,4 +276,63 @@ pub fn pretty_indent_zero_keeps_the_lines(): void {
     let m = Map<string, JsonValue>.empty();
     m.set("a", JsonValue.Int(1));
     assertEq(serializePretty(JsonValue.Obj(m), 0), "{\n\"a\": 1\n}");
+}
+
+// The reasons (3.7): one parser, two forms — parse ignores the note, parseOrThrow reads it.
+
+@Test
+pub fn parseOrThrow_answers_the_value(): void {
+    try {
+        let v = parseOrThrow("{\"a\": [1, 2]}");
+        assertEq(serialize(v), "{\"a\":[1,2]}");
+    } catch (e: JsonError) {
+        assertTrue(false, "valid json must not throw: " + e.message());
+    }
+}
+
+@Test
+pub fn parseOrThrow_names_line_and_column(): void {
+    var line = 0;
+    var column = 0;
+    var expected = "";
+    try {
+        let v = parseOrThrow("{\n  \"a\": ?\n}");
+        assertTrue(false, "the document must be refused, got " + serialize(v));
+    } catch (e: JsonError) {
+        line = e.line;
+        column = e.column;
+        expected = e.expected;
+    }
+    assertEq(line, 2);
+    assertEq(column, 8);
+    assertEq(expected, "a value");
+}
+
+@Test
+pub fn parseOrThrow_refuses_trailing_content(): void {
+    var expected = "";
+    try {
+        let v = parseOrThrow("1 2");
+        assertTrue(false, "trailing content must refuse, got " + serialize(v));
+    } catch (e: JsonError) {
+        expected = e.expected;
+    }
+    assertEq(expected, "end of the document");
+}
+
+@Test
+pub fn the_first_refusal_wins(): void {
+    // The inner leaf's place, not a parent's vaguer one: the broken escape is the story,
+    // however many containers sit above it.
+    var expected = "";
+    var column = 0;
+    try {
+        let v = parseOrThrow("[[\"a\\q\"]]");
+        assertTrue(false, "the escape must refuse, got " + serialize(v));
+    } catch (e: JsonError) {
+        expected = e.expected;
+        column = e.column;
+    }
+    assertEq(expected, "a valid escape");
+    assertEq(column, 7);
 }

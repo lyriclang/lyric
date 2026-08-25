@@ -55,6 +55,28 @@ pub fn fromChars(chars: char[]): string;
 /// documented there.
 pub fn utf8Decode(bytes: uint8[]): ?string;
 
+/// Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.
+pub class Utf8Error :: [Throwable] {
+    offset: int,
+
+    pub fn message(): string {
+        return "utf8: invalid byte at offset " + fromInt(this.offset);
+    }
+}
+
+// The offset of the last utf8Decode refusal, recorded by the runtime and read immediately after
+// a null — the VM is single-threaded, so nothing runs in between.
+fn utf8DecodeErrorOffset(): int;
+
+/// `utf8Decode`, with the reason when the bytes are not UTF-8: which byte broke the sequence.
+pub fn utf8DecodeOrThrow(bytes: uint8[]): string throws Utf8Error {
+    let text = utf8Decode(bytes);
+    if (text == null) {
+        throw Utf8Error { offset = utf8DecodeErrorOffset() };
+    }
+    return text;
+}
+
 // Behind `join` and `StringBuilder.build`: one native call instead of a copy cascade. Private —
 // `join` IS the public name for this.
 fn joinAll(parts: string[], separator: string): string;

@@ -10,6 +10,65 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v3.7.0 — 2026-08-25
+
+**M35 — the reason.** The gap `std.io.file` has carried since 2.14 — "a missing file and a
+permission denied look the same" — closes, and it closes as a LIBRARY DOCTRINE rather than a
+one-module patch (spec §9.0, `lyric-spec#22`): a value answers *whether*, a throw answers *why*.
+Everything is additive — no silent form changes, no format change (bytecode stays 3.6) — and
+every twin derives from the same implementation as its silent sibling, so the two can never
+drift.
+
+### Added
+
+- **`std.io.error`** — `IoError` and `IoErrorKind`, the reason an I/O operation failed: which
+  kind (`NotFound`, `PermissionDenied`, `InvalidPath`, `Other` — a matchable enum behind a
+  carrier class, so the list can grow without breaking anyone's `match`), on which path, and
+  what the platform said. Capability-free: knowing the type costs nothing, producing one takes
+  the capability of the module whose operation failed.
+
+- **`std.io.file` — an `OrThrow` twin for every silent form.** `textOrThrow`, `bytesOrThrow`,
+  `linesOrThrow`, `sizeOrThrow`, `entriesOrThrow` answer the value or throw the reason; the ten
+  operation twins (`writeTextOrThrow` … `removeDirOrThrow`) are `void` where the silent form
+  answers `bool`, throwing where it answers `false`. The runtime classifies the last failed
+  operation; the twins read the classification immediately — the VM is single-threaded, so
+  nothing runs in between. A module that binds the new natives needs a 3.7 runtime (the
+  `parseFloat` forward path); one that does not loads everywhere it always did.
+
+- **`entries(path): ?string[]`** completes the 2.14 line `listDir` missed: `null` when the
+  directory cannot be read, an empty array when it is empty. `listDir` — which answers an empty
+  array to both, with "ask `isDirectory` first" as its documented race — carries
+  `@Deprecated { until = "4.0" }`.
+
+- **`std.json.parseOrThrow`** — a `JsonError` naming the line, the column (1-based, code
+  points), the offset and what the parser expected there. One parser answers both forms: the
+  leaf that refuses records the FIRST place, `parse` ignores the note, `parseOrThrow` reads it.
+
+- **`std.encoding.hexDecodeOrThrow` / `base64DecodeOrThrow`** — an `EncodingError` naming the
+  character offset and what a canonical string would have had there.
+
+- **`std.string.utf8DecodeOrThrow`** — a `Utf8Error` naming the byte that broke the sequence.
+
+### Deliberately unchanged
+
+`parseInt` and `parseFloat` stay `?T` alone — the reason of a five-character input is the input.
+`std.os` stays silent throughout: an unset variable, an unanswered `hostName` — `null` IS the
+whole truth there. `Map.get`, `List` and the option helpers keep absence as a value, and panics
+keep programming errors.
+
+### Fixed
+
+- **An import mentioned only in a PATTERN warned as unused** (`LYR-SEM0072`). `match (e.kind)`
+  over an imported enum — the exact shape the new convention recommends — left the import
+  "unused", which under `--deny-warnings` fails the build. The 3.3.0 type-path fix, one node
+  kind further: a pattern's path is strings, and its qualifier is recorded now.
+
+### Documentation
+
+- Guide 10 gains "Whether, or why" — both shapes side by side, `??` for the fallback and
+  `match (e.kind)` for the reason. Guide 13 lists `std.io.error`, the twin convention, and the
+  `listDir` deprecation.
+
 ## v3.6.1 — 2026-08-25
 
 The sweep after 3.6.0, per the pipeline: adversarial probes against what the four changes make

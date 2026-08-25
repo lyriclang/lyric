@@ -6,11 +6,36 @@
 // characters outside the alphabet — because a lenient decoder silently accepts what another
 // system will reject, and the caller can always strip decorations before decoding.
 //
+// Since 3.7 the REASON has a form too (§9.0): each decoder has an `*OrThrow` twin throwing an
+// `EncodingError` with the character offset and what was expected there. One implementation
+// answers both — the core hands back the value AND the refusal, the silent form drops the
+// second half.
+//
 // No capability required: nothing here reaches beyond the values passed in.
 
 module std.encoding;
 
 import std.string as strings;
+
+/// Where and why a text was refused: the 0-based character offset of the refusal, and what the
+/// decoder expected there.
+pub class EncodingError :: [Throwable] {
+    offset: int,
+    expected: string,
+
+    pub fn message(): string {
+        return "encoding: expected " + this.expected + " at offset " + strings.fromInt(this.offset);
+    }
+}
+
+// What a decode core answers: the value, or where and what it expected. A struct rather than a
+// tuple, because a field initializer is a context position (§3.1) and a tuple element is not —
+// `value = null` adapts where `(null, …)` would need its type written out.
+struct DecodeAttempt {
+    value: ?uint8[],
+    at: int,
+    what: string,
+}
 
 // The base64 alphabet of RFC 4648 §4, indexed by the six-bit value each character encodes.
 let base64Chars: char[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toChars();
@@ -56,23 +81,42 @@ pub fn hexEncode(bytes: uint8[]): string {
 /// The bytes a hexadecimal string spells, or `null` when it spells none: an odd length or a
 /// character outside `0-9`, `a-f`, `A-F`. The empty string is an empty array.
 pub fn hexDecode(text: string): ?uint8[] {
+    return hexDecodeCore(text).value;
+}
+
+/// `hexDecode`, with the reason when the text spells no bytes: where it broke, and what a
+/// hexadecimal string would have had there.
+pub fn hexDecodeOrThrow(text: string): uint8[] throws EncodingError {
+    let attempt = hexDecodeCore(text);
+    let value = attempt.value;
+    if (value == null) {
+        throw EncodingError { offset = attempt.at, expected = attempt.what };
+    }
+    return value;
+}
+
+// The one implementation behind both forms: the value, or where and what it expected.
+fn hexDecodeCore(text: string): DecodeAttempt {
     let chars = text.toChars();
     if (chars.length % 2 != 0) {
-        return null;
+        return DecodeAttempt { value = null, at = chars.length, what = "an even number of digits" };
     }
     let zero: uint8 = 0;
     var out = [zero] * (chars.length / 2);
     var i = 0;
     while (i < out.length) {
         let hi = hexValue(chars[i * 2]);
+        if (hi < 0) {
+            return DecodeAttempt { value = null, at = i * 2, what = "a hexadecimal digit" };
+        }
         let lo = hexValue(chars[i * 2 + 1]);
-        if (hi < 0 || lo < 0) {
-            return null;
+        if (lo < 0) {
+            return DecodeAttempt { value = null, at = i * 2 + 1, what = "a hexadecimal digit" };
         }
         out[i] = (hi << 4 | lo) as uint8;
         i = i + 1;
     }
-    return out;
+    return DecodeAttempt { value = out, at = 0, what = "" };
 }
 
 /// Bytes as base64 (RFC 4648 §4: `A-Za-z0-9+/`), padded with `=` to a multiple of four
@@ -126,13 +170,33 @@ fn base64Value(c: char): int {
 /// the alphabet are refused, and so is padding whose unused bits are not zero — accepted input is
 /// exactly what `base64Encode` produces. The empty string is an empty array.
 pub fn base64Decode(text: string): ?uint8[] {
+    return base64DecodeCore(text).value;
+}
+
+/// `base64Decode`, with the reason when the text spells no bytes: where it broke, and what a
+/// base64 string would have had there.
+pub fn base64DecodeOrThrow(text: string): uint8[] throws EncodingError {
+    let attempt = base64DecodeCore(text);
+    let value = attempt.value;
+    if (value == null) {
+        throw EncodingError { offset = attempt.at, expected = attempt.what };
+    }
+    return value;
+}
+
+// The one implementation behind both forms: the value, or where and what it expected.
+fn base64DecodeCore(text: string): DecodeAttempt {
     let chars = text.toChars();
     if (chars.length % 4 != 0) {
-        return null;
+        return DecodeAttempt {
+            value = null,
+            at = chars.length,
+            what = "a multiple of four characters",
+        };
     }
     if (chars.length == 0) {
         let zero: uint8 = 0;
-        return [zero] * 0;
+        return DecodeAttempt { value = [zero] * 0, at = 0, what = "" };
     }
 
     // How many `=` end the string; only the last group may carry them.
@@ -153,9 +217,12 @@ pub fn base64Decode(text: string): ?uint8[] {
         let last = i + 4 == chars.length;
 
         let a = base64Value(chars[i]);
+        if (a < 0) {
+            return DecodeAttempt { value = null, at = i, what = "a base64 character" };
+        }
         let b = base64Value(chars[i + 1]);
-        if (a < 0 || b < 0) {
-            return null;
+        if (b < 0) {
+            return DecodeAttempt { value = null, at = i + 1, what = "a base64 character" };
         }
 
         // The third and fourth character may be padding, but only in the final group.
@@ -163,18 +230,24 @@ pub fn base64Decode(text: string): ?uint8[] {
         var d = 0;
         if (last && padding == 2) {
             if (chars[i + 2] != '=' || chars[i + 3] != '=') {
-                return null;
+                return DecodeAttempt { value = null, at = i + 2, what = "'=='" };
             }
         } else if (last && padding == 1) {
             c = base64Value(chars[i + 2]);
-            if (c < 0 || chars[i + 3] != '=') {
-                return null;
+            if (c < 0) {
+                return DecodeAttempt { value = null, at = i + 2, what = "a base64 character" };
+            }
+            if (chars[i + 3] != '=') {
+                return DecodeAttempt { value = null, at = i + 3, what = "'='" };
             }
         } else {
             c = base64Value(chars[i + 2]);
+            if (c < 0) {
+                return DecodeAttempt { value = null, at = i + 2, what = "a base64 character" };
+            }
             d = base64Value(chars[i + 3]);
-            if (c < 0 || d < 0) {
-                return null;
+            if (d < 0) {
+                return DecodeAttempt { value = null, at = i + 3, what = "a base64 character" };
             }
         }
 
@@ -190,14 +263,14 @@ pub fn base64Decode(text: string): ?uint8[] {
         // Unused padding bits must be zero, or the text is not the canonical spelling of any
         // byte sequence: two strings would decode to the same bytes.
         if (last && padding == 2 && group & 0xFFFF != 0) {
-            return null;
+            return DecodeAttempt { value = null, at = i + 1, what = "zero bits under the padding" };
         }
         if (last && padding == 1 && group & 0xFF != 0) {
-            return null;
+            return DecodeAttempt { value = null, at = i + 2, what = "zero bits under the padding" };
         }
 
         outAt = outAt + 3;
         i = i + 4;
     }
-    return out;
+    return DecodeAttempt { value = out, at = 0, what = "" };
 }
