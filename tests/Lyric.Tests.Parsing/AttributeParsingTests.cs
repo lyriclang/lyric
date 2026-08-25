@@ -184,6 +184,17 @@ public class AttributeParsingTests
     }
 
     [Fact]
+    public void A_second_positional_value_reports_the_parenthesis_alone()
+    {
+        // Recovery goes THROUGH the parenthesis: leaving ', 4)' in the stream handed it to the
+        // declaration parser, which then blamed the attribute for missing its declaration.
+        Parse("@Retry(3, 4)\nfn f(): void { }", out var diagnostics);
+
+        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0018");
+        Assert.DoesNotContain(diagnostics, d => d.Code == "LYR-PAR0042");
+    }
+
+    [Fact]
     public void AstChildren_walks_the_attribute_and_its_fields()
     {
         var module = ParseClean("@System { order = 1 }\nfn f(): void { }");

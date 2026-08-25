@@ -141,8 +141,22 @@ public sealed partial class Parser
         {
             _buffer.Advance();
             positional = ParseSubExpr();
-            end = _buffer.Expect(TokenKind.RParen, "LYR-PAR0018",
-                "expected ')' after the attribute value — the parenthesized form carries one").Span;
+            if (_buffer.Check(TokenKind.RParen))
+            {
+                end = _buffer.Advance().Span;
+            }
+            else
+            {
+                _de.Report("LYR-PAR0018", Severity.Error, _buffer.Current.Span,
+                    "expected ')' after the attribute value — the parenthesized form carries one");
+                // Recover THROUGH the parenthesis: leaving its leftovers in the stream hands
+                // them to the declaration parser, which then blames the attribute for missing
+                // its declaration.
+                while (!_buffer.Check(TokenKind.RParen) && !_buffer.Check(TokenKind.LBrace)
+                    && !_buffer.AtEnd)
+                    _buffer.Advance();
+                end = _buffer.Check(TokenKind.RParen) ? _buffer.Advance().Span : pathEnd;
+            }
         }
 
         return new AttributeNode(path.ToArray(), fields.ToArray(), Span.Union(first.Span, end))

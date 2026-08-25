@@ -640,6 +640,36 @@ public class AttributeTests
             """);
 
     [Fact]
+    public void The_witharg_promise_travels_the_parent_chain() =>
+        // 3.9.1: the conformance is reached through an interface parent, and the first-field
+        // check runs at the entry that reaches it — without it the mismatch surfaced at every
+        // use as a plain assignment error.
+        AssertReports("LYR-SEM0095", "first field", """
+            import std.core { OnFunction, WithArg };
+
+            interface Carries :: [WithArg<int>] { }
+
+            struct Retry :: [OnFunction, Carries] { limit: string }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
+    public void A_field_no_row_can_hold_refuses_the_use() =>
+        // 3.9.1: the sema accepted 'n: ?int' with 'n = 3' — the literal adapts — and the
+        // bytecode writer, which has no encoding for an optional, took the compiler down.
+        AssertReports("LYR-SEM0096", "row", """
+            import std.core { OnFunction };
+
+            struct Odd :: [OnFunction] { n: ?int }
+
+            @Odd { n = 3 }
+            fn f(): void { }
+
+            fn main(): int { return 0; }
+            """);
+
+    [Fact]
     public void A_group_on_a_member_obeys_the_member_rule() =>
         AssertReports("LYR-SEM0065", "only '@Deprecated'", EventVocabulary + """
 
