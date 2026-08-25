@@ -191,6 +191,10 @@ public static class Disassembler
         Op.MakeInterface => $"mkiface {TypeRefName(module, i.Immediate)} -> " +
                             $"{TypeRefName(module, i.Immediate2)}",
         Op.CallVirt => $"callvirt {SlotName(module, i.Immediate, i.Immediate2)}",
+        Op.MakeCoroutine =>
+            $"mkcoro {CalleeName(module, (int)i.Immediate)}, argc {N(i.Immediate2)}",
+        Op.ResumePull => i.Immediate == 1 ? "resume (lenient)" : "resume",
+        Op.YieldSuspend => i.Immediate == 1 ? "yield" : "yield (bare)",
         Op.EnumTag => "enumtag",
         Op.Throw => "throw",
         Op.EndFinally => "endfinally",

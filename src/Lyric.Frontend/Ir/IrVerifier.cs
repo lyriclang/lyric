@@ -798,6 +798,9 @@ public static class IrVerifier
                 case StoreGlobal g: CheckStoreGlobal(g, block, index); break;
                 case MakeClosure m: CheckMakeClosure(m, block, index); break;
                 case CallIndirect c: CheckCallIndirect(c, block, index); break;
+                case MakeCoroutine m: CheckMakeCoroutine(m, block, index); break;
+                case ResumePull r: CheckResumePull(r, block, index); break;
+                case YieldSuspend y: CheckYieldSuspend(y, block, index); break;
                 default:
                     throw new InternalCompilationException(
                         $"ir-verifier: unhandled op {op.GetType().Name}");
@@ -1195,6 +1198,65 @@ public static class IrVerifier
                                  $"but {Show(signature)} returns {Show(signature.Return)}");
 
         if (c.Dest is { } dest) RequireDestType(dest, signature.Return, "callind", block, index);
+    }
+
+    private void CheckMakeCoroutine(MakeCoroutine m, BlockId block, int index)
+    {
+        if (m.Body.Value < 0 || m.Body.Value >= _module.Functions.Count)
+        {
+            Report(block, index, $"mkcoro body {m.Body} is out of range " +
+                                 $"(module has {N(_module.Functions.Count)} function(s))");
+            return;
+        }
+
+        // The captured arguments become the body frame's parameters at the first pull, so they
+        // must fit the body the way call arguments fit a callee.
+        var body = _module.Functions[m.Body.Value];
+        if (m.Args.Length != body.ParamCount)
+        {
+            Report(block, index, $"mkcoro captures {N(m.Args.Length)} arg(s), " +
+                                 $"but body {body.Name} takes {N(body.ParamCount)}");
+        }
+        else if (body.ParamCount <= body.Locals.Count)
+        {
+            for (var i = 0; i < m.Args.Length; i++)
+            {
+                var expected = body.Locals[i].Type;
+                if (!IrType.Equal(TypeOf(m.Args[i]), expected))
+                    Report(block, index, $"mkcoro argument {N(i)} is {Show(TypeOf(m.Args[i]))}, " +
+                                         $"expected {Show(expected)}");
+            }
+        }
+
+        RequireDestType(m.Dest, m.Type, "mkcoro", block, index);
+    }
+
+    private void CheckResumePull(ResumePull r, BlockId block, int index)
+    {
+        // A chain value carries the coroutine signature — a function type, like the closure the
+        // state-machine era used, so no second value form exists for it.
+        if (TypeOf(r.Coroutine) is not IrFunctionType)
+        {
+            Report(block, index,
+                $"resume operand is {Show(TypeOf(r.Coroutine))}, expected a coroutine value");
+            return;
+        }
+
+        if (r.Dest is not { } dest) return;
+        var expected = r.Lenient
+            ? IsVoid(r.YieldType) ? new IrScalarType(IrScalar.Bool) : new IrOptionalType(r.YieldType)
+            : r.YieldType;
+        RequireDestType(dest, expected, "resume", block, index);
+    }
+
+    private void CheckYieldSuspend(YieldSuspend y, BlockId block, int index)
+    {
+        if (y.Value is { } value && !IrType.Equal(TypeOf(value), y.YieldType))
+            Report(block, index, $"yield value is {Show(TypeOf(value))}, " +
+                                 $"annotated {Show(y.YieldType)}");
+        if (y.Value is null && !IsVoid(y.YieldType))
+            Report(block, index, $"bare yield annotated {Show(y.YieldType)} — a value-yielding " +
+                                 "suspension carries its value");
     }
 
     private void CheckCallVirt(CallVirt c, BlockId block, int index)

@@ -200,6 +200,12 @@ public static class IrPrinter
         CallIndirect c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "") +
                           $"callind {c.Callee}({string.Join(", ", c.Args)})",
         StoreGlobal g => $"stglobal {g.Global}, {g.Value}",
+        MakeCoroutine m => $"{m.Dest}: {TypeStr(m.Type)} = mkcoro {m.Body}" +
+                           (m.Args.Length > 0 ? $", {string.Join(", ", m.Args)}" : ""),
+        ResumePull r => (r.Dest is { } rd ? $"{rd}: {TypeStr(r.YieldType)} = " : "") +
+                        $"resume{(r.Lenient ? ".lenient" : "")} {r.Coroutine}",
+        YieldSuspend y => $"yield {TypeStr(y.YieldType)}" +
+                          (y.Value is { } v ? $" {v}" : ""),
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 

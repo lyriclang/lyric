@@ -614,6 +614,26 @@ public static class BytecodeWriter
                 code.ULeb(((ulong)c.Args.Length << 1) | (c.Dest is null ? 0UL : 1UL));
                 break;
 
+            case MakeCoroutine m:
+                code.Opcode(Op.MakeCoroutine);
+                // The body index in the shared call space, like a closure target.
+                code.ULeb((ulong)(importCount + m.Body.Value));
+                code.ULeb((ulong)m.Args.Length);
+                WriteType(code, ((IrFunctionType)m.Type).Return);
+                break;
+
+            case ResumePull r:
+                code.Opcode(Op.ResumePull);
+                code.ULeb(r.Lenient ? 1UL : 0UL);
+                WriteType(code, r.YieldType);
+                break;
+
+            case YieldSuspend y:
+                code.Opcode(Op.YieldSuspend);
+                code.ULeb(y.Value is null ? 0UL : 1UL);
+                WriteType(code, y.YieldType);
+                break;
+
             case LoadGlobal l:
                 code.Opcode(Op.LoadGlobal);
                 code.ULeb(l.Global.Value);

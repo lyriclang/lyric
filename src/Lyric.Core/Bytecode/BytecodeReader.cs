@@ -40,9 +40,14 @@ public static class BytecodeReader
 
         var major = reader.U16();
         var minor = reader.U16();
-        if (major != Format.VersionMajor)
+        // 3.x stays readable: format 4.0 ADDS opcodes and removes nothing, so every 3.x module
+        // is a 4.0 module that happens not to use them — the state-machine coroutines those
+        // modules carry are ordinary code. What a 4.0 reader cannot promise is anything OLDER
+        // than 3: the pre-3 formats predate the compatibility rule itself.
+        if (major != Format.VersionMajor && major != 3)
             throw new MalformedBytecodeException(BytecodeDiagnostics.UnsupportedVersion,
-                $"bytecode major version {major} is not supported (this build reads {Format.VersionMajor})");
+                $"bytecode major version {major} is not supported (this build reads " +
+                $"{Format.VersionMajor} and 3)");
 
         ulong capabilities = 0;
         IReadOnlyList<string> strings = Array.Empty<string>();
@@ -970,6 +975,27 @@ public static class BytecodeReader
                     throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
                         $"function '{function.Name}' at {instruction.Offset}: global index " +
                         $"{instruction.Immediate} is outside {module.Globals.Count} global(s)");
+
+                // A chain's body is called by index at the first pull, so the index must be a
+                // defined FUNCTION: an import has no frame to capture, and a body outside the
+                // table is a wild call.
+                case Op.MakeCoroutine
+                    when instruction.Immediate < (ulong)module.Imports.Count
+                         || instruction.Immediate >=
+                            (ulong)(module.Imports.Count + module.Functions.Count):
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
+                        $"function '{function.Name}' at {instruction.Offset}: mkcoro body " +
+                        $"{instruction.Immediate} is not a defined function " +
+                        $"({module.Imports.Count} import(s), {module.Functions.Count} function(s))");
+
+                case Op.MakeCoroutine
+                    when instruction.Immediate2 != (ulong)module
+                        .Functions[(int)instruction.Immediate - module.Imports.Count]
+                        .ParamCount:
+                    throw new MalformedBytecodeException(BytecodeDiagnostics.IndexOutOfRange,
+                        $"function '{function.Name}' at {instruction.Offset}: mkcoro captures " +
+                        $"{instruction.Immediate2} argument(s), but the body takes " +
+                        $"{module.Functions[(int)instruction.Immediate - module.Imports.Count].ParamCount}");
 
                 // The fused arithmetic writes a slot and reads one or two; all three are checked
                 // here so the interpreter reads and writes an array without asking.

@@ -4,7 +4,7 @@
 > marker against the canonical body. Edit it there, mirror it here.
 
 <!-- sync:body -->
-# Lyric `.lyrbc` Bytecode Format 3.6
+# Lyric `.lyrbc` Bytecode Format 4.0
 
 This document is normative. The C# serializer implements it; it does not define it. A disassembler
 or a second runtime can be written from this document alone.
@@ -12,10 +12,18 @@ or a second runtime can be written from this document alone.
 Before Lyric v1.0 the format may change incompatibly with a major version bump and without a
 migration path. A stability promise begins at v1.0.
 
-Format version **3.6** covers: scalars, locals, module-internal and native calls, structured
+Format version **4.0** covers: scalars, locals, module-internal and native calls, structured
 control flow, classes, arrays, optionals, enums, interfaces with vtable dispatch, structs with
-value semantics, exceptions, global constants, closures, host objects, source positions,
-attributes, debug information, the names of opaque field types, and fused compare-and-branch.
+value semantics, exceptions, global constants, closures, coroutine chains, host objects, source
+positions, attributes, debug information, the names of opaque field types, and fused
+compare-and-branch.
+
+**4.0 against 3.6**: three new opcodes — the coroutine chain forms `mkcoro`, `resume` and
+`yield` (§Coroutines) — and nothing else. The major is honest about direction: a 3.x reader
+meets an opcode it has no case for and must reject the module, while a 4.0 reader accepts every
+**3.x** module unchanged — the state-machine coroutines those modules carry are ordinary code
+over opcodes that all still exist, so nothing old stops running. Compilers of the 4.x line emit
+the chain forms; the per-module rule of §Versioning is unchanged.
 
 **3.6 against 3.5**: four new opcodes. `brcmp` and `brcmpk` (§Calls and control flow) do in one
 instruction what a comparison followed by `condbr` does in four; `binll` and `binlk`
@@ -916,6 +924,43 @@ The function index is stored incremented by one, so that a closure over function
 environment is distinguishable from "no value".
 
 A reader must reject a `mkclosure` target index outside the call space.
+
+### Coroutines
+
+New in 4.0: a coroutine is a CHAIN of captured frames, not a compiled state machine. The
+chain object holds the frames it is suspended over; `resume` pushes them back onto the
+runtime's stack, and `yield` — executed at ANY call depth beneath the running resume — slices
+them off again. The type each form carries is the chain's element type, encoded as in a
+signature (§Types), where top-level `void` is permitted and means a bare-yield chain.
+
+| Opcode | Mnemonic | Operands | Stack | Effect |
+|---|---|---|---|---|
+| `0x79` | `mkcoro` | `uleb128` body, `uleb128` argc, `type` yield | −argc +1 | build a not-yet-started chain |
+| `0x7A` | `resume` | `uleb128` lenient, `type` yield | −1 +(0/1) | drive a chain one step |
+| `0x7B` | `yield` | `uleb128` hasvalue, `type` | −(0/1) +0 | suspend the running chain |
+
+`mkcoro` pops the captured arguments — call order, the first lowest — and stores them in the
+chain; the first pull hands them to the body's frame as its parameters. The body index lives in
+the shared call space like a closure target and must name a defined function: an import has no
+frame to capture.
+
+`resume` pops the chain value and runs it to its next suspension. Strict (`lenient` 0) pushes
+the yielded value — nothing for a void chain — and PANICS on a chain whose body has ended, at
+this pull or an earlier one. Lenient always pushes one value: the optional-wrapped yield, none
+on exhaustion, and for a void chain a bool — whether it advanced. The stack effect follows from
+`lenient` and the type's leading tag: strict pushes nothing exactly when the type is `void`.
+A resume of a chain that is RUNNING — suspended mid-resume, reached through its own body or any
+other — panics: one chain, one driver.
+
+`yield` pops its value when `hasvalue` is 1 and suspends the whole chain up to the nearest
+resume active in the SAME runtime loop, which receives the value; execution continues at the
+next instruction when the chain is resumed. With no such resume it panics — and a native or
+compiled frame between the yield and the resume runs in a loop of its own, so the panic is also
+the C-boundary rule. The body's last frame returning through the resume boundary ends the
+chain; frames abandoned suspended run nothing.
+
+A reader must reject: a `mkcoro` body index outside the defined functions — imports included
+below the range — and an `argc` that is not the body's parameter count.
 
 ---
 

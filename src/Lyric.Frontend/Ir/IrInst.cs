@@ -115,6 +115,39 @@ public sealed record MakeClosure(TempId Dest, FunctionId Target, TempId? Environ
 public sealed record CallIndirect(TempId? Dest, TempId Callee, TempId[] Args,
     IrType ReturnType, Span Span) : IrOp(Span);
 
+// Coroutines as CHAINS (format 4.0). A coroutine value holds captured frames, not a compiled
+// state machine: mkcoro builds it suspended-before-start, resume pushes its frames back onto
+// the interpreter's stack, and yield slices them off again down to the nearest running resume.
+// The state-machine lowering these replace could never suspend a helper — the frame it would
+// have to capture belonged to the CLR, not to the coroutine.
+
+/// <param name="Body">The body function. Like <see cref="MakeClosure.Target"/> it is a root:
+/// nothing else names it, and the chain calls it by index at the first pull.</param>
+/// <param name="Args">The captured arguments — <c>this</c> first when the coroutine is a
+/// method — which the first resume hands to the body's frame as its parameters.</param>
+public sealed record MakeCoroutine(TempId Dest, FunctionId Body, TempId[] Args,
+    IrFunctionType Type, Span Span) : IrOp(Span);
+
+/// <param name="Lenient">The pull form: <c>false</c> is <c>resume</c> — exhaustion panics —
+/// and <c>true</c> is <c>next()</c>, which writes <c>?T</c> (or, for a void chain, whether it
+/// advanced). The whole 2.2 contract in one instruction; the state-machine era assembled it
+/// from a flag parameter, a native import and three blocks of wrapping.</param>
+/// <param name="YieldType">What the chain yields — the type <c>Dest</c> is written as before
+/// any lenient wrapping, and a copy for the printer like <see cref="CallIndirect.ReturnType"/>.
+/// </param>
+public sealed record ResumePull(TempId? Dest, TempId Coroutine, bool Lenient,
+    IrType YieldType, Span Span) : IrOp(Span);
+
+/// <param name="Value">What the pull receives, or <c>null</c> for a void chain's bare
+/// <c>yield;</c>.</param>
+/// <param name="YieldType">The static type of <see cref="Value"/> at the yield site. Through
+/// 3.x the sema admits yield only inside a coroutine body, where it already checked this
+/// against the chain; the operand is in the encoding from day one because §10a rule 3 (4.0)
+/// compares it against the RUNNING chain's element type at the suspension itself.</param>
+/// <remarks>An op, not a terminator: when the chain is resumed, execution continues at the
+/// next instruction — the suspension is the interpreter's business, not the CFG's.</remarks>
+public sealed record YieldSuspend(TempId? Value, IrType YieldType, Span Span) : IrOp(Span);
+
 //Ir Terminator
 public sealed record Return(TempId? Value, Span Span) : IrTerminator(Span); // Value == null means a void return
 public sealed record Branch(BlockId Target, Span Span) : IrTerminator(Span);

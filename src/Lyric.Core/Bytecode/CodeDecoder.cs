@@ -72,6 +72,12 @@ public static class CodeDecoder
                 // optnone/optsome carry only the inner type, which the decoder skips.
                 Op.OptNone or Op.OptSome => DecodeWithType(reader, offset, opcode),
 
+                // The chain opcodes (4.0): ulebs first, then the yield type — kept as its leading
+                // tag, which is all the interpreter needs to know the value's presence and shape.
+                Op.MakeCoroutine => DecodeChainOp(reader, offset, opcode, immediates: 2),
+                Op.ResumePull or Op.YieldSuspend =>
+                    DecodeChainOp(reader, offset, opcode, immediates: 1),
+
                 _ => new BytecodeInstruction { Offset = offset, Opcode = opcode, Type = reader.Tag() },
             });
         }
@@ -179,6 +185,25 @@ public static class CodeDecoder
         return new BytecodeInstruction { Offset = offset, Opcode = opcode };
     }
 
+    /// <summary>A chain opcode (4.0): one or two uleb128s, then the yield type — which, alone in
+    /// the instruction stream, may be top-level VOID: a <c>Coroutine&lt;void&gt;</c> yields
+    /// nothing and still has to say so.</summary>
+    private static BytecodeInstruction DecodeChainOp(ByteReader reader, int offset, Op opcode,
+        int immediates)
+    {
+        var immediate = reader.ULeb();
+        var immediate2 = immediates == 2 ? reader.ULeb() : 0UL;
+
+        var tag = reader.Tag();
+        if (tag != TypeTag.Void) SkipTypeBody(reader, offset, tag);
+
+        return new BytecodeInstruction
+        {
+            Offset = offset, Opcode = opcode,
+            Immediate = immediate, Immediate2 = immediate2, Type = tag,
+        };
+    }
+
     /// <summary>
     /// Skips an inline-encoded type in the instruction stream.
     ///
@@ -189,6 +214,14 @@ public static class CodeDecoder
     private static void SkipType(ByteReader reader, int offset)
     {
         var tag = reader.Tag();
+        SkipTypeBody(reader, offset, tag);
+    }
+
+    /// <summary>The rest of a type whose tag is already read. Split from <see cref="SkipType"/>
+    /// for the one place that admits a top-level void; every composite position keeps refusing
+    /// it through the recursion.</summary>
+    private static void SkipTypeBody(ByteReader reader, int offset, TypeTag tag)
+    {
         switch (tag)
         {
             // Carry a uleb128 table index.
@@ -302,6 +335,14 @@ public static class CodeDecoder
         // environment, and a function value does not carry its signature.
         Op.MakeClosure => ((immediate & 1) == 1 ? 1 : 0, 1),
         Op.CallIndirect => (1 + (int)(immediate >> 1), (immediate & 1) == 1 ? 1 : 0),
+
+        // The chain opcodes (4.0). mkcoro pops its captured arguments; resume pops the chain and
+        // pushes what the form promises — lenient always answers, strict answers what a void
+        // chain lacks; yield pops the value it carries.
+        Op.MakeCoroutine => ((int)instruction.Immediate2, 1),
+        Op.ResumePull =>
+            (1, instruction.Immediate == 1 || instruction.Type != TypeTag.Void ? 1 : 0),
+        Op.YieldSuspend => ((int)instruction.Immediate, 0),
 
         Op.LoadGlobal => (0, 1),
         Op.StoreGlobal => (1, 0),

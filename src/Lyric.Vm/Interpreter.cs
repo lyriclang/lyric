@@ -257,6 +257,18 @@ public static class Interpreter
         return at is null ? name : $"{name} ({at})";
     }
 
+    /// <summary>One resume in flight: which chain, where its frames begin on the stack — the
+    /// count right after the resumer was pushed — and which pull form asked. A stack of these
+    /// per Loop, because chains nest; and per LOOP, not per VM: a native calling back into
+    /// script runs a Loop of its own, whose empty stack is what makes a yield beneath it the
+    /// no-resume panic — the C-boundary rule, falling out of the machine's shape.</summary>
+    private readonly struct ActiveResume(CoroutineChain chain, int boundary, bool lenient)
+    {
+        public readonly CoroutineChain Chain = chain;
+        public readonly int Boundary = boundary;
+        public readonly bool Lenient = lenient;
+    }
+
     private static LyrValue Loop<TPolicy>(Prepared[] prepared, IReadOnlyList<string> strings,
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
         NativeRegistry.BoundNative[] natives, LyrValue[] globals,
@@ -264,6 +276,9 @@ public static class Interpreter
         Stack<Frame> frames, ref Frame frame, TPolicy policy, Jit.JitContext? jit)
         where TPolicy : struct, IExecutionPolicy
     {
+        // The resumes in flight. Grows only when a program nests chains, so an ordinary run
+        // pays one empty allocation per Execute and nothing per instruction.
+        var actives = new Stack<ActiveResume>();
         // The frame's two arrays, its instruction list and its stack pointer, in LOCALS.
         //
         // A 'frame.Push' was three dependent loads before a single value moved -- the frame
@@ -462,6 +477,11 @@ public static class Interpreter
                         throw new LyricPanic(VmDiagnostics.UncaughtException,
                             $"uncaught exception of type '{TypeName(types, pendingType)}'");
 
+                    // An unwind that crossed a resume boundary ended that chain: the handler
+                    // stands in the resumer or deeper, and a chain whose frames are gone is done.
+                    while (actives.Count > 0 && frames.Count < actives.Peek().Boundary)
+                        actives.Pop().Chain.State = CoroutineChain.ChainState.Done;
+
                     locals = frame.Slots;
                     stack = frame.Stack;
                     instructions = frame.Fn.Instructions;
@@ -486,6 +506,10 @@ public static class Interpreter
                     if (!Resume(frames, ref frame, thrown, type))
                         throw new LyricPanic(VmDiagnostics.UncaughtException,
                             $"uncaught exception of type '{TypeName(types, type)}'");
+
+                    // As at endfinally: a chain the unwind carried away is done.
+                    while (actives.Count > 0 && frames.Count < actives.Peek().Boundary)
+                        actives.Pop().Chain.State = CoroutineChain.ChainState.Done;
 
                     locals = frame.Slots;
                     stack = frame.Stack;
@@ -625,6 +649,121 @@ public static class Interpreter
                     stack = frame.Stack;
                     instructions = frame.Fn.Instructions;
                     sp = frame.Sp;
+                    break;
+                }
+
+                // A chain object, not yet started: the captured arguments wait for the first
+                // pull, which hands them to the body's frame. The body index is validated at
+                // load time, like a closure target.
+                case Op.MakeCoroutine:
+                {
+                    var argc = (int)instruction.Immediate2;
+                    var captured = argc == 0 ? Array.Empty<LyrValue>() : new LyrValue[argc];
+                    for (var i = argc - 1; i >= 0; i--) captured[i] = stack[--sp];
+                    stack[sp++] = LyrValue.FromCoroutine(new CoroutineChain(
+                        (int)instruction.Immediate - natives.Length, captured, instruction.Type));
+                    break;
+                }
+
+                // Drives a chain one step: push the resumer, install the chain's frames, run
+                // until a yield slices them off again or the body's last frame returns through
+                // the boundary. Strict pulls panic where the specification says; lenient ones
+                // answer — the whole next() contract, in the machine instead of in emitted code.
+                case Op.ResumePull:
+                {
+                    var lenient = instruction.Immediate == 1;
+                    var chain = (CoroutineChain)stack[--sp].AsCoroutine;
+
+                    if (chain.State == CoroutineChain.ChainState.Done)
+                    {
+                        if (!lenient)
+                            throw new LyricPanic(VmDiagnostics.Panicked,
+                                "resume on a coroutine that has already finished");
+                        stack[sp++] = chain.YieldTag == TypeTag.Void
+                            ? LyrValue.FromBool(false)
+                            : LyrValue.None;
+                        break;
+                    }
+
+                    if (chain.State == CoroutineChain.ChainState.Running)
+                        throw new LyricPanic(VmDiagnostics.CoroutineRunning,
+                            "resume of a coroutine that is already running in " +
+                            $"'{frame.Fn.Source.Name}' — one chain, one driver");
+
+                    var incoming = chain.State == CoroutineChain.ChainState.NotStarted
+                        ? 1
+                        : chain.SavedCount;
+                    if (frames.Count + incoming >= MaxCallDepth)
+                        throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
+                            $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
+
+                    frame.Sp = sp;
+                    frames.Push(frame);
+                    var boundary = frames.Count; // the chain's frames live from here up
+
+                    if (chain.State == CoroutineChain.ChainState.NotStarted)
+                    {
+                        var first = prepared[chain.Body].Rent();
+                        var captured = chain.Args!;
+                        for (var i = 0; i < captured.Length; i++) first.Slots[i] = captured[i];
+                        chain.Args = null;
+                        frame = first;
+                    }
+                    else
+                    {
+                        var saved = chain.Saved!;
+                        for (var i = 0; i < chain.SavedCount - 1; i++) frames.Push(saved[i]);
+                        frame = saved[chain.SavedCount - 1];
+                        chain.SavedCount = 0; // the array stays, for the next suspension
+                    }
+
+                    chain.State = CoroutineChain.ChainState.Running;
+                    actives.Push(new ActiveResume(chain, boundary, lenient));
+
+                    locals = frame.Slots;
+                    stack = frame.Stack;
+                    instructions = frame.Fn.Instructions;
+                    sp = frame.Sp;
+                    break;
+                }
+
+                // Suspends the running chain up to the nearest active resume, which receives the
+                // value. The segment — every frame above the boundary plus this one — moves into
+                // the chain object, outermost first, ready to be pushed back.
+                case Op.YieldSuspend:
+                {
+                    var value = instruction.Immediate == 1 ? stack[--sp] : default;
+
+                    if (actives.Count == 0)
+                        throw new LyricPanic(VmDiagnostics.YieldWithoutResume,
+                            $"yield outside a running resume in '{frame.Fn.Source.Name}'");
+
+                    var active = actives.Pop();
+                    var chain = active.Chain;
+
+                    frame.Sp = sp;
+                    var count = frames.Count - active.Boundary + 1;
+                    var saved = chain.Saved is { } kept && kept.Length >= count
+                        ? kept
+                        : new Frame[count];
+                    saved[count - 1] = frame;
+                    for (var i = count - 2; i >= 0; i--) saved[i] = frames.Pop();
+                    chain.Saved = saved;
+                    chain.SavedCount = count;
+                    chain.State = CoroutineChain.ChainState.Suspended;
+
+                    frame = frames.Pop(); // the resumer
+                    locals = frame.Slots;
+                    stack = frame.Stack;
+                    instructions = frame.Fn.Instructions;
+                    sp = frame.Sp;
+
+                    if (active.Lenient)
+                        stack[sp++] = chain.YieldTag == TypeTag.Void
+                            ? LyrValue.FromBool(true)
+                            : LyrValue.Some(value);
+                    else if (chain.YieldTag != TypeTag.Void)
+                        stack[sp++] = value;
                     break;
                 }
 
@@ -782,6 +921,32 @@ public static class Interpreter
                 {
                     var result = instruction.Opcode == Op.ReturnValue ? stack[--sp] : default;
                     var returnsValue = frame.Fn.Source.ReturnType.Tag != TypeTag.Void;
+
+                    // The chain's LAST frame returning through the boundary is the chain's end:
+                    // the resumer gets exhaustion, not a return value — the body is void by
+                    // construction. A strict pull that drove the body to its end panics, the
+                    // promise 'resume' has made since coroutines exist; a lenient one answers.
+                    if (actives.Count > 0 && frames.Count == actives.Peek().Boundary)
+                    {
+                        var active = actives.Pop();
+                        active.Chain.State = CoroutineChain.ChainState.Done;
+
+                        var ended = frame;
+                        frame = frames.Pop(); // the resumer
+                        ended.Fn.Recycle(ended);
+                        locals = frame.Slots;
+                        stack = frame.Stack;
+                        instructions = frame.Fn.Instructions;
+                        sp = frame.Sp;
+
+                        if (!active.Lenient)
+                            throw new LyricPanic(VmDiagnostics.Panicked,
+                                "resume on a coroutine that has already finished");
+                        stack[sp++] = active.Chain.YieldTag == TypeTag.Void
+                            ? LyrValue.FromBool(false)
+                            : LyrValue.None;
+                        break;
+                    }
 
                     // The result was read before the recycle clears the arrays; a LyrValue is a
                     // copy, so nothing points back into the dead frame.

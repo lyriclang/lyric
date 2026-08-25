@@ -11,6 +11,31 @@
 
 ## Current milestone
 
+**v4 — stackful coroutines — IN PROGRESS on `feature/v4-stackful`** (2026-08-25; the basket is
+`lyric#121`, the language rules are spec §10/§10a via `lyric-spec#26`, the format is §13 4.0
+via `lyric-spec#27`; the branch does NOT merge until the 4.0 line ships — main stays the 3.9.x
+line). **Slice 1 — the chain machinery under the OLD semantics — is BUILT.** A coroutine is a
+chain of captured frames now, not a compiled state machine: three opcodes (`mkcoro` 0x79,
+`resume` 0x7A, `yield` 0x7B; format 3.6 → 4.0), the body lowers as an ORDINARY void function —
+locals in slots; the state object, the re-entry jump table, the lenient parameter and the
+zero-field trick all RETIRED — and `resume`/`next()` are one instruction each: the VM answers
+`?T` and the advanced-bool directly, and `coroutineIsDone` stays registered only for 3.x
+modules. The interpreter captures/restores frame segments over a per-Loop active-resume stack,
+which is also why the C-boundary rule costs nothing: a native callback runs a Loop of its own,
+and a yield beneath it finds no active resume. Sema untouched — yield stays body-only until
+slice 2 — which is what makes the gate meaningful: **the whole pre-4.0 suite passes unchanged
+on the new machine** (4921 tests, the Vm suite green under `LYRIC_JIT=1` too; the JIT declines
+chain functions, so task-shaped code runs interpreted, the #121 contract). The tree still
+claims 3.9.1 while the FORMAT claims 4.0 — nothing releases from this branch, and slice 2
+flips the version. A 4.0 reader accepts every 3.x module (a state machine is ordinary code); a
+3.x reader rejects a 4.0 module at the first unknown opcode. **What the state machine never
+could, pinned in `CoroutineChainTests`**: a chain nested in a chain, DONE once a throw crosses
+the pull (the old machine left that edge undefined and nothing pinned it), defers running as
+the throw unwinds the chain, the one-driver panic, a hundred suspensions reusing one capture
+array. Reader rejections for `mkcoro` seeded in the negative catalogue. Next: **slice 2 — the
+dynamic yield** (SEM0038 narrows, the five §10a panics, rule 3's typed check), which activates
+the five 4.0 suite cases and claims 4.0.0.
+
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
 design round: `@On(Event.Damage)` — ONE positional value, admitted by `std.core.WithArg<T>`

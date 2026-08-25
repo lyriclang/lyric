@@ -16,8 +16,7 @@ namespace Lyric.Ir.Lowering;
 internal sealed class CoroutineTable
 {
     private readonly record struct Pending(
-        FunctionDecl Decl, string Name, FunctionId Id, TypeId State, IrType Yield,
-        TypeSymbol? Receiver);
+        FunctionDecl Decl, string Name, FunctionId Id, IrType Yield, TypeSymbol? Receiver);
 
     private readonly List<Pending> _pending = new();
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
@@ -34,14 +33,13 @@ internal sealed class CoroutineTable
 
     /// <summary>Registers a body and returns the id under which the factory later references it.
     /// </summary>
-    public FunctionId Register(FunctionDecl decl, string name, TypeId state, IrType yield,
-        TypeSymbol? receiver)
+    public FunctionId Register(FunctionDecl decl, string name, IrType yield, TypeSymbol? receiver)
     {
         var id = _ids.Next();
 
         // '<' cannot occur in any Lyric identifier, so the name collides with nothing — the same
         // convention as for '<globals>' and '<lambda0>'.
-        _pending.Add(new Pending(decl, $"{name}.<body>", id, state, yield, receiver));
+        _pending.Add(new Pending(decl, $"{name}.<body>", id, yield, receiver));
         return id;
     }
 
@@ -54,7 +52,7 @@ internal sealed class CoroutineTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
-            lowered.Add((p.Id, FunctionLowerer.ForCoroutineBody(p.Decl, p.Name, p.State, p.Yield,
+            lowered.Add((p.Id, FunctionLowerer.ForCoroutineBody(p.Decl, p.Name, p.Yield,
                 p.Receiver, types, functions, imports, typeTable, globals, lambdas, instances).Run()));
         }
 
