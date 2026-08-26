@@ -133,7 +133,17 @@ poll) — the first reproduces the exact CI failure on the old code. 124 lyrtest
 process slip to not repeat: #129 was merged while `gh pr checks --watch` had exited with
 "no checks reported" (the watch ran before CI registered) and the `;`-chained merge went
 ahead anyway — merge must be `&&`-gated on a green watch, retrying until checks exist.
-Next: **basket item 8, `console.readAll`** (stdin to EOF — the CLI goal means pipes).
+**Basket item 8, `console.readAll`, turned out to be ALREADY BUILT** — it has existed since
+M8b (2026-08-07, `aa40098`), native-backed, documented, registered. The basket listed it as
+missing because nothing ever proved it: no test ran the console input natives against an
+actual pipe. What item 8 actually delivered is that proof — `StdinTests` in the Cli suite
+runs filter programs through `lyric run` with piped input and pins three facts: `readAll`
+hands over the whole pipe (trailing line without a final newline included), an EMPTY pipe
+reads as `""` (the documented nothing-and-empty-mean-the-same contract, unlike `readLine`,
+where EOF is a state), and `lines()` walks a pipe like the filter it is meant for. Nothing in
+the stdlib changed; no CHANGELOG entry, since none of it is new in 4.0. Next: **basket item
+9, interrupt handling** (Ctrl+C wakes `Wait.Interrupt`; the Interrupt-only-run panic in
+`std.task` retires; embedded stays the host's business).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
