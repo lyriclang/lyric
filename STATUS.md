@@ -141,9 +141,26 @@ runs filter programs through `lyric run` with piped input and pins three facts: 
 hands over the whole pipe (trailing line without a final newline included), an EMPTY pipe
 reads as `""` (the documented nothing-and-empty-mean-the-same contract, unlike `readLine`,
 where EOF is a state), and `lines()` walks a pipe like the filter it is meant for. Nothing in
-the stdlib changed; no CHANGELOG entry, since none of it is new in 4.0. Next: **basket item
-9, interrupt handling** (Ctrl+C wakes `Wait.Interrupt`; the Interrupt-only-run panic in
-`std.task` retires; embedded stays the host's business).
+the stdlib changed; no CHANGELOG entry, since none of it is new in 4.0.
+
+**Basket item 9, interrupt handling, is DONE**: `Wait.Interrupt` comes alive. While a task is
+parked there, Ctrl+C goes to the scheduler instead of killing the process, and the new pub
+`interrupt()` raises the SAME event from inside — a "quit" command and a signal stay one
+mechanism. One interrupt wakes EVERY parked task in park order (a half-woken set would mean
+the second Ctrl+C kills the process while a shutdown task still believes it is covered);
+raised with nobody parked it is REMEMBERED like a pending signal; the Interrupt-only-run
+panic retires — waiting quietly for the interrupt is what such a run is for. The
+single-native budget held: `poll` gains a fourth argument (whether anyone is parked, re-read
+every call, so the Ctrl+C swallowing lasts exactly as long as somebody listens — `run()`'s
+last clock reading disarms it on the way out), and the answer channel gains the impossible
+descriptor `-1`. Every poll goes through the new `ask()`, which decides `-1` centrally — a
+plain clock reading cannot drop an interrupt. Host-side, three wake paths for the three ways
+a poll can wait: a flag, an event for the descriptorless wait, and a UDP self-pipe datagram
+for a poll inside select (the one self-pipe shape `Socket.Select` accepts everywhere). Three
+lyrtest cases on both engines plus a Unix-only Cli test that sends the real SIGINT end to
+end (Windows skips: only the delivery differs). 127 lyrtest, doc floor 498. Embedded stays
+the host's business, as decided. Next: **basket item 10, `std.process`** (spawn/streams/exit
+code, its own capability bit; waiting on exit is a Wait under door C).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
