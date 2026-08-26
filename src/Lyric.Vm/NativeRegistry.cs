@@ -1461,7 +1461,99 @@ public sealed class NativeRegistry
             _ => LyrValue.FromI64(_lastNetKind));
         registry.Register("std.io.net.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastNetDetail ?? ""));
+
+        // ---------------------------------------------------------------------------- UDP
+        //
+        // The same table, the same non-blocking rule, the same select through poll. The
+        // received sender parks in a thread-local pair — the last-failure convention applied
+        // to a second two-part answer.
+
+        registry.Register("std.io.net.udpBind", [TypeTag.String, i64], i64, args =>
+        {
+            try
+            {
+                var address = ResolveHost(args[0].AsString);
+                var socket = new System.Net.Sockets.Socket(address.AddressFamily,
+                    System.Net.Sockets.SocketType.Dgram,
+                    System.Net.Sockets.ProtocolType.Udp)
+                { Blocking = false };
+                socket.Bind(new System.Net.IPEndPoint(address, (int)args[1].AsI64));
+                return LyrValue.FromI64(AddSocket(socket));
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
+        });
+
+        registry.RegisterWithArrayParams("std.io.net.udpSendTo",
+            [i64, TypeTag.String, i64, TypeTag.Array], [null, null, null, TypeTag.U8], i64,
+            args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-2);
+            try
+            {
+                var target = new System.Net.IPEndPoint(
+                    ResolveHost(args[1].AsString), (int)args[2].AsI64);
+                socket.SendTo(ToBytes(args[3]), target);
+                return LyrValue.FromI64(1);
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
+            {
+                RecordNet(e);
+                return LyrValue.FromI64(-1);
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
+        });
+
+        registry.RegisterOptionalArrayReturning("std.io.net.udpReceive", [i64, i64],
+            TypeTag.U8, args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } socket)
+            {
+                RecordNet(new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.NotSocket));
+                return LyrValue.None;
+            }
+            var max = (int)Math.Clamp(args[1].AsI64, 1, 1 << 20);
+            var buffer = new byte[max];
+            System.Net.EndPoint sender = new System.Net.IPEndPoint(
+                socket.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6
+                    ? System.Net.IPAddress.IPv6Any
+                    : System.Net.IPAddress.Any, 0);
+            try
+            {
+                var got = socket.ReceiveFrom(buffer, ref sender);
+                var from = (System.Net.IPEndPoint)sender;
+                _lastUdpSenderHost = from.Address.ToString();
+                _lastUdpSenderPort = from.Port;
+                return Bytes(buffer[..got]);
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
+            {
+                RecordNet(e);
+                return LyrValue.None;
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.MessageSize)
+            {
+                // The OS CUT the datagram to the buffer; the module documents the cut, so
+                // what fits is the answer, not a failure. The sender still arrived.
+                var from = (System.Net.IPEndPoint)sender;
+                _lastUdpSenderHost = from.Address.ToString();
+                _lastUdpSenderPort = from.Port;
+                return Bytes(buffer);
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.None; }
+        });
+
+        registry.Register("std.io.net.udpSenderHost", [], TypeTag.String,
+            _ => LyrValue.FromString(_lastUdpSenderHost ?? ""));
+        registry.Register("std.io.net.udpSenderPort", [], i64,
+            _ => LyrValue.FromI64(_lastUdpSenderPort));
     }
+
+    [ThreadStatic] private static string? _lastUdpSenderHost;
+    [ThreadStatic] private static int _lastUdpSenderPort;
 
     // ------------------------------------------------------------------ std.process (4.0)
     //

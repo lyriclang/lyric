@@ -23,7 +23,7 @@ public class DocCoverageTests
     /// that remains. Lowered deliberately from 430 for exactly that removal, and from 450 at
     /// 4.0, when `listDir` — documented like everything else — went with its clock.
     /// </summary>
-    private const int Floor = 511;
+    private const int Floor = 524;
 
     private static string RepoRoot([CallerFilePath] string thisFile = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", ".."));

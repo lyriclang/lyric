@@ -29,6 +29,22 @@ pub opaque type Listener = int;
 /// A connected stream. Opaque, like the listener.
 pub opaque type Socket = int;
 
+/// A UDP endpoint. Opaque, like the others; one handle both sends and receives.
+pub opaque type UdpSocket = int;
+
+/// One received datagram: its payload, and who sent it — the address `sendTo` answers to.
+///
+/// UDP has no EOF, so an EMPTY payload here is a real (empty) packet, not an end — the one
+/// place this module's bytes mean something different than `readSome`'s.
+pub struct Packet {
+    /// The payload, complete: a datagram arrives whole or not at all.
+    bytes: uint8[],
+    /// The sender's address, as the receiving socket saw it.
+    host: string,
+    /// The sender's port.
+    port: int,
+}
+
 // The natives. All sockets are non-blocking; a native answers immediately, and the WAITING is
 // this module yielding to the scheduler. The classification pair follows std.io.file's
 // last-failure contract; the codes are 1 NotFound, 2 PermissionDenied, 4 ConnectionRefused,
@@ -43,6 +59,15 @@ fn netWriteFrom(socket: int, bytes: uint8[], offset: int): int;
 fn netClose(socket: int): void;
 fn lastErrorKind(): int;
 fn lastErrorDetail(): string;
+
+// The UDP natives. `udpReceive` answers the payload and parks the SENDER in the last-sender
+// pair — the same thread-local convention as the failure pair below, and for the same reason:
+// one answer, two truths, no struct crossing the native boundary.
+fn udpBind(host: string, port: int): int;
+fn udpSendTo(socket: int, host: string, port: int, bytes: uint8[]): int;
+fn udpReceive(socket: int, max: int): ?uint8[];
+fn udpSenderHost(): string;
+fn udpSenderPort(): int;
 
 fn lastNetError(address: string): IoError {
     let kind = match (lastErrorKind()) {
@@ -194,4 +219,89 @@ pub fn close(socket: Socket): void {
 /// Closes a listener.
 pub fn closeListener(listener: Listener): void {
     netClose(listener as int);
+}
+
+// ------------------------------------------------------------------------------------- UDP
+
+/// Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `localPort` says
+/// which. `null` when the address cannot be taken; `bindOrThrow` says why, `AddressInUse`
+/// being the usual answer.
+pub fn bind(host: string, port: int): ?UdpSocket {
+    let fd = udpBind(host, port);
+    if (fd < 0) {
+        return null;
+    }
+    return fd as UdpSocket;
+}
+
+/// `bind`, with the reason when it cannot.
+pub fn bindOrThrow(host: string, port: int): UdpSocket throws IoError {
+    let bound = bind(host, port);
+    if (bound == null) {
+        throw lastNetError(address(host, port));
+    }
+    return bound;
+}
+
+/// The port a UDP endpoint actually holds — the answer to `bind(host, 0)`.
+pub fn localPort(socket: UdpSocket): int {
+    return netLocalPort(socket as int);
+}
+
+/// Sends one datagram to `host:port`, waiting out a full send buffer. The datagram goes
+/// whole or not at all; `false` when it cannot go — `sendToOrThrow` says why. There is no
+/// delivery promise: that is UDP, not this module.
+pub fn sendTo(socket: UdpSocket, host: string, port: int, bytes: uint8[]): bool {
+    while (true) {
+        let sent = udpSendTo(socket as int, host, port, bytes);
+        if (sent == 1) {
+            return true;
+        }
+        if (sent == -2) {
+            return false;
+        }
+        yield Wait.Writable(socket as int);
+    }
+}
+
+/// `sendTo`, with the reason when the datagram cannot go.
+pub fn sendToOrThrow(
+    socket: UdpSocket,
+    host: string,
+    port: int,
+    bytes: uint8[]
+): void throws IoError {
+    if (!sendTo(socket, host, port, bytes)) {
+        throw lastNetError(address(host, port));
+    }
+}
+
+/// Waits for one datagram and answers it whole, with its sender. A payload longer than `max`
+/// is CUT to it — datagrams do not queue their remainder. `null` is a failure;
+/// `receiveFromOrThrow` says which. An empty payload is a real packet: UDP has no EOF.
+pub fn receiveFrom(socket: UdpSocket, max: int): ?Packet {
+    while (true) {
+        let got = udpReceive(socket as int, max);
+        if (got != null) {
+            return Packet { bytes = got, host = udpSenderHost(), port = udpSenderPort() };
+        }
+        if (lastErrorKind() != 6) {
+            return null;
+        }
+        yield Wait.Readable(socket as int);
+    }
+}
+
+/// `receiveFrom`, with the reason when the socket broke.
+pub fn receiveFromOrThrow(socket: UdpSocket, max: int): Packet throws IoError {
+    let got = receiveFrom(socket, max);
+    if (got == null) {
+        throw lastNetError("receive");
+    }
+    return got;
+}
+
+/// Closes a UDP endpoint. Closing twice closes once.
+pub fn close(socket: UdpSocket): void {
+    netClose(socket as int);
 }

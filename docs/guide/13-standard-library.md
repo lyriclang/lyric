@@ -127,6 +127,13 @@ twins say why with an `IoError` — `ConnectionRefused` and `AddressInUse` joine
 exactly these answers. `readSome` folds three truths into one value: bytes are bytes, an EMPTY
 array is the peer being done, `null` is a failure.
 
+Since 4.0 the module also speaks UDP: `bind` a `UdpSocket` (port 0 asks the OS, `localPort`
+answers), `sendTo` one datagram — whole or not at all, with no delivery promise, that is UDP —
+and `receiveFrom` waits for one and answers a `Packet`: the payload plus who sent it, which is
+the address a reply's `sendTo` takes. UDP has no EOF, so an empty payload is a real packet, the
+one place these bytes mean something different than `readSome`'s. `localPort` and `close` are
+the same names TCP uses — overloading picks by the handle.
+
 `std.process` (since 4.0, `processAccess` — its OWN capability bit, because starting programs
 is a new power rather than an `osAccess` refinement) is child processes for tasks: `start` a
 program, `write` to its stdin (queued, drained in the background — `closeStdin` is how a

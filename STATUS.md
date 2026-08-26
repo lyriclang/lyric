@@ -192,7 +192,26 @@ lyrtest cases run real children on both engines and platforms — echo, an exit 
 as the stdin round trip (the one filter both worlds ship under the same name), NotFound
 through the twin — plus two capability pins, including osAccess alone REFUSING to start a
 process. 131 lyrtest, doc floor 511, 21 doc pages; guide 13 shows the sort filter as a
-compiled snippet. Next: **basket item 11, UDP in `std.io.net`**.
+compiled snippet.
+
+**Basket item 11, UDP in `std.io.net`, is DONE** — and it found two bugs beyond itself.
+The API: `bind` a `UdpSocket` (port 0 asks the OS), `sendTo` one datagram (whole or not at
+all, no delivery promise — that is UDP, not this module), `receiveFrom` waits and answers a
+`Packet` — payload plus sender via the last-sender thread-local pair, the last-failure
+convention applied to a second two-part answer — and `localPort`/`close` are the same names
+TCP uses, chosen by the handle. UDP has no EOF, so an empty payload is a REAL packet (pinned
+by a test), the one place the module's bytes mean something different than `readSome`'s.
+Finding one, a since-3.0 compiler bug against §4.3a: a module-QUALIFIED call
+(`net.localPort(x)` through an alias) bound only the first function of the name and refused
+with a type mismatch while the selective import chose correctly — overload resolution
+depended on the import style. Fixed in the checker (the qualified route now collects the
+module's whole candidate set, public-only from outside) and pinned in `OverloadTests`; these
+were the stdlib's FIRST overloads, which is why nothing had ever hit it. Finding two,
+DocGen's item anchors collided for overloads (name AND kind equal) — repeats now take an
+ordinal (`#fn-close`, `#fn-close-2`). Three lyrtest cases (datagram round trip answering to
+the packet's sender, the empty-packet pin, AddressInUse through the twin); 134 lyrtest, doc
+floor 524. Next: **basket item 12, `secureRandom`** (host entropy, capability-free;
+`std.random` stays deterministic).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

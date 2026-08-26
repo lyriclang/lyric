@@ -84,3 +84,85 @@ pub fn a_taken_address_names_its_kind(): void {
     net.closeListener(first);
     assertTrue(kindIsTaken, "the second listener must be told the address is taken");
 }
+
+// ------------------------------------------------------------------------------------- UDP
+
+fn udpPong(): Coroutine<Wait> {
+    let sock = net.bind("127.0.0.1", 0)!;
+    netLog.port = net.localPort(sock);
+    let packet = net.receiveFrom(sock, 64)!;
+    netLog.notes.append(strings.utf8Decode(packet.bytes)!);
+    let ok = net.sendTo(sock, packet.host, packet.port, "pong".utf8Encode());
+    assertTrue(ok, "the answer datagram must go");
+    net.close(sock);
+}
+
+fn udpPing(): Coroutine<Wait> {
+    while (netLog.port == 0) {
+        yield Wait.Now;
+    }
+    let sock = net.bind("127.0.0.1", 0)!;
+    let ok = net.sendTo(sock, "127.0.0.1", netLog.port, "ping".utf8Encode());
+    assertTrue(ok, "the request datagram must go");
+    let back = net.receiveFrom(sock, 64)!;
+    netLog.notes.append(strings.utf8Decode(back.bytes)!);
+    net.close(sock);
+}
+
+@Test
+pub fn a_datagram_roundtrip_answers_to_the_packets_sender(): void {
+    netLog.port = 0;
+    spawn(udpPong());
+    spawn(udpPing());
+    run();
+    assertEq(netLog.notes.build(), "pingpong");
+}
+
+fn emptyPacketPair(): Coroutine<Wait> {
+    let receiver = net.bind("127.0.0.1", 0)!;
+    let sender = net.bind("127.0.0.1", 0)!;
+    let zero: uint8 = 0;
+    let nothing = [zero] * 0;
+    let ok = net.sendTo(sender, "127.0.0.1", net.localPort(receiver), nothing);
+    assertTrue(ok, "an empty datagram is sendable");
+    let packet = net.receiveFrom(receiver, 64)!;
+    assertEq(packet.bytes.length, 0);
+    assertEq(packet.port, net.localPort(sender));
+    net.close(receiver);
+    net.close(sender);
+}
+
+@Test
+pub fn an_empty_datagram_is_a_packet_and_not_an_end(): void {
+    // The one place this module's bytes mean something different than readSome's: UDP has
+    // no EOF, so empty is a real packet — with a real sender.
+    spawn(emptyPacketPair());
+    run();
+}
+
+@Test
+pub fn a_taken_port_names_address_in_use_for_udp_too(): void {
+    seenTaken.value = false;
+    spawn(udpDoubleBind());
+    run();
+    assertTrue(seenTaken.value, "the twin names AddressInUse");
+}
+
+class Flag {
+    value: bool,
+}
+
+let seenTaken = Flag { value = false };
+
+fn udpDoubleBind(): Coroutine<Wait> {
+    let first = net.bind("127.0.0.1", 0)!;
+    try {
+        net.bindOrThrow("127.0.0.1", net.localPort(first));
+    } catch (e: IoError) {
+        seenTaken.value = match (e.kind) {
+            IoErrorKind.AddressInUse => true,
+            _ => false,
+        };
+    }
+    net.close(first);
+}

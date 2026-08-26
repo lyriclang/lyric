@@ -29,9 +29,23 @@ public static class StdlibPages
         if (module.Doc is not null)
             body.Append(Prose(module.Doc, module.Path, links));
 
+        // Overloads share a name AND a kind (4.0: net's UDP `localPort`/`close` beside TCP's),
+        // so the anchor of a repeat takes an ordinal — '#fn-close', '#fn-close-2' — in
+        // declaration order, which the page shows in.
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+
         foreach (var item in module.Items)
         {
             var anchor = Anchor(item);
+            if (seen.TryGetValue(anchor, out var repeats))
+            {
+                seen[anchor] = repeats + 1;
+                anchor = $"{anchor}-{repeats + 1}";
+            }
+            else
+            {
+                seen[anchor] = 1;
+            }
             headings.Add(new Heading(2, item.Name, anchor));
 
             body.Append($"<section class=\"item\" id=\"{Escape(anchor)}\">\n");
