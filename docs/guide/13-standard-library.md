@@ -112,6 +112,13 @@ because the scheduler has nobody to hand an exception to. The module carries the
 capability — its one native asks the OS about time and readiness, and blocks the thread where
 the program asked to sleep.
 
+`Wait.Interrupt` is the clean-shutdown seat: a task that parks there wakes on Ctrl+C — while
+one is parked, the signal goes to the scheduler instead of killing the process — or on
+`interrupt()`, the same event raised from inside, which is how a "quit" command and a signal
+stay one mechanism. One interrupt wakes EVERY parked task, so a server's shutdown task closes
+the listeners and `run()` drains to an ordinary return. With nobody parked, Ctrl+C keeps its
+usual meaning, and an `interrupt()` raised early is remembered for the next task to park.
+
 `std.io.net` (since 4.0, `networkAccess`) is TCP for tasks: `listen`/`accept`, `connect`,
 `readSome`/`write`, `close` — every waiting form yields to the scheduler INSIDE the module, so
 a server is straight-line code inside a task and no signature anywhere mentions waiting. The

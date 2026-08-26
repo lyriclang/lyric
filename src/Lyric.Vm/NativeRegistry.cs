@@ -824,26 +824,65 @@ public sealed class NativeRegistry
 
         // std.task's ONE native (4.0): time and readiness in one answer, [now, readyFd...].
         // The clock is monotonic — differences mean something, the origin does not. A negative
-        // timeout means "no deadline"; with no descriptors either, that would sleep forever, so
-        // the scheduler never asks for it and the native refuses rather than hanging a host.
-        // The descriptors are std.io.net's; a socket in error reports as READABLE, so the read
-        // that follows is what tells the waiter, the same convention select has always had.
+        // timeout means "no deadline"; with no descriptors and no interrupt listener either,
+        // that would sleep forever, so the scheduler never asks for it and the native refuses
+        // rather than hanging a host. The descriptors are std.io.net's; a socket in error
+        // reports as READABLE, so the read that follows is what tells the waiter, the same
+        // convention select has always had. `wantInterrupt` (a task is parked on
+        // Wait.Interrupt) arms the Ctrl+C handler and reports an interrupt as the impossible
+        // descriptor -1; the flag is re-read every call, so the swallowing of Ctrl+C lasts
+        // exactly as long as somebody is parked.
         var intArray = new BytecodeType(TypeTag.Array, -1) { Element = BytecodeType.Scalar(TypeTag.I64) };
         registry.RegisterWithTypes("std.task.poll",
-            [intArray, intArray, BytecodeType.Scalar(TypeTag.I64)], intArray,
+            [intArray, intArray, BytecodeType.Scalar(TypeTag.I64), BytecodeType.Scalar(TypeTag.Bool)],
+            intArray,
             args =>
             {
                 var read = args[0].AsObject;
                 var write = args[1].AsObject;
                 var timeout = args[2].AsI64;
+                var wantInterrupt = args[3].AsBool;
+
+                _interruptListening = wantInterrupt;
+                if (wantInterrupt) EnsureInterruptHandler();
+
+                // A pending interrupt outranks every wait: taken (and reported) only when the
+                // scheduler listens, remembered otherwise — a signal, not a broadcast.
+                if (wantInterrupt && TakePendingInterrupt())
+                    return LyrValue.FromObject(new[]
+                    {
+                        LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
+                    });
 
                 if (read.Length == 0 && write.Length == 0)
                 {
-                    if (timeout < 0)
+                    if (timeout < 0 && !wantInterrupt)
                         throw new LyricPanic(VmDiagnostics.Panicked,
                             "std.task.poll: waiting forever on nothing — no deadline and no "
                             + "descriptor");
-                    if (timeout > 0) Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
+
+                    if (wantInterrupt)
+                    {
+                        // Reset BEFORE the pending re-check: a raise between the two leaves
+                        // the flag set for the check, or the event set for the wait — either
+                        // way it is seen. A stale wake without a pending flag only makes the
+                        // scheduler recompute and block again, which is correct in two steps.
+                        InterruptEvent.Reset();
+                        if (!TakePendingInterrupt())
+                            InterruptEvent.Wait(timeout < 0
+                                ? Timeout.Infinite
+                                : (int)Math.Min(timeout, int.MaxValue));
+                        if (TakePendingInterrupt())
+                            return LyrValue.FromObject(new[]
+                            {
+                                LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
+                            });
+                    }
+                    else if (timeout > 0)
+                    {
+                        Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
+                    }
+
                     return LyrValue.FromObject(
                         new[] { LyrValue.FromI64(Environment.TickCount64) });
                 }
@@ -856,6 +895,12 @@ public sealed class NativeRegistry
                 foreach (var value in write)
                     if (SocketOf(value.AsI64) is { } s) { checkWrite.Add(s); checkError.Add(s); }
 
+                // The self-pipe puts the interrupt into the SAME select: Ctrl+C writes a
+                // datagram, the socket readies, the select returns. The read side never
+                // reaches NameReady — it is drained and removed before the answer is built.
+                var pipe = wantInterrupt ? EnsureInterruptPipe() : null;
+                if (pipe is not null) checkRead.Add(pipe);
+
                 // Select takes microseconds; clamping a huge timeout wakes the scheduler
                 // early, which recomputes and blocks again — correct, just in two steps.
                 var micros = timeout < 0
@@ -864,11 +909,26 @@ public sealed class NativeRegistry
                 System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
 
                 var ready = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
+                if (pipe is not null && checkRead.Remove(pipe)) DrainInterruptPipe(pipe);
+                if (wantInterrupt && TakePendingInterrupt())
+                {
+                    InterruptEvent.Reset();
+                    ready.Add(LyrValue.FromI64(-1));
+                }
                 var named = new HashSet<long>();
                 foreach (var s in checkRead) NameReady(s, ready, named);
                 foreach (var s in checkWrite) NameReady(s, ready, named);
                 foreach (var s in checkError) NameReady(s, ready, named);
                 return LyrValue.FromObject(ready.ToArray());
+            });
+
+        // The programmatic Ctrl+C: same flag, same wake, callable from a task. What makes a
+        // "quit" command and a signal one mechanism instead of two.
+        registry.Register("std.task.interrupt", none, TypeTag.Void,
+            _ =>
+            {
+                RaiseInterrupt();
+                return default;
             });
 
         RegisterNet(registry);
@@ -1148,6 +1208,80 @@ public sealed class NativeRegistry
                 ready.Add(LyrValue.FromI64(fd));
                 return;
             }
+    }
+
+    // --------------------------------------------------------------- std.task interrupt (4.0)
+    //
+    // PROCESS-wide, not per-thread, because that is what a signal is: SIGINT has no idea which
+    // VM it means. The pending flag survives until a listening poll takes it — an interrupt
+    // raised while nobody is parked is remembered, like a pending signal. Three wake paths for
+    // the three ways a poll can be waiting: the flag for a poll that has not started waiting,
+    // the event for a descriptorless wait, and a self-pipe datagram for a poll inside select.
+
+    private static int _interruptPending;
+    private static volatile bool _interruptListening;
+    private static int _interruptHandlerInstalled;
+    private static System.Net.Sockets.Socket? _interruptPipe;
+    private static readonly ManualResetEventSlim InterruptEvent = new(false);
+
+    private static bool TakePendingInterrupt() =>
+        Interlocked.Exchange(ref _interruptPending, 0) == 1;
+
+    private static void RaiseInterrupt()
+    {
+        Interlocked.Exchange(ref _interruptPending, 1);
+        InterruptEvent.Set();
+        try
+        {
+            _interruptPipe?.Send(new byte[] { 1 });
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            // A full or torn pipe loses only the select wake; the flag still stands, and the
+            // next poll's pending check reads it.
+        }
+    }
+
+    private static void EnsureInterruptHandler()
+    {
+        if (Interlocked.Exchange(ref _interruptHandlerInstalled, 1) == 1) return;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            // Not listening: the default stands and Ctrl+C ends the process — a program
+            // without a parked Interrupt task keeps behaving like every other program.
+            if (!_interruptListening) return;
+            e.Cancel = true;
+            RaiseInterrupt();
+        };
+    }
+
+    // A UDP socket sent to itself over loopback: the one self-pipe shape that select accepts
+    // on every platform Socket.Select runs on.
+    private static System.Net.Sockets.Socket EnsureInterruptPipe()
+    {
+        if (_interruptPipe is { } existing) return existing;
+        var pipe = new System.Net.Sockets.Socket(
+            System.Net.Sockets.AddressFamily.InterNetwork,
+            System.Net.Sockets.SocketType.Dgram,
+            System.Net.Sockets.ProtocolType.Udp);
+        pipe.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+        pipe.Connect(pipe.LocalEndPoint!);
+        pipe.Blocking = false;
+        _interruptPipe = pipe;
+        return pipe;
+    }
+
+    private static void DrainInterruptPipe(System.Net.Sockets.Socket pipe)
+    {
+        var swallow = new byte[16];
+        try
+        {
+            while (pipe.Available > 0) pipe.Receive(swallow);
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            // Nothing left to read is exactly the state draining wants.
+        }
     }
 
     // The classification of the last failed std.io.net operation — the same last-failure
