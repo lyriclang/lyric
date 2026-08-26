@@ -822,6 +822,32 @@ public sealed class NativeRegistry
         registry.Register("std.time.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
+        // std.task's ONE native (4.0): time and readiness in one answer, [now, readyFd...].
+        // The clock is monotonic — differences mean something, the origin does not. A negative
+        // timeout means "no deadline"; with descriptors none of, that would sleep forever, so
+        // the scheduler never asks for it and the native refuses rather than hanging a host.
+        // Descriptors arrive with std.io.net; until then any fd is unknown by construction.
+        var intArray = new BytecodeType(TypeTag.Array, -1) { Element = BytecodeType.Scalar(TypeTag.I64) };
+        registry.RegisterWithTypes("std.task.poll",
+            [intArray, intArray, BytecodeType.Scalar(TypeTag.I64)], intArray,
+            args =>
+            {
+                var read = args[0].AsObject;
+                var write = args[1].AsObject;
+                var timeout = args[2].AsI64;
+
+                if (read.Length > 0 || write.Length > 0)
+                    throw new LyricPanic(VmDiagnostics.Panicked,
+                        "std.task.poll: no such descriptor — descriptors arrive with std.io.net");
+                if (timeout < 0)
+                    throw new LyricPanic(VmDiagnostics.Panicked,
+                        "std.task.poll: waiting forever on nothing — no deadline and no descriptor");
+
+                if (timeout > 0) Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
+                var answer = new LyrValue[] { LyrValue.FromI64(Environment.TickCount64) };
+                return LyrValue.FromObject(answer);
+            });
+
         registry.Register("std.os.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 

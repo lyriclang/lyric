@@ -46,6 +46,10 @@ public static class CapabilityTable
         // The same bit as std.os, deliberately: reading the clock is a question to the
         // environment, and a new bit would be a contract change for every older runtime.
         ("std.time", Capability.OsAccess),
+        // The scheduler's poll blocks the thread on the OS clock — sleeping is the same
+        // question asked slowly, so it takes the same bit (4.0). The descriptors it will one
+        // day watch are std.io.net's, and their SOURCES carry the network bit.
+        ("std.task", Capability.OsAccess),
         ("std.dotnet", Capability.HostAccess),
     ];
 

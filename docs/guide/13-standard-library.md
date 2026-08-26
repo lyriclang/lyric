@@ -76,6 +76,42 @@ fn main(): int {
 }
 ```
 
+## Tasks
+
+`std.task` (since 4.0) turns coroutines into cooperative tasks: a task is a `Coroutine<Wait>`,
+and every value it yields tells the scheduler what it waits for — `Wait.Now` to make room,
+`Wait.Sleep(ms)` for time, `Wait.Readable(fd)`/`Wait.Writable(fd)` for descriptors once
+`std.io.net` lands. One thread, no preemption; `run()` drives everything to its end and
+returns. The waiting can live in a HELPER — no signature anywhere says so, which is what
+stackful coroutines bought:
+
+```lyr
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn breathe(): void {
+    yield Wait.Now;
+}
+
+fn worker(name: string): Coroutine<Wait> {
+    println(name + " starts");
+    breathe();
+    println(name + " finishes");
+}
+
+fn main(): int {
+    spawn(worker("a"));
+    spawn(worker("b"));
+    run();
+    return 0;
+}
+```
+
+`spawn` takes the non-throwing coroutine type on purpose: a task settles its own errors,
+because the scheduler has nobody to hand an exception to. The module carries the `osAccess`
+capability — its one native asks the OS about time and readiness, and blocks the thread where
+the program asked to sleep.
+
 ## Iteration
 
 Anything implementing `Iterable<T>` works with `for-in`, including your own types.

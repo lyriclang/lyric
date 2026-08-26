@@ -34,6 +34,15 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   throwing twin. Deliberately without iteration: a queue is drained, not walked. Written in
   Lyric, like the rest of the collections.
 
+- **`std.task`** — cooperative tasks over coroutine chains, the scheduler written in Lyric.
+  A task is a `Coroutine<Wait>`; `Wait` says what it waits for (`Now`, `Sleep(ms)`,
+  `Readable(fd)`/`Writable(fd)` for `std.io.net`'s descriptors once they exist, `Interrupt`
+  parked until interrupt handling lands). `spawn` enqueues, `run()` drives everything to its
+  end — round-robin when ready, blocking in the module's ONE native (`poll`, time and
+  readiness in one answer) when not. The waiting composes through helpers with no marker on
+  any signature — what stackful coroutines were for. `spawn` takes the non-throwing type: a
+  task settles its own errors. Carries `osAccess`.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty

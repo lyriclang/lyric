@@ -1,0 +1,212 @@
+// std.task — cooperative tasks over coroutine chains.
+//
+// A task is a `Coroutine<Wait>`: every value it yields — from any call depth, §10a — tells the
+// scheduler what it is waiting for. One thread, no preemption: a task runs until it yields, and
+// the scheduler is ordinary Lyric over ONE native (`poll`), which asks the OS about time and
+// readiness. The run queue is a `Deque`, which exists for exactly this seat.
+
+/// Cooperative tasks: `spawn` a `Coroutine<Wait>`, then `run()` drives every task to its end.
+///
+/// A task settles its own errors — `spawn` takes the non-throwing coroutine type, because the
+/// scheduler has nobody to hand an exception to. A panic anywhere ends the program, as panics
+/// do.
+module std.task;
+
+import std.collections { Deque, List };
+
+/// What a yielded value asks the scheduler for.
+pub enum Wait {
+    /// Run me again once everyone before me had a turn — the cooperative "make room".
+    Now,
+    /// Wake me after this many milliseconds.
+    Sleep(int),
+    /// Wake me when this descriptor has bytes to read. Descriptors come from `std.io.net`.
+    Readable(int),
+    /// Wake me when this descriptor can take bytes.
+    Writable(int),
+    /// Wake me on an interrupt. Until interrupt handling lands, nothing can wake such a task,
+    /// and a `run` left with only these panics rather than sleeping forever.
+    Interrupt,
+}
+
+// The one native. `poll([], [], 0)` answers the clock without waiting — which is how `now`
+// stays inside the single-native budget — and a negative timeout means "no deadline": wait
+// for a descriptor alone. The answer is `[now, readyFd...]`, the clock monotonic and in
+// milliseconds; whose epoch it is means nothing, only differences do.
+fn poll(read: int[], write: int[], timeoutMillis: int): int[];
+
+fn now(): int {
+    let empty: int[] = [0] * 0;
+    return poll(empty, empty, 0)[0];
+}
+
+// One scheduler per program. A class rather than loose globals because its fields change;
+// parallel columns rather than pair structs because a waiter is a task PLUS one number, and
+// the removal pattern (swap with last, pop) keeps every wake O(1) per woken task.
+class Scheduler {
+    ready: Deque<Coroutine<Wait>>,
+    sleepers: List<Coroutine<Wait>>,
+    deadlines: List<int>,
+    readers: List<Coroutine<Wait>>,
+    readerFds: List<int>,
+    writers: List<Coroutine<Wait>>,
+    writerFds: List<int>,
+    interrupted: List<Coroutine<Wait>>,
+}
+
+let scheduler = Scheduler {
+    ready = Deque<Coroutine<Wait>>.empty(),
+    sleepers = List<Coroutine<Wait>>.empty(),
+    deadlines = List<int>.empty(),
+    readers = List<Coroutine<Wait>>.empty(),
+    readerFds = List<int>.empty(),
+    writers = List<Coroutine<Wait>>.empty(),
+    writerFds = List<int>.empty(),
+    interrupted = List<Coroutine<Wait>>.empty(),
+};
+
+/// Adds a task to the back of the run queue. Nothing runs before `run` does; spawning from
+/// inside a running task is ordinary and the new task gets its turn in the same round.
+pub fn spawn(task: Coroutine<Wait>): void {
+    scheduler.ready.pushBack(task);
+}
+
+/// How many tasks the scheduler holds, whatever they are waiting for. Zero after `run`
+/// returns; useful to a host deciding whether another `run` is worth calling.
+pub fn pending(): int {
+    return scheduler.ready.length()
+        + scheduler.sleepers.length()
+        + scheduler.readers.length()
+        + scheduler.writers.length()
+        + scheduler.interrupted.length();
+}
+
+/// Drives every task to its end and returns when none is left.
+///
+/// Ready tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in
+/// `poll` until the nearest deadline passes or a descriptor readies — the thread sleeps, it
+/// does not spin. `run` panics if only `Wait.Interrupt` tasks remain, because nothing can wake
+/// them yet; sleeping forever would be the same hang with less honesty.
+pub fn run(): void {
+    while (true) {
+        var turn = scheduler.ready.length();
+        while (turn > 0) {
+            step(scheduler.ready.popFront()!);
+            turn = turn - 1;
+        }
+
+        if (scheduler.ready.length() > 0) {
+            continue;
+        }
+        if (pending() == 0) {
+            return;
+        }
+        block();
+    }
+}
+
+// One step of one task: pull, then park it where its answer says. Exhaustion — `null` — is
+// the task's end, and nothing holds it any longer.
+fn step(task: Coroutine<Wait>): void {
+    let asked = task.next();
+    if (asked == null) {
+        return;
+    }
+    match (asked) {
+        Now => scheduler.ready.pushBack(task),
+        Sleep(ms) => {
+            scheduler.sleepers.push(task);
+            scheduler.deadlines.push(now() + ms);
+        }
+        Readable(fd) => {
+            scheduler.readers.push(task);
+            scheduler.readerFds.push(fd);
+        }
+        Writable(fd) => {
+            scheduler.writers.push(task);
+            scheduler.writerFds.push(fd);
+        }
+        Interrupt => scheduler.interrupted.push(task),
+    }
+}
+
+// Blocks until something can run: the nearest deadline, or a ready descriptor. Wakes
+// everything the answer covers — deadlines that have passed, descriptors the poll names.
+fn block(): void {
+    if (scheduler.sleepers.length() == 0
+        && scheduler.readers.length() == 0
+        && scheduler.writers.length() == 0) {
+        panic(
+            "std.task: only Wait.Interrupt tasks remain, and interrupt handling has not "
+                + "landed — nothing could ever wake them"
+        );
+    }
+
+    var timeout = -1;
+    if (scheduler.deadlines.length() > 0) {
+        let current = now();
+        let nearest = nearestDeadline();
+        timeout = nearest - current;
+        if (timeout < 0) {
+            timeout = 0;
+        }
+    }
+
+    let answer = poll(scheduler.readerFds.toArray(), scheduler.writerFds.toArray(), timeout);
+    let clock = answer[0];
+
+    wakeSleepers(clock);
+    wakeReady(answer);
+}
+
+fn nearestDeadline(): int {
+    var nearest = scheduler.deadlines.get(0);
+    var i = 1;
+    while (i < scheduler.deadlines.length()) {
+        let deadline = scheduler.deadlines.get(i);
+        if (deadline < nearest) {
+            nearest = deadline;
+        }
+        i = i + 1;
+    }
+    return nearest;
+}
+
+fn wakeSleepers(clock: int): void {
+    var i = 0;
+    while (i < scheduler.deadlines.length()) {
+        if (scheduler.deadlines.get(i) <= clock) {
+            scheduler.ready.pushBack(scheduler.sleepers.get(i));
+            scheduler.sleepers.removeAt(i);
+            scheduler.deadlines.removeAt(i);
+        } else {
+            i = i + 1;
+        }
+    }
+}
+
+// The poll answer names ready descriptors from index 1 on; a descriptor a reader AND a writer
+// wait on wakes both. Waiters are matched by value: two tasks may wait on one descriptor, and
+// both wake when it readies — whoever runs second sees the state the first one left.
+fn wakeReady(answer: int[]): void {
+    var a = 1;
+    while (a < answer.length) {
+        let fd = answer[a];
+        wakeWaiters(scheduler.readers, scheduler.readerFds, fd);
+        wakeWaiters(scheduler.writers, scheduler.writerFds, fd);
+        a = a + 1;
+    }
+}
+
+fn wakeWaiters(waiters: List<Coroutine<Wait>>, fds: List<int>, fd: int): void {
+    var i = 0;
+    while (i < fds.length()) {
+        if (fds.get(i) == fd) {
+            scheduler.ready.pushBack(waiters.get(i));
+            waiters.removeAt(i);
+            fds.removeAt(i);
+        } else {
+            i = i + 1;
+        }
+    }
+}

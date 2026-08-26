@@ -75,8 +75,21 @@ everything. One ring, O(1) at both ends, `?T` answers with null-means-empty as t
 (no throwing twin, the §9.0 silent-only case), deliberately without iteration — a queue is
 drained, not walked. Written in Lyric; six lyrtest cases (ring wrap, growth while wrapped,
 head wandering, clear keeps backing, the drain-refill shape); guide 13; doc floor 449 → 464.
-Next: **`std.task`** — spawn, `Wait` (Readable/Writable/Sleep/Now/Interrupt), `run()`, one
-poll native, the scheduler itself in Lyric over `Coroutine<Wait>` chains.
+**`std.task` — basket item 2 — is BUILT** (branch `feature/v4-task`): the scheduler in Lyric
+over `Coroutine<Wait>` chains, a `Deque` run queue, parallel waiter columns, and ONE native —
+`poll(read, write, timeoutMillis): [now, readyFd...]`, time and readiness in one answer;
+`poll([],[],0)` IS `now`, which keeps the clock inside the single-native budget. Decisions
+worth keeping: the module carries **osAccess** (the std.time precedent — sleeping is asking
+the OS clock slowly; the descriptors it will watch are net's, and their SOURCES carry the
+network bit), `spawn` takes the NON-throwing coroutine type (a task settles its own errors —
+the scheduler has nobody to hand an exception to), and a `run` left with only
+`Wait.Interrupt` tasks PANICS rather than sleeping forever, until item 9 lands the wiring.
+The dynamic yield earns its keep on day one: `breathe()`/`net.readLine`-shaped helpers yield
+the `Wait` with no marker on any signature — pinned in `task_tests` beside round-robin
+fairness, real 5ms/40ms deadline ordering, spawn-from-a-task, and the empty run. 110 lyrtest
+cases, guide 13 §Tasks, doc floor 464 → 473, 18 module pages. Next: **basket item 3,
+`std.io.net`** (TCP; the netAccess bit wakes, `IoError` + OrThrow doctrine, the poll native's
+descriptor half becomes real).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
