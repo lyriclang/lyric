@@ -1583,6 +1583,16 @@ public sealed class TypeChecker
                 return named.Members.OverloadsLocal(mem.Member)
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
 
+            // A MODULE-qualified name ('net.localPort', alias or dotted path): the module's
+            // members hold the whole overload set, and the qualified route must see the same
+            // set a selective import brings — §4.3a would otherwise depend on the import
+            // style. Only public members take part from the outside, as for the single lookup.
+            case MemberExpr mem when ModuleReceiverOf(mem.Target, scope) is { } mod:
+                return mod.Members.OverloadsLocal(mem.Member)
+                    .Where(f => f.Visibility == Visibility.Public
+                        || ReferenceEquals(mod, _currentModule))
+                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+
             // A method or an extension. Both scopes contribute, because both are searched when a
             // member is looked up: own members first, then the visible extensions.
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
@@ -1607,6 +1617,30 @@ public sealed class TypeChecker
     /// own member and an extension that fit a call EQUALLY well are not an ambiguity, because the
     /// member has won that since extensions existed.</summary>
     private readonly record struct OverloadCandidate(FunctionSymbol Fn, bool FromExtension);
+
+    /// <summary>The module a qualified callee's receiver names — an alias (<c>net</c>) or a
+    /// dotted path (<c>std.io.net</c>) — and <c>null</c> for every receiver that is a value.
+    /// </summary>
+    private ModuleSymbol? ModuleReceiverOf(Expr target, SymbolTable scope)
+    {
+        switch (target)
+        {
+            case IdentifierExpr id:
+            {
+                var found = scope.Lookup(id.Name);
+                if (found is ImportBindingSymbol ib) found = ib.Target;
+                return found as ModuleSymbol;
+            }
+            case MemberExpr mem when ModuleReceiverOf(mem.Target, scope) is { } outer:
+            {
+                var inner = outer.Members.LookupLocal(mem.Member);
+                if (inner is ImportBindingSymbol ib) inner = ib.Target;
+                return inner as ModuleSymbol;
+            }
+            default:
+                return null;
+        }
+    }
 
     /// <summary>The receiver's type as the checker recorded it a moment ago, with an optional
     /// receiver unwrapped the way the member lookup unwraps it.</summary>

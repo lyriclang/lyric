@@ -136,4 +136,27 @@ public class OverloadTests
             """);
         Assert.False(de.HasErrors);
     }
+
+    [Fact]
+    public void A_module_qualified_call_sees_the_whole_overload_set()
+    {
+        // §4.3a separates by the parameter list HOWEVER the name is reached. The alias route
+        // used to bind the first member only — `net.localPort(udp)` was refused with "cannot
+        // assign 'UdpSocket' to 'Listener'" while the selective import chose correctly, which
+        // made overload resolution depend on the import style.
+        var de = Check("""
+            import std.io.net as net;
+
+            fn main(): int {
+                let sock = net.bind("127.0.0.1", 0);
+                if (sock == null) {
+                    return 1;
+                }
+                let p = net.localPort(sock);
+                net.close(sock);
+                return if (p > 0) 0 else 1;
+            }
+            """);
+        Assert.False(de.HasErrors);
+    }
 }

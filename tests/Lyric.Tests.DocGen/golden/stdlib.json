@@ -2625,6 +2625,62 @@
           }
         },
         {
+          "Kind": "Alias",
+          "Name": "UdpSocket",
+          "Signature": "pub type UdpSocket = int",
+          "Doc": "A UDP endpoint. Opaque, like the others; one handle both sends and receives.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 33
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "Packet",
+          "Signature": "pub struct Packet",
+          "Doc": "One received datagram: its payload, and who sent it — the address `sendTo` answers to.\n\nUDP has no EOF, so an EMPTY payload here is a real (empty) packet, not an end — the one\nplace this module's bytes mean something different than `readSome`'s.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "bytes",
+              "Signature": "bytes: uint8[]",
+              "Doc": "The payload, complete: a datagram arrives whole or not at all.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/net.lyr",
+                "Line": 41
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "host",
+              "Signature": "host: string",
+              "Doc": "The sender's address, as the receiving socket saw it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/net.lyr",
+                "Line": 43
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "port",
+              "Signature": "port: int",
+              "Doc": "The sender's port.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/net.lyr",
+                "Line": 45
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 39
+          }
+        },
+        {
           "Kind": "Function",
           "Name": "listen",
           "Signature": "pub fn listen(host: string, port: int): ?Listener",
@@ -2632,7 +2688,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 64
+            "Line": 89
           }
         },
         {
@@ -2643,7 +2699,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 73
+            "Line": 98
           }
         },
         {
@@ -2654,7 +2710,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 82
+            "Line": 107
           }
         },
         {
@@ -2665,7 +2721,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 87
+            "Line": 112
           }
         },
         {
@@ -2676,7 +2732,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 101
+            "Line": 126
           }
         },
         {
@@ -2687,7 +2743,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 111
+            "Line": 136
           }
         },
         {
@@ -2698,7 +2754,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 130
+            "Line": 155
           }
         },
         {
@@ -2709,7 +2765,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 141
+            "Line": 166
           }
         },
         {
@@ -2720,7 +2776,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 156
+            "Line": 181
           }
         },
         {
@@ -2731,7 +2787,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 166
+            "Line": 191
           }
         },
         {
@@ -2742,7 +2798,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 183
+            "Line": 208
           }
         },
         {
@@ -2753,7 +2809,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 190
+            "Line": 215
           }
         },
         {
@@ -2764,7 +2820,95 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
-            "Line": 195
+            "Line": 220
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "bind",
+          "Signature": "pub fn bind(host: string, port: int): ?UdpSocket",
+          "Doc": "Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `localPort` says\nwhich. `null` when the address cannot be taken; `bindOrThrow` says why, `AddressInUse`\nbeing the usual answer.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 229
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "bindOrThrow",
+          "Signature": "pub fn bindOrThrow(host: string, port: int): UdpSocket throws IoError",
+          "Doc": "`bind`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 238
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "localPort",
+          "Signature": "pub fn localPort(socket: UdpSocket): int",
+          "Doc": "The port a UDP endpoint actually holds — the answer to `bind(host, 0)`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 247
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sendTo",
+          "Signature": "pub fn sendTo(socket: UdpSocket, host: string, port: int, bytes: uint8[]): bool",
+          "Doc": "Sends one datagram to `host:port`, waiting out a full send buffer. The datagram goes\nwhole or not at all; `false` when it cannot go — `sendToOrThrow` says why. There is no\ndelivery promise: that is UDP, not this module.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 254
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sendToOrThrow",
+          "Signature": "pub fn sendToOrThrow(socket: UdpSocket, host: string, port: int, bytes: uint8[]): void throws IoError",
+          "Doc": "`sendTo`, with the reason when the datagram cannot go.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 268
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "receiveFrom",
+          "Signature": "pub fn receiveFrom(socket: UdpSocket, max: int): ?Packet",
+          "Doc": "Waits for one datagram and answers it whole, with its sender. A payload longer than `max`\nis CUT to it — datagrams do not queue their remainder. `null` is a failure;\n`receiveFromOrThrow` says which. An empty payload is a real packet: UDP has no EOF.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 282
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "receiveFromOrThrow",
+          "Signature": "pub fn receiveFromOrThrow(socket: UdpSocket, max: int): Packet throws IoError",
+          "Doc": "`receiveFrom`, with the reason when the socket broke.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 296
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "close",
+          "Signature": "pub fn close(socket: UdpSocket): void",
+          "Doc": "Closes a UDP endpoint. Closing twice closes once.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 305
           }
         }
       ]

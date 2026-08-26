@@ -53,6 +53,10 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   say why (`IoErrorKind` gains `ConnectionRefused` and `AddressInUse`). `readSome`: bytes are
   bytes, an empty array is EOF, `null` is a failure. `std.task.poll`'s descriptor half is
   real now — select over the module's sockets, an errored socket reporting as readable.
+  And UDP: `bind` a `UdpSocket`, `sendTo` one datagram (whole or not at all, no delivery
+  promise — that is UDP), `receiveFrom` waits and answers a `Packet` — payload plus sender,
+  the address a reply's `sendTo` takes. UDP has no EOF, so an empty payload is a real
+  packet; `localPort` and `close` are the same names TCP uses, chosen by the handle.
 
 - **`std.process`** — child processes for tasks, behind `processAccess`, the FIFTH capability
   bit and the first new one since 1.0: starting programs is a new power, not an `osAccess`
@@ -84,6 +88,14 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
 - **The inward opaque cast outside the declaring module is an ERROR** (`LYR-SEM0093`), as 3.8
   announced: a handle is issued, not assembled — the declaring module offers a constructor
   function for values rebuilt from stored numbers.
+
+### Fixed
+
+- **A module-qualified call sees the whole overload set.** Since 3.0, `net.localPort(x)`
+  through a module alias bound only the FIRST function of the name and refused the call with
+  a type mismatch, while the selective import chose correctly — overload resolution depended
+  on the import style, against §4.3a. Surfaced by UDP's `localPort`/`close` sharing their
+  TCP names; the qualified route now collects the same candidate set.
 
 ## v3.9.1 — 2026-08-25
 
