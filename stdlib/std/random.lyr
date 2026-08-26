@@ -15,6 +15,15 @@ module std.random;
 import std.collections { List };
 import std.math { absInt, sqrt, log, cos, tau };
 
+/// `count` bytes from the operating system's cryptographic source — the ONE thing in this
+/// module that is not deterministic, and deliberately so marked: keys, tokens and session ids
+/// need entropy no seed can replay, which is exactly what makes it useless for a simulation
+/// that wants to be reproduced. A negative `count` panics; zero answers the empty array.
+///
+/// Capability-free like the rest of the module: the source reaches no file, no clock and no
+/// network — an embedded host loses nothing by a guest that can draw good dice.
+pub fn secureRandom(count: int): uint8[];
+
 /// One xorshift64 round: three shifts and three exclusive ors over the state.
 ///
 /// Native, and this one is worth a word because the rest of this module is not. Written in Lyric
@@ -24,7 +33,8 @@ import std.math { absInt, sqrt, log, cos, tau };
 fn xorshift(state: int): int;
 
 /// A deterministic pseudo-random generator (xorshift64*): one `int` of state, seeded by the
-/// caller. Not cryptographic — keys need a source from the operating system.
+/// caller. Not cryptographic — keys need a source from the operating system, which is what
+/// `secureRandom` is.
 pub class Random {
     /// The generator state; every draw replaces it.
     state: int,

@@ -494,6 +494,21 @@ public sealed class NativeRegistry
             return LyrValue.FromI64(x);
         });
 
+        // The one non-deterministic draw (4.0): the OS's cryptographic source. Capability-free
+        // like the module — entropy reaches no file, clock or network. A negative count is the
+        // caller's bug and panics like a bad slice bound would.
+        registry.RegisterArrayReturning("std.random.secureRandom", [TypeTag.I64], TypeTag.U8,
+            args =>
+            {
+                var count = args[0].AsI64;
+                if (count < 0)
+                    throw new LyricPanic(VmDiagnostics.Panicked,
+                        "std.random.secureRandom: negative count");
+                var bytes = new byte[(int)Math.Min(count, 1 << 20)];
+                System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+                return Bytes(bytes);
+            });
+
         registry.Register("std.math.sqrt", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Sqrt(args[0].AsF64)));
         registry.Register("std.math.abs", f1, TypeTag.F64,

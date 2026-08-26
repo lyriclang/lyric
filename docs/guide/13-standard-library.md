@@ -15,7 +15,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.io.error` | `IoError`, `IoErrorKind` — the reason an I/O operation failed; no capability |
 | `std.io.file` | reading and writing files — requires `fileAccess` |
 | `std.os` | environment, process, exit — requires `osAccess` |
-| `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic, no capability |
+| `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic; `secureRandom` (4.0) is the one OS-entropy draw. No capability |
 | `std.time` | `Instant`, `Duration`, ISO 8601 — requires `osAccess` |
 | `std.json` | `JsonValue`, `parse`, `serialize`, `serializePretty` — JSON, RFC 8259 |
 | `std.encoding` | `hexEncode`/`hexDecode`, `base64Encode`/`base64Decode` — RFC 4648 |
