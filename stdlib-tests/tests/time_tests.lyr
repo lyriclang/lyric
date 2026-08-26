@@ -1,5 +1,6 @@
 import std.test { Test, assertEq, assertTrue };
-import std.time { Instant, Duration };
+import std.time { Instant, Duration, TimeError };
+import std.string as strings;
 
 @Test
 pub fn durations_add_and_convert(): void {
@@ -37,4 +38,60 @@ pub fn iso_lands_pre_epoch_instants_in_the_right_day(): void {
 pub fn the_clock_moves_forward(): void {
     let now = Instant.now();
     assertTrue(now.epochMillis() > 1500000000000, "the wall clock stands after 2017");
+}
+
+@Test
+pub fn from_iso_round_trips_what_iso_writes(): void {
+    let cases = [0, 86400000, 951868800000, 0 - 1, 0 - 62135596800000];
+    var i = 0;
+    while (i < cases.length) {
+        let x = Instant.ofEpochMillis(cases[i]);
+        let back = Instant.fromIso(x.iso());
+        assertTrue(back != null, "iso output must read back: " + x.iso());
+        assertEq(back!.epochMillis(), cases[i]);
+        i = i + 1;
+    }
+}
+
+@Test
+pub fn from_iso_reads_the_leap_day_and_refuses_the_fake_one(): void {
+    let leap = Instant.fromIso("2024-02-29T12:00:00.000Z");
+    assertTrue(leap != null, "2024 has a february 29th");
+    assertEq(leap!.iso(), "2024-02-29T12:00:00.000Z");
+    assertTrue(Instant.fromIso("2023-02-29T12:00:00.000Z") == null, "2023 does not");
+    assertTrue(
+        Instant.fromIso("2024-02-31T00:00:00.000Z") == null,
+        "no month carries a 31st into march"
+    );
+}
+
+@Test
+pub fn from_iso_refuses_what_is_not_the_shape(): void {
+    assertTrue(Instant.fromIso("") == null, "empty");
+    assertTrue(Instant.fromIso("gestern") == null, "words");
+    assertTrue(Instant.fromIso("2024-02-29T12:00:00.000") == null, "missing Z");
+    assertTrue(Instant.fromIso("2024-02-29T12:00:00.000+01:00") == null, "offsets are not UTC");
+    assertTrue(Instant.fromIso("2024-02-29T24:00:00.000Z") == null, "hour 24");
+    assertTrue(Instant.fromIso("999-02-01T00:00:00.000Z") == null, "three-digit year");
+}
+
+@Test
+pub fn from_iso_or_throw_names_the_field(): void {
+    var said = "";
+    try {
+        let x = Instant.fromIsoOrThrow("2024-13-01T00:00:00.000Z");
+        assertEq(x.epochMillis(), 0);
+    } catch (e: TimeError) {
+        said = e.message();
+    }
+    assertTrue(said.indexOf("range") >= 0, "13 is a month out of range: " + said);
+
+    var second = "";
+    try {
+        let y = Instant.fromIsoOrThrow("2024-xx-01T00:00:00.000Z");
+        assertEq(y.epochMillis(), 0);
+    } catch (e: TimeError) {
+        second = e.message();
+    }
+    assertTrue(second.indexOf("month") >= 0, "the month did not read: " + second);
 }

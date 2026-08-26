@@ -62,6 +62,16 @@ pub struct Duration {
     }
 }
 
+/// A failed reading of a time text: what was handed in, and what broke.
+pub class TimeError :: [Throwable] {
+    /// What went wrong, naming the field that broke.
+    text: string,
+
+    pub fn message(): string {
+        return this.text;
+    }
+}
+
 /// A point on the wall clock: milliseconds since 1970-01-01 UTC.
 pub struct Instant {
     /// Milliseconds since the epoch; negative is before 1970.
@@ -123,9 +133,188 @@ pub struct Instant {
         let clock = two(hour) + ":" + two(minute) + ":" + two(second);
         return date + "T" + clock + "." + fromInt(ms).padStart(3, '0') + "Z";
     }
+
+    /// Reads what `iso()` writes — the round-trip half that was missing since `iso` exists:
+    /// `fromIso(x.iso())` is `x`, pre-epoch instants included. `null` when the text is not
+    /// that shape or names a day that does not exist; `fromIsoOrThrow` says which field broke.
+    ///
+    /// Strict on purpose: exactly `YYYY-MM-DDTHH:MM:SS.mmmZ`, UTC only. A parser that accepts
+    /// offsets or shortened forms would be promising calendar arithmetic this module does not
+    /// have; the day `31` of February is refused rather than silently carried into March.
+    pub static fn fromIso(text: string): ?Instant {
+        let parsed = parseIso(text);
+        if (parsed == null) {
+            return null;
+        }
+        return Instant { millis = parsed };
+    }
+
+    /// `fromIso`, with the reason when the text does not read.
+    pub static fn fromIsoOrThrow(text: string): Instant throws TimeError {
+        let read = Instant.fromIso(text);
+        if (read == null) {
+            throw TimeError { text = isoFault(text) };
+        }
+        return read;
+    }
 }
 
 // Two digits, zero-padded — the ISO field width.
 fn two(value: int): string {
     return fromInt(value).padStart(2, '0');
+}
+
+// The strict shape: year (4+ digits, an optional leading '-'), then -MM-DDTHH:MM:SS.mmmZ.
+// Returns the epoch milliseconds, or null. One walk; the OrThrow twin re-walks through
+// `isoFault` for the sentence, so the silent path pays nothing for the reason it drops.
+fn parseIso(text: string): ?int {
+    let chars = text.toChars();
+
+    var at = 0;
+    var yearSign = 1;
+    if (chars.length > 0 && chars[0] == '-') {
+        yearSign = 0 - 1;
+        at = 1;
+    }
+
+    var yearDigits = 0;
+    var year = 0;
+    while (at < chars.length && isDigit(chars[at])) {
+        year = year * 10 + digit(chars[at]);
+        yearDigits = yearDigits + 1;
+        at = at + 1;
+    }
+    if (yearDigits < 4) {
+        return null;
+    }
+    year = year * yearSign;
+
+    let month = fixed2(chars, at, '-');
+    if (month == null) {
+        return null;
+    }
+    let day = fixed2(chars, at + 3, '-');
+    if (day == null) {
+        return null;
+    }
+    let hour = fixed2(chars, at + 6, 'T');
+    if (hour == null) {
+        return null;
+    }
+    let minute = fixed2(chars, at + 9, ':');
+    if (minute == null) {
+        return null;
+    }
+    let second = fixed2(chars, at + 12, ':');
+    if (second == null) {
+        return null;
+    }
+
+    // .mmmZ, and then nothing: a trailing offset or stray character refuses the whole text.
+    let msAt = at + 15;
+    if (msAt + 5 != chars.length || chars[msAt] != '.') {
+        return null;
+    }
+    if (!isDigit(chars[msAt + 1]) || !isDigit(chars[msAt + 2]) || !isDigit(chars[msAt + 3])) {
+        return null;
+    }
+    if (chars[chars.length - 1] != 'Z') {
+        return null;
+    }
+    let ms = digit(chars[msAt + 1]) * 100 + digit(chars[msAt + 2]) * 10 + digit(chars[msAt + 3]);
+
+    if (month < 1 || month > 12) {
+        return null;
+    }
+    if (day < 1 || day > daysInMonth(year, month)) {
+        return null;
+    }
+    if (hour > 23 || minute > 59 || second > 59) {
+        return null;
+    }
+
+    // Days-from-civil — the exact inverse of iso()'s civil-from-days, same era arithmetic.
+    let shifted = if (month <= 2) year - 1 else year;
+    let era = divFloor(shifted, 400);
+    let yoe = shifted - era * 400;
+    let mp = if (month > 2) month - 3 else month + 9;
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let dayNumber = era * 146097 + doe - 719468;
+
+    return dayNumber * 86400000 + hour * 3600000 + minute * 60000 + second * 1000 + ms;
+}
+
+// A separator followed by exactly two digits, read at a fixed position; null when either is
+// not there. The separator comes FIRST because every two-digit field in the shape follows one.
+fn fixed2(chars: char[], at: int, separator: char): ?int {
+    if (at + 2 >= chars.length || chars[at] != separator) {
+        return null;
+    }
+    if (!isDigit(chars[at + 1]) || !isDigit(chars[at + 2])) {
+        return null;
+    }
+    return digit(chars[at + 1]) * 10 + digit(chars[at + 2]);
+}
+
+fn isDigit(c: char): bool {
+    return c >= '0' && c <= '9';
+}
+
+fn digit(c: char): int {
+    return c as int - '0' as int;
+}
+
+fn isLeap(year: int): bool {
+    if (modFloor(year, 400) == 0) {
+        return true;
+    }
+    if (modFloor(year, 100) == 0) {
+        return false;
+    }
+    return modFloor(year, 4) == 0;
+}
+
+fn daysInMonth(year: int, month: int): int {
+    if (month == 2) {
+        return if (isLeap(year)) 29 else 28;
+    }
+    if (month == 4 || month == 6 || month == 9 || month == 11) {
+        return 30;
+    }
+    return 31;
+}
+
+// The sentence behind fromIsoOrThrow: name the first field that breaks, in reading order.
+fn isoFault(text: string): string {
+    let head = "not an iso instant (expected YYYY-MM-DDTHH:MM:SS.mmmZ): ";
+    let chars = text.toChars();
+    var at = if (chars.length > 0 && chars[0] == '-') 1 else 0;
+    var digits = 0;
+    while (at < chars.length && isDigit(chars[at])) {
+        digits = digits + 1;
+        at = at + 1;
+    }
+    if (digits < 4) {
+        return head + "the year wants four digits";
+    }
+    if (fixed2(chars, at, '-') == null) {
+        return head + "the month did not read";
+    }
+    if (fixed2(chars, at + 3, '-') == null) {
+        return head + "the day did not read";
+    }
+    if (fixed2(chars, at + 6, 'T') == null) {
+        return head + "the hour did not read";
+    }
+    if (fixed2(chars, at + 9, ':') == null) {
+        return head + "the minute did not read";
+    }
+    if (fixed2(chars, at + 12, ':') == null) {
+        return head + "the second did not read";
+    }
+    if (at + 20 != chars.length || chars[at + 15] != '.' || chars[chars.length - 1] != 'Z') {
+        return head + "the tail is not .mmmZ";
+    }
+    return head + "a field is out of its range";
 }

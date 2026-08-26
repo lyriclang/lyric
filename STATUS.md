@@ -112,8 +112,18 @@ capability-free. Five lyrtest cases including the three-call line reader the too
 for. Doc floor 493, 20 module pages. Also this session, outside the basket: erato2's AOT
 loader popped the OS "invalid image" dialog on a broken package dll (0xC000012F, three times
 at the user's desk) — fixed there with an MZ probe plus a thread-local error-mode window
-around `LoadLibrary` (erato2 `febdd63`; 3612 assertions green). Next: **basket item 7,
-`Instant.fromIso`** (the round-trip half `iso()` never had, with an OrThrow twin per §9.0).
+around `LoadLibrary` (erato2 `febdd63`; 3612 assertions green). **`Instant.fromIso` — basket item 7 — is BUILT** (branch `feature/v4-time-fromiso`): the
+inverse of `iso()`'s civil-from-days (Hinnant's era arithmetic both ways), strict to exactly
+the shape `iso()` writes — UTC only, no offsets, and a February 31st is REFUSED rather than
+silently carried into March, because a parser that carries is a parser that lies. `null` says
+whether; `fromIsoOrThrow` names the FIELD that broke (`TimeError`, the JsonError-shaped
+carrier), and the silent path pays nothing for the sentence it drops — the fault walk runs
+only in the twin. Round-trip pinned over epoch, leap edge 2000-03-01, pre-epoch `-1`, and the
+year-1 boundary; 122 lyrtest, doc floor 497. One pre-existing edge recorded, not fixed:
+`iso()` renders a NEGATIVE year through `padStart`, which mangles the sign
+(`fromInt(-1).padStart(4,'0')` is `"00-1"`) — unreachable this side of 62 billion negative
+milliseconds, a decision for whoever first needs BCE. Next: **basket item 8,
+`console.readAll`** (stdin to EOF — the CLI goal means pipes).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

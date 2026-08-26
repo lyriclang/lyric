@@ -58,6 +58,12 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   (a line ends in one byte; the protocol that needs more can ask). Written in Lyric,
   capability-free.
 
+- **`Instant.fromIso`** — the round-trip half `iso()` never had: `fromIso(x.iso())` is `x`,
+  pre-epoch instants included. Strict on purpose — exactly `YYYY-MM-DDTHH:MM:SS.mmmZ`, UTC
+  only, and a day that does not exist (February 31st) is refused rather than carried into
+  March. `null` answers whether; `fromIsoOrThrow` names the field that broke (`TimeError`,
+  §9.0's twin doctrine). Written in Lyric, the exact inverse of `iso()`'s civil-from-days.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty
