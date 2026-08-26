@@ -102,8 +102,18 @@ the carrier-behind-kind design absorbing them without breaking a match, as it pr
 socket reporting as readable so the read that follows tells the waiter. Three lyrtest cases
 pin it end to end — an echo roundtrip ACROSS the scheduler (with the EOF assertion), the
 refused connect naming its kind, the taken address naming its. 113 lyrtest, doc floor 490,
-19 module pages, guide 13. Next: **basket item 5, byte tooling** (`slice`/`concat`/`indexOf`
-over `uint8[]` — the wire-protocol prerequisite, then `readLine` becomes writable).
+19 module pages, guide 13. **`std.bytes` — basket item 5 — is BUILT** (branch `feature/v4-bytes`), smaller than its
+listing: the item named `slice`/`concat`/`indexOf`, and CONCAT turned out to already exist —
+`a + b` joins arrays (the `ArrayConcat` opcode's surface since always), so a function would
+have been a second name for the operator; Rule 2 says no, and the guide now says `+`. What
+landed: `slice` with `string.substring`'s exact edges (negative/past-the-end start panics,
+count clamps), `indexOf`/`indexOfFrom` answering `-1` like their string namesakes, pure Lyric,
+capability-free. Five lyrtest cases including the three-call line reader the tooling exists
+for. Doc floor 493, 20 module pages. Also this session, outside the basket: erato2's AOT
+loader popped the OS "invalid image" dialog on a broken package dll (0xC000012F, three times
+at the user's desk) — fixed there with an MZ probe plus a thread-local error-mode window
+around `LoadLibrary` (erato2 `febdd63`; 3612 assertions green). Next: **basket item 7,
+`Instant.fromIso`** (the round-trip half `iso()` never had, with an OrThrow twin per §9.0).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
