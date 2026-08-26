@@ -18,7 +18,9 @@ import std.collections { Deque, List };
 pub enum Wait {
     /// Run me again once everyone before me had a turn — the cooperative "make room".
     Now,
-    /// Wake me after this many milliseconds.
+    /// Wake me after this many milliseconds. Sleepers wake in deadline order — two deadlines
+    /// that pass in the same poll still wake nearest-first, and a deadline already in the past
+    /// (a zero or negative wait) is due at the very next poll.
     Sleep(int),
     /// Wake me when this descriptor has bytes to read. Descriptors come from `std.io.net`.
     Readable(int),
@@ -172,16 +174,28 @@ fn nearestDeadline(): int {
     return nearest;
 }
 
+// Overdue sleepers wake in DEADLINE order, not list order. The clock can cover several at
+// once — a slow first poll, a long-running task — and then the order must still be the one
+// the deadlines name, or wake order would depend on machine load. Ties wake in spawn order:
+// the strict `<` keeps the earliest index. Repeated minimum extraction, quadratic in the
+// number of overdue sleepers — which is small, and only ever paid when several are due.
 fn wakeSleepers(clock: int): void {
-    var i = 0;
-    while (i < scheduler.deadlines.length()) {
-        if (scheduler.deadlines.get(i) <= clock) {
-            scheduler.ready.pushBack(scheduler.sleepers.get(i));
-            scheduler.sleepers.removeAt(i);
-            scheduler.deadlines.removeAt(i);
-        } else {
+    while (true) {
+        var due = -1;
+        var i = 0;
+        while (i < scheduler.deadlines.length()) {
+            if (scheduler.deadlines.get(i) <= clock
+                && (due < 0 || scheduler.deadlines.get(i) < scheduler.deadlines.get(due))) {
+                due = i;
+            }
             i = i + 1;
         }
+        if (due < 0) {
+            return;
+        }
+        scheduler.ready.pushBack(scheduler.sleepers.get(due));
+        scheduler.sleepers.removeAt(due);
+        scheduler.deadlines.removeAt(due);
     }
 }
 

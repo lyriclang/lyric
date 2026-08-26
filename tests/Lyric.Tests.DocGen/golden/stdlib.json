@@ -5455,11 +5455,11 @@
               "Kind": "Variant",
               "Name": "Sleep",
               "Signature": "Sleep(int)",
-              "Doc": "Wake me after this many milliseconds.",
+              "Doc": "Wake me after this many milliseconds. Sleepers wake in deadline order — two deadlines\nthat pass in the same poll still wake nearest-first, and a deadline already in the past\n(a zero or negative wait) is due at the very next poll.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/task.lyr",
-                "Line": 22
+                "Line": 24
               }
             },
             {
@@ -5470,7 +5470,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/task.lyr",
-                "Line": 24
+                "Line": 26
               }
             },
             {
@@ -5481,7 +5481,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/task.lyr",
-                "Line": 26
+                "Line": 28
               }
             },
             {
@@ -5492,7 +5492,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/task.lyr",
-                "Line": 29
+                "Line": 31
               }
             }
           ],
@@ -5509,7 +5509,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 70
+            "Line": 72
           }
         },
         {
@@ -5520,7 +5520,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 76
+            "Line": 78
           }
         },
         {
@@ -5531,7 +5531,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 90
+            "Line": 92
           }
         }
       ]

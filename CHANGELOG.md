@@ -39,9 +39,10 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   `Readable(fd)`/`Writable(fd)` for `std.io.net`'s descriptors once they exist, `Interrupt`
   parked until interrupt handling lands). `spawn` enqueues, `run()` drives everything to its
   end — round-robin when ready, blocking in the module's ONE native (`poll`, time and
-  readiness in one answer) when not. The waiting composes through helpers with no marker on
-  any signature — what stackful coroutines were for. `spawn` takes the non-throwing type: a
-  task settles its own errors. Carries `osAccess`.
+  readiness in one answer) when not. Sleepers wake in deadline order even when one poll
+  covers several overdue deadlines; ties wake in spawn order. The waiting composes through
+  helpers with no marker on any signature — what stackful coroutines were for. `spawn` takes
+  the non-throwing type: a task settles its own errors. Carries `osAccess`.
 
 - **`std.io.net`** — TCP for tasks, and the `networkAccess` bit reserved since 1.x finally
   gates something. `listen`/`accept`, `connect`, `readSome`/`write`, `close`, with opaque
