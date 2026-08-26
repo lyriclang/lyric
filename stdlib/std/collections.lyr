@@ -287,6 +287,141 @@ pub fn collect<T>(source: Iterator<T>): List<T> {
 // Open addressing with linear probing: one flat array per column rather than a bucket per slot, and
 // a collision moves to the next index. A chain per bucket would need an object and a pointer per
 // entry.
+// ------------------------------------------------------- Deque
+//
+// A ring over one array: `head` is the front, indices wrap modulo the capacity, and growing
+// unrolls the ring into a fresh array with the front back at 0. Both ends are O(1), which is
+// what a scheduler's run queue needs and a List cannot give — its removeAt(0) moves everything.
+
+/// A double-ended queue: push and pop are O(1) at BOTH ends.
+///
+/// Deliberately without iteration for now: a run queue is drained, not walked, and `popFront`
+/// in a loop IS its walk. `null` from a pop or peek means "empty" — an ordinary state, like a
+/// `List` pop, and the whole truth, so there is no throwing twin.
+pub class Deque<T> {
+    /// The backing ring; optional so a popped slot releases its value.
+    data: (?T)[],
+    /// The index of the front value, meaningful while `count > 0`.
+    head: int,
+    /// How many slots are filled.
+    count: int,
+
+    /// An empty deque.
+    pub static fn empty(): Deque<T> {
+        let hole: ?T = null;
+        return Deque<T> { data = [hole] * 0, head = 0, count = 0 };
+    }
+
+    /// How many values are in it.
+    pub fn length(): int {
+        return this.count;
+    }
+
+    /// Whether nothing is in it.
+    pub fn isEmpty(): bool {
+        return this.count == 0;
+    }
+
+    /// How many slots are allocated, empty ones included. For tests and for anyone measuring
+    /// what the deque costs; `length` is the truth for everything else.
+    pub fn capacity(): int {
+        return this.data.length;
+    }
+
+    // Unrolls the ring into a fresh array, front at 0. Also the growth step, which is why the
+    // ring math below never has to handle a full ring: a push grows FIRST.
+    mut fn unroll(target: int): void {
+        let hole: ?T = null;
+        let moved = [hole] * target;
+
+        var i = 0;
+        while (i < this.count) {
+            moved[i] = this.data[(this.head + i) % this.data.length];
+            i = i + 1;
+        }
+        this.data = moved;
+        this.head = 0;
+    }
+
+    mut fn growIfFull(): void {
+        if (this.count >= this.data.length) {
+            if (this.data.length == 0) {
+                this.unroll(4);
+            } else {
+                this.unroll(this.data.length * 2);
+            }
+        }
+    }
+
+    /// Appends at the back; amortized O(1).
+    pub mut fn pushBack(value: T): void {
+        this.growIfFull();
+        this.data[(this.head + this.count) % this.data.length] = value;
+        this.count = this.count + 1;
+    }
+
+    /// Prepends at the front; amortized O(1) — the ring is the reason no slot moves.
+    pub mut fn pushFront(value: T): void {
+        this.growIfFull();
+        this.head = (this.head + this.data.length - 1) % this.data.length;
+        this.data[this.head] = value;
+        this.count = this.count + 1;
+    }
+
+    /// Removes and returns the front value, or `null` when empty.
+    // The slot is cleared rather than skipped, or the ring would keep the object alive and a
+    // "released" value would not be one.
+    pub mut fn popFront(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        let value = this.data[this.head];
+        this.data[this.head] = null;
+        this.head = (this.head + 1) % this.data.length;
+        this.count = this.count - 1;
+        return value;
+    }
+
+    /// Removes and returns the back value, or `null` when empty.
+    pub mut fn popBack(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        let at = (this.head + this.count - 1) % this.data.length;
+        let value = this.data[at];
+        this.data[at] = null;
+        this.count = this.count - 1;
+        return value;
+    }
+
+    /// The front value without removing it, or `null` when empty.
+    pub fn peekFront(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        return this.data[this.head];
+    }
+
+    /// The back value without removing it, or `null` when empty.
+    pub fn peekBack(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        return this.data[(this.head + this.count - 1) % this.data.length];
+    }
+
+    /// Empties the deque; the backing stays allocated, as `List.clear` keeps its.
+    pub mut fn clear(): void {
+        var i = 0;
+        while (i < this.count) {
+            this.data[(this.head + i) % this.data.length] = null;
+            i = i + 1;
+        }
+        this.head = 0;
+        this.count = 0;
+    }
+}
+
 //
 // Three states per slot (`states`): 0 empty, 1 occupied, 2 deleted. The third is needed because a
 // deleted slot must not break the probe chain, or a `get` would stop finding a key behind the gap.

@@ -28,6 +28,12 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   `resume`, `yield`); a 4.0 runtime runs every 3.x module unchanged, a 3.x runtime rejects
   4.0 modules.
 
+- **`std.collections.Deque<T>`** — the double-ended queue: `pushFront`/`pushBack`,
+  `popFront`/`popBack`, `peekFront`/`peekBack`, `length`, `isEmpty`, `clear`, all O(1) ends
+  over one ring. A pop or peek answers `?T` and `null` means "empty" — the whole truth, so no
+  throwing twin. Deliberately without iteration: a queue is drained, not walked. Written in
+  Lyric, like the rest of the collections.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty

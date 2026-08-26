@@ -1,0 +1,88 @@
+import std.test { Test, assertEq, assertTrue };
+import std.collections { Deque };
+
+@Test
+pub fn a_deque_pushes_and_pops_at_both_ends(): void {
+    let d = Deque<int>.empty();
+    d.pushBack(2);
+    d.pushBack(3);
+    d.pushFront(1);
+    assertEq(d.length(), 3);
+    assertEq(d.popFront()!, 1);
+    assertEq(d.popBack()!, 3);
+    assertEq(d.popFront()!, 2);
+    assertTrue(d.popFront() == null, "an empty deque pops null");
+    assertTrue(d.popBack() == null, "at both ends");
+}
+
+@Test
+pub fn the_ring_wraps_and_grows_without_losing_order(): void {
+    let d = Deque<int>.empty();
+    // Force head off zero, then wrap: pushes land below head, growth unrolls the ring.
+    d.pushBack(10);
+    d.pushBack(20);
+    d.pushBack(30);
+    assertEq(d.popFront()!, 10);
+    d.pushBack(40);
+    d.pushBack(50);
+    d.pushBack(60); // beyond the first capacity: unroll while wrapped
+    assertEq(d.popFront()!, 20);
+    assertEq(d.popFront()!, 30);
+    assertEq(d.popFront()!, 40);
+    assertEq(d.popFront()!, 50);
+    assertEq(d.popFront()!, 60);
+    assertTrue(d.isEmpty(), "drained after the wrap");
+}
+
+@Test
+pub fn push_front_wraps_below_zero(): void {
+    let d = Deque<int>.empty();
+    d.pushBack(2);
+    d.pushFront(1); // head steps from 0 to the ring's end
+    d.pushFront(0);
+    assertEq(d.popFront()!, 0);
+    assertEq(d.popFront()!, 1);
+    assertEq(d.popFront()!, 2);
+}
+
+@Test
+pub fn peeks_answer_without_removing(): void {
+    let d = Deque<string>.empty();
+    assertTrue(d.peekFront() == null, "empty peeks null");
+    d.pushBack("a");
+    d.pushBack("b");
+    assertEq(d.peekFront()!, "a");
+    assertEq(d.peekBack()!, "b");
+    assertEq(d.length(), 2);
+}
+
+@Test
+pub fn clear_empties_but_keeps_the_backing(): void {
+    let d = Deque<int>.empty();
+    d.pushBack(1);
+    d.pushBack(2);
+    d.pushBack(3);
+    let allocated = d.capacity();
+    d.clear();
+    assertEq(d.length(), 0);
+    assertEq(d.capacity(), allocated);
+    d.pushBack(9);
+    assertEq(d.popFront()!, 9);
+}
+
+@Test
+pub fn a_drained_deque_is_reusable_as_a_run_queue(): void {
+    // The scheduler's shape: drain, refill, drain — heads wander round the ring for good.
+    let d = Deque<int>.empty();
+    var round = 0;
+    var seen = 0;
+    while (round < 10) {
+        d.pushBack(round * 2);
+        d.pushBack(round * 2 + 1);
+        seen = seen + d.popFront()!;
+        seen = seen + d.popFront()!;
+        round = round + 1;
+    }
+    assertTrue(d.isEmpty(), "every round drained");
+    assertEq(seen, 190);
+}
