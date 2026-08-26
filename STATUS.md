@@ -159,8 +159,40 @@ a poll can wait: a flag, an event for the descriptorless wait, and a UDP self-pi
 for a poll inside select (the one self-pipe shape `Socket.Select` accepts everywhere). Three
 lyrtest cases on both engines plus a Unix-only Cli test that sends the real SIGINT end to
 end (Windows skips: only the delivery differs). 127 lyrtest, doc floor 498. Embedded stays
-the host's business, as decided. Next: **basket item 10, `std.process`** (spawn/streams/exit
-code, its own capability bit; waiting on exit is a Wait under door C).
+the host's business, as decided.
+
+The SIGINT test earned its keep before it ever passed: its first version hung BOTH Linux CI
+jobs for six hours (the GitHub default cap) on a bare `ReadLine()`, and chasing the hang
+uncovered a real DRIVER bug — `lyric run` is a wrapper, the program runs in a lyrvm child
+that inherits the pipes, and a Ctrl+C that reaches the process group killed the DRIVER first,
+tearing the pipes off a child that was mid-shutdown and stealing its exit code; a child
+parked on `Wait.Interrupt`, which swallows the signal by design, was left orphaned holding
+stdout open forever. Three fixes, all in #132: `Tool.Run` raises a cancel shield around the
+wait (the child decides, the driver answers with the child's exit code — what every wrapper
+owes its child); the test simulates a terminal honestly (`setsid` + a group-targeted kill,
+because signalling only the driver tests a delivery that does not exist) with every read
+BOUNDED and stderr drained concurrently; and every CI job is capped at 30 minutes, so no
+future hang can spend the default six hours twice over again.
+
+**Basket item 10, `std.process`, is DONE** (spec-first: `lyric-spec#28` added
+`processAccess`, bit 4 / `0x10`, the first NEW capability bit since 1.0 — starting programs
+is a new power, not an `osAccess` refinement, so a host that granted environment questions
+has not thereby agreed to it; the os bit still appears BESIDE it honestly, since the module
+waits through `std.task`, and the add-only rule of the bit table is now stated in §4.5/§13
+plus the mirror). The module is net's doctrine aimed at children: opaque `Child`, silent
+forms answer whether, `OrThrow` twins say why with the same `IoError`,
+`readSomeOut`/`readSomeErr` speak `readSome`'s three truths, `wait` answers the exit code,
+`kill` and `close`. The scheduler bridge is a notify descriptor per child — a UDP self-pipe
+registered IN the socket table, so "output arrived" and "the child exited" are ordinary
+`Wait.Readable` wakes through the one poll native; the host pumps the streams into buffers
+on pool threads and posts a datagram per event, and the natives answer from the buffers and
+never block. stdin is a queue drained by its own writer (a write enqueues and returns, the
+pipe-full case costs memory rather than a wait, `closeStdin` is the filter's EOF). Four
+lyrtest cases run real children on both engines and platforms — echo, an exit code, `sort`
+as the stdin round trip (the one filter both worlds ship under the same name), NotFound
+through the twin — plus two capability pins, including osAccess alone REFUSING to start a
+process. 131 lyrtest, doc floor 511, 21 doc pages; guide 13 shows the sort filter as a
+compiled snippet. Next: **basket item 11, UDP in `std.io.net`**.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
