@@ -5680,6 +5680,40 @@
           }
         },
         {
+          "Kind": "Class",
+          "Name": "TimeError",
+          "Signature": "pub class TimeError :: [Throwable]",
+          "Doc": "A failed reading of a time text: what was handed in, and what broke.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "text",
+              "Signature": "text: string",
+              "Doc": "What went wrong, naming the field that broke.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 68
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 70
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/time.lyr",
+            "Line": 66
+          }
+        },
+        {
           "Kind": "Struct",
           "Name": "Instant",
           "Signature": "pub struct Instant",
@@ -5693,7 +5727,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 68
+                "Line": 78
               }
             },
             {
@@ -5704,7 +5738,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 71
+                "Line": 81
               }
             },
             {
@@ -5715,7 +5749,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 77
+                "Line": 87
               }
             },
             {
@@ -5726,7 +5760,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 82
+                "Line": 92
               }
             },
             {
@@ -5737,7 +5771,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 87
+                "Line": 97
               }
             },
             {
@@ -5748,7 +5782,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 92
+                "Line": 102
               }
             },
             {
@@ -5759,13 +5793,35 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 101
+                "Line": 111
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "fromIso",
+              "Signature": "pub static fn fromIso(text: string): ?Instant",
+              "Doc": "Reads what `iso()` writes — the round-trip half that was missing since `iso` exists:\n`fromIso(x.iso())` is `x`, pre-epoch instants included. `null` when the text is not\nthat shape or names a day that does not exist; `fromIsoOrThrow` says which field broke.\n\nStrict on purpose: exactly `YYYY-MM-DDTHH:MM:SS.mmmZ`, UTC only. A parser that accepts\noffsets or shortened forms would be promising calendar arithmetic this module does not\nhave; the day `31` of February is refused rather than silently carried into March.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 144
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "fromIsoOrThrow",
+              "Signature": "pub static fn fromIsoOrThrow(text: string): Instant throws TimeError",
+              "Doc": "`fromIso`, with the reason when the text does not read.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 153
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/time.lyr",
-            "Line": 66
+            "Line": 76
           }
         }
       ]
