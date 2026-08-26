@@ -83,6 +83,34 @@ pub fn sleeps_wake_in_deadline_order(): void {
     assertEq(seen[1], 1);
 }
 
+// The test above holds only while the first poll comes back between the two deadlines — on a
+// loaded machine (CI under JIT warm-up) both were already overdue, and the scheduler woke them
+// in SPAWN order. Negative waits make that exact situation deterministic: both deadlines are
+// in the past at the first poll, and the later-spawned task holds the earlier one.
+@Test
+pub fn overdue_sleepers_still_wake_in_deadline_order(): void {
+    spawn(sleeper(1, 0));
+    spawn(sleeper(2, 0 - 20));
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 2);
+    assertEq(seen[0], 2);
+    assertEq(seen[1], 1);
+}
+
+@Test
+pub fn overdue_ties_wake_in_spawn_order(): void {
+    spawn(sleeper(1, 0 - 20));
+    spawn(sleeper(2, 0 - 20));
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 2);
+    assertEq(seen[0], 1);
+    assertEq(seen[1], 2);
+}
+
 fn parent(): Coroutine<Wait> {
     log.entries.push(1);
     spawn(child());

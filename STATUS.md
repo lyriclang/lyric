@@ -122,8 +122,18 @@ only in the twin. Round-trip pinned over epoch, leap edge 2000-03-01, pre-epoch 
 year-1 boundary; 122 lyrtest, doc floor 497. One pre-existing edge recorded, not fixed:
 `iso()` renders a NEGATIVE year through `padStart`, which mangles the sign
 (`fromInt(-1).padStart(4,'0')` is `"00-1"`) — unreachable this side of 62 billion negative
-milliseconds, a decision for whoever first needs BCE. Next: **basket item 8,
-`console.readAll`** (stdin to EOF — the CLI goal means pipes).
+milliseconds, a decision for whoever first needs BCE. The fromIso merge (#129) caught a
+LATENT `std.task` bug on CI's JIT tier: with warm-up eating the first 40ms, BOTH test
+deadlines were overdue at the first poll, and `wakeSleepers` woke them in list (= spawn)
+order — `sleeps_wake_in_deadline_order` was only green on machines fast enough to never
+see two deadlines in one poll. Fixed in the scheduler (repeated minimum extraction, ties
+keep spawn order), not the test: the test name IS the promised semantics. Two new
+deterministic tests force the race with negative waits (a past deadline is due at the next
+poll) — the first reproduces the exact CI failure on the old code. 124 lyrtest. Also a
+process slip to not repeat: #129 was merged while `gh pr checks --watch` had exited with
+"no checks reported" (the watch ran before CI registered) and the `;`-chained merge went
+ahead anyway — merge must be `&&`-gated on a green watch, retrying until checks exist.
+Next: **basket item 8, `console.readAll`** (stdin to EOF — the CLI goal means pipes).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
