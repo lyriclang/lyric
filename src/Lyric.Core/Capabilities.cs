@@ -12,9 +12,9 @@ public enum Capability : ulong
     /// <summary><c>std.io.file</c> — reading and writing the file system.</summary>
     FileAccess = 1UL << 0,
 
-    /// <summary><c>std.io.net</c> — sockets. The module does not exist yet; the bit is fixed
-    /// regardless, because a number that later means something else invalidates every older
-    /// <c>.lyrbc</c>.</summary>
+    /// <summary><c>std.io.net</c> — sockets. The bit predates the module (fixed since 1.0),
+    /// because a number that later means something else invalidates every older
+    /// <c>.lyrbc</c>; since 4.0 it gates the real thing.</summary>
     NetworkAccess = 1UL << 1,
 
     /// <summary><c>std.os</c> — environment variables, processes, exit codes.</summary>
@@ -23,8 +23,13 @@ public enum Capability : ulong
     /// <summary><c>std.dotnet</c> — host access through reflection.</summary>
     HostAccess = 1UL << 3,
 
+    /// <summary><c>std.process</c> — starting child processes. Its OWN bit rather than a ride
+    /// on <c>OsAccess</c>: a host that grants environment questions has not thereby agreed to
+    /// arbitrary programs being started.</summary>
+    ProcessAccess = 1UL << 4,
+
     /// <summary>What the standalone mode grants: everything.</summary>
-    All = FileAccess | NetworkAccess | OsAccess | HostAccess,
+    All = FileAccess | NetworkAccess | OsAccess | HostAccess | ProcessAccess,
 }
 
 /// <summary>
@@ -51,6 +56,8 @@ public static class CapabilityTable
         // day watch are std.io.net's, and their SOURCES carry the network bit.
         ("std.task", Capability.OsAccess),
         ("std.dotnet", Capability.HostAccess),
+        // Its own bit (4.0): starting programs is a new power, not an osAccess refinement.
+        ("std.process", Capability.ProcessAccess),
     ];
 
     /// <summary>What this module requires. <see cref="Capability.None"/> for everything that is
@@ -85,6 +92,7 @@ public static class CapabilityTable
         if (capability.HasFlag(Capability.NetworkAccess)) parts.Add("networkAccess");
         if (capability.HasFlag(Capability.OsAccess)) parts.Add("osAccess");
         if (capability.HasFlag(Capability.HostAccess)) parts.Add("hostAccess");
+        if (capability.HasFlag(Capability.ProcessAccess)) parts.Add("processAccess");
         return string.Join(" + ", parts);
     }
 
@@ -101,6 +109,7 @@ public static class CapabilityTable
                 "net" or "network" or "networkAccess" => Capability.NetworkAccess,
                 "os" or "osAccess" => Capability.OsAccess,
                 "host" or "hostAccess" => Capability.HostAccess,
+                "process" or "processAccess" => Capability.ProcessAccess,
                 "all" => Capability.All,
                 "none" => Capability.None,
                 _ => null,

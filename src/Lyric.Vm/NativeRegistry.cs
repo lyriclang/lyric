@@ -909,7 +909,7 @@ public sealed class NativeRegistry
                 System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
 
                 var ready = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
-                if (pipe is not null && checkRead.Remove(pipe)) DrainInterruptPipe(pipe);
+                if (pipe is not null && checkRead.Remove(pipe)) DrainPipe(pipe);
                 if (wantInterrupt && TakePendingInterrupt())
                 {
                     InterruptEvent.Reset();
@@ -932,6 +932,8 @@ public sealed class NativeRegistry
             });
 
         RegisterNet(registry);
+
+        RegisterProcess(registry);
 
         registry.Register("std.os.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
@@ -1271,7 +1273,7 @@ public sealed class NativeRegistry
         return pipe;
     }
 
-    private static void DrainInterruptPipe(System.Net.Sockets.Socket pipe)
+    private static void DrainPipe(System.Net.Sockets.Socket pipe)
     {
         var swallow = new byte[16];
         try
@@ -1459,6 +1461,325 @@ public sealed class NativeRegistry
             _ => LyrValue.FromI64(_lastNetKind));
         registry.Register("std.io.net.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastNetDetail ?? ""));
+    }
+
+    // ------------------------------------------------------------------ std.process (4.0)
+    //
+    // A child lives in a per-thread table like the sockets do, PLUS one notify socket — a UDP
+    // self-pipe registered in the SOCKET table, so the scheduler waits on the child with the
+    // ordinary Wait.Readable and the one poll native. The host pumps the child's stdout and
+    // stderr into buffers on pool threads and posts a datagram per event (a chunk arrived, a
+    // stream ended, the child exited, stdin broke); the natives answer from the buffers and
+    // never block. stdin is a queue drained by its own writer thread — a write enqueues and
+    // returns, and the pipe-full case costs memory rather than a wait.
+
+    private sealed class ChildState
+    {
+        public required System.Diagnostics.Process Process { get; init; }
+        public required System.Net.Sockets.Socket Notify { get; init; }
+        public required long NotifyFd { get; init; }
+        public readonly object Gate = new();
+        public readonly List<byte[]> OutChunks = [];
+        public int OutOffset;
+        public bool OutEof;
+        public bool OutFail;
+        public readonly List<byte[]> ErrChunks = [];
+        public int ErrOffset;
+        public bool ErrEof;
+        public bool ErrFail;
+        public readonly System.Collections.Concurrent.BlockingCollection<byte[]> StdinQueue =
+            new();
+        public volatile bool StdinBroken;
+        public bool Closed;
+    }
+
+    [ThreadStatic] private static Dictionary<long, ChildState>? _children;
+    [ThreadStatic] private static long _nextChildKey;
+    [ThreadStatic] private static int _lastProcKind;
+    [ThreadStatic] private static string? _lastProcDetail;
+
+    private static Dictionary<long, ChildState> Children => _children ??= new();
+
+    private static ChildState? ChildOf(long key) =>
+        _children is { } table && table.TryGetValue(key, out var child) ? child : null;
+
+    private static void RecordProc(int kind, string detail)
+    {
+        _lastProcKind = kind;
+        _lastProcDetail = detail;
+    }
+
+    // The event side runs on pool threads; a lost datagram only costs a wake, because every
+    // native that answers a waiter drains the pipe and re-reads the buffers first.
+    private static void Poke(ChildState state)
+    {
+        try
+        {
+            state.Notify.Send(new byte[] { 1 });
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            // The pipe being gone means nobody is waiting on it any more.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private static void StartPump(ChildState state, Stream stream, bool stderr) =>
+        Task.Run(async () =>
+        {
+            var buffer = new byte[8192];
+            try
+            {
+                while (true)
+                {
+                    var got = await stream.ReadAsync(buffer).ConfigureAwait(false);
+                    if (got <= 0) break;
+                    var chunk = buffer[..got];
+                    lock (state.Gate)
+                    {
+                        (stderr ? state.ErrChunks : state.OutChunks).Add(chunk);
+                    }
+                    Poke(state);
+                }
+                lock (state.Gate)
+                {
+                    if (stderr) state.ErrEof = true;
+                    else state.OutEof = true;
+                }
+            }
+            catch (Exception)
+            {
+                lock (state.Gate)
+                {
+                    if (stderr) state.ErrFail = true;
+                    else state.OutFail = true;
+                }
+            }
+            Poke(state);
+        });
+
+    private static void StartStdinWriter(ChildState state, Stream stdin) =>
+        Task.Run(() =>
+        {
+            try
+            {
+                foreach (var chunk in state.StdinQueue.GetConsumingEnumerable())
+                {
+                    stdin.Write(chunk);
+                    stdin.Flush();
+                }
+                stdin.Close();
+            }
+            catch (Exception)
+            {
+                state.StdinBroken = true;
+                try { stdin.Close(); } catch (Exception) { /* already broken */ }
+            }
+            Poke(state);
+        });
+
+    private static byte[] TakeBuffered(List<byte[]> chunks, ref int offset, int max)
+    {
+        var taken = new List<byte>(Math.Min(max, 8192));
+        while (taken.Count < max && chunks.Count > 0)
+        {
+            var head = chunks[0];
+            var want = Math.Min(head.Length - offset, max - taken.Count);
+            for (var i = 0; i < want; i++) taken.Add(head[offset + i]);
+            offset += want;
+            if (offset == head.Length)
+            {
+                chunks.RemoveAt(0);
+                offset = 0;
+            }
+        }
+        return [.. taken];
+    }
+
+    private static void RegisterProcess(NativeRegistry registry)
+    {
+        var i64 = TypeTag.I64;
+
+        registry.RegisterWithArrayParams("std.process.procStart",
+            [TypeTag.String, TypeTag.Array], [null, TypeTag.String], i64, args =>
+        {
+            var program = args[0].AsString;
+            var arguments = (LyrValue[])args[1].AsObject;
+
+            var info = new System.Diagnostics.ProcessStartInfo(program)
+            {
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            foreach (var argument in arguments) info.ArgumentList.Add(argument.AsString);
+
+            var process = new System.Diagnostics.Process
+            {
+                StartInfo = info,
+                EnableRaisingEvents = true,
+            };
+
+            System.Net.Sockets.Socket notify;
+            try
+            {
+                if (!process.Start())
+                {
+                    RecordProc(0, "the process did not start");
+                    return LyrValue.FromI64(-1);
+                }
+            }
+            catch (System.ComponentModel.Win32Exception e)
+            {
+                // Windows 2/3 = file/path not found and 5 = access denied; on Unix the code
+                // is errno, 2 ENOENT and 13 EACCES.
+                RecordProc(e.NativeErrorCode switch
+                {
+                    2 or 3 => 1,
+                    5 or 13 => 2,
+                    _ => 0,
+                }, e.Message);
+                return LyrValue.FromI64(-1);
+            }
+            catch (Exception e)
+            {
+                RecordProc(0, e.Message);
+                return LyrValue.FromI64(-1);
+            }
+
+            notify = new System.Net.Sockets.Socket(
+                System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Dgram,
+                System.Net.Sockets.ProtocolType.Udp);
+            notify.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+            notify.Connect(notify.LocalEndPoint!);
+            notify.Blocking = false;
+
+            var state = new ChildState
+            {
+                Process = process,
+                Notify = notify,
+                NotifyFd = AddSocket(notify),
+            };
+            var key = ++_nextChildKey;
+            Children[key] = state;
+
+            StartPump(state, process.StandardOutput.BaseStream, stderr: false);
+            StartPump(state, process.StandardError.BaseStream, stderr: true);
+            StartStdinWriter(state, process.StandardInput.BaseStream);
+            process.Exited += (_, _) => Poke(state);
+
+            return LyrValue.FromI64(key);
+        });
+
+        registry.Register("std.process.procNotifyFd", [i64], i64, args =>
+            LyrValue.FromI64(ChildOf(args[0].AsI64)?.NotifyFd ?? -1));
+
+        registry.RegisterOptionalArrayReturning("std.process.procTryRead",
+            [i64, TypeTag.Bool, i64], TypeTag.U8, args =>
+        {
+            if (ChildOf(args[0].AsI64) is not { } state)
+            {
+                RecordProc(0, "no such child");
+                return LyrValue.None;
+            }
+            var stderr = args[1].AsBool;
+            var max = (int)Math.Clamp(args[2].AsI64, 1, 1 << 20);
+
+            DrainPipe(state.Notify);
+            lock (state.Gate)
+            {
+                var chunks = stderr ? state.ErrChunks : state.OutChunks;
+                if (chunks.Count > 0)
+                    return Bytes(stderr
+                        ? TakeBuffered(chunks, ref state.ErrOffset, max)
+                        : TakeBuffered(chunks, ref state.OutOffset, max));
+                if (stderr ? state.ErrFail : state.OutFail)
+                {
+                    RecordProc(0, "the stream broke");
+                    return LyrValue.None;
+                }
+                if (stderr ? state.ErrEof : state.OutEof) return Bytes([]);
+                RecordProc(6, "nothing buffered yet");
+                return LyrValue.None;
+            }
+        });
+
+        registry.RegisterWithArrayParams("std.process.procWrite",
+            [i64, TypeTag.Array], [null, TypeTag.U8], TypeTag.Bool, args =>
+        {
+            if (ChildOf(args[0].AsI64) is not { } state || state.StdinBroken
+                || state.StdinQueue.IsAddingCompleted)
+            {
+                RecordProc(0, "stdin is not writable");
+                return LyrValue.FromBool(false);
+            }
+            state.StdinQueue.Add(ToBytes(args[1]));
+            return LyrValue.FromBool(true);
+        });
+
+        registry.Register("std.process.procCloseStdin", [i64], TypeTag.Void, args =>
+        {
+            if (ChildOf(args[0].AsI64) is { } state && !state.StdinQueue.IsAddingCompleted)
+                state.StdinQueue.CompleteAdding();
+            return default;
+        });
+
+        registry.Register("std.process.procHasExited", [i64], TypeTag.Bool, args =>
+        {
+            if (ChildOf(args[0].AsI64) is not { } state) return LyrValue.FromBool(true);
+            DrainPipe(state.Notify);
+            try
+            {
+                return LyrValue.FromBool(state.Process.HasExited);
+            }
+            catch (InvalidOperationException)
+            {
+                return LyrValue.FromBool(true);
+            }
+        });
+
+        registry.Register("std.process.procExitCode", [i64], i64, args =>
+        {
+            if (ChildOf(args[0].AsI64) is not { } state) return LyrValue.FromI64(-1);
+            try
+            {
+                return LyrValue.FromI64(state.Process.ExitCode);
+            }
+            catch (InvalidOperationException)
+            {
+                return LyrValue.FromI64(-1);
+            }
+        });
+
+        registry.Register("std.process.procKill", [i64], TypeTag.Void, args =>
+        {
+            if (ChildOf(args[0].AsI64) is { } state)
+                try { state.Process.Kill(entireProcessTree: true); }
+                catch (Exception) { /* already gone is exactly the goal */ }
+            return default;
+        });
+
+        registry.Register("std.process.procClose", [i64], TypeTag.Void, args =>
+        {
+            var key = args[0].AsI64;
+            if (ChildOf(key) is not { } state || state.Closed) return default;
+            state.Closed = true;
+            if (!state.StdinQueue.IsAddingCompleted) state.StdinQueue.CompleteAdding();
+            try { state.Notify.Close(); } catch (Exception) { /* twice closes once */ }
+            Sockets.Remove(state.NotifyFd);
+            try { state.Process.Dispose(); } catch (Exception) { /* disowned, not stopped */ }
+            Children.Remove(key);
+            return default;
+        });
+
+        registry.Register("std.process.lastErrorKind", [], i64,
+            _ => LyrValue.FromI64(_lastProcKind));
+        registry.Register("std.process.lastErrorDetail", [], TypeTag.String,
+            _ => LyrValue.FromString(_lastProcDetail ?? ""));
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>

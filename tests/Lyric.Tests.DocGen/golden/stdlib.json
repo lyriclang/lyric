@@ -4932,6 +4932,155 @@
       ]
     },
     {
+      "Path": "std.process",
+      "Doc": "Child processes for tasks: `start` a program, `write` to its stdin, `readSomeOut`/\n`readSomeErr` its streams, `wait` for its exit code — every waiting form yielding to the\nscheduler instead of blocking the thread.\n\nThe silent forms answer *whether* (`null`/`false`); the `OrThrow` twins say *why* with an\n`IoError` — `NotFound` when the program does not exist, `PermissionDenied` when it may not\nbe run. The streams speak `readSome`'s three truths: bytes are bytes, an EMPTY array is\nthe stream being done (EOF), and `null` is a failure.\n\nCarries `processAccess`, its own capability bit: starting programs is a new power, not an\n`osAccess` refinement.",
+      "Items": [
+        {
+          "Kind": "Alias",
+          "Name": "Child",
+          "Signature": "pub type Child = int",
+          "Doc": "A started child process. Opaque: it is issued here, never assembled.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 36
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "start",
+          "Signature": "pub fn start(program: string, args: string[]): ?Child",
+          "Doc": "Starts `program` with `args`, streams piped. `null` when it cannot start —\n`startOrThrow` says why, `NotFound` being the usual answer.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 66
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "startOrThrow",
+          "Signature": "pub fn startOrThrow(program: string, args: string[]): Child throws IoError",
+          "Doc": "`start`, with the reason when the program cannot start.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 75
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeOut",
+          "Signature": "pub fn readSomeOut(child: Child, max: int): ?uint8[]",
+          "Doc": "Waits for bytes on the child's standard output and reads up to `max` of them. Three\ntruths in one answer: bytes are bytes, an EMPTY array is the stream being done (EOF),\nand `null` is a failure — `readSomeOutOrThrow` says which.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 86
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeOutOrThrow",
+          "Signature": "pub fn readSomeOutOrThrow(child: Child, max: int): uint8[] throws IoError",
+          "Doc": "`readSomeOut`, with the reason when the stream broke. EOF stays the empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 91
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeErr",
+          "Signature": "pub fn readSomeErr(child: Child, max: int): ?uint8[]",
+          "Doc": "`readSomeOut`, for the child's standard error.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 100
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeErrOrThrow",
+          "Signature": "pub fn readSomeErrOrThrow(child: Child, max: int): uint8[] throws IoError",
+          "Doc": "`readSomeErr`, with the reason when the stream broke.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 105
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "write",
+          "Signature": "pub fn write(child: Child, bytes: uint8[]): bool",
+          "Doc": "Hands `bytes` to the child's standard input. The write is queued and drained in the\nbackground; `false` once the child's stdin broke — a child that exited without reading\neverything is the usual way.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 129
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "writeOrThrow",
+          "Signature": "pub fn writeOrThrow(child: Child, bytes: uint8[]): void throws IoError",
+          "Doc": "`write`, with the reason when the child's stdin broke.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 134
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "closeStdin",
+          "Signature": "pub fn closeStdin(child: Child): void",
+          "Doc": "Closes the child's standard input once everything queued is written — EOF is how a\nfilter learns it has everything.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 142
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "wait",
+          "Signature": "pub fn wait(child: Child): int",
+          "Doc": "Waits until the child has exited and answers its exit code.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 147
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "kill",
+          "Signature": "pub fn kill(child: Child): void",
+          "Doc": "Ends the child now, without appeal. The exit code `wait` then reports is the kill's,\nnot the program's.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 156
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "close",
+          "Signature": "pub fn close(child: Child): void",
+          "Doc": "Releases the child's resources — buffers, pipes, the notify descriptor. Closing twice\ncloses once; a running child is NOT stopped, only disowned.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/process.lyr",
+            "Line": 162
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.random",
       "Doc": null,
       "Items": [
