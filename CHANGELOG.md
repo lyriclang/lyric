@@ -36,8 +36,10 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
 
 - **`std.task`** — cooperative tasks over coroutine chains, the scheduler written in Lyric.
   A task is a `Coroutine<Wait>`; `Wait` says what it waits for (`Now`, `Sleep(ms)`,
-  `Readable(fd)`/`Writable(fd)` for `std.io.net`'s descriptors once they exist, `Interrupt`
-  parked until interrupt handling lands). `spawn` enqueues, `run()` drives everything to its
+  `Readable(fd)`/`Writable(fd)` for `std.io.net`'s descriptors, `Interrupt` for Ctrl+C or the
+  programmatic `interrupt()` — while a task is parked there, the signal wakes the scheduler
+  instead of killing the process, one interrupt wakes every parked task, and a run left with
+  only Interrupt tasks waits for it quietly). `spawn` enqueues, `run()` drives everything to its
   end — round-robin when ready, blocking in the module's ONE native (`poll`, time and
   readiness in one answer) when not. Sleepers wake in deadline order even when one poll
   covers several overdue deadlines; ties wake in spawn order. The waiting composes through

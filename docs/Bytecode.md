@@ -211,8 +211,12 @@ A `uleb128` bitset stating what the module requires.
 | 1 | `0x2` | `networkAccess` | `std.io.net` |
 | 2 | `0x4` | `osAccess` | `std.os` |
 | 3 | `0x8` | `hostAccess` | reserved |
+| 4 | `0x10` | `processAccess` | `std.process` *(4.0)* |
 
 `0` means the module requires nothing. Submodules inherit: `std.os.env` requires `osAccess`.
+Bits are only ever ADDED: a value never changes meaning, so a reader older than a bit rejects
+the module that carries it as requiring more than the reader can grant — which is the correct
+answer.
 
 Enforcement happens at load time. A module that requires more than the runtime grants is rejected
 (`LYR-CAP0001`) before any instruction runs.

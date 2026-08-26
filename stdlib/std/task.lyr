@@ -26,20 +26,46 @@ pub enum Wait {
     Readable(int),
     /// Wake me when this descriptor can take bytes.
     Writable(int),
-    /// Wake me on an interrupt. Until interrupt handling lands, nothing can wake such a task,
-    /// and a `run` left with only these panics rather than sleeping forever.
+    /// Wake me on an interrupt: Ctrl+C in a standalone program, or `interrupt()` from inside.
+    /// The clean-shutdown seat — a server parks a task here, and the wake is its signal to
+    /// close listeners and let `run` drain. Every parked task wakes on one interrupt.
     Interrupt,
 }
 
-// The one native. `poll([], [], 0)` answers the clock without waiting — which is how `now`
-// stays inside the single-native budget — and a negative timeout means "no deadline": wait
-// for a descriptor alone. The answer is `[now, readyFd...]`, the clock monotonic and in
-// milliseconds; whose epoch it is means nothing, only differences do.
-fn poll(read: int[], write: int[], timeoutMillis: int): int[];
+// The one native. `poll([], [], 0, ...)` answers the clock without waiting — which is how the
+// clock stays inside the single-native budget — and a negative timeout means "no deadline":
+// wait for a descriptor or an interrupt alone. `wantInterrupt` says whether a task is parked
+// on `Wait.Interrupt`; while it is true, Ctrl+C is taken by the scheduler instead of killing
+// the process. The answer is `[now, readyFd...]`, the clock monotonic and in milliseconds
+// (whose epoch it is means nothing, only differences do); an interrupt reports as the
+// impossible descriptor `-1`.
+fn poll(read: int[], write: int[], timeoutMillis: int, wantInterrupt: bool): int[];
+
+/// Wakes every task parked on `Wait.Interrupt`, exactly as Ctrl+C does — a server telling
+/// itself to shut down: a task that decides "we are done" interrupts, the parked shutdown
+/// task closes the listeners, and `run` drains. With nobody parked the interrupt is
+/// REMEMBERED and taken by the next task to park — a signal, not a broadcast into the void.
+pub fn interrupt(): void;
+
+// Every poll goes through here: the answer may carry `-1` — an interrupt — whatever the poll
+// was asked for, a plain clock reading included; deciding it centrally means no call site can
+// drop one. The listening flag is recomputed per call, so Ctrl+C kills the process again the
+// moment nobody is parked on Interrupt.
+fn ask(read: int[], write: int[], timeoutMillis: int): int[] {
+    let answer = poll(read, write, timeoutMillis, scheduler.interrupted.length() > 0);
+    var a = 1;
+    while (a < answer.length) {
+        if (answer[a] == 0 - 1) {
+            wakeInterrupted();
+        }
+        a = a + 1;
+    }
+    return answer;
+}
 
 fn now(): int {
     let empty: int[] = [0] * 0;
-    return poll(empty, empty, 0)[0];
+    return ask(empty, empty, 0)[0];
 }
 
 // One scheduler per program. A class rather than loose globals because its fields change;
@@ -86,9 +112,10 @@ pub fn pending(): int {
 /// Drives every task to its end and returns when none is left.
 ///
 /// Ready tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in
-/// `poll` until the nearest deadline passes or a descriptor readies — the thread sleeps, it
-/// does not spin. `run` panics if only `Wait.Interrupt` tasks remain, because nothing can wake
-/// them yet; sleeping forever would be the same hang with less honesty.
+/// `poll` until the nearest deadline passes, a descriptor readies, or — with a task parked on
+/// `Wait.Interrupt` — Ctrl+C arrives; the thread sleeps, it does not spin. A run holding ONLY
+/// Interrupt tasks therefore waits, quietly and indefinitely, for the interrupt that is its
+/// whole purpose.
 pub fn run(): void {
     while (true) {
         var turn = scheduler.ready.length();
@@ -101,6 +128,10 @@ pub fn run(): void {
             continue;
         }
         if (pending() == 0) {
+            // One last clock reading, for its side: `ask` recomputes the listening flag, and
+            // with nothing parked any more it is FALSE — Ctrl+C kills the process again the
+            // moment `run` returns, instead of being swallowed by a scheduler that is done.
+            now();
             return;
         }
         block();
@@ -132,18 +163,12 @@ fn step(task: Coroutine<Wait>): void {
     }
 }
 
-// Blocks until something can run: the nearest deadline, or a ready descriptor. Wakes
-// everything the answer covers — deadlines that have passed, descriptors the poll names.
+// Blocks until something can run: the nearest deadline, a ready descriptor, or an interrupt.
+// Wakes everything the answer covers — deadlines that have passed, descriptors the poll
+// names, and every Interrupt-parked task when the answer says `-1` (that wake happens in
+// `ask`). A run left with ONLY Interrupt tasks blocks with no deadline and no descriptor:
+// waiting for Ctrl+C is what such a task is for.
 fn block(): void {
-    if (scheduler.sleepers.length() == 0
-        && scheduler.readers.length() == 0
-        && scheduler.writers.length() == 0) {
-        panic(
-            "std.task: only Wait.Interrupt tasks remain, and interrupt handling has not "
-                + "landed — nothing could ever wake them"
-        );
-    }
-
     var timeout = -1;
     if (scheduler.deadlines.length() > 0) {
         let current = now();
@@ -154,11 +179,21 @@ fn block(): void {
         }
     }
 
-    let answer = poll(scheduler.readerFds.toArray(), scheduler.writerFds.toArray(), timeout);
+    let answer = ask(scheduler.readerFds.toArray(), scheduler.writerFds.toArray(), timeout);
     let clock = answer[0];
 
     wakeSleepers(clock);
     wakeReady(answer);
+}
+
+// An interrupt wakes EVERY parked task, in park order: one Ctrl+C is one event, and every
+// listener deserves to hear it — a half-woken set would mean the second Ctrl+C kills the
+// process while a shutdown task still believes it is covered.
+fn wakeInterrupted(): void {
+    while (scheduler.interrupted.length() > 0) {
+        scheduler.ready.pushBack(scheduler.interrupted.get(0));
+        scheduler.interrupted.removeAt(0);
+    }
 }
 
 fn nearestDeadline(): int {

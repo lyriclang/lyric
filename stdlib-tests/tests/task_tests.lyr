@@ -1,5 +1,5 @@
 import std.test { Test, assertEq, assertTrue };
-import std.task { Wait, spawn, run, pending };
+import std.task { Wait, spawn, run, pending, interrupt };
 import std.collections { List };
 
 // The log the tasks write into; each test drains it. A module-level class instance is the
@@ -139,4 +139,55 @@ pub fn run_returns_immediately_with_nothing_spawned(): void {
     run();
     assertEq(pending(), 0);
     assertTrue(drainLog().length == 0, "nothing ran");
+}
+
+// The shutdown shape: a task parks on Wait.Interrupt and only logs once woken.
+fn onInterrupt(id: int): Coroutine<Wait> {
+    yield Wait.Interrupt;
+    log.entries.push(id);
+}
+
+fn quitter(): Coroutine<Wait> {
+    yield Wait.Sleep(5);
+    log.entries.push(1);
+    interrupt();
+}
+
+@Test
+pub fn an_interrupt_wakes_the_parked_task(): void {
+    spawn(onInterrupt(100));
+    spawn(quitter());
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 2);
+    assertEq(seen[0], 1);
+    assertEq(seen[1], 100);
+}
+
+@Test
+pub fn one_interrupt_wakes_every_parked_task_in_park_order(): void {
+    spawn(onInterrupt(100));
+    spawn(onInterrupt(200));
+    spawn(quitter());
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 3);
+    assertEq(seen[0], 1);
+    assertEq(seen[1], 100);
+    assertEq(seen[2], 200);
+}
+
+@Test
+pub fn an_early_interrupt_is_remembered_for_the_next_to_park(): void {
+    // Raised before anything is parked: a signal, not a broadcast — it waits for a taker,
+    // and run() does not hang on the Interrupt-only rest.
+    interrupt();
+    spawn(onInterrupt(100));
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 1);
+    assertEq(seen[0], 100);
 }

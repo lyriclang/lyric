@@ -5488,11 +5488,11 @@
               "Kind": "Variant",
               "Name": "Interrupt",
               "Signature": "Interrupt",
-              "Doc": "Wake me on an interrupt. Until interrupt handling lands, nothing can wake such a task,\nand a `run` left with only these panics rather than sleeping forever.",
+              "Doc": "Wake me on an interrupt: Ctrl+C in a standalone program, or `interrupt()` from inside.\nThe clean-shutdown seat — a server parks a task here, and the wake is its signal to\nclose listeners and let `run` drain. Every parked task wakes on one interrupt.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/task.lyr",
-                "Line": 31
+                "Line": 32
               }
             }
           ],
@@ -5503,13 +5503,24 @@
         },
         {
           "Kind": "Function",
+          "Name": "interrupt",
+          "Signature": "pub fn interrupt(): void",
+          "Doc": "Wakes every task parked on `Wait.Interrupt`, exactly as Ctrl+C does — a server telling\nitself to shut down: a task that decides \"we are done\" interrupts, the parked shutdown\ntask closes the listeners, and `run` drains. With nobody parked the interrupt is\nREMEMBERED and taken by the next task to park — a signal, not a broadcast into the void.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/task.lyr",
+            "Line": 48
+          }
+        },
+        {
+          "Kind": "Function",
           "Name": "spawn",
           "Signature": "pub fn spawn(task: Coroutine<Wait>): void",
           "Doc": "Adds a task to the back of the run queue. Nothing runs before `run` does; spawning from\ninside a running task is ordinary and the new task gets its turn in the same round.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 72
+            "Line": 98
           }
         },
         {
@@ -5520,18 +5531,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 78
+            "Line": 104
           }
         },
         {
           "Kind": "Function",
           "Name": "run",
           "Signature": "pub fn run(): void",
-          "Doc": "Drives every task to its end and returns when none is left.\n\nReady tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in\n`poll` until the nearest deadline passes or a descriptor readies — the thread sleeps, it\ndoes not spin. `run` panics if only `Wait.Interrupt` tasks remain, because nothing can wake\nthem yet; sleeping forever would be the same hang with less honesty.",
+          "Doc": "Drives every task to its end and returns when none is left.\n\nReady tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in\n`poll` until the nearest deadline passes, a descriptor readies, or — with a task parked on\n`Wait.Interrupt` — Ctrl+C arrives; the thread sleeps, it does not spin. A run holding ONLY\nInterrupt tasks therefore waits, quietly and indefinitely, for the interrupt that is its\nwhole purpose.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 92
+            "Line": 119
           }
         }
       ]

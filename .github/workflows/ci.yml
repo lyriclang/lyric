@@ -29,9 +29,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Every job is capped well above its normal running time (about 5 minutes). The default cap
+  # is SIX HOURS, and a single hanging test once spent all of them twice over — a hang should
+  # be a red job with a log, not a burned evening.
   build-and-test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +74,7 @@ jobs:
     # here, so the tests that pin THOSE keep pinning them.
     name: Build and test (compiled)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -92,6 +97,7 @@ jobs:
     # job is what makes the mirror model honest — drift fails the build instead of shipping.
     name: Spec mirror sync
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -125,6 +131,7 @@ jobs:
     # '//! since:' cases apply — the tree claims what it is.
     name: Conformance gate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -156,6 +163,7 @@ jobs:
     # is an artifact nobody should install.
     needs: [build-and-test, compiled]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
