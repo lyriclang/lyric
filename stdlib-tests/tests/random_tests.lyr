@@ -1,5 +1,5 @@
 import std.test { Test, assertEq, assertTrue };
-import std.random { Random, shuffle, choice };
+import std.random { Random, secureRandom, shuffle, choice };
 import std.collections { List };
 import std.math { absInt, isFinite };
 
@@ -88,4 +88,29 @@ pub fn gaussian_draws_are_finite_and_reproducible(): void {
     let x = a.nextGaussian();
     assertTrue(isFinite(x), "a gaussian draw is a finite number");
     assertEq(if (x == b.nextGaussian()) 1 else 0, 1);
+}
+
+@Test
+pub fn secure_random_answers_the_asked_count_and_never_repeats(): void {
+    let a = secureRandom(32);
+    let b = secureRandom(32);
+    assertEq(a.length, 32);
+    assertEq(b.length, 32);
+
+    // Two equal 32-byte draws from a cryptographic source is a 2^-256 event: if this ever
+    // fails, the source is broken, not the test.
+    var same = true;
+    var i = 0;
+    while (i < 32) {
+        if (a[i] != b[i]) {
+            same = false;
+        }
+        i = i + 1;
+    }
+    assertTrue(!same, "two independent draws must differ");
+}
+
+@Test
+pub fn secure_random_of_zero_is_the_empty_array(): void {
+    assertEq(secureRandom(0).length, 0);
 }

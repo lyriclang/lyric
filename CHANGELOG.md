@@ -67,6 +67,11 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   notify descriptor — the host pumps the streams and posts a datagram per event, so a child is
   just another thing `poll` watches.
 
+- **`std.random.secureRandom`** — `count` bytes from the operating system's cryptographic
+  source, the ONE non-deterministic draw in an otherwise reproducible module, and marked as
+  such. Capability-free: entropy reaches no file, clock or network, so an embedded guest
+  that can draw good dice costs a host nothing. `Random` stays seeded-by-the-caller.
+
 - **`std.bytes`** — slicing and searching over `uint8[]`, the tooling wire protocols stand
   on: `slice` with `string.substring`'s exact edge behavior, `indexOf`/`indexOfFrom`
   answering `-1` like their string namesakes. Deliberately absent: `concat` (`a + b` already

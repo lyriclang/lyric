@@ -210,8 +210,19 @@ were the stdlib's FIRST overloads, which is why nothing had ever hit it. Finding
 DocGen's item anchors collided for overloads (name AND kind equal) — repeats now take an
 ordinal (`#fn-close`, `#fn-close-2`). Three lyrtest cases (datagram round trip answering to
 the packet's sender, the empty-packet pin, AddressInUse through the twin); 134 lyrtest, doc
-floor 524. Next: **basket item 12, `secureRandom`** (host entropy, capability-free;
-`std.random` stays deterministic).
+floor 524.
+
+**Basket item 12, `secureRandom`, is DONE** — the smallest item, delivered as exactly that:
+`pub fn secureRandom(count: int): uint8[]` in `std.random`, `count` bytes from the OS's
+cryptographic source, the ONE non-deterministic draw in an otherwise reproducible module and
+marked as such in its doc (the `Random` doc already said "keys need a source from the
+operating system" — now the sentence ends with its name). Capability-free by design: entropy
+reaches no file, clock or network, so an embedded guest that can draw good dice costs a host
+nothing. Negative count panics like a bad slice bound; zero answers the empty array. Two
+lyrtest cases (asked count + two 32-byte draws differing — a 2^-256 event if not, in which
+case the SOURCE is broken; zero is empty). 136 lyrtest, doc floor 525. Next: **basket item
+13, `std.io.path`** (the path helpers move out of `io.file` — the major window pays the
+move), the LAST basket item before the 4.0 release round.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

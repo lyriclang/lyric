@@ -5229,10 +5229,21 @@
       "Doc": null,
       "Items": [
         {
+          "Kind": "Function",
+          "Name": "secureRandom",
+          "Signature": "pub fn secureRandom(count: int): uint8[]",
+          "Doc": "`count` bytes from the operating system's cryptographic source — the ONE thing in this\nmodule that is not deterministic, and deliberately so marked: keys, tokens and session ids\nneed entropy no seed can replay, which is exactly what makes it useless for a simulation\nthat wants to be reproduced. A negative `count` panics; zero answers the empty array.\n\nCapability-free like the rest of the module: the source reaches no file, no clock and no\nnetwork — an embedded host loses nothing by a guest that can draw good dice.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/random.lyr",
+            "Line": 25
+          }
+        },
+        {
           "Kind": "Class",
           "Name": "Random",
           "Signature": "pub class Random",
-          "Doc": "A deterministic pseudo-random generator (xorshift64*): one `int` of state, seeded by the\ncaller. Not cryptographic — keys need a source from the operating system.",
+          "Doc": "A deterministic pseudo-random generator (xorshift64*): one `int` of state, seeded by the\ncaller. Not cryptographic — keys need a source from the operating system, which is what\n`secureRandom` is.",
           "Members": [
             {
               "Kind": "Field",
@@ -5242,7 +5253,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 30
+                "Line": 40
               }
             },
             {
@@ -5253,7 +5264,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 35
+                "Line": 45
               }
             },
             {
@@ -5264,7 +5275,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 40
+                "Line": 50
               }
             },
             {
@@ -5275,7 +5286,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 47
+                "Line": 57
               }
             },
             {
@@ -5286,7 +5297,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 56
+                "Line": 66
               }
             },
             {
@@ -5297,7 +5308,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 63
+                "Line": 73
               }
             },
             {
@@ -5308,13 +5319,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 68
+                "Line": 78
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/random.lyr",
-            "Line": 28
+            "Line": 38
           }
         },
         {
@@ -5325,7 +5336,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/random.lyr",
-            "Line": 83
+            "Line": 93
           }
         },
         {
@@ -5336,7 +5347,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/random.lyr",
-            "Line": 93
+            "Line": 103
           }
         }
       ]
