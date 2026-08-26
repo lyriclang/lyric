@@ -1,0 +1,114 @@
+import std.test { Test, assertEq, assertTrue };
+import std.task { Wait, spawn, run, pending };
+import std.collections { List };
+
+// The log the tasks write into; each test drains it. A module-level class instance is the
+// pattern the scheduler itself uses for its state.
+class Log {
+    entries: List<int>,
+}
+
+let log = Log { entries = List<int>.empty() };
+
+fn drainLog(): int[] {
+    let taken = log.entries.toArray();
+    log.entries.clear();
+    return taken;
+}
+
+fn noting(id: int, times: int): Coroutine<Wait> {
+    var i = 0;
+    while (i < times) {
+        log.entries.push(id * 10 + i);
+        yield Wait.Now;
+        i = i + 1;
+    }
+}
+
+@Test
+pub fn two_tasks_interleave_round_robin(): void {
+    spawn(noting(1, 2));
+    spawn(noting(2, 2));
+    run();
+    assertEq(pending(), 0);
+
+    let seen = drainLog();
+    assertEq(seen.length, 4);
+    assertEq(seen[0], 10);
+    assertEq(seen[1], 20);
+    assertEq(seen[2], 11);
+    assertEq(seen[3], 21);
+}
+
+// The §10a showcase: the WAIT is yielded by a helper the task calls — no marker anywhere in a
+// signature, which is what door C bought.
+fn breathe(): void {
+    yield Wait.Now;
+}
+
+fn viaHelper(id: int): Coroutine<Wait> {
+    log.entries.push(id);
+    breathe();
+    log.entries.push(id + 100);
+}
+
+@Test
+pub fn a_helper_can_wait_for_its_caller(): void {
+    spawn(viaHelper(1));
+    spawn(viaHelper(2));
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 4);
+    assertEq(seen[0], 1);
+    assertEq(seen[1], 2);
+    assertEq(seen[2], 101);
+    assertEq(seen[3], 102);
+}
+
+fn sleeper(id: int, ms: int): Coroutine<Wait> {
+    yield Wait.Sleep(ms);
+    log.entries.push(id);
+}
+
+@Test
+pub fn sleeps_wake_in_deadline_order(): void {
+    spawn(sleeper(1, 40));
+    spawn(sleeper(2, 5));
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 2);
+    assertEq(seen[0], 2);
+    assertEq(seen[1], 1);
+}
+
+fn parent(): Coroutine<Wait> {
+    log.entries.push(1);
+    spawn(child());
+    yield Wait.Now;
+    log.entries.push(3);
+}
+
+fn child(): Coroutine<Wait> {
+    log.entries.push(2);
+}
+
+@Test
+pub fn a_task_may_spawn_a_task(): void {
+    spawn(parent());
+    run();
+
+    let seen = drainLog();
+    assertEq(seen.length, 3);
+    assertEq(seen[0], 1);
+    assertEq(seen[1], 2);
+    assertEq(seen[2], 3);
+}
+
+@Test
+pub fn run_returns_immediately_with_nothing_spawned(): void {
+    run();
+    assertEq(pending(), 0);
+    assertTrue(drainLog().length == 0, "nothing ran");
+}

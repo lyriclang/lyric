@@ -5199,6 +5199,112 @@
       ]
     },
     {
+      "Path": "std.task",
+      "Doc": "Cooperative tasks: `spawn` a `Coroutine<Wait>`, then `run()` drives every task to its end.\n\nA task settles its own errors — `spawn` takes the non-throwing coroutine type, because the\nscheduler has nobody to hand an exception to. A panic anywhere ends the program, as panics\ndo.",
+      "Items": [
+        {
+          "Kind": "Enum",
+          "Name": "Wait",
+          "Signature": "pub enum Wait",
+          "Doc": "What a yielded value asks the scheduler for.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "Now",
+              "Signature": "Now",
+              "Doc": "Run me again once everyone before me had a turn — the cooperative \"make room\".",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/task.lyr",
+                "Line": 20
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Sleep",
+              "Signature": "Sleep(int)",
+              "Doc": "Wake me after this many milliseconds.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/task.lyr",
+                "Line": 22
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Readable",
+              "Signature": "Readable(int)",
+              "Doc": "Wake me when this descriptor has bytes to read. Descriptors come from `std.io.net`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/task.lyr",
+                "Line": 24
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Writable",
+              "Signature": "Writable(int)",
+              "Doc": "Wake me when this descriptor can take bytes.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/task.lyr",
+                "Line": 26
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Interrupt",
+              "Signature": "Interrupt",
+              "Doc": "Wake me on an interrupt. Until interrupt handling lands, nothing can wake such a task,\nand a `run` left with only these panics rather than sleeping forever.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/task.lyr",
+                "Line": 29
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/task.lyr",
+            "Line": 18
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "spawn",
+          "Signature": "pub fn spawn(task: Coroutine<Wait>): void",
+          "Doc": "Adds a task to the back of the run queue. Nothing runs before `run` does; spawning from\ninside a running task is ordinary and the new task gets its turn in the same round.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/task.lyr",
+            "Line": 70
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "pending",
+          "Signature": "pub fn pending(): int",
+          "Doc": "How many tasks the scheduler holds, whatever they are waiting for. Zero after `run`\nreturns; useful to a host deciding whether another `run` is worth calling.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/task.lyr",
+            "Line": 76
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "run",
+          "Signature": "pub fn run(): void",
+          "Doc": "Drives every task to its end and returns when none is left.\n\nReady tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in\n`poll` until the nearest deadline passes or a descriptor readies — the thread sleeps, it\ndoes not spin. `run` panics if only `Wait.Interrupt` tasks remain, because nothing can wake\nthem yet; sleeping forever would be the same hang with less honesty.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/task.lyr",
+            "Line": 90
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.test",
       "Doc": "Marking tests, and the assertions that fail them. `lyric test` runs every function marked\n`@Test` in the project's test root; a test fails by panicking, which is what the assertions\nhere do.",
       "Items": [
