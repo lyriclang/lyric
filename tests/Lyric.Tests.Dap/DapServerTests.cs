@@ -121,6 +121,42 @@ public class DapServerTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stop_inside_a_chain_shows_the_logical_stack()
+    {
+        // The lyric#121 debugger answer, pinned: paused beneath a resume — since 4.0 a helper
+        // may stand there — the stack is the chain's frames spliced onto the resumer's, one
+        // stack in the order a reader thinks in. The chain boundary is not a DAP artifact.
+        await using var client = Client();
+        await LaunchAsync(client, """
+            import std.io.console { println };
+
+            fn helper(): void {
+                println("deep");
+                yield 1;
+            }
+
+            fn gen(): Coroutine<int> {
+                helper();
+            }
+
+            fn main(): int {
+                let co = gen();
+                return resume co;
+            }
+            """, breakpointLines: [4]); // println("deep");
+
+        var stopped = client.TakeEvent("stopped").Body!.Value;
+        Assert.Equal("breakpoint", stopped.GetProperty("reason").GetString());
+
+        var stack = (await client.RequestAsync("stackTrace", new { threadId = 1 })).Body!.Value;
+        var frames = stack.GetProperty("stackFrames").EnumerateArray()
+            .Select(f => f.GetProperty("name").GetString()).ToList();
+        Assert.Equal(["main.helper", "main.gen.<body>", "main.main"], frames);
+
+        await client.RequestAsync("continue", new { threadId = 1 });
+    }
+
+    [Fact]
     public async Task Scopes_variables_and_expansion_carry_the_debug_names()
     {
         await using var client = Client();

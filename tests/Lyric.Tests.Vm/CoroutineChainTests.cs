@@ -197,6 +197,68 @@ public class CoroutineChainTests
     }
 
     [Fact]
+    public void A_panic_at_depth_carries_the_whole_chain_in_its_backtrace()
+    {
+        // The logical stack IS the physical stack while a chain runs (lyric#121's debugger
+        // answer): the faulting helper, the body beneath the resume, the puller — one stack,
+        // the order a reader thinks in. The helper is padded past the inline budget on
+        // purpose, the ExecutionBudgetTests trick: a spliced callee vanishes from every
+        // backtrace, chains included, and would prove nothing here.
+        var panic = Panics("""
+            fn boom(): int {
+                var n = 0;
+                n = n + 0;
+                n = n + 1;
+                n = n + 2;
+                n = n + 3;
+                n = n + 4;
+                n = n + 5;
+                n = n + 6;
+                n = n + 7;
+                n = n + 8;
+                n = n + 9;
+                n = n + 10;
+                n = n + 11;
+                n = n + 12;
+                n = n + 13;
+                n = n + 14;
+                n = n + 15;
+                n = n + 16;
+                n = n + 17;
+                n = n + 18;
+                n = n + 19;
+                n = n + 20;
+                n = n + 21;
+                n = n + 22;
+                n = n + 23;
+                n = n + 24;
+                n = n + 25;
+                n = n + 26;
+                n = n + 27;
+                n = n + 28;
+                n = n + 29;
+                let x: ?int = null;
+                return x! + n;
+            }
+
+            fn gen(): Coroutine<int> {
+                yield boom();
+            }
+
+            fn main(): int {
+                let co = gen();
+                return resume co;
+            }
+            """);
+
+        var stack = panic.CallStack;
+        Assert.Contains("boom", stack[0]);
+        var body = stack.ToList().FindIndex(f => f.Contains("gen"));
+        Assert.True(body > 0, string.Join(" | ", stack));
+        Assert.Contains("main.main", stack[body + 1]);
+    }
+
+    [Fact]
     public void A_long_generator_survives_many_suspensions()
     {
         // The capture array is reused across suspensions; a hundred round trips would surface

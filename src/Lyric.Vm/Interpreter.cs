@@ -127,8 +127,10 @@ internal readonly struct BudgetPolicy(ExecutionBudget budget) : IExecutionPolicy
 ///
 /// <para>Frames are pooled per function: a call rents, a return or a handled unwind recycles.
 /// Before the pool, the three allocations behind a frame were half of all bytes a call-heavy
-/// program allocated. The pool is not thread-safe, which is the VM's own contract: one thread,
-/// coroutines are state machines and hold no frame across a yield.</para>
+/// program allocated. The pool is not thread-safe, which is the VM's own contract: one thread.
+/// A frame captured into a suspended chain (4.0) leaves the pool's sight until the chain runs
+/// again — or forever, when the chain is dropped: lost entries, never corrupt ones, the same
+/// bargain a panic strikes.</para>
 /// </summary>
 public static class Interpreter
 {

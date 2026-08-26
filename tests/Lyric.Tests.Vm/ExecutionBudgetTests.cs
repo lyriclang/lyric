@@ -346,4 +346,39 @@ public class ExecutionBudgetTests
 
         Assert.Equal(4999950000, program.Invoke(program.IndexOfFunction("main.work")).AsI64);
     }
+
+    [Fact]
+    public void The_budget_reaches_inside_a_resumed_chain()
+    {
+        // The 4.0 contract half (lyric#121): a resume is a call, and its chain's work is that
+        // call's work — instructions executed at any depth beneath it count against the same
+        // budget, and a suspension neither resets nor forks one. The generator here never
+        // ends; the budget is what stops the program, wherever it happens to stand.
+        var budget = new ExecutionBudget(10_000);
+        var program = Load("""
+            fn spin(): void {
+                while (true) {
+                    yield 1;
+                }
+            }
+
+            fn gen(): Coroutine<int> {
+                spin();
+            }
+
+            fn main(): int {
+                let co = gen();
+                var n = 0;
+                while (true) {
+                    n = resume co;
+                }
+                return n;
+            }
+            """);
+
+        var panic = Assert.Throws<LyricPanic>(() => program.RunEntry([], budget));
+
+        Assert.Equal("LYR-CAP0002", panic.Code);
+        Assert.Equal(0, budget.Remaining);
+    }
 }

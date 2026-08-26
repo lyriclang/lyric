@@ -51,8 +51,24 @@ floor 450 → 449, deliberately) and `LYR-SEM0093` is an ERROR (guide 12, the pr
 flipped to refusal, the embedding save-fixture moved onto the constructor pattern it always
 should have modelled). Guide 11 gains "Yield from any depth"; CHANGELOG carries the 4.0.0
 Unreleased section. Full suite green at 4.0.0 across all 14 projects, Vm under `LYRIC_JIT=1`
-included. Next: **slice 3 — the contracts** (debugger stack splicing across chains, budget
-pins, embedding pins per the #121 answers), then the basket items as their own features.
+included.
+
+**Slice 3 — the contracts — is BUILT, and with it the stackful item is COMPLETE.** The four
+#121 answers, pinned rather than promised: the **debugger** shows the logical stack because the
+logical stack IS the physical one while a chain runs — a breakpoint in a helper beneath a
+resume answers `[helper, gen.<body>, main]`, pinned at the DAP level; the **backtrace** of a
+panic at depth carries the same splice (with the inliner's standing caveat: a spliced callee
+vanishes from every backtrace, chains included — the pin pads past the inline budget, the
+ExecutionBudgetTests trick); the **budget** reaches inside a resumed chain (a resume is a call,
+its chain's work is that call's work, suspension resets nothing); and the **JIT** declines
+every chain-op-containing function while the program answers unchanged, `Refusals` naming it —
+task-shaped code runs interpreted, which the option's own tests now state. Two stale sentences
+fell: the interpreter's pool comment claimed coroutines "hold no frame across a yield" (chains
+do exactly that), and guide 21's reason for the parked debug thread claimed a CLR frame stack
+the machine has not had since the explicit stack landed — the honest reason is that a debug
+pause is a semaphore inside the loop, not a suspension of it. Next: the item goes to main as a
+PR (the v3 pattern — main claims the major, the release waits for the basket), then **basket
+item 2: `std.task`** per the pipeline.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
