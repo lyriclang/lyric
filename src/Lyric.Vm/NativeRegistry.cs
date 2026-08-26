@@ -824,9 +824,10 @@ public sealed class NativeRegistry
 
         // std.task's ONE native (4.0): time and readiness in one answer, [now, readyFd...].
         // The clock is monotonic — differences mean something, the origin does not. A negative
-        // timeout means "no deadline"; with descriptors none of, that would sleep forever, so
+        // timeout means "no deadline"; with no descriptors either, that would sleep forever, so
         // the scheduler never asks for it and the native refuses rather than hanging a host.
-        // Descriptors arrive with std.io.net; until then any fd is unknown by construction.
+        // The descriptors are std.io.net's; a socket in error reports as READABLE, so the read
+        // that follows is what tells the waiter, the same convention select has always had.
         var intArray = new BytecodeType(TypeTag.Array, -1) { Element = BytecodeType.Scalar(TypeTag.I64) };
         registry.RegisterWithTypes("std.task.poll",
             [intArray, intArray, BytecodeType.Scalar(TypeTag.I64)], intArray,
@@ -836,17 +837,41 @@ public sealed class NativeRegistry
                 var write = args[1].AsObject;
                 var timeout = args[2].AsI64;
 
-                if (read.Length > 0 || write.Length > 0)
-                    throw new LyricPanic(VmDiagnostics.Panicked,
-                        "std.task.poll: no such descriptor — descriptors arrive with std.io.net");
-                if (timeout < 0)
-                    throw new LyricPanic(VmDiagnostics.Panicked,
-                        "std.task.poll: waiting forever on nothing — no deadline and no descriptor");
+                if (read.Length == 0 && write.Length == 0)
+                {
+                    if (timeout < 0)
+                        throw new LyricPanic(VmDiagnostics.Panicked,
+                            "std.task.poll: waiting forever on nothing — no deadline and no "
+                            + "descriptor");
+                    if (timeout > 0) Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
+                    return LyrValue.FromObject(
+                        new[] { LyrValue.FromI64(Environment.TickCount64) });
+                }
 
-                if (timeout > 0) Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
-                var answer = new LyrValue[] { LyrValue.FromI64(Environment.TickCount64) };
-                return LyrValue.FromObject(answer);
+                var checkRead = new List<System.Net.Sockets.Socket>();
+                var checkWrite = new List<System.Net.Sockets.Socket>();
+                var checkError = new List<System.Net.Sockets.Socket>();
+                foreach (var value in read)
+                    if (SocketOf(value.AsI64) is { } s) { checkRead.Add(s); checkError.Add(s); }
+                foreach (var value in write)
+                    if (SocketOf(value.AsI64) is { } s) { checkWrite.Add(s); checkError.Add(s); }
+
+                // Select takes microseconds; clamping a huge timeout wakes the scheduler
+                // early, which recomputes and blocks again — correct, just in two steps.
+                var micros = timeout < 0
+                    ? -1
+                    : (int)Math.Min(timeout * 1000, int.MaxValue);
+                System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
+
+                var ready = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
+                var named = new HashSet<long>();
+                foreach (var s in checkRead) NameReady(s, ready, named);
+                foreach (var s in checkWrite) NameReady(s, ready, named);
+                foreach (var s in checkError) NameReady(s, ready, named);
+                return LyrValue.FromObject(ready.ToArray());
             });
+
+        RegisterNet(registry);
 
         registry.Register("std.os.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
@@ -1089,6 +1114,217 @@ public sealed class NativeRegistry
             RecordIo(e);
             return null;
         }
+    }
+
+    // ------------------------------------------------------------------ std.io.net (4.0)
+    //
+    // Sockets live in a per-thread table under integer descriptors — the numbers Wait.Readable
+    // carries and std.task.poll selects over. ThreadStatic for the same reason as the io
+    // classification: parallel VMs (the test host) must not see each other's sockets. Every
+    // socket is non-blocking; the WAITING lives in std.task, a native only ever answers now.
+
+    [ThreadStatic] private static Dictionary<long, System.Net.Sockets.Socket>? _sockets;
+    [ThreadStatic] private static long _nextSocketFd;
+
+    private static Dictionary<long, System.Net.Sockets.Socket> Sockets => _sockets ??= new();
+
+    private static System.Net.Sockets.Socket? SocketOf(long fd) =>
+        _sockets is { } table && table.TryGetValue(fd, out var socket) ? socket : null;
+
+    private static long AddSocket(System.Net.Sockets.Socket socket)
+    {
+        var fd = ++_nextSocketFd;
+        Sockets[fd] = socket;
+        return fd;
+    }
+
+    private static void NameReady(System.Net.Sockets.Socket socket, List<LyrValue> ready,
+        HashSet<long> named)
+    {
+        if (_sockets is null) return;
+        foreach (var (fd, s) in _sockets)
+            if (ReferenceEquals(s, socket) && named.Add(fd))
+            {
+                ready.Add(LyrValue.FromI64(fd));
+                return;
+            }
+    }
+
+    // The classification of the last failed std.io.net operation — the same last-failure
+    // contract as the io pair above. The codes are a contract with std/io/net.lyr's kindOf:
+    // 1 NotFound, 2 PermissionDenied, 4 ConnectionRefused, 5 AddressInUse, 6 WouldBlock,
+    // 0 Other.
+    [ThreadStatic] private static int _lastNetKind;
+    [ThreadStatic] private static string? _lastNetDetail;
+
+    private static void RecordNet(Exception e)
+    {
+        _lastNetKind = e is System.Net.Sockets.SocketException se
+            ? se.SocketErrorCode switch
+            {
+                System.Net.Sockets.SocketError.ConnectionRefused => 4,
+                System.Net.Sockets.SocketError.AddressAlreadyInUse => 5,
+                System.Net.Sockets.SocketError.WouldBlock
+                    or System.Net.Sockets.SocketError.InProgress => 6,
+                System.Net.Sockets.SocketError.HostNotFound
+                    or System.Net.Sockets.SocketError.NoData => 1,
+                System.Net.Sockets.SocketError.AccessDenied => 2,
+                _ => 0,
+            }
+            : 0;
+        _lastNetDetail = e.Message;
+    }
+
+    private static System.Net.IPAddress ResolveHost(string host)
+    {
+        if (host is "localhost" or "") return System.Net.IPAddress.Loopback;
+        if (System.Net.IPAddress.TryParse(host, out var literal)) return literal;
+        var found = System.Net.Dns.GetHostAddresses(host);
+        if (found.Length == 0)
+            throw new System.Net.Sockets.SocketException(
+                (int)System.Net.Sockets.SocketError.HostNotFound);
+        return found[0];
+    }
+
+    private static System.Net.Sockets.Socket NewTcp(System.Net.IPAddress address) =>
+        new(address.AddressFamily, System.Net.Sockets.SocketType.Stream,
+            System.Net.Sockets.ProtocolType.Tcp)
+        { Blocking = false };
+
+    private static void RegisterNet(NativeRegistry registry)
+    {
+        var i64 = TypeTag.I64;
+
+        registry.Register("std.io.net.netListen", [TypeTag.String, i64], i64, args =>
+        {
+            try
+            {
+                var address = ResolveHost(args[0].AsString);
+                var socket = NewTcp(address);
+                socket.Bind(new System.Net.IPEndPoint(address, (int)args[1].AsI64));
+                socket.Listen(64);
+                return LyrValue.FromI64(AddSocket(socket));
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
+        });
+
+        registry.Register("std.io.net.netLocalPort", [i64], i64, args =>
+            SocketOf(args[0].AsI64)?.LocalEndPoint is System.Net.IPEndPoint at
+                ? LyrValue.FromI64(at.Port)
+                : LyrValue.FromI64(-1));
+
+        registry.Register("std.io.net.netAccept", [i64], i64, args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } listener) return LyrValue.FromI64(-2);
+            try
+            {
+                var accepted = listener.Accept();
+                accepted.Blocking = false;
+                return LyrValue.FromI64(AddSocket(accepted));
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
+            {
+                RecordNet(e);
+                return LyrValue.FromI64(-1);
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
+        });
+
+        registry.Register("std.io.net.netConnectStart", [TypeTag.String, i64], i64, args =>
+        {
+            try
+            {
+                var address = ResolveHost(args[0].AsString);
+                var socket = NewTcp(address);
+                try
+                {
+                    socket.Connect(new System.Net.IPEndPoint(address, (int)args[1].AsI64));
+                }
+                catch (System.Net.Sockets.SocketException e)
+                    when (e.SocketErrorCode is System.Net.Sockets.SocketError.WouldBlock
+                        or System.Net.Sockets.SocketError.InProgress) { /* in flight */ }
+                return LyrValue.FromI64(AddSocket(socket));
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
+        });
+
+        registry.Register("std.io.net.netConnectDone", [i64], i64, args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-1);
+            try
+            {
+                if (socket.Poll(0, System.Net.Sockets.SelectMode.SelectError))
+                {
+                    var code = (System.Net.Sockets.SocketError)(int)socket.GetSocketOption(
+                        System.Net.Sockets.SocketOptionLevel.Socket,
+                        System.Net.Sockets.SocketOptionName.Error)!;
+                    RecordNet(new System.Net.Sockets.SocketException((int)code));
+                    return LyrValue.FromI64(-1);
+                }
+                return LyrValue.FromI64(
+                    socket.Poll(0, System.Net.Sockets.SelectMode.SelectWrite) ? 1 : 0);
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
+        });
+
+        registry.RegisterOptionalArrayReturning("std.io.net.netReadReady", [i64, i64],
+            TypeTag.U8, args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.None;
+            var max = (int)Math.Clamp(args[1].AsI64, 1, 1 << 20);
+            var buffer = new byte[max];
+            try
+            {
+                var got = socket.Receive(buffer, 0, max, System.Net.Sockets.SocketFlags.None);
+                if (got == 0) return Bytes([]); // the peer is done: an EOF, not a failure
+                return Bytes(buffer[..got]);
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
+            {
+                RecordNet(e);
+                return LyrValue.None;
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.None; }
+        });
+
+        registry.RegisterWithArrayParams("std.io.net.netWriteFrom",
+            [i64, TypeTag.Array, i64], [null, TypeTag.U8, null], i64, args =>
+        {
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-2);
+            var bytes = ToBytes(args[1]);
+            var offset = (int)Math.Clamp(args[2].AsI64, 0, bytes.Length);
+            try
+            {
+                var sent = socket.Send(bytes, offset, bytes.Length - offset,
+                    System.Net.Sockets.SocketFlags.None);
+                return LyrValue.FromI64(sent);
+            }
+            catch (System.Net.Sockets.SocketException e)
+                when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
+            {
+                RecordNet(e);
+                return LyrValue.FromI64(-1);
+            }
+            catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
+        });
+
+        registry.Register("std.io.net.netClose", [i64], TypeTag.Void, args =>
+        {
+            var fd = args[0].AsI64;
+            if (SocketOf(fd) is { } socket)
+            {
+                try { socket.Close(); } catch (Exception) { /* closing twice closes once */ }
+                Sockets.Remove(fd);
+            }
+            return default;
+        });
+
+        registry.Register("std.io.net.lastErrorKind", [], i64,
+            _ => LyrValue.FromI64(_lastNetKind));
+        registry.Register("std.io.net.lastErrorDetail", [], TypeTag.String,
+            _ => LyrValue.FromString(_lastNetDetail ?? ""));
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>

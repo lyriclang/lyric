@@ -2015,6 +2015,28 @@
                 "File": "stdlib/std/io/error.lyr",
                 "Line": 22
               }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "ConnectionRefused",
+              "Signature": "ConnectionRefused",
+              "Doc": "The peer answered \"no\" — nothing listens there (4.0, with `std.io.net`).",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 24
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "AddressInUse",
+              "Signature": "AddressInUse",
+              "Doc": "The local address is already taken (4.0, with `std.io.net`).",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/error.lyr",
+                "Line": 26
+              }
             }
           ],
           "Source": {
@@ -2036,7 +2058,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/io/error.lyr",
-                "Line": 29
+                "Line": 33
               }
             },
             {
@@ -2047,7 +2069,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/io/error.lyr",
-                "Line": 30
+                "Line": 34
               }
             },
             {
@@ -2058,7 +2080,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/io/error.lyr",
-                "Line": 31
+                "Line": 35
               }
             },
             {
@@ -2069,13 +2091,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/io/error.lyr",
-                "Line": 33
+                "Line": 37
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/io/error.lyr",
-            "Line": 28
+            "Line": 32
           }
         }
       ]
@@ -2533,6 +2555,177 @@
           "Source": {
             "File": "stdlib/std/io/file.lyr",
             "Line": 353
+          }
+        }
+      ]
+    },
+    {
+      "Path": "std.io.net",
+      "Doc": "TCP for tasks: `listen`/`accept` on the server side, `connect` on the client's,\n`readSome`/`write` on both, every waiting form yielding to the scheduler instead of\nblocking the thread.\n\nThe silent forms answer *whether* (`null`/`false`); the `OrThrow` twins say *why* with an\n`IoError`, from the same implementation. `readSome` folds three truths into one answer:\nbytes are bytes, an EMPTY array is the peer being done (EOF), and `null` is a failure.",
+      "Items": [
+        {
+          "Kind": "Alias",
+          "Name": "Listener",
+          "Signature": "pub type Listener = int",
+          "Doc": "A listening endpoint. Opaque: it is issued here, never assembled.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 27
+          }
+        },
+        {
+          "Kind": "Alias",
+          "Name": "Socket",
+          "Signature": "pub type Socket = int",
+          "Doc": "A connected stream. Opaque, like the listener.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 30
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "listen",
+          "Signature": "pub fn listen(host: string, port: int): ?Listener",
+          "Doc": "Listens on `host:port`. Port 0 asks the OS for a free one — `localPort` says which.\n`null` when the address cannot be taken; `listenOrThrow` says why.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 64
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "listenOrThrow",
+          "Signature": "pub fn listenOrThrow(host: string, port: int): Listener throws IoError",
+          "Doc": "`listen`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 73
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "localPort",
+          "Signature": "pub fn localPort(listener: Listener): int",
+          "Doc": "The port a listener actually holds — the answer to `listen(host, 0)`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 82
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "accept",
+          "Signature": "pub fn accept(listener: Listener): ?Socket",
+          "Doc": "Waits for the next connection. `null` when the listener broke; `acceptOrThrow` says why.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 87
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "acceptOrThrow",
+          "Signature": "pub fn acceptOrThrow(listener: Listener): Socket throws IoError",
+          "Doc": "`accept`, with the reason when the listener broke.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 101
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "connect",
+          "Signature": "pub fn connect(host: string, port: int): ?Socket",
+          "Doc": "Waits until a connection to `host:port` stands or is refused. `null` on refusal or any\nother failure; `connectOrThrow` names the kind — `ConnectionRefused` when nothing listens.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 111
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "connectOrThrow",
+          "Signature": "pub fn connectOrThrow(host: string, port: int): Socket throws IoError",
+          "Doc": "`connect`, with the reason when it cannot.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 130
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSome",
+          "Signature": "pub fn readSome(socket: Socket, max: int): ?uint8[]",
+          "Doc": "Waits for bytes and reads up to `max` of them. Three truths in one answer: bytes are\nbytes, an EMPTY array is the peer being done (EOF), and `null` is a failure —\n`readSomeOrThrow` says which failure.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 141
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeOrThrow",
+          "Signature": "pub fn readSomeOrThrow(socket: Socket, max: int): uint8[] throws IoError",
+          "Doc": "`readSome`, with the reason when the stream broke. EOF stays the empty array — the peer\nbeing done is an ordinary state, not a failure.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 156
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "write",
+          "Signature": "pub fn write(socket: Socket, bytes: uint8[]): bool",
+          "Doc": "Writes ALL of `bytes`, waiting whenever the stream is full. `false` when the stream broke\nmidway; `writeOrThrow` says why.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 166
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "writeOrThrow",
+          "Signature": "pub fn writeOrThrow(socket: Socket, bytes: uint8[]): void throws IoError",
+          "Doc": "`write`, with the reason when the stream broke.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 183
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "close",
+          "Signature": "pub fn close(socket: Socket): void",
+          "Doc": "Closes a socket. Closing twice closes once.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 190
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "closeListener",
+          "Signature": "pub fn closeListener(listener: Listener): void",
+          "Doc": "Closes a listener.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/net.lyr",
+            "Line": 195
           }
         }
       ]

@@ -112,6 +112,14 @@ because the scheduler has nobody to hand an exception to. The module carries the
 capability — its one native asks the OS about time and readiness, and blocks the thread where
 the program asked to sleep.
 
+`std.io.net` (since 4.0, `networkAccess`) is TCP for tasks: `listen`/`accept`, `connect`,
+`readSome`/`write`, `close` — every waiting form yields to the scheduler INSIDE the module, so
+a server is straight-line code inside a task and no signature anywhere mentions waiting. The
+handles are opaque (`Listener`, `Socket`); the silent forms answer whether and the `OrThrow`
+twins say why with an `IoError` — `ConnectionRefused` and `AddressInUse` joined the kinds for
+exactly these answers. `readSome` folds three truths into one value: bytes are bytes, an EMPTY
+array is the peer being done, `null` is a failure.
+
 ## Iteration
 
 Anything implementing `Iterable<T>` works with `for-in`, including your own types.

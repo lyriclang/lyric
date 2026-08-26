@@ -87,9 +87,23 @@ the scheduler has nobody to hand an exception to), and a `run` left with only
 The dynamic yield earns its keep on day one: `breathe()`/`net.readLine`-shaped helpers yield
 the `Wait` with no marker on any signature — pinned in `task_tests` beside round-robin
 fairness, real 5ms/40ms deadline ordering, spawn-from-a-task, and the empty run. 110 lyrtest
-cases, guide 13 §Tasks, doc floor 464 → 473, 18 module pages. Next: **basket item 3,
-`std.io.net`** (TCP; the netAccess bit wakes, `IoError` + OrThrow doctrine, the poll native's
-descriptor half becomes real).
+cases, guide 13 §Tasks, doc floor 464 → 473, 18 module pages. **`std.io.net` — basket item 3 — is BUILT** (branch `feature/v4-net`): TCP for tasks, the
+`networkAccess` bit awake at last. The shape is the §10a promise kept literally: every waiting
+form — `accept`, `connect`, `readSome`, `write` — yields its `Wait` INSIDE the module, so a
+server is straight-line code in a task and no signature anywhere says "async". Handles are
+opaque (`Listener`/`Socket`; the module's own inward casts are its privilege, the outward cast
+is how a `Wait.Readable` gets its number). The natives are non-blocking answer-now calls over
+a ThreadStatic fd→Socket table (parallel VMs stay apart, the io-classification precedent);
+would-block is kind 6 in the last-failure contract and never surfaces — it is the signal to
+wait. `readSome` folds three truths into `?uint8[]`: bytes, EMPTY-is-EOF (the 2.14
+convention), null-is-failure, and `IoErrorKind` gains `ConnectionRefused`/`AddressInUse` —
+the carrier-behind-kind design absorbing them without breaking a match, as it promised in
+3.7. `std.task.poll`'s descriptor half is real: select over the socket table, an errored
+socket reporting as readable so the read that follows tells the waiter. Three lyrtest cases
+pin it end to end — an echo roundtrip ACROSS the scheduler (with the EOF assertion), the
+refused connect naming its kind, the taken address naming its. 113 lyrtest, doc floor 490,
+19 module pages, guide 13. Next: **basket item 5, byte tooling** (`slice`/`concat`/`indexOf`
+over `uint8[]` — the wire-protocol prerequisite, then `readLine` becomes writable).
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

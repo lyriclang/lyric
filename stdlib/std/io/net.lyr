@@ -1,0 +1,197 @@
+// std.io.net — TCP, inside tasks.
+//
+// Every waiting form here yields a `std.task.Wait` from INSIDE this module — the §10a shape:
+// `readSome(sock)` waits so its caller does not have to, and no signature anywhere says so.
+// That also means the waiting forms belong under a running `std.task.run()`; called outside
+// one, the yield is the no-resume panic, which is the honest answer to "wait, but nobody is
+// driving".
+//
+// The handles are opaque: nothing forges a `Socket`, and on the wire it is its number — the
+// same number `Wait.Readable` carries, reached by the free outward cast where this module
+// waits.
+
+/// TCP for tasks: `listen`/`accept` on the server side, `connect` on the client's,
+/// `readSome`/`write` on both, every waiting form yielding to the scheduler instead of
+/// blocking the thread.
+///
+/// The silent forms answer *whether* (`null`/`false`); the `OrThrow` twins say *why* with an
+/// `IoError`, from the same implementation. `readSome` folds three truths into one answer:
+/// bytes are bytes, an EMPTY array is the peer being done (EOF), and `null` is a failure.
+module std.io.net;
+
+import std.io.error { IoError, IoErrorKind };
+import std.task { Wait };
+import std.string as strings;
+
+/// A listening endpoint. Opaque: it is issued here, never assembled.
+pub opaque type Listener = int;
+
+/// A connected stream. Opaque, like the listener.
+pub opaque type Socket = int;
+
+// The natives. All sockets are non-blocking; a native answers immediately, and the WAITING is
+// this module yielding to the scheduler. The classification pair follows std.io.file's
+// last-failure contract; the codes are 1 NotFound, 2 PermissionDenied, 4 ConnectionRefused,
+// 5 AddressInUse, 6 WouldBlock (never surfaced — it is the signal to wait), 0 Other.
+fn netListen(host: string, port: int): int;
+fn netLocalPort(listener: int): int;
+fn netAccept(listener: int): int;
+fn netConnectStart(host: string, port: int): int;
+fn netConnectDone(socket: int): int;
+fn netReadReady(socket: int, max: int): ?uint8[];
+fn netWriteFrom(socket: int, bytes: uint8[], offset: int): int;
+fn netClose(socket: int): void;
+fn lastErrorKind(): int;
+fn lastErrorDetail(): string;
+
+fn lastNetError(address: string): IoError {
+    let kind = match (lastErrorKind()) {
+        1 => IoErrorKind.NotFound,
+        2 => IoErrorKind.PermissionDenied,
+        4 => IoErrorKind.ConnectionRefused,
+        5 => IoErrorKind.AddressInUse,
+        _ => IoErrorKind.Other,
+    };
+    return IoError { kind = kind, path = address, detail = lastErrorDetail() };
+}
+
+fn address(host: string, port: int): string {
+    return host + ":" + strings.fromInt(port);
+}
+
+/// Listens on `host:port`. Port 0 asks the OS for a free one — `localPort` says which.
+/// `null` when the address cannot be taken; `listenOrThrow` says why.
+pub fn listen(host: string, port: int): ?Listener {
+    let fd = netListen(host, port);
+    if (fd < 0) {
+        return null;
+    }
+    return fd as Listener;
+}
+
+/// `listen`, with the reason when it cannot.
+pub fn listenOrThrow(host: string, port: int): Listener throws IoError {
+    let bound = listen(host, port);
+    if (bound == null) {
+        throw lastNetError(address(host, port));
+    }
+    return bound;
+}
+
+/// The port a listener actually holds — the answer to `listen(host, 0)`.
+pub fn localPort(listener: Listener): int {
+    return netLocalPort(listener as int);
+}
+
+/// Waits for the next connection. `null` when the listener broke; `acceptOrThrow` says why.
+pub fn accept(listener: Listener): ?Socket {
+    while (true) {
+        let fd = netAccept(listener as int);
+        if (fd >= 0) {
+            return fd as Socket;
+        }
+        if (fd == -2) {
+            return null;
+        }
+        yield Wait.Readable(listener as int);
+    }
+}
+
+/// `accept`, with the reason when the listener broke.
+pub fn acceptOrThrow(listener: Listener): Socket throws IoError {
+    let conn = accept(listener);
+    if (conn == null) {
+        throw lastNetError("accept");
+    }
+    return conn;
+}
+
+/// Waits until a connection to `host:port` stands or is refused. `null` on refusal or any
+/// other failure; `connectOrThrow` names the kind — `ConnectionRefused` when nothing listens.
+pub fn connect(host: string, port: int): ?Socket {
+    let fd = netConnectStart(host, port);
+    if (fd < 0) {
+        return null;
+    }
+    while (true) {
+        let done = netConnectDone(fd);
+        if (done == 1) {
+            return fd as Socket;
+        }
+        if (done < 0) {
+            netClose(fd);
+            return null;
+        }
+        yield Wait.Writable(fd);
+    }
+}
+
+/// `connect`, with the reason when it cannot.
+pub fn connectOrThrow(host: string, port: int): Socket throws IoError {
+    let conn = connect(host, port);
+    if (conn == null) {
+        throw lastNetError(address(host, port));
+    }
+    return conn;
+}
+
+/// Waits for bytes and reads up to `max` of them. Three truths in one answer: bytes are
+/// bytes, an EMPTY array is the peer being done (EOF), and `null` is a failure —
+/// `readSomeOrThrow` says which failure.
+pub fn readSome(socket: Socket, max: int): ?uint8[] {
+    while (true) {
+        let got = netReadReady(socket as int, max);
+        if (got != null) {
+            return got;
+        }
+        if (lastErrorKind() != 6) {
+            return null;
+        }
+        yield Wait.Readable(socket as int);
+    }
+}
+
+/// `readSome`, with the reason when the stream broke. EOF stays the empty array — the peer
+/// being done is an ordinary state, not a failure.
+pub fn readSomeOrThrow(socket: Socket, max: int): uint8[] throws IoError {
+    let got = readSome(socket, max);
+    if (got == null) {
+        throw lastNetError("read");
+    }
+    return got;
+}
+
+/// Writes ALL of `bytes`, waiting whenever the stream is full. `false` when the stream broke
+/// midway; `writeOrThrow` says why.
+pub fn write(socket: Socket, bytes: uint8[]): bool {
+    var offset = 0;
+    while (offset < bytes.length) {
+        let sent = netWriteFrom(socket as int, bytes, offset);
+        if (sent >= 0) {
+            offset = offset + sent;
+            continue;
+        }
+        if (sent == -2) {
+            return false;
+        }
+        yield Wait.Writable(socket as int);
+    }
+    return true;
+}
+
+/// `write`, with the reason when the stream broke.
+pub fn writeOrThrow(socket: Socket, bytes: uint8[]): void throws IoError {
+    if (!write(socket, bytes)) {
+        throw lastNetError("write");
+    }
+}
+
+/// Closes a socket. Closing twice closes once.
+pub fn close(socket: Socket): void {
+    netClose(socket as int);
+}
+
+/// Closes a listener.
+pub fn closeListener(listener: Listener): void {
+    netClose(listener as int);
+}
