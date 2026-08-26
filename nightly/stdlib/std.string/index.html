@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../../stdlib/std.iter/">std.iter</a></li>
 <li><a href="../../stdlib/std.json/">std.json</a></li>
@@ -61,6 +62,8 @@
 <li><a href="#function-repeat">repeat</a></li>
 <li><a href="#function-fromchars">fromChars</a></li>
 <li><a href="#function-utf8decode">utf8Decode</a></li>
+<li><a href="#class-utf8error">Utf8Error</a></li>
+<li><a href="#function-utf8decodeorthrow">utf8DecodeOrThrow</a></li>
 <li><a href="#function-isdigit">isDigit</a></li>
 <li><a href="#function-isalpha">isAlpha</a></li>
 <li><a href="#function-isalphanumeric">isAlphanumeric</a></li>
@@ -134,61 +137,81 @@ standing in for the data — the difference to <code>std.io.file.text</code>, wh
 documented there.</p>
 <p class="source">stdlib/std/string.lyr:56</p>
 </section>
+<section class="item" id="class-utf8error">
+<h2><a href="#class-utf8error">Utf8Error</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class Utf8Error :: [Throwable]</code></pre>
+<p>Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">offset: int</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/string.lyr:59</p>
+</section>
+<section class="item" id="function-utf8decodeorthrow">
+<h2><a href="#function-utf8decodeorthrow">utf8DecodeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn utf8DecodeOrThrow(bytes: uint8[]): string throws Utf8Error</code></pre>
+<p><code>utf8Decode</code>, with the reason when the bytes are not UTF-8: which byte broke the sequence.</p>
+<p class="source">stdlib/std/string.lyr:72</p>
+</section>
 <section class="item" id="function-isdigit">
 <h2><a href="#function-isdigit">isDigit</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isDigit(c: char): bool</code></pre>
 <p><code>'0'</code> through <code>'9'</code>.</p>
-<p class="source">stdlib/std/string.lyr:365</p>
+<p class="source">stdlib/std/string.lyr:387</p>
 </section>
 <section class="item" id="function-isalpha">
 <h2><a href="#function-isalpha">isAlpha</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isAlpha(c: char): bool</code></pre>
 <p>An ASCII letter.</p>
-<p class="source">stdlib/std/string.lyr:371</p>
+<p class="source">stdlib/std/string.lyr:393</p>
 </section>
 <section class="item" id="function-isalphanumeric">
 <h2><a href="#function-isalphanumeric">isAlphanumeric</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isAlphanumeric(c: char): bool</code></pre>
 <p>An ASCII letter or a digit.</p>
-<p class="source">stdlib/std/string.lyr:376</p>
+<p class="source">stdlib/std/string.lyr:398</p>
 </section>
 <section class="item" id="function-iswhitespace">
 <h2><a href="#function-iswhitespace">isWhitespace</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isWhitespace(c: char): bool</code></pre>
 <p>Space, tab, <code>\n</code> or <code>\r</code>.</p>
-<p class="source">stdlib/std/string.lyr:381</p>
+<p class="source">stdlib/std/string.lyr:403</p>
 </section>
 <section class="item" id="function-isupper">
 <h2><a href="#function-isupper">isUpper</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isUpper(c: char): bool</code></pre>
 <p><code>'A'</code> through <code>'Z'</code>.</p>
-<p class="source">stdlib/std/string.lyr:386</p>
+<p class="source">stdlib/std/string.lyr:408</p>
 </section>
 <section class="item" id="function-islower">
 <h2><a href="#function-islower">isLower</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isLower(c: char): bool</code></pre>
 <p><code>'a'</code> through <code>'z'</code>.</p>
-<p class="source">stdlib/std/string.lyr:391</p>
+<p class="source">stdlib/std/string.lyr:413</p>
 </section>
 <section class="item" id="function-chartodigit">
 <h2><a href="#function-chartodigit">charToDigit</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn charToDigit(c: char): ?int</code></pre>
 <p>The numeric value of a digit, or <code>null</code> when it is not one.</p>
 <p><code>?int</code> rather than <code>-1</code>: a failure the caller has to handle belongs in the type.</p>
-<p class="source">stdlib/std/string.lyr:398</p>
+<p class="source">stdlib/std/string.lyr:420</p>
 </section>
 <section class="item" id="function-digittochar">
 <h2><a href="#function-digittochar">digitToChar</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn digitToChar(value: int): ?char</code></pre>
 <p>The digit as a character, or <code>null</code> outside <code>0..9</code>.</p>
-<p class="source">stdlib/std/string.lyr:406</p>
+<p class="source">stdlib/std/string.lyr:428</p>
 </section>
 <section class="item" id="function-join">
 <h2><a href="#function-join">join</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn join(parts: string[], separator: string): string</code></pre>
 <p>Joins the parts with a separator: the inverse of <code>split</code>. One native call — a left fold
 would copy the whole result once per part.</p>
-<p class="source">stdlib/std/string.lyr:433</p>
+<p class="source">stdlib/std/string.lyr:455</p>
 </section>
 <section class="item" id="function-parseint">
 <h2><a href="#function-parseint">parseInt</a> <span class="kind">function</span></h2>
@@ -196,19 +219,19 @@ would copy the whole result once per part.</p>
 <p><code>&quot;-42&quot;</code> becomes <code>-42</code>, anything else <code>null</code>.</p>
 <p>No overflow protection: a number beyond <code>int64</code> wraps rather than yielding <code>null</code>. Detecting
 it would need a division per digit.</p>
-<p class="source">stdlib/std/string.lyr:448</p>
+<p class="source">stdlib/std/string.lyr:470</p>
 </section>
 <section class="item" id="function-parseintradix">
 <h2><a href="#function-parseintradix">parseIntRadix</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseIntRadix(value: string, radix: int): ?int</code></pre>
 <p>From a base of 2 to 36. Letters continue from <code>a</code>/<code>A</code>.</p>
-<p class="source">stdlib/std/string.lyr:482</p>
+<p class="source">stdlib/std/string.lyr:504</p>
 </section>
 <section class="item" id="function-parsebool">
 <h2><a href="#function-parsebool">parseBool</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseBool(value: string): ?bool</code></pre>
 <p>Exactly <code>&quot;true&quot;</code> or <code>&quot;false&quot;</code>; anything else is <code>null</code>.</p>
-<p class="source">stdlib/std/string.lyr:527</p>
+<p class="source">stdlib/std/string.lyr:549</p>
 </section>
 <section class="item" id="function-parsefloat">
 <h2><a href="#function-parsefloat">parseFloat</a> <span class="kind">function</span></h2>
@@ -220,7 +243,7 @@ numbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 presc
 <p>Native because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision
 arithmetic in the worst cases; an approximate parser hands back a float the text did not
 say. <code>parseFloat(fromFloat(x))</code> is <code>x</code> again, for every finite <code>x</code>.</p>
-<p class="source">stdlib/std/string.lyr:545</p>
+<p class="source">stdlib/std/string.lyr:567</p>
 </section>
 <section class="item" id="class-stringbuilder">
 <h2><a href="#class-stringbuilder">StringBuilder</a> <span class="kind">class</span></h2>
@@ -263,7 +286,7 @@ builder exists to avoid. Reads and never consumes: building twice yields the sam
 string.</p>
 </div>
 </div>
-<p class="source">stdlib/std/string.lyr:556</p>
+<p class="source">stdlib/std/string.lyr:578</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.random/">std.random</a>

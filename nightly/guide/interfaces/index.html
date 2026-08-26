@@ -338,14 +338,18 @@ fn main(): int {
 }
 </code></pre>
 <p>The operator picks the conformance by the type on its right, and nothing else: both methods are
-called <code>mul</code>, so the name never decides. That is also the limit of it — <code>v.mul(2.0)</code> written out is
-ambiguous, because a written call has only the name to go on. A constraint names the conformance it
-wants the same way: <code>fn twice&lt;T :: [Mul&lt;float, T&gt;]&gt;</code> promises scaling, <code>fn square&lt;T :: [Mul&lt;T, T&gt;]&gt;</code>
-promises multiplication by one's own kind, and the two are different promises.</p>
+called <code>mul</code>, so the name never decides — the arguments do. A written <code>v.mul(2.0)</code> resolves
+exactly where <code>v * 2.0</code> does, by the overload rules (<a href="/nightly/guide/functions/">chapter 3</a>). A constraint
+names the conformance it wants the same way: <code>fn twice&lt;T :: [Mul&lt;float, T&gt;]&gt;</code> promises scaling,
+<code>fn square&lt;T :: [Mul&lt;T, T&gt;]&gt;</code> promises multiplication by one's own kind, and the two are
+different promises.</p>
 <p>Two conformances that take the SAME right-hand type and disagree on the result are refused where
-the operator is used (<code>LYR-SEM0083</code>): nothing in <code>v * 2.0</code> says which was meant. This is the one
-place in the language where a type may conform to an interface twice — everywhere else, a second
-conformance is a mistake.</p>
+the operator is used (<code>LYR-SEM0083</code>): nothing in <code>v * 2.0</code> says which was meant. Conforming to
+one interface several times is otherwise general since 3.0 — <code>Tag :: [Equatable&lt;Tag&gt;, Equatable&lt;int&gt;]</code> works, each conformance satisfied by its own overload. What a list may not do
+is repeat itself: naming one interface at the same arguments twice in one <code>::</code> list is refused
+(since 3.6.0), because such a list claims two conformances where one exists. An <code>extend</code> block
+restating a conformance the type also declares stays fine — the two declarations may live in
+different modules.</p>
 <p><code>%</code> stays numeric-only. Compound assignment (<code>v += w</code>) reaches through the interfaces for variable
 targets since v1.13 — and picks its conformance by the right operand, exactly as the plain form
 does; a field or element target stays written out (<code>p.v = p.v + w</code>), because the shorthand would

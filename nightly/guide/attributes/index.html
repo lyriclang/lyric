@@ -49,6 +49,8 @@
 <ul>
 <li><a href="#an-attribute-is-a-struct">An attribute is a struct</a></li>
 <li><a href="#arguments-are-values-at-compile-time">Arguments are values at compile time</a></li>
+<li><a href="#one-value-in-parentheses">One value, in parentheses</a></li>
+<li><a href="#several-attributes-at-once">Several attributes at once</a></li>
 <li><a href="#the-module-header">The module header</a></li>
 <li><a href="#what-ends-up-in-the-module-and-who-reads-it">What ends up in the module, and who reads it</a></li>
 <li><a href="#where-the-vocabulary-comes-from">Where the vocabulary comes from</a></li>
@@ -168,6 +170,54 @@ nothing to write into the module.</p>
 <p>Two more rules, both diagnosed where they happen: the same attribute may not sit on one target
 twice, and neither a generic attribute struct nor a generic target is allowed — the compiled
 module holds one row, and one row cannot stand for every instance.</p>
+<h2 id="one-value-in-parentheses">One value, in parentheses</h2>
+<p>Since 3.9 an attribute can take its value positionally — the shape an event vocabulary wants:</p>
+<pre><code class="language-lyr">import std.core { OnFunction, WithArg };
+
+pub enum Event { Damage, Heal }
+
+pub struct On :: [OnFunction, WithArg&lt;Event&gt;] { event: Event, order: int = 0 }
+
+@On(Event.Damage)
+pub fn onDamage(): void { }
+
+fn main(): int { return 0; }
+</code></pre>
+<p>The parentheses carry exactly one value, under the same rules as a written field, and it fills
+the attribute's FIRST field — <code>order</code> above keeps its default, as if nothing were written. The
+row this produces is indistinguishable from <code>@On { event = Event.Damage }</code>; a host reading it
+cannot tell which form the source used, and does not need to.</p>
+<p>The form is opted into, not free: <code>WithArg&lt;Event&gt;</code> is what admits it, and its type argument
+must be the first field's type, checked where the attribute is <strong>declared</strong>. That is the same
+conformance-decides rule the placement markers follow, and it exists for the same reason —
+nothing becomes positional by accident, and a struct's field order never silently becomes an
+argument order an SDK is stuck with. An attribute that declares no <code>WithArg</code> keeps the braces
+form alone (<code>LYR-SEM0094</code>), and a conformance whose <code>T</code> is not the first field's type is
+refused at the declaration (<code>LYR-SEM0095</code>), so the mistake lands with whoever ships the
+attribute, not with everyone who writes it.</p>
+<p>One use writes one form or the other; <code>@On(…) { … }</code> is not a spelling.</p>
+<h2 id="several-attributes-at-once">Several attributes at once</h2>
+<p>Since 3.9 a list of attributes can stand as one group:</p>
+<pre><code class="language-lyr">import std.core { OnFunction, WithArg };
+
+pub enum Event { Damage, Heal }
+
+pub struct On :: [OnFunction, WithArg&lt;Event&gt;] { event: Event }
+pub struct Traced :: [OnFunction] { }
+
+@[Traced, On(Event.Damage)]
+pub fn onDamage(): void { }
+
+fn main(): int { return 0; }
+</code></pre>
+<p><code>@[Traced, On(Event.Damage)]</code> declares exactly what stacking <code>@Traced</code> and <code>@On(…)</code> on two
+lines declares — the same rows, in the same order, under the same rules; the same attribute
+twice in one group is still the same attribute twice. The entries carry no <code>@</code> of their own,
+and a group holds at least one.</p>
+<p><code>lyric fmt</code> treats the group as <em>the</em> shape for two or more attributes: stacked lines fold
+into one group, a single-entry group unfolds to the plain <code>@Name</code>, and a group that outgrows
+the line breaks one entry per line. Which spelling you type is taste; what a formatted file
+holds is one shape.</p>
 <h2 id="the-module-header">The module header</h2>
 <p>An attribute before <code>module</code> describes the file as a whole:</p>
 <pre><code class="language-lyr">@Plugin { name = &quot;mymod&quot;, api = 2 }

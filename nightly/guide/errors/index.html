@@ -47,6 +47,7 @@
 <h1>Errors</h1>
 <nav class="contents">
 <ul>
+<li><a href="#whether-or-why">Whether, or why</a></li>
 <li><a href="#panics">Panics</a></li>
 <li><a href="#exceptions">Exceptions</a></li>
 <li><a href="#cleanup">Cleanup</a></li>
@@ -59,6 +60,40 @@
 not catchable and ends the process with exit code <code>101</code>.</li>
 <li>An <strong>exception</strong> is an expected condition that a caller may handle.</li>
 </ul>
+<h2 id="whether-or-why">Whether, or why</h2>
+<p>The standard library divides the recoverable world by the QUESTION, not by the operation
+(since 3.7): a value answers <em>whether</em> — <code>?T</code> for &quot;is it there?&quot;, <code>bool</code> for &quot;did it happen?&quot; —
+and a throw answers <em>why not</em>. Where a failure carries a reason worth acting on, a silent form
+has an <code>OrThrow</code> twin that declares a module-specific error type; both come from one
+implementation, so the twin throws exactly where the silent form answers <code>null</code> or <code>false</code>.
+Which one you call states what you will do with a failure: fall back, or handle the reason.</p>
+<pre><code class="language-lyr">import std.io.file { text, textOrThrow };
+import std.io.error { IoError, IoErrorKind };
+import std.io.console { println };
+
+fn main(): int {
+    // Falling back: absence is an ordinary answer, no ceremony.
+    let motd = text(&quot;motd.txt&quot;) ?? &quot;no message today&quot;;
+    println(motd);
+
+    // Handling the reason: the twin says which kind, on which path, and what the platform said.
+    try {
+        println(textOrThrow(&quot;config.json&quot;));
+    } catch (e: IoError) {
+        println(match (e.kind) {
+            IoErrorKind.NotFound =&gt; &quot;no config — using defaults&quot;,
+            _ =&gt; &quot;config unreadable: &quot; + e.message(),
+        });
+    }
+    return 0;
+}
+</code></pre>
+<p>The twins in 3.7: every read and operation of <code>std.io.file</code> (throwing <code>IoError</code>, whose <code>kind</code>
+is a matchable <code>IoErrorKind</code>), <code>std.json.parseOrThrow</code> (a <code>JsonError</code> naming line and column),
+the <code>std.encoding</code> decoders (an <code>EncodingError</code> naming the offset), and
+<code>std.string.utf8DecodeOrThrow</code> (a <code>Utf8Error</code> naming the byte). Where <code>null</code> already IS the
+whole truth — an unset environment variable, a key a map does not hold, <code>parseInt</code> on a short
+input — the silent form stands alone, deliberately.</p>
 <h2 id="panics">Panics</h2>
 <pre><code class="language-lyr">import std.core { panic, assert };
 

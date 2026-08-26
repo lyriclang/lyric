@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../../stdlib/std.iter/">std.iter</a></li>
 <li><a href="../../stdlib/std.json/">std.json</a></li>
@@ -70,6 +71,7 @@
 <li><a href="#interface-onmodule">OnModule</a></li>
 <li><a href="#interface-ontype">OnType</a></li>
 <li><a href="#interface-onfunction">OnFunction</a></li>
+<li><a href="#interface-witharg">WithArg</a></li>
 <li><a href="#struct-deprecated">Deprecated</a></li>
 </ul>
 </nav>
@@ -274,6 +276,15 @@ belongs in a named function returning an optional.</p>
 <p>A struct declaring this may stand as <code>@Name</code> before a top-level function.</p>
 <p class="source">stdlib/std/core.lyr:483</p>
 </section>
+<section class="item" id="interface-witharg">
+<h2><a href="#interface-witharg">WithArg</a> <span class="kind">interface</span></h2>
+<pre class="signature"><code class="language-lyr">pub interface WithArg&lt;T&gt;</code></pre>
+<p>An attribute declaring this takes its one value in parentheses — <code>@On(Event.Damage)</code> — and
+the value fills the attribute's FIRST field, whose type must be <code>T</code>. The braces form stays
+open to every attribute; this one is opted into, so a struct's field order never becomes an
+argument order by accident.</p>
+<p class="source">stdlib/std/core.lyr:489</p>
+</section>
 <section class="item" id="struct-deprecated">
 <h2><a href="#struct-deprecated">Deprecated</a> <span class="kind">struct</span></h2>
 <pre class="signature"><code class="language-lyr">pub struct Deprecated :: [OnModule, OnType, OnFunction]</code></pre>
@@ -293,7 +304,7 @@ the removal happens because the build stops, not because somebody remembered.</p
 <p>Empty means the ordinary policy: warn now, remove at the next major.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:488</p>
+<p class="source">stdlib/std/core.lyr:494</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.collections/">std.collections</a>

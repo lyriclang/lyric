@@ -47,6 +47,7 @@
 <h1>The standard library</h1>
 <nav class="contents">
 <ul>
+<li><a href="#whether-or-why-the-orthrow-twins">Whether, or why: the OrThrow twins</a></li>
 <li><a href="#collections">Collections</a></li>
 <li><a href="#iteration">Iteration</a></li>
 <li><a href="#one-name-per-type-in-the-library">One name per type, in the library</a></li>
@@ -103,6 +104,10 @@
 <td><code>print</code>, <code>println</code>, <code>readLine</code> — the writers take any <code>Display</code> value: <code>println(42)</code></td>
 </tr>
 <tr>
+<td><code>std.io.error</code></td>
+<td><code>IoError</code>, <code>IoErrorKind</code> — the reason an I/O operation failed; no capability</td>
+</tr>
+<tr>
 <td><code>std.io.file</code></td>
 <td>reading and writing files — requires <code>fileAccess</code></td>
 </tr>
@@ -132,6 +137,16 @@
 </tr>
 </tbody>
 </table>
+<h2 id="whether-or-why-the-orthrow-twins">Whether, or why: the <code>OrThrow</code> twins</h2>
+<p>Since 3.7 a silent form whose failure carries a REASON has a throwing twin, suffixed <code>OrThrow</code>:
+<code>text</code>/<code>textOrThrow</code>, <code>writeText</code>/<code>writeTextOrThrow</code>, <code>parse</code>/<code>parseOrThrow</code>, and so on through
+<code>std.io.file</code>, <code>std.json</code>, <code>std.encoding</code> and <code>utf8Decode</code>. Both come from one implementation —
+the twin throws a module-specific error type (<code>IoError</code>, <code>JsonError</code>, <code>EncodingError</code>,
+<code>Utf8Error</code>) exactly where the silent form answers <code>null</code> or <code>false</code>. <a href="/nightly/guide/errors/">Chapter 10</a>
+shows both shapes side by side. Where <code>null</code> is the whole truth — <code>env</code>, <code>Map.get</code>, <code>parseInt</code> —
+the silent form stands alone. <code>listDir</code> is deprecated toward 4.0: it answers an empty array to
+both &quot;empty&quot; and &quot;unreadable&quot;, which <code>entries</code> (<code>?string[]</code>) and <code>entriesOrThrow</code> can finally
+tell apart.</p>
 <h2 id="collections">Collections</h2>
 <p><code>List&lt;T&gt;</code> grows; <code>T[]</code> does not.</p>
 <pre><code class="language-lyr">import std.io.console { println };

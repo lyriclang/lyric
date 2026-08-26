@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
 <li><a href="../../stdlib/std.iter/">std.iter</a></li>
 <li><a href="../../stdlib/std.json/" class="here">std.json</a></li>
@@ -55,7 +56,9 @@
 <li><a href="#enum-jsonvalue">JsonValue</a></li>
 <li><a href="#function-serialize">serialize</a></li>
 <li><a href="#function-serializepretty">serializePretty</a></li>
+<li><a href="#class-jsonerror">JsonError</a></li>
 <li><a href="#function-parse">parse</a></li>
+<li><a href="#function-parseorthrow">parseOrThrow</a></li>
 </ul>
 </nav>
 <section class="item" id="enum-jsonvalue">
@@ -133,20 +136,46 @@ it changes the value.</p>
 <p>The member named <code>name</code>, or <code>null</code> when this is not an object or has no such member.</p>
 </div>
 </div>
-<p class="source">stdlib/std/json.lyr:27</p>
+<p class="source">stdlib/std/json.lyr:28</p>
 </section>
 <section class="item" id="function-serialize">
 <h2><a href="#function-serialize">serialize</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn serialize(value: JsonValue): string</code></pre>
 <p>The value as compact JSON: no whitespace anywhere.</p>
-<p class="source">stdlib/std/json.lyr:123</p>
+<p class="source">stdlib/std/json.lyr:124</p>
 </section>
 <section class="item" id="function-serializepretty">
 <h2><a href="#function-serializepretty">serializePretty</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn serializePretty(value: JsonValue, indent: int): string</code></pre>
 <p>The value as JSON with a newline per element and <code>indent</code> spaces per nesting level, the shape
 a person reads. An <code>indent</code> below zero is treated as zero.</p>
-<p class="source">stdlib/std/json.lyr:131</p>
+<p class="source">stdlib/std/json.lyr:132</p>
+</section>
+<section class="item" id="class-jsonerror">
+<h2><a href="#class-jsonerror">JsonError</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class JsonError :: [Throwable]</code></pre>
+<p>Where and why a document was refused: the first place the parser could not continue, and
+what it expected there. <code>line</code> and <code>column</code> are 1-based and counted in code points.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">line: int</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">column: int</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">offset: int</code></pre>
+<p>The 0-based code-point offset of the refusal — <code>line</code> and <code>column</code>, unfolded.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">expected: string</code></pre>
+<p>What the parser expected at that place, as prose: <code>&quot;a value&quot;</code>, <code>&quot;',' or '}'&quot;</code>, …</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/json.lyr:303</p>
 </section>
 <section class="item" id="function-parse">
 <h2><a href="#function-parse">parse</a> <span class="kind">function</span></h2>
@@ -159,7 +188,14 @@ whitespace around it is fine.</p>
 <p>Duplicate object keys follow <code>Map.set</code>: the last one wins, as in JavaScript.</p>
 <p>The depth bound is the module's own, not the runtime's: input is data, and data that is not
 JSON must come back as <code>null</code> rather than as a panic about call depth.</p>
-<p class="source">stdlib/std/json.lyr:310</p>
+<p class="source">stdlib/std/json.lyr:331</p>
+</section>
+<section class="item" id="function-parseorthrow">
+<h2><a href="#function-parseorthrow">parseOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parseOrThrow(text: string): JsonValue throws JsonError</code></pre>
+<p><code>parse</code>, with the reason when the text spells no value: where the document broke, and what
+the parser expected there. The strictness is <code>parse</code>'s — the two are one parser.</p>
+<p class="source">stdlib/std/json.lyr:347</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.iter/">std.iter</a>
