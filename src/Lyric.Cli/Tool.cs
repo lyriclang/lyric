@@ -74,8 +74,22 @@ public sealed record Tool(string Name, string Flag, string EnvironmentVariable)
                 return CliDiagnostics.Fail(error, CliDiagnostics.VmLaunchFailed,
                     $"could not start '{executable}'", ExitCodes.Failure);
 
-            process.WaitForExit();
-            return process.ExitCode;
+            // While the child runs, an interrupt belongs to IT. Ctrl+C reaches the whole
+            // process group — this driver AND the child — and the child decides whether it
+            // dies or drains (std.task parks a task on Wait.Interrupt for exactly that).
+            // A wrapper owes its child the wait: dying first would tear the inherited pipes
+            // off a program that is mid-shutdown and steal its exit code.
+            ConsoleCancelEventHandler shield = (_, e) => e.Cancel = true;
+            Console.CancelKeyPress += shield;
+            try
+            {
+                process.WaitForExit();
+                return process.ExitCode;
+            }
+            finally
+            {
+                Console.CancelKeyPress -= shield;
+            }
         }
         catch (Exception ex)
         {

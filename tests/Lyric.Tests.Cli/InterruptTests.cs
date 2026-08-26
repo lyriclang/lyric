@@ -44,13 +44,20 @@ public sealed class InterruptTests
             }
             """);
 
-        var info = new ProcessStartInfo(Toolchain.LyricPath)
+        // `lyric run` is a DRIVER: the program itself runs in a lyrvm child that inherits the
+        // pipes. A terminal's Ctrl+C goes to the whole foreground process group, so the test
+        // must too — setsid gives the driver its own group (its pid becomes the pgid), and the
+        // kill below signals the group. Signalling only the driver killed the wrapper and
+        // orphaned a lyrvm that held stdout open forever, which is exactly the failure the
+        // driver's cancel shield now prevents.
+        var info = new ProcessStartInfo("/usr/bin/setsid")
         {
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             WorkingDirectory = Toolchain.RepositoryRoot,
         };
+        info.ArgumentList.Add(Toolchain.LyricPath);
         info.ArgumentList.Add("run");
         info.ArgumentList.Add(source.Path);
 
@@ -70,7 +77,7 @@ public sealed class InterruptTests
 
         using var kill = Process.Start(new ProcessStartInfo("/bin/kill")
         {
-            ArgumentList = { "-s", "INT", process.Id.ToString() },
+            ArgumentList = { "-s", "INT", "--", "-" + process.Id },
             UseShellExecute = false,
         })!;
         kill.WaitForExit();
