@@ -1,0 +1,86 @@
+import std.test { Test, assertEq, assertTrue };
+import std.io.net as net;
+import std.io.error { IoError, IoErrorKind };
+import std.string as strings;
+import std.task { Wait, spawn, run };
+
+class NetLog {
+    port: int,
+    notes: strings.StringBuilder,
+}
+
+let netLog = NetLog { port = 0, notes = strings.StringBuilder.new() };
+
+fn echoServer(): Coroutine<Wait> {
+    let l = net.listen("127.0.0.1", 0)!;
+    netLog.port = net.localPort(l);
+    let conn = net.accept(l)!;
+    let got = net.readSome(conn, 64)!;
+    let ok = net.write(conn, got);
+    assertTrue(ok, "the echo write must reach the peer");
+    net.close(conn);
+    net.closeListener(l);
+}
+
+fn echoClient(): Coroutine<Wait> {
+    while (netLog.port == 0) {
+        yield Wait.Now;
+    }
+    let conn = net.connect("127.0.0.1", netLog.port)!;
+    let ok = net.write(conn, "ping".utf8Encode());
+    assertTrue(ok, "the request write must reach the server");
+    let back = net.readSome(conn, 64)!;
+    netLog.notes.append(strings.utf8Decode(back)!);
+    let eof = net.readSome(conn, 64)!;
+    assertEq(eof.length, 0);
+    net.close(conn);
+}
+
+@Test
+pub fn an_echo_roundtrip_crosses_the_scheduler(): void {
+    netLog.port = 0;
+    spawn(echoServer());
+    spawn(echoClient());
+    run();
+    assertEq(netLog.notes.build(), "ping");
+}
+
+fn refusedClient(): Coroutine<Wait> {
+    // A port nothing listens on: the OS said no, and the kind says WHY. Port 1 is safely
+    // unserved on a test box; the refusal arrives through the connect wait.
+    var kindIsRefused = false;
+    try {
+        let conn = net.connectOrThrow("127.0.0.1", 1);
+        net.close(conn);
+    } catch (e: IoError) {
+        kindIsRefused = match (e.kind) {
+            IoErrorKind.ConnectionRefused => true,
+            _ => false,
+        };
+    }
+    assertTrue(kindIsRefused, "nothing listens on port 1 — the kind must say refused");
+}
+
+@Test
+pub fn a_refused_connect_names_its_kind(): void {
+    spawn(refusedClient());
+    run();
+}
+
+@Test
+pub fn a_taken_address_names_its_kind(): void {
+    let first = net.listen("127.0.0.1", 0)!;
+    let port = net.localPort(first);
+    var kindIsTaken = false;
+    try {
+        let second = net.listenOrThrow("127.0.0.1", port);
+        net.closeListener(second);
+    } catch (e: IoError) {
+        kindIsTaken = match (e.kind) {
+            IoErrorKind.AddressInUse => true,
+            _ => false,
+        };
+    }
+    net.closeListener(first);
+    assertTrue(kindIsTaken, "the second listener must be told the address is taken");
+}

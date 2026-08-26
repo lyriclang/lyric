@@ -20,6 +20,10 @@ pub enum IoErrorKind {
     PermissionDenied,
     InvalidPath,
     Other,
+    /// The peer answered "no" — nothing listens there (4.0, with `std.io.net`).
+    ConnectionRefused,
+    /// The local address is already taken (4.0, with `std.io.net`).
+    AddressInUse,
 }
 
 /// The reason an I/O operation failed: which kind, on which path, and what the platform said.
@@ -36,6 +40,8 @@ pub class IoError :: [Throwable] {
             IoErrorKind.PermissionDenied => "permission denied",
             IoErrorKind.InvalidPath => "invalid path",
             IoErrorKind.Other => "failed",
+            IoErrorKind.ConnectionRefused => "connection refused",
+            IoErrorKind.AddressInUse => "address in use",
         };
         let suffix = if (this.detail == "") "" else " — " + this.detail;
         return name + ": " + this.path + suffix;

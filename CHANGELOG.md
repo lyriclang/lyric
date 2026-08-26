@@ -43,6 +43,14 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   any signature — what stackful coroutines were for. `spawn` takes the non-throwing type: a
   task settles its own errors. Carries `osAccess`.
 
+- **`std.io.net`** — TCP for tasks, and the `networkAccess` bit reserved since 1.x finally
+  gates something. `listen`/`accept`, `connect`, `readSome`/`write`, `close`, with opaque
+  `Listener`/`Socket` handles; every waiting form yields to the scheduler inside the module,
+  so a server is straight-line code in a task. Silent forms answer whether; `OrThrow` twins
+  say why (`IoErrorKind` gains `ConnectionRefused` and `AddressInUse`). `readSome`: bytes are
+  bytes, an empty array is EOF, `null` is a failure. `std.task.poll`'s descriptor half is
+  real now — select over the module's sockets, an errored socket reporting as readable.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty
