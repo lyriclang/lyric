@@ -93,6 +93,18 @@ public readonly struct LyrValue
     /// <summary>Does this closure carry an environment? Without captures there is none.</summary>
     public bool HasEnvironment => Ref is not null;
 
+    /// <summary>
+    /// A coroutine chain value (4.0): the reference IS the chain object. Only the chain opcodes
+    /// touch it, and the verifier proved their operand's type, so no tag distinguishes it — the
+    /// same bet every other value form makes. A <c>?Coroutine&lt;T&gt;</c> works unchanged: the
+    /// reference doubles as the presence marker, as for any object.
+    /// </summary>
+    public static LyrValue FromCoroutine(object chain) => new(0UL, chain);
+
+    /// <summary>The chain object behind a coroutine value.</summary>
+    public object AsCoroutine => Ref
+        ?? throw new InvalidOperationException("null coroutine reference");
+
     /// <summary>"No value" is an empty reference, uniformly for every <c>?T</c>.</summary>
     public static LyrValue None => default;
 

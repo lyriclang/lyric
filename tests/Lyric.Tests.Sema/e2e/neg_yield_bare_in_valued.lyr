@@ -1,0 +1,11 @@
+// Negative: a bare 'yield;' inside a body that yields a value — the half of LYR-SEM0038 that
+// survives 4.0. (The outside-a-body half retired into §10a's runtime panics.)
+
+fn counts(): Coroutine<int> {
+    yield;
+}
+
+fn main(): int {
+    let co = counts();
+    return resume co;
+}

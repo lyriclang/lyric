@@ -11,8 +11,8 @@ public static class Format
 
     /// <summary>An unknown major version is rejected, an unknown minor tolerated, because a new
     /// minor may only add skippable sections. Before v1.0 the major may change freely.</summary>
-    public const ushort VersionMajor = 3;
-    public const ushort VersionMinor = 6;
+    public const ushort VersionMajor = 4;
+    public const ushort VersionMinor = 0;
 }
 
 /// <summary>
@@ -420,4 +420,30 @@ public enum Op : byte
     /// which the runtime passes as argument 0 when one is present.
     /// </summary>
     CallIndirect = 0x78,
+
+    // --- Coroutines as chains (Format 4.0) -----------------------------------------------------
+
+    /// <summary>
+    /// <c>mkcoro &lt;uleb128 body&gt; &lt;uleb128 argc&gt; &lt;type yield&gt;</c> — pops the
+    /// captured arguments and builds a not-yet-started chain. The body index lives in the shared
+    /// call space like a closure target; the first pull hands the arguments to the body's frame.
+    /// The yield type is what the chain carries and what a suspension is compared against.
+    /// </summary>
+    MakeCoroutine = 0x79,
+
+    /// <summary>
+    /// <c>resume &lt;uleb128 lenient&gt; &lt;type yield&gt;</c> — pops a chain value and drives
+    /// it one step. Strict (<c>lenient</c> 0) panics on an exhausted chain and pushes the yielded
+    /// value (nothing for a void chain); lenient pushes the optional-wrapped value or none — for
+    /// a void chain, whether it advanced.
+    /// </summary>
+    ResumePull = 0x7A,
+
+    /// <summary>
+    /// <c>yield &lt;uleb128 hasvalue&gt; &lt;type&gt;</c> — pops the value when one is carried
+    /// and suspends the running chain up to the nearest active resume, which receives it.
+    /// Executed with no resume running it panics, as it does when the value's type is not the
+    /// chain's element type or a frame the interpreter cannot capture stands between.
+    /// </summary>
+    YieldSuspend = 0x7B,
 }

@@ -10,6 +10,33 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.0.0 — Unreleased
+
+The major, in progress on `feature/v4-stackful` (the basket is `lyric#121`); nothing below is
+released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), the format as
+§13 4.0 (`lyric-spec#27`).
+
+### Added
+
+- **Stackful coroutines.** A coroutine is a chain of captured frames, and `yield` works from
+  ANY call depth beneath a running `resume` — a helper can wait so its callers do not have to,
+  with no marker on any signature. `yield` is legal in every function; its failures are
+  PANICS, the dynamic half of the rule: no running resume, a value whose type is not the
+  running chain's element type, a native or JIT-compiled frame between yield and resume
+  (Lua's C-boundary rule), and `resume` of a coroutine that is already running. Inside a
+  coroutine body the static check stays. Format 3.6 → 4.0: three opcodes (`mkcoro`,
+  `resume`, `yield`); a 4.0 runtime runs every 3.x module unchanged, a 3.x runtime rejects
+  4.0 modules.
+
+### Removed — the clocks came due
+
+- **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty
+  array to both "empty" and "unreadable". `entries` says `null`, `entriesOrThrow` says why.
+  Modules compiled before 4.0 still bind the native.
+- **The inward opaque cast outside the declaring module is an ERROR** (`LYR-SEM0093`), as 3.8
+  announced: a handle is issued, not assembled — the declaring module offers a constructor
+  function for values rebuilt from stored numbers.
+
 ## v3.9.1 — 2026-08-25
 
 **The sweep after 3.9.0** (spec: `lyric-spec#25`). Twelve probes; two real findings and one

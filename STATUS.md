@@ -11,6 +11,65 @@
 
 ## Current milestone
 
+**v4 — stackful coroutines — IN PROGRESS on `feature/v4-stackful`** (2026-08-25; the basket is
+`lyric#121`, the language rules are spec §10/§10a via `lyric-spec#26`, the format is §13 4.0
+via `lyric-spec#27`; the branch does NOT merge until the 4.0 line ships — main stays the 3.9.x
+line). **Slice 1 — the chain machinery under the OLD semantics — is BUILT.** A coroutine is a
+chain of captured frames now, not a compiled state machine: three opcodes (`mkcoro` 0x79,
+`resume` 0x7A, `yield` 0x7B; format 3.6 → 4.0), the body lowers as an ORDINARY void function —
+locals in slots; the state object, the re-entry jump table, the lenient parameter and the
+zero-field trick all RETIRED — and `resume`/`next()` are one instruction each: the VM answers
+`?T` and the advanced-bool directly, and `coroutineIsDone` stays registered only for 3.x
+modules. The interpreter captures/restores frame segments over a per-Loop active-resume stack,
+which is also why the C-boundary rule costs nothing: a native callback runs a Loop of its own,
+and a yield beneath it finds no active resume. Sema untouched — yield stays body-only until
+slice 2 — which is what makes the gate meaningful: **the whole pre-4.0 suite passes unchanged
+on the new machine** (4921 tests, the Vm suite green under `LYRIC_JIT=1` too; the JIT declines
+chain functions, so task-shaped code runs interpreted, the #121 contract). The tree still
+claims 3.9.1 while the FORMAT claims 4.0 — nothing releases from this branch, and slice 2
+flips the version. A 4.0 reader accepts every 3.x module (a state machine is ordinary code); a
+3.x reader rejects a 4.0 module at the first unknown opcode. **What the state machine never
+could, pinned in `CoroutineChainTests`**: a chain nested in a chain, DONE once a throw crosses
+the pull (the old machine left that edge undefined and nothing pinned it), defers running as
+the throw unwinds the chain, the one-driver panic, a hundred suspensions reusing one capture
+array. Reader rejections for `mkcoro` seeded in the negative catalogue.
+
+**Slice 2 — the dynamic yield — is BUILT, and the tree claims 4.0.0.** `yield` is legal in
+every function: the sema's SEM0038 narrowed to its surviving half (bare `yield;` in a valued
+body; the outside-a-body pins retired WITH their rule, replaced by their §10a opposites — a
+lambda's yields are the dynamic kind even inside a coroutine body), the lowering annotates a
+dynamic yield with the expression's own type, and §10a rule 3 is a BYTE COMPARISON in the VM:
+a chain op's encoded type span is recorded at decode (SlotA/SlotB into the code bytes), the
+chain keeps its element type's canonical encoding from `mkcoro`, and byte equality is type
+equality within a module — the runtime needs no type model for it (`LYR-VM0015`; 0013/0014
+landed with slice 1, all three in Appendix A). **The five 4.0 suite cases activate and pass —
+conformance 149/149** — including yield-through-a-helper AND through a lambda, the
+no-resume panic, the typed mismatch, one-driver, throw-at-depth with defers. **The clocks came
+due with the version claim**, because SEM0081 enforces them the moment the tree says 4.0.0:
+`listDir` is REMOVED (guide 13 past tense; the native stays registered for 3.x modules; doc
+floor 450 → 449, deliberately) and `LYR-SEM0093` is an ERROR (guide 12, the privilege tests
+flipped to refusal, the embedding save-fixture moved onto the constructor pattern it always
+should have modelled). Guide 11 gains "Yield from any depth"; CHANGELOG carries the 4.0.0
+Unreleased section. Full suite green at 4.0.0 across all 14 projects, Vm under `LYRIC_JIT=1`
+included.
+
+**Slice 3 — the contracts — is BUILT, and with it the stackful item is COMPLETE.** The four
+#121 answers, pinned rather than promised: the **debugger** shows the logical stack because the
+logical stack IS the physical one while a chain runs — a breakpoint in a helper beneath a
+resume answers `[helper, gen.<body>, main]`, pinned at the DAP level; the **backtrace** of a
+panic at depth carries the same splice (with the inliner's standing caveat: a spliced callee
+vanishes from every backtrace, chains included — the pin pads past the inline budget, the
+ExecutionBudgetTests trick); the **budget** reaches inside a resumed chain (a resume is a call,
+its chain's work is that call's work, suspension resets nothing); and the **JIT** declines
+every chain-op-containing function while the program answers unchanged, `Refusals` naming it —
+task-shaped code runs interpreted, which the option's own tests now state. Two stale sentences
+fell: the interpreter's pool comment claimed coroutines "hold no frame across a yield" (chains
+do exactly that), and guide 21's reason for the parked debug thread claimed a CLR frame stack
+the machine has not had since the explicit stack landed — the honest reason is that a debug
+pause is a semaphore inside the loop, not a suspension of it. Next: the item goes to main as a
+PR (the v3 pattern — main claims the major, the release waits for the basket), then **basket
+item 2: `std.task`** per the pipeline.
+
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the
 design round: `@On(Event.Damage)` — ONE positional value, admitted by `std.core.WithArg<T>`

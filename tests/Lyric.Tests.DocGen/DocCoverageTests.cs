@@ -20,9 +20,10 @@ public class DocCoverageTests
     /// <summary>
     /// The documented items counted after the 2.0 cut (2026-08-20): 389 of 389 — the cut removed
     /// 41 deprecated (and documented) declarations, and the coverage reached ALL of the surface
-    /// that remains. Lowered deliberately from 430 for exactly that removal.
+    /// that remains. Lowered deliberately from 430 for exactly that removal, and from 450 at
+    /// 4.0, when `listDir` — documented like everything else — went with its clock.
     /// </summary>
-    private const int Floor = 450;
+    private const int Floor = 449;
 
     private static string RepoRoot([CallerFilePath] string thisFile = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", ".."));

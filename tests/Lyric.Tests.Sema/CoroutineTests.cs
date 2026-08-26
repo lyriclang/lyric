@@ -135,16 +135,24 @@ public class CoroutineTests
     // --- yield rules (SEM0038) ---
 
     [Fact]
-    public void Yield_outside_coroutine_is_reported()
+    public void Yield_outside_a_coroutine_body_is_legal_since_4_0()
     {
-        Assert.Contains(Diags("fn u(): int { yield 1; return 0; }").Diagnostics, d => d.Code == "LYR-SEM0038");
+        // §10a: which chain a yield suspends is a runtime fact, so the checker admits it in
+        // every function; a yield with no running resume is the VM's panic, not a diagnostic.
+        // The pin this replaces held the 3.x static rule.
+        Assert.DoesNotContain(Diags("fn u(): int { yield 1; return 0; }").Diagnostics,
+            d => d.Code == "LYR-SEM0038");
     }
 
     [Fact]
-    public void Yield_in_lambda_is_reported()
+    public void Yield_in_a_lambda_is_the_dynamic_kind()
     {
-        Assert.Contains(Diags("fn co(): Coroutine<int> { let f = (x: int) => { yield 1; return x; }; yield 2; }")
-            .Diagnostics, d => d.Code == "LYR-SEM0038");
+        // Inside a coroutine body a lambda's yields are still the DYNAMIC kind — whose chain
+        // they meet is decided by who calls the lambda — so nothing is checked against the
+        // enclosing coroutine's element type.
+        Assert.DoesNotContain(
+            Diags("fn co(): Coroutine<int> { let f = (x: int) => { yield 1; return x; }; yield 2; }")
+                .Diagnostics, d => d.Code == "LYR-SEM0038");
     }
 
     [Fact]

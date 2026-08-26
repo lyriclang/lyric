@@ -47,7 +47,7 @@ public class ReaderValidationTests
     {
         var file = new Bytes()
             .Raw(0x4C, 0x59, 0x52, 0x42)            // 'LYRB'
-            .Raw((byte)Format.VersionMajor, 0, 6, 0);     // version 3.6, little-endian u16 pair
+            .Raw((byte)Format.VersionMajor, 0, (byte)Format.VersionMinor, 0); // little-endian u16 pair
         foreach (var (id, payload) in sections)
         {
             file.U8(id).Leb((ulong)payload.Length).Raw(payload);
@@ -86,6 +86,39 @@ public class ReaderValidationTests
         Assert.Throws<MalformedBytecodeException>(() => BytecodeReader.ReadOrThrow(module));
 
     // ------------------------------------------------------------------ the catalogue
+
+    [Fact]
+    public void A_mkcoro_body_outside_the_functions_is_rejected()
+    {
+        // mkcoro body 5 in a module with one function and no imports: the chain would call a
+        // function that does not exist at the first pull. 'pop' balances the pushed chain.
+        var code = new Bytes()
+            .Raw(0x79).Leb(5).Leb(0).U8(Void)   // mkcoro body=5, argc=0, yield void
+            .Raw(0x04)                          // pop
+            .Raw(0x41)                          // ret
+            .Data;
+        var ex = Rejects(Module(
+            (2, Strings("f")),
+            (5, FunctionSection(Void, code))));
+        Assert.Contains("mkcoro body", ex.Message);
+    }
+
+    [Fact]
+    public void A_mkcoro_argc_that_is_not_the_bodys_parameter_count_is_rejected()
+    {
+        // Body 0 takes no parameters; a mkcoro claiming one captured argument would hand the
+        // first pull a frame slot nobody declared.
+        var code = new Bytes()
+            .Raw(0x01, I64).Leb(1)              // const i64 1 — the claimed capture
+            .Raw(0x79).Leb(0).Leb(1).U8(Void)   // mkcoro body=0, argc=1, yield void
+            .Raw(0x04)                          // pop
+            .Raw(0x41)                          // ret
+            .Data;
+        var ex = Rejects(Module(
+            (2, Strings("f")),
+            (5, FunctionSection(Void, code))));
+        Assert.Contains("captures", ex.Message);
+    }
 
     [Fact]
     public void A_block_without_a_terminator_is_rejected()

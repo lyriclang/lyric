@@ -151,6 +151,10 @@ internal static class Reachability
                         // lifted function, and it is called indirectly later.
                         case MakeClosure closure: Wurzel(closure.Target); break;
 
+                        // A coroutine body the same way: 'mkcoro' names it, the chain calls it
+                        // by index at the first pull.
+                        case MakeCoroutine coroutine: Wurzel(coroutine.Body); break;
+
                         // The only way an interface value arises in CODE. From here on a 'callvirt' can
                         // hit the methods of this type.
                         case MakeInterface iface: gehoben.Add(iface.Concrete.Value); break;
@@ -215,6 +219,7 @@ internal static class Reachability
                     {
                         Call call => call with { Target = new FunctionId(funktionen[call.Target.Value]) },
                         MakeClosure c => c with { Target = new FunctionId(funktionen[c.Target.Value]) },
+                        MakeCoroutine co => co with { Body = new FunctionId(funktionen[co.Body.Value]) },
                         CallImport ci => ci with { Target = new ImportId(importe[ci.Target.Value]) },
                         var other => other,
                     };

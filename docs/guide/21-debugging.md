@@ -132,9 +132,10 @@ The debuggee's output does not travel as output events here. Your host owns the 
 and already has somewhere to put them.
 
 What this does not do is keep the window drawing. The parked thread is the one the game runs on,
-so the picture stands still until a resume arrives. Drawing through a breakpoint would need an
-interpreter that can return to its host mid-instruction and be resumed later; this one keeps its
-frame stack on the CLR stack, and that is a different machine.
+so the picture stands still until a resume arrives. A breakpoint is a semaphore inside the
+running loop, not a suspension of it: the machine can suspend chains of Lyric frames since 4.0,
+but a debug pause is not a `yield` — nobody stands above it to receive one — and turning every
+instruction boundary into a resumable suspension is a different debugger, not a flag.
 
 Three limits, stated rather than discovered:
 

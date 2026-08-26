@@ -103,4 +103,33 @@ public class CompiledExecutionTests
         Assert.Equal(55L, instance.Call<long>("fib", 10));
         Assert.Contains(instance.Refusals, r => r.Function.EndsWith(".fib", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void A_chain_function_is_declined_and_answers_unchanged()
+    {
+        // 4.0: a function containing a chain opcode cannot compile — a suspended chain must
+        // capture its frames, and a compiled frame cannot be captured; a jitted frame would be
+        // a yield BARRIER besides (§10a rule 4). Task-shaped code runs interpreted, which is
+        // the lyric#121 contract, and the option changes nothing about what it answers.
+        var instance = Instance("""
+            fn firstTwo(): void {
+                yield 1;
+                yield 2;
+            }
+
+            pub fn sum(): int {
+                let co = gen();
+                return (resume co) + (resume co) + (resume co);
+            }
+
+            fn gen(): Coroutine<int> {
+                firstTwo();
+                yield 3;
+            }
+            """, compile: true);
+
+        Assert.Equal(6L, instance.Call<long>("sum"));
+        Assert.Contains(instance.Refusals,
+            r => r.Function.EndsWith(".sum", StringComparison.Ordinal));
+    }
 }

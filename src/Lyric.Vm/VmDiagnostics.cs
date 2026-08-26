@@ -75,6 +75,21 @@ public static class VmDiagnostics
     /// <para>Checked where the value is produced rather than where it is used, so the error
     /// surfaces at the arithmetic that caused it.</para></summary>
     public const string InvalidCodepoint = "LYR-VM0012";
+
+    /// <summary>A <c>yield</c> with no resume running it (4.0, §10a rule 1) — including one
+    /// beneath a native or compiled frame, which runs in an Execute of its own and therefore
+    /// finds no active resume: the C-boundary rule falls out of the machine's shape.</summary>
+    public const string YieldWithoutResume = "LYR-VM0013";
+
+    /// <summary>A <c>resume</c> of a chain that is suspended mid-resume (4.0, §10a rule 5):
+    /// one chain, one driver.</summary>
+    public const string CoroutineRunning = "LYR-VM0014";
+
+    /// <summary>A yield whose value's type is not the running chain's element type (4.0, §10a
+    /// rule 3). The site's type is what the expression statically is — which chain it meets is
+    /// a runtime fact, so the meeting is where the check lives; admitted, the value would
+    /// corrupt the puller, whose result type is static.</summary>
+    public const string YieldTypeMismatch = "LYR-VM0015";
 }
 
 /// <summary>

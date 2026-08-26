@@ -255,27 +255,6 @@ internal sealed class TypeTable
     }
 
     /// <summary>
-    /// Reserves the state type of a coroutine, WITHOUT a layout.
-    ///
-    /// <para>The same two-phase shape as for a recursive class, and for the same reason: the id has to
-    /// stand before the layout is known. Which locals survive a <c>yield</c> is known only once the body
-    /// is lowered, and the body needs the id at its first field access.</para>
-    ///
-    /// <para>Slot 0 is the RE-ENTRY POINT: 0 means "not started yet", n the block behind the nth
-    /// <c>yield</c>, -1 "ran through". Parameters and locals follow.</para>
-    /// </summary>
-    public TypeId ReserveCoroutineState(string name)
-    {
-        var id = new TypeId(_defs.Count);
-        _defs.Add(new IrTypeDef($"<coro:{name}>", [], []));
-        return id;
-    }
-
-    /// <summary>Supplies the layout once the body is lowered.</summary>
-    public void CompleteCoroutineState(TypeId id, IrType[] fieldTypes, string[] fieldNames) =>
-        _defs[id.Value] = _defs[id.Value] with { FieldTypes = fieldTypes, FieldNames = fieldNames };
-
-    /// <summary>
     /// The type of a closure's environment: an object whose fields are the captured values.
     ///
     /// <para>NOT interned, unlike a cell: two lambdas with identically shaped captures still capture

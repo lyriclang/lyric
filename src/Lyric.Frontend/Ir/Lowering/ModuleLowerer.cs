@@ -268,18 +268,17 @@ public static class ModuleLowerer
         {
             try
             {
-                // A coroutine becomes TWO functions: the factory carries the written name and yields a
-                // state object, the body is registered and appended at the end.
+                // A coroutine becomes TWO functions: the factory carries the written name and
+                // yields the suspended chain, the body is registered and appended at the end.
                 if (CoroutineYield(decl) is { } yieldNode)
                 {
-                    var state = typeTable.ReserveCoroutineState(name);
                     var yieldType = typeTable.Lower(yieldNode);
                     var parameterTypes = decl.Parameters
                         .Select(p => typeTable.Lower(p.Type)).ToArray();
                     var receiverType = receiver is null ? null : typeTable.RefTo(receiver);
 
-                    var body = coroutines.Register(decl, name, state, yieldType, receiver);
-                    functions.Add(CoroutineFactory.Build(decl, name, state, yieldType, body,
+                    var body = coroutines.Register(decl, name, yieldType, receiver);
+                    functions.Add(CoroutineFactory.Build(decl, name, yieldType, body,
                         parameterTypes, receiver is not null, receiverType, decl.Span));
                     continue;
                 }

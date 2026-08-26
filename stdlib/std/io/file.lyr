@@ -242,11 +242,9 @@ pub fn removeDir(path: string): bool;
 /// `listDir` predates.
 pub fn entries(path: string): ?string[];
 
-/// The entries of a directory — names, sorted — before 3.7. It answers an empty array to both
-/// "empty" and "unreadable", which no caller can tell apart; `entries` says `null`, and
-/// `entriesOrThrow` says why.
-@Deprecated { message = "use entries — it can say null — or entriesOrThrow", until = "4.0" }
-pub fn listDir(path: string): string[];
+// 'listDir' went with 4.0, as its clock promised since 3.7: it answered an empty array to both
+// "empty" and "unreadable". 'entries' says null, 'entriesOrThrow' says why; the native stays
+// registered in the runtime, because modules compiled before 4.0 still bind it by name.
 
 /// A path in the system's temporary directory. Does NOT create the file.
 pub fn tempDir(): string;

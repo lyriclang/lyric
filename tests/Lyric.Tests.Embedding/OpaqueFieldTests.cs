@@ -37,6 +37,8 @@ public sealed class OpaqueFieldTests : IDisposable
             pub opaque type Entity = int;
 
             pub fn spawn(): Entity { return 1 as Entity; }
+
+            pub fn nobody(): Entity { return 0 as Entity; }
             """);
 
         Module("engine.save", """
@@ -74,7 +76,7 @@ public sealed class OpaqueFieldTests : IDisposable
 
         @Saved
         pub class Holder {
-            hero: world.Entity = 0 as world.Entity,
+            hero: world.Entity = world.nobody(),
             stage: int = 0
         }
         """;

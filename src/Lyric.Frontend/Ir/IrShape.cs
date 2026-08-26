@@ -64,6 +64,11 @@ public static class IrShape
         // CallVirt needs no special handling.
         CallVirt c => c.Args,
 
+        // The body index stands in the instruction, like a closure's target.
+        MakeCoroutine m => m.Args,
+        ResumePull r => new[] { r.Coroutine },
+        YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
+
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
 
@@ -119,6 +124,10 @@ public static class IrShape
         MakeClosure m => m.Dest,
         CallIndirect c => c.Dest,
         CallVirt c => c.Dest,
+
+        MakeCoroutine m => m.Dest,
+        ResumePull r => r.Dest,
+        YieldSuspend => null,
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
@@ -195,6 +204,10 @@ public static class IrShape
                 Dest = Opt(c.Dest), Callee = temp(c.Callee), Args = All(c.Args),
             },
             CallVirt c => c with { Dest = Opt(c.Dest), Args = All(c.Args) },
+
+            MakeCoroutine m => m with { Dest = temp(m.Dest), Args = All(m.Args) },
+            ResumePull r => r with { Dest = Opt(r.Dest), Coroutine = temp(r.Coroutine) },
+            YieldSuspend y => y with { Value = Opt(y.Value) },
 
             _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
         };

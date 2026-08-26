@@ -29,9 +29,9 @@ Since 3.7 a silent form whose failure carries a REASON has a throwing twin, suff
 the twin throws a module-specific error type (`IoError`, `JsonError`, `EncodingError`,
 `Utf8Error`) exactly where the silent form answers `null` or `false`. [Chapter 10](10-errors.md)
 shows both shapes side by side. Where `null` is the whole truth — `env`, `Map.get`, `parseInt` —
-the silent form stands alone. `listDir` is deprecated toward 4.0: it answers an empty array to
-both "empty" and "unreadable", which `entries` (`?string[]`) and `entriesOrThrow` can finally
-tell apart.
+the silent form stands alone. `listDir` went with 4.0, as its clock promised: it answered an
+empty array to both "empty" and "unreadable", which `entries` (`?string[]`) and
+`entriesOrThrow` tell apart.
 
 ## Collections
 

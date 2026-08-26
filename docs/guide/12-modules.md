@@ -192,10 +192,11 @@ is its underlying number. The wall spans modules: an SDK of several files declar
 once and imports it wherever a native signature names it — selectively or module-qualified, in
 scalar and array positions alike.
 
-**Making one is the declaring module's privilege** (since 3.8). The inward cast — `42 as
+**Making one is the declaring module's privilege**. The inward cast — `42 as
 Entity` — used to work from any module that could see the alias, which quietly undid the wall:
 a script could forge the very handle the type exists to protect. Outside the declaring module
-it now warns (`LYR-SEM0093`), and 4.0 refuses it. The outward cast (`e as int`) stays free
+it is refused (`LYR-SEM0093`; 3.8 announced it as a warning, 4.0 keeps the promise the clock
+made). The outward cast (`e as int`) stays free
 everywhere — reading the number breaks no promise. If a value legitimately has to be rebuilt
 from a stored number — a saved game, a wire message — the declaring module offers a constructor
 function for it; issuing stays an issuer's act:

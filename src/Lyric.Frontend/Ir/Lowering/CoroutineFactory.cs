@@ -4,12 +4,13 @@ using Lyric.Core;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// Builds the FACTORY of a coroutine: the function that stands under the written name and yields a
-/// state object.
+/// Builds the FACTORY of a coroutine: the function that stands under the written name and yields
+/// the suspended chain.
 ///
-/// <para>It is tiny and does exactly three things: allocate the object, write the parameters into it,
-/// return it. The re-entry point in field 0 stays at 0 — "not started yet" — because a freshly
-/// allocated object has its fields zeroed.</para>
+/// <para>Since format 4.0 it is one instruction of substance: <c>mkcoro</c> captures the
+/// arguments — <c>this</c> first when the coroutine is a method — and builds the chain object,
+/// not-yet-started; the first pull hands them to the body's frame as its parameters. The
+/// state-machine era allocated a field object and closed a state machine over it here.</para>
 ///
 /// <para>A file of its own rather than a mode in the FunctionLowerer, because the factory lowers no
 /// written code. It has no body, no expressions and no control flow; housing it in the big lowerer
@@ -17,8 +18,9 @@ namespace Lyric.Ir.Lowering;
 /// </summary>
 internal static class CoroutineFactory
 {
-    public static IrFunction Build(FunctionDecl decl, string name, TypeId state, IrType yieldType,
-        FunctionId body, IrType[] parameterTypes, bool hasReceiver, IrType? receiverType, Span span)
+    public static IrFunction Build(FunctionDecl decl, string name, IrType yieldType,
+        FunctionId body, IrType[] parameterTypes, bool hasReceiver, IrType? receiverType,
+        Span span)
     {
         var slots = new SlotAllocator();
         var blocks = new List<IrBlock>();
@@ -30,39 +32,27 @@ internal static class CoroutineFactory
         for (var i = 0; i < decl.Parameters.Length; i++)
             slots.Declare(decl.Parameters[i].Name, parameterTypes[i]);
 
-        var stateType = new IrRefType(state);
-        var instance = slots.NewTemp(stateType);
-        builder.Emit(new NewObject(instance, state, stateType, span));
-
-        // Field 0 is the re-entry point and stays 0. Behind it come 'this' first, then the parameters —
-        // the same order the body lowerer uses when allocating.
-        var field = 1;
+        var args = new List<TempId>();
         var slot = 0;
-
         if (hasReceiver && receiverType is not null)
         {
             var value = slots.NewTemp(receiverType);
-            builder.Emit(new LoadLocal(value, new LocalId(slot), receiverType, span));
-            builder.Emit(new StoreField(instance, state, new FieldId(field), value, span));
-            field++;
-            slot++;
+            builder.Emit(new LoadLocal(value, new LocalId(slot++), receiverType, span));
+            args.Add(value);
         }
-
-        for (var i = 0; i < decl.Parameters.Length; i++, field++, slot++)
+        for (var i = 0; i < decl.Parameters.Length; i++, slot++)
         {
             var value = slots.NewTemp(parameterTypes[i]);
             builder.Emit(new LoadLocal(value, new LocalId(slot), parameterTypes[i], span));
-            builder.Emit(new StoreField(instance, state, new FieldId(field), value, span));
+            args.Add(value);
         }
 
-        // The return value is a CLOSURE over the state object: a fat pointer of object reference and
-        // body index. That makes 'resume co' an ordinary 'callind', needing neither an opcode nor a
-        // value type of its own. The signature carries the lenient flag the body's exhausted exits
-        // branch on.
+        // The chain value keeps the coroutine signature the closure era gave it, so nothing about
+        // assignability, fields or the format's type tags moves with the mechanism.
         var signature = TypeTable.CoroutineSignature(yieldType);
-        var closure = slots.NewTemp(signature);
-        builder.Emit(new MakeClosure(closure, body, instance, signature, span));
-        builder.Seal(new Return(closure, span));
+        var chain = slots.NewTemp(signature);
+        builder.Emit(new MakeCoroutine(chain, body, args.ToArray(), signature, span));
+        builder.Seal(new Return(chain, span));
 
         return new IrFunction(name, signature,
             decl.Parameters.Length + (hasReceiver ? 1 : 0), slots.Locals, slots.Temps, blocks)
