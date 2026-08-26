@@ -198,4 +198,33 @@ public class CapabilityTests
         // 'null' rather than 'None': silently granting less than requested would be the dangerous answer,
         // and the caller should report.
         Assert.Null(CapabilityTable.Parse("file,quantum"));
+
+    private const string UsesProcess = """
+        import std.process { start };
+        fn main(): int { if (start("x", []) == null) { return 0; } return 1; }
+        """;
+
+    [Fact]
+    public void Std_process_carries_its_own_bit_on_top_of_the_scheduler_s() =>
+        // The FIFTH bit (4.0), and the point of it: starting programs is a NEW power, not an
+        // osAccess refinement — so it is a bit osAccess does not imply. The os bit still
+        // appears BESIDE it, honestly: std.process waits through std.task, whose poll is an
+        // environment question. The numeric pin matters for the same reason as bit 2's above —
+        // 0x10 is part of the bytecode contract now.
+        Assert.Equal((ulong)(Capability.ProcessAccess | Capability.OsAccess),
+            Compile(UsesProcess).Capabilities);
+
+    [Fact]
+    public void Os_access_does_not_let_a_program_start_processes()
+    {
+        // The doctrine test: a host that granted the environment questions has not thereby
+        // agreed to arbitrary programs being started.
+        var refused = Assert.Throws<LyricRuntimeException>(() => Interpreter.Run(
+            Compile(UsesProcess), [],
+            NativeRegistry.CreateDefault(TextWriter.Null, TextWriter.Null),
+            Capability.OsAccess));
+
+        Assert.Equal("LYR-CAP0001", refused.Code);
+        Assert.Contains("processAccess", refused.Message);
+    }
 }

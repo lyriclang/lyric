@@ -1,0 +1,164 @@
+// std.process — child processes, inside tasks.
+//
+// The same doctrine as std.io.net: every waiting form yields a `std.task.Wait` from INSIDE
+// this module, so a caller reads straight-line code and no signature anywhere says "waits".
+// The waiting forms therefore belong under a running `std.task.run()`.
+//
+// The bridge to the scheduler is a NOTIFY descriptor per child — a real socket the host owns,
+// registered beside std.io.net's, so "the child produced output" and "the child exited" are
+// ordinary `Wait.Readable` wakes through the one poll native. The host pumps the child's
+// streams into buffers and posts a datagram per event; the natives here answer from the
+// buffers and never block.
+//
+// stdin is QUEUED: `write` hands the bytes to the host and returns, a background writer
+// drains them into the child, and `false` answers only once the child's stdin broke. The
+// pipe-full case therefore costs memory rather than a wait — the honest trade for a child
+// that reads slowly, and the reason `closeStdin` exists: EOF is how a filter learns it has
+// everything.
+
+/// Child processes for tasks: `start` a program, `write` to its stdin, `readSomeOut`/
+/// `readSomeErr` its streams, `wait` for its exit code — every waiting form yielding to the
+/// scheduler instead of blocking the thread.
+///
+/// The silent forms answer *whether* (`null`/`false`); the `OrThrow` twins say *why* with an
+/// `IoError` — `NotFound` when the program does not exist, `PermissionDenied` when it may not
+/// be run. The streams speak `readSome`'s three truths: bytes are bytes, an EMPTY array is
+/// the stream being done (EOF), and `null` is a failure.
+///
+/// Carries `processAccess`, its own capability bit: starting programs is a new power, not an
+/// `osAccess` refinement.
+module std.process;
+
+import std.io.error { IoError, IoErrorKind };
+import std.task { Wait };
+
+/// A started child process. Opaque: it is issued here, never assembled.
+pub opaque type Child = int;
+
+// The natives. Nothing here blocks: reads answer from the host's buffers (null with the
+// would-block kind 6 when a buffer is empty but the stream lives), writes enqueue, and the
+// waiting is this module yielding on the child's notify descriptor. The classification pair
+// follows std.io's last-failure contract; the codes are 1 NotFound, 2 PermissionDenied,
+// 6 WouldBlock (never surfaced — it is the signal to wait), 0 Other.
+fn procStart(program: string, args: string[]): int;
+fn procNotifyFd(child: int): int;
+fn procTryRead(child: int, stderr: bool, max: int): ?uint8[];
+fn procWrite(child: int, bytes: uint8[]): bool;
+fn procCloseStdin(child: int): void;
+fn procHasExited(child: int): bool;
+fn procExitCode(child: int): int;
+fn procKill(child: int): void;
+fn procClose(child: int): void;
+fn lastErrorKind(): int;
+fn lastErrorDetail(): string;
+
+fn lastProcessError(what: string): IoError {
+    let kind = match (lastErrorKind()) {
+        1 => IoErrorKind.NotFound,
+        2 => IoErrorKind.PermissionDenied,
+        _ => IoErrorKind.Other,
+    };
+    return IoError { kind = kind, path = what, detail = lastErrorDetail() };
+}
+
+/// Starts `program` with `args`, streams piped. `null` when it cannot start —
+/// `startOrThrow` says why, `NotFound` being the usual answer.
+pub fn start(program: string, args: string[]): ?Child {
+    let key = procStart(program, args);
+    if (key < 0) {
+        return null;
+    }
+    return key as Child;
+}
+
+/// `start`, with the reason when the program cannot start.
+pub fn startOrThrow(program: string, args: string[]): Child throws IoError {
+    let started = start(program, args);
+    if (started == null) {
+        throw lastProcessError(program);
+    }
+    return started;
+}
+
+/// Waits for bytes on the child's standard output and reads up to `max` of them. Three
+/// truths in one answer: bytes are bytes, an EMPTY array is the stream being done (EOF),
+/// and `null` is a failure — `readSomeOutOrThrow` says which.
+pub fn readSomeOut(child: Child, max: int): ?uint8[] {
+    return readSomeFrom(child, false, max);
+}
+
+/// `readSomeOut`, with the reason when the stream broke. EOF stays the empty array.
+pub fn readSomeOutOrThrow(child: Child, max: int): uint8[] throws IoError {
+    let got = readSomeOut(child, max);
+    if (got == null) {
+        throw lastProcessError("stdout");
+    }
+    return got;
+}
+
+/// `readSomeOut`, for the child's standard error.
+pub fn readSomeErr(child: Child, max: int): ?uint8[] {
+    return readSomeFrom(child, true, max);
+}
+
+/// `readSomeErr`, with the reason when the stream broke.
+pub fn readSomeErrOrThrow(child: Child, max: int): uint8[] throws IoError {
+    let got = readSomeErr(child, max);
+    if (got == null) {
+        throw lastProcessError("stderr");
+    }
+    return got;
+}
+
+fn readSomeFrom(child: Child, stderr: bool, max: int): ?uint8[] {
+    while (true) {
+        let got = procTryRead(child as int, stderr, max);
+        if (got != null) {
+            return got;
+        }
+        if (lastErrorKind() != 6) {
+            return null;
+        }
+        yield Wait.Readable(procNotifyFd(child as int));
+    }
+}
+
+/// Hands `bytes` to the child's standard input. The write is queued and drained in the
+/// background; `false` once the child's stdin broke — a child that exited without reading
+/// everything is the usual way.
+pub fn write(child: Child, bytes: uint8[]): bool {
+    return procWrite(child as int, bytes);
+}
+
+/// `write`, with the reason when the child's stdin broke.
+pub fn writeOrThrow(child: Child, bytes: uint8[]): void throws IoError {
+    if (!write(child, bytes)) {
+        throw lastProcessError("stdin");
+    }
+}
+
+/// Closes the child's standard input once everything queued is written — EOF is how a
+/// filter learns it has everything.
+pub fn closeStdin(child: Child): void {
+    procCloseStdin(child as int);
+}
+
+/// Waits until the child has exited and answers its exit code.
+pub fn wait(child: Child): int {
+    while (!procHasExited(child as int)) {
+        yield Wait.Readable(procNotifyFd(child as int));
+    }
+    return procExitCode(child as int);
+}
+
+/// Ends the child now, without appeal. The exit code `wait` then reports is the kill's,
+/// not the program's.
+pub fn kill(child: Child): void {
+    procKill(child as int);
+}
+
+/// Releases the child's resources — buffers, pipes, the notify descriptor. Closing twice
+/// closes once; a running child is NOT stopped, only disowned.
+pub fn close(child: Child): void {
+    procClose(child as int);
+}

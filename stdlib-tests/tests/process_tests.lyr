@@ -1,0 +1,107 @@
+import std.test { Test, assertEq, assertTrue };
+import std.task { Wait, spawn, run };
+import std.process { Child, start, startOrThrow, readSomeOut, write, closeStdin, wait, close };
+import std.io.error { IoError, IoErrorKind };
+import std.os { platform };
+import std.string as strings;
+
+// Every waiting form lives under run(); a driver task records what it saw and the test
+// asserts after run() returned. A task settles its own errors, so the tasks use the silent
+// forms and PANIC via the assertions — which is how a test fails. The commands are picked
+// per platform: cmd on Windows, the POSIX staples elsewhere — and `sort` for the stdin
+// round trip, the one filter both worlds ship under the same name.
+
+class Seen {
+    exitCode: int,
+    text: string,
+}
+
+let seen = Seen { exitCode = 0 - 999, text = "" };
+
+fn readAllOut(child: Child): string {
+    var collected = "";
+    while (true) {
+        let got = readSomeOut(child, 4096);
+        if (got == null) {
+            return collected;
+        }
+        if (got.length == 0) {
+            return collected;
+        }
+        let decoded = strings.utf8Decode(got);
+        if (decoded != null) {
+            collected = collected + decoded;
+        }
+    }
+}
+
+fn echoing(): Coroutine<Wait> {
+    let child = if (platform() == "windows") start("cmd", ["/c", "echo hi"])
+    else start("/bin/echo", ["hi"]);
+    assertTrue(child != null, "the child started");
+    seen.text = readAllOut(child!);
+    seen.exitCode = wait(child!);
+    close(child!);
+}
+
+@Test
+pub fn a_child_speaks_and_exits_zero(): void {
+    spawn(echoing());
+    run();
+
+    assertEq(seen.exitCode, 0);
+    assertTrue(seen.text.indexOf("hi") == 0, "stdout starts with what echo said");
+}
+
+fn exiting(): Coroutine<Wait> {
+    let child = if (platform() == "windows") start("cmd", ["/c", "exit 3"])
+    else start("/bin/sh", ["-c", "exit 3"]);
+    assertTrue(child != null, "the child started");
+    seen.exitCode = wait(child!);
+    close(child!);
+}
+
+@Test
+pub fn the_exit_code_comes_back_as_the_child_set_it(): void {
+    spawn(exiting());
+    run();
+
+    assertEq(seen.exitCode, 3);
+}
+
+fn sorting(): Coroutine<Wait> {
+    let child = start("sort", []);
+    assertTrue(child != null, "the child started");
+    assertTrue(write(child!, "banana\napple\n".utf8Encode()), "stdin takes the lines");
+    closeStdin(child!);
+    seen.text = readAllOut(child!);
+    seen.exitCode = wait(child!);
+    close(child!);
+}
+
+@Test
+pub fn stdin_rides_through_a_filter_and_comes_back_sorted(): void {
+    spawn(sorting());
+    run();
+
+    assertEq(seen.exitCode, 0);
+    let apple = seen.text.indexOf("apple");
+    let banana = seen.text.indexOf("banana");
+    assertTrue(apple >= 0 && banana > apple, "the filter sorted apple before banana");
+}
+
+@Test
+pub fn a_missing_program_is_null_and_the_twin_names_not_found(): void {
+    assertTrue(start("surely-no-such-program-anywhere", []) == null, "null says whether");
+
+    var named = false;
+    try {
+        startOrThrow("surely-no-such-program-anywhere", []);
+    } catch (e: IoError) {
+        named = match (e.kind) {
+            IoErrorKind.NotFound => true,
+            _ => false,
+        };
+    }
+    assertTrue(named, "the twin names NotFound");
+}

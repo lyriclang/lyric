@@ -54,6 +54,15 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   bytes, an empty array is EOF, `null` is a failure. `std.task.poll`'s descriptor half is
   real now — select over the module's sockets, an errored socket reporting as readable.
 
+- **`std.process`** — child processes for tasks, behind `processAccess`, the FIFTH capability
+  bit and the first new one since 1.0: starting programs is a new power, not an `osAccess`
+  refinement, so a host that granted environment questions has not thereby agreed to it.
+  `start`/`startOrThrow` (opaque `Child`), `readSomeOut`/`readSomeErr` speaking `readSome`'s
+  three truths, queued `write` to stdin with `closeStdin` as the filter's EOF, `wait` for the
+  exit code, `kill`, `close`. Every waiting form yields to the scheduler through the child's
+  notify descriptor — the host pumps the streams and posts a datagram per event, so a child is
+  just another thing `poll` watches.
+
 - **`std.bytes`** — slicing and searching over `uint8[]`, the tooling wire protocols stand
   on: `slice` with `string.substring`'s exact edge behavior, `indexOf`/`indexOfFrom`
   answering `-1` like their string namesakes. Deliberately absent: `concat` (`a + b` already

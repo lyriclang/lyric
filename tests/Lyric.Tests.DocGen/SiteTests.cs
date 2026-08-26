@@ -82,7 +82,7 @@ public class SiteTests
     public void Every_standard_library_module_has_a_page()
     {
         var stdlib = Build().Sections[3];
-        Assert.Equal(20, stdlib.Pages.Length); // + std.io.error in v3.7; + std.task, std.io.net and std.bytes in 4.0
+        Assert.Equal(21, stdlib.Pages.Length); // + std.io.error in v3.7; + std.task, std.io.net, std.bytes and std.process in 4.0
         Assert.All(stdlib.Pages, p => Assert.StartsWith("stdlib/std.", p.SitePath));
     }
 

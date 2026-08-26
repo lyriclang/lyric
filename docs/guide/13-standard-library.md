@@ -127,6 +127,45 @@ twins say why with an `IoError` — `ConnectionRefused` and `AddressInUse` joine
 exactly these answers. `readSome` folds three truths into one value: bytes are bytes, an EMPTY
 array is the peer being done, `null` is a failure.
 
+`std.process` (since 4.0, `processAccess` — its OWN capability bit, because starting programs
+is a new power rather than an `osAccess` refinement) is child processes for tasks: `start` a
+program, `write` to its stdin (queued, drained in the background — `closeStdin` is how a
+filter learns it has everything), `readSomeOut`/`readSomeErr` with `readSome`'s three truths,
+`wait` for the exit code, `kill` and `close`. The handle is opaque (`Child`), and every
+waiting form yields to the scheduler through the child's notify descriptor, so running `sort`
+over some lines is straight-line code inside a task:
+
+```lyr
+import std.io.console { println };
+import std.process { start, write, closeStdin, readSomeOut, wait, close };
+import std.string as strings;
+import std.task { Wait, spawn, run };
+
+fn sorting(): Coroutine<Wait> {
+    let child = start("sort", []);
+    if (child == null) {
+        return;
+    }
+    write(child, "banana\napple\n".utf8Encode());
+    closeStdin(child);
+    let sorted = readSomeOut(child, 4096);
+    if (sorted != null) {
+        let text = strings.utf8Decode(sorted);
+        if (text != null) {
+            println(text);
+        }
+    }
+    wait(child);
+    close(child);
+}
+
+fn main(): int {
+    spawn(sorting());
+    run();
+    return 0;
+}
+```
+
 `std.bytes` (since 4.0, capability-free) is what a wire protocol does between reads:
 `slice(bytes, start, count)` with `string.substring`'s exact edges, and
 `indexOf`/`indexOfFrom` answering `-1` like their string namesakes. Concatenation needs no
