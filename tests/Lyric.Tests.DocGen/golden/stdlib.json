@@ -345,6 +345,172 @@
         },
         {
           "Kind": "Class",
+          "Name": "Deque",
+          "Signature": "pub class Deque<T>",
+          "Doc": "A double-ended queue: push and pop are O(1) at BOTH ends.\n\nDeliberately without iteration for now: a run queue is drained, not walked, and `popFront`\nin a loop IS its walk. `null` from a pop or peek means \"empty\" — an ordinary state, like a\n`List` pop, and the whole truth, so there is no throwing twin.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "data",
+              "Signature": "data: (?T)[]",
+              "Doc": "The backing ring; optional so a popped slot releases its value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 303
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "head",
+              "Signature": "head: int",
+              "Doc": "The index of the front value, meaningful while `count > 0`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 305
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "count",
+              "Signature": "count: int",
+              "Doc": "How many slots are filled.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 307
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "empty",
+              "Signature": "pub static fn empty(): Deque<T>",
+              "Doc": "An empty deque.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 310
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "length",
+              "Signature": "pub fn length(): int",
+              "Doc": "How many values are in it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 316
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "isEmpty",
+              "Signature": "pub fn isEmpty(): bool",
+              "Doc": "Whether nothing is in it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 321
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "capacity",
+              "Signature": "pub fn capacity(): int",
+              "Doc": "How many slots are allocated, empty ones included. For tests and for anyone measuring\nwhat the deque costs; `length` is the truth for everything else.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 327
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "pushBack",
+              "Signature": "pub mut fn pushBack(value: T): void",
+              "Doc": "Appends at the back; amortized O(1).",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 357
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "pushFront",
+              "Signature": "pub mut fn pushFront(value: T): void",
+              "Doc": "Prepends at the front; amortized O(1) — the ring is the reason no slot moves.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 364
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "popFront",
+              "Signature": "pub mut fn popFront(): ?T",
+              "Doc": "Removes and returns the front value, or `null` when empty.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 374
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "popBack",
+              "Signature": "pub mut fn popBack(): ?T",
+              "Doc": "Removes and returns the back value, or `null` when empty.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 386
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "peekFront",
+              "Signature": "pub fn peekFront(): ?T",
+              "Doc": "The front value without removing it, or `null` when empty.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 398
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "peekBack",
+              "Signature": "pub fn peekBack(): ?T",
+              "Doc": "The back value without removing it, or `null` when empty.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 406
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "clear",
+              "Signature": "pub mut fn clear(): void",
+              "Doc": "Empties the deque; the backing stays allocated, as `List.clear` keeps its.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 414
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 301
+          }
+        },
+        {
+          "Kind": "Class",
           "Name": "Map",
           "Signature": "pub class Map<K :: [Hashable<K>], V>",
           "Doc": "A hash map: open addressing, linear probing, load factor 3/4. The key type says how to\nhash and how to compare — `[Hashable<K>]` — and the iteration order is\nUNSPECIFIED.",
@@ -357,7 +523,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 303
+                "Line": 438
               }
             },
             {
@@ -368,7 +534,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 305
+                "Line": 440
               }
             },
             {
@@ -379,7 +545,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 307
+                "Line": 442
               }
             },
             {
@@ -390,7 +556,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 309
+                "Line": 444
               }
             },
             {
@@ -401,7 +567,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 311
+                "Line": 446
               }
             },
             {
@@ -412,7 +578,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 314
+                "Line": 449
               }
             },
             {
@@ -423,7 +589,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 319
+                "Line": 454
               }
             },
             {
@@ -434,7 +600,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 356
+                "Line": 491
               }
             },
             {
@@ -445,7 +611,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 369
+                "Line": 504
               }
             },
             {
@@ -456,7 +622,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 374
+                "Line": 509
               }
             },
             {
@@ -467,7 +633,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 383
+                "Line": 518
               }
             },
             {
@@ -478,7 +644,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 423
+                "Line": 558
               }
             },
             {
@@ -489,7 +655,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 430
+                "Line": 565
               }
             },
             {
@@ -500,13 +666,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 445
+                "Line": 580
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 301
+            "Line": 436
           }
         },
         {
@@ -517,7 +683,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 503
+            "Line": 638
           }
         },
         {
@@ -528,7 +694,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 512
+            "Line": 647
           }
         },
         {
@@ -545,7 +711,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 605
+                "Line": 740
               }
             },
             {
@@ -556,7 +722,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 607
+                "Line": 742
               }
             },
             {
@@ -567,7 +733,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 609
+                "Line": 744
               }
             },
             {
@@ -578,7 +744,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 611
+                "Line": 746
               }
             },
             {
@@ -589,7 +755,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 614
+                "Line": 749
               }
             },
             {
@@ -600,7 +766,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 619
+                "Line": 754
               }
             },
             {
@@ -611,7 +777,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 651
+                "Line": 786
               }
             },
             {
@@ -622,7 +788,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 657
+                "Line": 792
               }
             },
             {
@@ -633,7 +799,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 664
+                "Line": 799
               }
             },
             {
@@ -644,7 +810,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 699
+                "Line": 834
               }
             },
             {
@@ -655,7 +821,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 712
+                "Line": 847
               }
             },
             {
@@ -666,13 +832,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 724
+                "Line": 859
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 603
+            "Line": 738
           }
         },
         {
@@ -689,7 +855,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 755
+                "Line": 890
               }
             },
             {
@@ -700,7 +866,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 757
+                "Line": 892
               }
             },
             {
@@ -711,13 +877,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 760
+                "Line": 895
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 753
+            "Line": 888
           }
         },
         {
@@ -728,7 +894,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 775
+            "Line": 910
           }
         },
         {
@@ -739,7 +905,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 787
+            "Line": 922
           }
         },
         {
@@ -750,7 +916,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 801
+            "Line": 936
           }
         },
         {
@@ -761,7 +927,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 812
+            "Line": 947
           }
         },
         {
@@ -778,7 +944,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 835
+                "Line": 970
               }
             },
             {
@@ -789,7 +955,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 837
+                "Line": 972
               }
             },
             {
@@ -800,13 +966,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 840
+                "Line": 975
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 833
+            "Line": 968
           }
         },
         {
@@ -823,7 +989,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 855
+                "Line": 990
               }
             },
             {
@@ -834,7 +1000,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 857
+                "Line": 992
               }
             },
             {
@@ -845,13 +1011,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 860
+                "Line": 995
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 853
+            "Line": 988
           }
         },
         {
@@ -868,7 +1034,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 878
+                "Line": 1013
               }
             },
             {
@@ -879,7 +1045,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 880
+                "Line": 1015
               }
             },
             {
@@ -890,13 +1056,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 883
+                "Line": 1018
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 876
+            "Line": 1011
           }
         },
         {
@@ -907,7 +1073,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 900
+            "Line": 1035
           }
         },
         {
@@ -918,7 +1084,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 905
+            "Line": 1040
           }
         },
         {
@@ -929,7 +1095,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 912
+            "Line": 1047
           }
         },
         {
@@ -940,7 +1106,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 923
+            "Line": 1058
           }
         },
         {
@@ -951,7 +1117,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 935
+            "Line": 1070
           }
         }
       ]

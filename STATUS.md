@@ -66,9 +66,17 @@ task-shaped code runs interpreted, which the option's own tests now state. Two s
 fell: the interpreter's pool comment claimed coroutines "hold no frame across a yield" (chains
 do exactly that), and guide 21's reason for the parked debug thread claimed a CLR frame stack
 the machine has not had since the explicit stack landed — the honest reason is that a debug
-pause is a semaphore inside the loop, not a suspension of it. Next: the item goes to main as a
-PR (the v3 pattern — main claims the major, the release waits for the basket), then **basket
-item 2: `std.task`** per the pipeline.
+pause is a semaphore inside the loop, not a suspension of it. The item is MERGED to main
+(PR #124); main claims the major, the release waits for the basket.
+
+**`Deque<T>` — basket item 6, pulled forward — is BUILT** (branch `feature/v4-deque`): the
+scheduler's run queue has to exist before the scheduler, and a `List`'s `removeAt(0)` moves
+everything. One ring, O(1) at both ends, `?T` answers with null-means-empty as the whole truth
+(no throwing twin, the §9.0 silent-only case), deliberately without iteration — a queue is
+drained, not walked. Written in Lyric; six lyrtest cases (ring wrap, growth while wrapped,
+head wandering, clear keeps backing, the drain-refill shape); guide 13; doc floor 449 → 464.
+Next: **`std.task`** — spawn, `Wait` (Readable/Writable/Sleep/Now/Interrupt), `run()`, one
+poll native, the scheduler itself in Lyric over `Coroutine<Wait>` chains.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

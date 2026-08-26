@@ -55,6 +55,27 @@ fn main(): int {
 }
 ```
 
+`Map<K, V>` and `Set<T>` hash; `Deque<T>` (since 4.0) is the double-ended queue — push and pop
+are O(1) at BOTH ends, the shape a work queue needs, where a `List`'s `removeAt(0)` would move
+everything. A pop or peek answers `?T`, and `null` means "empty", the whole truth. Deliberately
+without iteration: a queue is drained, not walked — `popFront` in a loop *is* its walk.
+
+```lyr
+import std.collections { Deque };
+
+fn main(): int {
+    let queue = Deque<int>.empty();
+    queue.pushBack(2);
+    queue.pushFront(1);
+
+    var sum = 0;
+    while (!queue.isEmpty()) {
+        sum = sum + queue.popFront()!;
+    }
+    return sum;
+}
+```
+
 ## Iteration
 
 Anything implementing `Iterable<T>` works with `for-in`, including your own types.
