@@ -51,6 +51,13 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   bytes, an empty array is EOF, `null` is a failure. `std.task.poll`'s descriptor half is
   real now — select over the module's sockets, an errored socket reporting as readable.
 
+- **`std.bytes`** — slicing and searching over `uint8[]`, the tooling wire protocols stand
+  on: `slice` with `string.substring`'s exact edge behavior, `indexOf`/`indexOfFrom`
+  answering `-1` like their string namesakes. Deliberately absent: `concat` (`a + b` already
+  joins arrays — a function would be a second name for the operator) and subsequence search
+  (a line ends in one byte; the protocol that needs more can ask). Written in Lyric,
+  capability-free.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty

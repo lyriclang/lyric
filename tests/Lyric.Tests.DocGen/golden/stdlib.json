@@ -29,6 +29,45 @@
       ]
     },
     {
+      "Path": "std.bytes",
+      "Doc": "Slicing and searching over `uint8[]` — what a wire protocol does between reads.\n\nThe edges mirror `string.substring` exactly: a negative `start` or `count` panics, a\n`start` past the end panics, and a `count` past the end clamps to it. `indexOf` answers\n`-1` when nothing is found — ready for `slice`, as `string.indexOf` is for `substring`.",
+      "Items": [
+        {
+          "Kind": "Function",
+          "Name": "slice",
+          "Signature": "pub fn slice(bytes: uint8[], start: int, count: int): uint8[]",
+          "Doc": "`count` bytes from `start`, clamped at the end like `string.substring`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/bytes.lyr",
+            "Line": 16
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "indexOf",
+          "Signature": "pub fn indexOf(bytes: uint8[], value: uint8): int",
+          "Doc": "The first position of `value`, or `-1` — ready for `slice`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/bytes.lyr",
+            "Line": 40
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "indexOfFrom",
+          "Signature": "pub fn indexOfFrom(bytes: uint8[], value: uint8, start: int): int",
+          "Doc": "Searches from a position. `-1` when nothing is found, as in `indexOf`; a negative `start`\nsearches from the front, one past the end finds nothing.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/bytes.lyr",
+            "Line": 46
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.collections",
       "Doc": null,
       "Items": [

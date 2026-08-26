@@ -1,0 +1,47 @@
+import std.test { Test, assertEq, assertTrue };
+import std.bytes { slice, indexOf, indexOfFrom };
+import std.string as strings;
+
+fn sample(): uint8[] {
+    return "hello\nworld".utf8Encode();
+}
+
+@Test
+pub fn slice_takes_the_middle(): void {
+    let mid = slice(sample(), 6, 5);
+    assertEq("world", strings.utf8Decode(mid)!);
+}
+
+@Test
+pub fn slice_clamps_at_the_end_like_substring(): void {
+    let tail = slice(sample(), 6, 99);
+    assertEq("world", strings.utf8Decode(tail)!);
+    assertEq(slice(sample(), 11, 4).length, 0);
+}
+
+@Test
+pub fn index_of_finds_the_line_break(): void {
+    assertEq(indexOf(sample(), 10u8), 5);
+    assertEq(indexOf(sample(), 122u8), 0 - 1); // no 'z' anywhere
+}
+
+@Test
+pub fn index_of_from_resumes_a_search(): void {
+    let doubled = sample() + sample();
+    let first = indexOf(doubled, 10u8);
+    assertEq(first, 5);
+    assertEq(indexOfFrom(doubled, 10u8, first + 1), 16);
+    assertEq(indexOfFrom(doubled, 10u8, 17), 0 - 1);
+}
+
+@Test
+pub fn a_line_reader_is_three_calls(): void {
+    // The shape the tooling exists for: find the break, slice the line, keep the rest.
+    let wire = sample();
+    let at = indexOf(wire, 10u8);
+    assertTrue(at >= 0, "the sample carries a line break");
+    let line = slice(wire, 0, at);
+    let rest = slice(wire, at + 1, wire.length);
+    assertEq("hello", strings.utf8Decode(line)!);
+    assertEq("world", strings.utf8Decode(rest)!);
+}

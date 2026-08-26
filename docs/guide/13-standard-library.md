@@ -120,6 +120,12 @@ twins say why with an `IoError` — `ConnectionRefused` and `AddressInUse` joine
 exactly these answers. `readSome` folds three truths into one value: bytes are bytes, an EMPTY
 array is the peer being done, `null` is a failure.
 
+`std.bytes` (since 4.0, capability-free) is what a wire protocol does between reads:
+`slice(bytes, start, count)` with `string.substring`'s exact edges, and
+`indexOf`/`indexOfFrom` answering `-1` like their string namesakes. Concatenation needs no
+function — `a + b` joins arrays, bytes included. A line reader is three calls: find the
+break, slice the line, keep the rest.
+
 ## Iteration
 
 Anything implementing `Iterable<T>` works with `for-in`, including your own types.
