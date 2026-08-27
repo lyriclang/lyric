@@ -10,7 +10,7 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v4.0.1 — Unreleased
+## v4.0.1 — 2026-08-27
 
 **The sweep after 4.0.0.** Eight probes against what the major added; four real findings, all
 fixed failing-test-first. Nothing in the language or the format changed.
