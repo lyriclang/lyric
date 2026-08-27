@@ -18,6 +18,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.os` | environment, process, exit — requires `osAccess` |
 | `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic; `secureRandom` (4.0) is the one OS-entropy draw. No capability |
 | `std.time` | `Instant`, `Duration`, ISO 8601 — requires `osAccess` |
+| `std.io.stream` | open files read and written in pieces, inside tasks — requires `fileAccess` + `osAccess` |
 | `std.json` | `JsonValue`, `parse`, `serialize`, `serializePretty` — JSON, RFC 8259 |
 | `std.encoding` | `hexEncode`/`hexDecode`, `base64Encode`/`base64Decode` — RFC 4648 |
 | `std.build` | `addExecutable` — only a `build.lyr` run by `lyric build` can use it |
@@ -341,6 +342,87 @@ What none of the shapes carries is a REASON: a missing file and a permission den
 same. That gap is known and left open on purpose — carrying reasons means an error type and a
 decision about `throws` that this module should not make on its own.
 
+## A file too large to hold, and a file read beside other work
+
+`std.io.file` reads a file in ONE call, and it blocks the thread while it does. That is right for
+a config file and wrong for two things: a file too large to hold in memory, and a program with
+tasks, where one blocking read stalls every other task.
+
+Since 4.2 `std.io.stream` opens a HANDLE, and it waits the way `std.io.net` and `std.process`
+already do — inside the module, so the code reads straight down and no signature says "waits":
+
+```lyr
+import std.io.stream as stream;
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn countLines(path: string): Coroutine<Wait> {
+    let f = stream.open(path)!;
+    var seen = 0;
+    let reader = stream.lineReader(f);
+    while (true) {
+        let line = reader.next();
+        if (line == null) {
+            break;
+        }
+        seen = seen + 1;
+    }
+    if (reader.failed()) {
+        println(f"the read broke after {seen} lines");
+    } else {
+        println(seen);
+    }
+    stream.close(f);
+}
+
+fn main(): int {
+    spawn(countLines("big.log"));
+    run();
+    return 0;
+}
+```
+
+`readSome` speaks the same three truths as everywhere else in `std.io`: bytes are bytes, an
+**empty** array is the end of the file, and `null` is a failure — `readSomeOrThrow` says which.
+`write` answers the OUTCOME rather than the handover, which is the difference to `std.process`:
+a queued write cannot report a full disk at the call, and for a file that is the answer that
+matters.
+
+**A `LineReader` is an `Iterator<string>`**, so the adapters chain onto it and every step yields
+through the read beneath:
+
+```lyr
+import std.iter { collectArray };
+import std.io.stream as stream;
+import std.io.console { println };
+import std.string as strings;
+import std.task { Wait };
+
+fn firstErrors(f: stream.File): Coroutine<Wait> {
+    let errors = collectArray(
+        stream.lineReader(f).filter((s) => s.contains("ERROR")).take(20));
+    println(f"{errors.length} errors");
+}
+```
+
+That protocol spends `null` on "the end", so a read failure and the end of the file look the same
+from `next()` alone. `failed()` is how you tell them apart after the walk — Rust yields a
+`Result` per line for this; Lyric has no `Result`, so the question is asked once at the end
+instead of answered once per line.
+
+### Two things to know before you reach for it
+
+**These forms need a running `run()`.** `readSome`, `write` and a `LineReader` walk yield, and a
+yield outside a running coroutine panics ([chapter 11](11-coroutines.md)). `open` and `close`
+work anywhere. Outside a scheduler, `std.io.file`'s whole-file forms are the answer, and they
+are unchanged.
+
+**It is its own module because of the capability.** Waiting means importing `std.task`, which
+carries `osAccess`, and a module requires the union of what it imports — so a handle beside
+`text` would make every program that reads a config file demand `osAccess` too. It is the
+`std.io.path` split of 4.0 in the other direction: a path costs no capability and moved out, a
+handle costs an extra one and stays out.
+
 ## JSON is one value type
 
 `std.json` reads and writes JSON (RFC 8259). A whole document is one `JsonValue` — an enum over
@@ -462,9 +544,12 @@ decision.
 
 ## Capabilities
 
-`std.io.file`, `std.os` and `std.time` require a capability. A standalone run grants
-everything; a host grants explicitly, and a module that requires more than it is granted is
-rejected before it runs.
+`std.io.file`, `std.io.stream`, `std.io.net`, `std.os`, `std.time`, `std.task` and
+`std.process` require a capability. A standalone run grants everything; a host grants
+explicitly, and a module that requires more than it is granted is rejected before it runs.
+
+A module requires the UNION of what it imports, which is why `std.io.stream` needs `osAccess`
+beside `fileAccess`: it waits, waiting is `std.task`, and `std.task` asks the OS clock.
 
 ## Strings have methods
 

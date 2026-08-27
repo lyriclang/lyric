@@ -191,3 +191,39 @@ pub fn an_early_interrupt_is_remembered_for_the_next_to_park(): void {
     assertEq(seen.length, 1);
     assertEq(seen[0], 100);
 }
+
+// A spinner and a waiter, which is the pair that showed `block` was reachable only with an
+// EMPTY run queue: the poll is the one place a deadline or a descriptor is looked at, so a
+// task yielding `Wait.Now` in a loop starved every other kind of wait for ever. Found while
+// building `std.io.stream`, where a reading task and a busy neighbour are the ordinary shape.
+class SpinLog {
+    woke: bool,
+    turns: int,
+}
+
+let spin = SpinLog { woke = false, turns = 0 };
+
+fn sleepThenWake(): Coroutine<Wait> {
+    yield Wait.Sleep(5);
+    spin.woke = true;
+}
+
+fn spinUntilWoken(): Coroutine<Wait> {
+    // The cap is the assertion: without the fix this loop never ends, so a bounded spin turns
+    // a hang into a failure a test run can report.
+    while (!spin.woke && spin.turns < 100000) {
+        spin.turns = spin.turns + 1;
+        yield Wait.Now;
+    }
+}
+
+@Test
+pub fn a_spinning_task_does_not_starve_a_sleeper(): void {
+    spin.woke = false;
+    spin.turns = 0;
+    spawn(sleepThenWake());
+    spawn(spinUntilWoken());
+    run();
+    assertTrue(spin.woke, "the 5ms sleeper must wake while another task yields Wait.Now");
+    assertTrue(spin.turns < 100000, "the spinner ended because the sleeper woke, not on its cap");
+}

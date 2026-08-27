@@ -11,6 +11,34 @@
 
 ## Current milestone
 
+**v4.2.0 — the file handle — closes the two-release train** (2026-08-27). `std.io.stream`:
+`open`/`create`/`openAppend`/`readSome`/`write`/`close` with their §9.0 twins, plus a
+`LineReader` that is an `Iterator<string>`, so the adapters chain onto it and every step yields
+through the read beneath — the first place the library itself spends what 4.0's dynamic yield
+bought. Host side is the `std.process` shape, deliberately and not the `std.io.net` one: **a
+regular file is not selectable on any platform** (`Socket.Select` takes sockets, POSIX `select()`
+calls a file ready whatever its state), so a handle carries a notify socket and the work runs on
+a pool thread. The price, named rather than discovered later: one loopback UDP socket per open
+file. `write` answers the OUTCOME rather than the handover, which is where it parts from
+`std.process` — a queued write cannot report a full disk at the call.
+
+**Two findings the slice produced, and the first one nearly shipped.** (1) The handle was built
+INSIDE `std.io.file` first, and that silently added `osAccess` to every program that merely calls
+`text` — measured, 0x1 → 0x5 on a config-file program — because waiting means importing
+`std.task` and a module requires the UNION of its imports. Hence the own module: the `std.io.path`
+split of 4.0 in the other direction, a path costs no capability and moved out, a handle costs an
+extra one and stays out. The lesson is that a capability requirement is a compile-time
+consequence of an IMPORT, so any std module that gains a `std.task` import is making that
+decision for everyone downstream. (2) **A `Wait.Now` spinner starved every other wait** —
+`run` reached `block()` only with an EMPTY run queue, and `block()` is the one place a descriptor
+or a deadline is looked at. A 4.0 scheduler bug, not a new one: `std.io.net` and `std.process`
+were equally affected, and nothing caught it because no test mixed a spinner with a waiter for
+longer than one round. Probe measured `read=0` after 200 000 spinner turns; after the fix
+`read=400` in 249. Fixed failing-test-first, pinned in `task_tests` with a 5ms sleeper beside a
+bounded spinner — the bound IS the assertion, since without the fix the loop never ends. 165
+lyrtest (13 new), all 14 C# projects green, doc floor 533 → 554, module pages 22 → 23, guide 13
+gains "A file too large to hold, and a file read beside other work".
+
 **The std round after the major opens with v4.1.0** (2026-08-27): `Instant` and `Duration`
 get the four conformances every other value in the library has had — `Equatable`, `Ordered`,
 `Hashable`, `Display`. It is the first item of the two-release train the maintainer chose over

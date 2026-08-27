@@ -989,6 +989,8 @@ public sealed class NativeRegistry
 
         RegisterProcess(registry);
 
+        RegisterFileHandles(registry);
+
         registry.Register("std.os.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
@@ -1713,11 +1715,13 @@ public sealed class NativeRegistry
 
     // The event side runs on pool threads; a lost datagram only costs a wake, because every
     // native that answers a waiter drains the pipe and re-reads the buffers first.
-    private static void Poke(ChildState state)
+    private static void Poke(ChildState state) => Poke(state.Notify);
+
+    private static void Poke(System.Net.Sockets.Socket notify)
     {
         try
         {
-            state.Notify.Send(new byte[] { 1 });
+            notify.Send(new byte[] { 1 });
         }
         catch (System.Net.Sockets.SocketException)
         {
@@ -1982,6 +1986,262 @@ public sealed class NativeRegistry
             _ => LyrValue.FromI64(_lastProcKind));
         registry.Register("std.process.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastProcDetail ?? ""));
+    }
+
+    // ---------------------------------------------------------- std.io.stream (4.2)
+    //
+    // The std.process shape rather than the std.io.net one, and the reason is the platform: a
+    // regular file is not selectable. Socket.Select takes only sockets, and a POSIX select()
+    // over a file descriptor reports it ready whatever its state, so readiness cannot be asked
+    // for. An open file therefore carries a notify socket like a child does, the work runs on a
+    // pool thread, and the scheduler waits on it with the ordinary Wait.Readable through the one
+    // poll native. Every native here answers now; the WAITING lives in std/io/file.lyr.
+    //
+    // One read and one write may be in flight per handle. The module yields until each settles,
+    // so a second start cannot arrive from Lyric -- the check exists for the runtime's own sake.
+
+    private sealed class FileState
+    {
+        public required FileStream Stream { get; init; }
+        public required System.Net.Sockets.Socket Notify { get; init; }
+        public required long NotifyFd { get; init; }
+        public readonly object Gate = new();
+        public readonly List<byte[]> Chunks = [];
+        public int Offset;
+        public bool Reading;
+        public bool Eof;
+        public bool ReadFailed;
+        public bool Writing;
+        public int WriteOutcome;
+        public string? Detail;
+        public bool Closed;
+    }
+
+    [ThreadStatic] private static Dictionary<long, FileState>? _files;
+    [ThreadStatic] private static long _nextFileKey;
+
+    private static Dictionary<long, FileState> Files => _files ??= new();
+
+    private static FileState? FileOf(long key) =>
+        _files is { } table && table.TryGetValue(key, out var state) ? state : null;
+
+    // Kind 6 is the would-block signal std.io.net and std.process already speak; it never
+    // surfaces to a caller, because the module turns it into a wait.
+    private static void RecordIoWouldBlock()
+    {
+        _lastIoKind = 6;
+        _lastIoDetail = "the operation has not finished";
+    }
+
+    private static void RecordIoNoHandle()
+    {
+        _lastIoKind = 0;
+        _lastIoDetail = "no such open file";
+    }
+
+    private static void StartRead(FileState state, int max)
+    {
+        state.Reading = true;
+        _ = Task.Run(async () =>
+        {
+            var buffer = new byte[max];
+            try
+            {
+                var got = await state.Stream.ReadAsync(buffer.AsMemory(0, max))
+                    .ConfigureAwait(false);
+                lock (state.Gate)
+                {
+                    if (got <= 0) state.Eof = true;
+                    else state.Chunks.Add(buffer[..got]);
+                    state.Reading = false;
+                }
+            }
+            catch (Exception e)
+            {
+                lock (state.Gate)
+                {
+                    state.ReadFailed = true;
+                    state.Detail = e.Message;
+                    state.Reading = false;
+                }
+            }
+            Poke(state.Notify);
+        });
+    }
+
+    private static void StartWrite(FileState state, byte[] bytes)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await state.Stream.WriteAsync(bytes).ConfigureAwait(false);
+                await state.Stream.FlushAsync().ConfigureAwait(false);
+                lock (state.Gate)
+                {
+                    state.WriteOutcome = 1;
+                    state.Writing = false;
+                }
+            }
+            catch (Exception e)
+            {
+                lock (state.Gate)
+                {
+                    state.WriteOutcome = 0;
+                    state.Detail = e.Message;
+                    state.Writing = false;
+                }
+            }
+            Poke(state.Notify);
+        });
+    }
+
+    private static void RegisterFileHandles(NativeRegistry registry)
+    {
+        var i64 = TypeTag.I64;
+
+        // Mode 0 reads, 1 creates or truncates, 2 appends. One native rather than three: the
+        // three differ in a FileMode and in nothing else.
+        registry.Register("std.io.stream.streamOpen", [TypeTag.String, i64], i64, args =>
+        {
+            var path = args[0].AsString;
+            FileStream stream;
+            try
+            {
+                stream = args[1].AsI64 switch
+                {
+                    1 => new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read,
+                        4096, useAsync: true),
+                    2 => new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read,
+                        4096, useAsync: true),
+                    _ => new FileStream(path, FileMode.Open, FileAccess.Read,
+                        FileShare.ReadWrite, 4096, useAsync: true),
+                };
+            }
+            catch (Exception e)
+            {
+                RecordIo(e);
+                return LyrValue.FromI64(-1);
+            }
+
+            var notify = new System.Net.Sockets.Socket(
+                System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Dgram,
+                System.Net.Sockets.ProtocolType.Udp);
+            notify.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+            notify.Connect(notify.LocalEndPoint!);
+            notify.Blocking = false;
+
+            var key = ++_nextFileKey;
+            Files[key] = new FileState
+            {
+                Stream = stream,
+                Notify = notify,
+                NotifyFd = AddSocket(notify),
+            };
+            return LyrValue.FromI64(key);
+        });
+
+        registry.Register("std.io.stream.streamNotifyFd", [i64], i64, args =>
+            LyrValue.FromI64(FileOf(args[0].AsI64)?.NotifyFd ?? -1));
+
+        registry.RegisterOptionalArrayReturning("std.io.stream.streamTryRead", [i64, i64], TypeTag.U8,
+            args =>
+        {
+            if (FileOf(args[0].AsI64) is not { } state)
+            {
+                RecordIoNoHandle();
+                return LyrValue.None;
+            }
+            var max = (int)Math.Clamp(args[1].AsI64, 1, 1 << 20);
+
+            DrainPipe(state.Notify);
+            lock (state.Gate)
+            {
+                // Buffered bytes come first even after a failure: what was read was read.
+                if (state.Chunks.Count > 0)
+                    return Bytes(TakeBuffered(state.Chunks, ref state.Offset, max));
+                if (state.ReadFailed)
+                {
+                    _lastIoKind = 0;
+                    _lastIoDetail = state.Detail ?? "the read failed";
+                    return LyrValue.None;
+                }
+                if (state.Eof) return Bytes([]);
+                if (!state.Reading) StartRead(state, max);
+                RecordIoWouldBlock();
+                return LyrValue.None;
+            }
+        });
+
+        registry.RegisterWithArrayParams("std.io.stream.streamWriteStart",
+            [i64, TypeTag.Array], [null, TypeTag.U8], TypeTag.Bool, args =>
+        {
+            if (FileOf(args[0].AsI64) is not { } state || state.Closed)
+            {
+                RecordIoNoHandle();
+                return LyrValue.FromBool(false);
+            }
+            lock (state.Gate)
+            {
+                if (state.Writing)
+                {
+                    _lastIoKind = 0;
+                    _lastIoDetail = "a write is already in flight";
+                    return LyrValue.FromBool(false);
+                }
+                state.Writing = true;
+                state.WriteOutcome = -1;
+            }
+            StartWrite(state, ToBytes(args[1]));
+            return LyrValue.FromBool(true);
+        });
+
+        // -1 while the write is in flight, 1 when it landed, 0 when it broke.
+        registry.Register("std.io.stream.streamWriteReady", [i64], i64, args =>
+        {
+            if (FileOf(args[0].AsI64) is not { } state)
+            {
+                RecordIoNoHandle();
+                return LyrValue.FromI64(0);
+            }
+            DrainPipe(state.Notify);
+            lock (state.Gate)
+            {
+                if (state.Writing)
+                {
+                    RecordIoWouldBlock();
+                    return LyrValue.FromI64(-1);
+                }
+                if (state.WriteOutcome == 0)
+                {
+                    _lastIoKind = 0;
+                    _lastIoDetail = state.Detail ?? "the write failed";
+                }
+                return LyrValue.FromI64(state.WriteOutcome);
+            }
+        });
+
+        registry.Register("std.io.stream.streamClose", [i64], TypeTag.Void, args =>
+        {
+            var key = args[0].AsI64;
+            if (FileOf(key) is not { } state || state.Closed) return default;
+            state.Closed = true;
+            // A read or write still in flight ends against a disposed stream, which its own
+            // catch records; nobody is left to read the record.
+            try { state.Stream.Dispose(); } catch (Exception) { /* closing twice closes once */ }
+            try { state.Notify.Close(); } catch (Exception) { /* the same */ }
+            Sockets.Remove(state.NotifyFd);
+            Files.Remove(key);
+            return default;
+        });
+
+        // The same storage std.io.file records into: one RecordIo serves both modules, and a
+        // module only ever reads it straight after its own silent form refused.
+        registry.Register("std.io.stream.lastErrorKind", [], i64,
+            _ => LyrValue.FromI64(_lastIoKind));
+        registry.Register("std.io.stream.lastErrorDetail", [], TypeTag.String,
+            _ => LyrValue.FromString(_lastIoDetail ?? ""));
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>

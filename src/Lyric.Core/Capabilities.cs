@@ -46,6 +46,11 @@ public static class CapabilityTable
     private static readonly (string Module, Capability Needs)[] Gated =
     [
         ("std.io.file", Capability.FileAccess),
+        // Open-file handles (4.2). The disk bit here; the osAccess the waiting needs
+        // arrives through its std.task import, which is the whole reason it is not
+        // part of std.io.file — a program reading a config file must not pay for a
+        // scheduler it never starts.
+        ("std.io.stream", Capability.FileAccess),
         ("std.io.net", Capability.NetworkAccess),
         ("std.os", Capability.OsAccess),
         // The same bit as std.os, deliberately: reading the clock is a question to the

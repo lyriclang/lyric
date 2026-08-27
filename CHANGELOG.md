@@ -10,6 +10,72 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.2.0 — 2026-08-27
+
+**Open files, read and written in pieces, inside tasks** — and a scheduler bug the feature's own
+test exposed. Additive: nothing was deprecated or removed, and no existing program changes
+meaning.
+
+### Added
+
+- **`std.io.stream` — a file HANDLE, and it waits without blocking the thread.** `std.io.file`
+  reads a file in one call and holds the thread while it does. That is right for a config file
+  and wrong for two things: a file too large to hold, and a program with tasks, where one
+  blocking read stalls every other task.
+
+  ```lyr
+  let f = stream.open(path)!;
+  let reader = stream.lineReader(f);
+  while (true) {
+      let line = reader.next();
+      if (line == null) { break; }
+      // …
+  }
+  stream.close(f);
+  ```
+
+  `open`, `create`, `openAppend`, `readSome`, `write`, `close`, each with its `OrThrow` twin per
+  §9.0. `readSome` speaks the 2.14 three truths — bytes are bytes, an EMPTY array is the end of
+  the file, `null` is a failure. The waiting happens INSIDE the module, so no signature says
+  "waits", exactly as in `std.io.net` and `std.process`.
+
+  **`write` answers the OUTCOME, not the handover**, which is the difference to `std.process`:
+  a queued write cannot report a full disk at the call, and for a file that is the answer that
+  matters.
+
+- **`LineReader`, an `Iterator<string>` over an open file.** Terminators removed, CRLF and LF
+  alike, a last line without a terminator still a line. The adapters chain onto it, and every
+  step yields through the read beneath it — the first place the standard library itself uses
+  what 4.0's dynamic yield bought.
+
+  The iterator protocol spends `null` on "the end", so a read failure and the end of the file
+  look the same from `next()`. `failed()` tells them apart after the walk.
+
+- **These forms need a running `std.task.run()`.** They yield, and a yield outside a running
+  coroutine panics. `open` and `close` work anywhere; outside a scheduler, `std.io.file`'s
+  whole-file forms are unchanged and remain the answer.
+
+- **It is its own module because of the capability, and that is the whole reason.** Waiting means
+  importing `std.task`, which carries `osAccess`, and a module requires the union of what it
+  imports. Putting the handle beside `text` would have made every program that reads a config
+  file demand `osAccess` as well — measured at 0x1 before and 0x5 after, on a program that only
+  calls `text`. It is the `std.io.path` split of 4.0 in the other direction: a path costs no
+  capability and moved out, a handle costs an extra one and stays out.
+
+### Fixed
+
+- **A task yielding `Wait.Now` in a loop no longer starves every other kind of wait.**
+  `std.task.run` reached its poll only with an EMPTY run queue, and the poll is the one place a
+  descriptor or a deadline is ever looked at. So one spinning task meant a `Wait.Sleep` never
+  woke and a `Wait.Readable` never fired — for as long as the spinner ran.
+
+  This is a bug in 4.0's scheduler, not in the new module; it affects `std.io.net` and
+  `std.process` exactly as much. Nothing caught it because no test mixed a spinner with a
+  waiter for longer than a single round. The fix polls with a zero timeout when a task is
+  runnable and blocks only when none is, so a runnable task still runs first and a waiter is
+  still looked at every round. Pinned in `task_tests` with a 5ms sleeper beside a bounded
+  spinner — the bound is the assertion, because without the fix the loop never ends.
+
 ## v4.1.0 — 2026-08-27
 
 **`Instant` and `Duration` join the library's conformances.** Additive: no existing program
