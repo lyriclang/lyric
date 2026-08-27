@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.process — Lyric v4.2.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/" class="here">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.process</h1>
+<nav class="contents">
+<ul>
+<li><a href="#alias-child">Child</a></li>
+<li><a href="#function-start">start</a></li>
+<li><a href="#function-startorthrow">startOrThrow</a></li>
+<li><a href="#function-readsomeout">readSomeOut</a></li>
+<li><a href="#function-readsomeoutorthrow">readSomeOutOrThrow</a></li>
+<li><a href="#function-readsomeerr">readSomeErr</a></li>
+<li><a href="#function-readsomeerrorthrow">readSomeErrOrThrow</a></li>
+<li><a href="#function-write">write</a></li>
+<li><a href="#function-writeorthrow">writeOrThrow</a></li>
+<li><a href="#function-closestdin">closeStdin</a></li>
+<li><a href="#function-wait">wait</a></li>
+<li><a href="#function-kill">kill</a></li>
+<li><a href="#function-close">close</a></li>
+</ul>
+</nav>
+<p>Child processes for tasks: <code>start</code> a program, <code>write</code> to its stdin, <code>readSomeOut</code>/
+<code>readSomeErr</code> its streams, <code>wait</code> for its exit code — every waiting form yielding to the
+scheduler instead of blocking the thread.</p>
+<p>The silent forms answer <em>whether</em> (<code>null</code>/<code>false</code>); the <code>OrThrow</code> twins say <em>why</em> with an
+<code>IoError</code> — <code>NotFound</code> when the program does not exist, <code>PermissionDenied</code> when it may not
+be run. The streams speak <code>readSome</code>'s three truths: bytes are bytes, an EMPTY array is
+the stream being done (EOF), and <code>null</code> is a failure.</p>
+<p>Carries <code>processAccess</code>, its own capability bit: starting programs is a new power, not an
+<code>osAccess</code> refinement.</p>
+<section class="item" id="alias-child">
+<h2><a href="#alias-child">Child</a> <span class="kind">alias</span></h2>
+<pre class="signature"><code class="language-lyr">pub type Child = int</code></pre>
+<p>A started child process. Opaque: it is issued here, never assembled.</p>
+<p class="source">stdlib/std/process.lyr:36</p>
+</section>
+<section class="item" id="function-start">
+<h2><a href="#function-start">start</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn start(program: string, args: string[]): ?Child</code></pre>
+<p>Starts <code>program</code> with <code>args</code>, streams piped. <code>null</code> when it cannot start —
+<code>startOrThrow</code> says why, <code>NotFound</code> being the usual answer.</p>
+<p class="source">stdlib/std/process.lyr:66</p>
+</section>
+<section class="item" id="function-startorthrow">
+<h2><a href="#function-startorthrow">startOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn startOrThrow(program: string, args: string[]): Child throws IoError</code></pre>
+<p><code>start</code>, with the reason when the program cannot start.</p>
+<p class="source">stdlib/std/process.lyr:75</p>
+</section>
+<section class="item" id="function-readsomeout">
+<h2><a href="#function-readsomeout">readSomeOut</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeOut(child: Child, max: int): ?uint8[]</code></pre>
+<p>Waits for bytes on the child's standard output and reads up to <code>max</code> of them. Three
+truths in one answer: bytes are bytes, an EMPTY array is the stream being done (EOF),
+and <code>null</code> is a failure — <code>readSomeOutOrThrow</code> says which.</p>
+<p class="source">stdlib/std/process.lyr:86</p>
+</section>
+<section class="item" id="function-readsomeoutorthrow">
+<h2><a href="#function-readsomeoutorthrow">readSomeOutOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeOutOrThrow(child: Child, max: int): uint8[] throws IoError</code></pre>
+<p><code>readSomeOut</code>, with the reason when the stream broke. EOF stays the empty array.</p>
+<p class="source">stdlib/std/process.lyr:91</p>
+</section>
+<section class="item" id="function-readsomeerr">
+<h2><a href="#function-readsomeerr">readSomeErr</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeErr(child: Child, max: int): ?uint8[]</code></pre>
+<p><code>readSomeOut</code>, for the child's standard error.</p>
+<p class="source">stdlib/std/process.lyr:100</p>
+</section>
+<section class="item" id="function-readsomeerrorthrow">
+<h2><a href="#function-readsomeerrorthrow">readSomeErrOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeErrOrThrow(child: Child, max: int): uint8[] throws IoError</code></pre>
+<p><code>readSomeErr</code>, with the reason when the stream broke.</p>
+<p class="source">stdlib/std/process.lyr:105</p>
+</section>
+<section class="item" id="function-write">
+<h2><a href="#function-write">write</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn write(child: Child, bytes: uint8[]): bool</code></pre>
+<p>Hands <code>bytes</code> to the child's standard input. The write is queued and drained in the
+background; <code>false</code> once the child's stdin broke — a child that exited without reading
+everything is the usual way.</p>
+<p class="source">stdlib/std/process.lyr:129</p>
+</section>
+<section class="item" id="function-writeorthrow">
+<h2><a href="#function-writeorthrow">writeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn writeOrThrow(child: Child, bytes: uint8[]): void throws IoError</code></pre>
+<p><code>write</code>, with the reason when the child's stdin broke.</p>
+<p class="source">stdlib/std/process.lyr:134</p>
+</section>
+<section class="item" id="function-closestdin">
+<h2><a href="#function-closestdin">closeStdin</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn closeStdin(child: Child): void</code></pre>
+<p>Closes the child's standard input once everything queued is written — EOF is how a
+filter learns it has everything.</p>
+<p class="source">stdlib/std/process.lyr:142</p>
+</section>
+<section class="item" id="function-wait">
+<h2><a href="#function-wait">wait</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn wait(child: Child): int</code></pre>
+<p>Waits until the child has exited and answers its exit code.</p>
+<p class="source">stdlib/std/process.lyr:147</p>
+</section>
+<section class="item" id="function-kill">
+<h2><a href="#function-kill">kill</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn kill(child: Child): void</code></pre>
+<p>Ends the child now, without appeal. The exit code <code>wait</code> then reports is the kill's,
+not the program's.</p>
+<p class="source">stdlib/std/process.lyr:156</p>
+</section>
+<section class="item" id="function-close">
+<h2><a href="#function-close">close</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn close(child: Child): void</code></pre>
+<p>Releases the child's resources — buffers, pipes, the notify descriptor. Closing twice
+closes once; a running child is NOT stopped, only disowned.</p>
+<p class="source">stdlib/std/process.lyr:162</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.os/">std.os</a>
+<a class="next" href="../../stdlib/std.random/">std.random</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

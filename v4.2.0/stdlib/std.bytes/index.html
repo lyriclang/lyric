@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.bytes — Lyric v4.2.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/" class="here">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.bytes</h1>
+<nav class="contents">
+<ul>
+<li><a href="#function-slice">slice</a></li>
+<li><a href="#function-indexof">indexOf</a></li>
+<li><a href="#function-indexoffrom">indexOfFrom</a></li>
+</ul>
+</nav>
+<p>Slicing and searching over <code>uint8[]</code> — what a wire protocol does between reads.</p>
+<p>The edges mirror <code>string.substring</code> exactly: a negative <code>start</code> or <code>count</code> panics, a
+<code>start</code> past the end panics, and a <code>count</code> past the end clamps to it. <code>indexOf</code> answers
+<code>-1</code> when nothing is found — ready for <code>slice</code>, as <code>string.indexOf</code> is for <code>substring</code>.</p>
+<section class="item" id="function-slice">
+<h2><a href="#function-slice">slice</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn slice(bytes: uint8[], start: int, count: int): uint8[]</code></pre>
+<p><code>count</code> bytes from <code>start</code>, clamped at the end like <code>string.substring</code>.</p>
+<p class="source">stdlib/std/bytes.lyr:16</p>
+</section>
+<section class="item" id="function-indexof">
+<h2><a href="#function-indexof">indexOf</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn indexOf(bytes: uint8[], value: uint8): int</code></pre>
+<p>The first position of <code>value</code>, or <code>-1</code> — ready for <code>slice</code>.</p>
+<p class="source">stdlib/std/bytes.lyr:40</p>
+</section>
+<section class="item" id="function-indexoffrom">
+<h2><a href="#function-indexoffrom">indexOfFrom</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn indexOfFrom(bytes: uint8[], value: uint8, start: int): int</code></pre>
+<p>Searches from a position. <code>-1</code> when nothing is found, as in <code>indexOf</code>; a negative <code>start</code>
+searches from the front, one past the end finds nothing.</p>
+<p class="source">stdlib/std/bytes.lyr:46</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.build/">std.build</a>
+<a class="next" href="../../stdlib/std.collections/">std.collections</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
