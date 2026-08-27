@@ -99,6 +99,16 @@ pub fn spawn(task: Coroutine<Wait>): void {
     scheduler.ready.pushBack(task);
 }
 
+// Everyone the POLL has to answer for. `run` asks it every round rather than only when the
+// run queue empties: the poll is the one place a descriptor or a deadline is looked at, so
+// skipping it while somebody is runnable is what let a `Wait.Now` spinner starve them.
+fn parked(): int {
+    return scheduler.sleepers.length()
+        + scheduler.readers.length()
+        + scheduler.writers.length()
+        + scheduler.interrupted.length();
+}
+
 /// How many tasks the scheduler holds, whatever they are waiting for. Zero after `run`
 /// returns; useful to a host deciding whether another `run` is worth calling.
 pub fn pending(): int {
@@ -124,10 +134,10 @@ pub fn run(): void {
             turn = turn - 1;
         }
 
-        if (scheduler.ready.length() > 0) {
-            continue;
-        }
-        if (pending() == 0) {
+        if (parked() == 0) {
+            if (scheduler.ready.length() > 0) {
+                continue;
+            }
             // One last clock reading, for its side: `ask` recomputes the listening flag, and
             // with nothing parked any more it is FALSE — Ctrl+C kills the process again the
             // moment `run` returns, instead of being swallowed by a scheduler that is done.
@@ -170,7 +180,12 @@ fn step(task: Coroutine<Wait>): void {
 // waiting for Ctrl+C is what such a task is for.
 fn block(): void {
     var timeout = -1;
-    if (scheduler.deadlines.length() > 0) {
+    if (scheduler.ready.length() > 0) {
+        // Somebody can run, so this poll may not wait — it only asks what has BECOME ready.
+        // Without it a task yielding `Wait.Now` in a loop keeps the run queue non-empty for
+        // ever, and a descriptor or a deadline is never looked at again.
+        timeout = 0;
+    } else if (scheduler.deadlines.length() > 0) {
         let current = now();
         let nearest = nearestDeadline();
         timeout = nearest - current;

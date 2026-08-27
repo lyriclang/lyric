@@ -2920,6 +2920,244 @@
       ]
     },
     {
+      "Path": "std.io.stream",
+      "Doc": null,
+      "Items": [
+        {
+          "Kind": "Alias",
+          "Name": "File",
+          "Signature": "pub type File = int",
+          "Doc": "An open file. Opaque: it is issued by `open`, `create` or `openAppend`, never assembled.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 41
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "open",
+          "Signature": "pub fn open(path: string): ?File",
+          "Doc": "Opens an existing file for reading. `null` when it does not exist or cannot be read —\n`openOrThrow` says which.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 80
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "openOrThrow",
+          "Signature": "pub fn openOrThrow(path: string): File throws IoError",
+          "Doc": "`open`, with the reason when the file will not open.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 85
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "create",
+          "Signature": "pub fn create(path: string): ?File",
+          "Doc": "Opens a file for writing, creating it or TRUNCATING what is there. `null` when the path is\nnot writable.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 95
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "createOrThrow",
+          "Signature": "pub fn createOrThrow(path: string): File throws IoError",
+          "Doc": "`create`, with the reason when the file will not open.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 100
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "openAppend",
+          "Signature": "pub fn openAppend(path: string): ?File",
+          "Doc": "Opens a file for writing at its END, creating it when it does not exist.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 109
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "openAppendOrThrow",
+          "Signature": "pub fn openAppendOrThrow(path: string): File throws IoError",
+          "Doc": "`openAppend`, with the reason when the file will not open.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 114
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSome",
+          "Signature": "pub fn readSome(file: File, max: int): ?uint8[]",
+          "Doc": "Reads up to `max` bytes, waiting for them. Three truths in one answer, the 2.14 convention\n`std.io.net` and `std.process` also speak: bytes are bytes, an EMPTY array is the end of the\nfile, and `null` is a failure — `readSomeOrThrow` says which.\n\nFewer than `max` bytes is an ordinary answer; call again until the empty array.\n\nYields while the read is outstanding, so it needs a running `std.task.run()`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 129
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "readSomeOrThrow",
+          "Signature": "pub fn readSomeOrThrow(file: File, max: int): uint8[] throws IoError",
+          "Doc": "`readSome`, with the reason when the read failed. The end of the file stays the empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 143
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "write",
+          "Signature": "pub fn write(file: File, bytes: uint8[]): bool",
+          "Doc": "Writes `bytes` and waits for them to land. `false` when the write failed — `writeOrThrow`\nsays why.\n\nThe answer is the OUTCOME, not the handover: a queued write could not report a full disk at\nthe call, and for a file that is the answer that matters. `std.process` queues its writes for\nthe opposite reason — a child that reads slowly must not stall its writer.\n\nYields while the write is outstanding, so it needs a running `std.task.run()`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 159
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "writeOrThrow",
+          "Signature": "pub fn writeOrThrow(file: File, bytes: uint8[]): void throws IoError",
+          "Doc": "`write`, with the reason when it failed.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 173
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "close",
+          "Signature": "pub fn close(file: File): void",
+          "Doc": "Closes the handle and releases the notify descriptor. Closing twice closes once. A read or\nwrite still outstanding is abandoned, not awaited.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 181
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "LineReader",
+          "Signature": "pub class LineReader :: [Iterator<string>]",
+          "Doc": "The lines of an open file, walked as they are read — the shape a file too large to hold\nneeds. Terminators are removed, and a carriage return before the newline goes with it, so\nCRLF and LF read alike.\n\nIt is an `Iterator<string>`, so the adapters chain onto it. That protocol spends `null` on\n\"the end\", which means a read FAILURE and the end of the file look the same from `next()`\nalone — ask `failed()` after the walk when the difference matters.\n\nEvery step may yield, so a walk needs a running `std.task.run()`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "source",
+              "Signature": "source: File",
+              "Doc": "The open file being walked.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 202
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "pending",
+              "Signature": "pending: uint8[]",
+              "Doc": "Bytes read and not yet handed out as a line.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 204
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "at",
+              "Signature": "at: int",
+              "Doc": "The first unconsumed byte of `pending`; a cursor rather than a re-slice per line, so a\nchunk full of short lines costs one copy instead of one per line.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 207
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "ended",
+              "Signature": "ended: bool",
+              "Doc": "Whether the file has no more bytes to give.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 209
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "broke",
+              "Signature": "broke: bool",
+              "Doc": "Whether the walk stopped on a failure rather than on the end.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 211
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?string",
+              "Doc": "The next line, or `null` at the end of the file — and at a failure, which `failed()`\ntells apart.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 215
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "failed",
+              "Signature": "pub fn failed(): bool",
+              "Doc": "Whether the walk ended because a read failed. `false` after an ordinary end of file.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/io/stream.lyr",
+                "Line": 237
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 200
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "lineReader",
+          "Signature": "pub fn lineReader(file: File): LineReader",
+          "Doc": "A walk over the lines of an open file. The handle stays the caller's to `close`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/stream.lyr",
+            "Line": 273
+          }
+        }
+      ]
+    },
+    {
       "Path": "std.iter",
       "Doc": null,
       "Items": [
@@ -5841,7 +6079,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 104
+            "Line": 114
           }
         },
         {
@@ -5852,7 +6090,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/task.lyr",
-            "Line": 119
+            "Line": 129
           }
         }
       ]

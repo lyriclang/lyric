@@ -1,0 +1,275 @@
+// std.io.stream — files read and written in pieces, inside tasks.
+//
+// `std.io.file` reads a file in ONE call and blocks the thread while it does. That is the right
+// shape for a config file and the wrong one for two things: a file too large to hold, and a
+// program with tasks, where one blocking read stalls every other task.
+//
+// A handle answers both. `readSome` and `write` yield a `std.task.Wait` from INSIDE this module,
+// exactly as `std.io.net` and `std.process` do, so a caller reads straight-line code and no
+// signature says "waits".
+//
+// WHY ITS OWN MODULE, and not more of `std.io.file`: the capability. Waiting means importing
+// `std.task`, which carries `osAccess`, and a module's requirement is the union over everything
+// it imports — so putting the handle beside `text` would make every program that reads a config
+// file demand `osAccess` as well. The split is `std.io.path`'s at 4.0, in the other direction: a
+// path costs no capability and moved OUT, a handle costs an extra one and stays out.
+//
+// Reading a file whole and reading it in pieces are two concepts, not two mechanisms for one —
+// the pair `std.io.console` has carried since M8b, where `readAll` stands beside `lines`.
+//
+// THE PRICE, stated where it is paid: `readSome`, `write` and a `LineReader` walk need a running
+// `std.task.run()`. A yield outside one panics (§10a rule 1). `open` and `close` work anywhere.
+
+/// Open files, read and written in pieces: `open` a path, `readSome` or `write` it, `close` it —
+/// every waiting form yielding to the scheduler instead of blocking the thread.
+///
+/// The silent forms answer *whether* (`null`/`false`); the `OrThrow` twins say *why* with an
+/// `IoError`. A read speaks the 2.14 three truths: bytes are bytes, an EMPTY array is the end of
+/// the file, and `null` is a failure.
+///
+/// Carries `fileAccess` for the disk and `osAccess` through `std.task` for the waiting.
+
+module std.io.stream;
+
+import std.io.error { IoError, IoErrorKind };
+import std.task { Wait };
+import std.bytes { indexOfFrom, slice };
+import std.iter { Iterator };
+import std.string { utf8Decode };
+
+/// An open file. Opaque: it is issued by `open`, `create` or `openAppend`, never assembled.
+pub opaque type File = int;
+
+// The natives. Nothing here blocks: a read starts on a pool thread and answers `null` with the
+// would-block kind until it lands, and the waiting is this module yielding on the file's notify
+// descriptor. A regular file is not selectable on any platform — `select()` calls one ready
+// whatever its state — which is why a handle carries that descriptor at all.
+//
+// The classification pair follows std.io's last-failure contract; the codes are the ones
+// `std.io.file` speaks — 1 NotFound, 2 PermissionDenied, 3 InvalidPath, 0 Other — plus
+// 6 WouldBlock, which never surfaces: it is the signal to wait.
+fn streamOpen(path: string, mode: int): int;
+fn streamNotifyFd(file: int): int;
+fn streamTryRead(file: int, max: int): ?uint8[];
+fn streamWriteStart(file: int, bytes: uint8[]): bool;
+fn streamWriteReady(file: int): int;
+fn streamClose(file: int): void;
+fn lastErrorKind(): int;
+fn lastErrorDetail(): string;
+
+fn lastStreamError(what: string): IoError {
+    let kind = match (lastErrorKind()) {
+        1 => IoErrorKind.NotFound,
+        2 => IoErrorKind.PermissionDenied,
+        3 => IoErrorKind.InvalidPath,
+        _ => IoErrorKind.Other,
+    };
+    return IoError { kind = kind, path = what, detail = lastErrorDetail() };
+}
+
+fn openMode(path: string, mode: int): ?File {
+    let key = streamOpen(path, mode);
+    if (key < 0) {
+        return null;
+    }
+    return key as File;
+}
+
+/// Opens an existing file for reading. `null` when it does not exist or cannot be read —
+/// `openOrThrow` says which.
+pub fn open(path: string): ?File {
+    return openMode(path, 0);
+}
+
+/// `open`, with the reason when the file will not open.
+pub fn openOrThrow(path: string): File throws IoError {
+    let opened = open(path);
+    if (opened == null) {
+        throw lastStreamError(path);
+    }
+    return opened;
+}
+
+/// Opens a file for writing, creating it or TRUNCATING what is there. `null` when the path is
+/// not writable.
+pub fn create(path: string): ?File {
+    return openMode(path, 1);
+}
+
+/// `create`, with the reason when the file will not open.
+pub fn createOrThrow(path: string): File throws IoError {
+    let opened = create(path);
+    if (opened == null) {
+        throw lastStreamError(path);
+    }
+    return opened;
+}
+
+/// Opens a file for writing at its END, creating it when it does not exist.
+pub fn openAppend(path: string): ?File {
+    return openMode(path, 2);
+}
+
+/// `openAppend`, with the reason when the file will not open.
+pub fn openAppendOrThrow(path: string): File throws IoError {
+    let opened = openAppend(path);
+    if (opened == null) {
+        throw lastStreamError(path);
+    }
+    return opened;
+}
+
+/// Reads up to `max` bytes, waiting for them. Three truths in one answer, the 2.14 convention
+/// `std.io.net` and `std.process` also speak: bytes are bytes, an EMPTY array is the end of the
+/// file, and `null` is a failure — `readSomeOrThrow` says which.
+///
+/// Fewer than `max` bytes is an ordinary answer; call again until the empty array.
+///
+/// Yields while the read is outstanding, so it needs a running `std.task.run()`.
+pub fn readSome(file: File, max: int): ?uint8[] {
+    while (true) {
+        let got = streamTryRead(file as int, max);
+        if (got != null) {
+            return got;
+        }
+        if (lastErrorKind() != 6) {
+            return null;
+        }
+        yield Wait.Readable(streamNotifyFd(file as int));
+    }
+}
+
+/// `readSome`, with the reason when the read failed. The end of the file stays the empty array.
+pub fn readSomeOrThrow(file: File, max: int): uint8[] throws IoError {
+    let got = readSome(file, max);
+    if (got == null) {
+        throw lastStreamError("read");
+    }
+    return got;
+}
+
+/// Writes `bytes` and waits for them to land. `false` when the write failed — `writeOrThrow`
+/// says why.
+///
+/// The answer is the OUTCOME, not the handover: a queued write could not report a full disk at
+/// the call, and for a file that is the answer that matters. `std.process` queues its writes for
+/// the opposite reason — a child that reads slowly must not stall its writer.
+///
+/// Yields while the write is outstanding, so it needs a running `std.task.run()`.
+pub fn write(file: File, bytes: uint8[]): bool {
+    if (!streamWriteStart(file as int, bytes)) {
+        return false;
+    }
+    while (true) {
+        let done = streamWriteReady(file as int);
+        if (done >= 0) {
+            return done == 1;
+        }
+        yield Wait.Readable(streamNotifyFd(file as int));
+    }
+}
+
+/// `write`, with the reason when it failed.
+pub fn writeOrThrow(file: File, bytes: uint8[]): void throws IoError {
+    if (!write(file, bytes)) {
+        throw lastStreamError("write");
+    }
+}
+
+/// Closes the handle and releases the notify descriptor. Closing twice closes once. A read or
+/// write still outstanding is abandoned, not awaited.
+pub fn close(file: File): void {
+    streamClose(file as int);
+}
+
+// ------------------------------------------------------------------------- reading lines
+
+// How many bytes one refill asks for. Large enough that the per-read yield is amortized over
+// many lines, small enough that a handle costs no meaningful memory.
+let chunkSize: int = 65536;
+
+/// The lines of an open file, walked as they are read — the shape a file too large to hold
+/// needs. Terminators are removed, and a carriage return before the newline goes with it, so
+/// CRLF and LF read alike.
+///
+/// It is an `Iterator<string>`, so the adapters chain onto it. That protocol spends `null` on
+/// "the end", which means a read FAILURE and the end of the file look the same from `next()`
+/// alone — ask `failed()` after the walk when the difference matters.
+///
+/// Every step may yield, so a walk needs a running `std.task.run()`.
+pub class LineReader :: [Iterator<string>] {
+    /// The open file being walked.
+    source: File,
+    /// Bytes read and not yet handed out as a line.
+    pending: uint8[],
+    /// The first unconsumed byte of `pending`; a cursor rather than a re-slice per line, so a
+    /// chunk full of short lines costs one copy instead of one per line.
+    at: int,
+    /// Whether the file has no more bytes to give.
+    ended: bool,
+    /// Whether the walk stopped on a failure rather than on the end.
+    broke: bool,
+
+    /// The next line, or `null` at the end of the file — and at a failure, which `failed()`
+    /// tells apart.
+    pub mut fn next(): ?string {
+        while (true) {
+            let stop = indexOfFrom(this.pending, 10, this.at);
+            if (stop >= 0) {
+                let line = this.lineFrom(this.at, stop - this.at);
+                this.at = stop + 1;
+                return line;
+            }
+            if (this.ended) {
+                // A last line without a terminator is still a line; nothing left is the end.
+                if (this.at >= this.pending.length) {
+                    return null;
+                }
+                let rest = this.lineFrom(this.at, this.pending.length - this.at);
+                this.at = this.pending.length;
+                return rest;
+            }
+            this.refill();
+        }
+    }
+
+    /// Whether the walk ended because a read failed. `false` after an ordinary end of file.
+    pub fn failed(): bool {
+        return this.broke;
+    }
+
+    // One line out of the buffer: the carriage return of a CRLF pair drops with the newline,
+    // and bytes that are not UTF-8 read as the empty string rather than taking the walk down.
+    fn lineFrom(start: int, count: int): string {
+        var width = count;
+        if (width > 0 && this.pending[start + width - 1] == 13) {
+            width = width - 1;
+        }
+        return utf8Decode(slice(this.pending, start, width)) ?? "";
+    }
+
+    // Drops what has been handed out and asks for more. Compacting HERE rather than per line is
+    // what keeps the walk linear: it happens once per chunk, not once per line.
+    mut fn refill(): void {
+        let kept = slice(this.pending, this.at, this.pending.length - this.at);
+        this.at = 0;
+        let got = readSome(this.source, chunkSize);
+        if (got == null) {
+            this.pending = kept;
+            this.broke = true;
+            this.ended = true;
+            return;
+        }
+        if (got.length == 0) {
+            this.pending = kept;
+            this.ended = true;
+            return;
+        }
+        this.pending = kept + got;
+    }
+}
+
+/// A walk over the lines of an open file. The handle stays the caller's to `close`.
+pub fn lineReader(file: File): LineReader {
+    return LineReader { source = file, pending = [], at = 0, ended = false, broke = false };
+}

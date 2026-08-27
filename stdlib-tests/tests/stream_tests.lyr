@@ -1,0 +1,333 @@
+import std.test { Test, assertEq, assertTrue };
+import std.io.stream as stream;
+import std.io.file { remove, tempDir, writeBytes, writeText };
+import std.io.path { joinPath };
+import std.io.error { IoError, IoErrorKind };
+import std.string as strings;
+import std.task { Wait, spawn, run };
+import std.iter { collectArray };
+
+// The scheduler has no return channel — a task settles its own errors — so what a task learned
+// travels through this. Reset per test.
+class StreamLog {
+    text: strings.StringBuilder,
+    count: int,
+    flag: bool,
+    other: bool,
+}
+
+let log = StreamLog { text = strings.StringBuilder.new(), count = 0, flag = false, other = false };
+
+fn reset(): void {
+    log.text = strings.StringBuilder.new();
+    log.count = 0;
+    log.flag = false;
+    log.other = false;
+}
+
+fn scratch(name: string): string {
+    return joinPath(tempDir(), "lyric-stream-" + name);
+}
+
+// ------------------------------------------------------------------- bytes in and out
+
+fn writeThenReadBack(path: string, payload: uint8[]): Coroutine<Wait> {
+    let out = stream.create(path)!;
+    let ok = stream.write(out, payload);
+    assertTrue(ok, "the write must land");
+    stream.close(out);
+
+    let input = stream.open(path)!;
+    var seen = 0;
+    while (true) {
+        let got = stream.readSome(input, 4096)!;
+        if (got.length == 0) {
+            break;
+        }
+        seen = seen + got.length;
+    }
+    stream.close(input);
+    log.count = seen;
+}
+
+@Test
+pub fn a_handle_writes_what_it_reads_back(): void {
+    reset();
+    let path = scratch("roundtrip.bin");
+    let payload = "one two three".utf8Encode();
+    spawn(writeThenReadBack(path, payload));
+    run();
+    assertEq(log.count, payload.length);
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+fn readInSmallBites(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    var rounds = 0;
+    var seen = 0;
+    while (true) {
+        // Deliberately smaller than the file: the multi-round path is the one a big file takes,
+        // and a single-shot read would never enter it.
+        let got = stream.readSome(input, 64)!;
+        rounds = rounds + 1;
+        if (got.length == 0) {
+            break;
+        }
+        seen = seen + got.length;
+    }
+    stream.close(input);
+    log.count = seen;
+    log.flag = rounds > 2;
+}
+
+@Test
+pub fn a_file_larger_than_the_read_comes_back_whole(): void {
+    reset();
+    let path = scratch("many-rounds.bin");
+    let chunk = "0123456789";
+    var content = "";
+    var i = 0;
+    while (i < 40) {
+        content = content + chunk;
+        i = i + 1;
+    }
+    assertTrue(writeText(path, content), "the fixture must be written");
+    spawn(readInSmallBites(path));
+    run();
+    assertEq(log.count, 400);
+    assertTrue(log.flag, "400 bytes at 64 per read must take more than two rounds");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+fn readEmpty(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    let got = stream.readSome(input, 64);
+    log.flag = got != null;
+    log.count = if (got == null) 0 - 1 else got.length;
+    stream.close(input);
+}
+
+@Test
+pub fn an_empty_file_reads_as_the_end_not_as_a_failure(): void {
+    reset();
+    let path = scratch("empty.bin");
+    assertTrue(writeBytes(path, []), "the empty fixture must be written");
+    spawn(readEmpty(path));
+    run();
+    assertTrue(log.flag, "an empty file answers an array, not null");
+    assertEq(log.count, 0);
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+fn readAfterClose(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    stream.close(input);
+    // The 4.0 sweep found this shape as a CRASH on sockets: an unresolvable descriptor answered
+    // "no bytes" without a reason, and the stale would-block sent the caller back to the
+    // scheduler forever. Here it must be an ordinary refusal.
+    let got = stream.readSome(input, 64);
+    log.flag = got == null;
+}
+
+@Test
+pub fn a_read_after_close_refuses_instead_of_hanging(): void {
+    reset();
+    let path = scratch("closed.bin");
+    assertTrue(writeText(path, "x"), "the fixture must be written");
+    spawn(readAfterClose(path));
+    run();
+    assertTrue(log.flag, "a closed handle answers null");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+// ------------------------------------------------------------------------ the reasons
+
+@Test
+pub fn opening_what_is_not_there_answers_whether_and_why(): void {
+    let missing = scratch("definitely-absent.bin");
+    assertTrue(stream.open(missing) == null, "a missing file does not open");
+
+    var kindIsNotFound = false;
+    try {
+        let f = stream.openOrThrow(missing);
+        stream.close(f);
+    } catch (e: IoError) {
+        kindIsNotFound = match (e.kind) {
+            IoErrorKind.NotFound => true,
+            _ => false,
+        };
+    }
+    assertTrue(kindIsNotFound, "the twin names NotFound");
+}
+
+fn appendTwice(path: string): Coroutine<Wait> {
+    let first = stream.openAppend(path)!;
+    assertTrue(stream.write(first, "a".utf8Encode()), "the first append lands");
+    stream.close(first);
+
+    let second = stream.openAppend(path)!;
+    assertTrue(stream.write(second, "b".utf8Encode()), "the second append lands");
+    stream.close(second);
+
+    let input = stream.open(path)!;
+    log.text.append(strings.utf8Decode(stream.readSome(input, 64)!)!);
+    stream.close(input);
+}
+
+@Test
+pub fn append_adds_rather_than_replaces(): void {
+    reset();
+    let path = scratch("append.txt");
+    assertTrue(writeText(path, "start:"), "the fixture must be written");
+    spawn(appendTwice(path));
+    run();
+    assertEq(log.text.build(), "start:ab");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+// ------------------------------------------------------ the point of the whole slice
+
+fn slowReader(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    while (true) {
+        let got = stream.readSome(input, 8)!;
+        if (got.length == 0) {
+            break;
+        }
+    }
+    stream.close(input);
+    log.flag = true;
+}
+
+fn busyNeighbour(): Coroutine<Wait> {
+    // While the reader waits on the disk, this one must get turns. Before the handle existed
+    // the whole-file read held the thread and this counter stayed at whatever one pass gave.
+    var turns = 0;
+    while (!log.flag) {
+        turns = turns + 1;
+        yield Wait.Now;
+    }
+    log.count = turns;
+    log.other = true;
+}
+
+@Test
+pub fn a_reading_task_does_not_stall_its_neighbours(): void {
+    reset();
+    let path = scratch("neighbours.bin");
+    var content = "";
+    var i = 0;
+    while (i < 40) {
+        content = content + "0123456789";
+        i = i + 1;
+    }
+    assertTrue(writeText(path, content), "the fixture must be written");
+    spawn(slowReader(path));
+    spawn(busyNeighbour());
+    run();
+    assertTrue(log.other, "the neighbour ran to its end");
+    assertTrue(
+        log.count > 1,
+        "the neighbour got more than one turn: " + strings.fromInt(log.count)
+    );
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+// ---------------------------------------------------------------------- lines
+
+fn walkLines(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    let reader = stream.lineReader(input);
+    while (true) {
+        let line = reader.next();
+        if (line == null) {
+            break;
+        }
+        log.text.append("[" + line + "]");
+        log.count = log.count + 1;
+    }
+    log.flag = reader.failed();
+    stream.close(input);
+}
+
+@Test
+pub fn lines_read_lf_crlf_and_a_tail_without_a_terminator(): void {
+    reset();
+    let path = scratch("lines.txt");
+    // The last line carries no terminator on purpose: it is still a line.
+    assertTrue(writeBytes(path, "one\ntwo\r\nthree".utf8Encode()), "the fixture must be written");
+    spawn(walkLines(path));
+    run();
+    assertEq(log.text.build(), "[one][two][three]");
+    assertEq(log.count, 3);
+    assertTrue(!log.flag, "an ordinary walk did not fail");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+@Test
+pub fn an_empty_file_has_no_lines(): void {
+    reset();
+    let path = scratch("no-lines.txt");
+    assertTrue(writeBytes(path, []), "the empty fixture must be written");
+    spawn(walkLines(path));
+    run();
+    assertEq(log.count, 0);
+    assertTrue(!log.flag, "the end of an empty file is not a failure");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+@Test
+pub fn a_trailing_newline_does_not_add_an_empty_line(): void {
+    reset();
+    let path = scratch("trailing.txt");
+    assertTrue(writeBytes(path, "one\ntwo\n".utf8Encode()), "the fixture must be written");
+    spawn(walkLines(path));
+    run();
+    assertEq(log.text.build(), "[one][two]");
+    assertEq(log.count, 2);
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+fn chainOverLines(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    // The reader IS an Iterator<string>, so the adapters take it — and every step of the chain
+    // yields through the reader beneath it.
+    let picked = collectArray(stream.lineReader(input).filter((s) => s.startsWith("keep")).take(2));
+    log.count = picked.length;
+    log.text.append(strings.join(picked, ","));
+    stream.close(input);
+}
+
+@Test
+pub fn a_line_reader_chains_like_any_iterator(): void {
+    reset();
+    let path = scratch("chain.txt");
+    let body = "keep one\ndrop this\nkeep two\ndrop that\nkeep three\n";
+    assertTrue(writeText(path, body), "the fixture must be written");
+    spawn(chainOverLines(path));
+    run();
+    assertEq(log.count, 2);
+    assertEq(log.text.build(), "keep one,keep two");
+    assertTrue(remove(path), "the scratch file goes");
+}
+
+fn walkLinesOfClosed(path: string): Coroutine<Wait> {
+    let input = stream.open(path)!;
+    stream.close(input);
+    let reader = stream.lineReader(input);
+    let line = reader.next();
+    log.flag = line == null;
+    log.other = reader.failed();
+}
+
+@Test
+pub fn a_failed_walk_says_so_where_the_protocol_cannot(): void {
+    reset();
+    let path = scratch("broken-walk.txt");
+    assertTrue(writeText(path, "one\ntwo\n"), "the fixture must be written");
+    spawn(walkLinesOfClosed(path));
+    run();
+    assertTrue(log.flag, "next() answers null, as the protocol demands");
+    assertTrue(log.other, "failed() tells that apart from an ordinary end");
+    assertTrue(remove(path), "the scratch file goes");
+}
