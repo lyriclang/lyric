@@ -10,6 +10,35 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.1 — 2026-08-27
+
+**Round 4 of the sweep, aimed at what 4.3.0 rebuilt.** Two findings, and both are 4.3.0's own.
+
+### Fixed
+
+- **A disposed VM no longer opens handles it will never release.** `Dispose` returns early the
+  second time, so anything a script acquired AFTER the first call was skipped — the fix for a
+  leak had a leak in it, reachable by calling into a VM after disposing it.
+
+  A disposed VM now keeps INTERPRETING but opens nothing: a file, a socket or a child process
+  answers the ordinary "could not" of that operation, which a script already handles like any
+  other I/O failure. Pure code still runs, because it holds nothing and stopping it would be a
+  second and stranger failure mode.
+
+  This also replaces the sentence 4.3.0 shipped. It said calling into a disposed VM was "not
+  defined"; undefined behaviour is not an answer a sandbox may give, and now it is defined.
+
+- **The toolchain's own registry owners dispose.** 4.3.0 made the registry disposable and wired
+  only `LangVm`. Four places create one directly and did not: `lyric run`'s host, its bind-only
+  path, the REPL and the debug adapter.
+
+  **The REPL was the one that mattered.** It creates a registry per ENTRY and re-runs its
+  accumulated declarations every time, so an entry that opens a file opened it again — and each
+  evaluation stranded the previous one's handles for the whole session. The debug adapter is the
+  same shape one level up: an editor keeps one adapter across many runs, and a debugged program's
+  sockets and files accumulated in it. Attached rather than launched, nothing is released — the
+  registry is the host's, exactly as the controller only detaches.
+
 ## v4.3.0 — 2026-08-27
 
 **A VM owns what its scripts open.** The heaviest finding of the 4.2 sweep, fixed.

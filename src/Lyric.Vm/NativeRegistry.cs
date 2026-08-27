@@ -1448,6 +1448,12 @@ public sealed class NativeRegistry : IDisposable
 
         Register("std.io.net.netListen", [TypeTag.String, i64], i64, args =>
         {
+            if (!Live)
+            {
+                RecordNet(new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.Shutdown));
+                return LyrValue.FromI64(-1);
+            }
             try
             {
                 var address = ResolveHost(args[0].AsString);
@@ -1484,6 +1490,12 @@ public sealed class NativeRegistry : IDisposable
 
         Register("std.io.net.netConnectStart", [TypeTag.String, i64], i64, args =>
         {
+            if (!Live)
+            {
+                RecordNet(new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.Shutdown));
+                return LyrValue.FromI64(-1);
+            }
             try
             {
                 var address = ResolveHost(args[0].AsString);
@@ -1594,6 +1606,12 @@ public sealed class NativeRegistry : IDisposable
 
         Register("std.io.net.udpBind", [TypeTag.String, i64], i64, args =>
         {
+            if (!Live)
+            {
+                RecordNet(new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.Shutdown));
+                return LyrValue.FromI64(-1);
+            }
             try
             {
                 var address = ResolveHost(args[0].AsString);
@@ -1823,6 +1841,11 @@ public sealed class NativeRegistry : IDisposable
         RegisterWithArrayParams("std.process.procStart",
             [TypeTag.String, TypeTag.Array], [null, TypeTag.String], i64, args =>
         {
+            if (!Live)
+            {
+                RecordProc(0, "the VM is disposed");
+                return LyrValue.FromI64(-1);
+            }
             var program = args[0].AsString;
             var arguments = (LyrValue[])args[1].AsObject;
 
@@ -2116,6 +2139,11 @@ public sealed class NativeRegistry : IDisposable
         // three differ in a FileMode and in nothing else.
         Register("std.io.stream.streamOpen", [TypeTag.String, i64], i64, args =>
         {
+            if (!Live)
+            {
+                RecordIoNoHandle();
+                return LyrValue.FromI64(-1);
+            }
             var path = args[0].AsString;
             FileStream stream;
             try
@@ -2271,6 +2299,16 @@ public sealed class NativeRegistry : IDisposable
     // said plainly in the embedding chapter rather than half-answered: a finalizer here would run
     // on the finalizer thread against Socket, FileStream and Process objects that have their own,
     // in an order nobody controls.
+
+    /// <summary>Whether this registry may still hand out an OS resource.
+    ///
+    /// <para>A disposed VM keeps INTERPRETING — pure code has nothing to release and stopping it
+    /// would be a second, stranger failure mode — but it opens nothing new. Without this a script
+    /// called after <c>Dispose</c> acquired handles that the next <c>Dispose</c> then skipped,
+    /// because it returns early: the fix for a leak would have introduced one. A refusal here is
+    /// an ordinary I/O failure to the guest, which is a shape every caller already handles.
+    /// </para></summary>
+    private bool Live => !_disposed;
 
     /// <summary>Closes every socket, child and file this registry's guest left open.
     ///
