@@ -401,6 +401,15 @@ internal sealed class WarningAnalyzer
         if (usedInFile is not null
             && (usedInFile.Contains(binding) || usedInFile.Contains(target))) return;
 
+        // Importing a name brings the whole overload SET, and a call may have chosen any member
+        // of it — the lookup above answers with the first. Without this the accounting warned
+        // about a name the file demonstrably calls, which under --deny-warnings breaks a build
+        // for correct code (found in the 4.0 sweep: net's UDP `localPort` is the TCP name's
+        // second member).
+        if (usedInFile is not null)
+            foreach (var overload in module.Members.OverloadsLocal(name))
+                if (usedInFile.Contains(overload)) return;
+
         // A MODULE import is used when one of its extension methods resolved in this file:
         // 'import std.string as strings;' exists exactly for 's.trim()' (v1.15), and no name of
         // the module has to appear in the source for that.

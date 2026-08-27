@@ -19,8 +19,34 @@ interrupts with the driver's cancel shield (9), `std.process` behind the fifth c
 (`lyric-spec#26`–`#28`, pin moved to 4.0 with the release), one release at the end as
 decided. Release mechanics per the checklist: the tree claimed 4.0.0 since PR#124, README
 already carried it, so the release commit is the CHANGELOG dating plus this paragraph — and
-the tag waits for green CI on main, the 3.8.1 lesson. Next per the pipeline: **the 4.0
-bug-sweep loop**. The paragraphs below record how the basket landed, newest first.
+the tag waits for green CI on main, the 3.8.1 lesson.
+
+**The 4.0 sweep — round 1 — is DONE** (2026-08-27, ships as 4.0.1). Eight probes aimed at what
+the major added; four real findings, each fixed failing-test-first, and one hardening. **The
+worst was a CRASH, not a bug**: reading a CLOSED socket inside a task killed the process with
+a .NET `ArgumentNullException` stack trace — `netReadReady` answered "no bytes" for an
+unknown descriptor WITHOUT recording a reason, the stale would-block sent `readSome` back to
+the scheduler, and `poll` then called `Socket.Select` on lists that had resolved to nothing.
+Two fixes: an unresolvable descriptor records a real failure (silent form answers `null`, the
+twin names it — §9.0 restored on that path), and `poll` names a dead descriptor READY at once,
+the convention an errored socket already followed. **The other three**: `LYR-SEM0072` warned
+about imports used through their SECOND overload (the accounting looked only at the first
+member — under `--deny-warnings` a build break for correct code, and the cheapest finding to
+have shipped); one VM's `interrupt()` reached another VM's tasks (the pending flag was
+process-wide while the socket table beside it is per-thread for exactly the opposite reason —
+the SIGNAL stays process-wide, the programmatic raise is now per VM); and a second VM cleared
+the first one's interrupt listening on every poll, turning Ctrl+C back into a process kill
+while somebody waited for it (counted now, moving on transitions). Plus the hardening: the
+ms→µs conversion overflowed for sleeps beyond ~292 million years into a negative "wait
+forever". **What the probes could NOT reach**: the cross-VM isolation itself is argued, not
+tested — the honest test needs two VMs on two threads and a timing margin, the shape that
+flaked in CI before; both single-VM halves stay covered (lyrtest for the programmatic path,
+the Cli SIGINT test for the signal). Probes that came back CLEAN and are worth not
+re-running: the dynamic yield's byte-compare type rule (structurally identical structs, and
+the same shape across two modules, both correctly refused), nested chains with an inner
+resume inside an outer body, reentrant `run()` from inside a task, process use after `close`,
+and a doubled `interrupt()`. 144 lyrtest on both engines; all 15 test projects green. The
+paragraphs below record how the basket landed, newest first.
 
 **v4 — stackful coroutines — was built on `feature/v4-stackful`** (2026-08-25; the basket is
 `lyric#121`, the language rules are spec §10/§10a via `lyric-spec#26`, the format is §13 4.0

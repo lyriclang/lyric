@@ -10,6 +10,37 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.0.1 — Unreleased
+
+**The sweep after 4.0.0.** Eight probes against what the major added; four real findings, all
+fixed failing-test-first. Nothing in the language or the format changed.
+
+### Fixed
+
+- **A read of a CLOSED socket no longer crashes the process.** `netReadReady` answered "no
+  bytes" for a descriptor the table does not know without recording a reason, so the previous
+  call's would-block stood and `readSome` went back to the scheduler to wait on a descriptor
+  nothing could ever ready. `poll` then selected on a list that resolved to nothing, and
+  `Socket.Select` threw — an unhandled host exception, printed as a .NET stack trace, which is
+  precisely what the panic doctrine exists to prevent. Now: an unresolvable descriptor is a
+  recorded failure (so the silent form answers `null` and the twin names it), and `poll` names
+  a dead descriptor READY at once — the convention an errored socket already followed, since
+  the wake exists so the next read can tell the waiter what happened.
+- **An import used through its SECOND overload is no longer reported as unused**
+  (`LYR-SEM0072`). Importing a name brings the whole set, but the accounting looked only at
+  its first member — so `import std.io.net { bind, localPort, close };` warned about names the
+  file demonstrably calls, and under `--deny-warnings` that breaks a build for correct code.
+- **One VM's `interrupt()` no longer reaches another VM's tasks.** The pending flag was
+  process-wide, while the socket table beside it is per-thread for exactly the opposite
+  reason. The SIGNAL stays process-wide — SIGINT means the process — but the programmatic
+  raise is now per VM.
+- **A second VM no longer clears the first one's interrupt listening.** The flag was assigned
+  on every poll, so a VM without a parked task turned Ctrl+C back into a process kill while
+  another VM was waiting for it. Listening is counted now, and the count moves on transitions.
+- **A sleep beyond ~292 million years no longer waits forever.** The millisecond-to-microsecond
+  conversion overflowed into a negative number, which `Select` reads as "no deadline"; the
+  clamp now happens before the multiplication.
+
 ## v4.0.0 — 2026-08-27
 
 The major (the basket is `lyric#121`, decided 2026-08-25 and delivered whole). One sentence

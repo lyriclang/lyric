@@ -166,3 +166,36 @@ fn udpDoubleBind(): Coroutine<Wait> {
     }
     net.close(first);
 }
+
+// ------------------------------------------------------------- the dead descriptor (4.0 sweep)
+
+fn closedReader(): Coroutine<Wait> {
+    let l = net.listen("127.0.0.1", 0)!;
+    netLog.port = net.localPort(l);
+    let conn = net.accept(l)!;
+
+    // The peer sends nothing, so the module's first read waits — which records would-block as
+    // the last failure. Closing and reading again must NOT be read as "wait more": the socket
+    // is gone, and a wait on a gone descriptor is a wait nothing can end.
+    net.close(conn);
+    let got = net.readSome(conn, 16);
+    assertTrue(got == null, "a read of a closed socket is a failure, not a wait");
+    net.closeListener(l);
+}
+
+fn quietPeer(): Coroutine<Wait> {
+    while (netLog.port == 0) {
+        yield Wait.Now;
+    }
+    let conn = net.connect("127.0.0.1", netLog.port)!;
+    yield Wait.Sleep(50);
+    net.close(conn);
+}
+
+@Test
+pub fn a_read_of_a_closed_socket_answers_null_instead_of_waiting_forever(): void {
+    netLog.port = 0;
+    spawn(closedReader());
+    spawn(quietPeer());
+    run();
+}

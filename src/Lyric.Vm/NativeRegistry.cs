@@ -858,7 +858,14 @@ public sealed class NativeRegistry
                 var timeout = args[2].AsI64;
                 var wantInterrupt = args[3].AsBool;
 
-                _interruptListening = wantInterrupt;
+                // The count moves on TRANSITIONS only. Assigning per poll let a second VM
+                // without a parked task clear the first one's listening, and then Ctrl+C
+                // killed a process that was waiting for it.
+                if (wantInterrupt != _listeningHere)
+                {
+                    _listeningHere = wantInterrupt;
+                    Interlocked.Add(ref _listeningVms, wantInterrupt ? 1 : -1);
+                }
                 if (wantInterrupt) EnsureInterruptHandler();
 
                 // A pending interrupt outranks every wait: taken (and reported) only when the
@@ -905,10 +912,39 @@ public sealed class NativeRegistry
                 var checkRead = new List<System.Net.Sockets.Socket>();
                 var checkWrite = new List<System.Net.Sockets.Socket>();
                 var checkError = new List<System.Net.Sockets.Socket>();
+
+                // A descriptor the table cannot resolve is closed, and its waiter is named
+                // READY at once — the same convention an errored socket follows: the wake
+                // exists so the next read tells the waiter what happened. Waiting on it
+                // instead would be a wait nothing can end, and selecting on a list that
+                // resolved to nothing throws inside the host (4.0 sweep: it did, and the
+                // exception escaped as an unhandled crash rather than a panic).
+                var dead = new List<LyrValue>();
                 foreach (var value in read)
                     if (SocketOf(value.AsI64) is { } s) { checkRead.Add(s); checkError.Add(s); }
+                    else dead.Add(value);
                 foreach (var value in write)
                     if (SocketOf(value.AsI64) is { } s) { checkWrite.Add(s); checkError.Add(s); }
+                    else dead.Add(value);
+
+                if (dead.Count > 0)
+                {
+                    // Something is actionable now, so nothing is waited for. The interrupt
+                    // pipe is not consulted: a pending interrupt is taken by the next poll,
+                    // which is where the flag has waited for a listener all along.
+                    var immediate = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
+                    var alreadyNamed = new HashSet<long>();
+                    if (checkRead.Count > 0 || checkWrite.Count > 0)
+                    {
+                        System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, 0);
+                        foreach (var s in checkRead) NameReady(s, immediate, alreadyNamed);
+                        foreach (var s in checkWrite) NameReady(s, immediate, alreadyNamed);
+                        foreach (var s in checkError) NameReady(s, immediate, alreadyNamed);
+                    }
+                    foreach (var value in dead)
+                        if (alreadyNamed.Add(value.AsI64)) immediate.Add(value);
+                    return LyrValue.FromObject(immediate.ToArray());
+                }
 
                 // The self-pipe puts the interrupt into the SAME select: Ctrl+C writes a
                 // datagram, the socket readies, the select returns. The read side never
@@ -917,10 +953,13 @@ public sealed class NativeRegistry
                 if (pipe is not null) checkRead.Add(pipe);
 
                 // Select takes microseconds; clamping a huge timeout wakes the scheduler
-                // early, which recomputes and blocks again — correct, just in two steps.
+                // early, which recomputes and blocks again — correct, just in two steps. The
+                // clamp happens BEFORE the multiplication: a sleep of more than ~292 million
+                // years overflowed the product into a negative number, which Select reads as
+                // "wait forever" — the one wait that is never correct here.
                 var micros = timeout < 0
                     ? -1
-                    : (int)Math.Min(timeout * 1000, int.MaxValue);
+                    : (int)(Math.Min(timeout, int.MaxValue / 1000) * 1000);
                 System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
 
                 var ready = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
@@ -1229,24 +1268,61 @@ public sealed class NativeRegistry
 
     // --------------------------------------------------------------- std.task interrupt (4.0)
     //
-    // PROCESS-wide, not per-thread, because that is what a signal is: SIGINT has no idea which
-    // VM it means. The pending flag survives until a listening poll takes it — an interrupt
-    // raised while nobody is parked is remembered, like a pending signal. Three wake paths for
-    // the three ways a poll can be waiting: the flag for a poll that has not started waiting,
-    // the event for a descriptorless wait, and a self-pipe datagram for a poll inside select.
+    // TWO pending flags, because there are two events wearing one name. The SIGNAL is
+    // process-wide — SIGINT has no idea which VM it means, and a standalone program has one
+    // anyway. The programmatic `interrupt()` is PER VM, like the socket table above and for
+    // the same reason: parallel VMs (a host, the test runner) must not reach into each
+    // other, and one guest raising its own shutdown must not end another's. Either flag
+    // survives until a listening poll takes it — an interrupt raised while nobody is parked
+    // is remembered, like a pending signal.
+    //
+    // The WAKE mechanisms stay shared, and may be woken spuriously: an event set or a
+    // datagram that belongs to another VM only makes this one recompute and block again,
+    // which is the same two-step the timeout clamp already relies on.
+    //
+    // Three wake paths for the three ways a poll can be waiting: the flag for a poll that has
+    // not started waiting, the event for a descriptorless wait, and a self-pipe datagram for
+    // a poll inside select.
 
-    private static int _interruptPending;
-    private static volatile bool _interruptListening;
+    [ThreadStatic] private static int _interruptPending;
+    private static int _signalPending;
+
+    // Whether THIS VM has a task parked, and how many VMs do — the handler reads the count,
+    // because a VM polling without a parked task must not clear another VM's listening.
+    [ThreadStatic] private static bool _listeningHere;
+    private static int _listeningVms;
     private static int _interruptHandlerInstalled;
     private static System.Net.Sockets.Socket? _interruptPipe;
     private static readonly ManualResetEventSlim InterruptEvent = new(false);
 
-    private static bool TakePendingInterrupt() =>
-        Interlocked.Exchange(ref _interruptPending, 0) == 1;
+    /// <summary>Takes whichever interrupt is pending for this VM: its own raise, or the
+    /// process's signal. Both are taken — one wake answers both.</summary>
+    private static bool TakePendingInterrupt()
+    {
+        var mine = _interruptPending == 1;
+        _interruptPending = 0;
+        var signal = Interlocked.Exchange(ref _signalPending, 0) == 1;
+        return mine || signal;
+    }
 
+    /// <summary>Records that this VM's own `interrupt()` was raised, and wakes the waiters.
+    /// </summary>
     private static void RaiseInterrupt()
     {
-        Interlocked.Exchange(ref _interruptPending, 1);
+        _interruptPending = 1;
+        WakeInterruptWaiters();
+    }
+
+    /// <summary>Records the process signal — from the Ctrl+C handler, on whatever thread the
+    /// runtime hands it — and wakes the waiters.</summary>
+    private static void RaiseSignal()
+    {
+        Interlocked.Exchange(ref _signalPending, 1);
+        WakeInterruptWaiters();
+    }
+
+    private static void WakeInterruptWaiters()
+    {
         InterruptEvent.Set();
         try
         {
@@ -1264,11 +1340,11 @@ public sealed class NativeRegistry
         if (Interlocked.Exchange(ref _interruptHandlerInstalled, 1) == 1) return;
         Console.CancelKeyPress += (_, e) =>
         {
-            // Not listening: the default stands and Ctrl+C ends the process — a program
+            // Nobody listening: the default stands and Ctrl+C ends the process — a program
             // without a parked Interrupt task keeps behaving like every other program.
-            if (!_interruptListening) return;
+            if (Volatile.Read(ref _listeningVms) == 0) return;
             e.Cancel = true;
-            RaiseInterrupt();
+            RaiseSignal();
         };
     }
 
@@ -1326,6 +1402,16 @@ public sealed class NativeRegistry
         _lastNetDetail = e.Message;
     }
 
+    /// <summary>Records "that descriptor is not a socket" and passes the caller's answer
+    /// through. A closed handle is a real failure with a real reason, and the <c>OrThrow</c>
+    /// twins read the LAST one recorded — without this they named the previous call's.</summary>
+    private static long NotASocket(long answer)
+    {
+        RecordNet(new System.Net.Sockets.SocketException(
+            (int)System.Net.Sockets.SocketError.NotSocket));
+        return answer;
+    }
+
     private static System.Net.IPAddress ResolveHost(string host)
     {
         if (host is "localhost" or "") return System.Net.IPAddress.Loopback;
@@ -1366,7 +1452,7 @@ public sealed class NativeRegistry
 
         registry.Register("std.io.net.netAccept", [i64], i64, args =>
         {
-            if (SocketOf(args[0].AsI64) is not { } listener) return LyrValue.FromI64(-2);
+            if (SocketOf(args[0].AsI64) is not { } listener) return LyrValue.FromI64(NotASocket(-2));
             try
             {
                 var accepted = listener.Accept();
@@ -1402,7 +1488,7 @@ public sealed class NativeRegistry
 
         registry.Register("std.io.net.netConnectDone", [i64], i64, args =>
         {
-            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-1);
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(NotASocket(-1));
             try
             {
                 if (socket.Poll(0, System.Net.Sockets.SelectMode.SelectError))
@@ -1422,7 +1508,16 @@ public sealed class NativeRegistry
         registry.RegisterOptionalArrayReturning("std.io.net.netReadReady", [i64, i64],
             TypeTag.U8, args =>
         {
-            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.None;
+            // A descriptor the table does not know is CLOSED, and that is a failure, not a
+            // reason to wait. Answering None without recording one left the previous kind
+            // standing — usually would-block, which sent the module back to the scheduler to
+            // wait on a descriptor nothing could ever ready (4.0 sweep).
+            if (SocketOf(args[0].AsI64) is not { } socket)
+            {
+                RecordNet(new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.NotSocket));
+                return LyrValue.None;
+            }
             var max = (int)Math.Clamp(args[1].AsI64, 1, 1 << 20);
             var buffer = new byte[max];
             try
@@ -1443,7 +1538,7 @@ public sealed class NativeRegistry
         registry.RegisterWithArrayParams("std.io.net.netWriteFrom",
             [i64, TypeTag.Array, i64], [null, TypeTag.U8, null], i64, args =>
         {
-            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-2);
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(NotASocket(-2));
             var bytes = ToBytes(args[1]);
             var offset = (int)Math.Clamp(args[2].AsI64, 0, bytes.Length);
             try
@@ -1502,7 +1597,7 @@ public sealed class NativeRegistry
             [i64, TypeTag.String, i64, TypeTag.Array], [null, null, null, TypeTag.U8], i64,
             args =>
         {
-            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(-2);
+            if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(NotASocket(-2));
             try
             {
                 var target = new System.Net.IPEndPoint(
