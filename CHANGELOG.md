@@ -10,6 +10,38 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.1.0 — 2026-08-27
+
+**`Instant` and `Duration` join the library's conformances.** Additive: no existing program
+changes meaning, and nothing was deprecated or removed.
+
+### Added
+
+- **`Instant` and `Duration` conform to `Equatable`, `Ordered`, `Hashable` and `Display`.**
+  Every other value type in the library has carried these; the two time types never did, so
+  comparing two instants meant unwrapping both to `epochMillis()`, sorting a `List<Instant>`
+  was not possible at all, and neither type could be printed or used as a `Map` key.
+
+  ```lyr
+  if (started < finished) {              // Ordered
+      println(finished.since(started));  // Display -> "3500ms"
+  }
+  sortList(stamps);                      // the reason Ordered is on the type
+  seen.set(finished, "done");            // Hashable
+  ```
+
+  `Instant.show()` is the text `iso()` writes — the one textual form the type has.
+  `Duration.show()` is the millisecond count with its unit (`3500ms`, `-500ms`), NOT a scaled
+  `3.5s`: the type counts whole milliseconds, and a rendering that divides them promises a
+  precision the value does not carry.
+
+  `compare` is three comparisons rather than a subtraction of the two fields. Two instants far
+  enough apart overflow that subtraction and it answers with the opposite sign.
+
+  **`+` and `-` did not arrive with them.** `plus`, `minus` and `since` are methods, and an
+  operator beside them would be a second way to write one calculation; `Instant - Instant` is a
+  `Duration` besides, which the homogeneous operator interfaces do not express.
+
 ## v4.0.1 — 2026-08-27
 
 **The sweep after 4.0.0.** Eight probes against what the major added; four real findings, all

@@ -13,6 +13,7 @@
 
 module std.time;
 
+import std.core { Display, Equatable, Hashable, Ordered };
 import std.math { divFloor, modFloor };
 import std.string { fromInt };
 
@@ -22,7 +23,7 @@ fn nowMillis(): int;
 
 /// A distance between two instants, in whole milliseconds. May be negative: `a.since(b)` with
 /// `b` later than `a` says so rather than hiding it.
-pub struct Duration {
+pub struct Duration :: [Equatable<Duration>, Ordered<Duration>, Hashable<Duration>, Display] {
     /// The distance in milliseconds; the sign is the direction.
     millis: int,
 
@@ -60,6 +61,39 @@ pub struct Duration {
     pub fn minus(other: Duration): Duration {
         return Duration { millis = this.millis - other.millis };
     }
+
+    /// Whether the two span the same distance.
+    pub fn equals(other: Duration): bool {
+        return this.millis == other.millis;
+    }
+
+    /// The shorter distance first; a negative duration comes before a positive one.
+    ///
+    /// Three comparisons rather than `this.millis - other.millis`: that subtraction overflows
+    /// for two durations far enough apart and hands back the opposite sign.
+    pub fn compare(other: Duration): int {
+        if (this.millis < other.millis) {
+            return -1;
+        }
+        if (this.millis > other.millis) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /// The millisecond count, which is what `int` hashes to.
+    pub fn hash(): int {
+        return this.millis;
+    }
+
+    /// The distance with its unit: `1500ms`, `-500ms`.
+    ///
+    /// Milliseconds, not a scaled `1.5s`: this type counts whole milliseconds, and a rendering
+    /// that divides them invents a precision the value does not carry. Scaled forms are
+    /// `std.fmt` work.
+    pub fn show(): string {
+        return fromInt(this.millis) + "ms";
+    }
 }
 
 /// A failed reading of a time text: what was handed in, and what broke.
@@ -73,7 +107,7 @@ pub class TimeError :: [Throwable] {
 }
 
 /// A point on the wall clock: milliseconds since 1970-01-01 UTC.
-pub struct Instant {
+pub struct Instant :: [Equatable<Instant>, Ordered<Instant>, Hashable<Instant>, Display] {
     /// Milliseconds since the epoch; negative is before 1970.
     millis: int,
 
@@ -156,6 +190,37 @@ pub struct Instant {
             throw TimeError { text = isoFault(text) };
         }
         return read;
+    }
+
+    /// Whether the two name the same point on the clock.
+    pub fn equals(other: Instant): bool {
+        return this.millis == other.millis;
+    }
+
+    /// The earlier instant first.
+    ///
+    /// Three comparisons rather than `this.millis - other.millis`: an instant near the epoch
+    /// against one near the type's maximum overflows that subtraction, and the sign it hands
+    /// back is the wrong one.
+    pub fn compare(other: Instant): int {
+        if (this.millis < other.millis) {
+            return -1;
+        }
+        if (this.millis > other.millis) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /// The epoch milliseconds, which is what `int` hashes to.
+    pub fn hash(): int {
+        return this.millis;
+    }
+
+    /// The ISO 8601 form — the same text `iso()` writes, because it is the one textual shape
+    /// this type has.
+    pub fn show(): string {
+        return this.iso();
     }
 }
 

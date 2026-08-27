@@ -5903,7 +5903,7 @@
         {
           "Kind": "Struct",
           "Name": "Duration",
-          "Signature": "pub struct Duration",
+          "Signature": "pub struct Duration :: [Equatable<Duration>, Ordered<Duration>, Hashable<Duration>, Display]",
           "Doc": "A distance between two instants, in whole milliseconds. May be negative: `a.since(b)` with\n`b` later than `a` says so rather than hiding it.",
           "Members": [
             {
@@ -5914,7 +5914,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 27
+                "Line": 28
               }
             },
             {
@@ -5925,7 +5925,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 30
+                "Line": 31
               }
             },
             {
@@ -5936,7 +5936,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 35
+                "Line": 36
               }
             },
             {
@@ -5947,7 +5947,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 40
+                "Line": 41
               }
             },
             {
@@ -5958,7 +5958,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 45
+                "Line": 46
               }
             },
             {
@@ -5969,7 +5969,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 50
+                "Line": 51
               }
             },
             {
@@ -5980,7 +5980,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 55
+                "Line": 56
               }
             },
             {
@@ -5991,13 +5991,57 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 60
+                "Line": 61
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "equals",
+              "Signature": "pub fn equals(other: Duration): bool",
+              "Doc": "Whether the two span the same distance.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 66
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "compare",
+              "Signature": "pub fn compare(other: Duration): int",
+              "Doc": "The shorter distance first; a negative duration comes before a positive one.\n\nThree comparisons rather than `this.millis - other.millis`: that subtraction overflows\nfor two durations far enough apart and hands back the opposite sign.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 74
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "hash",
+              "Signature": "pub fn hash(): int",
+              "Doc": "The millisecond count, which is what `int` hashes to.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 85
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "show",
+              "Signature": "pub fn show(): string",
+              "Doc": "The distance with its unit: `1500ms`, `-500ms`.\n\nMilliseconds, not a scaled `1.5s`: this type counts whole milliseconds, and a rendering\nthat divides them invents a precision the value does not carry. Scaled forms are\n`std.fmt` work.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 94
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/time.lyr",
-            "Line": 25
+            "Line": 26
           }
         },
         {
@@ -6014,7 +6058,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 68
+                "Line": 102
               }
             },
             {
@@ -6025,19 +6069,19 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 70
+                "Line": 104
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/time.lyr",
-            "Line": 66
+            "Line": 100
           }
         },
         {
           "Kind": "Struct",
           "Name": "Instant",
-          "Signature": "pub struct Instant",
+          "Signature": "pub struct Instant :: [Equatable<Instant>, Ordered<Instant>, Hashable<Instant>, Display]",
           "Doc": "A point on the wall clock: milliseconds since 1970-01-01 UTC.",
           "Members": [
             {
@@ -6048,7 +6092,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 78
+                "Line": 112
               }
             },
             {
@@ -6059,7 +6103,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 81
+                "Line": 115
               }
             },
             {
@@ -6070,7 +6114,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 87
+                "Line": 121
               }
             },
             {
@@ -6081,7 +6125,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 92
+                "Line": 126
               }
             },
             {
@@ -6092,7 +6136,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 97
+                "Line": 131
               }
             },
             {
@@ -6103,7 +6147,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 102
+                "Line": 136
               }
             },
             {
@@ -6114,7 +6158,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 111
+                "Line": 145
               }
             },
             {
@@ -6125,7 +6169,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 144
+                "Line": 178
               }
             },
             {
@@ -6136,13 +6180,57 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/time.lyr",
-                "Line": 153
+                "Line": 187
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "equals",
+              "Signature": "pub fn equals(other: Instant): bool",
+              "Doc": "Whether the two name the same point on the clock.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 196
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "compare",
+              "Signature": "pub fn compare(other: Instant): int",
+              "Doc": "The earlier instant first.\n\nThree comparisons rather than `this.millis - other.millis`: an instant near the epoch\nagainst one near the type's maximum overflows that subtraction, and the sign it hands\nback is the wrong one.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 205
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "hash",
+              "Signature": "pub fn hash(): int",
+              "Doc": "The epoch milliseconds, which is what `int` hashes to.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 216
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "show",
+              "Signature": "pub fn show(): string",
+              "Doc": "The ISO 8601 form — the same text `iso()` writes, because it is the one textual shape\nthis type has.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/time.lyr",
+                "Line": 222
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/time.lyr",
-            "Line": 76
+            "Line": 110
           }
         }
       ]
