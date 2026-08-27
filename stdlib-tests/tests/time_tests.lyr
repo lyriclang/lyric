@@ -1,5 +1,7 @@
 import std.test { Test, assertEq, assertTrue };
 import std.time { Instant, Duration, TimeError };
+import std.collections { List, Map, sortList };
+import std.core { Display };
 import std.string as strings;
 
 @Test
@@ -94,4 +96,87 @@ pub fn from_iso_or_throw_names_the_field(): void {
         second = e.message();
     }
     assertTrue(second.indexOf("month") >= 0, "the month did not read: " + second);
+}
+
+// --------------------------------------------------------------- the conformances
+
+// What a constrained caller sees: `println` reaches `show` exactly this way, through the
+// constraint rather than through the concrete type.
+fn render<T :: [Display]>(value: T): string {
+    return value.show();
+}
+
+@Test
+pub fn instants_compare_across_the_whole_range(): void {
+    // The pair that a subtraction-based `compare` gets WRONG: the distance between them
+    // overflows an int and comes back with the opposite sign.
+    let early = Instant.ofEpochMillis(0 - 9000000000000000000);
+    let late = Instant.ofEpochMillis(9000000000000000000);
+    assertTrue(early.compare(late) < 0, "the early instant comes first");
+    assertTrue(late.compare(early) > 0, "the late instant comes second");
+    assertEq(early.compare(early), 0);
+}
+
+@Test
+pub fn durations_compare_across_the_whole_range(): void {
+    let back = Duration.ofMillis(0 - 9000000000000000000);
+    let forward = Duration.ofMillis(9000000000000000000);
+    assertTrue(back.compare(forward) < 0, "the negative duration comes first");
+    assertTrue(forward.compare(back) > 0, "the positive duration comes second");
+    assertEq(forward.compare(forward), 0);
+}
+
+@Test
+pub fn instants_and_durations_answer_equality(): void {
+    assertEq(Instant.ofEpochMillis(1000), Instant.ofEpochMillis(1000));
+    assertEq(Duration.ofSeconds(1), Duration.ofMillis(1000));
+    assertTrue(!Instant.ofEpochMillis(1000).equals(Instant.ofEpochMillis(1001)), "one ms apart");
+    assertTrue(!Duration.ofMillis(0 - 500).equals(Duration.ofMillis(500)), "the sign counts");
+}
+
+@Test
+pub fn a_list_of_instants_sorts(): void {
+    // The reason `Ordered` is on the type at all: this call is what it buys.
+    let xs = List<Instant>.empty();
+    xs.push(Instant.ofEpochMillis(4500));
+    xs.push(Instant.ofEpochMillis(0 - 1));
+    xs.push(Instant.ofEpochMillis(1000));
+    sortList(xs);
+    assertEq(xs.get(0).epochMillis(), 0 - 1);
+    assertEq(xs.get(1).epochMillis(), 1000);
+    assertEq(xs.get(2).epochMillis(), 4500);
+}
+
+@Test
+pub fn an_instant_keys_a_map(): void {
+    let seen = Map<Instant, string>.empty();
+    seen.set(Instant.ofEpochMillis(1000), "first");
+    seen.set(Instant.ofEpochMillis(1000), "second");
+    assertEq(seen.length(), 1);
+    assertEq(seen.getOr(Instant.ofEpochMillis(1000), ""), "second");
+    assertTrue(seen.get(Instant.ofEpochMillis(1001)) == null, "a different key is absent");
+}
+
+@Test
+pub fn a_duration_shows_its_milliseconds(): void {
+    assertEq(Duration.ofSeconds(90).plus(Duration.ofMillis(500)).show(), "90500ms");
+    assertEq(Duration.ofMillis(0).show(), "0ms");
+    assertEq(Duration.ofMillis(0 - 500).show(), "-500ms");
+    assertEq(render(Duration.ofMillis(1500)), "1500ms");
+}
+
+@Test
+pub fn an_instant_shows_what_iso_writes(): void {
+    let x = Instant.ofEpochMillis(951868800000);
+    assertEq(x.show(), x.iso());
+    assertEq(x.show(), "2000-03-01T00:00:00.000Z");
+    // Pre-epoch through the same path, since `show` is `iso`.
+    assertEq(Instant.ofEpochMillis(0 - 1).show(), "1969-12-31T23:59:59.999Z");
+    assertEq(render(Instant.ofEpochMillis(0)), "1970-01-01T00:00:00.000Z");
+}
+
+@Test
+pub fn equal_values_hash_equal(): void {
+    assertEq(Instant.ofEpochMillis(4500).hash(), Instant.ofEpochMillis(4500).hash());
+    assertEq(Duration.ofSeconds(1).hash(), Duration.ofMillis(1000).hash());
 }

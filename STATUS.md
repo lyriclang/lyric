@@ -11,6 +11,25 @@
 
 ## Current milestone
 
+**The std round after the major opens with v4.1.0** (2026-08-27): `Instant` and `Duration`
+get the four conformances every other value in the library has had — `Equatable`, `Ordered`,
+`Hashable`, `Display`. It is the first item of the two-release train the maintainer chose over
+opening the HTTP question (the other is a yielding file handle): both are decided before they
+are built, where HTTP still owes an answer on TLS. What the inventory actually found: the two
+types carried NO conformance at all, so `a < b` was `a.epochMillis() < b.epochMillis()`,
+`sortList` over a `List<Instant>` could not be written, and neither type could be printed or
+key a `Map`. **`compare` is three comparisons, not a field subtraction** — the pair pinned in
+the tests (`±9e18`) overflows that subtraction and answers with the opposite sign, which is the
+whole reason the case is in the suite. `Duration.show()` renders `3500ms` rather than `3.5s`:
+the type counts whole milliseconds and a divided rendering promises a precision it does not
+carry. **What deliberately did NOT come**: `Add`/`Sub` conformances — `plus`/`minus`/`since`
+are methods, an operator beside them is a second way to write one calculation, and
+`Instant - Instant` is heterogeneous besides. Pure Lyric, no host, no format, no sema: +69 lines
+in `stdlib/std/time.lyr`, 8 lyrtest cases (152 total), guide 13 gains "Instants compare, sort
+and print", doc floor 525 → 533. One thing NOTED, not fixed: `show()` inherits `iso()`'s
+pre-epoch negative-year `padStart` mangling, unreachable this side of 62 billion negative
+milliseconds and already recorded.
+
 **v4 SHIPS as v4.0.0** (2026-08-27). The whole `lyric#121` basket delivered — stackful
 coroutines with the dynamic yield (items 1–3), `Deque` (6), `std.task` (4), `std.io.net` TCP
 (5) and UDP (11), `std.bytes` (5a), `Instant.fromIso` (7), the stdin-pipe proof (8),

@@ -418,6 +418,48 @@ form. Both decoders are strict — no whitespace, no missing padding, nothing ou
 alphabet — because a lenient decoder accepts what the next system rejects; strip decorations
 before decoding.
 
+## Instants compare, sort and print
+
+Since 4.1 `Instant` and `Duration` carry the four conformances every other value in the library
+has had: `Equatable`, `Ordered`, `Hashable` and `Display`. So the ordinary operators work, the
+ordinary sort works, and an instant may be a `Map` key:
+
+```lyr
+import std.time { Instant, Duration };
+import std.collections { List, sortList };
+import std.io.console { println };
+
+fn main(): int {
+    let started = Instant.ofEpochMillis(1000);
+    let finished = started.plus(Duration.ofMillis(3500));
+
+    if (started < finished) {
+        println(finished.since(started));      // 3500ms
+    }
+
+    let stamps = List<Instant>.empty();
+    stamps.push(finished);
+    stamps.push(started);
+    sortList(stamps);
+    println(stamps.get(0));                    // 1970-01-01T00:00:01.000Z
+    return 0;
+}
+```
+
+An instant prints as the text `iso()` writes, because that is the one textual form the type
+has. A duration prints its milliseconds with the unit — `3500ms`, not `3.5s`: this type counts
+whole milliseconds, and a rendering that divides them would promise a precision the value does
+not carry. Scale it yourself, or reach for `std.fmt`.
+
+**`compare` is three comparisons, not a subtraction.** `a.millis - b.millis` overflows for two
+instants far enough apart and answers with the opposite sign; the same trap waits in any
+`compare` you write yourself over a wide numeric field.
+
+What did NOT arrive is `+` and `-` on the two types. `plus`, `minus` and `since` are methods,
+and an operator beside them would be a second way to write one calculation. `Instant - Instant`
+is a `Duration` besides — heterogeneous, and the operator interfaces here are homogeneous by
+decision.
+
 ## Capabilities
 
 `std.io.file`, `std.os` and `std.time` require a capability. A standalone run grants
