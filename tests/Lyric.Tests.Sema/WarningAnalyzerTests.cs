@@ -235,6 +235,28 @@ public class WarningAnalyzerTests
     }
 
     [Fact]
+    public void An_import_used_through_its_second_overload_is_used()
+    {
+        // Importing a name brings the whole overload SET, but the accounting looked only at the
+        // first member: a call that chose a later one left the import counted as unused, and
+        // under --deny-warnings that breaks the build for correct code. Found in the 4.0 sweep
+        // on std.io.net, whose UDP `localPort`/`close` are the TCP names' second members.
+        AssertSilent(Check("""
+            import std.io.net { bind, localPort, close };
+
+            fn main(): int {
+                let sock = bind("127.0.0.1", 0);
+                if (sock == null) {
+                    return 1;
+                }
+                let p = localPort(sock);
+                close(sock);
+                return if (p > 0) 0 else 1;
+            }
+            """, withStdlib: true));
+    }
+
+    [Fact]
     public void A_type_used_only_in_an_annotation_counts_as_used()
     {
         // The use stands in a type position, not in an expression: the resolver's table carries
