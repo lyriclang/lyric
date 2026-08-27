@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.time — Lyric v4.3.1</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.1</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/" class="here">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.time</h1>
+<nav class="contents">
+<ul>
+<li><a href="#struct-duration">Duration</a></li>
+<li><a href="#class-timeerror">TimeError</a></li>
+<li><a href="#struct-instant">Instant</a></li>
+</ul>
+</nav>
+<section class="item" id="struct-duration">
+<h2><a href="#struct-duration">Duration</a> <span class="kind">struct</span></h2>
+<pre class="signature"><code class="language-lyr">pub struct Duration :: [Equatable&lt;Duration&gt;, Ordered&lt;Duration&gt;, Hashable&lt;Duration&gt;, Display]</code></pre>
+<p>A distance between two instants, in whole milliseconds. May be negative: <code>a.since(b)</code> with
+<code>b</code> later than <code>a</code> says so rather than hiding it.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">millis: int</code></pre>
+<p>The distance in milliseconds; the sign is the direction.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn ofMillis(value: int): Duration</code></pre>
+<p>A duration of whole milliseconds.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn ofSeconds(value: int): Duration</code></pre>
+<p>A duration of whole seconds.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn ofMinutes(value: int): Duration</code></pre>
+<p>A duration of whole minutes.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn totalMillis(): int</code></pre>
+<p>The whole distance in milliseconds.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn totalSeconds(): int</code></pre>
+<p>The whole distance in seconds, truncated towards zero.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn plus(other: Duration): Duration</code></pre>
+<p>The two added.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn minus(other: Duration): Duration</code></pre>
+<p>The other subtracted from this one.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn equals(other: Duration): bool</code></pre>
+<p>Whether the two span the same distance.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn compare(other: Duration): int</code></pre>
+<p>The shorter distance first; a negative duration comes before a positive one.</p>
+<p>Three comparisons rather than <code>this.millis - other.millis</code>: that subtraction overflows
+for two durations far enough apart and hands back the opposite sign.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn hash(): int</code></pre>
+<p>The millisecond count, which is what <code>int</code> hashes to.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn show(): string</code></pre>
+<p>The distance with its unit: <code>1500ms</code>, <code>-500ms</code>.</p>
+<p>Milliseconds, not a scaled <code>1.5s</code>: this type counts whole milliseconds, and a rendering
+that divides them invents a precision the value does not carry. Scaled forms are
+<code>std.fmt</code> work.</p>
+</div>
+</div>
+<p class="source">stdlib/std/time.lyr:26</p>
+</section>
+<section class="item" id="class-timeerror">
+<h2><a href="#class-timeerror">TimeError</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class TimeError :: [Throwable]</code></pre>
+<p>A failed reading of a time text: what was handed in, and what broke.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">text: string</code></pre>
+<p>What went wrong, naming the field that broke.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/time.lyr:100</p>
+</section>
+<section class="item" id="struct-instant">
+<h2><a href="#struct-instant">Instant</a> <span class="kind">struct</span></h2>
+<pre class="signature"><code class="language-lyr">pub struct Instant :: [Equatable&lt;Instant&gt;, Ordered&lt;Instant&gt;, Hashable&lt;Instant&gt;, Display]</code></pre>
+<p>A point on the wall clock: milliseconds since 1970-01-01 UTC.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">millis: int</code></pre>
+<p>Milliseconds since the epoch; negative is before 1970.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn now(): Instant</code></pre>
+<p>The wall clock, now.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn ofEpochMillis(value: int): Instant</code></pre>
+<p>The instant at these epoch milliseconds — for stored timestamps and for tests, which
+want a clock that stands still.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn epochMillis(): int</code></pre>
+<p>Milliseconds since the epoch — the raw number back, for storing.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn since(earlier: Instant): Duration</code></pre>
+<p>The distance from <code>earlier</code> to this instant. Negative when <code>earlier</code> is actually later.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn plus(d: Duration): Instant</code></pre>
+<p>This instant moved by a duration; a negative one moves backwards.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn iso(): string</code></pre>
+<p>ISO 8601 in UTC, millisecond precision: <code>1970-01-01T00:00:00.000Z</code>.</p>
+<p><code>divFloor</code>/<code>modFloor</code> rather than <code>/</code> and <code>%</code>, so an instant BEFORE the epoch lands in
+the right day — truncation would round the day towards 1970 and hand the rest a negative
+time.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn fromIso(text: string): ?Instant</code></pre>
+<p>Reads what <code>iso()</code> writes — the round-trip half that was missing since <code>iso</code> exists:
+<code>fromIso(x.iso())</code> is <code>x</code>, pre-epoch instants included. <code>null</code> when the text is not
+that shape or names a day that does not exist; <code>fromIsoOrThrow</code> says which field broke.</p>
+<p>Strict on purpose: exactly <code>YYYY-MM-DDTHH:MM:SS.mmmZ</code>, UTC only. A parser that accepts
+offsets or shortened forms would be promising calendar arithmetic this module does not
+have; the day <code>31</code> of February is refused rather than silently carried into March.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn fromIsoOrThrow(text: string): Instant throws TimeError</code></pre>
+<p><code>fromIso</code>, with the reason when the text does not read.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn equals(other: Instant): bool</code></pre>
+<p>Whether the two name the same point on the clock.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn compare(other: Instant): int</code></pre>
+<p>The earlier instant first.</p>
+<p>Three comparisons rather than <code>this.millis - other.millis</code>: an instant near the epoch
+against one near the type's maximum overflows that subtraction, and the sign it hands
+back is the wrong one.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn hash(): int</code></pre>
+<p>The epoch milliseconds, which is what <code>int</code> hashes to.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn show(): string</code></pre>
+<p>The ISO 8601 form — the same text <code>iso()</code> writes, because it is the one textual shape
+this type has.</p>
+</div>
+</div>
+<p class="source">stdlib/std/time.lyr:110</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.test/">std.test</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
