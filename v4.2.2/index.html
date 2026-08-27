@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.2.2</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.2</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.2.2 — 2026-08-27</h2>
+<p><strong>Round 2 of the sweep.</strong> One diagnostic fixed, one limit documented, and two language questions
+recorded rather than answered — deciding them is not a sweep's job.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A diagnostic no longer tells you to wait for a newer compiler when your program is simply
+wrong.</strong> <code>x == null</code>, <code>x ?? y</code> and <code>x ??= y</code> on a value that is not optional reported
+<code>LYR-IR0001</code> with the note <em>&quot;this compiler version cannot lower it yet&quot;</em>. No version will lower
+it — there is nothing to lower — so the note sent a reader looking for a release that will never
+help. It now reads <em>&quot;a value of this type is never null&quot;</em>.</p>
+<p><strong>The check itself stays in the lowering, and that is correct</strong>: a generic body may write
+<code>x == null</code> or <code>x ?? y</code> over a <code>T</code> that IS instantiated with an optional, and only
+monomorphization knows. The code stays <code>LYR-IR0001</code> — codes are stable identifiers, and
+<code>LYR-IR0002..0010</code> stay free by decision. Only the aside changed, and only at the six sites
+where the default category was false.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li><strong>An f-string interpolation holds a scalar, and the guide now says so.</strong> <code>f&quot;{p}&quot;</code> on a struct
+is refused even when the type conforms to <code>Display</code>, while <code>println(p)</code> works through the
+constraint. v4.1.0 made that gap felt rather than created it, by giving <code>Instant</code> and <code>Duration</code>
+a <code>Display</code>; guide 2 and guide 13 now state the limit and show <code>.show()</code> as the way through.</li>
+</ul>
+<h3 id="probed-and-clean">Probed and clean</h3>
+<p>Round 1's own fix re-checked: the guard's panic is NOT catchable as an <code>IoError</code>, and a computed
+<code>max</code> walking down to exactly one still reads. Beyond that: a <code>LineReader</code> walked inside a
+coroutine that is itself pulled from a task — a chain in a chain, with the file read at the bottom
+yielding past the inner chain to the scheduler; the same walk through <code>map</code> and <code>filter</code>; one
+handle used across two separate <code>run()</code> calls; fifty queued writes all landing; and the time types
+carried through a coroutine by value.</p>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Functions — Lyric v4.2.2</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a class="current" href="../../guide/getting-started/">Guide</a>
+<a href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.2</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Guide</h2>
+<ul>
+<li><a href="../../guide/getting-started/">Getting started</a></li>
+<li><a href="../../guide/values-and-types/">Values and types</a></li>
+<li><a href="../../guide/functions/" class="here">Functions</a></li>
+<li><a href="../../guide/control-flow/">Control flow</a></li>
+<li><a href="../../guide/structs-and-classes/">Structs and classes</a></li>
+<li><a href="../../guide/enums-and-matching/">Enums and pattern matching</a></li>
+<li><a href="../../guide/interfaces/">Interfaces</a></li>
+<li><a href="../../guide/generics/">Generics</a></li>
+<li><a href="../../guide/optionals/">Optionals</a></li>
+<li><a href="../../guide/errors/">Errors</a></li>
+<li><a href="../../guide/coroutines/">Coroutines</a></li>
+<li><a href="../../guide/modules/">Modules</a></li>
+<li><a href="../../guide/standard-library/">The standard library</a></li>
+<li><a href="../../guide/embedding/">Embedding</a></li>
+<li><a href="../../guide/attributes/">Attributes</a></li>
+<li><a href="../../guide/building/">Building a project</a></li>
+<li><a href="../../guide/packaging/">Packing a program</a></li>
+<li><a href="../../guide/formatting/">Formatting</a></li>
+<li><a href="../../guide/diagnostics/">Diagnostics</a></li>
+<li><a href="../../guide/testing/">Testing</a></li>
+<li><a href="../../guide/debugging/">Debugging</a></li>
+</ul>
+</nav>
+<main>
+<h1>Functions</h1>
+<nav class="contents">
+<ul>
+<li><a href="#default-and-variadic-parameters">Default and variadic parameters</a></li>
+<li><a href="#several-functions-of-one-name">Several functions of one name</a></li>
+<li><a href="#functions-as-values">Functions as values</a></li>
+<li><a href="#lambdas">Lambdas</a></li>
+<li><a href="#static-methods">Static methods</a></li>
+</ul>
+</nav>
+<pre><code class="language-lyr">fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn main(): int {
+    return add(2, 3);
+}
+</code></pre>
+<p>A function without a return type returns <code>void</code>. The return type is written after the parameters.</p>
+<h2 id="default-and-variadic-parameters">Default and variadic parameters</h2>
+<p>A parameter may have a default. <code>params</code> on the last parameter collects the rest into an array.</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+fn greet(name: string, greeting: string = &quot;Hello&quot;): string {
+    return greeting + &quot;, &quot; + name;
+}
+
+fn total(params values: int[]): int {
+    var sum = 0;
+    for (v in values) { sum = sum + v; }
+    return sum;
+}
+
+fn main(): int {
+    println(greet(&quot;Ada&quot;));
+    println(greet(&quot;Ada&quot;, &quot;Good evening&quot;));
+    return total(1, 2, 3);
+}
+</code></pre>
+<p>A finished array may be passed to a variadic parameter as a whole.</p>
+<h2 id="several-functions-of-one-name">Several functions of one name</h2>
+<p>Two functions may share a name when their parameters tell them apart. The call picks by what you
+pass:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.string { fromInt };
+
+fn describe(n: int): string {
+    return &quot;the number &quot; + fromInt(n);
+}
+
+fn describe(s: string): string {
+    return &quot;the word &quot; + s;
+}
+
+fn describe(a: int, b: int): string {
+    return &quot;a pair&quot;;
+}
+
+fn main(): int {
+    println(describe(7));
+    println(describe(&quot;seven&quot;));
+    println(describe(1, 2));
+    return 0;
+}
+</code></pre>
+<p><strong>The arguments choose, and only the arguments.</strong> Not what you do with the result: <code>let n: int = describe(...)</code> does not reach a different <code>describe</code>, because a call has to mean one thing before
+anyone looks at where it goes.</p>
+<p>The rules, in the order they apply — you rarely need them, and when you do you need them exactly:</p>
+<ol>
+<li>an argument that matches a parameter's type <strong>exactly</strong> beats one that would adapt, so with
+<code>f(int)</code> and <code>f(float)</code> in reach, <code>f(2)</code> is the int one;</li>
+<li>a concrete parameter beats a <strong>type parameter</strong>: a function written for your type wins over a
+generic one that would also take it;</li>
+<li>the overload that needs no <strong>default argument</strong> wins, then the one that is not <strong>variadic</strong>;</li>
+<li>a type's <strong>own method</strong> beats an extension that fits equally well — the rule that predates
+overloading.</li>
+</ol>
+<p>If nothing fits, or two fit exactly as well, the compiler says so and names every candidate it
+weighed.</p>
+<p><strong>Where it works.</strong> Free functions, methods of a struct, class or enum, <strong>static</strong> methods
+(<code>Id.of(7)</code> beside <code>Id.of(&quot;seven&quot;)</code>) and <strong>extension</strong> methods — including two in one <code>extend</code>
+block, which used to be an ambiguity and is an overload set now.</p>
+<p><strong>What may not be overloaded.</strong> Interface members: a method table holds one function per slot and
+finds it by name, so two of a name would have nowhere to go. Two functions whose parameters are
+the SAME are a redeclaration, even when the results differ.</p>
+<p>Overloading is per SCOPE, and a name that means several functions can be imported as a whole:
+<code>import geometry { area };</code> brings every <code>area</code> the module exports. <code>@Deprecated</code> sits on one
+overload rather than on the name, so the warning fires only where that one is called.</p>
+<p>A lambda passed as an argument does not take part in choosing — it has no type until a parameter
+gives it one — so the other arguments have to separate the candidates.</p>
+<h3 id="using-an-overloaded-name-as-a-value">Using an overloaded name as a value</h3>
+<p>A call chooses by its arguments; a value has none, so the type it is wanted as chooses instead:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.string { fromInt };
+
+fn describe(n: int): string { return &quot;number &quot; + fromInt(n); }
+fn describe(s: string): string { return &quot;word &quot; + s; }
+
+fn twice(f: fn(int) -&gt; string, n: int): string {
+    return f(n) + f(n);
+}
+
+fn main(): int {
+    // picks 'describe(int)', because that is the shape 'twice' asks for
+    println(twice(describe, 7));
+    return 0;
+}
+</code></pre>
+<p>Where no type says which — <code>let g = describe;</code> — the compiler refuses rather than guessing.</p>
+<h2 id="functions-as-values">Functions as values</h2>
+<p>A function name used without parentheses is a value of type <code>fn(...) -&gt; R</code>.</p>
+<pre><code class="language-lyr">fn double(n: int): int { return n * 2; }
+
+fn apply(f: fn(int) -&gt; int, value: int): int {
+    return f(value);
+}
+
+fn main(): int {
+    return apply(double, 21);
+}
+</code></pre>
+<h2 id="lambdas">Lambdas</h2>
+<p>A lambda is written with <code>=&gt;</code>. Its body is an expression or a block.</p>
+<pre><code class="language-lyr">fn apply(f: fn(int) -&gt; int, value: int): int {
+    return f(value);
+}
+
+fn main(): int {
+    let triple = (n: int) =&gt; n * 3;
+    let describe = (n: int): int =&gt; { return n + 1; };
+
+    return apply(triple, 3) + apply(describe, 5);
+}
+</code></pre>
+<p>A lambda captures the variables it uses. A block-bodied lambda infers its return type from its
+<code>return</code> statements when neither an annotation nor a context provides one — the returns must
+agree, the same rule match arms follow.</p>
+<h2 id="static-methods">Static methods</h2>
+<p>A type can carry functions that need no instance. They are called through the type.</p>
+<pre><code class="language-lyr">struct Point {
+    x: int,
+    y: int,
+
+    static fn origin(): Point { return Point { x = 0, y = 0 }; }
+    static let ZERO: int = 0;
+}
+
+fn main(): int {
+    let p = Point.origin();
+    return p.x + Point.ZERO;
+}
+</code></pre>
+<p>On a generic type the type arguments belong to the type:</p>
+<pre><code class="language-lyr">struct Pair&lt;T&gt; {
+    a: T,
+    b: T,
+
+    static fn both(value: T): Pair&lt;T&gt; { return Pair&lt;T&gt; { a = value, b = value }; }
+}
+
+fn main(): int {
+    let p = Pair&lt;int&gt;.both(4);
+    return p.a + p.b;
+}
+</code></pre>
+<nav class="neighbours">
+<a class="prev" href="../../guide/values-and-types/">Values and types</a>
+<a class="next" href="../../guide/control-flow/">Control flow</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
