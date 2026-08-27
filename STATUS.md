@@ -11,6 +11,28 @@
 
 ## Current milestone
 
+**The sweep after the std train — round 1 — ships as v4.2.1** (2026-08-27). Ten probe groups,
+**one real finding**, and it was older and wider than the release that surfaced it: the
+`readSome` family clamped `max` into `[1, 1MB]`, so asking for ZERO bytes handed back one. Four
+entry points across three modules (`std.io.net.readSome`/`receiveFrom`, `std.process`'s pair,
+`std.io.stream.readSome`) — only the last is new in 4.2; the other three have done this since
+4.0. **The datagram case is the one that loses data**: `receiveFrom` cuts a payload to `max` and
+drops the remainder, so a zero kept one byte and threw the packet away. Now a panic, the
+convention `string.substring` and `std.bytes.slice` already follow — there is no value to answer
+instead, since empty means EOF and null means a failure with a reason. Pinned in the CLI suite
+rather than lyrtest, because a panic ends the program the runner is running. **Also measured
+rather than argued**: the 4.2.0 scheduler fix has a SECOND symptom, and the pre-fix binary was
+rebuilt to see it — with a task spinning on `Wait.Now`, an interrupt reached a parked task only
+after the spinner gave up (100 000 turns against 52). Pinned. **Clean and worth not re-running**:
+two tasks sharing one handle, a 200 000-byte line and a CRLF split across the 64 KB refill
+boundary, 2 000 open/close rounds with no descriptor leak, a directory opened as a file, a write
+to a read-only handle, `close` while a read is outstanding (the 4.0 crash class — answers `null`),
+reads after EOF, `create` truncation, the time conformances at both ends of `int` through
+`sortList`/`Set`/`Map`, the stdlib suite under `LYRIC_JIT=1`, and a packed executable. **What the
+probes could NOT reach**: the `ExecutionBudget` contract across a stream read (needs an embedding
+fixture, not a probe), and cross-VM isolation of the per-thread file table — argued from the
+socket precedent, not tested, exactly as in 4.0. Round 2 follows; the loop exits on a clean one.
+
 **v4.2.0 — the file handle — closes the two-release train** (2026-08-27). `std.io.stream`:
 `open`/`create`/`openAppend`/`readSome`/`write`/`close` with their §9.0 twins, plus a
 `LineReader` that is an `Iterator<string>`, so the adapters chain onto it and every step yields

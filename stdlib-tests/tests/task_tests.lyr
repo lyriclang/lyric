@@ -227,3 +227,33 @@ pub fn a_spinning_task_does_not_starve_a_sleeper(): void {
     assertTrue(spin.woke, "the 5ms sleeper must wake while another task yields Wait.Now");
     assertTrue(spin.turns < 100000, "the spinner ended because the sleeper woke, not on its cap");
 }
+
+// The starvation's SECOND symptom, measured against the pre-fix scheduler: with a task spinning
+// on `Wait.Now`, an interrupt reached the parked task only after the spinner stopped — 100 000
+// turns against 52 with the fix. `ask` is what delivers an interrupt, and `block` was the only
+// caller that ran during a loop.
+fn parkOnInterrupt(): Coroutine<Wait> {
+    yield Wait.Interrupt;
+    spin.woke = true;
+}
+
+fn raiseAfterAWhile(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 50) {
+        yield Wait.Now;
+        i = i + 1;
+    }
+    interrupt();
+}
+
+@Test
+pub fn an_interrupt_reaches_a_parked_task_while_another_spins(): void {
+    spin.woke = false;
+    spin.turns = 0;
+    spawn(parkOnInterrupt());
+    spawn(raiseAfterAWhile());
+    spawn(spinUntilWoken());
+    run();
+    assertTrue(spin.woke, "the parked task must hear the interrupt");
+    assertTrue(spin.turns < 1000, "it must arrive promptly, not once the spinner gives up");
+}
