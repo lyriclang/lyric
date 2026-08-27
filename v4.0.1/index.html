@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.0.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.0.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.0.1 — 2026-08-27</h2>
+<p><strong>The sweep after 4.0.0.</strong> Eight probes against what the major added; four real findings, all
+fixed failing-test-first. Nothing in the language or the format changed.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><strong>A read of a CLOSED socket no longer crashes the process.</strong> <code>netReadReady</code> answered &quot;no
+bytes&quot; for a descriptor the table does not know without recording a reason, so the previous
+call's would-block stood and <code>readSome</code> went back to the scheduler to wait on a descriptor
+nothing could ever ready. <code>poll</code> then selected on a list that resolved to nothing, and
+<code>Socket.Select</code> threw — an unhandled host exception, printed as a .NET stack trace, which is
+precisely what the panic doctrine exists to prevent. Now: an unresolvable descriptor is a
+recorded failure (so the silent form answers <code>null</code> and the twin names it), and <code>poll</code> names
+a dead descriptor READY at once — the convention an errored socket already followed, since
+the wake exists so the next read can tell the waiter what happened.</li>
+<li><strong>An import used through its SECOND overload is no longer reported as unused</strong>
+(<code>LYR-SEM0072</code>). Importing a name brings the whole set, but the accounting looked only at
+its first member — so <code>import std.io.net { bind, localPort, close };</code> warned about names the
+file demonstrably calls, and under <code>--deny-warnings</code> that breaks a build for correct code.</li>
+<li><strong>One VM's <code>interrupt()</code> no longer reaches another VM's tasks.</strong> The pending flag was
+process-wide, while the socket table beside it is per-thread for exactly the opposite
+reason. The SIGNAL stays process-wide — SIGINT means the process — but the programmatic
+raise is now per VM.</li>
+<li><strong>A second VM no longer clears the first one's interrupt listening.</strong> The flag was assigned
+on every poll, so a VM without a parked task turned Ctrl+C back into a process kill while
+another VM was waiting for it. Listening is counted now, and the count moves on transitions.</li>
+<li><strong>A sleep beyond ~292 million years no longer waits forever.</strong> The millisecond-to-microsecond
+conversion overflowed into a negative number, which <code>Select</code> reads as &quot;no deadline&quot;; the
+clamp now happens before the multiplication.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
