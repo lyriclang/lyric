@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.0.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.0.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.0.0 — 2026-08-27</h2>
+<p>The major (the basket is <code>lyric#121</code>, decided 2026-08-25 and delivered whole). One sentence
+carries it: <strong><code>yield</code> works from any call depth, and everything the standard library waits
+for is built on that.</strong> Coroutines became stackful, <code>std.task</code> turned them into cooperative
+tasks, and TCP, UDP, child processes and Ctrl+C are all &quot;a task yields a <code>Wait</code>&quot; — no async
+syntax, no threads, no second mechanism. Every language rule landed spec-first
+(<code>lyric-spec#26</code>–<code>#28</code>); format 3.6 → 4.0; a 4.0 runtime runs every 3.x module unchanged, a
+3.x runtime rejects 4.0 modules — which is the correct answer.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Stackful coroutines.</strong> A coroutine is a chain of captured frames, and <code>yield</code> works from
+ANY call depth beneath a running <code>resume</code> — a helper can wait so its callers do not have to,
+with no marker on any signature. <code>yield</code> is legal in every function; its failures are
+PANICS, the dynamic half of the rule: no running resume, a value whose type is not the
+running chain's element type, a native or JIT-compiled frame between yield and resume
+(Lua's C-boundary rule), and <code>resume</code> of a coroutine that is already running. Inside a
+coroutine body the static check stays. Format 3.6 → 4.0: three opcodes (<code>mkcoro</code>,
+<code>resume</code>, <code>yield</code>); a 4.0 runtime runs every 3.x module unchanged, a 3.x runtime rejects
+4.0 modules.</p>
+</li>
+<li><p><strong><code>std.collections.Deque&lt;T&gt;</code></strong> — the double-ended queue: <code>pushFront</code>/<code>pushBack</code>,
+<code>popFront</code>/<code>popBack</code>, <code>peekFront</code>/<code>peekBack</code>, <code>length</code>, <code>isEmpty</code>, <code>clear</code>, all O(1) ends
+over one ring. A pop or peek answers <code>?T</code> and <code>null</code> means &quot;empty&quot; — the whole truth, so no
+throwing twin. Deliberately without iteration: a queue is drained, not walked. Written in
+Lyric, like the rest of the collections.</p>
+</li>
+<li><p><strong><code>std.task</code></strong> — cooperative tasks over coroutine chains, the scheduler written in Lyric.
+A task is a <code>Coroutine&lt;Wait&gt;</code>; <code>Wait</code> says what it waits for (<code>Now</code>, <code>Sleep(ms)</code>,
+<code>Readable(fd)</code>/<code>Writable(fd)</code> for <code>std.io.net</code>'s descriptors, <code>Interrupt</code> for Ctrl+C or the
+programmatic <code>interrupt()</code> — while a task is parked there, the signal wakes the scheduler
+instead of killing the process, one interrupt wakes every parked task, and a run left with
+only Interrupt tasks waits for it quietly). <code>spawn</code> enqueues, <code>run()</code> drives everything to its
+end — round-robin when ready, blocking in the module's ONE native (<code>poll</code>, time and
+readiness in one answer) when not. Sleepers wake in deadline order even when one poll
+covers several overdue deadlines; ties wake in spawn order. The waiting composes through
+helpers with no marker on any signature — what stackful coroutines were for. <code>spawn</code> takes
+the non-throwing type: a task settles its own errors. Carries <code>osAccess</code>.</p>
+</li>
+<li><p><strong><code>std.io.net</code></strong> — TCP for tasks, and the <code>networkAccess</code> bit reserved since 1.x finally
+gates something. <code>listen</code>/<code>accept</code>, <code>connect</code>, <code>readSome</code>/<code>write</code>, <code>close</code>, with opaque
+<code>Listener</code>/<code>Socket</code> handles; every waiting form yields to the scheduler inside the module,
+so a server is straight-line code in a task. Silent forms answer whether; <code>OrThrow</code> twins
+say why (<code>IoErrorKind</code> gains <code>ConnectionRefused</code> and <code>AddressInUse</code>). <code>readSome</code>: bytes are
+bytes, an empty array is EOF, <code>null</code> is a failure. <code>std.task.poll</code>'s descriptor half is
+real now — select over the module's sockets, an errored socket reporting as readable.
+And UDP: <code>bind</code> a <code>UdpSocket</code>, <code>sendTo</code> one datagram (whole or not at all, no delivery
+promise — that is UDP), <code>receiveFrom</code> waits and answers a <code>Packet</code> — payload plus sender,
+the address a reply's <code>sendTo</code> takes. UDP has no EOF, so an empty payload is a real
+packet; <code>localPort</code> and <code>close</code> are the same names TCP uses, chosen by the handle.</p>
+</li>
+<li><p><strong><code>std.process</code></strong> — child processes for tasks, behind <code>processAccess</code>, the FIFTH capability
+bit and the first new one since 1.0: starting programs is a new power, not an <code>osAccess</code>
+refinement, so a host that granted environment questions has not thereby agreed to it.
+<code>start</code>/<code>startOrThrow</code> (opaque <code>Child</code>), <code>readSomeOut</code>/<code>readSomeErr</code> speaking <code>readSome</code>'s
+three truths, queued <code>write</code> to stdin with <code>closeStdin</code> as the filter's EOF, <code>wait</code> for the
+exit code, <code>kill</code>, <code>close</code>. Every waiting form yields to the scheduler through the child's
+notify descriptor — the host pumps the streams and posts a datagram per event, so a child is
+just another thing <code>poll</code> watches.</p>
+</li>
+<li><p><strong><code>std.random.secureRandom</code></strong> — <code>count</code> bytes from the operating system's cryptographic
+source, the ONE non-deterministic draw in an otherwise reproducible module, and marked as
+such. Capability-free: entropy reaches no file, clock or network, so an embedded guest
+that can draw good dice costs a host nothing. <code>Random</code> stays seeded-by-the-caller.</p>
+</li>
+<li><p><strong><code>std.bytes</code></strong> — slicing and searching over <code>uint8[]</code>, the tooling wire protocols stand
+on: <code>slice</code> with <code>string.substring</code>'s exact edge behavior, <code>indexOf</code>/<code>indexOfFrom</code>
+answering <code>-1</code> like their string namesakes. Deliberately absent: <code>concat</code> (<code>a + b</code> already
+joins arrays — a function would be a second name for the operator) and subsequence search
+(a line ends in one byte; the protocol that needs more can ask). Written in Lyric,
+capability-free.</p>
+</li>
+<li><p><strong><code>Instant.fromIso</code></strong> — the round-trip half <code>iso()</code> never had: <code>fromIso(x.iso())</code> is <code>x</code>,
+pre-epoch instants included. Strict on purpose — exactly <code>YYYY-MM-DDTHH:MM:SS.mmmZ</code>, UTC
+only, and a day that does not exist (February 31st) is refused rather than carried into
+March. <code>null</code> answers whether; <code>fromIsoOrThrow</code> names the field that broke (<code>TimeError</code>,
+§9.0's twin doctrine). Written in Lyric, the exact inverse of <code>iso()</code>'s civil-from-days.</p>
+</li>
+</ul>
+<h3 id="moved">Moved</h3>
+<ul>
+<li><strong>The path helpers left <code>std.io.file</code> for <code>std.io.path</code></strong> — <code>joinPath</code>, <code>fileName</code>,
+<code>parentDir</code>, <code>extension</code>, <code>stem</code>, <code>withExtension</code>, <code>isAbsolute</code>, unchanged in behavior.
+The move is the point: a path is a string and touches no disk, so it now costs NO
+capability — a sandboxed guest can assemble the path it hands its host without being
+granted <code>fileAccess</code>. The old names in <code>io.file</code> are gone, not doubled; the 4.0 major
+pays the rename.</li>
+</ul>
+<h3 id="removed-the-clocks-came-due">Removed — the clocks came due</h3>
+<ul>
+<li><strong><code>listDir</code> is gone</strong>, as its <code>until = &quot;4.0&quot;</code> promised since 3.7: it answered an empty
+array to both &quot;empty&quot; and &quot;unreadable&quot;. <code>entries</code> says <code>null</code>, <code>entriesOrThrow</code> says why.
+Modules compiled before 4.0 still bind the native.</li>
+<li><strong>The inward opaque cast outside the declaring module is an ERROR</strong> (<code>LYR-SEM0093</code>), as 3.8
+announced: a handle is issued, not assembled — the declaring module offers a constructor
+function for values rebuilt from stored numbers.</li>
+</ul>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><strong>A module-qualified call sees the whole overload set.</strong> Since 3.0, <code>net.localPort(x)</code>
+through a module alias bound only the FIRST function of the name and refused the call with
+a type mismatch, while the selective import chose correctly — overload resolution depended
+on the import style, against §4.3a. Surfaced by UDP's <code>localPort</code>/<code>close</code> sharing their
+TCP names; the qualified route now collects the same candidate set.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
