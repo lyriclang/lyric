@@ -11,6 +11,24 @@
 
 ## Current milestone
 
+**Round 4 ships as v4.3.1** (2026-08-27) — aimed at what 4.3.0 rebuilt, which is where a fresh
+core path deserves to be probed. **Two findings, both 4.3.0's own.** (1) **The leak fix had a leak
+in it**: `Dispose` returns early the second time, so a handle a script acquired AFTER the first
+call was never released — reachable by calling into a disposed VM, which 4.3.0's own doc had
+called "not defined". Undefined behaviour is not an answer a sandbox may give. It is defined now:
+a disposed VM keeps INTERPRETING (pure code holds nothing, and stopping it would be a second and
+stranger failure mode) but opens nothing — five creation points refuse with the ordinary "could
+not" of their operation. The measurement that found it: `open after dispose: ok — the guest got a
+fresh handle` / `after a second dispose: STILL LOCKED`. (2) **4.3.0 wired only `LangVm`**: four
+places create a registry directly and disposed none — `lyric run`'s host, its bind-only path, the
+REPL and the DAP. The REPL is the one that mattered, because it makes a registry per ENTRY and
+re-runs its accumulated declarations, so every evaluation stranded the previous one's handles for
+the session; the DAP is the same shape one level up, an editor keeping one adapter across many
+runs. Attached, nothing is released — the registry is the host's, the same reason the controller
+only detaches. **Process lesson, twice in one round**: a python edit script that asserts AFTER its
+loop and writes at the END silently discarded two finished edits when a later one threw. Write
+first, or verify the count afterwards — `grep -c` caught both. Round 5 follows.
+
 **v4.3.0 — a VM owns what its scripts open** (2026-08-27). The sweep's heaviest finding, fixed:
 the descriptor tables move from the THREAD to the `NativeRegistry`, which was already one per VM
 and only its state was not. `LangVm` and the registry are `IDisposable`, and disposing closes

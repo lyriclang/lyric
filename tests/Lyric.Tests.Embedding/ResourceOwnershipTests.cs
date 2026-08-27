@@ -67,6 +67,16 @@ public class ResourceOwnershipTests
         pub fn drain(path: string): void { spawn(drainForever(path)); run(); }
         pub fn listen(): void { spawn(listenAndLeave()); run(); }
         pub fn listeningPort(): int { return port.at; }
+
+        pub fn compute(): int {
+            var n = 0;
+            var i = 0;
+            while (i < 100) {
+                n = n + i;
+                i = i + 1;
+            }
+            return n;
+        }
         """;
 
     private static string Fixture(string tag)
@@ -251,6 +261,42 @@ public class ResourceOwnershipTests
             System.Net.Sockets.SocketType.Stream,
             System.Net.Sockets.ProtocolType.Tcp);
         probe.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, (int)port));
+    }
+
+    /// <summary>
+    /// A disposed VM keeps interpreting but opens nothing new, and what a script tries to open
+    /// after that fails the way any I/O failure does.
+    ///
+    /// <para>This is the leak the leak-fix nearly introduced: <c>Dispose</c> returns early the
+    /// second time, so a handle acquired AFTER the first one was never released. Pure code still
+    /// runs — it holds nothing, and stopping it would be a second and stranger failure mode.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void A_disposed_vm_still_computes_but_opens_nothing()
+    {
+        var path = Fixture("afterwards");
+        try
+        {
+            var vm = Vm();
+            var instance = Instance(vm);
+            instance.CallVoid("leave", path);
+            vm.Dispose();
+            Assert.False(Locked(path));
+
+            // Pure interpretation is unaffected.
+            Assert.Equal(4950, instance.Call<long>("compute"));
+
+            // Opening is not: the guest sees null, and its own force-unwrap says so.
+            Assert.ThrowsAny<Exception>(() => instance.CallVoid("leave", path));
+
+            vm.Dispose();
+            Assert.False(Locked(path), "nothing was acquired after the first dispose");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

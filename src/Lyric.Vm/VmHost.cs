@@ -31,7 +31,10 @@ public static class VmHost
     {
         try
         {
-            var natives = NativeRegistry.CreateDefault(output, error);
+            // Disposed when the run ends: a program may leave sockets, child pipes or files
+            // open, and since 4.3 the registry that issued them is what releases them. The
+            // process usually exits right after, but this method is a library entry point too.
+            using var natives = NativeRegistry.CreateDefault(output, error);
 
             // The exit code is 0..255, so the lowest byte is taken.
             return (int)(Interpreter.Run(module, arguments, natives, granted).AsI64 & 0xFF);
@@ -89,7 +92,8 @@ public static class VmHost
 
         try
         {
-            NativeRegistry.CreateDefault(output, error).Bind(module);
+            using var binding = NativeRegistry.CreateDefault(output, error);
+            binding.Bind(module);
         }
         catch (LyricRuntimeException ex)
         {

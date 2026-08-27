@@ -96,6 +96,12 @@ public sealed class DapServer
         public required DebugController Controller { get; init; }
         public required string BaseDirectory { get; init; }
         public required string[] Arguments { get; init; }
+
+        /// <summary>The debuggee's registry, kept so the session can release what the program
+        /// left open. An adapter outlives its sessions — an editor keeps one across many runs —
+        /// so a debugged program's sockets and files must not accumulate in it.</summary>
+        public NativeRegistry? Natives { get; init; }
+
         public bool Started;
 
         /// <summary>Variable references handed to the client, each resolving to a variable list.
@@ -239,6 +245,10 @@ public sealed class DapServer
                     // the breakpoints nobody reads park it again next frame. Launched, the process
                     // is the session and ending it is the whole answer.
                     _attached?.Controller.Detach();
+                    // The debuggee is over, so what it opened goes with it. Attached, the
+                    // registry is the HOST's and `_session` is null, so nothing is released
+                    // here — the same reason the controller only detaches.
+                    _session?.Natives?.Dispose();
                     _disconnect = true;
                     await RespondAsync(request, null, cancellationToken).ConfigureAwait(false);
                     break;
@@ -303,6 +313,7 @@ public sealed class DapServer
         }
 
         LoadedProgram loaded;
+        NativeRegistry? debuggeeNatives = null;
         try
         {
             // The program's stdout and stderr become output events: the adapter's own stdout IS
@@ -313,6 +324,7 @@ public sealed class DapServer
                 new EventTextWriter(line => PostOutput("stderr", line)),
                 TextReader.Null);
             loaded = LoadedProgram.Load(module, natives);
+            debuggeeNatives = natives;
         }
         catch (LyricRuntimeException ex)
         {
@@ -325,6 +337,7 @@ public sealed class DapServer
             Controller = DebugController.Create(loaded, stopOnEntry && !noDebug),
             BaseDirectory = baseDirectory,
             Arguments = programArguments,
+            Natives = debuggeeNatives,
         };
         _session = session;
 

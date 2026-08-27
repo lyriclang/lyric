@@ -172,7 +172,11 @@ public sealed class Session(string? stdlibRoot)
             }
 
             var module = BytecodeReader.ReadOrThrow(BytecodeWriter.Write(ir));
-            Interpreter.Run(module, [], NativeRegistry.CreateDefault(output, error));
+            // One registry per entry, disposed with it. The session re-runs its accumulated
+            // declarations every time, so an entry that opens a file opens it again — without
+            // this each evaluation stranded the previous one's handles for the whole session.
+            using var natives = NativeRegistry.CreateDefault(output, error);
+            Interpreter.Run(module, [], natives);
         }
         catch (LyricPanic panic)
         {

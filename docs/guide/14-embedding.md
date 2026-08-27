@@ -426,6 +426,12 @@ outside world.
 so which thread opened a handle does not decide who owns it, and disposing one VM cannot touch
 another's.
 
+**A disposed VM still computes, but opens nothing.** Calling into one is not an error: pure code
+runs as it did. What it cannot do is acquire a file, a socket or a child process — those answer
+the ordinary "could not" of the operation, and a script handles it like any other I/O failure.
+The rule exists so that a call after `Dispose` cannot strand handles the next `Dispose` would
+skip.
+
 ## Errors
 
 A script that fails throws on the host side:

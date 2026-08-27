@@ -59,8 +59,12 @@ public sealed class LangVm : IDisposable
     /// does: releasing a handle automatically must not mean more than releasing it by hand. Kill
     /// it from the script, or hold the pid yourself.</para>
     ///
-    /// <para>Disposing twice does nothing the second time. Calling into a disposed VM is not
-    /// defined — instantiate a new one.</para></summary>
+    /// <para>Disposing twice does nothing the second time. A disposed VM keeps INTERPRETING —
+    /// pure code holds nothing, and stopping it would be a second and stranger failure mode —
+    /// but it opens nothing new: a script that tries to open a file, a socket or a process after
+    /// this gets the ordinary "could not" of that operation. Without that rule a call after
+    /// <c>Dispose</c> would acquire handles the next <c>Dispose</c> skips, and the fix for a leak
+    /// would have introduced one.</para></summary>
     public void Dispose() => _natives.Dispose();
 
     /// <summary>What scripts of this VM may reach.</summary>
