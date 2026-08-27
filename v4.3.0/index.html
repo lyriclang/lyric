@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.3.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.3.0 — 2026-08-27</h2>
+<p><strong>A VM owns what its scripts open.</strong> The heaviest finding of the 4.2 sweep, fixed.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong><code>LangVm</code> is <code>IDisposable</code>, and disposing it closes every socket, child process and file its
+scripts left open.</strong></p>
+<pre><code class="language-csharp">using var vm = new LangVm(new HostOptions { Capabilities = Capability.FileAccess });
+// leaving the block closes whatever the script still held
+</code></pre>
+<p>A script has no obligation to close what it opens: it may be stopped by an <code>ExecutionBudget</code>,
+it may panic, or it may simply return with a handle in hand. Until now those handles were held
+per THREAD, so neither dropping the VM nor collecting it released them — a host that stopped an
+untrusted script was left holding its resources, and on Windows a file the script opened stayed
+locked. That was the half of the sandbox a host could not work around.</p>
+</li>
+<li><p><strong>Two VMs never share a descriptor</strong>, on one thread or on several. The tables belong to the VM,
+so which thread opened a handle no longer decides who owns it, and disposing one VM cannot
+touch another's. The two-VMs-on-two-threads case is a deterministic test now rather than a
+timing argument.</p>
+</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li><strong>A child process is DISOWNED, not killed, when a VM is disposed</strong> — what <code>std.process.close</code>
+already does by hand. Releasing a handle automatically must not mean more than releasing it by
+hand; kill it from the script, or hold the pid in the host.</li>
+</ul>
+<h3 id="deliberately-unchanged">Deliberately unchanged</h3>
+<ul>
+<li><strong>There is no finalizer.</strong> A VM that is merely dropped keeps its handles until the process
+ends. A finalizer here would run against <code>Socket</code>, <code>FileStream</code> and <code>Process</code> objects that have
+their own, in an order nobody controls — a half answer that hides the case instead of closing
+it. Guide 14 says so plainly instead.</li>
+<li><strong>The interrupt SIGNAL stays process-wide</strong> — the handler, the pending signal, the listening
+count and the self-pipe. Only the programmatic <code>interrupt()</code> and the listening flag became
+per-VM, which is what they had always meant; they were per-thread standing in for it.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>

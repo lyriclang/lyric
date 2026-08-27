@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.io.stream — Lyric v4.3.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/" class="here">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.io.stream</h1>
+<nav class="contents">
+<ul>
+<li><a href="#alias-file">File</a></li>
+<li><a href="#function-open">open</a></li>
+<li><a href="#function-openorthrow">openOrThrow</a></li>
+<li><a href="#function-create">create</a></li>
+<li><a href="#function-createorthrow">createOrThrow</a></li>
+<li><a href="#function-openappend">openAppend</a></li>
+<li><a href="#function-openappendorthrow">openAppendOrThrow</a></li>
+<li><a href="#function-readsome">readSome</a></li>
+<li><a href="#function-readsomeorthrow">readSomeOrThrow</a></li>
+<li><a href="#function-write">write</a></li>
+<li><a href="#function-writeorthrow">writeOrThrow</a></li>
+<li><a href="#function-close">close</a></li>
+<li><a href="#class-linereader">LineReader</a></li>
+<li><a href="#function-linereader">lineReader</a></li>
+</ul>
+</nav>
+<section class="item" id="alias-file">
+<h2><a href="#alias-file">File</a> <span class="kind">alias</span></h2>
+<pre class="signature"><code class="language-lyr">pub type File = int</code></pre>
+<p>An open file. Opaque: it is issued by <code>open</code>, <code>create</code> or <code>openAppend</code>, never assembled.</p>
+<p class="source">stdlib/std/io/stream.lyr:41</p>
+</section>
+<section class="item" id="function-open">
+<h2><a href="#function-open">open</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn open(path: string): ?File</code></pre>
+<p>Opens an existing file for reading. <code>null</code> when it does not exist or cannot be read —
+<code>openOrThrow</code> says which.</p>
+<p class="source">stdlib/std/io/stream.lyr:80</p>
+</section>
+<section class="item" id="function-openorthrow">
+<h2><a href="#function-openorthrow">openOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn openOrThrow(path: string): File throws IoError</code></pre>
+<p><code>open</code>, with the reason when the file will not open.</p>
+<p class="source">stdlib/std/io/stream.lyr:85</p>
+</section>
+<section class="item" id="function-create">
+<h2><a href="#function-create">create</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn create(path: string): ?File</code></pre>
+<p>Opens a file for writing, creating it or TRUNCATING what is there. <code>null</code> when the path is
+not writable.</p>
+<p class="source">stdlib/std/io/stream.lyr:95</p>
+</section>
+<section class="item" id="function-createorthrow">
+<h2><a href="#function-createorthrow">createOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn createOrThrow(path: string): File throws IoError</code></pre>
+<p><code>create</code>, with the reason when the file will not open.</p>
+<p class="source">stdlib/std/io/stream.lyr:100</p>
+</section>
+<section class="item" id="function-openappend">
+<h2><a href="#function-openappend">openAppend</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn openAppend(path: string): ?File</code></pre>
+<p>Opens a file for writing at its END, creating it when it does not exist.</p>
+<p class="source">stdlib/std/io/stream.lyr:109</p>
+</section>
+<section class="item" id="function-openappendorthrow">
+<h2><a href="#function-openappendorthrow">openAppendOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn openAppendOrThrow(path: string): File throws IoError</code></pre>
+<p><code>openAppend</code>, with the reason when the file will not open.</p>
+<p class="source">stdlib/std/io/stream.lyr:114</p>
+</section>
+<section class="item" id="function-readsome">
+<h2><a href="#function-readsome">readSome</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSome(file: File, max: int): ?uint8[]</code></pre>
+<p>Reads up to <code>max</code> bytes, waiting for them. Three truths in one answer, the 2.14 convention
+<code>std.io.net</code> and <code>std.process</code> also speak: bytes are bytes, an EMPTY array is the end of the
+file, and <code>null</code> is a failure — <code>readSomeOrThrow</code> says which.</p>
+<p>Fewer than <code>max</code> bytes is an ordinary answer; call again until the empty array. A <code>max</code>
+of zero or less PANICS: an empty answer already means the end of the file, so there is
+no honest value to hand back for it.</p>
+<p>Yields while the read is outstanding, so it needs a running <code>std.task.run()</code>.</p>
+<p class="source">stdlib/std/io/stream.lyr:131</p>
+</section>
+<section class="item" id="function-readsomeorthrow">
+<h2><a href="#function-readsomeorthrow">readSomeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeOrThrow(file: File, max: int): uint8[] throws IoError</code></pre>
+<p><code>readSome</code>, with the reason when the read failed. The end of the file stays the empty array.</p>
+<p class="source">stdlib/std/io/stream.lyr:148</p>
+</section>
+<section class="item" id="function-write">
+<h2><a href="#function-write">write</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn write(file: File, bytes: uint8[]): bool</code></pre>
+<p>Writes <code>bytes</code> and waits for them to land. <code>false</code> when the write failed — <code>writeOrThrow</code>
+says why.</p>
+<p>The answer is the OUTCOME, not the handover: a queued write could not report a full disk at
+the call, and for a file that is the answer that matters. <code>std.process</code> queues its writes for
+the opposite reason — a child that reads slowly must not stall its writer.</p>
+<p>Yields while the write is outstanding, so it needs a running <code>std.task.run()</code>.</p>
+<p class="source">stdlib/std/io/stream.lyr:164</p>
+</section>
+<section class="item" id="function-writeorthrow">
+<h2><a href="#function-writeorthrow">writeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn writeOrThrow(file: File, bytes: uint8[]): void throws IoError</code></pre>
+<p><code>write</code>, with the reason when it failed.</p>
+<p class="source">stdlib/std/io/stream.lyr:178</p>
+</section>
+<section class="item" id="function-close">
+<h2><a href="#function-close">close</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn close(file: File): void</code></pre>
+<p>Closes the handle and releases the notify descriptor. Closing twice closes once. A read or
+write still outstanding is abandoned, not awaited.</p>
+<p class="source">stdlib/std/io/stream.lyr:186</p>
+</section>
+<section class="item" id="class-linereader">
+<h2><a href="#class-linereader">LineReader</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class LineReader :: [Iterator&lt;string&gt;]</code></pre>
+<p>The lines of an open file, walked as they are read — the shape a file too large to hold
+needs. Terminators are removed, and a carriage return before the newline goes with it, so
+CRLF and LF read alike.</p>
+<p>It is an <code>Iterator&lt;string&gt;</code>, so the adapters chain onto it. That protocol spends <code>null</code> on
+&quot;the end&quot;, which means a read FAILURE and the end of the file look the same from <code>next()</code>
+alone — ask <code>failed()</code> after the walk when the difference matters.</p>
+<p>Every step may yield, so a walk needs a running <code>std.task.run()</code>.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">source: File</code></pre>
+<p>The open file being walked.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pending: uint8[]</code></pre>
+<p>Bytes read and not yet handed out as a line.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">at: int</code></pre>
+<p>The first unconsumed byte of <code>pending</code>; a cursor rather than a re-slice per line, so a
+chunk full of short lines costs one copy instead of one per line.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">ended: bool</code></pre>
+<p>Whether the file has no more bytes to give.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">broke: bool</code></pre>
+<p>Whether the walk stopped on a failure rather than on the end.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub mut fn next(): ?string</code></pre>
+<p>The next line, or <code>null</code> at the end of the file — and at a failure, which <code>failed()</code>
+tells apart.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn failed(): bool</code></pre>
+<p>Whether the walk ended because a read failed. <code>false</code> after an ordinary end of file.</p>
+</div>
+</div>
+<p class="source">stdlib/std/io/stream.lyr:205</p>
+</section>
+<section class="item" id="function-linereader">
+<h2><a href="#function-linereader">lineReader</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn lineReader(file: File): LineReader</code></pre>
+<p>A walk over the lines of an open file. The handle stays the caller's to <code>close</code>.</p>
+<p class="source">stdlib/std/io/stream.lyr:278</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.io.path/">std.io.path</a>
+<a class="next" href="../../stdlib/std.iter/">std.iter</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
