@@ -387,6 +387,45 @@ wrote. It is the LEAF name: a field of type `Entity[]` answers `Entity`, and `fi
 says it is an array. What the host does with the answer is its own business — the language keeps
 refusing to say what an attribute means.
 
+## A VM owns what its scripts open
+
+Since 4.3 `LangVm` is `IDisposable`, and disposing it closes every socket, child process and file
+its scripts left open:
+
+```csharp
+using var vm = new LangVm(new HostOptions
+{
+    Capabilities = Capability.FileAccess | Capability.OsAccess,
+});
+
+var instance = vm.Instantiate(vm.Compile(source, "mod"));
+instance.CallVoid("run", new ExecutionBudget(1_000_000));
+// leaving the block closes whatever the script still held
+```
+
+**A script has no obligation to close what it opens.** It may be stopped by a budget, it may
+panic, or it may simply return with a handle in hand — and none of those run its `close`. Before
+4.3 those handles were held per THREAD, so neither dropping the VM nor collecting it released
+them: a host that stopped an untrusted script was left holding its resources, and on Windows a
+file the script had opened stayed locked. That was the half of the sandbox a host could not work
+around.
+
+Two things follow, and the second is a real limit rather than a detail:
+
+**A child process is DISOWNED, not killed.** That is what `std.process.close` does by hand, and
+releasing a handle automatically must not mean more than releasing it by hand. If a host needs
+the child gone, the script kills it, or the host holds the pid itself.
+
+**There is no finalizer.** A VM that is merely dropped keeps its handles until the process ends.
+The alternative would be a finalizer running on the finalizer thread against `Socket`,
+`FileStream` and `Process` objects that have their own, in an order nobody controls — a half
+answer that hides the case instead of closing it. So: dispose a VM whose scripts touch the
+outside world.
+
+**Two VMs never share a descriptor**, on one thread or on several. The tables belong to the VM,
+so which thread opened a handle does not decide who owns it, and disposing one VM cannot touch
+another's.
+
 ## Errors
 
 A script that fails throws on the host side:

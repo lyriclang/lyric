@@ -11,6 +11,28 @@
 
 ## Current milestone
 
+**v4.3.0 — a VM owns what its scripts open** (2026-08-27). The sweep's heaviest finding, fixed:
+the descriptor tables move from the THREAD to the `NativeRegistry`, which was already one per VM
+and only its state was not. `LangVm` and the registry are `IDisposable`, and disposing closes
+every socket, child and file the guest left. **The unit is the REGISTRY, not the ScriptInstance,
+and the reason is measured rather than preferred**: a native is a `Func<LyrValue[], LyrValue>` and
+gets no caller context, so per-instance ownership would change the native signature everywhere,
+`RegisterNative` included — an API break for a distinction that buys nothing, since instances of
+one VM live and die together and a descriptor is opaque. **The refactor cost almost nothing in
+churn**, because the three registrars and the body of `CreateDefault` became INSTANCE methods:
+inside them `this` is the registry, so 103 `registry.` prefixes fell away and every helper
+resolved unchanged. What stays process-wide is the interrupt SIGNAL half — `_signalPending`, the
+handler, the listening count, the self-pipe — exactly the split the 4.0 sweep established; what
+became per-VM is the programmatic raise and the listening flag, which were per-thread standing in
+for per-VM. **A child is DISOWNED, not killed**, as `std.process.close` already did: releasing a
+handle automatically may not mean more than releasing it by hand. **No finalizer, deliberately** —
+a host that never disposes still leaks, and that is said in guide 14 rather than half-answered by
+a finalizer racing `Socket`, `FileStream` and `Process` finalizers in an order nobody controls.
+**The second open thread closes with it**: two VMs on two THREADS, disposed from a third, is now
+a deterministic test — the 4.0 sweep had declined that shape as CI-flaky, and per-thread state was
+the only reason it needed timing at all. Seven ownership pins, the whole suite green including
+`LYRIC_JIT=1`, 166 lyrtest unchanged.
+
 **Round 3 ships as v4.2.3** (2026-08-27), and it is not clean either. **The heavy finding is a
 RESOURCE LEAK across the sandbox boundary, recorded rather than fixed**: a file handle a guest
 opens and does not close stays open for the lifetime of the THREAD. Measured over five shapes —
@@ -165,8 +187,8 @@ the SIGNAL stays process-wide, the programmatic raise is now per VM); and a seco
 the first one's interrupt listening on every poll, turning Ctrl+C back into a process kill
 while somebody waited for it (counted now, moving on transitions). Plus the hardening: the
 ms→µs conversion overflowed for sleeps beyond ~292 million years into a negative "wait
-forever". **What the probes could NOT reach**: the cross-VM isolation itself is argued, not
-tested — the honest test needs two VMs on two threads and a timing margin, the shape that
+forever". **What the probes could NOT reach at the time**: the cross-VM isolation itself was argued, not
+tested — 4.3.0 made it ordinary and it is pinned now (§Current milestone); it was argued, not — the honest test needs two VMs on two threads and a timing margin, the shape that
 flaked in CI before; both single-VM halves stay covered (lyrtest for the programmatic path,
 the Cli SIGINT test for the signal). Probes that came back CLEAN and are worth not
 re-running: the dynamic yield's byte-compare type rule (structurally identical structs, and
@@ -1483,15 +1505,6 @@ answer yet, and it belongs asked before E4 starts.
 
 **Tooling and format:**
 
-- **A guest's OS handles outlive the guest.** A file opened through `std.io.stream` and not
-  closed stays open for the lifetime of the THREAD: measured surviving a budget stop, a guest
-  panic, an ordinary return, and the VM plus instance being garbage collected — only an explicit
-  `close` releases it, and on Windows the file stays locked meanwhile. `_sockets` (4.0) and
-  `_children` (4.0) are the same shape; the file case merely made it observable. **This is the
-  sandbox's own promise**: a host that stops an untrusted script is left holding handles the guest
-  opened. The fix is per-instance resource ownership — the ThreadStatic tables keyed by instance
-  and released on dispose — which is the same change the cross-VM isolation question needs, and
-  it is a design decision rather than a sweep fix. Found by the 4.2 sweep, round 3.
 
 - **The four ways to ask "is this null?" disagree inside a GENERIC body.** With
   `fn f<T>(x: T)`: `x == null` and `x ?? fallback` COMPILE and behave correctly when `T` is

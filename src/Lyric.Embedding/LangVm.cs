@@ -14,8 +14,13 @@ namespace Lyric.Embedding;
 ///
 /// <para>One VM is one sandbox: two VMs in the same process share no capabilities, no registry
 /// and no loaded modules.</para>
+///
+/// <para>Since 4.3 a VM also OWNS what its scripts open — sockets, child pipes, files — and
+/// <see cref="Dispose"/> closes whatever they left behind. Dispose a VM whose scripts touch the
+/// outside world; a VM that is merely dropped keeps those handles until the process ends,
+/// because there is no finalizer to catch that case.</para>
 /// </summary>
-public sealed class LangVm
+public sealed class LangVm : IDisposable
 {
     /// <summary>The module name registered host functions appear under. A script writes
     /// <c>import host;</c> or <c>import host { playSound };</c>.</summary>
@@ -41,6 +46,22 @@ public sealed class LangVm
             _options.Output ?? TextWriter.Null,
             _options.Error ?? TextWriter.Null);
     }
+
+    /// <summary>Closes every socket, child process and file this VM's scripts left open.
+    ///
+    /// <para>A script has no obligation to close what it opens: it may be stopped by an
+    /// <see cref="ExecutionBudget"/>, it may panic, or it may simply return with a handle in
+    /// hand. Before 4.3 those handles outlived the VM — they were held per THREAD, so neither
+    /// dropping the VM nor collecting it released them, and on Windows a file the guest opened
+    /// stayed locked. A host that stops an untrusted script was left holding its resources.</para>
+    ///
+    /// <para>A child process is DISOWNED rather than killed, exactly as <c>std.process.close</c>
+    /// does: releasing a handle automatically must not mean more than releasing it by hand. Kill
+    /// it from the script, or hold the pid yourself.</para>
+    ///
+    /// <para>Disposing twice does nothing the second time. Calling into a disposed VM is not
+    /// defined — instantiate a new one.</para></summary>
+    public void Dispose() => _natives.Dispose();
 
     /// <summary>What scripts of this VM may reach.</summary>
     public Capability Capabilities => _options.Capabilities;
