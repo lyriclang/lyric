@@ -123,10 +123,15 @@ pub fn openAppendOrThrow(path: string): File throws IoError {
 /// `std.io.net` and `std.process` also speak: bytes are bytes, an EMPTY array is the end of the
 /// file, and `null` is a failure — `readSomeOrThrow` says which.
 ///
-/// Fewer than `max` bytes is an ordinary answer; call again until the empty array.
+/// Fewer than `max` bytes is an ordinary answer; call again until the empty array. A `max`
+/// of zero or less PANICS: an empty answer already means the end of the file, so there is
+/// no honest value to hand back for it.
 ///
 /// Yields while the read is outstanding, so it needs a running `std.task.run()`.
 pub fn readSome(file: File, max: int): ?uint8[] {
+    if (max <= 0) {
+        panic("std.io.stream.readSome: max must be positive");
+    }
     while (true) {
         let got = streamTryRead(file as int, max);
         if (got != null) {

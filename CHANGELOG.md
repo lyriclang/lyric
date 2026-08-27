@@ -10,6 +10,41 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.2.1 — 2026-08-27
+
+**The sweep after 4.1.0 and 4.2.0.** Ten probe groups against what the two releases added; one
+real finding, fixed failing-test-first, and it turned out to be older and wider than the release
+that surfaced it.
+
+### Fixed
+
+- **A `readSome` of zero or fewer bytes no longer returns one byte.** The natives clamped `max`
+  into `[1, 1MB]`, so asking for nothing handed back a byte nobody asked for. A caller computing
+  a remaining-byte count — the length-prefixed frame reader `std.bytes` exists for — silently
+  over-consumed its stream at the moment the count reached zero.
+
+  Four entry points, across three modules: `std.io.net.readSome` and `std.io.net.receiveFrom`,
+  `std.process.readSomeOut`/`readSomeErr`, and `std.io.stream.readSome`. **Only the last is new
+  in 4.2** — the other three have behaved this way since 4.0.
+
+  **The datagram case was the worst.** `receiveFrom` cuts a payload to `max` and drops the
+  remainder, so `receiveFrom(s, 0)` kept one byte and threw the packet away.
+
+  A non-positive `max` now panics, which is the convention `string.substring` and
+  `std.bytes.slice` already follow for an argument that has no sensible answer. There is no
+  value to return instead: an empty array already means EOF, and `null` already means a failure
+  with a reason behind it. `max` of one is unchanged and still reads one byte.
+
+### Probed and clean
+
+Worth not re-running: two tasks sharing one handle (300 of 300 bytes, both finish); a 200 000-byte
+line and a CRLF pair split across the 64 KB refill boundary (exact); 2 000 open/close rounds with
+no descriptor leak; a directory opened as a file, and a write to a read-only handle, both refused
+with the twin naming why; `close` while a read is outstanding — the 4.0 sweep's crash class — which
+answers `null` rather than taking the process down; reads after EOF staying empty; `create`
+truncating; the time conformances at both ends of `int`, including `sortList`, `Set` and `Map`;
+the whole stdlib suite under `LYRIC_JIT=1`; and a packed executable.
+
 ## v4.2.0 — 2026-08-27
 
 **Open files, read and written in pieces, inside tasks** — and a scheduler bug the feature's own
