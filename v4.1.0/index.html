@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.1.0</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.1.0</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.1.0 — 2026-08-27</h2>
+<p><strong><code>Instant</code> and <code>Duration</code> join the library's conformances.</strong> Additive: no existing program
+changes meaning, and nothing was deprecated or removed.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong><code>Instant</code> and <code>Duration</code> conform to <code>Equatable</code>, <code>Ordered</code>, <code>Hashable</code> and <code>Display</code>.</strong>
+Every other value type in the library has carried these; the two time types never did, so
+comparing two instants meant unwrapping both to <code>epochMillis()</code>, sorting a <code>List&lt;Instant&gt;</code>
+was not possible at all, and neither type could be printed or used as a <code>Map</code> key.</p>
+<pre><code class="language-lyr">if (started &lt; finished) {              // Ordered
+    println(finished.since(started));  // Display -&gt; &quot;3500ms&quot;
+}
+sortList(stamps);                      // the reason Ordered is on the type
+seen.set(finished, &quot;done&quot;);            // Hashable
+</code></pre>
+<p><code>Instant.show()</code> is the text <code>iso()</code> writes — the one textual form the type has.
+<code>Duration.show()</code> is the millisecond count with its unit (<code>3500ms</code>, <code>-500ms</code>), NOT a scaled
+<code>3.5s</code>: the type counts whole milliseconds, and a rendering that divides them promises a
+precision the value does not carry.</p>
+<p><code>compare</code> is three comparisons rather than a subtraction of the two fields. Two instants far
+enough apart overflow that subtraction and it answers with the opposite sign.</p>
+<p><strong><code>+</code> and <code>-</code> did not arrive with them.</strong> <code>plus</code>, <code>minus</code> and <code>since</code> are methods, and an
+operator beside them would be a second way to write one calculation; <code>Instant - Instant</code> is a
+<code>Duration</code> besides, which the homogeneous operator interfaces do not express.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
