@@ -10,11 +10,15 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v4.0.0 — Unreleased
+## v4.0.0 — 2026-08-27
 
-The major, in progress on `feature/v4-stackful` (the basket is `lyric#121`); nothing below is
-released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), the format as
-§13 4.0 (`lyric-spec#27`).
+The major (the basket is `lyric#121`, decided 2026-08-25 and delivered whole). One sentence
+carries it: **`yield` works from any call depth, and everything the standard library waits
+for is built on that.** Coroutines became stackful, `std.task` turned them into cooperative
+tasks, and TCP, UDP, child processes and Ctrl+C are all "a task yields a `Wait`" — no async
+syntax, no threads, no second mechanism. Every language rule landed spec-first
+(`lyric-spec#26`–`#28`); format 3.6 → 4.0; a 4.0 runtime runs every 3.x module unchanged, a
+3.x runtime rejects 4.0 modules — which is the correct answer.
 
 ### Added
 
