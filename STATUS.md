@@ -21,6 +21,17 @@ decided. Release mechanics per the checklist: the tree claimed 4.0.0 since PR#12
 already carried it, so the release commit is the CHANGELOG dating plus this paragraph — and
 the tag waits for green CI on main, the 3.8.1 lesson.
 
+**The 4.0 sweep SHIPS as v4.0.1** (2026-08-27). Round 2 came back CLEAN over six probes —
+UDP truncation to `max`, a child writing 128 KB past every pipe buffer, `kill` of a child
+that never ends on its own, 20 000 `fromIso` round trips across years 1–9999, 50 000
+mixed-end `Deque` operations against a `List` model, exceptions crossing the resume boundary
+before AND after a yield — plus a self-check of round 1's own fix: a poll holding one dead
+and one live descriptor answers the dead one at once without starving the live one. A clean
+round is the loop's exit condition, so the fixes ship. One edge RECORDED, not fixed: a
+blocking native (`poll`'s sleep, `std.os.sleep`) is not bounded by an `ExecutionBudget`, so
+a guest granted `osAccess` can hold a host's thread — a pre-existing class since 1.x, not a
+4.0 regression, and gated by the capability it rides on.
+
 **The 4.0 sweep — round 1 — is DONE** (2026-08-27, ships as 4.0.1). Eight probes aimed at what
 the major added; four real findings, each fixed failing-test-first, and one hardening. **The
 worst was a CRASH, not a bug**: reading a CLOSED socket inside a task killed the process with
