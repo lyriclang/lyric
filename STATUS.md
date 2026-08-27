@@ -11,6 +11,27 @@
 
 ## Current milestone
 
+**Round 2 of the sweep ships as v4.2.2** (2026-08-27) — and it is NOT a clean round, so the loop
+does not exit here. One fix, one documented limit, two language questions recorded under §Still
+open rather than answered. **The fix**: `x == null` / `x ?? y` / `x ??= y` on a non-optional
+carried IR0001's default note, *"this compiler version cannot lower it yet"* — false at those
+sites, because no version will lower what has nothing to lower. The note is now per-site
+(*"a value of this type is never null"*) at the six optional-shaped refusals; the CODE stays one,
+per the standing decision that IR0002..0010 remain free. **The check stays in the lowering, and
+probing proved that right**: a generic body over `T` compiles `x == null` and `x ?? y` and both
+behave correctly at `T = ?int` — only monomorphization can decide it. **What that probe ALSO
+turned up is the first recorded question**: `x!` and the `null` pattern over the same `T` are
+refused at declaration time (SEM0005/SEM0029), so two of the four ways to ask "is this null?"
+defer to monomorphization and two do not. Not additive either way — making `??` strict would break
+generic bodies that use it today. **The second question**: an f-string interpolation takes a
+scalar, so `f"{instant}"` is refused while `println(instant)` works; 4.1.0 made that felt by
+giving the time types a `Display`. Guide 2 and 13 now state the limit; whether the lowering learns
+to call `show()` is a feature decision. **Clean in round 2**: round 1's own guard (its panic is
+not catchable as an `IoError`, and a computed `max` down to one still reads), a `LineReader`
+walked inside a coroutine pulled from a task — a chain in a chain with the read yielding past the
+inner chain — the same walk through `map`/`filter`, one handle across two `run()` calls, fifty
+queued writes, and the time types through a coroutine. Round 3 follows.
+
 **The sweep after the std train — round 1 — ships as v4.2.1** (2026-08-27). Ten probe groups,
 **one real finding**, and it was older and wider than the release that surfaced it: the
 `readSome` family clamped `max` into `[1, 1MB]`, so asking for ZERO bytes handed back one. Four
@@ -1435,6 +1456,23 @@ answer yet, and it belongs asked before E4 starts.
 ## Still open
 
 **Tooling and format:**
+
+- **The four ways to ask "is this null?" disagree inside a GENERIC body.** With
+  `fn f<T>(x: T)`: `x == null` and `x ?? fallback` COMPILE and behave correctly when `T` is
+  instantiated with an optional (measured, `?int` → `false`/`true` and `9`/`3`), while `x!` is
+  refused by `LYR-SEM0005` and `match (x) { null => … }` by `LYR-SEM0029`, both at declaration
+  time. Two operators defer the question to monomorphization; two answer it up front. Either a
+  `T` may be treated as possibly-optional — then the force-unwrap and the pattern should also
+  wait — or it may not, and then the coalesce and the null test belong in the sema. **A spec-round
+  candidate, and it is NOT additive either way**: making `??` strict would break any generic body
+  that uses it today. Found by the 4.2 sweep, round 2; pre-existing.
+- **An f-string interpolation holds a SCALAR, and a `Display` conformance does not change that.**
+  `f"{p}"` on a struct is `LYR-IR0001: interpolating a non-scalar value` — correctly noted as a
+  backend gap, since calling `show()` and splicing is exactly what the lowering would do — while
+  `println(p)` works through the constraint. 4.1.0 made the gap FELT rather than created it, by
+  giving `Instant` and `Duration` a `Display` and documenting that they print. The limit is now
+  stated in guide 2 and guide 13; whether the lowering learns it is a feature decision, not a
+  sweep fix. Found by the 4.2 sweep, round 2.
 
 - **A `v1.0.1` runtime cannot read a module with a source map.** The skip that lets a reader step
   over a section it does not know was broken until 3.1, so the forward compatibility the format
