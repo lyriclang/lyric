@@ -2232,7 +2232,7 @@ internal sealed class FunctionLowerer
             case LiteralPattern { Literal: NullLiteralExpr } nullPattern:
             {
                 if (subjectType is not IrOptionalType)
-                    throw NotSupported("'null' pattern on a non-optional", nullPattern.Span);
+                    throw NotSupported("'null' pattern on a non-optional", nullPattern.Span, LoweringDiagnostics.NeverNull);
 
                 var isSome = _slots.NewTemp(BoolType);
                 _b.Emit(new OptIsSome(isSome, subject, nullPattern.Span));
@@ -2470,7 +2470,7 @@ internal sealed class FunctionLowerer
         if (option is null) return null;
 
         var value = LowerExpr(option);
-        if (TypeOfExpr(option) is not IrOptionalType) throw NotSupported("null test on a non-optional", expr.Span);
+        if (TypeOfExpr(option) is not IrOptionalType) throw NotSupported("null test on a non-optional", expr.Span, LoweringDiagnostics.NeverNull);
 
         var isSome = _slots.NewTemp(BoolType);
         _b.Emit(new OptIsSome(isSome, value, expr.Span));
@@ -2567,7 +2567,7 @@ internal sealed class FunctionLowerer
     {
         var value = LowerExpr(operand);
         if (TypeOfExpr(operand) is not IrOptionalType option)
-            throw NotSupported("'!' on a non-optional", span);
+            throw NotSupported("'!' on a non-optional", span, LoweringDiagnostics.NeverNull);
 
         var dest = _slots.NewTemp(option.Inner);
         _b.Emit(new OptGet(dest, value, option.Inner, span));
@@ -2586,7 +2586,7 @@ internal sealed class FunctionLowerer
 
         var option = LowerExpr(expr.Left);
         if (TypeOfExpr(expr.Left) is not IrOptionalType left)
-            throw NotSupported("'??' on a non-optional", expr.Span);
+            throw NotSupported("'??' on a non-optional", expr.Span, LoweringDiagnostics.NeverNull);
 
         var test = _slots.NewTemp(BoolType);
         _b.Emit(new OptIsSome(test, option, expr.Span));
@@ -2624,7 +2624,7 @@ internal sealed class FunctionLowerer
     {
         var type = _slots.TypeOfLocal(slot);
         if (type is not IrOptionalType option)
-            throw NotSupported("'??=' on a non-optional target", expr.Span);
+            throw NotSupported("'??=' on a non-optional target", expr.Span, LoweringDiagnostics.NeverNull);
 
         var current = _slots.NewTemp(type);
         _b.Emit(new LoadLocal(current, slot, type, expr.Target.Span));
@@ -2667,7 +2667,7 @@ internal sealed class FunctionLowerer
             throw NotSupported("'?.' with a call whose result is not an optional", expr.Span);
 
         if (TypeOfExpr(callee.Target) is not IrOptionalType target)
-            throw NotSupported("'?.' on a non-optional", expr.Span);
+            throw NotSupported("'?.' on a non-optional", expr.Span, LoweringDiagnostics.NeverNull);
 
         // The method's actual return type. 'TypeOfExpr(expr)' is no good for that: the sema gave the call
         // the chain type '?int', while the method yields 'int'.
@@ -2750,7 +2750,7 @@ internal sealed class FunctionLowerer
             throw NotSupported("'?.' whose result is not an optional", expr.Span);
 
         if (TypeOfExpr(expr.Target) is not IrOptionalType target)
-            throw NotSupported("'?.' on a non-optional", expr.Span);
+            throw NotSupported("'?.' on a non-optional", expr.Span, LoweringDiagnostics.NeverNull);
 
         var slot = _slots.DeclareSynthetic("chain", resultType);
         var option = LowerExpr(expr.Target);
@@ -4424,8 +4424,8 @@ internal sealed class FunctionLowerer
     /// <see cref="ModuleLowerer"/> into a <c>LYR-IR0001</c> diagnostic with file, line and column, so no
     /// position is written into the text here; the DiagnosticEngine renders it. The text names the
     /// construct and nothing else — the category is a note the report attaches.</summary>
-    private static UnsupportedConstructException NotSupported(string what, Span span) =>
-        new(what, span);
+    private static UnsupportedConstructException NotSupported(string what, Span span,
+        string? note = null) => new(what, span, note);
 
     /// <summary>An internal inconsistency: the compiler is broken, not the source.</summary>
     private InternalCompilationException Bug(string message) =>

@@ -27,10 +27,24 @@ internal static class LoweringDiagnostics
     /// </summary>
     private const string Category = "this compiler version cannot lower it yet";
 
+    /// <summary>
+    /// The note for a refusal that is NOT a gap: an optional-shaped operation on a value that,
+    /// after monomorphization, has no optional in it. No compiler version will lower that, because
+    /// there is nothing to lower — telling the reader to wait for a newer one sends them looking
+    /// for a release that will never help.
+    /// </summary>
+    public const string NeverNull = "a value of this type is never null";
+
     /// <summary>Reports the one lowering code. Every site goes through here, so the note hangs in
-    /// a single place and no message has to carry the category in its own text.</summary>
-    public static void ReportUnsupported(DiagnosticEngine de, Span span, string message) =>
-        de.Report(NotSupported, Severity.Error, span, message, new DiagnosticNote(Category));
+    /// a single place and no message has to carry the category in its own text.
+    ///
+    /// <para><paramref name="note"/> overrides the default category for a site where it does not
+    /// apply. The CODE stays one — codes are stable identifiers — and only the aside changes.
+    /// </para></summary>
+    public static void ReportUnsupported(DiagnosticEngine de, Span span, string message,
+        string? note = null) =>
+        de.Report(NotSupported, Severity.Error, span, message,
+            new DiagnosticNote(note ?? Category));
 }
 
 /// <summary>
@@ -46,5 +60,15 @@ internal sealed class UnsupportedConstructException : Exception
 {
     public Span Span { get; }
 
-    public UnsupportedConstructException(string message, Span span) : base(message) => Span = span;
+    /// <summary>The note this refusal wants instead of the default category, or <c>null</c> for
+    /// the default. See <see cref="LoweringDiagnostics.NeverNull"/> for why a site needs one.
+    /// </summary>
+    public string? Note { get; }
+
+    public UnsupportedConstructException(string message, Span span, string? note = null)
+        : base(message)
+    {
+        Span = span;
+        Note = note;
+    }
 }

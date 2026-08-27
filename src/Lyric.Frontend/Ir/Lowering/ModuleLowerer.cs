@@ -126,7 +126,7 @@ public static class ModuleLowerer
                     }
                     catch (UnsupportedConstructException ex)
                     {
-                        LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+                        LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
                         failed = true;
                     }
                     continue;
@@ -213,7 +213,7 @@ public static class ModuleLowerer
                         }
                         catch (UnsupportedConstructException ex)
                         {
-                            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+                            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
                             failed = true;
                         }
 
@@ -240,7 +240,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
             return null;
         }
 
@@ -293,7 +293,7 @@ public static class ModuleLowerer
                 // reported once: the user should see all the MISSING CONSTRUCTS of their program, not
                 // every place the same one is missing.
                 if (reported.Add((ex.Span, ex.Message)))
-                    LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+                    LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
                 failed = true;
             }
         }
@@ -316,7 +316,7 @@ public static class ModuleLowerer
             }
             catch (UnsupportedConstructException ex)
             {
-                LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+                LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
                 return null;
             }
         }
@@ -341,7 +341,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
             return null;
         }
 
@@ -399,7 +399,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message);
+            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
             return null;
         }
 

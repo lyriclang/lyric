@@ -81,6 +81,22 @@ fn main(): int {
 
 Write `{{` and `}}` for a literal brace.
 
+**An interpolation holds a SCALAR** — a number, a `bool`, a `char` or a `string`. A struct, a
+class or an enum is refused there even when it conforms to `Display`, so a type that prints
+through `println` still needs `.show()` inside an f-string:
+
+```lyr
+import std.io.console { println };
+import std.time { Instant };
+
+fn main(): int {
+    let at = Instant.ofEpochMillis(1000);
+    println(at);                        // Display, through the constraint
+    println(f"at {at.show()}");         // f"{at}" is refused
+    return 0;
+}
+```
+
 ## Arrays
 
 `T[]` is a fixed-length array. Its length is part of the value, not of the type.

@@ -584,6 +584,46 @@ public class LoweringTests
     }
 
     /// <summary>
+    /// An optional-shaped operation on a value that is not optional carries a note saying so —
+    /// NOT the default "cannot lower it yet" category.
+    ///
+    /// <para>The check has to sit in the lowering, because a generic body may write
+    /// <c>x == null</c> or <c>x ?? y</c> over a <c>T</c> that IS instantiated with an optional,
+    /// and only monomorphization knows. But once the substituted type has no optional in it, no
+    /// future compiler version will lower it either — there is nothing to lower. The old note
+    /// sent a reader looking for a release that will never help.</para>
+    ///
+    /// <para>The CODE stays <c>LYR-IR0001</c>: codes are stable identifiers and
+    /// <c>LYR-IR0002..0010</c> stay free by decision. Only the aside changes.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("if (x == null) { return 1; }", "null test on a non-optional")]
+    [InlineData("let y: int = x ?? 0;", "'??' on a non-optional")]
+    [InlineData("var z = x; z ??= 0;", "'??=' on a non-optional target")]
+    public void An_optional_operation_on_a_plain_value_says_it_is_never_null(
+        string statement, string expected)
+    {
+        var (ir, de) = TryLower($$"""
+            fn main(): int {
+                let x: int = 5;
+                {{statement}}
+                return 0;
+            }
+            """);
+
+        Assert.Null(ir);
+        // Single on the ERRORS: a case may also carry an unused-binding warning, which is not
+        // what this test is about.
+        var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Severity == Severity.Error));
+        Assert.Equal("LYR-IR0001", diagnostic.Code);
+        Assert.Contains(expected, diagnostic.Message, StringComparison.Ordinal);
+
+        var rendered = Render(de);
+        Assert.Contains("a value of this type is never null", rendered, StringComparison.Ordinal);
+        Assert.DoesNotContain("cannot lower it yet", rendered, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// A type whose layout fails at a scope boundary must not corrupt the type table.
     ///
     /// <para>That was a compiler crash rather than a blemish: <c>Intern</c> records the placeholder

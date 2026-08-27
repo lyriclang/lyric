@@ -10,6 +10,41 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.2.2 — 2026-08-27
+
+**Round 2 of the sweep.** One diagnostic fixed, one limit documented, and two language questions
+recorded rather than answered — deciding them is not a sweep's job.
+
+### Fixed
+
+- **A diagnostic no longer tells you to wait for a newer compiler when your program is simply
+  wrong.** `x == null`, `x ?? y` and `x ??= y` on a value that is not optional reported
+  `LYR-IR0001` with the note *"this compiler version cannot lower it yet"*. No version will lower
+  it — there is nothing to lower — so the note sent a reader looking for a release that will never
+  help. It now reads *"a value of this type is never null"*.
+
+  **The check itself stays in the lowering, and that is correct**: a generic body may write
+  `x == null` or `x ?? y` over a `T` that IS instantiated with an optional, and only
+  monomorphization knows. The code stays `LYR-IR0001` — codes are stable identifiers, and
+  `LYR-IR0002..0010` stay free by decision. Only the aside changed, and only at the six sites
+  where the default category was false.
+
+### Documentation
+
+- **An f-string interpolation holds a scalar, and the guide now says so.** `f"{p}"` on a struct
+  is refused even when the type conforms to `Display`, while `println(p)` works through the
+  constraint. v4.1.0 made that gap felt rather than created it, by giving `Instant` and `Duration`
+  a `Display`; guide 2 and guide 13 now state the limit and show `.show()` as the way through.
+
+### Probed and clean
+
+Round 1's own fix re-checked: the guard's panic is NOT catchable as an `IoError`, and a computed
+`max` walking down to exactly one still reads. Beyond that: a `LineReader` walked inside a
+coroutine that is itself pulled from a task — a chain in a chain, with the file read at the bottom
+yielding past the inner chain to the scheduler; the same walk through `map` and `filter`; one
+handle used across two separate `run()` calls; fifty queued writes all landing; and the time types
+carried through a coroutine by value.
+
 ## v4.2.1 — 2026-08-27
 
 **The sweep after 4.1.0 and 4.2.0.** Ten probe groups against what the two releases added; one
