@@ -45,6 +45,12 @@
 </nav>
 <main>
 <h1>Coroutines</h1>
+<nav class="contents">
+<ul>
+<li><a href="#yield-from-any-depth">Yield from any depth</a></li>
+<li><a href="#when-the-body-throws">When the body throws</a></li>
+</ul>
+</nav>
 <p>A function whose body contains <code>yield</code> is a coroutine. Its return type is <code>Coroutine&lt;T&gt;</code>, where
 <code>T</code> is what it yields. Calling it does not run the body; it produces a coroutine value.</p>
 <pre><code class="language-lyr">import std.io.console { println };
@@ -133,6 +139,52 @@ the <code>null</code>, exactly as if the body had run through.</p>
 or a type argument — a driver that steps a stored <code>List&lt;Coroutine&lt;float&gt;&gt;</code> every frame holds
 them like anything else. Copying the value copies a reference to the same suspended state; two
 holders drive one coroutine.</p>
+<h2 id="yield-from-any-depth">Yield from any depth</h2>
+<p>Since 4.0 a coroutine is <strong>stackful</strong>: its frames live on a chain of their own, and a <code>yield</code>
+executed at any call depth beneath a running <code>resume</code> suspends the whole chain. A helper can
+wait so its callers do not have to:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.string as strings;
+
+fn firstTwo(): void {
+    yield 1;
+    yield 2;
+}
+
+fn numbers(): Coroutine&lt;int&gt; {
+    firstTwo();
+    yield 3;
+}
+
+fn main(): int {
+    let co = numbers();
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    return 0;
+}
+</code></pre>
+<p><code>firstTwo</code> is an ordinary function — no marker in its signature, and its callers need none
+either, which is the point: waiting composes without colouring anything. What it does when it
+runs is decided by <em>who is running it</em>: beneath a resume of <code>numbers</code>, its yields arrive at
+<code>numbers</code>' puller.</p>
+<p>Because the chain is a runtime fact, the failures are <strong>panics</strong>, not compile errors:</p>
+<ul>
+<li>a yield with no resume running it — in <code>main</code>, or beneath a host callback — panics;</li>
+<li>the value's type must <em>be</em> the running chain's element type: <code>yield &quot;x&quot;;</code> reaching a
+<code>Coroutine&lt;int&gt;</code> panics, and the yielded expression is typed as what it is, with no context
+to adapt against (a <code>Coroutine&lt;int32&gt;</code> chain wants an <code>int32</code>-typed value, not a bare
+literal in some helper);</li>
+<li>a native or JIT-compiled frame between the yield and its resume is a wall — the chain cannot
+capture it — and the yield panics rather than suspending half a chain;</li>
+<li><code>resume</code> on a coroutine that is already running — reached through a stored reference from
+its own chain — panics: one chain, one driver.</li>
+</ul>
+<p>Inside a coroutine <em>body</em> nothing changes: a yield there still checks its value against <code>T</code> at
+compile time, the better error when the chain is statically known. And a <code>defer</code> runs when its
+frame exits — by return or by an exception unwinding toward the pull; a chain dropped while
+suspended runs nothing, so cleanup that must happen belongs to whoever drives the coroutine to
+its end.</p>
 <h2 id="when-the-body-throws">When the body throws</h2>
 <p>A coroutine body may <code>throw</code>, and the exception comes out of the <code>resume</code> or <code>next()</code> that was
 running it — not out of the call that made the coroutine, which runs no body at all. It lands in

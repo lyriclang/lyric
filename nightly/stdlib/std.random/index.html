@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../../grammar/">Lyric Grammar</a></li>
-<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 3.6</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
 <li><a href="../../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -31,6 +31,7 @@
 <h2>Standard library</h2>
 <ul>
 <li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
 <li><a href="../../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
@@ -38,13 +39,18 @@
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
 <li><a href="../../stdlib/std.iter/">std.iter</a></li>
 <li><a href="../../stdlib/std.json/">std.json</a></li>
 <li><a href="../../stdlib/std.math/">std.math</a></li>
 <li><a href="../../stdlib/std.option/">std.option</a></li>
 <li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/" class="here">std.random</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
 <li><a href="../../stdlib/std.time/">std.time</a></li>
 </ul>
@@ -53,16 +59,29 @@
 <h1>std.random</h1>
 <nav class="contents">
 <ul>
+<li><a href="#function-securerandom">secureRandom</a></li>
 <li><a href="#class-random">Random</a></li>
 <li><a href="#function-shuffle">shuffle</a></li>
 <li><a href="#function-choice">choice</a></li>
 </ul>
 </nav>
+<section class="item" id="function-securerandom">
+<h2><a href="#function-securerandom">secureRandom</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn secureRandom(count: int): uint8[]</code></pre>
+<p><code>count</code> bytes from the operating system's cryptographic source — the ONE thing in this
+module that is not deterministic, and deliberately so marked: keys, tokens and session ids
+need entropy no seed can replay, which is exactly what makes it useless for a simulation
+that wants to be reproduced. A negative <code>count</code> panics; zero answers the empty array.</p>
+<p>Capability-free like the rest of the module: the source reaches no file, no clock and no
+network — an embedded host loses nothing by a guest that can draw good dice.</p>
+<p class="source">stdlib/std/random.lyr:25</p>
+</section>
 <section class="item" id="class-random">
 <h2><a href="#class-random">Random</a> <span class="kind">class</span></h2>
 <pre class="signature"><code class="language-lyr">pub class Random</code></pre>
 <p>A deterministic pseudo-random generator (xorshift64*): one <code>int</code> of state, seeded by the
-caller. Not cryptographic — keys need a source from the operating system.</p>
+caller. Not cryptographic — keys need a source from the operating system, which is what
+<code>secureRandom</code> is.</p>
 <div class="members">
 <div class="member">
 <pre class="signature"><code class="language-lyr">state: int</code></pre>
@@ -95,22 +114,22 @@ plausible input.</p>
 <p>Normally distributed, mean 0 and deviation 1 (Box–Muller).</p>
 </div>
 </div>
-<p class="source">stdlib/std/random.lyr:28</p>
+<p class="source">stdlib/std/random.lyr:38</p>
 </section>
 <section class="item" id="function-shuffle">
 <h2><a href="#function-shuffle">shuffle</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn shuffle&lt;T&gt;(random: Random, xs: List&lt;T&gt;): void</code></pre>
 <p>Shuffles in place, Fisher–Yates: every permutation equally likely, one draw per element.</p>
-<p class="source">stdlib/std/random.lyr:83</p>
+<p class="source">stdlib/std/random.lyr:93</p>
 </section>
 <section class="item" id="function-choice">
 <h2><a href="#function-choice">choice</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn choice&lt;T&gt;(random: Random, xs: List&lt;T&gt;): ?T</code></pre>
 <p>One element drawn uniformly, or <code>null</code> from an empty list.</p>
-<p class="source">stdlib/std/random.lyr:93</p>
+<p class="source">stdlib/std/random.lyr:103</p>
 </section>
 <nav class="neighbours">
-<a class="prev" href="../../stdlib/std.os/">std.os</a>
+<a class="prev" href="../../stdlib/std.process/">std.process</a>
 <a class="next" href="../../stdlib/std.string/">std.string</a>
 </nav>
 </main>

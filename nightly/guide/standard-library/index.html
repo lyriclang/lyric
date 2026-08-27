@@ -49,13 +49,16 @@
 <ul>
 <li><a href="#whether-or-why-the-orthrow-twins">Whether, or why: the OrThrow twins</a></li>
 <li><a href="#collections">Collections</a></li>
+<li><a href="#tasks">Tasks</a></li>
 <li><a href="#iteration">Iteration</a></li>
 <li><a href="#one-name-per-type-in-the-library">One name per type, in the library</a></li>
 <li><a href="#iterators-chain">Iterators chain</a></li>
 <li><a href="#a-chain-has-to-start-somewhere">A chain has to start somewhere</a></li>
 <li><a href="#files-answer-two-ways-and-each-says-which">Files answer two ways, and each says which</a></li>
+<li><a href="#a-file-too-large-to-hold-and-a-file-read-beside-other-work">A file too large to hold, and a file read beside other work</a></li>
 <li><a href="#json-is-one-value-type">JSON is one value type</a></li>
 <li><a href="#bytes-become-text-and-come-back">Bytes become text and come back</a></li>
+<li><a href="#instants-compare-sort-and-print">Instants compare, sort and print</a></li>
 <li><a href="#capabilities">Capabilities</a></li>
 <li><a href="#strings-have-methods">Strings have methods</a></li>
 <li><a href="#constructors-live-on-the-types">Constructors live on the types</a></li>
@@ -112,16 +115,24 @@
 <td>reading and writing files — requires <code>fileAccess</code></td>
 </tr>
 <tr>
+<td><code>std.io.path</code></td>
+<td>joining, splitting and inspecting path strings — no capability (since 4.0; moved out of <code>io.file</code>)</td>
+</tr>
+<tr>
 <td><code>std.os</code></td>
 <td>environment, process, exit — requires <code>osAccess</code></td>
 </tr>
 <tr>
 <td><code>std.random</code></td>
-<td><code>Random.seeded</code>, <code>shuffle</code>, <code>choice</code>, <code>nextGaussian</code> — deterministic, no capability</td>
+<td><code>Random.seeded</code>, <code>shuffle</code>, <code>choice</code>, <code>nextGaussian</code> — deterministic; <code>secureRandom</code> (4.0) is the one OS-entropy draw. No capability</td>
 </tr>
 <tr>
 <td><code>std.time</code></td>
 <td><code>Instant</code>, <code>Duration</code>, ISO 8601 — requires <code>osAccess</code></td>
+</tr>
+<tr>
+<td><code>std.io.stream</code></td>
+<td>open files read and written in pieces, inside tasks — requires <code>fileAccess</code> + <code>osAccess</code></td>
 </tr>
 <tr>
 <td><code>std.json</code></td>
@@ -144,9 +155,9 @@
 the twin throws a module-specific error type (<code>IoError</code>, <code>JsonError</code>, <code>EncodingError</code>,
 <code>Utf8Error</code>) exactly where the silent form answers <code>null</code> or <code>false</code>. <a href="/nightly/guide/errors/">Chapter 10</a>
 shows both shapes side by side. Where <code>null</code> is the whole truth — <code>env</code>, <code>Map.get</code>, <code>parseInt</code> —
-the silent form stands alone. <code>listDir</code> is deprecated toward 4.0: it answers an empty array to
-both &quot;empty&quot; and &quot;unreadable&quot;, which <code>entries</code> (<code>?string[]</code>) and <code>entriesOrThrow</code> can finally
-tell apart.</p>
+the silent form stands alone. <code>listDir</code> went with 4.0, as its clock promised: it answered an
+empty array to both &quot;empty&quot; and &quot;unreadable&quot;, which <code>entries</code> (<code>?string[]</code>) and
+<code>entriesOrThrow</code> tell apart.</p>
 <h2 id="collections">Collections</h2>
 <p><code>List&lt;T&gt;</code> grows; <code>T[]</code> does not.</p>
 <pre><code class="language-lyr">import std.io.console { println };
@@ -165,6 +176,115 @@ fn main(): int {
     return copy.length;
 }
 </code></pre>
+<p><code>Map&lt;K, V&gt;</code> and <code>Set&lt;T&gt;</code> hash; <code>Deque&lt;T&gt;</code> (since 4.0) is the double-ended queue — push and pop
+are O(1) at BOTH ends, the shape a work queue needs, where a <code>List</code>'s <code>removeAt(0)</code> would move
+everything. A pop or peek answers <code>?T</code>, and <code>null</code> means &quot;empty&quot;, the whole truth. Deliberately
+without iteration: a queue is drained, not walked — <code>popFront</code> in a loop <em>is</em> its walk.</p>
+<pre><code class="language-lyr">import std.collections { Deque };
+
+fn main(): int {
+    let queue = Deque&lt;int&gt;.empty();
+    queue.pushBack(2);
+    queue.pushFront(1);
+
+    var sum = 0;
+    while (!queue.isEmpty()) {
+        sum = sum + queue.popFront()!;
+    }
+    return sum;
+}
+</code></pre>
+<h2 id="tasks">Tasks</h2>
+<p><code>std.task</code> (since 4.0) turns coroutines into cooperative tasks: a task is a <code>Coroutine&lt;Wait&gt;</code>,
+and every value it yields tells the scheduler what it waits for — <code>Wait.Now</code> to make room,
+<code>Wait.Sleep(ms)</code> for time, <code>Wait.Readable(fd)</code>/<code>Wait.Writable(fd)</code> for descriptors once
+<code>std.io.net</code> lands. One thread, no preemption; <code>run()</code> drives everything to its end and
+returns. The waiting can live in a HELPER — no signature anywhere says so, which is what
+stackful coroutines bought:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn breathe(): void {
+    yield Wait.Now;
+}
+
+fn worker(name: string): Coroutine&lt;Wait&gt; {
+    println(name + &quot; starts&quot;);
+    breathe();
+    println(name + &quot; finishes&quot;);
+}
+
+fn main(): int {
+    spawn(worker(&quot;a&quot;));
+    spawn(worker(&quot;b&quot;));
+    run();
+    return 0;
+}
+</code></pre>
+<p><code>spawn</code> takes the non-throwing coroutine type on purpose: a task settles its own errors,
+because the scheduler has nobody to hand an exception to. The module carries the <code>osAccess</code>
+capability — its one native asks the OS about time and readiness, and blocks the thread where
+the program asked to sleep.</p>
+<p><code>Wait.Interrupt</code> is the clean-shutdown seat: a task that parks there wakes on Ctrl+C — while
+one is parked, the signal goes to the scheduler instead of killing the process — or on
+<code>interrupt()</code>, the same event raised from inside, which is how a &quot;quit&quot; command and a signal
+stay one mechanism. One interrupt wakes EVERY parked task, so a server's shutdown task closes
+the listeners and <code>run()</code> drains to an ordinary return. With nobody parked, Ctrl+C keeps its
+usual meaning, and an <code>interrupt()</code> raised early is remembered for the next task to park.</p>
+<p><code>std.io.net</code> (since 4.0, <code>networkAccess</code>) is TCP for tasks: <code>listen</code>/<code>accept</code>, <code>connect</code>,
+<code>readSome</code>/<code>write</code>, <code>close</code> — every waiting form yields to the scheduler INSIDE the module, so
+a server is straight-line code inside a task and no signature anywhere mentions waiting. The
+handles are opaque (<code>Listener</code>, <code>Socket</code>); the silent forms answer whether and the <code>OrThrow</code>
+twins say why with an <code>IoError</code> — <code>ConnectionRefused</code> and <code>AddressInUse</code> joined the kinds for
+exactly these answers. <code>readSome</code> folds three truths into one value: bytes are bytes, an EMPTY
+array is the peer being done, <code>null</code> is a failure.</p>
+<p>Since 4.0 the module also speaks UDP: <code>bind</code> a <code>UdpSocket</code> (port 0 asks the OS, <code>localPort</code>
+answers), <code>sendTo</code> one datagram — whole or not at all, with no delivery promise, that is UDP —
+and <code>receiveFrom</code> waits for one and answers a <code>Packet</code>: the payload plus who sent it, which is
+the address a reply's <code>sendTo</code> takes. UDP has no EOF, so an empty payload is a real packet, the
+one place these bytes mean something different than <code>readSome</code>'s. <code>localPort</code> and <code>close</code> are
+the same names TCP uses — overloading picks by the handle.</p>
+<p><code>std.process</code> (since 4.0, <code>processAccess</code> — its OWN capability bit, because starting programs
+is a new power rather than an <code>osAccess</code> refinement) is child processes for tasks: <code>start</code> a
+program, <code>write</code> to its stdin (queued, drained in the background — <code>closeStdin</code> is how a
+filter learns it has everything), <code>readSomeOut</code>/<code>readSomeErr</code> with <code>readSome</code>'s three truths,
+<code>wait</code> for the exit code, <code>kill</code> and <code>close</code>. The handle is opaque (<code>Child</code>), and every
+waiting form yields to the scheduler through the child's notify descriptor, so running <code>sort</code>
+over some lines is straight-line code inside a task:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.process { start, write, closeStdin, readSomeOut, wait, close };
+import std.string as strings;
+import std.task { Wait, spawn, run };
+
+fn sorting(): Coroutine&lt;Wait&gt; {
+    let child = start(&quot;sort&quot;, []);
+    if (child == null) {
+        return;
+    }
+    write(child, &quot;banana\napple\n&quot;.utf8Encode());
+    closeStdin(child);
+    let sorted = readSomeOut(child, 4096);
+    if (sorted != null) {
+        let text = strings.utf8Decode(sorted);
+        if (text != null) {
+            println(text);
+        }
+    }
+    wait(child);
+    close(child);
+}
+
+fn main(): int {
+    spawn(sorting());
+    run();
+    return 0;
+}
+</code></pre>
+<p><code>std.bytes</code> (since 4.0, capability-free) is what a wire protocol does between reads:
+<code>slice(bytes, start, count)</code> with <code>string.substring</code>'s exact edges, and
+<code>indexOf</code>/<code>indexOfFrom</code> answering <code>-1</code> like their string namesakes. Concatenation needs no
+function — <code>a + b</code> joins arrays, bytes included. A line reader is three calls: find the
+break, slice the line, keep the rest.</p>
 <h2 id="iteration">Iteration</h2>
 <p>Anything implementing <code>Iterable&lt;T&gt;</code> works with <code>for-in</code>, including your own types.</p>
 <pre><code class="language-lyr">import std.io.console { println };
@@ -314,6 +434,74 @@ old names (<code>readText</code>, <code>readBytes</code>, <code>readLines</code>
 <p>What none of the shapes carries is a REASON: a missing file and a permission denied look the
 same. That gap is known and left open on purpose — carrying reasons means an error type and a
 decision about <code>throws</code> that this module should not make on its own.</p>
+<h2 id="a-file-too-large-to-hold-and-a-file-read-beside-other-work">A file too large to hold, and a file read beside other work</h2>
+<p><code>std.io.file</code> reads a file in ONE call, and it blocks the thread while it does. That is right for
+a config file and wrong for two things: a file too large to hold in memory, and a program with
+tasks, where one blocking read stalls every other task.</p>
+<p>Since 4.2 <code>std.io.stream</code> opens a HANDLE, and it waits the way <code>std.io.net</code> and <code>std.process</code>
+already do — inside the module, so the code reads straight down and no signature says &quot;waits&quot;:</p>
+<pre><code class="language-lyr">import std.io.stream as stream;
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn countLines(path: string): Coroutine&lt;Wait&gt; {
+    let f = stream.open(path)!;
+    var seen = 0;
+    let reader = stream.lineReader(f);
+    while (true) {
+        let line = reader.next();
+        if (line == null) {
+            break;
+        }
+        seen = seen + 1;
+    }
+    if (reader.failed()) {
+        println(f&quot;the read broke after {seen} lines&quot;);
+    } else {
+        println(seen);
+    }
+    stream.close(f);
+}
+
+fn main(): int {
+    spawn(countLines(&quot;big.log&quot;));
+    run();
+    return 0;
+}
+</code></pre>
+<p><code>readSome</code> speaks the same three truths as everywhere else in <code>std.io</code>: bytes are bytes, an
+<strong>empty</strong> array is the end of the file, and <code>null</code> is a failure — <code>readSomeOrThrow</code> says which.
+<code>write</code> answers the OUTCOME rather than the handover, which is the difference to <code>std.process</code>:
+a queued write cannot report a full disk at the call, and for a file that is the answer that
+matters.</p>
+<p><strong>A <code>LineReader</code> is an <code>Iterator&lt;string&gt;</code></strong>, so the adapters chain onto it and every step yields
+through the read beneath:</p>
+<pre><code class="language-lyr">import std.iter { collectArray };
+import std.io.stream as stream;
+import std.io.console { println };
+import std.string as strings;
+import std.task { Wait };
+
+fn firstErrors(f: stream.File): Coroutine&lt;Wait&gt; {
+    let errors = collectArray(
+        stream.lineReader(f).filter((s) =&gt; s.contains(&quot;ERROR&quot;)).take(20));
+    println(f&quot;{errors.length} errors&quot;);
+}
+</code></pre>
+<p>That protocol spends <code>null</code> on &quot;the end&quot;, so a read failure and the end of the file look the same
+from <code>next()</code> alone. <code>failed()</code> is how you tell them apart after the walk — Rust yields a
+<code>Result</code> per line for this; Lyric has no <code>Result</code>, so the question is asked once at the end
+instead of answered once per line.</p>
+<h3 id="two-things-to-know-before-you-reach-for-it">Two things to know before you reach for it</h3>
+<p><strong>These forms need a running <code>run()</code>.</strong> <code>readSome</code>, <code>write</code> and a <code>LineReader</code> walk yield, and a
+yield outside a running coroutine panics (<a href="/nightly/guide/coroutines/">chapter 11</a>). <code>open</code> and <code>close</code>
+work anywhere. Outside a scheduler, <code>std.io.file</code>'s whole-file forms are the answer, and they
+are unchanged.</p>
+<p><strong>It is its own module because of the capability.</strong> Waiting means importing <code>std.task</code>, which
+carries <code>osAccess</code>, and a module requires the union of what it imports — so a handle beside
+<code>text</code> would make every program that reads a config file demand <code>osAccess</code> too. It is the
+<code>std.io.path</code> split of 4.0 in the other direction: a path costs no capability and moved out, a
+handle costs an extra one and stays out.</p>
 <h2 id="json-is-one-value-type">JSON is one value type</h2>
 <p><code>std.json</code> reads and writes JSON (RFC 8259). A whole document is one <code>JsonValue</code> — an enum over
 the six JSON shapes, with arrays as <code>List&lt;JsonValue&gt;</code> and objects as <code>Map&lt;string, JsonValue&gt;</code>,
@@ -380,10 +568,47 @@ text; decoding answers <code>?uint8[]</code>, and <code>null</code> means the te
 form. Both decoders are strict — no whitespace, no missing padding, nothing outside the
 alphabet — because a lenient decoder accepts what the next system rejects; strip decorations
 before decoding.</p>
+<h2 id="instants-compare-sort-and-print">Instants compare, sort and print</h2>
+<p>Since 4.1 <code>Instant</code> and <code>Duration</code> carry the four conformances every other value in the library
+has had: <code>Equatable</code>, <code>Ordered</code>, <code>Hashable</code> and <code>Display</code>. So the ordinary operators work, the
+ordinary sort works, and an instant may be a <code>Map</code> key:</p>
+<pre><code class="language-lyr">import std.time { Instant, Duration };
+import std.collections { List, sortList };
+import std.io.console { println };
+
+fn main(): int {
+    let started = Instant.ofEpochMillis(1000);
+    let finished = started.plus(Duration.ofMillis(3500));
+
+    if (started &lt; finished) {
+        println(finished.since(started));      // 3500ms
+    }
+
+    let stamps = List&lt;Instant&gt;.empty();
+    stamps.push(finished);
+    stamps.push(started);
+    sortList(stamps);
+    println(stamps.get(0));                    // 1970-01-01T00:00:01.000Z
+    return 0;
+}
+</code></pre>
+<p>An instant prints as the text <code>iso()</code> writes, because that is the one textual form the type
+has. A duration prints its milliseconds with the unit — <code>3500ms</code>, not <code>3.5s</code>: this type counts
+whole milliseconds, and a rendering that divides them would promise a precision the value does
+not carry. Scale it yourself, or reach for <code>std.fmt</code>.</p>
+<p><strong><code>compare</code> is three comparisons, not a subtraction.</strong> <code>a.millis - b.millis</code> overflows for two
+instants far enough apart and answers with the opposite sign; the same trap waits in any
+<code>compare</code> you write yourself over a wide numeric field.</p>
+<p>What did NOT arrive is <code>+</code> and <code>-</code> on the two types. <code>plus</code>, <code>minus</code> and <code>since</code> are methods,
+and an operator beside them would be a second way to write one calculation. <code>Instant - Instant</code>
+is a <code>Duration</code> besides — heterogeneous, and the operator interfaces here are homogeneous by
+decision.</p>
 <h2 id="capabilities">Capabilities</h2>
-<p><code>std.io.file</code>, <code>std.os</code> and <code>std.time</code> require a capability. A standalone run grants
-everything; a host grants explicitly, and a module that requires more than it is granted is
-rejected before it runs.</p>
+<p><code>std.io.file</code>, <code>std.io.stream</code>, <code>std.io.net</code>, <code>std.os</code>, <code>std.time</code>, <code>std.task</code> and
+<code>std.process</code> require a capability. A standalone run grants everything; a host grants
+explicitly, and a module that requires more than it is granted is rejected before it runs.</p>
+<p>A module requires the UNION of what it imports, which is why <code>std.io.stream</code> needs <code>osAccess</code>
+beside <code>fileAccess</code>: it waits, waiting is <code>std.task</code>, and <code>std.task</code> asks the OS clock.</p>
 <h2 id="strings-have-methods">Strings have methods</h2>
 <p>Since v1.15 the string API is method-shaped: <code>s.trim()</code>, <code>s.split(&quot;,&quot;)</code>, <code>s.contains(x)</code>,
 <code>s.length()</code>. The deprecated free forms (<code>trim(s)</code>, …) went with 2.0. <code>concat</code> and <code>repeat</code>

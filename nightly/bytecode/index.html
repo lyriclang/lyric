@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Lyric .lyrbc Bytecode Format 3.6 — Lyric nightly</title>
+<title>Lyric .lyrbc Bytecode Format 4.0 — Lyric nightly</title>
 <link rel="stylesheet" href="../site.css" />
 </head>
 <body>
@@ -21,7 +21,7 @@
 <h2>Reference</h2>
 <ul>
 <li><a href="../grammar/">Lyric Grammar</a></li>
-<li><a href="../bytecode/" class="here">Lyric .lyrbc Bytecode Format 3.6</a></li>
+<li><a href="../bytecode/" class="here">Lyric .lyrbc Bytecode Format 4.0</a></li>
 <li><a href="../pack/">The Pack Format</a></li>
 </ul>
 <h2>Project</h2>
@@ -31,6 +31,7 @@
 <h2>Standard library</h2>
 <ul>
 <li><a href="../stdlib/std.build/">std.build</a></li>
+<li><a href="../stdlib/std.bytes/">std.bytes</a></li>
 <li><a href="../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../stdlib/std.core/">std.core</a></li>
 <li><a href="../stdlib/std.encoding/">std.encoding</a></li>
@@ -38,19 +39,24 @@
 <li><a href="../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../stdlib/std.io.stream/">std.io.stream</a></li>
 <li><a href="../stdlib/std.iter/">std.iter</a></li>
 <li><a href="../stdlib/std.json/">std.json</a></li>
 <li><a href="../stdlib/std.math/">std.math</a></li>
 <li><a href="../stdlib/std.option/">std.option</a></li>
 <li><a href="../stdlib/std.os/">std.os</a></li>
+<li><a href="../stdlib/std.process/">std.process</a></li>
 <li><a href="../stdlib/std.random/">std.random</a></li>
 <li><a href="../stdlib/std.string/">std.string</a></li>
+<li><a href="../stdlib/std.task/">std.task</a></li>
 <li><a href="../stdlib/std.test/">std.test</a></li>
 <li><a href="../stdlib/std.time/">std.time</a></li>
 </ul>
 </nav>
 <main>
-<h1>Lyric .lyrbc Bytecode Format 3.6</h1>
+<h1>Lyric .lyrbc Bytecode Format 4.0</h1>
 <nav class="contents">
 <ul>
 <li><a href="#encoding">1. Encoding</a></li>
@@ -74,10 +80,17 @@ marker against the canonical body. Edit it there, mirror it here.</p>
 or a second runtime can be written from this document alone.</p>
 <p>Before Lyric v1.0 the format may change incompatibly with a major version bump and without a
 migration path. A stability promise begins at v1.0.</p>
-<p>Format version <strong>3.6</strong> covers: scalars, locals, module-internal and native calls, structured
+<p>Format version <strong>4.0</strong> covers: scalars, locals, module-internal and native calls, structured
 control flow, classes, arrays, optionals, enums, interfaces with vtable dispatch, structs with
-value semantics, exceptions, global constants, closures, host objects, source positions,
-attributes, debug information, the names of opaque field types, and fused compare-and-branch.</p>
+value semantics, exceptions, global constants, closures, coroutine chains, host objects, source
+positions, attributes, debug information, the names of opaque field types, and fused
+compare-and-branch.</p>
+<p><strong>4.0 against 3.6</strong>: three new opcodes — the coroutine chain forms <code>mkcoro</code>, <code>resume</code> and
+<code>yield</code> (§Coroutines) — and nothing else. The major is honest about direction: a 3.x reader
+meets an opcode it has no case for and must reject the module, while a 4.0 reader accepts every
+<strong>3.x</strong> module unchanged — the state-machine coroutines those modules carry are ordinary code
+over opcodes that all still exist, so nothing old stops running. Compilers of the 4.x line emit
+the chain forms; the per-module rule of §Versioning is unchanged.</p>
 <p><strong>3.6 against 3.5</strong>: four new opcodes. <code>brcmp</code> and <code>brcmpk</code> (§Calls and control flow) do in one
 instruction what a comparison followed by <code>condbr</code> does in four; <code>binll</code> and <code>binlk</code>
 (§Arithmetic and bit operations) do the same for an operation whose operands are slots and whose
@@ -346,9 +359,18 @@ variant is not a layout. A type may name itself as a field type, including forwa
 <td><code>hostAccess</code></td>
 <td>reserved</td>
 </tr>
+<tr>
+<td>4</td>
+<td><code>0x10</code></td>
+<td><code>processAccess</code></td>
+<td><code>std.process</code> <em>(4.0)</em></td>
+</tr>
 </tbody>
 </table>
-<p><code>0</code> means the module requires nothing. Submodules inherit: <code>std.os.env</code> requires <code>osAccess</code>.</p>
+<p><code>0</code> means the module requires nothing. Submodules inherit: <code>std.os.env</code> requires <code>osAccess</code>.
+Bits are only ever ADDED: a value never changes meaning, so a reader older than a bit rejects
+the module that carries it as requiring more than the reader can grant — which is the correct
+answer.</p>
 <p>Enforcement happens at load time. A module that requires more than the runtime grants is rejected
 (<code>LYR-CAP0001</code>) before any instruction runs.</p>
 <p>The bitset also bounds USE: a reader must reject the binding of a gated native inside a module
@@ -1473,6 +1495,65 @@ function value does not carry its signature in the instruction stream.</p>
 <p>The function index is stored incremented by one, so that a closure over function 0 without an
 environment is distinguishable from &quot;no value&quot;.</p>
 <p>A reader must reject a <code>mkclosure</code> target index outside the call space.</p>
+<h3 id="coroutines">Coroutines</h3>
+<p>New in 4.0: a coroutine is a CHAIN of captured frames, not a compiled state machine. The
+chain object holds the frames it is suspended over; <code>resume</code> pushes them back onto the
+runtime's stack, and <code>yield</code> — executed at ANY call depth beneath the running resume — slices
+them off again. The type each form carries is the chain's element type, encoded as in a
+signature (§Types), where top-level <code>void</code> is permitted and means a bare-yield chain.</p>
+<table>
+<thead>
+<tr>
+<th>Opcode</th>
+<th>Mnemonic</th>
+<th>Operands</th>
+<th>Stack</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x79</code></td>
+<td><code>mkcoro</code></td>
+<td><code>uleb128</code> body, <code>uleb128</code> argc, <code>type</code> yield</td>
+<td>−argc +1</td>
+<td>build a not-yet-started chain</td>
+</tr>
+<tr>
+<td><code>0x7A</code></td>
+<td><code>resume</code></td>
+<td><code>uleb128</code> lenient, <code>type</code> yield</td>
+<td>−1 +(0/1)</td>
+<td>drive a chain one step</td>
+</tr>
+<tr>
+<td><code>0x7B</code></td>
+<td><code>yield</code></td>
+<td><code>uleb128</code> hasvalue, <code>type</code></td>
+<td>−(0/1) +0</td>
+<td>suspend the running chain</td>
+</tr>
+</tbody>
+</table>
+<p><code>mkcoro</code> pops the captured arguments — call order, the first lowest — and stores them in the
+chain; the first pull hands them to the body's frame as its parameters. The body index lives in
+the shared call space like a closure target and must name a defined function: an import has no
+frame to capture.</p>
+<p><code>resume</code> pops the chain value and runs it to its next suspension. Strict (<code>lenient</code> 0) pushes
+the yielded value — nothing for a void chain — and PANICS on a chain whose body has ended, at
+this pull or an earlier one. Lenient always pushes one value: the optional-wrapped yield, none
+on exhaustion, and for a void chain a bool — whether it advanced. The stack effect follows from
+<code>lenient</code> and the type's leading tag: strict pushes nothing exactly when the type is <code>void</code>.
+A resume of a chain that is RUNNING — suspended mid-resume, reached through its own body or any
+other — panics: one chain, one driver.</p>
+<p><code>yield</code> pops its value when <code>hasvalue</code> is 1 and suspends the whole chain up to the nearest
+resume active in the SAME runtime loop, which receives the value; execution continues at the
+next instruction when the chain is resumed. With no such resume it panics — and a native or
+compiled frame between the yield and the resume runs in a loop of its own, so the panic is also
+the C-boundary rule. The body's last frame returning through the resume boundary ends the
+chain; frames abandoned suspended run nothing.</p>
+<p>A reader must reject: a <code>mkcoro</code> body index outside the defined functions — imports included
+below the range — and an <code>argc</code> that is not the body's parameter count.</p>
 <hr />
 <h2 id="load-time-validation">6. Load-time validation</h2>
 <p>A runtime must validate a module completely before executing it, and may then run it without

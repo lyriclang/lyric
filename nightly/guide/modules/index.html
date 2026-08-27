@@ -202,9 +202,10 @@ script holds and returns the handle — and cannot leak it into arithmetic. On t
 is its underlying number. The wall spans modules: an SDK of several files declares the handle
 once and imports it wherever a native signature names it — selectively or module-qualified, in
 scalar and array positions alike.</p>
-<p><strong>Making one is the declaring module's privilege</strong> (since 3.8). The inward cast — <code>42 as Entity</code> — used to work from any module that could see the alias, which quietly undid the wall:
+<p><strong>Making one is the declaring module's privilege</strong>. The inward cast — <code>42 as Entity</code> — used to work from any module that could see the alias, which quietly undid the wall:
 a script could forge the very handle the type exists to protect. Outside the declaring module
-it now warns (<code>LYR-SEM0093</code>), and 4.0 refuses it. The outward cast (<code>e as int</code>) stays free
+it is refused (<code>LYR-SEM0093</code>; 3.8 announced it as a warning, 4.0 keeps the promise the clock
+made). The outward cast (<code>e as int</code>) stays free
 everywhere — reading the number breaks no promise. If a value legitimately has to be rebuilt
 from a stored number — a saved game, a wire message — the declaring module offers a constructor
 function for it; issuing stays an issuer's act:</p>

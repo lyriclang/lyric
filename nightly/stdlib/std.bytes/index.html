@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>std.build — Lyric nightly</title>
+<title>std.bytes — Lyric nightly</title>
 <link rel="stylesheet" href="../../site.css" />
 </head>
 <body>
@@ -30,8 +30,8 @@
 </ul>
 <h2>Standard library</h2>
 <ul>
-<li><a href="../../stdlib/std.build/" class="here">std.build</a></li>
-<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/" class="here">std.bytes</a></li>
 <li><a href="../../stdlib/std.collections/">std.collections</a></li>
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
@@ -56,34 +56,40 @@
 </ul>
 </nav>
 <main>
-<h1>std.build</h1>
+<h1>std.bytes</h1>
 <nav class="contents">
 <ul>
-<li><a href="#class-artifact">Artifact</a></li>
-<li><a href="#function-addexecutable">addExecutable</a></li>
+<li><a href="#function-slice">slice</a></li>
+<li><a href="#function-indexof">indexOf</a></li>
+<li><a href="#function-indexoffrom">indexOfFrom</a></li>
 </ul>
 </nav>
-<section class="item" id="class-artifact">
-<h2><a href="#class-artifact">Artifact</a> <span class="kind">class</span></h2>
-<pre class="signature"><code class="language-lyr">pub class Artifact</code></pre>
-<p>One thing a build produces: a <code>.lyrbc</code> compiled from an entry file.</p>
-<p>Returned by <code>addExecutable</code>, and configured after the fact — the compile itself happens once
-<code>build</code> has returned, so an option set on the next line still applies.</p>
-<p class="source">stdlib/std/build.lyr:7</p>
+<p>Slicing and searching over <code>uint8[]</code> — what a wire protocol does between reads.</p>
+<p>The edges mirror <code>string.substring</code> exactly: a negative <code>start</code> or <code>count</code> panics, a
+<code>start</code> past the end panics, and a <code>count</code> past the end clamps to it. <code>indexOf</code> answers
+<code>-1</code> when nothing is found — ready for <code>slice</code>, as <code>string.indexOf</code> is for <code>substring</code>.</p>
+<section class="item" id="function-slice">
+<h2><a href="#function-slice">slice</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn slice(bytes: uint8[], start: int, count: int): uint8[]</code></pre>
+<p><code>count</code> bytes from <code>start</code>, clamped at the end like <code>string.substring</code>.</p>
+<p class="source">stdlib/std/bytes.lyr:16</p>
 </section>
-<section class="item" id="function-addexecutable">
-<h2><a href="#function-addexecutable">addExecutable</a> <span class="kind">function</span></h2>
-<pre class="signature"><code class="language-lyr">pub fn addExecutable(entry: string, output: string): Artifact</code></pre>
-<p>Declares a program to compile: <code>entry</code> is its main file, <code>output</code> the <code>.lyrbc</code> to write.</p>
-<p>Both are relative to the directory holding <code>build.lyr</code>. The module root and the native roots
-come from <code>lyric.json</code>; this does not repeat them.</p>
-<p>Nothing is compiled while <code>build</code> runs. The artifacts are collected and built afterwards, so
-work the script does in between — writing a generated source file, for instance — is finished
-before any of them is read.</p>
-<p class="source">stdlib/std/build.lyr:22</p>
+<section class="item" id="function-indexof">
+<h2><a href="#function-indexof">indexOf</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn indexOf(bytes: uint8[], value: uint8): int</code></pre>
+<p>The first position of <code>value</code>, or <code>-1</code> — ready for <code>slice</code>.</p>
+<p class="source">stdlib/std/bytes.lyr:40</p>
+</section>
+<section class="item" id="function-indexoffrom">
+<h2><a href="#function-indexoffrom">indexOfFrom</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn indexOfFrom(bytes: uint8[], value: uint8, start: int): int</code></pre>
+<p>Searches from a position. <code>-1</code> when nothing is found, as in <code>indexOf</code>; a negative <code>start</code>
+searches from the front, one past the end finds nothing.</p>
+<p class="source">stdlib/std/bytes.lyr:46</p>
 </section>
 <nav class="neighbours">
-<a class="next" href="../../stdlib/std.bytes/">std.bytes</a>
+<a class="prev" href="../../stdlib/std.build/">std.build</a>
+<a class="next" href="../../stdlib/std.collections/">std.collections</a>
 </nav>
 </main>
 </div>

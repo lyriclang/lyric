@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.task — Lyric nightly</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">nightly</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/" class="here">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.task</h1>
+<nav class="contents">
+<ul>
+<li><a href="#enum-wait">Wait</a></li>
+<li><a href="#function-interrupt">interrupt</a></li>
+<li><a href="#function-spawn">spawn</a></li>
+<li><a href="#function-pending">pending</a></li>
+<li><a href="#function-run">run</a></li>
+</ul>
+</nav>
+<p>Cooperative tasks: <code>spawn</code> a <code>Coroutine&lt;Wait&gt;</code>, then <code>run()</code> drives every task to its end.</p>
+<p>A task settles its own errors — <code>spawn</code> takes the non-throwing coroutine type, because the
+scheduler has nobody to hand an exception to. A panic anywhere ends the program, as panics
+do.</p>
+<section class="item" id="enum-wait">
+<h2><a href="#enum-wait">Wait</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum Wait</code></pre>
+<p>What a yielded value asks the scheduler for.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">Now</code></pre>
+<p>Run me again once everyone before me had a turn — the cooperative &quot;make room&quot;.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Sleep(int)</code></pre>
+<p>Wake me after this many milliseconds. Sleepers wake in deadline order — two deadlines
+that pass in the same poll still wake nearest-first, and a deadline already in the past
+(a zero or negative wait) is due at the very next poll.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Readable(int)</code></pre>
+<p>Wake me when this descriptor has bytes to read. Descriptors come from <code>std.io.net</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Writable(int)</code></pre>
+<p>Wake me when this descriptor can take bytes.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Interrupt</code></pre>
+<p>Wake me on an interrupt: Ctrl+C in a standalone program, or <code>interrupt()</code> from inside.
+The clean-shutdown seat — a server parks a task here, and the wake is its signal to
+close listeners and let <code>run</code> drain. Every parked task wakes on one interrupt.</p>
+</div>
+</div>
+<p class="source">stdlib/std/task.lyr:18</p>
+</section>
+<section class="item" id="function-interrupt">
+<h2><a href="#function-interrupt">interrupt</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn interrupt(): void</code></pre>
+<p>Wakes every task parked on <code>Wait.Interrupt</code>, exactly as Ctrl+C does — a server telling
+itself to shut down: a task that decides &quot;we are done&quot; interrupts, the parked shutdown
+task closes the listeners, and <code>run</code> drains. With nobody parked the interrupt is
+REMEMBERED and taken by the next task to park — a signal, not a broadcast into the void.</p>
+<p class="source">stdlib/std/task.lyr:48</p>
+</section>
+<section class="item" id="function-spawn">
+<h2><a href="#function-spawn">spawn</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn spawn(task: Coroutine&lt;Wait&gt;): void</code></pre>
+<p>Adds a task to the back of the run queue. Nothing runs before <code>run</code> does; spawning from
+inside a running task is ordinary and the new task gets its turn in the same round.</p>
+<p class="source">stdlib/std/task.lyr:98</p>
+</section>
+<section class="item" id="function-pending">
+<h2><a href="#function-pending">pending</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn pending(): int</code></pre>
+<p>How many tasks the scheduler holds, whatever they are waiting for. Zero after <code>run</code>
+returns; useful to a host deciding whether another <code>run</code> is worth calling.</p>
+<p class="source">stdlib/std/task.lyr:114</p>
+</section>
+<section class="item" id="function-run">
+<h2><a href="#function-run">run</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn run(): void</code></pre>
+<p>Drives every task to its end and returns when none is left.</p>
+<p>Ready tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in
+<code>poll</code> until the nearest deadline passes, a descriptor readies, or — with a task parked on
+<code>Wait.Interrupt</code> — Ctrl+C arrives; the thread sleeps, it does not spin. A run holding ONLY
+Interrupt tasks therefore waits, quietly and indefinitely, for the interrupt that is its
+whole purpose.</p>
+<p class="source">stdlib/std/task.lyr:129</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.string/">std.string</a>
+<a class="next" href="../../stdlib/std.test/">std.test</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

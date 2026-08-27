@@ -30,25 +30,65 @@
 </a>
 </nav>
 <section class="changes">
-<h2>What changed in v3.9.1 — 2026-08-25</h2>
-<p><strong>The sweep after 3.9.0</strong> (spec: <code>lyric-spec#25</code>). Twelve probes; two real findings and one
-recovery wart, all three fixed failing-test-first.</p>
+<h2>What changed in v4.2.0 — 2026-08-27</h2>
+<p><strong>Open files, read and written in pieces, inside tasks</strong> — and a scheduler bug the feature's own
+test exposed. Additive: nothing was deprecated or removed, and no existing program changes
+meaning.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong><code>std.io.stream</code> — a file HANDLE, and it waits without blocking the thread.</strong> <code>std.io.file</code>
+reads a file in one call and holds the thread while it does. That is right for a config file
+and wrong for two things: a file too large to hold, and a program with tasks, where one
+blocking read stalls every other task.</p>
+<pre><code class="language-lyr">let f = stream.open(path)!;
+let reader = stream.lineReader(f);
+while (true) {
+    let line = reader.next();
+    if (line == null) { break; }
+    // …
+}
+stream.close(f);
+</code></pre>
+<p><code>open</code>, <code>create</code>, <code>openAppend</code>, <code>readSome</code>, <code>write</code>, <code>close</code>, each with its <code>OrThrow</code> twin per
+§9.0. <code>readSome</code> speaks the 2.14 three truths — bytes are bytes, an EMPTY array is the end of
+the file, <code>null</code> is a failure. The waiting happens INSIDE the module, so no signature says
+&quot;waits&quot;, exactly as in <code>std.io.net</code> and <code>std.process</code>.</p>
+<p><strong><code>write</code> answers the OUTCOME, not the handover</strong>, which is the difference to <code>std.process</code>:
+a queued write cannot report a full disk at the call, and for a file that is the answer that
+matters.</p>
+</li>
+<li><p><strong><code>LineReader</code>, an <code>Iterator&lt;string&gt;</code> over an open file.</strong> Terminators removed, CRLF and LF
+alike, a last line without a terminator still a line. The adapters chain onto it, and every
+step yields through the read beneath it — the first place the standard library itself uses
+what 4.0's dynamic yield bought.</p>
+<p>The iterator protocol spends <code>null</code> on &quot;the end&quot;, so a read failure and the end of the file
+look the same from <code>next()</code>. <code>failed()</code> tells them apart after the walk.</p>
+</li>
+<li><p><strong>These forms need a running <code>std.task.run()</code>.</strong> They yield, and a yield outside a running
+coroutine panics. <code>open</code> and <code>close</code> work anywhere; outside a scheduler, <code>std.io.file</code>'s
+whole-file forms are unchanged and remain the answer.</p>
+</li>
+<li><p><strong>It is its own module because of the capability, and that is the whole reason.</strong> Waiting means
+importing <code>std.task</code>, which carries <code>osAccess</code>, and a module requires the union of what it
+imports. Putting the handle beside <code>text</code> would have made every program that reads a config
+file demand <code>osAccess</code> as well — measured at 0x1 before and 0x5 after, on a program that only
+calls <code>text</code>. It is the <code>std.io.path</code> split of 4.0 in the other direction: a path costs no
+capability and moved out, a handle costs an extra one and stays out.</p>
+</li>
+</ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
-<li><strong>An attribute field no row can hold is refused instead of crashing the compiler</strong>
-(<code>LYR-SEM0096</code>). <code>struct Odd :: [OnFunction] { n: ?int }</code> with <code>@Odd { n = 3 }</code> passed the
-sema — the literal adapts to <code>?int</code> — and <code>lyrc build</code> died on the writer's &quot;not encodable&quot;
-throw. Reachable since 3.2 with any non-row-shaped field (an optional, an array, a struct);
-found by probing the new forms. The refusal sits at the USE and names the field: the struct
-alone is an ordinary struct.</li>
-<li><strong>The <code>WithArg&lt;T&gt;</code> promise travels the parent chain</strong> (<code>LYR-SEM0095</code>). An attribute reaching
-the conformance through an interface parent (<code>interface Carries :: [WithArg&lt;int&gt;]</code>) admitted
-<code>@Retry(3)</code> while the first-field check ran only on direct list entries — the mismatch then
-surfaced at every use as a plain assignment error. The check runs at the entry that reaches
-the conformance now, so it lands with whoever ships the attribute.</li>
-<li><strong><code>@Retry(3, 4)</code> reports the parenthesis alone.</strong> Recovery now consumes through the
-parenthesis; before, the leftovers reached the declaration parser, which blamed the
-attribute for missing its declaration (<code>LYR-PAR0042</code>) on top of the real message.</li>
+<li><p><strong>A task yielding <code>Wait.Now</code> in a loop no longer starves every other kind of wait.</strong>
+<code>std.task.run</code> reached its poll only with an EMPTY run queue, and the poll is the one place a
+descriptor or a deadline is ever looked at. So one spinning task meant a <code>Wait.Sleep</code> never
+woke and a <code>Wait.Readable</code> never fired — for as long as the spinner ran.</p>
+<p>This is a bug in 4.0's scheduler, not in the new module; it affects <code>std.io.net</code> and
+<code>std.process</code> exactly as much. Nothing caught it because no test mixed a spinner with a
+waiter for longer than a single round. The fix polls with a zero timeout when a task is
+runnable and blocks only when none is, so a runnable task still runs first and a waiter is
+still looked at every round. Pinned in <code>task_tests</code> with a 5ms sleeper beside a bounded
+spinner — the bound is the assertion, because without the fix the loop never ends.</p>
+</li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>
 </section>
