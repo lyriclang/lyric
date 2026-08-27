@@ -14,6 +14,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.io.console` | `print`, `println`, `readLine` — the writers take any `Display` value: `println(42)` |
 | `std.io.error` | `IoError`, `IoErrorKind` — the reason an I/O operation failed; no capability |
 | `std.io.file` | reading and writing files — requires `fileAccess` |
+| `std.io.path` | joining, splitting and inspecting path strings — no capability (since 4.0; moved out of `io.file`) |
 | `std.os` | environment, process, exit — requires `osAccess` |
 | `std.random` | `Random.seeded`, `shuffle`, `choice`, `nextGaussian` — deterministic; `secureRandom` (4.0) is the one OS-entropy draw. No capability |
 | `std.time` | `Instant`, `Duration`, ISO 8601 — requires `osAccess` |

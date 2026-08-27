@@ -1,0 +1,126 @@
+// std.io.path — path strings, without the disk.
+//
+// Moved out of `std.io.file` at 4.0, and the move IS the point: a path is a string, and
+// joining or splitting one reaches nothing — but living in `io.file` it sat behind
+// `fileAccess`, so a sandboxed guest could not even ASSEMBLE the path it wanted to hand its
+// host. Now the helpers cost no capability, and `io.file` is only what actually touches the
+// disk. The 4.0 major pays the move; the old names in `io.file` are gone, not doubled — one
+// mechanism per concept.
+//
+// Nothing here is native: finding separators is something the language does, and a host
+// would bring its own platform convention into a platform-neutral bytecode.
+
+/// Joining, splitting and inspecting path STRINGS — no capability, because none of it
+/// touches the disk. Both separators count everywhere: Windows understands `/`, and a script
+/// running on both systems should not have to guess.
+module std.io.path;
+
+// For the string METHODS the helpers use; the alias avoids shadowing the builtin type name.
+import std.string as strings;
+
+/// Both separators count. Windows understands `/`, and a script running on both systems
+/// should not have to guess which one applies.
+fn isSeparator(c: char): bool {
+    return c == '/' || c == '\\';
+}
+
+/// Joins two path parts, with neither a doubled nor a missing separator.
+pub fn joinPath(left: string, right: string): string {
+    if (left.length() == 0) {
+        return right;
+    }
+    if (right.length() == 0) {
+        return left;
+    }
+
+    let endsWithSeparator = isSeparator(left.charAt(left.length() - 1));
+    let startsWithSeparator = isSeparator(right.charAt(0));
+
+    if (endsWithSeparator && startsWithSeparator) {
+        return left + right.substring(1, right.length() - 1);
+    }
+    if (endsWithSeparator || startsWithSeparator) {
+        return left + right;
+    }
+    return left + "/" + right;
+}
+
+// The index after the last separator, or 0 when there is none.
+fn afterLastSeparator(path: string): int {
+    var i = path.length() - 1;
+    while (i >= 0) {
+        if (isSeparator(path.charAt(i))) {
+            return i + 1;
+        }
+        i = i - 1;
+    }
+    return 0;
+}
+
+/// The last component. `"a/b/c.txt"` becomes `"c.txt"`.
+pub fn fileName(path: string): string {
+    let start = afterLastSeparator(path);
+    return path.substring(start, path.length() - start);
+}
+
+/// Everything before the last separator, or `""` when there is none.
+pub fn parentDir(path: string): string {
+    let start = afterLastSeparator(path);
+    if (start == 0) {
+        return "";
+    }
+    // The separator itself is dropped, except for "/x", where the parent is the root.
+    if (start == 1) {
+        return path.substring(0, 1);
+    }
+    return path.substring(0, start - 1);
+}
+
+/// The extension WITHOUT the dot. `""` when there is none.
+///
+/// A leading dot does not count: `".gitignore"` has no extension, that is its name. This rule
+/// differs between languages, so it is stated here.
+pub fn extension(path: string): string {
+    let name = fileName(path);
+    var i = name.length() - 1;
+    while (i > 0) {
+        if (name.charAt(i) == '.') {
+            return name.substring(i + 1, name.length() - i - 1);
+        }
+        if (isSeparator(name.charAt(i))) {
+            return "";
+        }
+        i = i - 1;
+    }
+    return "";
+}
+
+/// The name without its extension. `"a/b/c.txt"` becomes `"c"`.
+pub fn stem(path: string): string {
+    let name = fileName(path);
+    let ext = extension(name);
+    if (ext.length() == 0) {
+        return name;
+    }
+    return name.substring(0, name.length() - ext.length() - 1);
+}
+
+/// Replaces the extension. An empty extension removes it.
+pub fn withExtension(path: string, ext: string): string {
+    let directory = parentDir(path);
+    let base = stem(path);
+    let renamed = if (ext.length() == 0) base else base + "." + ext;
+    return if (directory.length() == 0) renamed else joinPath(directory, renamed);
+}
+
+/// Does the path start at the root? Recognises `/x` and `C:\x`.
+pub fn isAbsolute(path: string): bool {
+    if (path.length() == 0) {
+        return false;
+    }
+    if (isSeparator(path.charAt(0))) {
+        return true;
+    }
+    // A drive letter: 'C:' at the start.
+    return path.length() >= 2 && path.charAt(1) == ':';
+}

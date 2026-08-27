@@ -220,9 +220,21 @@ operating system" — now the sentence ends with its name). Capability-free by d
 reaches no file, clock or network, so an embedded guest that can draw good dice costs a host
 nothing. Negative count panics like a bad slice bound; zero answers the empty array. Two
 lyrtest cases (asked count + two 32-byte draws differing — a 2^-256 event if not, in which
-case the SOURCE is broken; zero is empty). 136 lyrtest, doc floor 525. Next: **basket item
-13, `std.io.path`** (the path helpers move out of `io.file` — the major window pays the
-move), the LAST basket item before the 4.0 release round.
+case the SOURCE is broken; zero is empty). 136 lyrtest, doc floor 525.
+
+**Basket item 13, `std.io.path`, is DONE — and with it THE v4 BASKET IS COMPLETE.** The
+seven path helpers (`joinPath`, `fileName`, `parentDir`, `extension`, `stem`,
+`withExtension`, `isAbsolute`) moved out of `std.io.file` into their own module, unchanged
+in behavior, and the move is the point: a path is a string and touches no disk, so it now
+costs NO capability — a sandboxed guest can assemble the path it hands its host without
+holding `fileAccess` (pinned in `CapabilityTests`: an `std.io.path` program records bits
+`0`). The old names in `io.file` are gone, not doubled — the 4.0 major pays the rename; the
+only users (file_tests, Vm's `PathTests`) were rewired. Seven lyrtest cases pin every
+documented edge (the `.gitignore` rule, the `/x` root parent, the drive letter); 143
+lyrtest, 22 doc pages, floor stays 525 — the items only moved. Next: **the 4.0 release
+round** — spec sync (README "describes Lyric 4.0", suite pin → 4.0.0), version files +
+README + ratchets + status TOGETHER, ONE major release, tag after green CI, then the big
+sweep per the pipeline.
 
 **The attribute round — SHIPS as v3.9.0** (2026-08-25, format stays 3.6; spec-first,
 `lyric-spec#24` merged first, this is the twin). Two rules the maintainer picked from the

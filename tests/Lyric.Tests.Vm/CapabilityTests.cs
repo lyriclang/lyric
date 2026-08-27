@@ -215,6 +215,15 @@ public class CapabilityTests
             Compile(UsesProcess).Capabilities);
 
     [Fact]
+    public void Path_strings_cost_no_capability() =>
+        // The point of the 4.0 move out of io.file: joining a path touches no disk, so a
+        // sandboxed guest assembles the path it hands its host without holding fileAccess.
+        Assert.Equal(0UL, Compile("""
+            import std.io.path { joinPath };
+            fn main(): int { let p = joinPath("a", "b"); return if (p == "a/b") 0 else 1; }
+            """).Capabilities);
+
+    [Fact]
     public void Os_access_does_not_let_a_program_start_processes()
     {
         // The doctrine test: a host that granted the environment questions has not thereby
