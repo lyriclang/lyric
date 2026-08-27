@@ -11,7 +11,18 @@
 
 ## Current milestone
 
-**v4 — stackful coroutines — IN PROGRESS on `feature/v4-stackful`** (2026-08-25; the basket is
+**v4 SHIPS as v4.0.0** (2026-08-27). The whole `lyric#121` basket delivered — stackful
+coroutines with the dynamic yield (items 1–3), `Deque` (6), `std.task` (4), `std.io.net` TCP
+(5) and UDP (11), `std.bytes` (5a), `Instant.fromIso` (7), the stdin-pipe proof (8),
+interrupts with the driver's cancel shield (9), `std.process` behind the fifth capability bit
+(10), `secureRandom` (12), and the `std.io.path` move (13) — every language rule spec-first
+(`lyric-spec#26`–`#28`, pin moved to 4.0 with the release), one release at the end as
+decided. Release mechanics per the checklist: the tree claimed 4.0.0 since PR#124, README
+already carried it, so the release commit is the CHANGELOG dating plus this paragraph — and
+the tag waits for green CI on main, the 3.8.1 lesson. Next per the pipeline: **the 4.0
+bug-sweep loop**. The paragraphs below record how the basket landed, newest first.
+
+**v4 — stackful coroutines — was built on `feature/v4-stackful`** (2026-08-25; the basket is
 `lyric#121`, the language rules are spec §10/§10a via `lyric-spec#26`, the format is §13 4.0
 via `lyric-spec#27`; the branch does NOT merge until the 4.0 line ships — main stays the 3.9.x
 line). **Slice 1 — the chain machinery under the OLD semantics — is BUILT.** A coroutine is a
