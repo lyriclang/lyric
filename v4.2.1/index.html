@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.2.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.2.1 — 2026-08-27</h2>
+<p><strong>The sweep after 4.1.0 and 4.2.0.</strong> Ten probe groups against what the two releases added; one
+real finding, fixed failing-test-first, and it turned out to be older and wider than the release
+that surfaced it.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A <code>readSome</code> of zero or fewer bytes no longer returns one byte.</strong> The natives clamped <code>max</code>
+into <code>[1, 1MB]</code>, so asking for nothing handed back a byte nobody asked for. A caller computing
+a remaining-byte count — the length-prefixed frame reader <code>std.bytes</code> exists for — silently
+over-consumed its stream at the moment the count reached zero.</p>
+<p>Four entry points, across three modules: <code>std.io.net.readSome</code> and <code>std.io.net.receiveFrom</code>,
+<code>std.process.readSomeOut</code>/<code>readSomeErr</code>, and <code>std.io.stream.readSome</code>. <strong>Only the last is new
+in 4.2</strong> — the other three have behaved this way since 4.0.</p>
+<p><strong>The datagram case was the worst.</strong> <code>receiveFrom</code> cuts a payload to <code>max</code> and drops the
+remainder, so <code>receiveFrom(s, 0)</code> kept one byte and threw the packet away.</p>
+<p>A non-positive <code>max</code> now panics, which is the convention <code>string.substring</code> and
+<code>std.bytes.slice</code> already follow for an argument that has no sensible answer. There is no
+value to return instead: an empty array already means EOF, and <code>null</code> already means a failure
+with a reason behind it. <code>max</code> of one is unchanged and still reads one byte.</p>
+</li>
+</ul>
+<h3 id="probed-and-clean">Probed and clean</h3>
+<p>Worth not re-running: two tasks sharing one handle (300 of 300 bytes, both finish); a 200 000-byte
+line and a CRLF pair split across the 64 KB refill boundary (exact); 2 000 open/close rounds with
+no descriptor leak; a directory opened as a file, and a write to a read-only handle, both refused
+with the twin naming why; <code>close</code> while a read is outstanding — the 4.0 sweep's crash class — which
+answers <code>null</code> rather than taking the process down; reads after EOF staying empty; <code>create</code>
+truncating; the time conformances at both ends of <code>int</code>, including <code>sortList</code>, <code>Set</code> and <code>Map</code>;
+the whole stdlib suite under <code>LYRIC_JIT=1</code>; and a packed executable.</p>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
