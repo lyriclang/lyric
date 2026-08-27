@@ -10,8 +10,12 @@ namespace Lyric.Tests.Cli;
 /// of the datagram was discarded with it. There is no honest value to answer instead: an empty
 /// array already means EOF, and <c>null</c> already means a failure with a reason.</para>
 ///
-/// <para>The pin lives here rather than in <c>stdlib-tests</c> because a panic ends the program,
-/// which the lyrtest runner cannot survive.</para>
+/// <para>The pin lives here rather than in <c>stdlib-tests</c> because <c>std.test</c> has no
+/// expect-a-panic assertion: <c>lyrtest</c> survives a panicking test perfectly — it runs each
+/// test in a fresh instance, reports the panic as a FAIL with its backtrace, scheduler-deep ones
+/// included, and carries on — but a panic is by definition a failed test there, so it can never
+/// be a green pin. The 4.2.1 notes gave "the runner cannot survive it" as the reason, which was
+/// simply untrue; measured and corrected by round 3 of the sweep.</para>
 /// </summary>
 public sealed class ReadMaxTests
 {
