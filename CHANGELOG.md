@@ -85,6 +85,15 @@ released yet. The language rules landed spec-first as §10a (`lyric-spec#26`), t
   March. `null` answers whether; `fromIsoOrThrow` names the field that broke (`TimeError`,
   §9.0's twin doctrine). Written in Lyric, the exact inverse of `iso()`'s civil-from-days.
 
+### Moved
+
+- **The path helpers left `std.io.file` for `std.io.path`** — `joinPath`, `fileName`,
+  `parentDir`, `extension`, `stem`, `withExtension`, `isAbsolute`, unchanged in behavior.
+  The move is the point: a path is a string and touches no disk, so it now costs NO
+  capability — a sandboxed guest can assemble the path it hands its host without being
+  granted `fileAccess`. The old names in `io.file` are gone, not doubled; the 4.0 major
+  pays the rename.
+
 ### Removed — the clocks came due
 
 - **`listDir` is gone**, as its `until = "4.0"` promised since 3.7: it answered an empty

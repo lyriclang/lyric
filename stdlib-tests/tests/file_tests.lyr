@@ -9,7 +9,6 @@ import std.io.file {
     remove,
     exists,
     tempDir,
-    joinPath,
     textOrThrow,
     bytesOrThrow,
     linesOrThrow,
@@ -20,6 +19,7 @@ import std.io.file {
     removeOrThrow,
 };
 import std.io.error { IoError, IoErrorKind };
+import std.io.path { joinPath };
 import std.string { utf8Decode, fromInt };
 
 // The byte bridge (v1.14): bytes out, bytes in, and the strict decode that refuses what

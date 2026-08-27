@@ -10,7 +10,7 @@ using Lyric.Vm;
 namespace Lyric.Tests.Vm;
 
 /// <summary>
-/// The path helpers from `std.io.file`, ALL WRITTEN IN LYRIC.
+/// The path helpers from `std.io.path` (out of `std.io.file` since 4.0), ALL WRITTEN IN LYRIC.
 ///
 /// <para>A path is a string, and searching for separators is something the language can do itself. The
 /// host would only bring its own platform convention here, and with a platform-neutral bytecode that is
@@ -52,7 +52,7 @@ public class PathTests
 
     private const string Head = """
         import std.io.console { println };
-        import std.io.file { joinPath, fileName, parentDir, extension, stem, withExtension,
+        import std.io.path { joinPath, fileName, parentDir, extension, stem, withExtension,
                              isAbsolute };
 
         """;
@@ -112,7 +112,7 @@ public class PathTests
         // A host native would bring its own convention here.
         Assert.Equal("[c.txt]", Out("""
             import std.io.console { println };
-            import std.io.file { fileName };
+            import std.io.path { fileName };
             import std.string { fromChar };
 
             fn main(): int {
@@ -126,7 +126,7 @@ public class PathTests
     public void An_absolute_path_is_recognised_in_both_shapes() =>
         Assert.Equal("true true false false", Out("""
             import std.io.console { println };
-            import std.io.file { isAbsolute };
+            import std.io.path { isAbsolute };
             import std.string { fromChar };
 
             fn main(): int {
@@ -152,7 +152,8 @@ public class PathTests
     public void An_optional_native_over_a_scalar_returns_its_value() =>
         Assert.Equal("5 true", Out("""
             import std.io.console { println };
-            import std.io.file { size, writeText, remove, joinPath, tempDir };
+            import std.io.file { size, writeText, remove, tempDir };
+            import std.io.path { joinPath };
 
             fn main(): int {
                 let pfad = joinPath(tempDir(), "lyric-size-probe.txt");

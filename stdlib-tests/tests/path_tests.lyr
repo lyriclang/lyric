@@ -1,0 +1,59 @@
+import std.test { Test, assertEq, assertTrue };
+import std.io.path { joinPath, fileName, parentDir, extension, stem, withExtension, isAbsolute };
+
+// The helpers lived in std.io.file until 4.0 and were tested only through use; the move to
+// their own capability-free module is when every documented edge got its pin.
+
+@Test
+pub fn join_neither_doubles_nor_drops_the_separator(): void {
+    assertEq(joinPath("a", "b"), "a/b");
+    assertEq(joinPath("a/", "b"), "a/b");
+    assertEq(joinPath("a", "/b"), "a/b");
+    assertEq(joinPath("a/", "/b"), "a/b");
+    assertEq(joinPath("", "b"), "b");
+    assertEq(joinPath("a", ""), "a");
+}
+
+@Test
+pub fn file_name_is_the_last_component(): void {
+    assertEq(fileName("a/b/c.txt"), "c.txt");
+    assertEq(fileName("c.txt"), "c.txt");
+    assertEq(fileName("a\\b\\c.txt"), "c.txt");
+}
+
+@Test
+pub fn parent_dir_drops_the_separator_except_at_the_root(): void {
+    assertEq(parentDir("a/b/c.txt"), "a/b");
+    assertEq(parentDir("c.txt"), "");
+    assertEq(parentDir("/x"), "/");
+}
+
+@Test
+pub fn the_extension_has_no_dot_and_a_leading_dot_is_a_name(): void {
+    assertEq(extension("a/b/c.txt"), "txt");
+    assertEq(extension("archive.tar.gz"), "gz");
+    assertEq(extension(".gitignore"), "");
+    assertEq(extension("plain"), "");
+}
+
+@Test
+pub fn the_stem_is_the_name_without_its_extension(): void {
+    assertEq(stem("a/b/c.txt"), "c");
+    assertEq(stem(".gitignore"), ".gitignore");
+    assertEq(stem("plain"), "plain");
+}
+
+@Test
+pub fn with_extension_replaces_and_an_empty_one_removes(): void {
+    assertEq(withExtension("a/b/c.txt", "lyr"), "a/b/c.lyr");
+    assertEq(withExtension("c.txt", ""), "c");
+    assertEq(withExtension("plain", "txt"), "plain.txt");
+}
+
+@Test
+pub fn absolute_recognises_the_root_and_a_drive_letter(): void {
+    assertTrue(isAbsolute("/etc/hosts"), "a rooted path is absolute");
+    assertTrue(isAbsolute("C:\\Users"), "a drive letter is absolute");
+    assertTrue(!isAbsolute("a/b"), "a relative path is not");
+    assertTrue(!isAbsolute(""), "the empty path is not");
+}

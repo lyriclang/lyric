@@ -2153,7 +2153,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 44
+            "Line": 41
           }
         },
         {
@@ -2164,7 +2164,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 48
+            "Line": 45
           }
         },
         {
@@ -2175,7 +2175,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 52
+            "Line": 49
           }
         },
         {
@@ -2186,7 +2186,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 55
+            "Line": 52
           }
         },
         {
@@ -2197,7 +2197,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 58
+            "Line": 55
           }
         },
         {
@@ -2208,7 +2208,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 61
+            "Line": 58
           }
         },
         {
@@ -2219,7 +2219,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 64
+            "Line": 61
           }
         },
         {
@@ -2230,7 +2230,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 68
+            "Line": 65
           }
         },
         {
@@ -2241,7 +2241,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 71
+            "Line": 68
           }
         },
         {
@@ -2252,7 +2252,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 94
+            "Line": 91
           }
         },
         {
@@ -2263,7 +2263,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 103
+            "Line": 100
           }
         },
         {
@@ -2274,7 +2274,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 112
+            "Line": 109
           }
         },
         {
@@ -2285,7 +2285,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 121
+            "Line": 118
           }
         },
         {
@@ -2296,7 +2296,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 130
+            "Line": 127
           }
         },
         {
@@ -2307,7 +2307,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 143
+            "Line": 140
           }
         },
         {
@@ -2318,7 +2318,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 150
+            "Line": 147
           }
         },
         {
@@ -2329,7 +2329,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 157
+            "Line": 154
           }
         },
         {
@@ -2340,7 +2340,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 164
+            "Line": 161
           }
         },
         {
@@ -2351,7 +2351,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 172
+            "Line": 169
           }
         },
         {
@@ -2362,7 +2362,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 179
+            "Line": 176
           }
         },
         {
@@ -2373,7 +2373,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 186
+            "Line": 183
           }
         },
         {
@@ -2384,7 +2384,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 193
+            "Line": 190
           }
         },
         {
@@ -2395,7 +2395,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 200
+            "Line": 197
           }
         },
         {
@@ -2406,7 +2406,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 207
+            "Line": 204
           }
         },
         {
@@ -2417,7 +2417,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 218
+            "Line": 215
           }
         },
         {
@@ -2428,7 +2428,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 220
+            "Line": 217
           }
         },
         {
@@ -2439,7 +2439,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 222
+            "Line": 219
           }
         },
         {
@@ -2450,7 +2450,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 225
+            "Line": 222
           }
         },
         {
@@ -2461,7 +2461,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 228
+            "Line": 225
           }
         },
         {
@@ -2472,7 +2472,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 231
+            "Line": 228
           }
         },
         {
@@ -2483,7 +2483,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 234
+            "Line": 231
           }
         },
         {
@@ -2494,7 +2494,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 238
+            "Line": 235
           }
         },
         {
@@ -2505,7 +2505,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 243
+            "Line": 240
           }
         },
         {
@@ -2516,84 +2516,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 250
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "joinPath",
-          "Signature": "pub fn joinPath(left: string, right: string): string",
-          "Doc": "Joins two path parts, with neither a doubled nor a missing separator.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 264
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "fileName",
-          "Signature": "pub fn fileName(path: string): string",
-          "Doc": "The last component. `\"a/b/c.txt\"` becomes `\"c.txt\"`.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 297
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "parentDir",
-          "Signature": "pub fn parentDir(path: string): string",
-          "Doc": "Everything before the last separator, or `\"\"` when there is none.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 303
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "extension",
-          "Signature": "pub fn extension(path: string): string",
-          "Doc": "The extension WITHOUT the dot. `\"\"` when there is none.\n\nA leading dot does not count: `\".gitignore\"` has no extension, that is its name. This rule\ndiffers between languages, so it is stated here.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 319
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "stem",
-          "Signature": "pub fn stem(path: string): string",
-          "Doc": "The name without its extension. `\"a/b/c.txt\"` becomes `\"c\"`.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 335
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "withExtension",
-          "Signature": "pub fn withExtension(path: string, ext: string): string",
-          "Doc": "Replaces the extension. An empty extension removes it.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 345
-          }
-        },
-        {
-          "Kind": "Function",
-          "Name": "isAbsolute",
-          "Signature": "pub fn isAbsolute(path: string): bool",
-          "Doc": "Does the path start at the root? Recognises `/x` and `C:\\x`.",
-          "Members": [],
-          "Source": {
-            "File": "stdlib/std/io/file.lyr",
-            "Line": 353
+            "Line": 247
           }
         }
       ]
@@ -2909,6 +2832,89 @@
           "Source": {
             "File": "stdlib/std/io/net.lyr",
             "Line": 305
+          }
+        }
+      ]
+    },
+    {
+      "Path": "std.io.path",
+      "Doc": "Joining, splitting and inspecting path STRINGS — no capability, because none of it\ntouches the disk. Both separators count everywhere: Windows understands `/`, and a script\nrunning on both systems should not have to guess.",
+      "Items": [
+        {
+          "Kind": "Function",
+          "Name": "joinPath",
+          "Signature": "pub fn joinPath(left: string, right: string): string",
+          "Doc": "Joins two path parts, with neither a doubled nor a missing separator.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 28
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "fileName",
+          "Signature": "pub fn fileName(path: string): string",
+          "Doc": "The last component. `\"a/b/c.txt\"` becomes `\"c.txt\"`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 61
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parentDir",
+          "Signature": "pub fn parentDir(path: string): string",
+          "Doc": "Everything before the last separator, or `\"\"` when there is none.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 67
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "extension",
+          "Signature": "pub fn extension(path: string): string",
+          "Doc": "The extension WITHOUT the dot. `\"\"` when there is none.\n\nA leading dot does not count: `\".gitignore\"` has no extension, that is its name. This rule\ndiffers between languages, so it is stated here.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 83
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "stem",
+          "Signature": "pub fn stem(path: string): string",
+          "Doc": "The name without its extension. `\"a/b/c.txt\"` becomes `\"c\"`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 99
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "withExtension",
+          "Signature": "pub fn withExtension(path: string, ext: string): string",
+          "Doc": "Replaces the extension. An empty extension removes it.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 109
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "isAbsolute",
+          "Signature": "pub fn isAbsolute(path: string): bool",
+          "Doc": "Does the path start at the root? Recognises `/x` and `C:\\x`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/path.lyr",
+            "Line": 117
           }
         }
       ]
