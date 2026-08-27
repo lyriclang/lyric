@@ -11,6 +11,30 @@
 
 ## Current milestone
 
+**Round 3 ships as v4.2.3** (2026-08-27), and it is not clean either. **The heavy finding is a
+RESOURCE LEAK across the sandbox boundary, recorded rather than fixed**: a file handle a guest
+opens and does not close stays open for the lifetime of the THREAD. Measured over five shapes —
+it survives a budget stop, a guest panic, an ordinary return, and the VM and instance being
+garbage collected; only an explicit `stream.close` releases it, and on Windows the file stays
+locked until then. This is the ThreadStatic-table class `_sockets` (4.0) and `_children` (4.0)
+already belong to; files merely made it VISIBLE, because a locked file is observable at once. It
+matters because it is the sandbox's own promise: a host that stops an untrusted script is left
+holding an OS handle the guest opened, with no way to release it. The fix is per-instance
+resource ownership — the tables keyed by instance and released on dispose — which is the same
+architecture change sitting behind the "cross-VM isolation is argued, not tested" thread. Not a
+sweep's to make. **The second finding is a sentence of mine that was simply false**: 4.2.1
+claimed the guard pins live in the CLI suite "because a panic ends the program the lyrtest runner
+is running". `lyrtest` survives a panicking test perfectly — fresh instance per test, the panic
+reported as a FAIL with its backtrace (scheduler-deep ones included), the run continuing. The
+real reason is that `std.test` has no expect-a-panic assertion, so a panic can only ever be a red
+test there. Corrected here and at the test's own doc comment; the pushed tag keeps the wrong
+sentence. **Two named gaps CLOSED with pins rather than prose** (`StreamHostTests`): a host
+granted only `fileAccess` is refused — not at `Compile`, which is why the first attempt to pin it
+passed wrongly, but by the time the script runs — and an `ExecutionBudget` does reach inside a
+task waiting on a file, stopping the drain with `LYR-CAP0002`. **Clean**: the `LineReader` walk is
+LINEAR (25k lines 622ms, 100k lines 2373ms — 3.8x for 4x the work, so the per-refill cursor does
+what it was written for). Round 4 follows.
+
 **Round 2 of the sweep ships as v4.2.2** (2026-08-27) — and it is NOT a clean round, so the loop
 does not exit here. One fix, one documented limit, two language questions recorded under §Still
 open rather than answered. **The fix**: `x == null` / `x ?? y` / `x ??= y` on a non-optional
@@ -41,7 +65,9 @@ entry points across three modules (`std.io.net.readSome`/`receiveFrom`, `std.pro
 drops the remainder, so a zero kept one byte and threw the packet away. Now a panic, the
 convention `string.substring` and `std.bytes.slice` already follow — there is no value to answer
 instead, since empty means EOF and null means a failure with a reason. Pinned in the CLI suite
-rather than lyrtest, because a panic ends the program the runner is running. **Also measured
+rather than lyrtest — the reason given here was WRONG and round 3 corrected it: `lyrtest` survives
+a panicking test fine, and the real reason is that `std.test` has no expect-a-panic assertion, so
+a panic can only ever be a red test there. **Also measured
 rather than argued**: the 4.2.0 scheduler fix has a SECOND symptom, and the pre-fix binary was
 rebuilt to see it — with a task spinning on `Wait.Now`, an interrupt reached a parked task only
 after the spinner gave up (100 000 turns against 52). Pinned. **Clean and worth not re-running**:
@@ -1456,6 +1482,16 @@ answer yet, and it belongs asked before E4 starts.
 ## Still open
 
 **Tooling and format:**
+
+- **A guest's OS handles outlive the guest.** A file opened through `std.io.stream` and not
+  closed stays open for the lifetime of the THREAD: measured surviving a budget stop, a guest
+  panic, an ordinary return, and the VM plus instance being garbage collected — only an explicit
+  `close` releases it, and on Windows the file stays locked meanwhile. `_sockets` (4.0) and
+  `_children` (4.0) are the same shape; the file case merely made it observable. **This is the
+  sandbox's own promise**: a host that stops an untrusted script is left holding handles the guest
+  opened. The fix is per-instance resource ownership — the ThreadStatic tables keyed by instance
+  and released on dispose — which is the same change the cross-VM isolation question needs, and
+  it is a design decision rather than a sweep fix. Found by the 4.2 sweep, round 3.
 
 - **The four ways to ask "is this null?" disagree inside a GENERIC body.** With
   `fn f<T>(x: T)`: `x == null` and `x ?? fallback` COMPILE and behave correctly when `T` is

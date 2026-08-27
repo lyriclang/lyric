@@ -10,6 +10,37 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.2.3 — 2026-08-27
+
+**Round 3 of the sweep.** No behaviour changed: two gaps the earlier rounds named are now pinned
+by tests, one sentence of the 4.2.1 notes is corrected, and the heaviest finding is recorded
+rather than fixed.
+
+### Documentation
+
+- **A correction to the v4.2.1 notes.** They said the zero-`max` pins live in the CLI suite
+  "because a panic ends the program the lyrtest runner is running". That is not true: `lyrtest`
+  runs each test in a fresh instance, reports a panic as a FAIL with its backtrace — including
+  one raised deep under the scheduler — and carries on. The real reason is that `std.test` has no
+  expect-a-panic assertion, so a panic can only ever be a red test there.
+
+### Testing
+
+- **Two questions the sweep had answered with prose are answered with pins.** A host granted only
+  `fileAccess` cannot run a `std.io.stream` script — the refusal comes by the time it runs, not at
+  compile time — and an `ExecutionBudget` does reach inside a task that is waiting on a file,
+  stopping the drain with `LYR-CAP0002` rather than letting it wait its way out of the budget.
+
+### Known, not fixed
+
+- **A guest's OS handles outlive the guest.** A file opened through `std.io.stream` and not closed
+  stays open for the lifetime of the thread — measured surviving a budget stop, a guest panic, an
+  ordinary return, and the VM being garbage collected. `std.io.net`'s sockets and `std.process`'s
+  children have the same shape since 4.0; a locked file merely makes it visible. A host that stops
+  an untrusted script is therefore left holding handles the guest opened. The fix is per-instance
+  resource ownership rather than per-thread, which is a design decision; it is recorded in
+  `STATUS.md` under §Still open.
+
 ## v4.2.2 — 2026-08-27
 
 **Round 2 of the sweep.** One diagnostic fixed, one limit documented, and two language questions
