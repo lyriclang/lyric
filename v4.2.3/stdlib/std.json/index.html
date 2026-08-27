@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.json — Lyric v4.2.3</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.3</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/" class="here">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.json</h1>
+<nav class="contents">
+<ul>
+<li><a href="#enum-jsonvalue">JsonValue</a></li>
+<li><a href="#function-serialize">serialize</a></li>
+<li><a href="#function-serializepretty">serializePretty</a></li>
+<li><a href="#class-jsonerror">JsonError</a></li>
+<li><a href="#function-parse">parse</a></li>
+<li><a href="#function-parseorthrow">parseOrThrow</a></li>
+</ul>
+</nav>
+<section class="item" id="enum-jsonvalue">
+<h2><a href="#enum-jsonvalue">JsonValue</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum JsonValue</code></pre>
+<p>One JSON value — the tree <code>parse</code> answers and <code>serialize</code> writes.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">Null</code></pre>
+<p>The literal <code>null</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Bool(bool)</code></pre>
+<p><code>true</code> or <code>false</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Int(int)</code></pre>
+<p>A number the text wrote without fraction or exponent, exact in the <code>int</code> range.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Float(float)</code></pre>
+<p>A number with a fraction or an exponent — or an integer too large for <code>Int</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Str(string)</code></pre>
+<p>A string.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Arr(List&lt;JsonValue&gt;)</code></pre>
+<p>An array.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Obj(Map&lt;string, JsonValue&gt;)</code></pre>
+<p>An object. Member order is the map's: unspecified.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn isNull(): bool</code></pre>
+<p>Whether this is the JSON <code>null</code> — the value, not an absent optional.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asBool(): ?bool</code></pre>
+<p>The boolean, or <code>null</code> when this is not one.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asInt(): ?int</code></pre>
+<p>The integer, or <code>null</code> when this is not <code>Int</code>. A <code>Float</code> with an integral value stays
+<code>null</code>: which of the two a number is was decided by the text it came from.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asFloat(): ?float</code></pre>
+<p>The number as a float — <code>Float</code> directly, <code>Int</code> widened — or <code>null</code> when this is not a
+number. JSON has one number type; two variants is this module keeping precision, not two
+kinds of JSON value.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asString(): ?string</code></pre>
+<p>The string, or <code>null</code> when this is not one.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asArray(): ?List&lt;JsonValue&gt;</code></pre>
+<p>The elements, or <code>null</code> when this is not an array. The list is the value's own — changing
+it changes the value.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn asObject(): ?Map&lt;string, JsonValue&gt;</code></pre>
+<p>The members, or <code>null</code> when this is not an object. The map is the value's own — changing
+it changes the value.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn at(index: int): ?JsonValue</code></pre>
+<p>The element at <code>index</code>, or <code>null</code> when this is not an array or the index is outside it.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn field(name: string): ?JsonValue</code></pre>
+<p>The member named <code>name</code>, or <code>null</code> when this is not an object or has no such member.</p>
+</div>
+</div>
+<p class="source">stdlib/std/json.lyr:28</p>
+</section>
+<section class="item" id="function-serialize">
+<h2><a href="#function-serialize">serialize</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn serialize(value: JsonValue): string</code></pre>
+<p>The value as compact JSON: no whitespace anywhere.</p>
+<p class="source">stdlib/std/json.lyr:124</p>
+</section>
+<section class="item" id="function-serializepretty">
+<h2><a href="#function-serializepretty">serializePretty</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn serializePretty(value: JsonValue, indent: int): string</code></pre>
+<p>The value as JSON with a newline per element and <code>indent</code> spaces per nesting level, the shape
+a person reads. An <code>indent</code> below zero is treated as zero.</p>
+<p class="source">stdlib/std/json.lyr:132</p>
+</section>
+<section class="item" id="class-jsonerror">
+<h2><a href="#class-jsonerror">JsonError</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class JsonError :: [Throwable]</code></pre>
+<p>Where and why a document was refused: the first place the parser could not continue, and
+what it expected there. <code>line</code> and <code>column</code> are 1-based and counted in code points.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">line: int</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">column: int</code></pre>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">offset: int</code></pre>
+<p>The 0-based code-point offset of the refusal — <code>line</code> and <code>column</code>, unfolded.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">expected: string</code></pre>
+<p>What the parser expected at that place, as prose: <code>&quot;a value&quot;</code>, <code>&quot;',' or '}'&quot;</code>, …</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/json.lyr:303</p>
+</section>
+<section class="item" id="function-parse">
+<h2><a href="#function-parse">parse</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parse(text: string): ?JsonValue</code></pre>
+<p>The value a JSON document spells, or <code>null</code> when the text spells none: a syntax error
+anywhere, anything after the value, a lone surrogate escape, a raw control character in a
+string, or containers nested more than 128 deep. Strict RFC 8259 — no comments, no trailing
+commas, no <code>NaN</code>, no single quotes. The whole document is one value; leading and trailing
+whitespace around it is fine.</p>
+<p>Duplicate object keys follow <code>Map.set</code>: the last one wins, as in JavaScript.</p>
+<p>The depth bound is the module's own, not the runtime's: input is data, and data that is not
+JSON must come back as <code>null</code> rather than as a panic about call depth.</p>
+<p class="source">stdlib/std/json.lyr:331</p>
+</section>
+<section class="item" id="function-parseorthrow">
+<h2><a href="#function-parseorthrow">parseOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parseOrThrow(text: string): JsonValue throws JsonError</code></pre>
+<p><code>parse</code>, with the reason when the text spells no value: where the document broke, and what
+the parser expected there. The strictness is <code>parse</code>'s — the two are one parser.</p>
+<p class="source">stdlib/std/json.lyr:347</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.iter/">std.iter</a>
+<a class="next" href="../../stdlib/std.math/">std.math</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

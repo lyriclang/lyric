@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.2.3</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.3</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.2.3 — 2026-08-27</h2>
+<p><strong>Round 3 of the sweep.</strong> No behaviour changed: two gaps the earlier rounds named are now pinned
+by tests, one sentence of the 4.2.1 notes is corrected, and the heaviest finding is recorded
+rather than fixed.</p>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li><strong>A correction to the v4.2.1 notes.</strong> They said the zero-<code>max</code> pins live in the CLI suite
+&quot;because a panic ends the program the lyrtest runner is running&quot;. That is not true: <code>lyrtest</code>
+runs each test in a fresh instance, reports a panic as a FAIL with its backtrace — including
+one raised deep under the scheduler — and carries on. The real reason is that <code>std.test</code> has no
+expect-a-panic assertion, so a panic can only ever be a red test there.</li>
+</ul>
+<h3 id="testing">Testing</h3>
+<ul>
+<li><strong>Two questions the sweep had answered with prose are answered with pins.</strong> A host granted only
+<code>fileAccess</code> cannot run a <code>std.io.stream</code> script — the refusal comes by the time it runs, not at
+compile time — and an <code>ExecutionBudget</code> does reach inside a task that is waiting on a file,
+stopping the drain with <code>LYR-CAP0002</code> rather than letting it wait its way out of the budget.</li>
+</ul>
+<h3 id="known-not-fixed">Known, not fixed</h3>
+<ul>
+<li><strong>A guest's OS handles outlive the guest.</strong> A file opened through <code>std.io.stream</code> and not closed
+stays open for the lifetime of the thread — measured surviving a budget stop, a guest panic, an
+ordinary return, and the VM being garbage collected. <code>std.io.net</code>'s sockets and <code>std.process</code>'s
+children have the same shape since 4.0; a locked file merely makes it visible. A host that stops
+an untrusted script is therefore left holding handles the guest opened. The fix is per-instance
+resource ownership rather than per-thread, which is a design decision; it is recorded in
+<code>STATUS.md</code> under §Still open.</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coroutines — Lyric v4.2.3</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a class="current" href="../../guide/getting-started/">Guide</a>
+<a href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.2.3</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Guide</h2>
+<ul>
+<li><a href="../../guide/getting-started/">Getting started</a></li>
+<li><a href="../../guide/values-and-types/">Values and types</a></li>
+<li><a href="../../guide/functions/">Functions</a></li>
+<li><a href="../../guide/control-flow/">Control flow</a></li>
+<li><a href="../../guide/structs-and-classes/">Structs and classes</a></li>
+<li><a href="../../guide/enums-and-matching/">Enums and pattern matching</a></li>
+<li><a href="../../guide/interfaces/">Interfaces</a></li>
+<li><a href="../../guide/generics/">Generics</a></li>
+<li><a href="../../guide/optionals/">Optionals</a></li>
+<li><a href="../../guide/errors/">Errors</a></li>
+<li><a href="../../guide/coroutines/" class="here">Coroutines</a></li>
+<li><a href="../../guide/modules/">Modules</a></li>
+<li><a href="../../guide/standard-library/">The standard library</a></li>
+<li><a href="../../guide/embedding/">Embedding</a></li>
+<li><a href="../../guide/attributes/">Attributes</a></li>
+<li><a href="../../guide/building/">Building a project</a></li>
+<li><a href="../../guide/packaging/">Packing a program</a></li>
+<li><a href="../../guide/formatting/">Formatting</a></li>
+<li><a href="../../guide/diagnostics/">Diagnostics</a></li>
+<li><a href="../../guide/testing/">Testing</a></li>
+<li><a href="../../guide/debugging/">Debugging</a></li>
+</ul>
+</nav>
+<main>
+<h1>Coroutines</h1>
+<nav class="contents">
+<ul>
+<li><a href="#yield-from-any-depth">Yield from any depth</a></li>
+<li><a href="#when-the-body-throws">When the body throws</a></li>
+</ul>
+</nav>
+<p>A function whose body contains <code>yield</code> is a coroutine. Its return type is <code>Coroutine&lt;T&gt;</code>, where
+<code>T</code> is what it yields. Calling it does not run the body; it produces a coroutine value.</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+fn counter(): Coroutine&lt;int&gt; {
+    var n = 0;
+    while (true) {
+        yield n;
+        n += 1;
+    }
+}
+
+fn main(): int {
+    let c = counter();
+
+    var sum = 0;
+    var i = 0;
+    while (i &lt; 5) {
+        sum = sum + resume c;
+        i += 1;
+    }
+
+    println(f&quot;sum: {sum}&quot;);
+    return sum;
+}
+</code></pre>
+<p><code>resume</code> runs the coroutine until its next <code>yield</code> and produces that value. The state between two
+<code>yield</code>s — locals and the position in the loop — survives. Without that, the loop above would read
+<code>0</code> five times.</p>
+<p>A coroutine may also be finite. When its body runs to the end, it is exhausted:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+fn three(): Coroutine&lt;int&gt; {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    let t = three();
+    let a = resume t;
+    let b = resume t;
+
+    println(f&quot;{a}, {b}&quot;);
+    return a + b;
+}
+</code></pre>
+<p><code>resume</code> on an exhausted coroutine is a panic. A caller either knows how many values there are, or
+uses an infinite coroutine and stops itself — or pulls with <code>next()</code>:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+fn three(): Coroutine&lt;int&gt; {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    let co = three();
+    var sum = 0;
+    var live = true;
+    while (live) {
+        let v = co.next();
+        if (v == null) {
+            live = false;
+        } else {
+            sum += v;
+        }
+    }
+    println(f&quot;sum: {sum}&quot;);
+    return sum;
+}
+</code></pre>
+<p><code>co.next()</code> is the safe form of the same pull: it advances the coroutine exactly like <code>resume</code>
+and answers <code>?T</code> — the value, or <code>null</code> once the body has run to its end. After the end it stays
+<code>null</code> on every further call; <code>resume</code> on the same coroutine still panics, because leniency
+belongs to the call, not to the state. The name and shape are <code>Iterator&lt;T&gt;.next()</code>'s on purpose.</p>
+<p>Two yield types change the answer's form, for the same reason: a <code>Coroutine&lt;void&gt;</code> has no value
+to wrap, so its <code>next()</code> returns <code>bool</code> — did it advance? — and <code>while (p.next()) { }</code> drives it
+to the end. A <code>Coroutine&lt;?T&gt;</code> refuses <code>next()</code> outright (<code>LYR-SEM0080</code>): a <code>null</code> there would
+mean both &quot;yielded null&quot; and &quot;done&quot;, so such a coroutine is driven with <code>resume</code> and a protocol
+of its own.</p>
+<p>A coroutine may also end itself early with a bare <code>return;</code> — the next pull is then the panic or
+the <code>null</code>, exactly as if the body had run through.</p>
+<p>A coroutine is an ordinary value: it can be a parameter, a local, a field of a class or struct,
+or a type argument — a driver that steps a stored <code>List&lt;Coroutine&lt;float&gt;&gt;</code> every frame holds
+them like anything else. Copying the value copies a reference to the same suspended state; two
+holders drive one coroutine.</p>
+<h2 id="yield-from-any-depth">Yield from any depth</h2>
+<p>Since 4.0 a coroutine is <strong>stackful</strong>: its frames live on a chain of their own, and a <code>yield</code>
+executed at any call depth beneath a running <code>resume</code> suspends the whole chain. A helper can
+wait so its callers do not have to:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.string as strings;
+
+fn firstTwo(): void {
+    yield 1;
+    yield 2;
+}
+
+fn numbers(): Coroutine&lt;int&gt; {
+    firstTwo();
+    yield 3;
+}
+
+fn main(): int {
+    let co = numbers();
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    println(strings.fromInt(resume co));
+    return 0;
+}
+</code></pre>
+<p><code>firstTwo</code> is an ordinary function — no marker in its signature, and its callers need none
+either, which is the point: waiting composes without colouring anything. What it does when it
+runs is decided by <em>who is running it</em>: beneath a resume of <code>numbers</code>, its yields arrive at
+<code>numbers</code>' puller.</p>
+<p>Because the chain is a runtime fact, the failures are <strong>panics</strong>, not compile errors:</p>
+<ul>
+<li>a yield with no resume running it — in <code>main</code>, or beneath a host callback — panics;</li>
+<li>the value's type must <em>be</em> the running chain's element type: <code>yield &quot;x&quot;;</code> reaching a
+<code>Coroutine&lt;int&gt;</code> panics, and the yielded expression is typed as what it is, with no context
+to adapt against (a <code>Coroutine&lt;int32&gt;</code> chain wants an <code>int32</code>-typed value, not a bare
+literal in some helper);</li>
+<li>a native or JIT-compiled frame between the yield and its resume is a wall — the chain cannot
+capture it — and the yield panics rather than suspending half a chain;</li>
+<li><code>resume</code> on a coroutine that is already running — reached through a stored reference from
+its own chain — panics: one chain, one driver.</li>
+</ul>
+<p>Inside a coroutine <em>body</em> nothing changes: a yield there still checks its value against <code>T</code> at
+compile time, the better error when the chain is statically known. And a <code>defer</code> runs when its
+frame exits — by return or by an exception unwinding toward the pull; a chain dropped while
+suspended runs nothing, so cleanup that must happen belongs to whoever drives the coroutine to
+its end.</p>
+<h2 id="when-the-body-throws">When the body throws</h2>
+<p>A coroutine body may <code>throw</code>, and the exception comes out of the <code>resume</code> or <code>next()</code> that was
+running it — not out of the call that made the coroutine, which runs no body at all. It lands in
+the function driving the pull, where a <code>try</code> catches it like any other:</p>
+<pre><code class="language-lyr">import std.core { Exception };
+import std.io.console { println };
+
+fn steps(): Coroutine&lt;int&gt; throws Exception {
+    yield 1;
+    throw Exception { text = &quot;the second step failed&quot; };
+}
+
+fn main(): int {
+    try {
+        let co = steps();
+        println(f&quot;{resume co}&quot;);
+        println(f&quot;{resume co}&quot;);
+    } catch (e: Exception) {
+        println(e.message());
+    }
+    return 0;
+}
+</code></pre>
+<p><strong>The throwability is part of the type.</strong> <code>steps()</code> above does not produce a <code>Coroutine&lt;int&gt;</code>
+but a <code>Coroutine&lt;int&gt; throws Exception</code>, and the two are different types. The call demands
+nothing — it builds a suspended frame and runs no body — while every <strong>pull</strong> of that value is a
+throw site: handled by a <code>try</code> around it, or declared by the function doing the pulling.</p>
+<p>That is what lets it survive being stored. A driver holding coroutines — a cutscene runner, a
+task list — writes the throwability into the field, and the compiler keeps asking at every pull:</p>
+<pre><code class="language-lyr">import std.core { Exception };
+import std.io.console { println };
+
+fn steps(): Coroutine&lt;int&gt; throws Exception {
+    yield 1;
+    throw Exception { text = &quot;the second step failed&quot; };
+}
+
+class Runner {
+    current: ?Coroutine&lt;int&gt; throws Exception = null,
+
+    fn load() {
+        this.current = steps();
+    }
+
+    fn step(): bool throws Exception {
+        let co = this.current;
+        if (co == null) { return false; }
+        println(f&quot;{resume co}&quot;);   // demands handling, so this method declares 'throws'
+        return true;
+    }
+}
+
+fn main(): int {
+    let r = Runner { };
+    r.load();
+    try {
+        while (r.step()) { }
+    } catch (e: Exception) {
+        println(e.message());
+    }
+    return 0;
+}
+</code></pre>
+<p>Write <code>throws</code> alone (<code>Coroutine&lt;int&gt; throws</code>) when the body may throw anything. A coroutine that
+cannot throw fits a slot declared <code>throws</code> — the slot promises a handler and a value that never
+throws keeps that promise — but not the other way round: a throwing coroutine in a plain
+<code>Coroutine&lt;int&gt;</code> field would be a pull nobody was asked to handle.</p>
+<p><code>next()</code> is no way around it: it is lenient about the END of a body, not about a body that
+throws, and an exception passes straight through it.</p>
+<p><em>Before 3.0 the demand was checked at the CALL, which is the one event that cannot throw. It
+looked right as long as the coroutine stayed a local beside its <code>try</code>, and vanished the moment it
+reached a field or an optional — where an exception ended the program with exit code 101.</em></p>
+<p>Send values (<code>resume c, v</code>) do not exist.</p>
+<nav class="neighbours">
+<a class="prev" href="../../guide/errors/">Errors</a>
+<a class="next" href="../../guide/modules/">Modules</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
