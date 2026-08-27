@@ -20,9 +20,11 @@ namespace Lyric.Vm;
 /// later reads someone else's arguments. Copy the values out instead; every implementation in
 /// this file already does.</para>
 /// </summary>
-public sealed class NativeRegistry
+public sealed class NativeRegistry : IDisposable
 {
     private readonly Dictionary<string, Native> _natives = new(StringComparer.Ordinal);
+
+    private bool _disposed;
 
     private sealed record Native(
         TypeTag[] ParamTypes, TypeTag ReturnType, Func<LyrValue[], LyrValue> Implementation,
@@ -249,18 +251,29 @@ public sealed class NativeRegistry
         TextWriter output, TextWriter error, TextReader? input = null)
     {
         var registry = new NativeRegistry();
+        registry.RegisterDefaults(output, error, input ?? Console.In);
+        return registry;
+    }
+
+    /// <summary>The default set, registered ON this registry.
+    ///
+    /// <para>An instance method rather than a static one taking the registry, because the state
+    /// the natives read — the descriptor tables, the last-failure slots — belongs to the registry
+    /// now. Inside here <c>this</c> IS that registry, so every lambda closes over it and every
+    /// helper resolves without a prefix.</para></summary>
+    private void RegisterDefaults(TextWriter output, TextWriter error, TextReader stdin)
+    {
         var str = new[] { TypeTag.String };
         var none = Array.Empty<TypeTag>();
-        var stdin = input ?? Console.In;
 
         // Since v1.14 the module declares these as PRIVATE raw* natives behind the Display
         // generics; the old public names stay bound so bytecode compiled before the change keeps
         // running. One host function under both names keeps a single truth about the behavior.
         void ConsoleWriter(string name, Func<LyrValue[], LyrValue> implementation)
         {
-            registry.Register("std.io.console.raw" + char.ToUpperInvariant(name[0]) + name[1..],
+            Register("std.io.console.raw" + char.ToUpperInvariant(name[0]) + name[1..],
                 str, TypeTag.Void, implementation);
-            registry.Register("std.io.console." + name, str, TypeTag.Void, implementation);
+            Register("std.io.console." + name, str, TypeTag.Void, implementation);
         }
 
         ConsoleWriter("print", args => { output.Write(args[0].AsString); return default; });
@@ -279,44 +292,44 @@ public sealed class NativeRegistry
         // access decision. A host that wants to forbid it passes an empty reader.
 
         // '?string' because EOF is a state, not an error.
-        registry.RegisterOptionalReturning("std.io.console.readLine", none, TypeTag.String,
+        RegisterOptionalReturning("std.io.console.readLine", none, TypeTag.String,
             _ => Optional(stdin.ReadLine()));
 
         // Everything up to EOF. Returns "" rather than null: nothing and empty mean the same
         // here.
-        registry.Register("std.io.console.readAll", none, TypeTag.String,
+        Register("std.io.console.readAll", none, TypeTag.String,
             _ => LyrValue.FromString(stdin.ReadToEnd()));
 
         // A single code point. 'Read()' yields UTF-16 units, so a surrogate pair is combined; half
         // a pair is not a valid char.
-        registry.RegisterOptionalReturning("std.io.console.readChar", none, TypeTag.Char,
+        RegisterOptionalReturning("std.io.console.readChar", none, TypeTag.Char,
             _ => ReadCodepoint(stdin));
 
         // Terminal or pipe: whether a prompt belongs in the stream at all.
-        registry.Register("std.io.console.isInteractive", none, TypeTag.Bool,
+        Register("std.io.console.isInteractive", none, TypeTag.Bool,
             _ => LyrValue.FromBool(!Console.IsInputRedirected && !Console.IsOutputRedirected));
 
         // Needed when a prompt is written without a line break, which would otherwise sit in the
         // buffer while the program waits for the answer.
-        registry.Register("std.io.console.flush", none, TypeTag.Void,
+        Register("std.io.console.flush", none, TypeTag.Void,
             _ => { output.Flush(); return default; });
 
-        registry.Register("std.string.concat", new[] { TypeTag.String, TypeTag.String },
+        Register("std.string.concat", new[] { TypeTag.String, TypeTag.String },
             TypeTag.String, args => LyrValue.FromString(args[0].AsString + args[1].AsString));
 
         // 'ab' * 3. A negative factor yields the empty string; there is no error case for it.
-        registry.Register("std.string.repeat", new[] { TypeTag.String, TypeTag.I64 },
+        Register("std.string.repeat", new[] { TypeTag.String, TypeTag.I64 },
             TypeTag.String, args => LyrValue.FromString(
                 args[1].AsI64 <= 0 ? string.Empty
                     : string.Concat(Enumerable.Repeat(args[0].AsString, (int)args[1].AsI64))));
 
         // A panic is not catchable and never returns, so it throws. The loop that holds the frame
         // stack attaches the backtrace.
-        registry.Register("std.core.panic", str, TypeTag.Void,
+        Register("std.core.panic", str, TypeTag.Void,
             args => throw new LyricPanic(VmDiagnostics.Panicked, args[0].AsString));
 
         // A 'resume' on an exhausted coroutine. It is a panic, not a catchable error.
-        registry.Register("std.core.coroutineEnded", Array.Empty<TypeTag>(), TypeTag.Void,
+        Register("std.core.coroutineEnded", Array.Empty<TypeTag>(), TypeTag.Void,
             _ => throw new LyricPanic(VmDiagnostics.Panicked,
                 "resume on a coroutine that has already finished"));
 
@@ -324,7 +337,7 @@ public sealed class NativeRegistry
         // re-entry marker, and -1 means the body ran through. The compiler emits one import per
         // coroutine signature; the tag comparison in Bind lets this one implementation answer
         // them all, because the marker sits at the same place in every state layout.
-        registry.Register("std.core.coroutineIsDone", new[] { TypeTag.Fn }, TypeTag.Bool,
+        Register("std.core.coroutineIsDone", new[] { TypeTag.Fn }, TypeTag.Bool,
             args => args[0].HasEnvironment
                 ? LyrValue.FromBool(unchecked((int)args[0].AsObject[0].AsU64) == -1)
                 : throw new LyricPanic(VmDiagnostics.Panicked, "next on an empty coroutine value"));
@@ -336,8 +349,8 @@ public sealed class NativeRegistry
         void Both(string name, TypeTag[] paramTypes, TypeTag returnType,
             Func<LyrValue[], LyrValue> implementation)
         {
-            registry.Register("std.string." + name, paramTypes, returnType, implementation);
-            registry.Register("std.core." + name, paramTypes, returnType, implementation);
+            Register("std.string." + name, paramTypes, returnType, implementation);
+            Register("std.core." + name, paramTypes, returnType, implementation);
         }
 
         // Invariant culture: '3.5', not '3,5'. The same .lyrbc produces the same output on every
@@ -357,7 +370,7 @@ public sealed class NativeRegistry
         // first — the runtime's own parser would also take whitespace and the words
         // "NaN"/"Infinity", which this contract refuses. A magnitude beyond the type rounds to
         // the infinities, as IEEE 754 rounding prescribes (so no finiteness check after).
-        registry.RegisterOptionalReturning("std.string.parseFloat",
+        RegisterOptionalReturning("std.string.parseFloat",
             new[] { TypeTag.String }, TypeTag.F64,
             args => FloatShaped(args[0].AsString)
                 && double.TryParse(args[0].AsString, NumberStyles.Float,
@@ -379,12 +392,12 @@ public sealed class NativeRegistry
 
         // --- the byte bridge and the array-parameter joiners (v1.14) ---------------------
 
-        registry.RegisterArrayReturning("std.string.utf8Encode", str, TypeTag.U8,
+        RegisterArrayReturning("std.string.utf8Encode", str, TypeTag.U8,
             args => Bytes(System.Text.Encoding.UTF8.GetBytes(args[0].AsString)));
 
         // STRICT, unlike readText: invalid bytes are the caller's question here, and the answer
         // is null rather than a U+FFFD quietly standing in for the data.
-        registry.RegisterWithArrayParams("std.string.utf8Decode",
+        RegisterWithArrayParams("std.string.utf8Decode",
             new[] { TypeTag.Array }, new TypeTag?[] { TypeTag.U8 },
             TypeTag.Optional, args =>
             {
@@ -403,12 +416,12 @@ public sealed class NativeRegistry
                 }
             }, returnElement: TypeTag.String);
 
-        registry.Register("std.string.utf8DecodeErrorOffset", none, TypeTag.I64,
+        Register("std.string.utf8DecodeErrorOffset", none, TypeTag.I64,
             _ => LyrValue.FromI64(_lastUtf8ErrorOffset));
 
         // Behind std.string.join and StringBuilder.build: one native call instead of a copy
         // cascade the language cannot avoid without preallocating strings.
-        registry.RegisterWithArrayParams("std.string.joinAll",
+        RegisterWithArrayParams("std.string.joinAll",
             new[] { TypeTag.Array, TypeTag.String }, new TypeTag?[] { TypeTag.String, null },
             TypeTag.String, args =>
             {
@@ -420,7 +433,7 @@ public sealed class NativeRegistry
 
         // The inverse of toChars, native since v1.14: one call instead of one string per
         // character.
-        registry.RegisterWithArrayParams("std.string.fromChars",
+        RegisterWithArrayParams("std.string.fromChars",
             new[] { TypeTag.Array }, new TypeTag?[] { TypeTag.Char },
             TypeTag.String, args =>
             {
@@ -431,42 +444,42 @@ public sealed class NativeRegistry
                 return LyrValue.FromString(builder.ToString());
             });
 
-        registry.Register("std.string.substring",
+        Register("std.string.substring",
             new[] { TypeTag.String, TypeTag.I64, TypeTag.I64 }, TypeTag.String,
             args => LyrValue.FromString(Substring(args[0].AsString, args[1].AsI64, args[2].AsI64)));
 
-        registry.Register("std.string.indexOf", new[] { TypeTag.String, TypeTag.String },
+        Register("std.string.indexOf", new[] { TypeTag.String, TypeTag.String },
             TypeTag.I64, args => LyrValue.FromI64(IndexOf(args[0].AsString, args[1].AsString)));
 
-        registry.Register("std.string.contains", new[] { TypeTag.String, TypeTag.String },
+        Register("std.string.contains", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool,
             args => LyrValue.FromBool(args[0].AsString.Contains(args[1].AsString, StringComparison.Ordinal)));
 
-        registry.Register("std.string.startsWith", new[] { TypeTag.String, TypeTag.String },
+        Register("std.string.startsWith", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool,
             args => LyrValue.FromBool(args[0].AsString.StartsWith(args[1].AsString, StringComparison.Ordinal)));
 
-        registry.Register("std.string.endsWith", new[] { TypeTag.String, TypeTag.String },
+        Register("std.string.endsWith", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool,
             args => LyrValue.FromBool(args[0].AsString.EndsWith(args[1].AsString, StringComparison.Ordinal)));
 
-        registry.Register("std.string.trim", str, TypeTag.String,
+        Register("std.string.trim", str, TypeTag.String,
             args => LyrValue.FromString(args[0].AsString.Trim()));
 
         // Ordinal rather than culture-dependent, so the same program yields the same result on
         // every machine.
-        registry.Register("std.string.toUpper", str, TypeTag.String,
+        Register("std.string.toUpper", str, TypeTag.String,
             args => LyrValue.FromString(args[0].AsString.ToUpperInvariant()));
 
-        registry.Register("std.string.toLower", str, TypeTag.String,
+        Register("std.string.toLower", str, TypeTag.String,
             args => LyrValue.FromString(args[0].AsString.ToLowerInvariant()));
 
-        registry.RegisterArrayReturning("std.string.split",
+        RegisterArrayReturning("std.string.split",
             new[] { TypeTag.String, TypeTag.String }, TypeTag.String,
             args => Split(args[0].AsString, args[1].AsString));
 
         // The anchor for 'for (c in s)': one O(n) pass instead of n calls to 'charAt'.
-        registry.RegisterArrayReturning("std.string.toChars", str, TypeTag.Char,
+        RegisterArrayReturning("std.string.toChars", str, TypeTag.Char,
             args => ToChars(args[0].AsString));
 
         // --- std.os (capability-gated) --------------------------------------------------
@@ -485,7 +498,7 @@ public sealed class NativeRegistry
         // ors, and the loads and stores between them -- and every one of them costs what a
         // crossing costs. The shift semantics have to match the language exactly: '>>' on a
         // signed integer is arithmetic here as it is there, and '<<' wraps.
-        registry.Register("std.random.xorshift", new[] { TypeTag.I64 }, TypeTag.I64, args =>
+        Register("std.random.xorshift", new[] { TypeTag.I64 }, TypeTag.I64, args =>
         {
             var x = args[0].AsI64;
             x ^= x << 13;
@@ -497,7 +510,7 @@ public sealed class NativeRegistry
         // The one non-deterministic draw (4.0): the OS's cryptographic source. Capability-free
         // like the module — entropy reaches no file, clock or network. A negative count is the
         // caller's bug and panics like a bad slice bound would.
-        registry.RegisterArrayReturning("std.random.secureRandom", [TypeTag.I64], TypeTag.U8,
+        RegisterArrayReturning("std.random.secureRandom", [TypeTag.I64], TypeTag.U8,
             args =>
             {
                 var count = args[0].AsI64;
@@ -509,59 +522,59 @@ public sealed class NativeRegistry
                 return Bytes(bytes);
             });
 
-        registry.Register("std.math.sqrt", f1, TypeTag.F64,
+        Register("std.math.sqrt", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Sqrt(args[0].AsF64)));
-        registry.Register("std.math.abs", f1, TypeTag.F64,
+        Register("std.math.abs", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Abs(args[0].AsF64)));
-        registry.Register("std.math.floor", f1, TypeTag.F64,
+        Register("std.math.floor", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Floor(args[0].AsF64)));
-        registry.Register("std.math.ceil", f1, TypeTag.F64,
+        Register("std.math.ceil", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Ceiling(args[0].AsF64)));
 
         // Round half to even, which avoids the systematic bias of always rounding up.
-        registry.Register("std.math.round", f1, TypeTag.F64,
+        Register("std.math.round", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Round(args[0].AsF64, MidpointRounding.ToEven)));
 
-        registry.Register("std.math.min", f2, TypeTag.F64,
+        Register("std.math.min", f2, TypeTag.F64,
             args => LyrValue.FromF64(Math.Min(args[0].AsF64, args[1].AsF64)));
-        registry.Register("std.math.max", f2, TypeTag.F64,
+        Register("std.math.max", f2, TypeTag.F64,
             args => LyrValue.FromF64(Math.Max(args[0].AsF64, args[1].AsF64)));
-        registry.Register("std.math.pow", f2, TypeTag.F64,
+        Register("std.math.pow", f2, TypeTag.F64,
             args => LyrValue.FromF64(Math.Pow(args[0].AsF64, args[1].AsF64)));
 
-        registry.Register("std.math.sin", f1, TypeTag.F64,
+        Register("std.math.sin", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Sin(args[0].AsF64)));
-        registry.Register("std.math.cos", f1, TypeTag.F64,
+        Register("std.math.cos", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Cos(args[0].AsF64)));
-        registry.Register("std.math.tan", f1, TypeTag.F64,
+        Register("std.math.tan", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Tan(args[0].AsF64)));
         // log2 and log10 are native although 'log(x)/log(base)' expresses them: the derived form
         // is imprecise. 'log10(1000.0)' computed that way yields 2.9999999999999996, and 'as int'
         // turns that into 2.
-        registry.Register("std.string.fromUint", new[] { TypeTag.U64 }, TypeTag.String,
+        Register("std.string.fromUint", new[] { TypeTag.U64 }, TypeTag.String,
             args => LyrValue.FromString(args[0].AsU64.ToString(CultureInfo.InvariantCulture)));
 
-        registry.Register("std.fmt.formatUint", new[] { TypeTag.U64, TypeTag.String },
+        Register("std.fmt.formatUint", new[] { TypeTag.U64, TypeTag.String },
             TypeTag.String, args => Formatted(args[0].AsU64, args[1].AsString));
 
-        registry.Register("std.math.log2", f1, TypeTag.F64,
+        Register("std.math.log2", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Log2(args[0].AsF64)));
-        registry.Register("std.math.log10", f1, TypeTag.F64,
+        Register("std.math.log10", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Log10(args[0].AsF64)));
 
-        registry.Register("std.math.asin", f1, TypeTag.F64,
+        Register("std.math.asin", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Asin(args[0].AsF64)));
-        registry.Register("std.math.acos", f1, TypeTag.F64,
+        Register("std.math.acos", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Acos(args[0].AsF64)));
-        registry.Register("std.math.atan", f1, TypeTag.F64,
+        Register("std.math.atan", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Atan(args[0].AsF64)));
-        registry.Register("std.math.atan2", new[] { TypeTag.F64, TypeTag.F64 }, TypeTag.F64,
+        Register("std.math.atan2", new[] { TypeTag.F64, TypeTag.F64 }, TypeTag.F64,
             args => LyrValue.FromF64(Math.Atan2(args[0].AsF64, args[1].AsF64)));
 
-        registry.Register("std.math.log", f1, TypeTag.F64,
+        Register("std.math.log", f1, TypeTag.F64,
             args => LyrValue.FromF64(Math.Log(args[0].AsF64)));
 
-        registry.Register("std.os.platform", Array.Empty<TypeTag>(), TypeTag.String,
+        Register("std.os.platform", Array.Empty<TypeTag>(), TypeTag.String,
             _ => LyrValue.FromString(
                 OperatingSystem.IsWindows() ? "windows"
                 : OperatingSystem.IsLinux() ? "linux"
@@ -572,34 +585,34 @@ public sealed class NativeRegistry
         //
         // The specifier language is .NET's, passed through unchanged: N2, F3, D5, X, E2, P1.
         // Always invariant, so a number does not change shape with the machine's locale.
-        registry.Register("std.fmt.formatInt", new[] { TypeTag.I64, TypeTag.String },
+        Register("std.fmt.formatInt", new[] { TypeTag.I64, TypeTag.String },
             TypeTag.String, args => Formatted(args[0].AsI64, args[1].AsString));
 
-        registry.Register("std.fmt.formatFloat", new[] { TypeTag.F64, TypeTag.String },
+        Register("std.fmt.formatFloat", new[] { TypeTag.F64, TypeTag.String },
             TypeTag.String, args => Formatted(args[0].AsF64, args[1].AsString));
 
-        registry.Register("std.fmt.formatBool", new[] { TypeTag.Bool, TypeTag.String },
+        Register("std.fmt.formatBool", new[] { TypeTag.Bool, TypeTag.String },
             TypeTag.String, args => LyrValue.FromString(Padded(args[0].AsBool ? "true" : "false",
                 args[1].AsString)));
 
-        registry.Register("std.fmt.formatChar", new[] { TypeTag.Char, TypeTag.String },
+        Register("std.fmt.formatChar", new[] { TypeTag.Char, TypeTag.String },
             TypeTag.String, args => LyrValue.FromString(Padded(
                 char.ConvertFromUtf32((int)args[0].Bits), args[1].AsString)));
 
-        registry.Register("std.fmt.formatString", new[] { TypeTag.String, TypeTag.String },
+        Register("std.fmt.formatString", new[] { TypeTag.String, TypeTag.String },
             TypeTag.String,
             args => LyrValue.FromString(Padded(args[0].AsString, args[1].AsString)));
 
-        registry.RegisterOptionalReturning("std.os.env", str, TypeTag.String,
+        RegisterOptionalReturning("std.os.env", str, TypeTag.String,
             args => Optional(Environment.GetEnvironmentVariable(args[0].AsString)));
 
-        registry.Register("std.os.currentDir", Array.Empty<TypeTag>(), TypeTag.String,
+        Register("std.os.currentDir", Array.Empty<TypeTag>(), TypeTag.String,
             _ => LyrValue.FromString(Directory.GetCurrentDirectory()));
 
         // Exits immediately: no 'defer' runs and no 'catch' applies. The return type is 'void'
         // rather than 'never', which would let the compiler treat the following code as
         // unreachable.
-        registry.Register("std.os.exit", new[] { TypeTag.I64 }, TypeTag.Void,
+        Register("std.os.exit", new[] { TypeTag.I64 }, TypeTag.Void,
             args => { Environment.Exit((int)(args[0].AsI64 & 0xFF)); return default; });
 
         // --- std.io.file (capability-gated: fileAccess) ------------------------------------
@@ -611,52 +624,52 @@ public sealed class NativeRegistry
         // empty file. Before that a read had three conventions between them -- an optional, an
         // empty array, a bool -- and the empty array was the one that lied: an unreadable file
         // and an empty one gave the same answer.
-        registry.RegisterOptionalReturning("std.io.file.text", str, TypeTag.String,
+        RegisterOptionalReturning("std.io.file.text", str, TypeTag.String,
             args => Optional(TryIo(() => File.ReadAllText(args[0].AsString))));
 
-        registry.RegisterOptionalArrayReturning("std.io.file.lines", str, TypeTag.String,
+        RegisterOptionalArrayReturning("std.io.file.lines", str, TypeTag.String,
             args => OptionalLines(TryIo(() => File.ReadAllText(args[0].AsString))));
 
         // The raw bytes, undecoded -- the answer 'text' cannot give: its UTF-8 decoding turns
         // invalid bytes into U+FFFD.
-        registry.RegisterOptionalArrayReturning("std.io.file.bytes", str, TypeTag.U8,
+        RegisterOptionalArrayReturning("std.io.file.bytes", str, TypeTag.U8,
             args => OptionalBytes(TryIoBytes(() => File.ReadAllBytes(args[0].AsString))));
 
         // The names before 2.14, kept bound although the shipped stdlib no longer declares them.
         // The set a runtime must implement is what the stdlib declares (spec §11), but a MODULE
         // compiled before 2.14 carries these in its import table, and a '.lyrbc' that loaded
         // yesterday has to load today.
-        registry.RegisterOptionalReturning("std.io.file.readText", str, TypeTag.String,
+        RegisterOptionalReturning("std.io.file.readText", str, TypeTag.String,
             args => Optional(TryIo(() => File.ReadAllText(args[0].AsString))));
 
-        registry.Register("std.io.file.writeText", new[] { TypeTag.String, TypeTag.String },
+        Register("std.io.file.writeText", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() => { File.WriteAllText(args[0].AsString, args[1].AsString); return ""; }) is not null));
 
-        registry.Register("std.io.file.appendText", new[] { TypeTag.String, TypeTag.String },
+        Register("std.io.file.appendText", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() => { File.AppendAllText(args[0].AsString, args[1].AsString); return ""; }) is not null));
 
-        registry.Register("std.io.file.exists", str, TypeTag.Bool,
+        Register("std.io.file.exists", str, TypeTag.Bool,
             args => LyrValue.FromBool(File.Exists(args[0].AsString)));
 
         // 'true' when the file is gone afterwards, including when it never existed.
-        registry.Register("std.io.file.remove", str, TypeTag.Bool,
+        Register("std.io.file.remove", str, TypeTag.Bool,
             args => LyrValue.FromBool(
                 TryIo(() => { File.Delete(args[0].AsString); return ""; }) is not null));
 
-        registry.RegisterArrayReturning("std.io.file.readLines", str, TypeTag.String,
+        RegisterArrayReturning("std.io.file.readLines", str, TypeTag.String,
             args => Lines(TryIo(() => File.ReadAllText(args[0].AsString))));
 
         // The raw bytes, undecoded — the answer readText cannot give: its UTF-8 decoding turns
         // invalid bytes into U+FFFD. Empty when unreadable, the readLines convention; a caller
         // that needs the difference asks 'exists' first.
-        registry.RegisterArrayReturning("std.io.file.readBytes", str, TypeTag.U8,
+        RegisterArrayReturning("std.io.file.readBytes", str, TypeTag.U8,
             args => Bytes(TryIoBytes(() => File.ReadAllBytes(args[0].AsString))));
 
         // The write side (v1.14) — the first natives with an ARRAY parameter. The failure model
         // is writeText's: a bool, through the same broad TryIo.
-        registry.RegisterWithArrayParams("std.io.file.writeBytes",
+        RegisterWithArrayParams("std.io.file.writeBytes",
             new[] { TypeTag.String, TypeTag.Array }, new TypeTag?[] { null, TypeTag.U8 },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() =>
@@ -665,7 +678,7 @@ public sealed class NativeRegistry
                     return "";
                 }) is not null));
 
-        registry.RegisterWithArrayParams("std.io.file.appendBytes",
+        RegisterWithArrayParams("std.io.file.appendBytes",
             new[] { TypeTag.String, TypeTag.Array }, new TypeTag?[] { null, TypeTag.U8 },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() =>
@@ -682,7 +695,7 @@ public sealed class NativeRegistry
         // are states, reported through the return value.
 
         // Not through 'TryIo', which carries a string; this returns a number.
-        registry.RegisterOptionalReturning("std.io.file.size", str, TypeTag.I64,
+        RegisterOptionalReturning("std.io.file.size", str, TypeTag.I64,
             args =>
             {
                 try
@@ -708,40 +721,40 @@ public sealed class NativeRegistry
                 }
             });
 
-        registry.Register("std.io.file.isFile", str, TypeTag.Bool,
+        Register("std.io.file.isFile", str, TypeTag.Bool,
             args => LyrValue.FromBool(File.Exists(args[0].AsString)));
 
-        registry.Register("std.io.file.isDirectory", str, TypeTag.Bool,
+        Register("std.io.file.isDirectory", str, TypeTag.Bool,
             args => LyrValue.FromBool(Directory.Exists(args[0].AsString)));
 
-        registry.Register("std.io.file.copy", new[] { TypeTag.String, TypeTag.String },
+        Register("std.io.file.copy", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() => { File.Copy(args[0].AsString, args[1].AsString, true); return ""; })
                 is not null));
 
-        registry.Register("std.io.file.move", new[] { TypeTag.String, TypeTag.String },
+        Register("std.io.file.move", new[] { TypeTag.String, TypeTag.String },
             TypeTag.Bool, args => LyrValue.FromBool(
                 TryIo(() => { File.Move(args[0].AsString, args[1].AsString, true); return ""; })
                 is not null));
 
         // An existing directory counts as success: the desired state is reached.
-        registry.Register("std.io.file.createDir", str, TypeTag.Bool,
+        Register("std.io.file.createDir", str, TypeTag.Bool,
             args => LyrValue.FromBool(
                 TryIo(() => { Directory.CreateDirectory(args[0].AsString); return ""; })
                 is not null));
 
-        registry.Register("std.io.file.createDirAll", str, TypeTag.Bool,
+        Register("std.io.file.createDirAll", str, TypeTag.Bool,
             args => LyrValue.FromBool(
                 TryIo(() => { Directory.CreateDirectory(args[0].AsString); return ""; })
                 is not null));
 
         // Empty directories only ('recursive: false'). There is no recursive delete.
-        registry.Register("std.io.file.removeDir", str, TypeTag.Bool,
+        Register("std.io.file.removeDir", str, TypeTag.Bool,
             args => LyrValue.FromBool(
                 TryIo(() => { Directory.Delete(args[0].AsString, false); return ""; })
                 is not null));
 
-        registry.RegisterArrayReturning("std.io.file.listDir", str, TypeTag.String,
+        RegisterArrayReturning("std.io.file.listDir", str, TypeTag.String,
             args =>
             {
                 try
@@ -763,7 +776,7 @@ public sealed class NativeRegistry
 
         // 'entries' completes the 2.14 line listDir missed: an unreadable directory is null,
         // an empty one is an empty array — and the failure is classified for entriesOrThrow.
-        registry.RegisterOptionalArrayReturning("std.io.file.entries", str, TypeTag.String,
+        RegisterOptionalArrayReturning("std.io.file.entries", str, TypeTag.String,
             args =>
             {
                 try
@@ -787,25 +800,25 @@ public sealed class NativeRegistry
                 }
             });
 
-        registry.Register("std.io.file.tempDir", none, TypeTag.String,
+        Register("std.io.file.tempDir", none, TypeTag.String,
             _ => LyrValue.FromString(Path.GetTempPath()));
 
         // The classification of the last failed operation (3.7), for the OrThrow forms. Non-pub
         // on the Lyric side: nothing outside file.lyr ever reads these. A module that binds them
         // needs a 3.7 runtime — the parseFloat forward path.
-        registry.Register("std.io.file.lastErrorKind", none, TypeTag.I64,
+        Register("std.io.file.lastErrorKind", none, TypeTag.I64,
             _ => LyrValue.FromI64(_lastIoKind));
 
-        registry.Register("std.io.file.lastErrorDetail", none, TypeTag.String,
+        Register("std.io.file.lastErrorDetail", none, TypeTag.String,
             _ => LyrValue.FromString(_lastIoDetail ?? ""));
 
         // ------------------------------------------------------ std.os, extended
 
-        registry.RegisterArrayReturning("std.os.args", none, TypeTag.String,
+        RegisterArrayReturning("std.os.args", none, TypeTag.String,
             _ => LyrValue.FromObject(Environment.GetCommandLineArgs()
                 .Select(LyrValue.FromString).ToArray()));
 
-        registry.Register("std.os.setEnv", new[] { TypeTag.String, TypeTag.String }, TypeTag.Bool,
+        Register("std.os.setEnv", new[] { TypeTag.String, TypeTag.String }, TypeTag.Bool,
             args =>
             {
                 try
@@ -819,22 +832,22 @@ public sealed class NativeRegistry
                 }
             });
 
-        registry.RegisterOptionalReturning("std.os.hostName", none, TypeTag.String,
+        RegisterOptionalReturning("std.os.hostName", none, TypeTag.String,
             _ => Optional(TryIo(() => Environment.MachineName)));
 
-        registry.RegisterOptionalReturning("std.os.userName", none, TypeTag.String,
+        RegisterOptionalReturning("std.os.userName", none, TypeTag.String,
             _ => Optional(TryIo(() => Environment.UserName)));
 
-        registry.RegisterOptionalReturning("std.os.homeDir", none, TypeTag.String,
+        RegisterOptionalReturning("std.os.homeDir", none, TypeTag.String,
             _ => Optional(TryIo(() =>
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))));
 
-        registry.Register("std.os.cpuCount", none, TypeTag.I64,
+        Register("std.os.cpuCount", none, TypeTag.I64,
             _ => LyrValue.FromI64(Environment.ProcessorCount));
 
         // std.time's private clock — the same host function as std.os.nowMillis, two names, one
         // truth.
-        registry.Register("std.time.nowMillis", none, TypeTag.I64,
+        Register("std.time.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
         // std.task's ONE native (4.0): time and readiness in one answer, [now, readyFd...].
@@ -848,7 +861,7 @@ public sealed class NativeRegistry
         // descriptor -1; the flag is re-read every call, so the swallowing of Ctrl+C lasts
         // exactly as long as somebody is parked.
         var intArray = new BytecodeType(TypeTag.Array, -1) { Element = BytecodeType.Scalar(TypeTag.I64) };
-        registry.RegisterWithTypes("std.task.poll",
+        RegisterWithTypes("std.task.poll",
             [intArray, intArray, BytecodeType.Scalar(TypeTag.I64), BytecodeType.Scalar(TypeTag.Bool)],
             intArray,
             args =>
@@ -978,30 +991,30 @@ public sealed class NativeRegistry
 
         // The programmatic Ctrl+C: same flag, same wake, callable from a task. What makes a
         // "quit" command and a signal one mechanism instead of two.
-        registry.Register("std.task.interrupt", none, TypeTag.Void,
+        Register("std.task.interrupt", none, TypeTag.Void,
             _ =>
             {
                 RaiseInterrupt();
                 return default;
             });
 
-        RegisterNet(registry);
+        RegisterNet();
 
-        RegisterProcess(registry);
+        RegisterProcess();
 
-        RegisterFileHandles(registry);
+        RegisterFileHandles();
 
-        registry.Register("std.os.nowMillis", none, TypeTag.I64,
+        Register("std.os.nowMillis", none, TypeTag.I64,
             _ => LyrValue.FromI64(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
         // Monotonic, with an arbitrary origin, and therefore not comparable with nowMillis: a
         // system clock can jump during a measurement.
-        registry.Register("std.os.nowNanos", none, TypeTag.I64,
+        Register("std.os.nowNanos", none, TypeTag.I64,
             _ => LyrValue.FromI64(
                 (long)(System.Diagnostics.Stopwatch.GetTimestamp()
                        * (1_000_000_000.0 / System.Diagnostics.Stopwatch.Frequency))));
 
-        registry.Register("std.os.sleep", new[] { TypeTag.I64 }, TypeTag.Void,
+        Register("std.os.sleep", new[] { TypeTag.I64 }, TypeTag.Void,
             args =>
             {
                 var millis = args[0].AsI64;
@@ -1014,8 +1027,8 @@ public sealed class NativeRegistry
         // function of the same name, so the methods call raw* twins; the old public names stay
         // bound for bytecode compiled before the change. Same entries, second name each.
         void StringRaw(string name) =>
-            registry._natives["std.string.raw" + char.ToUpperInvariant(name[0]) + name[1..]] =
-                registry._natives["std.string." + name];
+            _natives["std.string.raw" + char.ToUpperInvariant(name[0]) + name[1..]] =
+                _natives["std.string." + name];
 
         StringRaw("length");
         StringRaw("charAt");
@@ -1030,8 +1043,6 @@ public sealed class NativeRegistry
         StringRaw("split");
         StringRaw("toChars");
         StringRaw("utf8Encode");
-
-        return registry;
     }
 
     // ------------------------------------------------------------------ code point helpers
@@ -1172,20 +1183,20 @@ public sealed class NativeRegistry
     // The classification of the last FAILED std.io.file operation, read by the
     // lastErrorKind/lastErrorDetail natives — which the OrThrow forms in file.lyr call
     // immediately after a silent form answered null/false. The interpreter runs an execution on
-    // one thread, so nothing can run between the failure and the read; ThreadStatic rather than
-    // static keeps parallel VMs (the test host) from seeing each other's failures. A SUCCESS
-    // does not clear it: only the null/false branch ever reads.
+    // one thread, so nothing can run between the failure and the read; per REGISTRY rather than
+    // static keeps parallel VMs from seeing each other's failures, whether or not they share a
+    // thread. A SUCCESS does not clear it: only the null/false branch ever reads.
     //
     // The codes are a contract with std/io/file.lyr's kindOf: 1 NotFound, 2 PermissionDenied,
     // 3 InvalidPath, 0 Other.
-    [ThreadStatic] private static int _lastIoKind;
-    [ThreadStatic] private static string? _lastIoDetail;
+    private int _lastIoKind;
+    private string? _lastIoDetail;
 
     // The byte offset of the last utf8Decode refusal, for std.string.utf8DecodeOrThrow — the
     // same last-failure contract as the pair above.
-    [ThreadStatic] private static int _lastUtf8ErrorOffset;
+    private int _lastUtf8ErrorOffset;
 
-    private static void RecordIo(Exception e)
+    private void RecordIo(Exception e)
     {
         _lastIoKind = e switch
         {
@@ -1197,13 +1208,13 @@ public sealed class NativeRegistry
         _lastIoDetail = e.Message;
     }
 
-    private static void RecordIoNotFound(string path)
+    private void RecordIoNotFound(string path)
     {
         _lastIoKind = 1;
         _lastIoDetail = $"no file at '{path}'";
     }
 
-    private static string? TryIo(Func<string> operation)
+    private string? TryIo(Func<string> operation)
     {
         try
         {
@@ -1220,7 +1231,7 @@ public sealed class NativeRegistry
     /// <summary>Lines without their terminators, so the result does not depend on whether the
     /// file was written with CRLF or LF.</summary>
     /// <summary>As <see cref="TryIo"/>, for an operation whose answer is bytes.</summary>
-    private static byte[]? TryIoBytes(Func<byte[]> operation)
+    private byte[]? TryIoBytes(Func<byte[]> operation)
     {
         try
         {
@@ -1236,27 +1247,28 @@ public sealed class NativeRegistry
 
     // ------------------------------------------------------------------ std.io.net (4.0)
     //
-    // Sockets live in a per-thread table under integer descriptors — the numbers Wait.Readable
-    // carries and std.task.poll selects over. ThreadStatic for the same reason as the io
-    // classification: parallel VMs (the test host) must not see each other's sockets. Every
-    // socket is non-blocking; the WAITING lives in std.task, a native only ever answers now.
+    // Sockets live in a per-REGISTRY table under integer descriptors — the numbers Wait.Readable
+    // carries and std.task.poll selects over. One registry is one VM, so parallel VMs cannot see
+    // each other's sockets even on one thread, and disposing a VM closes what its guest left
+    // open. Every socket is non-blocking; the WAITING lives in std.task, a native only ever
+    // answers now.
 
-    [ThreadStatic] private static Dictionary<long, System.Net.Sockets.Socket>? _sockets;
-    [ThreadStatic] private static long _nextSocketFd;
+    private Dictionary<long, System.Net.Sockets.Socket>? _sockets;
+    private long _nextSocketFd;
 
-    private static Dictionary<long, System.Net.Sockets.Socket> Sockets => _sockets ??= new();
+    private Dictionary<long, System.Net.Sockets.Socket> Sockets => _sockets ??= new();
 
-    private static System.Net.Sockets.Socket? SocketOf(long fd) =>
+    private System.Net.Sockets.Socket? SocketOf(long fd) =>
         _sockets is { } table && table.TryGetValue(fd, out var socket) ? socket : null;
 
-    private static long AddSocket(System.Net.Sockets.Socket socket)
+    private long AddSocket(System.Net.Sockets.Socket socket)
     {
         var fd = ++_nextSocketFd;
         Sockets[fd] = socket;
         return fd;
     }
 
-    private static void NameReady(System.Net.Sockets.Socket socket, List<LyrValue> ready,
+    private void NameReady(System.Net.Sockets.Socket socket, List<LyrValue> ready,
         HashSet<long> named)
     {
         if (_sockets is null) return;
@@ -1286,12 +1298,12 @@ public sealed class NativeRegistry
     // not started waiting, the event for a descriptorless wait, and a self-pipe datagram for
     // a poll inside select.
 
-    [ThreadStatic] private static int _interruptPending;
+    private int _interruptPending;
     private static int _signalPending;
 
     // Whether THIS VM has a task parked, and how many VMs do — the handler reads the count,
     // because a VM polling without a parked task must not clear another VM's listening.
-    [ThreadStatic] private static bool _listeningHere;
+    private bool _listeningHere;
     private static int _listeningVms;
     private static int _interruptHandlerInstalled;
     private static System.Net.Sockets.Socket? _interruptPipe;
@@ -1299,7 +1311,7 @@ public sealed class NativeRegistry
 
     /// <summary>Takes whichever interrupt is pending for this VM: its own raise, or the
     /// process's signal. Both are taken — one wake answers both.</summary>
-    private static bool TakePendingInterrupt()
+    private bool TakePendingInterrupt()
     {
         var mine = _interruptPending == 1;
         _interruptPending = 0;
@@ -1309,7 +1321,7 @@ public sealed class NativeRegistry
 
     /// <summary>Records that this VM's own `interrupt()` was raised, and wakes the waiters.
     /// </summary>
-    private static void RaiseInterrupt()
+    private void RaiseInterrupt()
     {
         _interruptPending = 1;
         WakeInterruptWaiters();
@@ -1383,10 +1395,10 @@ public sealed class NativeRegistry
     // contract as the io pair above. The codes are a contract with std/io/net.lyr's kindOf:
     // 1 NotFound, 2 PermissionDenied, 4 ConnectionRefused, 5 AddressInUse, 6 WouldBlock,
     // 0 Other.
-    [ThreadStatic] private static int _lastNetKind;
-    [ThreadStatic] private static string? _lastNetDetail;
+    private int _lastNetKind;
+    private string? _lastNetDetail;
 
-    private static void RecordNet(Exception e)
+    private void RecordNet(Exception e)
     {
         _lastNetKind = e is System.Net.Sockets.SocketException se
             ? se.SocketErrorCode switch
@@ -1407,7 +1419,7 @@ public sealed class NativeRegistry
     /// <summary>Records "that descriptor is not a socket" and passes the caller's answer
     /// through. A closed handle is a real failure with a real reason, and the <c>OrThrow</c>
     /// twins read the LAST one recorded — without this they named the previous call's.</summary>
-    private static long NotASocket(long answer)
+    private long NotASocket(long answer)
     {
         RecordNet(new System.Net.Sockets.SocketException(
             (int)System.Net.Sockets.SocketError.NotSocket));
@@ -1430,11 +1442,11 @@ public sealed class NativeRegistry
             System.Net.Sockets.ProtocolType.Tcp)
         { Blocking = false };
 
-    private static void RegisterNet(NativeRegistry registry)
+    private void RegisterNet()
     {
         var i64 = TypeTag.I64;
 
-        registry.Register("std.io.net.netListen", [TypeTag.String, i64], i64, args =>
+        Register("std.io.net.netListen", [TypeTag.String, i64], i64, args =>
         {
             try
             {
@@ -1447,12 +1459,12 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
 
-        registry.Register("std.io.net.netLocalPort", [i64], i64, args =>
+        Register("std.io.net.netLocalPort", [i64], i64, args =>
             SocketOf(args[0].AsI64)?.LocalEndPoint is System.Net.IPEndPoint at
                 ? LyrValue.FromI64(at.Port)
                 : LyrValue.FromI64(-1));
 
-        registry.Register("std.io.net.netAccept", [i64], i64, args =>
+        Register("std.io.net.netAccept", [i64], i64, args =>
         {
             if (SocketOf(args[0].AsI64) is not { } listener) return LyrValue.FromI64(NotASocket(-2));
             try
@@ -1470,7 +1482,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
         });
 
-        registry.Register("std.io.net.netConnectStart", [TypeTag.String, i64], i64, args =>
+        Register("std.io.net.netConnectStart", [TypeTag.String, i64], i64, args =>
         {
             try
             {
@@ -1488,7 +1500,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
 
-        registry.Register("std.io.net.netConnectDone", [i64], i64, args =>
+        Register("std.io.net.netConnectDone", [i64], i64, args =>
         {
             if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(NotASocket(-1));
             try
@@ -1507,7 +1519,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
 
-        registry.RegisterOptionalArrayReturning("std.io.net.netReadReady", [i64, i64],
+        RegisterOptionalArrayReturning("std.io.net.netReadReady", [i64, i64],
             TypeTag.U8, args =>
         {
             // A descriptor the table does not know is CLOSED, and that is a failure, not a
@@ -1537,7 +1549,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.None; }
         });
 
-        registry.RegisterWithArrayParams("std.io.net.netWriteFrom",
+        RegisterWithArrayParams("std.io.net.netWriteFrom",
             [i64, TypeTag.Array, i64], [null, TypeTag.U8, null], i64, args =>
         {
             if (SocketOf(args[0].AsI64) is not { } socket) return LyrValue.FromI64(NotASocket(-2));
@@ -1558,7 +1570,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
         });
 
-        registry.Register("std.io.net.netClose", [i64], TypeTag.Void, args =>
+        Register("std.io.net.netClose", [i64], TypeTag.Void, args =>
         {
             var fd = args[0].AsI64;
             if (SocketOf(fd) is { } socket)
@@ -1569,9 +1581,9 @@ public sealed class NativeRegistry
             return default;
         });
 
-        registry.Register("std.io.net.lastErrorKind", [], i64,
+        Register("std.io.net.lastErrorKind", [], i64,
             _ => LyrValue.FromI64(_lastNetKind));
-        registry.Register("std.io.net.lastErrorDetail", [], TypeTag.String,
+        Register("std.io.net.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastNetDetail ?? ""));
 
         // ---------------------------------------------------------------------------- UDP
@@ -1580,7 +1592,7 @@ public sealed class NativeRegistry
         // received sender parks in a thread-local pair — the last-failure convention applied
         // to a second two-part answer.
 
-        registry.Register("std.io.net.udpBind", [TypeTag.String, i64], i64, args =>
+        Register("std.io.net.udpBind", [TypeTag.String, i64], i64, args =>
         {
             try
             {
@@ -1595,7 +1607,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
 
-        registry.RegisterWithArrayParams("std.io.net.udpSendTo",
+        RegisterWithArrayParams("std.io.net.udpSendTo",
             [i64, TypeTag.String, i64, TypeTag.Array], [null, null, null, TypeTag.U8], i64,
             args =>
         {
@@ -1616,7 +1628,7 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-2); }
         });
 
-        registry.RegisterOptionalArrayReturning("std.io.net.udpReceive", [i64, i64],
+        RegisterOptionalArrayReturning("std.io.net.udpReceive", [i64, i64],
             TypeTag.U8, args =>
         {
             if (SocketOf(args[0].AsI64) is not { } socket)
@@ -1658,14 +1670,14 @@ public sealed class NativeRegistry
             catch (Exception e) { RecordNet(e); return LyrValue.None; }
         });
 
-        registry.Register("std.io.net.udpSenderHost", [], TypeTag.String,
+        Register("std.io.net.udpSenderHost", [], TypeTag.String,
             _ => LyrValue.FromString(_lastUdpSenderHost ?? ""));
-        registry.Register("std.io.net.udpSenderPort", [], i64,
+        Register("std.io.net.udpSenderPort", [], i64,
             _ => LyrValue.FromI64(_lastUdpSenderPort));
     }
 
-    [ThreadStatic] private static string? _lastUdpSenderHost;
-    [ThreadStatic] private static int _lastUdpSenderPort;
+    private string? _lastUdpSenderHost;
+    private int _lastUdpSenderPort;
 
     // ------------------------------------------------------------------ std.process (4.0)
     //
@@ -1697,17 +1709,17 @@ public sealed class NativeRegistry
         public bool Closed;
     }
 
-    [ThreadStatic] private static Dictionary<long, ChildState>? _children;
-    [ThreadStatic] private static long _nextChildKey;
-    [ThreadStatic] private static int _lastProcKind;
-    [ThreadStatic] private static string? _lastProcDetail;
+    private Dictionary<long, ChildState>? _children;
+    private long _nextChildKey;
+    private int _lastProcKind;
+    private string? _lastProcDetail;
 
-    private static Dictionary<long, ChildState> Children => _children ??= new();
+    private Dictionary<long, ChildState> Children => _children ??= new();
 
-    private static ChildState? ChildOf(long key) =>
+    private ChildState? ChildOf(long key) =>
         _children is { } table && table.TryGetValue(key, out var child) ? child : null;
 
-    private static void RecordProc(int kind, string detail)
+    private void RecordProc(int kind, string detail)
     {
         _lastProcKind = kind;
         _lastProcDetail = detail;
@@ -1804,11 +1816,11 @@ public sealed class NativeRegistry
         return [.. taken];
     }
 
-    private static void RegisterProcess(NativeRegistry registry)
+    private void RegisterProcess()
     {
         var i64 = TypeTag.I64;
 
-        registry.RegisterWithArrayParams("std.process.procStart",
+        RegisterWithArrayParams("std.process.procStart",
             [TypeTag.String, TypeTag.Array], [null, TypeTag.String], i64, args =>
         {
             var program = args[0].AsString;
@@ -1881,10 +1893,10 @@ public sealed class NativeRegistry
             return LyrValue.FromI64(key);
         });
 
-        registry.Register("std.process.procNotifyFd", [i64], i64, args =>
+        Register("std.process.procNotifyFd", [i64], i64, args =>
             LyrValue.FromI64(ChildOf(args[0].AsI64)?.NotifyFd ?? -1));
 
-        registry.RegisterOptionalArrayReturning("std.process.procTryRead",
+        RegisterOptionalArrayReturning("std.process.procTryRead",
             [i64, TypeTag.Bool, i64], TypeTag.U8, args =>
         {
             if (ChildOf(args[0].AsI64) is not { } state)
@@ -1914,7 +1926,7 @@ public sealed class NativeRegistry
             }
         });
 
-        registry.RegisterWithArrayParams("std.process.procWrite",
+        RegisterWithArrayParams("std.process.procWrite",
             [i64, TypeTag.Array], [null, TypeTag.U8], TypeTag.Bool, args =>
         {
             if (ChildOf(args[0].AsI64) is not { } state || state.StdinBroken
@@ -1927,14 +1939,14 @@ public sealed class NativeRegistry
             return LyrValue.FromBool(true);
         });
 
-        registry.Register("std.process.procCloseStdin", [i64], TypeTag.Void, args =>
+        Register("std.process.procCloseStdin", [i64], TypeTag.Void, args =>
         {
             if (ChildOf(args[0].AsI64) is { } state && !state.StdinQueue.IsAddingCompleted)
                 state.StdinQueue.CompleteAdding();
             return default;
         });
 
-        registry.Register("std.process.procHasExited", [i64], TypeTag.Bool, args =>
+        Register("std.process.procHasExited", [i64], TypeTag.Bool, args =>
         {
             if (ChildOf(args[0].AsI64) is not { } state) return LyrValue.FromBool(true);
             DrainPipe(state.Notify);
@@ -1948,7 +1960,7 @@ public sealed class NativeRegistry
             }
         });
 
-        registry.Register("std.process.procExitCode", [i64], i64, args =>
+        Register("std.process.procExitCode", [i64], i64, args =>
         {
             if (ChildOf(args[0].AsI64) is not { } state) return LyrValue.FromI64(-1);
             try
@@ -1961,7 +1973,7 @@ public sealed class NativeRegistry
             }
         });
 
-        registry.Register("std.process.procKill", [i64], TypeTag.Void, args =>
+        Register("std.process.procKill", [i64], TypeTag.Void, args =>
         {
             if (ChildOf(args[0].AsI64) is { } state)
                 try { state.Process.Kill(entireProcessTree: true); }
@@ -1969,7 +1981,7 @@ public sealed class NativeRegistry
             return default;
         });
 
-        registry.Register("std.process.procClose", [i64], TypeTag.Void, args =>
+        Register("std.process.procClose", [i64], TypeTag.Void, args =>
         {
             var key = args[0].AsI64;
             if (ChildOf(key) is not { } state || state.Closed) return default;
@@ -1982,9 +1994,9 @@ public sealed class NativeRegistry
             return default;
         });
 
-        registry.Register("std.process.lastErrorKind", [], i64,
+        Register("std.process.lastErrorKind", [], i64,
             _ => LyrValue.FromI64(_lastProcKind));
-        registry.Register("std.process.lastErrorDetail", [], TypeTag.String,
+        Register("std.process.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastProcDetail ?? ""));
     }
 
@@ -2017,29 +2029,29 @@ public sealed class NativeRegistry
         public bool Closed;
     }
 
-    [ThreadStatic] private static Dictionary<long, FileState>? _files;
-    [ThreadStatic] private static long _nextFileKey;
+    private Dictionary<long, FileState>? _files;
+    private long _nextFileKey;
 
-    private static Dictionary<long, FileState> Files => _files ??= new();
+    private Dictionary<long, FileState> Files => _files ??= new();
 
-    private static FileState? FileOf(long key) =>
+    private FileState? FileOf(long key) =>
         _files is { } table && table.TryGetValue(key, out var state) ? state : null;
 
     // Kind 6 is the would-block signal std.io.net and std.process already speak; it never
     // surfaces to a caller, because the module turns it into a wait.
-    private static void RecordIoWouldBlock()
+    private void RecordIoWouldBlock()
     {
         _lastIoKind = 6;
         _lastIoDetail = "the operation has not finished";
     }
 
-    private static void RecordIoNoHandle()
+    private void RecordIoNoHandle()
     {
         _lastIoKind = 0;
         _lastIoDetail = "no such open file";
     }
 
-    private static void StartRead(FileState state, int max)
+    private void StartRead(FileState state, int max)
     {
         state.Reading = true;
         _ = Task.Run(async () =>
@@ -2069,7 +2081,7 @@ public sealed class NativeRegistry
         });
     }
 
-    private static void StartWrite(FileState state, byte[] bytes)
+    private void StartWrite(FileState state, byte[] bytes)
     {
         _ = Task.Run(async () =>
         {
@@ -2096,13 +2108,13 @@ public sealed class NativeRegistry
         });
     }
 
-    private static void RegisterFileHandles(NativeRegistry registry)
+    private void RegisterFileHandles()
     {
         var i64 = TypeTag.I64;
 
         // Mode 0 reads, 1 creates or truncates, 2 appends. One native rather than three: the
         // three differ in a FileMode and in nothing else.
-        registry.Register("std.io.stream.streamOpen", [TypeTag.String, i64], i64, args =>
+        Register("std.io.stream.streamOpen", [TypeTag.String, i64], i64, args =>
         {
             var path = args[0].AsString;
             FileStream stream;
@@ -2142,10 +2154,10 @@ public sealed class NativeRegistry
             return LyrValue.FromI64(key);
         });
 
-        registry.Register("std.io.stream.streamNotifyFd", [i64], i64, args =>
+        Register("std.io.stream.streamNotifyFd", [i64], i64, args =>
             LyrValue.FromI64(FileOf(args[0].AsI64)?.NotifyFd ?? -1));
 
-        registry.RegisterOptionalArrayReturning("std.io.stream.streamTryRead", [i64, i64], TypeTag.U8,
+        RegisterOptionalArrayReturning("std.io.stream.streamTryRead", [i64, i64], TypeTag.U8,
             args =>
         {
             if (FileOf(args[0].AsI64) is not { } state)
@@ -2174,7 +2186,7 @@ public sealed class NativeRegistry
             }
         });
 
-        registry.RegisterWithArrayParams("std.io.stream.streamWriteStart",
+        RegisterWithArrayParams("std.io.stream.streamWriteStart",
             [i64, TypeTag.Array], [null, TypeTag.U8], TypeTag.Bool, args =>
         {
             if (FileOf(args[0].AsI64) is not { } state || state.Closed)
@@ -2198,7 +2210,7 @@ public sealed class NativeRegistry
         });
 
         // -1 while the write is in flight, 1 when it landed, 0 when it broke.
-        registry.Register("std.io.stream.streamWriteReady", [i64], i64, args =>
+        Register("std.io.stream.streamWriteReady", [i64], i64, args =>
         {
             if (FileOf(args[0].AsI64) is not { } state)
             {
@@ -2222,7 +2234,7 @@ public sealed class NativeRegistry
             }
         });
 
-        registry.Register("std.io.stream.streamClose", [i64], TypeTag.Void, args =>
+        Register("std.io.stream.streamClose", [i64], TypeTag.Void, args =>
         {
             var key = args[0].AsI64;
             if (FileOf(key) is not { } state || state.Closed) return default;
@@ -2238,10 +2250,88 @@ public sealed class NativeRegistry
 
         // The same storage std.io.file records into: one RecordIo serves both modules, and a
         // module only ever reads it straight after its own silent form refused.
-        registry.Register("std.io.stream.lastErrorKind", [], i64,
+        Register("std.io.stream.lastErrorKind", [], i64,
             _ => LyrValue.FromI64(_lastIoKind));
-        registry.Register("std.io.stream.lastErrorDetail", [], TypeTag.String,
+        Register("std.io.stream.lastErrorDetail", [], TypeTag.String,
             _ => LyrValue.FromString(_lastIoDetail ?? ""));
+    }
+
+    // ------------------------------------------------------------- releasing what a guest left
+    //
+    // A guest opens sockets, child pipes and files through these natives, and nothing makes it
+    // close them: a script may be stopped by a budget, may panic, or may simply return with a
+    // handle still in hand. Before 4.3 those tables were per-THREAD and static, so what a guest
+    // opened outlived it — the handle stayed open for the life of the thread, and neither
+    // dropping the VM nor collecting it released anything.
+    //
+    // They belong to the registry now, and one registry is one VM. Disposing it is the moment
+    // the guest's world ends, so it is also the moment its handles go.
+    //
+    // There is deliberately NO finalizer. A host that never disposes still leaks, and that is
+    // said plainly in the embedding chapter rather than half-answered: a finalizer here would run
+    // on the finalizer thread against Socket, FileStream and Process objects that have their own,
+    // in an order nobody controls.
+
+    /// <summary>Closes every socket, child and file this registry's guest left open.
+    ///
+    /// <para>A child is DISOWNED rather than killed, exactly as <c>std.process.close</c> does:
+    /// releasing a handle automatically must not mean more than releasing it by hand.</para>
+    ///
+    /// <para>Every failure is swallowed. Cleanup that can fail is cleanup a caller cannot
+    /// rely on, and there is nobody left to tell.</para></summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (_files is { } files)
+        {
+            foreach (var state in files.Values)
+            {
+                Quietly(() => state.Stream.Dispose());
+                Quietly(() => state.Notify.Close());
+            }
+            files.Clear();
+        }
+
+        if (_children is { } children)
+        {
+            foreach (var state in children.Values)
+            {
+                if (!state.StdinQueue.IsAddingCompleted) Quietly(state.StdinQueue.CompleteAdding);
+                Quietly(() => state.Notify.Close());
+                Quietly(state.Process.Dispose);
+            }
+            children.Clear();
+        }
+
+        // Last: the notify sockets above are registered in this table too, and closing one twice
+        // closes it once.
+        if (_sockets is { } sockets)
+        {
+            foreach (var socket in sockets.Values) Quietly(socket.Close);
+            sockets.Clear();
+        }
+
+        // A VM that was listening for the interrupt stops counting towards the process-wide
+        // total, or Ctrl+C would stay captured for a program that has gone.
+        if (_listeningHere)
+        {
+            _listeningHere = false;
+            Interlocked.Decrement(ref _listeningVms);
+        }
+    }
+
+    private static void Quietly(Action release)
+    {
+        try
+        {
+            release();
+        }
+        catch (Exception)
+        {
+            // Already gone is the goal; a torn handle is not something to report to nobody.
+        }
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>

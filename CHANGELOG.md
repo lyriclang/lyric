@@ -10,6 +10,47 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.0 — 2026-08-27
+
+**A VM owns what its scripts open.** The heaviest finding of the 4.2 sweep, fixed.
+
+### Added
+
+- **`LangVm` is `IDisposable`, and disposing it closes every socket, child process and file its
+  scripts left open.**
+
+  ```csharp
+  using var vm = new LangVm(new HostOptions { Capabilities = Capability.FileAccess });
+  // leaving the block closes whatever the script still held
+  ```
+
+  A script has no obligation to close what it opens: it may be stopped by an `ExecutionBudget`,
+  it may panic, or it may simply return with a handle in hand. Until now those handles were held
+  per THREAD, so neither dropping the VM nor collecting it released them — a host that stopped an
+  untrusted script was left holding its resources, and on Windows a file the script opened stayed
+  locked. That was the half of the sandbox a host could not work around.
+
+- **Two VMs never share a descriptor**, on one thread or on several. The tables belong to the VM,
+  so which thread opened a handle no longer decides who owns it, and disposing one VM cannot
+  touch another's. The two-VMs-on-two-threads case is a deterministic test now rather than a
+  timing argument.
+
+### Changed
+
+- **A child process is DISOWNED, not killed, when a VM is disposed** — what `std.process.close`
+  already does by hand. Releasing a handle automatically must not mean more than releasing it by
+  hand; kill it from the script, or hold the pid in the host.
+
+### Deliberately unchanged
+
+- **There is no finalizer.** A VM that is merely dropped keeps its handles until the process
+  ends. A finalizer here would run against `Socket`, `FileStream` and `Process` objects that have
+  their own, in an order nobody controls — a half answer that hides the case instead of closing
+  it. Guide 14 says so plainly instead.
+- **The interrupt SIGNAL stays process-wide** — the handler, the pending signal, the listening
+  count and the self-pipe. Only the programmatic `interrupt()` and the listening flag became
+  per-VM, which is what they had always meant; they were per-thread standing in for it.
+
 ## v4.2.3 — 2026-08-27
 
 **Round 3 of the sweep.** No behaviour changed: two gaps the earlier rounds named are now pinned
