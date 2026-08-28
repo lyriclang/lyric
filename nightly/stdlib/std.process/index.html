@@ -108,25 +108,27 @@ the stream being done (EOF), and <code>null</code> is a failure.</p>
 <p>Waits for bytes on the child's standard output and reads up to <code>max</code> of them. Three
 truths in one answer: bytes are bytes, an EMPTY array is the stream being done (EOF),
 and <code>null</code> is a failure — <code>readSomeOutOrThrow</code> says which.</p>
-<p class="source">stdlib/std/process.lyr:86</p>
+<p>A <code>max</code> of zero or less PANICS: an empty answer already means EOF, so there is no
+honest value to hand back for it.</p>
+<p class="source">stdlib/std/process.lyr:89</p>
 </section>
 <section class="item" id="function-readsomeoutorthrow">
 <h2><a href="#function-readsomeoutorthrow">readSomeOutOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn readSomeOutOrThrow(child: Child, max: int): uint8[] throws IoError</code></pre>
 <p><code>readSomeOut</code>, with the reason when the stream broke. EOF stays the empty array.</p>
-<p class="source">stdlib/std/process.lyr:91</p>
+<p class="source">stdlib/std/process.lyr:94</p>
 </section>
 <section class="item" id="function-readsomeerr">
 <h2><a href="#function-readsomeerr">readSomeErr</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn readSomeErr(child: Child, max: int): ?uint8[]</code></pre>
 <p><code>readSomeOut</code>, for the child's standard error.</p>
-<p class="source">stdlib/std/process.lyr:100</p>
+<p class="source">stdlib/std/process.lyr:103</p>
 </section>
 <section class="item" id="function-readsomeerrorthrow">
 <h2><a href="#function-readsomeerrorthrow">readSomeErrOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn readSomeErrOrThrow(child: Child, max: int): uint8[] throws IoError</code></pre>
 <p><code>readSomeErr</code>, with the reason when the stream broke.</p>
-<p class="source">stdlib/std/process.lyr:105</p>
+<p class="source">stdlib/std/process.lyr:108</p>
 </section>
 <section class="item" id="function-write">
 <h2><a href="#function-write">write</a> <span class="kind">function</span></h2>
@@ -134,40 +136,40 @@ and <code>null</code> is a failure — <code>readSomeOutOrThrow</code> says whic
 <p>Hands <code>bytes</code> to the child's standard input. The write is queued and drained in the
 background; <code>false</code> once the child's stdin broke — a child that exited without reading
 everything is the usual way.</p>
-<p class="source">stdlib/std/process.lyr:129</p>
+<p class="source">stdlib/std/process.lyr:135</p>
 </section>
 <section class="item" id="function-writeorthrow">
 <h2><a href="#function-writeorthrow">writeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn writeOrThrow(child: Child, bytes: uint8[]): void throws IoError</code></pre>
 <p><code>write</code>, with the reason when the child's stdin broke.</p>
-<p class="source">stdlib/std/process.lyr:134</p>
+<p class="source">stdlib/std/process.lyr:140</p>
 </section>
 <section class="item" id="function-closestdin">
 <h2><a href="#function-closestdin">closeStdin</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn closeStdin(child: Child): void</code></pre>
 <p>Closes the child's standard input once everything queued is written — EOF is how a
 filter learns it has everything.</p>
-<p class="source">stdlib/std/process.lyr:142</p>
+<p class="source">stdlib/std/process.lyr:148</p>
 </section>
 <section class="item" id="function-wait">
 <h2><a href="#function-wait">wait</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn wait(child: Child): int</code></pre>
 <p>Waits until the child has exited and answers its exit code.</p>
-<p class="source">stdlib/std/process.lyr:147</p>
+<p class="source">stdlib/std/process.lyr:153</p>
 </section>
 <section class="item" id="function-kill">
 <h2><a href="#function-kill">kill</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn kill(child: Child): void</code></pre>
 <p>Ends the child now, without appeal. The exit code <code>wait</code> then reports is the kill's,
 not the program's.</p>
-<p class="source">stdlib/std/process.lyr:156</p>
+<p class="source">stdlib/std/process.lyr:162</p>
 </section>
 <section class="item" id="function-close">
 <h2><a href="#function-close">close</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn close(child: Child): void</code></pre>
 <p>Releases the child's resources — buffers, pipes, the notify descriptor. Closing twice
 closes once; a running child is NOT stopped, only disowned.</p>
-<p class="source">stdlib/std/process.lyr:162</p>
+<p class="source">stdlib/std/process.lyr:168</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.os/">std.os</a>

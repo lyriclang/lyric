@@ -125,15 +125,17 @@ not writable.</p>
 <p>Reads up to <code>max</code> bytes, waiting for them. Three truths in one answer, the 2.14 convention
 <code>std.io.net</code> and <code>std.process</code> also speak: bytes are bytes, an EMPTY array is the end of the
 file, and <code>null</code> is a failure — <code>readSomeOrThrow</code> says which.</p>
-<p>Fewer than <code>max</code> bytes is an ordinary answer; call again until the empty array.</p>
+<p>Fewer than <code>max</code> bytes is an ordinary answer; call again until the empty array. A <code>max</code>
+of zero or less PANICS: an empty answer already means the end of the file, so there is
+no honest value to hand back for it.</p>
 <p>Yields while the read is outstanding, so it needs a running <code>std.task.run()</code>.</p>
-<p class="source">stdlib/std/io/stream.lyr:129</p>
+<p class="source">stdlib/std/io/stream.lyr:131</p>
 </section>
 <section class="item" id="function-readsomeorthrow">
 <h2><a href="#function-readsomeorthrow">readSomeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn readSomeOrThrow(file: File, max: int): uint8[] throws IoError</code></pre>
 <p><code>readSome</code>, with the reason when the read failed. The end of the file stays the empty array.</p>
-<p class="source">stdlib/std/io/stream.lyr:143</p>
+<p class="source">stdlib/std/io/stream.lyr:148</p>
 </section>
 <section class="item" id="function-write">
 <h2><a href="#function-write">write</a> <span class="kind">function</span></h2>
@@ -144,20 +146,20 @@ says why.</p>
 the call, and for a file that is the answer that matters. <code>std.process</code> queues its writes for
 the opposite reason — a child that reads slowly must not stall its writer.</p>
 <p>Yields while the write is outstanding, so it needs a running <code>std.task.run()</code>.</p>
-<p class="source">stdlib/std/io/stream.lyr:159</p>
+<p class="source">stdlib/std/io/stream.lyr:164</p>
 </section>
 <section class="item" id="function-writeorthrow">
 <h2><a href="#function-writeorthrow">writeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn writeOrThrow(file: File, bytes: uint8[]): void throws IoError</code></pre>
 <p><code>write</code>, with the reason when it failed.</p>
-<p class="source">stdlib/std/io/stream.lyr:173</p>
+<p class="source">stdlib/std/io/stream.lyr:178</p>
 </section>
 <section class="item" id="function-close">
 <h2><a href="#function-close">close</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn close(file: File): void</code></pre>
 <p>Closes the handle and releases the notify descriptor. Closing twice closes once. A read or
 write still outstanding is abandoned, not awaited.</p>
-<p class="source">stdlib/std/io/stream.lyr:181</p>
+<p class="source">stdlib/std/io/stream.lyr:186</p>
 </section>
 <section class="item" id="class-linereader">
 <h2><a href="#class-linereader">LineReader</a> <span class="kind">class</span></h2>
@@ -201,13 +203,13 @@ tells apart.</p>
 <p>Whether the walk ended because a read failed. <code>false</code> after an ordinary end of file.</p>
 </div>
 </div>
-<p class="source">stdlib/std/io/stream.lyr:200</p>
+<p class="source">stdlib/std/io/stream.lyr:205</p>
 </section>
 <section class="item" id="function-linereader">
 <h2><a href="#function-linereader">lineReader</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn lineReader(file: File): LineReader</code></pre>
 <p>A walk over the lines of an open file. The handle stays the caller's to <code>close</code>.</p>
-<p class="source">stdlib/std/io/stream.lyr:273</p>
+<p class="source">stdlib/std/io/stream.lyr:278</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.io.path/">std.io.path</a>

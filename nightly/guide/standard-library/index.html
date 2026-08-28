@@ -593,7 +593,8 @@ fn main(): int {
 }
 </code></pre>
 <p>An instant prints as the text <code>iso()</code> writes, because that is the one textual form the type
-has. A duration prints its milliseconds with the unit — <code>3500ms</code>, not <code>3.5s</code>: this type counts
+has. <strong>Inside an f-string it needs <code>.show()</code> explicitly</strong> — an interpolation holds a scalar, and
+a <code>Display</code> conformance does not change that (<a href="/nightly/guide/values-and-types/">chapter 2</a>). A duration prints its milliseconds with the unit — <code>3500ms</code>, not <code>3.5s</code>: this type counts
 whole milliseconds, and a rendering that divides them would promise a precision the value does
 not carry. Scale it yourself, or reach for <code>std.fmt</code>.</p>
 <p><strong><code>compare</code> is three comparisons, not a subtraction.</strong> <code>a.millis - b.millis</code> overflows for two

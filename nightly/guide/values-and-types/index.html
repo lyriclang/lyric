@@ -160,6 +160,19 @@ fn main(): int {
 }
 </code></pre>
 <p>Write <code>{{</code> and <code>}}</code> for a literal brace.</p>
+<p><strong>An interpolation holds a SCALAR</strong> — a number, a <code>bool</code>, a <code>char</code> or a <code>string</code>. A struct, a
+class or an enum is refused there even when it conforms to <code>Display</code>, so a type that prints
+through <code>println</code> still needs <code>.show()</code> inside an f-string:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.time { Instant };
+
+fn main(): int {
+    let at = Instant.ofEpochMillis(1000);
+    println(at);                        // Display, through the constraint
+    println(f&quot;at {at.show()}&quot;);         // f&quot;{at}&quot; is refused
+    return 0;
+}
+</code></pre>
 <h2 id="arrays">Arrays</h2>
 <p><code>T[]</code> is a fixed-length array. Its length is part of the value, not of the type.</p>
 <pre><code class="language-lyr">import std.io.console { println };
