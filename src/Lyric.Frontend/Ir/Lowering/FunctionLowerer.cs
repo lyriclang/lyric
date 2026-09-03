@@ -2212,7 +2212,8 @@ internal sealed class FunctionLowerer
                 return;
 
             case BindingPattern binding when _types.RefOf(pattern) is EnumVariantSymbol:
-                _b.Seal(new CondBranch(EmitTagTest(enumId, binding.Name, subject, binding.Span),
+                _b.Seal(new CondBranch(
+                    EmitTagTest(enumId, binding.Name, subject, subjectType, binding.Span),
                     onMatch, onFail, binding.Span));
                 return;
 
@@ -2221,7 +2222,8 @@ internal sealed class FunctionLowerer
                 return;
 
             case VariantPattern variant:
-                _b.Seal(new CondBranch(EmitTagTest(enumId, variant.Path[^1], subject, variant.Span),
+                _b.Seal(new CondBranch(
+                    EmitTagTest(enumId, variant.Path[^1], subject, subjectType, variant.Span),
                     onMatch, onFail, variant.Span));
                 return;
 
@@ -2292,10 +2294,23 @@ internal sealed class FunctionLowerer
         }
     }
 
-    private TempId EmitTagTest(TypeId? enumId, string variant, TempId tag, Span span)
+    private TempId EmitTagTest(TypeId? enumId, string variant, TempId tag, IrType subjectType,
+        Span span)
     {
         if (enumId is not { } id)
+        {
+            // An OPTIONAL enum is not "a non-enum", and saying so sent the reader looking for a
+            // mistake in the type rather than at the missing lowering. The tag lives inside the
+            // optional, so a variant arm needs the unwrapped value while the 'null' arm needs
+            // the optional itself — two subjects where this lowering carries one. Narrowing
+            // first is what the language already offers for it.
+            if (subjectType is IrOptionalType { Inner: IrEnumType })
+                throw NotSupported(
+                    "a variant pattern in a match over an optional enum — narrow it first, "
+                    + "then match the value", span);
+
             throw NotSupported("a variant pattern in a match over a non-enum", span);
+        }
 
         var expected = EmitConst(new IntConst((ulong)_typeTable.TagOf(id, variant, span)),
             new IrScalarType(IrScalar.I64), span);

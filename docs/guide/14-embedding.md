@@ -432,6 +432,18 @@ the ordinary "could not" of the operation, and a script handles it like any othe
 The rule exists so that a call after `Dispose` cannot strand handles the next `Dispose` would
 skip.
 
+**`Dispose` may be called while a script is still running, from another thread**, and for one
+case it is the only thing that works: a guest parked in a wait is out of reach of an
+`ExecutionBudget`, because a budget is counted on the guest's own thread and a parked guest is
+not executing. So a host that has to take a hung script down does it from outside.
+
+**It gives the thread back.** Every wait a guest can be in ends: a wait on a descriptor, because
+`Dispose` closes the descriptor under it, and a wait on the interrupt — the shutdown shape, which
+holds no descriptor at all — because a disposed VM answers that wait the way an interrupt does.
+Tasks parked on `Wait.Interrupt` wake, the run drains, and the call the host made returns. A guest
+in the middle of an I/O call sees that call fail the ordinary way; nothing crosses the boundary
+that is not a `ScriptException`.
+
 ## Errors
 
 A script that fails throws on the host side:

@@ -11,6 +11,52 @@
 
 ## Current milestone
 
+**Round 6 ships as v4.3.3** (2026-09-04) — still not clean, so the loop continues. Aimed at what
+round 5 built, and **two of the three findings are round 5's own**, which is the fourth round
+running where the newest core path is where the finds are.
+
+**The heavy one is the wait that holds no descriptor.** Round 5 pinned that disposing frees a
+parked guest — and the pin parked on `net.accept`, which holds a SOCKET. A guest parked on
+`Wait.Interrupt` holds nothing: it stands on a process-wide event that `Dispose` must not close,
+so nothing woke it. Measured: `reachedPark=True disposeMs=1 threadFreed=False` — the host's thread
+gone for good while `Dispose` returned in a millisecond and reported success. **"Disposing frees a
+parked guest" was true BY ACCIDENT**, for the parks that happened to hold a handle, and the shape
+that did not work is the documented shutdown shape — the case the whole contract exists for. A
+disposed VM now answers that wait the way an interrupt does (`-1`, every parked task wakes, the
+run drains): `Wait.Interrupt` is the language's "you are being asked to stop", so it is the honest
+answer for a VM that is ending, and the alternative was a thread nobody gets back. `Dispose` also
+pokes the three wake paths 4.0 already built, so a poll already inside `Select` or
+`InterruptEvent.Wait` returns and re-reads the flag.
+
+**The second is the interrupt listening count, and it is a process-wide hazard.** The transition
+moves on `wantInterrupt != _listeningHere`, and the poll that moves it read and updated that flag
+OUTSIDE the lock `Dispose` uses to read the same flag — so a raise landing between Dispose's read
+and the guest's `Interlocked.Add` adds a listener nothing ever subtracts. While the count is above
+zero the Ctrl+C handler sets `e.Cancel = true` — **the process stops being killable by Ctrl+C, on
+behalf of a VM that is gone.** The transition is one step now and a disposed VM never arms. **The
+probe could NOT provoke it** (0 of 80 rounds; the window is three instructions), so the pin is the
+deterministic half instead: an interrupt park entered on an already-disposed VM must return. That
+pin's FIRST version was green with and without the fix — its guest created a marker file, which a
+disposed VM refuses, so the run ended before it ever reached the park. A test that passes either
+way is worse than no test; the guest opens nothing now, and both pins were checked red.
+
+**The third is older and was found by checking that round 5 broke nothing legitimate.** A variant
+pattern over an OPTIONAL enum — `match (e) { null => …, E.A => … }` on a `?E` — is refused by the
+lowering, which is right (the tag lives inside the optional, so a variant arm needs the unwrapped
+value while a `null` arm needs the optional itself: two subjects where the lowering carries one).
+What was wrong is that it said *"a match over a non-enum"*, sending the reader to look for a
+mistake in the type. It names the optional now and says to narrow first. Unit, tuple and struct
+variants were all affected; the binding-arm form was never and is pinned as still lowering.
+
+**Clean in round 6, worth not re-running**: the 4.3.2 `Select` catch does NOT hot-spin when the
+guest closes a socket another task waits on (`net.close` removes the fd, so the next poll resolves
+it dead and answers at once — measured, the run ended in 8 ms with the reader seeing its ordinary
+`null`); round 5's struct refusal hits no legitimate enum form (qualified, generic, nested,
+tuple-variant all unchanged); and a `Socket` cannot be forged out of an int in a probe, because
+SEM0093 refuses it — 3.8's opaque privilege doing its job. One grammar-vs-parser gap noted, not
+filed as a finding: `Box<int>.Full { v }` is a parse error though §7's `TypePath` admits the type
+arguments, and the unqualified `Full { v }` is what the language actually wants. Round 7 follows.
+
 **Round 5 ships as v4.3.2** (2026-09-03), and it is not clean either — so the loop does not exit
 here. Aimed at 4.3's ownership rebuild AND, per the maintainer's choice of the wide round, at the
 specification's own sentences. **Four findings in the toolchain, two in the documents.**
@@ -1592,6 +1638,14 @@ answer yet, and it belongs asked before E4 starts.
   stated in guide 2 and guide 13; whether the lowering learns it is a feature decision, not a
   sweep fix. Found by the 4.2 sweep, round 2.
 
+- **A variant pattern over an optional enum is refused, and building it is a slice.**
+  `match (e) { null => …, E.A => … }` on a `?E`: the sema accepts it and specifies exhaustiveness
+  over "the two states of a `?T`", and the lowering carries ONE subject per match while this needs
+  two — the tag lives inside the optional, so a variant arm needs the unwrapped value and the
+  `null` arm the optional itself, and the presence test has to run before any tag is read whatever
+  order the arms are written in. Since 4.3.3 the refusal names the optional and points at
+  narrowing. Either the match lowering learns two subjects, or the sema refuses the combination
+  and the guide names the narrowing as the form. Found by the 4.3 sweep, round 6; pre-existing.
 - **Struct destructuring in a `match` is sema-complete and unlowerable, and the decision is which
   half to keep.** `match (p) { P { n, m } => … }` binds the field types, computes its own
   irrefutability and has a Sema test asserting it clean; the lowering emits nothing for it and

@@ -885,13 +885,39 @@ public sealed class NativeRegistry : IDisposable
                 var timeout = args[2].AsI64;
                 var wantInterrupt = args[3].AsBool;
 
+                // A DISPOSED VM answers the interrupt channel at once rather than parking.
+                // Nothing can satisfy this wait any more: Dispose closed the descriptors, and
+                // the interrupt belongs to a VM that is gone. Interrupt is the language's "you
+                // are being asked to stop", so it is the honest answer — every parked task
+                // wakes, the run drains, and the host gets its thread back.
+                //
+                // Without it, disposing freed a parked guest only BY ACCIDENT: a guest waiting
+                // on a socket was woken because Dispose closed the socket under its select, and
+                // a guest parked on Wait.Interrupt alone — the documented shutdown shape — was
+                // never woken at all, because Dispose closes nothing that wait stands on.
+                if (!Live && wantInterrupt)
+                    return LyrValue.FromObject(new[]
+                    {
+                        LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
+                    });
+
                 // The count moves on TRANSITIONS only. Assigning per poll let a second VM
                 // without a parked task clear the first one's listening, and then Ctrl+C
                 // killed a process that was waiting for it.
-                if (wantInterrupt != _listeningHere)
+                //
+                // Under the table lock, because Dispose reads and clears the same flag: the
+                // read and the count change have to be one step, or a raise landing between
+                // them adds a listener that nothing will ever subtract — and a listening count
+                // stuck above zero swallows Ctrl+C for the whole PROCESS, on behalf of a VM
+                // that no longer exists.
+                lock (_tables)
                 {
-                    _listeningHere = wantInterrupt;
-                    Interlocked.Add(ref _listeningVms, wantInterrupt ? 1 : -1);
+                    var arm = wantInterrupt && !_disposed;
+                    if (arm != _listeningHere)
+                    {
+                        _listeningHere = arm;
+                        Interlocked.Add(ref _listeningVms, arm ? 1 : -1);
+                    }
                 }
                 if (wantInterrupt) EnsureInterruptHandler();
 
@@ -2477,6 +2503,13 @@ public sealed class NativeRegistry : IDisposable
             wasListening = _listeningHere;
             _listeningHere = false;
         }
+
+        // A guest parked in poll has to be told. Closing its descriptors wakes a select; a
+        // wait with NO descriptor stands on the interrupt event alone, and nothing in the loop
+        // above touches that — so the shared wake runs here, and the poll it releases sees the
+        // disposed flag and answers the interrupt channel. Spurious for other VMs, which the
+        // wake paths already tolerate by design: they recompute and block again.
+        WakeInterruptWaiters();
 
         // Released OUTSIDE the lock. Closing a stream or a child can take a while, and a guest
         // thread that only wants to resolve a descriptor has no business waiting for it.

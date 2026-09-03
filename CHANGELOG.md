@@ -10,6 +10,38 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.3 — 2026-09-04
+
+**Round 6 of the sweep**, aimed at what round 5 built. Two findings in it, both mine, and one
+older one found while checking that round 5 had broken nothing.
+
+### Fixed
+
+- **Disposing a VM now frees a guest parked on `Wait.Interrupt`.** It did not, and the reason it
+  looked like it did is the point: a guest waiting on a SOCKET is woken because `Dispose` closes
+  the socket under its select. A guest parked on the interrupt holds no descriptor, so nothing
+  woke it — the host's thread was gone for good while `Dispose` returned in a millisecond and
+  reported success. "Disposing frees a parked guest" was true by accident, for the parks that
+  happened to hold a handle.
+
+  A disposed VM now answers that wait the way an interrupt does: every parked task wakes, the run
+  drains, and the call returns. `Wait.Interrupt` is the language's "you are being asked to stop",
+  which makes it the honest answer for a VM that is ending — and it is the documented shutdown
+  shape, so it was the case the contract exists for that did not work.
+
+- **A disposed VM no longer leaves Ctrl+C swallowed for the whole process.** The interrupt
+  listening count moves on transitions, and the poll that moves it read and updated it outside
+  the lock `Dispose` uses to read the same flag. A raise landing between the two adds a listener
+  that nothing ever subtracts, and while that count is above zero the Ctrl+C handler cancels the
+  signal — on behalf of a VM that no longer exists. The transition is one step now, and a
+  disposed VM does not arm at all.
+
+- **A variant pattern over an OPTIONAL enum stops calling it a non-enum.**
+  `match (e) { null => …, E.A => … }` on a `?E` is refused by the lowering, which is unchanged —
+  but it said "a match over a non-enum", sending the reader to look for a mistake in the type
+  rather than at the missing lowering. It now names the optional and says what to do:
+  `narrow it first, then match the value`. Matching an optional with a binding arm is unaffected.
+
 ## v4.3.2 — 2026-09-03
 
 **Round 5 of the sweep**, aimed at 4.3's ownership rebuild and at the specification's own
