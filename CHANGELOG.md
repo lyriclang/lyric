@@ -10,6 +10,59 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.2 — 2026-09-03
+
+**Round 5 of the sweep**, aimed at 4.3's ownership rebuild and at the specification's own
+sentences. Four findings in the toolchain and two in the documents; the heaviest is again in what
+the release before it built.
+
+### Fixed
+
+- **Disposing a VM while its guest is still running no longer throws, and strands nothing.**
+
+  A host may do this, and for one case it is the only thing it can do: a guest parked in a
+  blocking wait is out of reach of an `ExecutionBudget`, which runs on the guest's own thread.
+  4.3.0 moved the descriptor tables to the VM and left them plain dictionaries, so that host got
+  two wrong answers instead. Measured over 60 rounds: `Dispose` threw
+  `InvalidOperationException` out of its own enumeration 53 times, and 55 rounds left a handle
+  stranded past a second `Dispose` — two of them with no exception at all, which is a handle
+  published into a table `Dispose` had already emptied.
+
+  The tables take a lock, and acquisition publishes under it: if the VM went while a file or
+  socket was being opened, the call closes what it opened and answers its own "could not", the
+  same refusal it gives when the VM was already disposed.
+
+- **A disposed VM no longer hands the host a raw `SocketException`.** The descriptors under
+  `poll`'s select are closed by `Dispose`, and the select throws when they are. Nothing caught
+  it, so a host that disposed a parked VM got a `System.Net.Sockets` failure in the platform's
+  own language, across an API whose every other failure is a `ScriptException`. The wait now
+  ends with the clock alone: the next turn finds those descriptors gone and the reads give the
+  waiter the ordinary failure they always gave.
+
+- **Destructuring a struct in a `match` says so instead of blaming a name.** The form is
+  sema-complete — field types bound, irrefutability computed — and the lowering half was never
+  built. It did not say that: the bindings were simply not emitted, so the first USE of one
+  failed as `reference to 'x' (only parameters, locals and constants)`, a message about a name
+  that only looks undeclared. It is now `LYR-IR0001: destructuring a struct or class in a match`.
+  Enum destructuring is untouched — it is the form the specification gives meaning to.
+
+- **The debug adapter refuses a second `launch`** instead of overwriting its session and
+  stranding the first debuggee's sockets, children and files. No client should send one; that is
+  why the adapter must not be the one to leak when it happens.
+
+### Documentation
+
+- **The specification stopped contradicting itself.** `spec/02-grammar.md` §3.5 said an
+  interface's parent list "holds at most one entry" — false since 2.16, and said the other way
+  round in §5.2 of the same document, in the conformance suite, and in the compiler's own
+  comment. Corrected upstream (`lyriclang/lyric-spec#30`) and mirrored here. No rule changed and
+  no case moved, so the suite pin stays at 4.0.
+
+- **The README stopped promising the REPL forgets.** It said "declarations persist across
+  entries; statements run once". What persists is the declaration, and the session re-runs
+  everything it has accumulated on every entry — so a declaration whose initializer has an
+  effect repeats that effect once per entry. Measured: four entries, four executions.
+
 ## v4.3.1 — 2026-08-27
 
 **Round 4 of the sweep, aimed at what 4.3.0 rebuilt.** Two findings, and both are 4.3.0's own.

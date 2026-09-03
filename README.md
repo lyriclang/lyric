@@ -12,7 +12,7 @@ The compiler, the bytecode VM and the standard library work end to end; every co
 [`docs/Grammar.md`](docs/Grammar.md) compiles and runs. From v1.0 the language and the `.lyrbc`
 format carry the promise the versioning describes: a minor may add, a major may break.
 
-Current version: **4.3.1**, bytecode format **4.0**.
+Current version: **4.3.2**, bytecode format **4.0**.
 
 ## Targets
 
@@ -135,14 +135,16 @@ That is what a release ships, one archive per platform.
 
 ```
 $ lyric repl
-Lyric 4.3.1 — :help for commands, :quit to leave
+Lyric 4.3.2 — :help for commands, :quit to leave
 lyr> let x = 5
 lyr> x * 2
 10
 ```
 
-Declarations persist across entries; statements run once. `:list` shows the session, `:reset`
-clears it.
+Declarations persist across entries; statements run once. What persists is the DECLARATION, and
+the session re-runs everything it has accumulated on every entry — so a declaration whose
+initializer does something does it again each time, once per entry from the one that declared it.
+`:list` shows the session, `:reset` clears it.
 
 `.lyrbc` is a specified format, so a third-party runtime can replace `lyrvm`. Point the driver at
 it with `lyric run app.lyr --vm ./their-runtime`, or set `LYRIC_VM`.

@@ -145,6 +145,11 @@ public class PatternTests
         AssertType(LyrType.Int, t);
     }
 
+    /// <summary>The FRONT half only. The sema binds these field types and computes the form's
+    /// irrefutability, and the lowering has never been able to emit it — a refusal pinned in
+    /// LoweringTests since 4.3.2, because until then the missing half said nothing and the first
+    /// use of a bound name failed as an unknown reference. Nothing here promises the form runs.
+    /// </summary>
     [Fact]
     public void Struct_destructuring_binds_field_types()
     {
