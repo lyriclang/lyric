@@ -538,6 +538,38 @@ public class LoweringTests
     public void Destructuring_a_struct_in_a_match_is_refused_by_name(string source, string expected) =>
         AssertNotSupported(source, expected);
 
+    /// <summary>A variant pattern over an OPTIONAL enum is refused, and the refusal stops calling
+    /// it a non-enum.
+    ///
+    /// <para>`?E` is an enum, so the old message sent the reader looking for a mistake in the
+    /// type instead of at the missing lowering. What is actually missing is a second subject: the
+    /// tag lives inside the optional, so a variant arm needs the unwrapped value while a `null`
+    /// arm needs the optional itself, and this lowering carries one subject. Narrowing first is
+    /// what the language already offers, and the message says so.</para>
+    ///
+    /// <para>Pre-existing, found by the 4.3 sweep round 6 while checking that round 5's struct
+    /// refusal hit nothing legitimate. The last case is that check: an optional matched with a
+    /// BINDING arm is the ordinary narrowing form and still lowers.</para></summary>
+    [Theory]
+    [InlineData("enum E { A, B } fn f(e: ?E): int { match (e) { null => { return -1; }, E.A => { return 0; }, E.B => { return 1; } } }",
+        "over an optional enum")]
+    [InlineData("enum E { A, B(int) } fn f(e: ?E): int { match (e) { null => { return -1; }, E.B(n) => { return n; }, E.A => { return 0; } } }",
+        "narrow it first")]
+    public void A_variant_pattern_over_an_optional_enum_names_the_optional(string source,
+        string expected) => AssertNotSupported(source, expected);
+
+    /// <summary>The neighbour that must keep working: an optional matched with a binding arm.
+    /// </summary>
+    [Fact]
+    public void An_optional_with_a_binding_arm_still_lowers()
+    {
+        var (ir, de) = TryLower(
+            "enum E { A, B } fn f(e: ?E): int { match (e) { null => { return -1; }, x => { return 0; } } }");
+
+        Assert.NotNull(ir);
+        Assert.Empty(de.Diagnostics.Where(d => d.Severity == Severity.Error));
+    }
+
     /// <summary>
     /// The M24 probe result, turned around by M33: a GENERIC default method on an interface is
     /// sema-legal AND lowerable since 2.17. It is monomorphized like any generic function and

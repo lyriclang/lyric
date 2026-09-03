@@ -466,4 +466,104 @@ public class ResourceOwnershipTests
             }
         }
     }
+    // ---- the wait that holds no descriptor --------------------------------------------------
+
+    /// <summary>The guest of the interrupt pins: it parks on <c>Wait.Interrupt</c> and holds
+    /// nothing else, so nothing <c>Dispose</c> closes can wake it.</summary>
+    private const string InterruptParkSource = """
+        import std.task { Wait, spawn, run };
+        import std.io.stream as stream;
+
+        fn parkForever(marker: string): Coroutine<Wait> {
+            let m = stream.create(marker)!;
+            yield Wait.Interrupt;
+        }
+
+        pub fn park(marker: string): void { spawn(parkForever(marker)); run(); }
+        """;
+
+    /// <summary>Disposing frees a guest parked on <c>Wait.Interrupt</c> — the wait that holds no
+    /// descriptor at all.
+    ///
+    /// <para>Until 4.3.3 it did not, and the reason it looked like it did is worth keeping: a
+    /// guest waiting on a SOCKET is woken because <c>Dispose</c> closes the socket under its
+    /// select. A guest parked on the interrupt stands on a process-wide event that <c>Dispose</c>
+    /// must not close, so nothing woke it and the host's thread was gone for good — while
+    /// <c>Dispose</c> returned in a millisecond and reported success. "Disposing frees a parked
+    /// guest" was true by accident, for the parks that happened to hold a handle.</para>
+    ///
+    /// <para>It is the documented shutdown shape that was affected, which is what makes it the
+    /// case the contract exists for.</para></summary>
+    [Fact]
+    public void A_guest_parked_on_the_interrupt_alone_is_freed_by_dispose()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), $"lyric-park-int-{Guid.NewGuid():N}.marker");
+        try
+        {
+            var vm = Vm();
+            var instance = vm.Instantiate(vm.Compile(InterruptParkSource, "parkonly"));
+
+            Exception? guestFailure = null;
+            var guest = new Thread(() =>
+            {
+                try { instance.CallVoid("park", marker); }
+                catch (Exception e) { guestFailure = e; }
+            }) { IsBackground = true };
+            guest.Start();
+
+            var reached = false;
+            for (var spin = 0; spin < 3000 && !reached; spin++)
+            {
+                reached = File.Exists(marker);
+                if (!reached) Thread.Sleep(10);
+            }
+            Assert.True(reached, "the guest reached its wait");
+
+            vm.Dispose();
+
+            Assert.True(guest.Join(TimeSpan.FromSeconds(30)),
+                "disposing freed the thread the guest was parked on");
+            Assert.True(guestFailure is null or ScriptException,
+                $"a {guestFailure?.GetType().Name} crossed the embedding boundary: "
+                + guestFailure?.Message);
+        }
+        finally
+        {
+            try { File.Delete(marker); } catch (IOException) { /* asserted above */ }
+        }
+    }
+
+    /// <summary>The same rule from the other side, and with no threads in it: an interrupt park
+    /// entered on an ALREADY disposed VM returns instead of waiting.
+    ///
+    /// <para>This is the deterministic half — no marker, no join, nothing that could pass by
+    /// timing. Its guest opens NOTHING, deliberately: a version that created a marker file first
+    /// was green with and without the fix, because the disposed VM refused the file and the run
+    /// ended before it ever reached the park. It also covers what the race version cannot reach
+    /// in a test: a disposed VM must not ARM the process-wide interrupt listening, because it
+    /// will never poll again to disarm it, and a listening count stuck above zero makes the
+    /// Ctrl+C handler swallow the signal for the whole process on behalf of a VM that is
+    /// gone.</para></summary>
+    [Fact]
+    public void An_interrupt_park_on_a_disposed_vm_returns_instead_of_waiting()
+    {
+        var vm = Vm();
+        var instance = vm.Instantiate(vm.Compile("""
+            import std.task { Wait, spawn, run };
+
+            fn parkForever(): Coroutine<Wait> { yield Wait.Interrupt; }
+
+            pub fn park(): void { spawn(parkForever()); run(); }
+            """, "bareparkonly"));
+        vm.Dispose();
+
+        var call = Task.Run(() =>
+        {
+            try { instance.CallVoid("park"); }
+            catch (Exception) { /* the guest's own end is not the subject */ }
+        });
+
+        Assert.True(call.Wait(TimeSpan.FromSeconds(30)),
+            "a wait on a disposed VM answers instead of parking forever");
+    }
 }
