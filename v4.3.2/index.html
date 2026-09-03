@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.3.2</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.2</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.3.2 — 2026-09-03</h2>
+<p><strong>Round 5 of the sweep</strong>, aimed at 4.3's ownership rebuild and at the specification's own
+sentences. Four findings in the toolchain and two in the documents; the heaviest is again in what
+the release before it built.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>Disposing a VM while its guest is still running no longer throws, and strands nothing.</strong></p>
+<p>A host may do this, and for one case it is the only thing it can do: a guest parked in a
+blocking wait is out of reach of an <code>ExecutionBudget</code>, which runs on the guest's own thread.
+4.3.0 moved the descriptor tables to the VM and left them plain dictionaries, so that host got
+two wrong answers instead. Measured over 60 rounds: <code>Dispose</code> threw
+<code>InvalidOperationException</code> out of its own enumeration 53 times, and 55 rounds left a handle
+stranded past a second <code>Dispose</code> — two of them with no exception at all, which is a handle
+published into a table <code>Dispose</code> had already emptied.</p>
+<p>The tables take a lock, and acquisition publishes under it: if the VM went while a file or
+socket was being opened, the call closes what it opened and answers its own &quot;could not&quot;, the
+same refusal it gives when the VM was already disposed.</p>
+</li>
+<li><p><strong>A disposed VM no longer hands the host a raw <code>SocketException</code>.</strong> The descriptors under
+<code>poll</code>'s select are closed by <code>Dispose</code>, and the select throws when they are. Nothing caught
+it, so a host that disposed a parked VM got a <code>System.Net.Sockets</code> failure in the platform's
+own language, across an API whose every other failure is a <code>ScriptException</code>. The wait now
+ends with the clock alone: the next turn finds those descriptors gone and the reads give the
+waiter the ordinary failure they always gave.</p>
+</li>
+<li><p><strong>Destructuring a struct in a <code>match</code> says so instead of blaming a name.</strong> The form is
+sema-complete — field types bound, irrefutability computed — and the lowering half was never
+built. It did not say that: the bindings were simply not emitted, so the first USE of one
+failed as <code>reference to 'x' (only parameters, locals and constants)</code>, a message about a name
+that only looks undeclared. It is now <code>LYR-IR0001: destructuring a struct or class in a match</code>.
+Enum destructuring is untouched — it is the form the specification gives meaning to.</p>
+</li>
+<li><p><strong>The debug adapter refuses a second <code>launch</code></strong> instead of overwriting its session and
+stranding the first debuggee's sockets, children and files. No client should send one; that is
+why the adapter must not be the one to leak when it happens.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li><p><strong>The specification stopped contradicting itself.</strong> <code>spec/02-grammar.md</code> §3.5 said an
+interface's parent list &quot;holds at most one entry&quot; — false since 2.16, and said the other way
+round in §5.2 of the same document, in the conformance suite, and in the compiler's own
+comment. Corrected upstream (<code>lyriclang/lyric-spec#30</code>) and mirrored here. No rule changed and
+no case moved, so the suite pin stays at 4.0.</p>
+</li>
+<li><p><strong>The README stopped promising the REPL forgets.</strong> It said &quot;declarations persist across
+entries; statements run once&quot;. What persists is the declaration, and the session re-runs
+everything it has accumulated on every entry — so a declaration whose initializer has an
+effect repeats that effect once per entry. Measured: four entries, four executions.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
