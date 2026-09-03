@@ -24,7 +24,21 @@ public sealed class NativeRegistry : IDisposable
 {
     private readonly Dictionary<string, Native> _natives = new(StringComparer.Ordinal);
 
-    private bool _disposed;
+    private volatile bool _disposed;
+
+    /// <summary>Guards the three descriptor tables and the id counters beside them.
+    ///
+    /// <para>A host may dispose a VM while its guest is still inside a native — that is the ONE
+    /// recourse against a guest parked in a blocking wait, since an <c>ExecutionBudget</c> runs
+    /// on the guest's own thread and never reaches it. Held per registry, the tables were plain
+    /// dictionaries: the enumeration in <c>Dispose</c> threw against a concurrent insert, and a
+    /// handle published after the tables were cleared was stranded for good, because the second
+    /// <c>Dispose</c> returns early.</para>
+    ///
+    /// <para>No long operation runs under it. A descriptor is RESOLVED here and the syscall
+    /// happens outside, which is what keeps <c>poll</c>'s select from blocking a disposer.</para>
+    /// </summary>
+    private readonly object _tables = new();
 
     private sealed record Native(
         TypeTag[] ParamTypes, TypeTag ReturnType, Func<LyrValue[], LyrValue> Implementation,
@@ -948,12 +962,18 @@ public sealed class NativeRegistry : IDisposable
                     var immediate = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
                     var alreadyNamed = new HashSet<long>();
                     if (checkRead.Count > 0 || checkWrite.Count > 0)
-                    {
-                        System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, 0);
-                        foreach (var s in checkRead) NameReady(s, immediate, alreadyNamed);
-                        foreach (var s in checkWrite) NameReady(s, immediate, alreadyNamed);
-                        foreach (var s in checkError) NameReady(s, immediate, alreadyNamed);
-                    }
+                        try
+                        {
+                            System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, 0);
+                            foreach (var s in checkRead) NameReady(s, immediate, alreadyNamed);
+                            foreach (var s in checkWrite) NameReady(s, immediate, alreadyNamed);
+                            foreach (var s in checkError) NameReady(s, immediate, alreadyNamed);
+                        }
+                        catch (System.Net.Sockets.SocketException)
+                        {
+                            // A socket closed under the select — the dead list below is the
+                            // answer either way, and naming nothing ready is the truth.
+                        }
                     foreach (var value in dead)
                         if (alreadyNamed.Add(value.AsI64)) immediate.Add(value);
                     return LyrValue.FromObject(immediate.ToArray());
@@ -973,7 +993,24 @@ public sealed class NativeRegistry : IDisposable
                 var micros = timeout < 0
                     ? -1
                     : (int)(Math.Min(timeout, int.MaxValue / 1000) * 1000);
-                System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
+                try
+                {
+                    System.Net.Sockets.Socket.Select(checkRead, checkWrite, checkError, micros);
+                }
+                catch (System.Net.Sockets.SocketException)
+                {
+                    // The select was standing on descriptors somebody closed underneath it —
+                    // disposing the VM is the one thing that does that, and it does it from
+                    // another thread by design, because a guest parked here cannot be reached
+                    // by a budget. Answer the CLOCK and nothing else: the next turn resolves
+                    // those descriptors to nothing, names them ready at once, and the reads
+                    // that follow give the waiter its ordinary failure. Letting it out instead
+                    // hands the host a raw platform exception across an API whose every other
+                    // failure is a ScriptException — the shape the 4.0 sweep fixed once already,
+                    // for the other way this select can throw.
+                    return LyrValue.FromObject(
+                        new[] { LyrValue.FromI64(Environment.TickCount64) });
+                }
 
                 var ready = new List<LyrValue> { LyrValue.FromI64(Environment.TickCount64) };
                 if (pipe is not null && checkRead.Remove(pipe)) DrainPipe(pipe);
@@ -1258,20 +1295,40 @@ public sealed class NativeRegistry : IDisposable
 
     private Dictionary<long, System.Net.Sockets.Socket> Sockets => _sockets ??= new();
 
-    private System.Net.Sockets.Socket? SocketOf(long fd) =>
-        _sockets is { } table && table.TryGetValue(fd, out var socket) ? socket : null;
-
-    private long AddSocket(System.Net.Sockets.Socket socket)
+    private System.Net.Sockets.Socket? SocketOf(long fd)
     {
-        var fd = ++_nextSocketFd;
-        Sockets[fd] = socket;
-        return fd;
+        lock (_tables)
+            return _sockets is { } table && table.TryGetValue(fd, out var socket) ? socket : null;
+    }
+
+    /// <summary>Takes a socket into the table, or refuses because the VM was disposed while it
+    /// was being opened.
+    ///
+    /// <para>The check and the insert are one step. Checking <c>Live</c> and publishing
+    /// afterwards leaves a window in which a handle lands in a table <c>Dispose</c> has already
+    /// cleared — nobody can reach it, and nobody will ever close it. A refusal here means the
+    /// caller closes what it just opened and answers its own "could not".</para></summary>
+    private bool TryPublishSocket(System.Net.Sockets.Socket socket, out long fd)
+    {
+        lock (_tables)
+        {
+            if (_disposed) { fd = -1; return false; }
+            fd = ++_nextSocketFd;
+            Sockets[fd] = socket;
+            return true;
+        }
+    }
+
+    private void ReleaseSocket(long fd)
+    {
+        lock (_tables) _sockets?.Remove(fd);
     }
 
     private void NameReady(System.Net.Sockets.Socket socket, List<LyrValue> ready,
         HashSet<long> named)
     {
         if (_sockets is null) return;
+        lock (_tables)
         foreach (var (fd, s) in _sockets)
             if (ReferenceEquals(s, socket) && named.Add(fd))
             {
@@ -1437,6 +1494,16 @@ public sealed class NativeRegistry : IDisposable
         return found[0];
     }
 
+    /// <summary>The answer a net call gives when the VM was disposed under it: the same
+    /// shutdown failure the pre-check records, so a guest cannot tell the two apart — one is
+    /// simply the race the other one loses.</summary>
+    private long DisposedNet(long answer = -1)
+    {
+        RecordNet(new System.Net.Sockets.SocketException(
+            (int)System.Net.Sockets.SocketError.Shutdown));
+        return answer;
+    }
+
     private static System.Net.Sockets.Socket NewTcp(System.Net.IPAddress address) =>
         new(address.AddressFamily, System.Net.Sockets.SocketType.Stream,
             System.Net.Sockets.ProtocolType.Tcp)
@@ -1460,7 +1527,9 @@ public sealed class NativeRegistry : IDisposable
                 var socket = NewTcp(address);
                 socket.Bind(new System.Net.IPEndPoint(address, (int)args[1].AsI64));
                 socket.Listen(64);
-                return LyrValue.FromI64(AddSocket(socket));
+                if (TryPublishSocket(socket, out var fd)) return LyrValue.FromI64(fd);
+                Quietly(socket.Close);
+                return LyrValue.FromI64(DisposedNet());
             }
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
@@ -1477,7 +1546,9 @@ public sealed class NativeRegistry : IDisposable
             {
                 var accepted = listener.Accept();
                 accepted.Blocking = false;
-                return LyrValue.FromI64(AddSocket(accepted));
+                if (TryPublishSocket(accepted, out var fd)) return LyrValue.FromI64(fd);
+                Quietly(accepted.Close);
+                return LyrValue.FromI64(DisposedNet(-2));
             }
             catch (System.Net.Sockets.SocketException e)
                 when (e.SocketErrorCode == System.Net.Sockets.SocketError.WouldBlock)
@@ -1507,7 +1578,9 @@ public sealed class NativeRegistry : IDisposable
                 catch (System.Net.Sockets.SocketException e)
                     when (e.SocketErrorCode is System.Net.Sockets.SocketError.WouldBlock
                         or System.Net.Sockets.SocketError.InProgress) { /* in flight */ }
-                return LyrValue.FromI64(AddSocket(socket));
+                if (TryPublishSocket(socket, out var fd)) return LyrValue.FromI64(fd);
+                Quietly(socket.Close);
+                return LyrValue.FromI64(DisposedNet());
             }
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
@@ -1588,7 +1661,7 @@ public sealed class NativeRegistry : IDisposable
             if (SocketOf(fd) is { } socket)
             {
                 try { socket.Close(); } catch (Exception) { /* closing twice closes once */ }
-                Sockets.Remove(fd);
+                ReleaseSocket(fd);
             }
             return default;
         });
@@ -1620,7 +1693,9 @@ public sealed class NativeRegistry : IDisposable
                     System.Net.Sockets.ProtocolType.Udp)
                 { Blocking = false };
                 socket.Bind(new System.Net.IPEndPoint(address, (int)args[1].AsI64));
-                return LyrValue.FromI64(AddSocket(socket));
+                if (TryPublishSocket(socket, out var fd)) return LyrValue.FromI64(fd);
+                Quietly(socket.Close);
+                return LyrValue.FromI64(DisposedNet());
             }
             catch (Exception e) { RecordNet(e); return LyrValue.FromI64(-1); }
         });
@@ -1734,8 +1809,37 @@ public sealed class NativeRegistry : IDisposable
 
     private Dictionary<long, ChildState> Children => _children ??= new();
 
-    private ChildState? ChildOf(long key) =>
-        _children is { } table && table.TryGetValue(key, out var child) ? child : null;
+    private ChildState? ChildOf(long key)
+    {
+        lock (_tables)
+            return _children is { } table && table.TryGetValue(key, out var child) ? child : null;
+    }
+
+    /// <summary>The child twin of <see cref="TryPublishSocket"/>: the notify descriptor and the
+    /// child entry become visible together or not at all.</summary>
+    private bool TryPublishChild(System.Diagnostics.Process process,
+        System.Net.Sockets.Socket notify, out long key, out ChildState state)
+    {
+        lock (_tables)
+        {
+            if (_disposed) { key = -1; state = null!; return false; }
+            var fd = ++_nextSocketFd;
+            Sockets[fd] = notify;
+            state = new ChildState { Process = process, Notify = notify, NotifyFd = fd };
+            key = ++_nextChildKey;
+            Children[key] = state;
+            return true;
+        }
+    }
+
+    private void ReleaseChild(long key, long notifyFd)
+    {
+        lock (_tables)
+        {
+            _children?.Remove(key);
+            _sockets?.Remove(notifyFd);
+        }
+    }
 
     private void RecordProc(int kind, string detail)
     {
@@ -1899,14 +2003,15 @@ public sealed class NativeRegistry : IDisposable
             notify.Connect(notify.LocalEndPoint!);
             notify.Blocking = false;
 
-            var state = new ChildState
+            if (!TryPublishChild(process, notify, out var key, out var state))
             {
-                Process = process,
-                Notify = notify,
-                NotifyFd = AddSocket(notify),
-            };
-            var key = ++_nextChildKey;
-            Children[key] = state;
+                // Disposed while the child was starting. Disowned, exactly as procClose does:
+                // releasing a handle automatically may not mean more than releasing it by hand.
+                Quietly(notify.Close);
+                Quietly(process.Dispose);
+                RecordProc(0, "the VM is disposed");
+                return LyrValue.FromI64(-1);
+            }
 
             StartPump(state, process.StandardOutput.BaseStream, stderr: false);
             StartPump(state, process.StandardError.BaseStream, stderr: true);
@@ -2011,9 +2116,8 @@ public sealed class NativeRegistry : IDisposable
             state.Closed = true;
             if (!state.StdinQueue.IsAddingCompleted) state.StdinQueue.CompleteAdding();
             try { state.Notify.Close(); } catch (Exception) { /* twice closes once */ }
-            Sockets.Remove(state.NotifyFd);
             try { state.Process.Dispose(); } catch (Exception) { /* disowned, not stopped */ }
-            Children.Remove(key);
+            ReleaseChild(key, state.NotifyFd);
             return default;
         });
 
@@ -2057,8 +2161,35 @@ public sealed class NativeRegistry : IDisposable
 
     private Dictionary<long, FileState> Files => _files ??= new();
 
-    private FileState? FileOf(long key) =>
-        _files is { } table && table.TryGetValue(key, out var state) ? state : null;
+    private FileState? FileOf(long key)
+    {
+        lock (_tables)
+            return _files is { } table && table.TryGetValue(key, out var state) ? state : null;
+    }
+
+    /// <summary>The file twin of <see cref="TryPublishSocket"/>: the notify descriptor and the
+    /// file entry become visible together or not at all.</summary>
+    private bool TryPublishFile(FileStream stream, System.Net.Sockets.Socket notify, out long key)
+    {
+        lock (_tables)
+        {
+            if (_disposed) { key = -1; return false; }
+            var fd = ++_nextSocketFd;
+            Sockets[fd] = notify;
+            key = ++_nextFileKey;
+            Files[key] = new FileState { Stream = stream, Notify = notify, NotifyFd = fd };
+            return true;
+        }
+    }
+
+    private void ReleaseFile(long key, long notifyFd)
+    {
+        lock (_tables)
+        {
+            _files?.Remove(key);
+            _sockets?.Remove(notifyFd);
+        }
+    }
 
     // Kind 6 is the would-block signal std.io.net and std.process already speak; it never
     // surfaces to a caller, because the module turns it into a wait.
@@ -2172,13 +2303,13 @@ public sealed class NativeRegistry : IDisposable
             notify.Connect(notify.LocalEndPoint!);
             notify.Blocking = false;
 
-            var key = ++_nextFileKey;
-            Files[key] = new FileState
+            if (!TryPublishFile(stream, notify, out var key))
             {
-                Stream = stream,
-                Notify = notify,
-                NotifyFd = AddSocket(notify),
-            };
+                Quietly(() => stream.Dispose());
+                Quietly(notify.Close);
+                RecordIoNoHandle();
+                return LyrValue.FromI64(-1);
+            }
             return LyrValue.FromI64(key);
         });
 
@@ -2271,8 +2402,7 @@ public sealed class NativeRegistry : IDisposable
             // catch records; nobody is left to read the record.
             try { state.Stream.Dispose(); } catch (Exception) { /* closing twice closes once */ }
             try { state.Notify.Close(); } catch (Exception) { /* the same */ }
-            Sockets.Remove(state.NotifyFd);
-            Files.Remove(key);
+            ReleaseFile(key, state.NotifyFd);
             return default;
         });
 
@@ -2307,7 +2437,12 @@ public sealed class NativeRegistry : IDisposable
     /// called after <c>Dispose</c> acquired handles that the next <c>Dispose</c> then skipped,
     /// because it returns early: the fix for a leak would have introduced one. A refusal here is
     /// an ordinary I/O failure to the guest, which is a shape every caller already handles.
-    /// </para></summary>
+    /// </para>
+    ///
+    /// <para>This is the CHEAP half: it spares the syscall when the VM is already gone. It is not
+    /// the guarantee, because a <c>Dispose</c> on another thread fits between it and the insert
+    /// that follows — <see cref="TryPublishSocket"/> and its twins are where the answer is
+    /// actually decided.</para></summary>
     private bool Live => !_disposed;
 
     /// <summary>Closes every socket, child and file this registry's guest left open.
@@ -2319,45 +2454,52 @@ public sealed class NativeRegistry : IDisposable
     /// rely on, and there is nobody left to tell.</para></summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        FileState[] files;
+        ChildState[] children;
+        System.Net.Sockets.Socket[] sockets;
+        bool wasListening;
 
-        if (_files is { } files)
+        // Everything the tables hold is taken in ONE step, so a guest publishing on another
+        // thread either gets in before the flag or is refused by it — never into a table that
+        // has already been emptied, which the second Dispose would then skip.
+        lock (_tables)
         {
-            foreach (var state in files.Values)
-            {
-                Quietly(() => state.Stream.Dispose());
-                Quietly(() => state.Notify.Close());
-            }
-            files.Clear();
+            if (_disposed) return;
+            _disposed = true;
+
+            files = _files is { } f ? [.. f.Values] : [];
+            children = _children is { } c ? [.. c.Values] : [];
+            sockets = _sockets is { } s ? [.. s.Values] : [];
+            _files?.Clear();
+            _children?.Clear();
+            _sockets?.Clear();
+
+            wasListening = _listeningHere;
+            _listeningHere = false;
         }
 
-        if (_children is { } children)
+        // Released OUTSIDE the lock. Closing a stream or a child can take a while, and a guest
+        // thread that only wants to resolve a descriptor has no business waiting for it.
+        foreach (var state in files)
         {
-            foreach (var state in children.Values)
-            {
-                if (!state.StdinQueue.IsAddingCompleted) Quietly(state.StdinQueue.CompleteAdding);
-                Quietly(() => state.Notify.Close());
-                Quietly(state.Process.Dispose);
-            }
-            children.Clear();
+            Quietly(() => state.Stream.Dispose());
+            Quietly(() => state.Notify.Close());
+        }
+
+        foreach (var state in children)
+        {
+            if (!state.StdinQueue.IsAddingCompleted) Quietly(state.StdinQueue.CompleteAdding);
+            Quietly(() => state.Notify.Close());
+            Quietly(state.Process.Dispose);
         }
 
         // Last: the notify sockets above are registered in this table too, and closing one twice
         // closes it once.
-        if (_sockets is { } sockets)
-        {
-            foreach (var socket in sockets.Values) Quietly(socket.Close);
-            sockets.Clear();
-        }
+        foreach (var socket in sockets) Quietly(socket.Close);
 
         // A VM that was listening for the interrupt stops counting towards the process-wide
         // total, or Ctrl+C would stay captured for a program that has gone.
-        if (_listeningHere)
-        {
-            _listeningHere = false;
-            Interlocked.Decrement(ref _listeningVms);
-        }
+        if (wasListening) Interlocked.Decrement(ref _listeningVms);
     }
 
     private static void Quietly(Action release)
