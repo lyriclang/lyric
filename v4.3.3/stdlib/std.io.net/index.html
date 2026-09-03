@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.io.net — Lyric v4.3.3</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.3</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/" class="here">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.io.net</h1>
+<nav class="contents">
+<ul>
+<li><a href="#alias-listener">Listener</a></li>
+<li><a href="#alias-socket">Socket</a></li>
+<li><a href="#alias-udpsocket">UdpSocket</a></li>
+<li><a href="#struct-packet">Packet</a></li>
+<li><a href="#function-listen">listen</a></li>
+<li><a href="#function-listenorthrow">listenOrThrow</a></li>
+<li><a href="#function-localport">localPort</a></li>
+<li><a href="#function-accept">accept</a></li>
+<li><a href="#function-acceptorthrow">acceptOrThrow</a></li>
+<li><a href="#function-connect">connect</a></li>
+<li><a href="#function-connectorthrow">connectOrThrow</a></li>
+<li><a href="#function-readsome">readSome</a></li>
+<li><a href="#function-readsomeorthrow">readSomeOrThrow</a></li>
+<li><a href="#function-write">write</a></li>
+<li><a href="#function-writeorthrow">writeOrThrow</a></li>
+<li><a href="#function-close">close</a></li>
+<li><a href="#function-closelistener">closeListener</a></li>
+<li><a href="#function-bind">bind</a></li>
+<li><a href="#function-bindorthrow">bindOrThrow</a></li>
+<li><a href="#function-localport-2">localPort</a></li>
+<li><a href="#function-sendto">sendTo</a></li>
+<li><a href="#function-sendtoorthrow">sendToOrThrow</a></li>
+<li><a href="#function-receivefrom">receiveFrom</a></li>
+<li><a href="#function-receivefromorthrow">receiveFromOrThrow</a></li>
+<li><a href="#function-close-2">close</a></li>
+</ul>
+</nav>
+<p>TCP for tasks: <code>listen</code>/<code>accept</code> on the server side, <code>connect</code> on the client's,
+<code>readSome</code>/<code>write</code> on both, every waiting form yielding to the scheduler instead of
+blocking the thread.</p>
+<p>The silent forms answer <em>whether</em> (<code>null</code>/<code>false</code>); the <code>OrThrow</code> twins say <em>why</em> with an
+<code>IoError</code>, from the same implementation. <code>readSome</code> folds three truths into one answer:
+bytes are bytes, an EMPTY array is the peer being done (EOF), and <code>null</code> is a failure.</p>
+<section class="item" id="alias-listener">
+<h2><a href="#alias-listener">Listener</a> <span class="kind">alias</span></h2>
+<pre class="signature"><code class="language-lyr">pub type Listener = int</code></pre>
+<p>A listening endpoint. Opaque: it is issued here, never assembled.</p>
+<p class="source">stdlib/std/io/net.lyr:27</p>
+</section>
+<section class="item" id="alias-socket">
+<h2><a href="#alias-socket">Socket</a> <span class="kind">alias</span></h2>
+<pre class="signature"><code class="language-lyr">pub type Socket = int</code></pre>
+<p>A connected stream. Opaque, like the listener.</p>
+<p class="source">stdlib/std/io/net.lyr:30</p>
+</section>
+<section class="item" id="alias-udpsocket">
+<h2><a href="#alias-udpsocket">UdpSocket</a> <span class="kind">alias</span></h2>
+<pre class="signature"><code class="language-lyr">pub type UdpSocket = int</code></pre>
+<p>A UDP endpoint. Opaque, like the others; one handle both sends and receives.</p>
+<p class="source">stdlib/std/io/net.lyr:33</p>
+</section>
+<section class="item" id="struct-packet">
+<h2><a href="#struct-packet">Packet</a> <span class="kind">struct</span></h2>
+<pre class="signature"><code class="language-lyr">pub struct Packet</code></pre>
+<p>One received datagram: its payload, and who sent it — the address <code>sendTo</code> answers to.</p>
+<p>UDP has no EOF, so an EMPTY payload here is a real (empty) packet, not an end — the one
+place this module's bytes mean something different than <code>readSome</code>'s.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">bytes: uint8[]</code></pre>
+<p>The payload, complete: a datagram arrives whole or not at all.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">host: string</code></pre>
+<p>The sender's address, as the receiving socket saw it.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">port: int</code></pre>
+<p>The sender's port.</p>
+</div>
+</div>
+<p class="source">stdlib/std/io/net.lyr:39</p>
+</section>
+<section class="item" id="function-listen">
+<h2><a href="#function-listen">listen</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn listen(host: string, port: int): ?Listener</code></pre>
+<p>Listens on <code>host:port</code>. Port 0 asks the OS for a free one — <code>localPort</code> says which.
+<code>null</code> when the address cannot be taken; <code>listenOrThrow</code> says why.</p>
+<p class="source">stdlib/std/io/net.lyr:89</p>
+</section>
+<section class="item" id="function-listenorthrow">
+<h2><a href="#function-listenorthrow">listenOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn listenOrThrow(host: string, port: int): Listener throws IoError</code></pre>
+<p><code>listen</code>, with the reason when it cannot.</p>
+<p class="source">stdlib/std/io/net.lyr:98</p>
+</section>
+<section class="item" id="function-localport">
+<h2><a href="#function-localport">localPort</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn localPort(listener: Listener): int</code></pre>
+<p>The port a listener actually holds — the answer to <code>listen(host, 0)</code>.</p>
+<p class="source">stdlib/std/io/net.lyr:107</p>
+</section>
+<section class="item" id="function-accept">
+<h2><a href="#function-accept">accept</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn accept(listener: Listener): ?Socket</code></pre>
+<p>Waits for the next connection. <code>null</code> when the listener broke; <code>acceptOrThrow</code> says why.</p>
+<p class="source">stdlib/std/io/net.lyr:112</p>
+</section>
+<section class="item" id="function-acceptorthrow">
+<h2><a href="#function-acceptorthrow">acceptOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn acceptOrThrow(listener: Listener): Socket throws IoError</code></pre>
+<p><code>accept</code>, with the reason when the listener broke.</p>
+<p class="source">stdlib/std/io/net.lyr:126</p>
+</section>
+<section class="item" id="function-connect">
+<h2><a href="#function-connect">connect</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn connect(host: string, port: int): ?Socket</code></pre>
+<p>Waits until a connection to <code>host:port</code> stands or is refused. <code>null</code> on refusal or any
+other failure; <code>connectOrThrow</code> names the kind — <code>ConnectionRefused</code> when nothing listens.</p>
+<p class="source">stdlib/std/io/net.lyr:136</p>
+</section>
+<section class="item" id="function-connectorthrow">
+<h2><a href="#function-connectorthrow">connectOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn connectOrThrow(host: string, port: int): Socket throws IoError</code></pre>
+<p><code>connect</code>, with the reason when it cannot.</p>
+<p class="source">stdlib/std/io/net.lyr:155</p>
+</section>
+<section class="item" id="function-readsome">
+<h2><a href="#function-readsome">readSome</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSome(socket: Socket, max: int): ?uint8[]</code></pre>
+<p>Waits for bytes and reads up to <code>max</code> of them. Three truths in one answer: bytes are
+bytes, an EMPTY array is the peer being done (EOF), and <code>null</code> is a failure —
+<code>readSomeOrThrow</code> says which failure.</p>
+<p>A <code>max</code> of zero or less PANICS: an empty answer already means EOF, so there is no
+honest value to hand back for it.</p>
+<p class="source">stdlib/std/io/net.lyr:169</p>
+</section>
+<section class="item" id="function-readsomeorthrow">
+<h2><a href="#function-readsomeorthrow">readSomeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn readSomeOrThrow(socket: Socket, max: int): uint8[] throws IoError</code></pre>
+<p><code>readSome</code>, with the reason when the stream broke. EOF stays the empty array — the peer
+being done is an ordinary state, not a failure.</p>
+<p class="source">stdlib/std/io/net.lyr:187</p>
+</section>
+<section class="item" id="function-write">
+<h2><a href="#function-write">write</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn write(socket: Socket, bytes: uint8[]): bool</code></pre>
+<p>Writes ALL of <code>bytes</code>, waiting whenever the stream is full. <code>false</code> when the stream broke
+midway; <code>writeOrThrow</code> says why.</p>
+<p class="source">stdlib/std/io/net.lyr:197</p>
+</section>
+<section class="item" id="function-writeorthrow">
+<h2><a href="#function-writeorthrow">writeOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn writeOrThrow(socket: Socket, bytes: uint8[]): void throws IoError</code></pre>
+<p><code>write</code>, with the reason when the stream broke.</p>
+<p class="source">stdlib/std/io/net.lyr:214</p>
+</section>
+<section class="item" id="function-close">
+<h2><a href="#function-close">close</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn close(socket: Socket): void</code></pre>
+<p>Closes a socket. Closing twice closes once.</p>
+<p class="source">stdlib/std/io/net.lyr:221</p>
+</section>
+<section class="item" id="function-closelistener">
+<h2><a href="#function-closelistener">closeListener</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn closeListener(listener: Listener): void</code></pre>
+<p>Closes a listener.</p>
+<p class="source">stdlib/std/io/net.lyr:226</p>
+</section>
+<section class="item" id="function-bind">
+<h2><a href="#function-bind">bind</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn bind(host: string, port: int): ?UdpSocket</code></pre>
+<p>Binds a UDP endpoint on <code>host:port</code>. Port 0 asks the OS for a free one — <code>localPort</code> says
+which. <code>null</code> when the address cannot be taken; <code>bindOrThrow</code> says why, <code>AddressInUse</code>
+being the usual answer.</p>
+<p class="source">stdlib/std/io/net.lyr:235</p>
+</section>
+<section class="item" id="function-bindorthrow">
+<h2><a href="#function-bindorthrow">bindOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn bindOrThrow(host: string, port: int): UdpSocket throws IoError</code></pre>
+<p><code>bind</code>, with the reason when it cannot.</p>
+<p class="source">stdlib/std/io/net.lyr:244</p>
+</section>
+<section class="item" id="function-localport-2">
+<h2><a href="#function-localport-2">localPort</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn localPort(socket: UdpSocket): int</code></pre>
+<p>The port a UDP endpoint actually holds — the answer to <code>bind(host, 0)</code>.</p>
+<p class="source">stdlib/std/io/net.lyr:253</p>
+</section>
+<section class="item" id="function-sendto">
+<h2><a href="#function-sendto">sendTo</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sendTo(socket: UdpSocket, host: string, port: int, bytes: uint8[]): bool</code></pre>
+<p>Sends one datagram to <code>host:port</code>, waiting out a full send buffer. The datagram goes
+whole or not at all; <code>false</code> when it cannot go — <code>sendToOrThrow</code> says why. There is no
+delivery promise: that is UDP, not this module.</p>
+<p class="source">stdlib/std/io/net.lyr:260</p>
+</section>
+<section class="item" id="function-sendtoorthrow">
+<h2><a href="#function-sendtoorthrow">sendToOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sendToOrThrow(socket: UdpSocket, host: string, port: int, bytes: uint8[]): void throws IoError</code></pre>
+<p><code>sendTo</code>, with the reason when the datagram cannot go.</p>
+<p class="source">stdlib/std/io/net.lyr:274</p>
+</section>
+<section class="item" id="function-receivefrom">
+<h2><a href="#function-receivefrom">receiveFrom</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn receiveFrom(socket: UdpSocket, max: int): ?Packet</code></pre>
+<p>Waits for one datagram and answers it whole, with its sender. A payload longer than <code>max</code>
+is CUT to it — datagrams do not queue their remainder. <code>null</code> is a failure;
+<code>receiveFromOrThrow</code> says which. An empty payload is a real packet: UDP has no EOF.</p>
+<p>A <code>max</code> of zero or less PANICS. It would otherwise cut the datagram to one byte and
+throw the rest away, which is the cutting rule above turned into silent data loss.</p>
+<p class="source">stdlib/std/io/net.lyr:291</p>
+</section>
+<section class="item" id="function-receivefromorthrow">
+<h2><a href="#function-receivefromorthrow">receiveFromOrThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn receiveFromOrThrow(socket: UdpSocket, max: int): Packet throws IoError</code></pre>
+<p><code>receiveFrom</code>, with the reason when the socket broke.</p>
+<p class="source">stdlib/std/io/net.lyr:308</p>
+</section>
+<section class="item" id="function-close-2">
+<h2><a href="#function-close-2">close</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn close(socket: UdpSocket): void</code></pre>
+<p>Closes a UDP endpoint. Closing twice closes once.</p>
+<p class="source">stdlib/std/io/net.lyr:317</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.io.file/">std.io.file</a>
+<a class="next" href="../../stdlib/std.io.path/">std.io.path</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

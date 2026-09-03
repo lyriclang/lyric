@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.3.3</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.3</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.3.3 — 2026-09-04</h2>
+<p><strong>Round 6 of the sweep</strong>, aimed at what round 5 built. Two findings in it, both mine, and one
+older one found while checking that round 5 had broken nothing.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>Disposing a VM now frees a guest parked on <code>Wait.Interrupt</code>.</strong> It did not, and the reason it
+looked like it did is the point: a guest waiting on a SOCKET is woken because <code>Dispose</code> closes
+the socket under its select. A guest parked on the interrupt holds no descriptor, so nothing
+woke it — the host's thread was gone for good while <code>Dispose</code> returned in a millisecond and
+reported success. &quot;Disposing frees a parked guest&quot; was true by accident, for the parks that
+happened to hold a handle.</p>
+<p>A disposed VM now answers that wait the way an interrupt does: every parked task wakes, the run
+drains, and the call returns. <code>Wait.Interrupt</code> is the language's &quot;you are being asked to stop&quot;,
+which makes it the honest answer for a VM that is ending — and it is the documented shutdown
+shape, so it was the case the contract exists for that did not work.</p>
+</li>
+<li><p><strong>A disposed VM no longer leaves Ctrl+C swallowed for the whole process.</strong> The interrupt
+listening count moves on transitions, and the poll that moves it read and updated it outside
+the lock <code>Dispose</code> uses to read the same flag. A raise landing between the two adds a listener
+that nothing ever subtracts, and while that count is above zero the Ctrl+C handler cancels the
+signal — on behalf of a VM that no longer exists. The transition is one step now, and a
+disposed VM does not arm at all.</p>
+</li>
+<li><p><strong>A variant pattern over an OPTIONAL enum stops calling it a non-enum.</strong>
+<code>match (e) { null =&gt; …, E.A =&gt; … }</code> on a <code>?E</code> is refused by the lowering, which is unchanged —
+but it said &quot;a match over a non-enum&quot;, sending the reader to look for a mistake in the type
+rather than at the missing lowering. It now names the optional and says what to do:
+<code>narrow it first, then match the value</code>. Matching an optional with a binding arm is unaffected.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
