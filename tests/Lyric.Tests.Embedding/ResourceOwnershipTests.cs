@@ -497,39 +497,48 @@ public class ResourceOwnershipTests
     [Fact]
     public void A_guest_parked_on_the_interrupt_alone_is_freed_by_dispose()
     {
-        var marker = Path.Combine(Path.GetTempPath(), $"lyric-park-int-{Guid.NewGuid():N}.marker");
-        try
+        // ROUNDS, because one park samples the window once. The wake Dispose sends is
+        // edge-triggered, and the poll resets the event just before waiting on it: a Dispose
+        // landing between the disposed-check and that reset had its wake discarded, and the
+        // guest waited on an event nobody would set again. One round found that in three CI
+        // runs; fifteen find it every time.
+        for (var round = 0; round < 15; round++)
         {
-            var vm = Vm();
-            var instance = vm.Instantiate(vm.Compile(InterruptParkSource, "parkonly"));
-
-            Exception? guestFailure = null;
-            var guest = new Thread(() =>
+            var marker = Path.Combine(Path.GetTempPath(),
+                $"lyric-park-int-{round}-{Guid.NewGuid():N}.marker");
+            try
             {
-                try { instance.CallVoid("park", marker); }
-                catch (Exception e) { guestFailure = e; }
-            }) { IsBackground = true };
-            guest.Start();
+                var vm = Vm();
+                var instance = vm.Instantiate(vm.Compile(InterruptParkSource, "parkonly"));
 
-            var reached = false;
-            for (var spin = 0; spin < 3000 && !reached; spin++)
-            {
-                reached = File.Exists(marker);
-                if (!reached) Thread.Sleep(10);
+                Exception? guestFailure = null;
+                var guest = new Thread(() =>
+                {
+                    try { instance.CallVoid("park", marker); }
+                    catch (Exception e) { guestFailure = e; }
+                }) { IsBackground = true };
+                guest.Start();
+
+                var reached = false;
+                for (var spin = 0; spin < 2000 && !reached; spin++)
+                {
+                    reached = File.Exists(marker);
+                    if (!reached) Thread.Sleep(5);
+                }
+                Assert.True(reached, $"round {round}: the guest reached its wait");
+
+                vm.Dispose();
+
+                Assert.True(guest.Join(TimeSpan.FromSeconds(15)),
+                    $"round {round}: disposing freed the thread the guest was parked on");
+                Assert.True(guestFailure is null or ScriptException,
+                    $"round {round}: a {guestFailure?.GetType().Name} crossed the embedding "
+                    + $"boundary: {guestFailure?.Message}");
             }
-            Assert.True(reached, "the guest reached its wait");
-
-            vm.Dispose();
-
-            Assert.True(guest.Join(TimeSpan.FromSeconds(30)),
-                "disposing freed the thread the guest was parked on");
-            Assert.True(guestFailure is null or ScriptException,
-                $"a {guestFailure?.GetType().Name} crossed the embedding boundary: "
-                + guestFailure?.Message);
-        }
-        finally
-        {
-            try { File.Delete(marker); } catch (IOException) { /* asserted above */ }
+            finally
+            {
+                try { File.Delete(marker); } catch (IOException) { /* asserted above */ }
+            }
         }
     }
 

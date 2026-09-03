@@ -10,7 +10,7 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v4.3.3 — 2026-09-04
+## v4.3.4 — 2026-09-04
 
 **Round 6 of the sweep**, aimed at what round 5 built. Two findings in it, both mine, and one
 older one found while checking that round 5 had broken nothing.
@@ -35,6 +35,16 @@ older one found while checking that round 5 had broken nothing.
   that nothing ever subtracts, and while that count is above zero the Ctrl+C handler cancels the
   signal — on behalf of a VM that no longer exists. The transition is one step now, and a
   disposed VM does not arm at all.
+
+- **The wake that frees a parked guest is no longer discarded.** The poll resets the interrupt
+  event just before waiting on it, and re-reads the pending flag afterwards for exactly that
+  reason. The disposed flag was checked only once, at the top — so a `Dispose` landing between
+  that check and the reset had its wake wiped, and the guest waited on an event nobody would set
+  again. It is re-read after the reset now, like the pending flag beside it.
+
+  *`v4.3.3` was tagged and published nothing: the release gate ran the suite on Windows and the
+  parked-guest test hung there. This release is that content plus the fix. No download carries
+  `4.3.3`.*
 
 - **A variant pattern over an OPTIONAL enum stops calling it a non-enum.**
   `match (e) { null => …, E.A => … }` on a `?E` is refused by the lowering, which is unchanged —
