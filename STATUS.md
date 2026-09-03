@@ -11,7 +11,19 @@
 
 ## Current milestone
 
-**Round 6 ships as v4.3.3** (2026-09-04) — still not clean, so the loop continues. Aimed at what
+**Round 6 ships as v4.3.4** (2026-09-04) — still not clean, so the loop continues. **`v4.3.3` is
+tagged and published NOTHING**, the 3.8.1 shape with a different cause: the release gate ran the
+suite on Windows in Release and round 6's own new pin HUNG there, after passing locally and on two
+CI runs. The gate did its job; no download carries 4.3.3. What the hang exposed is a fourth
+finding, and it was in round 6's fix rather than in what round 6 was aiming at — **the wake
+`Dispose` sends is edge-triggered, and the poll RESETS that event just before waiting on it.** The
+code has always re-read the pending flag after that reset for precisely this reason; the disposed
+flag was checked once, at the top of the native, so a `Dispose` landing between the check and the
+reset had its wake wiped and the guest waited on an event nobody would set again. Re-read after
+the reset now, beside the flag it should always have stood with. **Honest about what is proven**:
+the window is real by INSPECTION and is closed; that it is what the runner hit is not proven, and
+the pin samples it rather than forcing it — fifteen rounds catch the original bug every time and
+did not reproduce the lost wake on this machine in three tries. A slower, loaded runner did. Aimed at what
 round 5 built, and **two of the three findings are round 5's own**, which is the fourth round
 running where the newest core path is where the finds are.
 

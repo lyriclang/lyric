@@ -942,12 +942,24 @@ public sealed class NativeRegistry : IDisposable
                         // the flag set for the check, or the event set for the wait — either
                         // way it is seen. A stale wake without a pending flag only makes the
                         // scheduler recompute and block again, which is correct in two steps.
+                        //
+                        // DISPOSAL IS RE-CHECKED THE SAME WAY, and it has to be: this Reset
+                        // discards the wake Dispose just sent, so a Dispose landing between the
+                        // Live check at the top of this native and the Reset would leave the
+                        // guest waiting on an event nobody will set again. The pending flag has
+                        // always been re-read here for exactly that reason; the disposed flag is
+                        // edge-triggered in the same way and needs the same treatment.
                         InterruptEvent.Reset();
+                        if (!Live)
+                            return LyrValue.FromObject(new[]
+                            {
+                                LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
+                            });
                         if (!TakePendingInterrupt())
                             InterruptEvent.Wait(timeout < 0
                                 ? Timeout.Infinite
                                 : (int)Math.Min(timeout, int.MaxValue));
-                        if (TakePendingInterrupt())
+                        if (!Live || TakePendingInterrupt())
                             return LyrValue.FromObject(new[]
                             {
                                 LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
