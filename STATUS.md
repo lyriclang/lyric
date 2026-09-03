@@ -11,6 +11,57 @@
 
 ## Current milestone
 
+**Round 5 ships as v4.3.2** (2026-09-03), and it is not clean either — so the loop does not exit
+here. Aimed at 4.3's ownership rebuild AND, per the maintainer's choice of the wide round, at the
+specification's own sentences. **Four findings in the toolchain, two in the documents.**
+
+**The heavy one is the race behind 4.3.1's fix.** A host may dispose a VM while its guest is still
+inside a native, and for ONE case that is the only thing it can do: a guest parked in a blocking
+wait is out of reach of an `ExecutionBudget`, which runs on the guest's own thread — the edge the
+4.0 sweep recorded, now load-bearing. 4.3.0 moved the tables to the VM and left them plain
+dictionaries. **Measured over 60 rounds before the fix: `Dispose` threw `InvalidOperationException`
+out of its own enumeration 53 times, 55 rounds stranded a handle past a SECOND `Dispose`, and two
+of those stranded with no exception at all** — which is the second mechanism on its own, a handle
+published into a table `Dispose` had already emptied, exactly round 4's finding reached by a race
+instead of a call order. The tables take one lock and nothing long runs under it: a descriptor is
+resolved there and the syscall happens outside, so `poll`'s select never blocks a disposer.
+Acquisition opens FIRST and publishes second, and **the publish is the check** — the window is made
+harmless rather than closed, which is the only shape that works when the OS call cannot be held
+under a lock. The five `Live` pre-checks stay as what they are: a saved syscall, not the guarantee.
+
+**The second rode in on the first**: `Socket.Select` throws when the descriptors under it are
+closed, and nothing caught it, so a host that disposed a parked VM got a raw `SocketException` — in
+the platform's own language — across an API whose every other failure is a `ScriptException`. The
+4.0 sweep fixed the OTHER way this select can throw (an empty resolved list) and the comment
+saying so sits three lines above the uncaught call; 4.3.0 added this way by closing sockets from
+another thread. It answers the clock alone now, and the guest ends cleanly rather than at all.
+
+**The third is a half-built feature that said nothing.** Destructuring a struct in a `match` is
+sema-COMPLETE — field types bound, irrefutability computed, a Sema test pinning it as clean — and
+the lowering half has never existed. It did not say so: `BindPattern` skipped the field bindings
+when there was no enum, so the first USE of one failed as *"reference to 'x' (only parameters,
+locals and constants)"*, a message about a name that only looks undeclared. Named now
+(`destructuring a struct or class in a match`) and pinned in `LoweringTests` on both roads — the
+irrefutable arm through the binding side, the guarded one through the tag test — with the Sema
+test told that it pins the FRONT half. The form is in no normative or user-facing document:
+§7.6 gives the field pattern to enum VARIANTS. **Whether it gets built or gets refused in the sema
+is under §Still open**; what it no longer is, is silent. The fourth: the debug adapter refuses a
+second `launch` instead of overwriting its session and stranding the first debuggee's handles.
+
+**Teil B — the specification against the tree — found what the round was opened for.**
+`spec/02-grammar.md` §3.5 said an interface's parent list *"holds at most one entry"*: false since
+2.16, and contradicted in §5.2 of the SAME document, in `conformance/cases/05-interfaces/several_parents.lyr`,
+and in the compiler's own comment. A normative document that contradicts its own suite is worse
+than a compiler bug — it is what a second implementation would be built against. Corrected
+spec-first (`lyric-spec#30`, merged) and mirrored; no rule changed, so the pin stays at 4.0. The
+README's REPL sentence went the same way: *"declarations persist across entries; statements run
+once"* — what persists is the DECLARATION, and the session re-runs everything it has accumulated,
+so an initializer with an effect repeats it once per entry (measured: four entries, four
+executions). **Eighteen other claims were compiled and hold**, grammar and types alike; two
+apparent hits were my own mis-tests, recorded so nobody re-runs them: `<` on two optionals is
+SEM0003 because §6.2's SEM0059 sentence is about `==`, and a self-referential alias IS refused
+(SEM0064) — at its first use, with the declaration's span. Round 6 follows.
+
 **Round 4 ships as v4.3.1** (2026-08-27) — aimed at what 4.3.0 rebuilt, which is where a fresh
 core path deserves to be probed. **Two findings, both 4.3.0's own.** (1) **The leak fix had a leak
 in it**: `Dispose` returns early the second time, so a handle a script acquired AFTER the first
@@ -1541,6 +1592,23 @@ answer yet, and it belongs asked before E4 starts.
   stated in guide 2 and guide 13; whether the lowering learns it is a feature decision, not a
   sweep fix. Found by the 4.2 sweep, round 2.
 
+- **Struct destructuring in a `match` is sema-complete and unlowerable, and the decision is which
+  half to keep.** `match (p) { P { n, m } => … }` binds the field types, computes its own
+  irrefutability and has a Sema test asserting it clean; the lowering emits nothing for it and
+  refuses by name since 4.3.2. The form appears in NO normative or user-facing document — §7.6
+  gives the field pattern to enum variants — so nothing promises it either way. Either it is
+  built (the binding side needs field reads off a struct subject, which the enum path already
+  does one level down) or the sema refuses it and the Sema test goes with it. What it must not
+  stay is a feature that exists only in the front end. Found by the 4.3 sweep, round 5;
+  pre-existing.
+- **The REPL repeats every side effect it has accumulated.** A session re-runs its declarations
+  on every entry, so a declaration whose initializer does something does it again each time —
+  measured, four entries and four executions of one `appendText`. 4.3.1 made each entry's
+  registry disposable, which fixed the LEAK and left the repetition. The README says so as of
+  4.3.2 rather than promising otherwise, but the honest fix is a session that keeps its VM and
+  its globals across entries instead of replaying them — a REPL rearchitecture, not a sweep's
+  work, and it would have to decide what happens to a declaration the user then redefines.
+  Found by the 4.3 sweep, round 5; pre-existing.
 - **A `v1.0.1` runtime cannot read a module with a source map.** The skip that lets a reader step
   over a section it does not know was broken until 3.1, so the forward compatibility the format
   promises does not hold for the one release before it. `--no-source-map` produces a module those

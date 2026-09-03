@@ -274,9 +274,10 @@ An interface member with a body is a default implementation.
 The interface list names the **parent**: whoever conforms to the interface conforms to the parent
 too, transitively — abstract members of the whole chain must be implemented, default methods of the
 whole chain are inherited, and a constraint on the parent is satisfied by the child. Semantic
-rules, not syntactic ones: the list holds at most **one** entry (several requirements side by side
-are what constraints are for: `<T :: [A, B]>`), the entry names an interface, the chain is acyclic,
-and a member of the chain cannot be redeclared — an inherited member keeps its declaring interface.
+rules, not syntactic ones: every entry names an interface, the chain is acyclic, an entry may not
+repeat an earlier one, and a member of the chain cannot be redeclared — an inherited member keeps
+its declaring interface. **Several parents are allowed since 2.16** (§5.2); what two of them may
+not do is contribute the same member name from different declarations.
 
 A value of interface type reaches the members of its whole chain. It does not, however, convert to
 a value of the parent's type: conformance is implied for the *implementing* type, so take the

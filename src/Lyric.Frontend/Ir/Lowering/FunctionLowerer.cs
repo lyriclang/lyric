@@ -2348,6 +2348,15 @@ internal sealed class FunctionLowerer
             return;
         }
 
+        // A struct or class destructure reaches here with no enum to read fields off. The sema
+        // supports the form fully — it binds the field types and computes irrefutability for it —
+        // and this half was never built, so the bindings were simply not emitted and the FIRST USE
+        // of one failed as an unknown reference. Refused where it is missing instead: the message
+        // names the form rather than a name that only looks undeclared. The irrefutable case comes
+        // through here and the refutable one through EmitTagTest, so both say something true.
+        if (pattern is VariantPattern { StructFields: not null } destructure && enumId is null)
+            throw NotSupported("destructuring a struct or class in a match", destructure.Span);
+
         if (enumId is { } id) BindPatternFields(pattern, id, value);
     }
 

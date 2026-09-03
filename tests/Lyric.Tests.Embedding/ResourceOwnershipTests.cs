@@ -316,4 +316,154 @@ public class ResourceOwnershipTests
             File.Delete(path);
         }
     }
+
+    // ---- disposing a VM whose guest is still running -------------------------------------
+
+    /// <summary>The guest of the race pins: it opens handles as fast as it can and never closes
+    /// one, so a <c>Dispose</c> landing anywhere inside the loop has something to strand.</summary>
+    private const string RaceSource = """
+        import std.io.stream as stream;
+
+        pub fn openMany(path: string, count: int): int {
+            var i = 0;
+            while (i < count) {
+                let f = stream.open(path);
+                if (f == null) {
+                    return i;
+                }
+                i = i + 1;
+            }
+            return i;
+        }
+        """;
+
+    /// <summary>Disposing a VM while its guest is inside a native strands nothing and throws
+    /// nothing.
+    ///
+    /// <para>A host may do this, and for one case it is the ONLY thing it can do: a guest parked
+    /// in a blocking wait is out of reach of an <c>ExecutionBudget</c>, which runs on the guest's
+    /// own thread. Held as plain dictionaries, the tables answered that with an
+    /// <c>InvalidOperationException</c> out of <c>Dispose</c> (53 of 60 rounds) and a handle
+    /// stranded past a second <c>Dispose</c> (55 of 60) — two of those with no exception at all,
+    /// which is the publish landing in a table that was already cleared.</para>
+    ///
+    /// <para>The rounds ARE the assertion: the window is wide, so a build without the fix fails
+    /// within the first few. Nothing here waits on a duration.</para></summary>
+    [Fact]
+    public void Disposing_a_vm_under_a_running_guest_strands_nothing()
+    {
+        var rng = new Random(20260903);
+
+        for (var round = 0; round < 30; round++)
+        {
+            var path = Fixture($"race{round}");
+            try
+            {
+                var vm = Vm();
+                var instance = vm.Instantiate(vm.Compile(RaceSource, "race"));
+
+                Exception? disposeFailure = null;
+                var guest = new Thread(() =>
+                {
+                    try { instance.Call<long>("openMany", path, 4000L); }
+                    catch (Exception) { /* the guest's own I/O failure is not the subject */ }
+                });
+                var disposer = new Thread(() =>
+                {
+                    Thread.Sleep(rng.Next(0, 12));
+                    try { vm.Dispose(); }
+                    catch (Exception e) { disposeFailure = e; }
+                });
+
+                guest.Start();
+                disposer.Start();
+                Assert.True(guest.Join(TimeSpan.FromSeconds(30)), "the guest thread finished");
+                Assert.True(disposer.Join(TimeSpan.FromSeconds(30)), "the disposer finished");
+
+                Assert.True(disposeFailure is null,
+                    $"round {round}: Dispose threw {disposeFailure?.GetType().Name}: "
+                    + disposeFailure?.Message);
+
+                vm.Dispose();
+                Assert.False(Locked(path),
+                    $"round {round}: a handle was published into an emptied table");
+            }
+            finally
+            {
+                try { File.Delete(path); } catch (IOException) { /* still held: the assert said so */ }
+            }
+        }
+    }
+
+    /// <summary>A guest parked in a wait is freed by <c>Dispose</c>, and what reaches the host is
+    /// not a platform exception.
+    ///
+    /// <para>This is the case the whole contract exists for. The descriptors vanish under
+    /// <c>poll</c>'s select, which throws a <c>SocketException</c> — uncaught until 4.3.2, so a
+    /// host that disposed a parked VM got a raw <c>System.Net.Sockets</c> failure, in the
+    /// platform's own language, across an API whose every other failure is a
+    /// <c>ScriptException</c>. The 4.0 sweep fixed the other way this select can throw; this is
+    /// the way 4.3.0 added by closing sockets from another thread.</para>
+    ///
+    /// <para>The park is signalled by a marker the guest creates just before it waits, so the
+    /// host waits on an EVENT rather than on a duration; the rounds carry the rest.</para>
+    /// </summary>
+    [Fact]
+    public void A_parked_guest_is_freed_by_dispose_without_a_platform_exception()
+    {
+        const string ParkSource = """
+            import std.io.net as net;
+            import std.io.stream as stream;
+            import std.task { Wait, spawn, run };
+
+            fn parkForever(marker: string): Coroutine<Wait> {
+                let l = net.listen("127.0.0.1", 0)!;
+                let m = stream.create(marker)!;
+                let c = net.accept(l);
+            }
+
+            pub fn park(marker: string): void { spawn(parkForever(marker)); run(); }
+            """;
+
+        for (var round = 0; round < 5; round++)
+        {
+            var marker = Path.Combine(Path.GetTempPath(),
+                $"lyric-park-{round}-{Guid.NewGuid():N}.marker");
+            try
+            {
+                var vm = Vm();
+                var instance = vm.Instantiate(vm.Compile(ParkSource, "park"));
+
+                Exception? guestFailure = null;
+                var guest = new Thread(() =>
+                {
+                    try { instance.CallVoid("park", marker); }
+                    catch (Exception e) { guestFailure = e; }
+                });
+                guest.Start();
+
+                var reached = false;
+                for (var spin = 0; spin < 3000 && !reached; spin++)
+                {
+                    reached = File.Exists(marker);
+                    if (!reached) Thread.Sleep(10);
+                }
+                Assert.True(reached, $"round {round}: the guest reached its wait");
+
+                vm.Dispose();
+
+                Assert.True(guest.Join(TimeSpan.FromSeconds(30)),
+                    $"round {round}: disposing freed the thread the guest was parked on");
+                Assert.True(guestFailure is null or ScriptException,
+                    $"round {round}: a {guestFailure?.GetType().Name} crossed the embedding "
+                    + $"boundary: {guestFailure?.Message}");
+
+                vm.Dispose();
+            }
+            finally
+            {
+                try { File.Delete(marker); } catch (IOException) { /* asserted above */ }
+            }
+        }
+    }
 }

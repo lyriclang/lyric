@@ -150,6 +150,17 @@ public sealed class DapServer
                         cancellationToken).ConfigureAwait(false);
                     break;
 
+                case "launch" when _session is not null:
+                    // A second launch would overwrite the session and strand the first
+                    // debuggee's registry — its sockets, children and files with it, since
+                    // only 'disconnect' releases one. The protocol has no such flow (a restart
+                    // is its own request, and this adapter does not offer one), so refusing is
+                    // the whole fix.
+                    await FailAsync(request,
+                        "this adapter is already running a program — send 'disconnect' first",
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+
                 case "launch":
                     await LaunchAsync(request, cancellationToken).ConfigureAwait(false);
                     break;

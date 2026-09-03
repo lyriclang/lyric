@@ -326,4 +326,23 @@ public class DapServerTests : IDisposable
         Assert.False(response.Success);
         Assert.Contains("unsupported", response.Message);
     }
+    /// <summary>A second launch is refused rather than served.
+    ///
+    /// <para>Serving it would overwrite the session and strand the first debuggee's registry —
+    /// its sockets, children and files with it, since only <c>disconnect</c> releases one. No
+    /// client should send this (a restart is its own request, which this adapter does not
+    /// offer), which is exactly why the adapter must not be the one to leak when it happens.
+    /// </para></summary>
+    [Fact]
+    public async Task A_launched_adapter_refuses_a_second_launch()
+    {
+        await using var client = Client();
+        await LaunchAsync(client, Counting);
+
+        var again = await client.RequestAsync("launch",
+            new { program = WriteProgram(Counting, "second.lyr"), stopOnEntry = false });
+
+        Assert.False(again.Success);
+        Assert.Contains("already running a program", again.Message);
+    }
 }
