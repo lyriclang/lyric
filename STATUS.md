@@ -36,9 +36,16 @@ to release a VM's handles without ending it, which is the per-instance ownership
 Recorded under §Still open; guide 20 states the limit rather than leaving it to be found. The
 third finding rides along: `lyrbuild` never disposed its VM either.
 
-**Two process lessons, both mine.** A pin that passes with AND without the fix is worse than no
+**Three process lessons, all mine.** A pin that passes with AND without the fix is worse than no
 pin — round 6 shipped one (its guest created a marker file a disposed VM refuses, so the run ended
 before the park) and this round nearly shipped a second. Verify red in both directions, always.
+**And do not assert an exact number about a system you have not traced**: the spin pin first
+asserted exactly one shutdown turn, passed on this machine on both engines, and a loaded Linux
+runner answered ZERO — the wake is consumed by the first ask, and whether the scheduler was far
+enough along to turn that into a resumed task depends on where it stood. A VM disposed before its
+task parks has no shutdown to run, so zero is correct too. The pin asserts what the fix actually
+promises — that the loop does not spin — with a bound five orders of magnitude below the failing
+behaviour, and it reports what it saw.
 And the heredoc trap in the maintenance notes is not theoretical: it collapsed backslash-n and
 doubled backslashes inside C# string literals twice this round, producing files that would not
 compile — and then a third time, in the sentence recording it. For content carrying backslashes
