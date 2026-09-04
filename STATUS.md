@@ -11,6 +11,48 @@
 
 ## Current milestone
 
+**Round 10 found NO defect in the toolchain** (2026-09-04) — the first round of this sweep that
+did not. Eight areas probed, six of them never touched by rounds 5 to 9, and the only correction
+is one sentence in the diagnostics appendix (`lyric-spec#32`). **Nothing ships from the toolchain
+again**: no behaviour changed. One pin was added, for a contract nothing covered.
+
+**Deliberately away from the dispose machinery**, which had carried four rounds and came back
+clean in round 9. What was probed and holds: a **packed executable running a task program** —
+never once run in this suite, and the shape a user actually ships (workers round-robin, the ticker
+sleeping, exit 0); the same program through **`lyric run`**, driver and lyrvm child; **one VM
+disposing beside another that sleeps**, eight rounds, the bystander sleeping its full deadline and
+ending on its own — the shared interrupt event and self-pipe do not disturb it; an
+**`ExecutionBudget` against a task program**, still stopping both a spinner (14 ms) and a sleeper
+(3 865 ms, the wall time a sleep burns without instructions — the 4.0 edge, unchanged); the
+`--vm`/`LYRIC_VM` replaceable-runtime hook, already covered by four tests including precedence;
+and **a child outliving the VM that started it**, which is 4.3.0's "disowned, not killed" decision
+holding.
+
+**One contract was uncovered and is now pinned**: a breakpoint inside a TASK. The chain case was
+pinned for a bare coroutine driven by a hand-written resume; with `std.task` the scheduler stands
+between, and the stack reads
+`main.worker.<body>:6 | std.task.step:154 | std.task.run:133 | main.main:11` — the order a person
+thinks in, the splice carrying through library frames. Nothing was broken; it is pinned because
+four rounds of changes to how a VM waits could have broken it and nothing would have said so.
+
+**The control run earned its place twice in one probe.** The child-disowning probe reported
+"killed, not disowned" — a contradiction of a documented decision — and its control said the probe
+could not see a child at all. Two argument shapes later the control passed and so did the result.
+Both "findings" were mine. **A probe without a control is a coin flip you cannot read**, and this
+round is the second time that has been true.
+
+**Two observations, neither a defect.** `spawn(...)` in one REPL entry and `run();` in the next
+does nothing at all, in silence — statements run once, so the spawn is gone by the time the run
+happens; within one entry it works. That is the documented model in its least pleasant form and
+belongs to the REPL entry already under §Still open. And `LYR-VM0011` is what a stdlib native
+raises when it stops the program itself, which the appendix described as the program's own
+`panic(msg)`; corrected, because a second implementation reading that row would pick a different
+code for the same event.
+
+**The loop's exit condition is a clean round, and whether this is one is the maintainer's call**:
+no toolchain defect, one appendix sentence. Round 11 aims at whatever is chosen; if the loop
+exits here, the next feature is planned instead — and HTTP still owes its TLS answer first.
+
 **Round 9 found ONE thing, and it is in the specification** (2026-09-04) — so the loop continues,
 but **nothing ships from the toolchain this round**: no behaviour changed, so there is nothing a
 CHANGELOG entry could tell a user, and a version bump would say something untrue. The artifact is
