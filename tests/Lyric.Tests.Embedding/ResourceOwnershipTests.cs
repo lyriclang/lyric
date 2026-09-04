@@ -575,4 +575,69 @@ public class ResourceOwnershipTests
         Assert.True(call.Wait(TimeSpan.FromSeconds(30)),
             "a wait on a disposed VM answers instead of parking forever");
     }
+    /// <summary>A task that RE-PARKS on the interrupt ends instead of spinning.
+    ///
+    /// <para>A disposed VM answers an interrupt wait the way an interrupt does, so shutdown code
+    /// gets to run. A "wait for quit" loop asks again — and until 4.3.5 it was handed that same
+    /// answer for ever: measured at 508 896 turns in five seconds on a saturated core, a HOT hang
+    /// where the bug this replaced was merely a quiet one. The wake is delivered once and the
+    /// next ask panics, which is the sentence this native already uses for a wait nothing can
+    /// end; here it is true in the strongest form, because the VM is gone.</para>
+    ///
+    /// <para>The turn count IS the assertion: one shutdown turn, not a number that depends on how
+    /// fast the machine spins.</para></summary>
+    [Fact]
+    public void A_reparking_interrupt_loop_ends_when_the_vm_is_disposed()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), $"lyric-requeue-{Guid.NewGuid():N}.marker");
+        try
+        {
+            var vm = Vm();
+            var instance = vm.Instantiate(vm.Compile("""
+                import std.task { Wait, spawn, run };
+                import std.io.stream as stream;
+
+                class Box { turns: int }
+                let box = Box { turns = 0 };
+
+                fn quitLoop(marker: string): Coroutine<Wait> {
+                    let m = stream.create(marker)!;
+                    var i = 0;
+                    while (i < 100000000) {
+                        yield Wait.Interrupt;
+                        box.turns = box.turns + 1;
+                        i = i + 1;
+                    }
+                }
+
+                pub fn park(marker: string): void { spawn(quitLoop(marker)); run(); }
+                pub fn turns(): int { return box.turns; }
+                """, "requeue"));
+
+            var guest = new Thread(() =>
+            {
+                try { instance.CallVoid("park", marker); }
+                catch (Exception) { /* an end of any kind is an end */ }
+            }) { IsBackground = true };
+            guest.Start();
+
+            var reached = false;
+            for (var spin = 0; spin < 2000 && !reached; spin++)
+            {
+                reached = File.Exists(marker);
+                if (!reached) Thread.Sleep(5);
+            }
+            Assert.True(reached, "the guest reached its wait");
+
+            vm.Dispose();
+
+            Assert.True(guest.Join(TimeSpan.FromSeconds(20)),
+                "the loop ended instead of spinning on the disposal wake");
+            Assert.Equal(1, instance.Call<long>("turns"));
+        }
+        finally
+        {
+            try { File.Delete(marker); } catch (IOException) { }
+        }
+    }
 }

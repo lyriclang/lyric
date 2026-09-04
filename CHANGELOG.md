@@ -10,6 +10,33 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.5 — 2026-09-04
+
+**Round 7 of the sweep.** Three findings: one is round 6's own, and two are the ownership rule of
+4.3.0 meeting tools nobody had checked against it.
+
+### Fixed
+
+- **A task that re-parks on `Wait.Interrupt` ends when the VM is disposed, instead of spinning.**
+  4.3.4 taught a disposed VM to answer that wait the way an interrupt does, so shutdown code gets
+  to run. A "wait for quit" loop asks again — and was handed that same answer for ever: measured
+  at 508 896 turns in five seconds on a saturated core. That is a HOT hang where the bug before it
+  was a quiet one. The wake is delivered once now; the next ask panics with the sentence this
+  native already uses for a wait nothing can end, which here is true in the strongest form.
+
+- **A handle one test file leaks no longer reaches the next.** `lyrtest` promises a fresh instance
+  per test, and it delivers one — but a file, socket or child belongs to the VM, and the runner
+  used ONE VM for the whole run. Measured: a test that opened a file and did not close it made a
+  test in another file fail to write that file. One VM per test file now, which costs nothing
+  measurable because the module is compiled once either way.
+
+  Two tests in one file still share a VM, and guide 20 says so rather than leaving it to be
+  discovered. Closing that half needs either a VM per test — about twelve times the compilation —
+  or a way to release a VM's handles without ending it.
+
+- **`lyrbuild` disposes the VM its build script ran in**, so a script that leaves a file open no
+  longer holds it until the process ends.
+
 ## v4.3.4 — 2026-09-04
 
 **Round 6 of the sweep**, aimed at what round 5 built. Two findings in it, both mine, and one

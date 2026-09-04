@@ -895,11 +895,7 @@ public sealed class NativeRegistry : IDisposable
                 // on a socket was woken because Dispose closed the socket under its select, and
                 // a guest parked on Wait.Interrupt alone — the documented shutdown shape — was
                 // never woken at all, because Dispose closes nothing that wait stands on.
-                if (!Live && wantInterrupt)
-                    return LyrValue.FromObject(new[]
-                    {
-                        LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
-                    });
+                if (!Live && wantInterrupt) return DisposedInterruptAnswer();
 
                 // The count moves on TRANSITIONS only. Assigning per poll let a second VM
                 // without a parked task clear the first one's listening, and then Ctrl+C
@@ -950,20 +946,17 @@ public sealed class NativeRegistry : IDisposable
                         // always been re-read here for exactly that reason; the disposed flag is
                         // edge-triggered in the same way and needs the same treatment.
                         InterruptEvent.Reset();
-                        if (!Live)
-                            return LyrValue.FromObject(new[]
-                            {
-                                LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
-                            });
+                        if (!Live) return DisposedInterruptAnswer();
                         if (!TakePendingInterrupt())
                             InterruptEvent.Wait(timeout < 0
                                 ? Timeout.Infinite
                                 : (int)Math.Min(timeout, int.MaxValue));
-                        if (!Live || TakePendingInterrupt())
+                        if (TakePendingInterrupt())
                             return LyrValue.FromObject(new[]
                             {
                                 LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
                             });
+                        if (!Live) return DisposedInterruptAnswer();
                     }
                     else if (timeout > 0)
                     {
@@ -1403,6 +1396,33 @@ public sealed class NativeRegistry : IDisposable
     private static int _interruptHandlerInstalled;
     private static System.Net.Sockets.Socket? _interruptPipe;
     private static readonly ManualResetEventSlim InterruptEvent = new(false);
+
+    private int _disposeWakeSent;
+
+    /// <summary>What an interrupt wait is told on a VM that has been disposed: the wake, ONCE,
+    /// and a panic every time after.
+    ///
+    /// <para>The wake exists so shutdown code gets to run — <c>Wait.Interrupt</c> is the
+    /// language's "you are being asked to stop", and a VM that is ending is exactly that. But a
+    /// task that RE-PARKS, which is what an idiomatic "wait for quit" loop does, would be handed
+    /// that same answer for ever: measured at half a million turns in five seconds on a
+    /// saturated core, a hot hang where the bug before it was merely a quiet one.</para>
+    ///
+    /// <para>So the second ask panics, and the sentence is the one this native already uses for
+    /// a wait nothing can end. It is true here in the strongest form: the VM is gone, so no
+    /// interrupt can ever arrive.</para></summary>
+    private LyrValue DisposedInterruptAnswer()
+    {
+        if (Interlocked.Exchange(ref _disposeWakeSent, 1) == 0)
+            return LyrValue.FromObject(new[]
+            {
+                LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
+            });
+
+        throw new LyricPanic(VmDiagnostics.Panicked,
+            "std.task.poll: waiting forever on nothing — the VM is disposed, so no interrupt "
+            + "can arrive");
+    }
 
     /// <summary>Takes whichever interrupt is pending for this VM: its own raise, or the
     /// process's signal. Both are taken — one wake answers both.</summary>

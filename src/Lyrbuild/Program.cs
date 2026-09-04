@@ -81,7 +81,9 @@ public static class Program
                 $"warning: {Path.Combine(project!.Directory, ProjectFile.FileName)}: {warning}");
 
         var artifacts = new List<Artifact>();
-        var vm = new LangVm(new HostOptions
+        // Disposed with the build: a build script that leaves a file open holds it until this
+        // process ends otherwise, and on Windows that locks it against whatever runs next.
+        using var vm = new LangVm(new HostOptions
         {
             // A build script writes files and starts processes. Withholding that would leave a
             // manifest with parentheses.

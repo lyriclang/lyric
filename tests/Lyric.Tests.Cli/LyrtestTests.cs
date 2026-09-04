@@ -113,4 +113,63 @@ public sealed class LyrtestTests
         Assert.Contains("FAIL math_tests.divides", result.Out);
         Assert.Contains("division by zero", result.Out);
     }
+    /// <summary>A handle one test file leaves open does not reach the next file.
+    ///
+    /// <para>The VM is the unit a handle belongs to, and until 4.3.5 the runner used ONE for the
+    /// whole run — so a test that opened a file and did not close it held it for every later
+    /// test. Measured before the fix: a test in another file could not write that file, and on
+    /// Windows the lock is what says so. One VM per file now, which costs nothing measurable
+    /// because the module is compiled once either way.</para>
+    ///
+    /// <para>Two tests in ONE file still share a VM; that half needs either a VM per test, at
+    /// about twelve times the compilation, or a way to release a VM's handles without ending it.
+    /// It is recorded as a decision rather than guessed at, so this test pins the half that is
+    /// answered.</para></summary>
+    [Fact]
+    public void A_handle_one_test_file_leaks_does_not_reach_the_next()
+    {
+        using var directory = Toolchain.TempDirectory();
+        directory.Write("lyric.json", """
+            { "sourceRoot": "src" }
+            """);
+        directory.Write(Path.Combine("src", "mathx.lyr"), Library);
+
+        // Forward slashes: the path goes into Lyric source, where a backslash opens an escape.
+        var shared = Path.Combine(directory.Path, "shared.bin")
+            .Replace(Path.DirectorySeparatorChar, '/');
+
+        directory.Write(Path.Combine("tests", "a_leaks_tests.lyr"), """
+            import std.test { Test, assertTrue };
+            import std.io.stream as stream;
+            import std.task { Wait, spawn, run };
+
+            fn opener(): Coroutine<Wait> {
+                let h = stream.create("@SHARED@")!;
+                let ok = stream.write(h, [65u8]);
+            }
+
+            @Test
+            pub fn leaks(): void {
+                spawn(opener());
+                run();
+                assertTrue(true, "left it open");
+            }
+            """.Replace("@SHARED@", shared));
+
+        directory.Write(Path.Combine("tests", "b_writes_tests.lyr"), """
+            import std.test { Test, assertTrue };
+            import std.io.file as file;
+
+            @Test
+            pub fn writes(): void {
+                assertTrue(file.writeText("@SHARED@", "b"),
+                    "the previous file's leak did not reach this one");
+            }
+            """.Replace("@SHARED@", shared));
+
+        var result = Toolchain.Lyrtest(directory.Path);
+
+        Assert.Contains("PASS b_writes_tests.writes", result.Out);
+        Assert.Equal(0, result.ExitCode);
+    }
 }

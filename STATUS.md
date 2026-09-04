@@ -11,6 +11,43 @@
 
 ## Current milestone
 
+**Round 7 ships as v4.3.5** (2026-09-04) — not clean, so the loop continues. **Three findings: one
+is round 6's own, and two are 4.3.0's ownership rule meeting tools nobody had checked against it.**
+
+**The first is a hot hang where the last one was quiet.** 4.3.4 taught a disposed VM to answer an
+interrupt wait the way an interrupt does, so shutdown code gets to run. A task that RE-PARKS — the
+idiomatic "wait for quit" loop — asks again, and was handed that same answer for ever: **measured
+at 508 896 turns in five seconds with a fully saturated core.** Trading a thread that parks quietly
+for one that burns a core is a worse bug than the one it replaced, and it was mine. The wake is
+delivered ONCE now and the next ask panics — the sentence this native already carries for a wait
+nothing can end, true here in the strongest form because the VM is gone. The turn count is the
+pin's assertion: one shutdown turn, not a number that depends on how fast the machine spins.
+
+**The second is the ownership rule against `lyrtest`, and it makes 4.3.0's own reasoning partly
+false.** 4.3.0 chose the REGISTRY as the unit over the ScriptInstance, arguing that per-instance
+ownership "buys nothing, since instances of one VM live and die together". For the test runner
+they do not: it promises a fresh instance per test precisely so they do not. The instance is
+fresh; **the resources are not.** Measured with a two-test project: a test that opens a file and
+does not close it makes the NEXT test fail to write that file, and across files too. One VM per
+test FILE now — the module is compiled once either way, so the stdlib suite runs in the same 3.9 s
+— which closes the cross-file half. **The within-file half is a decision, not a guess**: a VM per
+test is about twelve times the compilation (13 compiles become 166), and the alternative is a way
+to release a VM's handles without ending it, which is the per-instance ownership 4.3.0 declined.
+Recorded under §Still open; guide 20 states the limit rather than leaving it to be found. The
+third finding rides along: `lyrbuild` never disposed its VM either.
+
+**Two process lessons, both mine.** A pin that passes with AND without the fix is worse than no
+pin — round 6 shipped one (its guest created a marker file a disposed VM refuses, so the run ended
+before the park) and this round nearly shipped a second. Verify red in both directions, always.
+And the heredoc trap in the maintenance notes is not theoretical: it collapsed backslash-n and
+doubled backslashes inside C# string literals twice this round, producing files that would not
+compile — and then a third time, in the sentence recording it. For content carrying backslashes
+the shell is the wrong tool; an edit tool takes the text literally.
+
+**Clean in round 7**: round 6's two pins still hold after the one-shot change, and the disposal
+wake reaching other VMs is spurious-but-harmless as designed (they recompute and block again).
+Round 8 follows.
+
 **Round 6 ships as v4.3.4** (2026-09-04) — still not clean, so the loop continues. **`v4.3.3` is
 tagged and published NOTHING**, the 3.8.1 shape with a different cause: the release gate ran the
 suite on Windows in Release and round 6's own new pin HUNG there, after passing locally and on two
@@ -1650,6 +1687,16 @@ answer yet, and it belongs asked before E4 starts.
   stated in guide 2 and guide 13; whether the lowering learns it is a feature decision, not a
   sweep fix. Found by the 4.2 sweep, round 2.
 
+- **`lyrtest` isolates module state per test, but not resources — and closing that needs a
+  decision.** A file, socket or child belongs to the VM (4.3.0's rule), and the runner uses one VM
+  per test FILE since 4.3.5, so two tests in ONE file still share what either of them opens:
+  measured, a test that leaves a file open makes a later test in the same file fail to write it.
+  Two ways out, and both cost something. A VM per TEST means compiling the file once per test —
+  13 compiles become 166, and the stdlib suite goes from 3.9 s to an estimated 50 s. A way to
+  release a VM's handles WITHOUT ending it is the per-instance ownership 4.3.0 declined, and
+  reintroducing it as a second lifetime needs an answer to Rule 2: is "end this VM" and "end this
+  run inside it" one mechanism or two? Guide 20 documents the limit meanwhile. Found by the 4.3
+  sweep, round 7.
 - **A variant pattern over an optional enum is refused, and building it is a slice.**
   `match (e) { null => …, E.A => … }` on a `?E`: the sema accepts it and specifies exhaustiveness
   over "the two states of a `?T`", and the lowering carries ONE subject per match while this needs
