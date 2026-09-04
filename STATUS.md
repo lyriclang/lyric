@@ -11,6 +11,41 @@
 
 ## Current milestone
 
+**Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither
+is M36's**: both are older, and the feature only made them findable.
+
+**A pattern could bind the same name twice, and the second binding was DROPPED IN SILENCE.**
+`P { n = x, m = x }` over `P { n = 7, m = 9 }` answered **7**; `E.B(x, x)` over `(7, 9)` the same;
+`P { n, n }` compiled without a word. Both declaration sites ignored the answer `TryDeclare`
+gives, which is exactly how the first binding came to win. **The mirror image had always been
+refused** — `LYR-SEM0070` for a duplicate field in an INITIALIZER — so one brace list answered the
+same question two ways depending on the direction it was read in. `LYR-SEM0097` now refuses it,
+spec-first (`lyric-spec#35`, §7.6 plus the appendix row). Shadowing an enclosing name is untouched,
+and so is an or-pattern, whose alternatives are REQUIRED to repeat their names. The tuple half is
+years old; 4.4 only extended the silence to struct field patterns.
+
+**An or-pattern that BINDS never lowered, and is the third member of M36's family.**
+`E.A(x) | E.B(x)` — the idiomatic spelling, and the one `LYR-SEM0032` exists to check — binds
+nothing: each alternative is a branch of its own while the binding step runs once for the whole
+pattern. The symptom was word for word the one 4.3.2 recorded for struct destructuring, *reference
+to 'x' (only parameters, locals and constants)*, a message about a name that only looks
+undeclared. Named now, and the build recorded as a decision rather than guessed at.
+
+**A spurious warning rides with it, recorded rather than bent around.** `SEM0071` reports the
+binding of every alternative after the first as unused, because only alternative 0's symbols
+become the arm scope — an artifact of how `SEM0032` checks the alternatives, not something an
+author can act on. The analyzer has no parent pointers to tell where a binding sits, and the form
+is refused anyway, so the warning only ever accompanies an error today. It becomes real the day
+the or-pattern lowering is built; the pin says so instead of asserting a lone diagnostic.
+
+**Clean over eleven probes**: nested optional-enum matches (the tag locals are distinct —
+`DeclareSynthetic` allocates a fresh id per call, and `TagOf` numbers variants from zero, so `-1`
+is safe), or-patterns mixing `null` with a variant, guards over payloads, a match in a loop and one
+across a coroutine's yields, a generic enum, an optional STRUCT (a clean refusal, not a crash),
+exhaustiveness catching both a missing `null` arm and a missing variant, the scrutinee evaluated
+exactly ONCE, a class field and an array field left as references while a struct field is copied,
+and the FORMATTER carrying every new pattern form through unchanged. Round 2 follows.
+
 **M36 — pattern matching becomes complete — SHIPPED as v4.4.0** (2026-09-04). The
 sweep loop exited on round 10, and the maintainer chose a language gap over the HTTP module: two
 forms that are sema-COMPLETE and were never lowered. `match (p) { P { n, m } => … }` over a struct
@@ -1892,6 +1927,17 @@ answer yet, and it belongs asked before E4 starts.
   reintroducing it as a second lifetime needs an answer to Rule 2: is "end this VM" and "end this
   run inside it" one mechanism or two? Guide 20 documents the limit meanwhile. Found by the 4.3
   sweep, round 7.
+- **An or-pattern that BINDS does not lower, and a spurious warning rides with it.**
+  `E.A(x) | E.B(x)` is the idiomatic spelling and the one `LYR-SEM0032` exists to check — every
+  alternative must bind the same names at the same types — and the lowering binds nothing for it:
+  each alternative is a branch of its own while the binding step runs once for the whole pattern.
+  Refused by name since 4.4.1. Building it means binding on each alternative's own path before it
+  reaches the shared body, which is where the shape differs from every other pattern. The warning
+  half: `SEM0071` calls the binding of every alternative after the first unused, because only
+  alternative 0's symbols become the arm scope; the analyzer has no parent pointers to tell where
+  a binding sits, so it cannot be exempted the way a shorthand field pattern is. It only ever
+  accompanies the refusal today and becomes real the day the lowering is built. Found by the 4.4
+  sweep, round 1; pre-existing.
 - **A variant pattern over an optional enum is refused, and building it is a slice.**
   `match (e) { null => …, E.A => … }` on a `?E`: the sema accepts it and specifies exhaustiveness
   over "the two states of a `?T`", and the lowering carries ONE subject per match while this needs
