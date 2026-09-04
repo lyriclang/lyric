@@ -10,6 +10,53 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.4.0 — 2026-09-04
+
+**Pattern matching becomes complete.** Two forms the grammar always admitted, the checker always
+accepted, and the lowering never built. Both are additive: every program that compiled before
+compiles unchanged, and the bytecode format is untouched.
+
+### Added
+
+- **A `match` takes a struct or a class apart.**
+
+  ```lyr
+  struct Point { x: int, y: int }
+
+  fn sum(p: Point): int {
+      return match (p) {
+          Point { x, y } => x + y,
+      };
+  }
+  ```
+
+  It tests nothing — the value is already of that type — so one arm covers the whole `match`.
+  `Point { x = across }` binds under a name of your own, `_` in a field's place skips the field,
+  and a field left out is not read at all. A bound field is a **copy**, exactly as `let x = p.x;`
+  is.
+
+  A field pattern only binds: writing a test into one (`Point { x = 3 }`) is refused, and the
+  refusal names the field it sits on.
+
+- **A `match` over an optional enum takes both states.**
+
+  ```lyr
+  fn area(s: ?Shape): int {
+      return match (s) {
+          null                => -1,
+          Shape.Dot           => 0,
+          Shape.Rect { w, h } => w * h,
+      };
+  }
+  ```
+
+  Presence is settled before any variant is examined, because the tag lives inside the optional —
+  and that changes nothing about which arm answers: the arms are tried in the order they were
+  written, wherever the `null` arm stands among them.
+
+  Before this, both forms failed at compile time with `LYR-IR0001`. Nothing that worked has
+  changed.
+
 ## v4.3.6 — 2026-09-04
 
 **Round 8 of the sweep.** One finding, and it is a sentence I wrote in 4.3.5 that was not true.

@@ -82,6 +82,56 @@ fn main(): int { return classify(7); }
 An arm whose body is an expression ends with `,`. An arm whose body is a block may omit it, but a
 block arm must `return` or `throw` — it contributes no value.
 
+## Taking a struct apart
+
+A `match` also destructures a struct or a class. It tests nothing — the value is already of that
+type — so one arm covers the whole `match`, and the pattern is simply a list of the fields you
+want:
+
+```lyr
+struct Point { x: int, y: int }
+
+fn distanceSquared(p: Point): int {
+    return match (p) {
+        Point { x, y } => x * y + x * y,
+    };
+}
+
+fn main(): int { return distanceSquared(Point { x = 3, y = 4 }); }
+```
+
+`Point { x, y }` binds each field to its own name. Write `Point { x = across, y = up }` to choose
+other names, `_` in a field's place to skip it, and leave a field out entirely if you do not want
+it — it is not read.
+
+A field pattern only **binds**. Putting a test inside it — `Point { x = 3 }` — is refused, because
+a pattern that otherwise never fails would suddenly have a way to.
+
+A bound field is a **copy**, exactly as `let x = p.x;` is. Changing the original afterwards does
+not change what the pattern bound.
+
+## Matching an optional
+
+A `?T` of an enum takes both its states in one `match`: `null` for the missing one, the variants
+for the one that is there.
+
+```lyr
+enum Shape { Dot, Rect { w: int, h: int }, }
+
+fn area(s: ?Shape): int {
+    return match (s) {
+        null                => -1,
+        Shape.Dot           => 0,
+        Shape.Rect { w, h } => w * h,
+    };
+}
+
+fn main(): int { return area(Shape.Rect { w = 3, h = 4 }); }
+```
+
+Where you write the `null` arm makes no difference to which arm answers — the arms are tried in
+the order you wrote them, as everywhere else.
+
 ## Generic enums
 
 The type arguments belong to the enum and precede the variant:

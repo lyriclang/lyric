@@ -11,12 +11,41 @@
 
 ## Current milestone
 
-**M36 — pattern matching becomes complete — is PLANNED, and slice 0 is DONE** (2026-09-04). The
+**M36 — pattern matching becomes complete — SHIPPED as v4.4.0** (2026-09-04). The
 sweep loop exited on round 10, and the maintainer chose a language gap over the HTTP module: two
 forms that are sema-COMPLETE and were never lowered. `match (p) { P { n, m } => … }` over a struct
 or class binds field types, computes its own irrefutability and has a Sema test asserting it clean;
 `match (e) { null => …, E.A => … }` over a `?E` is accepted and its exhaustiveness is specified.
 Both have been refused BY NAME since 4.3.2 and 4.3.3, which is what made them findable.
+
+**Slice 2 — the optional enum — is BUILT, and M36 SHIPS as v4.4.0** (2026-09-04). The problem was
+never the reading but the ORDER: the tag lives inside the optional, so a variant arm needs the
+unwrapped value while a `null` arm needs the optional itself — two subjects where the lowering
+carries one — and presence must be settled before any tag is read, whatever order the arms stand
+in. **Both facts fold into one number.** A synthetic tag local holds the real tag when the value
+is present and `-1` when it is not; no variant can carry `-1`, so a `null` arm becomes an ordinary
+tag comparison and every arm is tested the same way, in the order it was written. **One local, not
+two**: the unwrapped value would need one as well, and the absent path has no value to store —
+so a variant's payload is unwrapped inside its OWN body, where the tag test has already proved the
+value is there.
+
+**The alternative was rejected on the rule, not on taste.** Desugaring into `if present { match … }
+else { … }` is less code and would have split the arms into two groups; §7.6 promises declaration
+order, and the conformance case is built to catch exactly that — its helper answers `7` for a
+`Dot`, so a lowering that let the binding arm take the present value ahead of the variant arm
+above it prints `7` where the case expects `0`.
+
+**One correction fell out of threading it**: `BindPattern` was being handed the SUBJECT's type,
+which for an enum is the tag's scalar. Harmless until now, and wrong for `?E`, where the binding
+arm needs the optional to unwrap. It gets the scrutinee's type now, which is what every branch of
+it actually wanted. The 4.3.3 refusal pins retire with their rule; what stays is the neighbour
+that always worked and that a two-subject match could most easily break — an optional matched with
+a binding arm.
+
+**The release.** Version 4.4.0, and the bump is what ACTIVATES the six cases gated `since: 4.4.0`
+in slice 0: **156/156 against this tree, one skip, the pre-existing `until 3.0.0`**. Format stays
+4.0 — no opcode was added, only ones that already existed were arranged differently. Guide 6 gains
+"Taking a struct apart" and "Matching an optional". Both engines green.
 
 **Slice 1 — the struct half — is BUILT.** A field pattern over a struct or class lowers: the
 branch side always matches (like a tuple pattern, and for a plainer reason — the scrutinee's type
