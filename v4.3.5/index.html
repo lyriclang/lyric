@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.3.5</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.3.5</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.3.5 — 2026-09-04</h2>
+<p><strong>Round 7 of the sweep.</strong> Three findings: one is round 6's own, and two are the ownership rule of
+4.3.0 meeting tools nobody had checked against it.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A task that re-parks on <code>Wait.Interrupt</code> ends when the VM is disposed, instead of spinning.</strong>
+4.3.4 taught a disposed VM to answer that wait the way an interrupt does, so shutdown code gets
+to run. A &quot;wait for quit&quot; loop asks again — and was handed that same answer for ever: measured
+at 508 896 turns in five seconds on a saturated core. That is a HOT hang where the bug before it
+was a quiet one. The wake is delivered once now; the next ask panics with the sentence this
+native already uses for a wait nothing can end, which here is true in the strongest form.</p>
+</li>
+<li><p><strong>A handle one test file leaks no longer reaches the next.</strong> <code>lyrtest</code> promises a fresh instance
+per test, and it delivers one — but a file, socket or child belongs to the VM, and the runner
+used ONE VM for the whole run. Measured: a test that opened a file and did not close it made a
+test in another file fail to write that file. One VM per test file now, which costs nothing
+measurable because the module is compiled once either way.</p>
+<p>Two tests in one file still share a VM, and guide 20 says so rather than leaving it to be
+discovered. Closing that half needs either a VM per test — about twelve times the compilation —
+or a way to release a VM's handles without ending it.</p>
+</li>
+<li><p><strong><code>lyrbuild</code> disposes the VM its build script ran in</strong>, so a script that leaves a file open no
+longer holds it until the process ends.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
