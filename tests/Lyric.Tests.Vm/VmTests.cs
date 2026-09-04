@@ -1649,6 +1649,98 @@ public class VmTests
             }
             """).AsI64);
 
+    // ------------------------------------------------------------------ Feld-Patterns (§7.6)
+
+    [Fact]
+    public void A_field_pattern_binds_each_field_to_its_own_name() =>
+        Assert.Equal(7, Run("""
+            struct Point { x: int, y: int }
+            fn main(): int {
+                let p = Point { x = 3, y = 4 };
+                return match (p) { Point { x, y } => x + y };
+            }
+            """).AsI64);
+
+    [Fact]
+    public void A_field_pattern_takes_a_name_of_its_own() =>
+        Assert.Equal(12, Run("""
+            struct Point { x: int, y: int }
+            fn main(): int {
+                let p = Point { x = 3, y = 4 };
+                return match (p) { Point { x = a, y = b } => a * b };
+            }
+            """).AsI64);
+
+    [Fact]
+    public void A_field_pattern_works_on_a_class() =>
+        // The form is about fields, not about where the value lives: a class is a reference and a
+        // struct a value, and both carry the layout the pattern reads.
+        Assert.Equal(5, Run("""
+            class Counter { n: int }
+            fn main(): int {
+                let c = Counter { n = 5 };
+                return match (c) { Counter { n } => n };
+            }
+            """).AsI64);
+
+    [Fact]
+    public void A_field_pattern_reads_only_what_it_names() =>
+        Assert.Equal(4, Run("""
+            struct Three { a: int, b: int, c: int }
+            fn main(): int {
+                let t = Three { a = 4, b = 5, c = 6 };
+                return match (t) { Three { a, b = _ } => a };
+            }
+            """).AsI64);
+
+    [Fact]
+    public void A_field_pattern_carries_its_bindings_into_a_guard() =>
+        // Always matching does not mean always winning: the guard runs with the bindings in scope
+        // and its failure falls through to the next arm.
+        Assert.Equal(41, Run("""
+            struct P { n: int }
+            fn pick(p: P): int { return match (p) { P { n } if n > 0 => n, _ => 0 }; }
+            fn main(): int { return pick(P { n = 41 }) + pick(P { n = -1 }); }
+            """).AsI64);
+
+    [Fact]
+    public void A_field_pattern_reads_a_generic_struct_at_its_instance() =>
+        // Unqualified, because the scrutinee's type already fixes the instance. Writing the
+        // arguments out — 'Box<int> { v }' — is a PARSE error: a pattern path does not resolve
+        // '<' the way an expression path does (§6.3), which is a gap the 4.3 sweep recorded and
+        // this feature does not close.
+        Assert.Equal(9, Run("""
+            struct Box<T> { v: T }
+            fn main(): int {
+                let b = Box<int> { v = 9 };
+                return match (b) { Box { v } => v };
+            }
+            """).AsI64);
+
+    /// <summary>A bound STRUCT field is a copy, exactly as <c>let i = o.i;</c> is.
+    ///
+    /// <para>The first version of this lowering read the field and stored it without copying, so
+    /// the binding aliased the field it came from: mutating the original through its own name
+    /// changed what the pattern had bound. Measured at 99 here, where the `let` spelling of the
+    /// same read answered 1.</para></summary>
+    [Fact]
+    public void A_bound_struct_field_is_a_copy() =>
+        Assert.Equal(1, Run("""
+            struct Inner { v: int }
+            struct Outer { i: Inner, n: int }
+            fn main(): int {
+                var o = Outer { i = Inner { v = 1 }, n = 0 };
+                var got = 0;
+                match (o) {
+                    Outer { i } => {
+                        o.i.v = 99;
+                        got = i.v;
+                    }
+                }
+                return got;
+            }
+            """).AsI64);
+
     // ------------------------------------------------------------------ Tupel (§4)
 
     [Fact]

@@ -2211,6 +2211,25 @@ internal sealed class FunctionLowerer
                 _b.Seal(new Branch(onMatch, span));
                 return;
 
+            // A field pattern over a STRUCT or CLASS cannot fail either, and for a plainer reason
+            // than the tuple's: the scrutinee's type already IS the pattern's type, so there is
+            // nothing left to test — the pattern only says which fields to read (§7.6). Binding is
+            // BindPattern's job; this branch always matches.
+            case VariantPattern { StructFields: { } named } when enumId is null:
+            {
+                // The limit §7.6 records: a sub-pattern that could fail would be a test inside a
+                // pattern that performs none, and this lowering has nowhere to put it. Refused by
+                // the FIELD it sits on, so the message points at what was written.
+                foreach (var field in named)
+                    if (field.Pattern is not (null or BindingPattern or WildcardPattern))
+                        throw NotSupported(
+                            $"a field pattern that can fail — '{field.Name}' carries a test, and a "
+                            + "field pattern only binds", field.Span);
+
+                _b.Seal(new Branch(onMatch, span));
+                return;
+            }
+
             case BindingPattern binding when _types.RefOf(pattern) is EnumVariantSymbol:
                 _b.Seal(new CondBranch(
                     EmitTagTest(enumId, binding.Name, subject, subjectType, binding.Span),
@@ -2363,14 +2382,39 @@ internal sealed class FunctionLowerer
             return;
         }
 
-        // A struct or class destructure reaches here with no enum to read fields off. The sema
-        // supports the form fully — it binds the field types and computes irrefutability for it —
-        // and this half was never built, so the bindings were simply not emitted and the FIRST USE
-        // of one failed as an unknown reference. Refused where it is missing instead: the message
-        // names the form rather than a name that only looks undeclared. The irrefutable case comes
-        // through here and the refutable one through EmitTagTest, so both say something true.
-        if (pattern is VariantPattern { StructFields: not null } destructure && enumId is null)
-            throw NotSupported("destructuring a struct or class in a match", destructure.Span);
+        // A struct or class destructure: the same field-by-field binding an enum variant gets,
+        // MINUS the narrowing step. There the value must be pushed to its variant first, because
+        // the tag says which layout it carries; here the value already is what the pattern names,
+        // so the object to read from is the subject itself.
+        if (pattern is VariantPattern { StructFields: { } structFields } && enumId is null)
+        {
+            // A class is a reference and a struct a value, and both carry their layout id: the
+            // difference decides how the value travels, not how a field is read out of it. A type
+            // that is neither — an optional, say — has no layout to read here, and the value would
+            // have to be narrowed first.
+            var holder = valueType switch
+            {
+                IrRefType reference => reference.Type,
+                IrStructType structure => structure.Type,
+                _ => throw NotSupported(
+                    "a field pattern over a value that carries no fields here — narrow it first",
+                    pattern.Span),
+            };
+
+            var layout = _typeTable.Defs[holder.Value];
+            foreach (var field in structFields)
+            {
+                var index = Array.IndexOf(layout.FieldNames, field.Name);
+                if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a pattern", field.Span);
+
+                // Short form `{ n }`: the sema bound the name on the FieldPattern node itself, so
+                // that node IS the binding — the same rule the variant path follows.
+                BindOne(field.Pattern ?? (Node)field, value, holder,
+                    new FieldId(index), layout.FieldTypes[index], field.Name, field.Span);
+            }
+
+            return;
+        }
 
         if (enumId is { } id) BindPatternFields(pattern, id, value);
     }
@@ -2449,6 +2493,14 @@ internal sealed class FunctionLowerer
         var slot = _slots.DeclareFor(local, type);
         var loaded = _slots.NewTemp(type);
         _b.Emit(new LoadField(loaded, obj, variantType, field, type, span));
+
+        // A STRUCT field is a value, and binding it takes a copy — the same thing `let i = o.i;`
+        // does. Without this the binding aliased the field it was read from, so mutating the
+        // original through its own name changed what the pattern had bound: measured at 99 where
+        // an ordinary `let` of the same field answered 1. Unobservable on the variant path, which
+        // shares this helper, only because an enum's payload cannot be reached to mutate.
+        if (type is IrStructType structType) loaded = CopyStructValue(loaded, structType, span);
+
         _b.Emit(new StoreLocal(slot, loaded, span));
     }
 
