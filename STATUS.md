@@ -11,6 +11,40 @@
 
 ## Current milestone
 
+**Round 9 found ONE thing, and it is in the specification** (2026-09-04) — so the loop continues,
+but **nothing ships from the toolchain this round**: no behaviour changed, so there is nothing a
+CHANGELOG entry could tell a user, and a version bump would say something untrue. The artifact is
+`lyric-spec#31`, merged.
+
+**The finding: three chapters describe two compiler-bound edges that 4.0 retired.** §4.4 lists
+`coroutineEnded` and `coroutineIsDone` among the functions the compiler binds without an import,
+§11 says an implementation MUST provide them, and §10's runtime bullet described the retired
+machine as current — a coroutine as a function VALUE carrying a lenient flag, with exhaustion read
+back through a library call. That is 3.x. **Measured rather than argued**: a 4.0 module driving a
+coroutine with `next()` imports `std.io.console.rawPrintln` and `std.core.fromInt` and nothing
+else, and its body stands in the function list as an ordinary function; a second module using
+every other special edge imports `panic`, `concat`, `repeat`, `rawToChars` and `fromInt`, so those
+four keep their standing and only the coroutine pair changes. The chapters now say that both edges
+exist only so pre-4.0 modules keep running. No rule moved, so the pin stays at 4.0. **This is the
+§3.5 shape again** (round 5): a sentence that outlived the release it described, in the chapter
+that release rewrote.
+
+**Clean, and worth not re-running.** (1) The `ManualResetEventSlim` round 8 gave every registry is
+`IDisposable` and is never disposed — which looked like a handle leak in the class whose whole job
+is not to leak. **Measured: 60 VMs whose guests slept moved the process handle count by ZERO**,
+because a slim event blocks on a monitor and allocates a kernel handle only for a caller that asks
+for its `WaitHandle`, which nothing here does. It is now documented as a deliberate non-fix:
+disposing it would throw `ObjectDisposedException` at a guest sitting inside its `Wait` — the raw
+platform exception 4.3.4 removed. (2) A VM holding BOTH descriptorless waits — a sleeper and a
+shutdown task — disposes cleanly over ten rounds, and the shutdown task gets its turn every time,
+because a parked interrupt makes the head check fire before the sleep branch is reached.
+
+**Two of my own leads were misreadings, recorded so nobody re-runs them**: catching `Throwable` is
+legal (§9.3 refuses an interface OTHER than `Throwable`, and the tree does exactly that), and
+`isDone` correctly does not exist in any form — the "exists only as a call" sentence is about
+`next`, and §10 says plainly that there is deliberately no query answering "done" without pulling.
+Round 10 follows.
+
 **Round 8 ships as v4.3.6** (2026-09-04) — **one finding, and it is a sentence I wrote in 4.3.5.**
 Guide 14 has promised since then that disposing "gives the thread back", and I had verified two of
 the THREE ways a task can wait. A descriptor wait ends because `Dispose` closes the descriptor
