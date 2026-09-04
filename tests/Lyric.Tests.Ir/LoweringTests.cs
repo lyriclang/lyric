@@ -516,27 +516,24 @@ public class LoweringTests
     public void Out_of_scope_constructs_report_where_and_what(string source, string expected) =>
         AssertNotSupported(source, expected);
 
-    /// <summary>Destructuring a STRUCT in a match is refused, and the refusal says so.
+    /// <summary>What SURVIVES of the struct-destructuring refusal: a field pattern whose
+    /// sub-pattern can fail.
     ///
-    /// <para>The sema supports the form completely: it binds the field types, computes
-    /// irrefutability for it, and a Sema test pins it as clean. The lowering half was never
-    /// built, and it did not say so — the bindings were simply not emitted, so the first USE of
-    /// one failed as "reference to 'x' (only parameters, locals and constants)", a message about
-    /// a name that only looks undeclared. A half-built feature is allowed; a silent one is not,
-    /// which is the same verdict the M24 probe reached about iterator chaining.</para>
+    /// <para>4.3.2 refused the whole form by name, because the sema supported it and the lowering
+    /// half had never been built. 4.4 builds that half, so those pins retired WITH their rule —
+    /// the shape 4.0 used when SEM0038 lost its outside-a-body half. This is the piece that stays,
+    /// and §7.6 records it as an implementation limit: a field pattern only binds, so a
+    /// sub-pattern that could FAIL would be a test inside a pattern that performs none.</para>
     ///
-    /// <para>Both roads are pinned: the irrefutable single arm comes through the binding side,
-    /// the guarded one through the tag test. Enum destructuring is untouched — it is the form
-    /// the specification actually gives meaning to (§7.6).</para></summary>
+    /// <para>The message names the FIELD it sits on, so it points at what was written rather than
+    /// at the pattern as a whole.</para></summary>
     [Theory]
-    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n, m } => { return n + m; } } }",
-        "destructuring a struct or class in a match")]
-    [InlineData("class C { n: int } fn f(c: C): int { match (c) { C { n } => { return n; } } }",
-        "destructuring a struct or class in a match")]
-    [InlineData("struct P { n: int } fn f(p: P): int { match (p) { P { n } if n > 0 => { return n; }, _ => { return 0; } } }",
-        "a variant pattern in a match over a non-enum")]
-    public void Destructuring_a_struct_in_a_match_is_refused_by_name(string source, string expected) =>
-        AssertNotSupported(source, expected);
+    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n = 3, m } => { return m; }, _ => { return 0; } } }",
+        "a field pattern that can fail")]
+    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n, m = 4 } => { return n; }, _ => { return 0; } } }",
+        "'m' carries a test")]
+    public void A_field_pattern_that_can_fail_is_refused_by_its_field(string source,
+        string expected) => AssertNotSupported(source, expected);
 
     /// <summary>A variant pattern over an OPTIONAL enum is refused, and the refusal stops calling
     /// it a non-enum.

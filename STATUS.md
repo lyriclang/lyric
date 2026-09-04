@@ -18,6 +18,36 @@ or class binds field types, computes its own irrefutability and has a Sema test 
 `match (e) { null => …, E.A => … }` over a `?E` is accepted and its exhaustiveness is specified.
 Both have been refused BY NAME since 4.3.2 and 4.3.3, which is what made them findable.
 
+**Slice 1 — the struct half — is BUILT.** A field pattern over a struct or class lowers: the
+branch side always matches (like a tuple pattern, and for a plainer reason — the scrutinee's type
+IS the pattern's type, so nothing is left to test), and the binding side is the second half of
+`BindPatternFields` MINUS the narrowing step. There the value must be pushed to its variant first,
+because the tag says which layout it carries; here the value already is what the pattern names.
+The refusals 4.3.2 introduced **retire with their rule**, the shape 4.0 used when SEM0038 lost its
+outside-a-body half; what stays pinned is the limit §7.6 records, refused now by the FIELD it sits
+on rather than by the pattern as a whole.
+
+**The slice found a defect in its own first version, and it was mine.** A bound struct field
+ALIASED the field it was read from: mutating the original through its own name changed what the
+pattern had bound. Measured at **99 where `let i = o.i;` of the same field answered 1** — the
+lowering read and stored without the `structcopy` that the ordinary binding path emits. Fixed in
+the shared helper, so the variant path is covered too; there it was **unobservable**, because an
+enum's payload cannot be reached to mutate, which is exactly why nothing had caught it. The pin
+carries the measurement rather than the conclusion.
+
+**Two things measured on the way, neither closed here.** A class is an `IrRefType` and a struct an
+`IrStructType` — the difference decides how a value travels, not how a field is read out of it,
+and the first version handled only the first (the class case compiled, the struct cases did not).
+And a generic struct destructures unqualified (`Box { v }`) while the spelled-out `Box<int> { v }`
+is a PARSE error: a pattern path does not resolve `<` the way an expression path does (§6.3). That
+is the gap round 9 recorded; this feature does not close it, and the test says so where a reader
+will meet it.
+
+**The version stays 4.3.6 deliberately.** The six conformance cases gate on `since: 4.4.0`, so
+bumping now would activate slice 2's cases against a lowering that cannot serve them yet. The bump
+comes with slice 2, and activates all six at once. 1449 Vm tests and all fourteen projects green,
+`LYRIC_JIT=1` included.
+
 **Slice 0 — the rules — SHIPPED to the specification** (`lyric-spec#33`, merged). §7.6 gains the
 field pattern over a struct or class: it **tests nothing**, because the scrutinee's type is
 already the pattern's type, so it always matches and one arm carrying it covers the `match`; it
