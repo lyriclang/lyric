@@ -584,8 +584,13 @@ public class ResourceOwnershipTests
     /// next ask panics, which is the sentence this native already uses for a wait nothing can
     /// end; here it is true in the strongest form, because the VM is gone.</para>
     ///
-    /// <para>The turn count IS the assertion: one shutdown turn, not a number that depends on how
-    /// fast the machine spins.</para></summary>
+    /// <para>The turn count is BOUNDED, not exact. An earlier version asserted exactly one — the
+    /// shutdown turn — and a loaded Linux runner answered zero: the wake is consumed by the first
+    /// ask, and whether the guest's scheduler was far enough along to turn that into a resumed
+    /// task depends on where it stood when the disposal landed. A VM disposed before its task
+    /// ever parks has no shutdown to run. What the fix actually promises, and all this pins, is
+    /// that the loop does not SPIN: the failing behaviour was five orders of magnitude away from
+    /// this bound, so nothing about it is close.</para></summary>
     [Fact]
     public void A_reparking_interrupt_loop_ends_when_the_vm_is_disposed()
     {
@@ -633,7 +638,11 @@ public class ResourceOwnershipTests
 
             Assert.True(guest.Join(TimeSpan.FromSeconds(20)),
                 "the loop ended instead of spinning on the disposal wake");
-            Assert.Equal(1, instance.Call<long>("turns"));
+
+            var turns = instance.Call<long>("turns");
+            Assert.True(turns <= 2,
+                $"the loop took {turns} turns after the dispose; before the fix it took 508 896 "
+                + "in five seconds on a saturated core");
         }
         finally
         {
