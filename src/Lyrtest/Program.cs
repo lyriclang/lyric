@@ -88,23 +88,32 @@ public static class Program
             return ExitCodes.Success;
         }
 
-        // Every capability: a test is the user's own code run on their own machine, the same
-        // standing as 'lyric run'. Output goes through, which is how a failing test gets to
-        // print what it saw.
-        var vm = new LangVm(new HostOptions
-        {
-            Capabilities = Capability.All,
-            StdlibRoot = stdlib,
-            SourceRoot = project?.SourceRoot,
-            NativeRoots = project?.NativeRoots,
-            Output = Console.Out,
-            Error = Console.Error,
-        });
-
         var total = 0;
         var failed = 0;
         foreach (var file in files)
         {
+            // ONE VM PER FILE, disposed with it. Every capability: a test is the user's own code
+            // run on their own machine, the same standing as 'lyric run'. Output goes through,
+            // which is how a failing test gets to print what it saw.
+            //
+            // The VM is the unit a handle belongs to, so a test that leaves a file open holds it
+            // for as long as its VM lives. Held for the whole RUN, as it was until 4.3.5, one
+            // test's leak reached every later test: measured, a test that opened a file and did
+            // not close it made a test in ANOTHER FILE fail to write that file. Per file is
+            // where the cost is nothing — the module is compiled once either way — and it is not
+            // the whole answer: two tests in ONE file still share, which needs either a VM per
+            // test (about twelve times the compilation) or a way to release a VM's handles
+            // without ending it. That is a decision, and it is recorded rather than guessed.
+            using var vm = new LangVm(new HostOptions
+            {
+                Capabilities = Capability.All,
+                StdlibRoot = stdlib,
+                SourceRoot = project?.SourceRoot,
+                NativeRoots = project?.NativeRoots,
+                Output = Console.Out,
+                Error = Console.Error,
+            });
+
             ScriptModule module;
             try
             {

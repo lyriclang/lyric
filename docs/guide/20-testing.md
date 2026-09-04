@@ -42,6 +42,13 @@ an instance. A failing assertion names both values (`expected 5, got 4`); a pani
 with its backtrace; the exit code is `0` when everything passed and `1` otherwise, which is all
 a CI step needs.
 
+**What a fresh instance does not reset is what a test OPENED.** A file, socket or child process
+belongs to the VM, and the runner uses one VM per test FILE — so a test that opens a file and
+does not close it holds it until the rest of that file's tests have run, and on Windows the file
+stays locked against them. Tests in other files are unaffected. Close what you open, in a `defer`
+if the test can fail in between, and a test that means to leave a handle open belongs in a file
+of its own.
+
 Test files are ordinary programs of your project: they import your modules through the
 `sourceRoot` the `lyric.json` declares, and the whole standard library and every capability are
 theirs — a test is your own code running on your own machine, the same standing `lyric run`
