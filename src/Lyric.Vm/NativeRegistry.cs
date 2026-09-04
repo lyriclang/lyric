@@ -1411,7 +1411,16 @@ public sealed class NativeRegistry : IDisposable
 
     /// <summary>Set once, by <see cref="Dispose"/>, and never reset: the signal a wait on this
     /// VM's own deadline blocks on, so that disposing ends it instead of leaving the host to sit
-    /// out a sleep the guest asked for.</summary>
+    /// out a sleep the guest asked for.
+    ///
+    /// <para>It is deliberately NOT disposed, and that is not an oversight to tidy up. Disposing
+    /// it while a guest thread sits inside its <c>Wait</c> throws an
+    /// <c>ObjectDisposedException</c> at that thread — a raw platform exception across an API
+    /// whose every other failure is a <c>ScriptException</c>, which is the bug 4.3.4 fixed for
+    /// the select. There is nothing to release either way: measured over 60 VMs whose guests
+    /// slept, the process handle count did not move, because the slim event blocks on a monitor
+    /// and allocates a kernel handle only for a caller that asks for its <c>WaitHandle</c>, which
+    /// nothing here does.</para></summary>
     private readonly ManualResetEventSlim _disposeSignal = new(false);
 
     /// <summary>What a wait is told on a VM that has been disposed: the answer ONCE, and a panic
