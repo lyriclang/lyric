@@ -10,6 +10,23 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.3.6 — 2026-09-04
+
+**Round 8 of the sweep.** One finding, and it is a sentence I wrote in 4.3.5 that was not true.
+
+### Fixed
+
+- **Disposing a VM now frees a guest that is only sleeping.** A task can be waiting in three
+  ways. A descriptor wait ends because `Dispose` closes the descriptor under it, and an interrupt
+  wait because a disposed VM answers it — but a deadline was a plain sleep, which nothing
+  interrupts. So "disposing gives the thread back", which guide 14 has promised since 4.3.5, held
+  for two waits out of three: measured, a task that asked for 20 000 ms held the host's thread for
+  19 845 ms after its VM was gone. It waits on the VM's own signal now — 6 ms in the same
+  measurement — and guide 14 names all three waits rather than the two that happened to work.
+
+  A guest sleeping is exactly the hung script a host has no other way to stop, so this was the
+  case the contract exists for, missing for the second round running.
+
 ## v4.3.5 — 2026-09-04
 
 **Round 7 of the sweep.** Three findings: one is round 6's own, and two are the ownership rule of

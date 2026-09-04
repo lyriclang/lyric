@@ -11,6 +11,28 @@
 
 ## Current milestone
 
+**Round 8 ships as v4.3.6** (2026-09-04) — **one finding, and it is a sentence I wrote in 4.3.5.**
+Guide 14 has promised since then that disposing "gives the thread back", and I had verified two of
+the THREE ways a task can wait. A descriptor wait ends because `Dispose` closes the descriptor
+under it; an interrupt wait because a disposed VM answers it; **a deadline was a plain
+`Thread.Sleep`, which nothing interrupts.** Measured: a task that asked for 20 000 ms held the
+host's thread for **19 845 ms after its VM was disposed**. It blocks on the VM's own signal now —
+6 ms in the same measurement — and guide 14 names all three waits instead of the two that happened
+to work. **A sleeping guest is exactly the hung script a host has no other way to stop**, so this
+was the case the contract exists for, missing for the second round running: round 6 found the
+interrupt wait the same way, and both times the pin that "proved" disposal freed a parked guest had
+picked the one wait kind that already worked.
+
+**Everything else this round came back clean, and two of those are worth not re-running.**
+`std.process` against a racing dispose — a child streaming 46 KB on pool threads while the VM is
+disposed under it, twelve rounds — no crash, no hang, no stray exception, no dispose failure; the
+probe carries a CONTROL run so that "clean" cannot mean "the child never started", which is the
+mistake a probe of this shape makes. And **round 7's per-file VM costs nothing at scale**: a
+generated 80-file, 160-test project runs in 2.46 s with a VM per file against 2.55 s with one for
+the whole run, so the isolation was free rather than cheap.
+
+Round 9 follows; the loop still has not produced a clean round.
+
 **Round 7 ships as v4.3.5** (2026-09-04) — not clean, so the loop continues. **Three findings: one
 is round 6's own, and two are 4.3.0's ownership rule meeting tools nobody had checked against it.**
 
