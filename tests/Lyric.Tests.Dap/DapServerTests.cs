@@ -345,4 +345,55 @@ public class DapServerTests : IDisposable
         Assert.False(again.Success);
         Assert.Contains("already running a program", again.Message);
     }
+    /// <summary>A breakpoint inside a TASK, with the scheduler standing between the body and
+    /// main.
+    ///
+    /// <para>The chain case above pins a bare coroutine driven by a hand-written resume. This is
+    /// the shape somebody actually debugs — a worker under <c>std.task</c> — and the scheduler
+    /// between them is ordinary Lyric, so the splice has to carry through two more frames of it.
+    /// The stack reads in the order a person thinks: the body, <c>step</c>, <c>run</c>,
+    /// <c>main</c>.</para>
+    ///
+    /// <para>Nothing was broken when this was written; it is here because four rounds of changes
+    /// to how a VM waits and is torn down could have broken it, and nothing covered the task
+    /// case.</para></summary>
+    [Fact]
+    public async Task A_breakpoint_inside_a_task_shows_the_scheduler_between_body_and_main()
+    {
+        await using var client = Client();
+        var program = await LaunchAsync(client, """
+            import std.io.console { println };
+            import std.task { Wait, spawn, run };
+
+            fn worker(n: int): Coroutine<Wait> {
+                yield Wait.Now;
+                println("worked");
+            }
+
+            fn main(): int {
+                spawn(worker(1));
+                run();
+                return 0;
+            }
+            """, breakpointLines: [6]);
+
+        Assert.Equal("breakpoint", client.TakeEvent("stopped").Body!.Value
+            .GetProperty("reason").GetString());
+
+        var stack = (await client.RequestAsync("stackTrace", new { threadId = 1 })).Body!.Value;
+        var frames = stack.GetProperty("stackFrames").EnumerateArray().ToList();
+
+        Assert.Equal("main.worker.<body>", frames[0].GetProperty("name").GetString());
+        Assert.Equal(6, frames[0].GetProperty("line").GetInt32());
+        Assert.Equal(program, frames[0].GetProperty("source").GetProperty("path").GetString());
+
+        // The scheduler is Lyric of the standard library, so it stands here by name and the
+        // splice does not stop at the chain boundary.
+        var names = frames.Select(f => f.GetProperty("name").GetString()).ToList();
+        Assert.Contains("std.task.run", names);
+        Assert.Equal("main.main", names[^1]);
+
+        Assert.True((await client.RequestAsync("continue", new { threadId = 1 })).Success);
+        Assert.Equal(0, client.TakeEvent("exited").Body!.Value.GetProperty("exitCode").GetInt32());
+    }
 }
