@@ -2479,6 +2479,18 @@ internal sealed class FunctionLowerer
             return;
         }
 
+        // An OR-PATTERN that binds reaches here and binds NOTHING: each alternative is a branch
+        // of its own in EmitPatternBranch, while this runs once for the whole pattern, and
+        // BindPatternFields wants a variant. The sema is complete — LYR-SEM0032 already checks
+        // that every alternative binds the same names at the same types — so the missing half is
+        // here, and until 4.4.1 it said nothing: the first USE of a bound name failed as an
+        // unknown reference. That is the shape 4.3.2 and 4.3.3 found twice and M36 closed twice;
+        // this is the third member of the family, named rather than left silent.
+        if (pattern is OrPattern { Alternatives: { } alternatives } && alternatives.Any(PatternBinds))
+            throw NotSupported(
+                "an or-pattern that binds — every alternative would have to bind in its own branch",
+                pattern.Span);
+
         if (enumId is { } id)
         {
             // Over an OPTIONAL enum the payload sits inside the optional. This arm is reached only
@@ -2553,6 +2565,17 @@ internal sealed class FunctionLowerer
                     new FieldId(index), layout.FieldTypes[index], field.Name, field.Span);
             }
     }
+
+    /// <summary>Does this pattern introduce a name? A unit variant looks like a binding and is
+    /// not one — only the sema knows which, and it recorded the answer.</summary>
+    private bool PatternBinds(Pattern pattern) => pattern switch
+    {
+        BindingPattern => _types.RefOf(pattern) is LocalSymbol,
+        VariantPattern { TupleElements: not null } or VariantPattern { StructFields: not null } => true,
+        TuplePattern tuple => tuple.Elements.Any(PatternBinds),
+        OrPattern or => or.Alternatives.Any(PatternBinds),
+        _ => false,
+    };
 
     private void BindOne(Node? sub, TempId obj, TypeId variantType, FieldId field, IrType type,
         string? shorthandName = null, Span shorthandSpan = default)

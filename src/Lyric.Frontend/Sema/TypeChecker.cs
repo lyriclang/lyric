@@ -4395,7 +4395,7 @@ public sealed class TypeChecker
                     return;
                 }
                 var local = new LocalSymbol(b.Name, scrutinee, mutable, b);
-                scope.TryDeclare(local);
+                DeclareBinding(scope, local, b.Span);
                 _result.BindRef(b, local); // for definite-assignment analysis
                 return;
 
@@ -4577,11 +4577,32 @@ public sealed class TypeChecker
             Report(v.Span, "LYR-SEM0031", $"variant '{ev.Name}' carries a payload — destructure it");
     }
 
+    /// <summary>Declares a name a pattern binds, and refuses a second binding of the same name in
+    /// the SAME pattern.
+    ///
+    /// <para>Both declaration sites used to ignore the answer, so the second binding was dropped
+    /// and the first won in silence: <c>P { n = x, m = x }</c> over <c>P { n = 7, m = 9 }</c>
+    /// answered 7, and <c>E.B(x, x)</c> the same. A binding the program writes and the compiler
+    /// discards is the shape this project refuses on sight, and the mirror image already does —
+    /// <c>LYR-SEM0070</c> refuses a duplicate field in an INITIALIZER.</para>
+    ///
+    /// <para>Shadowing an outer name stays legal: an arm binds into a scope of its own, and only a
+    /// clash within one table reaches here. Or-pattern alternatives bind into tables of their own
+    /// too, so <c>E.A(x) | E.B(x)</c> — where the name MUST repeat — is untouched.</para></summary>
+    private void DeclareBinding(SymbolTable scope, LocalSymbol local, Core.Span span)
+    {
+        if (scope.TryDeclare(local)) return;
+
+        _de.Report("LYR-SEM0097", Severity.Error, span,
+            $"'{local.Name}' is already bound in this pattern — a name binds once, and the second "
+            + "one would be dropped");
+    }
+
     private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope)
     {
         if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope); return; }
         var local = new LocalSymbol(fp.Name, type, false, fp); // short form: the field name binds
-        scope.TryDeclare(local);
+        DeclareBinding(scope, local, fp.Span);
         _result.BindRef(fp, local);
     }
 

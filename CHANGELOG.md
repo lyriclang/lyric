@@ -10,6 +10,28 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.4.1 — 2026-09-04
+
+**Round 1 of the sweep after M36.** Two findings, both older than the feature that surfaced them.
+
+### Fixed
+
+- **A pattern may no longer bind the same name twice** (`LYR-SEM0097`). `P { n, n }`,
+  `P { n = x, m = x }` and `E.B(x, x)` each name one binding twice, and the second was **dropped
+  in silence**: `P { n = 7, m = 9 }` matched against `P { n = x, m = x }` answered `7`. The mirror
+  image had always been refused — `LYR-SEM0070` for a duplicate field in an initializer — so one
+  brace list answered the same question two ways depending on whether you were constructing or
+  destructuring.
+
+  Shadowing a name from an enclosing scope is untouched, and so is an or-pattern, whose
+  alternatives are required to repeat the same names.
+
+- **An or-pattern that binds is refused by name.** `E.A(x) | E.B(x)` never lowered: each
+  alternative is a branch of its own and would have to bind on its own path, while the binding
+  step runs once for the whole pattern. It said nothing about that, so the first *use* of a bound
+  name failed as `reference to 'x'` — a message about a name that only looks undeclared. An
+  or-pattern that binds nothing, which is what the form is usually for, is unaffected.
+
 ## v4.4.0 — 2026-09-04
 
 **Pattern matching becomes complete.** Two forms the grammar always admitted, the checker always

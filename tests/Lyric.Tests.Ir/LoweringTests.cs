@@ -535,6 +535,44 @@ public class LoweringTests
     public void A_field_pattern_that_can_fail_is_refused_by_its_field(string source,
         string expected) => AssertNotSupported(source, expected);
 
+    /// <summary>An or-pattern that BINDS is refused by name.
+    ///
+    /// <para>Each alternative is a branch of its own, while the binding step runs once for the
+    /// whole pattern — so nothing was emitted and the first USE of a bound name failed as
+    /// "reference to 'x'", a message about a name that only looks undeclared. The sema half is
+    /// complete: LYR-SEM0032 already checks that every alternative binds the same names at the
+    /// same types. This is the third member of the family 4.3.2 and 4.3.3 found and M36 closed
+    /// twice, named rather than left silent.</para>
+    ///
+    /// <para>An or-pattern that binds NOTHING is the common case and keeps working; the second
+    /// row pins that the refusal did not swallow it.</para></summary>
+    [Fact]
+    public void An_or_pattern_that_binds_is_refused_by_name()
+    {
+        // Not AssertNotSupported: that helper demands a LONE diagnostic, and a spurious
+        // SEM0071 rides along here. Alternative 0's bindings become the arm scope, so every
+        // later alternative's binding looks unused — an artifact of how SEM0032 checks the
+        // alternatives, not something the author can act on. It only ever accompanies this
+        // error today, and it is recorded under Still open beside the missing lowering.
+        var (ir, de) = TryLower(
+            "enum E { A(int), B(int) } fn f(e: E): int { match (e) { E.A(x) | E.B(x) => { return x; } } }");
+
+        Assert.Null(ir);
+        var refusal = Assert.Single(de.Diagnostics.Where(d => d.Severity == Severity.Error));
+        Assert.Equal("LYR-IR0001", refusal.Code);
+        Assert.Contains("an or-pattern that binds", refusal.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_or_pattern_that_binds_nothing_still_lowers()
+    {
+        var (ir, de) = TryLower(
+            "enum E { A, B, C } fn f(e: E): int { match (e) { E.A | E.B => { return 1; }, E.C => { return 2; } } }");
+
+        Assert.NotNull(ir);
+        Assert.Empty(de.Diagnostics.Where(d => d.Severity == Severity.Error));
+    }
+
     /// <summary>The neighbour that had to keep working while the optional enum gained its own
     /// lowering: an optional matched with a BINDING arm.
     ///

@@ -517,4 +517,34 @@ public class PatternTests
         AssertClean(de);
         AssertType(new ArrayOf(LyrType.Int), t);
     }
+    // --- a name binds once in a pattern (§7.6) ---
+
+    /// <summary>A pattern may not bind the same name twice.
+    ///
+    /// <para>Both declaration sites ignored the answer <c>TryDeclare</c> gives, so the second
+    /// binding was dropped and the first won in silence: <c>P { n = x, m = x }</c> over
+    /// <c>P { n = 7, m = 9 }</c> answered 7, and <c>E.B(x, x)</c> the same. A binding the program
+    /// writes and the compiler discards is what the mirror image already refuses —
+    /// <c>LYR-SEM0070</c> for a duplicate field in an INITIALIZER.</para></summary>
+    [Theory]
+    [InlineData("struct P { n: int, m: int } fn u(p: P) { let v = match (p) { P { n, n } => n }; }")]
+    [InlineData("struct P { n: int, m: int } fn u(p: P) { let v = match (p) { P { n = x, m = x } => x }; }")]
+    [InlineData("enum E { A, B(int, int) } fn u(e: E) { let v = match (e) { E.B(x, x) => x, E.A => 0 }; }")]
+    public void A_name_binds_once_in_a_pattern(string source)
+    {
+        var (_, de) = LastInit(source);
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0097");
+    }
+
+    /// <summary>What the rule must NOT catch: shadowing an outer name, and an or-pattern, whose
+    /// alternatives are required to repeat the same names (LYR-SEM0032) and bind into tables of
+    /// their own.</summary>
+    [Theory]
+    [InlineData("struct P { n: int } fn u(p: P) { let n = 5; let v = match (p) { P { n } => n }; }")]
+    [InlineData("enum E { A(int), B(int) } fn u(e: E) { let v = match (e) { E.A(x) | E.B(x) => 0 }; }")]
+    public void The_rule_leaves_shadowing_and_or_patterns_alone(string source)
+    {
+        var (_, de) = LastInit(source);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0097");
+    }
 }
