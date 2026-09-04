@@ -30,29 +30,19 @@
 </a>
 </nav>
 <section class="changes">
-<h2>What changed in v4.3.1 — 2026-08-27</h2>
-<p><strong>Round 4 of the sweep, aimed at what 4.3.0 rebuilt.</strong> Two findings, and both are 4.3.0's own.</p>
+<h2>What changed in v4.3.6 — 2026-09-04</h2>
+<p><strong>Round 8 of the sweep.</strong> One finding, and it is a sentence I wrote in 4.3.5 that was not true.</p>
 <h3 id="fixed">Fixed</h3>
 <ul>
-<li><p><strong>A disposed VM no longer opens handles it will never release.</strong> <code>Dispose</code> returns early the
-second time, so anything a script acquired AFTER the first call was skipped — the fix for a
-leak had a leak in it, reachable by calling into a VM after disposing it.</p>
-<p>A disposed VM now keeps INTERPRETING but opens nothing: a file, a socket or a child process
-answers the ordinary &quot;could not&quot; of that operation, which a script already handles like any
-other I/O failure. Pure code still runs, because it holds nothing and stopping it would be a
-second and stranger failure mode.</p>
-<p>This also replaces the sentence 4.3.0 shipped. It said calling into a disposed VM was &quot;not
-defined&quot;; undefined behaviour is not an answer a sandbox may give, and now it is defined.</p>
-</li>
-<li><p><strong>The toolchain's own registry owners dispose.</strong> 4.3.0 made the registry disposable and wired
-only <code>LangVm</code>. Four places create one directly and did not: <code>lyric run</code>'s host, its bind-only
-path, the REPL and the debug adapter.</p>
-<p><strong>The REPL was the one that mattered.</strong> It creates a registry per ENTRY and re-runs its
-accumulated declarations every time, so an entry that opens a file opened it again — and each
-evaluation stranded the previous one's handles for the whole session. The debug adapter is the
-same shape one level up: an editor keeps one adapter across many runs, and a debugged program's
-sockets and files accumulated in it. Attached rather than launched, nothing is released — the
-registry is the host's, exactly as the controller only detaches.</p>
+<li><p><strong>Disposing a VM now frees a guest that is only sleeping.</strong> A task can be waiting in three
+ways. A descriptor wait ends because <code>Dispose</code> closes the descriptor under it, and an interrupt
+wait because a disposed VM answers it — but a deadline was a plain sleep, which nothing
+interrupts. So &quot;disposing gives the thread back&quot;, which guide 14 has promised since 4.3.5, held
+for two waits out of three: measured, a task that asked for 20 000 ms held the host's thread for
+19 845 ms after its VM was gone. It waits on the VM's own signal now — 6 ms in the same
+measurement — and guide 14 names all three waits rather than the two that happened to work.</p>
+<p>A guest sleeping is exactly the hung script a host has no other way to stop, so this was the
+case the contract exists for, missing for the second round running.</p>
 </li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>

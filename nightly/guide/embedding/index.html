@@ -387,6 +387,20 @@ runs as it did. What it cannot do is acquire a file, a socket or a child process
 the ordinary &quot;could not&quot; of the operation, and a script handles it like any other I/O failure.
 The rule exists so that a call after <code>Dispose</code> cannot strand handles the next <code>Dispose</code> would
 skip.</p>
+<p><strong><code>Dispose</code> may be called while a script is still running, from another thread</strong>, and for one
+case it is the only thing that works: a guest parked in a wait is out of reach of an
+<code>ExecutionBudget</code>, because a budget is counted on the guest's own thread and a parked guest is
+not executing. So a host that has to take a hung script down does it from outside.</p>
+<p><strong>It gives the thread back.</strong> A task can be waiting in exactly three ways, and disposing ends all
+three: a <strong>descriptor</strong> wait, because <code>Dispose</code> closes the descriptor under it; an <strong>interrupt</strong>
+wait — the shutdown shape, which holds no descriptor at all — because a disposed VM answers it the
+way an interrupt does, so tasks parked on <code>Wait.Interrupt</code> wake and the run drains; and a
+<strong>deadline</strong>, because the sleep blocks on the VM's own signal rather than on the clock. A guest
+that asked to sleep ten minutes does not cost the host ten minutes.</p>
+<p>A guest in the middle of an I/O call sees that call fail the ordinary way, and nothing crosses the
+boundary that is not a <code>ScriptException</code>. A run that then keeps asking to wait — a task that parks
+on the interrupt again in a loop — is told once and panics on the next ask: there is nothing left
+that could answer it.</p>
 <h2 id="errors">Errors</h2>
 <p>A script that fails throws on the host side:</p>
 <table>

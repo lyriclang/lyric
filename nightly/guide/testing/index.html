@@ -78,6 +78,12 @@ each in a <strong>fresh instance</strong>: module state cannot leak between test
 an instance. A failing assertion names both values (<code>expected 5, got 4</code>); a panic fails the test
 with its backtrace; the exit code is <code>0</code> when everything passed and <code>1</code> otherwise, which is all
 a CI step needs.</p>
+<p><strong>What a fresh instance does not reset is what a test OPENED.</strong> A file, socket or child process
+belongs to the VM, and the runner uses one VM per test FILE — so a test that opens a file and
+does not close it holds it until the rest of that file's tests have run, and on Windows the file
+stays locked against them. Tests in other files are unaffected. Close what you open, in a <code>defer</code>
+if the test can fail in between, and a test that means to leave a handle open belongs in a file
+of its own.</p>
 <p>Test files are ordinary programs of your project: they import your modules through the
 <code>sourceRoot</code> the <code>lyric.json</code> declares, and the whole standard library and every capability are
 theirs — a test is your own code running on your own machine, the same standing <code>lyric run</code>

@@ -59,6 +59,10 @@
 <h1>Changelog</h1>
 <nav class="contents">
 <ul>
+<li><a href="#v4.3.6-2026-09-04">v4.3.6 — 2026-09-04</a></li>
+<li><a href="#v4.3.5-2026-09-04">v4.3.5 — 2026-09-04</a></li>
+<li><a href="#v4.3.4-2026-09-04">v4.3.4 — 2026-09-04</a></li>
+<li><a href="#v4.3.2-2026-09-03">v4.3.2 — 2026-09-03</a></li>
 <li><a href="#v4.3.1-2026-08-27">v4.3.1 — 2026-08-27</a></li>
 <li><a href="#v4.3.0-2026-08-27">v4.3.0 — 2026-08-27</a></li>
 <li><a href="#v4.2.3-2026-08-27">v4.2.3 — 2026-08-27</a></li>
@@ -138,9 +142,139 @@ churn rather than change. The pre-1.0 releases carry their notes in their annota
 lists what changed <strong>for someone using the toolchain</strong>: the language, the standard library, the
 bytecode format, the command line and the embedding API. Compiler internals are in <code>git log</code>.</p>
 <hr />
+<h2 id="v4.3.6-2026-09-04">v4.3.6 — 2026-09-04</h2>
+<p><strong>Round 8 of the sweep.</strong> One finding, and it is a sentence I wrote in 4.3.5 that was not true.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>Disposing a VM now frees a guest that is only sleeping.</strong> A task can be waiting in three
+ways. A descriptor wait ends because <code>Dispose</code> closes the descriptor under it, and an interrupt
+wait because a disposed VM answers it — but a deadline was a plain sleep, which nothing
+interrupts. So &quot;disposing gives the thread back&quot;, which guide 14 has promised since 4.3.5, held
+for two waits out of three: measured, a task that asked for 20 000 ms held the host's thread for
+19 845 ms after its VM was gone. It waits on the VM's own signal now — 6 ms in the same
+measurement — and guide 14 names all three waits rather than the two that happened to work.</p>
+<p>A guest sleeping is exactly the hung script a host has no other way to stop, so this was the
+case the contract exists for, missing for the second round running.</p>
+</li>
+</ul>
+<h2 id="v4.3.5-2026-09-04">v4.3.5 — 2026-09-04</h2>
+<p><strong>Round 7 of the sweep.</strong> Three findings: one is round 6's own, and two are the ownership rule of
+4.3.0 meeting tools nobody had checked against it.</p>
+<h3 id="fixed-1">Fixed</h3>
+<ul>
+<li><p><strong>A task that re-parks on <code>Wait.Interrupt</code> ends when the VM is disposed, instead of spinning.</strong>
+4.3.4 taught a disposed VM to answer that wait the way an interrupt does, so shutdown code gets
+to run. A &quot;wait for quit&quot; loop asks again — and was handed that same answer for ever: measured
+at 508 896 turns in five seconds on a saturated core. That is a HOT hang where the bug before it
+was a quiet one. The wake is delivered once now; the next ask panics with the sentence this
+native already uses for a wait nothing can end, which here is true in the strongest form.</p>
+</li>
+<li><p><strong>A handle one test file leaks no longer reaches the next.</strong> <code>lyrtest</code> promises a fresh instance
+per test, and it delivers one — but a file, socket or child belongs to the VM, and the runner
+used ONE VM for the whole run. Measured: a test that opened a file and did not close it made a
+test in another file fail to write that file. One VM per test file now, which costs nothing
+measurable because the module is compiled once either way.</p>
+<p>Two tests in one file still share a VM, and guide 20 says so rather than leaving it to be
+discovered. Closing that half needs either a VM per test — about twelve times the compilation —
+or a way to release a VM's handles without ending it.</p>
+</li>
+<li><p><strong><code>lyrbuild</code> disposes the VM its build script ran in</strong>, so a script that leaves a file open no
+longer holds it until the process ends.</p>
+</li>
+</ul>
+<h2 id="v4.3.4-2026-09-04">v4.3.4 — 2026-09-04</h2>
+<p><strong>Round 6 of the sweep</strong>, aimed at what round 5 built. Two findings in it, both mine, and one
+older one found while checking that round 5 had broken nothing.</p>
+<h3 id="fixed-2">Fixed</h3>
+<ul>
+<li><p><strong>Disposing a VM now frees a guest parked on <code>Wait.Interrupt</code>.</strong> It did not, and the reason it
+looked like it did is the point: a guest waiting on a SOCKET is woken because <code>Dispose</code> closes
+the socket under its select. A guest parked on the interrupt holds no descriptor, so nothing
+woke it — the host's thread was gone for good while <code>Dispose</code> returned in a millisecond and
+reported success. &quot;Disposing frees a parked guest&quot; was true by accident, for the parks that
+happened to hold a handle.</p>
+<p>A disposed VM now answers that wait the way an interrupt does: every parked task wakes, the run
+drains, and the call returns. <code>Wait.Interrupt</code> is the language's &quot;you are being asked to stop&quot;,
+which makes it the honest answer for a VM that is ending — and it is the documented shutdown
+shape, so it was the case the contract exists for that did not work.</p>
+</li>
+<li><p><strong>A disposed VM no longer leaves Ctrl+C swallowed for the whole process.</strong> The interrupt
+listening count moves on transitions, and the poll that moves it read and updated it outside
+the lock <code>Dispose</code> uses to read the same flag. A raise landing between the two adds a listener
+that nothing ever subtracts, and while that count is above zero the Ctrl+C handler cancels the
+signal — on behalf of a VM that no longer exists. The transition is one step now, and a
+disposed VM does not arm at all.</p>
+</li>
+<li><p><strong>The wake that frees a parked guest is no longer discarded.</strong> The poll resets the interrupt
+event just before waiting on it, and re-reads the pending flag afterwards for exactly that
+reason. The disposed flag was checked only once, at the top — so a <code>Dispose</code> landing between
+that check and the reset had its wake wiped, and the guest waited on an event nobody would set
+again. It is re-read after the reset now, like the pending flag beside it.</p>
+<p><em><code>v4.3.3</code> was tagged and published nothing: the release gate ran the suite on Windows and the
+parked-guest test hung there. This release is that content plus the fix. No download carries
+<code>4.3.3</code>.</em></p>
+</li>
+<li><p><strong>A variant pattern over an OPTIONAL enum stops calling it a non-enum.</strong>
+<code>match (e) { null =&gt; …, E.A =&gt; … }</code> on a <code>?E</code> is refused by the lowering, which is unchanged —
+but it said &quot;a match over a non-enum&quot;, sending the reader to look for a mistake in the type
+rather than at the missing lowering. It now names the optional and says what to do:
+<code>narrow it first, then match the value</code>. Matching an optional with a binding arm is unaffected.</p>
+</li>
+</ul>
+<h2 id="v4.3.2-2026-09-03">v4.3.2 — 2026-09-03</h2>
+<p><strong>Round 5 of the sweep</strong>, aimed at 4.3's ownership rebuild and at the specification's own
+sentences. Four findings in the toolchain and two in the documents; the heaviest is again in what
+the release before it built.</p>
+<h3 id="fixed-3">Fixed</h3>
+<ul>
+<li><p><strong>Disposing a VM while its guest is still running no longer throws, and strands nothing.</strong></p>
+<p>A host may do this, and for one case it is the only thing it can do: a guest parked in a
+blocking wait is out of reach of an <code>ExecutionBudget</code>, which runs on the guest's own thread.
+4.3.0 moved the descriptor tables to the VM and left them plain dictionaries, so that host got
+two wrong answers instead. Measured over 60 rounds: <code>Dispose</code> threw
+<code>InvalidOperationException</code> out of its own enumeration 53 times, and 55 rounds left a handle
+stranded past a second <code>Dispose</code> — two of them with no exception at all, which is a handle
+published into a table <code>Dispose</code> had already emptied.</p>
+<p>The tables take a lock, and acquisition publishes under it: if the VM went while a file or
+socket was being opened, the call closes what it opened and answers its own &quot;could not&quot;, the
+same refusal it gives when the VM was already disposed.</p>
+</li>
+<li><p><strong>A disposed VM no longer hands the host a raw <code>SocketException</code>.</strong> The descriptors under
+<code>poll</code>'s select are closed by <code>Dispose</code>, and the select throws when they are. Nothing caught
+it, so a host that disposed a parked VM got a <code>System.Net.Sockets</code> failure in the platform's
+own language, across an API whose every other failure is a <code>ScriptException</code>. The wait now
+ends with the clock alone: the next turn finds those descriptors gone and the reads give the
+waiter the ordinary failure they always gave.</p>
+</li>
+<li><p><strong>Destructuring a struct in a <code>match</code> says so instead of blaming a name.</strong> The form is
+sema-complete — field types bound, irrefutability computed — and the lowering half was never
+built. It did not say that: the bindings were simply not emitted, so the first USE of one
+failed as <code>reference to 'x' (only parameters, locals and constants)</code>, a message about a name
+that only looks undeclared. It is now <code>LYR-IR0001: destructuring a struct or class in a match</code>.
+Enum destructuring is untouched — it is the form the specification gives meaning to.</p>
+</li>
+<li><p><strong>The debug adapter refuses a second <code>launch</code></strong> instead of overwriting its session and
+stranding the first debuggee's sockets, children and files. No client should send one; that is
+why the adapter must not be the one to leak when it happens.</p>
+</li>
+</ul>
+<h3 id="documentation">Documentation</h3>
+<ul>
+<li><p><strong>The specification stopped contradicting itself.</strong> <code>spec/02-grammar.md</code> §3.5 said an
+interface's parent list &quot;holds at most one entry&quot; — false since 2.16, and said the other way
+round in §5.2 of the same document, in the conformance suite, and in the compiler's own
+comment. Corrected upstream (<code>lyriclang/lyric-spec#30</code>) and mirrored here. No rule changed and
+no case moved, so the suite pin stays at 4.0.</p>
+</li>
+<li><p><strong>The README stopped promising the REPL forgets.</strong> It said &quot;declarations persist across
+entries; statements run once&quot;. What persists is the declaration, and the session re-runs
+everything it has accumulated on every entry — so a declaration whose initializer has an
+effect repeats that effect once per entry. Measured: four entries, four executions.</p>
+</li>
+</ul>
 <h2 id="v4.3.1-2026-08-27">v4.3.1 — 2026-08-27</h2>
 <p><strong>Round 4 of the sweep, aimed at what 4.3.0 rebuilt.</strong> Two findings, and both are 4.3.0's own.</p>
-<h3 id="fixed">Fixed</h3>
+<h3 id="fixed-4">Fixed</h3>
 <ul>
 <li><p><strong>A disposed VM no longer opens handles it will never release.</strong> <code>Dispose</code> returns early the
 second time, so anything a script acquired AFTER the first call was skipped — the fix for a
@@ -204,7 +338,7 @@ per-VM, which is what they had always meant; they were per-thread standing in fo
 <p><strong>Round 3 of the sweep.</strong> No behaviour changed: two gaps the earlier rounds named are now pinned
 by tests, one sentence of the 4.2.1 notes is corrected, and the heaviest finding is recorded
 rather than fixed.</p>
-<h3 id="documentation">Documentation</h3>
+<h3 id="documentation-1">Documentation</h3>
 <ul>
 <li><strong>A correction to the v4.2.1 notes.</strong> They said the zero-<code>max</code> pins live in the CLI suite
 &quot;because a panic ends the program the lyrtest runner is running&quot;. That is not true: <code>lyrtest</code>
@@ -232,7 +366,7 @@ resource ownership rather than per-thread, which is a design decision; it is rec
 <h2 id="v4.2.2-2026-08-27">v4.2.2 — 2026-08-27</h2>
 <p><strong>Round 2 of the sweep.</strong> One diagnostic fixed, one limit documented, and two language questions
 recorded rather than answered — deciding them is not a sweep's job.</p>
-<h3 id="fixed-1">Fixed</h3>
+<h3 id="fixed-5">Fixed</h3>
 <ul>
 <li><p><strong>A diagnostic no longer tells you to wait for a newer compiler when your program is simply
 wrong.</strong> <code>x == null</code>, <code>x ?? y</code> and <code>x ??= y</code> on a value that is not optional reported
@@ -246,7 +380,7 @@ monomorphization knows. The code stays <code>LYR-IR0001</code> — codes are sta
 where the default category was false.</p>
 </li>
 </ul>
-<h3 id="documentation-1">Documentation</h3>
+<h3 id="documentation-2">Documentation</h3>
 <ul>
 <li><strong>An f-string interpolation holds a scalar, and the guide now says so.</strong> <code>f&quot;{p}&quot;</code> on a struct
 is refused even when the type conforms to <code>Display</code>, while <code>println(p)</code> works through the
@@ -264,7 +398,7 @@ carried through a coroutine by value.</p>
 <p><strong>The sweep after 4.1.0 and 4.2.0.</strong> Ten probe groups against what the two releases added; one
 real finding, fixed failing-test-first, and it turned out to be older and wider than the release
 that surfaced it.</p>
-<h3 id="fixed-2">Fixed</h3>
+<h3 id="fixed-6">Fixed</h3>
 <ul>
 <li><p><strong>A <code>readSome</code> of zero or fewer bytes no longer returns one byte.</strong> The natives clamped <code>max</code>
 into <code>[1, 1MB]</code>, so asking for nothing handed back a byte nobody asked for. A caller computing
@@ -335,7 +469,7 @@ calls <code>text</code>. It is the <code>std.io.path</code> split of 4.0 in the 
 capability and moved out, a handle costs an extra one and stays out.</p>
 </li>
 </ul>
-<h3 id="fixed-3">Fixed</h3>
+<h3 id="fixed-7">Fixed</h3>
 <ul>
 <li><p><strong>A task yielding <code>Wait.Now</code> in a loop no longer starves every other kind of wait.</strong>
 <code>std.task.run</code> reached its poll only with an EMPTY run queue, and the poll is the one place a
@@ -378,7 +512,7 @@ operator beside them would be a second way to write one calculation; <code>Insta
 <h2 id="v4.0.1-2026-08-27">v4.0.1 — 2026-08-27</h2>
 <p><strong>The sweep after 4.0.0.</strong> Eight probes against what the major added; four real findings, all
 fixed failing-test-first. Nothing in the language or the format changed.</p>
-<h3 id="fixed-4">Fixed</h3>
+<h3 id="fixed-8">Fixed</h3>
 <ul>
 <li><strong>A read of a CLOSED socket no longer crashes the process.</strong> <code>netReadReady</code> answered &quot;no
 bytes&quot; for a descriptor the table does not know without recording a reason, so the previous
@@ -500,7 +634,7 @@ Modules compiled before 4.0 still bind the native.</li>
 announced: a handle is issued, not assembled — the declaring module offers a constructor
 function for values rebuilt from stored numbers.</li>
 </ul>
-<h3 id="fixed-5">Fixed</h3>
+<h3 id="fixed-9">Fixed</h3>
 <ul>
 <li><strong>A module-qualified call sees the whole overload set.</strong> Since 3.0, <code>net.localPort(x)</code>
 through a module alias bound only the FIRST function of the name and refused the call with
@@ -511,7 +645,7 @@ TCP names; the qualified route now collects the same candidate set.</li>
 <h2 id="v3.9.1-2026-08-25">v3.9.1 — 2026-08-25</h2>
 <p><strong>The sweep after 3.9.0</strong> (spec: <code>lyric-spec#25</code>). Twelve probes; two real findings and one
 recovery wart, all three fixed failing-test-first.</p>
-<h3 id="fixed-6">Fixed</h3>
+<h3 id="fixed-10">Fixed</h3>
 <ul>
 <li><strong>An attribute field no row can hold is refused instead of crashing the compiler</strong>
 (<code>LYR-SEM0096</code>). <code>struct Odd :: [OnFunction] { n: ?int }</code> with <code>@Odd { n = 3 }</code> passed the
@@ -552,7 +686,7 @@ one-per-attribute rule counts across both spellings.</li>
 take the group shape, a single-entry group unfolds to <code>@Name</code>, and a group that outgrows
 the line breaks one entry per line. Module-header attributes keep their stacked lines.</li>
 </ul>
-<h3 id="documentation-2">Documentation</h3>
+<h3 id="documentation-3">Documentation</h3>
 <ul>
 <li>Guide 15 documents both forms; <code>docs/Grammar.md</code> mirrors the amended spec chapter.</li>
 </ul>
@@ -565,7 +699,7 @@ else changed. There is no v3.8.1 download, and the tag stays as the record of wh
 <p><em>Tagged, never released — the gate refused it (see v3.8.2, which carries this content).</em></p>
 <p><strong>The sweep after 3.8.0.</strong> One finding, one cause, two faces: a global initializer was checked
 as if it stood in no module at all.</p>
-<h3 id="fixed-7">Fixed</h3>
+<h3 id="fixed-11">Fixed</h3>
 <ul>
 <li><strong>The inward privilege reaches global initializers</strong> (<code>LYR-SEM0093</code>). <code>let g = 42 as Entity;</code>
 at module scope compiled without the 3.8.0 warning — a global's initializer is checked before
@@ -599,7 +733,7 @@ warning now, rather than the error, is what gives running code a line of release
 (no stale error classification across two failures; <code>removeOrThrow</code> keeps <code>remove</code>'s
 success-when-never-existed semantics). Per the pipeline, the loop exits without a patch.</li>
 </ul>
-<h3 id="documentation-3">Documentation</h3>
+<h3 id="documentation-4">Documentation</h3>
 <ul>
 <li>Guide 12 stops claiming a script &quot;can neither forge one&quot; — it could, until now — and
 documents the privilege, the clock, and the constructor pattern.</li>
@@ -647,14 +781,14 @@ character offset and what a canonical string would have had there.</p>
 <code>std.os</code> stays silent throughout: an unset variable, an unanswered <code>hostName</code> — <code>null</code> IS the
 whole truth there. <code>Map.get</code>, <code>List</code> and the option helpers keep absence as a value, and panics
 keep programming errors.</p>
-<h3 id="fixed-8">Fixed</h3>
+<h3 id="fixed-12">Fixed</h3>
 <ul>
 <li><strong>An import mentioned only in a PATTERN warned as unused</strong> (<code>LYR-SEM0072</code>). <code>match (e.kind)</code>
 over an imported enum — the exact shape the new convention recommends — left the import
 &quot;unused&quot;, which under <code>--deny-warnings</code> fails the build. The 3.3.0 type-path fix, one node
 kind further: a pattern's path is strings, and its qualifier is recorded now.</li>
 </ul>
-<h3 id="documentation-4">Documentation</h3>
+<h3 id="documentation-5">Documentation</h3>
 <ul>
 <li>Guide 10 gains &quot;Whether, or why&quot; — both shapes side by side, <code>??</code> for the fallback and
 <code>match (e.kind)</code> for the reason. Guide 13 lists <code>std.io.error</code>, the twin convention, and the
@@ -664,7 +798,7 @@ kind further: a pattern's path is strings, and its qualifier is recorded now.</l
 <p>The sweep after 3.6.0, per the pipeline: adversarial probes against what the four changes make
 newly reachable. Two findings, both fixed with a failing test first; a second probe wave over
 the fixes found nothing.</p>
-<h3 id="fixed-9">Fixed</h3>
+<h3 id="fixed-13">Fixed</h3>
 <ul>
 <li><p><strong><code>lyric fmt</code> no longer strips the type from <code>catch (_: Boom)</code>.</strong> The clause printer read a
 null binding name as &quot;the whole binding is <code>_</code>&quot; and dropped the annotation — a selective
@@ -692,7 +826,7 @@ deliberately covers conformance and parent lists only.</p>
 down in spec §8.3, and the two places where the compiler silently chose or silently accepted now
 say so out loud. No format change — the bytecode stays <strong>3.6</strong> — and no correct, order-independent
 program changes meaning.</p>
-<h3 id="fixed-10">Fixed</h3>
+<h3 id="fixed-14">Fixed</h3>
 <ul>
 <li><p><strong>The order of a <code>::</code> list no longer decides a call</strong> (<code>LYR-SEM0092</code>). Type-argument inference
 through a conformance took the FIRST conformance in declaration order, so with
@@ -725,7 +859,7 @@ documented refusal (<code>LYR-IR0001</code>) instead of the crash.</p>
 lambda that calls it.</p>
 </li>
 </ul>
-<h3 id="documentation-5">Documentation</h3>
+<h3 id="documentation-6">Documentation</h3>
 <ul>
 <li>Guide 7 stops claiming that <code>v.mul(2.0)</code> is ambiguous (it resolves by the overload rules since
 3.0, exactly where <code>v * 2.0</code> does) and that the arithmetic interfaces are &quot;the one place&quot; a
@@ -793,7 +927,7 @@ name — the designed forward path, as with <code>co.next()</code> in 2.2.0 — 
 calls <code>parseFloat</code> loads everywhere it always did.</p>
 </li>
 </ul>
-<h3 id="documentation-6">Documentation</h3>
+<h3 id="documentation-7">Documentation</h3>
 <ul>
 <li>Guide 13 gains the two module sections and their rows in the module table, and its
 capabilities line stops naming <code>std.io.net</code> — a module that does not exist.</li>
@@ -803,7 +937,7 @@ capabilities line stops naming <code>std.io.net</code> — a module that does no
 none changes the behaviour of a correct, documented program — what they change is that malformed
 input, whether hand-written source or crafted bytecode, is now refused with a message instead of
 crashing, corrupting, or slipping through.</p>
-<h3 id="fixed-11">Fixed</h3>
+<h3 id="fixed-15">Fixed</h3>
 <ul>
 <li><p><strong>A Unicode escape past the last scalar no longer crashes the compiler.</strong> <code>&quot;\u{80000000}&quot;</code> —
 eight hex digits with the high bit set — wrapped to a negative number and took the compiler
@@ -877,7 +1011,7 @@ distinction available. It is lazy like every other adapter.</p>
 </li>
 </ul>
 <h2 id="v3.3.0-2026-08-24">v3.3.0 — 2026-08-24</h2>
-<h3 id="fixed-12">Fixed</h3>
+<h3 id="fixed-16">Fixed</h3>
 <ul>
 <li><p><strong>A module that only CALLS through an interface no longer fails to load.</strong> A library — an
 interface, a class calling through it, and the implementing left to whoever imports it —
@@ -989,7 +1123,7 @@ its signature — the part no test elsewhere can answer.</p>
 </li>
 </ul>
 <h2 id="v3.0.2-2026-08-23">v3.0.2 — 2026-08-23</h2>
-<h3 id="fixed-13">Fixed</h3>
+<h3 id="fixed-17">Fixed</h3>
 <ul>
 <li><p><strong>The build sometimes produced a <code>lyric pack</code> that could not pack</strong> (#101). Intermittent on
 Linux, on an unchanged tree, and the message pointed at the packer — where nothing was wrong.</p>
@@ -1013,7 +1147,7 @@ so, in the build, instead of shipping an archive whose driver could not pack.</p
 <h2 id="v3.0.1-2026-08-23">v3.0.1 — 2026-08-23</h2>
 <p><strong>The first sweep after the major</strong>, and the reason the pipeline now has one: four defects, none
 of which a test had asked about, all in what the new features do to EACH OTHER.</p>
-<h3 id="fixed-14">Fixed</h3>
+<h3 id="fixed-18">Fixed</h3>
 <ul>
 <li><p><strong>Static methods did not overload.</strong> <code>Id.of(7)</code> beside <code>Id.of(&quot;seven&quot;)</code> took the first
 declaration and then failed to type the argument. A static call names the type rather than
@@ -1041,7 +1175,7 @@ fires when two of them share a name AND their parameters, which is the case noth
 apart.</p>
 </li>
 </ul>
-<h3 id="documentation-7">Documentation</h3>
+<h3 id="documentation-8">Documentation</h3>
 <ul>
 <li>Guide 13 no longer says the language has no overloading. The <code>minInt</code>/<code>clampInt</code> family keeps
 its names — they were chosen when that was true — and the chapter says so rather than pretending
@@ -1178,7 +1312,7 @@ Reported where the operator is used, not at the declaration: a conformance anoth
 </li>
 </ul>
 <hr />
-<h3 id="fixed-15">Fixed</h3>
+<h3 id="fixed-19">Fixed</h3>
 <ul>
 <li><p><strong>A generic interface member called on an instance of a generic class.</strong>
 <code>ArrayIterator&lt;int&gt;.zip&lt;string&gt;(…)</code> did not compile: the receiver took the instance path, which
@@ -1274,7 +1408,7 @@ the next — <strong>the monomorphization does not terminate</strong>. It was tr
 answering. <code>map</code> and <code>flatMap</code> change the element type safely because they are generic: built
 per use rather than per instance.</li>
 </ul>
-<h3 id="fixed-16">Fixed</h3>
+<h3 id="fixed-20">Fixed</h3>
 <ul>
 <li><p><strong>A non-terminating monomorphization is a diagnostic instead of a hang.</strong> The lowering now
 reports it with the advice that fixes it — write the method as a free function — where it
@@ -1316,7 +1450,7 @@ parent running behind a child receiver, which is the case the old reasoning said
 <h2 id="v2.15.0-2026-08-22">v2.15.0 — 2026-08-22</h2>
 <p>Two small things off the list before v3, both of the same kind: something written in the source
 that the compiler looked past.</p>
-<h3 id="fixed-17">Fixed</h3>
+<h3 id="fixed-21">Fixed</h3>
 <ul>
 <li><strong>A <code>::</code> list takes interfaces only.</strong> <code>struct S :: [Vec2]</code> was SKIPPED — the entry resolved to
 something that is not an interface, and the check moved on. The declaration claimed a
@@ -1602,7 +1736,7 @@ from the number it is made of. Unlike 3.4, this one asks nothing of anybody.</li
 <h2 id="v2.10.1-2026-08-22">v2.10.1 — 2026-08-22</h2>
 <p>One fix, reported the day 2.10.0 landed: the new enum argument was unusable in the shape an SDK
 actually writes.</p>
-<h3 id="fixed-18">Fixed</h3>
+<h3 id="fixed-22">Fixed</h3>
 <ul>
 <li><p><strong>An attribute's field default holds in every module that uses the attribute.</strong> A default is
 written where the attribute is DECLARED — <code>layout: Layout = Layout.Shared</code> in the SDK — and read
@@ -1706,7 +1840,7 @@ answer.</p>
 <h2 id="v2.8.0-2026-08-22">v2.8.0 — 2026-08-22</h2>
 <p>Module constants initialize in dependency order, so a file compiles the same way whoever compiles
 it. The bytecode format stays <strong>3.3</strong>; more programs compile than before and none fewer.</p>
-<h3 id="fixed-19">Fixed</h3>
+<h3 id="fixed-23">Fixed</h3>
 <ul>
 <li><p><strong>A module-level <code>let</code> may read one from a module it imports.</strong> The order of initialization
 followed the order in which the entry file happened to discover the modules, so a THIRD module
@@ -1752,7 +1886,7 @@ question arises. The diagnostic's message says what the order is now.</p>
 </ul>
 <h2 id="v2.7.1-2026-08-22">v2.7.1 — 2026-08-22</h2>
 <p>One fix, to a request the debug adapter left unanswered.</p>
-<h3 id="fixed-20">Fixed</h3>
+<h3 id="fixed-24">Fixed</h3>
 <ul>
 <li><p><strong><code>lyrdbg</code> answers <code>setExceptionBreakpoints</code>.</strong> An editor configures exception breakpoints as
 part of its startup sequence — after the <code>initialized</code> event, before <code>configurationDone</code> —
@@ -1819,7 +1953,7 @@ reason for this release.</li>
 </ul>
 <h2 id="v2.5.1-2026-08-21">v2.5.1 — 2026-08-21</h2>
 <p>One fix, to a promise the formatter's own chapter makes.</p>
-<h3 id="fixed-21">Fixed</h3>
+<h3 id="fixed-25">Fixed</h3>
 <ul>
 <li><p><strong><code>lyric fmt</code> breaks operator chains at the 100-column limit.</strong> A condition of three
 comparisons ran to 140 characters and stayed there, idempotently: <code>BinaryDoc</code> held no line
@@ -1840,7 +1974,7 @@ reformatting turned out to be.</p>
 <h2 id="v2.5.0-2026-08-21">v2.5.0 — 2026-08-21</h2>
 <p>One requirement from the embedder, and the documentation gap beside it. The bytecode format stays
 <strong>3.3</strong>; nothing on the wire changes, which is the whole finding.</p>
-<h3 id="fixed-22">Fixed</h3>
+<h3 id="fixed-26">Fixed</h3>
 <ul>
 <li><p><strong>A native signature may name a value struct of ANOTHER SDK module.</strong> An SDK of several files
 declares its <code>Vec2</code> once; before this only the declaring module could name it, so a second
@@ -1859,7 +1993,7 @@ an array or an object is still refused — crossing a module line changes nothin
 host would have to know.</p>
 </li>
 </ul>
-<h3 id="documentation-8">Documentation</h3>
+<h3 id="documentation-9">Documentation</h3>
 <ul>
 <li><strong>The <code>…Int</code> family of <code>std.math</code> is named in the guide.</strong> <code>clamp</code> takes floats and <code>clampInt</code>
 takes ints, as <code>min</code>/<code>minInt</code> and <code>abs</code>/<code>absInt</code> do, because the language has no overloading and
@@ -1918,7 +2052,7 @@ to a narrow field while <code>let N = 5;</code> is already an <code>int</code> �
 that was doing anything unusual. The bytecode format stays <strong>3.3</strong>, and the language gains
 nothing — three of the four were valid programs the toolchain mishandled. Three conformance
 cases activate with this release (<code>//! since: 2.3.1</code>); the suite stands at 88.</p>
-<h3 id="fixed-23">Fixed</h3>
+<h3 id="fixed-27">Fixed</h3>
 <ul>
 <li><strong>A parent interface's default method works through a child-typed value.</strong> <code>c.describe()</code>,
 where <code>describe</code> is a default declared on the parent of <code>c</code>'s interface, was an internal
@@ -1978,7 +2112,7 @@ debug shape is available to any host that compiles.</li>
 runs before the debugger attaches, standard-library lines are not steppable, and optimized
 bytecode shows the optimizer's world.</li>
 </ul>
-<h3 id="fixed-24">Fixed</h3>
+<h3 id="fixed-28">Fixed</h3>
 <ul>
 <li><strong><code>tools/Bench</code> compiles again.</strong> The 2.0 deprecation removal took <code>std.collections.emptySet</code>
 with it and the harness's <code>set_iter</code> case was never migrated; every run died before the first
@@ -1989,7 +2123,7 @@ and its diagnostics.</li>
 <p>One fix, found by the embedder the same day: the specification's §3.5 promises that an opaque
 alias resolves to its underlying in a native signature — without restricting where the alias
 was declared. The toolchain under-delivered.</p>
-<h3 id="fixed-25">Fixed</h3>
+<h3 id="fixed-29">Fixed</h3>
 <ul>
 <li><strong>An imported opaque type resolves in a native signature.</strong> An SDK of several modules
 declares its handle type once (<code>engine.world</code> owns <code>TextureId</code>) and names it in a sibling's
@@ -2021,7 +2155,7 @@ Python, JavaScript or C# has one. The pull with an end signal is the honest form
 with that name in the message — the format's designed forward path.</p>
 </li>
 </ul>
-<h3 id="fixed-26">Fixed</h3>
+<h3 id="fixed-30">Fixed</h3>
 <ul>
 <li><strong><code>Coroutine&lt;T&gt;</code> works as a field type.</strong> A class or struct field, and a type argument
 (<code>List&lt;Coroutine&lt;T&gt;&gt;</code>), used to be refused with <code>LYR-IR0001</code> (&quot;type 'Coroutine' (not a
@@ -2036,7 +2170,7 @@ common form, was always fine.)</li>
 <h2 id="v2.1.1-2026-08-20">v2.1.1 — 2026-08-20</h2>
 <p>One fix, found the day of 2.1.0 by the first embedder to re-pin: a compiler crash on a form
 the language always meant to allow.</p>
-<h3 id="fixed-27">Fixed</h3>
+<h3 id="fixed-31">Fixed</h3>
 <ul>
 <li><strong>A static call through a module-qualified type works.</strong> <code>import std.random;</code> followed by
 <code>random.Random.seeded(1234)</code> crashed the compiler with an internal error out of the lowering
@@ -2068,7 +2202,7 @@ themselves as before. Parameter defaults thread their context too.</li>
 <p>The first harvest of the deep audit: seven bugs measured against the now-normative
 specification, fixed as one wave. Seven new conformance cases activate with this release
 (<code>//! since: 2.0.1</code>); the suite stands at 78.</p>
-<h3 id="fixed-28">Fixed</h3>
+<h3 id="fixed-32">Fixed</h3>
 <ul>
 <li><strong><code>a..=hi</code> reaches the type's maximum.</strong> The inclusive range desugared to <code>..hi+1</code>, which
 wraps at the bound — <code>for (_ in max-2..=max)</code> ran ZERO times. Inclusive ranges ride their
@@ -2147,7 +2281,7 @@ is not in the module (<code>Defines</code> says so), which is why this waited fo
 <p>The language has a specification: <code>lyriclang/lyric-spec</code> holds twelve chapters and a
 conformance suite, non-normative until 2.0 — and from this release on the semantics are
 FROZEN. Two toolchain fixes came out of writing it. The bytecode format stays <strong>3.2</strong>.</p>
-<h3 id="fixed-29">Fixed</h3>
+<h3 id="fixed-33">Fixed</h3>
 <ul>
 <li><p><strong><code>{{</code> and <code>}}</code> in f-strings produce a literal brace</strong> — promised by the grammar since 1.0,
 honored by the lexer since this release: <code>f&quot;json: {{\&quot;k\&quot;: {n}}}&quot;</code> renders braces instead
@@ -2166,7 +2300,7 @@ conformance test — the alternative was a clause that silently caught nothing.<
 <p>The freeze prep: the design leftovers settled before the spec freezes semantics. <code>opaque type</code>
 arrives, the string API becomes methods, iterator chaining gets its documented No — and a
 latent function-id collision in the lowering falls. The bytecode format stays <strong>3.2</strong>.</p>
-<h3 id="fixed-30">Fixed</h3>
+<h3 id="fixed-34">Fixed</h3>
 <ul>
 <li><strong>A function-id collision in the lowering</strong>, latent since struct-returning natives: the
 global initializer's slot was reserved only for DECLARED globals, but a struct-return buffer
@@ -2236,7 +2370,7 @@ The subtraction is a named method, not an operator — <code>Instant - Instant</
 and the operator interfaces are homogeneous by the v1.13 decision.</p>
 </li>
 </ul>
-<h3 id="fixed-31">Fixed</h3>
+<h3 id="fixed-35">Fixed</h3>
 <ul>
 <li><p><strong><code>std.string</code> stops being quadratic.</strong> <code>StringBuilder.build</code> and <code>join</code> folded left and
 copied the whole result once per piece — both are one native join now; <code>replace</code> moves
@@ -2291,7 +2425,7 @@ makes <code>std.core</code> the library's root — and <code>import std.core { D
 <code>std.string</code> legal. Public API is unchanged; existing bytecode keeps running.</p>
 </li>
 </ul>
-<h3 id="fixed-32">Fixed</h3>
+<h3 id="fixed-36">Fixed</h3>
 <ul>
 <li><strong><code>@Deprecated</code> keeps its promise</strong>: it emits no metadata row and roots nothing. Previously a
 non-generic deprecated function survived dead-code pruning in every importing program — dead
@@ -2685,7 +2819,7 @@ named, typed shape of an attributed type.</p>
 counts them, and hovering <code>@System</code> in an editor answers with the struct.</p>
 </li>
 </ul>
-<h3 id="fixed-33">Fixed</h3>
+<h3 id="fixed-37">Fixed</h3>
 <ul>
 <li><strong>A duplicate field in a struct initializer crashed the compiler.</strong> <code>P { x = 1, x = 2 }</code> passed
 the type checker and died in the lowering with an internal exception instead of an error
@@ -2752,7 +2886,7 @@ accident of how compounds were checked, recorded as a limit. The compound check 
 delivered them.</p>
 </li>
 </ul>
-<h3 id="fixed-34">Fixed</h3>
+<h3 id="fixed-38">Fixed</h3>
 <ul>
 <li><strong>A compound assignment never checked its operator.</strong> <code>p += p</code> on a struct passed the compiler and
 produced an integer addition of two references at runtime — the <code>s += &quot;x&quot;</code> class of bug fixed in
@@ -2797,7 +2931,7 @@ is <code>.</code>; everything else is the editor asking on its own.</p>
 a signature and nothing else. All three are written now, interface members included.</p>
 </li>
 </ul>
-<h3 id="fixed-35">Fixed</h3>
+<h3 id="fixed-39">Fixed</h3>
 <ul>
 <li><p><strong>A struct initializer is a reference to its type.</strong> Asking for the definition of <code>Point</code> in
 <code>let p = Point { x = 1 };</code> used to answer nothing, and find-references did not list it. Both do
@@ -2819,7 +2953,7 @@ system — and not the scope.</li>
 another file of your project that imports it is not searched.</li>
 </ul>
 <h2 id="v1.3.1-2026-08-17">v1.3.1 — 2026-08-17</h2>
-<h3 id="fixed-36">Fixed</h3>
+<h3 id="fixed-40">Fixed</h3>
 <ul>
 <li><p><strong>Eight diagnostics pointed at a document that does not exist.</strong> Five named <code>Sprache.md</code>, which has
 been <a href="/nightly/grammar/"><code>docs/Grammar.md</code></a> for some time, and the sections they cited were wrong as
@@ -2875,7 +3009,7 @@ for a catch binding. An editor that announces <code>linkSupport</code> now also 
 the declaration beside the name, so a peek window shows the declaration and puts the cursor on its
 name.</li>
 </ul>
-<h3 id="fixed-37">Fixed</h3>
+<h3 id="fixed-41">Fixed</h3>
 <ul>
 <li><strong>Go to definition on a struct initializer no longer jumps somewhere else.</strong> In
 <code>let p = Point { x = 1 };</code>, asking about <code>Point</code> used to land on <code>p</code> — the enclosing binding, which
@@ -3037,7 +3171,7 @@ library sits beside the toolchain — keeps its bare name. Nothing absolute reac
 module does not carry the directory layout of the machine that built it.</p>
 </li>
 </ul>
-<h3 id="fixed-38">Fixed</h3>
+<h3 id="fixed-42">Fixed</h3>
 <ul>
 <li><p><strong><code>s += &quot;x&quot;</code> on a string silently produced the empty string.</strong> <code>+</code> on a <code>string</code> is a call to
 <code>std.string.concat</code> and on an array an <code>arrcat</code> instruction, but the compound forms emitted a bare
@@ -3082,7 +3216,7 @@ editing the importing file does.</li>
 <p>Both need a place where a project says what it consists of, and putting that on the command line
 would make a third place where the layout is written down.</p>
 <h2 id="v1.0.1-2026-08-14">v1.0.1 — 2026-08-14</h2>
-<h3 id="fixed-39">Fixed</h3>
+<h3 id="fixed-43">Fixed</h3>
 <ul>
 <li><p><strong>A module with both a module-level <code>let</code> and a <code>try</code>/<code>catch</code> compiled to a file that would not
 load.</strong> The compiler wrote the Globals section (id 10) ahead of the Handlers section (id 9), and
@@ -3127,7 +3261,7 @@ and report <code>ok</code> for programs the backend could not express.</li>
 <li>Releases ship a <strong>self-contained archive per platform</strong> (<code>win-x64</code>, <code>linux-x64</code>, <code>osx-arm64</code>) that
 runs without a .NET install.</li>
 </ul>
-<h3 id="documentation-9">Documentation</h3>
+<h3 id="documentation-10">Documentation</h3>
 <ul>
 <li>A static documentation site generated by <code>tools/DocGen</code>: the guide, both specifications, and a
 standard library reference generated from the <code>.lyr</code> signatures. One frozen directory per version.</li>
