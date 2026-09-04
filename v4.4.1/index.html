@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric v4.4.1</title>
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="">Lyric</a>
+<nav class="areas">
+<a href="guide/getting-started/">Guide</a>
+<a href="grammar/">Documentation</a>
+</nav>
+<span class="version">v4.4.1</span>
+<nav class="switcher" data-versions="../versions.json"></nav>
+</header>
+<main class="welcome">
+<h1>Lyric</h1>
+<p class="lead">A statically typed application language with a bytecode VM — standalone, and embeddable in a host with a capability-based sandbox.</p>
+<nav class="cards">
+<a class="card" href="guide/getting-started/">
+<h2>Guide</h2>
+<p>Learn the language chapter by chapter — from the first program to embedding, building and attributes.</p>
+</a>
+<a class="card" href="grammar/">
+<h2>Documentation</h2>
+<p>The reference: the grammar, the bytecode format, the standard library and the changelog.</p>
+</a>
+</nav>
+<section class="changes">
+<h2>What changed in v4.4.1 — 2026-09-04</h2>
+<p><strong>Round 1 of the sweep after M36.</strong> Two findings, both older than the feature that surfaced them.</p>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><p><strong>A pattern may no longer bind the same name twice</strong> (<code>LYR-SEM0097</code>). <code>P { n, n }</code>,
+<code>P { n = x, m = x }</code> and <code>E.B(x, x)</code> each name one binding twice, and the second was <strong>dropped
+in silence</strong>: <code>P { n = 7, m = 9 }</code> matched against <code>P { n = x, m = x }</code> answered <code>7</code>. The mirror
+image had always been refused — <code>LYR-SEM0070</code> for a duplicate field in an initializer — so one
+brace list answered the same question two ways depending on whether you were constructing or
+destructuring.</p>
+<p>Shadowing a name from an enclosing scope is untouched, and so is an or-pattern, whose
+alternatives are required to repeat the same names.</p>
+</li>
+<li><p><strong>An or-pattern that binds is refused by name.</strong> <code>E.A(x) | E.B(x)</code> never lowered: each
+alternative is a branch of its own and would have to bind on its own path, while the binding
+step runs once for the whole pattern. It said nothing about that, so the first <em>use</em> of a bound
+name failed as <code>reference to 'x'</code> — a message about a name that only looks undeclared. An
+or-pattern that binds nothing, which is what the form is usually for, is unaffected.</p>
+</li>
+</ul>
+<p><a href="changelog/">The full changelog →</a></p>
+</section>
+</main>
+<script src="site.js"></script>
+</body>
+</html>
