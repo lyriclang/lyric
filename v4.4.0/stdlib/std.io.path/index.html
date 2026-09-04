@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.io.path — Lyric v4.4.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.4.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/" class="here">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.io.path</h1>
+<nav class="contents">
+<ul>
+<li><a href="#function-joinpath">joinPath</a></li>
+<li><a href="#function-filename">fileName</a></li>
+<li><a href="#function-parentdir">parentDir</a></li>
+<li><a href="#function-extension">extension</a></li>
+<li><a href="#function-stem">stem</a></li>
+<li><a href="#function-withextension">withExtension</a></li>
+<li><a href="#function-isabsolute">isAbsolute</a></li>
+</ul>
+</nav>
+<p>Joining, splitting and inspecting path STRINGS — no capability, because none of it
+touches the disk. Both separators count everywhere: Windows understands <code>/</code>, and a script
+running on both systems should not have to guess.</p>
+<section class="item" id="function-joinpath">
+<h2><a href="#function-joinpath">joinPath</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn joinPath(left: string, right: string): string</code></pre>
+<p>Joins two path parts, with neither a doubled nor a missing separator.</p>
+<p class="source">stdlib/std/io/path.lyr:28</p>
+</section>
+<section class="item" id="function-filename">
+<h2><a href="#function-filename">fileName</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn fileName(path: string): string</code></pre>
+<p>The last component. <code>&quot;a/b/c.txt&quot;</code> becomes <code>&quot;c.txt&quot;</code>.</p>
+<p class="source">stdlib/std/io/path.lyr:61</p>
+</section>
+<section class="item" id="function-parentdir">
+<h2><a href="#function-parentdir">parentDir</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parentDir(path: string): string</code></pre>
+<p>Everything before the last separator, or <code>&quot;&quot;</code> when there is none.</p>
+<p class="source">stdlib/std/io/path.lyr:67</p>
+</section>
+<section class="item" id="function-extension">
+<h2><a href="#function-extension">extension</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn extension(path: string): string</code></pre>
+<p>The extension WITHOUT the dot. <code>&quot;&quot;</code> when there is none.</p>
+<p>A leading dot does not count: <code>&quot;.gitignore&quot;</code> has no extension, that is its name. This rule
+differs between languages, so it is stated here.</p>
+<p class="source">stdlib/std/io/path.lyr:83</p>
+</section>
+<section class="item" id="function-stem">
+<h2><a href="#function-stem">stem</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn stem(path: string): string</code></pre>
+<p>The name without its extension. <code>&quot;a/b/c.txt&quot;</code> becomes <code>&quot;c&quot;</code>.</p>
+<p class="source">stdlib/std/io/path.lyr:99</p>
+</section>
+<section class="item" id="function-withextension">
+<h2><a href="#function-withextension">withExtension</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn withExtension(path: string, ext: string): string</code></pre>
+<p>Replaces the extension. An empty extension removes it.</p>
+<p class="source">stdlib/std/io/path.lyr:109</p>
+</section>
+<section class="item" id="function-isabsolute">
+<h2><a href="#function-isabsolute">isAbsolute</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn isAbsolute(path: string): bool</code></pre>
+<p>Does the path start at the root? Recognises <code>/x</code> and <code>C:\x</code>.</p>
+<p class="source">stdlib/std/io/path.lyr:117</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.io.net/">std.io.net</a>
+<a class="next" href="../../stdlib/std.io.stream/">std.io.stream</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
