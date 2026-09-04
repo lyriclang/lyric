@@ -2087,6 +2087,10 @@ internal sealed class FunctionLowerer
     /// site.</summary>
     private bool _matchFellThrough = true;
 
+    /// <summary>The tag an ABSENT optional enum reports. Variant tags are numbered from zero, so
+    /// no variant can claim it, which is what lets a 'null' arm be tested like any other.</summary>
+    private const long AbsentTag = -1;
+
     private TempId? LowerMatch(Expr scrutinee, MatchArm[] arms, IrType? resultType, Span span)
     {
         var scrutineeType = TypeOfExpr(scrutinee);
@@ -2106,6 +2110,51 @@ internal sealed class FunctionLowerer
             _b.Emit(new EnumTag(tag, value, span));
             subject = tag;
             subjectType = new IrScalarType(IrScalar.I64);
+        }
+        else if (scrutineeType is IrOptionalType { Inner: IrEnumType inner })
+        {
+            // An OPTIONAL enum carries its tag INSIDE the optional, so the tag cannot be read
+            // before presence is known — whatever order the arms are written in. Both facts are
+            // folded into one value: a tag local that holds the real tag when the value is there
+            // and ABSENT_TAG when it is not. No variant can carry that number, so a 'null' arm
+            // becomes an ordinary tag comparison and every arm is tested the same way, in the
+            // order it was written (§7.6).
+            //
+            // One local, not two: the unwrapped VALUE would need one as well, and there is no
+            // value to store on the absent path. A variant arm's payload is unwrapped inside its
+            // own body instead, where the tag test has already proved the value is present.
+            // Already lowered: the inner type carries the table id the tag is read against.
+            enumId = inner.Type;
+
+            var i64 = new IrScalarType(IrScalar.I64);
+            var tagLocal = _slots.DeclareSynthetic("matchTag", i64);
+
+            var isSome = _slots.NewTemp(BoolType);
+            _b.Emit(new OptIsSome(isSome, value, span));
+
+            var present = _b.NewBlock();
+            var absent = _b.NewBlock();
+            var tested = _b.NewBlock();
+            _b.Seal(new CondBranch(isSome, present, absent, span));
+
+            _b.SwitchTo(present);
+            var unwrapped = _slots.NewTemp(inner);
+            _b.Emit(new OptGet(unwrapped, value, inner, span));
+            var presentTag = _slots.NewTemp(i64);
+            _b.Emit(new EnumTag(presentTag, unwrapped, span));
+            _b.Emit(new StoreLocal(tagLocal, presentTag, span));
+            _b.Seal(new Branch(tested, span));
+
+            _b.SwitchTo(absent);
+            _b.Emit(new StoreLocal(tagLocal, EmitConst(new IntConst(unchecked((ulong)AbsentTag)),
+                i64, span), span));
+            _b.Seal(new Branch(tested, span));
+
+            _b.SwitchTo(tested);
+            var loaded = _slots.NewTemp(i64);
+            _b.Emit(new LoadLocal(loaded, tagLocal, i64, span));
+            subject = loaded;
+            subjectType = i64;
         }
 
         // The merge block arises ONLY when an arm needs it. If none falls through — every arm returns,
@@ -2131,13 +2180,13 @@ internal sealed class FunctionLowerer
             var next = unconditional ? (BlockId?)null : _b.NewBlock();
 
             if (unconditional) _b.Seal(new Branch(body, arm.Span));
-            else EmitPatternBranch(arm.Pattern, subject, subjectType, enumId,
+            else EmitPatternBranch(arm.Pattern, subject, subjectType, scrutineeType, enumId,
                 body, next!.Value, arm.Span);
 
             _b.SwitchTo(body);
 
             // Bindings come before the guard: 'n if n > 0' needs 'n'.
-            BindPattern(arm.Pattern, value, subjectType, enumId);
+            BindPattern(arm.Pattern, value, scrutineeType, enumId);
 
             if (arm.Guard is { } guard)
             {
@@ -2195,7 +2244,7 @@ internal sealed class FunctionLowerer
     /// rather than opcodes.</para>
     /// </summary>
     private void EmitPatternBranch(Pattern pattern, TempId subject, IrType subjectType,
-        TypeId? enumId, BlockId onMatch, BlockId onFail, Span span)
+        IrType scrutineeType, TypeId? enumId, BlockId onMatch, BlockId onFail, Span span)
     {
         switch (pattern)
         {
@@ -2252,6 +2301,20 @@ internal sealed class FunctionLowerer
             // type ?…").
             case LiteralPattern { Literal: NullLiteralExpr } nullPattern:
             {
+                // Over an optional ENUM the subject is already the tag, and absence is the one
+                // number no variant carries — so 'null' is tested exactly like a variant is,
+                // which is what keeps the arms in one order instead of two groups.
+                if (scrutineeType is IrOptionalType { Inner: IrEnumType } && enumId is not null)
+                {
+                    var absent = EmitConst(new IntConst(unchecked((ulong)AbsentTag)),
+                        subjectType, nullPattern.Span);
+                    var matchesAbsent = _slots.NewTemp(BoolType);
+                    _b.Emit(new BinOp(matchesAbsent, IrBinKind.Eq, BoolType, subject, absent,
+                        nullPattern.Span));
+                    _b.Seal(new CondBranch(matchesAbsent, onMatch, onFail, nullPattern.Span));
+                    return;
+                }
+
                 if (subjectType is not IrOptionalType)
                     throw NotSupported("'null' pattern on a non-optional", nullPattern.Span, LoweringDiagnostics.NeverNull);
 
@@ -2299,8 +2362,8 @@ internal sealed class FunctionLowerer
                     var lastAlternative = i == or.Alternatives.Length - 1;
                     var nextAlternative = lastAlternative ? onFail : _b.NewBlock();
 
-                    EmitPatternBranch(or.Alternatives[i], subject, subjectType, enumId,
-                        onMatch, nextAlternative, or.Span);
+                    EmitPatternBranch(or.Alternatives[i], subject, subjectType, scrutineeType,
+                        enumId, onMatch, nextAlternative, or.Span);
 
                     if (!lastAlternative) _b.SwitchTo(nextAlternative);
                 }
@@ -2416,7 +2479,25 @@ internal sealed class FunctionLowerer
             return;
         }
 
-        if (enumId is { } id) BindPatternFields(pattern, id, value);
+        if (enumId is { } id)
+        {
+            // Over an OPTIONAL enum the payload sits inside the optional. This arm is reached only
+            // when the tag matched a real variant, and the absent value carries a tag no variant
+            // has — so the value is present here and the unwrap cannot fail. It happens at this
+            // point rather than up front for the reason the tag local exists: the absent path has
+            // no value to unwrap, and nothing could have carried one across.
+            var payloadSource = value;
+            if (pattern is VariantPattern { TupleElements: not null }
+                    or VariantPattern { StructFields: not null }
+                && valueType is IrOptionalType optional)
+            {
+                var unwrapped = _slots.NewTemp(optional.Inner);
+                _b.Emit(new OptGet(unwrapped, value, optional.Inner, pattern.Span));
+                payloadSource = unwrapped;
+            }
+
+            BindPatternFields(pattern, id, payloadSource);
+        }
     }
 
     /// <summary>Lowers the body of an arm. Returns whether it falls through.</summary>

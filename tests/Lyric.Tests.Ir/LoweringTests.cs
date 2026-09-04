@@ -535,28 +535,14 @@ public class LoweringTests
     public void A_field_pattern_that_can_fail_is_refused_by_its_field(string source,
         string expected) => AssertNotSupported(source, expected);
 
-    /// <summary>A variant pattern over an OPTIONAL enum is refused, and the refusal stops calling
-    /// it a non-enum.
+    /// <summary>The neighbour that had to keep working while the optional enum gained its own
+    /// lowering: an optional matched with a BINDING arm.
     ///
-    /// <para>`?E` is an enum, so the old message sent the reader looking for a mistake in the
-    /// type instead of at the missing lowering. What is actually missing is a second subject: the
-    /// tag lives inside the optional, so a variant arm needs the unwrapped value while a `null`
-    /// arm needs the optional itself, and this lowering carries one subject. Narrowing first is
-    /// what the language already offers, and the message says so.</para>
-    ///
-    /// <para>Pre-existing, found by the 4.3 sweep round 6 while checking that round 5's struct
-    /// refusal hit nothing legitimate. The last case is that check: an optional matched with a
-    /// BINDING arm is the ordinary narrowing form and still lowers.</para></summary>
-    [Theory]
-    [InlineData("enum E { A, B } fn f(e: ?E): int { match (e) { null => { return -1; }, E.A => { return 0; }, E.B => { return 1; } } }",
-        "over an optional enum")]
-    [InlineData("enum E { A, B(int) } fn f(e: ?E): int { match (e) { null => { return -1; }, E.B(n) => { return n; }, E.A => { return 0; } } }",
-        "narrow it first")]
-    public void A_variant_pattern_over_an_optional_enum_names_the_optional(string source,
-        string expected) => AssertNotSupported(source, expected);
-
-    /// <summary>The neighbour that must keep working: an optional matched with a binding arm.
-    /// </summary>
+    /// <para>4.3.3 pinned the refusal of a variant pattern over a `?E` and made its message name
+    /// the optional. 4.4 builds that lowering, so those rows retired with their rule; this one
+    /// stays, because it is the form that always worked and the one a two-subject match could
+    /// most easily break — the binding takes the unwrapped value while a `null` arm takes the
+    /// optional itself.</para></summary>
     [Fact]
     public void An_optional_with_a_binding_arm_still_lowers()
     {

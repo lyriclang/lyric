@@ -1741,6 +1741,66 @@ public class VmTests
             }
             """).AsI64);
 
+    // ------------------------------------------------------------------ ?E im match (§7.6)
+
+    [Fact]
+    public void An_optional_enum_matches_null_and_its_variants() =>
+        Assert.Equal(11, Run("""
+            enum Shape { Dot, Rect { w: int, h: int } }
+            fn area(s: ?Shape): int {
+                return match (s) {
+                    null => -1,
+                    Shape.Dot => 0,
+                    Shape.Rect { w, h } => w * h,
+                };
+            }
+            fn main(): int {
+                let missing: ?Shape = null;
+                return area(missing) + area(Shape.Dot) + area(Shape.Rect { w = 3, h = 4 });
+            }
+            """).AsI64);
+
+    [Fact]
+    public void An_optional_enum_reads_a_tuple_payload() =>
+        Assert.Equal(9, Run("""
+            enum E { A, B(int, int) }
+            fn f(e: ?E): int {
+                return match (e) { null => -1, E.B(x, y) => x + y, E.A => 0 };
+            }
+            fn main(): int { return f(E.B(4, 5)); }
+            """).AsI64);
+
+    /// <summary>Settling presence before reading a tag is not a reordering.
+    ///
+    /// <para>'kindOf' answers 7 for a Dot, so a lowering that let the binding arm take the present
+    /// value ahead of the variant arm written above it would answer 7 where this expects 0. That
+    /// is the whole risk of carrying two subjects, in one number.</para></summary>
+    [Fact]
+    public void An_optional_enum_keeps_the_arms_in_the_order_they_were_written() =>
+        Assert.Equal(98, Run("""
+            enum Shape { Dot, Rect { w: int, h: int } }
+            fn kindOf(s: Shape): int {
+                return match (s) { Shape.Dot => 7, Shape.Rect { w, h } => w * h };
+            }
+            fn pick(s: ?Shape): int {
+                return match (s) { Shape.Dot => 0, null => -1, x => kindOf(x) };
+            }
+            fn main(): int {
+                let missing: ?Shape = null;
+                return pick(Shape.Dot) + pick(Shape.Rect { w = 9, h = 11 }) + pick(missing);
+            }
+            """).AsI64);
+
+    [Fact]
+    public void An_optional_enum_takes_the_null_arm_last_too() =>
+        // The absent value carries a tag no variant has, so where the 'null' arm stands changes
+        // nothing about which arm answers.
+        Assert.Equal(-1, Run("""
+            enum E { A, B }
+            fn f(e: ?E): int { return match (e) { E.A => 1, E.B => 2, null => -1 }; }
+            fn main(): int { let missing: ?E = null; return f(missing); }
+            """).AsI64);
+
     // ------------------------------------------------------------------ Tupel (§4)
 
     [Fact]
