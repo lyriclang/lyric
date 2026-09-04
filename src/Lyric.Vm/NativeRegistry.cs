@@ -960,7 +960,17 @@ public sealed class NativeRegistry : IDisposable
                     }
                     else if (timeout > 0)
                     {
-                        Thread.Sleep((int)Math.Min(timeout, int.MaxValue));
+                        // A DEADLINE is the third kind of wait, and it used to be a plain
+                        // Thread.Sleep — which nothing interrupts. A descriptor wait ends because
+                        // Dispose closes the descriptor and an interrupt wait because Dispose
+                        // answers it, so "disposing gives the thread back" held for two waits out
+                        // of three: a guest sleeping ten minutes held the host's thread for ten
+                        // minutes after its VM was gone. Measured at 19 845 ms of a 20 000 ms
+                        // sleep. Waiting on this VM's own signal instead ends the sleep the
+                        // moment the VM does, and costs a live VM nothing: the event is set once,
+                        // by Dispose, and never reset.
+                        _disposeSignal.Wait((int)Math.Min(timeout, int.MaxValue));
+                        if (!Live) return DisposedInterruptAnswer(clockOnly: true);
                     }
 
                     return LyrValue.FromObject(
@@ -1399,8 +1409,13 @@ public sealed class NativeRegistry : IDisposable
 
     private int _disposeWakeSent;
 
-    /// <summary>What an interrupt wait is told on a VM that has been disposed: the wake, ONCE,
-    /// and a panic every time after.
+    /// <summary>Set once, by <see cref="Dispose"/>, and never reset: the signal a wait on this
+    /// VM's own deadline blocks on, so that disposing ends it instead of leaving the host to sit
+    /// out a sleep the guest asked for.</summary>
+    private readonly ManualResetEventSlim _disposeSignal = new(false);
+
+    /// <summary>What a wait is told on a VM that has been disposed: the answer ONCE, and a panic
+    /// every time after.
     ///
     /// <para>The wake exists so shutdown code gets to run — <c>Wait.Interrupt</c> is the
     /// language's "you are being asked to stop", and a VM that is ending is exactly that. But a
@@ -1411,17 +1426,16 @@ public sealed class NativeRegistry : IDisposable
     /// <para>So the second ask panics, and the sentence is the one this native already uses for
     /// a wait nothing can end. It is true here in the strongest form: the VM is gone, so no
     /// interrupt can ever arrive.</para></summary>
-    private LyrValue DisposedInterruptAnswer()
+    private LyrValue DisposedInterruptAnswer(bool clockOnly = false)
     {
         if (Interlocked.Exchange(ref _disposeWakeSent, 1) == 0)
-            return LyrValue.FromObject(new[]
-            {
-                LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1),
-            });
+            return LyrValue.FromObject(clockOnly
+                ? [LyrValue.FromI64(Environment.TickCount64)]
+                : [LyrValue.FromI64(Environment.TickCount64), LyrValue.FromI64(-1)]);
 
         throw new LyricPanic(VmDiagnostics.Panicked,
-            "std.task.poll: waiting forever on nothing — the VM is disposed, so no interrupt "
-            + "can arrive");
+            "std.task.poll: waiting forever on nothing — the VM is disposed, so neither an "
+            + "interrupt nor a deadline can still be answered");
     }
 
     /// <summary>Takes whichever interrupt is pending for this VM: its own raise, or the
@@ -2536,11 +2550,12 @@ public sealed class NativeRegistry : IDisposable
             _listeningHere = false;
         }
 
-        // A guest parked in poll has to be told. Closing its descriptors wakes a select; a
-        // wait with NO descriptor stands on the interrupt event alone, and nothing in the loop
-        // above touches that — so the shared wake runs here, and the poll it releases sees the
-        // disposed flag and answers the interrupt channel. Spurious for other VMs, which the
-        // wake paths already tolerate by design: they recompute and block again.
+        // A guest parked in poll has to be told, and there are three ways it can be waiting.
+        // Closing its descriptors wakes a select. An interrupt wait stands on the shared event,
+        // which the wake below sets — spurious for other VMs, which the wake paths already
+        // tolerate by design: they recompute and block again. A DEADLINE stands on this VM's own
+        // signal, and nothing shared would ever end it.
+        _disposeSignal.Set();
         WakeInterruptWaiters();
 
         // Released OUTSIDE the lock. Closing a stream or a child can take a while, and a guest

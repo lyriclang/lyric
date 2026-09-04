@@ -649,4 +649,63 @@ public class ResourceOwnershipTests
             try { File.Delete(marker); } catch (IOException) { }
         }
     }
+    /// <summary>Disposing frees a guest that is only SLEEPING — the third kind of wait.
+    ///
+    /// <para>A descriptor wait ends because Dispose closes the descriptor, and an interrupt wait
+    /// because a disposed VM answers it. A deadline was a plain <c>Thread.Sleep</c>, which
+    /// nothing interrupts, so "disposing gives the thread back" held for two waits out of three:
+    /// measured, a task that asked for 20 000 ms held the host's thread for 19 845 ms AFTER its
+    /// VM was disposed. It waits on the VM's own signal now — 6 ms in the same measurement.</para>
+    ///
+    /// <para>The margin is the assertion, not a duration: the sleep asked for is twenty seconds
+    /// and the bound is five, so nothing here can pass by being fast.</para></summary>
+    [Fact]
+    public void A_sleeping_guest_is_freed_by_dispose()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), $"lyric-nap-{Guid.NewGuid():N}.marker");
+        try
+        {
+            var vm = Vm();
+            var instance = vm.Instantiate(vm.Compile("""
+                import std.task { Wait, spawn, run };
+                import std.io.stream as stream;
+
+                fn sleeper(marker: string): Coroutine<Wait> {
+                    let m = stream.create(marker)!;
+                    yield Wait.Sleep(20000);
+                }
+
+                pub fn nap(marker: string): void { spawn(sleeper(marker)); run(); }
+                """, "nap"));
+
+            var guest = new Thread(() =>
+            {
+                try { instance.CallVoid("nap", marker); }
+                catch (Exception) { /* an end of any kind is an end */ }
+            }) { IsBackground = true };
+            guest.Start();
+
+            var reached = false;
+            for (var spin = 0; spin < 2000 && !reached; spin++)
+            {
+                reached = File.Exists(marker);
+                if (!reached) Thread.Sleep(5);
+            }
+            Assert.True(reached, "the guest reached its sleep");
+            Thread.Sleep(150);
+
+            var since = System.Diagnostics.Stopwatch.StartNew();
+            vm.Dispose();
+            var freed = guest.Join(TimeSpan.FromSeconds(15));
+
+            Assert.True(freed, "disposing freed the sleeping guest's thread");
+            Assert.True(since.ElapsedMilliseconds < 5000,
+                $"the thread came back {since.ElapsedMilliseconds} ms after the dispose; the "
+                + "task had asked to sleep 20 000");
+        }
+        finally
+        {
+            try { File.Delete(marker); } catch (IOException) { }
+        }
+    }
 }
