@@ -11,6 +11,37 @@
 
 ## Current milestone
 
+**M36 — pattern matching becomes complete — is PLANNED, and slice 0 is DONE** (2026-09-04). The
+sweep loop exited on round 10, and the maintainer chose a language gap over the HTTP module: two
+forms that are sema-COMPLETE and were never lowered. `match (p) { P { n, m } => … }` over a struct
+or class binds field types, computes its own irrefutability and has a Sema test asserting it clean;
+`match (e) { null => …, E.A => … }` over a `?E` is accepted and its exhaustiveness is specified.
+Both have been refused BY NAME since 4.3.2 and 4.3.3, which is what made them findable.
+
+**Slice 0 — the rules — SHIPPED to the specification** (`lyric-spec#33`, merged). §7.6 gains the
+field pattern over a struct or class: it **tests nothing**, because the scrutinee's type is
+already the pattern's type, so it always matches and one arm carrying it covers the `match`; it
+reads the fields it names and no others. The three errors it can produce (`SEM0015`, `SEM0029`,
+`SEM0031`) were already what the reference emits and are written down rather than left to be
+found. §7.6 also gains the `?E` scrutinee, with the sentence that matters: presence is settled
+before any tag is read — the tag lives inside the optional — **and that is not a reordering**, the
+earlier arm still wins. One implementation limit is recorded the way §9.3 records its own: a field
+pattern whose sub-pattern can FAIL is a test inside a pattern that otherwise performs none.
+
+**Both rules are additive**, so the version is **4.4.0** and the FORMAT IS UNTOUCHED — the lowering
+needs no opcode it does not already have (`LoadField`, `EnumAs`, `OptIsSome`, `OptGet`, `EnumTag`
+all exist, and a struct value already carries its layout id in its `IrRefType`).
+
+**Seven cases: six gated `since: 4.4.0`, one that runs today.** And a habit worth keeping: **every
+gated case was compiled before being committed.** A gated case is otherwise checked by nothing
+until the feature lands, which is how a typo in one survives to ambush the implementation slice.
+Each produces EXACTLY ONE diagnostic — the refusal of the half it waits for — and no syntax error,
+unknown name, type error or warning, so everything they assert besides the missing half is already
+sound. The order case DISCRIMINATES rather than merely passing: its helper answers `7` for a
+`Dot`, so an implementation that let the binding arm take the present value ahead of the variant
+arm above it would print `7` where the case expects `0`. Suite 150/150 against this tree, 7
+skipped. Slices 1 (the struct half, binding only) and 2 (the `?E` half, control flow) follow.
+
 **Round 10 found NO defect in the toolchain** (2026-09-04) — the first round of this sweep that
 did not. Eight areas probed, six of them never touched by rounds 5 to 9, and the only correction
 is one sentence in the diagnostics appendix (`lyric-spec#32`). **Nothing ships from the toolchain
