@@ -30,19 +30,24 @@
 </a>
 </nav>
 <section class="changes">
-<h2>What changed in v4.3.6 — 2026-09-04</h2>
-<p><strong>Round 8 of the sweep.</strong> One finding, and it is a sentence I wrote in 4.3.5 that was not true.</p>
+<h2>What changed in v4.4.1 — 2026-09-04</h2>
+<p><strong>Round 1 of the sweep after M36.</strong> Two findings, both older than the feature that surfaced them.</p>
 <h3 id="fixed">Fixed</h3>
 <ul>
-<li><p><strong>Disposing a VM now frees a guest that is only sleeping.</strong> A task can be waiting in three
-ways. A descriptor wait ends because <code>Dispose</code> closes the descriptor under it, and an interrupt
-wait because a disposed VM answers it — but a deadline was a plain sleep, which nothing
-interrupts. So &quot;disposing gives the thread back&quot;, which guide 14 has promised since 4.3.5, held
-for two waits out of three: measured, a task that asked for 20 000 ms held the host's thread for
-19 845 ms after its VM was gone. It waits on the VM's own signal now — 6 ms in the same
-measurement — and guide 14 names all three waits rather than the two that happened to work.</p>
-<p>A guest sleeping is exactly the hung script a host has no other way to stop, so this was the
-case the contract exists for, missing for the second round running.</p>
+<li><p><strong>A pattern may no longer bind the same name twice</strong> (<code>LYR-SEM0097</code>). <code>P { n, n }</code>,
+<code>P { n = x, m = x }</code> and <code>E.B(x, x)</code> each name one binding twice, and the second was <strong>dropped
+in silence</strong>: <code>P { n = 7, m = 9 }</code> matched against <code>P { n = x, m = x }</code> answered <code>7</code>. The mirror
+image had always been refused — <code>LYR-SEM0070</code> for a duplicate field in an initializer — so one
+brace list answered the same question two ways depending on whether you were constructing or
+destructuring.</p>
+<p>Shadowing a name from an enclosing scope is untouched, and so is an or-pattern, whose
+alternatives are required to repeat the same names.</p>
+</li>
+<li><p><strong>An or-pattern that binds is refused by name.</strong> <code>E.A(x) | E.B(x)</code> never lowered: each
+alternative is a branch of its own and would have to bind on its own path, while the binding
+step runs once for the whole pattern. It said nothing about that, so the first <em>use</em> of a bound
+name failed as <code>reference to 'x'</code> — a message about a name that only looks undeclared. An
+or-pattern that binds nothing, which is what the form is usually for, is unaffected.</p>
 </li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>
