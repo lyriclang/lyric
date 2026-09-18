@@ -61,15 +61,23 @@ public static class Program
                 "run: missing file argument", ExitCodes.Usage);
 
         var path = positional[1];
-        var passThrough = positional[2..];
+        var options = positional[2..];
 
         // Checked before the compile step so a misconfigured runtime is reported without one.
         if (Missing(selection, Tool.Runtime) is { } runtimeError) return runtimeError;
 
+        // A module needs no compile, so every option is the runtime's — and one the runtime does
+        // not know is refused there, by name.
         if (path.EndsWith(".lyrbc", StringComparison.OrdinalIgnoreCase))
-            return Execute(selection, path, passThrough, programArguments);
+            return Execute(selection, path, options, programArguments);
 
         if (Missing(selection, Tool.Compiler) is { } compilerError) return compilerError;
+
+        // Two tools, one option list: what says how to RUN goes to the runtime, everything else
+        // says how to COMPILE and goes to the compiler. A table rather than everything to one of
+        // them, because a flag the wrong tool receives is refused there — rightly, once the right
+        // tool has had its chance to take it.
+        var (compilerOptions, runtimeOptions) = Split(options);
 
         // The name carries the source file name so a backtrace from the runtime stays readable.
         var module = Path.Combine(Path.GetTempPath(),
@@ -80,10 +88,10 @@ public static class Program
             // '--quiet' suppresses the compiler's summary of an artifact that is about to be
             // deleted. Passing it twice is harmless.
             var built = Tool.Run(selection.PathOf(Tool.Compiler),
-                ["build", path, "-o", module, "--quiet", .. passThrough], Console.Error);
+                ["build", path, "-o", module, "--quiet", .. compilerOptions], Console.Error);
             if (built != ExitCodes.Success) return built;
 
-            return Execute(selection, module, [], programArguments);
+            return Execute(selection, module, runtimeOptions, programArguments);
         }
         finally
         {
@@ -98,6 +106,34 @@ public static class Program
         string[] tail = programArguments.Length == 0 ? [] : ["--", .. programArguments];
         return Tool.Run(selection.PathOf(Tool.Runtime),
             ["run", module, .. options, .. tail], Console.Error);
+    }
+
+    /// <summary>What the runtime takes out of a <c>run</c>'s options: <c>--jit</c>, and
+    /// <c>--grant</c> with its list. Everything else is the compiler's.</summary>
+    private static (string[] Compiler, string[] Runtime) Split(string[] options)
+    {
+        var compiler = new List<string>();
+        var runtime = new List<string>();
+        for (var i = 0; i < options.Length; i++)
+        {
+            switch (options[i])
+            {
+                case "--jit":
+                    runtime.Add(options[i]);
+                    break;
+
+                case "--grant":
+                    runtime.Add(options[i]);
+                    if (i + 1 < options.Length) runtime.Add(options[++i]);
+                    break;
+
+                default:
+                    compiler.Add(options[i]);
+                    break;
+            }
+        }
+
+        return (compiler.ToArray(), runtime.ToArray());
     }
 
     /// <summary>
@@ -155,6 +191,10 @@ public static class Program
         }
 
         if (Missing(selection, Tool.Compiler) is { } compilerError) return compilerError;
+
+        // Packing is shipping: the release profile, unless the caller named one.
+        if (!compilerArguments.Any(a => a is "--profile" or "--release" or "--debug"))
+            compilerArguments.Insert(0, "--release");
 
         var executable = output ?? DefaultExecutable(file);
         var module = Path.Combine(Path.GetTempPath(),
@@ -258,7 +298,7 @@ public static class Program
               run <file>               Compile and execute (.lyr or .lyrbc)
               build <file> [-o <out>]  Compile .lyr to .lyrbc
               build [<dir>]            Run the build.lyr there and compile what it declares
-              pack <file> [-o <out>]   Compile and pack into one standalone executable
+              pack <file> [-o <out>]   Compile (release profile) and pack into one executable
               fmt <path>... [--check]  Format .lyr files in place (--check only lists)
               test [<dir>]             Run the @Test functions of the project's test root
               check <file> [--emit]    Compile without writing a file (--emit: through the bytes)
@@ -273,7 +313,10 @@ public static class Program
               --version, -v            Show versions and the selected tools
               --help, -h               Show this help
 
-            Every other option is passed straight to the tool that runs the command.
+            Every other option is passed straight to the tool that runs the command; a 'run'
+            hands --jit and --grant to the runtime and everything else (--release, --profile,
+            --no-optimize, ...) to the compiler. Compiles are the debug profile unless told
+            otherwise; 'pack' is the release profile unless told otherwise.
             For compiler internals (tokenize, parse, lower) call 'lyrc' directly;
             to inspect a module (verify, info) call 'lyrvm'.
             """);

@@ -129,7 +129,7 @@ public static class SourceCompiler
         // so the two durations can be measured separately.
         report?.BeginPhase(Phase.Lower);
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
-            optimize: options.Optimize, libraryRoots: true);
+            optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));
         report?.EndPhase();
         if (ir is null || stage == Stage.Lower)
@@ -152,7 +152,7 @@ public static class SourceCompiler
         report?.BeginPhase(Phase.Emit, FunctionCount(ir));
         var bytes = BytecodeWriter.Write(ir, options.SourceMap
             ? new SourceMapContext(sources, source.BaseDirectory)
-            : null, options.DebugInfo);
+            : null, options.DebugInfo, options.Fusion);
         ReadBack(bytes, source.DisplayName);
         report?.EndPhase();
 
@@ -301,7 +301,7 @@ public static class SourceCompiler
             return new CompileResult(sources, diagnostics, null, null, model);
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
-            libraryRoots: true);
+            optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
         if (ir is null) return new CompileResult(sources, diagnostics, null, null, model);
 
         if (ModuleLowerer.VerifyByDefault) IrVerifier.VerifyOrThrow(ir);
@@ -430,23 +430,34 @@ public sealed record CompilerOptions
     public IReadOnlyDictionary<string, string>? SourceOverlay { get; init; }
 
     /// <summary>
-    /// Whether the SourceMap section is written. On by default: a panic that names a line is worth
-    /// the bytes, and the moment it is needed is the moment nobody planned for it.
+    /// Whether the SourceMap section is written. Both profiles keep it: a panic that names a line
+    /// is worth the bytes, and the moment it is needed is the moment nobody planned for it.
     ///
     /// <para>Turning it off produces exactly the file a build produced before the section existed,
     /// which is what makes stripping a decision with no other consequence.</para>
     /// </summary>
-    public bool SourceMap { get; init; } = true;
+    public bool SourceMap { get; init; } = Profile.Default.SourceMap;
 
     /// <summary>Whether the DebugInfo section (slot names) and the Names entries no attribute row
-    /// demands are written. On by default for the same reason the source map is: the moment a
-    /// debugger is attached is the moment nobody planned for it.</summary>
-    public bool DebugInfo { get; init; } = true;
+    /// demands are written. The debug profile keeps them: the moment a debugger is attached is
+    /// the moment nobody planned for it. The release profile drops them.</summary>
+    public bool DebugInfo { get; init; } = Profile.Default.DebugInfo;
 
     /// <summary>Whether the IR optimizations (inlining, scalar replacement, devirtualization)
-    /// run. A debugger turns them off: an inlined callee has no frame to show, and a
-    /// scalar-replaced struct no longer exists as one value.</summary>
-    public bool Optimize { get; init; } = true;
+    /// run. The debug profile turns them off: an inlined callee has no frame to show, and a
+    /// scalar-replaced struct no longer exists as one value. The three defaults here are
+    /// <see cref="Profile.Default"/>'s, so <c>new CompilerOptions()</c> IS the default profile.</summary>
+    public bool Optimize { get; init; } = Profile.Default.Optimize;
+
+    /// <summary>Which of the optimizations run when <see cref="Optimize"/> is on. All of them
+    /// unless a diagnostic switch (<c>--no-inline</c> and its siblings) takes one out to bisect a
+    /// finding.</summary>
+    public IrPasses Passes { get; init; } = IrPasses.All;
+
+    /// <summary>Whether the emitter selects the fused instruction forms. Not a profile field:
+    /// fusion changes the encoding and not the frames, so no debugger is lied to by it. Off only
+    /// to bisect a finding down to the encoding.</summary>
+    public bool Fusion { get; init; } = true;
 }
 
 /// <summary>

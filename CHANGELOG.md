@@ -10,6 +10,54 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## Unreleased
+
+**Two profiles, and a compile is the debug one unless you say otherwise.**
+
+### Added
+
+- **Profiles.** A compile is one of two named shapes. `debug` runs no IR optimizations and keeps
+  the source map and the debug info; `release` runs them and drops the debug info, keeping the
+  source map. `lyrc`, `lyrbuild` and `lyrtest` take `--profile <name>`, `--release` and
+  `--debug`, and `lyric run`, `lyric build` and `lyric pack` hand them through. Every field of a
+  profile stays overridable, and a field flag wins: `--optimize`/`--no-optimize`,
+  `--source-map`/`--no-source-map`, `--debug-info`/`--no-debug-info`. `LYRIC_PROFILE` names the
+  default for a whole process, the `LYRIC_JIT` shape; a flag beats it.
+
+- **`HostOptions.Profile`** in the embedding API. A host that ships sets `Profile.Release` beside
+  `Compile = true`; left unset, a VM compiles the process default.
+
+- **Four diagnostic switches on `lyrc`**, part of no profile: `--no-inline`,
+  `--no-scalar-replacement`, `--no-devirtualize` and `--no-fusion`. Each takes one pass or the
+  fused instruction forms out of an optimized build, for bisecting a finding down to the pass.
+
+- **`lyrvm run --jit`**, the engine `HostOptions.Compile` opts into, from the command line.
+  `lyric run app.lyr --jit` hands it through to the runtime.
+
+### Changed
+
+- **`lyric build`, `lyric run`, `lyric check`, `lyric test`, the REPL and the embedding API
+  compile the debug profile by default.** Before, every compile ran the optimizations and kept
+  the names, the shape `--release --debug-info` produces now. `lyric pack` compiles the release
+  profile by default. The measurement behind the change, on this interpreter (`tools/Bench`,
+  Release configuration, both shapes in one session):
+
+  | shape | release | debug |
+  |---|---:|---:|
+  | struct built and added per iteration (`construct_call`) | 55 ns | 141 ns |
+  | `for-in` over a range | 73 ns | 117 ns |
+  | `for-in` over an array | 154 ns | 140 ns |
+  | `Set.iter()` loop | 409 ns | 351 ns |
+  | one call per iteration | 64 ns | 65 ns |
+  | the standard library's test suite | 3.96 s | 3.45 s |
+
+  A backtrace from a default build names every frame, small callees included; the release
+  profile still splices them away.
+
+- **Every tool refuses an option it does not know** (`LYR-CLI0003`, exit code 2). `lyrc` and
+  `lyrvm` used to overlook one in silence, so `lyric run app.lyr --grant none` sent `--grant` to
+  the compiler, which ignored it, and the program ran with every capability.
+
 ## v4.4.1 — 2026-09-04
 
 **Round 1 of the sweep after M36.** Two findings, both older than the feature that surfaced them.

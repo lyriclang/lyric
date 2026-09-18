@@ -29,6 +29,10 @@ The return value of `main` becomes the process exit code, masked with `& 0xFF`.
 | `lyric disasm <file>` | print the bytecode |
 | `lyric repl` | interactive prompt |
 
+A compile is the **debug profile** unless you say `--release`: every frame kept, every name
+kept, the shape a backtrace and a debugger read honestly. [Chapter 16](16-building.md#two-profiles)
+has the table.
+
 `lyric check` goes as far as the intermediate representation, so a construct the code generator
 cannot lower is reported there rather than at the build. It stops before the bytes: a module can
 pass everything above and still be one the loader refuses. `lyric check <file> --emit` runs that

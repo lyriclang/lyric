@@ -1,3 +1,4 @@
+using Lyric.Compiler;
 using Lyric.Core;
 
 namespace Lyric.Embedding;
@@ -57,6 +58,17 @@ public sealed record HostOptions
     /// is ignored: every script is interpreted, and nothing else about the host changes.</para>
     /// </summary>
     public bool Compile { get; init; }
+
+    /// <summary>
+    /// The profile scripts of this VM are compiled with. <c>null</c> takes the process default:
+    /// <see cref="Compiler.Profile.Debug"/>, or what <c>LYRIC_PROFILE</c> names.
+    ///
+    /// <para>The same default the command line has, for the same reason <see cref="Compile"/>
+    /// defaults to off: develop on the shape a debugger and a backtrace can read, and ship with
+    /// both switched — <see cref="Compiler.Profile.Release"/> here and <see cref="Compile"/>
+    /// beside it are the two halves of "fast", one at compile time and one at run time.</para>
+    /// </summary>
+    public Profile? Profile { get; init; }
 
     /// <summary>Where a script writes. Defaults to <see cref="TextWriter.Null"/>.</summary>
     public TextWriter? Output { get; init; }

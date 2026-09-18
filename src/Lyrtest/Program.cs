@@ -26,6 +26,7 @@ public static class Program
 
         string? directoryArgument = null;
         string? stdlib = null;
+        var profile = Profile.Default;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -38,6 +39,19 @@ public static class Program
                     return ExitCodes.Success;
                 case "--stdlib" when i + 1 < args.Length:
                     stdlib = args[++i];
+                    break;
+                case "--profile" when i + 1 < args.Length:
+                    if (Profile.Named(args[++i]) is not { } named)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                            $"--profile: unknown profile '{args[i]}' (expected debug or release)",
+                            ExitCodes.Usage);
+                    profile = named;
+                    break;
+                case "--release":
+                    profile = Profile.Release;
+                    break;
+                case "--debug":
+                    profile = Profile.Debug;
                     break;
                 default:
                     if (args[i].StartsWith('-') || directoryArgument is not null)
@@ -110,6 +124,10 @@ public static class Program
                 StdlibRoot = stdlib,
                 SourceRoot = project?.SourceRoot,
                 NativeRoots = project?.NativeRoots,
+                // The debug profile unless asked otherwise: a failing test wants every frame in
+                // its backtrace. '--release' runs the same tests against the optimized shape,
+                // which is how a suite catches an optimizer that changed an answer.
+                Profile = profile,
                 Output = Console.Out,
                 Error = Console.Error,
             });
@@ -123,7 +141,7 @@ public static class Program
             {
                 // Compiled a second time only on the failure path, because the exception carries
                 // the diagnostics as data and rendering wants the sources they point into.
-                var result = SourceCompiler.Check(file, new CompilerOptions
+                var result = SourceCompiler.Check(file, profile.Options() with
                 {
                     StdlibRoot = stdlib,
                     SourceRoot = project?.SourceRoot,
@@ -176,6 +194,8 @@ public static class Program
         Console.Out.WriteLine("panicking — std.test has the assertions.");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
+        Console.Out.WriteLine("  --profile <name>         debug (the default) or release: the shape the tests run in");
+        Console.Out.WriteLine("  --debug, --release       The same, shorter");
         Console.Out.WriteLine("  --stdlib <dir>           Where the stdlib lives (beats $LYRIC_STDLIB)");
         Console.Out.WriteLine("  --version, -v            Show the toolchain version");
         Console.Out.WriteLine("  --help, -h               Show this help");

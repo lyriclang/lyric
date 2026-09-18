@@ -26,8 +26,12 @@ public static class VmHost
     /// the first <c>--</c>.</param>
     /// <param name="granted">Which capabilities this execution receives. Standalone grants
     /// everything; an embedded host sets it narrower.</param>
+    /// <param name="compile">Whether functions are compiled to machine code as they are first
+    /// called — the engine a host opts into with <c>HostOptions.Compile</c>, under the same rules:
+    /// what the emitter declines stays interpreted.</param>
     public static int Execute(BytecodeModule module, IReadOnlyList<string> arguments,
-        TextWriter output, TextWriter error, Capability granted = Capability.All)
+        TextWriter output, TextWriter error, Capability granted = Capability.All,
+        bool compile = false)
     {
         try
         {
@@ -37,7 +41,7 @@ public static class VmHost
             using var natives = NativeRegistry.CreateDefault(output, error);
 
             // The exit code is 0..255, so the lowest byte is taken.
-            return (int)(Interpreter.Run(module, arguments, natives, granted).AsI64 & 0xFF);
+            return (int)(Interpreter.Run(module, arguments, natives, granted, compile).AsI64 & 0xFF);
         }
         catch (LyricPanic panic)
         {

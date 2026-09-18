@@ -9,10 +9,11 @@ lyric pack app.lyr
 ./app arg1 arg2
 ```
 
-That is the whole workflow. `lyric pack` compiles the file and hands the module to `lyrpack`,
-which copies a prebuilt runtime — the *stub* — and appends the module to it. No compiler ships
-inside the result, nothing is installed on the target machine, and packing takes about as long
-as copying the file, because that is what it is.
+That is the whole workflow. `lyric pack` compiles the file in the release profile ([chapter
+16](16-building.md#two-profiles); `--debug` if you want the other one) and hands the module to
+`lyrpack`, which copies a prebuilt runtime — the *stub* — and appends the module to it. No
+compiler ships inside the result, nothing is installed on the target machine, and packing takes
+about as long as copying the file, because that is what it is.
 
 An already compiled module packs directly, which is how a `build.lyr` project packs its
 artifact:

@@ -164,7 +164,9 @@ public sealed class Session(string? stdlibRoot)
         // (InternalCompilationException), and that must end the entry, not the session.
         try
         {
-            var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics);
+            // The process default profile, as every other tool: a prompt is a development seat.
+            var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
+                optimize: Lyric.Compiler.Profile.Default.Optimize);
             if (ir is null)
             {
                 diagnostics.RenderText(error);

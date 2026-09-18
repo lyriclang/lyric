@@ -45,15 +45,57 @@ public static class Program
     {
         ConsoleStreams.UseUtf8WhenRedirected();
 
-        if (args.Contains("--help") || args.Contains("-h")) { PrintHelp(); return ExitCodes.Success; }
-        if (args.Contains("--version") || args.Contains("-v"))
+        string? directoryArgument = null;
+        string? stdlib = null;
+        var profile = Profile.Default;
+        for (var i = 0; i < args.Length; i++)
         {
-            Console.Out.WriteLine($"lyrbuild {ToolchainVersion.Value}");
-            return ExitCodes.Success;
+            switch (args[i])
+            {
+                case "--help" or "-h":
+                    PrintHelp();
+                    return ExitCodes.Success;
+
+                case "--version" or "-v":
+                    Console.Out.WriteLine($"lyrbuild {ToolchainVersion.Value}");
+                    return ExitCodes.Success;
+
+                case "--stdlib":
+                    if (++i >= args.Length)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                            "--stdlib: missing directory argument", ExitCodes.Usage);
+                    stdlib = args[i];
+                    break;
+
+                case "--profile":
+                    if (++i >= args.Length)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                            "--profile: missing name (debug or release)", ExitCodes.Usage);
+                    if (Profile.Named(args[i]) is not { } named)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                            $"--profile: unknown profile '{args[i]}' (expected debug or release)",
+                            ExitCodes.Usage);
+                    profile = named;
+                    break;
+
+                case "--release":
+                    profile = Profile.Release;
+                    break;
+
+                case "--debug":
+                    profile = Profile.Debug;
+                    break;
+
+                default:
+                    if (args[i].StartsWith('-') || directoryArgument is not null)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                            $"unknown argument: {args[i]} — try 'lyrbuild --help'", ExitCodes.Usage);
+                    directoryArgument = args[i];
+                    break;
+            }
         }
 
-        var directory = Path.GetFullPath(
-            args.FirstOrDefault(a => !a.StartsWith('-')) ?? Directory.GetCurrentDirectory());
+        var directory = Path.GetFullPath(directoryArgument ?? Directory.GetCurrentDirectory());
 
         var script = Path.Combine(directory, FileName);
         if (!File.Exists(script))
@@ -62,7 +104,7 @@ public static class Program
 
         try
         {
-            return Run(script, directory, Flag(args, "--stdlib"));
+            return Run(script, directory, stdlib, profile);
         }
         catch (ProjectFileException broken)
         {
@@ -71,7 +113,7 @@ public static class Program
         }
     }
 
-    private static int Run(string script, string directory, string? stdlibRoot)
+    private static int Run(string script, string directory, string? stdlibRoot, Profile profile)
     {
         // The roots belong to the project and not to the build: lyric.json answers them once, for
         // the script itself and for everything it declares.
@@ -171,12 +213,13 @@ public static class Program
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
                 $"{FileName}: 'build' declared nothing to compile", ExitCodes.Failure);
 
-        return Compile(artifacts, project, stdlibRoot);
+        return Compile(artifacts, project, stdlibRoot, profile);
     }
 
     /// <summary>Compiles what the script collected. Every artifact is a whole program of its own;
     /// there is no link step and nothing is shared between them but the source on disk.</summary>
-    private static int Compile(List<Artifact> artifacts, ProjectFile? project, string? stdlibRoot)
+    private static int Compile(List<Artifact> artifacts, ProjectFile? project, string? stdlibRoot,
+        Profile profile)
     {
         var failed = false;
 
@@ -190,12 +233,14 @@ public static class Program
                 continue;
             }
 
-            var result = SourceCompiler.Compile(artifact.Entry, new CompilerOptions
+            var result = SourceCompiler.Compile(artifact.Entry, profile.Options() with
             {
                 StdlibRoot = stdlibRoot,
                 SourceRoot = project?.SourceRoot,
                 NativeRoots = project?.NativeRoots,
-                SourceMap = artifact.SourceMap,
+                // The script's word stands beside the profile's: 'sourceMap(false)' strips even
+                // where the profile would keep the map, and never adds one the profile omits.
+                SourceMap = artifact.SourceMap && profile.SourceMap,
             });
 
             var writer = new StringWriter();
@@ -224,13 +269,6 @@ public static class Program
         return failed ? ExitCodes.Failure : ExitCodes.Success;
     }
 
-    private static string? Flag(string[] args, string name)
-    {
-        for (var i = 0; i < args.Length - 1; i++)
-            if (args[i] == name) return args[i + 1];
-        return null;
-    }
-
     private static void PrintHelp()
     {
         Console.Out.WriteLine("Usage: lyrbuild [directory] [options]");
@@ -239,9 +277,12 @@ public static class Program
         Console.Out.WriteLine("Without a directory, the working directory.");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
-        Console.Out.WriteLine("  --stdlib <dir>   Where the stdlib lives (beats $LYRIC_STDLIB)");
-        Console.Out.WriteLine("  --version, -v    Show the toolchain version");
-        Console.Out.WriteLine("  --help, -h       Show this help");
+        Console.Out.WriteLine("  --profile <name>   The profile every artifact is compiled with:");
+        Console.Out.WriteLine("                     debug (the default) or release");
+        Console.Out.WriteLine("  --debug, --release The same, shorter");
+        Console.Out.WriteLine("  --stdlib <dir>     Where the stdlib lives (beats $LYRIC_STDLIB)");
+        Console.Out.WriteLine("  --version, -v      Show the toolchain version");
+        Console.Out.WriteLine("  --help, -h         Show this help");
         Console.Out.WriteLine();
         Console.Out.WriteLine("A build script runs with every capability: it may write files and");
         Console.Out.WriteLine("start processes, like make or cmake.");

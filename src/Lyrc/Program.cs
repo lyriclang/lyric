@@ -55,17 +55,156 @@ public static class Program
         }
     }
 
+    /// <summary>
+    /// The options behind <c>command file</c>, parsed once and strictly: an option nobody knows is
+    /// refused rather than overlooked. A flag that silently does nothing is the one that costs an
+    /// afternoon — the reason a <c>lyric.json</c> key nobody knows warns, applied to the command
+    /// line, where the person is right there to be told.
+    /// </summary>
+    private sealed record Flags
+    {
+        public string? Output { get; init; }
+        public string? Stdlib { get; init; }
+        public bool Emit { get; init; }
+        public bool DenyWarnings { get; init; }
+
+        /// <summary>The bundle. The three nullable fields below each override one of its
+        /// entries; unset, the entry stands.</summary>
+        public Profile Profile { get; init; } = Profile.Default;
+        public bool? Optimize { get; init; }
+        public bool? SourceMap { get; init; }
+        public bool? DebugInfo { get; init; }
+
+        public IrPasses Passes { get; init; } = IrPasses.All;
+        public bool Fusion { get; init; } = true;
+    }
+
+    private sealed record Refusal(string Code, string Message);
+
+    /// <summary>
+    /// Reads the options behind <c>command file</c>. Which command takes which option is decided
+    /// here rather than tolerated: <c>-o</c> belongs to the one command that writes, <c>--emit</c>
+    /// to the one that reads back, and the profile flags to every command that lowers.
+    /// </summary>
+    private static (Flags? Flags, Refusal? Refused) ParseFlags(string command, string[] args)
+    {
+        var flags = new Flags();
+        for (var i = 2; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "-o" or "--output":
+                    if (command != "build")
+                        return Refuse(CliDiagnostics.UnknownCommand,
+                            $"{args[i]}: only 'build' writes a file");
+                    if (++i >= args.Length)
+                        return Refuse(CliDiagnostics.MissingArgument, "-o: missing path argument");
+                    flags = flags with { Output = args[i] };
+                    break;
+
+                case "--stdlib":
+                    if (++i >= args.Length)
+                        return Refuse(CliDiagnostics.MissingArgument,
+                            "--stdlib: missing directory argument");
+                    flags = flags with { Stdlib = args[i] };
+                    break;
+
+                case "--emit":
+                    if (command != "check")
+                        return Refuse(CliDiagnostics.UnknownCommand,
+                            "--emit: only 'check' has a step to add");
+                    flags = flags with { Emit = true };
+                    break;
+
+                case "--deny-warnings":
+                    flags = flags with { DenyWarnings = true };
+                    break;
+
+                case "--profile":
+                    if (++i >= args.Length)
+                        return Refuse(CliDiagnostics.MissingArgument,
+                            "--profile: missing name (debug or release)");
+                    if (Profile.Named(args[i]) is not { } named)
+                        return Refuse(CliDiagnostics.UnknownCommand,
+                            $"--profile: unknown profile '{args[i]}' (expected debug or release)");
+                    flags = flags with { Profile = named };
+                    break;
+
+                case "--release":
+                    flags = flags with { Profile = Profile.Release };
+                    break;
+
+                case "--debug":
+                    flags = flags with { Profile = Profile.Debug };
+                    break;
+
+                case "--optimize":
+                    flags = flags with { Optimize = true };
+                    break;
+
+                case "--no-optimize":
+                    flags = flags with { Optimize = false };
+                    break;
+
+                case "--source-map":
+                    flags = flags with { SourceMap = true };
+                    break;
+
+                case "--no-source-map":
+                    flags = flags with { SourceMap = false };
+                    break;
+
+                case "--debug-info":
+                    flags = flags with { DebugInfo = true };
+                    break;
+
+                case "--no-debug-info":
+                    flags = flags with { DebugInfo = false };
+                    break;
+
+                case "--no-inline":
+                    flags = flags with { Passes = flags.Passes & ~IrPasses.Inline };
+                    break;
+
+                case "--no-scalar-replacement":
+                    flags = flags with { Passes = flags.Passes & ~IrPasses.ScalarReplacement };
+                    break;
+
+                case "--no-devirtualize":
+                    flags = flags with { Passes = flags.Passes & ~IrPasses.Devirtualize };
+                    break;
+
+                case "--no-fusion":
+                    flags = flags with { Fusion = false };
+                    break;
+
+                default:
+                    return Refuse(CliDiagnostics.UnknownCommand, args[i].StartsWith('-')
+                        ? $"unknown option '{args[i]}' — try 'lyrc --help'"
+                        : $"unexpected argument '{args[i]}' — {command} takes one file");
+            }
+        }
+
+        return (flags, null);
+
+        static (Flags?, Refusal?) Refuse(string code, string message) =>
+            (null, new Refusal(code, message));
+    }
+
     /// <summary>Compiles to <c>.lyrbc</c>. Without <c>-o</c> the output lands next to the
     /// source.</summary>
     private static int Build(string path, string[] args, TerminalOutput terminal)
     {
-        var output = Flag(args, "-o") ?? Flag(args, "--output")
-            ?? Path.ChangeExtension(path, ".lyrbc");
+        var (flags, refused) = ParseFlags("build", args);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
 
-        var result = SourceCompiler.Compile(path, Options(path, args, terminal, out var suspect));
+        var output = flags.Output ?? Path.ChangeExtension(path, ".lyrbc");
+
+        var result = SourceCompiler.Compile(path, Options(path, flags, terminal, out var suspect));
         terminal.Render(result.Diagnostics);
         if (!result.Ok || result.Bytes is null) return ExitCodes.Failure;
-        if (DeniedWarnings(args, result, suspect) is { } denied) return denied;
+        if (DeniedWarnings(flags, result, suspect) is { } denied) return denied;
 
         try
         {
@@ -93,14 +232,18 @@ public static class Program
     /// </summary>
     private static int Check(string path, string[] args, TerminalOutput terminal)
     {
-        var options = Options(path, args, terminal, out var suspect);
-        var result = Present(args, "--emit")
+        var (flags, refused) = ParseFlags("check", args);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+
+        var options = Options(path, flags, terminal, out var suspect);
+        var result = flags.Emit
             ? SourceCompiler.Compile(path, options)
             : SourceCompiler.Check(path, options);
 
         terminal.Render(result.Diagnostics);
         if (!result.Ok) return ExitCodes.Failure;
-        if (DeniedWarnings(args, result, suspect) is { } denied) return denied;
+        if (DeniedWarnings(flags, result, suspect) is { } denied) return denied;
 
         terminal.Info($"{path}: ok");
         return ExitCodes.Success;
@@ -110,12 +253,12 @@ public static class Program
     /// The <c>--deny-warnings</c> gate, AFTER the render: the warnings keep their severity in the
     /// output, and one error at the end carries the policy into the exit code. Deliberately not
     /// rustc's way (<c>-D</c> relabels them as errors) — what a diagnostic IS must not depend on a
-    /// flag.
+    /// flag. A profile may carry the policy too, which is how a build script asks for it.
     /// </summary>
-    private static int? DeniedWarnings(string[] args, CompileResult result, int suspect)
+    private static int? DeniedWarnings(Flags flags, CompileResult result, int suspect)
     {
         var warnings = result.Diagnostics.WarningCount + suspect;
-        if (warnings == 0 || !Present(args, "--deny-warnings")) return null;
+        if (warnings == 0 || !(flags.DenyWarnings || flags.Profile.DenyWarnings)) return null;
 
         return CliDiagnostics.Fail(Console.Error, CliDiagnostics.WarningsDenied,
             warnings == 1 ? "1 warning denied by --deny-warnings"
@@ -123,11 +266,16 @@ public static class Program
             ExitCodes.Failure);
     }
 
-    /// <summary>Debug output of the mid-level IR. Lowers only when sema reported no errors.
-    /// </summary>
+    /// <summary>Debug output of the mid-level IR. Lowers only when sema reported no errors; the
+    /// profile and the diagnostic switches apply, which is what makes the dump useful for
+    /// looking at what one pass did.</summary>
     private static int Lower(string path, string[] args, TerminalOutput terminal)
     {
-        var result = SourceCompiler.Lower(path, Options(path, args, terminal, out _));
+        var (flags, refused) = ParseFlags("lower", args);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+
+        var result = SourceCompiler.Lower(path, Options(path, flags, terminal, out _));
         terminal.Render(result.Diagnostics);
         if (!result.Ok || result.Ir is null) return ExitCodes.Failure;
 
@@ -137,6 +285,10 @@ public static class Program
 
     private static int Parse(string path, string[] args, TerminalOutput terminal)
     {
+        var (flags, refused) = ParseFlags("parse", args);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+
         var (sources, diagnostics, id) = SourceCompiler.Read(path);
         if (!id.IsValid) { terminal.Render(diagnostics); return ExitCodes.Failure; }
 
@@ -148,6 +300,10 @@ public static class Program
 
     private static int Tokenize(string path, string[] args, TerminalOutput terminal)
     {
+        var (flags, refused) = ParseFlags("tokenize", args);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+
         var (sources, diagnostics, id) = SourceCompiler.Read(path);
         if (!id.IsValid) { terminal.Render(diagnostics); return ExitCodes.Failure; }
 
@@ -166,13 +322,14 @@ public static class Program
     }
 
     /// <summary>
-    /// What the compiler needs besides the file. <c>--stdlib</c> beats <c>LYRIC_STDLIB</c>.
+    /// What the compiler needs besides the file: the profile's options with the flags' overrides,
+    /// <c>--stdlib</c> (beats <c>LYRIC_STDLIB</c>), and the roots.
     ///
     /// <para>A <c>lyric.json</c> above the source supplies the module root and the native roots.
     /// Without one nothing changes: the entry file's directory is the root, as it was before the
     /// file existed.</para>
     /// </summary>
-    private static CompilerOptions Options(string path, string[] args, TerminalOutput terminal,
+    private static CompilerOptions Options(string path, Flags flags, TerminalOutput terminal,
         out int suspect)
     {
         var project = ProjectFile.Discover(Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".");
@@ -186,14 +343,18 @@ public static class Program
             CliDiagnostics.Warn(Console.Error, CliDiagnostics.ProjectFileSuspect,
                 $"{Path.Combine(project!.Directory, ProjectFile.FileName)}: {warning}");
 
-        return new CompilerOptions
+        var profile = flags.Profile;
+        return profile.Options() with
         {
-            StdlibRoot = Flag(args, "--stdlib"),
+            StdlibRoot = flags.Stdlib,
             Progress = terminal,
-            SourceMap = !Present(args, "--no-source-map"),
-            DebugInfo = !Present(args, "--no-debug-info"),
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
+            Optimize = flags.Optimize ?? profile.Optimize,
+            SourceMap = flags.SourceMap ?? profile.SourceMap,
+            DebugInfo = flags.DebugInfo ?? profile.DebugInfo,
+            Passes = flags.Passes,
+            Fusion = flags.Fusion,
         };
     }
 
@@ -206,22 +367,6 @@ public static class Program
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
                 $"{command}: missing file argument", ExitCodes.Usage);
         return run(args[1], args, terminal);
-    }
-
-    private static string? Flag(string[] args, string name)
-    {
-        for (var i = 2; i < args.Length - 1; i++)
-            if (args[i] == name) return args[i + 1];
-        return null;
-    }
-
-    /// <summary>A switch that carries no value. Same window as <see cref="Flag"/>: the command and
-    /// the file stand before it.</summary>
-    private static bool Present(string[] args, string name)
-    {
-        for (var i = 2; i < args.Length; i++)
-            if (args[i] == name) return true;
-        return false;
     }
 
     private static int Version(TerminalOutput terminal)
@@ -245,11 +390,16 @@ public static class Program
         Console.Out.WriteLine("  parse <file>             Print the AST dump (debug)");
         Console.Out.WriteLine("  tokenize <file>          Print the token stream (debug)");
         Console.Out.WriteLine();
+        Console.Out.WriteLine("Profile (debug unless $LYRIC_PROFILE says release; every field overridable):");
+        Console.Out.WriteLine("  --profile <name>         debug or release");
+        Console.Out.WriteLine("  --debug, --release       The same, shorter");
+        Console.Out.WriteLine("  --optimize, --no-optimize        Run or skip the IR optimizations");
+        Console.Out.WriteLine("  --source-map, --no-source-map    Keep or omit line numbers; a panic then names the function");
+        Console.Out.WriteLine("  --debug-info, --no-debug-info    Keep or omit slot names; a debugger then shows indices");
+        Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
         Console.Out.WriteLine("  --stdlib <dir>           Where the stdlib lives (beats $LYRIC_STDLIB)");
         Console.Out.WriteLine("  --emit                   check: emit the bytes and load them, writing neither");
-        Console.Out.WriteLine("  --no-source-map          Omit line numbers; a panic names the function");
-        Console.Out.WriteLine("  --no-debug-info          Omit slot names; a debugger shows indices");
         Console.Out.WriteLine("  --deny-warnings          Exit nonzero when the run reports warnings (CI)");
         Console.Out.WriteLine("  --json                   Diagnostics as JSON on stderr");
         Console.Out.WriteLine("  --quiet, -q              Suppress success messages");
@@ -257,6 +407,10 @@ public static class Program
         Console.Out.WriteLine("  --progress <mode>        auto (default), never or always");
         Console.Out.WriteLine("  --version, -v            Show the toolchain version");
         Console.Out.WriteLine("  --help, -h               Show this help");
+        Console.Out.WriteLine();
+        Console.Out.WriteLine("Diagnostic switches, for bisecting an optimizer finding (no part of any profile):");
+        Console.Out.WriteLine("  --no-inline, --no-scalar-replacement, --no-devirtualize   Skip one IR pass");
+        Console.Out.WriteLine("  --no-fusion              Emit the unfused instruction forms");
         Console.Out.WriteLine();
         Console.Out.WriteLine("lyrc does not execute anything. Use 'lyrvm run' or 'lyric run'.");
     }

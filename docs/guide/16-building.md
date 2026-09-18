@@ -105,6 +105,59 @@ Where modules live is a property of the project, not of a build, so it stays in
 Both files are read for every artifact. The script never repeats a root, and an editor learns the
 layout from `lyric.json` without running anything.
 
+## Two profiles
+
+A compile is one of two shapes, and the shape is a named bundle rather than a list of flags to
+remember:
+
+| | `debug` | `release` |
+|---|---|---|
+| IR optimizations (inlining, scalar replacement, devirtualization) | off | on |
+| source map (line numbers) | kept | kept |
+| debug info (slot and field names) | kept | dropped |
+
+`lyric build`, `lyric run`, `lyric check` and `lyric test` compile the **debug** profile unless
+told otherwise; `lyric pack` compiles the **release** profile unless told otherwise. The reason
+is what each shape is for. A debug build keeps every frame, so a panic's backtrace names the
+function that failed rather than the caller it was spliced into, and a debugger stops in it. A
+release build is what ships. Both keep the source map: a panic in production that names its line
+is worth the bytes.
+
+```bash
+lyric build app.lyr --release      # or --profile release; --debug is the other name
+lyric run app.lyr --release        # the compile flags travel to the compiler
+lyric pack app.lyr --debug         # a pack you can debug
+```
+
+Every field of a profile stays individually overridable, and a field flag wins over the profile:
+
+```bash
+lyric build app.lyr --release --debug-info      # optimized, with the names
+lyric build app.lyr --no-source-map             # the debug profile without line numbers
+```
+
+`--optimize`/`--no-optimize`, `--source-map`/`--no-source-map` and `--debug-info`/`--no-debug-info`
+are the six; `--deny-warnings` stays its own flag. The environment variable `LYRIC_PROFILE`
+names the default for a whole process — `LYRIC_PROFILE=release dotnet test` is how a suite runs
+in the other shape — and any flag beats it.
+
+What the profiles cost, measured on this interpreter with `tools/Bench`: a loop that builds and
+adds structs runs about two and a half times slower in the debug profile, a `for-in` over a range
+about one and a half times, and array and iterator loops run about as fast either way. Compiling
+is about a tenth faster without the optimizer, which is why the standard library's own test suite
+is quicker in the debug profile.
+
+### Switches for bisecting
+
+`lyrc` takes four more switches that belong to no profile: `--no-inline`,
+`--no-scalar-replacement`, `--no-devirtualize` and `--no-fusion`. Each takes one optimization or
+the fused instruction forms out of a `--release` build, which is how a program that answers
+differently or runs slower optimized is narrowed down to the pass responsible. They are
+diagnostic aids and carry no compatibility promise beyond that.
+
+Every tool refuses an option it does not know, by name (`LYR-CLI0003`). A flag that is accepted
+and does nothing is the one that costs an afternoon.
+
 ## When something goes wrong
 
 | | |

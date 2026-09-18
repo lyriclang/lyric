@@ -11,6 +11,61 @@
 
 ## Current milestone
 
+**M37 — the project system, build v2 and profiles — IN PROGRESS** (2026-09-18, branch
+`feature/m37-profiles`). Stage A of the 2026-09-17 design round: a compile is a named PROFILE,
+`lyric.json` learns `name`, `dependencies` and `toolchain`, a project without `build.lyr` builds
+by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
+
+- [x] **slice 0 — the measurement**, before the default fell. Both shapes through `tools/Bench`
+      in one session, Release configuration, the control cases (`loopOnly`, `intAdd`, `floatAdd`,
+      `maskOnly`, `nativeSqrt`) at identical instruction counts in both:
+
+      | case | release | debug |
+      |---|---:|---:|
+      | `construct_call` (a struct built and added) | 55.0 ns, 0 B | 141.0 ns, 112 B |
+      | `operator` (`a + b` through `Add`) | 58.4 ns | 136.6 ns |
+      | `native_vec2_arg` | 37.9 ns, 0 B | 101.7 ns, 56 B |
+      | `forin_range` | 73.2 ns | 116.8 ns |
+      | `call` | 63.6 ns | 64.6 ns |
+      | `forin_array` | 154.3 ns | 140.4 ns |
+      | `set_iter` | 408.9 ns | 351.3 ns |
+      | `arrayRead` (interpreter table) | 13 instr, 58.8 ns | 11 instr, 47.2 ns |
+      | lyrtest over `stdlib-tests` (min of 3) | 3 959 ms | 3 448 ms |
+      | `lyrc check` of `collections_tests.lyr`, `lower` phase | 115 ms | 87 ms |
+
+      **The price of the debug profile is at most 2.7× on struct-heavy loops and 1.6× on a range
+      loop**, not the 30× the M14 baseline-to-optimized figures suggested: frame pooling is
+      VM-side and stays. And the release shape LOSES on three cases, which is a finding about the
+      optimizer, not about the profile — **three findings, recorded, not fixed here**: (1)
+      `ScalarReplacement.ForwardLocals` forwards a single-store local across BLOCK boundaries, so
+      the emitter spills the temp into a synthetic slot and has to spill the already-computed
+      index beside it (`arrayRead`: 13 instructions where 11 do); a non-struct value forwarded
+      across a block cannot gain anything, the temp becomes a slot again. (2) The inlined `call`
+      executes 15 instructions where the real call executes 11: the callee is spliced as its own
+      blocks, so the argument, a constant and the result each travel through a slot and three
+      block hops — inlining alone buys nothing since pooling made a frame cheap; what pays is the
+      scalar replacement behind it. (3) `forin_array` and `set_iter` carry same-block copies
+      (`stloc 13; ldloc 13`) the forwarding does not remove while it removes the cross-block ones
+      that hurt. Correctness in the debug shape: Ir 175, Vm 1453, Embedding 222, lyrtest 166 all
+      green; Cli 276 of 277, the one red a backtrace pin of the inlined shape. **Zero wrong
+      answers.** The optimizer round is its own milestone after this one.
+- [x] **slice 1 — profiles** (this branch): `Profile` (debug, release; ONE table in
+      `Lyric.Frontend/Compiler/Profile.cs`, read by lyrc, lyrbuild, lyrtest, lyrdbg, the REPL and
+      `LangVm`), `--profile`/`--release`/`--debug` plus the six field flags, `LYRIC_PROFILE` as the
+      process default (the `LYRIC_JIT` shape), `HostOptions.Profile`, the four diagnostic switches
+      (`--no-inline`, `--no-scalar-replacement`, `--no-devirtualize`, `--no-fusion`) over
+      `IrPasses` and the emitter's fusion switch, `lyrvm run --jit`, strict option parsing in
+      lyrc and lyrvm, the driver's routing table (compile flags to lyrc, `--jit`/`--grant` to
+      lyrvm), `lyric pack` release by default, a CI job with `LYRIC_PROFILE=release`, guides 1,
+      14, 16, 17, 20, 21, CHANGELOG Unreleased
+- [ ] slice 2 — `lyric.json` v2 (`name`, `dependencies`, `toolchain`), `ModuleRoots`, the
+      reader moved to Core, the LSP on the same table
+- [ ] slice 3 — `std.build` v2 and `lyrbuild` v2 (synthetic entry, the model in Lyric, implicit
+      build, `packed`, options, `after`)
+- [ ] slice 4 — the driver's verbs without a file argument, artifact names, `out/<profile>/`,
+      templates, project-wide `check`
+- [ ] slice 5 — the spec sentence (§4, a dependency root), the release
+
 **Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither
 is M36's**: both are older, and the feature only made them findable.
 
