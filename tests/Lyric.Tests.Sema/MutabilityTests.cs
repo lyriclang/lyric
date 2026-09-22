@@ -118,4 +118,63 @@ public class MutabilityTests
             struct V { x: int, fn peek(): int { this.x = 9; return this.x; } }
             fn main(): int { return 0; }
             """);
+
+    // ------------------------------------------------- the three ways past the rule
+
+    /// <summary>
+    /// <c>++</c> and <c>--</c> write as much as they read, and the walker only ever looked at
+    /// assignments: <c>let x = 1; x++;</c> compiled without a word and answered 2.
+    /// </summary>
+    [Theory]
+    [InlineData("x++;")]
+    [InlineData("x--;")]
+    [InlineData("let y = ++x; return y;")]   // prefix only in expression position: '++x;' as a
+    [InlineData("let y = --x; return y;")]   // statement is LYR-SEM0022, which is a rule of its own
+    public void Increment_and_decrement_obey_let(string form) =>
+        Rejected($$"""
+            fn main(): int { let x = 1; {{form}} return x; }
+            """);
+
+    [Theory]
+    [InlineData("x++;")]
+    [InlineData("let y = ++x; return y;")]
+    public void Increment_and_decrement_still_work_on_var(string form) =>
+        Allowed($$"""
+            fn main(): int { var x = 1; {{form}} return x; }
+            """);
+
+    /// <summary>
+    /// A lambda body is a body. It was reached through the child-expression list, which carries
+    /// expressions and cannot carry a block, so the rules never ran inside one at all — and an
+    /// assignment to a captured <c>let</c> travelled to the lowering, which has no diagnostic for
+    /// it and threw.
+    /// </summary>
+    [Fact]
+    public void A_lambda_body_obeys_let() =>
+        Rejected("""
+            fn main(): int { let x = 1; let f = (): void => { x = 5; }; f(); return x; }
+            """);
+
+    /// <summary>And the same for an expression-bodied lambda, which the list did carry.</summary>
+    [Fact]
+    public void An_expression_lambda_obeys_let() =>
+        Rejected("""
+            fn main(): int { let x = 1; let f = (): int => (x = 5); return f(); }
+            """);
+
+    /// <summary>
+    /// The BLOCK arm of a match EXPRESSION, for the same reason: the list collected the expression
+    /// arms only. The statement form was always walked, so the two spellings of one construct
+    /// disagreed — and the block arm quietly overwrote the binding at runtime.
+    /// </summary>
+    [Fact]
+    public void A_block_arm_of_a_match_expression_obeys_let() =>
+        Rejected("""
+            fn main(): int {
+                let x = 1;
+                let k = 1;
+                let v = match (k) { 1 => { x = 9; return x; }, _ => 5 };
+                return v;
+            }
+            """);
 }

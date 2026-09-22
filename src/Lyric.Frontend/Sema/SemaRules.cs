@@ -185,15 +185,57 @@ public sealed class SemaRules
 
     private void WalkExpr(Expr expr)
     {
-        if (expr is AssignExpr a)
+        switch (expr)
         {
-            if (!_types.TypeOf(a.Target).IsError && !IsMutableLvalue(a.Target))
-                _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, "cannot assign to this target (not a mutable lvalue)");
-            WalkExpr(a.Value);
-            WalkExpr(a.Target);
-            return;
+            case AssignExpr a:
+                if (!_types.TypeOf(a.Target).IsError && !IsMutableLvalue(a.Target))
+                    _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, "cannot assign to this target (not a mutable lvalue)");
+                WalkExpr(a.Value);
+                WalkExpr(a.Target);
+                return;
+
+            // '++' and '--' READ AND WRITE. Checked only as assignments, they were the one way past
+            // §7.1: 'let x = 1; x++;' compiled without a word and answered 2.
+            case PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } p:
+                CheckIncrementTarget(p.Operand);
+                WalkExpr(p.Operand);
+                return;
+
+            case UnaryExpr { Operator: UnaryOp.PreInc or UnaryOp.PreDec } u:
+                CheckIncrementTarget(u.Operand);
+                WalkExpr(u.Operand);
+                return;
+
+            // A lambda BODY is a body: the same rules hold inside it. Reached only through
+            // 'Children', it was never walked at all, and an assignment to a captured 'let' went
+            // to the lowering, which has no diagnostic for it and threw.
+            case LambdaExpr lambda:
+                if (lambda.Body is Block block) WalkStmt(block);
+                else if (lambda.Body is Expr body) WalkExpr(body);
+                return;
+
+            // The BLOCK arms of a match expression, for the same reason: 'Children' collects the
+            // expression arms, and a block arm assigning to a 'let' passed unseen.
+            case MatchExpr match:
+                WalkExpr(match.Scrutinee);
+                foreach (var arm in match.Arms)
+                {
+                    if (arm.Guard is not null) WalkExpr(arm.Guard);
+                    if (arm.Body is Block armBlock) WalkStmt(armBlock);
+                    else if (arm.Body is Expr armExpr) WalkExpr(armExpr);
+                }
+                return;
         }
+
         foreach (var child in Children(expr)) WalkExpr(child);
+    }
+
+    /// <summary>The target of <c>++</c> or <c>--</c>, which is written as much as read.</summary>
+    private void CheckIncrementTarget(Expr operand)
+    {
+        if (_types.TypeOf(operand).IsError || IsMutableLvalue(operand)) return;
+        _de.Report("LYR-SEM0019", Severity.Error, operand.Span,
+            "cannot increment or decrement this target (not a mutable lvalue)");
     }
 
     private bool IsMutableLvalue(Expr expr) => expr switch
@@ -257,7 +299,8 @@ public sealed class SemaRules
         StructInitExpr si => si.Fields.Select(f => f.Value),
         InterpolatedStringExpr fs => fs.Segments.OfType<InterpHole>().Select(h => h.Expr),
         IfExpr iff => [iff.Condition, iff.Then, iff.Else],
-        MatchExpr ma => new[] { ma.Scrutinee }.Concat(ma.Arms.Where(a => a.Body is Expr).Select(a => (Expr)a.Body)),
+        // MatchExpr and LambdaExpr are handled in WalkExpr: their block arms and block bodies are
+        // STATEMENTS, which this list cannot carry.
         AssignExpr a => [a.Target, a.Value],
         _ => []
     };
