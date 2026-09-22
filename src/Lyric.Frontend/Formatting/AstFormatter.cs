@@ -309,6 +309,7 @@ public sealed class AstFormatter
         {
             Attributes(decl.Attributes),
             Pub(decl.IsPublic),
+            decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
             Doc.From($"fn {decl.Name}"),
@@ -322,6 +323,9 @@ public sealed class AstFormatter
             head.Add(Doc.From(" throws"));
             if (throws.Type is { } thrown) head.Add(Doc.Of(Doc.Space, TypeDoc(thrown)));
         }
+
+        if (decl.Extern is { SymbolSpan: { } symbol })
+            head.Add(Doc.Of(Doc.From(" = "), Src(symbol)));
 
         head.Add(decl.Body is { } body ? Doc.Of(Doc.Space, BlockDoc(body)) : Doc.From(";"));
         return new Doc.Concat(head);

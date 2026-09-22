@@ -164,8 +164,18 @@ public sealed class NativeRegistry : IDisposable
         {
             var import = module.Imports[i];
             if (!_natives.TryGetValue(import.Name, out var native))
-                throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
-                    $"no native implementation for '{import.Name}'");
+            {
+                // An 'extern "dotnet"' import is resolved by reflection when nobody registered
+                // it by hand; the registered table stays the first word, so a host can still
+                // decide what a symbol means for its scripts. The capability check below
+                // applies to it like to any gated native.
+                if (DotnetBinding.TryBind(import) is { } reflected)
+                    native = new Native(import.ParamTypes.Select(p => p.Tag).ToArray(),
+                        import.ReturnType.Tag, reflected);
+                else
+                    throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
+                        $"no native implementation for '{import.Name}'");
+            }
 
             // A gated native may only be bound when the module DECLARED the capability it needs.
             // The load-time check (LoadedProgram.Load) refuses a module that declares more than

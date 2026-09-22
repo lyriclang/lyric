@@ -115,6 +115,54 @@ Three things follow from how it is keyed:
 A module in a native root may hold ordinary Lyric code beside its declarations; `anyKey` above is
 compiled like any other function.
 
+## Reaching into .NET from the script
+
+Everything above is the host offering something to a script. Since 4.5 a script can also ask
+for a public static .NET method itself, by symbol:
+
+```lyr
+import std.io.console { println };
+
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+extern "dotnet" fn tempPath(): string = "System.IO.Path::GetTempPath";
+
+fn main(): int {
+    println(f"{cbrt(27.0)} {tempPath()}");
+    return 0;
+}
+```
+
+An `extern` declaration is a function without a body, like a native root's, with two strings
+instead: the **ABI** — `"dotnet"` is the one this runtime binds — and the **symbol**, the type
+and the method as .NET spells them. A type that lives in an assembly the process has not loaded
+is written assembly-qualified, `"System.Net.Dns, System.Net.NameResolution::GetHostName"`, and
+the assembly is loaded for it.
+
+The Lyric signature is what picks the overload: each parameter type names exactly one .NET
+type — `int` is `Int64`, `int32` is `Int32`, `float` is `Double`, `char` is `Char`, `string`
+is `String` — and the one public static method with that parameter list and that return type
+is the binding. A symbol nobody can bind, or one with two candidates, refuses the module at
+load with the candidates in the message; the same place a missing native root implementation
+is reported.
+
+Three rules make this fit the rest of the sandbox rather than punch through it:
+
+- **It is gated.** An extern declaration records `hostAccess` in the compiled module — the bit
+  reserved for this since 1.0 — so a VM that does not grant `Capability.HostAccess` refuses
+  the module before any instruction runs, exactly as it refuses `std.io.file` without
+  `FileAccess`. `lyrvm run app.lyrbc --grant none` says so too.
+- **What crosses is what a native root can cross today:** the scalars, `bool`, `char`,
+  `string`, and `void` as a return. An optional, an array or a struct in the signature is
+  refused where it is declared (`LYR-SEM0099`); how those cross is the next stage of the
+  design, not something the binder guesses.
+- **A .NET exception is a panic.** `System.Int32::Parse` given `"zz"` ends the program with
+  `LYR-VM0016` and the exception's own message. Mapping it onto a Lyric `throws` is the open
+  item of this stage, and until it is settled the failure is loud rather than turned into a
+  value.
+
+A host that has registered a native under the same `dotnet:` name wins over reflection: a
+registration is a decision, reflection is the default.
+
 ## Value types across the boundary
 
 A native signature may use a `struct` an SDK module declares, with scalar and string fields only.

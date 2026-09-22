@@ -90,6 +90,12 @@ public static class VmDiagnostics
     /// a runtime fact, so the meeting is where the check lives; admitted, the value would
     /// corrupt the puller, whose result type is static.</summary>
     public const string YieldTypeMismatch = "LYR-VM0015";
+
+    /// <summary>An <c>extern "dotnet"</c> call threw on the host side, or an argument could not
+    /// cross the boundary. A panic rather than a Lyric exception in stage 1 of the ABI: the
+    /// mapping onto <c>throws</c> is an open design item, and until it is decided the failure is
+    /// not silently turned into a value.</summary>
+    public const string HostCallFailed = "LYR-VM0016";
 }
 
 /// <summary>

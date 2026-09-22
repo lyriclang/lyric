@@ -76,6 +76,26 @@ public sealed record FunctionDecl(
     /// enum or extend block — where the sema admits only the row-less <c>@Deprecated</c>.
     /// Interface members stay attribute-free: the parser rejects the list there.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
+
+    /// <summary>Set on an <c>extern "abi" fn</c> declaration: a bodyless function whose
+    /// implementation the runtime binds outside the program. <c>null</c> for every ordinary
+    /// function.</summary>
+    public ExternSpec? Extern { get; init; }
+}
+
+/// <summary>
+/// The foreign side of an <c>extern</c> declaration: which ABI binds it and under which symbol.
+/// </summary>
+/// <param name="Abi">The ABI string — <c>"dotnet"</c> is the one this compiler knows.</param>
+/// <param name="Symbol">The symbol named after <c>=</c>, or <c>null</c> when the function's own
+/// name is the symbol.</param>
+public sealed record ExternSpec(string Abi, string? Symbol, Span Span) : Node(Span)
+{
+    /// <summary>The ABI string literal as written, for the formatter.</summary>
+    public required Span AbiSpan { get; init; }
+
+    /// <summary>The symbol string literal as written, or <c>null</c> when none was.</summary>
+    public Span? SymbolSpan { get; init; }
 }
 
 /// <summary>A <c>static let</c> constant in the body of a struct or class, reachable as

@@ -94,7 +94,10 @@ public static class ModuleLowerer
                 // sema already rejected this as LYR-SEM0051.
                 if (function.Body is null)
                 {
-                    if (!compilation.IsNative(module)) continue;
+                    // An 'extern' declaration is a native the PROGRAM declares: the import is
+                    // named after the ABI and the symbol rather than after the module, so the
+                    // binder knows which side answers for it — 'dotnet:System.Math::Cbrt'.
+                    if (!compilation.IsNative(module) && function.Extern is null) continue;
 
                     // Caught rather than thrown: a native signature with a type the lowering does not
                     // know is a scope boundary like any other, and the user should see a diagnostic with
@@ -118,7 +121,9 @@ public static class ModuleLowerer
                             flattened = [.. flattened, outParam.Declared];
 
                         imports.Declare(symbol, new IrImport(
-                            NameMangling.ForFunction(module, function.Name),
+                            function.Extern is { } spec
+                                ? NameMangling.ForExtern(spec, function.Name)
+                                : NameMangling.ForFunction(module, function.Name),
                             flattened, wireReturn),
                             new ImportShape(parameters, returned is { } ret
                                 ? new ImportReturn(ret.Struct!.Value, ret.Fields)
@@ -828,7 +833,16 @@ public static class ModuleLowerer
     {
         var needed = Capability.None;
         foreach (var module in compilation.Modules)
+        {
             needed |= CapabilityTable.RequiredForImport(module.FullName);
+
+            // An extern declaration is a gated import the module itself writes: the bit follows
+            // the ABI, exactly as it follows the module name for 'std.io.file'. Recorded whether
+            // or not the program calls it — the same rule as for an import nobody uses.
+            foreach (var decl in compilation.AstOf(module).Declarations)
+                if (decl is FunctionDecl { Extern: { } spec, Name: var name })
+                    needed |= CapabilityTable.RequiredForImport(NameMangling.ForExtern(spec, name));
+        }
         return needed;
     }
 

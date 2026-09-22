@@ -1,0 +1,24 @@
+// Stage 1 of the ABI: a Lyric program binds public static .NET methods itself.
+//
+// An 'extern "dotnet"' declaration is a bodyless function whose body the runtime finds by
+// reflection: the symbol names the type and the method, the Lyric signature picks the overload.
+// The declaration records the 'hostAccess' capability in the module, so a host that grants
+// nothing refuses to load it — the same gate as 'std.io.file'.
+import std.io.console { println };
+
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+extern "dotnet" fn clamp(value: int, lo: int, hi: int): int = "System.Math::Clamp";
+extern "dotnet" fn tempPath(): string = "System.IO.Path::GetTempPath";
+extern "dotnet" fn hostName(): string = "System.Net.Dns, System.Net.NameResolution::GetHostName";
+extern "dotnet" fn isWhite(c: char): bool = "System.Char::IsWhiteSpace";
+extern "dotnet" fn env(name: string): string = "System.Environment::GetEnvironmentVariable";
+
+fn main(): int {
+    println(f"cbrt(27) = {cbrt(27.0)}");
+    println(f"clamp(99, 0, 10) = {clamp(99, 0, 10)}");
+    println(f"tmp = {tempPath()}");
+    println(f"host = {hostName()}");
+    println(f"' ' is white: {isWhite(' ')}, 'x' is white: {isWhite('x')}");
+    println(f"HOME set: {env("HOME") != ""}");
+    return 0;
+}

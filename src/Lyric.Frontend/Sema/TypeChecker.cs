@@ -386,9 +386,73 @@ public sealed class TypeChecker
     {
         if (fn.Body is not null || _comp.IsNative(module)) return;
 
+        // An 'extern' declaration is the one bodyless form user code may write: the body lives
+        // in the host, the runtime binds it by symbol, and the capability the ABI needs is
+        // recorded in the module (hostAccess for "dotnet").
+        if (fn.Extern is { } spec)
+        {
+            CheckExtern(fn, spec, module);
+            return;
+        }
+
         _de.Report("LYR-SEM0051", Severity.Error, fn.Span,
             $"'{fn.Name}' has no body; only standard-library modules may declare native functions");
     }
+
+    /// <summary>
+    /// What may cross an <c>extern</c> boundary, checked where the declaration stands so a
+    /// signature nobody can bind is refused at the declaration rather than at load time.
+    ///
+    /// <para>Stage 1 of the ABI: the <c>"dotnet"</c> ABI, and the marshalling set is the
+    /// scalars, <c>bool</c>, <c>char</c> and <c>string</c>, with <c>void</c> as a return. Every
+    /// other type is a question the design leaves to a later stage (optionals as
+    /// <c>Nullable</c>/null, arrays as <c>Span</c>, structs by field), and until it is answered
+    /// the checker says so rather than letting the binder guess.</para>
+    /// </summary>
+    private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
+    {
+        if (spec.Abi != "dotnet")
+        {
+            _de.Report("LYR-SEM0098", Severity.Error, spec.Span,
+                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"dotnet\"");
+            return;
+        }
+
+        // The symbol carries the type; a bare function name could not say where to look.
+        if (spec.Symbol is null || !spec.Symbol.Contains("::", StringComparison.Ordinal))
+            _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
+                $"extern '{fn.Name}' needs a symbol of the form \"Type::Method\" after '=' — "
+                + "the \"dotnet\" ABI binds a public static method of a named type");
+
+        if (fn.Generics.Length > 0)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Span,
+                $"'{fn.Name}' is extern and cannot have type parameters — a host symbol is one signature");
+
+        if (fn.Throws is not null)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span,
+                $"'{fn.Name}' is extern and cannot declare 'throws' — a host exception arrives as a panic in stage 1");
+
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: false))
+                _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
+                    $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
+                    + "cross the \"dotnet\" boundary — scalars, bool, char and string do");
+        }
+
+        if (fn.ReturnType is { } ret)
+        {
+            var type = ResolveType(ret, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: true))
+                _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
+                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not cross the \"dotnet\" "
+                    + "boundary — scalars, bool, char, string and void do");
+        }
+    }
+
+    private static bool CrossesHostBoundary(LyrType type, bool asReturn) =>
+        type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
 
     private void CheckMethods(string typeName, Decl[] members, ModuleSymbol module)
     {

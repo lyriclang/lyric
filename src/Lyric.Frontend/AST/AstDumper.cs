@@ -204,7 +204,7 @@ public static class AstDumper
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
             case FunctionDecl n:
-                Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Body is null ? " (abstract)" : "")}", n.Span);
+                Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Extern is { } x ? $" extern \"{x.Abi}\"{(x.Symbol is null ? "" : $" = \"{x.Symbol}\"")}" : n.Body is null ? " (abstract)" : "")}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var p in n.Parameters) Write(p, indent + 1, sb);
