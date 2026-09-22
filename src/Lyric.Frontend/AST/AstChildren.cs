@@ -60,8 +60,13 @@ public static class AstChildren
                 if (t.Type is not null) yield return t.Type;
                 break;
 
+            // The ABI and the symbol are strings, not nodes: a leaf.
+            case ExternSpec:
+                break;
+
             case FunctionDecl f:
                 foreach (var a in f.Attributes) yield return a;
+                if (f.Extern is not null) yield return f.Extern;
                 foreach (var g in f.Generics) yield return g;
                 foreach (var p in f.Parameters) yield return p;
                 if (f.ReturnType is not null) yield return f.ReturnType;
@@ -225,6 +230,10 @@ public static class AstChildren
 
             case UnaryExpr u:
                 yield return u.Operand;
+                break;
+
+            case ComptimeExpr ct:
+                yield return ct.Inner;
                 break;
 
             case ResumeExpr r:

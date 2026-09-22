@@ -249,6 +249,60 @@ the same rule `build` uses to tell "compile this file" from "build this project"
 compilation and the test root as a second one that imports it. A test calling a function that
 was renamed is a question no per-file check can answer, and this is the answer.
 
+## Values computed while building
+
+Since 4.5 an expression can be marked for the compiler to compute:
+
+```lyr
+import std.io.console { println };
+
+fn fib(n: int): int {
+    var a = 0;
+    var b = 1;
+    for (_ in 0..n) {
+        let next = a + b;
+        a = b;
+        b = next;
+    }
+    return a;
+}
+
+let FIB_90 = comptime fib(90);
+
+fn main(): int {
+    println(f"{FIB_90} {comptime (60 * 60 * 24 * 365)}");
+    return 0;
+}
+```
+
+`comptime e` is the value `e` has — the same value, computed at the same rules — with one
+difference: it is computed by the compiler, and the module carries the literal rather than
+the code. `fib` above is not in the compiled program at all; `FIB_90` is a constant, and the
+disassembly shows it as one.
+
+How it works is worth knowing, because it is what makes the feature safe to have. The
+compiler lowers every site into a function of its own, prunes that module down to what the
+sites reach, and hands it to the runtime — **with no capability and an instruction budget**.
+Then it compiles the program a second time with the values in hand. So:
+
+- **A site cannot reach outside.** `comptime exists("/etc/passwd")` is a compile error
+  (`LYR-CT0002`) saying which capability it would need; compile-time evaluation grants none,
+  whatever the program itself is granted. A pure site in a program that reads files elsewhere
+  is fine — the evaluation module never contains that part.
+- **A site cannot hang the build.** A loop that does not finish within the budget is reported
+  at the site; so is a panic, with its message.
+- **A site is deterministic.** The language's arithmetic is specified to the bit and the only
+  non-deterministic draws are gated, so the same source yields the same literal on every
+  machine — a build stays reproducible.
+- **A site sees module-level names only.** A local, a parameter, `this` or a lambda is refused
+  where it stands (`LYR-SEM0100`): the expression runs before any frame exists. The result has
+  to be a scalar, a `bool`, a `char` or a `string` — what a module can hold as a literal.
+
+`comptime` binds like a prefix operator: `comptime 60 * 60` is `(comptime 60) * 60`, so a
+compound expression takes parentheses. A tool that only checks — the editor, `lyrc check` —
+type-checks the site and runs nothing; a build through `lyrc`, `lyric build` or the embedding
+API evaluates it.
+
 ## What the script does not say
 
 Where modules live is a property of the project, not of a build, so it stays in

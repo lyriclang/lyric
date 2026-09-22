@@ -138,7 +138,8 @@ internal sealed class FunctionLowerer
         TypeSymbol? receiver = null,
         GenericInstance? ownerInstance = null,
         TypeNode? receiverTypeNode = null,
-        IrType? coroutineYield = null)
+        IrType? coroutineYield = null,
+        IrType? returnTypeOverride = null)
     {
         _ownerInstance = ownerInstance;
         _instances = instances;
@@ -160,7 +161,10 @@ internal sealed class FunctionLowerer
         // parameters in slots, locals in slots, defers, lambdas — is the ordinary machinery,
         // which is the point: a frame the interpreter can capture is a frame like any other.
         _coroutineYield = coroutineYield;
-        _returnType = coroutineYield is not null ? VoidType : LowerDeclaredReturnType();
+        // A synthetic function — a comptime site's evaluator — has no written return type; the
+        // sema type of its expression is handed in lowered instead.
+        _returnType = coroutineYield is not null ? VoidType
+            : returnTypeOverride ?? LowerDeclaredReturnType();
 
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
         // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
@@ -1443,6 +1447,7 @@ internal sealed class FunctionLowerer
         StructInitExpr e => LowerObjectInit(e),
         RangeExpr e => throw NotSupported("range expression", e.Span),
         ResumeExpr e => LowerResume(e),
+        ComptimeExpr e => LowerComptime(e),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),
@@ -1807,6 +1812,24 @@ internal sealed class FunctionLowerer
     /// The jump table in the body makes the call continue where the last <c>yield</c> stopped; from here
     /// it looks like any other call, and that is the whole point of the transformation.</para>
     /// </summary>
+    /// <summary>
+    /// A <c>comptime</c> site. With the evaluator's values in hand it is a constant; in the
+    /// hoisting pass and in a check it is the inner expression, computed where it stands — the
+    /// same value, so the two lowerings agree by construction. See <see cref="ComptimeTable"/>.
+    /// </summary>
+    private TempId? LowerComptime(ComptimeExpr expr)
+    {
+        if (_typeTable.Comptime is { Values: { } values })
+        {
+            var index = _types.ComptimeSites.IndexOf(expr);
+            if (index < 0 || !values.TryGetValue(index, out var constant))
+                throw Bug($"comptime site at {expr.Span} has no evaluated value");
+            return EmitConst(constant, TypeOfExpr(expr), expr.Span);
+        }
+
+        return LowerExpr(expr.Inner);
+    }
+
     private TempId? LowerResume(ResumeExpr expr)
     {
         if (LowerType(_types.TypeOf(expr.Coroutine), expr.Span) is not IrFunctionType signature)

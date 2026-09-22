@@ -219,6 +219,14 @@ public sealed partial class Parser
                     RejectAttributes(attributes, "a type alias");
                     return ParseTypeAlias(isPublic, isOpaque: false, start);
                 }
+                // 'extern "dotnet" fn f(x: int): int = "System.Math::Abs";' — contextual like
+                // 'type': the word stays an identifier everywhere else, so no program that names
+                // something 'extern' loses that name.
+                if (AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral)
+                {
+                    RejectAttributes(attributes, "an extern declaration");
+                    return ParseExternDecl(isPublic, start);
+                }
                 // 'opaque type X = int;' — contextual like 'type' itself: neither word is a
                 // keyword, so neither is taken from anyone's identifiers.
                 if (AtContextual("opaque") && PeekContextual(1, "type"))
@@ -284,7 +292,7 @@ public sealed partial class Parser
                 or TokenKind.Interface or TokenKind.Extend or TokenKind.Let or TokenKind.Var
                 or TokenKind.AtIdentifier)
                 break;
-            if (AtContextual("type")) break;
+            if (AtContextual("type") || AtContextual("extern")) break;
             span = _buffer.Advance().Span;
         }
         return span;
@@ -337,7 +345,23 @@ public sealed partial class Parser
 
     // --- Functions (§3.1) ---
 
-    private FunctionDecl ParseFunctionDecl(bool isPublic, Span start, bool isStatic = false)
+    /// <summary>
+    /// <c>extern "abi" fn name(params): T [= "symbol"];</c> — a function whose body lives
+    /// outside the program. The ABI string says which binder answers for it; the symbol names
+    /// what that binder looks up, defaulting to the function's own name. Whether the ABI is one
+    /// this compiler knows, and whether the signature can cross it, is the checker's question.
+    /// </summary>
+    private Decl ParseExternDecl(bool isPublic, Span start)
+    {
+        var kw = _buffer.Advance(); // 'extern'
+        var abiTok = _buffer.Advance(); // the string literal the caller peeked
+        var abi = LiteralDecoder.DecodeString(_sm.Slice(abiTok.Span), abiTok.Span, _de);
+        var spec = new ExternSpec(abi, null, Span.Union(kw.Span, abiTok.Span)) { AbiSpan = abiTok.Span };
+        return ParseFunctionDecl(isPublic, start, spec: spec);
+    }
+
+    private FunctionDecl ParseFunctionDecl(bool isPublic, Span start, bool isStatic = false,
+        ExternSpec? spec = null)
     {
         var isMut = _buffer.Match(TokenKind.Mut);
         _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {_buffer.Current.TokenKind}");
@@ -365,7 +389,25 @@ public sealed partial class Parser
 
         Block? body = null;
         Span end;
-        if (_buffer.Check(TokenKind.LBrace))
+        if (spec is not null)
+        {
+            // An extern declaration has no body by definition; what it may carry is the symbol.
+            if (_buffer.Match(TokenKind.Equal))
+            {
+                var symbolTok = _buffer.Expect(TokenKind.StringLiteral, "LYR-PAR0044",
+                    $"expected the symbol as a string after '=', got {_buffer.Current.TokenKind}");
+                if (symbolTok.TokenKind == TokenKind.StringLiteral)
+                    spec = spec with
+                    {
+                        Symbol = LiteralDecoder.DecodeString(_sm.Slice(symbolTok.Span), symbolTok.Span, _de),
+                        SymbolSpan = symbolTok.Span,
+                        Span = Span.Union(spec.Span, symbolTok.Span),
+                    };
+            }
+            end = _buffer.Expect(TokenKind.Semicolon, "LYR-PAR0016",
+                "expected ';' to end the extern declaration — its body lives outside the program").Span;
+        }
+        else if (_buffer.Check(TokenKind.LBrace))
         {
             body = ParseBlock();
             end = body.Span;
@@ -376,7 +418,7 @@ public sealed partial class Parser
         }
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
-            Span.Union(start, end)) { NameSpan = name.Span };
+            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec };
     }
 
     private Param[] ParseParamList()

@@ -169,6 +169,7 @@ internal sealed class ExceptionAnalyzer
                 break;
             case LambdaExpr lam: AnalyzeLambda(lam); break;
             case UnaryExpr u: AnalyzeExpr(u.Operand); break;
+            case ComptimeExpr ct: AnalyzeExpr(ct.Inner); break;
             case ResumeExpr re:
                 AnalyzeExpr(re.Coroutine);
                 if (_types.ThrownByPull(re) is { } resumed)

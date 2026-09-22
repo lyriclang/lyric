@@ -199,7 +199,7 @@ public class IrModule(List<IrFunction> Functions)
     /// <para>It stands IN the module rather than beside it, because a '.lyrbc' can come from elsewhere:
     /// a host loading foreign bytecode has to know without the compiler what the program wants to touch.
     /// </para></summary>
-    public Capability Capabilities { get; init; } = Capability.None;
+    public Capability Capabilities { get; set; } = Capability.None;
 
     /// <summary>The layouts of the composite types. <see cref="IrRefType"/>, <c>NewObject</c>,
     /// <c>LoadField</c> and <c>StoreField</c> reference them by <see cref="TypeId"/>; densely indexed

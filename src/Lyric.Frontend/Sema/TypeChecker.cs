@@ -386,9 +386,73 @@ public sealed class TypeChecker
     {
         if (fn.Body is not null || _comp.IsNative(module)) return;
 
+        // An 'extern' declaration is the one bodyless form user code may write: the body lives
+        // in the host, the runtime binds it by symbol, and the capability the ABI needs is
+        // recorded in the module (hostAccess for "dotnet").
+        if (fn.Extern is { } spec)
+        {
+            CheckExtern(fn, spec, module);
+            return;
+        }
+
         _de.Report("LYR-SEM0051", Severity.Error, fn.Span,
             $"'{fn.Name}' has no body; only standard-library modules may declare native functions");
     }
+
+    /// <summary>
+    /// What may cross an <c>extern</c> boundary, checked where the declaration stands so a
+    /// signature nobody can bind is refused at the declaration rather than at load time.
+    ///
+    /// <para>Stage 1 of the ABI: the <c>"dotnet"</c> ABI, and the marshalling set is the
+    /// scalars, <c>bool</c>, <c>char</c> and <c>string</c>, with <c>void</c> as a return. Every
+    /// other type is a question the design leaves to a later stage (optionals as
+    /// <c>Nullable</c>/null, arrays as <c>Span</c>, structs by field), and until it is answered
+    /// the checker says so rather than letting the binder guess.</para>
+    /// </summary>
+    private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
+    {
+        if (spec.Abi != "dotnet")
+        {
+            _de.Report("LYR-SEM0098", Severity.Error, spec.Span,
+                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"dotnet\"");
+            return;
+        }
+
+        // The symbol carries the type; a bare function name could not say where to look.
+        if (spec.Symbol is null || !spec.Symbol.Contains("::", StringComparison.Ordinal))
+            _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
+                $"extern '{fn.Name}' needs a symbol of the form \"Type::Method\" after '=' — "
+                + "the \"dotnet\" ABI binds a public static method of a named type");
+
+        if (fn.Generics.Length > 0)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Span,
+                $"'{fn.Name}' is extern and cannot have type parameters — a host symbol is one signature");
+
+        if (fn.Throws is not null)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span,
+                $"'{fn.Name}' is extern and cannot declare 'throws' — a host exception arrives as a panic in stage 1");
+
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: false))
+                _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
+                    $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
+                    + "cross the \"dotnet\" boundary — scalars, bool, char and string do");
+        }
+
+        if (fn.ReturnType is { } ret)
+        {
+            var type = ResolveType(ret, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: true))
+                _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
+                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not cross the \"dotnet\" "
+                    + "boundary — scalars, bool, char, string and void do");
+        }
+    }
+
+    private static bool CrossesHostBoundary(LyrType type, bool asReturn) =>
+        type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
 
     private void CheckMethods(string typeName, Decl[] members, ModuleSymbol module)
     {
@@ -1459,6 +1523,7 @@ public sealed class TypeChecker
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ResumeExpr re: return CheckResume(re, scope);
+            case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -4747,6 +4812,60 @@ public sealed class TypeChecker
     }
 
     // resume co: yields the value of the next yield.
+    /// <summary>
+    /// <c>comptime e</c>: <c>e</c> is checked exactly as it would be without the prefix — the
+    /// value is the same — and then held to what the evaluator can honour. It runs the
+    /// expression in a VM with no capability and no frame of the enclosing function, so a
+    /// local, a parameter or <c>this</c> has nothing to stand on there; a lambda inside would be
+    /// a value the module cannot hold; and the result has to be a literal the lowering can
+    /// write back, which is a scalar, a <c>bool</c>, a <c>char</c> or a <c>string</c>. A nested
+    /// <c>comptime</c> is simply evaluated as part of the outer one.
+    /// </summary>
+    private LyrType CheckComptime(ComptimeExpr ct, SymbolTable scope, LyrType? expected)
+    {
+        var type = CheckExpr(ct.Inner, scope, expected);
+        if (type.IsError) return type;
+
+        if (type is not PrimitiveType { Kind: not PrimitiveKind.Void })
+            return Report(ct.Span, "LYR-SEM0100",
+                $"a 'comptime' expression has to produce a scalar, a bool, a char or a string — this one "
+                + $"is '{TypeFacts.Display(type)}', which the compiled module has no way to hold as a literal");
+
+        var pure = true;
+        void Walk(Node? node)
+        {
+            switch (node)
+            {
+                case null: return;
+                case ThisExpr t:
+                    pure = false;
+                    Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
+                        + "it is evaluated before any receiver exists");
+                    return;
+                case IdentifierExpr id when _result.RefOf(id) is LocalSymbol or ParameterSymbol:
+                    pure = false;
+                    Report(id.Span, "LYR-SEM0100", $"'{id.Name}' is a local of the enclosing function and "
+                        + "cannot be used in a 'comptime' expression — only module-level names can");
+                    return;
+                case LambdaExpr lam:
+                    pure = false;
+                    Report(lam.Span, "LYR-SEM0100", "a lambda cannot be used in a 'comptime' expression");
+                    return;
+                case AssignExpr a:
+                    pure = false;
+                    Report(a.Span, "LYR-SEM0100", "an assignment cannot be used in a 'comptime' expression");
+                    return;
+                default:
+                    foreach (var child in AstChildren.Of(node)) Walk(child);
+                    return;
+            }
+        }
+        Walk(ct.Inner);
+
+        if (pure) _result.ComptimeSites.Add(ct);
+        return type;
+    }
+
     private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
     {
         var t = CheckExpr(re.Coroutine, scope);
@@ -4942,6 +5061,7 @@ public sealed class TypeChecker
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
+                case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

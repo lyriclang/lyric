@@ -169,14 +169,19 @@ TopLevelDecl    = ImportDecl
                 | [ 'pub' ] ( InterfaceDecl
                             | ExtendDecl
                             | GlobalBinding
-                            | TypeAlias ) .
+                            | TypeAlias
+                            | ExternDecl ) .
 
 GlobalBinding   = BindingStmt .                   (* 'let' only *)
 TypeAlias       = [ 'opaque' ] 'type' IDENTIFIER '=' TypeExpr ';' .
+ExternDecl      = 'extern' STRING 'fn' IDENTIFIER '(' [ ParamList ] ')' [ ':' TypeExpr ]
+                  [ '=' STRING ] ';' .
 ```
 
-Neither `type` nor `opaque` is a keyword; both are contextual, so both remain usable as
-identifiers.
+Neither `type`, `opaque` nor `extern` is a keyword; all three are contextual, so they remain
+usable as identifiers. `extern` opens a declaration only when a string literal follows it.
+The first string names the ABI (`"dotnet"`), the second the symbol the ABI binds
+(`"System.Math::Cbrt"`); an extern declaration has no body and no `throws` clause.
 
 A plain alias is a name for a type, not a new type. An **opaque** alias (since v1.15) is a new
 IDENTITY over the same layout: nothing converts implicitly in either direction, an explicit `as`
@@ -456,6 +461,7 @@ Lambda          = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
 LambdaParam     = IDENTIFIER [ ':' TypeExpr ] .
 
 ResumeExpr      = 'resume' UnaryExpr .
+ComptimeExpr    = 'comptime' UnaryExpr .        (* contextual: only before an expression *)
 
 StructInit      = TypePath '{' [ StructInitField { ',' StructInitField } [ ',' ] ] '}' .
 StructInitField = IDENTIFIER '=' Expr .

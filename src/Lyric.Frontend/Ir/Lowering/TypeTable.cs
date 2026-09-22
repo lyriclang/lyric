@@ -45,6 +45,11 @@ internal sealed class TypeTable
 
     public Compilation? Compilation { get; init; }
 
+    /// <summary>How <c>comptime</c> sites lower in this run; <c>null</c> for a check. Carried
+    /// here because the table reaches every <see cref="FunctionLowerer"/> already — globals,
+    /// instances and extensions included — and a site may stand in any of them.</summary>
+    public ComptimeTable? Comptime { get; init; }
+
     /// <summary>The worklist of used extension methods. It hangs here rather than being threaded through
     /// every lowerer: EVERY one has the TypeTable anyway, and the alternative would be an extra parameter
     /// on four tables (instances, lambdas, coroutines, extensions themselves) — four opportunities to

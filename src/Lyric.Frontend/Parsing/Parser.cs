@@ -162,6 +162,15 @@ public sealed partial class Parser
             var co = ParsePrefix();
             return new ResumeExpr(co, Span.Union(kw.Span, co.Span));
         }
+        // 'comptime e': contextual, like 'resume' in shape. It opens the prefix only when what
+        // follows can begin an expression, so an identifier 'comptime' before an operator, a
+        // comma or a closing bracket is still the name.
+        if (AtContextual("comptime") && BeginsExpression(_buffer.Peek(1).TokenKind))
+        {
+            var kw = _buffer.Advance();
+            var inner = ParsePrefix();
+            return new ComptimeExpr(inner, Span.Union(kw.Span, inner.Span));
+        }
 
         return ParsePostfix(ParsePrimary());
     }
@@ -297,6 +306,14 @@ public sealed partial class Parser
     // ---------------------------------------------------------------------
     // Primary (§6.2)
     // ---------------------------------------------------------------------
+
+    /// <summary>Can a token open an expression? The question a contextual prefix word asks of
+    /// its successor: 'comptime x' is the prefix, 'comptime + 1' is a name.</summary>
+    private static bool BeginsExpression(TokenKind kind) => kind is TokenKind.Identifier
+        or TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.StringLiteral
+        or TokenKind.CharLiteral or TokenKind.FStringStart or TokenKind.True or TokenKind.False
+        or TokenKind.LParen or TokenKind.LBracket or TokenKind.Minus or TokenKind.Exclamation
+        or TokenKind.Tilde or TokenKind.If or TokenKind.Match;
 
     private Expr ParsePrimary()
     {

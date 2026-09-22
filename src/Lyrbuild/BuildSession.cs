@@ -245,6 +245,9 @@ internal sealed class BuildSession(
         Optimize = artifact.Optimize,
         SourceMap = artifact.SourceMap,
         DebugInfo = artifact.DebugInfo,
+        // The VM in a sandbox evaluates 'comptime' sites; see VmComptimeRunner. The build runner
+        // owns a runtime, so it can hand one in where 'lyrc check' cannot.
+        ComptimeRunner = new Lyric.Vm.VmComptimeRunner(),
     };
 
     private bool Write(string path, byte[] bytes)

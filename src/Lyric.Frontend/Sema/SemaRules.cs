@@ -288,6 +288,7 @@ public sealed class SemaRules
         UnaryExpr u => [u.Operand],
         PostfixExpr p => [p.Operand],
         ResumeExpr re => [re.Coroutine],
+        ComptimeExpr ct => [ct.Inner],
         BinaryExpr b => [b.Left, b.Right],
         RangeExpr r => [r.Low, r.High],
         CastExpr c => [c.Operand],

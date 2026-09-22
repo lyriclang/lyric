@@ -309,6 +309,7 @@ public sealed class AstFormatter
         {
             Attributes(decl.Attributes),
             Pub(decl.IsPublic),
+            decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
             Doc.From($"fn {decl.Name}"),
@@ -322,6 +323,9 @@ public sealed class AstFormatter
             head.Add(Doc.From(" throws"));
             if (throws.Type is { } thrown) head.Add(Doc.Of(Doc.Space, TypeDoc(thrown)));
         }
+
+        if (decl.Extern is { SymbolSpan: { } symbol })
+            head.Add(Doc.Of(Doc.From(" = "), Src(symbol)));
 
         head.Add(decl.Body is { } body ? Doc.Of(Doc.Space, BlockDoc(body)) : Doc.From(";"));
         return new Doc.Concat(head);
@@ -664,7 +668,7 @@ public sealed class AstFormatter
     private static int LevelOf(Expr expr) => expr switch
     {
         BinaryExpr b => BinaryInfo(b.Operator).Level,
-        UnaryExpr or ResumeExpr => Prefix,
+        UnaryExpr or ResumeExpr or ComptimeExpr => Prefix,
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
         RangeExpr => Range,
@@ -695,6 +699,7 @@ public sealed class AstFormatter
 
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
         ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
+        ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),
         BinaryExpr b => BinaryDoc(b),
         AssignExpr a => AssignDoc(a),
