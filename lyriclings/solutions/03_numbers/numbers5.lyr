@@ -1,0 +1,19 @@
+// numbers5.lyr — solution
+//
+// The zero case is decided before the division happens; the panic never fires.
+
+import std.io.console { println };
+
+fn divide(a: int, b: int): void {
+    if (b == 0) {
+        println("cannot divide by zero");
+        return;
+    }
+    println(f"{a} / {b} = {a / b} remainder {a % b}");
+}
+
+fn main(): int {
+    divide(7, 2);
+    divide(7, 0);
+    return 0;
+}

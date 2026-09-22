@@ -1,0 +1,12 @@
+// numbers1.lyr — solution
+//
+// `as` converts between any two numeric types. Here the value cannot change, only its type.
+
+import std.io.console { println };
+
+fn main(): int {
+    let n: int = 42;
+    let wide: int64 = n as int64;
+    println(f"{wide}");
+    return 0;
+}

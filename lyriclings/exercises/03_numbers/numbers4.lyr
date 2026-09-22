@@ -1,0 +1,42 @@
+// numbers4.lyr
+//
+// Integer arithmetic is two's-complement WRAPPING arithmetic at the width of the operands:
+// overflow is not an error, not undefined, and identical on every platform. Narrowing with
+// `as` keeps the low bits of the value.                         (spec §3.2, §3.6)
+//
+// This program checks your prediction with `assert` — a failed assertion is a panic. Replace
+// the three placeholder values with what the arithmetic really produces.
+//
+// Expected output:
+//   127 + 1 as int8 = -128
+//   0 - 1 as uint8 = 255
+//   300 as int8 = 44
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { assert };
+
+fn main(): int {
+    let top: int8 = 127;
+    let wrapped = top + 1;
+
+    let zero: uint8 = 0;
+    let below = zero - 1;
+
+    let narrowed = 300 as int8;
+
+    // TODO: what do the three lines above actually hold?
+    let expectedWrapped: int8 = 0;
+    let expectedBelow: uint8 = 0;
+    let expectedNarrowed: int8 = 0;
+
+    assert(wrapped == expectedWrapped, "int8 addition wraps");
+    assert(below == expectedBelow, "uint8 subtraction wraps");
+    assert(narrowed == expectedNarrowed, "narrowing keeps the low bits");
+
+    println(f"127 + 1 as int8 = {wrapped}");
+    println(f"0 - 1 as uint8 = {below}");
+    println(f"300 as int8 = {narrowed}");
+    return 0;
+}

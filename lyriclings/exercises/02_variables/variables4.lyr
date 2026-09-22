@@ -1,0 +1,19 @@
+// variables4.lyr
+//
+// Lyric has NO implicit conversions. A `string` never becomes an `int`, not even "3"; an
+// `int` never becomes a `float`. The compiler reports the two types it could not reconcile
+// (LYR-SEM0001) — read that message; it is the most common one you will meet.
+//                                                               (spec §3.7, guide chapter 2)
+//
+// Expected output:
+//   count: 3
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let count: int = "3";
+    println(f"count: {count}");
+    return 0;
+}

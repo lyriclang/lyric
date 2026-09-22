@@ -1,0 +1,19 @@
+// numbers2.lyr
+//
+// A literal adapts to its context type only when its value FITS. `int8` ranges from -128 to
+// 127, so `let b: int8 = 200;` is the ordinary assignability error — never a silent wrap.
+// The width-named unsigned types exist for exactly this kind of value: a byte.
+//                                                               (spec §3.1, guide chapter 2)
+//
+// Expected output:
+//   200
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let level: int8 = 200;
+    println(f"{level}");
+    return 0;
+}

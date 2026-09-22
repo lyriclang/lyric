@@ -1,0 +1,25 @@
+// numbers5.lyr
+//
+// Two things can go wrong at runtime in Lyric, and they are kept apart on purpose. A PANIC
+// is a programming error — index out of range, division by zero, unwrapping an absent value.
+// It is not catchable; the process ends with exit code 101. (Exceptions, the recoverable
+// kind, are chapter 16.) Integer division truncates toward zero, and `/` or `%` by zero
+// panics with LYR-VM0002.                                       (spec §3.2, §9.4, guide chapter 10)
+//
+// Expected output:
+//   7 / 2 = 3 remainder 1
+//   cannot divide by zero
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn divide(a: int, b: int): void {
+    println(f"{a} / {b} = {a / b} remainder {a % b}");
+}
+
+fn main(): int {
+    divide(7, 2);
+    divide(7, 0);
+    return 0;
+}

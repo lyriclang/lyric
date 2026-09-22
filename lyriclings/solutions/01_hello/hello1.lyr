@@ -1,0 +1,10 @@
+// hello1.lyr — solution
+//
+// `println` comes from std.io.console; a selective import brings the name into scope.
+
+import std.io.console { println };
+
+fn main(): int {
+    println("Hello, Lyric!");
+    return 0;
+}

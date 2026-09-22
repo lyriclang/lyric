@@ -1,0 +1,23 @@
+// variables2.lyr
+//
+// A `var` may be declared without an initializer and assigned later — but the compiler
+// insists that it is DEFINITELY assigned before every read. The rule is structural: after an
+// `if` without `else`, nothing counts as assigned, because the branch might not have run.
+//                                                               (spec §7.7, guide chapter 2)
+//
+// Expected output:
+//   big
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let n = 7;
+    var label: string;
+    if (n > 3) {
+        label = "big";
+    }
+    println(label);
+    return 0;
+}

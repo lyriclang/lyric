@@ -1,0 +1,11 @@
+// numbers3.lyr — solution
+
+import std.io.console { println };
+
+fn main(): int {
+    let price = 2.5;
+    let count = 3;
+    let total = price * (count as float);
+    println(f"{total}");
+    return 0;
+}

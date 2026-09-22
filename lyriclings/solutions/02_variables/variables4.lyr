@@ -1,0 +1,12 @@
+// variables4.lyr — solution
+//
+// The number is written as a number. (Turning text into a number at runtime is
+// `std.string.parseInt`, which answers `?int` — chapter 20 comes back to that.)
+
+import std.io.console { println };
+
+fn main(): int {
+    let count: int = 3;
+    println(f"count: {count}");
+    return 0;
+}

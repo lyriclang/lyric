@@ -1,0 +1,8 @@
+// hello3.lyr — solution
+
+import std.io.console { println };
+
+fn main(): int {
+    println("ready");
+    return 0;
+}

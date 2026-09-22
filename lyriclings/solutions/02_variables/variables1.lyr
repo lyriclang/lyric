@@ -1,0 +1,14 @@
+// variables1.lyr — solution
+//
+// `var` says the binding will change; `let` would have been the promise that it never does.
+
+import std.io.console { println };
+
+fn main(): int {
+    var total = 0;
+    total = total + 1;
+    total = total + 2;
+    total = total + 3;
+    println(f"total: {total}");
+    return 0;
+}

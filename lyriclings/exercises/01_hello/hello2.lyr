@@ -1,0 +1,18 @@
+// hello2.lyr
+//
+// `main` is declared to return an `int`: that number becomes the exit code of the process
+// (masked with & 0xFF). A function with a return type must return a value on EVERY path —
+// falling off the end is an error, not an implicit `return 0`.   (spec §7.3, guide chapter 1)
+//
+// Expected output:
+//   one
+//   two
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    println("one");
+    println("two");
+}

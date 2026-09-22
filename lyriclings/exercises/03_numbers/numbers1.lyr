@@ -1,0 +1,23 @@
+// numbers1.lyr
+//
+// `int`, `uint` and `float` are the DEFAULT numeric types; `int8` … `int64`, `uint8` … `uint64`,
+// `float32` and `float64` are the width-named ones. Every row is a distinct type: `int` and
+// `int64` share width and representation and STILL do not assign to each other.
+//
+// One accommodation exists — for literals only: an unsuffixed literal adapts to the type its
+// context wants (`let n: int64 = 7;` works). A variable never adapts; between two variables
+// of different numeric types the crossing is `as`.              (spec §3.1, guide chapter 2)
+//
+// Expected output:
+//   42
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let n: int = 42;
+    let wide: int64 = n;
+    println(f"{wide}");
+    return 0;
+}

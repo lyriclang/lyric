@@ -1,0 +1,21 @@
+// numbers3.lyr
+//
+// The arithmetic operators want two operands of ONE type. `2.5 * 3` works because the
+// literal 3 adapts to `float`; `price * count` with `count: int` does not, because a variable
+// never adapts (LYR-SEM0003: operator not applicable to 'float' and 'int').
+// `as` is the crossing, and int → float rounds to nearest.      (spec §3.6, guide chapter 2)
+//
+// Expected output:
+//   7.5
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let price = 2.5;
+    let count = 3;
+    let total = price * count;
+    println(f"{total}");
+    return 0;
+}

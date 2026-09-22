@@ -1,0 +1,23 @@
+// variables3.lyr
+//
+// A binding takes its type from its initializer — unless the initializer carries no type of
+// its own. `null` is "no value" for EVERY optional type, so `let found = null;` cannot decide
+// between `?int`, `?string` and all the others. The same holds for `[]`, the empty array.
+// Such a binding needs an annotation.                           (spec §7.1, guide chapter 9)
+//
+// Expected output:
+//   nothing yet
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let found = null;
+    if (found == null) {
+        println("nothing yet");
+    } else {
+        println(f"found {found}");
+    }
+    return 0;
+}

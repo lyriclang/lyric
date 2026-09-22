@@ -1,0 +1,11 @@
+// numbers2.lyr — solution
+//
+// `uint8` holds 0..255, so the literal fits and adapts.
+
+import std.io.console { println };
+
+fn main(): int {
+    let level: uint8 = 200;
+    println(f"{level}");
+    return 0;
+}

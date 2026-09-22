@@ -1,0 +1,21 @@
+// hello1.lyr
+//
+// Welcome to lyriclings. Every exercise is a small Lyric program with something wrong in it.
+// Your job: make it compile, run and print what the exercise expects.
+//
+// A Lyric program starts at `main`, which returns the process exit code. `println` lives in
+// the standard library module `std.io.console`; nothing from the standard library is in scope
+// until you import it.                                          (spec §4.2, guide chapter 1)
+//
+// Run this exercise as it is to see what the compiler says, then fix it and remove the line
+// below that says the exercise is not done.
+//
+// Expected output:
+//   Hello, Lyric!
+
+// I AM NOT DONE
+
+fn main(): int {
+    println("Hello, Lyric!");
+    return 0;
+}

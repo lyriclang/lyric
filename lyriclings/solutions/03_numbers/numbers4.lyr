@@ -1,0 +1,30 @@
+// numbers4.lyr — solution
+//
+// 127 + 1 leaves the int8 range and comes back in at the bottom; 0 - 1 on a uint8 comes
+// back in at the top; 300 = 0x12C, whose low byte 0x2C is 44.
+
+import std.io.console { println };
+import std.core { assert };
+
+fn main(): int {
+    let top: int8 = 127;
+    let wrapped = top + 1;
+
+    let zero: uint8 = 0;
+    let below = zero - 1;
+
+    let narrowed = 300 as int8;
+
+    let expectedWrapped: int8 = -128;
+    let expectedBelow: uint8 = 255;
+    let expectedNarrowed: int8 = 44;
+
+    assert(wrapped == expectedWrapped, "int8 addition wraps");
+    assert(below == expectedBelow, "uint8 subtraction wraps");
+    assert(narrowed == expectedNarrowed, "narrowing keeps the low bits");
+
+    println(f"127 + 1 as int8 = {wrapped}");
+    println(f"0 - 1 as uint8 = {below}");
+    println(f"300 as int8 = {narrowed}");
+    return 0;
+}

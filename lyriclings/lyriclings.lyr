@@ -1,0 +1,432 @@
+// lyriclings — small exercises to get you used to reading and writing Lyric.
+//
+// This is the runner. It is an ordinary Lyric program: it reads `exercises.json`, compiles and
+// runs one exercise at a time through the `lyric` command-line tool (found through the
+// environment variable LYRIC_CLI, or as `lyric` on the PATH) and compares what came out with
+// what the exercise expects.
+//
+// Run it from the directory that holds `exercises.json`:
+//
+//     lyric run lyriclings.lyr -- watch
+//
+// Subcommands: watch, next, run <name>, hint <name>, list, verify [--solutions], audit.
+
+import std.io.console { println, print };
+import std.io.file { text };
+import std.json { parse, JsonValue };
+import std.collections { List };
+import std.process { Child, start, readSomeOut, readSomeErr, wait, close, closeStdin };
+import std.string as strings;
+import std.task { Wait, spawn, run };
+import std.os { env, sleep, exit };
+
+// ---------------------------------------------------------------------------------------------
+// The exercise list
+
+let MARKER = "// I AM NOT DONE";
+
+struct Exercise {
+    name: string,
+    path: string,
+    chapter: string,
+    hint: string,
+    /// The exact standard output the finished exercise prints; `null` when only "compiles and
+    /// exits 0" is asked.
+    expect: ?string,
+    /// The diagnostic code (or `panic:CODE`, or `output`) the exercise produces as shipped.
+    /// Only `audit` reads it.
+    broken: ?string,
+}
+
+fn stringField(obj: JsonValue, name: string): ?string {
+    let v = obj.field(name);
+    if (v == null) { return null; }
+    return v.asString();
+}
+
+fn loadExercises(): List<Exercise> {
+    let out = List<Exercise>.empty();
+    let raw = text("exercises.json");
+    if (raw == null) {
+        println("lyriclings: exercises.json not found — run me from the lyriclings directory");
+        exit(2);
+        return out;
+    }
+    let doc = parse(raw);
+    if (doc == null) {
+        println("lyriclings: exercises.json is not valid JSON");
+        exit(2);
+        return out;
+    }
+    let list = doc.field("exercises")?.asArray();
+    if (list == null) {
+        println("lyriclings: exercises.json has no 'exercises' array");
+        exit(2);
+        return out;
+    }
+    for (entry in list) {
+        out.push(Exercise {
+            name = stringField(entry, "name") ?? "?",
+            path = stringField(entry, "path") ?? "?",
+            chapter = stringField(entry, "chapter") ?? "?",
+            hint = stringField(entry, "hint") ?? "no hint for this one",
+            expect = stringField(entry, "expect"),
+            broken = stringField(entry, "broken"),
+        });
+    }
+    return out;
+}
+
+fn findExercise(all: List<Exercise>, name: string): ?Exercise {
+    for (e in all) {
+        if (e.name == name) { return e; }
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Running the compiler
+
+struct Outcome {
+    exitCode: int,
+    stdout: string,
+    stderr: string,
+}
+
+fn drain(child: Child, fromStderr: bool): string {
+    let sb = strings.StringBuilder.new();
+    while (true) {
+        let got = if (fromStderr) readSomeErr(child, 65536) else readSomeOut(child, 65536);
+        if (got == null || got.length == 0) { break; }
+        sb.append(strings.utf8Decode(got) ?? "");
+    }
+    return sb.build();
+}
+
+/// Compiles and runs `path` with the Lyric toolchain. Waits inside, so it belongs in a task.
+fn compileAndRun(path: string): Outcome {
+    let cli = env("LYRIC_CLI") ?? "lyric";
+    let child = start(cli, ["run", path]);
+    if (child == null) {
+        return Outcome {
+            exitCode = -1,
+            stdout = "",
+            stderr = "lyriclings: could not start '" + cli + "' — set LYRIC_CLI to the lyric executable or put it on the PATH",
+        };
+    }
+    closeStdin(child);
+    let out = drain(child, false);
+    let err = drain(child, true);
+    let code = wait(child);
+    close(child);
+    return Outcome { exitCode = code, stdout = out, stderr = err };
+}
+
+fn normalize(s: string): string {
+    return s.replace("\r\n", "\n").trimEnd();
+}
+
+enum Verdict {
+    NotDone,
+    Failed { why: string },
+    Passed,
+}
+
+fn check(e: Exercise, path: string): Verdict {
+    let source = text(path);
+    if (source == null) {
+        return Verdict.Failed { why = "the file " + path + " cannot be read" };
+    }
+    if (source.contains(MARKER)) {
+        return Verdict.NotDone;
+    }
+    let result = compileAndRun(path);
+    if (result.exitCode != 0) {
+        let what = if (result.exitCode == 101) "the program panicked" else "the program did not compile or exit with 0";
+        return Verdict.Failed { why = what + " (exit code " + strings.fromInt(result.exitCode) + ")\n" + result.stderr.trimEnd() };
+    }
+    let expected = e.expect;
+    if (expected != null && normalize(result.stdout) != normalize(expected)) {
+        return Verdict.Failed {
+            why = "the output is not what the exercise expects\n--- expected ---\n" + normalize(expected)
+                + "\n--- got ---\n" + normalize(result.stdout) + "\n---",
+        };
+    }
+    return Verdict.Passed;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The commands
+
+fn banner(e: Exercise): string {
+    return e.name + "  (" + e.path + ")";
+}
+
+fn report(e: Exercise, v: Verdict): bool {
+    var ok = false;
+    match (v) {
+        NotDone => {
+            println("[  todo  ] " + banner(e));
+            println("    remove the line '" + MARKER + "' once you have fixed the file");
+            println("    (run it as is to see what the compiler says: run " + e.name + ")");
+        },
+        Failed { why } => {
+            println("[ FAILED ] " + banner(e));
+            println(indent(why));
+        },
+        Passed => {
+            println("[   ok   ] " + banner(e));
+            ok = true;
+        },
+    }
+    return ok;
+}
+
+fn indent(s: string): string {
+    let sb = strings.StringBuilder.new();
+    for (line in s.splitLines()) {
+        sb.appendLine("    " + line);
+    }
+    return sb.build().trimEnd();
+}
+
+fn cmdList(all: List<Exercise>, solutionsDir: bool): void {
+    var chapter = "";
+    var index = 0;
+    for (e in all) {
+        if (e.chapter != chapter) {
+            chapter = e.chapter;
+            println("");
+            println("== " + chapter);
+        }
+        index += 1;
+        let source = text(if (solutionsDir) solutionPath(e) else e.path);
+        let state = if (source == null) "missing" else if (source.contains(MARKER)) "todo" else "edited";
+        println(f"{index:D2}  {e.name:22} {state}");
+    }
+}
+
+fn cmdHint(all: List<Exercise>, name: string): void {
+    let e = findExercise(all, name);
+    if (e == null) {
+        println("lyriclings: no exercise called '" + name + "' — 'list' shows them");
+        exit(1);
+        return;
+    }
+    println("hint for " + e.name + ":");
+    println(indent(e.hint));
+}
+
+/// `run <name>`: compile and run one exercise whatever its marker says, and show everything.
+fn cmdRun(all: List<Exercise>, name: string): Coroutine<Wait> {
+    let e = findExercise(all, name);
+    if (e == null) {
+        println("lyriclings: no exercise called '" + name + "' — 'list' shows them");
+        exit(1);
+        return;
+    }
+    let result = compileAndRun(e.path);
+    print(result.stdout);
+    print(result.stderr);
+    println("");
+    println(f"exit code {result.exitCode}");
+    let source = text(e.path) ?? "";
+    if (source.contains(MARKER)) {
+        println("the file still carries '" + MARKER + "' — remove it when you are done");
+    } else {
+        report(e, check(e, e.path));
+    }
+    println("stuck? try: hint " + e.name);
+}
+
+/// The first exercise that is not finished, or `null` when everything passes.
+fn firstPending(all: List<Exercise>): ?Exercise {
+    for (e in all) {
+        let source = text(e.path);
+        if (source == null || source.contains(MARKER)) { return e; }
+        if (!isPassed(check(e, e.path))) { return e; }
+    }
+    return null;
+}
+
+fn isPassed(v: Verdict): bool {
+    return match (v) {
+        Passed => true,
+        _ => false,
+    };
+}
+
+fn cmdNext(all: List<Exercise>): Coroutine<Wait> {
+    let e = firstPending(all);
+    if (e == null) {
+        println("Every exercise passes. You are done — congratulations!");
+        return;
+    }
+    let source = text(e.path) ?? "";
+    println("next: " + banner(e));
+    if (source.contains(MARKER)) {
+        let result = compileAndRun(e.path);
+        print(result.stdout);
+        print(result.stderr);
+        println("");
+        println(f"exit code {result.exitCode}");
+        println("fix the file and remove the '" + MARKER + "' line; hint " + e.name + " helps");
+    } else {
+        report(e, check(e, e.path));
+        println("stuck? try: hint " + e.name);
+    }
+}
+
+/// `watch`: like `next`, but stays and re-runs the exercise whenever its file changes.
+fn cmdWatch(all: List<Exercise>): Coroutine<Wait> {
+    var current: ?Exercise = null;
+    var lastSeen = "";
+    while (true) {
+        let e = firstPending(all);
+        if (e == null) {
+            println("");
+            println("Every exercise passes. You are done — congratulations!");
+            return;
+        }
+        let now = text(e.path) ?? "";
+        let switched = current == null || current.name != e.name;
+        if (switched || now != lastSeen) {
+            current = e;
+            lastSeen = now;
+            println("");
+            println("---------------------------------------------------------------");
+            println("watching " + banner(e) + "   (Ctrl+C to leave)");
+            if (now.contains(MARKER)) {
+                let result = compileAndRun(e.path);
+                print(result.stdout);
+                print(result.stderr);
+                println("");
+                println(f"exit code {result.exitCode} — fix the file, then remove the '{MARKER}' line");
+            } else {
+                report(e, check(e, e.path));
+            }
+            println("hint: lyric run lyriclings.lyr -- hint " + e.name);
+        }
+        // Poll for a change: the file's text is the clock, there is no mtime in std.io.file.
+        while (true) {
+            sleep(500);
+            let again = text(e.path) ?? "";
+            if (again != lastSeen) { break; }
+        }
+    }
+}
+
+fn solutionPath(e: Exercise): string {
+    return e.path.replaceFirst("exercises/", "solutions/");
+}
+
+/// `verify`: every exercise in order; stops at the first one that is not finished.
+fn cmdVerify(all: List<Exercise>, useSolutions: bool): Coroutine<Wait> {
+    var passed = 0;
+    for (e in all) {
+        let path = if (useSolutions) solutionPath(e) else e.path;
+        let ok = report(e, check(e, path));
+        if (!ok) {
+            println("");
+            println(f"{passed} of {all.length()} exercises pass; stopped at {e.name}");
+            exit(1);
+            return;
+        }
+        passed += 1;
+    }
+    println("");
+    println(f"{passed} of {all.length()} exercises pass");
+}
+
+/// `audit`: for maintainers. Checks that every exercise, as shipped, fails the way
+/// `broken` says, and that every solution passes. Does not stop at the first problem.
+fn cmdAudit(all: List<Exercise>): Coroutine<Wait> {
+    var problems = 0;
+    var count = 0;
+    for (e in all) {
+        count += 1;
+        let shipped = compileAndRun(e.path);
+        let want = e.broken ?? "?";
+        var brokenOk = false;
+        if (want == "output") {
+            let expected = e.expect ?? "";
+            brokenOk = shipped.exitCode == 0 && normalize(shipped.stdout) != normalize(expected);
+        } else if (want.startsWith("panic:")) {
+            brokenOk = shipped.exitCode == 101 && shipped.stderr.contains(want.substring(6, want.length() - 6));
+        } else {
+            brokenOk = shipped.exitCode == 1 && shipped.stderr.contains("error[" + want + "]");
+        }
+        let sol = check(e, solutionPath(e));
+        let solutionOk = isPassed(sol);
+        if (brokenOk && solutionOk) {
+            println("[   ok   ] " + e.name + "  broken=" + want);
+        } else {
+            problems += 1;
+            println("[PROBLEM ] " + banner(e));
+            if (!brokenOk) {
+                println(f"    as shipped: expected {want}, got exit {shipped.exitCode}");
+                println(indent(shipped.stderr.trimEnd()));
+                if (want == "output") { println(indent("stdout: " + shipped.stdout.trimEnd())); }
+            }
+            if (!solutionOk) {
+                println("    solution " + solutionPath(e) + ":");
+                report(e, sol);
+            }
+        }
+    }
+    println("");
+    println(f"{count} exercises audited, {problems} problem(s)");
+    if (problems > 0) { exit(1); }
+}
+
+fn usage(): void {
+    println("lyriclings — learn Lyric by fixing small broken programs");
+    println("");
+    println("  lyric run lyriclings.lyr -- watch              the next unsolved exercise, re-run on every save");
+    println("  lyric run lyriclings.lyr -- next               the next unsolved exercise, once");
+    println("  lyric run lyriclings.lyr -- run <name>         compile and run one exercise, show everything");
+    println("  lyric run lyriclings.lyr -- hint <name>        the hint for one exercise");
+    println("  lyric run lyriclings.lyr -- list               every exercise and whether you touched it");
+    println("  lyric run lyriclings.lyr -- verify             every exercise in order; stops at the first broken one");
+    println("  lyric run lyriclings.lyr -- verify --solutions the same over solutions/");
+    println("  lyric run lyriclings.lyr -- audit              maintainers: shipped state fails as declared, solutions pass");
+    println("");
+    println("The compiler is found through LYRIC_CLI, or as 'lyric' on the PATH.");
+}
+
+fn main(args: string[]): int {
+    if (args.length == 0) {
+        usage();
+        return 2;
+    }
+    let all = loadExercises();
+    let command = args[0];
+    let arg = if (args.length > 1) args[1] else "";
+
+    if (command == "list") {
+        cmdList(all, arg == "--solutions");
+        return 0;
+    }
+    if (command == "hint") {
+        if (arg == "") { println("hint: which exercise? 'list' shows the names"); return 2; }
+        cmdHint(all, arg);
+        return 0;
+    }
+    if (command == "run") {
+        if (arg == "") { println("run: which exercise? 'list' shows the names"); return 2; }
+        spawn(cmdRun(all, arg));
+    } else if (command == "next") {
+        spawn(cmdNext(all));
+    } else if (command == "watch") {
+        spawn(cmdWatch(all));
+    } else if (command == "verify") {
+        spawn(cmdVerify(all, arg == "--solutions"));
+    } else if (command == "audit") {
+        spawn(cmdAudit(all));
+    } else {
+        usage();
+        return 2;
+    }
+    run();
+    return 0;
+}

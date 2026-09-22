@@ -1,0 +1,15 @@
+// variables3.lyr — solution
+//
+// `?int` names the type; `null` is then a valid value of it.
+
+import std.io.console { println };
+
+fn main(): int {
+    let found: ?int = null;
+    if (found == null) {
+        println("nothing yet");
+    } else {
+        println(f"found {found}");
+    }
+    return 0;
+}

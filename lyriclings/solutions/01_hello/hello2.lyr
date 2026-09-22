@@ -1,0 +1,11 @@
+// hello2.lyr — solution
+//
+// A non-void function returns on every path; 0 is the conventional "all went well".
+
+import std.io.console { println };
+
+fn main(): int {
+    println("one");
+    println("two");
+    return 0;
+}

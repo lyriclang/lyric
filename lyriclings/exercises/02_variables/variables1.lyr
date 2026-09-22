@@ -1,0 +1,21 @@
+// variables1.lyr
+//
+// Every binding has a type, and `let` binds a name ONCE. A name that has to change later is
+// declared with `var`. Assigning to a `let` — whether the first time or the tenth — is
+// LYR-SEM0019.                                                  (spec §7.1, guide chapter 2)
+//
+// Expected output:
+//   total: 6
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let total = 0;
+    total = total + 1;
+    total = total + 2;
+    total = total + 3;
+    println(f"total: {total}");
+    return 0;
+}

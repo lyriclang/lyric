@@ -1,0 +1,17 @@
+// variables2.lyr — solution
+//
+// With an `else`, both branches assign `label`, so the read after them is safe.
+
+import std.io.console { println };
+
+fn main(): int {
+    let n = 7;
+    var label: string;
+    if (n > 3) {
+        label = "big";
+    } else {
+        label = "small";
+    }
+    println(label);
+    return 0;
+}
