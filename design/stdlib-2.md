@@ -546,12 +546,21 @@ Receiver (`fn f<K :: [Keeper<?int>]>(k: K) { k.or(3) }`). Der Interface-Member-P
 längst. Jetzt gibt es einen Helfer `InstanceSubstitution(GenericInstance)`, den alle drei
 übrigen Stellen benutzen.
 
-Warum es so lange unsichtbar war: die KLASSE erreichte den Instanz-Pfad vor dem Enum
-(`Holder<?int>.Full(x).or(3)` stürzte, `Box<?int> { … }.or(3)` nicht), und eine Klasse MIT
-Interface-Konformanz nahm ohnehin den Pfad, der die Abbildung hatte. pattern-lambda hat
-denselben Defekt unabhängig gefunden und in Commit 76ae5ee8 gefixt — beim Merge genügt einer
-der beiden, mit der Prüfung, dass alle vier Wege abgedeckt sind. Test:
-`tests/Lyric.Tests.Ir/LoweringTests.cs`, alle vier gepinnt.
+**Nachgewiesen statt angenommen:** die Abbildung an allen vier Stellen neutralisiert, Test
+laufen lassen — vier Findings, eines pro Weg (`Box<?int>.of` statisch, `Box<?int>.or` Instanz,
+`Holder<?int>.or` Instanz-Enum, `Box<?int>.or` im Constraint-Rumpf). Erst das macht den Test
+zum Beleg; eine frühere Vermutung von mir, eine Klasse MIT Interface-Konformanz nehme ohnehin
+den Interface-Pfad und sei deshalb unauffällig, hält dem nicht stand: das konforme `Box`
+landet ebenfalls im Instanz-Pfad.
+
+**Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
+grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
+der schon `?int` ist, braucht keine Widerung und reist durch die Lücke, ohne sie zu berühren.
+Steht als eigener Absatz im Test.
+
+pattern-lambda hat denselben Defekt unabhängig gefunden (Commits 76ae5ee8 + 5dca585f) — beim
+Merge genügt einer der beiden, mit der Prüfung „vier Wege, Literale als Argumente“. Test:
+`tests/Lyric.Tests.Ir/LoweringTests.cs`.
 
 **Was damit geht:** `Result<?T, E>` wird konstruiert, gematcht (über `Ok(_)`), `isOk`/`isErr`/
 `unwrapOr`/`err`/`map` arbeiten darauf — Vollständigkeitstest in
