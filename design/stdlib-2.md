@@ -601,9 +601,16 @@ Messung ohne sie nichts aussagt — die Regel, die diese Runde gelehrt hat, auf 
 angewandt: mit zusätzlich entfernter Instanz-Substitution und einer Datei, die den Defekt
 sicher auslöst, melden BEIDE Messpfade (`lyric test` über die stdlib-Tests: vier Findings;
 `lyrc build` über ein Beispiel: eines). Die Pfade erreichen den Verifier also nachweislich,
-und die 0 oben ist eine gemessene Null und keine blinde. pattern-lambda hat dieselbe Messung
-samt Kontrolle auf ihrem Branch wiederholt (28 Dateien mit neuem Pattern-Lowering, 0 Befunde),
-womit die Empfehlung auf beiden Korpora belegt ist.
+und die 0 oben ist eine gemessene Null und keine blinde.
+
+**Auch die .NET-Testkorpora sind unoptimiert geprüft** (`probes/suites_unoptimised.py`:
+`ModuleLowerer.Lower` lowert per Standard unoptimiert, dann die vier IR-erzeugenden Suiten):
+Ir und Sema bleiben vollständig grün, Vm und Bytecode weichen in **fünf** Tests ab — drei
+Backtraces, der Fusion-Test und ein Golden-Disassembly —, und jede dieser Abweichungen setzt
+Optimierung VORAUS. **Kein einziger Verifier-Befund.** pattern-lambda hat Messung und
+Kontrolle auf ihrem Branch wiederholt (28 Beispieldateien mit neuem Pattern-Lowering,
+0 Befunde; Ir/Sema grün, Vm mit denselben drei Backtrace-Abweichungen), womit die Empfehlung
+auf beiden Bäumen und auf beiden Arten von Korpus belegt ist: Programme und Tests.
 
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
