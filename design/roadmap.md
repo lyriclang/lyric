@@ -35,18 +35,28 @@ Thema: was in Ausdrucksposition stehen darf, und was ein Wert rendert. Alles add
   Methoden. Von stdlib-redesign gemeldet.
 - **Methode eines generischen Enums unaufrufbar** (`FunctionLowerer.cs:3898`, ein Wort `or Enum`) —
   Fix liegt auf stdlib-redesigns Branch.
-- **Argumente einer generischen Methode werden nicht substituiert** (`LowerGenericMethodCall` reicht
-  keine `calleeSubstitution` an `MaterializeArguments`): ein Parameter, der `T` geschrieben steht,
-  bleibt ein Name, und bei `T = ?int` unterbleibt die Widerung (`store of i64 into ?i64`). Der Pfad für
-  generische **Interface**-Member baute dieselbe Abbildung längst — die Lücke war verdeckt, weil der
-  Klassen-Pfad sie zuerst erreicht. **Der Fix liegt zweimal vor**, unabhängig gefunden: stdlib-redesign
-  `a8df8a5d`, pattern-lambda `76ae5ee8`. **Beim Merge einen behalten — den von pattern-lambda**, er zieht
-  zusätzlich den Constraint-Pfad mit. **Die Tests beider Branches übernehmen**, weil sie auf
-  verschiedenen Ebenen sitzen: pattern-lambdas `GenericEnumTests` pinnt drei Fälle bei der Ausführung
-  (Enum mit Payload, Enum ohne Payload, Klasse — der dritte ist der, der vorher zufällig durchkam und
-  die Lücke verdeckte), stdlib-redesigns Test fängt denselben Defekt eine Schicht tiefer im IR. Beide
-  behalten heißt: eine Ebene Verifier, eine Ebene Ausführung. Dass zwei Teams denselben Defekt am selben Tag finden, ist das
-  deutlichste Zeichen dafür, dass er in 4.5 gehört.
+- **Argumente einer Methode auf einer generischen Instanz werden nicht substituiert**: ein Parameter,
+  der `T` geschrieben steht, bleibt ein Name, und bei `T = ?int` unterbleibt die Widerung
+  (`store of i64 into ?i64`, bzw. `optissome expects an optional, found i64`). Der Pfad für generische
+  **Interface**-Member trug die Abbildung von Anfang an — **und genau das hat den Defekt verdeckt**:
+  eine Klasse mit Interface-Konformanz nimmt diesen Pfad, also sah niemand etwas, der sein Repro so
+  schrieb. Unabhängig gefunden und in mehreren Schritten geschlossen (pattern-lambda `76ae5ee8`,
+  `5dca585f`; stdlib-redesign `a8df8a5d`, `330be0f3`); **beide Fassungen sind inzwischen
+  deckungsgleich**.
+
+  **Die Merge-Prüfung ist inhaltlich, nicht nach Herkunft** — die erste Fassung *jeder* Seite war
+  unvollständig, und eine Empfehlung „nimm den von X" hätte genau das konserviert. Abzuhaken sind die
+  **vier Wege** zu einer Methode einer generischen Instanz: Instanzmethode auf einer Klasse,
+  Instanzmethode auf einem Enum, **statische** Methode (`LowerGenericStaticCall`) und Constraint-Pfad
+  mit generischem Receiver. Klasse **mit** und **ohne** Interface-Konformanz zählen dabei getrennt.
+
+  **Methodische Bedingung an den Test, sonst ist er grün und beweist nichts:** das Argument muss ein
+  **Literal** sein. Ein bereits optionaler Wert braucht keine Widerung und passiert die Lücke, ohne sie
+  zu berühren — pattern-lambdas erste Vier-Wege-Probe war deshalb grün, während drei der vier Wege
+  kaputt waren. Ihr Test pinnt jetzt sieben Fälle über die vier Wege; stdlib-redesigns Test fängt
+  denselben Defekt eine Schicht tiefer im IR. **Beide Testsätze übernehmen:** eine Ebene Verifier, eine
+  Ebene Ausführung. Dass zwei Teammitglieder denselben Defekt unabhängig finden — und beide ihn beim
+  ersten Anlauf nur halb schließen — ist das deutlichste Zeichen dafür, dass er in 4.5 gehört.
 - **`rawArrayAlloc<T>(n): T[]` als privates Native** (~15 VM-Zeilen): hängt inzwischen doppelt —
   `List<?T>`/`Map<K, ?V>` brauchen es für ihre Backing-Arrays (stdlib-redesign), und pattern-lambdas
   benannter Rest `[first, ..rest]` braucht es, weil das Lowering kein Array unbekannter Länge bauen
