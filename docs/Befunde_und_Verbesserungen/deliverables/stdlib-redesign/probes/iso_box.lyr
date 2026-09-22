@@ -1,0 +1,26 @@
+// Ist der Fall Result-spezifisch? Nein: eine gewöhnliche generische KLASSE genügt.
+// Der Parameter `fallback: T` wird mit T = ?int zu `?int`; ein int-LITERAL am Aufruf
+// wird nicht gewidert, ein vorab gebundenes ?int-Lokal schon.
+module probe;
+import std.io.console { println };
+
+class Box<T> {
+    value: T,
+
+    pub fn or(fallback: T): T {
+        return this.value;
+    }
+}
+
+fn main(): int {
+    let slot: ?int = 7;
+    let b = Box<?int> { value = slot };
+
+    // Geht: das Argument ist bereits ein ?int.
+    let held: ?int = 3;
+    println(b.or(held) ?? -1);
+
+    // Stürzt ab: int-Literal für einen Parameter, der erst durch Substitution ?int wurde.
+    println(b.or(3) ?? -1);
+    return 0;
+}

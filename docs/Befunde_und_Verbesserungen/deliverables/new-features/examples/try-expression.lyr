@@ -1,0 +1,30 @@
+// Stufe (a), implementiert: ein try, dessen catches alle verlassen, traegt bei, was sein Body
+// zugewiesen hat. Die Form, die vor 4.5 LYR-SEM0018 war:
+import std.io.console { println };
+import std.core { Exception };
+
+struct Options { port: int }
+
+fn parse(args: string[]): Options throws Exception {
+    if (args.length == 0) { throw Exception { text = "usage: app <port>" }; }
+    return Options { port = 8080 };
+}
+
+fn main(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parse(args);
+    } catch (e: Exception) {
+        println(e.message());
+        return 2;                       // jeder catch verlaesst → opts ist danach zugewiesen
+    }
+    println(f"port {opts.port}");       // 4.4: LYR-SEM0018, 4.5: ok
+    return 0;
+}
+
+// Stufe (b), SOLL (Design, kompiliert nicht):
+//
+//     let opts = try parse(args) catch (e: Exception) { println(e.message()); return 2; };
+//     let maybe: ?Options = try? parse(args);              // geworfen → null
+//     let port = try? parsePort(line) ?? 8080;             // (try? parsePort(line)) ?? 8080
+//     let r: Result<Options, Exception> = try parse(args); // Option B (5.0), stdlib-redesign

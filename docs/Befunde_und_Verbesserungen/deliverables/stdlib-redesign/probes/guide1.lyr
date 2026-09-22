@@ -1,0 +1,19 @@
+import std.io.console { println };
+import std.string { parseIntOrErr, ParseError };
+import std.result { Result };
+import std.collections { List };
+
+fn main(): int {
+    let results = List<Result<int, ParseError>>.empty();
+    for (text in ["80", "x", "99999999999999999999"]) {
+        results.push(parseIntOrErr(text));
+    }
+    var ok = 0;
+    for (r in results) {
+        match (r) {
+            Ok(_) => { ok = ok + 1; }
+            Err(e) => { println(e.message()); }
+        }
+    }
+    return ok;
+}

@@ -1,0 +1,35 @@
+// Class vs. Enum bei einem Argument, dessen Parametertyp erst durch Substitution
+// optional wird. Ohne std.result, damit nur der Sprachfall übrig bleibt.
+module probe;
+import std.io.console { println };
+
+class Box<T> {
+    value: T,
+
+    pub fn or(fallback: T): T {
+        return this.value;
+    }
+}
+
+enum Holder<T> {
+    Full(T),
+    Empty;
+
+    pub fn or(fallback: T): T {
+        return match (this) {
+            Full(v) => v,
+            Empty => fallback,
+        };
+    }
+}
+
+fn main(): int {
+    let slot: ?int = 7;
+
+    let b = Box<?int> { value = slot };
+    println(b.or(3) ?? -1); // Klasse mit int-Literal: geht
+
+    let h = Holder<?int>.Full(slot);
+    println(h.or(3) ?? -1); // Enum mit int-Literal: ?
+    return 0;
+}

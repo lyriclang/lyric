@@ -1,0 +1,553 @@
+// std.core — what the language itself needs.
+//
+// 'panic' is a language built-in returning 'never': it does not return, cannot be caught and ends
+// the VM with a backtrace. The compiler binds the call without anyone importing 'std.core', the
+// same model as the f-string helpers in 'std.string'.
+
+/// What the language itself needs: aborting with a reason, the ready-made `Throwable`, and the
+/// interfaces the built-in types satisfy.
+///
+/// `panic` and `coroutineEnded` are bound by the compiler, so nothing has to import this module to
+/// reach them.
+module std.core;
+
+// No imports, deliberately: 'std.core' is the library's root, and any module it imported could
+// never import 'std.core' back (LYR-RES0005). The extensions below therefore use PRIVATE
+// duplicates of six string natives, declared at the end of this file; the registry binds both
+// names to the same host function.
+
+/// Ends the program with `message` and a backtrace.
+///
+/// Not catchable. Its return type is `never`, so the flow analysis treats everything after a call as
+/// unreachable — which is why `expect` can return a non-optional after panicking.
+pub fn panic(message: string): void;
+
+// A 'resume' on a coroutine whose body has run to the end. Bound by the compiler like 'panic':
+// the call sits in a dispatcher nobody wrote, so nobody could have written the import either.
+/// Panics because a coroutine was resumed after its body had run to the end.
+///
+/// Called from a dispatcher nobody wrote, which is why nobody could have written the import either.
+pub fn coroutineEnded(): void;
+
+// ------------------------------------------------------------------------ aborting with a reason
+//
+// All three are `panic` with a statement about who got it wrong. They are written in Lyric and
+// need no native edge; `panic` already is one.
+//
+// They are `void`, and the flow analysis draws nothing from `panic`'s `never` return type here, so
+// `fn f(): int { todo("x"); }` is `LYR-SEM0017`: they do not replace a `return`.
+
+/// Panics with `message` when `condition` is false, for invariants the compiler does not check.
+///
+/// `void` rather than `never`: it does not replace a `return`, and a function ending in `assert` is
+/// still `LYR-SEM0017`.
+pub fn assert(condition: bool, message: string): void {
+    if (!condition) {
+        panic(message);
+    }
+}
+
+/// Marks a place that is still missing. Unlike a comment it reports itself when reached, with
+/// `not implemented:` before the message.
+pub fn todo(message: string): void {
+    panic("not implemented: " + message);
+}
+
+/// Marks a branch that must never be taken, with `unreachable:` before the message.
+///
+/// `todo` means *still to come*; this means *must never happen*. Reaching it says that an assumption
+/// stated somewhere else is wrong.
+pub fn unreachable(message: string): void {
+    panic("unreachable: " + message);
+}
+
+// ---------------------------------------------------------------------------------- Exception
+//
+// The ready-made `Throwable` for throwing a message.
+//
+// The field is `text` and not `message`, because `Throwable` requires a METHOD `message()` and the
+// two cannot share a name.
+
+/// The ready-made `Throwable` for throwing a message: `throw Exception { text = "…" };`.
+pub class Exception :: [Throwable] {
+    /// What `message()` returns.
+    text: string,
+
+    /// The text this exception was built with.
+    pub fn message(): string {
+        return this.text;
+    }
+}
+
+// Display — what can be rendered as text.
+//
+// The anchor for 'println<T :: [Display]>' and for 'std.fmt'. A built-in can satisfy it: the
+// conformance hangs off an 'extend', and monomorphization turns the constrained call into a direct
+// one, so no interface value arises and an 'int' needs no boxing.
+//
+// A value held through the interface ('let d: Display = 5;') stays rejected: a fat pointer needs a
+// reference, and a scalar has none.
+/// What can be rendered as text — the anchor for `print`, `println` and `std.fmt`.
+///
+/// Every built-in scalar satisfies it through an `extend`, and a user type through `::`. A value
+/// held THROUGH the interface (`let d: Display = 5;`) stays rejected: an interface value is a fat
+/// pointer and needs a reference, which a scalar has none of.
+pub interface Display {
+    /// This value as text.
+    fn show(): string;
+}
+
+extend int :: [Display] {
+    fn show(): string {
+        return fromInt(this);
+    }
+}
+
+extend float :: [Display] {
+    fn show(): string {
+        return fromFloat(this);
+    }
+}
+
+extend bool :: [Display] {
+    fn show(): string {
+        return fromBool(this);
+    }
+}
+
+extend char :: [Display] {
+    fn show(): string {
+        return fromChar(this);
+    }
+}
+
+extend string :: [Display] {
+    fn show(): string {
+        return this;
+    }
+}
+
+// --------------------------------------------------------------- equality, hashing, ordering
+//
+// The same pattern as `Display` above: interface here, conformance of the built-ins through
+// `extend`, user types through `::`. A constraint becomes a direct call through monomorphization,
+// so no interface value and no boxing arise.
+//
+// Generic rather than `fn equals(other: Equatable)`: an interface as a parameter type requires an
+// interface VALUE, and a scalar cannot be one. `extend int :: [Equatable]` would be impossible and
+// there would be no `Map<int, V>`. With `Equatable<T>` both sides carry the concrete type.
+//
+// `Hashable` declares `Equatable` as its parent since 2.0: a hash table cannot exist without
+// equality, so demanding the hash without the comparison was a lie by omission. A conforming type
+// implements both; a caller requires only `K :: [Hashable<K>]` and the chain implies the rest.
+
+/// Values of this type can be compared for equality.
+///
+/// Generic rather than `fn equals(other: Equatable)`, so both sides carry the concrete type: an
+/// interface as a parameter type would need an interface VALUE, and a scalar cannot be one — there
+/// would be no `Map<int, V>`.
+pub interface Equatable<T> {
+    /// Whether the two are equal.
+    fn equals(other: T): bool;
+}
+
+/// Values of this type can be hashed, which is what a `Map` key and a `Set` element need.
+///
+/// **Equal values must produce equal hashes.** No compiler checks it and every hash table depends on
+/// it. The reverse does not hold — two different values may collide.
+///
+/// `Hashable<T>` implies `Equatable<T>` (its parent since 2.0): a hash table cannot exist
+/// without equality. A key constraint is `K :: [Hashable<K>]` alone.
+pub interface Hashable<T> :: [Equatable<T>] {
+    /// The hash of this value.
+    fn hash(): int;
+}
+
+/// Values of this type have an order — what sorting and range queries need.
+///
+/// One comparison instead of four methods: `<`, `<=`, `>` and `>=` all derive from it.
+pub interface Ordered<T> {
+    /// Negative when this comes first, zero when the two are equal, positive when `other` comes
+    /// first — as `strcmp`.
+    fn compare(other: T): int;
+}
+
+extend int :: [Equatable<int>] {
+    fn equals(other: int): bool {
+        return this == other;
+    }
+}
+
+extend int :: [Ordered<int>] {
+    fn compare(other: int): int {
+        if (this < other) {
+            return -1;
+        }
+        if (this > other) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+extend int :: [Hashable<int>] {
+    // An int is its own hash. Which bits a table needs is the table's business, not the
+    // value's.
+    fn hash(): int {
+        return this;
+    }
+}
+
+extend char :: [Equatable<char>] {
+    fn equals(other: char): bool {
+        return this == other;
+    }
+}
+
+extend char :: [Ordered<char>] {
+    fn compare(other: char): int {
+        if (this < other) {
+            return -1;
+        }
+        if (this > other) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+extend char :: [Hashable<char>] {
+    fn hash(): int {
+        return this as int;
+    }
+}
+
+extend bool :: [Equatable<bool>] {
+    fn equals(other: bool): bool {
+        return this == other;
+    }
+}
+
+extend bool :: [Hashable<bool>] {
+    fn hash(): int {
+        return if (this) 1 else 0;
+    }
+}
+
+extend float :: [Equatable<float>] {
+    fn equals(other: float): bool {
+        return this == other;
+    }
+}
+
+extend float :: [Ordered<float>] {
+    fn compare(other: float): int {
+        if (this < other) {
+            return -1;
+        }
+        if (this > other) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+extend string :: [Equatable<string>] {
+    fn equals(other: string): bool {
+        return this == other;
+    }
+}
+
+extend string :: [Ordered<string>] {
+    // Lexicographic over CODE POINTS, the same unit `length` counts and `for (c in s)` yields.
+    // No locale and no normalization: a `compare` that sorts differently per environment would
+    // contradict a platform-neutral bytecode.
+    fn compare(other: string): int {
+        let a = length(this);
+        let b = length(other);
+        let kurz = if (a < b) a else b;
+
+        var i = 0;
+        while (i < kurz) {
+            let x = charAt(this, i) as int;
+            let y = charAt(other, i) as int;
+            if (x < y) {
+                return -1;
+            }
+            if (x > y) {
+                return 1;
+            }
+            i = i + 1;
+        }
+
+        // Same prefix: the shorter one wins.
+        if (a < b) {
+            return -1;
+        }
+        if (a > b) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+extend string :: [Hashable<string>] {
+    // FNV-1a over the code points. In Lyric rather than native: a `char` is a number and the
+    // overflow wraps in a defined way.
+    //
+    // The constants are the 64-bit variant. A hash need not be cryptographic; it must spread and
+    // produce the same result everywhere.
+    fn hash(): int {
+        var h = -3750763034362895579; // the FNV offset basis, 64 bit
+        let n = length(this);
+        var i = 0;
+        while (i < n) {
+            h = h ^ charAt(this, i) as int;
+            h = h * 1099511628211; // FNV-Prime
+            i = i + 1;
+        }
+        return h;
+    }
+}
+
+extend uint :: [Equatable<uint>] {
+    fn equals(other: uint): bool {
+        return this == other;
+    }
+}
+
+extend uint :: [Ordered<uint>] {
+    fn compare(other: uint): int {
+        if (this < other) {
+            return -1;
+        }
+        if (this > other) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+extend uint :: [Hashable<uint>] {
+    fn hash(): int {
+        return this as int;
+    }
+}
+
+// ------------------------------------------------------------------------------- arithmetic
+//
+// The same pattern once more: one interface per operator, conformance of the built-ins through
+// `extend`, user types through `::`. `+` on a conforming type IS `add`, and monomorphization makes
+// the operator cost exactly what the method costs.
+//
+// Two parameters since 3.0: `Mul<T, R>` is "multiplied by a T, gives an R". The homogeneous case
+// writes both — `Mul<Vec2, Vec2>` — and the mixed one differs in them: `Mul<float, Vec2>` scales a
+// vector. The result cannot be read off `T`, or `Vec2 * 2.0` would have to give a `float`.
+//
+// A type may carry SEVERAL instances of one of these interfaces, which no other interface allows.
+// The operator picks the conformance by the type of its right operand, so the two never compete for
+// one name from the same site — each implementation stands in its own `extend` block.
+
+/// Values of this type can be added: `a + b` is `a.add(b)`.
+pub interface Add<T, R> {
+    /// The sum of this value and `other`.
+    fn add(other: T): R;
+}
+
+/// Values of this type can be subtracted: `a - b` is `a.sub(b)`.
+pub interface Sub<T, R> {
+    /// This value minus `other`.
+    fn sub(other: T): R;
+}
+
+/// Values of this type can be multiplied: `a * b` is `a.mul(b)`.
+pub interface Mul<T, R> {
+    /// The product of this value and `other`.
+    fn mul(other: T): R;
+}
+
+/// Values of this type can be divided: `a / b` is `a.div(b)`.
+pub interface Div<T, R> {
+    /// This value divided by `other`. What a division by zero does is the type's own business;
+    /// the built-in numerics panic.
+    fn div(other: T): R;
+}
+
+extend int :: [Add<int, int>] {
+    fn add(other: int): int {
+        return this + other;
+    }
+}
+
+extend int :: [Sub<int, int>] {
+    fn sub(other: int): int {
+        return this - other;
+    }
+}
+
+extend int :: [Mul<int, int>] {
+    fn mul(other: int): int {
+        return this * other;
+    }
+}
+
+extend int :: [Div<int, int>] {
+    fn div(other: int): int {
+        return this / other;
+    }
+}
+
+extend uint :: [Add<uint, uint>] {
+    fn add(other: uint): uint {
+        return this + other;
+    }
+}
+
+extend uint :: [Sub<uint, uint>] {
+    fn sub(other: uint): uint {
+        return this - other;
+    }
+}
+
+extend uint :: [Mul<uint, uint>] {
+    fn mul(other: uint): uint {
+        return this * other;
+    }
+}
+
+extend uint :: [Div<uint, uint>] {
+    fn div(other: uint): uint {
+        return this / other;
+    }
+}
+
+extend float :: [Add<float, float>] {
+    fn add(other: float): float {
+        return this + other;
+    }
+}
+
+extend float :: [Sub<float, float>] {
+    fn sub(other: float): float {
+        return this - other;
+    }
+}
+
+extend float :: [Mul<float, float>] {
+    fn mul(other: float): float {
+        return this * other;
+    }
+}
+
+extend float :: [Div<float, float>] {
+    fn div(other: float): float {
+        return this / other;
+    }
+}
+
+// `Add` alone: a string concatenates and does nothing else arithmetic.
+extend string :: [Add<string, string>] {
+    fn add(other: string): string {
+        return this + other;
+    }
+}
+
+// ------------------------------------------------------------------------------ conversion
+//
+// Explicit only. An implicit conversion is a second, invisible mechanism beside the visible one,
+// and it makes inference and error messages answer for decisions nobody wrote down.
+
+/// A value of this type converts to `T`: `x as T` is `x.into()`.
+///
+/// ONE target per type: the method is named `into`, and a type has one member of a name — a second
+/// conversion is an ordinary named method. Total conversions only; a conversion that can fail
+/// belongs in a named function returning an optional.
+///
+/// The numeric casts keep their opcodes: `1 as float` never goes through here.
+pub interface Into<T> {
+    /// This value as a `T`.
+    fn into(): T;
+}
+
+// The three attribute markers. Which of them a struct declares decides where '@Name' may stand;
+// conformance, not the name, so no struct becomes an attribute by accident. They are empty on
+// purpose: nothing is dispatched through them, so they cost nothing at runtime.
+
+/// A struct declaring this may stand as `@Name` before the module header.
+pub interface OnModule { }
+
+/// A struct declaring this may stand as `@Name` before a struct, class or enum declaration.
+pub interface OnType { }
+
+/// A struct declaring this may stand as `@Name` before a top-level function.
+pub interface OnFunction { }
+
+/// An attribute declaring this takes its one value in parentheses — `@On(Event.Damage)` — and
+/// the value fills the attribute's FIRST field, whose type must be `T`. The braces form stays
+/// open to every attribute; this one is opted into, so a struct's field order never becomes an
+/// argument order by accident.
+pub interface WithArg<T> { }
+
+/// Marks its target as deprecated: the compiler warns at every use, and `message` says what to
+/// use instead. The first attribute the compiler itself reads — it changes diagnostics and
+/// nothing else, so a program that ignores the warning runs unchanged.
+pub struct Deprecated :: [OnModule, OnType, OnFunction] {
+    /// What to use instead; shown in the warning at every use site.
+    message: string = "",
+
+    /// The version this is kept until, as `"3.5"` — and it is a PROMISE the compiler enforces:
+    /// building with a toolchain that has reached that version is an error (`LYR-SEM0081`), so
+    /// the removal happens because the build stops, not because somebody remembered.
+    ///
+    /// Empty means the ordinary policy: warn now, remove at the next major.
+    until: string = "",
+}
+
+// ------------------------------------------------------------------------------- hashing
+
+/// Folds `value` into `seed` — what a `hash()` over several fields is built from:
+/// `combineHash(combineHash(0, this.x.hash()), this.y.hash())`. Order matters, so `(1, 2)` and
+/// `(2, 1)` differ. The anchor a synthesized `Hashable` conformance (4.5) combines the fields
+/// with, so a hand-written `hash()` and a synthesized one agree.
+///
+/// The formula is Boost's `hash_combine` at 64 bits: the golden-ratio constant keeps a run of
+/// small values from cancelling, and the two shifts spread each field over the whole word.
+pub fn combineHash(seed: int, value: int): int {
+    return seed ^ value + (0 - 7046029254386353131) + (seed << 6) + (seed >> 2);
+}
+
+// ------------------------------------------------------------------- attribute anchors (4.5)
+
+/// A struct declaring this may stand as `@Name` before a METHOD or a field — the seat a
+/// `@Deprecated` on `List.oldName` needs. An anchor for the compiler (4.5): declared here so a
+/// library can name it today, honoured once the attribute rows carry members.
+pub interface OnMethod { }
+
+/// Marks an enum as one that may GAIN variants without breaking its callers: a `match` over it
+/// outside the declaring module must carry a `_` arm, so `Wait` or `IoErrorKind` can grow. The
+/// same contract Rust's `#[non_exhaustive]` states. An anchor for the compiler (4.5): the
+/// attribute is data today, the rule follows in the exhaustiveness check.
+pub struct NonExhaustive :: [OnType] { }
+
+// No `Hashable` for `float`, deliberately.
+//
+// A hash table requires equal values to hash equally. Floating point breaks the premise rather
+// than the promise: `NaN != NaN`, so a key does not find itself; `0.0 == -0.0` with different bit
+// patterns, so the hash would need a special rule. Both are solvable, but no solution is the
+// obviously right one, and a wrong default here would surface only as a map losing values.
+//
+// `Equatable` and `Ordered` remain: there `NaN != NaN` is the expected behaviour.
+
+// --- private string natives ---------------------------------------------------------------
+//
+// Duplicates of `std.string` declarations, private and for the extensions above only. This
+// module is the library's root and imports nothing — with an import of `std.string` here, no
+// module could import `std.core` back (LYR-RES0005). The registry binds both names to the same
+// host function, so behavior has one truth.
+
+fn fromInt(value: int): string;
+fn fromFloat(value: float): string;
+fn fromBool(value: bool): string;
+fn fromChar(value: char): string;
+fn length(text: string): int;
+fn charAt(text: string, index: int): char;

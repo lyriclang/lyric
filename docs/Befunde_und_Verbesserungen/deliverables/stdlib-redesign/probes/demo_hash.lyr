@@ -1,0 +1,16 @@
+module demo;
+import std.io.console { println };
+import std.hash { sha256Hex, crc32, hashCombine };
+import std.test { assertClose, assertNotEq, assertNull };
+import std.string { parseInt };
+
+fn main(): int {
+    println(sha256Hex("abc"));
+    println(crc32("123456789".utf8Encode()));
+    println(hashCombine(hashCombine(0, 1), 2) != hashCombine(hashCombine(0, 2), 1));
+    assertClose(0.1 + 0.2, 0.3, 0.000000001);
+    assertNotEq(1, 2);
+    assertNull<int>(parseInt("x"));
+    println("assertions passed");
+    return 0;
+}

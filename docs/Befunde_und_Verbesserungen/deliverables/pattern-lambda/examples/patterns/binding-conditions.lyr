@@ -1,0 +1,125 @@
+// Binding conditions (4.5): 'if (let P = e)', 'while (let P = e)' and 'let P = e else { … };'.
+//
+// One idea in three places: a pattern is TRIED, and where it holds its names are in scope.
+//   - if-let:    the then branch sees the names; the else branch does not.
+//   - while-let: the pattern is tried before every iteration and the body sees the names —
+//                the loop form of the iterator protocol, 'next(): ?T'.
+//   - let-else:  the names live in the surrounding block; the else block runs on a miss and
+//                has to leave (return, throw, break, continue, panic), so afterwards every
+//                name is bound on every path.
+// A '?T' matched by a plain name binds 'T' — the binding is the proof (§7.4). An enum payload
+// binds as in a match arm, a struct pattern takes a struct apart without an else at all.
+import std.io.console { println };
+import std.collections { Deque };
+
+class Profile {
+    email: ?string,
+}
+
+class User {
+    name: string,
+    profile: ?Profile,
+}
+
+enum Shape {
+    Circle(int),
+    Rect { w: int, h: int },
+    Empty,
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+struct Point {
+    x: int,
+    y: int,
+}
+
+// let-else over fields: no copy into a local, no 'if (p == null)'
+fn emailOf(u: User): string {
+    let p = u.profile else {
+        return "no profile";
+    };
+    let e = p.email else {
+        return "no email";
+    };
+    return e;
+}
+
+// if-let with a payload; the else branch is ordinary
+fn describe(s: Shape): string {
+    if (let Rect { w, h } = s) {
+        return f"rect {w}x{h}";
+    } else {
+        return "no rect";
+    }
+}
+
+// while-let: the pull stands once, in the condition
+fn drain(q: Deque<int>): int {
+    var sum = 0;
+    while (let v = q.popFront()) {
+        sum += v;
+    }
+    return sum;
+}
+
+// let-else over a generic enum whose payload is itself optional
+fn unwrapOr(r: Result<?int, string>, d: int): int {
+    let Ok(v) = r else {
+        return d;
+    };
+    return v ?? d;
+}
+
+// a pattern that cannot fail needs no else
+fn manhattan(p: Point): int {
+    let Point { x, y } = p;
+    return x + y;
+}
+
+// let-else inside a loop: 'continue' leaves the iteration
+fn sumOfCircles(shapes: Shape[]): int {
+    var sum = 0;
+    for (s in shapes) {
+        let Circle(r) = s else {
+            continue;
+        };
+        sum += r;
+    }
+    return sum;
+}
+
+fn main(): int {
+    let ada = User { name = "Ada", profile = Profile { email = "ada@x.org" } };
+    let bob = User { name = "Bob", profile = Profile { email = null } };
+    let kim = User { name = "Kim", profile = null };
+    println(emailOf(ada) + " / " + emailOf(bob) + " / " + emailOf(kim));
+
+    println(describe(Shape.Rect { w = 2, h = 3 }) + " / " + describe(Shape.Empty));
+
+    let q = Deque<int>.empty();
+    q.pushBack(1);
+    q.pushBack(2);
+    q.pushBack(3);
+    println(f"drain = {drain(q)}");
+
+    let none: ?int = null;
+    let ok: Result<?int, string> = Result.Ok(7);
+    let okNull: Result<?int, string> = Result.Ok(none);
+    let err: Result<?int, string> = Result.Err("bad");
+    println(f"{unwrapOr(ok, -1)} {unwrapOr(okNull, -1)} {unwrapOr(err, -1)}");
+
+    println(
+        f"{manhattan(Point { x = 3, y = 4 })} {sumOfCircles([Shape.Circle(1), Shape.Empty, Shape.Circle(5)])}"
+    );
+    return 0;
+}
+// Output:
+// ada@x.org / no email / no profile
+// rect 2x3 / no rect
+// drain = 6
+// 7 -1 -1
+// 7 6

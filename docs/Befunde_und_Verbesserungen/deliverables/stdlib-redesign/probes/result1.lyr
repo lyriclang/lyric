@@ -1,0 +1,74 @@
+module probe;
+import std.io.console { println };
+import std.string { fromInt };
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E);
+
+    pub fn isOk(): bool {
+        return match (this) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+    }
+
+    pub fn ok(): ?T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => null,
+        };
+    }
+
+    pub fn unwrapOr(fallback: T): T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => fallback,
+        };
+    }
+
+    pub fn map<U>(f: fn(T) -> U): Result<U, E> {
+        return match (this) {
+            Ok(v) => Result<U, E>.Ok(f(v)),
+            Err(e) => Result<U, E>.Err(e),
+        };
+    }
+
+    pub fn mapErr<F>(f: fn(E) -> F): Result<T, F> {
+        return match (this) {
+            Ok(v) => Result<T, F>.Ok(v),
+            Err(e) => Result<T, F>.Err(f(e)),
+        };
+    }
+
+    pub fn andThen<U>(f: fn(T) -> Result<U, E>): Result<U, E> {
+        return match (this) {
+            Ok(v) => f(v),
+            Err(e) => Result<U, E>.Err(e),
+        };
+    }
+}
+
+fn parsePort(s: string): Result<int, string> {
+    if (s == "80") {
+        return Result<int, string>.Ok(80);
+    }
+    return Result<int, string>.Err("bad port: " + s);
+}
+
+fn main(): int {
+    let r = parsePort("80");
+    let s = parsePort("x");
+    println(r.isOk());
+    println(r.unwrapOr(0));
+    println(s.unwrapOr(-1));
+    let doubled = r.map<int>((n: int) => n * 2);
+    println(doubled.ok() ?? 0);
+    let chained = r.andThen<string>((n: int) => Result<string, string>.Ok("port " + fromInt(n)));
+    println(chained.unwrapOr("?"));
+    match (s) {
+        Ok(v) => println(v),
+        Err(e) => println(e),
+    }
+    return 0;
+}

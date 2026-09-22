@@ -1,0 +1,14 @@
+module probe;
+import std.io.console { println };
+import std.result { Result, map };
+
+fn lookup(p: bool): ?int {
+    return if (p) 7 else null;
+}
+
+fn main(): int {
+    let a = Result<?int, string>.Ok(lookup(true));
+    let held: ?int = 3;
+    println(a.unwrapOr(held) ?? -1);
+    return 0;
+}

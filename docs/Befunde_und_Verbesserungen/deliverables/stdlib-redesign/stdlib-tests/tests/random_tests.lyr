@@ -1,0 +1,141 @@
+import std.test { Test, assertEq, assertTrue };
+import std.random { Random, secureRandom, shuffle, choice };
+import std.collections { List };
+import std.math { absInt, isFinite };
+
+@Test
+pub fn a_seeded_generator_is_reproducible(): void {
+    let a = Random.seeded(42);
+    let b = Random.seeded(42);
+    assertEq(a.nextInt(), b.nextInt());
+    assertEq(a.nextIntRange(0, 10), b.nextIntRange(0, 10));
+    let c = Random.seeded(0);
+    assertTrue(absInt(c.nextInt()) > 0, "the zero seed is replaced, not a fixed point");
+}
+
+/// The exact sequence, not just its reproducibility.
+///
+/// The test beside this one compares two generators, so it holds for ANY algorithm — it would
+/// have watched xorshift64 be replaced by something else without a word. These values were taken
+/// before the round moved into a native and are asserted after: what a seed produces is a promise
+/// to every program that saved a seed and expects the same world back.
+@Test
+pub fn a_seed_produces_exactly_this_sequence(): void {
+    let r = Random.seeded(1234);
+    assertEq(r.nextInt(), 1335200936027);
+    assertEq(r.nextInt(), 2392750596832386171);
+    assertEq(r.nextInt(), 0 - 8332078248054572541);
+    assertEq(r.nextInt(), 0 - 2142365548691529);
+    assertEq(r.nextInt(), 45745413532698888);
+
+    // The replaced zero seed has its own sequence, and it is part of the same promise.
+    let z = Random.seeded(0);
+    assertEq(z.nextInt(), 0 - 9120871113685408793);
+}
+
+@Test
+pub fn shuffle_permutes_and_keeps_every_element(): void {
+    let xs = List<int>.empty();
+    var i = 1;
+    while (i <= 20) {
+        xs.push(i);
+        i = i + 1;
+    }
+
+    let r = Random.seeded(7);
+    shuffle<int>(r, xs);
+
+    var sum = 0;
+    var j = 0;
+    while (j < xs.length()) {
+        sum = sum + xs.get(j);
+        j = j + 1;
+    }
+    assertEq(sum, 210);
+    assertEq(xs.length(), 20);
+
+    // The same seed gives the same permutation — determinism is the module's promise.
+    let ys = List<int>.empty();
+    i = 1;
+    while (i <= 20) {
+        ys.push(i);
+        i = i + 1;
+    }
+    shuffle<int>(Random.seeded(7), ys);
+    j = 0;
+    while (j < xs.length()) {
+        assertEq(xs.get(j), ys.get(j));
+        j = j + 1;
+    }
+}
+
+@Test
+pub fn choice_draws_from_the_list_and_null_from_nothing(): void {
+    let xs = List<int>.empty();
+    xs.push(5);
+    xs.push(6);
+    xs.push(7);
+    let r = Random.seeded(3);
+    let drawn = choice<int>(r, xs) ?? -1;
+    assertTrue(drawn >= 5 && drawn <= 7, "the draw must come from the list");
+    assertTrue(choice<int>(r, List<int>.empty()) == null, "an empty list yields null");
+}
+
+@Test
+pub fn gaussian_draws_are_finite_and_reproducible(): void {
+    let a = Random.seeded(11);
+    let b = Random.seeded(11);
+    let x = a.nextGaussian();
+    assertTrue(isFinite(x), "a gaussian draw is a finite number");
+    assertEq(if (x == b.nextGaussian()) 1 else 0, 1);
+}
+
+@Test
+pub fn secure_random_answers_the_asked_count_and_never_repeats(): void {
+    let a = secureRandom(32);
+    let b = secureRandom(32);
+    assertEq(a.length, 32);
+    assertEq(b.length, 32);
+
+    // Two equal 32-byte draws from a cryptographic source is a 2^-256 event: if this ever
+    // fails, the source is broken, not the test.
+    var same = true;
+    var i = 0;
+    while (i < 32) {
+        if (a[i] != b[i]) {
+            same = false;
+        }
+        i = i + 1;
+    }
+    assertTrue(!same, "two independent draws must differ");
+}
+
+@Test
+pub fn secure_random_of_zero_is_the_empty_array(): void {
+    assertEq(secureRandom(0).length, 0);
+}
+
+@Test
+pub fn ranges_hold_their_bounds_for_every_draw(): void {
+    let r = Random.seeded(7);
+    var i = 0;
+    while (i < 2000) {
+        let n = r.nextIntRange(-5, 5);
+        assertTrue(n >= -5 && n < 5, "in [-5, 5)");
+        let f = r.nextFloat();
+        assertTrue(f >= 0.0 && f < 1.0, "in [0, 1)");
+        i = i + 1;
+    }
+    // The widest range there is: every raw value is a valid answer.
+    let wide = r.nextIntRange(-9223372036854775807 - 1, 9223372036854775807);
+    assertTrue(wide < 9223372036854775807, "below hi");
+    assertEq(r.nextIntRange(3, 3), 3);
+}
+
+@Test
+pub fn a_fresh_generator_differs_per_run(): void {
+    let a = Random.fresh();
+    let b = Random.fresh();
+    // Two generators seeded from entropy agreeing on the first draw is a 2^-63 event.
+    assertTrue(a.nextInt() != b.nextInt(), "fresh generators differ");
+}

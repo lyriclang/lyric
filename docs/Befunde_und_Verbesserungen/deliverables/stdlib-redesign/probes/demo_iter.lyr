@@ -1,0 +1,21 @@
+module demo;
+import std.io.console { println };
+import std.iter { over, range };
+import std.string { join, fromInt };
+
+fn main(): int {
+    let evens = range(1, 11).filter((n: int) => n % 2 == 0).count();
+    println(evens);
+    let sum = range(1, 5).fold<int>(0, (acc: int, n: int) => acc + n);
+    println(sum);
+    println(range(1, 6).last() ?? -1);
+    println(range(1, 6).nth(2) ?? -1);
+    let stepped = over<int>([1, 2, 3, 4, 5, 6, 7]).stepBy(3).toArray();
+    println(join([fromInt(stepped[0]), fromInt(stepped[1]), fromInt(stepped[2])], ","));
+    let rest = over<int>([1, 5, 2, 6]).skipWhile((n: int) => n < 3).count();
+    println(rest);
+    let sums = over<int>([1, 2]).zipWith<int, int>(over<int>([10, 20, 30]), (a: int, b: int) => a + b).toArray();
+    println(sums.length);
+    println(over<int>([1, 1, 2, 2, 1]).dedupBy((n: int) => n).count());
+    return 0;
+}

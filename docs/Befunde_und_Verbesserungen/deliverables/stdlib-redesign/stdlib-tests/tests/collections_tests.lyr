@@ -1,0 +1,382 @@
+import std.test { Test, assertEq, assertTrue };
+import std.collections {
+    List,
+    Map,
+    Set,
+    Deque,
+    sortList,
+    sortListByKey,
+    sortArray,
+    union,
+    difference,
+    isSubset,
+    listContains,
+    listRemove,
+    entries,
+    maxBy,
+    minBy,
+    slice,
+    groupBy,
+    mapList,
+    arrayOf,
+    arrayFilled,
+};
+import std.string { fromInt };
+
+@Test
+pub fn a_list_grows_and_pops_in_order(): void {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    assertEq(xs.length(), 2);
+    assertEq(xs.pop()!, 2);
+    assertEq(xs.pop()!, 1);
+    assertTrue(xs.pop() == null, "an empty list pops null");
+}
+
+@Test
+pub fn a_map_overwrites_equal_keys(): void {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("a", 2);
+    assertEq(m.length(), 1);
+    assertEq(m.get("a")!, 2);
+}
+
+@Test
+pub fn removal_leaves_the_probe_chain_intact(): void {
+    // Enough keys to force collisions, then remove some and find the rest — the tombstone
+    // rule's observable half.
+    let m = Map<int, int>.empty();
+    var i = 0;
+    while (i < 32) {
+        m.set(i, i * 10);
+        i = i + 1;
+    }
+    var removed = 0;
+    i = 0;
+    while (i < 32) {
+        if (i % 3 == 0 && m.remove(i) != null) {
+            removed = removed + 1;
+        }
+        i = i + 1;
+    }
+    assertEq(m.length(), 32 - removed);
+    assertEq(m.get(1)!, 10);
+    assertEq(m.get(31)!, 310);
+    assertTrue(m.get(0) == null, "a removed key stays gone");
+}
+
+@Test
+pub fn a_set_answers_membership_and_algebra(): void {
+    let a = Set<int>.empty();
+    a.add(1);
+    a.add(2);
+    let b = Set<int>.empty();
+    b.add(2);
+    b.add(3);
+
+    assertTrue(a.contains(1), "1 was added");
+    assertTrue(!a.contains(3), "3 was not");
+    assertEq(union<int>(a, b).length(), 3);
+    assertEq(difference<int>(a, b).length(), 1);
+    assertTrue(isSubset<int>(a, union<int>(a, b)), "a is inside the union");
+}
+
+@Test
+pub fn sorting_is_stable_on_the_natural_order(): void {
+    let xs = List<int>.empty();
+    xs.push(3);
+    xs.push(1);
+    xs.push(2);
+    sortList<int>(xs);
+    assertEq(xs.get(0), 1);
+    assertEq(xs.get(1), 2);
+    assertEq(xs.get(2), 3);
+}
+
+@Test
+pub fn listContains_uses_equality(): void {
+    let xs = List<int>.empty();
+    xs.push(5);
+    assertTrue(listContains<int>(xs, 5), "5 is in it");
+    assertTrue(!listContains<int>(xs, 6), "6 is not");
+}
+
+// v1.14: `clear` keeps the backing for reuse; the values are released all the same.
+@Test
+pub fn clear_keeps_the_capacity_and_the_list_refills(): void {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+    xs.clear();
+    assertEq(xs.length(), 0);
+    assertTrue(xs.capacity() > 0, "the backing array must survive a clear");
+    xs.push(9);
+    assertEq(xs.get(0), 9);
+}
+
+// --- v1.14: the ergonomics round ---
+
+@Test
+pub fn insert_and_removeAt_shift_correctly(): void {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+    xs.insert(1, 9);
+    assertEq(xs.get(1), 9);
+    assertEq(xs.get(2), 2);
+    assertEq(xs.removeAt(0), 1);
+    assertEq(xs.get(0), 9);
+    assertEq(xs.length(), 3);
+}
+
+@Test
+pub fn first_last_reverse_and_swap(): void {
+    let xs = List<int>.empty();
+    xs.push(1);
+    xs.push(2);
+    xs.push(3);
+    assertEq(xs.first() ?? -1, 1);
+    assertEq(xs.last() ?? -1, 3);
+    xs.reverse();
+    assertEq(xs.first() ?? -1, 3);
+    xs.swap(0, 2);
+    assertEq(xs.get(0), 1);
+
+    let empty = List<int>.empty();
+    assertTrue(empty.first() == null, "an empty list has no first");
+    assertTrue(empty.last() == null, "an empty list has no last");
+}
+
+@Test
+pub fn a_map_answers_getOr_and_walks_its_entries(): void {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+    assertEq(m.getOr("a", 0), 1);
+    assertEq(m.getOr("z", 40), 40);
+
+    var total = 0;
+    for (entry in entries(m)) {
+        let (_, v) = entry;
+        total = total + v;
+    }
+    assertEq(total, 3);
+
+    m.clear();
+    assertEq(m.length(), 0);
+    m.set("c", 7);
+    assertEq(m.getOr("c", 0), 7);
+}
+
+@Test
+pub fn a_set_is_iterable_and_clears_in_place(): void {
+    let s = Set<int>.empty();
+    s.add(5);
+    s.add(6);
+    var sum = 0;
+    for (v in s) {
+        sum = sum + v;
+    }
+    assertEq(sum, 11);
+
+    s.clear();
+    assertEq(s.length(), 0);
+    assertTrue(s.add(5), "a cleared set takes the old value as new");
+}
+
+// ------------------------------------------------------------ 4.5: the container package
+
+@Test
+pub fn a_list_comes_from_an_array_and_takes_bulk(): void {
+    let xs = List<int>.of([3, 1, 2]);
+    assertEq(xs.length(), 3);
+    assertEq(xs.get(0), 3);
+    xs.pushAll([4, 5]);
+    xs.pushAllFrom(List<int>.of([6]));
+    assertEq(xs.length(), 6);
+    assertEq(xs.last()!, 6);
+    assertEq(List<int>.of([]).length(), 0);
+}
+
+@Test
+pub fn a_list_slices_maps_and_filters_eagerly(): void {
+    let xs = List<int>.of([1, 2, 3, 4, 5]);
+    let middle = xs.slice(1, 4);
+    assertEq(middle.length(), 3);
+    assertEq(middle.get(0), 2);
+    assertEq(xs.slice(2, 2).length(), 0);
+    let squares = mapList<int, int>(xs, (n: int) => n * n);
+    assertEq(squares.get(4), 25);
+    let evens = xs.filter((n: int) => n % 2 == 0);
+    assertEq(evens.length(), 2);
+    let names = mapList<int, string>(xs, (n: int) => fromInt(n));
+    assertEq(names.get(0), "1");
+    var total = 0;
+    xs.forEach(
+        (n: int) => {
+            total = total + n;
+        }
+    );
+    assertEq(total, 15);
+    assertEq(xs.length(), 5);
+}
+
+@Test
+pub fn remove_where_and_to_reversed(): void {
+    let xs = List<int>.of([1, 2, 3, 4, 5, 6]);
+    assertEq(xs.removeWhere((n: int) => n % 2 == 0), 3);
+    assertEq(xs.length(), 3);
+    assertEq(xs.get(2), 5);
+    let back = xs.toReversed();
+    assertEq(back.get(0), 5);
+    assertEq(xs.get(0), 1);
+    assertTrue(listRemove<int>(xs, 3), "3 was there");
+    assertTrue(!listRemove<int>(xs, 3), "and is gone");
+    assertEq(xs.length(), 2);
+}
+
+@Test
+pub fn a_map_walks_through_its_own_methods(): void {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+    var keyCount = 0;
+    for (_ in m.keys()) {
+        keyCount = keyCount + 1;
+    }
+    assertEq(keyCount, 2);
+    var sum = 0;
+    for (v in m.values()) {
+        sum = sum + v;
+    }
+    assertEq(sum, 3);
+    var joined = 0;
+    for (entry in m.entries()) {
+        let (k, v) = entry;
+        joined = joined + k.length() + v;
+    }
+    assertEq(joined, 5);
+    let built = Map<string, int>.fromEntries([("x", 1), ("y", 2), ("x", 3)]);
+    assertEq(built.length(), 2);
+    assertEq(built.get("x")!, 3);
+}
+
+@Test
+pub fn get_or_insert_and_update_make_a_group_by_one_line(): void {
+    let groups = Map<int, List<string>>.empty();
+    for (word in ["a", "bb", "cc", "d"]) {
+        groups.getOrInsert(word.length(), () => List<string>.empty()).push(word);
+    }
+    assertEq(groups.get(1)!.length(), 2);
+    assertEq(groups.get(2)!.length(), 2);
+
+    let counts = Map<string, int>.empty();
+    for (word in ["x", "y", "x"]) {
+        counts.update(word, (n: ?int) => (n ?? 0) + 1);
+    }
+    assertEq(counts.get("x")!, 2);
+    assertEq(counts.get("y")!, 1);
+
+    let grouped = groupBy<string, int>(
+        List<string>.of(["a", "bb", "cc", "d"]),
+        (w: string) => w.length()
+    );
+    assertEq(grouped.get(2)!.get(1), "cc");
+}
+
+@Test
+pub fn a_churned_map_does_not_grow_without_bound(): void {
+    // Set and remove a fresh key each round: the map never holds more than one entry, and
+    // before 4.5 every threshold crossing DOUBLED the table.
+    let m = Map<int, int>.empty();
+    var i = 0;
+    while (i < 10000) {
+        m.set(i, i);
+        m.remove(i);
+        i = i + 1;
+    }
+    assertEq(m.length(), 0);
+    assertTrue(m.capacity() <= 16, "capacity stays small: " + fromInt(m.capacity()));
+    // And a table that really fills still grows.
+    var j = 0;
+    while (j < 100) {
+        m.set(j, j);
+        j = j + 1;
+    }
+    assertEq(m.length(), 100);
+    assertEq(m.get(57)!, 57);
+}
+
+@Test
+pub fn a_set_comes_from_an_array_and_goes_back(): void {
+    let s = Set<int>.of([3, 1, 3, 2]);
+    assertEq(s.length(), 3);
+    assertEq(s.addAll([2, 9]), 1);
+    let arr = s.toArray();
+    assertEq(arr.length, 4);
+    sortArray<int>(arr);
+    assertEq(arr[0], 1);
+    assertEq(arr[3], 9);
+    assertEq(s.toList().length(), 4);
+    let churned = Set<int>.empty();
+    var i = 0;
+    while (i < 10000) {
+        churned.add(i);
+        churned.remove(i);
+        i = i + 1;
+    }
+    assertEq(churned.length(), 0);
+}
+
+@Test
+pub fn a_deque_can_be_looked_at_without_draining(): void {
+    let q = Deque<int>.empty();
+    q.pushBack(2);
+    q.pushFront(1);
+    q.pushBack(3);
+    let arr = q.toArray();
+    assertEq(arr.length, 3);
+    assertEq(arr[0], 1);
+    assertEq(arr[2], 3);
+    assertEq(q.length(), 3);
+}
+
+@Test
+pub fn sorting_by_key_and_arrays(): void {
+    let words = List<string>.of(["ccc", "a", "bb"]);
+    sortListByKey<string, int>(words, (w: string) => w.length());
+    assertEq(words.get(0), "a");
+    assertEq(words.get(2), "ccc");
+    assertEq(maxBy<string, int>(words, (w: string) => w.length())!, "ccc");
+    assertEq(minBy<string, int>(words, (w: string) => w.length())!, "a");
+    assertTrue(
+        maxBy<string, int>(List<string>.empty(), (w: string) => w.length()) == null,
+        "empty"
+    );
+    let arr = [5, 3, 9, 1];
+    sortArray<int>(arr);
+    assertEq(arr[0], 1);
+    assertEq(arr[3], 9);
+    let part = slice<int>(arr, 1, 3);
+    assertEq(part.length, 2);
+    assertEq(part[0], 3);
+    assertEq(slice<int>(arr, 4, 4).length, 0);
+}
+
+@Test
+pub fn arrays_come_from_a_function_or_a_value(): void {
+    let squares = arrayOf<int>(4, (i: int) => i * i);
+    assertEq(squares.length, 4);
+    assertEq(squares[3], 9);
+    assertEq(arrayOf<string>(0, (i: int) => "x").length, 0);
+    let names = arrayOf<string>(2, (i: int) => "n" + fromInt(i));
+    assertEq(names[1], "n1");
+    let filled = arrayFilled<int>(3, 7);
+    assertEq(filled.length, 3);
+    assertEq(filled[2], 7);
+    assertEq(arrayFilled<int>(0, 7).length, 0);
+}

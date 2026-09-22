@@ -1,0 +1,689 @@
+// std.string — building strings.
+//
+// The f-string lowering uses these functions too: `f"n={x}"` becomes `concat("n=", fromInt(x))`.
+// The compiler references them without the user importing `std.string`.
+//
+// They sit in an ordinary, documented module rather than a hidden compiler module, which would be
+// a second notion of what a module is.
+//
+// The names distinguish by source type (`fromInt`, `fromFloat`, …) rather than being overloads;
+// there is no overloading.
+
+module std.string;
+
+// The one import this module has, and it is safe: `std.result` imports nothing, so no cycle
+// through `std.core` (which imports THIS module) can arise.
+import std.result { Result };
+
+/// The two joined — what `+` on strings compiles to.
+pub fn concat(a: string, b: string): string;
+
+/// The decimal text of the value.
+pub fn fromInt(value: int): string;
+
+// A separate converter for unsigned numbers: 'fromInt' would read a large 'uint' as a negative
+// number.
+/// The decimal text of an unsigned value.
+pub fn fromUint(value: uint): string;
+/// The decimal text of the value.
+pub fn fromFloat(value: float): string;
+/// `"true"` or `"false"`.
+pub fn fromBool(value: bool): string;
+/// The character as a one-character string.
+pub fn fromChar(value: char): string;
+
+// 'ab' * 3. A function rather than an opcode: repetition is library work, and a 'mul' opcode
+// doing something else for string than for int would be polymorphic dispatch.
+/// The string repeated `count` times — what `s * n` compiles to.
+pub fn repeat(value: string, count: int): string;
+
+// --- queries ------------------------------------------------------------------------------
+//
+// Every position and length counts CODE POINTS, the same unit iteration yields. Counting UTF-16
+// units instead would contradict the type system, in which a char is one code point.
+//
+// There is deliberately no 's[i]'. Access at a code-point position is O(n), and an index operator
+// would make the obvious loop quadratic without showing it. Walk characters with 'for (c in s)'.
+
+/// The characters joined back into one string — the inverse of `toChars`. Native since v1.14:
+/// one call instead of one string per character.
+pub fn fromChars(chars: char[]): string;
+
+// --- the byte bridge (v1.14) --------------------------------------------------------------
+//
+// The first natives whose PARAMETER is an array. The format always allowed it (§3 of the
+// bytecode specification); the registry and this module simply never used it before.
+
+/// The bytes as a string, STRICTLY: invalid UTF-8 answers `null` rather than a U+FFFD quietly
+/// standing in for the data — the difference to `std.io.file.text`, whose replacement decoding is
+/// documented there.
+pub fn utf8Decode(bytes: uint8[]): ?string;
+
+/// Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.
+pub class Utf8Error :: [Throwable] {
+    offset: int,
+
+    pub fn message(): string {
+        return "utf8: invalid byte at offset " + fromInt(this.offset);
+    }
+}
+
+// The offset of the last utf8Decode refusal, recorded by the runtime and read immediately after
+// a null — the VM is single-threaded, so nothing runs in between.
+fn utf8DecodeErrorOffset(): int;
+
+/// `utf8Decode`, with the reason when the bytes are not UTF-8: which byte broke the sequence.
+pub fn utf8DecodeOrThrow(bytes: uint8[]): string throws Utf8Error {
+    let text = utf8Decode(bytes);
+    if (text == null) {
+        throw Utf8Error { offset = utf8DecodeErrorOffset() };
+    }
+    return text;
+}
+
+// Behind `join` and `StringBuilder.build`: one native call instead of a copy cascade. Private —
+// `join` IS the public name for this.
+fn joinAll(parts: string[], separator: string): string;
+
+// --- the raw twins (v1.15) ----------------------------------------------------------------
+//
+// The method bodies below reach the host through these private twins. The registry also still
+// binds the old free-form names (length, charAt, …) to the same implementations: the pub
+// declarations went with 2.0, but bytecode compiled against 1.x keeps loading.
+
+fn rawLength(value: string): int;
+fn rawCharAt(value: string, index: int): char;
+fn rawSubstring(value: string, start: int, count: int): string;
+fn rawIndexOf(value: string, needle: string): int;
+fn rawContains(value: string, needle: string): bool;
+fn rawStartsWith(value: string, prefix: string): bool;
+fn rawEndsWith(value: string, suffix: string): bool;
+fn rawTrim(value: string): string;
+fn rawToUpper(value: string): string;
+fn rawToLower(value: string): string;
+fn rawSplit(value: string, separator: string): string[];
+fn rawToChars(value: string): char[];
+fn rawUtf8Encode(value: string): uint8[];
+
+// =============================================================== the method API (v1.15)
+//
+// One name, one form: `s.trim()`, not a free function beside a method. The deprecated free
+// forms went with 2.0; `concat` and `repeat` stay free — they back `+` and `*` — and the
+// type-directed families (`fromXxx`, `parseXxx`) keep their names.
+//
+// A method is a call and looks like one. `s.length()` has parentheses BECAUSE it costs O(n) —
+// a property would promise a stored answer this type does not have.
+
+extend string {
+    /// The length in code points — the unit every position in this module uses. O(n), which is
+    /// why it is a call and not a property.
+    pub fn length(): int {
+        return rawLength(this);
+    }
+
+    /// The character at a code-point position. O(n): a position counts code points, not bytes.
+    /// Walking all characters is `for (c in s)`, not a loop over positions.
+    pub fn charAt(index: int): char {
+        return rawCharAt(this, index);
+    }
+
+    /// `count` characters from `start`, both in code points.
+    pub fn substring(start: int, count: int): string {
+        return rawSubstring(this, start, count);
+    }
+
+    /// The first position of `needle` in code points, or `-1` — ready for `charAt` and
+    /// `substring`.
+    pub fn indexOf(needle: string): int {
+        return rawIndexOf(this, needle);
+    }
+
+    /// Searches from a position. `-1` when nothing is found, as in `indexOf`.
+    pub fn indexOfFrom(needle: string, start: int): int {
+        let chars = rawToChars(this);
+        let pattern = rawToChars(needle);
+        if (pattern.length == 0) {
+            return if (start <= chars.length) start else 0 - 1;
+        }
+
+        var i = if (start < 0) 0 else start;
+        while (i + pattern.length <= chars.length) {
+            if (matchesAt(chars, pattern, i)) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return 0 - 1;
+    }
+
+    /// The LAST occurrence, or `-1`.
+    pub fn lastIndexOf(needle: string): int {
+        let chars = rawToChars(this);
+        let pattern = rawToChars(needle);
+        if (pattern.length == 0) {
+            return chars.length;
+        }
+
+        var i = chars.length - pattern.length;
+        while (i >= 0) {
+            if (matchesAt(chars, pattern, i)) {
+                return i;
+            }
+            i = i - 1;
+        }
+        return 0 - 1;
+    }
+
+    /// Whether `needle` occurs.
+    pub fn contains(needle: string): bool {
+        return rawContains(this, needle);
+    }
+
+    /// Whether the string begins with `prefix`.
+    pub fn startsWith(prefix: string): bool {
+        return rawStartsWith(this, prefix);
+    }
+
+    /// Whether the string ends with `suffix`.
+    pub fn endsWith(suffix: string): bool {
+        return rawEndsWith(this, suffix);
+    }
+
+    /// How often `needle` occurs, WITHOUT overlap: `"aaa".count("aa")` is 1. This matches
+    /// `replace`.
+    pub fn count(needle: string): int {
+        let chars = rawToChars(this);
+        let pattern = rawToChars(needle);
+        if (pattern.length == 0) {
+            return 0;
+        }
+
+        var n = 0;
+        var i = 0;
+        while (i + pattern.length <= chars.length) {
+            if (matchesAt(chars, pattern, i)) {
+                n = n + 1;
+                i = i + pattern.length;
+            } else {
+                i = i + 1;
+            }
+        }
+        return n;
+    }
+
+    /// Whether the length is zero.
+    pub fn isEmpty(): bool {
+        return rawLength(this) == 0;
+    }
+
+    /// Empty or whitespace only.
+    pub fn isBlank(): bool {
+        let chars = rawToChars(this);
+        var i = 0;
+        while (i < chars.length) {
+            if (!isWhitespace(chars[i])) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    /// Without leading and trailing whitespace. The receiver is unchanged — every method here
+    /// returns a NEW string; a Lyric string has nothing to mutate.
+    pub fn trim(): string {
+        return rawTrim(this);
+    }
+
+    /// Without leading whitespace.
+    pub fn trimStart(): string {
+        let chars = rawToChars(this);
+        var i = 0;
+        while (i < chars.length && isWhitespace(chars[i])) {
+            i = i + 1;
+        }
+        return rawSubstring(this, i, chars.length - i);
+    }
+
+    /// Without trailing whitespace.
+    pub fn trimEnd(): string {
+        let chars = rawToChars(this);
+        var n = chars.length;
+        while (n > 0 && isWhitespace(chars[n - 1])) {
+            n = n - 1;
+        }
+        return rawSubstring(this, 0, n);
+    }
+
+    /// Upper-cased, ordinal — the same result everywhere, no culture involved.
+    pub fn toUpper(): string {
+        return rawToUpper(this);
+    }
+
+    /// Lower-cased, ordinal.
+    pub fn toLower(): string {
+        return rawToLower(this);
+    }
+
+    /// Every non-overlapping occurrence of `needle` replaced. An empty needle changes nothing.
+    // Untouched stretches travel as WHOLE substrings into a builder rather than character by
+    // character into a growing string.
+    pub fn replace(needle: string, replacement: string): string {
+        let chars = rawToChars(this);
+        let pattern = rawToChars(needle);
+        if (pattern.length == 0) {
+            return this;
+        }
+
+        let out = StringBuilder.new();
+        var segmentStart = 0;
+        var i = 0;
+
+        while (i + pattern.length <= chars.length) {
+            if (matchesAt(chars, pattern, i)) {
+                if (i > segmentStart) {
+                    out.append(rawSubstring(this, segmentStart, i - segmentStart));
+                }
+                out.append(replacement);
+                i = i + pattern.length;
+                segmentStart = i;
+            } else {
+                i = i + 1;
+            }
+        }
+
+        if (segmentStart == 0) {
+            return this; // nothing matched, nothing copied
+        }
+        if (segmentStart < chars.length) {
+            out.append(rawSubstring(this, segmentStart, chars.length - segmentStart));
+        }
+        return out.build();
+    }
+
+    /// The first occurrence replaced; without one the string comes back unchanged.
+    pub fn replaceFirst(needle: string, replacement: string): string {
+        let i = rawIndexOf(this, needle);
+        if (i < 0) {
+            return this;
+        }
+        let n = rawLength(this);
+        let m = rawLength(needle);
+        let front = rawSubstring(this, 0, i);
+        let back = rawSubstring(this, i + m, n - i - m);
+        return front + replacement + back;
+    }
+
+    /// Pads at the front until `width` is reached. A longer string is left unchanged;
+    /// truncating would lose data in a function that only formats.
+    pub fn padStart(width: int, fill: char): string {
+        let missing = width - rawLength(this);
+        if (missing <= 0) {
+            return this;
+        }
+        return repeat(fromChar(fill), missing) + this;
+    }
+
+    /// Pads at the end until `width` is reached. A longer string is left unchanged; truncating
+    /// would lose data in a function that only formats.
+    pub fn padEnd(width: int, fill: char): string {
+        let missing = width - rawLength(this);
+        if (missing <= 0) {
+            return this;
+        }
+        return this + repeat(fromChar(fill), missing);
+    }
+
+    /// The parts between occurrences of `separator`. An empty separator panics: "split into
+    /// what" has no answer.
+    pub fn split(separator: string): string[] {
+        return rawSplit(this, separator);
+    }
+
+    /// Splits at line breaks. Both `\r\n` and `\n` count.
+    pub fn splitLines(): string[] {
+        return this.replace("\r\n", "\n").split("\n");
+    }
+
+    /// Splits at the FIRST occurrence; the rest stays whole, for `key=value=more`.
+    pub fn splitFirst(separator: string): string[] {
+        let i = rawIndexOf(this, separator);
+        if (i < 0) {
+            return [this];
+        }
+        let n = rawLength(this);
+        let m = rawLength(separator);
+        let front = rawSubstring(this, 0, i);
+        let back = rawSubstring(this, i + m, n - i - m);
+        return [front, back];
+    }
+
+    /// The characters as an array, in one O(n) pass — what `for (c in s)` uses.
+    pub fn toChars(): char[] {
+        return rawToChars(this);
+    }
+
+    /// The string as UTF-8 bytes — the inverse of `utf8Decode`, and what a file or a socket
+    /// actually carries.
+    pub fn utf8Encode(): uint8[] {
+        return rawUtf8Encode(this);
+    }
+}
+
+// ================================================================== written in Lyric
+//
+// Nothing below is native. Everything builds on the primitives above — `length`, `charAt`,
+// `substring`, `concat` — and otherwise computes with code points.
+//
+// That works because a `char` is a number, so `isDigit` and `parseInt` are ordinary arithmetic.
+// Otherwise each of them would need a native signature, and every native signature is a line in
+// the bytecode contract.
+//
+// This module imports nothing and must not: `std.core` imports `std.string`. There is therefore
+// no `List<T>` and no `Iterator<T>` here; collecting happens into an array.
+// `string[]`.
+
+// ------------------------------------------------------------------ character tests
+//
+// All take a `char` rather than a `string`: the question is asked of a character.
+
+/// `'0'` through `'9'`.
+pub fn isDigit(c: char): bool {
+    return c >= '0' && c <= '9';
+}
+
+// ASCII only. A full Unicode category would need the tables from the standard.
+/// An ASCII letter.
+pub fn isAlpha(c: char): bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
+}
+
+/// An ASCII letter or a digit.
+pub fn isAlphanumeric(c: char): bool {
+    return isAlpha(c) || isDigit(c);
+}
+
+/// Whether the character is white space in the Unicode sense — the same set `trim` removes,
+/// so `s.trim() == s.trimStart().trimEnd()` and `isBlank` agree with it: the ASCII controls
+/// `\t`..`\r` and the space, U+0085, U+00A0 and the other space separators (U+1680,
+/// U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000). Before 4.5 only four ASCII
+/// characters counted here while `trim` already used this set.
+pub fn isWhitespace(c: char): bool {
+    let n = c as int;
+    if (n <= 32) {
+        return n == 32 || n >= 9 && n <= 13;
+    }
+    if (n < 133) {
+        return false;
+    }
+    return n == 133
+        || n == 160
+        || n == 5760
+        || n >= 8192 && n <= 8202
+        || n == 8232
+        || n == 8233
+        || n == 8239
+        || n == 8287
+        || n == 12288;
+}
+
+/// `'A'` through `'Z'`.
+pub fn isUpper(c: char): bool {
+    return c >= 'A' && c <= 'Z';
+}
+
+/// `'a'` through `'z'`.
+pub fn isLower(c: char): bool {
+    return c >= 'a' && c <= 'z';
+}
+
+/// The numeric value of a digit, or `null` when it is not one.
+///
+/// `?int` rather than `-1`: a failure the caller has to handle belongs in the type.
+pub fn charToDigit(c: char): ?int {
+    if (!isDigit(c)) {
+        return null;
+    }
+    return c as int - '0' as int;
+}
+
+/// The digit as a character, or `null` outside `0..9`.
+pub fn digitToChar(value: int): ?char {
+    if (value < 0 || value > 9) {
+        return null;
+    }
+    return ('0' as int + value) as char;
+}
+
+// ------------------------------------------------------------------ predicates
+
+// ------------------------------------------------------------------ searching
+
+// Whether `needle` stands at `at` in `chars` — the window comparison the searches below share.
+fn matchesAt(chars: char[], needle: char[], at: int): bool {
+    var j = 0;
+    while (j < needle.length) {
+        if (chars[at + j] != needle[j]) {
+            return false;
+        }
+        j = j + 1;
+    }
+    return true;
+}
+
+// ------------------------------------------------------------------ splitting and joining
+
+/// Joins the parts with a separator: the inverse of `split`. One native call — a left fold
+/// would copy the whole result once per part.
+pub fn join(parts: string[], separator: string): string {
+    return joinAll(parts, separator);
+}
+
+// ------------------------------------------------------------------ trimming and padding
+
+// ------------------------------------------------------------------ parsing
+//
+// All return `?T`: an unparsable string is an ordinary state of the world, not a programming
+// error.
+
+/// `"-42"` becomes `-42`, anything else `null` — an empty text, a sign on its own, a character
+/// that is no digit, and since 4.5 a magnitude beyond `int`, which used to wrap silently. The
+/// reason is what `parseIntOrErr` says.
+pub fn parseInt(value: string): ?int {
+    return parseIntRadix(value, 10);
+}
+
+/// From a base of 2 to 36. Letters continue from `a`/`A`. `null` on anything `parseInt`
+/// refuses, and on a base outside `2..=36`.
+pub fn parseIntRadix(value: string, radix: int): ?int {
+    let scanned = scanInt(value, radix);
+    let (code, number, _) = scanned;
+    return if (code == 0) number else null;
+}
+
+/// What kept a text from being a number.
+pub enum ParseErrorKind {
+    /// Nothing to read: the text is empty, or a sign with nothing after it.
+    Empty,
+    /// A character that is no digit of the base — `offset` says which.
+    InvalidDigit,
+    /// The digits are fine and the number is not: it lies outside `int`.
+    Overflow,
+}
+
+/// Why a text is not a number: which kind, and at which code-point offset the reading stopped.
+///
+/// The carrier-plus-kind shape of `std.io.error.IoError`: a class that throws, holding an enum
+/// that matches, so a kind can be added without breaking a `match` over the ones known.
+pub class ParseError :: [Throwable] {
+    /// What went wrong.
+    kind: ParseErrorKind,
+    /// Where the reading stopped, in code points; the text's length for `Overflow` and `Empty`.
+    offset: int,
+
+    pub fn message(): string {
+        let what = match (this.kind) {
+            ParseErrorKind.Empty => "nothing to read",
+            ParseErrorKind.InvalidDigit => "not a digit",
+            ParseErrorKind.Overflow => "outside the int range",
+        };
+        return "parse: " + what + " at offset " + fromInt(this.offset);
+    }
+}
+
+/// `parseInt`, with the reason when the text is not a number: the value, or a `ParseError`
+/// saying what stopped the reading and where.
+pub fn parseIntOrErr(value: string): Result<int, ParseError> {
+    return parseIntRadixOrErr(value, 10);
+}
+
+/// `parseIntRadix`, with the reason. A base outside `2..=36` is reported as `InvalidDigit` at
+/// offset 0: no character of any text is a digit of a base that does not exist.
+pub fn parseIntRadixOrErr(value: string, radix: int): Result<int, ParseError> {
+    let scanned = scanInt(value, radix);
+    let (code, number, at) = scanned;
+    if (code == 0) {
+        return Result<int, ParseError>.Ok(number);
+    }
+    let kind = match (code) {
+        1 => ParseErrorKind.Empty,
+        2 => ParseErrorKind.InvalidDigit,
+        _ => ParseErrorKind.Overflow,
+    };
+    return Result<int, ParseError>.Err(ParseError { kind = kind, offset = at });
+}
+
+// The one reader behind the four parsers: `(code, value, offset)`, where the code is 0 for a
+// number, 1 for nothing to read, 2 for a character that is no digit and 3 for overflow. The
+// magnitude accumulates NEGATIVELY — `int.min` has no positive twin, so a positive accumulator
+// could never reach it — and the overflow test precedes each step: `acc * radix - digit` stays
+// at or above the limit exactly when `acc >= (limit + digit) / radix`, with `/` rounding towards
+// zero, which for a non-positive dividend is the ceiling the inequality needs.
+fn scanInt(value: string, radix: int): (int, int, int) {
+    let chars = rawToChars(value);
+    let n = chars.length;
+    if (radix < 2 || radix > 36) {
+        return (2, 0, 0);
+    }
+    if (n == 0) {
+        return (1, 0, 0);
+    }
+
+    var i = 0;
+    var negative = false;
+    let first = chars[0];
+    if (first == '-' || first == '+') {
+        negative = first == '-';
+        i = 1;
+    }
+    // A sign on its own is not a number.
+    if (i >= n) {
+        return (1, 0, n);
+    }
+
+    let limit = if (negative) 0 - 9223372036854775807 - 1 else 0 - 9223372036854775807;
+    var acc = 0;
+    while (i < n) {
+        let c = chars[i];
+        var digit = -1;
+        if (isDigit(c)) {
+            digit = c as int - '0' as int;
+        } else if (isLower(c)) {
+            digit = c as int - 'a' as int + 10;
+        } else if (isUpper(c)) {
+            digit = c as int - 'A' as int + 10;
+        }
+        if (digit < 0 || digit >= radix) {
+            return (2, 0, i);
+        }
+        if (acc < (limit + digit) / radix) {
+            return (3, 0, n);
+        }
+        acc = acc * radix - digit;
+        i = i + 1;
+    }
+
+    return (0, if (negative) acc else 0 - acc, n);
+}
+
+/// Exactly `"true"` or `"false"`; anything else is `null`.
+pub fn parseBool(value: string): ?bool {
+    if (value == "true") {
+        return true;
+    }
+    if (value == "false") {
+        return false;
+    }
+    return null;
+}
+
+/// The closest `float` to the decimal the text spells — `"3.5"`, `"-0.25"`, `".5"`, `"42"`,
+/// exponent notation included (`"1e-6"`, `"2.5E3"`) — or `null` when the text spells none.
+/// Strict about shape: no whitespace, no separators, and the words `NaN` and `Infinity` are not
+/// numbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 prescribes.
+///
+/// Native because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision
+/// arithmetic in the worst cases; an approximate parser hands back a float the text did not
+/// say. `parseFloat(fromFloat(x))` is `x` again, for every finite `x`.
+pub fn parseFloat(value: string): ?float;
+
+// ------------------------------------------------------------------ building
+
+/// Builds a string piece by piece.
+///
+/// `s = s + part` in a loop is quadratic: every step copies the whole string so far. The builder
+/// collects the parts and joins them once.
+///
+/// The backing is a doubling `string[]`, written by hand because this module must not import
+/// `std.collections`.
+pub class StringBuilder {
+    /// The collected pieces; `count` says how many are filled.
+    parts: string[],
+    /// How many entries of `parts` are real.
+    count: int,
+
+    /// An empty builder.
+    pub static fn new(): StringBuilder {
+        return StringBuilder { parts = [""] * 4, count = 0 };
+    }
+
+    /// Adds a piece; the backing array doubles when full.
+    pub mut fn append(value: string): void {
+        if (this.count == this.parts.length) {
+            let grown = [""] * (if (this.parts.length == 0) 4 else this.parts.length * 2);
+            var i = 0;
+            while (i < this.count) {
+                grown[i] = this.parts[i];
+                i = i + 1;
+            }
+            this.parts = grown;
+        }
+        this.parts[this.count] = value;
+        this.count = this.count + 1;
+    }
+
+    /// Adds the piece and a `\n`.
+    pub mut fn appendLine(value: string): void {
+        this.append(value);
+        this.append("\n");
+    }
+
+    /// Adds one character.
+    pub mut fn appendChar(value: char): void {
+        this.append(fromChar(value));
+    }
+
+    /// The pieces joined once — the point of collecting them. One native call over the filled
+    /// slice; a left fold would copy the whole result once per piece, the exact cost the
+    /// builder exists to avoid. Reads and never consumes: building twice yields the same
+    /// string.
+    pub fn build(): string {
+        var filled = [""] * this.count;
+        var i = 0;
+        while (i < this.count) {
+            filled[i] = this.parts[i];
+            i = i + 1;
+        }
+        return joinAll(filled, "");
+    }
+}
