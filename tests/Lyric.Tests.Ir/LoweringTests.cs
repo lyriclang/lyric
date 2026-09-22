@@ -839,4 +839,51 @@ public class LoweringTests
         Assert.NotNull(ir);
         Assert.Null(ir!.EntryFunction);
     }
+
+    /// <summary>
+    /// An argument whose parameter type only BECOMES optional through the instance's
+    /// substitution is widened at the call.
+    ///
+    /// <para><c>or(fallback: T)</c> on a <c>Holder&lt;?int&gt;</c> takes a <c>?int</c>, but the
+    /// declaration says <c>T</c>, and an <c>int</c> literal lowers to a bare scalar. Without the
+    /// owner's substitution at the call site the store into the optional slot is malformed, which
+    /// the verifier catches one step later — the parameter reads as a plain name until the
+    /// instance says otherwise. Both container kinds are pinned: the class reached this path
+    /// before the enum did, which is what kept the gap hidden.</para>
+    /// </summary>
+    [Fact]
+    public void An_argument_widens_to_what_the_instance_makes_of_its_parameter_type()
+    {
+        var (ir, de) = TryLower("""
+            class Box<T> {
+                value: T,
+
+                pub fn or(fallback: T): T {
+                    return this.value;
+                }
+            }
+
+            enum Holder<T> {
+                Full(T),
+                Empty;
+
+                pub fn or(fallback: T): T {
+                    return match (this) {
+                        Full(v) => v,
+                        Empty => fallback,
+                    };
+                }
+            }
+
+            fn f(): int {
+                let slot: ?int = 7;
+                let boxed = Box<?int> { value = slot };
+                let held = Holder<?int>.Full(slot);
+                return (boxed.or(3) ?? 0) + (held.or(3) ?? 0);
+            }
+            """);
+
+        Assert.False(de.HasErrors);
+        Assert.NotNull(ir);
+    }
 }

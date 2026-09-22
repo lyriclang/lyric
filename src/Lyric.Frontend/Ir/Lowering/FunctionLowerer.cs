@@ -3398,7 +3398,19 @@ internal sealed class FunctionLowerer
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         var receiver = LowerExpr(member.Target);
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+
+        // The owner's substitution, so a parameter written 'T' is lowered against what T IS here.
+        // Without it an argument whose parameter type only BECOMES optional through the
+        // substitution — 'or(fallback: T)' on a 'Holder<?int>' — is passed as the bare scalar the
+        // literal lowered to, and the verifier catches the store into the optional slot one step
+        // later. Reading the declaration alone cannot see that: 'T' is a name until the instance
+        // says otherwise.
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
+            mapping[owner.Definition.Generics[i].Name] = owner.Arguments[i];
+
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            mapping);
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
         // receiver comes before them, as in every method call.
