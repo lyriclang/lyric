@@ -120,10 +120,17 @@ Member-Sichtbarkeit (5.0) ◄── @Deprecated auf Membern (4.5) ◄── stdl
   Sema-Seite des lyriclings-ICE (ein `match` ohne wertliefernden Arm ist `never`) ist gebaut, meine
   Lowering-Seite ebenfalls — **der ICE ist nach dem Merge beidseitig geschlossen**.
 - `@NonExhaustive` haben sie **designt, nicht implementiert** (`design/patterns.md` §3.6) — es bleibt
-  eine 4.6-Position und die Exhaustiveness-Seite von stdlib-redesigns Anker.
+  eine 4.6-Position und die Exhaustiveness-Seite von stdlib-redesigns Anker. **Andockstelle benannt:**
+  ihre Zeugen-Routine (`TypeChecker.MissingCases`/`MissingVariants`/`MissingArrayCases`, ~4290–4420)
+  bekommt eine zusätzliche „unbekannte Variante" in die Aufzählung, wenn das Enum markiert ist und der
+  `match` außerhalb des deklarierenden Moduls steht. Damit ist die Position nicht nur gewollt, sondern
+  verortet.
 - Ihr `design/lambdas.md` §3.2 (werfende Funktionstypen) ist die Lambda-Seite meines typed-throws-Designs;
   zwei Verfeinerungen daraus (`FnType.Throws`, geschriebene Klausel ohne Kontext) sind übernommen.
-- **Merge:** keine Konflikte, vier Berührungspunkte, alle in `design/value-block.md` notiert.
+- **Merge:** keine Konflikte. Sechs Berührungspunkte, alle in `design/value-block.md` notiert; einer
+  davon verkleinert nach dem Merge beide Seiten (ihr `HoldsStatements` entfällt zugunsten meines
+  ValueBlocks). Ihr `IsStructInitAhead` beantwortet zusätzlich eine offene Frage meines
+  Value-Block-Designs (Struct-Initializer als Tail ohne Klammern).
 
 **stdlib-redesign** (Branch `worktree-agent-aa7b5e912a78e6f2d`, fertig):
 - Braucht von mir: bedingte Konformanz (12), typed throws (9/10/13), Konformanz-Synthese (8),

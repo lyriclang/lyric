@@ -81,7 +81,19 @@ Lambda     = '(' … ')' [ ':' TypeExpr ] '=>' ( Expr | ValueBlock ) .
   dieselbe Stelle im gewöhnlichen `LowerIf`. In `LowerReturn` haben **beide** einen never-Zweig mit
   derselben Bedeutung — beim Merge einen davon behalten. Ihre neuen AST-Knoten (`LetCondExpr`,
   `LetPatternStmt`, `ArrayPattern`, `RestPattern`) und die Konvention „ein `NameSpan` ist leer, wenn die
-  Quelle nichts benennt" berühren meinen `TailExprStmt` nicht.
+  Quelle nichts benennt" berühren meinen `TailExprStmt` nicht. Zwei weitere Stellen kamen mit ihrem
+  Commit `8cd174b7`/`06325fe4` dazu: `ParseArrayPattern` (neuer `LBracket`-Fall in
+  `ParsePatternPrimary`) und die Trailing-Lambda-Erkennung in `ParsePostfix` samt dem oben genannten
+  `IsStructInitAhead`. Keine davon berührt `ParseBlock`.
+
+**Eine Vereinfachung, die erst NACH dem Merge möglich ist** (von pattern-lambda gefunden): ihre
+Trailing-Lambda ruft heute `ParseBlock()` für einen Statement-Body und liest einen
+Ein-Ausdruck-Body (`xs.map { it * 2 }`) selbst aus, unterschieden durch den Helfer `HoldsStatements`,
+der den balancierten Klammerinhalt nach einem `;` auf Ebene 1 absucht. Mit dem ValueBlock entfällt die
+Unterscheidung: `{ it * 2 }` ist ein ValueBlock, dessen einziges Statement ein Tail ist, und
+`{ let y = …; y }` ebenso. **`HoldsStatements` fällt damit ersatzlos weg** — ein Helfer weniger und
+eine Stelle weniger, an der zwei Parser-Pfade dasselbe Klammerpaar verschieden lesen. Das ist der
+einzige Punkt, an dem sich unsere beiden Arbeiten nach dem Merge gegenseitig verkleinern.
 
 ## Breaking
 
@@ -137,7 +149,18 @@ wertlos, kein allgemeiner Block-Ausdruck), mit Rusts Regel für den defer/Drop-Z
    (§7.3) und die Lesbarkeit von Funktionsenden sprechen dagegen; Lambdas sind kurz, Funktionen nicht.
 2. `if`-STATEMENT-Zweige als ValueBlock, wenn das `if` in Wert-Position steht (`let x = if (c) { … } else { … }`)?
    Das wäre ein neues Konstrukt (if-Ausdruck mit Blöcken) — Kandidat für 4.6, Grammatik: `IfExpr = 'if' '(' Expr ')' ( Expr | ValueBlock ) 'else' ( Expr | ValueBlock | IfExpr )`.
-3. Struct-Initializer als Tail ohne Klammern per Lookahead? Nach Rückmeldung entscheiden.
+3. **Struct-Initializer als Tail ohne Klammern — beantwortet, mit pattern-lambdas Regel.** Ich hatte
+   Klammern verlangt (`(Point { x = 1 })`), weil die Alternative ein Zwei-Token-Lookahead **nach** einem
+   balancierten `{ … }` gewesen wäre. Den braucht es nicht: ihr `IsStructInitAhead` (Parser.cs, Commit
+   `8cd174b7`) entscheidet an den ersten **zwei** Tokens hinter der öffnenden Klammer — `{}` oder
+   `{ name = …` ist ein Initializer, alles andere ein Block. Damit lautet die Regel für den Tail:
+   **innerhalb eines ValueBlocks bleibt `_allowStructInit` auch am Statement-Anfang gesetzt**. Ein
+   `Point { x = 1 }` dort ist dann entweder der Tail (wenn `}` folgt) oder ein Ausdrucksstatement ohne
+   Wirkung (`LYR-SEM0022`) — und ein bloßer Bezeichner mit folgendem Block ist heute schon genau das.
+   §6.8 („ein Statement beginnt nie mit einem Struct-Initializer") bleibt für gewöhnliche
+   Statement-Blöcke **unverändert**; die Lockerung gilt nur dort, wo ein Wert hingehört.
+   *Nicht im Prototyp umgesetzt* — der Prototyp verlangt weiterhin Klammern, und beides ist
+   vorwärtskompatibel: wer heute klammert, klammert danach umsonst.
 
 ## Spec-Diff
 
