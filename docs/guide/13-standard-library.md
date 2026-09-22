@@ -8,9 +8,11 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.string` | inspection, search, split, join, trim, pad, parsing, `StringBuilder` |
 | `std.fmt` | number formatting, padding, alignment, tables |
 | `std.math` | `sqrt`, `pi`, `abs`, `min`, `max`, rounding, trigonometry |
-| `std.collections` | `List<T>`, `Map<K, V>`, `Set<T>`, `Indexable<T>`, sorting |
-| `std.iter` | `Iterator<T>`, `Iterable<T>`, adapters, the entrances (`over`, `range`, `compact`), `sum` |
+| `std.collections` | `List<T>`, `Map<K, V>`, `Set<T>`, `Deque<T>`, `Indexable<T>`, sorting, `groupBy` |
+| `std.iter` | `Iterator<T>`, `Iterable<T>`, adapters and terminators as methods, the entrances (`over`, `range`, `compact`), `sum` |
 | `std.option` | `map`, `andThen`, `filter`, `zip`, `contains`, `toArray`, `iter`, `expect` |
+| `std.result` | `Result<T, E>` — a failure as a value; `map`, `andThen`, `orThrow`, `fromOptional` (since 4.5) |
+| `std.hash` | `sha256`, `sha1`, `md5`, `crc32`, `hashCombine` — digests over bytes; no capability (since 4.5) |
 | `std.io.console` | `print`, `println`, `readLine` — the writers take any `Display` value: `println(42)` |
 | `std.io.error` | `IoError`, `IoErrorKind` — the reason an I/O operation failed; no capability |
 | `std.io.file` | reading and writing files — requires `fileAccess` |
@@ -35,9 +37,69 @@ the silent form stands alone. `listDir` went with 4.0, as its clock promised: it
 empty array to both "empty" and "unreadable", which `entries` (`?string[]`) and
 `entriesOrThrow` tell apart.
 
+## Whether, why — or the reason as a value
+
+Since 4.5 a third form stands beside the silent one and the throwing twin: a `Result<T, E>`
+from `std.result`, under the suffix `OrErr` — `parseIntOrErr`, `textOrErr`, `parseOrErr`,
+`hexDecodeOrErr`. Like `OrThrow`, the suffix names the answer form. The result is an ordinary
+enum, `Ok(value)` or `Err(reason)`, for the failure that is not handled where it happens but
+stored, collected or mapped:
+
+```lyr
+import std.io.console { println };
+import std.string { parseIntOrErr, ParseError };
+import std.result { Result };
+import std.collections { List };
+
+fn main(): int {
+    let results = List<Result<int, ParseError>>.empty();
+    for (text in ["80", "x", "99999999999999999999"]) {
+        results.push(parseIntOrErr(text));
+    }
+    var ok = 0;
+    for (r in results) {
+        match (r) {
+            Ok(_) => { ok = ok + 1; }
+            Err(e) => { println(e.message()); }
+        }
+    }
+    return ok;
+}
+```
+
+```
+parse: not a digit at offset 0
+parse: outside the int range at offset 20
+```
+
+`isOk`, `ok()`, `err()`, `unwrapOr`, `unwrapOrElse` and `expect` are methods; `map`,
+`mapErr`, `andThen` and `orElse` are free functions, because a method of a generic type cannot
+introduce a type parameter of its own yet. `orThrow` throws the reason — the way back to
+`throws` — and `fromOptional` attaches a reason to a `?T`. `parseIntOrErr` says WHY a text is
+not a number: a `ParseError` with a kind (`Empty`, `InvalidDigit`, `Overflow`) and the offset
+where the reading stopped. `throws` remains the language's mechanism; `Result` is a holder,
+not a second one.
+
 ## Collections
 
-`List<T>` grows; `T[]` does not.
+`List<T>` grows; `T[]` does not. Since 4.5 it comes from an array (`List<int>.of([3, 1, 2])`),
+takes bulk (`pushAll`), slices, filters, and a `Map` walks through its own methods (`keys()`,
+`values()`, `entries()`) and answers `getOrInsert` — the whole of a group-by:
+
+```lyr
+import std.collections { List, Map };
+
+fn main(): int {
+    let groups = Map<int, List<string>>.empty();
+    for (word in ["a", "bb", "cc", "d"]) {
+        groups.getOrInsert(word.length(), () => List<string>.empty()).push(word);
+    }
+    return groups.get(2)!.length();
+}
+```
+
+`groupBy(xs, key)`, `sortListByKey`, `sortArray`, `maxBy`/`minBy` and `slice` over arrays
+stand beside as free functions, each with the constraint it needs on the element type.
 
 ```lyr
 import std.io.console { println };
@@ -262,10 +324,19 @@ fn main(): int {
 }
 ```
 
-`map`, `filter`, `take`, `skip`, `takeWhile`, `zip`, `chain` and `flatMap` are methods on
-`Iterator<T>`; the free forms still work, warn, and go with 3.0.
+`map`, `filter`, `take`, `skip`, `takeWhile`, `skipWhile`, `stepBy`, `inspect`, `dedupBy`,
+`zip`, `zipWith`, `chain` and `flatMap` are methods on `Iterator<T>` — and since 4.5 so are
+the terminators that ask nothing of the element type: `count`, `fold`, `reduce`, `first`,
+`last`, `nth`, `any`, `all`, `none`, `find`, `position`, `countWhere`, `forEach` and
+`toArray`. A chain reads to its end:
 
-Two families stay free, each for a reason worth knowing:
+```lyr
+let n = xs.iter().filter((n: int) => n % 2 == 0).count();
+let total = xs.iter().fold<int>(0, (acc: int, n: int) => acc + n);
+```
+
+The free forms of the terminators still work and go with 5.0. Two families stay free, each for
+a reason worth knowing:
 
 - **`sum`, `sumFloat`, `minValue`, `maxValue`** ask something of the ELEMENT type — that it is a
   number, that it is ordered — and an interface cannot require that of its own parameter.
@@ -338,9 +409,9 @@ those apart, and the advice was to ask `exists` first — which is a race, not a
 old names (`readText`, `readBytes`, `readLines`) warned through the 2.x line and went with 3.0;
 `text`, `bytes` and `lines` are what is left.
 
-What none of the shapes carries is a REASON: a missing file and a permission denied look the
-same. That gap is known and left open on purpose — carrying reasons means an error type and a
-decision about `throws` that this module should not make on its own.
+The REASON — a missing file against a permission denied — is what the `OrThrow` twin carries
+since 3.7 (`textOrThrow` throws an `IoError`), and what the `OrErr` form answers as a value
+since 4.5 (`textOrErr` is a `Result<string, IoError>`).
 
 ## A file too large to hold, and a file read beside other work
 
@@ -407,8 +478,9 @@ fn firstErrors(f: stream.File): Coroutine<Wait> {
 
 That protocol spends `null` on "the end", so a read failure and the end of the file look the same
 from `next()` alone. `failed()` is how you tell them apart after the walk — Rust yields a
-`Result` per line for this; Lyric has no `Result`, so the question is asked once at the end
-instead of answered once per line.
+`Result` per line for this; a Lyric `Iterator<Result<string, IoError>>` could too, but the
+iterator protocol is `?T`, so the question is asked once at the end instead of answered once
+per line.
 
 ### Two things to know before you reach for it
 
