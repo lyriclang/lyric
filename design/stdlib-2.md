@@ -609,8 +609,12 @@ Ir und Sema bleiben vollständig grün, Vm und Bytecode weichen in **fünf** Tes
 Backtraces, der Fusion-Test und ein Golden-Disassembly —, und jede dieser Abweichungen setzt
 Optimierung VORAUS. **Kein einziger Verifier-Befund.** pattern-lambda hat Messung und
 Kontrolle auf ihrem Branch wiederholt (28 Beispieldateien mit neuem Pattern-Lowering,
-0 Befunde; Ir/Sema grün, Vm mit denselben drei Backtrace-Abweichungen), womit die Empfehlung
-auf beiden Bäumen und auf beiden Arten von Korpus belegt ist: Programme und Tests.
+0 Befunde) und kommt in den Suiten auf **dasselbe Bild: fünf Abweichungen, alle mit
+vorausgesetzter Optimierung, null Verifier-Befunde** — bis auf die Testnamen identisch. Dass
+ihre Zahl zunächst bei drei lag, war keine Baumdifferenz, sondern eine ungemessene Suite; der
+Nachtrag schloss sie. Damit ist die Empfehlung auf beiden Bäumen und beiden Arten von Korpus
+belegt, Programme und Tests, und wer die Reihenfolge ändert, fasst genau diese fünf Tests an
+und sonst nichts.
 
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
