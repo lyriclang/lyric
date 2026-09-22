@@ -4129,8 +4129,13 @@ public sealed class TypeChecker
         // because one of the two sides is the finished target type.
         if (WidenAgainstNull(a, b) is { } widened) return widened;
 
-        if (IsAssignable(be, b, a)) return a;
-        if (IsAssignable(ae, a, b)) return b;
+        // WITHOUT the literal rule. An arm is not an adaptation context (§3.1), so a literal here
+        // does not take the other arm's type — and letting `IsAssignable` say yes on that ground
+        // alone would only CHECK the fit while nothing records it: the literal keeps its default
+        // type, and the lowering stores a `const i64` into the slot of the type this returns.
+        // `UnifyArms` asks the same question for `match` and never had the hole.
+        if (IsAssignable(be, b, a, adaptLiterals: false)) return a;
+        if (IsAssignable(ae, a, b, adaptLiterals: false)) return b;
         _de.Report("LYR-SEM0016", Severity.Error, span, $"incompatible branch types: '{TypeFacts.Display(a)}' vs '{TypeFacts.Display(b)}'");
         return a;
     }
@@ -5062,13 +5067,18 @@ public sealed class TypeChecker
         return false;
     }
 
-    private bool IsAssignable(Expr expr, LyrType from, LyrType to)
+    /// <param name="adaptLiterals">Whether an unsuffixed literal counts as fitting the target
+    /// (§3.1). True at every adaptation context, where the caller records the adaptation
+    /// afterwards. False where the answer only decides a type and nothing writes it back — an arm
+    /// unification — because a yes on that ground alone leaves the literal at its default type
+    /// while the result claims the target's.</param>
+    private bool IsAssignable(Expr expr, LyrType from, LyrType to, bool adaptLiterals = true)
     {
         if (from.IsError || to.IsError) return true;      // poison: no follow-up errors
         if (from is NeverType) return true;               // the bottom type: panic(...) fits anywhere
         if (LyrType.Equal(from, to)) return true;
         if (to is Optional inner)                          // T to ?T, widening
-            return from is NullType || IsAssignable(expr, from, inner.Inner);
+            return from is NullType || IsAssignable(expr, from, inner.Inner, adaptLiterals);
         if (from is NullType) return false;
 
         // A coroutine that cannot throw fits where one that may is expected: the target promises
@@ -5078,7 +5088,7 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield);
 
-        if (to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
+        if (adaptLiterals && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         return false;
     }
