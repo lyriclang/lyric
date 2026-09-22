@@ -586,6 +586,16 @@ werden, also ist „läuft durch `lyric run`" kein Beleg für wohlgeformtes IR. 
 Verifier-Befund sucht, misst unoptimiert (Testpfad) oder mit einem Körper, den der Inliner
 nicht frisst. Der Merge braucht hier nichts mehr nachzumessen.
 
+**Empfehlung an die IR-Zuständigen, mit Messung statt Meinung:** Der Verifier läuft heute NACH
+dem Optimierer (`SourceCompiler.cs:132-143` — `Lower(…, optimize: options.Optimize)`, danach
+`VerifyOrThrow`), prüft also nicht das Ergebnis des Lowerings, sondern das des Optimierers.
+Zusammen mit „IrVerifier nur im Debug-Build" (Bughunt P2-19) ist ein Lowering-Fehler im
+Release doppelt unsichtbar. Er gehört VOR die Optimierungspässe, wie LLVM es hält — und der
+Umbau ist risikoarm: mit `Optimize = false` verifiziert (`probes/verify_unoptimised.py`)
+bestehen **die gesamte stdlib, ihre 211 Tests und alle 47 Beispiele des Repositoriums** die
+Prüfung ohne einen einzigen Befund. Es gibt also heute nichts, was der Optimierer stillschweigend
+reparieren müsste.
+
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
 der schon `?int` ist, braucht keine Widerung und reist durch die Lücke, ohne sie zu berühren.
