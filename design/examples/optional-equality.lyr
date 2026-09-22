@@ -1,0 +1,45 @@
+// SOLL (4.5): zwei Optionals vergleichen. Kompiliert auf 4.4.1 NICHT (LYR-SEM0059).
+import std.io.console { println };
+import std.string { parseInt };
+
+struct Config {
+    port: ?int,
+    host: ?string,
+}
+
+fn sameEndpoint(a: Config, b: Config): bool {
+    return a.port == b.port && a.host == b.host;     // 4.4: SEM0059, 4.5: erlaubt
+}
+
+fn main(): int {
+    let a: ?int = parseInt("42");
+    let b: ?int = parseInt("42");
+    let c: ?int = parseInt("x");                     // null
+
+    println(f"{a == b}");        // true
+    println(f"{a == c}");        // false
+    println(f"{c == null}");     // true  — die Praesenzfrage, schon heute
+    println(f"{a == 42}");       // true  — gemischte Form: vorhanden UND gleich
+    println(f"{c == 42}");       // false
+
+    let x = Config { port = 80, host = null };
+    let y = Config { port = 80, host = null };
+    println(f"{sameEndpoint(x, y)}");                // true
+
+    // Bewusst NICHT definiert: Ordnung.
+    // if (a < b) { }     // bleibt ein Fehler — `null < 1` hat keine Antwort, und eine stille
+    //                    // wuerde jede Sortierung umordnen (Rust/Swift: None < Some(_)).
+    return 0;
+}
+
+// IST (4.4.1): vier Tests und zwei `!` pro Vergleich, und wer einen Zweig vergisst,
+// bekommt kein Signal:
+//
+// fn eqOpt(a: ?int, b: ?int): bool {
+//     if (a == null && b == null) { return true; }
+//     if (a == null || b == null) { return false; }
+//     return a! == b!;
+// }
+//
+// Folge in der stdlib: `assertEq(parseInt("x"), null)` ist nicht anbietbar, und ein
+// synthetisiertes `equals` (design/conformance-synthesis.md) kann kein ?T-Feld behandeln.
