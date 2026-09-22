@@ -1018,20 +1018,31 @@ internal sealed class FunctionLowerer
 
     private bool LowerBreak(BreakStmt stmt)
     {
-        if (_loops.Count == 0) throw Bug($"'break' outside a loop at {stmt.Span}");
-        var loop = _loops.Peek();
-        EmitPendingDefersAbove(loop.DeferDepth); // break leaves the body scope — its defers run first
+        var loop = TargetLoop(stmt.Label, "break", stmt.Span);
+        // A break leaves every scope between it and the loop it names — their defers run first,
+        // innermost first, down to the depth the target loop was entered at (§7.5).
+        EmitPendingDefersAbove(loop.DeferDepth);
         _b.Seal(new Branch(loop.BreakTarget, stmt.Span));
         return false;
     }
 
     private bool LowerContinue(ContinueStmt stmt)
     {
-        if (_loops.Count == 0) throw Bug($"'continue' outside a loop at {stmt.Span}");
-        var loop = _loops.Peek();
+        var loop = TargetLoop(stmt.Label, "continue", stmt.Span);
         EmitPendingDefersAbove(loop.DeferDepth); // continue ends the iteration — same exit path
         _b.Seal(new Branch(loop.ContinueTarget, stmt.Span));
         return false;
+    }
+
+    /// <summary>The innermost loop, or the enclosing one carrying the label. The stack enumerates
+    /// innermost first, so the first match is the nearest — and the sema refused a label that
+    /// repeats an enclosing one, so nearest and only coincide.</summary>
+    private LoopScope TargetLoop(string? label, string keyword, Span span)
+    {
+        if (_loops.Count == 0) throw Bug($"'{keyword}' outside a loop at {span}");
+        if (label is null) return _loops.Peek();
+        return _loops.FirstOrDefault(l => l.Label == label)
+               ?? throw Bug($"'{keyword} {label}' without a loop of that label at {span}");
     }
 
     /// <summary>
@@ -1143,7 +1154,7 @@ internal sealed class FunctionLowerer
         var variable = _slots.DeclareFor(loopVar, elementType);
         _b.Emit(new StoreLocal(variable, value, stmt.Span));
 
-        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
+        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count, Label = stmt.Label });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
         // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
         // once, with the last iteration's values (the 2.0.1 bug).
@@ -1366,7 +1377,7 @@ internal sealed class FunctionLowerer
         _b.SealBlock(condExit, new CondBranch(condition, bodyBlock, exitBlock, stmt.Condition.Span));
 
         _b.SwitchTo(bodyBlock);
-        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
+        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count, Label = stmt.Label });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
         // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
         // once, with the last iteration's values (the 2.0.1 bug).
@@ -1394,7 +1405,7 @@ internal sealed class FunctionLowerer
         _b.Seal(new Branch(bodyBlock, stmt.Span));
 
         _b.SwitchTo(bodyBlock);
-        var loop = new LoopScope(_b) { DeferDepth = _defers.Count };
+        var loop = new LoopScope(_b) { DeferDepth = _defers.Count, Label = stmt.Label };
         _loops.Push(loop);
         var fallsThrough = LowerScope(stmt.Body);
         _loops.Pop();

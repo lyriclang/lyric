@@ -64,6 +64,30 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_loop_label_stays_on_its_loop_and_on_its_jumps()
+    {
+        Assert.Equal("""
+            fn f(): int {
+                outer: for (i in 0..3) {
+                    inner: while (true) {
+                        if (i == 1) {
+                            continue outer;
+                        }
+                        break inner;
+                    }
+                }
+                return 0;
+            }
+
+            """, Format("""
+            fn f(): int {
+                outer:for (i in 0..3) { inner : while (true) { if (i == 1) { continue   outer; } break inner ; } }
+                return 0;
+            }
+            """));
+    }
+
+    [Fact]
     public void Redundant_parentheses_go_and_needed_ones_stay()
     {
         Assert.Equal("""

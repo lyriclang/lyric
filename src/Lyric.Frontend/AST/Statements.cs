@@ -30,19 +30,41 @@ public sealed record DestructuringStmt(bool IsMutable, TuplePattern Pattern, Typ
 // Else is a block, an IfStmt (else-if) or null.
 public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span);
 
-public sealed record WhileStmt(Expr Condition, Block Body, Span Span) : Stmt(Span);
-public sealed record DoWhileStmt(Block Body, Expr Condition, Span Span) : Stmt(Span);
+// A loop may carry a label ('outer: while (…) { … }'), the target of 'break outer' and
+// 'continue outer'. Labels are no symbols: they live beside the value namespace, scoped to the
+// body of the loop they name.
+public sealed record WhileStmt(Expr Condition, Block Body, Span Span) : Stmt(Span)
+{
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
+}
+public sealed record DoWhileStmt(Block Body, Expr Condition, Span Span) : Stmt(Span)
+{
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
+}
 /// <remarks>The loop variable is a declaration of its own; <see cref="INamedDecl.Name"/> is
 /// implemented explicitly so the node keeps calling it what it is.</remarks>
 public sealed record ForInStmt(string Variable, Expr Iterable, Block Body, Span Span) : Stmt(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
 
     string INamedDecl.Name => Variable;
 }
 
-public sealed record BreakStmt(Span Span) : Stmt(Span);
-public sealed record ContinueStmt(Span Span) : Stmt(Span);
+// Label == null means the innermost loop.
+public sealed record BreakStmt(Span Span) : Stmt(Span)
+{
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
+}
+public sealed record ContinueStmt(Span Span) : Stmt(Span)
+{
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
+}
 public sealed record ReturnStmt(Expr? Value, Span Span) : Stmt(Span);
 public sealed record YieldStmt(Expr? Value, Span Span) : Stmt(Span);
 // resume is an EXPRESSION (ResumeExpr in Expressions.cs); as a statement 'resume co;' runs through

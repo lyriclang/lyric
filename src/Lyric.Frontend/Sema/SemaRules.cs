@@ -18,6 +18,17 @@ public sealed class SemaRules
     private readonly bool _singleProgram;
     private bool _thisMut; // inside a 'mut fn' method?
 
+    /// <summary>The labeled loops enclosing the statement being walked, innermost last. A label
+    /// is no symbol — it shares no namespace with values — and is scoped to its loop's body.</summary>
+    private readonly List<LoopLabel> _labels = new();
+
+    private sealed class LoopLabel(string name, Span span)
+    {
+        public string Name => name;
+        public Span Span => span;
+        public bool Used;
+    }
+
     public SemaRules(Compilation comp, BindingResult binding, TypeResult types, DiagnosticEngine de,
         bool singleProgram = true)
     {
@@ -144,9 +155,20 @@ public sealed class SemaRules
             case BindingStmt bd: if (bd.Initializer is not null) WalkExpr(bd.Initializer); break;
             case DestructuringStmt d: WalkExpr(d.Initializer); break;
             case IfStmt f: WalkExpr(f.Condition); WalkStmt(f.Then); if (f.Else is not null) WalkStmt(f.Else); break;
-            case WhileStmt w: WalkExpr(w.Condition); WalkStmt(w.Body); break;
-            case DoWhileStmt d: WalkStmt(d.Body); WalkExpr(d.Condition); break;
-            case ForInStmt fo: WalkExpr(fo.Iterable); WalkStmt(fo.Body); break;
+            case WhileStmt w:
+                WalkExpr(w.Condition);
+                WalkLoopBody(w.Body, w.Label, w.LabelSpan);
+                break;
+            case DoWhileStmt d:
+                WalkLoopBody(d.Body, d.Label, d.LabelSpan);
+                WalkExpr(d.Condition);
+                break;
+            case ForInStmt fo:
+                WalkExpr(fo.Iterable);
+                WalkLoopBody(fo.Body, fo.Label, fo.LabelSpan);
+                break;
+            case BreakStmt br when br.Label is { } target: ResolveLabel(target, br.LabelSpan, "break"); break;
+            case ContinueStmt co when co.Label is { } target: ResolveLabel(target, co.LabelSpan, "continue"); break;
             case ReturnStmt r: if (r.Value is not null) WalkExpr(r.Value); break;
             case ThrowStmt t: WalkExpr(t.Value); break;
             case YieldStmt y: if (y.Value is not null) WalkExpr(y.Value); break;
@@ -161,6 +183,36 @@ public sealed class SemaRules
                 }
                 break;
         }
+    }
+
+    /// <summary>The body of a loop, under its label when it has one. A label repeating an
+    /// enclosing one is refused: 'break outer' would have two candidates, and picking the nearer
+    /// one silently is how the far one stops being reachable. A label nothing jumps to is a
+    /// warning, like an unused binding.</summary>
+    private void WalkLoopBody(Block body, string? label, Span labelSpan)
+    {
+        if (label is null) { WalkStmt(body); return; }
+
+        if (_labels.Any(l => l.Name == label))
+            _de.Report("LYR-SEM0099", Severity.Error, labelSpan,
+                $"label '{label}' already names an enclosing loop — a jump to it would be ambiguous");
+
+        var entry = new LoopLabel(label, labelSpan);
+        _labels.Add(entry);
+        WalkStmt(body);
+        _labels.RemoveAt(_labels.Count - 1);
+
+        if (!entry.Used)
+            _de.Report("LYR-SEM0100", Severity.Warning, labelSpan,
+                $"label '{label}' is never used — no 'break {label}' or 'continue {label}' names it");
+    }
+
+    private void ResolveLabel(string label, Span span, string keyword)
+    {
+        for (var i = _labels.Count - 1; i >= 0; i--)
+            if (_labels[i].Name == label) { _labels[i].Used = true; return; }
+        _de.Report("LYR-SEM0098", Severity.Error, span,
+            $"no enclosing loop is labeled '{label}' — '{keyword} {label}' names a loop this statement stands in");
     }
 
     // try/catch structure: at least one catch, and a catch-all without a type only as the last clause.

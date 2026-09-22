@@ -24,6 +24,9 @@ public sealed partial class Parser
 
     private Stmt ParseStmt() => _buffer.Current.TokenKind switch
     {
+        // 'name:' at the start of a statement is a loop label — nothing else begins that way
+        // (§6.8: an expression statement is a call, an assignment or 'resume').
+        TokenKind.Identifier when _buffer.Peek(1).TokenKind == TokenKind.Colon => ParseLabeled(),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
         TokenKind.If => ParseIf(),
@@ -40,6 +43,39 @@ public sealed partial class Parser
         TokenKind.Match => ParseMatchStmt(),
         _ => ParseExprStmt(),
     };
+
+    /// <summary>'outer: while (…) { … }' — the label names the loop that follows it, and only a
+    /// loop. On anything else the label is reported and the statement parsed as written, so one
+    /// misplaced label yields one diagnostic rather than a cascade.</summary>
+    private Stmt ParseLabeled()
+    {
+        var nameTok = _buffer.Advance(); // IDENTIFIER
+        _buffer.Advance();               // ':'
+        var label = _sm.Slice(nameTok.Span).ToString();
+        var start = nameTok.Span;
+        switch (_buffer.Current.TokenKind)
+        {
+            case TokenKind.While:
+            {
+                var w = (WhileStmt)ParseWhile();
+                return w with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, w.Span) };
+            }
+            case TokenKind.Do:
+            {
+                var d = (DoWhileStmt)ParseDoWhile();
+                return d with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, d.Span) };
+            }
+            case TokenKind.For:
+            {
+                var f = (ForInStmt)ParseForIn();
+                return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
+            }
+            default:
+                _de.Report("LYR-PAR0044", Severity.Error, nameTok.Span,
+                    $"a label names a loop: expected 'while', 'do' or 'for' after '{label}:'");
+                return ParseStmt();
+        }
+    }
 
     private Stmt ParseMatchStmt()
     {
@@ -175,15 +211,25 @@ public sealed partial class Parser
     private Stmt ParseBreak()
     {
         var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
         var semi = ExpectSemicolon();
-        return new BreakStmt(Span.Union(kw.Span, semi.Span));
+        return new BreakStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
     }
 
     private Stmt ParseContinue()
     {
         var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
         var semi = ExpectSemicolon();
-        return new ContinueStmt(Span.Union(kw.Span, semi.Span));
+        return new ContinueStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
+    }
+
+    /// <summary>'break outer;' — the identifier, when one stands before the ';'.</summary>
+    private (string? label, Span span) ParseOptionalLabel()
+    {
+        if (!_buffer.Check(TokenKind.Identifier)) return (null, default);
+        var tok = _buffer.Advance();
+        return (_sm.Slice(tok.Span).ToString(), tok.Span);
     }
 
     private Stmt ParseReturn()

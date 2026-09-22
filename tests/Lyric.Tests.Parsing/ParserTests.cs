@@ -30,6 +30,27 @@ public class ParserTests
         return (stmt, de);
     }
 
+    // --- loop labels ---
+
+    [Fact]
+    public void A_label_attaches_to_the_loop_that_follows_it()
+    {
+        var (stmt, de) = ParseStatement("outer: while (true) { break outer; }");
+        Assert.False(de.HasErrors);
+        var loop = Assert.IsType<WhileStmt>(stmt);
+        Assert.Equal("outer", loop.Label);
+        var jump = Assert.IsType<BreakStmt>(Assert.Single(loop.Body.Statements));
+        Assert.Equal("outer", jump.Label);
+    }
+
+    [Fact]
+    public void A_plain_break_carries_no_label()
+    {
+        var (stmt, de) = ParseStatement("continue;");
+        Assert.False(de.HasErrors);
+        Assert.Null(Assert.IsType<ContinueStmt>(stmt).Label);
+    }
+
     // --- throw as a prefix expression ---
 
     /// <summary>'throw' binds like a prefix operator: 'x ?? throw e' is the coalesce with a throw on

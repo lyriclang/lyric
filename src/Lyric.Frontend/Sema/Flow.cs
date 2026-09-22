@@ -18,8 +18,8 @@ internal static class Flow
         ExprStmt es => types?.TypeOf(es.Expr) is NeverType, // panic(...) diverges
         Block b => b.Statements.Any(st => AlwaysReturns(st, types)),
         IfStmt f => f.Else is not null && AlwaysReturns(f.Then, types) && AlwaysReturns(f.Else, types),
-        DoWhileStmt d => AlwaysReturns(d.Body, types) || Diverges(d.Condition, d.Body),
-        WhileStmt w => Diverges(w.Condition, w.Body),
+        DoWhileStmt d => AlwaysReturns(d.Body, types) || Diverges(d.Condition, d.Body, d.Label),
+        WhileStmt w => Diverges(w.Condition, w.Body, w.Label),
         ForInStmt => false, // the loop may not run at all
         TryStmt t => AlwaysReturns(t.Body, types) && t.Catches.All(c => AlwaysReturns(c.Body, types)),
         MatchStmt m => (types?.IsMatchExhaustive(m) == true || m.Arms.Any(a => a.Pattern is WildcardPattern))
@@ -51,19 +51,25 @@ internal static class Flow
         _ => AlwaysReturns(s, types),
     };
 
-    private static bool Diverges(Expr cond, Block body) => cond is BoolLiteralExpr { Value: true } && !HasBreak(body);
+    private static bool Diverges(Expr cond, Block body, string? label) =>
+        cond is BoolLiteralExpr { Value: true } && !HasBreak(body, label, nested: false);
 
     private static bool ArmReturns(MatchArm a, TypeResult? types) => a.Body is Block b && AlwaysReturns(b, types);
 
-    // A break that leaves THIS loop: do not descend into nested loops, whose break targets them.
-    private static bool HasBreak(Stmt s) => s switch
+    // A break that leaves THIS loop: a plain 'break' at this depth, or 'break L' naming this loop's
+    // label at ANY depth — inside a nested loop only the labeled form reaches out, so the descent
+    // into a nested loop counts labeled breaks alone.
+    private static bool HasBreak(Stmt s, string? label, bool nested) => s switch
     {
-        BreakStmt => true,
-        Block b => b.Statements.Any(HasBreak),
-        IfStmt f => HasBreak(f.Then) || (f.Else is not null && HasBreak(f.Else)),
-        TryStmt t => HasBreak(t.Body) || t.Catches.Any(c => HasBreak(c.Body)),
-        MatchStmt m => m.Arms.Any(a => a.Body is Block bl && HasBreak(bl)),
-        DeferStmt d => HasBreak(d.Body),
-        _ => false // WhileStmt, DoWhileStmt, ForInStmt: do not descend
+        BreakStmt b => b.Label is null ? !nested : label is not null && b.Label == label,
+        Block b => b.Statements.Any(st => HasBreak(st, label, nested)),
+        IfStmt f => HasBreak(f.Then, label, nested) || (f.Else is not null && HasBreak(f.Else, label, nested)),
+        TryStmt t => HasBreak(t.Body, label, nested) || t.Catches.Any(c => HasBreak(c.Body, label, nested)),
+        MatchStmt m => m.Arms.Any(a => a.Body is Block bl && HasBreak(bl, label, nested)),
+        DeferStmt d => HasBreak(d.Body, label, nested),
+        WhileStmt w => label is not null && HasBreak(w.Body, label, nested: true),
+        DoWhileStmt d => label is not null && HasBreak(d.Body, label, nested: true),
+        ForInStmt f => label is not null && HasBreak(f.Body, label, nested: true),
+        _ => false
     };
 }

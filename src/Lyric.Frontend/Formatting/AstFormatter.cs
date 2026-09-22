@@ -490,20 +490,23 @@ public sealed class AstFormatter
 
     // ------------------------------------------------------------------ statements
 
+    /// <summary>The label before a loop, 'outer: ', or nothing.</summary>
+    private static Doc LabelDoc(string? label) => Doc.From(label is null ? "" : label + ": ");
+
     private Doc StmtDoc(Stmt stmt) => stmt switch
     {
         Block b => BlockDoc(b),
         BindingStmt b => BindingDoc(b),
         DestructuringStmt d => DestructuringDoc(d),
         IfStmt s => IfStmtDoc(s),
-        WhileStmt s => Doc.Of(Doc.From("while ("), ExprDoc(s.Condition, Assign),
+        WhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("while ("), ExprDoc(s.Condition, Assign),
             Doc.From(") "), BlockDoc(s.Body)),
-        DoWhileStmt s => Doc.Of(Doc.From("do "), BlockDoc(s.Body),
+        DoWhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("do "), BlockDoc(s.Body),
             Doc.From(" while ("), ExprDoc(s.Condition, Assign), Doc.From(");")),
-        ForInStmt s => Doc.Of(Doc.From($"for ({s.Variable} in "), ExprDoc(s.Iterable, Assign),
+        ForInStmt s => Doc.Of(LabelDoc(s.Label), Doc.From($"for ({s.Variable} in "), ExprDoc(s.Iterable, Assign),
             Doc.From(") "), BlockDoc(s.Body)),
-        BreakStmt => Doc.From("break;"),
-        ContinueStmt => Doc.From("continue;"),
+        BreakStmt b => Doc.From(b.Label is null ? "break;" : $"break {b.Label};"),
+        ContinueStmt c => Doc.From(c.Label is null ? "continue;" : $"continue {c.Label};"),
         ReturnStmt s => s.Value is null
             ? Doc.From("return;")
             : Doc.Of(Doc.From("return "), ExprDoc(s.Value, Assign), Doc.From(";")),

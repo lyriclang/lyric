@@ -310,10 +310,10 @@ public static class AstDumper
                 Write(n.Body, indent + 1, sb);
                 break;
             case BreakStmt n:
-                Line(sb, indent, "Break", n.Span);
+                Line(sb, indent, n.Label is null ? "Break" : $"Break {n.Label}", n.Span);
                 break;
             case ContinueStmt n:
-                Line(sb, indent, "Continue", n.Span);
+                Line(sb, indent, n.Label is null ? "Continue" : $"Continue {n.Label}", n.Span);
                 break;
             case ReturnStmt n:
                 Line(sb, indent, "Return", n.Span);
