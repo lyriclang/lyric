@@ -1491,6 +1491,7 @@ public sealed class TypeChecker
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ResumeExpr re: return CheckResume(re, scope);
+            case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -4774,6 +4775,60 @@ public sealed class TypeChecker
     }
 
     // resume co: yields the value of the next yield.
+    /// <summary>
+    /// <c>comptime e</c>: <c>e</c> is checked exactly as it would be without the prefix — the
+    /// value is the same — and then held to what the evaluator can honour. It runs the
+    /// expression in a VM with no capability and no frame of the enclosing function, so a
+    /// local, a parameter or <c>this</c> has nothing to stand on there; a lambda inside would be
+    /// a value the module cannot hold; and the result has to be a literal the lowering can
+    /// write back, which is a scalar, a <c>bool</c>, a <c>char</c> or a <c>string</c>. A nested
+    /// <c>comptime</c> is simply evaluated as part of the outer one.
+    /// </summary>
+    private LyrType CheckComptime(ComptimeExpr ct, SymbolTable scope, LyrType? expected)
+    {
+        var type = CheckExpr(ct.Inner, scope, expected);
+        if (type.IsError) return type;
+
+        if (type is not PrimitiveType { Kind: not PrimitiveKind.Void })
+            return Report(ct.Span, "LYR-SEM0100",
+                $"a 'comptime' expression has to produce a scalar, a bool, a char or a string — this one "
+                + $"is '{TypeFacts.Display(type)}', which the compiled module has no way to hold as a literal");
+
+        var pure = true;
+        void Walk(Node? node)
+        {
+            switch (node)
+            {
+                case null: return;
+                case ThisExpr t:
+                    pure = false;
+                    Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
+                        + "it is evaluated before any receiver exists");
+                    return;
+                case IdentifierExpr id when _result.RefOf(id) is LocalSymbol or ParameterSymbol:
+                    pure = false;
+                    Report(id.Span, "LYR-SEM0100", $"'{id.Name}' is a local of the enclosing function and "
+                        + "cannot be used in a 'comptime' expression — only module-level names can");
+                    return;
+                case LambdaExpr lam:
+                    pure = false;
+                    Report(lam.Span, "LYR-SEM0100", "a lambda cannot be used in a 'comptime' expression");
+                    return;
+                case AssignExpr a:
+                    pure = false;
+                    Report(a.Span, "LYR-SEM0100", "an assignment cannot be used in a 'comptime' expression");
+                    return;
+                default:
+                    foreach (var child in AstChildren.Of(node)) Walk(child);
+                    return;
+            }
+        }
+        Walk(ct.Inner);
+
+        if (pure) _result.ComptimeSites.Add(ct);
+        return type;
+    }
+
     private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
     {
         var t = CheckExpr(re.Coroutine, scope);
@@ -4969,6 +5024,7 @@ public sealed class TypeChecker
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
+                case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

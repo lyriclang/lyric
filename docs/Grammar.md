@@ -461,6 +461,7 @@ Lambda          = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
 LambdaParam     = IDENTIFIER [ ':' TypeExpr ] .
 
 ResumeExpr      = 'resume' UnaryExpr .
+ComptimeExpr    = 'comptime' UnaryExpr .        (* contextual: only before an expression *)
 
 StructInit      = TypePath '{' [ StructInitField { ',' StructInitField } [ ',' ] ] '}' .
 StructInitField = IDENTIFIER '=' Expr .

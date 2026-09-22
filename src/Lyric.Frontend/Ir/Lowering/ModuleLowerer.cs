@@ -65,15 +65,19 @@ public static class ModuleLowerer
     /// <param name="libraryRoots">Whether a compile WITHOUT an entry point prunes from its `pub`
     /// functions (§4.6 of the specification, since 2.0). The drivers pass <c>true</c>; the default
     /// stays <c>false</c> so a test lowering a bare snippet keeps every function it wrote.</param>
+    /// <param name="comptime">How <c>comptime</c> sites lower: <c>null</c> as their inner
+    /// expression (a check), hoisted into evaluator functions, or replaced by evaluated values.
+    /// See <see cref="ComptimeTable"/>.</param>
     public static IrModule? Lower(Compilation compilation, BindingResult binding, TypeResult types,
-        DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false)
+        DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false,
+        ComptimeTable? comptime = null)
     {
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
         var pending = new List<(FunctionDecl Decl, string Name, TypeSymbol? Receiver, TypeNode? ExtendTarget)>();
         var ids = new Dictionary<FunctionSymbol, FunctionId>(ReferenceEqualityComparer.Instance);
         var imports = new ImportTable();
-        var typeTable = new TypeTable(binding) { Compilation = compilation };
+        var typeTable = new TypeTable(binding) { Compilation = compilation, Comptime = comptime };
         var globals = new GlobalTable();
         var exportRoots = new List<FunctionId>();
         FunctionId? entry = null;
@@ -258,6 +262,29 @@ public static class ModuleLowerer
         // every other downstream function. The old '+1 if globals' broke the moment PASS 2 both
         // requested an extension AND created a global (a struct-return buffer does) — the
         // initializer then landed on an id the extension already held.
+        // The evaluation pass: every comptime site becomes a parameterless function returning its
+        // expression, and those functions are the module's ONLY roots. The pruning then keeps
+        // exactly what the sites reach, and the capability bits are read off that — so a site
+        // that needs no capability evaluates even in a program that, elsewhere, reads files.
+        var comptimeReturns = new Dictionary<FunctionDecl, IrType>(ReferenceEqualityComparer.Instance);
+        if (comptime is { Hoist: true })
+        {
+            entry = null;
+            exportRoots.Clear();
+            for (var i = 0; i < types.ComptimeSites.Count; i++)
+            {
+                var site = types.ComptimeSites[i];
+                var name = ComptimeTable.FunctionName(i);
+                var decl = new FunctionDecl(IsPublic: true, IsMut: false, IsStatic: false, Name: name,
+                    Generics: [], Parameters: [], ReturnType: null, Throws: null,
+                    Body: new Block([new ReturnStmt(site.Inner, site.Span)], site.Span), Span: site.Span)
+                    { NameSpan = site.Span };
+                comptimeReturns[decl] = typeTable.Lower(types.TypeOf(site), site.Span);
+                exportRoots.Add(new FunctionId(pending.Count));
+                pending.Add((decl, name, null, null));
+            }
+        }
+
         var nextId = new FunctionIds(pending.Count);
         var coroutines = new CoroutineTable(nextId);
         var instances = new InstanceTable(nextId);
@@ -290,7 +317,8 @@ public static class ModuleLowerer
 
                 functions.Add(new FunctionLowerer(decl, name, types, ids, imports, typeTable,
                     NoSubstitution, globals, lambdas, instances, receiver,
-                    receiverTypeNode: extendTarget).Run());
+                    receiverTypeNode: extendTarget,
+                    returnTypeOverride: comptimeReturns.GetValueOrDefault(decl)).Run());
             }
             catch (UnsupportedConstructException ex)
             {
@@ -488,6 +516,16 @@ public static class ModuleLowerer
         // BEFORE the verifier: what gets deleted does not need checking, and the verifier runs again at
         // load time anyway, so this is the one place where the saving counts twice.
         Reachability.Prune(result);
+
+        // The evaluation module requires what its retained imports require — nothing more. The
+        // whole-program bits would refuse a pure site in a program that also touches the disk.
+        if (comptime is { Hoist: true })
+        {
+            var needed = Capability.None;
+            foreach (var import in result.Imports)
+                needed |= CapabilityTable.RequiredForImport(import.Name);
+            result.Capabilities = needed;
+        }
 
         if (verify ?? VerifyByDefault) IrVerifier.VerifyOrThrow(result);
         return result;

@@ -232,6 +232,10 @@ public static class AstChildren
                 yield return u.Operand;
                 break;
 
+            case ComptimeExpr ct:
+                yield return ct.Inner;
+                break;
+
             case ResumeExpr r:
                 yield return r.Coroutine;
                 break;

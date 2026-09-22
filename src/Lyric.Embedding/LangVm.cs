@@ -333,6 +333,9 @@ public sealed class LangVm : IDisposable
             NativeModules = HostModuleSource is { } host
                 ? new Dictionary<string, string>(StringComparer.Ordinal) { [HostModule] = host }
                 : null,
+            // 'comptime' sites are evaluated by a VM of their own with no capability, whatever
+            // this VM grants: what a script computes at compile time is not the host's to widen.
+            ComptimeRunner = new VmComptimeRunner(),
         });
 
         // 'Ok' rather than 'Bytes is not null': a compilation can produce bytes and report errors

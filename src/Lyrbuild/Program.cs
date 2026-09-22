@@ -196,6 +196,7 @@ public static class Program
                 SourceRoot = project?.SourceRoot,
                 NativeRoots = project?.NativeRoots,
                 SourceMap = artifact.SourceMap,
+                ComptimeRunner = new Lyric.Vm.VmComptimeRunner(),
             });
 
             var writer = new StringWriter();

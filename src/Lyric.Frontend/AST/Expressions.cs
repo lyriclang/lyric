@@ -35,6 +35,13 @@ public sealed record UnaryExpr(UnaryOp Operator, Expr Operand, Span Span) : Expr
 // 'resume co': a prefix expression at the unary level, yielding the value of the coroutine's next
 // yield. Send values do not exist.
 public sealed record ResumeExpr(Expr Coroutine, Span Span) : Expr(Span);
+/// <summary>
+/// <c>comptime e</c>: the value of <c>e</c>, computed by the compiler. Semantically the same
+/// value <c>e</c> has at run time — the prefix says WHEN it is computed and what <c>e</c> may
+/// therefore reach: no local, no parameter, no <c>this</c>, no capability. The lowering replaces
+/// the expression by the literal the evaluator produced.
+/// </summary>
+public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment

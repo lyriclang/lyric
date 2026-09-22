@@ -194,6 +194,8 @@ public static class Program
             DebugInfo = !Present(args, "--no-debug-info"),
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
+            // The VM in a sandbox evaluates 'comptime' sites; see VmComptimeRunner.
+            ComptimeRunner = new Lyric.Vm.VmComptimeRunner(),
         };
     }
 
