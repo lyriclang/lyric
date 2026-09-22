@@ -73,8 +73,21 @@ dieselbe Regel, nach der ein Block-Arm eines `match` kein `,` braucht. Eines dar
 
 **Body.** Enthält der Block auf seiner eigenen Ebene ein `;` oder beginnt er mit einem
 Statement-Schlüsselwort, ist er ein Statement-Block (wie `=> { … }`); sonst hält er **einen
-Ausdruck** und das Lambda liefert ihn. Landet der ValueBlock von new-features (Tail-Expression),
-fällt der zweite Fall mit ihm zusammen und `{ let a = 1; a * 2 }` wird zusätzlich möglich.
+Ausdruck** und das Lambda liefert ihn (`HoldsStatements`, Parser.cs).
+
+**Nach dem Merge mit dem ValueBlock entfällt diese Unterscheidung ersatzlos** — mit new-features
+abgestimmt und dort als eigener Taskliste-Eintrag festgehalten: `{ it * 2 }` ist dann ein
+ValueBlock mit einem Tail, `{ let y = it; y + 1 }` ebenso, und `HoldsStatements` fällt weg. Damit
+verschwindet auch die Stelle, an der zwei Parser-Pfade dasselbe Klammerpaar verschieden lesen.
+Kotlin kennt die Unterscheidung gar nicht: dort **ist** ein Trailing-Lambda-Body ein Block, dessen
+letzter Ausdruck sein Wert ist — nach dem Merge steht Lyric dort.
+
+**Umgekehrt beantwortet die Trailing-Lambda-Erkennung eine offene Frage des ValueBlocks.** Ein
+Struct-Initializer als Tail (`Point { x = 1 }`) braucht keine Klammern: die Entscheidung fällt an
+den ersten zwei Tokens *hinter* der öffnenden Klammer (`{}` oder `{ name = …` → Initializer,
+sonst Block), nicht an einem Lookahead hinter dem balancierten Block. Innerhalb eines ValueBlocks
+bleibt `_allowStructInit` damit auch am Statement-Anfang gesetzt; §6.8 gilt unverändert für
+gewöhnliche Statement-Blöcke. Von new-features übernommen.
 
 **Warum `it` und nicht `$0` oder `_`.** `_` ist in Lyric das Wildcard-Pattern — Scalas
 `xs.map(_ * 2)` wäre in `match`-Armen zweideutig und in `let (_, b) = t;` doppelt belegt. `$0`

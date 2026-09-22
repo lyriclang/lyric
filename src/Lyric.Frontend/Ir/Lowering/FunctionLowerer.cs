@@ -3518,7 +3518,14 @@ internal sealed class FunctionLowerer
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         var receiver = LowerExpr(member.Target);
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+
+        // UNDER THE INSTANCE'S SUBSTITUTION. A parameter written 'T' is the instance's argument
+        // here, and only the call site knows which: with 'T = ?int' an int LITERAL argument
+        // lowered to a bare scalar, and the store into the optional slot was caught a step later
+        // as "store of t3 (i64) into l9 (?i64)" — malformed IR with no line to point at. The
+        // interface path below has carried this mapping all along; this one had not.
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            InstanceSubstitution(owner));
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
         // receiver comes before them, as in every method call.
@@ -3751,7 +3758,8 @@ internal sealed class FunctionLowerer
                 ? direct
                 : throw NotSupported($"'{owner.Name}.{member.Member}' was not lowered", expr.Span);
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            concrete is GenericInstance forArguments ? InstanceSubstitution(forArguments) : null);
 
         var args = new TempId[supplied.Length + 1];
         args[0] = LowerExpr(member.Target);
@@ -4077,6 +4085,17 @@ internal sealed class FunctionLowerer
     /// same choice as in C#. Otherwise it would have to be lowered in a context where the caller's
     /// arguments are not visible.</para>
     /// </summary>
+    /// <summary>What a generic instance says its type parameters are, by NAME — the form
+    /// <see cref="MaterializeArguments"/> and <see cref="LowerArgument"/> want when they lower a
+    /// parameter type that was written with the declaration's own names.</summary>
+    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance instance)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(instance.Definition.Generics.Length, instance.Arguments.Length); i++)
+            mapping[instance.Definition.Generics[i].Name] = instance.Arguments[i];
+        return mapping;
+    }
+
     private TempId[] MaterializeArguments(FunctionDecl callee, Expr[] provided, string name,
         Span span, IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {

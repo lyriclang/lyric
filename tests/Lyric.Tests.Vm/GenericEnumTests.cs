@@ -312,4 +312,37 @@ public class GenericEnumTests
 
         Assert.Contains("write them", reported.Message, StringComparison.Ordinal);
     }
+
+    // --- an argument whose parameter is written 'T' (4.5) ---
+
+    /// <summary>
+    /// A method on an instance lowers its arguments UNDER THE INSTANCE'S SUBSTITUTION. With
+    /// <c>T = ?int</c> a parameter written <c>T</c> is a <c>?int</c>, so an int literal argument
+    /// has to be wrapped; lowered bare it produced "store of t3 (i64) into l9 (?i64)" — malformed
+    /// IR reported at the callee's slot, with nothing at the call site to point at.
+    ///
+    /// <para>Both shapes are pinned because they take different routes to the same helper, and
+    /// only one of them was ever exercised: the class path reached it through
+    /// <c>LowerGenericMethodCall</c>, the enum path could not be reached at all until a generic
+    /// enum's methods began to lower.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("Holder<?int>.Full(x).or(3)", 5)]
+    [InlineData("Holder<?int>.Empty.or(3)", 3)]
+    [InlineData("Box<?int> { v = x }.or(3)", 5)]
+    public void A_parameter_written_as_the_type_parameter_is_lowered_under_the_instance(
+        string call, long expected) =>
+        Assert.Equal(expected, Run($$"""
+            enum Holder<T> {
+                Full(T),
+                Empty;
+
+                fn or(fallback: T): T { return match (this) { Full(v) => v, Empty => fallback }; }
+            }
+            class Box<T> {
+                v: T,
+                fn or(fallback: T): T { return this.v; }
+            }
+            fn main(): int { let x: ?int = 5; return {{call}} ?? -1; }
+            """));
 }

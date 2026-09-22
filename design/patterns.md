@@ -181,7 +181,10 @@ Patterns, also nesten sie (`[Word("add"), Number(n), End]`). Irrefutabel ist nur
 alle binden ohne zu testen, deckt seine Länge exakt bzw. ab dort alles; `[] | [x] | [a, ..]` ist
 damit erschöpfend und braucht kein `_`, und eine Lücke wird als `[_]`/`[_, _]` benannt.
 
-**Nicht implementiert: der benannte Rest** `[first, ..rest]`. Er müsste die abgedeckten Elemente
+**Nicht implementiert: der benannte Rest** `[first, ..rest]` — und er hängt am **selben Haken wie
+`List<?T>`/`Map<K, ?V>`** (mit stdlib-redesign zusammengeführt): beide brauchen „ein Array
+unbekannter Länge bauen", also das private Native `rawArrayAlloc<T>(n): T[]`, geschätzt ~15
+VM-Zeilen für zwei Features. Danach ist der Rest im Pattern-Compiler eine Schleife von ~20 Zeilen. Er müsste die abgedeckten Elemente
 in ein eigenes Array kopieren, und diese Compilerversion kann kein Array einer erst zur Laufzeit
 bekannten Länge bauen (es gibt nur `newarr` mit ausgeschriebenen Elementen, kein Slice-Opcode und
 kein `rawArrayAlloc`-Native). Parser und Sema nehmen die Form (`rest: T[]`), das Lowering lehnt
