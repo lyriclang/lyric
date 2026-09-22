@@ -4256,7 +4256,7 @@ public sealed class TypeChecker
         {
             if (variant.TupleFields is not { } fields || fields.Length != elems.Length) return false;
             for (var i = 0; i < elems.Length; i++)
-                if (!IsIrrefutable(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst)))
+                if (!IsIrrefutable(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), nested: true))
                     return false;
             return true;
         }
@@ -4267,7 +4267,7 @@ public sealed class TypeChecker
             {
                 if (fp.Pattern is null) continue; // the short form only binds, so it is irrefutable
                 var fd = Array.Find(variant.StructFields, f => f.Name == fp.Name);
-                if (fd is null || !IsIrrefutable(fp.Pattern, Substitute(ResolveType(fd.Type, enumTs.Members), subst)))
+                if (fd is null || !IsIrrefutable(fp.Pattern, Substitute(ResolveType(fd.Type, enumTs.Members), subst), nested: true))
                     return false;
             }
             return true;
@@ -4276,21 +4276,23 @@ public sealed class TypeChecker
     }
 
     // Does this pattern match EVERY value of the type?
-    private bool IsIrrefutable(Pattern p, LyrType type)
+    private bool IsIrrefutable(Pattern p, LyrType type, bool nested = false)
     {
         switch (p)
         {
             case WildcardPattern:
                 return true;
             case OrPattern o:
-                return o.Alternatives.Any(a => IsIrrefutable(a, type));
+                return o.Alternatives.Any(a => IsIrrefutable(a, type, nested));
             case BindingPattern b:
-                if (type is Optional) return false; // binds the inner part and does not cover null
+                // At the top a name binds the present half of a '?T' and leaves null uncovered;
+                // nested it binds the whole optional (BindPattern) and covers it.
+                if (type is Optional opt) return nested && BindsWholeOptional(b, opt);
                 return EnumDefOf(type) is not { } e || VariantOf(e, b.Name) is null; // a variant name is a test
             case TuplePattern t:
                 if (type is not TupleOf tt || tt.Elements.Length != t.Elements.Length) return false;
                 for (var i = 0; i < t.Elements.Length; i++)
-                    if (!IsIrrefutable(t.Elements[i], tt.Elements[i])) return false;
+                    if (!IsIrrefutable(t.Elements[i], tt.Elements[i], nested: true)) return false;
                 return true;
             case VariantPattern v:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
@@ -4310,7 +4312,7 @@ public sealed class TypeChecker
         {
             if (fp.Pattern is null) continue;
             if (def.Members.LookupLocal(fp.Name) is not FieldSymbol fs) return false;
-            if (!IsIrrefutable(fp.Pattern, Substitute(FieldType(fs), subst))) return false;
+            if (!IsIrrefutable(fp.Pattern, Substitute(FieldType(fs), subst), nested: true)) return false;
         }
         return true;
     }
@@ -4370,12 +4372,20 @@ public sealed class TypeChecker
     }
 
     private void BindPattern(Pattern pattern, LyrType scrutinee, SymbolTable scope,
-        bool mutable = false)
+        bool mutable = false, bool nested = false)
     {
         if (scrutinee.IsError) { BindPoison(pattern, scope); return; }
-        if (scrutinee is Optional opt && pattern is not (WildcardPattern or OrPattern) && !IsNullPattern(pattern))
+
+        // A non-null pattern over a '?T' matches against 'T' (§7.6) — with one exception: a NAME
+        // in nested position ('Some(v)' over 'Opt<?int>', '(a, b)' over '(?int, int)') binds the
+        // '?T' as it is and covers it. At the top of a match the null arm is mandatory anyway, so
+        // the name after it means "the present rest" and narrows; inside a payload there is no
+        // such arm, and a name that silently refused null would leave a hole no arm could name.
+        // Rust's 'Some(v)' binds whatever is inside for the same reason.
+        if (scrutinee is Optional opt && pattern is not (WildcardPattern or OrPattern) && !IsNullPattern(pattern)
+            && !(nested && BindsWholeOptional(pattern, opt)))
         {
-            BindPattern(pattern, opt.Inner, scope, mutable);
+            BindPattern(pattern, opt.Inner, scope, mutable, nested);
             return;
         }
 
@@ -4403,7 +4413,7 @@ public sealed class TypeChecker
                 if (scrutinee is TupleOf tup && tup.Elements.Length == t.Elements.Length)
                 {
                     for (var i = 0; i < t.Elements.Length; i++)
-                        BindPattern(t.Elements[i], tup.Elements[i], scope, mutable);
+                        BindPattern(t.Elements[i], tup.Elements[i], scope, mutable, nested: true);
                     return;
                 }
                 Report(t.Span, "LYR-SEM0029", scrutinee is TupleOf other
@@ -4421,11 +4431,17 @@ public sealed class TypeChecker
                 return;
 
             case OrPattern o:
-                BindOrPattern(o, scrutinee, scope);
+                BindOrPattern(o, scrutinee, scope, nested);
                 return;
             // wildcard or error: no binding
         }
     }
+
+    /// <summary>Is this a plain name over a '?T' in nested position — one that binds the whole
+    /// optional rather than its present half? A name that spells a variant of the inner enum is
+    /// a test and still matches against 'T'.</summary>
+    private static bool BindsWholeOptional(Pattern pattern, Optional opt) =>
+        pattern is BindingPattern b && !(EnumDefOf(opt.Inner) is { } e && VariantOf(e, b.Name) is not null);
 
     private void CheckLiteralPattern(LiteralPattern lit, LyrType scrutinee, SymbolTable scope)
     {
@@ -4438,8 +4454,14 @@ public sealed class TypeChecker
         }
         var lt = CheckExpr(lit.Literal, scope);
         if (!lt.IsError && !IsAssignable(lit.Literal, lt, scrutinee))
+        {
             _de.Report("LYR-SEM0029", Severity.Error, lit.Span,
                 $"literal pattern of type '{TypeFacts.Display(lt)}' cannot match '{TypeFacts.Display(scrutinee)}'");
+            return;
+        }
+        // The literal IS of the scrutinee's type (§3.1): '1' over an 'int8' is an int8, and the
+        // side table has to say so, or the lowering compares an i8 against an i64 constant.
+        AdaptLiteralType(lit.Literal, scrutinee);
     }
 
     private void CheckRangePattern(RangePattern r, LyrType scrutinee, SymbolTable scope)
@@ -4449,8 +4471,13 @@ public sealed class TypeChecker
         if (lo.IsError || hi.IsError) return;
         var comparable = TypeFacts.IsNumeric(scrutinee) || scrutinee is PrimitiveType { Kind: PrimitiveKind.Char };
         if (!comparable || !IsAssignable(r.Low, lo, scrutinee) || !IsAssignable(r.High, hi, scrutinee))
+        {
             _de.Report("LYR-SEM0029", Severity.Error, r.Span,
                 $"range pattern of '{TypeFacts.Display(lo)}'..'{TypeFacts.Display(hi)}' cannot match '{TypeFacts.Display(scrutinee)}'");
+            return;
+        }
+        AdaptLiteralType(r.Low, scrutinee);
+        AdaptLiteralType(r.High, scrutinee);
     }
 
     private void BindVariantPattern(VariantPattern v, LyrType scrutinee, SymbolTable scope)
@@ -4543,7 +4570,7 @@ public sealed class TypeChecker
                 return;
             }
             for (var i = 0; i < elems.Length; i++)
-                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope);
+                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope, nested: true);
             return;
         }
 
@@ -4600,7 +4627,7 @@ public sealed class TypeChecker
 
     private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope)
     {
-        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope); return; }
+        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope, nested: true); return; }
         var local = new LocalSymbol(fp.Name, type, false, fp); // short form: the field name binds
         DeclareBinding(scope, local, fp.Span);
         _result.BindRef(fp, local);
@@ -4617,14 +4644,14 @@ public sealed class TypeChecker
     // Or-pattern: every alternative binds into a table of its own, and all of them have to bind the
     // same names with the same types. The bindings of the FIRST alternative become the arm scope,
     // consistently with the definite-assignment analysis, which uses alternative 0.
-    private void BindOrPattern(OrPattern o, LyrType scrutinee, SymbolTable scope)
+    private void BindOrPattern(OrPattern o, LyrType scrutinee, SymbolTable scope, bool nested = false)
     {
         if (o.Alternatives.Length == 0) return;
         var tables = new List<SymbolTable>(o.Alternatives.Length);
         foreach (var alt in o.Alternatives)
         {
             var t = new SymbolTable(scope);
-            BindPattern(alt, scrutinee, t);
+            BindPattern(alt, scrutinee, t, nested: nested);
             tables.Add(t);
         }
         var reference = tables[0].Symbols.OfType<LocalSymbol>().ToList();
@@ -4644,6 +4671,33 @@ public sealed class TypeChecker
             }
         }
         foreach (var s in reference) scope.TryDeclare(s);
+
+        // The arm body refers to alternative 0's symbols, so every later alternative's binding
+        // node is pointed at the SAME symbol: the lowering then stores into one slot whichever
+        // alternative matched, and the unused-name analysis sees one name with its uses rather
+        // than a second, never-read one per alternative.
+        for (var i = 1; i < o.Alternatives.Length; i++)
+            RebindToCanonical(o.Alternatives[i], reference);
+    }
+
+    private void RebindToCanonical(Node? node, List<LocalSymbol> canonical)
+    {
+        switch (node)
+        {
+            case BindingPattern b when _result.RefOf(b) is LocalSymbol l:
+                if (canonical.Find(c => c.Name == l.Name) is { } cb) _result.BindRef(b, cb);
+                return;
+            case FieldPattern { Pattern: null } f when _result.RefOf(f) is LocalSymbol l:
+                if (canonical.Find(c => c.Name == l.Name) is { } cf) _result.BindRef(f, cf);
+                return;
+            case FieldPattern f: RebindToCanonical(f.Pattern, canonical); return;
+            case TuplePattern t: foreach (var e in t.Elements) RebindToCanonical(e, canonical); return;
+            case VariantPattern v:
+                foreach (var e in v.TupleElements ?? []) RebindToCanonical(e, canonical);
+                foreach (var f in v.StructFields ?? []) RebindToCanonical(f, canonical);
+                return;
+            case OrPattern o: foreach (var a in o.Alternatives) RebindToCanonical(a, canonical); return;
+        }
     }
 
     // --- pattern helpers ---

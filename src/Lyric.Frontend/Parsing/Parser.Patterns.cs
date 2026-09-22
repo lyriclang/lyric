@@ -216,7 +216,17 @@ public sealed partial class Parser
     private MatchArm ParseMatchArm()
     {
         var pattern = ParseOrPattern();
-        Expr? guard = _buffer.Match(TokenKind.If) ? ParseExpr(0) : null;
+
+        // A guard is followed by '=>', so a parenthesized guard '(x > 0) => …' looks exactly
+        // like a lambda to the lookahead. The first '(' of a guard opens a group, never a
+        // lambda; a lambda inside the guard ('xs.any((y) => y > 0)') is deeper and unaffected.
+        Expr? guard = null;
+        if (_buffer.Match(TokenKind.If))
+        {
+            _guardHead = true;
+            guard = ParseExpr(0);
+            _guardHead = false;
+        }
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
         return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, body.Span));

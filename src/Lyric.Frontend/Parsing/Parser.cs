@@ -24,6 +24,10 @@ public sealed partial class Parser
     // inside delimiters through ParseSubExpr.
     private bool _allowStructInit = true;
 
+    /// <summary>Set while the FIRST primary of a match-arm guard is parsed: a '(' there opens a
+    /// group, not a lambda, because the arm's '=>' follows the guard.</summary>
+    private bool _guardHead;
+
     public Parser(SourceManager sm, FileId id, DiagnosticEngine de)
     {
         _sm = sm;
@@ -301,6 +305,7 @@ public sealed partial class Parser
     private Expr ParsePrimary()
     {
         var cur = _buffer.Current;
+        if (cur.TokenKind != TokenKind.LParen) _guardHead = false; // the guard's first primary is not a group
         switch (cur.TokenKind)
         {
             case TokenKind.IntLiteral:
@@ -385,7 +390,9 @@ public sealed partial class Parser
     /// </summary>
     private Expr ParseParenOrTupleOrLambda()
     {
-        if (IsLambdaAhead()) return ParseLambda();
+        var atGuardHead = _guardHead;
+        _guardHead = false;
+        if (!atGuardHead && IsLambdaAhead()) return ParseLambda();
 
         var open = _buffer.Advance(); // '('
         var first = ParseSubExpr();

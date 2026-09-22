@@ -84,8 +84,6 @@ fn main.Shape.area -> i64 {
     store l1, t18
     br bb3
   bb5:
-    br bb6
-  bb6:
     t19: i64 = const 0
     store l1, t19
     br bb3
