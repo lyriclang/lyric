@@ -1062,8 +1062,12 @@ internal sealed class FunctionLowerer
             var merge = _b.NewBlock();
             _b.Seal(new CondBranch(condition, thenBlock, merge, stmt.Span));
 
+            // Through LowerScope, not LowerStatements: the branch is a scope of its own, and a
+            // 'defer' in it belongs to it (§7.5). Lowered as bare statements, the defer was
+            // registered on the ENCLOSING scope — it ran at that scope's exit whether or not the
+            // branch had been taken, and inside a scope without defers of its own it never ran.
             _b.SwitchTo(thenBlock);
-            if (LowerStatements(stmt.Then)) _b.Seal(new Branch(merge, stmt.Then.Span));
+            if (LowerScope(stmt.Then)) _b.Seal(new Branch(merge, stmt.Then.Span));
 
             _b.SwitchTo(merge);
             return true;
@@ -1073,7 +1077,7 @@ internal sealed class FunctionLowerer
         _b.Seal(new CondBranch(condition, thenBlock, elseBlock, stmt.Span));
 
         _b.SwitchTo(thenBlock);
-        var thenFallsThrough = LowerStatements(stmt.Then);
+        var thenFallsThrough = LowerScope(stmt.Then);
         var thenExit = _b.CurrentId; // after nested control flow this is no longer thenBlock
 
         _b.SwitchTo(elseBlock);
