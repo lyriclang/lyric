@@ -532,15 +532,26 @@ JEDE Methode auf `Result<int, string>` unaufrufbar — Prototyp 21 hatte den Fal
 Fix: `or TypeSymbolKind.Enum`. pattern-lambda hat ihn übernommen, der Merge ist deckungsgleich.
 
 **(b) Argumente wurden nicht gegen die Substitution der Instanz gewidert** — der Folgefund von
-(a), gefunden bei der Gegenprobe gegen pattern-lambdas Branch. `LowerGenericMethodCall` reichte
-keine `calleeSubstitution` an `MaterializeArguments`, also blieb ein Parameter, der `T`
-geschrieben steht, ein Name: bei `T = ?int` lowerte ein `int`-Literal zum blanken Skalar, und
-der Store in den Optional-Slot war fehlerhaft — der Verifier fing es einen Schritt später im
-AUFRUFER, ohne Zeile zum Hinzeigen (`store of t10 (i64) into l8 (?i64)`). Der Pfad für
-generische Interface-Member baute dieselbe Abbildung längst; jetzt tut es der Instanz-Pfad
-auch. Minimaler Repro (`probes/iso_enum.lyr`): `Holder<?int>.Full(x).or(3)` stürzte ab,
-`Box<?int> { … }.or(3)` nicht — die Klasse erreichte den Pfad vor dem Enum, was die Lücke
-verdeckte. Test: `tests/Lyric.Tests.Ir/LoweringTests.cs`, beide Arten gepinnt.
+(a), gefunden bei der Gegenprobe gegen pattern-lambdas Branch. Ein Parameter, der `T`
+geschrieben steht, bleibt ein NAME, bis die Instanz etwas anderes sagt; ohne deren Abbildung
+lowerte bei `T = ?int` ein `int`-Literal zum blanken Skalar, und der Store in den Optional-Slot
+war fehlerhaft — der Verifier fing es einen Schritt später im AUFRUFER, ohne Zeile zum
+Hinzeigen (`store of t10 (i64) into l8 (?i64)`).
+
+**Vier Wege führen zu einer Methode einer Instanz, und sie nehmen verschiedene Pfade** — nur
+einer hatte die Abbildung. Erst `LowerGenericMethodCall` (Instanzmethode), dann, nach
+pattern-lambdas Nachfassen und eigener Prüfung (`probes/iso_paths.lyr`, zwei weitere Findings),
+auch `LowerGenericStaticCall` (`Box<?int>.of(3)`) und der Constraint-Pfad mit generischem
+Receiver (`fn f<K :: [Keeper<?int>]>(k: K) { k.or(3) }`). Der Interface-Member-Pfad trug sie
+längst. Jetzt gibt es einen Helfer `InstanceSubstitution(GenericInstance)`, den alle drei
+übrigen Stellen benutzen.
+
+Warum es so lange unsichtbar war: die KLASSE erreichte den Instanz-Pfad vor dem Enum
+(`Holder<?int>.Full(x).or(3)` stürzte, `Box<?int> { … }.or(3)` nicht), und eine Klasse MIT
+Interface-Konformanz nahm ohnehin den Pfad, der die Abbildung hatte. pattern-lambda hat
+denselben Defekt unabhängig gefunden und in Commit 76ae5ee8 gefixt — beim Merge genügt einer
+der beiden, mit der Prüfung, dass alle vier Wege abgedeckt sind. Test:
+`tests/Lyric.Tests.Ir/LoweringTests.cs`, alle vier gepinnt.
 
 **Was damit geht:** `Result<?T, E>` wird konstruiert, gematcht (über `Ok(_)`), `isOk`/`isErr`/
 `unwrapOr`/`err`/`map` arbeiten darauf — Vollständigkeitstest in

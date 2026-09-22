@@ -3386,6 +3386,24 @@ internal sealed class FunctionLowerer
     /// from the call — <c>get()</c> has no type parameters of its own, its <c>T</c> is that of
     /// <c>Box</c>.</para>
     /// </summary>
+    /// <summary>
+    /// What the instance makes of its definition's type parameters, by name.
+    ///
+    /// <para>A parameter written <c>T</c> is a NAME until the instance says otherwise, and the
+    /// declaration alone cannot see that. Without this, an argument whose parameter type only
+    /// BECOMES optional through the substitution — <c>or(fallback: T)</c> on a
+    /// <c>Holder&lt;?int&gt;</c> — is passed as the bare scalar its literal lowered to, and the
+    /// malformed store into the optional slot surfaces one step later, in the caller, with no
+    /// line to point at. Every path that calls a method OF an instance needs it.</para>
+    /// </summary>
+    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance owner)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
+            mapping[owner.Definition.Generics[i].Name] = owner.Arguments[i];
+        return mapping;
+    }
+
     private TempId? LowerGenericMethodCall(MemberExpr member, GenericInstance owner, CallExpr expr)
     {
         if (_types.RefOf(member) is not FunctionSymbol method)
@@ -3398,19 +3416,8 @@ internal sealed class FunctionLowerer
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         var receiver = LowerExpr(member.Target);
-
-        // The owner's substitution, so a parameter written 'T' is lowered against what T IS here.
-        // Without it an argument whose parameter type only BECOMES optional through the
-        // substitution — 'or(fallback: T)' on a 'Holder<?int>' — is passed as the bare scalar the
-        // literal lowered to, and the verifier catches the store into the optional slot one step
-        // later. Reading the declaration alone cannot see that: 'T' is a name until the instance
-        // says otherwise.
-        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
-        for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
-            mapping[owner.Definition.Generics[i].Name] = owner.Arguments[i];
-
         var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
-            mapping);
+            InstanceSubstitution(owner));
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
         // receiver comes before them, as in every method call.
@@ -3448,7 +3455,8 @@ internal sealed class FunctionLowerer
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
-        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            InstanceSubstitution(owner));
 
         var returns = ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
         if (IsVoid(returns))
@@ -3643,7 +3651,9 @@ internal sealed class FunctionLowerer
                 ? direct
                 : throw NotSupported($"'{owner.Name}.{member.Member}' was not lowered", expr.Span);
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        // As in LowerGenericMethodCall: for a generic receiver the parameters are the instance's.
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            concrete is GenericInstance receiverInstance ? InstanceSubstitution(receiverInstance) : null);
 
         var args = new TempId[supplied.Length + 1];
         args[0] = LowerExpr(member.Target);

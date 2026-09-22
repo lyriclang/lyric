@@ -848,15 +848,28 @@ public class LoweringTests
     /// declaration says <c>T</c>, and an <c>int</c> literal lowers to a bare scalar. Without the
     /// owner's substitution at the call site the store into the optional slot is malformed, which
     /// the verifier catches one step later — the parameter reads as a plain name until the
-    /// instance says otherwise. Both container kinds are pinned: the class reached this path
-    /// before the enum did, which is what kept the gap hidden.</para>
+    /// instance says otherwise.</para>
+    ///
+    /// <para>All four ways to reach a method OF an instance are pinned, because they take
+    /// different paths through the lowering and each needed the mapping of its own: an instance
+    /// method on a class and on an enum, a static method, and a call through a constraint whose
+    /// receiver is a type parameter. The class reached the instance path before the enum did,
+    /// which is what kept the gap hidden.</para>
     /// </summary>
     [Fact]
     public void An_argument_widens_to_what_the_instance_makes_of_its_parameter_type()
     {
         var (ir, de) = TryLower("""
-            class Box<T> {
+            interface Keeper<T> {
+                fn or(fallback: T): T;
+            }
+
+            class Box<T> :: [Keeper<T>] {
                 value: T,
+
+                pub static fn of(v: T): Box<T> {
+                    return Box<T> { value = v };
+                }
 
                 pub fn or(fallback: T): T {
                     return this.value;
@@ -875,11 +888,19 @@ public class LoweringTests
                 }
             }
 
+            fn viaConstraint<K :: [Keeper<?int>]>(k: K): ?int {
+                return k.or(3);
+            }
+
             fn f(): int {
                 let slot: ?int = 7;
                 let boxed = Box<?int> { value = slot };
                 let held = Holder<?int>.Full(slot);
-                return (boxed.or(3) ?? 0) + (held.or(3) ?? 0);
+                let made = Box<?int>.of(3);
+                return (boxed.or(3) ?? 0)
+                    + (held.or(3) ?? 0)
+                    + (made.or(slot) ?? 0)
+                    + (viaConstraint(boxed) ?? 0);
             }
             """);
 
