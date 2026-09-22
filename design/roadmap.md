@@ -41,8 +41,11 @@ Thema: was in Ausdrucksposition stehen darf, und was ein Wert rendert. Alles add
   generische **Interface**-Member baute dieselbe Abbildung längst — die Lücke war verdeckt, weil der
   Klassen-Pfad sie zuerst erreicht. **Der Fix liegt zweimal vor**, unabhängig gefunden: stdlib-redesign
   `a8df8a5d`, pattern-lambda `76ae5ee8`. **Beim Merge einen behalten — den von pattern-lambda**, er zieht
-  zusätzlich den Constraint-Pfad mit; die Tests beider Branches pinnen den Fall (Klasse *und* Enum) und
-  sollten beide übernommen werden. Dass zwei Teams denselben Defekt am selben Tag finden, ist das
+  zusätzlich den Constraint-Pfad mit. **Die Tests beider Branches übernehmen**, weil sie auf
+  verschiedenen Ebenen sitzen: pattern-lambdas `GenericEnumTests` pinnt drei Fälle bei der Ausführung
+  (Enum mit Payload, Enum ohne Payload, Klasse — der dritte ist der, der vorher zufällig durchkam und
+  die Lücke verdeckte), stdlib-redesigns Test fängt denselben Defekt eine Schicht tiefer im IR. Beide
+  behalten heißt: eine Ebene Verifier, eine Ebene Ausführung. Dass zwei Teams denselben Defekt am selben Tag finden, ist das
   deutlichste Zeichen dafür, dass er in 4.5 gehört.
 - **`rawArrayAlloc<T>(n): T[]` als privates Native** (~15 VM-Zeilen): hängt inzwischen doppelt —
   `List<?T>`/`Map<K, ?V>` brauchen es für ihre Backing-Arrays (stdlib-redesign), und pattern-lambdas

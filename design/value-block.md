@@ -169,12 +169,14 @@ wertlos, kein allgemeiner Block-Ausdruck), mit Rusts Regel für den defer/Drop-Z
    Setzt der ValueBlock das Flag, werden **beide** Lesarten zugleich scharf: `Point { x = 1 }` ist der
    Initializer-Tail, `run { 7 }` der Aufruf mit Trailing-Lambda. Das ist genau die Kombination, die man
    in Wert-Position will.
-   **Der Preis, benannt:** innerhalb eines ValueBlocks kann ein Bezeichner am Statement-Anfang nicht
-   mehr von einem *verschachtelten Statement-Block* gefolgt werden, ohne als Aufruf oder Initializer
-   gelesen zu werden. Nichts, was heute kompiliert, ändert dadurch seine Bedeutung — ein Statement aus
-   einem bloßen Bezeichner ist ohnehin `LYR-SEM0022` („expression statement has no effect") —, es
-   ändert sich nur die Diagnose, die ein Tippfehler bekommt. Wer wirklich einen anonymen Block braucht,
-   trennt ihn durch das `;` des vorigen Statements, das dort ohnehin steht.
+   **Der Preis, benannt und eingegrenzt** (Abgrenzung von pattern-lambda, `design/lambdas.md` §2.2):
+   betroffen ist **ausschließlich ein bloßer Bezeichner** am Anfang eines ValueBlock-Statements, dem
+   ein `{` folgt. **Nicht betroffen** ist ein Block, der für sich steht (`{ let a = 1; }` als
+   verschachtelter Scope) — er beginnt mit `{` und wird nie zum Argument von etwas —, und ebenso wenig
+   jede Form, die ihren Block über ein Schlüsselwort erreicht (`if`, `while`, `for`, `match`, `try`,
+   `defer`). Übrig bleibt damit **genau die Konstruktion, die heute schon `LYR-SEM0022` ist**
+   („expression statement has no effect"): ein Statement aus einem bloßen Bezeichner. Nichts, was heute
+   kompiliert, ändert seine Bedeutung; es ändert sich nur die Diagnose, die ein Tippfehler bekommt.
 
 ## Spec-Diff
 
