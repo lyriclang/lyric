@@ -32,6 +32,7 @@
 module std.io.file;
 
 import std.io.error { IoError, IoErrorKind };
+import std.result { Result };
 
 // For the deprecation promises on the three names this module used before 2.14.
 import std.core { Deprecated };
@@ -94,6 +95,16 @@ pub fn textOrThrow(path: string): string throws IoError {
         throw lastIoError(path);
     }
     return content;
+}
+
+/// `text`, with the reason as a VALUE: the content, or the `IoError` that `textOrThrow`
+/// would throw — for a read whose failure is stored or handled later rather than caught here.
+pub fn textOrErr(path: string): Result<string, IoError> {
+    let content = text(path);
+    if (content == null) {
+        return Result<string, IoError>.Err(lastIoError(path));
+    }
+    return Result<string, IoError>.Ok(content);
 }
 
 /// `bytes`, with the reason when it cannot.

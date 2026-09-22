@@ -11,6 +11,10 @@
 
 module std.string;
 
+// The one import this module has, and it is safe: `std.result` imports nothing, so no cycle
+// through `std.core` (which imports THIS module) can arise.
+import std.result { Result };
+
 /// The two joined — what `+` on strings compiles to.
 pub fn concat(a: string, b: string): string;
 
@@ -463,53 +467,87 @@ pub fn join(parts: string[], separator: string): string {
 // All return `?T`: an unparsable string is an ordinary state of the world, not a programming
 // error.
 
-/// `"-42"` becomes `-42`, anything else `null`.
-///
-/// No overflow protection: a number beyond `int64` wraps rather than yielding `null`. Detecting
-/// it would need a division per digit.
+/// `"-42"` becomes `-42`, anything else `null` — an empty text, a sign on its own, a character
+/// that is no digit, and since 4.5 a magnitude beyond `int`, which used to wrap silently. The
+/// reason is what `parseIntOrErr` says.
 pub fn parseInt(value: string): ?int {
-    let chars = rawToChars(value);
-    let n = chars.length;
-    if (n == 0) {
-        return null;
-    }
-
-    var i = 0;
-    var negative = false;
-    let first = chars[0];
-    if (first == '-' || first == '+') {
-        negative = first == '-';
-        i = 1;
-    }
-
-    // A sign on its own is not a number.
-    if (i >= n) {
-        return null;
-    }
-
-    var result = 0;
-    while (i < n) {
-        let digit = charToDigit(chars[i]);
-        if (digit == null) {
-            return null;
-        }
-        result = result * 10 + digit;
-        i = i + 1;
-    }
-
-    return if (negative) 0 - result else result;
+    return parseIntRadix(value, 10);
 }
 
-/// From a base of 2 to 36. Letters continue from `a`/`A`.
+/// From a base of 2 to 36. Letters continue from `a`/`A`. `null` on anything `parseInt`
+/// refuses, and on a base outside `2..=36`.
 pub fn parseIntRadix(value: string, radix: int): ?int {
-    if (radix < 2 || radix > 36) {
-        return null;
-    }
+    let scanned = scanInt(value, radix);
+    let (code, number, _) = scanned;
+    return if (code == 0) number else null;
+}
 
+/// What kept a text from being a number.
+pub enum ParseErrorKind {
+    /// Nothing to read: the text is empty, or a sign with nothing after it.
+    Empty,
+    /// A character that is no digit of the base — `offset` says which.
+    InvalidDigit,
+    /// The digits are fine and the number is not: it lies outside `int`.
+    Overflow,
+}
+
+/// Why a text is not a number: which kind, and at which code-point offset the reading stopped.
+///
+/// The carrier-plus-kind shape of `std.io.error.IoError`: a class that throws, holding an enum
+/// that matches, so a kind can be added without breaking a `match` over the ones known.
+pub class ParseError :: [Throwable] {
+    /// What went wrong.
+    kind: ParseErrorKind,
+    /// Where the reading stopped, in code points; the text's length for `Overflow` and `Empty`.
+    offset: int,
+
+    pub fn message(): string {
+        let what = match (this.kind) {
+            ParseErrorKind.Empty => "nothing to read",
+            ParseErrorKind.InvalidDigit => "not a digit",
+            ParseErrorKind.Overflow => "outside the int range",
+        };
+        return "parse: " + what + " at offset " + fromInt(this.offset);
+    }
+}
+
+/// `parseInt`, with the reason when the text is not a number: the value, or a `ParseError`
+/// saying what stopped the reading and where.
+pub fn parseIntOrErr(value: string): Result<int, ParseError> {
+    return parseIntRadixOrErr(value, 10);
+}
+
+/// `parseIntRadix`, with the reason. A base outside `2..=36` is reported as `InvalidDigit` at
+/// offset 0: no character of any text is a digit of a base that does not exist.
+pub fn parseIntRadixOrErr(value: string, radix: int): Result<int, ParseError> {
+    let scanned = scanInt(value, radix);
+    let (code, number, at) = scanned;
+    if (code == 0) {
+        return Result<int, ParseError>.Ok(number);
+    }
+    let kind = match (code) {
+        1 => ParseErrorKind.Empty,
+        2 => ParseErrorKind.InvalidDigit,
+        _ => ParseErrorKind.Overflow,
+    };
+    return Result<int, ParseError>.Err(ParseError { kind = kind, offset = at });
+}
+
+// The one reader behind the four parsers: `(code, value, offset)`, where the code is 0 for a
+// number, 1 for nothing to read, 2 for a character that is no digit and 3 for overflow. The
+// magnitude accumulates NEGATIVELY — `int.min` has no positive twin, so a positive accumulator
+// could never reach it — and the overflow test precedes each step: `acc * radix - digit` stays
+// at or above the limit exactly when `acc >= (limit + digit) / radix`, with `/` rounding towards
+// zero, which for a non-positive dividend is the ceiling the inequality needs.
+fn scanInt(value: string, radix: int): (int, int, int) {
     let chars = rawToChars(value);
     let n = chars.length;
+    if (radix < 2 || radix > 36) {
+        return (2, 0, 0);
+    }
     if (n == 0) {
-        return null;
+        return (1, 0, 0);
     }
 
     var i = 0;
@@ -519,30 +557,34 @@ pub fn parseIntRadix(value: string, radix: int): ?int {
         negative = first == '-';
         i = 1;
     }
+    // A sign on its own is not a number.
     if (i >= n) {
-        return null;
+        return (1, 0, n);
     }
 
-    var result = 0;
+    let limit = if (negative) 0 - 9223372036854775807 - 1 else 0 - 9223372036854775807;
+    var acc = 0;
     while (i < n) {
         let c = chars[i];
-        var digitValue = -1;
+        var digit = -1;
         if (isDigit(c)) {
-            digitValue = c as int - '0' as int;
+            digit = c as int - '0' as int;
         } else if (isLower(c)) {
-            digitValue = c as int - 'a' as int + 10;
+            digit = c as int - 'a' as int + 10;
         } else if (isUpper(c)) {
-            digitValue = c as int - 'A' as int + 10;
+            digit = c as int - 'A' as int + 10;
         }
-
-        if (digitValue < 0 || digitValue >= radix) {
-            return null;
+        if (digit < 0 || digit >= radix) {
+            return (2, 0, i);
         }
-        result = result * radix + digitValue;
+        if (acc < (limit + digit) / radix) {
+            return (3, 0, n);
+        }
+        acc = acc * radix - digit;
         i = i + 1;
     }
 
-    return if (negative) 0 - result else result;
+    return (0, if (negative) acc else 0 - acc, n);
 }
 
 /// Exactly `"true"` or `"false"`; anything else is `null`.

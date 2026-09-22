@@ -3824,7 +3824,7 @@ internal sealed class FunctionLowerer
             // INSTANCE rather than to the definition, and its return type may be T.
             case MemberExpr member
                 when SubstituteType(ReceiverType(member.Target)) is GenericInstance owner
-                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct:
+                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum:
                 return LowerGenericMethodCall(member, owner, expr);
 
             // An extension on a builtin: 'n.double()' with 'extend int'. The receiver is a scalar and

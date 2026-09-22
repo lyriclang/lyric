@@ -1,0 +1,161 @@
+// std.result — a failure as a VALUE.
+//
+// `throws` is the language's error mechanism and stays it: a failure that the caller handles
+// right there is a `throws` clause and a `catch`. What `throws` cannot do is hold the failure —
+// put it in a list, map over it, decide later. `Result<T, E>` is that holder: an ordinary enum,
+// no new mechanism, and the bridges at the end (`orThrow`, `fromOptional`, `ok`) connect it to
+// the two forms the library already speaks.
+//
+// The type carries no constraint on `E`: a `string` is a fine error for a config line, and a
+// `Throwable` is required only where the value is to be thrown (`orThrow`).
+//
+// `map`, `andThen`, `mapErr` and `orElse` are FREE functions rather than methods: a method of a
+// generic type cannot introduce a type parameter of its own today, and each of them does (`U`
+// or `F`). They become methods the day the compiler allows it; the free names stay as they are.
+//
+// This module imports nothing, deliberately: `std.string` reads it for `parseIntOrErr`, and
+// `std.core` imports `std.string`, so anything imported here could never import `std.core`
+// back (LYR-RES0005). `panic` needs no import — the compiler binds it.
+
+/// A failure as a value: `Ok(value)` or `Err(reason)`, and the combinators that compute with
+/// either without testing first.
+///
+/// `throws` remains the language's mechanism; this is the holder for a failure that is stored,
+/// collected or handled later. `orThrow` and `fromOptional` are the bridges to `throws` and `?T`.
+module std.result;
+
+/// The outcome of something that can fail: the value, or the reason it did not happen.
+///
+/// Two variants and nothing else, so a `match` covers it with two arms. The reason type `E` is
+/// unconstrained — a `string` is a fine reason for a config line, and `orThrow` alone asks for
+/// a `Throwable`.
+pub enum Result<T, E> {
+    /// It happened, and this is the value.
+    Ok(T),
+    /// It did not, and this says why.
+    Err(E);
+
+    /// Whether this is an `Ok`.
+    pub fn isOk(): bool {
+        return match (this) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+    }
+
+    /// Whether this is an `Err`.
+    pub fn isErr(): bool {
+        return match (this) {
+            Ok(_) => false,
+            Err(_) => true,
+        };
+    }
+
+    /// The value as an optional: `null` for an `Err`, which drops the reason — the bridge to
+    /// `??` and to every function that takes a `?T`.
+    pub fn ok(): ?T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => null,
+        };
+    }
+
+    /// The reason as an optional: `null` for an `Ok`.
+    pub fn err(): ?E {
+        return match (this) {
+            Ok(_) => null,
+            Err(e) => e,
+        };
+    }
+
+    /// The value, or `fallback` for an `Err`. The fallback is evaluated either way; for one that
+    /// costs something, `unwrapOrElse` takes a function.
+    pub fn unwrapOr(fallback: T): T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => fallback,
+        };
+    }
+
+    /// The value, or what `fallback` makes of the reason — the reason is not lost, it is handed
+    /// to the function that decides what stands in for the value.
+    pub fn unwrapOrElse(fallback: fn(E) -> T): T {
+        return match (this) {
+            Ok(v) => v,
+            Err(e) => fallback(e),
+        };
+    }
+
+    /// The value, or a panic carrying `message` — for a result that CANNOT be an `Err` here,
+    /// where being wrong about that is a programming error. As `std.option.expect` for `?T`.
+    pub fn expect(message: string): T {
+        let value = this.ok();
+        if (value == null) {
+            panic(message);
+        }
+        return value;
+    }
+}
+
+// ------------------------------------------------------------------------ computing
+
+/// Applies `f` to the value when there is one; an `Err` passes through unchanged.
+pub fn map<T, E, U>(r: Result<T, E>, f: fn(T) -> U): Result<U, E> {
+    return match (r) {
+        Ok(v) => Result<U, E>.Ok(f(v)),
+        Err(e) => Result<U, E>.Err(e),
+    };
+}
+
+/// Applies `f` to the REASON when there is one; an `Ok` passes through unchanged. What a
+/// layer uses to translate a lower layer's reason into its own.
+pub fn mapErr<T, E, F>(r: Result<T, E>, f: fn(E) -> F): Result<T, F> {
+    return match (r) {
+        Ok(v) => Result<T, F>.Ok(v),
+        Err(e) => Result<T, F>.Err(f(e)),
+    };
+}
+
+/// As `map`, but `f` may itself fail: the first `Err` in a chain wins, and everything after it
+/// is skipped. `andThen(andThen(parse(a), lookup), validate)` reads as the three steps it is.
+pub fn andThen<T, E, U>(r: Result<T, E>, f: fn(T) -> Result<U, E>): Result<U, E> {
+    return match (r) {
+        Ok(v) => f(v),
+        Err(e) => Result<U, E>.Err(e),
+    };
+}
+
+/// A second attempt when the first failed: `f` gets the reason and answers a result of its own.
+/// The mirror image of `andThen`.
+pub fn orElse<T, E, F>(r: Result<T, E>, f: fn(E) -> Result<T, F>): Result<T, F> {
+    return match (r) {
+        Ok(v) => Result<T, F>.Ok(v),
+        Err(e) => f(e),
+    };
+}
+
+// ------------------------------------------------------------------------ bridges
+
+/// The value, or the reason THROWN — the bridge from the value form back to the language's
+/// mechanism, for the moment a stored failure is finally handled.
+///
+/// The catch that goes with it is `catch (e: Throwable)` today: the compiler substitutes a
+/// throws clause's type parameter at no call site yet, so a `catch (e: IoError)` beside it is
+/// reported as not covering. That is a compiler limitation, not a property of this function.
+pub fn orThrow<T, E :: [Throwable]>(r: Result<T, E>): T throws E {
+    return match (r) {
+        Ok(v) => v,
+        Err(e) => {
+            throw e;
+        }
+    };
+}
+
+/// An optional with a reason attached: the value when there is one, `error` when there is not.
+/// What turns a `Map.get` or a `parseInt` into a result without a `match` at every site.
+pub fn fromOptional<T, E>(o: ?T, error: E): Result<T, E> {
+    if (o == null) {
+        return Result<T, E>.Err(error);
+    }
+    return Result<T, E>.Ok(o);
+}
