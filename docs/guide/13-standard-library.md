@@ -88,6 +88,7 @@ takes bulk (`pushAll`), slices, filters, and a `Map` walks through its own metho
 
 ```lyr
 import std.collections { List, Map };
+import std.string as strings;
 
 fn main(): int {
     let groups = Map<int, List<string>>.empty();
@@ -331,8 +332,14 @@ the terminators that ask nothing of the element type: `count`, `fold`, `reduce`,
 `toArray`. A chain reads to its end:
 
 ```lyr
-let n = xs.iter().filter((n: int) => n % 2 == 0).count();
-let total = xs.iter().fold<int>(0, (acc: int, n: int) => acc + n);
+import std.collections { List };
+
+fn main(): int {
+    let xs = List<int>.of([1, 2, 3, 4]);
+    let evens = xs.iter().filter((n) => n % 2 == 0).count();
+    let total = xs.iter().fold(0, (acc, n) => acc + n);
+    return evens + total;
+}
 ```
 
 The free forms of the terminators still work and go with 5.0. Two families stay free, each for
