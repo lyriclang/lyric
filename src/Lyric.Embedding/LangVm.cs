@@ -330,6 +330,7 @@ public sealed class LangVm : IDisposable
             StdlibRoot = _options.StdlibRoot,
             SourceRoot = _options.SourceRoot,
             NativeRoots = _options.NativeRoots,
+            DependencyRoots = _options.DependencyRoots,
             NativeModules = HostModuleSource is { } host
                 ? new Dictionary<string, string>(StringComparer.Ordinal) { [HostModule] = host }
                 : null,

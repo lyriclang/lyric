@@ -397,6 +397,7 @@ public sealed class DapServer
             StdlibRoot = _options.StdlibRoot,
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
+            DependencyRoots = project?.Dependencies,
         });
 
         return result.Bytes is null

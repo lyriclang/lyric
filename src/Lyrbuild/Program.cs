@@ -108,7 +108,7 @@ public static class Program
         }
         catch (ProjectFileException broken)
         {
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BadProjectFile,
+            return CliDiagnostics.Fail(Console.Error, broken.Code,
                 $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
         }
     }
@@ -238,6 +238,7 @@ public static class Program
                 StdlibRoot = stdlibRoot,
                 SourceRoot = project?.SourceRoot,
                 NativeRoots = project?.NativeRoots,
+                DependencyRoots = project?.Dependencies,
                 // The script's word stands beside the profile's: 'sourceMap(false)' strips even
                 // where the profile would keep the map, and never adds one the profile omits.
                 SourceMap = artifact.SourceMap && profile.SourceMap,

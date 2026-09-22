@@ -50,7 +50,7 @@ public static class Program
             // Caught here rather than where it is read: 'Options' builds a value and has nowhere to
             // put a diagnostic, and threading a result type through five commands would put the
             // handling in five places for a failure that ends all of them the same way.
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BadProjectFile,
+            return CliDiagnostics.Fail(Console.Error, broken.Code,
                 $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
         }
     }
@@ -350,6 +350,7 @@ public static class Program
             Progress = terminal,
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
+            DependencyRoots = project?.Dependencies,
             Optimize = flags.Optimize ?? profile.Optimize,
             SourceMap = flags.SourceMap ?? profile.SourceMap,
             DebugInfo = flags.DebugInfo ?? profile.DebugInfo,

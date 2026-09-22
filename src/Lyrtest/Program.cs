@@ -77,7 +77,7 @@ public static class Program
             // A named testRoot that is no directory lands here too: the project file validates
             // its own paths, and a named root is a promise — unlike the default below, which is
             // a convention.
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BadProjectFile,
+            return CliDiagnostics.Fail(Console.Error, broken.Code,
                 $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
         }
 
@@ -124,6 +124,7 @@ public static class Program
                 StdlibRoot = stdlib,
                 SourceRoot = project?.SourceRoot,
                 NativeRoots = project?.NativeRoots,
+                DependencyRoots = project?.Dependencies,
                 // The debug profile unless asked otherwise: a failing test wants every frame in
                 // its backtrace. '--release' runs the same tests against the optimized shape,
                 // which is how a suite catches an optimizer that changed an answer.
@@ -146,6 +147,7 @@ public static class Program
                     StdlibRoot = stdlib,
                     SourceRoot = project?.SourceRoot,
                     NativeRoots = project?.NativeRoots,
+                    DependencyRoots = project?.Dependencies,
                 });
                 result.Diagnostics.RenderText(Console.Error);
                 failed++;

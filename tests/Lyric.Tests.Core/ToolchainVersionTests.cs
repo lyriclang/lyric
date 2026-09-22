@@ -34,4 +34,41 @@ public class ToolchainVersionTests
 
         Assert.Equal(ToolchainVersion.Value, version);
     }
+
+    [Theory]
+    [InlineData("4.5", 4, 5, 0)]
+    [InlineData("4.5.1", 4, 5, 1)]
+    [InlineData("10.0.20", 10, 0, 20)]
+    public void A_minimum_is_two_or_three_numbers(string text, int major, int minor, int patch)
+    {
+        Assert.True(ToolchainVersion.TryParse(text, out var version));
+        Assert.Equal((major, minor, patch), version);
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("4.5.1.2")]
+    [InlineData("4.x")]
+    [InlineData("")]
+    [InlineData("v4.5")]
+    [InlineData("4..5")]
+    public void Anything_else_is_not_a_version(string text) =>
+        Assert.False(ToolchainVersion.TryParse(text, out _));
+
+    /// <summary>Relative to whatever the toolchain is today, so the test does not move with the
+    /// release commits.</summary>
+    [Fact]
+    public void Satisfying_a_minimum_is_at_least()
+    {
+        Assert.True(ToolchainVersion.TryParse(ToolchainVersion.Value, out var current));
+        var (major, minor, patch) = current;
+
+        Assert.True(ToolchainVersion.Satisfies(ToolchainVersion.Value));
+        Assert.True(ToolchainVersion.Satisfies($"{major}.{minor}"));
+        Assert.True(ToolchainVersion.Satisfies("1.0"));
+        Assert.False(ToolchainVersion.Satisfies($"{major}.{minor}.{patch + 1}"));
+        Assert.False(ToolchainVersion.Satisfies($"{major}.{minor + 1}"));
+        Assert.False(ToolchainVersion.Satisfies($"{major + 1}.0"));
+        Assert.False(ToolchainVersion.Satisfies("not a version"));
+    }
 }

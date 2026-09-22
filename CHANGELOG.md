@@ -34,6 +34,17 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 - **`lyrvm run --jit`**, the engine `HostOptions.Compile` opts into, from the command line.
   `lyric run app.lyr --jit` hands it through to the runtime.
 
+- **`lyric.json` learns three keys.** `dependencies` maps a module path segment to the directory
+  of another project; that project's own source root is where the segment's modules come from,
+  its `nativeRoots` and `dependencies` come along, and the table is flat: one segment, one
+  directory, for the whole program — two dependencies disagreeing are refused with both named,
+  and your own entry pins the segment for everybody under you. `name` is the project's name, a
+  module name. `toolchain` is the oldest toolchain that may build the project; an older one
+  refuses with both numbers (`LYR-CLI0018`) instead of compiling against a language the project
+  was not written for. All three are optional; a file without them means what it meant.
+
+- **`HostOptions.DependencyRoots`**, the same table for a host compiling a project's scripts.
+
 ### Changed
 
 - **`lyric build`, `lyric run`, `lyric check`, `lyric test`, the REPL and the embedding API

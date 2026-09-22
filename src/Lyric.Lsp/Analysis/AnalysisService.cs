@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Lyric.AST;
 using Lyric.Compiler;
+using Lyric.Core;
 using Lyric.Lsp.Documents;
 using Lyric.Lsp.Protocol;
 
@@ -381,6 +382,7 @@ public sealed class AnalysisService : IDisposable
         StdlibRoot = _stdlibRoot,
         SourceRoot = project?.SourceRoot,
         NativeRoots = project?.NativeRoots,
+        DependencyRoots = project?.Dependencies,
 
         // Everything the editor holds, not only the files this run starts from. Without it a
         // program is checked against the last SAVE of every module it imports, and the two

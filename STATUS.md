@@ -58,8 +58,20 @@ by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
       lyrc and lyrvm, the driver's routing table (compile flags to lyrc, `--jit`/`--grant` to
       lyrvm), `lyric pack` release by default, a CI job with `LYRIC_PROFILE=release`, guides 1,
       14, 16, 17, 20, 21, CHANGELOG Unreleased
-- [ ] slice 2 — `lyric.json` v2 (`name`, `dependencies`, `toolchain`), `ModuleRoots`, the
-      reader moved to Core, the LSP on the same table
+- [x] **slice 2 — `lyric.json` v2**: `name`, `dependencies` and `toolchain`. A dependency owns
+      its first segment as a native root does; the reader (moved to `Lyric.Core`, because the
+      driver will read it and references no compiler) computes the FLAT closure over every
+      dependency's own manifest — its `dependencies` and `nativeRoots` join the table, a diamond
+      is read once, a cycle ends — and refuses two projects that want one segment to mean two
+      directories, naming both, while the root project's own entry pins a segment for everybody
+      under it (Go's `replace`, Cargo's `[patch]`). No `ModuleRoots` class after all: the flat
+      table IS the project file's properties, and the loader gained one branch. `toolchain` is a
+      minimum, checked at the read, its own code (`LYR-CLI0018`) because "upgrade" is different
+      advice from "edit the file"; a dependency's minimum counts too. `CompilerOptions` and
+      `HostOptions` gained `DependencyRoots`, every tool passes it, the LSP included. Templates
+      carry `name`. Thirteen CLI tests over sibling temp projects, guide 12 and 16, CHANGELOG.
+      **The spec sentence**: §4.1 lists the roots a dotted path resolves under and gains the
+      dependency root (`lyric-spec`, spec-first, this slice's twin)
 - [ ] slice 3 — `std.build` v2 and `lyrbuild` v2 (synthetic entry, the model in Lyric, implicit
       build, `packed`, options, `after`)
 - [ ] slice 4 — the driver's verbs without a file argument, artifact names, `out/<profile>/`,

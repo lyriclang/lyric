@@ -41,6 +41,14 @@ public sealed record HostOptions
     public string? SourceRoot { get; init; }
 
     /// <summary>
+    /// Other projects a script's imports may reach, keyed by the segment each owns and naming
+    /// that project's source root — the flattened table a <c>lyric.json</c>'s
+    /// <c>dependencies</c> resolves to. A test runner compiling a project's tests is the case
+    /// that added it: the tests import what the project imports.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? DependencyRoots { get; init; }
+
+    /// <summary>
     /// Whether scripts of this VM may run COMPILED. Default: no, they are interpreted.
     ///
     /// <para>Compiled code has no instruction boundaries — a debugger cannot stop inside it and a

@@ -97,13 +97,15 @@ Where modules live is a property of the project, not of a build, so it stays in
 
 ```json
 {
+  "name": "game",
   "sourceRoot": "src",
   "nativeRoots": { "engine": "sdk" },
+  "dependencies": { "geometry": "../geometry" },
 }
 ```
 
-Both files are read for every artifact. The script never repeats a root, and an editor learns the
-layout from `lyric.json` without running anything.
+Both files are read for every artifact. The script never repeats a root or a dependency, and an
+editor learns the layout from `lyric.json` without running anything.
 
 ## Two profiles
 

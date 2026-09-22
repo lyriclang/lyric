@@ -74,6 +74,11 @@ public static class CliDiagnostics
     /// not silent.</summary>
     public const string ProjectFileSuspect = "LYR-CLI0017";
 
+    /// <summary>A <c>lyric.json</c> names a minimum toolchain this one does not reach. Its own
+    /// code rather than <see cref="BadProjectFile"/>, because the advice differs: nothing in the
+    /// file is wrong, the toolchain is too old.</summary>
+    public const string ToolchainTooOld = "LYR-CLI0018";
+
     /// <summary>Reports a CLI diagnostic and renders it immediately. It has no source span, so
     /// there is nothing to collect or order.</summary>
     public static int Fail(TextWriter error, string code, string message, int exitCode)
