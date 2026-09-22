@@ -2024,8 +2024,16 @@ internal sealed class FunctionLowerer
         var enumType = RequireEnum(_types.TypeOf(constructed), span);
         var variant = _typeTable.VariantOf(enumType.Type, callee.Member, span);
 
+        // Adapted to the declared payload type, exactly as an object initializer adapts a field:
+        // slot 0 is the tag, the payload starts at 1. Lowered raw, a struct payload would share the
+        // slot array with its source — value semantics broken — and a '?T' or interface payload
+        // would arrive as the bare value, which the verifier calls malformed IR.
+        var layout = _typeTable.Defs[variant.Value];
         var fields = new TempId[arguments.Length];
-        for (var i = 0; i < arguments.Length; i++) fields[i] = LowerExpr(arguments[i]);
+        for (var i = 0; i < arguments.Length; i++)
+            fields[i] = i + 1 < layout.FieldTypes.Length
+                ? LowerExprAs(arguments[i], layout.FieldTypes[i + 1])
+                : LowerExpr(arguments[i]);
 
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variant, enumType.Type, fields, span));
@@ -2042,8 +2050,16 @@ internal sealed class FunctionLowerer
         var variant = _typeTable.VariantOf(enumType.Type, variantName, expr.Span);
         var layout = _typeTable.Defs[variant.Value];
 
+        // Adapted to the declared field type, the same step an object initializer takes — see
+        // LowerVariantCall for what a raw payload costs.
         var values = new Dictionary<string, TempId>(StringComparer.Ordinal);
-        foreach (var field in expr.Fields) values[field.Name] = LowerExpr(field.Value);
+        foreach (var field in expr.Fields)
+        {
+            var fieldIndex = Array.IndexOf(layout.FieldNames, field.Name);
+            values[field.Name] = fieldIndex >= 0
+                ? LowerExprAs(field.Value, layout.FieldTypes[fieldIndex])
+                : LowerExpr(field.Value);
+        }
 
         var fields = new TempId[layout.FieldNames.Length - 1];
         for (var i = 1; i < layout.FieldNames.Length; i++)
@@ -2430,11 +2446,12 @@ internal sealed class FunctionLowerer
             {
                 var unwrapped = _slots.NewTemp(slotType);
                 _b.Emit(new OptGet(unwrapped, value, slotType, binding.Span));
-                _b.Emit(new StoreLocal(slot, unwrapped, binding.Span));
+                _b.Emit(new StoreLocal(slot, CopyIfStruct(unwrapped, slotType, binding.Span),
+                    binding.Span));
                 return;
             }
 
-            _b.Emit(new StoreLocal(slot, value, binding.Span));
+            _b.Emit(new StoreLocal(slot, CopyIfStruct(value, slotType, binding.Span), binding.Span));
             return;
         }
 
@@ -2610,10 +2627,21 @@ internal sealed class FunctionLowerer
         // original through its own name changed what the pattern had bound: measured at 99 where
         // an ordinary `let` of the same field answered 1. Unobservable on the variant path, which
         // shares this helper, only because an enum's payload cannot be reached to mutate.
-        if (type is IrStructType structType) loaded = CopyStructValue(loaded, structType, span);
-
-        _b.Emit(new StoreLocal(slot, loaded, span));
+        _b.Emit(new StoreLocal(slot, CopyIfStruct(loaded, type, span), span));
     }
+
+    /// <summary>
+    /// A struct value entering a binding, copied; anything else passed through.
+    ///
+    /// <para>A binding is where a value gets a new home, and a struct detaches there. Without it the
+    /// name aliases what it was read from, so mutating the original through ITS name changes what the
+    /// binding holds — measured at 99 where an ordinary <c>let</c> of the same value answered 1. A
+    /// freshly built value has no other owner and needs none.</para>
+    /// </summary>
+    private TempId CopyIfStruct(TempId value, IrType type, Span span) =>
+        type is IrStructType structType && !_fresh.Contains(value)
+            ? CopyStructValue(value, structType, span)
+            : value;
 
     // ------------------------------------------------------------------ optionals
 
