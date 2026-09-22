@@ -1,0 +1,38 @@
+// 22 Unäres Minus / `%` auf eigenen Typen; Compound-Zuweisung auf Feldern — IST-STAND (4.4.1)
+// Aufgabe: ein Vektortyp mit Negation und komponentenweisem Rest, und ein Objekt, dessen
+// Vektorfeld akkumuliert wird. Heute: kein `Neg`-/`Rem`-Interface (§6.1: `%` numeric-only,
+// CHANGELOG v1.5.0 "deliberately"), also `v.neg()` und `v.rem(w)` als Methoden; `h.v += w`
+// auf einem FELD mit Interface-Operator ist LYR-SEM0003 (§6.5) → ausgeschrieben.
+import std.io.console { println };
+import std.core { Add };
+
+struct V :: [Add<V, V>] {
+    x: int,
+    y: int,
+    fn add(o: V): V { return V { x = this.x + o.x, y = this.y + o.y }; }
+    fn neg(): V { return V { x = -this.x, y = -this.y }; }             // statt -v
+    fn rem(o: V): V { return V { x = this.x % o.x, y = this.y % o.y }; } // statt v % w
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+class Body { pos: V, vel: V, }
+
+fn step(b: Body): void {
+    b.pos = b.pos + b.vel;               // `b.pos += b.vel` ist SEM0003: Feldziel mit Interface-Operator
+}
+
+fn main(): int {
+    let v = V { x = 3, y = -4 };
+    println(v.neg().show());
+    println(v.rem(V { x = 2, y = 3 }).show());
+
+    let b = Body { pos = V { x = 0, y = 0 }, vel = V { x = 1, y = 2 } };
+    step(b);
+    step(b);
+    println(b.pos.show());
+    return b.pos.x + b.pos.y;
+}
+// Ausgabe (lyric run ist.lyr; exit 6):
+// (-3, 4)
+// (1, -1)
+// (2, 4)

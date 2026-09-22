@@ -1,0 +1,62 @@
+// 01 Result-Typ / `?`-Operator — IST-STAND (Lyric 4.4.1)
+// Aufgabe: "port=8080" parsen, Fehlerursache tragen, mehrere Ergebnisse SAMMELN
+// und später auswerten. Heute: throws für die Weitergabe, ein Enum von Hand
+// für die Speicherung (ein throws-Ergebnis lässt sich nicht in eine Liste legen).
+import std.io.console { println };
+import std.string { parseInt };
+import std.collections { List };
+
+class ParseError :: [Throwable] {
+    line: string,
+    why: string,
+    fn message(): string { return this.why + " in '" + this.line + "'"; }
+}
+
+// Weitergabe: throws deckt das "?" von Rust vollständig ab — jeder Aufruf einer
+// throwenden Funktion in einer throwenden Funktion propagiert automatisch.
+fn parsePort(line: string): int throws ParseError {
+    let eq = line.indexOf("=");
+    if (eq < 0) { throw ParseError { line = line, why = "no '='" }; }
+    let key = line.substring(0, eq);
+    if (key != "port") { throw ParseError { line = line, why = "unknown key " + key }; }
+    let value = parseInt(line.substring(eq + 1, line.length() - eq - 1));
+    if (value == null) { throw ParseError { line = line, why = "not a number" }; }
+    return value;
+}
+
+fn parseAndDouble(line: string): int throws ParseError {
+    return parsePort(line) * 2;       // Propagation ohne Zeremonie
+}
+
+// Speicherung: ein Ergebnis als WERT braucht heute ein eigenes Enum pro Fehlertyp,
+// und die Umwandlung throws -> Wert ist ein try/catch von Hand.
+enum PortResult { Ok(int), Err(ParseError), }
+
+fn tryParse(line: string): PortResult {
+    try {
+        return PortResult.Ok(parseAndDouble(line));
+    } catch (e: ParseError) {
+        return PortResult.Err(e);
+    }
+}
+
+fn main(): int {
+    let inputs = ["port=8080", "host=x", "port=abc", "nonsense"];
+    let results = List<PortResult>.empty();
+    for (line in inputs) {
+        results.push(tryParse(line));      // gesammelt, nicht sofort behandelt
+    }
+    var okCount = 0;
+    for (r in results) {
+        match (r) {
+            Ok(v) => { println(f"ok  {v}"); okCount += 1; }
+            Err(e) => { println("err " + e.message()); }
+        }
+    }
+    return okCount;
+}
+// Ausgabe (lyric run ist.lyr; exit 1):
+// ok  16160
+// err unknown key host in 'host=x'
+// err not a number in 'port=abc'
+// err no '=' in 'nonsense'

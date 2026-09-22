@@ -1,0 +1,50 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 09 Slices / Teilbereiche — SOLL-STAND
+//
+// Vorschlag (language-review): Index mit Range, als KOPIE (Wertsemantik wie heute, keine Views).
+//   Grammatik §6.2 Postfix:  IndexSuffix = '[' ( Expr | SliceRange ) ']' .
+//                            SliceRange  = [ Expr ] ( '..' | '..=' ) [ Expr ] .
+//   `xs[a..b]`  Elemente a ≤ i < b;  `xs[a..=b]` bis einschließlich b;  `xs[..b]`, `xs[a..]`,
+//   `xs[..]` mit weggelassener Grenze (0 bzw. length). Typ: `T[]` für `xs: T[]`.
+//   Panik bei a < 0, b > length oder a > b — dieselbe Regel wie ein Index außerhalb.
+// Warum keine Grammatik-Kollision: `..` hat heute Präzedenzstufe 7 und parst als RangeExpr
+//   (Parser.cs:74,113-118), die Sema lehnt jeden Wert-Kontext ab (§7.2). Im Index steht heute
+//   `ParseSubExpr`, also wird `xs[1..3]` schon geparst — und abgelehnt. Die Änderung ist in der
+//   Sema/Lowering, nicht im Parser (nur die offenen Formen `[..b]`/`[a..]` brauchen den Parser).
+//   §7.2 bleibt: eine Range ist kein Wert; sie tritt an genau ZWEI Stellen auf — Schleifenkopf
+//   und Index-Klammer.
+// Strings: `string` ist bewusst nicht indexierbar (§3.3: O(n)-Zugriff). Daher KEIN `s[a..b]`;
+//   der Weg bleibt `s.toChars()[a..b]` (explizite O(n)-Materialisierung) — oder die stdlib bekommt
+//   `substringFrom(from, to)`/`slice(from, to)` (an stdlib-review gemeldet).
+import std.io.console { println };
+import std.string { fromChars };
+
+fn isAlpha(c: char): bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+fn firstWord(text: string): string {
+    let cs = text.toChars();
+    var i = 0;
+    while (i < cs.length && isAlpha(cs[i])) { i += 1; }
+    return fromChars(cs[..i]);                       // Slice statt Kopierschleife
+}
+
+fn main(): int {
+    println(firstWord("hello, world"));
+
+    let xs = [10, 20, 30, 40, 50];
+    let head = xs[..2];                              // [10, 20]
+    let tail = xs[3..];                              // [40, 50]
+    let mid = xs[1..=3];                             // [20, 30, 40]
+    println(f"{head[0]},{head[1]} … {tail[0]},{tail[1]} mid {mid.length}");
+
+    let arg = "--name=ada";
+    let value = fromChars(arg.toChars()[7..]);       // oder stdlib: arg.slice(7, arg.length())
+    println(value);
+    return xs.length;
+}
+// Erwartete Ausgabe (exit 5):
+// hello
+// 10,20 … 40,50 mid 3
+// ada

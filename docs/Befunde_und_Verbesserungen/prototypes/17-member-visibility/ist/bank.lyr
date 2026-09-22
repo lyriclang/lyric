@@ -1,0 +1,23 @@
+// 17 Member-Sichtbarkeit — IST-STAND, Bibliotheksmodul (Lyric 4.4.1)
+// Die Bibliothek WILL eine Invariante schützen: balance ändert sich nur über deposit/withdraw,
+// und `audit` ist intern. `pub` auf Membern ist heute Dekoration (Spec §4.2 erfasst nur
+// Top-Level-Deklarationen); ein Feld kann gar nicht `pub` sein.
+module bank;
+
+pub class Account {
+    owner: string,
+    balance: int,               // gemeint: privat
+    audit: int,                 // gemeint: privat
+
+    pub fn read(): int { return this.balance; }
+    pub mut fn deposit(n: int): void {
+        if (n <= 0) { return; }
+        this.balance += n;
+        this.log();
+    }
+    mut fn log(): void { this.audit += 1; }     // gemeint: privat
+}
+
+pub fn open(owner: string): Account {
+    return Account { owner = owner, balance = 0, audit = 0 };
+}

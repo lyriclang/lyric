@@ -1,0 +1,52 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 16 Optional-Gleichheit; Narrowing von Feldpfaden — SOLL-STAND
+//
+// (a) Optional-Gleichheit (Spec §6.2, ersetzt "comparing two optionals is an error"):
+//     `a == b` mit `a, b: ?T` ist definiert, wenn `T` Equatable<T> erfüllt (oder Skalar):
+//       null == null → true;  null == v / v == null → false;  v == w → v.equals(w).
+//     `!=` ist die Negation. Ordnung (`<`) auf Optionals bleibt ein Fehler (keine natürliche
+//     Ordnung für null — Swift hat sie 2018 entfernt). Gemischte Form `?T == T` ist erlaubt
+//     (T widert zu ?T, §3.7). Kein neuer Operator, keine Grammatikänderung.
+//     Lowering: OptIsSome/OptGet existieren (STATUS.md); Desugar in vier Fälle.
+//     Damit wird das GENERISCHE `fn same<T :: [Equatable<T>]>(a: ?T, b: ?T)` schreibbar — und
+//     Prototyp 03 (synthetisiertes equals) kann `?T`-Felder feldweise vergleichen.
+// (b) Narrowing von Feldpfaden (Spec §7.4, "What proves a fact" erweitert) — nur SKIZZE:
+//     ein Pfad `x.f` (x eine `let`-Bindung eines STRUCT-Typs, f ein Feld) narrowt wie ein
+//     Identifier, solange zwischen Prüfung und Nutzung keine Zuweisung an x oder x.f steht.
+//     Structs haben Wertsemantik (§3.4): niemand sonst kann x.f schreiben, und eine `let`-
+//     Bindung kann nicht neu gebunden werden — der Beweis bleibt gültig. Für CLASS-Felder
+//     bleibt es beim Kopieren (Aliasing: ein Aufruf dazwischen könnte das Feld leeren) — oder
+//     let-else (Prototyp 02) bindet es in ein Lokal.
+import std.io.console { println };
+import std.core { Equatable };
+
+struct Config :: [Equatable<Config>] {          // mit Prototyp 03: synthetisiert, ?-Felder eingeschlossen
+    host: string,
+    port: ?int,
+    label: ?string,
+}
+
+fn same<T :: [Equatable<T>]>(a: ?T, b: ?T): bool {
+    return a == b;                                 // (a) generisch, einmal
+}
+
+fn describe(c: Config): string {
+    let p = if (c.port != null) c.port + 1 else 0;   // (b) Feldpfad narrowt: c ist let, Config ist struct
+    return f"{c.host}:{p}";
+}
+
+fn main(): int {
+    let a = Config { host = "h", port = 80, label = null };
+    let b = Config { host = "h", port = 80, label = null };
+    let c = Config { host = "h", port = null, label = "x" };
+    println(if (a == b) "a == b" else "a != b");
+    println(if (a == c) "a == c" else "a != c");
+    println(if (same(a.port, b.port)) "ports same" else "ports differ");
+    println(describe(a) + " " + describe(c));
+    return 0;
+}
+// Erwartete Ausgabe (exit 0):
+// a == b
+// a != c
+// ports same
+// h:81 h:0

@@ -1,0 +1,68 @@
+// 01 Result-Typ — LIB-VARIANTE (kompiliert heute): ein generisches Result<T, E>
+// als stdlib-Kandidat (std.result). Zeigt, was OHNE Sprachfeature geht und wo
+// es hakt: kein `?`, also jeder Schritt ein match; Kombinatoren ersetzen es teilweise.
+import std.io.console { println };
+import std.string { parseInt };
+import std.collections { List };
+
+// ---- Kandidat für std.result ----
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E);
+
+    fn isOk(): bool {
+        return match (this) { Ok(_) => true, Err(_) => false };
+    }
+    fn unwrapOr(fallback: T): T {
+        return match (this) { Ok(v) => v, Err(_) => fallback };
+    }
+    fn ok(): ?T {
+        return match (this) { Ok(v) => v, Err(_) => null };
+    }
+}
+// map/andThen als freie Funktionen: eine Methode kann keinen eigenen
+// Typparameter U einführen (Methoden generischer Typen sind nicht selbst generisch).
+pub fn map<T, U, E>(r: Result<T, E>, f: fn(T) -> U): Result<U, E> {
+    return match (r) { Ok(v) => Result<U, E>.Ok(f(v)), Err(e) => Result<U, E>.Err(e) };
+}
+pub fn andThen<T, U, E>(r: Result<T, E>, f: fn(T) -> Result<U, E>): Result<U, E> {
+    return match (r) { Ok(v) => f(v), Err(e) => Result<U, E>.Err(e) };
+}
+// ---- Ende Kandidat ----
+
+fn splitKv(line: string): Result<(string, string), string> {
+    let eq = line.indexOf("=");
+    if (eq < 0) { return Result<(string, string), string>.Err("no '='"); }
+    return Result<(string, string), string>.Ok((line.substring(0, eq), line.substring(eq + 1, line.length() - eq - 1)));
+}
+
+fn parsePort(line: string): Result<int, string> {
+    // Ohne `?`: Kombinator-Kette statt früher Rückkehr.
+    return andThen(splitKv(line), (kv: (string, string)) => {
+        let (k, v) = kv;
+        if (k != "port") { return Result<int, string>.Err("unknown key " + k); }
+        let n = parseInt(v);
+        return if (n == null) Result<int, string>.Err("not a number") else Result<int, string>.Ok(n);
+    });
+}
+
+fn main(): int {
+    let inputs = ["port=8080", "host=x", "port=abc", "nonsense"];
+    let results = List<Result<int, string>>.empty();
+    for (line in inputs) {
+        results.push(map(parsePort(line), (n: int) => n * 2));
+    }
+    var okCount = 0;
+    for (r in results) {
+        match (r) {
+            Ok(v) => { println(f"ok  {v}"); okCount += 1; }
+            Err(e) => { println("err " + e); }
+        }
+    }
+    return okCount;
+}
+// Ausgabe (lyric run lib-variante.lyr; exit 1):
+// ok  16160
+// err unknown key host
+// err not a number
+// err no '='

@@ -1,0 +1,6 @@
+// Nebenprobe: Kontext-Propagation in Array-Literale (§3.1) und die Anzeige von (?int)[]
+fn main(): int {
+    let a: (?int)[] = [null, 1];          // erwartet: ok (Kontext propagiert in Elemente)
+    let b: (?int)[] = [null] * 3;         // erwartet: ok? (Kontext durch `*`?)
+    return a.length + b.length;
+}

@@ -1,0 +1,9 @@
+// Nebenprobe: generisches ?T mit T = ?int — Sema schweigt, Lowering lehnt ab (IR0001)
+fn firstOf<T>(xs: T[]): ?T {
+    return if (xs.length == 0) null else xs[0];
+}
+fn main(): int {
+    let slots: (?int)[] = [null, 5];
+    let a = firstOf(slots);          // error[LYR-IR0001]: a nested optional '??T' — optionals do not nest
+    return if (a == null) 0 else 1;
+}

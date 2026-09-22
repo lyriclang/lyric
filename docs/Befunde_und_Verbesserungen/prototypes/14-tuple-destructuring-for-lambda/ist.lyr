@@ -1,0 +1,45 @@
+// 14 Tupel-Destructuring im for-Kopf und in Lambda-Parametern — IST-STAND (Lyric 4.4.1)
+// Aufgabe: über die Einträge einer Map laufen, über enumerate(...)-Paare, und ein Lambda
+// mit Tupel-Parameter schreiben. Heute: `for (x in …)` bindet genau EINEN Identifier (§5
+// ForInStmt), ein Lambda-Parameter ist `IDENTIFIER [':' TypeExpr]` — also ein Hilfsname
+// (`kv`, `pair`) und eine Destructuring-Zeile als erste Anweisung.
+import std.io.console { println };
+import std.collections { Map, entries };
+import std.iter { over, enumerate, fold };
+
+fn main(): int {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+
+    // (1) Map-Einträge: Hilfsname + Destructuring-Zeile
+    var total = 0;
+    for (kv in entries(m)) {
+        let (k, v) = kv;
+        println(k + "=" + f"{v}");
+        total += v;
+    }
+
+    // (2) enumerate: dito
+    let names = ["x", "y", "z"];
+    for (pair in enumerate(over(names))) {
+        let (i, name) = pair;
+        println(f"{i}: {name}");
+    }
+
+    // (3) Lambda mit Tupel-Parameter: der Parameter braucht einen Namen und den vollen Typ
+    let pairs = [(1, 10), (2, 20)];
+    let sum = fold(over(pairs), 0, (acc: int, p: (int, int)) => {
+        let (a, b) = p;
+        return acc + a * b;
+    });
+    println(f"sum {sum}");
+    return total + sum;
+}
+// Ausgabe (lyric run ist.lyr; exit 53) — Map-Reihenfolge ist Hash-Reihenfolge:
+// b=2
+// a=1
+// 0: x
+// 1: y
+// 2: z
+// sum 50

@@ -1,0 +1,35 @@
+// 19 Raw-/Mehrzeilen-Strings — IST-STAND (Lyric 4.4.1)
+// Aufgabe: ein JSON-Testdatum, ein mehrzeiliger Hilfetext (usage), ein Windows-Pfad-Muster.
+// Heute (§1.6/§1.7: "no raw or multiline string form"): jedes `"` escaped, jede Zeile ein
+// eigenes Literal mit `\n` und `+`, jeder Backslash verdoppelt.
+import std.io.console { println };
+import std.json { parse };
+
+fn main(): int {
+    // (1) JSON: sieben escapte Anführungszeichen für ein Objekt mit zwei Feldern
+    let doc = parse("{\"name\": \"aria\", \"level\": 3, \"tags\": [\"a\", \"b\"]}");
+    println(if (doc != null) "json ok" else "json bad");
+
+    // (2) usage-Text: fünf Literale, vier `+`, das `\n` am Ende jeder Zeile darf nicht fehlen
+    let usage = "usage: tool [options] <file>\n"
+              + "  -v        verbose\n"
+              + "  -o FILE   write output to FILE\n"
+              + "  --dry     do not write anything\n"
+              + "examples:\n"
+              + "  tool -v in.txt";
+    println(usage);
+
+    // (3) Pfad/Regex-artige Muster: jeder Backslash doppelt
+    let pattern = "C:\\Users\\ada\\*.txt";
+    println(pattern);
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// json ok
+// usage: tool [options] <file>
+//   -v        verbose
+//   -o FILE   write output to FILE
+//   --dry     do not write anything
+// examples:
+//   tool -v in.txt
+// C:\Users\ada\*.txt

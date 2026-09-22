@@ -1,0 +1,42 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 14 Tupel-Destructuring im for-Kopf und in Lambda-Parametern — SOLL-STAND
+//
+// Grammatik (§5, §6.2):
+//   ForInStmt   = 'for' '(' ( IDENTIFIER | TuplePattern ) 'in' ( RangeExpr | Expr ) ')' Block .
+//   LambdaParam = ( IDENTIFIER | TuplePattern ) [ ':' TypeExpr ] .
+// TuplePattern ist das irrefutable Muster aus DestructuringStmt (§5: "names, `_` and nested
+// tuple patterns; no form that can fail") — dieselbe Regel, dieselbe Lowering (§7.1).
+// Eindeutigkeit:
+//   for: nach `for (` steht heute ein IDENTIFIER; `(` ist dort ein Parsefehler → frei.
+//   Lambda: `((k, v)) => …` — die ÄUSSEREN Klammern sind die Parameterliste, die inneren das
+//   Muster. `(k, v) => …` bleibt ein Lambda mit ZWEI Parametern (heute so, nicht ändern!).
+//   Das ist Python-Regel (`lambda kv: …` vs. Rust `|(k, v)|`) — die Doppelklammer ist der Preis
+//   dafür, dass die bestehende Zwei-Parameter-Form unverändert bleibt.
+// Typen: das Muster erhält den Elementtyp (Iterator<(K, V)>) bzw. den Parametertyp aus dem
+//   Kontext (§7.3 bidirektional); Arity-Mismatch ist der bestehende Destructuring-Fehler.
+import std.io.console { println };
+import std.collections { Map, entries };
+import std.iter { over, enumerate, fold };
+
+fn main(): int {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+
+    var total = 0;
+    for ((k, v) in entries(m)) {                       // (1)
+        println(k + "=" + f"{v}");
+        total += v;
+    }
+
+    let names = ["x", "y", "z"];
+    for ((i, name) in enumerate(over(names))) {        // (2)
+        println(f"{i}: {name}");
+    }
+
+    let pairs = [(1, 10), (2, 20)];
+    let sum = fold(over(pairs), 0, (acc, (a, b)) => acc + a * b);   // (3) Typen aus dem Kontext
+    println(f"sum {sum}");
+    return total + sum;
+}
+// Erwartete Ausgabe: wie ist.lyr (exit 53)

@@ -1,0 +1,58 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 01 Result-Typ / `?`-Operator — SOLL-STAND
+//
+// Kern der Beobachtung: `throws` IST bereits Lyrics `?` — die Propagation ist
+// implizit. Was fehlt, ist die BRÜCKE zwischen der Welt der Ausnahmen und der
+// Welt der Werte. Vorschlag (zwei Teile):
+//   (1) stdlib: `std.result.Result<T, E>` mit map/andThen/unwrapOr/ok/orThrow.
+//   (2) Sprache (mit language-review vereinbart, Details in Prototyp 04):
+//       TryExpr = 'try' ['?'] UnaryExpr [ 'catch' '(' CatchBinding ')' ( Block | Expr ) ] .
+//       `try? e` → ?T (Fehlergrund egal; Swift try?), `try e catch (x: E) Expr` → Unifikation.
+//       Die Reifikation in ein Result ist damit ein gewöhnlicher catch-Ausdruck —
+//       keine eigene Produktion. Kein neues Token, kein postfix `?` (kollidiert mit `?.`).
+import std.io.console { println };
+import std.string { parseInt };
+import std.collections { List };
+import std.result { Result };
+
+class ParseError :: [Throwable] {
+    line: string,
+    why: string,
+    fn message(): string { return this.why + " in '" + this.line + "'"; }
+}
+
+fn parsePort(line: string): int throws ParseError {
+    let eq = line.indexOf("=");
+    if (eq < 0) { throw ParseError { line = line, why = "no '='" }; }
+    let key = line.substring(0, eq);
+    if (key != "port") { throw ParseError { line = line, why = "unknown key " + key }; }
+    let value = parseInt(line.substring(eq + 1, line.length() - eq - 1));
+    if (value == null) { throw ParseError { line = line, why = "not a number" }; }
+    return value;
+}
+
+fn parseAndDouble(line: string): int throws ParseError {
+    return parsePort(line) * 2;                  // unverändert: throws propagiert
+}
+
+fn main(): int {
+    let inputs = ["port=8080", "host=x", "port=abc", "nonsense"];
+    let results = List<Result<int, ParseError>>.empty();
+    for (line in inputs) {
+        // NEU: try als Ausdruck; der catch-Ausdruck unifiziert mit dem Operanden zu Result.
+        results.push(try Result<int, ParseError>.Ok(parseAndDouble(line))
+                     catch (e: ParseError) Result<int, ParseError>.Err(e));
+    }
+    // Wenn der Grund egal ist, reicht `try?` und ein Optional (80 % der Fälle):
+    let firstOrZero = try? parseAndDouble(inputs[0]) ?? 0;
+    var okCount = 0;
+    for (r in results) {
+        match (r) {
+            Ok(v) => { println(f"ok  {v}"); okCount += 1; }
+            Err(e) => { println("err " + e.message()); }
+        }
+    }
+    // Rückweg Wert -> Ausnahme ist reine Bibliothek: r.orThrow() : T throws E
+    return okCount;
+}
+// Erwartete Ausgabe: identisch mit ist.lyr

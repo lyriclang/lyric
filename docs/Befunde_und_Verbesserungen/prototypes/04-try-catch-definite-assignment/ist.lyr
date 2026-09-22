@@ -1,0 +1,60 @@
+// 04 try/catch und Definite Assignment — IST-STAND (Lyric 4.4.1)
+// Aufgabe: Argumente parsen (kann UsageError werfen), bei Fehler Meldung + exit 2,
+// sonst mit den Optionen weiterarbeiten. §7.7: "A try contributes nothing afterwards" —
+// also bleibt `opts` nach dem try/catch "possibly unassigned" (siehe fails.lyr).
+// Zwei Umwege, beide lauffähig:
+import std.io.console { println };
+
+class UsageError :: [Throwable] {
+    what: string,
+    fn message(): string { return "usage: " + this.what; }
+}
+
+struct Options { limit: int, verbose: bool, }
+
+fn parseArgs(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { what = "need at least one argument" }; }
+    return Options { limit = args.length, verbose = args[0] == "-v" };
+}
+
+// Umweg A: eine Helferfunktion, die die Ausnahme in ein Optional übersetzt (+6 Zeilen),
+// danach greift das gewöhnliche Narrowing über den frühen Exit.
+fn parseOrReport(args: string[]): ?Options {
+    try {
+        return parseArgs(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return null;
+    }
+}
+
+fn runA(args: string[]): int {
+    let opts = parseOrReport(args);
+    if (opts == null) { return 2; }
+    println(f"A: limit {opts.limit} verbose {opts.verbose}");
+    return 0;
+}
+
+// Umweg B: der gesamte Rest der Funktion wandert in den try-Block — und jede weitere
+// throwende Stelle im Rest wird vom selben catch mit abgedeckt, ob gewollt oder nicht.
+fn runB(args: string[]): int {
+    try {
+        let opts = parseArgs(args);
+        println(f"B: limit {opts.limit} verbose {opts.verbose}");
+        return 0;
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+}
+
+fn main(): int {
+    let ok = runA(["-v", "x"]) + runB(["-v", "x"]);
+    let bad = runA([]) + runB([]);
+    return ok + bad;
+}
+// Ausgabe (lyric run ist.lyr; exit 4):
+// A: limit 2 verbose true
+// B: limit 2 verbose true
+// usage: need at least one argument
+// usage: need at least one argument

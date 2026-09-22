@@ -1,0 +1,48 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 19 Raw-/Mehrzeilen-Strings — SOLL-STAND (rein lexikalisch, Spec §1.5/§1.6, Grammatik §1.5)
+//
+//   RawStringLit   = 'r' { '#' } '"' { any-char } '"' { '#' } .     (* gleich viele '#' *)
+//   MultiLineStr   = '"""' [ Newline ] { any-char | EscapeSeq } '"""' .
+//   InterpolatedML = 'f' MultiLineStr .                              (* Löcher wie InterpolatedStr *)
+// Raw: keine Escapes; der `#`-Zaun (Rust) erlaubt `"` im Inhalt: r#"say "hi""#.
+//   Lexer: heute ist `r"` ein Identifier `r` gefolgt von einem String → Parsefehler
+//   (zwei Primaries ohne Operator) → frei. `f"` ist bereits genau so gelöst (§1.5).
+// Mehrzeilig: `"""` — heute lext das als `""` (leerer String) + `"` (offener String) → Fehler,
+//   also frei. Regeln nach Swift: der Inhalt beginnt nach dem Zeilenumbruch hinter `"""`;
+//   der Einzug der SCHLIESSENDEN `"""` wird von jeder Zeile entfernt (weniger Einzug → Fehler);
+//   der letzte Zeilenumbruch vor `"""` gehört nicht zum Inhalt; `\` am Zeilenende verbindet Zeilen.
+//   Escapes gelten wie in "…"; `r"""…"""` kombiniert beides.
+// Formatter: Lexeme unverändert übernehmen (Einzug ist Inhalt!). Tests/`lyrfmt --check`: der
+//   Formatter darf einen Mehrzeilen-String nie neu einrücken.
+import std.io.console { println };
+import std.json { parse };
+
+fn main(): int {
+    // (1) JSON als Raw-String: keine Escapes
+    let doc = parse(r#"{"name": "aria", "level": 3, "tags": ["a", "b"]}"#);
+    println(if (doc != null) "json ok" else "json bad");
+
+    // (2) usage als Mehrzeilen-String; der Einzug der schließenden """ wird entfernt
+    let usage = """
+        usage: tool [options] <file>
+          -v        verbose
+          -o FILE   write output to FILE
+          --dry     do not write anything
+        examples:
+          tool -v in.txt
+        """;
+    println(usage);
+
+    // (3) Raw-Pfad
+    let pattern = r"C:\Users\ada\*.txt";
+    println(pattern);
+
+    // (4) f-Variante: Löcher wie in f"…"
+    let tool = "tool";
+    let hint = f"""
+        run {tool} --help for details
+        """;
+    println(hint);
+    return 0;
+}
+// Erwartete Ausgabe: wie ist.lyr, plus "run tool --help for details"

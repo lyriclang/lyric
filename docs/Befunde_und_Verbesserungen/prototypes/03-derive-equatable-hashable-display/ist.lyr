@@ -1,0 +1,92 @@
+// 03 Ableitung von Equatable/Hashable/Ordered/Display — IST-STAND (Lyric 4.4.1)
+// Aufgabe: ein Wertetyp mit drei Feldern, der als Map-Schlüssel und Set-Element taugt,
+// sich mit == vergleicht, sortierbar ist und sich drucken lässt. Heute: vier Methoden
+// von Hand, jede eine eigene Fehlerquelle (vergessenes Feld, Hash ≠ Equals).
+import std.io.console { println };
+import std.core { Equatable, Hashable, Ordered, Display };
+import std.collections { Map, Set, List, sortList };
+
+struct Coord :: [Hashable<Coord>, Ordered<Coord>, Display] {
+    x: int,
+    y: int,
+    label: string,
+
+    // Equatable kommt über Hashable (Parent), muss aber trotzdem geschrieben werden.
+    fn equals(other: Coord): bool {
+        return this.x == other.x && this.y == other.y && this.label == other.label;
+    }
+    // Muss zu equals passen — kein Compiler prüft das; ein vergessenes Feld ist hier still.
+    fn hash(): int {
+        var h = this.x.hash();
+        h = h * 31 + this.y.hash();
+        h = h * 31 + this.label.hash();
+        return h;
+    }
+    // Lexikografisch in Felddeklarationsreihenfolge.
+    fn compare(other: Coord): int {
+        if (this.x != other.x) { return if (this.x < other.x) -1 else 1; }
+        if (this.y != other.y) { return if (this.y < other.y) -1 else 1; }
+        return this.label.compare(other.label);
+    }
+    fn show(): string {
+        return f"Coord {{ x = {this.x}, y = {this.y}, label = \"{this.label}\" }}";
+    }
+}
+
+// Für ein Enum dasselbe noch einmal, mit match über beide Seiten.
+enum Cell :: [Equatable<Cell>, Display] {
+    Empty,
+    Wall,
+    Item(int);
+
+    fn equals(other: Cell): bool {
+        return match (this) {
+            Empty => match (other) { Empty => true, _ => false },
+            Wall  => match (other) { Wall => true, _ => false },
+            Item(a) => match (other) { Item(b) => a == b, _ => false },
+        };
+    }
+    fn show(): string {
+        return match (this) {
+            Empty => "Cell.Empty",
+            Wall => "Cell.Wall",
+            Item(n) => f"Cell.Item({n})",
+        };
+    }
+}
+
+fn main(): int {
+    let a = Coord { x = 1, y = 2, label = "a" };
+    let b = Coord { x = 1, y = 2, label = "a" };
+    let c = Coord { x = 0, y = 9, label = "c" };
+
+    println(if (a == b) "a == b" else "a != b");
+    println(if (a < c) "a < c" else "a >= c");
+
+    let visited = Set<Coord>.empty();
+    visited.add(a);
+    visited.add(b);                       // gleich → kein zweiter Eintrag
+    visited.add(c);
+    println(f"set size {visited.length()}");
+
+    let names = Map<Coord, string>.empty();
+    names.set(a, "start");
+    println(names.get(b) ?? "missing");   // b findet a's Eintrag
+
+    let sorted = List<Coord>.empty();
+    sorted.push(c); sorted.push(a);
+    sortList(sorted);
+    println(sorted.get(0));               // Display über println
+
+    println(Cell.Item(3));
+    println(if (Cell.Item(3) == Cell.Item(3)) "same" else "diff");
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// a == b
+// a >= c
+// set size 2
+// start
+// Coord { x = 0, y = 9, label = "c" }
+// Cell.Item(3)
+// same

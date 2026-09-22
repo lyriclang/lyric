@@ -1,0 +1,65 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 03 Synthetisierte Konformanz: Equatable/Hashable/Ordered/Display — SOLL-STAND
+//
+// Primärvorschlag (language-review, Swift-Modell): KEIN neues Schlüsselwort.
+//   Deklariert ein Struct/Enum `:: [Equatable<Self>]` (bzw. Hashable, Ordered, Display) und
+//   implementiert die Methode NICHT, synthetisiert der Compiler sie feldweise.
+//   Grammatik: unverändert. Spec §5.1 erhält einen Absatz "synthesized conformance":
+//   - Equatable<T>: feldweise `==` in Deklarationsreihenfolge; Enum: Tag gleich UND Payload
+//     feldweise gleich. Jedes Feld muss Equatable/Skalar sein, sonst LYR-SEM0020 AM FELD
+//     (dieselbe Meldung wie heute "does not implement 'equals'", nur mit Ursache).
+//   - Hashable<T>: kombinierte Feld-Hashes (Formel: h = h * 31 + field.hash(), Startwert Tag);
+//     impliziert die Synthese von equals, wenn nicht geschrieben — "equal ⇒ equal hash" per Bau.
+//   - Ordered<T>: lexikografisch nach Felddeklaration; Enum: erst Tag-Reihenfolge, dann Payload.
+//   - Display: Initializer-Syntax `Coord { x = 1, y = 2, label = "a" }`; Enum: `Cell.Item(3)`.
+//   - Unit-Enums: immer synthetisierbar (kein Feld kann die Eigenschaft verfehlen).
+//   - Eigene Methode vorhanden → keine Synthese (die eigene gewinnt, wie bei Default-Methoden
+//     eines Interfaces, Guide 7: "its own member wins").
+//   - Generischer Typ: `struct Pair<T> :: [Equatable<Pair<T>>]` verlangt `T :: [Equatable<T>]`
+//     als geschriebene Constraint (Lyric macht nichts implizit) — sonst Fehler am Feld.
+// Variante B (verworfen als Primärform, in README begründet): `@Derive`-Attribut oder das
+//   kontextuelle Wort `derive` in der Konformanzliste (`:: [derive Equatable<Coord>]`).
+import std.io.console { println };
+import std.core { Equatable, Hashable, Ordered, Display };
+import std.collections { Map, Set, List, sortList };
+
+struct Coord :: [Hashable<Coord>, Ordered<Coord>, Display] {   // kein einziger Methodenkörper
+    x: int,
+    y: int,
+    label: string,
+}
+
+enum Cell :: [Equatable<Cell>, Display] {
+    Empty,
+    Wall,
+    Item(int),
+}
+
+fn main(): int {
+    let a = Coord { x = 1, y = 2, label = "a" };
+    let b = Coord { x = 1, y = 2, label = "a" };
+    let c = Coord { x = 0, y = 9, label = "c" };
+
+    println(if (a == b) "a == b" else "a != b");
+    println(if (a < c) "a < c" else "a >= c");
+
+    let visited = Set<Coord>.empty();
+    visited.add(a);
+    visited.add(b);
+    visited.add(c);
+    println(f"set size {visited.length()}");
+
+    let names = Map<Coord, string>.empty();
+    names.set(a, "start");
+    println(names.get(b) ?? "missing");
+
+    let sorted = List<Coord>.empty();
+    sorted.push(c); sorted.push(a);
+    sortList(sorted);
+    println(sorted.get(0));
+
+    println(Cell.Item(3));
+    println(if (Cell.Item(3) == Cell.Item(3)) "same" else "diff");
+    return 0;
+}
+// Erwartete Ausgabe: identisch mit ist.lyr

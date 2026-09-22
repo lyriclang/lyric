@@ -1,0 +1,42 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 07 Enum-Variantenname / abgeleitetes Display — SOLL-STAND
+//
+// Zwei Teile (language-review-Vorschlag, Swift-/Kotlin-Modell):
+//  (a) Eingebautes Member `variantName()` auf JEDEM Enum-Wert — wie `length` auf Arrays und
+//      `next()` auf Coroutinen (§10: "a built-in member, not a method a type declares"):
+//      liefert den Namen der Variante ohne Payload, "Dial". Kein Interface, kein Import.
+//      Spec §3.4 (Enums) + §11 (kein stdlib-Vertrag nötig — Compiler-Member).
+//      Lowering: eine Konstanten-Tabelle pro Enum (die Namen stehen schon im Modul, §13
+//      "the enum's own entry carries the names" für Attribute) + `EnumTag` + Tabellenzugriff.
+//  (b) Synthetisiertes Display: deklariert ein Enum `:: [Display]` und implementiert `show`
+//      NICHT, synthetisiert der Compiler es: Unit-Variante → "Ack", Tupel-Variante →
+//      "Dial(host)" (Payload-Felder über ihr eigenes Display, sonst Fehler am Feld),
+//      Struct-Variante → "Rect { w = 1, h = 2 }" (Initializer-Syntax). Dieselbe Regel wie
+//      Prototyp 03 (Synthese bei Konformanz ohne Body) — ein Mechanismus, vier Interfaces.
+//  (c) Rückrichtung: `Mode.fromVariantName(s): ?Mode` als eingebautes STATISCHES Member für
+//      Unit-Enums (Kotlin `valueOf`, Rust strum `from_str`) — optionaler dritter Teil; für
+//      Enums mit Payload nicht definiert (keine Payload-Werte aus einem Namen).
+import std.io.console { println };
+import std.core { Display };
+
+enum Event :: [Display] { Dial(string), Ack, Data(int), Hangup, }   // show() synthetisiert
+
+enum Mode { Fast, Safe, Dry, }
+
+fn main(): int {
+    let events = [Event.Dial("host"), Event.Ack, Event.Data(5), Event.Hangup];
+    for (e in events) {
+        println(f"{e.variantName()}: {e.show()}");   // (a) + (b)
+    }
+    let m = Mode.fromVariantName("Safe");            // (c)
+    println(match (m) { null => "unknown", v => v.variantName() });
+    println(match (Mode.fromVariantName("Turbo")) { null => "unknown", v => v.variantName() });
+    return 0;
+}
+// Erwartete Ausgabe: wie ist.lyr (Namen in Deklarationsschreibweise: "Safe" statt "safe")
+// Dial: Dial(host)
+// Ack: Ack
+// Data: Data(5)
+// Hangup: Hangup
+// Safe
+// unknown

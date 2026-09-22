@@ -1,0 +1,61 @@
+// 08 `throw` ist kein Ausdruck — IST-STAND (Lyric 4.4.1)
+// Aufgabe: ein Mini-Evaluator. Drei Stellen wollen "sonst werfen": ein match-Arm,
+// die rechte Seite von `??`, ein if-else-Ausdruck. Heute: Block-Arm mit `throw;`,
+// if/throw als Statement davor, und `panic` ist `void` (§9.4 sagt "returns never").
+import std.io.console { println };
+import std.collections { Map };
+
+class EvalError :: [Throwable] {
+    what: string,
+    fn message(): string { return "eval: " + this.what; }
+}
+
+enum Token { Num(int), Name(string), Plus, Bad, }
+
+fn value(t: Token, env: Map<string, int>): int throws EvalError {
+    // (1) match-Arm: `_ => throw …` ist LYR-PAR0002; der Block-Arm ist der Umweg.
+    return match (t) {
+        Num(n) => n,
+        Name(id) => lookup(id, env),
+        _ => { throw EvalError { what = "not a value" }; }
+    };
+}
+
+fn lookup(id: string, env: Map<string, int>): int throws EvalError {
+    // (2) `env.get(id) ?? throw …` geht nicht: drei Zeilen if/throw davor.
+    let v = env.get(id);
+    if (v == null) { throw EvalError { what = "unbound " + id }; }
+    return v;
+}
+
+fn checkedDiv(a: int, b: int): int throws EvalError {
+    // (3) if-Ausdruck mit throw im else: als Statement.
+    if (b == 0) { throw EvalError { what = "division by zero" }; }
+    return a / b;
+}
+
+fn main(): int {
+    let env = Map<string, int>.empty();
+    env.set("x", 42);
+    var sum = 0;
+    let tokens = [Token.Num(1), Token.Name("x"), Token.Name("y"), Token.Plus];
+    for (t in tokens) {
+        try {
+            sum += value(t, env);
+        } catch (e: EvalError) {
+            println(e.message());
+        }
+    }
+    try {
+        sum += checkedDiv(sum, 0);
+    } catch (e: EvalError) {
+        println(e.message());
+    }
+    println(f"sum {sum}");
+    return sum;
+}
+// Ausgabe (lyric run ist.lyr; exit 43):
+// eval: unbound y
+// eval: not a value
+// eval: division by zero
+// sum 43

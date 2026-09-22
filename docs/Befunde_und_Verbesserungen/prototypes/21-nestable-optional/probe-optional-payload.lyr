@@ -1,0 +1,16 @@
+// Nebenprobe: match über eine Variante mit OPTIONALEM Payload — Exhaustiveness
+enum O { Some(?int), None, }
+
+fn a(o: O): int {
+    return match (o) { Some(v) => v ?? -1, None => -2 };       // SEM0050 "missing Some"?
+}
+fn b(o: O): int {
+    return match (o) { Some(_) => 1, None => 0 };
+}
+fn c(o: O): int {
+    return match (o) { Some(null) => 5, Some(v) => v, None => 0 };
+}
+
+fn main(): int {
+    return a(O.Some(3)) + b(O.None) + c(O.Some(null));
+}

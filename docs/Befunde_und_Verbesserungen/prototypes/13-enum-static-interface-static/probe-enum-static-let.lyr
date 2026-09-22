@@ -1,0 +1,6 @@
+// Nebenprobe: static let im Enum-Body — was sagt der Parser?
+enum Level {
+    Low, Mid, High;
+    static let DEFAULT: Level = Level.Mid;
+}
+fn main(): int { return 0; }

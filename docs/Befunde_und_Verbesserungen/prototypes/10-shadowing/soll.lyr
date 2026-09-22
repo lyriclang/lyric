@@ -1,0 +1,50 @@
+// PROPOSAL: kompiliert nicht (korrekt) mit 4.4.1 — es kompiliert, liefert aber falsche Werte
+// 10 Shadowing / Redeklaration — SOLL-STAND, Variante A (Rust-Shadowing, empfohlen)
+//
+// Regel (Spec §7.1, neuer Satz): "A `let` or `var` may bind a name that an earlier binding
+//   of the SAME block already bound; from that statement on, the name denotes the new
+//   binding. The earlier binding is unreachable afterwards (and its unused-warning is
+//   suppressed when the new initializer reads it)." Keine Grammatikänderung.
+//   Sema: TypeChecker.cs:1040 `scope.TryDeclare(local)` → `scope.Redeclare(local)`: der neue
+//   Symbol-Eintrag ersetzt den alten im Block-Scope; Lowering vergibt ohnehin pro Binding ein
+//   eigenes Lokal (zwei Slots, kein Konflikt); Definite Assignment/Narrowing hängen am Symbol,
+//   also automatisch am neuen.
+//   Damit wird das Narrowing-Idiom `let x = x ?? d;` möglich: rechts ist x die ALTE Bindung
+//   (?string), links entsteht die NEUE (string).
+//
+// Variante B (Alternative): LYR-RES0001 auf Blöcke ausdehnen — `let n = …; let n = …;` ist ein
+//   Fehler "redeclaration of 'n' in the same block". Sicher, aber verbietet das Idiom; jeder
+//   Verfeinerungsschritt braucht weiter einen neuen Namen (Kotlin/Swift/Go-Modell).
+import std.io.console { println };
+import std.string { parseInt };
+
+fn describe(input: ?string, fallback: string): string {
+    let input = input ?? fallback;         // ?string -> string, gleicher Name
+    let input = input.trim();              // string -> string
+    let parsed = parseInt(input);
+    if (parsed == null) { return "not a number: '" + input + "'"; }
+    return f"number {parsed}";
+}
+
+fn describeVar(input: ?string, fallback: string): string {
+    let x = input ?? fallback;             // kein var, kein `!`
+    return x.trim();
+}
+
+fn main(): int {
+    println(describe(" 42 ", "0"));
+    println(describe(null, "7"));
+    println(describe("abc", "0"));
+    println(describeVar(null, " z "));
+
+    let n = 1;
+    let n = n + 10;                        // heute still 1 — mit Variante A: 11
+    println(f"shadowed {n}");
+    return n;
+}
+// Erwartete Ausgabe (exit 11):
+// number 42
+// number 7
+// not a number: 'abc'
+// z
+// shadowed 11

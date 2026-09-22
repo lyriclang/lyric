@@ -1,0 +1,44 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 15 f-Strings rendern Display-Typen — SOLL-STAND
+//
+// Keine Grammatikänderung (Interpolation = '{' Expr [ ':' FormatSpec ] '}', §1.5).
+// Regel (§6.6, Ersatz für "there is no implicit Display call in interpolation"):
+//   Ein Loch desugart zu
+//     - `std.string.fromXxx(value)` für einen Skalar (wie heute),
+//     - `std.fmt.formatXxx(value, "spec")` mit Spezifizierer (wie heute),
+//     - `value.show()` für einen Typ, der `Display` erfüllt — GENAU die Regel, nach der
+//       `println(value)` den Wert heute annimmt (console.lyr: `println<T :: [Display]>`).
+//   Ein Loch mit Spezifizierer auf einem Display-Typ ist ein Fehler (Display hat keine Specs);
+//   ein Typ ohne Display bleibt LYR-SEM0006 — mit dem Hinweis "conform to Display".
+//   Opaque-Aliase bleiben refused (§3.5, bewusst).
+// Sema: die f-String-Desugaring-Stelle (TypeChecker, InterpolatedStr) prüft nach den Skalaren
+//   die Conformance `Display` (Conformance.cs, existiert für println) und bindet `show`.
+import std.io.console { println };
+import std.core { Display };
+
+struct Point :: [Display] {
+    x: int,
+    y: int,
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+enum Status :: [Display] {
+    Ok,
+    Failed(string);
+    fn show(): string {
+        return match (this) { Ok => "ok", Failed(why) => "failed: " + why };
+    }
+}
+
+fn report(p: Point, s: Status, tries: int): string {
+    return f"point {p} status {s} after {tries} tries";     // wie println(p)
+}
+
+fn main(): int {
+    let p = Point { x = 3, y = 4 };
+    println(p);
+    println(report(p, Status.Ok, 1));
+    println(report(Point { x = 0, y = 0 }, Status.Failed("timeout"), 3));
+    return 0;
+}
+// Erwartete Ausgabe: identisch mit ist.lyr

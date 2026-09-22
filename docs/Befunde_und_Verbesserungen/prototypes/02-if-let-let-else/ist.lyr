@@ -1,0 +1,75 @@
+// 02 if-let / let-else / while-let — IST-STAND (Lyric 4.4.1)
+// Drei Situationen, in denen Narrowing heute NICHT reicht:
+//  (a) ein optionales FELD / Aufrufergebnis: Narrowing gilt nur für Identifier (§7.4),
+//      also erst in ein Lokal kopieren;
+//  (b) ein Enum-Payload ohne vollständiges match: `match` mit `_`-Arm ist die einzige Form;
+//  (c) eine Schleife, die pullt bis null: Wert vor und am Ende der Schleife neu holen.
+import std.io.console { println };
+import std.collections { Deque };
+import std.option { andThen };
+
+class Profile { email: ?string, }
+class User { name: string, profile: ?Profile, }
+
+enum Shape { Circle(int), Rect { w: int, h: int }, Empty, }
+
+// (a) Feld-Narrowing: zwei Kopien, zwei ifs — oder die Kombinator-Form aus std.option.
+fn emailOf(u: User): string {
+    let p = u.profile;                 // Kopie, damit Narrowing greift
+    if (p == null) { return "no profile"; }
+    let e = p.email;                   // noch eine Kopie
+    if (e == null) { return "no email"; }
+    return e;
+}
+fn emailOfLib(u: User): string {
+    return andThen(u.profile, (p: Profile) => p.email) ?? "none";   // verliert die Unterscheidung
+}
+
+// (b) Payload-Extraktion ohne vollständiges match
+fn radiusOrZero(s: Shape): int {
+    match (s) {
+        Circle(r) => { return r; }
+        _ => { }                        // leerer Arm nur wegen Exhaustiveness
+    }
+    return 0;
+}
+fn describeIfRect(s: Shape): void {
+    match (s) {
+        Rect { w, h } => { println(f"rect {w}x{h}"); }
+        _ => { }
+    }
+}
+
+// (c) Pull-Schleife: den Wert vor der Schleife holen und am Ende erneut
+fn drain(q: Deque<int>): int {
+    var sum = 0;
+    var v = q.popFront();
+    while (v != null) {
+        sum += v;
+        v = q.popFront();              // vergisst man diese Zeile: Endlosschleife
+    }
+    return sum;
+}
+
+fn main(): int {
+    let ada = User { name = "Ada", profile = Profile { email = "ada@x.org" } };
+    let bob = User { name = "Bob", profile = Profile { email = null } };
+    let kim = User { name = "Kim", profile = null };
+    println(emailOf(ada) + " / " + emailOf(bob) + " / " + emailOf(kim));
+    println(emailOfLib(ada) + " / " + emailOfLib(bob) + " / " + emailOfLib(kim));
+
+    println(f"{radiusOrZero(Shape.Circle(4))} {radiusOrZero(Shape.Empty)}");
+    describeIfRect(Shape.Rect { w = 2, h = 3 });
+    describeIfRect(Shape.Empty);
+
+    let q = Deque<int>.empty();
+    q.pushBack(1); q.pushBack(2); q.pushBack(3);
+    println(f"drain = {drain(q)}");
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// ada@x.org / no email / no profile
+// ada@x.org / none / none
+// 4 0
+// rect 2x3
+// drain = 6

@@ -1,0 +1,35 @@
+// PROPOSAL: kompiliert heute, verhält sich aber nicht wie beschrieben (4.4.1)
+// 17 Member-Sichtbarkeit — SOLL-STAND, Bibliotheksmodul
+//
+// Regel (Spec §4.2 neu, "Only pub declarations cross a module boundary" auf MEMBER ausgedehnt):
+//   Ein Member (Feld, Methode, static let) ohne `pub` ist nur im DEKLARIERENDEN MODUL sichtbar
+//   (Rust-Modell: modulprivat, nicht typprivat — Hilfsfunktionen im selben Modul dürfen zugreifen).
+//   Mit `pub` ist es überall sichtbar, wo der Typ sichtbar ist.
+//   Grammatik §3.2/§3.3:  Field = [ 'pub' ] IDENTIFIER ':' TypeExpr [ '=' Expr ] .
+//   (FunctionDecl und StaticBinding tragen `[ 'pub' ]` bereits.)
+//   Ein Struct-/Class-Initializer AUSSERHALB des Moduls darf nur pub-Felder nennen; ein Feld
+//   ohne Default, das nicht pub ist, macht den Initializer außerhalb unmöglich → der Typ bietet
+//   eine Konstruktorfunktion (`open`), was hier gewollt ist.
+//   Interface-Konformanz: ein Member, das eine Interface-Anforderung erfüllt, ist über das
+//   Interface sichtbar, auch ohne `pub` (die Anforderung ist der Vertrag) — Rust-Regel.
+//   Neue Diagnose LYR-SEM-neu "member 'balance' of 'Account' is not public (declared in 'bank')".
+//   Deprecation-Uhr wie LYR-SEM0093 (§3.5): 4.x Warnung, 5.0 Fehler.
+module bank;
+
+pub class Account {
+    pub owner: string,          // lesbar von außen
+    balance: int,               // privat — nur über read()/deposit()
+    audit: int,                 // privat
+
+    pub fn read(): int { return this.balance; }
+    pub mut fn deposit(n: int): void {
+        if (n <= 0) { return; }
+        this.balance += n;
+        this.log();
+    }
+    mut fn log(): void { this.audit += 1; }     // privat
+}
+
+pub fn open(owner: string): Account {
+    return Account { owner = owner, balance = 0, audit = 0 };   // im Modul: alle Felder
+}

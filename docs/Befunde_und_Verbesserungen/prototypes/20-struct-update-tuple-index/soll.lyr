@@ -1,0 +1,48 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 20 Struct-Update-Syntax und Tupel-Index — SOLL-STAND
+//
+// (a) Grammatik §6.2:
+//     StructInit = TypePath '{' [ StructInitField { ',' StructInitField } [ ',' ] ] [ '..' Expr ] '}' .
+//     `..base` als LETZTER Eintrag: jedes nicht genannte Feld kommt aus `base` (Typ muss gleich
+//     sein). Struct: Kopie der Felder (Wertsemantik); Class: NEUE Instanz, Referenzfelder
+//     geteilt (flache Kopie — Rust-Semantik; für Klassen explizit zu dokumentieren).
+//     Eindeutig: `..` steht heute in einem Initializer nirgends (Felder sind `IDENT '=' Expr`);
+//     `..` ohne linken Operanden ist heute PAR0002 → frei. Nicht zu verwechseln mit RangeExpr
+//     (§7.2): das hier ist keine Range, sondern ein Eintrag der Feldliste.
+//     Ein Feld mit Default (§3.2) wird von `..base` überschrieben (Basis vor Default) — Rust dito.
+// (b) Grammatik §6.2 Postfix: TupleIndex = Expr '.' IntLit .   (nur eine Ebene: `t.1`, nicht `t.0.1`)
+//     Lexer-Konflikt: `t.1` lext heute als IDENT `t`, dann `.1`?? — nein: `.1` ist kein Float
+//     (FloatLit = DecLit '.' DecLit, braucht Ziffern VOR dem Punkt, §1.5) → Token `.` + IntLit `1`
+//     → heute PAR0003 "expected member name" → frei. Rust-Falle `t.0.1` (lext als `t` `.` `0.1`):
+//     vermieden, indem nur EIN Index erlaubt ist; verschachtelt: `(t.0).1` oder Destructuring.
+//     Typ: das i-te Element; i muss ein Literal < Arity sein (Sema); kein Schreibzugriff (Tupel
+//     sind unveränderlich, §3.3 — `t.1 = x` ist ein Fehler).
+import std.io.console { println };
+
+struct Config {
+    host: string,
+    port: int,
+    secure: bool,
+    retries: int,
+    timeoutMs: int,
+    label: string,
+}
+
+fn withPort(base: Config, port: int): Config {
+    return Config { port = port, ..base };            // (a) ein Feld, Rest aus base
+}
+
+fn main(): int {
+    let base = Config { host = "h", port = 80, secure = false, retries = 3, timeoutMs = 1000, label = "x" };
+    let a = withPort(base, 8080);
+    let b = Config { port = 9090, label = "y", ..base };
+    println(f"{a.port} {b.port} {base.port}");
+
+    let triple = (1, "two", 3.0);
+    println(triple.1);                                // (b)
+
+    let pairs = [(1, "a"), (2, "b")];
+    println(pairs[1].1);
+    return 0;
+}
+// Erwartete Ausgabe: wie ist.lyr
