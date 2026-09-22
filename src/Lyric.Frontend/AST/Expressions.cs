@@ -42,6 +42,9 @@ public sealed record ResumeExpr(Expr Coroutine, Span Span) : Expr(Span);
 /// the expression by the literal the evaluator produced.
 /// </summary>
 public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
+// 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
+// ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
+public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment

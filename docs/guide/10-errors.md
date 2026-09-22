@@ -115,6 +115,23 @@ fn main(): int {
 
 `main` cannot declare `throws`; an exception that reaches it aborts the process.
 
+A `try` whose every `catch` leaves — returns, throws, breaks or continues — counts what its
+body assigned: a throw mid-way lands in a clause that leaves, so the only way past the `try` is
+the body's own end.
+
+```lyr
+fn main(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parse(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    return run(opts);      // opts is definitely assigned here
+}
+```
+
 ## Cleanup
 
 `defer` runs when the scope ends, on the normal path and while unwinding:
@@ -162,5 +179,44 @@ fn main(): int {
     } catch (e: NotFound) {
         return 0;
     }
+}
+```
+
+## `throw` as an expression
+
+`throw` may stand where a value is expected. It has the type `never` — the type of an
+expression that does not deliver a value — and so it fits anywhere and takes part in no
+unification: the absent path of `??`, the other branch of an `if`, an arm of a `match`.
+
+```lyr
+fn need(o: ?int, key: string): int throws NotFound {
+    return o ?? throw NotFound { what = key };
+}
+
+fn code(c: Cmd): int throws NotFound {
+    return match (c) {
+        Cmd.Go => 1,
+        Cmd.Dial(n) if n > 0 => n,
+        _ => throw NotFound { what = "dial" },
+    };
+}
+```
+
+`throw` binds like a prefix operator: `x ?? throw e` reads as intended, and `throw e ?? f` is a
+throw of `e`, not of `e ?? f`. The throw site is checked exactly as the statement form is — the
+enclosing function declares `throws` or a `try` around it catches.
+
+A function of your own may declare `never` as its return type. Its body must throw or panic on
+every path, and a call to it ends the path the way `panic` does — the flow analysis counts it as
+a return and narrows what follows:
+
+```lyr
+fn fail(message: string): never {
+    panic("fatal: " + message);
+}
+
+fn guard(o: ?int): int {
+    if (o == null) { fail("no value"); }
+    return o;
 }
 ```

@@ -83,6 +83,29 @@ fn main(): int {
 
 `break` leaves the innermost loop, `continue` starts its next iteration.
 
+A loop may carry a **label**, and `break` or `continue` may name it to reach past the innermost
+loop:
+
+```lyr
+fn find(grid: int[][], target: int): (int, int) {
+    var found = (-1, -1);
+    outer: for (i in 0..grid.length) {
+        for (j in 0..grid[i].length) {
+            if (grid[i][j] == target) {
+                found = (i, j);
+                break outer;
+            }
+        }
+    }
+    return found;
+}
+```
+
+`continue outer` abandons the rest of the inner loop and starts the outer loop's next
+iteration. A label is visible only inside the loop it marks and shares nothing with variables;
+one nothing jumps to is a warning, and a label repeating an enclosing one is refused. Every
+`defer` between the jump and the loop it names runs on the way out, innermost first.
+
 ## Deferred work
 
 `defer` schedules a statement to run when the surrounding scope ends, whichever way it ends.

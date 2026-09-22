@@ -549,6 +549,7 @@ internal sealed class FunctionLowerer
         switch (_lambda!.Body)
         {
             case Block block:
+                _tailSink = new TailSink(null, null, AsReturn: true); // a tail is the lambda's return
                 if (LowerScope(block))
                     _b.Seal(IsVoid(_returnType)
                         ? new Return(null, block.Span)
@@ -593,6 +594,44 @@ internal sealed class FunctionLowerer
         return true;
     }
 
+    /// <summary>Where a value block's tail goes: into a match arm's result slot, out of a lambda
+    /// as its return, or nowhere (a block arm of a match statement). Set by the owner of the block
+    /// around its <see cref="LowerScope"/>; the tail is the last statement, so the scope's defers
+    /// run AFTER the value is taken — a store before the exit, or the return path's own drain.</summary>
+    private TailSink? _tailSink;
+
+    private readonly record struct TailSink(LocalId? Slot, IrType? Type, bool AsReturn);
+
+    private bool LowerTail(TailExprStmt tail)
+    {
+        var sink = _tailSink ?? throw Bug($"a tail expression without a value position at {tail.Span}");
+        if (Diverges(tail.Expr)) { LowerDiverging(tail.Expr); return false; }
+
+        if (sink.AsReturn)
+        {
+            // Exactly what 'return tail;' lowers to: the value first, then every pending defer.
+            var returned = IsVoid(_returnType) ? LowerExprOrVoidDiscarding(tail.Expr) : LowerExprAs(tail.Expr, _returnType);
+            EmitAllPendingDefers();
+            _b.Seal(new Return(returned, tail.Span));
+            return false;
+        }
+
+        if (sink.Slot is { } slot && sink.Type is { } type)
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(tail.Expr, type), tail.Span));
+            return true;
+        }
+
+        LowerExprOrVoid(tail.Expr); // a match statement's arm: the value goes nowhere
+        return !_b.IsSealed;
+    }
+
+    private TempId? LowerExprOrVoidDiscarding(Expr expr)
+    {
+        LowerExprOrVoid(expr);
+        return null;
+    }
+
     /// <summary>true means control flow falls through, false means the block is sealed.</summary>
     private bool LowerStmt(Stmt stmt)
     {
@@ -607,7 +646,11 @@ internal sealed class FunctionLowerer
             // 'panic(…)' has the return type 'never' and seals its block. An expression can therefore
             // end control flow, and the return value has to report that, or the caller later tries to
             // seal the same block a second time.
-            case ExprStmt e: LowerExprOrVoid(e.Expr); return !_b.IsSealed;
+            case ExprStmt e:
+                if (Diverges(e.Expr)) { LowerDiverging(e.Expr); return false; }
+                LowerExprOrVoid(e.Expr);
+                return !_b.IsSealed;
+            case TailExprStmt tail: return LowerTail(tail);
 
             // Only in the synthetic global initializer (see GlobalInitializer).
             case GlobalInitStmt g: LowerGlobalInit(g); return true;
@@ -653,6 +696,35 @@ internal sealed class FunctionLowerer
     /// outer one records its handler. Exactly this order is the contract while unwinding.</para>
     /// </summary>
     private readonly List<IrHandler> _handlers = new();
+
+    /// <summary>'throw' in value position: the same terminator as the statement, and no value —
+    /// the type is 'never'. Whoever lowers the enclosing expression asks <see cref="Diverges"/>
+    /// first, and so never asks this one for a temp it cannot give.</summary>
+    private TempId? LowerThrowExpr(ThrowExpr expr)
+    {
+        var value = LowerExpr(expr.Value);
+        var concrete = TypeOfExpr(expr.Value) switch
+        {
+            IrRefType r => (TypeId?)r.Type,
+            _ => null,
+        };
+        _b.Seal(new Throw(value, concrete, expr.Span));
+        return null;
+    }
+
+    /// <summary>Does this expression have the type 'never' — a 'throw', a call to 'panic' or to a
+    /// function declared 'never', an 'if' or 'match' whose every arm diverges? Such an expression
+    /// seals the block when lowered, and the position holding it must not store or branch after it.</summary>
+    private bool Diverges(Expr expr) => _types.TypeOf(expr) is NeverType;
+
+    /// <summary>Lowers a diverging expression for its effect. After it the block is sealed; a
+    /// lowering that did not seal (a never-declared user function, whose call is an ordinary
+    /// 'call') gets the 'unreachable' the sema's type promises.</summary>
+    private void LowerDiverging(Expr expr)
+    {
+        LowerExprOrVoid(expr);
+        if (!_b.IsSealed) _b.Seal(new Unreachable(expr.Span));
+    }
 
     private bool LowerThrow(ThrowStmt stmt)
     {
@@ -967,18 +1039,12 @@ internal sealed class FunctionLowerer
         // the interpreter marks exhaustion when this frame pops through the resume boundary.
         // A valued return in a coroutine is LYR-SEM0039 and never reaches this point.
 
+        // 'return match (…) { … }' whose every arm leaves: the sema typed the value 'never', so
+        // there is nothing to return — the arms already did. Lowered for its effect, sealed by it.
+        if (stmt.Value is { } diverging && Diverges(diverging)) { LowerDiverging(diverging); return false; }
+
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
-        // 'return match (…) { A => { return 1; }, B => { return 2; } }': the value diverges — its
-        // type is 'never' — so it is lowered for its effect, and it seals the block itself.
-        if (stmt.Value is { } diverging && _types.TypeOf(diverging) is NeverType)
-        {
-            LowerExprOrVoid(diverging);
-            if (_b.IsSealed) return false;
-            _b.Seal(new Unreachable(stmt.Span));
-            return false;
-        }
-
         var returned = stmt.Value is null ? null : (TempId?)LowerExprAs(stmt.Value, _returnType);
         EmitAllPendingDefers();
         _b.Seal(new Return(returned, stmt.Span));
@@ -987,20 +1053,31 @@ internal sealed class FunctionLowerer
 
     private bool LowerBreak(BreakStmt stmt)
     {
-        if (_loops.Count == 0) throw Bug($"'break' outside a loop at {stmt.Span}");
-        var loop = _loops.Peek();
-        EmitPendingDefersAbove(loop.DeferDepth); // break leaves the body scope — its defers run first
+        var loop = TargetLoop(stmt.Label, "break", stmt.Span);
+        // A break leaves every scope between it and the loop it names — their defers run first,
+        // innermost first, down to the depth the target loop was entered at (§7.5).
+        EmitPendingDefersAbove(loop.DeferDepth);
         _b.Seal(new Branch(loop.BreakTarget, stmt.Span));
         return false;
     }
 
     private bool LowerContinue(ContinueStmt stmt)
     {
-        if (_loops.Count == 0) throw Bug($"'continue' outside a loop at {stmt.Span}");
-        var loop = _loops.Peek();
+        var loop = TargetLoop(stmt.Label, "continue", stmt.Span);
         EmitPendingDefersAbove(loop.DeferDepth); // continue ends the iteration — same exit path
         _b.Seal(new Branch(loop.ContinueTarget, stmt.Span));
         return false;
+    }
+
+    /// <summary>The innermost loop, or the enclosing one carrying the label. The stack enumerates
+    /// innermost first, so the first match is the nearest — and the sema refused a label that
+    /// repeats an enclosing one, so nearest and only coincide.</summary>
+    private LoopScope TargetLoop(string? label, string keyword, Span span)
+    {
+        if (_loops.Count == 0) throw Bug($"'{keyword}' outside a loop at {span}");
+        if (label is null) return _loops.Peek();
+        return _loops.FirstOrDefault(l => l.Label == label)
+               ?? throw Bug($"'{keyword} {label}' without a loop of that label at {span}");
     }
 
     /// <summary>
@@ -1022,8 +1099,12 @@ internal sealed class FunctionLowerer
             var merge = _b.NewBlock();
             _b.Seal(new CondBranch(condition, thenBlock, merge, stmt.Span));
 
+            // Through LowerScope, not LowerStatements: the branch is a scope of its own, and a
+            // 'defer' in it belongs to it (§7.5). Lowered as bare statements, the defer was
+            // registered on the ENCLOSING scope — it ran at that scope's exit whether or not the
+            // branch had been taken, and inside a scope without defers of its own it never ran.
             _b.SwitchTo(thenBlock);
-            if (LowerStatements(stmt.Then)) _b.Seal(new Branch(merge, stmt.Then.Span));
+            if (LowerScope(stmt.Then)) _b.Seal(new Branch(merge, stmt.Then.Span));
 
             _b.SwitchTo(merge);
             return true;
@@ -1033,7 +1114,7 @@ internal sealed class FunctionLowerer
         _b.Seal(new CondBranch(condition, thenBlock, elseBlock, stmt.Span));
 
         _b.SwitchTo(thenBlock);
-        var thenFallsThrough = LowerStatements(stmt.Then);
+        var thenFallsThrough = LowerScope(stmt.Then);
         var thenExit = _b.CurrentId; // after nested control flow this is no longer thenBlock
 
         _b.SwitchTo(elseBlock);
@@ -1120,7 +1201,8 @@ internal sealed class FunctionLowerer
             LowerPattern(pattern, value, elementType,
                 () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
 
-        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
+        _loops.Push(new LoopScope(_b, condBlock, exitBlock)
+            { DeferDepth = _defers.Count, Label = stmt.Label });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
         // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
         // once, with the last iteration's values (the 2.0.1 bug).
@@ -1345,7 +1427,7 @@ internal sealed class FunctionLowerer
         _b.SealBlock(condExit, new CondBranch(condition, bodyBlock, exitBlock, stmt.Condition.Span));
 
         _b.SwitchTo(bodyBlock);
-        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
+        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count, Label = stmt.Label });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
         // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
         // once, with the last iteration's values (the 2.0.1 bug).
@@ -1468,13 +1550,14 @@ internal sealed class FunctionLowerer
         _b.Seal(new Branch(bodyBlock, stmt.Span));
 
         _b.SwitchTo(bodyBlock);
-        var loop = new LoopScope(_b) { DeferDepth = _defers.Count };
+        var loop = new LoopScope(_b) { DeferDepth = _defers.Count, Label = stmt.Label };
 
         // The targets a 'break' or 'continue' really reaches are reserved HERE, before the body:
         // created on demand from inside a try or a defer scope they would land in that region's
         // block range and put the code after the loop under its handler. See LoopScope.Reserve.
-        if (Flow.ReachesJump(stmt.Body, wantContinue: true, _types)) loop.Reserve(continueTarget: true);
-        if (Flow.ReachesJump(stmt.Body, wantContinue: false, _types)) loop.Reserve(continueTarget: false);
+        // A jump naming ANOTHER label leaves this loop and reserves nothing.
+        if (Flow.ReachesJump(stmt.Body, wantContinue: true, stmt.Label, _types)) loop.Reserve(continueTarget: true);
+        if (Flow.ReachesJump(stmt.Body, wantContinue: false, stmt.Label, _types)) loop.Reserve(continueTarget: false);
 
         _loops.Push(loop);
         var fallsThrough = LowerScope(stmt.Body);
@@ -1542,6 +1625,7 @@ internal sealed class FunctionLowerer
         RangeExpr e => throw NotSupported("range expression", e.Span),
         ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
+        ThrowExpr e => LowerThrowExpr(e),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),
@@ -1837,17 +1921,32 @@ internal sealed class FunctionLowerer
         // `LowerExprAs` rather than `LowerExpr`: the branch type need not be the result type.
         // `if (c) 5 else null` is `?int`, and both branches need the target type — the `null` because it
         // has none of its own, and the `5` because it has to be wrapped.
+        // A diverging branch ('else throw e') stores nothing and never reaches the merge: it seals
+        // its own block, and the merge has the other branch as its only predecessor.
         _b.SwitchTo(thenBlock);
-        _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Then, type), expr.Then.Span));
-        var thenExit = _b.CurrentId;
+        BlockId? thenExit = null;
+        if (Diverges(expr.Then)) LowerDiverging(expr.Then);
+        else
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Then, type), expr.Then.Span));
+            thenExit = _b.CurrentId;
+        }
 
         _b.SwitchTo(elseBlock);
-        _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
-        var elseExit = _b.CurrentId;
+        BlockId? elseExit = null;
+        if (Diverges(expr.Else)) LowerDiverging(expr.Else);
+        else
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
+            elseExit = _b.CurrentId;
+        }
+
+        if (thenExit is null && elseExit is null)
+            throw NotSupported("an 'if' expression whose both branches diverge", expr.Span);
 
         var mergeBlock = _b.NewBlock();
-        _b.SealBlock(thenExit, new Branch(mergeBlock, expr.Then.Span));
-        _b.SealBlock(elseExit, new Branch(mergeBlock, expr.Else.Span));
+        if (thenExit is { } t) _b.SealBlock(t, new Branch(mergeBlock, expr.Then.Span));
+        if (elseExit is { } e) _b.SealBlock(e, new Branch(mergeBlock, expr.Else.Span));
 
         _b.SwitchTo(mergeBlock);
         var dest = _slots.NewTemp(type);
@@ -2766,12 +2865,20 @@ internal sealed class FunctionLowerer
     {
         if (arm.Body is Expr expr)
         {
+            // '_ => throw e' or '_ => panic(…)': the arm diverges, stores nothing, and does not
+            // fall through to the merge — exactly like a block arm ending in a 'throw'.
+            if (Diverges(expr)) { LowerDiverging(expr); return false; }
             var produced = resultType is null ? LowerExprOrVoid(expr) : LowerExprAs(expr, resultType);
             if (slot is { } target && produced is { } v) _b.Emit(new StoreLocal(target, v, arm.Span));
             return true;
         }
 
-        return LowerScope((Block)arm.Body);
+        // A block arm: its tail, when it has one, lands in the result slot before the scope's
+        // defers run and the arm falls through to the merge.
+        var savedSink = _tailSink;
+        _tailSink = new TailSink(slot, resultType, AsReturn: false);
+        try { return LowerScope((Block)arm.Body); }
+        finally { _tailSink = savedSink; }
     }
     // ------------------------------------------------------------------ optionals
 
@@ -2948,9 +3055,14 @@ internal sealed class FunctionLowerer
         _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(whenNone);
-        var fallback = LowerExpr(expr.Right);
-        _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
-        _b.Seal(new Branch(merge, expr.Span));
+        // 'x ?? throw e': the absent path throws and never reaches the merge.
+        if (Diverges(expr.Right)) LowerDiverging(expr.Right);
+        else
+        {
+            var fallback = LowerExpr(expr.Right);
+            _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
+            _b.Seal(new Branch(merge, expr.Span));
+        }
 
         _b.SwitchTo(merge);
         var dest = _slots.NewTemp(type);
@@ -4459,9 +4571,14 @@ internal sealed class FunctionLowerer
 
                 case InterpHole hole:
                     FlushText(hole.Span);
-                    parts.Add(hole.FormatSpec is { } spec
-                        ? FormattedValue(hole.Expr, spec)
-                        : ToStringValue(hole.Expr));
+                    // A hole the sema routed through 'Display' IS the 'show()' call it stored —
+                    // the same seam as the operators; the value lowers once, as its receiver.
+                    if (_types.OperatorCallOf(hole) is { } shown)
+                        parts.Add(LowerCall(shown) ?? throw Bug("'show()' returned no value"));
+                    else
+                        parts.Add(hole.FormatSpec is { } spec
+                            ? FormattedValue(hole.Expr, spec)
+                            : ToStringValue(hole.Expr));
                     break;
 
                 default:

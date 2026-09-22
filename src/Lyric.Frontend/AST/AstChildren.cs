@@ -137,6 +137,10 @@ public static class AstChildren
                 foreach (var s in b.Statements) yield return s;
                 break;
 
+            case TailExprStmt t:
+                yield return t.Expr;
+                break;
+
             case BindingStmt b:
                 if (b.Type is not null) yield return b.Type;
                 if (b.Initializer is not null) yield return b.Initializer;
@@ -246,6 +250,10 @@ public static class AstChildren
 
             case ResumeExpr r:
                 yield return r.Coroutine;
+                break;
+
+            case ThrowExpr te:
+                yield return te.Value;
                 break;
 
             case PostfixExpr p:

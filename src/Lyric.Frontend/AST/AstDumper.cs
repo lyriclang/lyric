@@ -278,6 +278,10 @@ public static class AstDumper
                 Line(sb, indent, "Block", n.Span);
                 foreach (var s in n.Statements) Write(s, indent + 1, sb);
                 break;
+            case TailExprStmt n:
+                Line(sb, indent, "Tail", n.Span);
+                Write(n.Expr, indent + 1, sb);
+                break;
             case BindingStmt n:
                 Line(sb, indent, $"{(n.IsMutable ? "Var" : "Let")} {n.Name}", n.Span);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
@@ -319,10 +323,10 @@ public static class AstDumper
                 Write(n.Body, indent + 1, sb);
                 break;
             case BreakStmt n:
-                Line(sb, indent, "Break", n.Span);
+                Line(sb, indent, n.Label is null ? "Break" : $"Break {n.Label}", n.Span);
                 break;
             case ContinueStmt n:
-                Line(sb, indent, "Continue", n.Span);
+                Line(sb, indent, n.Label is null ? "Continue" : $"Continue {n.Label}", n.Span);
                 break;
             case ReturnStmt n:
                 Line(sb, indent, "Return", n.Span);
@@ -339,6 +343,10 @@ public static class AstDumper
             case ComptimeExpr n:
                 Line(sb, indent, "Comptime", n.Span);
                 Write(n.Inner, indent + 1, sb);
+                break;
+            case ThrowExpr n:
+                Line(sb, indent, "ThrowExpr", n.Span);
+                Write(n.Value, indent + 1, sb);
                 break;
             case DeferStmt n:
                 Line(sb, indent, "Defer", n.Span);

@@ -23,6 +23,10 @@ internal sealed class LoopScope(BlockBuilder blocks)
     /// skip them or drain the scopes it does not leave.</summary>
     public int DeferDepth { get; init; }
 
+    /// <summary>The loop's label, when it has one: what 'break L' and 'continue L' look for
+    /// walking outward through the loop stack.</summary>
+    public string? Label { get; init; }
+
     /// <summary>
     /// For <c>while</c> and <c>for-in</c>, where both blocks are ALWAYS reachable: the condition through
     /// the entry edge, the exit through its false edge. They also have to exist beforehand, because the

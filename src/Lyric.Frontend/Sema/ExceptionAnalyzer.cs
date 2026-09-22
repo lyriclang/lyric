@@ -99,6 +99,7 @@ internal sealed class ExceptionAnalyzer
         switch (stmt)
         {
             case Block b: foreach (var s in b.Statements) AnalyzeStmt(s); break;
+            case TailExprStmt tail: AnalyzeExpr(tail.Expr); break;
             case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
             // A destructuring binding REQUIRES its initializer, and that initializer is a call like
             // any other. Missing here, a throwing one escaped the walk entirely: `let (a, b) = mk();`
@@ -178,6 +179,13 @@ internal sealed class ExceptionAnalyzer
                 AnalyzeExpr(re.Coroutine);
                 if (_types.ThrownByPull(re) is { } resumed)
                     CheckSite(ThrownOf(resumed), re.Span, "'resume'");
+                break;
+            case ThrowExpr te:
+                // A throw site like the statement: the position changes the type, not the fact.
+                AnalyzeExpr(te.Value);
+                var thrownByExpr = _types.TypeOf(te.Value);
+                if (Conformance.IsThrowable(thrownByExpr, _throwable, _binding))
+                    CheckSite(ThrownOf(thrownByExpr), te.Span, "'throw'");
                 break;
             case PostfixExpr p: AnalyzeExpr(p.Operand); break;
             case BinaryExpr b: AnalyzeExpr(b.Left); AnalyzeExpr(b.Right); break;

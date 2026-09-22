@@ -494,6 +494,9 @@ public sealed class AstFormatter
 
     // ------------------------------------------------------------------ statements
 
+    /// <summary>The label before a loop, 'outer: ', or nothing.</summary>
+    private static Doc LabelDoc(string? label) => Doc.From(label is null ? "" : label + ": ");
+
     private Doc StmtDoc(Stmt stmt) => stmt switch
     {
         Block b => BlockDoc(b),
@@ -501,15 +504,17 @@ public sealed class AstFormatter
         DestructuringStmt d => DestructuringDoc(d),
         LetPatternStmt lp => LetPatternDoc(lp),
         IfStmt s => IfStmtDoc(s),
-        WhileStmt s => Doc.Of(Doc.From("while ("), ExprDoc(s.Condition, Assign),
+        WhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("while ("), ExprDoc(s.Condition, Assign),
             Doc.From(") "), BlockDoc(s.Body)),
-        DoWhileStmt s => Doc.Of(Doc.From("do "), BlockDoc(s.Body),
+        DoWhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("do "), BlockDoc(s.Body),
             Doc.From(" while ("), ExprDoc(s.Condition, Assign), Doc.From(");")),
-        ForInStmt s => Doc.Of(Doc.From("for ("),
+        // Both halves: the head may be a PATTERN ('for ((k, v) in …)') and the loop may carry a
+        // LABEL. Written as one, neither is lost when the other is present.
+        ForInStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("for ("),
             s.Pattern is { } loopPattern ? PatternDoc(loopPattern) : Doc.From(s.Variable),
             Doc.From(" in "), ExprDoc(s.Iterable, Assign), Doc.From(") "), BlockDoc(s.Body)),
-        BreakStmt => Doc.From("break;"),
-        ContinueStmt => Doc.From("continue;"),
+        BreakStmt b => Doc.From(b.Label is null ? "break;" : $"break {b.Label};"),
+        ContinueStmt c => Doc.From(c.Label is null ? "continue;" : $"continue {c.Label};"),
         ReturnStmt s => s.Value is null
             ? Doc.From("return;")
             : Doc.Of(Doc.From("return "), ExprDoc(s.Value, Assign), Doc.From(";")),
@@ -522,6 +527,7 @@ public sealed class AstFormatter
         TryStmt s => TryDoc(s),
         ExprStmt { Expr: CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } } s => ExprDoc(s.Expr, Assign),
         ExprStmt s => Doc.Of(ExprDoc(s.Expr, Assign), Doc.From(";")),
+        TailExprStmt t => ExprDoc(t.Expr, Assign), // the tail: no ';', that is what makes it one
         _ => throw new InternalCompilationException($"unreachable: unformatted {stmt.GetType().Name}"),
     };
 
@@ -694,7 +700,7 @@ public sealed class AstFormatter
     private static int LevelOf(Expr expr) => expr switch
     {
         BinaryExpr b => BinaryInfo(b.Operator).Level,
-        UnaryExpr or ResumeExpr or ComptimeExpr => Prefix,
+        UnaryExpr or ResumeExpr or ComptimeExpr or ThrowExpr => Prefix,
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
         RangeExpr => Range,
@@ -728,6 +734,7 @@ public sealed class AstFormatter
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
         ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
+        ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),
         BinaryExpr b => BinaryDoc(b),
         AssignExpr a => AssignDoc(a),

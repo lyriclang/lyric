@@ -277,7 +277,8 @@ public sealed partial class Parser
             _inGuard = false;
         }
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        // A block arm is a value block: in a match expression its tail is the arm's value.
+        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
         return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, body.Span));
     }
 

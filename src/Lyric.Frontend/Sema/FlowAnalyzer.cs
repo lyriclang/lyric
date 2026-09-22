@@ -106,6 +106,9 @@ internal sealed class FlowAnalyzer
             case ExprStmt es:
                 AnalyzeExpr(es.Expr, assigned);
                 return assigned;
+            case TailExprStmt tail:
+                AnalyzeExpr(tail.Expr, assigned);
+                return assigned;
             case ReturnStmt r:
                 if (r.Value is not null) AnalyzeExpr(r.Value, assigned);
                 return assigned;
@@ -135,14 +138,21 @@ internal sealed class FlowAnalyzer
                 AnalyzeStatements(fo.Body.Statements, loopSet);
                 return assigned;
             case TryStmt tr:
-                AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+            {
+                var afterBody = AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+                var everyCatchLeaves = true;
                 foreach (var c in tr.Catches)
                 {
                     var catchSet = Clone(assigned);
                     if (_types.RefOf(c) is { } bind) catchSet.Add(bind); // the catch assigns the binding
                     AnalyzeStatements(c.Body.Statements, catchSet);
+                    if (!Flow.AlwaysExits(c.Body, _types)) everyCatchLeaves = false;
                 }
-                return assigned;
+                // The body may have thrown mid-way, so what it assigns counts afterwards only
+                // when the throw cannot lead past the try: every catch leaves. Then the one way
+                // to the statement after it is the body's own end (§7.7).
+                return everyCatchLeaves ? afterBody : assigned;
+            }
             case MatchStmt m:
             {
                 AnalyzeExpr(m.Scrutinee, assigned);
@@ -216,6 +226,7 @@ internal sealed class FlowAnalyzer
             case UnaryExpr u: AnalyzeExpr(u.Operand, assigned); return;
             case ResumeExpr re: AnalyzeExpr(re.Coroutine, assigned); return;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner, assigned); return;
+            case ThrowExpr te: AnalyzeExpr(te.Value, assigned); return;
             case PostfixExpr p: AnalyzeExpr(p.Operand, assigned); return;
             case CallExpr c:
                 AnalyzeExpr(c.Callee, assigned);
@@ -262,6 +273,7 @@ internal sealed class FlowAnalyzer
                     AddPatternBindings(arm.Pattern, armSet);
                     if (arm.Guard is not null) AnalyzeExpr(arm.Guard, armSet);
                     if (arm.Body is Expr ae) AnalyzeExpr(ae, armSet);
+                    else if (arm.Body is Block ab) AnalyzeStatements(ab.Statements, armSet);
                 }
                 return;
             // Literals, this and @ident are no reads.

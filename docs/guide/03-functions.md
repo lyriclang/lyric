@@ -156,9 +156,11 @@ fn main(): int {
 }
 ```
 
-A lambda captures the variables it uses. A block-bodied lambda infers its return type from its
-`return` statements when neither an annotation nor a context provides one — the returns must
-agree, the same rule match arms follow.
+A lambda captures the variables it uses. A block-bodied lambda may end in a **tail**, an
+expression without `;`, which is its result — `(n: int) => { let d = n * 2; d + 1 }` — exactly
+as if it had written `return d + 1;`. It infers its return type from its `return` statements
+and its tail when neither an annotation nor a context provides one — they must agree, the same
+rule match arms follow.
 
 ## Static methods
 

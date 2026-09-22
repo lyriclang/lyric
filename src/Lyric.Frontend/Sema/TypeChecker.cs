@@ -132,6 +132,7 @@ public sealed class TypeChecker
         _mul = core?.LookupLocal("Mul") as TypeSymbol;
         _div = core?.LookupLocal("Div") as TypeSymbol;
         _into = core?.LookupLocal("Into") as TypeSymbol;
+        _display = core?.LookupLocal("Display") as TypeSymbol;
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
@@ -156,6 +157,11 @@ public sealed class TypeChecker
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
 
+    /// <summary>What an f-string hole renders a non-scalar value through (§6.6): the hole becomes
+    /// <c>value.show()</c> when the type conforms. Null without a standard library, and such a hole
+    /// is then the diagnostic it always was.</summary>
+    private readonly TypeSymbol? _display;
+
     /// <summary>The four arithmetic interfaces, under the same rules as <see cref="_equatable"/>.</summary>
     private readonly TypeSymbol? _add;
     private readonly TypeSymbol? _sub;
@@ -171,6 +177,11 @@ public sealed class TypeChecker
 
     /// <summary>The native declaration from <c>std.core</c>. See the constructor.</summary>
     private readonly FunctionSymbol? _stdPanic;
+
+    /// <summary>The context type a value block's tail checks against (§3.1, §6.9): the match
+    /// expression's context for a block arm, the lambda's return type for a block body. Set by
+    /// the owner around <see cref="CheckBlock"/>, and only read by the tail itself.</summary>
+    private LyrType? _tailExpected;
 
     /// <summary>Is <paramref name="f"/> the <c>panic</c> function, no matter which of the two names
     /// reached it?</summary>
@@ -1036,6 +1047,10 @@ public sealed class TypeChecker
         switch (stmt)
         {
             case Block b: CheckBlock(b, scope); break;
+            // The tail of a value block: checked against the context the block stands in, so a
+            // literal tail adapts like an expression arm would (§3.1). Its type is read back by
+            // whoever owns the block — a match arm, a lambda — through the side table.
+            case TailExprStmt tail: CheckExpr(tail.Expr, scope, _tailExpected); break;
             case BindingStmt bnd: CheckBinding(bnd, scope); break;
             case DestructuringStmt d: CheckDestructuring(d, scope); break;
             case LetPatternStmt lp: CheckLetPattern(lp, scope); break;
@@ -1596,6 +1611,8 @@ public sealed class TypeChecker
                                 $"'{TypeFacts.Display(hole)}' is opaque and does not render in "
                                 + "an f-string — convert explicitly: "
                                 + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
+                        else if (hole is not PrimitiveType && !hole.IsError)
+                            CheckDisplayHole(h, hole, scope);
                     }
                 return LyrType.String;
             case ErrorExpr: return LyrType.Error;
@@ -1625,6 +1642,17 @@ public sealed class TypeChecker
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ResumeExpr re: return CheckResume(re, scope);
             case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
+            case ThrowExpr te:
+            {
+                // The same rule as the statement (SEM0030); the difference is the type. 'never'
+                // fits anywhere (IsAssignable) and drops out of every unification, so
+                // 'x ?? throw e' is 'T' and a throwing arm leaves the other arms' type alone.
+                var thrownValue = CheckExpr(te.Value, scope);
+                if (!Conformance.IsThrowable(thrownValue, _throwable, _binding))
+                    _de.Report("LYR-SEM0030", Severity.Error, te.Span,
+                        $"cannot throw '{TypeFacts.Display(thrownValue)}' — only types implementing 'Throwable' can be thrown");
+                return LyrType.Never;
+            }
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -2724,6 +2752,45 @@ public sealed class TypeChecker
             + $"conversion comes from 'Into': give '{TypeFacts.Display(op)}' the conformance "
             + $":: [Into<{TypeFacts.Display(target)}>]' with a 'fn into(): {TypeFacts.Display(target)}'");
         return target;
+    }
+
+    /// <summary>
+    /// A hole whose value is not a scalar renders through <c>Display</c> (§6.6): <c>{p}</c> means
+    /// <c>{p.show()}</c> when the type conforms, and the call is recorded as what the hole means —
+    /// the same seam the operators and <c>as</c> use, so the lowering sees an ordinary method call.
+    ///
+    /// <para>A format specifier on such a hole is refused: <c>Display</c> has no spec language, and
+    /// silently ignoring one would be the classic "it printed, but not what I asked for". What does
+    /// not conform stays the error it was, with the conformance named instead of the converter.</para>
+    /// </summary>
+    private void CheckDisplayHole(InterpHole hole, LyrType type, SymbolTable scope)
+    {
+        // An interface VALUE renders through its vtable when the interface reaches Display —
+        // 'd.show()' on a 'd: Display' is a dispatch, not a conformance question.
+        var conforms = _display is { } display
+                       && (type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } iface
+                           ? Conformance.WithParents(iface.Symbol, _binding).Any(i => ReferenceEquals(i, display))
+                           : CanConform(type) && Satisfies(type, display, new NamedRef(display)));
+        if (!conforms)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+                $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
+                + "through 'Display': give the type the conformance ':: [Display]' with a "
+                + "'fn show(): string', or narrow and convert it explicitly");
+            return;
+        }
+        if (hole.FormatSpec is { } spec)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Span,
+                $"a format specifier ':{spec}' does not apply to '{TypeFacts.Display(type)}' — "
+                + "'Display' renders one way; format the text 'show()' answers instead");
+            return;
+        }
+        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
+        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span)
+            { MemberSpan = default };
+        var call = new CallExpr(member, [], hole.Expr.Span);
+        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
     }
 
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
@@ -4316,6 +4383,9 @@ public sealed class TypeChecker
         if (LyrType.Equal(a, b)) return a;
         if (a.IsError) return b;
         if (b.IsError) return a;
+        // A diverging branch contributes nothing (§6.9): 'if (c) v else throw e' is the type of 'v'.
+        if (a is NeverType) return b;
+        if (b is NeverType) return a;
 
         // A `null` branch makes the other one optional: `if (c) 5 else null` is `?int`.
         //
@@ -4354,13 +4424,40 @@ public sealed class TypeChecker
             switch (arm.Body)
             {
                 case Block b:
+                {
+                    var savedTail = _tailExpected;
+                    _tailExpected = asExpression ? expected : null;
                     CheckBlock(b, armScope);
-                    // Blocks have no value: in a match EXPRESSION a block arm has to leave the
-                    // function on every path, and it contributes nothing to the unification.
+                    _tailExpected = savedTail;
+
+                    if (b.Tail is { } tail)
+                    {
+                        // A block arm WITH a tail delivers the tail's value (§6.9): it takes part
+                        // in the unification exactly as an expression arm does. In a match
+                        // STATEMENT the value goes nowhere, so the tail is held to the expression
+                        // statement rule — a bare value there is the same mistake as 'x;'.
+                        var tt = _result.TypeOf(tail.Expr);
+                        if (!asExpression)
+                        {
+                            if (tail.Expr is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
+                                _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
+                                    "expression statement has no effect (only calls, assignments and resume are allowed)");
+                            break;
+                        }
+                        if (expected is not null && !expected.IsError)
+                            CheckAssignable(tail.Expr, tt, expected, tail.Span);
+                        bodies.Add(tt);
+                        break;
+                    }
+
+                    // Without a tail a block has no value: in a match EXPRESSION it has to leave
+                    // the function on every path, and it contributes nothing to the unification.
                     if (asExpression && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0033", Severity.Error, arm.Span,
-                            "a block arm of a match expression must return or throw on every path (blocks have no value)");
+                            "a block arm of a match expression must return or throw on every path, "
+                            + "or end in a tail expression without ';' that is the arm's value");
                     break;
+                }
                 case Expr e:
                     var bt = CheckExpr(e, armScope, expected);
                     // With a context the arm checks AGAINST it (§3.1/§6.9 since 2.1): a
@@ -4625,6 +4722,10 @@ public sealed class TypeChecker
         {
             if (bodies[i].IsError) continue;
             if (result.IsError) { result = bodies[i]; continue; }
+            // A diverging arm ('throw', 'panic') contributes nothing (§6.9): it never delivers a
+            // value the others would have to agree with. All arms diverging is 'never'.
+            if (bodies[i] is NeverType) continue;
+            if (result is NeverType) { result = bodies[i]; continue; }
             if (LyrType.Equal(result, bodies[i])) continue;
             if (WidenAgainstNull(result, bodies[i]) is { } widened) { result = widened; continue; }
             _de.Report("LYR-SEM0016", Severity.Error, span, $"{what} have incompatible types: '{TypeFacts.Display(result)}' vs '{TypeFacts.Display(bodies[i])}'");
@@ -5244,12 +5345,18 @@ public sealed class TypeChecker
                 }
                 break;
             case Block b:
-                if (contextRet is null && !openGeneric && !HasValueReturn(b))
+            {
+                // A tail is 'return tail;' at the block's end (§6.9, §7.3): it counts as a value
+                // return for the void default, joins the inferred returns, checks against the
+                // context, and covers the block's end.
+                var savedTail = _tailExpected;
+                if (contextRet is null && !openGeneric && !HasValueReturn(b) && b.Tail is null)
                 {
                     // A block lambda without context that returns no value becomes void, so
                     // side-effect closures (`() => { doStuff(); }`) need no `: void`.
                     ret = LyrType.Void;
                     _currentReturn = LyrType.Void;
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                 }
                 else if (contextRet is null || openGeneric)
@@ -5260,12 +5367,14 @@ public sealed class TypeChecker
                     var collected = new List<LyrType>();
                     _returnInference = collected;
                     _currentReturn = LyrType.Error; // nothing reads it while collecting
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                     _returnInference = null;
+                    if (b.Tail is { } inferredTail) collected.Add(_result.TypeOf(inferredTail.Expr));
                     ret = collected.Count == 0
                         ? LyrType.Void // openGeneric without a value return: U binds to void
                         : UnifyArms(collected, lam.Span, "the returns of this block lambda");
-                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
@@ -5273,12 +5382,17 @@ public sealed class TypeChecker
                 {
                     ret = contextRet;
                     _currentReturn = contextRet; // 'return' belongs to the LAMBDA, not to the enclosing function
+                    _tailExpected = TypeFacts.IsVoid(contextRet) ? null : contextRet;
                     CheckBlock(b, lambdaScope);
-                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (b.Tail is { } contextTail && !TypeFacts.IsVoid(contextRet)) // a void context discards the value
+                        CheckAssignable(contextTail.Expr, _result.TypeOf(contextTail.Expr), contextRet, contextTail.Span);
+                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
+                _tailExpected = savedTail;
                 break;
+            }
             default:
                 ret = LyrType.Error;
                 break;
@@ -5382,6 +5496,8 @@ public sealed class TypeChecker
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
+                case ThrowExpr te: WalkNode(te.Value); return;
+                case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

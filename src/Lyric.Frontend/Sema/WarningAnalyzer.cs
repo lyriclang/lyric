@@ -494,6 +494,7 @@ internal sealed class WarningAnalyzer
                 if (lp.Else is { } le) WalkBlock(le);
                 break;
             case ExprStmt es: WalkExpr(es.Expr); break;
+            case TailExprStmt tail: WalkExpr(tail.Expr); break;
             case ReturnStmt { Value: { } v }: WalkExpr(v); break;
             case YieldStmt { Value: { } v }: WalkExpr(v); break;
             case ThrowStmt t: WalkExpr(t.Value); break;
@@ -576,6 +577,7 @@ internal sealed class WarningAnalyzer
                 break;
             case ResumeExpr re: WalkExpr(re.Coroutine); break;
             case ComptimeExpr ct: WalkExpr(ct.Inner); break;
+            case ThrowExpr te: WalkExpr(te.Value); break;
             case AssignExpr a:
                 MarkMutated(a.Target);
                 WalkExpr(a.Target);

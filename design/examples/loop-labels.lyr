@@ -1,0 +1,54 @@
+// Labels fuer break/continue (4.5), Go-Form `name:` vor der Schleife.
+//
+// Ist-Stand (4.4): Flag-Variable, in der aeusseren Bedingung wiederholt, und bei `continue outer`
+// laeuft die Teilsumme der abgebrochenen Zeile trotzdem in `sum` (11 statt 8):
+//     var stop = false;
+//     for (row in rows) { if (stop) { break; } for (x in row) { if (x < 0) { stop = true; break; } sum += x; } }
+import std.io.console { println };
+
+fn find(grid: int[][], target: int): (int, int) {
+    var found = (-1, -1);
+    outer: for (i in 0..grid.length) {
+        for (j in 0..grid[i].length) {
+            if (grid[i][j] == target) {
+                found = (i, j);
+                break outer;                     // verlaesst BEIDE Schleifen
+            }
+        }
+    }
+    return found;
+}
+
+fn sumPositiveRows(rows: int[][]): int {
+    var sum = 0;
+    rows: for (row in rows) {
+        var partial = 0;
+        for (x in row) {
+            if (x < 0) { continue rows; }        // Zeile verwerfen, naechste Zeile
+            partial += x;
+        }
+        sum += partial;
+    }
+    return sum;
+}
+
+fn withDefers(): int {
+    var log = 0;
+    outer: for (i in 0..3) {
+        defer log += 10;                         // laeuft beim Verlassen des aeusseren Koerpers
+        for (j in 0..3) {
+            defer log += 1;                      // laeuft zuerst (innerster Scope)
+            if (i == 1 && j == 1) { break outer; }
+        }
+    }
+    return log;
+}
+
+fn main(): int {
+    let g = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    let (r, c) = find(g, 6);
+    println(f"{r},{c}");                                     // 1,2
+    println(f"{sumPositiveRows([[1, 2], [3, -1, 4], [5]])}"); // 8
+    println(f"{withDefers()}");                              // 25
+    return 0;
+}

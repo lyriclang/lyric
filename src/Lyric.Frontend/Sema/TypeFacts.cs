@@ -42,7 +42,8 @@ public static class TypeFacts
     };
 
     public static LyrType? FromBuiltinName(string name) =>
-        Builtins.TryGetValue(name, out var kind) ? new PrimitiveType(kind) : null;
+        name == "never" ? LyrType.Never
+        : Builtins.TryGetValue(name, out var kind) ? new PrimitiveType(kind) : null;
 
     /// <summary>Does an integer literal, possibly negated, fit into the target type?</summary>
     public static bool IntLiteralFits(bool negative, ulong magnitude, PrimitiveKind target) => target switch

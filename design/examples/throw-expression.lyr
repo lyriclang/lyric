@@ -1,0 +1,89 @@
+// throw als Ausdruck und `never` als Rueckgabetyp (4.5).
+//
+// Ist-Stand (4.4): drei Umwege fuer drei Stellen —
+//     let v = lookup(m, key); if (v == null) { throw NotFound { key = key }; } return v;
+//     _ => { throw NotFound { key = "dial" }; }        // Block-Arm, uneinheitlich zu den Nachbarn
+//     if (b) { v = 10; } else { throw ...; }            // if-Statement statt if-Ausdruck
+// und ein eigener Abbruch-Helfer musste `void` sein: `if (bad) { fail("x"); }` narrowt nichts.
+import std.io.console { println };
+
+class NotFound :: [Throwable] {
+    key: string,
+    fn message(): string { return "not found: " + this.key; }
+}
+
+enum Cmd { Go, Stop, Dial(int) }
+
+fn fail(msg: string): never {
+    panic("fatal: " + msg);
+}
+
+fn lookup(m: (string, int)[], key: string): ?int {
+    for (e in m) {
+        let (k, v) = e;
+        if (k == key) { return v; }
+    }
+    return null;
+}
+
+fn need(m: (string, int)[], key: string): int throws NotFound {
+    return lookup(m, key) ?? throw NotFound { key = key };      // ?? throw
+}
+
+fn code(c: Cmd): int throws NotFound {
+    return match (c) {
+        Cmd.Go => 1,
+        Cmd.Stop => 2,
+        Cmd.Dial(n) if n > 0 => n,
+        _ => throw NotFound { key = "dial" },                    // Arm vom Typ never
+    };
+}
+
+fn pick(b: bool, x: ?int): int throws NotFound {
+    let v = if (b) 10 else x ?? throw NotFound { key = "x" };   // if-Ausdruck
+    return v;
+}
+
+fn guard(n: int): int {
+    if (n < 0) { fail("negative"); }                             // never-Aufruf beendet den Pfad
+    return n * 2;
+}
+
+fn run(): void throws NotFound {
+    let m = [("a", 1), ("b", 2)];
+    println(f"{need(m, "b")}");
+    try {
+        println(f"{need(m, "z")}");
+    } catch (e: NotFound) {
+        println(e.message());
+    }
+    println(f"{code(Cmd.Dial(7))}");
+    try {
+        println(f"{code(Cmd.Dial(0))}");
+    } catch (e: NotFound) {
+        println("caught " + e.message());
+    }
+    try {
+        println(f"{pick(false, null)}");
+    } catch (e: NotFound) {
+        println("pick: " + e.message());
+    }
+    println(f"{pick(true, null)} {guard(21)}");
+}
+
+fn main(): int {
+    try {
+        run();
+    } catch (e: NotFound) {
+        println("unexpected: " + e.message());
+        return 1;
+    }
+    return 0;
+}
+// Ausgabe:
+// 2
+// not found: z
+// 7
+// caught not found: dial
+// pick: not found: x
+// 10 42

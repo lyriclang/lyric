@@ -1,0 +1,36 @@
+// f-Strings rendern Display-Typen (4.5): ein Loch ohne Spezifizierer ruft show(),
+// wenn der Typ Display erfuellt — dieselbe Frage, die println stellt.
+//
+// Ist-Stand (4.4): jedes Loch mit eigenem Typ brauchte `.show()`:
+//     println(f"p = {p.show()}, c = {c.show()}, took {d.show()}");
+// und ein Loch mit ?int oder int[] stuerzte das Lowering ab statt eine Diagnose zu geben.
+import std.io.console { println };
+import std.core { Display };
+import std.time { Duration };
+
+struct Point :: [Display] {
+    x: int,
+    y: int,
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+enum Color { Red, Blue }
+
+extend Color :: [Display] {
+    fn show(): string {
+        return match (this) { Color.Red => "red", Color.Blue => "blue" };
+    }
+}
+
+fn label<T :: [Display]>(tag: string, v: T): string {
+    return f"{tag}={v}";                // durch die Constraint
+}
+
+fn main(): int {
+    let p = Point { x = 1, y = 2 };
+    let d: Display = p;                 // Interface-Wert: vtable-Aufruf
+    println(f"p = {p}, c = {Color.Blue}, d = {d}, n = {42}");
+    println(label("point", p));
+    println(f"took {Duration.ofMillis(1500)}");
+    return 0;
+}

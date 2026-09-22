@@ -23,6 +23,7 @@ public sealed partial class Parser
     // false at the start of a statement, where it would be ambiguous with a block, and true again
     // inside delimiters through ParseSubExpr.
     private bool _allowStructInit = true;
+    private bool _allowTail; // inside a value block's own statement list (see ParseBlock)
 
     /// <summary>Set while the FIRST primary of a match-arm guard is parsed: a '(' there opens a
     /// group, not a lambda, because the arm's '=>' follows the guard.</summary>
@@ -171,6 +172,12 @@ public sealed partial class Parser
             var kw = _buffer.Advance();
             var co = ParsePrefix();
             return new ResumeExpr(co, Span.Union(kw.Span, co.Span));
+        }
+        if (op is TokenKind.Throw) // 'x ?? throw e': a prefix, so 'throw e ?? f' is not 'throw (e ?? f)'
+        {
+            var kw = _buffer.Advance();
+            var value = ParsePrefix();
+            return new ThrowExpr(value, Span.Union(kw.Span, value.Span));
         }
         // 'comptime e': contextual, like 'resume' in shape. It opens the prefix only when what
         // follows can begin an expression, so an identifier 'comptime' before an operator, a
@@ -742,8 +749,9 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012",
             $"expected '=>' in lambda, got {_buffer.Current.TokenKind}");
 
-        // Body: an expression or a block, '=> expr' or '=> { ... }'.
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
+        // its tail is the lambda's result, like 'return tail;' at its end.
+        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
         return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span));
     }
 

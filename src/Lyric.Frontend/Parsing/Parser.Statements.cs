@@ -24,6 +24,9 @@ public sealed partial class Parser
 
     private Stmt ParseStmt() => _buffer.Current.TokenKind switch
     {
+        // 'name:' at the start of a statement is a loop label — nothing else begins that way
+        // (§6.8: an expression statement is a call, an assignment or 'resume').
+        TokenKind.Identifier when _buffer.Peek(1).TokenKind == TokenKind.Colon => ParseLabeled(),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
         TokenKind.If => ParseIf(),
@@ -41,6 +44,39 @@ public sealed partial class Parser
         _ => ParseExprStmt(),
     };
 
+    /// <summary>'outer: while (…) { … }' — the label names the loop that follows it, and only a
+    /// loop. On anything else the label is reported and the statement parsed as written, so one
+    /// misplaced label yields one diagnostic rather than a cascade.</summary>
+    private Stmt ParseLabeled()
+    {
+        var nameTok = _buffer.Advance(); // IDENTIFIER
+        _buffer.Advance();               // ':'
+        var label = _sm.Slice(nameTok.Span).ToString();
+        var start = nameTok.Span;
+        switch (_buffer.Current.TokenKind)
+        {
+            case TokenKind.While:
+            {
+                var w = (WhileStmt)ParseWhile();
+                return w with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, w.Span) };
+            }
+            case TokenKind.Do:
+            {
+                var d = (DoWhileStmt)ParseDoWhile();
+                return d with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, d.Span) };
+            }
+            case TokenKind.For:
+            {
+                var f = (ForInStmt)ParseForIn();
+                return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
+            }
+            default:
+                _de.Report("LYR-PAR0044", Severity.Error, nameTok.Span,
+                    $"a label names a loop: expected 'while', 'do' or 'for' after '{label}:'");
+                return ParseStmt();
+        }
+    }
+
     private Stmt ParseMatchStmt()
     {
         var kw = _buffer.Advance(); // 'match'
@@ -48,10 +84,16 @@ public sealed partial class Parser
         return new MatchStmt(scrutinee, arms, Span.Union(kw.Span, end));
     }
 
-    private Block ParseBlock()
+    /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
+    /// a lambda body — whose last statement may be a tail expression without ';' (§6.9). The flag
+    /// holds for the block's OWN statements only: a nested statement block resets it, so a tail
+    /// can stand exactly where its value has somewhere to go.</summary>
+    private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
         var stmts = new List<Stmt>();
+        var savedTail = _allowTail;
+        _allowTail = valueBlock;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
             var before = _buffer.Position;
@@ -60,6 +102,7 @@ public sealed partial class Parser
                 _buffer.Advance(); // force progress, so an unconsumed token cannot loop forever
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close block");
+        _allowTail = savedTail;
         return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
     }
 
@@ -252,15 +295,25 @@ public sealed partial class Parser
     private Stmt ParseBreak()
     {
         var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
         var semi = ExpectSemicolon();
-        return new BreakStmt(Span.Union(kw.Span, semi.Span));
+        return new BreakStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
     }
 
     private Stmt ParseContinue()
     {
         var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
         var semi = ExpectSemicolon();
-        return new ContinueStmt(Span.Union(kw.Span, semi.Span));
+        return new ContinueStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
+    }
+
+    /// <summary>'break outer;' — the identifier, when one stands before the ';'.</summary>
+    private (string? label, Span span) ParseOptionalLabel()
+    {
+        if (!_buffer.Check(TokenKind.Identifier)) return (null, default);
+        var tok = _buffer.Advance();
+        return (_sm.Slice(tok.Span).ToString(), tok.Span);
     }
 
     private Stmt ParseReturn()
@@ -302,6 +355,13 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance();
         var value = ParseExpr(0);
+        // 'throw e' as the tail of a value block: the arm's value is 'never' (§6.9), and the
+        // block diverges — the same thing 'throw e;' says, in the position a tail stands in.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+        {
+            var span = Span.Union(kw.Span, value.Span);
+            return new TailExprStmt(new ThrowExpr(value, span), span);
+        }
         var semi = ExpectSemicolon();
         return new ThrowStmt(value, Span.Union(kw.Span, semi.Span));
     }
@@ -343,6 +403,15 @@ public sealed partial class Parser
         _allowStructInit = false;
         var expr = ParseExpr(0);
         _allowStructInit = saved;
+        // In a value block an expression followed by the closing brace is the block's tail: the
+        // one place a missing ';' is not an error (it was one before 4.5, so nothing changes
+        // meaning). A tail struct initializer needs parentheses, like any statement-first one.
+        //
+        // BEFORE the trailing-lambda rule below, because it is the narrower question: '_allowTail'
+        // holds only inside a value block, and there the last expression IS the value — including
+        // when it is written as a trailing lambda.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+            return new TailExprStmt(expr, expr.Span);
 
         // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
         // needs no ';', as a block arm of a match needs no ','. One may still stand there.
@@ -352,6 +421,7 @@ public sealed partial class Parser
         var semi = ExpectSemicolon();
         return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
     }
+
 
     private Token ExpectSemicolon() =>
         _buffer.Expect(TokenKind.Semicolon, "LYR-PAR0016", "expected ';'");
