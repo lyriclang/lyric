@@ -403,9 +403,28 @@ pub fn isAlphanumeric(c: char): bool {
     return isAlpha(c) || isDigit(c);
 }
 
-/// Space, tab, `\n` or `\r`.
+/// Whether the character is white space in the Unicode sense — the same set `trim` removes,
+/// so `s.trim() == s.trimStart().trimEnd()` and `isBlank` agree with it: the ASCII controls
+/// `\t`..`\r` and the space, U+0085, U+00A0 and the other space separators (U+1680,
+/// U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000). Before 4.5 only four ASCII
+/// characters counted here while `trim` already used this set.
 pub fn isWhitespace(c: char): bool {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    let n = c as int;
+    if (n <= 32) {
+        return n == 32 || n >= 9 && n <= 13;
+    }
+    if (n < 133) {
+        return false;
+    }
+    return n == 133
+        || n == 160
+        || n == 5760
+        || n >= 8192 && n <= 8202
+        || n == 8232
+        || n == 8233
+        || n == 8239
+        || n == 8287
+        || n == 12288;
 }
 
 /// `'A'` through `'Z'`.

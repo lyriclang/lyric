@@ -2,9 +2,9 @@
 //
 // No capability required: arithmetic reaches nothing.
 //
-// Every function works on `float` (64-bit IEEE 754). There are no integer variants: `abs` on an
-// `int` would be a second function for the same concept, and there is no overloading. Cast with
-// `as`, which is required anyway.
+// The native functions work on `float` (64-bit IEEE 754); the integer family below carries the
+// type in its name (`absInt`, `minInt`) — names chosen before the language had overloading
+// (3.0), and kept because every program calls them.
 //
 // Special values follow IEEE 754: `sqrt(-1.0)` is NaN, not a panic.
 
@@ -71,13 +71,95 @@ pub let tau: float = 6.283185307179586;
 
 // ------------------------------------------------------------------------------ integers
 //
-// Distinct names rather than overloading: `absInt` beside `abs` is two functions, because `int`
-// and `float` are two types.
+// The type in the name: `absInt` beside `abs`, from before overloading existed.
+
+/// The largest `int`, 2^63 - 1.
+pub let intMax: int = 9223372036854775807;
+
+/// The smallest `int`, -2^63. It has no positive twin: `absInt(intMin)` is `intMin` again, and
+/// `0 - intMin` too — arithmetic wraps.
+pub let intMin: int = 0 - 9223372036854775807 - 1;
 
 /// The absolute value. The most negative `int` has no positive twin and comes back
-/// unchanged — arithmetic wraps.
+/// unchanged — arithmetic wraps; `checkedAbs` answers `null` there instead.
 pub fn absInt(value: int): int {
     return if (value < 0) 0 - value else value;
+}
+
+// ------------------------------------------------------------------ checked arithmetic
+//
+// `+`, `-` and `*` wrap, by the language's decision (§6): a program that wants to KNOW asks
+// here. Each answers `null` where the wrapped operator would have answered a wrong number, and
+// each detects the overflow without committing it, which is why the tests look at the signs
+// rather than at the result.
+
+/// `a + b`, or `null` when the sum does not fit `int`.
+pub fn checkedAdd(a: int, b: int): ?int {
+    let sum = a + b;
+    // Overflow flips the sign against both operands: two positives cannot sum to a negative.
+    if (a >= 0 == b >= 0 && sum >= 0 != a >= 0) {
+        return null;
+    }
+    return sum;
+}
+
+/// `a - b`, or `null` when the difference does not fit `int`.
+pub fn checkedSub(a: int, b: int): ?int {
+    let difference = a - b;
+    // Operands of different sign, and the result on the wrong side of `a`.
+    if (a >= 0 != b >= 0 && difference >= 0 != a >= 0) {
+        return null;
+    }
+    return difference;
+}
+
+/// `a * b`, or `null` when the product does not fit `int`.
+pub fn checkedMul(a: int, b: int): ?int {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    let product = a * b;
+    // Undoing the multiplication must give the operand back; the one case division cannot
+    // check is `intMin * -1`, which wraps to `intMin` and divides back to `intMin` too.
+    if (product / b != a || a == intMin && b == -1 || b == intMin && a == -1) {
+        return null;
+    }
+    return product;
+}
+
+/// The absolute value, or `null` for `intMin`, the one value without one.
+pub fn checkedAbs(value: int): ?int {
+    if (value == intMin) {
+        return null;
+    }
+    return absInt(value);
+}
+
+/// `a + b`, held at `intMax` or `intMin` instead of wrapping.
+pub fn saturatingAdd(a: int, b: int): int {
+    let sum = checkedAdd(a, b);
+    if (sum != null) {
+        return sum;
+    }
+    return if (a < 0) intMin else intMax;
+}
+
+/// `a - b`, held at the bounds instead of wrapping.
+pub fn saturatingSub(a: int, b: int): int {
+    let difference = checkedSub(a, b);
+    if (difference != null) {
+        return difference;
+    }
+    return if (a < 0) intMin else intMax;
+}
+
+/// `a * b`, held at the bounds instead of wrapping.
+pub fn saturatingMul(a: int, b: int): int {
+    let product = checkedMul(a, b);
+    if (product != null) {
+        return product;
+    }
+    return if (a < 0 != b < 0) intMin else intMax;
 }
 
 /// The smaller of the two.
@@ -130,7 +212,8 @@ pub fn lcm(a: int, b: int): int {
 
 /// Integer power by repeated squaring.
 ///
-/// A negative exponent yields `null`: the result would be a fraction.
+/// `null` for a negative exponent — the result would be a fraction — and since 4.5 for a result
+/// beyond `int`, which used to wrap silently: `powInt(2, 64)` answered 0.
 pub fn powInt(base: int, exponent: int): ?int {
     if (exponent < 0) {
         return null;
@@ -141,10 +224,22 @@ pub fn powInt(base: int, exponent: int): ?int {
     var e = exponent;
     while (e > 0) {
         if (e % 2 == 1) {
-            result = result * b;
+            let next = checkedMul(result, b);
+            if (next == null) {
+                return null;
+            }
+            result = next;
         }
-        b = b * b;
         e = e / 2;
+        if (e > 0) {
+            // The square is needed only while a factor is still to come; squaring past the
+            // last bit would overflow for a result that fits.
+            let square = checkedMul(b, b);
+            if (square == null) {
+                return null;
+            }
+            b = square;
+        }
     }
     return result;
 }
