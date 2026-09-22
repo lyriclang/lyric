@@ -328,12 +328,18 @@ public class GenericEnumTests
     /// All four are pinned here because none of them is covered by another.</para>
     ///
     /// <para>MEASURED, not assumed: with the substitution taken out of
-    /// <c>LowerGenericMethodCall</c>, the ENUM row fails and both class rows keep passing — with
-    /// an interface conformance and without one. So a conformance is NOT what decides it; which
-    /// route a class instance method actually takes was not established, and this comment does
-    /// not claim it. With the substitution taken out of <c>LowerGenericStaticCall</c>, both
-    /// static rows fail. That asymmetry is the reason the defect survived: a repro written with
-    /// a class shows nothing, and the first two written for it were.</para>
+    /// <c>LowerGenericMethodCall</c>, the ENUM row fails here and both class rows keep passing —
+    /// with an interface conformance and without one. With it taken out of
+    /// <c>LowerGenericStaticCall</c>, both static rows fail. So on THIS tree a conformance
+    /// decides nothing, and which route a class instance method takes instead was not
+    /// established; this comment does not claim it.</para>
+    ///
+    /// <para>The same experiment on the stdlib branch, where the defect was found in parallel,
+    /// reports the class row failing together with the enum row. Both measurements were taken
+    /// per call site with literal arguments, and the probe written to tell them apart is green
+    /// here and red there — so the two trees genuinely differ, and neither result generalises to
+    /// the other. It is inconsequential for the fix, which covers every route either way, and it
+    /// is the one open question a merge should settle by measuring once.</para>
     ///
     /// <para>The argument has to be a LITERAL. Passing an expression that is already a
     /// <c>?int</c> needs no coercion, so it passes through the gap without touching it — a
