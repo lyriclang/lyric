@@ -43,6 +43,7 @@
     <ProjectReference Include="..\Lyrbuild\Lyrbuild.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\Lyrpack\Lyrpack.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\Lyrfmt\Lyrfmt.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Lyrtest\Lyrtest.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--
@@ -85,7 +86,7 @@
              Properties="Configuration=$(Configuration)" />
 
     <ItemGroup>
-      <ToolProject Include="..\Lyrc\;..\Lyrvm\;..\Lyrrepl\;..\Lyrbuild\;..\Lyrpack\;..\Lyrfmt\" />
+      <ToolProject Include="..\Lyrc\;..\Lyrvm\;..\Lyrrepl\;..\Lyrbuild\;..\Lyrpack\;..\Lyrfmt\;..\Lyrtest\" />
     </ItemGroup>
 
     <!--

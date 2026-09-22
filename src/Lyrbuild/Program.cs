@@ -36,7 +36,17 @@ public static class Program
 
     private sealed record Flags(string? Directory, string? Stdlib, Profile Profile,
         IReadOnlyDictionary<string, string> Defines, IReadOnlyList<string> Only,
-        bool Help, bool Version);
+        bool Help, bool Version, bool PrintPath);
+
+    /// <summary>
+    /// Where the build's own words go: the terminal normally, stderr under
+    /// <c>--print-path</c>.
+    ///
+    /// <para>Under that flag stdout carries ONE thing, the path of the artifact, because the
+    /// driver reads it to know what to run. Everything a person is meant to read — what was
+    /// compiled, what the script printed — is still shown, one stream over.</para>
+    /// </summary>
+    private static TextWriter Chatter(Flags flags) => flags.PrintPath ? Console.Error : Console.Out;
 
     public static int Main(string[] args)
     {
@@ -91,6 +101,7 @@ public static class Program
         var only = new List<string>();
         var help = false;
         var version = false;
+        var printPath = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -134,6 +145,10 @@ public static class Program
                     only.Add(artifact);
                     break;
 
+                case "--print-path":
+                    printPath = true;
+                    break;
+
                 case "-D":
                     if (Value(args, ref i, "name or name=value") is not { } define) return null;
                     if (!Define(defines, define)) return null;
@@ -159,7 +174,7 @@ public static class Program
             }
         }
 
-        return new Flags(directory, stdlib, profile, defines, only, help, version);
+        return new Flags(directory, stdlib, profile, defines, only, help, version, printPath);
     }
 
     private static string? Value(string[] args, ref int i, string what)
@@ -220,14 +235,32 @@ public static class Program
                 $"{FileName}: 'after' takes no parameters", ExitCodes.Failure);
 
         var session = new BuildSession(directory, project, flags.Stdlib, flags.Profile,
-            flags.Defines, flags.Only, Console.Out, Console.Error);
+            flags.Defines, flags.Only, Chatter(flags), Console.Error);
 
-        if (Execute(Entry(after is not null), directory, scriptOptions, session) is not { } exit)
+        if (Execute(Entry(after is not null), directory, scriptOptions, session, flags) is not { } exit)
             return ExitCodes.Failure;
 
-        return exit == ExitCodes.Success ? ExitCodes.Success
-            : session.UsageError ? ExitCodes.Usage
-            : ExitCodes.Failure;
+        if (exit != ExitCodes.Success)
+            return session.UsageError ? ExitCodes.Usage : ExitCodes.Failure;
+
+        return flags.PrintPath ? PrintPath(session.Default) : ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// The one line stdout carries under <c>--print-path</c>: the program the driver is to run.
+    ///
+    /// <para>A project that declares no program has nothing to run, and saying so here beats
+    /// the driver failing on an empty line it could not explain.</para>
+    /// </summary>
+    private static int PrintPath(Declared? artifact)
+    {
+        if (artifact is null)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownArtifact,
+                $"{FileName} declares no program to run — 'executable(name, entry)' is what "
+                + "declares one, and a library is checked rather than run", ExitCodes.Usage);
+
+        Console.Out.WriteLine(artifact.Output);
+        return ExitCodes.Success;
     }
 
     /// <summary>A <c>pub fn</c> of the script by name, or <c>null</c>. The script's own
@@ -285,7 +318,7 @@ public static class Program
     /// not answer.</para>
     /// </summary>
     private static int? Execute(string entry, string directory, CompilerOptions scriptOptions,
-        BuildSession session)
+        BuildSession session, Flags flags)
     {
         // Disposed with the build: a build script that leaves a file open holds it until this
         // process ends otherwise, and on Windows that locks it against whatever runs next.
@@ -297,7 +330,10 @@ public static class Program
             StdlibRoot = scriptOptions.StdlibRoot,
             SourceRoot = directory,
             Profile = Profile.Debug,
-            Output = Console.Out,
+            // What the SCRIPT prints is the build's words, not the program's: under
+            // --print-path it moves to stderr with everything else, so stdout stays the one
+            // path the driver reads.
+            Output = Chatter(flags),
             Error = Console.Error,
         });
 
@@ -373,7 +409,7 @@ public static class Program
         var name = project?.Name ?? new DirectoryInfo(directory).Name;
         var profile = flags.Profile;
         var session = new BuildSession(directory, project, flags.Stdlib, profile,
-            flags.Defines, flags.Only, Console.Out, Console.Error);
+            flags.Defines, flags.Only, Chatter(flags), Console.Error);
 
         var main = Path.Combine(sourceRoot, "main.lyr");
         if (File.Exists(main))
@@ -381,20 +417,29 @@ public static class Program
             var program = new Declared(Declared.Executable, name, main,
                 Path.Combine(directory, "out", profile.Name, $"{name}.lyrbc"),
                 profile.Optimize, profile.SourceMap, profile.DebugInfo, profile.DenyWarnings);
-            return session.Build(program) ? ExitCodes.Success : ExitCodes.Failure;
+            if (!session.Build(program)) return ExitCodes.Failure;
+            return flags.PrintPath ? PrintPath(program) : ExitCodes.Success;
         }
 
-        if (Directory.Exists(sourceRoot)
+        // A library needs a lyric.json to BE one: it is the file that says which directory is
+        // the source root and what the project is called. Without it, a directory that merely
+        // holds .lyr files is not a project — and treating one as a library would make
+        // 'lyric run' in a checkout sweep every file under it as one compilation.
+        if (project is not null && Directory.Exists(sourceRoot)
             && Directory.EnumerateFiles(sourceRoot, "*.lyr", SearchOption.AllDirectories).Any())
         {
             var library = new Declared(Declared.Library, name, sourceRoot, "",
                 profile.Optimize, profile.SourceMap, profile.DebugInfo, profile.DenyWarnings);
-            return session.Build(library) ? ExitCodes.Success : ExitCodes.Failure;
+            if (!session.Build(library)) return ExitCodes.Failure;
+            // A library has nothing to run, and a driver asking for a path has to hear that
+            // rather than an empty line.
+            return flags.PrintPath ? PrintPath(null) : ExitCodes.Success;
         }
 
         return CliDiagnostics.Fail(Console.Error, CliDiagnostics.NoBuildScript,
             $"nothing to build in {directory}: no {FileName}, and no main.lyr under "
-            + $"{sourceRoot} to build by convention", ExitCodes.Usage);
+            + $"{sourceRoot} to build by convention — name a file to compile, or make this a "
+            + "project with a lyric.json", ExitCodes.Usage);
     }
 
     /// <summary>The script's options after the fixed help: <c>build</c> runs so the script can
@@ -412,7 +457,8 @@ public static class Program
 
         var session = new BuildSession(directory, project: null, flags.Stdlib, flags.Profile,
             flags.Defines, flags.Only, TextWriter.Null, Console.Error);
-        if (Execute(HelpEntry, directory, scriptOptions, session) is null) return ExitCodes.Failure;
+        if (Execute(HelpEntry, directory, scriptOptions, session, flags) is null)
+            return ExitCodes.Failure;
 
         Console.Out.WriteLine();
         if (session.Options.Count == 0)
@@ -445,6 +491,8 @@ public static class Program
         Console.Out.WriteLine("  --debug, --release The same, shorter");
         Console.Out.WriteLine("  -D <name[=value]>  An option for the script; -D name for a flag");
         Console.Out.WriteLine("  --only <name>      Build this artifact alone; may be repeated");
+        Console.Out.WriteLine("  --print-path       Print the built program's path, and nothing");
+        Console.Out.WriteLine("                     else, on stdout — what 'lyric run' reads");
         Console.Out.WriteLine("  --stdlib <dir>     Where the stdlib lives (beats $LYRIC_STDLIB)");
         Console.Out.WriteLine("  --version, -v      Show the toolchain version");
         Console.Out.WriteLine("  --help, -h         Show this help, and the script's options");

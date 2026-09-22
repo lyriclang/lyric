@@ -100,4 +100,48 @@ public sealed record Tool(string Name, string Flag, string EnvironmentVariable)
                 $"could not start '{executable}': {ex.Message}", ExitCodes.Failure);
         }
     }
+
+    /// <summary>
+    /// Starts the tool and CAPTURES its stdout, leaving stderr inherited.
+    ///
+    /// <para>For the one thing a tool tells the driver rather than the user: the path
+    /// <c>lyrbuild --print-path</c> writes, which <c>lyric run</c> then executes. Everything
+    /// the person is meant to read — diagnostics, what was compiled — still goes straight to
+    /// the terminal, so the capture changes what the driver knows and not what the user
+    /// sees.</para>
+    ///
+    /// <para>Decoded as UTF-8, the other half of the encoding contract: every tool writes UTF-8
+    /// into a redirected stream (<see cref="ConsoleStreams.UseUtf8WhenRedirected"/>), and the
+    /// default here would be this process's console code page.</para>
+    /// </summary>
+    public static (int ExitCode, string Output) Capture(string executable,
+        IEnumerable<string> arguments, TextWriter error)
+    {
+        var info = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            StandardOutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+        };
+        foreach (var argument in arguments) info.ArgumentList.Add(argument);
+
+        try
+        {
+            using var process = Process.Start(info);
+            if (process is null)
+                return (CliDiagnostics.Fail(error, CliDiagnostics.VmLaunchFailed,
+                    $"could not start '{executable}'", ExitCodes.Failure), "");
+
+            // Read before waiting: in the other order a child blocks as soon as it writes more
+            // than fits into the pipe.
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return (process.ExitCode, output);
+        }
+        catch (Exception ex)
+        {
+            return (CliDiagnostics.Fail(error, CliDiagnostics.VmLaunchFailed,
+                $"could not start '{executable}': {ex.Message}", ExitCodes.Failure), "");
+        }
+    }
 }

@@ -14,12 +14,16 @@ myapp/
 ├── lyric.json      where the modules live
 ├── build.lyr       what to build
 ├── .gitignore
-└── src/main.lyr
+├── src/main.lyr
+├── src/greeting.lyr
+└── tests/greeting_tests.lyr
 ```
 
 ```bash
-cd myapp && lyric build && lyric run out/debug/myapp.lyrbc
+cd myapp && lyric run
 ```
+
+It also arrives with a `tests/` directory and one test in it, which `lyric test` runs.
 
 A library has no `build.lyr`, because there is nothing to build: it is source another project points
 its `sourceRoot` at and imports. Its module file is named after it, so `import mylib` finds
@@ -221,6 +225,29 @@ lyric build --only mktex
 
 Names one or more artifacts; the others are declared and not built. A name nobody declared is an
 error that lists the ones that were (`LYR-CLI0019`).
+
+## Running and packing what you built
+
+In a project the verbs need no file either:
+
+```bash
+lyric run                  # build the default artifact and run it
+lyric run mktex -- a b     # that one, with its own arguments
+lyric pack                 # build it in the release profile and pack it
+lyric check                # check the whole project, sources and tests
+lyric test                 # run the tests
+```
+
+The **default artifact** is the first executable the script declares — explicit, and in the
+order the script is read. A project without a script has one program and that is it.
+
+An argument decides itself: one that is on disk or carries `.lyr`/`.lyrbc` is a **file** and
+goes to the compiler, as it always did; anything else is the **name of an artifact**. That is
+the same rule `build` uses to tell "compile this file" from "build this project".
+
+`lyric check` in a project is worth its own sentence: it reads the source root as ONE
+compilation and the test root as a second one that imports it. A test calling a function that
+was renamed is a question no per-file check can answer, and this is the answer.
 
 ## What the script does not say
 

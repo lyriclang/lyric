@@ -62,12 +62,30 @@ what it builds, and a project builds without one.**
   were (`LYR-CLI0019`). A `pub fn after()` in the script runs once every artifact was written,
   and not otherwise.
 
+- **The verbs take no file in a project.** `lyric run` builds the default artifact — the first
+  executable the script declares — and runs it; `lyric run mktex` runs that one; `lyric pack`
+  builds it in the release profile and packs it. An argument that is on disk or carries
+  `.lyr`/`.lyrbc` is a file and goes to the compiler as before, and anything else is an
+  artifact's name.
+
+- **`lyric check` checks a whole project.** Without a file, or with a directory, the source
+  root is read as one compilation and the test root as a second one that imports it — a test
+  calling a function that was renamed is a question no per-file check can answer. `lyrc check`
+  takes the same directory.
+
+- **`lyric test --filter <text>`** runs the tests whose `module.function` contains the text.
+  A filter that matches nothing is an error, because a green run of nothing is worse.
+
 - **A project builds without a script.** `lyric build` in a directory without a `build.lyr`
   compiles `main.lyr` under the source root into `out/<profile>/<name>.lyrbc`, named after the
   project (`lyric.json`'s `name`, or the directory); a source root without a `main.lyr` is a
   library and is checked as a whole. Neither is `LYR-CLI0011`, naming both ways.
 
 ### Changed
+
+- **`lyric new` writes a `tests/` directory** with one test in it, and the app template gains a
+  module beside `main.lyr` for that test to import: a scaffold whose shape is the shape a
+  project keeps. `lyric test` runs it straight away.
 
 - **Build artifacts land under `out/<profile>/`.** `lyric new`'s app builds to
   `out/debug/<name>.lyrbc`, and `lyric build --release` to `out/release/`, so the two shapes
@@ -103,6 +121,19 @@ what it builds, and a project builds without one.**
 - **Every tool refuses an option it does not know** (`LYR-CLI0003`, exit code 2). `lyrc` and
   `lyrvm` used to overlook one in silence, so `lyric run app.lyr --grant none` sent `--grant` to
   the compiler, which ignored it, and the program ran with every capability.
+
+### Fixed
+
+- **The standard library's own tests are checked for warnings again.** The repository holds
+  every Lyric file it tracks to complete diagnostic silence, and the sixteen files under
+  `stdlib-tests/` were exempt by accident for as long as the rule has existed — the check that
+  routes a standard library module through an importing probe matched them on their path's
+  prefix. Three findings fell out of it at once, all cleaned: two unused imports and an unused
+  loop variable.
+
+- **`lyric test` could not find `lyrtest`** in a source build: the test runner was the one tool
+  the driver's output directory did not get a copy of. The release archive always carried it,
+  so the failure was a developer's, which is why nothing caught it.
 
 ## v4.4.1 — 2026-09-04
 

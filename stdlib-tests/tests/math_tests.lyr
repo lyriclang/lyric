@@ -1,5 +1,5 @@
 import std.test { Test, assertEq, assertTrue };
-import std.math { gcd, lcm, divFloor, modFloor, powInt, clampInt, isNaN, isFinite, sqrt, absInt };
+import std.math { gcd, lcm, divFloor, modFloor, powInt, clampInt, isNaN, isFinite, sqrt };
 
 @Test
 pub fn gcd_and_lcm_agree(): void {

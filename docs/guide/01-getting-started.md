@@ -29,6 +29,10 @@ The return value of `main` becomes the process exit code, masked with `& 0xFF`.
 | `lyric disasm <file>` | print the bytecode |
 | `lyric repl` | interactive prompt |
 
+In a project — a directory with a `lyric.json`, which `lyric new` writes — the same verbs take
+no file at all: `lyric run`, `lyric build`, `lyric check`, `lyric test` and `lyric pack` answer
+for the project. [Chapter 16](16-building.md) is about that.
+
 A compile is the **debug profile** unless you say `--release`: every frame kept, every name
 kept, the shape a backtrace and a debugger read honestly. [Chapter 16](16-building.md#two-profiles)
 has the table.

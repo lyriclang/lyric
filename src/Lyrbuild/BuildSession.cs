@@ -46,6 +46,18 @@ internal sealed class BuildSession(
     /// a name asked twice.</summary>
     public IReadOnlyList<DeclaredOption> Options => _options;
 
+    /// <summary>
+    /// The artifact <c>lyric run</c> and <c>lyric pack</c> mean when nobody names one: the FIRST
+    /// executable the script declared, or the one <c>--only</c> named.
+    ///
+    /// <para>The first declared rather than a rule about names — explicit, and in the order the
+    /// script is read. <c>null</c> when the script declares no program at all, which is a
+    /// library project and has nothing to run.</para>
+    /// </summary>
+    public Declared? Default =>
+        _artifacts.FirstOrDefault(a => a.Kind == Declared.Executable
+                                       && (only.Count == 0 || only.Contains(a.Name)));
+
     /// <summary>Set when the COMMAND LINE was wrong rather than the script or its sources: a
     /// <c>-D</c> no option answers, an <c>--only</c> no artifact carries. The exit code is then
     /// the usage one.</summary>
@@ -282,7 +294,14 @@ internal sealed class BuildSession(
             var parent = Path.GetDirectoryName(executable);
             if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
 
-            return Tool.Run(packer, [module, "-o", executable], error) == ExitCodes.Success;
+            // '--quiet': the packer's own summary goes to ITS stdout, which is this process's,
+            // and under --print-path that stream carries one thing. The line is written here
+            // instead, through the writer that knows where the build's words go.
+            if (Tool.Run(packer, [module, "-o", executable, "--quiet"], error) != ExitCodes.Success)
+                return false;
+
+            output.WriteLine($"{executable}: {new FileInfo(executable).Length} bytes");
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

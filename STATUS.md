@@ -99,8 +99,36 @@ by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
       The driver learned which of `build`'s options take a value (`--profile release` went to
       the COMPILER as a file before). The app template declares `executable("__name__", …)`;
       twenty CLI tests, guide 16 rewritten, guide 13, CHANGELOG
-- [ ] slice 4 — the driver's verbs without a file argument (`run`, `pack` on the default
-      artifact, by name), templates (a `tests/` directory, `.gitignore`), project-wide `check`
+- [x] **slice 4 — the verbs without a file**. In a project `lyric run` builds the default
+      artifact — the FIRST executable the script declares, explicit and in the script's order —
+      and runs it; `lyric run mktex` runs that one; `lyric pack` builds it in the release
+      profile and packs it. The rule that decides is one rule, the one `build` already used: an
+      argument on disk or carrying `.lyr`/`.lyrbc` is a file, everything else is a name. The
+      driver asks the RUNNER where an artifact landed rather than deriving it a second time —
+      `lyrbuild --print-path` writes exactly one line on stdout and moves everything else,
+      the script's own `println` included, to stderr, and `Tool.Capture` reads it. `lyrc check`
+      takes a directory or nothing: the source root as one compilation, the test root as a
+      second that imports it, which is the question a per-file check cannot answer (a test
+      calling a renamed function). `lyrtest --filter <text>` selects on the name a result line
+      shows, and a filter matching nothing is an ERROR. `lyric new` writes a `tests/` directory
+      with a test in it, and the app template gains a module for it to import.
+      **A third finding, and the oldest: the corpus-silence rule was VACUOUS for every file
+      under `stdlib-tests/`.** The branch that decides how a corpus file is checked tested the
+      PREFIX — `relativePath.StartsWith("stdlib")` — and `stdlib-tests\tests\math_tests.lyr`
+      starts with `stdlib`, so all sixteen went through the probe meant for library modules, as
+      `import tests.math_tests`: a path that resolves nowhere, whose error landed in the probe
+      file and was dropped there as the harness's own noise. Sixteen files stood in the corpus
+      and not one of them was read. The test is on the first SEGMENT now, and the corpus files
+      are checked with the roots their project declares — the way they are actually compiled.
+      It found dirt in the first run: an unused import in `math_tests` and in `string_tests`,
+      and an unused loop variable in `iter_tests`, all three cleaned here as the rule demands.
+      **Two more findings**, both from running the thing by hand: a project check read
+      only the DECLARED test root, so the conventional `tests/` went unchecked (it is the one
+      `lyrtest` uses, and a project whose tests only one tool finds is worse than none); and
+      `lyric test` could not find `lyrtest` at all in a source build — the one tool the
+      driver's output directory never got a copy of, invisible because the release archive
+      carries it and every test called the binary directly. Seventeen CLI tests, guides 1, 16,
+      17, 20, CHANGELOG
 - [ ] slice 5 — the spec sentence (§4, a dependency root), the release
 
 **Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither

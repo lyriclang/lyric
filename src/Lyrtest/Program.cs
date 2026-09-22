@@ -26,11 +26,15 @@ public static class Program
 
         string? directoryArgument = null;
         string? stdlib = null;
+        string? filter = null;
         var profile = Profile.Default;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--filter" when i + 1 < args.Length:
+                    filter = args[++i];
+                    break;
                 case "--version" or "-v":
                     Console.Out.WriteLine($"lyrtest {ToolchainVersion.Value}");
                     return ExitCodes.Success;
@@ -156,6 +160,11 @@ public static class Program
 
             foreach (var test in module.Attributes.OnFunctions("Test"))
             {
+                // The filter selects on the name as it is REPORTED, 'module.function', so what
+                // a failure line shows is what narrows the next run down to it.
+                if (filter is not null
+                    && !test.TargetName.Contains(filter, StringComparison.Ordinal)) continue;
+
                 total++;
                 try
                 {
@@ -178,6 +187,13 @@ public static class Program
             }
         }
 
+        // A filter that matches nothing is an error rather than a green run of nothing: a
+        // mistyped filter would otherwise report success having tested not one thing.
+        if (total == 0 && filter is not null)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownFunction,
+                $"no test matches '{filter}' — the filter is part of the name a result line "
+                + "shows, as 'math_tests.doubles'", ExitCodes.Failure);
+
         Console.Out.WriteLine(failed == 0
             ? $"{total} test(s), all passed"
             : $"{total} test(s), {failed} FAILED");
@@ -196,6 +212,8 @@ public static class Program
         Console.Out.WriteLine("panicking — std.test has the assertions.");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
+        Console.Out.WriteLine("  --filter <text>          Run only the tests whose 'module.function'");
+        Console.Out.WriteLine("                           contains this; no match is an error");
         Console.Out.WriteLine("  --profile <name>         debug (the default) or release: the shape the tests run in");
         Console.Out.WriteLine("  --debug, --release       The same, shorter");
         Console.Out.WriteLine("  --stdlib <dir>           Where the stdlib lives (beats $LYRIC_STDLIB)");

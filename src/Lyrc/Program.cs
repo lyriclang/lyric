@@ -37,7 +37,7 @@ public static class Program
                 "--version" or "-v" => Version(terminal),
                 "--help" or "-h" => Help(),
                 "build" => WithFile(args, "build", terminal, Build),
-                "check" => WithFile(args, "check", terminal, Check),
+                "check" => Check(args, terminal),
                 "lower" => WithFile(args, "lower", terminal, Lower),
                 "parse" => WithFile(args, "parse", terminal, Parse),
                 "tokenize" => WithFile(args, "tokenize", terminal, Tokenize),
@@ -86,10 +86,13 @@ public static class Program
     /// here rather than tolerated: <c>-o</c> belongs to the one command that writes, <c>--emit</c>
     /// to the one that reads back, and the profile flags to every command that lowers.
     /// </summary>
-    private static (Flags? Flags, Refusal? Refused) ParseFlags(string command, string[] args)
+    /// <param name="firstOption">Where the options start: behind the file, or behind the
+    /// command itself for the one command that takes no file.</param>
+    private static (Flags? Flags, Refusal? Refused) ParseFlags(string command, string[] args,
+        int firstOption = 2)
     {
         var flags = new Flags();
-        for (var i = 2; i < args.Length; i++)
+        for (var i = firstOption; i < args.Length; i++)
         {
             switch (args[i])
             {
@@ -230,6 +233,132 @@ public static class Program
     /// has no other way to ask. <c>--emit</c> writes nothing — the bytes are produced, read back
     /// and dropped.</para>
     /// </summary>
+    /// <summary>
+    /// <c>check</c> is the one command that takes a PROJECT as well as a file: without an
+    /// argument, or with a directory, every module of the project is checked as ONE
+    /// compilation.
+    ///
+    /// <para>That is a different question from checking each file on its own, and a stricter
+    /// one: two modules claiming one name, an import that resolves nowhere, a test that no
+    /// longer matches the function it tests are all answered only when the files are read
+    /// together. It is what the language server does for an open project, from the command
+    /// line.</para>
+    /// </summary>
+    private static int Check(string[] args, TerminalOutput terminal)
+    {
+        var target = args.Length > 1 && !args[1].StartsWith('-') ? args[1] : null;
+
+        if (target is not null && !Directory.Exists(target))
+            return Check(target, args, terminal);
+
+        var (flags, refused) = ParseFlags("check", args, target is null ? 1 : 2);
+        if (flags is null)
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+
+        if (flags.Emit)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                "--emit: a project has no one module to emit — name a file", ExitCodes.Usage);
+
+        // Without an argument there has to BE a project: a directory that merely holds .lyr
+        // files is not one, and reading every file under the working directory because
+        // somebody typed 'check' is not a default anybody asked for. A directory named
+        // outright is a deliberate act and needs no manifest.
+        if (target is null && ProjectFile.Discover(Directory.GetCurrentDirectory()) is null)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                "check: missing file argument — 'check <dir>' checks a directory, and a "
+                + $"{ProjectFile.FileName} makes this one a project", ExitCodes.Usage);
+
+        return CheckProject(Path.GetFullPath(target ?? "."), flags, terminal);
+    }
+
+    /// <summary>
+    /// Every <c>.lyr</c> under the source root as one compilation, and the test root as a
+    /// second one that imports it.
+    ///
+    /// <para>Two compilations rather than one: a test file and a source file may both declare
+    /// <c>main</c>, and the tests are not part of what ships — the same split
+    /// <c>lyrtest</c> makes, and the reason <c>@Test</c> needs no build rule.</para>
+    /// </summary>
+    private static int CheckProject(string directory, Flags flags, TerminalOutput terminal)
+    {
+        var project = ProjectFile.Discover(directory);
+        foreach (var warning in project?.Warnings ?? [])
+            CliDiagnostics.Warn(Console.Error, CliDiagnostics.ProjectFileSuspect,
+                $"{Path.Combine(project!.Directory, ProjectFile.FileName)}: {warning}");
+
+        var sourceRoot = project?.SourceRoot ?? directory;
+        var options = flags.Profile.Options() with
+        {
+            StdlibRoot = flags.Stdlib,
+            Progress = terminal,
+            SourceRoot = sourceRoot,
+            NativeRoots = project?.NativeRoots,
+            DependencyRoots = project?.Dependencies,
+            Optimize = flags.Optimize ?? flags.Profile.Optimize,
+            SourceMap = flags.SourceMap ?? flags.Profile.SourceMap,
+            DebugInfo = flags.DebugInfo ?? flags.Profile.DebugInfo,
+            Passes = flags.Passes,
+            Fusion = flags.Fusion,
+        };
+
+        var sources = Modules(sourceRoot);
+        if (sources.Count == 0)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.FileUnreadable,
+                $"no .lyr file under {sourceRoot} — 'check' takes a file, a directory or "
+                + "nothing at all", ExitCodes.Usage);
+
+        var warnings = project?.Warnings.Count ?? 0;
+        var checkedModules = sources.Count;
+
+        var result = SourceCompiler.CheckProject(sources, options);
+        terminal.Render(result.Diagnostics);
+        warnings += result.Diagnostics.WarningCount;
+        if (!result.Ok) return ExitCodes.Failure;
+
+        // The tests, against the same source root: they import what the project imports. The
+        // root is the one lyrtest uses, the named one or the conventional 'tests/' — a project
+        // whose tests are only found by one of the two tools would be worse than none.
+        var testRoot = project?.TestRoot
+                       ?? Path.Combine(project?.Directory ?? directory, "tests");
+        if (Directory.Exists(testRoot))
+        {
+            var tests = Modules(testRoot);
+            if (tests.Count > 0)
+            {
+                var checkedTests = SourceCompiler.CheckProject(tests, options);
+                terminal.Render(checkedTests.Diagnostics);
+                warnings += checkedTests.Diagnostics.WarningCount;
+                if (!checkedTests.Ok) return ExitCodes.Failure;
+                checkedModules += tests.Count;
+            }
+        }
+
+        if (warnings > 0 && (flags.DenyWarnings || flags.Profile.DenyWarnings))
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.WarningsDenied,
+                warnings == 1 ? "1 warning denied by --deny-warnings"
+                    : $"{warnings} warnings denied by --deny-warnings",
+                ExitCodes.Failure);
+
+        terminal.Info($"{directory}: {checkedModules} "
+            + $"{(checkedModules == 1 ? "module" : "modules")} ok");
+        return ExitCodes.Success;
+    }
+
+    /// <summary>Every module under a root, named the way an import of it would be — the
+    /// inverse of module path to file path, so a root is the module an import finds rather
+    /// than a second copy of it.</summary>
+    private static List<ScriptSource> Modules(string root)
+    {
+        if (!Directory.Exists(root)) return [];
+
+        var files = Directory.GetFiles(root, "*.lyr", SearchOption.AllDirectories);
+        Array.Sort(files, StringComparer.Ordinal);
+
+        return files
+            .Select(file => ScriptSource.FromDisk(file, ScriptSource.ModuleNameUnder(root, file)))
+            .ToList();
+    }
+
     private static int Check(string path, string[] args, TerminalOutput terminal)
     {
         var (flags, refused) = ParseFlags("check", args);
@@ -387,6 +516,8 @@ public static class Program
         Console.Out.WriteLine("Commands:");
         Console.Out.WriteLine("  build <file> [-o <out>]  Compile .lyr to .lyrbc");
         Console.Out.WriteLine("  check <file> [--emit]    Compile without writing a file");
+        Console.Out.WriteLine("  check [<dir>]            Check a whole project: its source root as");
+        Console.Out.WriteLine("                           one compilation, its test root as another");
         Console.Out.WriteLine("  lower <file>             Print the mid-IR dump (debug)");
         Console.Out.WriteLine("  parse <file>             Print the AST dump (debug)");
         Console.Out.WriteLine("  tokenize <file>          Print the token stream (debug)");

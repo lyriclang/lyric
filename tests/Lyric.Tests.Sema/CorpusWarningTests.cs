@@ -41,12 +41,31 @@ public class CorpusWarningTests
     [MemberData(nameof(Files))]
     public void The_repository_checks_in_silence(string relativePath)
     {
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(RepoRoot(), "stdlib") };
+        // The roots the file is actually compiled with. A corpus file belongs to a project —
+        // the templates have a lyric.json, and their test files import their source root — so
+        // checking it without one would report an import that resolves perfectly well in every
+        // real compile, which is how a corpus rule stops meaning anything.
+        var project = ProjectFile.Discover(
+            Path.GetDirectoryName(Path.Combine(RepoRoot(), relativePath))!);
+
+        var options = new CompilerOptions
+        {
+            StdlibRoot = Path.Combine(RepoRoot(), "stdlib"),
+            SourceRoot = project?.SourceRoot,
+            NativeRoots = project?.NativeRoots,
+            DependencyRoots = project?.Dependencies,
+        };
 
         // A standard library file is not an entry file — as one it may not even declare its
         // natives. It is checked the way it is ever compiled: loaded through the std root, by a
         // probe that imports it.
-        var result = relativePath.StartsWith("stdlib", StringComparison.Ordinal)
+        //
+        // The test is on the FIRST SEGMENT and not on the prefix, which is what it was until
+        // 4.5: 'stdlib-tests\…' starts with 'stdlib', so every one of the standard library's
+        // own test files went through the probe as 'import tests.math_tests' — a path that
+        // resolves nowhere, whose error sat in the probe file and was dropped as the harness's
+        // noise. Sixteen files were in the corpus and none of them was read.
+        var result = SegmentsOf(relativePath)[0] == "stdlib"
             ? SourceCompiler.Check(ScriptSource.FromBuffer(
                     Path.Combine(RepoRoot(), "corpus_probe.lyr"),
                     $"import {ModulePathOf(relativePath)};\n"),
@@ -69,10 +88,10 @@ public class CorpusWarningTests
     }
 
     /// <summary>stdlib/std/io/file.lyr → std.io.file</summary>
-    private static string ModulePathOf(string relativePath)
-    {
-        var segments = Path.ChangeExtension(relativePath, null)!
+    private static string ModulePathOf(string relativePath) =>
+        string.Join('.', SegmentsOf(relativePath).Skip(1)); // drop the 'stdlib' root segment
+
+    private static string[] SegmentsOf(string relativePath) =>
+        Path.ChangeExtension(relativePath, null)!
             .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Join('.', segments.Skip(1)); // drop the 'stdlib' root segment
-    }
 }
