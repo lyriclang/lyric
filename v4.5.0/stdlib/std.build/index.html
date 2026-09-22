@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.build — Lyric v4.5.0</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">v4.5.0</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/" class="here">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.build</h1>
+<nav class="contents">
+<ul>
+<li><a href="#struct-profile">Profile</a></li>
+<li><a href="#enum-kind">Kind</a></li>
+<li><a href="#class-artifact">Artifact</a></li>
+<li><a href="#function-executable">executable</a></li>
+<li><a href="#function-library">library</a></li>
+<li><a href="#function-packed">packed</a></li>
+<li><a href="#function-option">option</a></li>
+<li><a href="#function-flag">flag</a></li>
+<li><a href="#function-addexecutable">addExecutable</a></li>
+<li><a href="#function-finish">finish</a></li>
+</ul>
+</nav>
+<section class="item" id="struct-profile">
+<h2><a href="#struct-profile">Profile</a> <span class="kind">struct</span></h2>
+<pre class="signature"><code class="language-lyr">pub struct Profile</code></pre>
+<p>A bundle of compiler options under a name. The toolchain knows <code>debug</code> and <code>release</code>, and
+<code>lyric build --release</code> chooses one for the whole build.</p>
+<p>The table lives in the toolchain, not here: this asks it, so a build script and <code>lyrc</code> can
+never disagree about what <code>release</code> means.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">name: string</code></pre>
+<p><code>debug</code> or <code>release</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">optimize: bool</code></pre>
+<p>Whether the IR optimizations run: inlining, scalar replacement, devirtualization.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">sourceMap: bool</code></pre>
+<p>Whether the module carries line numbers, for a backtrace that names its line.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">debugInfo: bool</code></pre>
+<p>Whether the module carries slot and field names, for a debugger.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">denyWarnings: bool</code></pre>
+<p>Whether a warning fails the compile.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn selected(): Profile</code></pre>
+<p>The profile the command line chose (<code>--release</code>, <code>--profile x</code>); <code>debug</code> without a choice.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn debug(): Profile</code></pre>
+<p>The debug profile: no optimizations, every name and line kept.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn release(): Profile</code></pre>
+<p>The release profile: optimized, the line numbers kept, the debug info dropped.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn named(name: string): Profile</code></pre>
+<p>The toolchain's profile of that name. A name it does not know ends the build.</p>
+</div>
+</div>
+<p class="source">stdlib/std/build.lyr:13</p>
+</section>
+<section class="item" id="enum-kind">
+<h2><a href="#enum-kind">Kind</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum Kind</code></pre>
+<p>What an artifact is.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">Executable</code></pre>
+<p>A program: one <code>.lyrbc</code>, compiled whole from its entry file.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Library</code></pre>
+<p>A library: every module under its root checked as a whole, nothing written.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Packed</code></pre>
+<p>A program packed with the stub runtime into one executable.</p>
+</div>
+</div>
+<p class="source">stdlib/std/build.lyr:53</p>
+</section>
+<section class="item" id="class-artifact">
+<h2><a href="#class-artifact">Artifact</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class Artifact</code></pre>
+<p>One thing a build produces.</p>
+<p>A script holds it and configures it after the call that produced it; nothing is read from it
+until <code>build</code> has returned, so a field set on the next line still applies. Every option
+starts from the profile the build was started with, and <code>use</code> takes another.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">kind: Kind</code></pre>
+<p>What it is.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">name: string</code></pre>
+<p>Its name: an identifier, and the stem of the file it lands in.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">entry: string</code></pre>
+<p>The entry file of a program, or the root directory of a library, relative to the
+directory holding <code>build.lyr</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">profileName: string</code></pre>
+<p>The profile the options came from. It names the directory under <code>out/</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">optimize: bool</code></pre>
+<p>Whether the IR optimizations run.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">sourceMap: bool</code></pre>
+<p>Whether the module carries line numbers.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">debugInfo: bool</code></pre>
+<p>Whether the module carries slot and field names.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">denyWarnings: bool</code></pre>
+<p>Whether a warning fails this artifact.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">output: ?string</code></pre>
+<p>Where it lands. <code>null</code> means <code>out/&lt;profile&gt;/&lt;name&gt;.lyrbc</code>, or <code>out/&lt;profile&gt;/&lt;name&gt;</code> for a
+packed program, where the toolchain adds the platform's executable suffix to an output
+without one.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub mut fn use(profile: Profile): void</code></pre>
+<p>Takes the options of <code>profile</code>, its name included: a tool shipped beside a game that is
+still being debugged is <code>tool.use(Profile.release())</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn outputPath(): string</code></pre>
+<p>The path it is written to: <code>output</code> when set, the derivation above otherwise. Empty for a
+library, which writes nothing.</p>
+</div>
+</div>
+<p class="source">stdlib/std/build.lyr:67</p>
+</section>
+<section class="item" id="function-executable">
+<h2><a href="#function-executable">executable</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn executable(name: string, entry: string): Artifact</code></pre>
+<p>Declares a program: <code>name</code> is an identifier, <code>entry</code> its main file relative to the project.
+It starts with the profile the build was started with.</p>
+<p class="source">stdlib/std/build.lyr:117</p>
+</section>
+<section class="item" id="function-library">
+<h2><a href="#function-library">library</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn library(name: string, root: string): Artifact</code></pre>
+<p>Declares a library: every module under <code>root</code> is checked as a whole, and nothing is written.</p>
+<p class="source">stdlib/std/build.lyr:131</p>
+</section>
+<section class="item" id="function-packed">
+<h2><a href="#function-packed">packed</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn packed(app: Artifact): Artifact</code></pre>
+<p>Declares a packed program from an executable's artifact: the same name, entry and options,
+packed with the stub runtime once compiled. It lands as <code>out/&lt;profile&gt;/&lt;name&gt;</code>.</p>
+<p class="source">stdlib/std/build.lyr:145</p>
+</section>
+<section class="item" id="function-option">
+<h2><a href="#function-option">option</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn option(name: string, help: string): ?string</code></pre>
+<p>A value from the command line, <code>-D name=value</code>: <code>null</code> when it was not given, and <code>&quot;&quot;</code> when
+it was given without a value. <code>help</code> is what <code>lyric build --help</code> shows beside the name.</p>
+<p class="source">stdlib/std/build.lyr:162</p>
+</section>
+<section class="item" id="function-flag">
+<h2><a href="#function-flag">flag</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn flag(name: string, help: string): bool</code></pre>
+<p>A switch from the command line, <code>-D name</code>. <code>help</code> is what <code>lyric build --help</code> shows.</p>
+<p class="source">stdlib/std/build.lyr:171</p>
+</section>
+<section class="item" id="function-addexecutable">
+<h2><a href="#function-addexecutable">addExecutable</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn addExecutable(entry: string, output: string): Artifact</code></pre>
+<p>The 4.x form: the entry first, and the output named outright. It builds as it always did,
+named after the output's stem; the name rule is not applied, because a 4.x script never
+chose a name.</p>
+<p class="source">stdlib/std/build.lyr:179</p>
+</section>
+<section class="item" id="function-finish">
+<h2><a href="#function-finish">finish</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn finish(): int</code></pre>
+<p>Hands every declared artifact to the toolchain and compiles them. Called by <code>lyric build</code>
+once <code>build</code> has returned, never by a script. Returns how many failed.</p>
+<p class="source">stdlib/std/build.lyr:191</p>
+</section>
+<nav class="neighbours">
+<a class="next" href="../../stdlib/std.bytes/">std.bytes</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
