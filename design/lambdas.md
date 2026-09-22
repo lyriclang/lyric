@@ -89,6 +89,20 @@ sonst Block), nicht an einem Lookahead hinter dem balancierten Block. Innerhalb 
 bleibt `_allowStructInit` damit auch am Statement-Anfang gesetzt; §6.8 gilt unverändert für
 gewöhnliche Statement-Blöcke. Von new-features übernommen.
 
+**Beide Lesarten hängen an demselben Flag**, und das ist kein Zufall, sondern die Regel:
+`IsTrailingLambdaAhead` gibt für einen *bloßen Bezeichner* genau `_allowStructInit` zurück. Am
+Statement-Anfang ist es aus, also bleibt `Name {` dort die §6.8-Form „Name, dann Block" — weder
+Initializer noch Trailing-Lambda. Setzt der ValueBlock das Flag, werden beide zugleich scharf:
+`Point { x = 1 }` ist der Initializer-Tail, `run { 7 }` der Aufruf mit Trailing-Lambda.
+
+Der Preis, genau abgegrenzt: **nur ein Bezeichner** am Anfang eines ValueBlock-Statements kann
+danach keinen eigenen Block mehr einleiten. Ein Block, der für sich steht (`{ let a = 1; }` als
+verschachtelter Scope), ist unberührt — er beginnt mit `{` und wird nie zum Argument von etwas;
+ebenso jede Form nach `if`, `while`, `for` und `match`, die ihre Blöcke über Schlüsselwörter
+erreicht. Betroffen ist damit ausschließlich eine Konstruktion, die heute schon `LYR-SEM0022` ist
+(ein Bezeichner als Anweisung ohne Wirkung), und es ändert sich ihre Diagnose, nicht ihre
+Gültigkeit.
+
 **Warum `it` und nicht `$0` oder `_`.** `_` ist in Lyric das Wildcard-Pattern — Scalas
 `xs.map(_ * 2)` wäre in `match`-Armen zweideutig und in `let (_, b) = t;` doppelt belegt. `$0`
 verlangt eine Lexer-Änderung und sieht neben f-String-Löchern (`f"{x}"`) wie eine zweite
