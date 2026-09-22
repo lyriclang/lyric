@@ -4,7 +4,7 @@
 **Version:** Minor (4.5 Stufe 1–2, 4.6 Stufe 3) — additiv, heute gültige Programme haben keinen Typparameter in `throws`
 **Spec:** §4 (Prosa „coroutine types only" streichen), §7.3 (Lambdas), §8.3 (Inferenz von E), §9.2 (Klausel mit Typparameter, `never`), §10 (Funktionstyp mit Suffix), Appendix A (SEM0084 einschränken) · **Guide:** 10
 **Abhängigkeiten:** `design/throw-expression.md` (`never` als schreibbarer Typ ist implementiert — `throws never` ≡ keine Klausel). Voraussetzung für stdlib-redesigns `assertThrows<E>` und `Result.orThrow(): T throws E`.
-**Abgestimmt mit:** stdlib-redesign (Anker `assertThrows<E :: [Throwable]>(f: fn() -> void throws E): E`; sie bauen bis dahin `assertThrows(f: fn() -> void throws Throwable)`), pattern-lambda (liefert das Design der werfenden Funktionstypen aus ihrer Lambda-Sicht; die Sema-Umsetzung hängt an diesem Dokument)
+**Abgestimmt mit:** stdlib-redesign (Anker `assertThrows<E :: [Throwable]>(f: fn() -> void throws E): E`; sie bauen bis dahin `assertThrows(f: fn() -> void throws Throwable)`), pattern-lambda (`design/lambdas.md` §3.2 „Werfende Funktionstypen" auf Branch `worktree-agent-a1c2eb789de86ba9d` — ihr Design der Lambda-Seite; zwei Verfeinerungen daraus sind unten übernommen, die Sema-Umsetzung hängt an diesem Dokument)
 
 ## Motivation
 
@@ -75,6 +75,20 @@ der Typ seiner ungefangenen Throw-Sites: eine Klasse → diese; mehrere verschie
 → `never`. **Damit dürfen Lambdas erstmals werfen** — und nur dort, wo der Parametertyp es erlaubt. Ein
 Lambda an `fn(T) -> U` (ohne Suffix) bleibt wie heute: es darf nicht werfen.
 
+**Ohne Kontext wird die Klausel geschrieben** (Übernahme aus pattern-lambdas `design/lambdas.md` §3.2):
+`let f = (x: int): int throws Boom => risky(x);`. Die Inferenz gilt also nur nach innen, gegen einen
+erwarteten Funktionstyp — ein kontextloses Lambda, das wirft und nichts sagt, wäre eine Klausel, die
+niemand geschrieben hat und jeder erbt. Das ist dieselbe Linie, die Lyric bei benannten Funktionen zieht.
+
+**Zwei Implementierungsentscheidungen, mit pattern-lambda abgestimmt:**
+- `FnType` bekommt ein `Throws`-Feld (`null` = wirft nicht), analog zu `CoroutineOf.Throws`. Damit ist
+  die Werfbarkeit Teil der strukturellen Typgleichheit (`LyrType.Equal`), und die Assignability-Regel
+  steht an einer Stelle.
+- Der Aufruf **über einen Funktionswert** zählt in der Exception-Analyse wie ein Aufruf der Funktion:
+  `ExceptionAnalyzer` muss dafür den **Typ** des Callees lesen statt nur sein Symbol (heute
+  `ThrowsOf(Expr callee)` über `IdentifierExpr`/`MemberExpr`). Ohne diesen Schritt trägt der Typ die
+  Klausel, und niemand prüft sie.
+
 **Assignability** (§10-Regel, auf Funktionstypen ausgedehnt): `fn(T) -> U throws never` ⊂
 `fn(T) -> U throws E` ⊂ `fn(T) -> U throws Throwable`. Einseitig, wie bei Coroutinen: eine werfende
 Funktion passt **nicht** in einen nicht-werfenden Slot — genau das Loch, durch das die Forderung
@@ -106,7 +120,9 @@ Keine Änderung, Format bleibt 4.0.
   kein Fehler.
 - **`never`:** implementiert. `throws never` ≡ keine Klausel — die Spec sollte beide Schreibweisen als
   denselben Typ definieren, damit Konformanz und Assignability nicht zwei Fälle brauchen.
-- **Pattern/Lambda (pattern-lambda):** ihre Closure-Kurzsyntax erbt die Klausel-Inferenz; kein Konflikt.
+- **Pattern/Lambda (pattern-lambda):** ihre Closure-Kurzsyntax (`x => …`, Trailing-Lambda, `it`) erbt die
+  Klausel-Inferenz; kein Konflikt. Ihre kontextlose Kurzform hat per Definition einen Kontext (sie steht
+  als Argument), fällt also immer in den inferierten Fall.
 - **Formatter/LSP:** Signatur-Rendering muss `throws E` auf Funktionstypen ausgeben (TypeFacts.Display
   kann das für Coroutinen schon).
 
@@ -119,8 +135,8 @@ Funktionstyp (beides ist SEM0084 bzw. wirkungslos).
 
 | Ebene | Stufe 1 | Stufe 2 | Stufe 3 |
 |---|---|---|---|
-| Lexer/Parser | 0 | 0 | 0 |
-| Sema | ~60 Z. (Substitution im ExceptionAnalyzer) | ~80 Z. (strukturelle Inferenz, `never`-Bindung) | ~120 Z. (Lambda-Klausel-Inferenz) + ~40 Z. (Assignability) |
+| Lexer/Parser | 0 | 0 | 0 (die Klausel parst; sie landet heute nur im falschen Knoten — pattern-lambdas Befund P2-20) |
+| Sema | ~60 Z. (Substitution im ExceptionAnalyzer) | ~80 Z. (strukturelle Inferenz, `never`-Bindung) | ~120 Z. (Lambda-Klausel-Inferenz) + ~40 Z. (Assignability) + ~40 Z. (`FnType.Throws`, Callee-Typ im ExceptionAnalyzer) |
 | Lowering | 0 | 0 (Phantom-Parameter-Entscheidung) | 0 |
 | VM/Bytecode | 0 | 0 | 0 |
 | stdlib | — | — | `assertThrows`, `Iterator.next()` mit `throws E`, werfende `map`/`filter` |

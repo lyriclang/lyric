@@ -111,13 +111,19 @@ Member-Sichtbarkeit (5.0) ◄── @Deprecated auf Membern (4.5) ◄── stdl
 
 ## Abhängigkeiten zu den anderen Teammitgliedern
 
-**pattern-lambda** (Branch `worktree-agent-a1c2eb789de86ba9d`):
-- Baut auf meiner never-Regel auf (`UnifyArms`: ein Arm vom Typ `never` trägt nichts bei).
-- Ihr `@NonExhaustive` ist die Exhaustiveness-Seite von stdlib-redesigns Anker.
-- Gemeinsame Zeilen: `Parser.Patterns.cs:221` (ParseMatchArm) und `FunctionLowerer.LowerArm` — beide
-  Änderungen sind additiv und mergen.
-- **Kein Konflikt**, eine offene Frage: der ICE „match expression produced no value" braucht ihre
-  Sema-Seite (match ohne wertliefernden Arm = `never`); mein Lowering ist vorbereitet.
+**pattern-lambda** (Branch `worktree-agent-a1c2eb789de86ba9d`, **fertig**, 4 Commits):
+- Gebaut: rekursiver Pattern-Compiler (verschachtelte Varianten, Or-Patterns mit Bindungen, Literale in
+  Tupeln und Payloads, Literal-Adaption), if-let/while-let/let-else, Closure-Kurzsyntax mit
+  Trailing-Lambda und Parameter-Destructuring, Array-Patterns mit Rest, und SEM0050 mit **Zeugen-Pattern**
+  („no arm matches 'Some(false)'").
+- Baut auf meiner never-Regel auf (`UnifyArms`: ein Arm vom Typ `never` trägt nichts bei); ihre
+  Sema-Seite des lyriclings-ICE (ein `match` ohne wertliefernden Arm ist `never`) ist gebaut, meine
+  Lowering-Seite ebenfalls — **der ICE ist nach dem Merge beidseitig geschlossen**.
+- `@NonExhaustive` haben sie **designt, nicht implementiert** (`design/patterns.md` §3.6) — es bleibt
+  eine 4.6-Position und die Exhaustiveness-Seite von stdlib-redesigns Anker.
+- Ihr `design/lambdas.md` §3.2 (werfende Funktionstypen) ist die Lambda-Seite meines typed-throws-Designs;
+  zwei Verfeinerungen daraus (`FnType.Throws`, geschriebene Klausel ohne Kontext) sind übernommen.
+- **Merge:** keine Konflikte, vier Berührungspunkte, alle in `design/value-block.md` notiert.
 
 **stdlib-redesign** (Branch `worktree-agent-aa7b5e912a78e6f2d`, fertig):
 - Braucht von mir: bedingte Konformanz (12), typed throws (9/10/13), Konformanz-Synthese (8),

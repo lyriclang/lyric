@@ -4,7 +4,7 @@
 **Version:** Minor (4.5) — additiv; ein Ausdruck ohne `;` vor `}` war `LYR-PAR0016`
 **Spec:** §2 (`ValueBlock`), §6.9 (Wert des Blocks), §7.3 (Block-Lambdas), §7.5 (defer-Reihenfolge), §7.6, Appendix A (SEM0033-Text) · **Guide:** 03, 06
 **Abhängigkeiten:** `design/throw-expression.md` (Tail `throw e` ist ein never-Tail). Vorbereitung für den catch-Block des `try`-Ausdrucks (`design/try-expression.md`).
-**Abgestimmt mit:** pattern-lambda (LowerArm/ParseMatchArm-Zeile 221 gemeinsam; sie fassen den Block-Arm-Wert nicht an), lyriclings (ICE „match expression produced no value“ — `LowerReturn` ist jetzt never-aware, der Sema-Teil liegt bei pattern-lambda)
+**Abgestimmt mit:** pattern-lambda (Branch `worktree-agent-a1c2eb789de86ba9d`, fertig — Merge-Notizen unten), lyriclings (ICE „match expression produced no value“ — beide Hälften stehen jetzt: mein `LowerReturn` ist never-aware, ihre Sema gibt einem `match` ohne wertliefernden Arm den Typ `never`)
 
 ## Motivation
 
@@ -73,8 +73,15 @@ Lambda     = '(' … ')' [ ':' TypeExpr ] '=>' ( Expr | ValueBlock ) .
 - Generics: keine. Coroutinen: ein ValueBlock in einem Coroutine-Body (Arm eines match-Ausdrucks) —
   Tail ist ein gewöhnlicher Ausdruck; `yield` im Block-Arm bleibt möglich.
 - Labels: kein `break value` — bewusst (siehe `design/loop-labels.md`).
-- pattern-lambda: ihr Pattern-Compiler ersetzt die Pattern-Hälfte von LowerMatch; `LowerArm` ist der
-  Einhängepunkt und textlich bei beiden geändert (Diverges + TailSink) — Merge trivial.
+- pattern-lambda (Endstand geprüft, 4 Commits): ihr Pattern-Compiler ersetzt die Pattern-Hälfte von
+  `LowerMatch`; `LowerArm` ist bei ihnen **unverändert**, meine `Diverges`-Zeilen und der `TailSink`
+  gewinnen dort. In `ParseMatchArm` ändern wir verschiedene Zeilen derselben Methode (sie `_guardHead`
+  um den Guard, ich `ParseBlock(valueBlock: true)` für den Body) — beides behalten. Ihr `LowerIf` für
+  if-let nutzt bereits `LowerScope`, nimmt meinen `defer`-Fund also vorweg; mein Commit `869c360f` fixt
+  dieselbe Stelle im gewöhnlichen `LowerIf`. In `LowerReturn` haben **beide** einen never-Zweig mit
+  derselben Bedeutung — beim Merge einen davon behalten. Ihre neuen AST-Knoten (`LetCondExpr`,
+  `LetPatternStmt`, `ArrayPattern`, `RestPattern`) und die Konvention „ein `NameSpan` ist leer, wenn die
+  Quelle nichts benennt" berühren meinen `TailExprStmt` nicht.
 
 ## Breaking
 
