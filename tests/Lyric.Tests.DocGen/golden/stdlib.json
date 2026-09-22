@@ -2912,13 +2912,24 @@
         },
         {
           "Kind": "Function",
+          "Name": "modifiedMillis",
+          "Signature": "pub fn modifiedMillis(path: string): ?int",
+          "Doc": "When the file was last written, as milliseconds since the Unix epoch (UTC), or `null` when\nit does not exist — what a watcher compares between two looks without reading the content.\nMilliseconds rather than an `Instant`, because `std.time` costs `osAccess` and a file\nmodule must not; `Instant.ofEpochMillis` turns it into one.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 232
+          }
+        },
+        {
+          "Kind": "Function",
           "Name": "isFile",
           "Signature": "pub fn isFile(path: string): bool",
           "Doc": "Whether the path names an existing FILE.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 228
+            "Line": 234
           }
         },
         {
@@ -2929,7 +2940,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 230
+            "Line": 236
           }
         },
         {
@@ -2940,7 +2951,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 233
+            "Line": 239
           }
         },
         {
@@ -2951,7 +2962,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 236
+            "Line": 242
           }
         },
         {
@@ -2962,7 +2973,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 239
+            "Line": 245
           }
         },
         {
@@ -2973,7 +2984,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 242
+            "Line": 248
           }
         },
         {
@@ -2984,7 +2995,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 246
+            "Line": 252
           }
         },
         {
@@ -2995,7 +3006,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 251
+            "Line": 257
           }
         },
         {
@@ -3006,7 +3017,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 258
+            "Line": 264
           }
         }
       ]

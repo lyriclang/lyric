@@ -731,6 +731,32 @@ public sealed class NativeRegistry : IDisposable
         // are states, reported through the return value.
 
         // Not through 'TryIo', which carries a string; this returns a number.
+        // The last modification as milliseconds since the epoch, UTC — what a watcher compares
+        // between two looks, without reading the content. FileInfo answers "does not exist"
+        // itself, so that case is null without an exception, as in `size`.
+        RegisterOptionalReturning("std.io.file.modifiedMillis", str, TypeTag.I64,
+            args =>
+            {
+                try
+                {
+                    var info = new FileInfo(args[0].AsString);
+                    if (!info.Exists)
+                    {
+                        RecordIoNotFound(args[0].AsString);
+                        return LyrValue.None;
+                    }
+                    // 'Some' as in `size`: a '?int' signals presence through the marker.
+                    return LyrValue.Some(LyrValue.FromI64(
+                        new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds()));
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                              or ArgumentException or NotSupportedException)
+                {
+                    RecordIo(e);
+                    return LyrValue.None;
+                }
+            });
+
         RegisterOptionalReturning("std.io.file.size", str, TypeTag.I64,
             args =>
             {
@@ -850,9 +876,18 @@ public sealed class NativeRegistry : IDisposable
 
         // ------------------------------------------------------ std.os, extended
 
+        // The PROGRAM's arguments — what main(args) receives — not the process's: the runner
+        // (lyrvm, lyric run) passes them after the first `--`, and everything before it is the
+        // runner's own command line. Without a separator there are none, which is also what an
+        // embedding host without a command line sees.
         RegisterArrayReturning("std.os.args", none, TypeTag.String,
-            _ => LyrValue.FromObject(Environment.GetCommandLineArgs()
-                .Select(LyrValue.FromString).ToArray()));
+            _ =>
+            {
+                var all = Environment.GetCommandLineArgs();
+                var separator = Array.IndexOf(all, "--");
+                var own = separator < 0 ? Array.Empty<string>() : all[(separator + 1)..];
+                return LyrValue.FromObject(own.Select(LyrValue.FromString).ToArray());
+            });
 
         Register("std.os.setEnv", new[] { TypeTag.String, TypeTag.String }, TypeTag.Bool,
             args =>
