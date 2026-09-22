@@ -853,8 +853,12 @@ public class LoweringTests
     /// <para>All four ways to reach a method OF an instance are pinned, because they take
     /// different paths through the lowering and each needed the mapping of its own: an instance
     /// method on a class and on an enum, a static method, and a call through a constraint whose
-    /// receiver is a type parameter. The class reached the instance path before the enum did,
-    /// which is what kept the gap hidden.</para>
+    /// receiver is a type parameter. Neutralizing the mapping produces exactly four findings,
+    /// one per path, which is how this case earns its length.</para>
+    ///
+    /// <para><b>Every argument here is a LITERAL, and it has to be.</b> Passing a value that is
+    /// already a <c>?int</c> needs no widening, so it travels through the gap without touching
+    /// it — a probe written that way stays green while the paths are broken.</para>
     /// </summary>
     [Fact]
     public void An_argument_widens_to_what_the_instance_makes_of_its_parameter_type()
@@ -899,7 +903,7 @@ public class LoweringTests
                 let made = Box<?int>.of(3);
                 return (boxed.or(3) ?? 0)
                     + (held.or(3) ?? 0)
-                    + (made.or(slot) ?? 0)
+                    + (made.or(3) ?? 0)
                     + (viaConstraint(boxed) ?? 0);
             }
             """);
