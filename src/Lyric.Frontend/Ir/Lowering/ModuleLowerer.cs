@@ -255,7 +255,7 @@ public static class ModuleLowerer
         // initializer then landed on an id the extension already held.
         var nextId = new FunctionIds(pending.Count);
         var coroutines = new CoroutineTable(nextId);
-        var instances = new InstanceTable(nextId);
+        var instances = new InstanceTable(nextId, compilation);
         var lambdas = new LambdaTable(nextId);
         var extensions = new ExtensionTable(nextId);
         typeTable.Extensions = extensions;

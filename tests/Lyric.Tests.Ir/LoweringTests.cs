@@ -724,10 +724,53 @@ public class LoweringTests
         Assert.False(de.HasErrors);
         Assert.NotNull(ir);
 
-        // The name carries the type arguments: it is the key the instance is found again by, and it is
-        // readable in a disassembly.
-        Assert.Contains(ir!.Functions, f => f.Name == "id<int>");
+        // The name carries the MODULE PATH and the type arguments: together they are the key the
+        // instance is found again by, and they are readable in a disassembly. Without the module
+        // path two modules declaring 'id<T>' would share one instance.
+        Assert.Contains(ir!.Functions, f => f.Name == "main.id<int>");
         Assert.DoesNotContain(ir.Functions, f => f.Name == "main.id");
+    }
+
+    [Fact]
+    public void Two_modules_declaring_one_generic_name_get_two_instances()
+    {
+        // The instance key is the NAME, so an unqualified one made two declarations into one
+        // function: 'alpha.twice<int>' and 'beta.twice<int>' both asked for 'twice<int>', the
+        // second request found the first one's id, and 'beta.twice(2)' ran alpha's body. Nothing
+        // downstream could see it — the table deduplicated before any function was built, so the
+        // verifier's duplicate-name check never had two names to compare.
+        var root = Path.Combine(Path.GetTempPath(), "lyric-instance-key");
+        var overlay = new Dictionary<string, string>
+        {
+            [Path.GetFullPath(Path.Combine(root, "alpha.lyr"))] = """
+                module alpha;
+                pub fn twice<T>(x: T): T { return x; }
+                """,
+            [Path.GetFullPath(Path.Combine(root, "beta.lyr"))] = """
+                module beta;
+                pub fn twice<T>(x: T): T { return x; }
+                """,
+        };
+
+        var sm = new SourceManager();
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de)
+        {
+            ModuleLoader = StdlibLoader.ForProject(root, sm, de, overlay),
+        };
+        comp.AddModule(new Parser(sm, sm.AddVirtual("test.lyr", """
+            import alpha;
+            import beta;
+            fn main(): int { return alpha.twice(1) + beta.twice(2); }
+            """), de).ParseModule());
+        var binding = comp.Resolve();
+        var types = Semantics.Analyze(comp, binding, de);
+        Assert.False(de.HasErrors, Render(de));
+
+        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true, optimize: false);
+        Assert.NotNull(ir);
+        Assert.Contains(ir!.Functions, f => f.Name == "alpha.twice<int>");
+        Assert.Contains(ir.Functions, f => f.Name == "beta.twice<int>");
     }
 
     [Fact]
@@ -741,8 +784,8 @@ public class LoweringTests
             """);
 
         Assert.False(de.HasErrors);
-        Assert.Contains(ir!.Functions, f => f.Name == "id<int>");
-        Assert.Contains(ir.Functions, f => f.Name == "id<string>");
+        Assert.Contains(ir!.Functions, f => f.Name == "main.id<int>");
+        Assert.Contains(ir.Functions, f => f.Name == "main.id<string>");
     }
 
     [Fact]
@@ -756,7 +799,7 @@ public class LoweringTests
             """);
 
         Assert.False(de.HasErrors);
-        Assert.Single(ir!.Functions, f => f.Name == "id<int>");
+        Assert.Single(ir!.Functions, f => f.Name == "main.id<int>");
     }
 
     /// <summary>
