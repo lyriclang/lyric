@@ -3,13 +3,23 @@ import std.collections {
     List,
     Map,
     Set,
+    Deque,
     sortList,
+    sortListByKey,
+    sortArray,
     union,
     difference,
     isSubset,
     listContains,
+    listRemove,
     entries,
+    maxBy,
+    minBy,
+    slice,
+    groupBy,
+    mapList,
 };
+import std.string { fromInt };
 
 @Test
 pub fn a_list_grows_and_pops_in_order(): void {
@@ -174,4 +184,183 @@ pub fn a_set_is_iterable_and_clears_in_place(): void {
     s.clear();
     assertEq(s.length(), 0);
     assertTrue(s.add(5), "a cleared set takes the old value as new");
+}
+
+// ------------------------------------------------------------ 4.5: the container package
+
+@Test
+pub fn a_list_comes_from_an_array_and_takes_bulk(): void {
+    let xs = List<int>.of([3, 1, 2]);
+    assertEq(xs.length(), 3);
+    assertEq(xs.get(0), 3);
+    xs.pushAll([4, 5]);
+    xs.pushAllFrom(List<int>.of([6]));
+    assertEq(xs.length(), 6);
+    assertEq(xs.last()!, 6);
+    assertEq(List<int>.of([]).length(), 0);
+}
+
+@Test
+pub fn a_list_slices_maps_and_filters_eagerly(): void {
+    let xs = List<int>.of([1, 2, 3, 4, 5]);
+    let middle = xs.slice(1, 4);
+    assertEq(middle.length(), 3);
+    assertEq(middle.get(0), 2);
+    assertEq(xs.slice(2, 2).length(), 0);
+    let squares = mapList<int, int>(xs, (n: int) => n * n);
+    assertEq(squares.get(4), 25);
+    let evens = xs.filter((n: int) => n % 2 == 0);
+    assertEq(evens.length(), 2);
+    let names = mapList<int, string>(xs, (n: int) => fromInt(n));
+    assertEq(names.get(0), "1");
+    var total = 0;
+    xs.forEach(
+        (n: int) => {
+            total = total + n;
+        }
+    );
+    assertEq(total, 15);
+    assertEq(xs.length(), 5);
+}
+
+@Test
+pub fn remove_where_and_to_reversed(): void {
+    let xs = List<int>.of([1, 2, 3, 4, 5, 6]);
+    assertEq(xs.removeWhere((n: int) => n % 2 == 0), 3);
+    assertEq(xs.length(), 3);
+    assertEq(xs.get(2), 5);
+    let back = xs.toReversed();
+    assertEq(back.get(0), 5);
+    assertEq(xs.get(0), 1);
+    assertTrue(listRemove<int>(xs, 3), "3 was there");
+    assertTrue(!listRemove<int>(xs, 3), "and is gone");
+    assertEq(xs.length(), 2);
+}
+
+@Test
+pub fn a_map_walks_through_its_own_methods(): void {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+    var keyCount = 0;
+    for (_ in m.keys()) {
+        keyCount = keyCount + 1;
+    }
+    assertEq(keyCount, 2);
+    var sum = 0;
+    for (v in m.values()) {
+        sum = sum + v;
+    }
+    assertEq(sum, 3);
+    var joined = 0;
+    for (entry in m.entries()) {
+        let (k, v) = entry;
+        joined = joined + k.length() + v;
+    }
+    assertEq(joined, 5);
+    let built = Map<string, int>.fromEntries([("x", 1), ("y", 2), ("x", 3)]);
+    assertEq(built.length(), 2);
+    assertEq(built.get("x")!, 3);
+}
+
+@Test
+pub fn get_or_insert_and_update_make_a_group_by_one_line(): void {
+    let groups = Map<int, List<string>>.empty();
+    for (word in ["a", "bb", "cc", "d"]) {
+        groups.getOrInsert(word.length(), () => List<string>.empty()).push(word);
+    }
+    assertEq(groups.get(1)!.length(), 2);
+    assertEq(groups.get(2)!.length(), 2);
+
+    let counts = Map<string, int>.empty();
+    for (word in ["x", "y", "x"]) {
+        counts.update(word, (n: ?int) => (n ?? 0) + 1);
+    }
+    assertEq(counts.get("x")!, 2);
+    assertEq(counts.get("y")!, 1);
+
+    let grouped = groupBy<string, int>(
+        List<string>.of(["a", "bb", "cc", "d"]),
+        (w: string) => w.length()
+    );
+    assertEq(grouped.get(2)!.get(1), "cc");
+}
+
+@Test
+pub fn a_churned_map_does_not_grow_without_bound(): void {
+    // Set and remove a fresh key each round: the map never holds more than one entry, and
+    // before 4.5 every threshold crossing DOUBLED the table.
+    let m = Map<int, int>.empty();
+    var i = 0;
+    while (i < 10000) {
+        m.set(i, i);
+        m.remove(i);
+        i = i + 1;
+    }
+    assertEq(m.length(), 0);
+    assertTrue(m.capacity() <= 16, "capacity stays small: " + fromInt(m.capacity()));
+    // And a table that really fills still grows.
+    var j = 0;
+    while (j < 100) {
+        m.set(j, j);
+        j = j + 1;
+    }
+    assertEq(m.length(), 100);
+    assertEq(m.get(57)!, 57);
+}
+
+@Test
+pub fn a_set_comes_from_an_array_and_goes_back(): void {
+    let s = Set<int>.of([3, 1, 3, 2]);
+    assertEq(s.length(), 3);
+    assertEq(s.addAll([2, 9]), 1);
+    let arr = s.toArray();
+    assertEq(arr.length, 4);
+    sortArray<int>(arr);
+    assertEq(arr[0], 1);
+    assertEq(arr[3], 9);
+    assertEq(s.toList().length(), 4);
+    let churned = Set<int>.empty();
+    var i = 0;
+    while (i < 10000) {
+        churned.add(i);
+        churned.remove(i);
+        i = i + 1;
+    }
+    assertEq(churned.length(), 0);
+}
+
+@Test
+pub fn a_deque_can_be_looked_at_without_draining(): void {
+    let q = Deque<int>.empty();
+    q.pushBack(2);
+    q.pushFront(1);
+    q.pushBack(3);
+    let arr = q.toArray();
+    assertEq(arr.length, 3);
+    assertEq(arr[0], 1);
+    assertEq(arr[2], 3);
+    assertEq(q.length(), 3);
+}
+
+@Test
+pub fn sorting_by_key_and_arrays(): void {
+    let words = List<string>.of(["ccc", "a", "bb"]);
+    sortListByKey<string, int>(words, (w: string) => w.length());
+    assertEq(words.get(0), "a");
+    assertEq(words.get(2), "ccc");
+    assertEq(maxBy<string, int>(words, (w: string) => w.length())!, "ccc");
+    assertEq(minBy<string, int>(words, (w: string) => w.length())!, "a");
+    assertTrue(
+        maxBy<string, int>(List<string>.empty(), (w: string) => w.length()) == null,
+        "empty"
+    );
+    let arr = [5, 3, 9, 1];
+    sortArray<int>(arr);
+    assertEq(arr[0], 1);
+    assertEq(arr[3], 9);
+    let part = slice<int>(arr, 1, 3);
+    assertEq(part.length, 2);
+    assertEq(part[0], 3);
+    assertEq(slice<int>(arr, 4, 4).length, 0);
 }
