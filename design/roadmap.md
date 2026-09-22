@@ -37,9 +37,13 @@ Thema: was in Ausdrucksposition stehen darf, und was ein Wert rendert. Alles add
   Fix liegt auf stdlib-redesigns Branch.
 - **Argumente einer generischen Methode werden nicht substituiert** (`LowerGenericMethodCall` reicht
   keine `calleeSubstitution` an `MaterializeArguments`): ein Parameter, der `T` geschrieben steht,
-  bleibt ein Name, und bei `T = ?int` unterbleibt die Widerung (`store of i64 into ?i64`). Fix und
-  Test liegen auf stdlib-redesigns Branch (`a8df8a5d`). Der Pfad für generische **Interface**-Member
-  baute dieselbe Abbildung längst — die Lücke war verdeckt, weil der Klassen-Pfad sie zuerst erreicht.
+  bleibt ein Name, und bei `T = ?int` unterbleibt die Widerung (`store of i64 into ?i64`). Der Pfad für
+  generische **Interface**-Member baute dieselbe Abbildung längst — die Lücke war verdeckt, weil der
+  Klassen-Pfad sie zuerst erreicht. **Der Fix liegt zweimal vor**, unabhängig gefunden: stdlib-redesign
+  `a8df8a5d`, pattern-lambda `76ae5ee8`. **Beim Merge einen behalten — den von pattern-lambda**, er zieht
+  zusätzlich den Constraint-Pfad mit; die Tests beider Branches pinnen den Fall (Klasse *und* Enum) und
+  sollten beide übernommen werden. Dass zwei Teams denselben Defekt am selben Tag finden, ist das
+  deutlichste Zeichen dafür, dass er in 4.5 gehört.
 - **`rawArrayAlloc<T>(n): T[]` als privates Native** (~15 VM-Zeilen): hängt inzwischen doppelt —
   `List<?T>`/`Map<K, ?V>` brauchen es für ihre Backing-Arrays (stdlib-redesign), und pattern-lambdas
   benannter Rest `[first, ..rest]` braucht es, weil das Lowering kein Array unbekannter Länge bauen

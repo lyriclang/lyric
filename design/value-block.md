@@ -162,6 +162,20 @@ wertlos, kein allgemeiner Block-Ausdruck), mit Rusts Regel für den defer/Drop-Z
    *Nicht im Prototyp umgesetzt* — der Prototyp verlangt weiterhin Klammern, und beides ist
    vorwärtskompatibel: wer heute klammert, klammert danach umsonst.
 
+   **Die Regel kippt zwei Lesarten gleichzeitig, und das ist beabsichtigt.** pattern-lambdas
+   Trailing-Lambda hängt am selben Flag: `IsTrailingLambdaAhead(IdentifierExpr) => _allowStructInit`
+   (an ihrem Code geprüft, Parser.cs ~763). Am Statement-Anfang ist das Flag aus, und ein bloßer Name
+   vor `{` bleibt damit die §6.8-Form „Name, dann Block" — weder Initializer noch Trailing-Lambda.
+   Setzt der ValueBlock das Flag, werden **beide** Lesarten zugleich scharf: `Point { x = 1 }` ist der
+   Initializer-Tail, `run { 7 }` der Aufruf mit Trailing-Lambda. Das ist genau die Kombination, die man
+   in Wert-Position will.
+   **Der Preis, benannt:** innerhalb eines ValueBlocks kann ein Bezeichner am Statement-Anfang nicht
+   mehr von einem *verschachtelten Statement-Block* gefolgt werden, ohne als Aufruf oder Initializer
+   gelesen zu werden. Nichts, was heute kompiliert, ändert dadurch seine Bedeutung — ein Statement aus
+   einem bloßen Bezeichner ist ohnehin `LYR-SEM0022` („expression statement has no effect") —, es
+   ändert sich nur die Diagnose, die ein Tippfehler bekommt. Wer wirklich einen anonymen Block braucht,
+   trennt ihn durch das `;` des vorigen Statements, das dort ohnehin steht.
+
 ## Spec-Diff
 
 §2:
