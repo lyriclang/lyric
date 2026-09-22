@@ -258,4 +258,33 @@ public class ExceptionTests
     {
         AssertClean(Diags("""fn t() { panic("boom"); }"""));
     }
+
+    // --- every initializer is a site, including the one a destructuring requires ---
+
+    /// <summary>
+    /// A destructuring binding was the one statement the walk had no case for, so its initializer
+    /// was never a call site at all: <c>let (a, b) = mk();</c> with a throwing <c>mk</c> compiled
+    /// clean in a function that declares nothing, and the program ended as <c>LYR-VM0010</c> —
+    /// the panic §9.2 describes as unreachable from source.
+    /// </summary>
+    [Fact]
+    public void A_destructuring_initializer_is_a_call_site()
+    {
+        AssertCode(Diags("""
+            fn pair(): (int, int) throws NotFound { return (1, 2); }
+            fn t(): int { let (a, b) = pair(); return a + b; }
+            """), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_handled_destructuring_initializer_is_clean()
+    {
+        AssertClean(Diags("""
+            fn pair(): (int, int) throws NotFound { return (1, 2); }
+            fn t(): int {
+                try { let (a, b) = pair(); return a + b; }
+                catch (e: NotFound) { return 0; }
+            }
+            """));
+    }
 }

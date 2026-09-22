@@ -948,7 +948,23 @@ public sealed class TypeChecker
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
         foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
-        _narrowed = savedNarrowed; // narrowings established inside the block by an early exit end here
+        EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
+    }
+
+    /// <summary>
+    /// Leaves a region: the narrowings it ESTABLISHED end with it, the ones it ENDED stay ended.
+    ///
+    /// <para>The distinction is the whole point. An assignment ends a narrowing "from that point
+    /// on" (§7.4), and restoring the state before the region wholesale undid exactly that: after
+    /// <c>if (o != null) { if (c) { o = null; } … }</c> the sema believed <c>o</c> was still an
+    /// <c>int</c>, typed <c>o + 1</c>, and the program panicked with <c>LYR-VM0007</c> — a sound
+    /// analysis reporting nothing about a program that cannot run.</para>
+    /// </summary>
+    private void EndScope(Dictionary<Symbol, LyrType> before)
+    {
+        foreach (var symbol in before.Keys.ToList())
+            if (!_narrowed.ContainsKey(symbol)) before.Remove(symbol);
+        _narrowed = before;
     }
 
     private void CheckStmt(Stmt stmt, SymbolTable scope)
@@ -1237,23 +1253,39 @@ public sealed class TypeChecker
         CheckCondition(f.Condition, scope);
         var (thenFacts, elseFacts) = NarrowingFacts(f.Condition);
 
-        var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+        var before = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+
         Apply(thenFacts);
         CheckBlock(f.Then, scope);
-        _narrowed = snapshot;
+        var afterThen = _narrowed;
 
+        // The else branch starts from the state BEFORE the if, not from what the then branch left:
+        // the two are exclusive, and inheriting the then branch's endings would report an error in
+        // the else branch about a narrowing only the OTHER branch destroyed.
+        var afterElse = before;
         if (f.Else is not null)
         {
-            snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+            _narrowed = new Dictionary<Symbol, LyrType>(before, ReferenceEqualityComparer.Instance);
             Apply(elseFacts);
             CheckStmt(f.Else, scope);
-            _narrowed = snapshot;
+            afterElse = _narrowed;
         }
 
         // 'AlwaysExits' rather than 'AlwaysReturns': for narrowing what counts is whether the code
         // after the 'if' is reached at all, and 'continue' leaves the block just as 'return' does.
-        if (Flow.AlwaysExits(f.Then, _result)) Apply(elseFacts);
-        else if (f.Else is not null && Flow.AlwaysExits(f.Else, _result)) Apply(thenFacts);
+        var thenExits = Flow.AlwaysExits(f.Then, _result);
+        var elseExits = f.Else is not null && Flow.AlwaysExits(f.Else, _result);
+
+        // A narrowing survives the if when every branch that can REACH the code after it still
+        // holds the narrowing there. A branch that always exits never reaches it and has no say.
+        _narrowed = new Dictionary<Symbol, LyrType>(ReferenceEqualityComparer.Instance);
+        foreach (var (symbol, type) in before)
+            if ((thenExits || afterThen.ContainsKey(symbol))
+                && (elseExits || afterElse.ContainsKey(symbol)))
+                _narrowed[symbol] = type;
+
+        if (thenExits) Apply(elseFacts);
+        else if (elseExits) Apply(thenFacts);
     }
 
     /// <summary>
@@ -1275,7 +1307,7 @@ public sealed class TypeChecker
 
         Apply(thenFacts);
         CheckBlock(w.Body, scope);
-        _narrowed = snapshot;
+        EndScope(snapshot);
     }
 
     private void Apply(Dictionary<Symbol, LyrType> facts)
@@ -1889,7 +1921,7 @@ public sealed class TypeChecker
             var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
             Apply(b.Operator == BinaryOp.LogicalAnd ? thenFacts : elseFacts);
             r = CheckExpr(b.Right, scope);
-            _narrowed = snapshot;
+            EndScope(snapshot);
         }
         else
         {
