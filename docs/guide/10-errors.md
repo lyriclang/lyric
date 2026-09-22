@@ -115,6 +115,23 @@ fn main(): int {
 
 `main` cannot declare `throws`; an exception that reaches it aborts the process.
 
+A `try` whose every `catch` leaves — returns, throws, breaks or continues — counts what its
+body assigned: a throw mid-way lands in a clause that leaves, so the only way past the `try` is
+the body's own end.
+
+```lyr
+fn main(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parse(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    return run(opts);      // opts is definitely assigned here
+}
+```
+
 ## Cleanup
 
 `defer` runs when the scope ends, on the normal path and while unwinding:

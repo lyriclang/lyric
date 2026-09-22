@@ -130,14 +130,21 @@ internal sealed class FlowAnalyzer
                 AnalyzeStatements(fo.Body.Statements, loopSet);
                 return assigned;
             case TryStmt tr:
-                AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+            {
+                var afterBody = AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+                var everyCatchLeaves = true;
                 foreach (var c in tr.Catches)
                 {
                     var catchSet = Clone(assigned);
                     if (_types.RefOf(c) is { } bind) catchSet.Add(bind); // the catch assigns the binding
                     AnalyzeStatements(c.Body.Statements, catchSet);
+                    if (!Flow.AlwaysExits(c.Body, _types)) everyCatchLeaves = false;
                 }
-                return assigned;
+                // The body may have thrown mid-way, so what it assigns counts afterwards only
+                // when the throw cannot lead past the try: every catch leaves. Then the one way
+                // to the statement after it is the body's own end (§7.7).
+                return everyCatchLeaves ? afterBody : assigned;
+            }
             case MatchStmt m:
             {
                 AnalyzeExpr(m.Scrutinee, assigned);
