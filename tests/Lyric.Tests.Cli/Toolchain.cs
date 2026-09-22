@@ -55,6 +55,13 @@ public static class Toolchain
     public static string DefaultProfile =>
         Environment.GetEnvironmentVariable("LYRIC_PROFILE") == "release" ? "release" : "debug";
 
+    /// <summary>Whether every program in this run is COMPILED (<c>LYRIC_JIT=1</c>), the second
+    /// engine the CI runs the whole suite on. A test whose answer differs between the engines
+    /// states both rather than skipping one — what differs is the contract, and a contract
+    /// nobody pins is a promise nobody keeps.</summary>
+    public static bool Compiled =>
+        Environment.GetEnvironmentVariable("LYRIC_JIT") == "1";
+
     /// <summary>The directory a binary and its dependencies lie in: the basis of the architecture test.
     /// </summary>
     public static string OutputDirectory(string project) =>

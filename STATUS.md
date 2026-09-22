@@ -52,6 +52,17 @@ which shape of one a compile produces by default. The delivery list:
       that hurt. Correctness in the debug shape: Ir 175, Vm 1453, Embedding 222, lyrtest 166 all
       green; Cli 276 of 277, the one red a backtrace pin of the inlined shape. **Zero wrong
       answers.** The optimizer round is its own milestone after this one.
+
+      **A fourth finding, from the CI's other engine, after the release merged**: a panic that
+      passes through COMPILED code loses every frame below the function that failed. Measured on
+      one debug build of a `divide` called by `main`: interpreted it reports `main.divide` and
+      `main.main`, compiled only `main.divide`; the release build of the same program reports
+      one frame on both engines, because the callee was inlined away. So this is not new — it is
+      the documented cost of compiling (`Interpreter.Execute`: "a backtrace of one line") — and
+      the debug default is what made it VISIBLE, by keeping small callees as real calls. The
+      pin now states both engines instead of skipping one. Worth its own decision in the round:
+      a backtrace that ends where the compiled code begins is a poor thing to ship, and
+      `HostOptions.Compile = true` is what a host that ships sets.
 - [x] **slice 1 — profiles** (this branch): `Profile` (debug, release; ONE table in
       `Lyric.Frontend/Compiler/Profile.cs`, read by lyrc, lyrbuild, lyrtest, lyrdbg, the REPL and
       `LangVm`), `--profile`/`--release`/`--debug` plus the six field flags, `LYRIC_PROFILE` as the
