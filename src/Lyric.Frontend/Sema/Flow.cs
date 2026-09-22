@@ -51,6 +51,44 @@ internal static class Flow
         _ => AlwaysReturns(s, types),
     };
 
+    /// <summary>
+    /// Does a <c>break</c> (<paramref name="wantContinue"/> false) or <c>continue</c> (true) of THIS
+    /// loop stand on a path the lowering still walks?
+    ///
+    /// <para>A different question from <see cref="HasBreak"/>, which asks only whether the keyword
+    /// occurs. The lowering stops at the first statement that leaves the block, so a jump behind one
+    /// is never lowered — <c>do { return 1; break; }</c> has a <c>break</c> and jumps nowhere. That
+    /// is the same code <c>LYR-SEM0073</c> calls unreachable.</para>
+    ///
+    /// <para>The answer decides whether <c>do-while</c> creates its jump target BEFORE the body. It
+    /// is deliberately a LOWER bound: saying no where the answer is yes costs the target its early
+    /// position, while saying yes where it is no would leave a block nobody enters, which the
+    /// verifier refuses.</para>
+    /// </summary>
+    public static bool ReachesJump(Stmt s, bool wantContinue, TypeResult? types = null) => s switch
+    {
+        BreakStmt => !wantContinue,
+        ContinueStmt => wantContinue,
+        Block b => ReachesJumpInSequence(b.Statements, wantContinue, types),
+        IfStmt f => ReachesJump(f.Then, wantContinue, types)
+                    || (f.Else is not null && ReachesJump(f.Else, wantContinue, types)),
+        TryStmt t => ReachesJump(t.Body, wantContinue, types)
+                     || t.Catches.Any(c => ReachesJump(c.Body, wantContinue, types)),
+        MatchStmt m => m.Arms.Any(a => a.Body is Block bl && ReachesJump(bl, wantContinue, types)),
+        _ => false // while, do-while, for-in: their own break and continue. A defer body runs at the
+                   // end of its scope rather than where it stands, so its jumps are not this walk's.
+    };
+
+    private static bool ReachesJumpInSequence(Stmt[] statements, bool wantContinue, TypeResult? types)
+    {
+        foreach (var st in statements)
+        {
+            if (ReachesJump(st, wantContinue, types)) return true;
+            if (AlwaysExits(st, types)) return false;
+        }
+        return false;
+    }
+
     private static bool Diverges(Expr cond, Block body) => cond is BoolLiteralExpr { Value: true } && !HasBreak(body);
 
     private static bool ArmReturns(MatchArm a, TypeResult? types) => a.Body is Block b && AlwaysReturns(b, types);

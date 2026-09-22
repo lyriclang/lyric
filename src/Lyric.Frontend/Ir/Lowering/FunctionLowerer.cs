@@ -1363,6 +1363,13 @@ internal sealed class FunctionLowerer
 
         _b.SwitchTo(bodyBlock);
         var loop = new LoopScope(_b) { DeferDepth = _defers.Count };
+
+        // The targets a 'break' or 'continue' really reaches are reserved HERE, before the body:
+        // created on demand from inside a try or a defer scope they would land in that region's
+        // block range and put the code after the loop under its handler. See LoopScope.Reserve.
+        if (Flow.ReachesJump(stmt.Body, wantContinue: true, _types)) loop.Reserve(continueTarget: true);
+        if (Flow.ReachesJump(stmt.Body, wantContinue: false, _types)) loop.Reserve(continueTarget: false);
+
         _loops.Push(loop);
         var fallsThrough = LowerScope(stmt.Body);
         _loops.Pop();

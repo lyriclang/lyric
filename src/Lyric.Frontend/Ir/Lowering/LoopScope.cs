@@ -45,6 +45,26 @@ internal sealed class LoopScope(BlockBuilder blocks)
     /// <summary>The target of <c>break</c>.</summary>
     public BlockId BreakTarget => _break ??= blocks.NewBlock();
 
+    /// <summary>
+    /// Creates a target that the body is known to jump to, so its block id stands BEFORE every block
+    /// the body produces.
+    ///
+    /// <para>A protected region is a CONTIGUOUS range of block ids, ending at the block count after
+    /// its body. Created on demand from inside a <c>try</c>, a jump target of the ENCLOSING loop
+    /// lands in that range — and then the code after the loop is covered by a handler that belongs
+    /// inside it: a <c>throw</c> behind the loop is caught by the <c>catch</c> in its body, control
+    /// returns to the condition, and the loop runs forever. <c>while</c> and <c>for-in</c> never had
+    /// it, because their targets exist before the body is lowered.</para>
+    ///
+    /// <para>Only where the jump is REACHED: a target nobody enters is a verifier error, which is
+    /// what made these blocks lazy in the first place.</para>
+    /// </summary>
+    public void Reserve(bool continueTarget)
+    {
+        if (continueTarget) _ = ContinueTarget;
+        else _ = BreakTarget;
+    }
+
     /// <summary>Has anyone requested the target? Only then does the block exist.</summary>
     public bool ContinueRequested => _continue is not null;
 
