@@ -15,7 +15,7 @@ public static class ToolchainVersion
     /// <para>The editor clients (<c>lyriclang/vscode-lyric</c>, <c>lyriclang/jetbrains-lyric</c>)
     /// version independently, in their own repositories.</para>
     /// </summary>
-    public const string Value = "4.4.1";
+    public const string Value = "4.5.0";
 
     /// <summary>
     /// Reads <c>MAJOR.MINOR</c> or <c>MAJOR.MINOR.PATCH</c>, plain decimal digits and nothing else.

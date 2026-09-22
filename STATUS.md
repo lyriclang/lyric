@@ -11,10 +11,13 @@
 
 ## Current milestone
 
-**M37 — the project system, build v2 and profiles — IN PROGRESS** (2026-09-18, branch
+**M37 — the project system, build v2 and profiles — SHIPPED as v4.5.0** (2026-09-22, branch
 `feature/m37-profiles`). Stage A of the 2026-09-17 design round: a compile is a named PROFILE,
 `lyric.json` learns `name`, `dependencies` and `toolchain`, a project without `build.lyr` builds
-by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
+by convention, and `std.build` v2 moves its model into Lyric. **A minor, not a major**: every
+4.4 project still builds, and the one form that changed shape — `addExecutable(entry, output)` —
+still works and warns until 5.0. Bytecode format stays 4.0; nothing about a module changed, only
+which shape of one a compile produces by default. The delivery list:
 
 - [x] **slice 0 — the measurement**, before the default fell. Both shapes through `tools/Bench`
       in one session, Release configuration, the control cases (`loopOnly`, `intAdd`, `floatAdd`,
@@ -129,7 +132,13 @@ by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
       driver's output directory never got a copy of, invisible because the release archive
       carries it and every test called the binary directly. Seventeen CLI tests, guides 1, 16,
       17, 20, CHANGELOG
-- [ ] slice 5 — the spec sentence (§4, a dependency root), the release
+- [x] **slice 5 — the release**. The spec sentence landed first, as the process asks
+      (`lyric-spec#36`, merged): §4.1 lists the roots a dotted path resolves under and gains the
+      dependency root, "since 4.5". No conformance case with it — the rule is about the project
+      file and the file system, which the suite does not model — so the suite is unchanged at
+      158 and the spec pin moves to 4.5 after this release, last, as it always does. The tree
+      claims **4.5.0**: version, README, CHANGELOG and this file in one commit, the tag after
+      green CI on main.
 
 **Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither
 is M36's**: both are older, and the feature only made them findable.

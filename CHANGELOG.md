@@ -10,10 +10,12 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## Unreleased
+## v4.5.0 — 2026-09-22
 
-**Two profiles, and a compile is the debug one unless you say otherwise. A build script names
-what it builds, and a project builds without one.**
+**The project system.** A compile is one of two named profiles and the default is `debug`; a
+build script names what it builds; a project builds, runs, packs, checks and tests without
+anybody naming a file; and `lyric.json` says what the project is called, what it depends on and
+which toolchain it needs.
 
 ### Added
 
