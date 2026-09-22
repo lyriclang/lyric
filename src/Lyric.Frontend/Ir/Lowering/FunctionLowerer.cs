@@ -785,17 +785,29 @@ internal sealed class FunctionLowerer
         {
             fallsThrough = LowerStatements(block);
             pending = _defers.Peek();
-
-            // The normal path gets the bodies directly: no handler, no runtime cost.
-            if (fallsThrough) EmitDefers(pending);
         }
         finally
         {
             _defers.Pop();
         }
 
+        // The region ends with the BODY. Fixed after the inline copy below, it covered that copy
+        // too — and then a defer body that throws was caught by the very finally region those
+        // bodies are, which ran every defer of the scope a second time: the throwing one twice and
+        // the ones registered before it never, because the second pass threw at the same place.
         var end = new BlockId(_blocks.Count);
         var afterBody = _b.CurrentId;
+
+        // The normal path gets the bodies directly — no handler, no runtime cost — in a block of
+        // its own behind the region.
+        if (fallsThrough)
+        {
+            var normal = _b.NewBlock();
+            _b.SealBlock(afterBody, new Branch(normal, block.Span));
+            _b.SwitchTo(normal);
+            EmitDefers(pending);
+            afterBody = _b.CurrentId; // a defer body may have produced blocks of its own
+        }
 
         // And the same body once more as a finally region, for the case where an exception runs through
         // this scope. A defer runs on every scope exit, exceptions included; the normal exits are served
@@ -3806,12 +3818,15 @@ internal sealed class FunctionLowerer
             // route LowerConstraintCall takes.
             //
             // 'An own member beats a default' sits in the LookupLocal condition: when the concrete type
-            // has the method itself, this case falls through to the direct call.
+            // has the method itself, this case falls through to the direct call. A visible EXTENSION
+            // beats it too (§5.4), and that half was missing: the question asked was whether the TYPE
+            // carries the member, never what the sema had already BOUND.
             case MemberExpr member
                 when ReceiverType(member.Target) is NamedRef
                      { Symbol: { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct
                          or TypeSymbolKind.Enum } concrete }
                      && concrete.Members.LookupLocal(member.Member) is not FunctionSymbol
+                     && !BoundToExtension(member)
                      && _typeTable.InterfaceProviding(concrete, member.Member) is { } provider:
             {
                 // As the concrete type DECLARES it: 'Iterator<int>', not 'Iterator'. A generic
@@ -4538,6 +4553,19 @@ internal sealed class FunctionLowerer
     /// the distinction every program carries the five Display extensions from <c>std.core</c>, because
     /// that module is always loaded.</para>
     /// </summary>
+    /// <summary>
+    /// Did the sema bind this member to a visible EXTENSION method?
+    ///
+    /// <para>§5.4 fixes the order as own member, then extension, then a default of a conformed
+    /// interface. The sema follows it; the lowering asked only whether the concrete TYPE carried
+    /// the member, so an extension on a type whose interface supplies the same name as a default
+    /// was never called directly — the receiver was lifted and dispatched virtually, and the
+    /// vtable row found the default. Asking what was BOUND is asking the question once.</para>
+    /// </summary>
+    private bool BoundToExtension(MemberExpr member) =>
+        _types.RefOf(member) is FunctionSymbol bound
+        && _typeTable.ExtensionOwnerOf(bound) is not null;
+
     private bool TryResolveFunction(FunctionSymbol symbol, out FunctionId id)
     {
         if (_functions.TryGetValue(symbol, out id)) return true;

@@ -383,4 +383,44 @@ public class ExtendTests
     // No test for 'static fn' in an extend block: the grammar allows a FunctionDecl there, and 'static'
     // is a MEMBER marker that does not belong to it, so the parser rejects it with LYR-PAR0008. Whether
     // that is intended is a language question rather than a lowering question and is not answered here.
+
+    // ------------------------------------------------- §5.4: extension before interface default
+
+    /// <summary>
+    /// §5.4 fixes the order as own member, then visible extension, then a default of a conformed
+    /// interface's chain. The sema followed it and bound the extension; the LOWERING asked only
+    /// whether the concrete type carried the member itself, so it lifted the receiver and
+    /// dispatched virtually — and the vtable row, which resolves extensions only through
+    /// conformance blocks, found the default. A plain <c>extend S { … }</c> without <c>:: [A]</c>
+    /// was therefore never reachable through an instance call.
+    /// </summary>
+    [Fact]
+    public void A_visible_extension_beats_an_interface_default() =>
+        Assert.Equal(2, Run("""
+            interface A { fn rank(): int { return 1; } }
+            struct S :: [A] { v: int }
+            extend S { fn rank(): int { return 2; } }
+            fn main(): int { let s = S { v = 0 }; return s.rank(); }
+            """));
+
+    /// <summary>The counter-check that keeps the order an ORDER: an own member still beats both,
+    /// so a fix that simply preferred the extension everywhere would be red here.</summary>
+    [Fact]
+    public void An_own_member_still_beats_both() =>
+        Assert.Equal(3, Run("""
+            interface A { fn rank(): int { return 1; } }
+            struct S :: [A] { v: int, fn rank(): int { return 3; } }
+            extend S { fn rank(): int { return 2; } }
+            fn main(): int { let s = S { v = 0 }; return s.rank(); }
+            """));
+
+    /// <summary>And without an extension the default is still what a concrete receiver reaches —
+    /// the case the lifted path exists for.</summary>
+    [Fact]
+    public void The_default_still_wins_when_nothing_else_offers_the_name() =>
+        Assert.Equal(1, Run("""
+            interface A { fn rank(): int { return 1; } }
+            struct S :: [A] { v: int }
+            fn main(): int { let s = S { v = 0 }; return s.rank(); }
+            """));
 }

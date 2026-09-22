@@ -703,4 +703,50 @@ public class ExceptionTests
                 return 12;
             }
             """));
+
+    /// <summary>
+    /// A defer body that THROWS on the fall-through path, run once.
+    ///
+    /// <para>The inline copy of the bodies — the normal path, which carries no handler — used to be
+    /// emitted before the finally region's end was fixed, so it lay INSIDE that region. A throw
+    /// from a defer body was then caught by the very region those bodies are, and every defer of
+    /// the scope ran a second time: the throwing one twice, and the ones scheduled before it never,
+    /// because the second pass threw at the same place.</para>
+    ///
+    /// <para>The counter is on a class, so it survives the unwinding that the local would not.</para>
+    /// </summary>
+    [Fact]
+    public void A_throwing_defer_body_runs_once_on_the_fall_through_path() =>
+        Assert.Equal(1, Run("""
+            class Boom :: [Throwable] { n: int, fn message(): string { return "boom"; } }
+            class Counter { calls: int }
+
+            fn boom(c: Counter): int throws Boom {
+                c.calls = c.calls + 1;
+                throw Boom { n = 1 };
+            }
+
+            fn work(c: Counter): void throws Boom {
+                defer boom(c);
+                c.calls = c.calls;
+            }
+
+            fn main(): int {
+                let c = Counter { calls = 0 };
+                try { work(c); }
+                catch (e: Boom) { return c.calls; }
+                return -1;
+            }
+            """));
+
+    // Not pinned here, because it is not decided: whether the defers scheduled BEFORE a throwing
+    // one still run. They do not today, on either path. §7.5 says defers run in reverse scheduling
+    // order and says nothing about one that throws; Go, whose defer this is shaped after, runs the
+    // rest. Recorded in docs/Befunde_und_Verbesserungen/SPEC-RUNDE.md.
+    //
+    // The RETURN path carries the same double-run and is not fixed either: the drain happens at the
+    // return site, which lexically lies inside the region, so moving the region's end does not
+    // reach it. Getting it out means routing every return of a defer scope through one epilogue
+    // behind the region, with the return value in a synthetic local — worth building once the
+    // question above has an answer, not before.
 }
