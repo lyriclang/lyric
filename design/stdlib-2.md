@@ -546,12 +546,28 @@ Receiver (`fn f<K :: [Keeper<?int>]>(k: K) { k.or(3) }`). Der Interface-Member-P
 längst. Jetzt gibt es einen Helfer `InstanceSubstitution(GenericInstance)`, den alle drei
 übrigen Stellen benutzen.
 
-**Nachgewiesen statt angenommen:** die Abbildung an allen vier Stellen neutralisiert, Test
-laufen lassen — vier Findings, eines pro Weg (`Box<?int>.of` statisch, `Box<?int>.or` Instanz,
-`Holder<?int>.or` Instanz-Enum, `Box<?int>.or` im Constraint-Rumpf). Erst das macht den Test
-zum Beleg; eine frühere Vermutung von mir, eine Klasse MIT Interface-Konformanz nehme ohnehin
-den Interface-Pfad und sei deshalb unauffällig, hält dem nicht stand: das konforme `Box`
-landet ebenfalls im Instanz-Pfad.
+**Nachgewiesen statt angenommen, und dann pro Stelle zugeordnet.** Erst alle drei Stellen
+gemeinsam neutralisiert (Test rot), dann jede EINZELN (`probes/attribute_paths.py`), was die
+Findings ihren Pfaden zuweist:
+
+| neutralisierte Stelle | Findings |
+|---|---|
+| `LowerGenericMethodCall` (Instanzmethode) | **drei**: `Box<?int>.or` (Klasse), `Holder<?int>.or` (Enum), `Box<?int>.or` auf dem statisch erzeugten Objekt |
+| `LowerGenericStaticCall` | eines: `Box<?int>.of` |
+| Constraint-Pfad (generischer Receiver) | eines: `Box<?int>.or` im Rumpf von `viaConstraint` |
+
+Damit sind zwei frühere Erklärungen von mir erledigt — beide waren Vermutungen aus einer
+Messung, die die Stellen nicht trennte. Weder nimmt eine Klasse MIT Interface-Konformanz einen
+anderen Pfad (das konforme `Box` bricht im Instanz-Pfad), noch bleibt eine Klasse überhaupt
+unauffällig: **auf diesem Branch zeigt die Klasse den Defekt genauso wie das Enum.** Mein
+frühes `probes/iso_box.lyr`, das den Klassenfall grün meldete, war ein Messfehler.
+
+**Offen und bewusst nicht weggeschrieben:** pattern-lambda misst auf IHREM Branch das
+Gegenteil — dort bricht bei neutralisiertem `LowerGenericMethodCall` nur das Enum, die Klasse
+läuft, mit und ohne Konformanz. Beide Messungen sind je für sich sauber (Literale als
+Argumente, Stellen einzeln). Entweder unterscheiden sich die Branches an dieser Stelle, oder
+eine der Proben misst etwas anderes, als sie zu messen glaubt. Das ist beim Merge einmal
+nachzumessen; für den Fix ist es folgenlos, weil beide Fassungen alle Stellen abdecken.
 
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
@@ -559,7 +575,7 @@ der schon `?int` ist, braucht keine Widerung und reist durch die Lücke, ohne si
 Steht als eigener Absatz im Test.
 
 pattern-lambda hat denselben Defekt unabhängig gefunden (Commits 76ae5ee8 + 5dca585f) — beim
-Merge genügt einer der beiden, mit der Prüfung „vier Wege, Literale als Argumente“. Test:
+Merge genügt einer der beiden, mit der Prüfung „alle Aufrufwege, Literale als Argumente“. Test:
 `tests/Lyric.Tests.Ir/LoweringTests.cs`.
 
 **Was damit geht:** `Result<?T, E>` wird konstruiert, gematcht (über `Ok(_)`), `isOk`/`isErr`/
