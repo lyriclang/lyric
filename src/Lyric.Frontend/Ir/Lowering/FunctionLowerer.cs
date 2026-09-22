@@ -279,11 +279,19 @@ internal sealed class FunctionLowerer
 
         foreach (var p in lambda.Parameters)
         {
+            // The implicit 'it' of a trailing lambda in a context that takes nothing: the
+            // checker dropped it, so it has no symbol and no slot.
+            if (p.Implicit && _types.RefOf(p) is null) continue;
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"lambda parameter '{p.Name}' was not bound by the type checker");
             _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
+            _lambdaParameterCount++;
         }
     }
+
+    /// <summary>The parameters the lambda really has — its declared ones minus a dropped
+    /// implicit 'it'.</summary>
+    private int _lambdaParameterCount;
 
     /// <summary>
     /// The lowerer for the BODY OF A COROUTINE (format 4.0): an ordinary void function whose
@@ -521,6 +529,19 @@ internal sealed class FunctionLowerer
     /// </summary>
     private IrFunction RunLambda()
     {
+        // '((k, v)) => …': a pattern parameter is taken apart before the body runs, from the
+        // slot the caller filled — the same compiler a 'let' pattern uses, and it cannot fail.
+        foreach (var p in _lambda!.Parameters)
+        {
+            if (p.Pattern is not { } pattern || _types.RefOf(p) is not ParameterSymbol ps) continue;
+            if (!_slots.TryLookup(ps, out var slot)) continue;
+            var type = _slots.TypeOfLocal(slot);
+            var value = _slots.NewTemp(type);
+            _b.Emit(new LoadLocal(value, slot, type, p.Span));
+            LowerPattern(pattern, value, type,
+                () => throw Bug("an irrefutable parameter pattern asked for a failure path"), assumeMatch: true);
+        }
+
         switch (_lambda!.Body)
         {
             case Block block:
@@ -550,7 +571,7 @@ internal sealed class FunctionLowerer
 
         // The environment counts as parameter 0, the same arithmetic as for the receiver.
         return new IrFunction(_name, _returnType,
-            _lambda.Parameters.Length + (_envSlot is null ? 0 : 1),
+            _lambdaParameterCount + (_envSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
             Entry = new BlockId(0), Handlers = _handlers,
@@ -932,6 +953,16 @@ internal sealed class FunctionLowerer
 
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
+        // 'return match (…) { A => { return 1; }, B => { return 2; } }': the value diverges — its
+        // type is 'never' — so it is lowered for its effect, and it seals the block itself.
+        if (stmt.Value is { } diverging && _types.TypeOf(diverging) is NeverType)
+        {
+            LowerExprOrVoid(diverging);
+            if (_b.IsSealed) return false;
+            _b.Seal(new Unreachable(stmt.Span));
+            return false;
+        }
+
         var returned = stmt.Value is null ? null : (TempId?)LowerExprAs(stmt.Value, _returnType);
         EmitAllPendingDefers();
         _b.Seal(new Return(returned, stmt.Span));
@@ -1066,6 +1097,12 @@ internal sealed class FunctionLowerer
 
         var variable = _slots.DeclareFor(loopVar, elementType);
         _b.Emit(new StoreLocal(variable, value, stmt.Span));
+
+        // 'for ((k, v) in …)': the element is taken apart at the top of every iteration. The
+        // checker proved the pattern cannot fail, so no failure path is ever asked for.
+        if (stmt.Pattern is { } pattern)
+            LowerPattern(pattern, value, elementType,
+                () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
 
         _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
@@ -1322,7 +1359,7 @@ internal sealed class FunctionLowerer
         var thenBlock = _b.NewBlock();
         _b.Seal(new Branch(thenBlock, stmt.Span));
         _b.SwitchTo(thenBlock);
-        var thenFallsThrough = LowerStatements(stmt.Then);
+        var thenFallsThrough = LowerScope(stmt.Then); // a scope: its defers run at its end (§7.5)
         var thenExit = _b.CurrentId;
 
         // The pattern cannot fail (the sema warned): the else branch is dead and gets no block,
@@ -1469,8 +1506,12 @@ internal sealed class FunctionLowerer
         NullLiteralExpr e => LowerNull(e),
         LambdaExpr e => LowerLambda(e),
         TupleLitExpr e => LowerTupleLiteral(e),
-        MatchExpr e => LowerMatch(e.Scrutinee, e.Arms, TypeOfExpr(e), e.Span)
-                       ?? throw Bug($"match expression produced no value at {e.Span}"),
+        // A match whose arms all leave has the type 'never' and no result slot: nothing ever
+        // flows out of it, and 'never' has no IR type to give a slot.
+        MatchExpr e => _types.TypeOf(e) is NeverType
+            ? LowerMatch(e.Scrutinee, e.Arms, null, e.Span) // null: it diverges, and the caller sees the sealed block
+            : LowerMatch(e.Scrutinee, e.Arms, TypeOfExpr(e), e.Span)
+              ?? throw Bug($"match expression produced no value at {e.Span}"),
         MemberExpr e => LowerFieldRead(e),
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),

@@ -219,6 +219,23 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance(); // for
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'for'");
+
+        // 'for ((k, v) in …)': a parenthesis where the name stands opens a pattern — the
+        // element is taken apart at the top of every iteration. Only names stood here before,
+        // so the form is free.
+        if (_buffer.Check(TokenKind.LParen))
+        {
+            var patternStart = new Span(_buffer.Current.Span.File,
+                _buffer.Current.Span.Start, _buffer.Current.Span.Start); // no name: an empty span
+            var pattern = ParseTuplePattern();
+            _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
+            var patternIter = ParseExpr(0);
+            _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
+            var patternBody = ParseBlock();
+            return new ForInStmt("_", patternIter, patternBody, Span.Union(kw.Span, patternBody.Span))
+                { NameSpan = patternStart, Pattern = pattern };
+        }
+
         var varTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
             $"expected loop variable, got {_buffer.Current.TokenKind}");
         _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
@@ -323,6 +340,12 @@ public sealed partial class Parser
         _allowStructInit = false;
         var expr = ParseExpr(0);
         _allowStructInit = saved;
+
+        // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
+        // needs no ';', as a block arm of a match needs no ','. One may still stand there.
+        if (expr is CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } && !_buffer.Check(TokenKind.Semicolon))
+            return new ExprStmt(expr, expr.Span);
+
         var semi = ExpectSemicolon();
         return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
     }

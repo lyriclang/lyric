@@ -168,6 +168,7 @@ public static class AstChildren
                 break;
 
             case ForInStmt f:
+                if (f.Pattern is not null) yield return f.Pattern;
                 yield return f.Iterable;
                 yield return f.Body;
                 break;
@@ -305,6 +306,7 @@ public static class AstChildren
                 break;
 
             case LambdaParam p:
+                if (p.Pattern is not null) yield return p.Pattern;
                 if (p.Type is not null) yield return p.Type;
                 break;
 

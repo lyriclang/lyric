@@ -134,7 +134,8 @@ public static class AstDumper
                 Write(n.Body, indent + 1, sb);
                 break;
             case LambdaParam n:
-                Line(sb, indent, $"Param {n.Name}", n.Span);
+                Line(sb, indent, n.Implicit ? "Param it (implicit)" : $"Param {n.Name}", n.Span);
+                if (n.Pattern is not null) Write(n.Pattern, indent + 1, sb);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
 
@@ -313,6 +314,7 @@ public static class AstDumper
                 break;
             case ForInStmt n:
                 Line(sb, indent, $"ForIn {n.Variable}", n.Span);
+                if (n.Pattern is not null) Write(n.Pattern, indent + 1, sb);
                 Write(n.Iterable, indent + 1, sb);
                 Write(n.Body, indent + 1, sb);
                 break;

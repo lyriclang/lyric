@@ -1094,7 +1094,22 @@ public sealed class TypeChecker
             false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
+
+        // 'for ((k, v) in …)': the element still has its (hidden) slot; the pattern binds the
+        // names from it. It has to hold for every element — a test has no failure path here.
+        if (fo.Pattern is { } pattern) BindIrrefutable(pattern, loopVar.Type, loopScope, "a for-loop head");
+
         CheckBlock(fo.Body, loopScope);
+    }
+
+    /// <summary>Binds a pattern that is not allowed to fail — a for-loop head or a lambda
+    /// parameter. A refutable pattern is LYR-SEM0098 with the way out named.</summary>
+    private void BindIrrefutable(Pattern pattern, LyrType type, SymbolTable scope, string where)
+    {
+        if (!type.IsError && !IsIrrefutable(pattern, type))
+            _de.Report("LYR-SEM0098", Severity.Error, pattern.Span,
+                $"this pattern can fail on a '{TypeFacts.Display(type)}', and {where} has no path for a miss — bind a name and use 'let … else' in the body");
+        BindPattern(pattern, type, scope);
     }
 
     /// <summary>
@@ -1504,6 +1519,9 @@ public sealed class TypeChecker
             case MatchExpr ma:
             {
                 var armTypes = CheckMatch(ma, ma.Scrutinee, ma.Arms, scope, asExpression: true, expected);
+                // No arm delivers a value — every one is a block that leaves: the match never
+                // produces anything, and 'never' says so; the lowering seals it as diverging.
+                if (armTypes.Count == 0 && ma.Arms.Length > 0) return LyrType.Never;
                 // With a context the arms were checked against it inside; the match HAS it.
                 if (expected is not null && !expected.IsError) return expected;
                 return UnifyArms(armTypes, ma.Span);
@@ -4865,7 +4883,20 @@ public sealed class TypeChecker
     // returns (v1.13), and a non-void one requires return coverage.
     private LyrType CheckLambda(LambdaExpr lam, SymbolTable scope, LyrType? expected = null)
     {
-        var expFn = expected is FnType ef && ef.Parameters.Length == lam.Parameters.Length ? ef : null;
+        // A trailing lambda has the implicit 'it' — one parameter, or none when the context
+        // takes none: 'run { … }' beside 'xs.map { it * 2 }'. The parameter node is dropped
+        // then, and the lowering skips an unbound implicit parameter.
+        var parameters = lam.Parameters;
+        if (parameters is [{ Implicit: true }] && expected is FnType { Parameters.Length: 0 })
+            parameters = [];
+        if (parameters is [{ Implicit: true }] && expected is not FnType { Parameters.Length: 1 })
+        {
+            Report(lam.Span, "LYR-SEM0045",
+                "a trailing lambda takes one parameter, 'it' — the context has to expect a function of one parameter");
+            expected = null;
+        }
+
+        var expFn = expected is FnType ef && ef.Parameters.Length == parameters.Length ? ef : null;
 
         var savedYield = _currentYield;
         var savedReturn = _currentReturn;
@@ -4876,19 +4907,22 @@ public sealed class TypeChecker
         _returnInference = null; // this lambda's returns are its own, never the outer collection's
 
         var lambdaScope = new SymbolTable(scope);
-        var pTypes = new LyrType[lam.Parameters.Length];
-        for (var i = 0; i < lam.Parameters.Length; i++)
+        var pTypes = new LyrType[parameters.Length];
+        for (var i = 0; i < parameters.Length; i++)
         {
-            var p = lam.Parameters[i];
+            var p = parameters[i];
             LyrType pt;
             if (p.Type is not null) pt = ResolveType(p.Type, scope);
             else if (expFn is not null) pt = expFn.Parameters[i];
             else pt = Report(p.Span, "LYR-SEM0045",
                 $"lambda parameter '{p.Name}' needs a type annotation (no context type available)");
             var ps = new ParameterSymbol(p.Name, pt, p);
-            lambdaScope.TryDeclare(ps);
+            if (p.Pattern is null) lambdaScope.TryDeclare(ps); // a pattern parameter's '_' is not a name in scope
             _result.BindRef(p, ps); // for definite-assignment analysis: lambda parameters are assigned
             pTypes[i] = pt;
+
+            // '((k, v)) => …': the parameter has its slot, the pattern binds the names from it.
+            if (p.Pattern is { } pattern) BindIrrefutable(pattern, pt, lambdaScope, "a lambda parameter");
         }
 
         var contextRet = lam.ReturnType is not null ? ResolveType(lam.ReturnType, scope) : expFn?.Return;

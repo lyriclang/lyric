@@ -28,6 +28,12 @@ public sealed partial class Parser
     /// group, not a lambda, because the arm's '=>' follows the guard.</summary>
     private bool _guardHead;
 
+    /// <summary>Set while a match-arm guard is parsed, outside any delimiter: a bare name before
+    /// '=>' is then the guard's last operand, not a one-parameter lambda ('x if a + b => …').
+    /// Inside parentheses or brackets the flag is off, so 'x if xs.any(y => y > 0) => …' keeps
+    /// its lambda.</summary>
+    private bool _inGuard;
+
     public Parser(SourceManager sm, FileId id, DiagnosticEngine de)
     {
         _sm = sm;
@@ -292,6 +298,22 @@ public sealed partial class Parser
                         Span.Union(operand.Span, opTok.Span));
                     break;
                 }
+
+                // 'xs.map { it * 2 }', 'run { … }', 'fold(0) { acc + it }': a block directly
+                // after a callee or a call is its LAST argument, a lambda whose one parameter
+                // is 'it'. A '{' after an expression opened nothing before this — every block
+                // of the grammar follows a keyword or ')' — so no program changes meaning. The
+                // one look-alike, a struct initializer 'Name { x = 1 }' in statement position
+                // (§6.8 keeps it out of there), is told apart by its body: 'IDENT =' or '}'.
+                case TokenKind.LBrace when IsTrailingLambdaAhead(operand):
+                {
+                    var lambda = ParseTrailingLambda();
+                    operand = operand is CallExpr call && call.Arguments is not [.., LambdaExpr { Form: LambdaForm.Trailing }]
+                        ? new CallExpr(call.Callee, [.. call.Arguments, lambda],
+                            Span.Union(call.Span, lambda.Span), call.TypeArguments)
+                        : new CallExpr(operand, [lambda], Span.Union(operand.Span, lambda.Span));
+                    break;
+                }
                 default:
                     return operand;
             }
@@ -342,6 +364,10 @@ public sealed partial class Parser
             case TokenKind.Identifier:
                 if (IsStructInitAhead()) return ParseStructInit();
                 if (IsTypePathAhead()) return ParseTypePath();
+                // 'x => …' — one parameter, no parentheses. Free: a name directly before '=>'
+                // was a parse error everywhere but in a match arm, whose pattern is not parsed
+                // here, and in a guard, which the flag excludes.
+                if (!_inGuard && _buffer.Peek(1).TokenKind == TokenKind.FatArrow) return ParseBareLambda();
                 _buffer.Advance();
                 return new IdentifierExpr(_sm.Slice(cur.Span).ToString(), cur.Span);
             case TokenKind.This:
@@ -453,9 +479,12 @@ public sealed partial class Parser
     private Expr ParseSubExpr(int minBindingPower = 0)
     {
         var saved = _allowStructInit;
+        var savedGuard = _inGuard;
         _allowStructInit = true;
+        _inGuard = false; // a delimiter ends the guard's '=>' ambiguity
         var expr = ParseExpr(minBindingPower);
         _allowStructInit = saved;
+        _inGuard = savedGuard;
         return expr;
     }
 
@@ -482,7 +511,12 @@ public sealed partial class Parser
                 && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier)
                 i += 2;
         }
-        return _buffer.Peek(i).TokenKind == TokenKind.LBrace;
+        // The body decides the rest: a struct initializer holds nothing or 'name = …'; a block
+        // that holds anything else is a trailing lambda ('run { 7 }', 'xs.map { it * 2 }').
+        if (_buffer.Peek(i).TokenKind != TokenKind.LBrace) return false;
+        var after = _buffer.Peek(i + 1).TokenKind;
+        return after == TokenKind.RBrace
+            || (after == TokenKind.Identifier && _buffer.Peek(i + 2).TokenKind == TokenKind.Equal);
     }
 
     /// <summary>
@@ -655,13 +689,30 @@ public sealed partial class Parser
         {
             while (true)
             {
-                var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
-                    $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
-                TypeNode? type = null;
-                if (_buffer.Match(TokenKind.Colon)) type = ParseType();
-                var pspan = type is null ? nameTok.Span : Span.Union(nameTok.Span, type.Span);
-                parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), type, pspan)
-                    { NameSpan = nameTok.Span });
+                // '((k, v)) => …': a parenthesis where a name stands opens an irrefutable
+                // pattern over the parameter. The outer pair is still the parameter list, so
+                // '(k, v) => …' keeps its two parameters.
+                if (_buffer.Check(TokenKind.LParen))
+                {
+                    var patternStart = new Span(_buffer.Current.Span.File,
+                        _buffer.Current.Span.Start, _buffer.Current.Span.Start); // no name
+                    var pattern = ParseTuplePattern();
+                    TypeNode? patternType = null;
+                    if (_buffer.Match(TokenKind.Colon)) patternType = ParseType();
+                    var span = patternType is null ? pattern.Span : Span.Union(pattern.Span, patternType.Span);
+                    parameters.Add(new LambdaParam("_", patternType, span)
+                        { NameSpan = patternStart, Pattern = pattern });
+                }
+                else
+                {
+                    var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
+                        $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
+                    TypeNode? type = null;
+                    if (_buffer.Match(TokenKind.Colon)) type = ParseType();
+                    var pspan = type is null ? nameTok.Span : Span.Union(nameTok.Span, type.Span);
+                    parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), type, pspan)
+                        { NameSpan = nameTok.Span });
+                }
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
             }
@@ -677,6 +728,94 @@ public sealed partial class Parser
         // Body: an expression or a block, '=> expr' or '=> { ... }'.
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
         return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span));
+    }
+
+    /// <summary><c>x =&gt; body</c>: one parameter without parentheses and without an annotation —
+    /// the type comes from the context, as it does for '(x) => body'.</summary>
+    private LambdaExpr ParseBareLambda()
+    {
+        var nameTok = _buffer.Advance();
+        _buffer.Advance(); // '=>', checked by the caller
+        var parameter = new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null, nameTok.Span)
+            { NameSpan = nameTok.Span };
+        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        return new LambdaExpr([parameter], null, body, Span.Union(nameTok.Span, body.Span))
+            { Form = LambdaForm.Bare };
+    }
+
+    /// <summary>Is the '{' at the cursor a trailing lambda after <paramref name="operand"/>?
+    ///
+    /// <para>Only after a name, a member or a call — the three things a call can be made of. A
+    /// STRUCT INITIALIZER never reaches this point: <see cref="IsStructInitAhead"/> decides at
+    /// the primary, before the postfix loop runs, and it takes everything shaped like
+    /// <c>Name { }</c> or <c>Name { field = … }</c>. What arrives here is what it left.</para>
+    ///
+    /// <para>The cost is one error message: a call statement whose ';' is missing, followed by a
+    /// block, used to be "expected ';'" and now reads as a trailing lambda. Kotlin and Swift pay
+    /// the same, and they have no ';' to miss.</para></summary>
+    private bool IsTrailingLambdaAhead(Expr operand) =>
+        operand switch
+        {
+            // At the START OF A STATEMENT a bare name followed by '{' is what §6.8 keeps out:
+            // 'Point { x = 1 };' must stay the error it is rather than turning into a call with
+            // a trailing lambda. Everywhere else — and after a member or a call anywhere — the
+            // brace is the lambda.
+            IdentifierExpr => _allowStructInit,
+            MemberExpr or CallExpr => true,
+            _ => false,
+        };
+
+    /// <summary>
+    /// <c>{ it * 2 }</c> or <c>{ println(it); }</c>: a trailing lambda's body. Without a ';' at
+    /// the block's own level the braces hold ONE expression and the lambda yields it; with one
+    /// they hold statements, exactly as '=> { … }' does. (A value block with statements before
+    /// its tail is the ValueBlock proposal's ground and folds in when that lands.)
+    /// </summary>
+    private LambdaExpr ParseTrailingLambda()
+    {
+        var open = _buffer.Current; // '{'
+        // 'it' is implicit: the source does not write it, so its name span is empty.
+        var it = new LambdaParam("it", null, open.Span)
+            { NameSpan = new Span(open.Span.File, open.Span.Start, open.Span.Start), Implicit = true };
+
+        Node body;
+        if (HoldsStatements())
+        {
+            body = ParseBlock();
+        }
+        else
+        {
+            _buffer.Advance(); // '{'
+            var expr = ParseSubExpr();
+            var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close the lambda body");
+            body = expr;
+            return new LambdaExpr([it], null, body, Span.Union(open.Span, close.Span)) { Form = LambdaForm.Trailing };
+        }
+        return new LambdaExpr([it], null, body, Span.Union(open.Span, body.Span)) { Form = LambdaForm.Trailing };
+    }
+
+    // Does the block at the cursor contain a ';' at its own level, or begin with a statement
+    // keyword? Then it is a statement block rather than a single expression.
+    private bool HoldsStatements()
+    {
+        if (_buffer.Peek(1).TokenKind is TokenKind.Let or TokenKind.Var or TokenKind.Return
+            or TokenKind.Throw or TokenKind.Defer or TokenKind.Try or TokenKind.While or TokenKind.For
+            or TokenKind.Do or TokenKind.Break or TokenKind.Continue or TokenKind.Yield or TokenKind.LBrace)
+            return true;
+        var depth = 0;
+        for (var i = 0; ; i++)
+        {
+            switch (_buffer.Peek(i).TokenKind)
+            {
+                case TokenKind.LParen or TokenKind.LBracket or TokenKind.LBrace: depth++; break;
+                case TokenKind.RParen or TokenKind.RBracket or TokenKind.RBrace:
+                    depth--;
+                    if (depth == 0) return false;
+                    break;
+                case TokenKind.Semicolon when depth == 1: return true;
+                case TokenKind.Eof: return true;
+            }
+        }
     }
 
     /// <summary>

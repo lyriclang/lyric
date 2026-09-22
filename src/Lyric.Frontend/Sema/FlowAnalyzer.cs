@@ -131,6 +131,7 @@ internal sealed class FlowAnalyzer
                 AnalyzeExpr(fo.Iterable, assigned);
                 var loopSet = Clone(assigned);
                 if (_types.RefOf(fo) is { } lv) loopSet.Add(lv);
+                if (fo.Pattern is not null) AddPatternBindings(fo.Pattern, loopSet);
                 AnalyzeStatements(fo.Body.Statements, loopSet);
                 return assigned;
             case TryStmt tr:
@@ -244,7 +245,10 @@ internal sealed class FlowAnalyzer
                 // with a snapshot of the current set plus the lambda's own parameters.
                 var lamSet = Clone(assigned);
                 foreach (var p in lam.Parameters)
+                {
                     if (_types.RefOf(p) is { } ps) lamSet.Add(ps);
+                    if (p.Pattern is not null) AddPatternBindings(p.Pattern, lamSet);
+                }
                 if (lam.Body is Block lb) AnalyzeStatements(lb.Statements, lamSet);
                 else if (lam.Body is Expr le) AnalyzeExpr(le, lamSet);
                 return;

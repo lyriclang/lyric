@@ -224,8 +224,10 @@ public sealed partial class Parser
         if (_buffer.Match(TokenKind.If))
         {
             _guardHead = true;
+            _inGuard = true;
             guard = ParseExpr(0);
             _guardHead = false;
+            _inGuard = false;
         }
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);

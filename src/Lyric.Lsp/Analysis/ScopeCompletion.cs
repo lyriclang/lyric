@@ -84,7 +84,11 @@ public static class ScopeCompletion
 
             case LambdaExpr lambda:
                 foreach (var parameter in lambda.Parameters)
-                    if (model.Types.RefOf(parameter) is { } symbol) yield return symbol;
+                {
+                    if (parameter.Pattern is { } parameterPattern)
+                        foreach (var bound in PatternNames(model, parameterPattern)) yield return bound;
+                    else if (model.Types.RefOf(parameter) is { } symbol) yield return symbol;
+                }
                 break;
 
             // A loop or catch variable belongs to the body, not to the head: in
@@ -98,7 +102,9 @@ public static class ScopeCompletion
                 break;
 
             case ForInStmt loop when Covers(loop.Body, offset):
-                if (model.Types.RefOf(loop) is { } loopVar) yield return loopVar;
+                if (loop.Pattern is { } loopPattern)
+                    foreach (var bound in PatternNames(model, loopPattern)) yield return bound;
+                else if (model.Types.RefOf(loop) is { } loopVar) yield return loopVar;
                 break;
 
             case CatchClause catchClause when Covers(catchClause.Body, offset):

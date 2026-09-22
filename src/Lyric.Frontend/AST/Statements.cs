@@ -47,6 +47,11 @@ public sealed record ForInStmt(string Variable, Expr Iterable, Block Body, Span 
 {
     public required Span NameSpan { get; init; }
 
+    /// <summary><c>for ((k, v) in …)</c>: an irrefutable pattern over the element instead of a
+    /// name. <see cref="Variable"/> is then <c>_</c> — the element still gets a slot, and the
+    /// pattern takes it apart at the top of every iteration.</summary>
+    public Pattern? Pattern { get; init; }
+
     string INamedDecl.Name => Variable;
 }
 
