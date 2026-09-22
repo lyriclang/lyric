@@ -1,0 +1,9 @@
+// 10 — der BUG heute: die zweite `let n` im selben Block wird still verworfen.
+import std.io.console { println };
+
+fn main(): int {
+    let n = 1;
+    let n = n + 10;          // keine Diagnose …
+    println(f"{n}");         // … und es druckt 1, nicht 11
+    return n;
+}

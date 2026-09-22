@@ -1,0 +1,18 @@
+// PROPOSAL: kompiliert nicht mit dem Soll (die drei markierten Zeilen wären Fehler)
+// 17 Member-Sichtbarkeit — SOLL-STAND, Anwendung
+import std.io.console { println };
+import bank { open, Account };
+
+fn main(): int {
+    let a = open("ada");
+    a.deposit(50);
+    println(f"read {a.read()} owner {a.owner}");        // pub-Member: ok
+
+    // a.balance = -999;        // error: member 'balance' of 'Account' is not public (declared in 'bank')
+    // a.log();                 // error: member 'log' of 'Account' is not public
+    // let forged = Account { owner = "eve", balance = 1000000, audit = 0 };
+    //                          // error: field 'balance' of 'Account' is not public — use 'bank.open'
+    return 0;
+}
+// Erwartete Ausgabe (exit 0):
+// read 50 owner ada

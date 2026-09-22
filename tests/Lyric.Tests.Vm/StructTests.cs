@@ -342,4 +342,60 @@ public class StructTests
             struct V { n: int = 7, }
             fn main(): int { let v = V { }; return v.n; }
             """));
+
+    // --- the binding points a struct used to slip through uncopied ---
+
+    /// <summary>
+    /// A <c>match</c> arm binding the whole subject. The field bindings inside a variant pattern
+    /// were copied; the top-level name was stored as it stood, so the arm's name aliased the
+    /// subject and a mutation of the original through ITS name was visible through the binding.
+    /// The ordinary <c>let</c> of the same value answered correctly next to it.
+    /// </summary>
+    [Fact]
+    public void A_match_arm_binding_the_subject_copies_it() =>
+        Assert.Equal(1, Run("""
+            struct P { v: int }
+            fn main(): int {
+                var p = P { v = 1 };
+                match (p) { q => { p.v = 99; return q.v; } }
+            }
+            """));
+
+    // The narrowed binding of a '?Struct' subject takes the same copy, and there is no test for it
+    // here: wrapping a struct into '?T' already copies, so nothing observable is shared to begin
+    // with, and the one way to share it — mutating through the optional — is the open question of
+    // whether a '?Struct' is a value at all. A test written for it is green either way, which is
+    // worse than no test.
+
+    /// <summary>
+    /// A tuple variant's payload. Object initializers adapt every field to its declared type;
+    /// variant construction lowered its arguments raw, so a struct payload shared the slot array
+    /// with the value it was built from.
+    /// </summary>
+    [Fact]
+    public void A_tuple_variant_copies_a_struct_payload() =>
+        Assert.Equal(1, Run("""
+            struct P { v: int }
+            enum Sh { Box(P), Empty }
+            fn main(): int {
+                var p = P { v = 1 };
+                let s = Sh.Box(p);
+                p.v = 99;
+                match (s) { Sh.Box(q) => { return q.v; }, Sh.Empty => { return 0; } }
+            }
+            """));
+
+    /// <summary>And a struct variant's, which took the same raw path.</summary>
+    [Fact]
+    public void A_struct_variant_copies_a_struct_payload() =>
+        Assert.Equal(1, Run("""
+            struct P { v: int }
+            enum Sh { Cell { p: P }, Empty }
+            fn main(): int {
+                var p = P { v = 1 };
+                let s = Sh.Cell { p = p };
+                p.v = 99;
+                match (s) { Sh.Cell { p } => { return p.v; }, Sh.Empty => { return 0; } }
+            }
+            """));
 }

@@ -1,0 +1,61 @@
+// Gegenprobe für pattern-lambda: Result<?T, E> mit std.result aus meinem Branch,
+// übersetzt mit ihrem Compiler (worktree-agent-a1c2eb789de86ba9d).
+//
+// Ergebnis: Konstruktion, Matchen und if-let/let-else über einen OPTIONALEN Payload
+// funktionieren. Was nicht geht, liegt an der Signatur der Bibliotheksfunktion, nicht am
+// Compiler: jede Stelle, an der `?T` mit `T = ?U` in einer Signatur steht, ist `??U`.
+//   * `ok(): ?T`            → `??int`   (Methode auf Result<?int, E> nicht instanziierbar)
+//   * `fromOptional(o: ?T)` → `??int`   (für optionale T gar nicht instanziierbar)
+module probe;
+import std.io.console { println };
+import std.result { Result, map };
+
+fn lookup(present: bool): ?int {
+    return if (present) 7 else null;
+}
+
+fn main(): int {
+    // 1. Konstruktion mit optionalem Payload — der IrVerifier-Fall aus Prototyp 21.
+    let a = Result<?int, string>.Ok(lookup(true));
+    let b = Result<?int, string>.Ok(lookup(false));
+    let c = Result<?int, string>.Err("missing");
+
+    // 2. match: null-Fall und Wert-Fall getrennt — der Coverage-Fall (TypeChecker:4288).
+    println(match (a) {
+        Ok(null) => "ok, but empty",
+        Ok(v) => "ok " + (v ?? 0).show(),
+        Err(e) => "err " + e,
+    });
+    println(match (b) {
+        Ok(null) => "ok, but empty",
+        Ok(v) => "ok " + (v ?? 0).show(),
+        Err(e) => "err " + e,
+    });
+    println(match (c) {
+        Ok(null) => "ok, but empty",
+        Ok(v) => "ok " + (v ?? 0).show(),
+        Err(e) => "err " + e,
+    });
+
+    // 3. Methoden auf Result<?int, E>, die T nicht in ein Optional stecken.
+    println(a.isOk());
+    println(a.isErr());
+    println(a.unwrapOr(0) ?? -1);
+    println(c.unwrapOr(42) ?? -1);
+    println(c.err() ?? "none");
+
+    // 4. map über einen optionalen Payload.
+    let doubled = map<?int, string, int>(a, (v: ?int) => (v ?? 0) * 2);
+    println(doubled.unwrapOr(-1));
+
+    // 5. if-let und let-else über Result (pattern-lambdas neue Formen).
+    if (let Ok(v) = a) {
+        println("if-let saw " + (v ?? -1).show());
+    }
+    let Ok(w) = c else {
+        println("let-else took the Err branch");
+        return 0;
+    };
+    println(w ?? -1);
+    return 0;
+}

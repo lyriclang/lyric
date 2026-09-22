@@ -1,0 +1,40 @@
+module demo;
+import std.io.console { println };
+import std.collections { List, Map, Set, groupBy, sortArray, arrayOf };
+import std.string as strings;
+
+fn main(): int {
+    let xs = List<int>.of([3, 1, 2]);
+    xs.pushAll([9, 8]);
+    println(xs.slice(1, 3).length());
+    println(xs.filter((n: int) => n > 2).length());
+
+    let groups = groupBy<string, int>(List<string>.of(["a", "bb", "cc", "d"]), (w: string) => w.length());
+    println(groups.get(2)!.length());
+
+    let counts = Map<string, int>.empty();
+    for (w in ["x", "y", "x"]) {
+        counts.update(w, (n: ?int) => (n ?? 0) + 1);
+    }
+    for (entry in counts.entries()) {
+        let (k, v) = entry;
+        println(k + "=" + v.show());
+    }
+
+    let churn = Map<int, int>.empty();
+    var i = 0;
+    while (i < 10000) {
+        churn.set(i, i);
+        churn.remove(i);
+        i = i + 1;
+    }
+    println(churn.capacity());
+
+    let arr = Set<int>.of([5, 3, 5, 1]).toArray();
+    sortArray<int>(arr);
+    println(arr.length);
+    println(arr[0]);
+    let squares = arrayOf<int>(4, (n: int) => n * n);
+    println(squares[3]);
+    return 0;
+}

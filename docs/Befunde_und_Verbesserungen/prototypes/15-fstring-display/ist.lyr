@@ -1,0 +1,37 @@
+// 15 f-Strings rendern keine Display-Typen — IST-STAND (Lyric 4.4.1)
+// Aufgabe: Werte eigener Typen in Meldungen einbetten. Heute: ein Loch hält nur Skalare (§6.6);
+// ein Display-konformer Typ braucht `.show()` in JEDEM Loch — obwohl `println(p)` ihn direkt
+// nimmt. Dasselbe Programm mit `Instant`/`Duration` aus std.time (beide Display) sähe genauso aus.
+import std.io.console { println };
+import std.core { Display };
+
+struct Point :: [Display] {
+    x: int,
+    y: int,
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+enum Status :: [Display] {
+    Ok,
+    Failed(string);
+    fn show(): string {
+        return match (this) { Ok => "ok", Failed(why) => "failed: " + why };
+    }
+}
+
+fn report(p: Point, s: Status, tries: int): string {
+    // vier Löcher, zwei davon mit .show() — und f"{p}" wäre LYR-SEM0006
+    return f"point {p.show()} status {s.show()} after {tries} tries";
+}
+
+fn main(): int {
+    let p = Point { x = 3, y = 4 };
+    println(p);                                    // Display über die Constraint: geht
+    println(report(p, Status.Ok, 1));
+    println(report(Point { x = 0, y = 0 }, Status.Failed("timeout"), 3));
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// (3, 4)
+// point (3, 4) status ok after 1 tries
+// point (0, 0) status failed: timeout after 3 tries

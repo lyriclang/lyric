@@ -948,7 +948,23 @@ public sealed class TypeChecker
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
         foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
-        _narrowed = savedNarrowed; // narrowings established inside the block by an early exit end here
+        EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
+    }
+
+    /// <summary>
+    /// Leaves a region: the narrowings it ESTABLISHED end with it, the ones it ENDED stay ended.
+    ///
+    /// <para>The distinction is the whole point. An assignment ends a narrowing "from that point
+    /// on" (§7.4), and restoring the state before the region wholesale undid exactly that: after
+    /// <c>if (o != null) { if (c) { o = null; } … }</c> the sema believed <c>o</c> was still an
+    /// <c>int</c>, typed <c>o + 1</c>, and the program panicked with <c>LYR-VM0007</c> — a sound
+    /// analysis reporting nothing about a program that cannot run.</para>
+    /// </summary>
+    private void EndScope(Dictionary<Symbol, LyrType> before)
+    {
+        foreach (var symbol in before.Keys.ToList())
+            if (!_narrowed.ContainsKey(symbol)) before.Remove(symbol);
+        _narrowed = before;
     }
 
     private void CheckStmt(Stmt stmt, SymbolTable scope)
@@ -1237,23 +1253,39 @@ public sealed class TypeChecker
         CheckCondition(f.Condition, scope);
         var (thenFacts, elseFacts) = NarrowingFacts(f.Condition);
 
-        var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+        var before = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+
         Apply(thenFacts);
         CheckBlock(f.Then, scope);
-        _narrowed = snapshot;
+        var afterThen = _narrowed;
 
+        // The else branch starts from the state BEFORE the if, not from what the then branch left:
+        // the two are exclusive, and inheriting the then branch's endings would report an error in
+        // the else branch about a narrowing only the OTHER branch destroyed.
+        var afterElse = before;
         if (f.Else is not null)
         {
-            snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+            _narrowed = new Dictionary<Symbol, LyrType>(before, ReferenceEqualityComparer.Instance);
             Apply(elseFacts);
             CheckStmt(f.Else, scope);
-            _narrowed = snapshot;
+            afterElse = _narrowed;
         }
 
         // 'AlwaysExits' rather than 'AlwaysReturns': for narrowing what counts is whether the code
         // after the 'if' is reached at all, and 'continue' leaves the block just as 'return' does.
-        if (Flow.AlwaysExits(f.Then, _result)) Apply(elseFacts);
-        else if (f.Else is not null && Flow.AlwaysExits(f.Else, _result)) Apply(thenFacts);
+        var thenExits = Flow.AlwaysExits(f.Then, _result);
+        var elseExits = f.Else is not null && Flow.AlwaysExits(f.Else, _result);
+
+        // A narrowing survives the if when every branch that can REACH the code after it still
+        // holds the narrowing there. A branch that always exits never reaches it and has no say.
+        _narrowed = new Dictionary<Symbol, LyrType>(ReferenceEqualityComparer.Instance);
+        foreach (var (symbol, type) in before)
+            if ((thenExits || afterThen.ContainsKey(symbol))
+                && (elseExits || afterElse.ContainsKey(symbol)))
+                _narrowed[symbol] = type;
+
+        if (thenExits) Apply(elseFacts);
+        else if (elseExits) Apply(thenFacts);
     }
 
     /// <summary>
@@ -1275,7 +1307,7 @@ public sealed class TypeChecker
 
         Apply(thenFacts);
         CheckBlock(w.Body, scope);
-        _narrowed = snapshot;
+        EndScope(snapshot);
     }
 
     private void Apply(Dictionary<Symbol, LyrType> facts)
@@ -1889,7 +1921,7 @@ public sealed class TypeChecker
             var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
             Apply(b.Operator == BinaryOp.LogicalAnd ? thenFacts : elseFacts);
             r = CheckExpr(b.Right, scope);
-            _narrowed = snapshot;
+            EndScope(snapshot);
         }
         else
         {
@@ -4129,8 +4161,13 @@ public sealed class TypeChecker
         // because one of the two sides is the finished target type.
         if (WidenAgainstNull(a, b) is { } widened) return widened;
 
-        if (IsAssignable(be, b, a)) return a;
-        if (IsAssignable(ae, a, b)) return b;
+        // WITHOUT the literal rule. An arm is not an adaptation context (§3.1), so a literal here
+        // does not take the other arm's type — and letting `IsAssignable` say yes on that ground
+        // alone would only CHECK the fit while nothing records it: the literal keeps its default
+        // type, and the lowering stores a `const i64` into the slot of the type this returns.
+        // `UnifyArms` asks the same question for `match` and never had the hole.
+        if (IsAssignable(be, b, a, adaptLiterals: false)) return a;
+        if (IsAssignable(ae, a, b, adaptLiterals: false)) return b;
         _de.Report("LYR-SEM0016", Severity.Error, span, $"incompatible branch types: '{TypeFacts.Display(a)}' vs '{TypeFacts.Display(b)}'");
         return a;
     }
@@ -5062,13 +5099,18 @@ public sealed class TypeChecker
         return false;
     }
 
-    private bool IsAssignable(Expr expr, LyrType from, LyrType to)
+    /// <param name="adaptLiterals">Whether an unsuffixed literal counts as fitting the target
+    /// (§3.1). True at every adaptation context, where the caller records the adaptation
+    /// afterwards. False where the answer only decides a type and nothing writes it back — an arm
+    /// unification — because a yes on that ground alone leaves the literal at its default type
+    /// while the result claims the target's.</param>
+    private bool IsAssignable(Expr expr, LyrType from, LyrType to, bool adaptLiterals = true)
     {
         if (from.IsError || to.IsError) return true;      // poison: no follow-up errors
         if (from is NeverType) return true;               // the bottom type: panic(...) fits anywhere
         if (LyrType.Equal(from, to)) return true;
         if (to is Optional inner)                          // T to ?T, widening
-            return from is NullType || IsAssignable(expr, from, inner.Inner);
+            return from is NullType || IsAssignable(expr, from, inner.Inner, adaptLiterals);
         if (from is NullType) return false;
 
         // A coroutine that cannot throw fits where one that may is expected: the target promises
@@ -5078,7 +5120,7 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield);
 
-        if (to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
+        if (adaptLiterals && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         return false;
     }

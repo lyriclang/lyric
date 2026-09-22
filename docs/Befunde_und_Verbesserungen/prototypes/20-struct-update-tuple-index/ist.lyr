@@ -1,0 +1,57 @@
+// 20 Struct-Update-Syntax und Tupel-Index — IST-STAND (Lyric 4.4.1)
+// Aufgabe: (a) aus einer 6-Feld-Konfiguration eine Kopie mit EINEM geänderten Feld bauen;
+// (b) aus einem Tupel nur das zweite Element lesen. Heute: (a) alle Felder abschreiben
+// (oder `var` + Zuweisung — für Structs ok, für Classes eine geteilte Referenz!);
+// (b) vollständiges Destructuring mit `_` für die uninteressanten Elemente.
+import std.io.console { println };
+
+struct Config {
+    host: string,
+    port: int,
+    secure: bool,
+    retries: int,
+    timeoutMs: int,
+    label: string,
+}
+
+fn withPort(base: Config, port: int): Config {
+    // (a) sechs Felder abschreiben, um eines zu ändern — ein neues Feld in Config
+    // muss hier nachgezogen werden (sonst Compilerfehler, immerhin).
+    return Config {
+        host = base.host,
+        port = port,
+        secure = base.secure,
+        retries = base.retries,
+        timeoutMs = base.timeoutMs,
+        label = base.label,
+    };
+}
+
+fn withPortVar(base: Config, port: int): Config {
+    // Struct-Alternative: Kopie (Wertsemantik) und Zuweisung — kürzer, aber nur für Structs
+    // korrekt; bei einer CLASS wäre `copy` dieselbe Instanz wie `base`.
+    var copy = base;
+    copy.port = port;
+    return copy;
+}
+
+fn main(): int {
+    let base = Config { host = "h", port = 80, secure = false, retries = 3, timeoutMs = 1000, label = "x" };
+    let a = withPort(base, 8080);
+    let b = withPortVar(base, 9090);
+    println(f"{a.port} {b.port} {base.port}");
+
+    // (b) Tupel: nur das zweite Element — zwei `_`, nur um eines zu lesen
+    let triple = (1, "two", 3.0);
+    let (_, second, _) = triple;
+    println(second);
+
+    let pairs = [(1, "a"), (2, "b")];
+    let (_, name) = pairs[1];
+    println(name);
+    return a.port - b.port + 3;
+}
+// Ausgabe (lyric run ist.lyr; exit 17 — 8080-9090+3 = -1007, vom OS auf 8 Bit maskiert):
+// 8080 9090 80
+// two
+// b

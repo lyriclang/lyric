@@ -1,0 +1,49 @@
+// Nested variant patterns: an expression simplifier in one match.
+//
+// 'Neg(Neg(x))', 'Add(Lit(0), r)' and 'Mul(_, Lit(0))' reach two levels into the tree; the
+// pattern compiler descends into every payload with the same code, so the depth is not
+// limited. Or-patterns bind too: 'Add(Lit(0), e) | Add(e, Lit(0))' names the surviving side
+// from either alternative and stores it into ONE local.
+import std.io.console { println };
+
+enum Expr {
+    Lit(int),
+    Neg(Expr),
+    Add(Expr, Expr),
+    Mul(Expr, Expr),
+}
+
+fn simplify(e: Expr): Expr {
+    return match (e) {
+        Neg(Neg(x)) => simplify(x),
+        Neg(Lit(0)) => Expr.Lit(0),
+        Add(Lit(0), r) | Add(r, Lit(0)) => simplify(r),
+        Mul(Lit(1), r) | Mul(r, Lit(1)) => simplify(r),
+        Mul(Lit(0), _) | Mul(_, Lit(0)) => Expr.Lit(0),
+        Add(Lit(a), Lit(b)) => Expr.Lit(a + b),
+        Add(l, r) => Expr.Add(simplify(l), simplify(r)),
+        Mul(l, r) => Expr.Mul(simplify(l), simplify(r)),
+        Neg(x) => Expr.Neg(simplify(x)),
+        Lit(n) => Expr.Lit(n),
+    };
+}
+
+fn show(e: Expr): string {
+    return match (e) {
+        Lit(n) => f"{n}",
+        Neg(x) => "-" + show(x),
+        Add(l, r) => "(" + show(l) + " + " + show(r) + ")",
+        Mul(l, r) => "(" + show(l) + " * " + show(r) + ")",
+    };
+}
+
+fn main(): int {
+    let zero = Expr.Lit(0);
+    let one = Expr.Lit(1);
+    let x = Expr.Neg(Expr.Neg(Expr.Lit(7)));
+    println(show(simplify(x))); // 7
+    println(show(simplify(Expr.Add(zero, Expr.Mul(one, Expr.Lit(5)))))); // 5
+    println(show(simplify(Expr.Mul(Expr.Add(Expr.Lit(2), Expr.Lit(3)), zero)))); // 0
+    println(show(simplify(Expr.Add(Expr.Lit(2), Expr.Neg(Expr.Lit(3)))))); // (2 + -3)
+    return 0;
+}

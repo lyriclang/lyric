@@ -1,0 +1,87 @@
+// 06 Keine Polymorphie über Werfbarkeit — IST-STAND (Lyric 4.4.1)
+// Aufgabe: eine Pipeline-Stufe `evens`, die eine werfende UND eine nicht-werfende Quelle
+// verarbeitet, und ein `mapInts`, dem man eine werfende Operation geben kann.
+// Heute: die Werfbarkeit ist Teil des Coroutine-Typs (§10), Zuweisung nur non-throwing →
+// throwing. Eine Stufe muss sich für EINE Signatur entscheiden — die werfende — und dann
+// werden auch nicht-werfende Quellen werfend, mit einem catch, der nie feuert.
+// (Nicht generisch über T: generische Coroutine-Funktionen werden heute nicht als
+//  Coroutine gelowert — Bug, siehe language-review-Eintrag.)
+import std.io.console { println };
+import std.core { Exception };
+import std.string { parseInt };
+
+// Eine Quelle, die nichts wirft …
+fn numbers(): Coroutine<int> {
+    yield 1; yield 2; yield 3; yield 4;
+}
+
+// … und eine, die wirft.
+fn parsed(lines: string[]): Coroutine<int> throws Exception {
+    for (l in lines) {
+        let n = parseInt(l);
+        if (n == null) { throw Exception { text = "not a number: " + l }; }
+        yield n;
+    }
+}
+
+// Die Stufe muss die werfende Signatur wählen, sonst passt `parsed(...)` nicht hinein
+// ("cannot assign 'Coroutine<int> throws Exception' to 'Coroutine<int>'").
+fn evens(input: Coroutine<int> throws Exception): Coroutine<int> throws Exception {
+    while (true) {
+        let v = input.next();          // Pull einer werfenden Coroutine: Throw-Site
+        if (v == null) { return; }
+        if (v % 2 == 0) { yield v; }
+    }
+}
+
+fn sumAll(co: Coroutine<int> throws Exception): int throws Exception {
+    var sum = 0;
+    while (true) {
+        let v = co.next();
+        if (v == null) { return sum; }
+        sum += v;
+    }
+}
+
+// mapInts mit werfender Operation: ein Lambda hat keine throws-Klausel — es MUSS intern
+// fangen und ein Sentinel/Optional liefern. Der Grund geht verloren.
+fn mapInts(xs: int[], f: fn(int) -> ?int): (?int)[] {
+    let hole: ?int = null;                 // `[null] * n` bekommt keinen Kontext (siehe README)
+    var out: (?int)[] = [hole] * xs.length;
+    for (i in 0..xs.length) { out[i] = f(xs[i]); }
+    return out;
+}
+fn checkedDouble(n: int): int throws Exception {
+    if (n > 100) { throw Exception { text = "too big" }; }
+    return n * 2;
+}
+
+fn main(): int {
+    // Nicht-werfende Quelle durch die werfende Stufe: catch ist Pflicht und toter Code.
+    var a = 0;
+    try {
+        a = sumAll(evens(numbers()));
+    } catch (e: Exception) {
+        println("cannot happen: " + e.message());
+    }
+    println(f"evens of numbers: {a}");
+
+    var b = 0;
+    try {
+        b = sumAll(evens(parsed(["10", "x", "12"])));
+    } catch (e: Exception) {
+        println("parsed failed: " + e.message());
+    }
+    println(f"evens of parsed: {b}");
+
+    let doubled = mapInts([1, 200, 3], (n: int): ?int => {
+        try { return checkedDouble(n); } catch (_) { return null; }
+    });
+    println(f"{doubled[0] ?? -1} {doubled[1] ?? -1} {doubled[2] ?? -1}");
+    return a;
+}
+// Ausgabe (lyric run ist.lyr; exit 6):
+// evens of numbers: 6
+// parsed failed: not a number: x
+// evens of parsed: 0
+// 2 -1 6

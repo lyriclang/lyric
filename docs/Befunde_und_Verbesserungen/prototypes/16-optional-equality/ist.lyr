@@ -1,0 +1,49 @@
+// 16 Optional-Gleichheit `?T == ?T`; Narrowing von Feldpfaden — IST-STAND (Lyric 4.4.1)
+// Aufgabe: zwei Konfigurationen vergleichen, deren Felder optional sind (Kotlin/Swift: `==`
+// auf Optionals ist definiert, null == null). Heute: `p == q` auf zwei `?int` ist LYR-SEM0059;
+// der Umweg ist eine Hilfsfunktion pro Elementtyp (Generics helfen nicht: `?T == ?T` ist in
+// generischem Code genauso verboten). Und ein Feld `c.port` narrowt nicht (§7.4) — Kopie nötig.
+import std.io.console { println };
+
+struct Config {
+    host: string,
+    port: ?int,
+    label: ?string,
+}
+
+// Hilfsfunktion je Typ — generisch NICHT schreibbar (`a == b` auf ?T ist SEM0059)
+fn sameInt(a: ?int, b: ?int): bool {
+    if (a == null) { return b == null; }
+    if (b == null) { return false; }
+    return a == b;                                   // beide narrowed
+}
+fn sameString(a: ?string, b: ?string): bool {
+    if (a == null) { return b == null; }
+    if (b == null) { return false; }
+    return a == b;
+}
+
+fn sameConfig(x: Config, y: Config): bool {
+    return x.host == y.host && sameInt(x.port, y.port) && sameString(x.label, y.label);
+}
+
+fn describe(c: Config): string {
+    // Feld-Narrowing: `if (c.port != null) { c.port + 1 }` geht nicht — Kopie in ein Lokal.
+    let port = c.port;
+    let p = if (port != null) port + 1 else 0;
+    return f"{c.host}:{p}";
+}
+
+fn main(): int {
+    let a = Config { host = "h", port = 80, label = null };
+    let b = Config { host = "h", port = 80, label = null };
+    let c = Config { host = "h", port = null, label = "x" };
+    println(if (sameConfig(a, b)) "a == b" else "a != b");
+    println(if (sameConfig(a, c)) "a == c" else "a != c");
+    println(describe(a) + " " + describe(c));
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// a == b
+// a != c
+// h:81 h:0

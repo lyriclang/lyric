@@ -1,0 +1,47 @@
+// 12 Benannte Argumente — IST-STAND (Lyric 4.4.1)
+// Aufgabe: `connect` mit fünf Parametern, vier davon mit Default; ein Aufrufer will NUR
+// timeoutMs setzen. Heute: (A) alle Defaults davor wiederholen — positional, Reihenfolge und
+// Werte müssen aus der Signatur abgeschrieben werden; (B) das Options-Struct-Idiom, das
+// dank Felddefaults (§3.2) und Initializer-Syntax gut funktioniert (+3 Zeilen Deklaration,
+// aber benannt, beliebige Reihenfolge, weglassbar). (C) Zeigt zudem, warum `f(x = 3)`
+// als Soll-Syntax NICHT geht: es ist heute eine gültige Zuweisung als Ausdruck.
+import std.io.console { println };
+
+fn connect(host: string, port: int = 80, secure: bool = false, retries: int = 3, timeoutMs: int = 1000): string {
+    return f"{host}:{port} secure={secure} retries={retries} timeout={timeoutMs}";
+}
+
+// (B) Options-Struct: die Defaults leben im Struct, der Aufruf nennt nur, was abweicht.
+struct ConnectOptions {
+    port: int = 80,
+    secure: bool = false,
+    retries: int = 3,
+    timeoutMs: int = 1000,
+}
+fn connect2(host: string, o: ConnectOptions): string {
+    return f"{host}:{o.port} secure={o.secure} retries={o.retries} timeout={o.timeoutMs}";
+}
+
+fn main(): int {
+    // (A) positional: vier Defaults abschreiben, um den fünften zu setzen
+    println(connect("a", 80, false, 3, 500));
+    // Vertauschte Bool/Int-Positionen fallen auf — vertauschte gleichtypige nicht:
+    println(connect("a", 3, false, 80));            // port=3, retries=80: kompiliert, falsch
+
+    // (B) Options-Struct
+    println(connect2("b", ConnectOptions { timeoutMs = 500 }));
+    println(connect2("b", ConnectOptions { retries = 5, secure = true }));
+
+    // (C) `f(x = 3)` ist heute eine Zuweisung als Ausdruck — DESHALB kein `=` für benannte Argumente.
+    var port = 0;
+    println(connect("c", port = 8080));             // weist port zu UND übergibt 8080
+    println(f"port is now {port}");
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// a:80 secure=false retries=3 timeout=500
+// a:3 secure=false retries=80 timeout=1000
+// b:80 secure=false retries=3 timeout=500
+// b:80 secure=true retries=5 timeout=1000
+// c:8080 secure=false retries=3 timeout=1000
+// port is now 8080

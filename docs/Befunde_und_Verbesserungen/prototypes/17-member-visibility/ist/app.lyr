@@ -1,0 +1,22 @@
+// 17 Member-Sichtbarkeit — IST-STAND, Anwendung (Lyric 4.4.1)
+// Alles, was die Bibliothek verbergen wollte, ist von hier aus erreichbar — und kompiliert.
+import std.io.console { println };
+import bank { open, Account };
+
+fn main(): int {
+    let a = open("ada");
+    a.deposit(50);
+    println(f"read {a.read()}");
+
+    a.balance = -999;                       // nicht-pub Feld eines fremden Moduls: kompiliert
+    a.log();                                // nicht-pub Methode: kompiliert
+    println(f"after tampering: {a.read()} audit {a.audit}");
+
+    let forged = Account { owner = "eve", balance = 1000000, audit = 0 };   // Initializer umgeht open()
+    println(f"forged {forged.read()}");
+    return 0;
+}
+// Ausgabe (lyric run ist/app.lyr; exit 0):
+// read 50
+// after tampering: -999 audit 2
+// forged 1000000

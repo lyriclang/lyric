@@ -1,0 +1,65 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 13 `static let` im Enum; statische Interface-Member — SOLL-STAND (Semantik: language-review)
+//
+// (a) Grammatik §3.4:  EnumBody = EnumVariant { ',' EnumVariant } [ ',' ] [ ';' { EnumMember } ] .
+//                      EnumMember = FunctionDecl | StaticBinding .
+//     Heute steht nach dem `;` nur `{ FunctionDecl }`; `static let` ist dort PAR-Fehler (probe).
+//     Semantik wie bei Structs (§3.2 StaticBinding, Guide 5 "Constants on a type"): Initialisierung
+//     in Deklarationsreihenfolge vor main; ein Initializer darf Varianten des eigenen Enums bauen.
+// (b) Grammatik §3.5:  InterfaceMember = FunctionDecl .  — FunctionDecl erlaubt `static` bereits
+//     syntaktisch (Parser.Declarations.cs:652 lehnt es semantisch ab: "an interface member cannot
+//     be 'static'"). Vorschlag: `static fn zero(): T;` als STATISCHE ANFORDERUNG:
+//     - ein konformer Typ muss `static fn zero()` deklarieren (Prüfung wie für Instanzmember);
+//     - in generischem Code mit `T :: [Zero<T>]` ist `T.zero()` erlaubt und wird nach der
+//       Monomorphisierung ein direkter Aufruf (§8.1: constrained calls are direct calls);
+//     - über einen INTERFACE-WERT (`let z: Zero<int> = …; z.zero()`) NICHT erreichbar — ein
+//       vtable-Slot braucht einen Receiver (§3.5-Begründung bleibt für Werte wahr); Fehler mit
+//       Hinweis "static requirements are reached through a type parameter, not a value".
+//     - Default-Body erlaubt (`static fn zero(): T { … }` — selten sinnvoll, aber konsistent).
+//     Rust: assoziierte Funktionen/Konstanten in Traits (`T::zero()`), Swift: `static func`
+//     als Protocol-Requirement, erreichbar über `T.zero()`.
+import std.io.console { println };
+import std.core { Add };
+
+enum Level {
+    Low,
+    Mid,
+    High;
+
+    static let DEFAULT: Level = Level.Mid;             // (a)
+    static let LOW_MAX: int = 10;
+    static let MID_MAX: int = 50;
+
+    static fn fromScore(s: int): Level {
+        return if (s < Level.LOW_MAX) Level.Low else if (s < Level.MID_MAX) Level.Mid else Level.High;
+    }
+    fn name(): string {
+        return match (this) { Low => "Low", Mid => "Mid", High => "High" };
+    }
+}
+
+interface Zero<T> {
+    static fn zero(): T;                               // (b) statische Anforderung
+}
+extend int :: [Zero<int>] { static fn zero(): int { return 0; } }
+
+struct Vec2 :: [Add<Vec2, Vec2>, Zero<Vec2>] {
+    x: int, y: int,
+    fn add(o: Vec2): Vec2 { return Vec2 { x = this.x + o.x, y = this.y + o.y }; }
+    static fn zero(): Vec2 { return Vec2 { x = 0, y = 0 }; }
+}
+
+fn sum<T :: [Add<T, T>, Zero<T>]>(xs: T[]): T {
+    var acc = T.zero();                                // direkter Aufruf nach Monomorphisierung
+    for (x in xs) { acc = acc + x; }
+    return acc;
+}
+
+fn main(): int {
+    println(Level.DEFAULT.name() + " " + Level.fromScore(7).name() + " " + Level.fromScore(99).name());
+    println(f"{sum([1, 2, 3])}");
+    let v = sum([Vec2 { x = 1, y = 2 }, Vec2 { x = 3, y = 4 }]);
+    println(f"({v.x}, {v.y})");
+    return v.x;
+}
+// Erwartete Ausgabe: wie ist.lyr (exit 4)

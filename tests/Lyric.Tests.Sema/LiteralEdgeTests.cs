@@ -123,4 +123,39 @@ public class LiteralEdgeTests
             + "    let _ = x;\n    return 0;\n}\n");
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0016");
     }
+
+    [Fact]
+    public void An_arm_is_no_adaptation_context()
+    {
+        // §3.1 lists the contexts, and the other arm of an if-expression is not among them.
+        // The rule used to be CHECKED without being recorded: the arms unified to the wider
+        // type while the literal kept its default one, so the lowering stored a `const i64`
+        // into an f64 slot and `if (c) 1 else 2.5` printed 5e-324 — the bit pattern of 1 read
+        // as a double. The int8 half of the same hole truncated instead.
+        foreach (var arm in new[] { "2.5", "a" })
+        {
+            var de = Check(
+                "fn main(): int {\n"
+                + "    let c = 1 < 2;\n"
+                + "    let a: int8 = 5;\n"
+                + $"    let q = if (c) 1 else {arm};\n"
+                + "    let _ = a;\n    let _ = q;\n"
+                + "    return 0;\n}\n");
+            Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0016");
+        }
+    }
+
+    [Fact]
+    public void A_context_still_adapts_an_arm()
+    {
+        // The counterpart, and the reason the fix sits in the unification rather than in the
+        // adaptation: with a context the arms check against IT, and the literal adapts there.
+        var de = Check(
+            "fn main(): int {\n"
+            + "    let c = 1 < 2;\n"
+            + "    let q: float = if (c) 1 else 2.5;\n"
+            + "    let _ = q;\n"
+            + "    return 0;\n}\n");
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics.Select(d => d.Message)));
+    }
 }

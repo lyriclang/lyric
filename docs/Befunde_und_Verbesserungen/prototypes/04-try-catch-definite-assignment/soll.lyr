@@ -1,0 +1,85 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 04 try/catch und Definite Assignment — SOLL-STAND, zwei Stufen
+//
+// Stufe (a) — nur eine Analyse-Regel (Spec §7.7, FlowAnalyzer.cs:129-137):
+//   "Wenn JEDER catch-Zweig immer verlässt (return/throw/break/continue/panic), zählt
+//    nach dem try/catch, was der try-Body am Ende zugewiesen hat."
+//   Begründung: die Fortsetzung wird nur über den normalen Abschluss des Bodys erreicht.
+//   Kein Syntaxänderung. Additiv: kein heute gültiges Programm ändert sich.
+//
+// Stufe (b) — `try` als Ausdruck (Spec §6.2 Primary, §6.9):
+//   TryExpr = 'try' [ '?' ] UnaryExpr [ 'catch' '(' CatchBinding ')' ( Block | Expr ) ] .
+//   - `try e catch (x: E) { Block }`  : Typ T; der Block muss den Scope verlassen.
+//   - `try e catch (x: E) Expr`       : Typ = Unifikation von T und Expr (§6.9).
+//   - `try? e`                        : Typ ?T — null, wenn e wirft (Swift `try?`).
+//   - `try e` ohne catch              : nicht erlaubt (nichts wird behandelt) → Fehler.
+//   Der Operand ist die geschützte Region (wie ein try-Block); mehrere catch-Klauseln
+//   wären möglich, sind aber für Runde 1 nicht vorgesehen.
+//   Disambiguierung: `try` gefolgt von `{` ist weiterhin TryStmt (§5); jedes andere Token
+//   nach `try` öffnet TryExpr (§6.2). Heute ist `try` + Nicht-`{` ein Parsefehler (PAR0017).
+//   `try? e` mit `e: ?T` bleibt `?T` — kein `??T` (§3.3); "geworfen" und "null" fallen zusammen,
+//   genau wie bei `next()` auf Coroutine<?T> (§10) — wer das unterscheiden muss, nimmt catch.
+//   Block-Form in Ausdrucksposition: der Block muss auf jedem Pfad verlassen (Regel des
+//   Block-Arms heute, LYR-SEM0033) — ODER, falls Prototyp 05 (Tail-Expression) angenommen
+//   wird, darf er einen Wert liefern (siehe runB2).
+import std.io.console { println };
+
+class UsageError :: [Throwable] {
+    what: string,
+    fn message(): string { return "usage: " + this.what; }
+}
+
+struct Options { limit: int, verbose: bool, }
+
+fn parseArgs(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { what = "need at least one argument" }; }
+    return Options { limit = args.length, verbose = args[0] == "-v" };
+}
+
+// (a) — die Form aus fails.lyr, unverändert; wird mit der neuen Regel akzeptiert.
+fn runA(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parseArgs(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    println(f"A: limit {opts.limit} verbose {opts.verbose}");   // opts ist assigned
+    return 0;
+}
+
+// (b) — try als Ausdruck: Bindung und Behandlung in einer Zeile, `let` statt `var`.
+fn runB(args: string[]): int {
+    let opts = try parseArgs(args) catch (e: UsageError) { println(e.message()); return 2; };
+    println(f"B: limit {opts.limit} verbose {opts.verbose}");
+    return 0;
+}
+
+// (b, mit Prototyp 05) — der catch-Block liefert per Tail-Expression einen Ersatzwert.
+fn runB2(args: string[]): int {
+    let opts = try parseArgs(args) catch (e: UsageError) {
+        println(e.message());
+        Options { limit = 1, verbose = false }       // Tail-Expression = Wert des Blocks
+    };
+    return opts.limit;
+}
+
+// (b') — try? für den Fall "Grund egal": Optional statt Ausnahme.
+fn limitOrDefault(args: string[]): int {
+    let opts = try? parseArgs(args);
+    return opts?.limit ?? 1;
+}
+
+fn main(): int {
+    let ok = runA(["-v", "x"]) + runB(["-v", "x"]);
+    let bad = runA([]) + runB([]);
+    println(f"default {limitOrDefault([])}");
+    return ok + bad;
+}
+// Erwartete Ausgabe (exit 4):
+// A: limit 2 verbose true
+// B: limit 2 verbose true
+// usage: need at least one argument
+// usage: need at least one argument
+// default 1

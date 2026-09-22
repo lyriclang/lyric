@@ -1,0 +1,45 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 22 `Neg<R>` / `Rem<T, R>`; Compound-Zuweisung auf Feldern — SOLL-STAND
+//
+// (a) std.core (stdlib, zwei Interfaces nach dem Muster von Add/Sub/Mul/Div, §6.1):
+//       pub interface Neg<R> { fn neg(): R; }          // prefix `-v` ist `v.neg()`
+//       pub interface Rem<T, R> { fn rem(other: T): R; } // `v % w` ist `v.rem(w)`, wie Add
+//     Sprache: §6.1 erhält zwei Sätze — `-a` auf einem nicht-primitiven Typ ist `a.neg()` über
+//     `Neg<R>`; `%` verliert "numeric-only" und folgt der Add-Regel (rechter Operand wählt die
+//     Konformanz). Keine Grammatikänderung (`-` prefix und `%` existieren). Builtins bekommen
+//     `extend int :: [Neg<int>, Rem<int, int>]` usw. (wie Add heute), damit generischer Code
+//     `T :: [Neg<T>]` int und V gleich behandelt.
+// (b) Compound auf Feld/Element (§6.5): `p.v += w` und `xs[i] += w` werden erlaubt; die Spec
+//     verspricht "Objekt bzw. Index werden GENAU EINMAL ausgewertet" (Rust/C#-Regel) — das
+//     Lowering legt Receiver/Index in Temps (der Mechanismus existiert für `?.`-Ketten:
+//     FunctionLowerer `_chainReceivers`). Das heutige Argument "sichtbar zweimal auswerten"
+//     (§6.5) entfällt, wenn die Spec einmal verspricht. `&&=`/`||=` bleiben davon unberührt.
+import std.io.console { println };
+import std.core { Add, Neg, Rem };
+
+struct V :: [Add<V, V>, Neg<V>, Rem<V, V>] {
+    x: int,
+    y: int,
+    fn add(o: V): V { return V { x = this.x + o.x, y = this.y + o.y }; }
+    fn neg(): V { return V { x = -this.x, y = -this.y }; }
+    fn rem(o: V): V { return V { x = this.x % o.x, y = this.y % o.y }; }
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+class Body { pos: V, vel: V, }
+
+fn step(b: Body): void {
+    b.pos += b.vel;                       // (b) Feldziel, Receiver einmal ausgewertet
+}
+
+fn main(): int {
+    let v = V { x = 3, y = -4 };
+    println((-v).show());                 // (a) Neg
+    println((v % V { x = 2, y = 3 }).show());   // (a) Rem
+    let b = Body { pos = V { x = 0, y = 0 }, vel = V { x = 1, y = 2 } };
+    step(b);
+    step(b);
+    println(b.pos.show());
+    return b.pos.x + b.pos.y;
+}
+// Erwartete Ausgabe: wie ist.lyr (exit 6)

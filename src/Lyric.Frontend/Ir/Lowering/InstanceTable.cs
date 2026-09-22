@@ -48,14 +48,69 @@ internal sealed class InstanceTable
     /// rather than producing two identical functions.</summary>
     private readonly Dictionary<string, FunctionId> _byKey = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The module a generic declaration stands in, so its instances carry the module path the rest
+    /// of the IR carries (<see cref="NameMangling.ForFunction"/>).
+    ///
+    /// <para>The name IS the key here, so an UNQUALIFIED one is not a cosmetic matter: two modules
+    /// declaring <c>fn twice&lt;T&gt;</c> both ask for <c>twice&lt;int&gt;</c>, the second request
+    /// finds the first one's id, and the call lands in the other module's body. The verifier cannot
+    /// see it, because the table deduplicated before any function was built.</para>
+    ///
+    /// <para>Built once from the compilation — the same walk pass 1 makes — and indexed by the AST
+    /// node, which is the one identity a symbol, an instance definition and a declaration all
+    /// agree on.</para>
+    /// </summary>
+    private Dictionary<Node, string>? _declaringModules;
+
+    private string Qualify(Node? declaration, string name)
+    {
+        if (declaration is null) return name;
+        _declaringModules ??= BuildModuleIndex(_compilation);
+        return _declaringModules.TryGetValue(declaration, out var module) ? $"{module}.{name}" : name;
+    }
+
+    /// <summary>Every declaration that can carry generics, with the module it stands in: the
+    /// top-level ones, and the members of a type, because a generic type's method is requested
+    /// through the type's declaration.</summary>
+    private static Dictionary<Node, string> BuildModuleIndex(Compilation? compilation)
+    {
+        var index = new Dictionary<Node, string>(ReferenceEqualityComparer.Instance);
+        if (compilation is null) return index;
+
+        foreach (var module in compilation.Modules)
+            foreach (var decl in compilation.AstOf(module).Declarations)
+            {
+                index[decl] = module.FullName;
+                IEnumerable<Decl>? members = decl switch
+                {
+                    StructDecl s => s.Members,
+                    ClassDecl c => c.Members,
+                    EnumDecl e => e.Methods,
+                    InterfaceDecl i => i.Members,
+                    ExtendDecl x => x.Methods,
+                    _ => null,
+                };
+                if (members is null) continue;
+                foreach (var member in members) index[member] = module.FullName;
+            }
+
+        return index;
+    }
+
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
     /// request a lambda, a lambda an instance — and without this mark everything would arise anew on
     /// every pass.</summary>
     private int _lowered;
 
     private readonly FunctionIds _ids;
+    private readonly Compilation? _compilation;
 
-    public InstanceTable(FunctionIds ids) => _ids = ids;
+    public InstanceTable(FunctionIds ids, Compilation? compilation = null)
+    {
+        _ids = ids;
+        _compilation = compilation;
+    }
 
     public bool IsEmpty => _pending.Count == 0;
 
@@ -79,12 +134,15 @@ internal sealed class InstanceTable
                 $"call to '{baseName}' supplies {typeArguments.Count} type argument(s), "
                 + $"but it declares {symbol.Generics.Length}", span);
 
-        // The name IS the key: it contains the type arguments, is therefore unique, and a human can read
-        // off a disassembly which instance is in front of them.
+        // The name IS the key: it carries the module path, the type arguments and, for a method, the
+        // owning instance, is therefore unique, and a human can read off a disassembly which instance
+        // is in front of them.
         var name = owner is { } owning
-            ? $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(TypeFacts.Display))}>"
+            ? Qualify(owning.Definition.Declaration,
+                  $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(TypeFacts.Display))}>")
               + $".{symbol.Name}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>"
-            : $"{baseName}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
+            : Qualify(decl, baseName)
+              + $"<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
         if (_byKey.TryGetValue(name, out var existing)) return existing;
 
         // A type parameter still open means the inference did not get through at the call site, and then
@@ -139,8 +197,8 @@ internal sealed class InstanceTable
     public FunctionId RequestMethod(FunctionSymbol method, FunctionDecl decl,
         GenericInstance owner, Core.Span span)
     {
-        var ownerName =
-            $"{owner.Definition.Name}<{string.Join(", ", owner.Arguments.Select(TypeFacts.Display))}>";
+        var ownerName = Qualify(owner.Definition.Declaration,
+            $"{owner.Definition.Name}<{string.Join(", ", owner.Arguments.Select(TypeFacts.Display))}>");
         var name = $"{ownerName}.{method.Name}";
         if (_byKey.TryGetValue(name, out var existing)) return existing;
 

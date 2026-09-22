@@ -1,0 +1,42 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 18 Array-Konstruktion mit Generator — SOLL-STAND, zwei Formen
+//
+// Form A (stdlib, EMPFOHLEN zuerst): zwei Funktionen in std.core (oder std.collections):
+//     pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[]      // Kotlin Array(n) { i -> f(i) }
+//     pub fn arrayFilled<T>(n: int, x: T): T[]             // = [x] * n, aber für n == 0 ohne Element
+//   Beide sind heute NICHT in Lyric schreibbar — sie brauchen intern genau das Array ohne
+//   erstes Element, das der Sprache fehlt (kein default(T), kein `[]`-Wachstum) — also als
+//   NATIVE Funktionen (VM: allocate array of n slots; das kann die VM, `[x] * n` tut es).
+//   Damit ist Form A eine stdlib-Erweiterung mit einem Native, KEINE Sprachänderung.
+// Form B (Sprache): ArrayLit erhält eine Generator-Form
+//     ArrayLit = '[' [ Expr { ',' Expr } [ ',' ] ] ']'
+//              | '[' Expr ';' Expr ']'                      // Rust-Form [x; n]  — ODER
+//              | '[' Expr ']' 'of' Lambda .                  // [n] of (i) => f(i)
+//   `of` als kontextuelles Wort nach einem `]` (heute Parsefehler dort → eindeutig). Form B
+//   spart gegenüber A einen Import und erlaubt Kontext-Typisierung des Lambdas ohne Annotation;
+//   sonst kein Mehrwert. Empfehlung: A, und B nur, falls A sich als zu geschwätzig erweist.
+import std.io.console { println };
+import std.core { arrayOf, arrayFilled };
+
+fn mapArr<T, U>(xs: T[], f: fn(T) -> U): U[] {
+    return arrayOf(xs.length, (i: int) => f(xs[i]));   // kein Sonderfall, f genau n-mal
+}
+
+struct Slot { id: int, used: bool, }
+
+fn main(): int {
+    let doubled = mapArr([1, 2, 3], (n: int) => n * 2);
+    println(f"{doubled[0]} {doubled[1]} {doubled[2]}");
+
+    let squares = arrayOf(5, (i: int) => i * i);
+    println(f"{squares[4]}");
+
+    let slots = arrayOf(3, (i: int) => Slot { id = i, used = false });   // kein Dummy
+    println(f"{slots[2].id}");
+
+    let zeros = arrayFilled(0, 0);                       // leeres int[] ohne Annotation
+    let cubes = [4] of (i) => i * i * i;                 // Form B, Lambda-Typ aus dem Kontext
+    println(f"{cubes[3]}");
+    return doubled.length + squares.length + slots.length + cubes.length + zeros.length;
+}
+// Erwartete Ausgabe: wie ist.lyr (exit 15)

@@ -1,0 +1,24 @@
+2497d558 design: the two measurements agree, down to the count
+c09af6f1 design: the test corpora are verified unoptimized too
+cc91d3cd design: the corpus measurement carries its own control
+dcf266d5 design: verifying before the optimizer would cost nothing today
+6c22040e design: the inliner was hiding the defect, which settles the divergence
+bf335732 design: stdlib 2 — findings attributed per path, and one divergence left open
+4158f539 design: stdlib 2 — the widening gap is measured, and the probe trap named
+1d043492 ir: the widening test says why every argument in it is a literal
+330be0f3 ir: every path to a method of an instance carries its substitution
+58d581e4 design: stdlib 2 — the second lowering fix, and the limit that is not a bug
+881accbd stdlib: std.result carries an optional payload, and says where it cannot
+a8df8a5d ir: an argument widens to what the instance makes of its parameter type
+66dcaced design: stdlib 2 — determinism rule, native-or-extern split, final inventory
+4fe6381e stdlib: args after the separator, and a file's modification time
+2f216369 docs: every chapter-13 snippet is a program again
+33e95fcf design: stdlib 2 — the prototype inventory after arrayOf and the team's answers
+2656bcb9 stdlib: arrayOf and arrayFilled — an array without a first element
+8b32fdad design: stdlib 2 — the target for 4.5 and 5.0
+6bd1a6e9 docs: the guide learns the value form, the terminators and the container package
+6014114c stdlib: std.hash, combineHash, and the wider assertion family
+1eb318f8 stdlib: powInt refuses overflow, one whitespace, an unbiased Random
+2dd73b36 stdlib: the container package, and a churned map stops growing
+09e97f13 stdlib: iterator terminators as methods, and five adapters
+5164fe2b stdlib: std.result — a failure as a value, and parseInt refuses overflow

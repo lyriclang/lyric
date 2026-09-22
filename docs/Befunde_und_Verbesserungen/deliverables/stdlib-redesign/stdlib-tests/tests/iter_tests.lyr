@@ -1,0 +1,281 @@
+import std.test { Test, assertEq, assertTrue };
+// The adapters are METHODS since 2.17 and need no import; what is imported here are the forms
+// that stay free — the terminals, and the two that would make the monomorphization diverge as
+// methods (see the note in std.iter).
+import std.iter { fold, count, sum, any, all, find, minValue, maxValue, chunks, reduce, first };
+// The entrances: what starts a chain where the built-in forms cannot start one themselves.
+import std.iter { over, range, rangeInclusive, compact };
+import std.collections { List, collect };
+
+fn upTo(n: int): List<int> {
+    let xs = List<int>.empty();
+    var i = 1;
+    while (i <= n) {
+        xs.push(i);
+        i = i + 1;
+    }
+    return xs;
+}
+
+@Test
+pub fn adapters_compose_lazily(): void {
+    let doubledEvens = collect<int>(
+        upTo(6).iter().filter((n: int) => n % 2 == 0).map<int>((n: int) => n * 10)
+    );
+    assertEq(doubledEvens.length(), 3);
+    assertEq(doubledEvens.get(0), 20);
+    assertEq(doubledEvens.get(2), 60);
+}
+
+@Test
+pub fn take_and_skip_split_a_sequence(): void {
+    assertEq(sum(upTo(10).iter().take(3)), 6);
+    assertEq(sum(upTo(10).iter().skip(7)), 27);
+    assertEq(count<int>(upTo(3).iter().take(0 - 1)), 0);
+}
+
+@Test
+pub fn zip_ends_with_the_shorter_side(): void {
+    let pairs = collect<(int, int)>(upTo(2).iter().zip<int>(upTo(5).iter()));
+    assertEq(pairs.length(), 2);
+}
+
+@Test
+pub fn chain_walks_both_in_order(): void {
+    assertEq(sum(upTo(2).iter().chain(upTo(3).iter())), 9);
+}
+
+@Test
+pub fn fold_carries_the_seed_left_to_right(): void {
+    assertEq(fold<int, int>(upTo(4).iter(), 100, (acc: int, n: int) => acc + n), 110);
+}
+
+@Test
+pub fn any_all_and_find_answer_predicates(): void {
+    assertTrue(any<int>(upTo(5).iter(), (n: int) => n == 3), "3 is in it");
+    assertTrue(all<int>(upTo(5).iter(), (n: int) => n > 0), "all are positive");
+    assertEq(find<int>(upTo(5).iter(), (n: int) => n > 3)!, 4);
+}
+
+@Test
+pub fn min_and_max_answer_null_on_empty(): void {
+    assertEq(minValue<int>(upTo(5).iter())!, 1);
+    assertEq(maxValue<int>(upTo(5).iter())!, 5);
+    assertTrue(minValue<int>(upTo(0).iter()) == null, "an empty source has no minimum");
+}
+
+// --- v1.14: flatMap, chunks, reduce, first ---
+
+@Test
+pub fn flatMap_runs_the_sequences_back_to_back(): void {
+    let total = fold<int, int>(
+        upTo(3).iter().flatMap<int>((n: int) => pairOf(n).iter()),
+        0,
+        (acc: int, v: int) => acc + v
+    );
+    // 1+10 + 2+20 + 3+30
+    assertEq(total, 66);
+}
+
+fn pairOf(n: int): List<int> {
+    let xs = List<int>.empty();
+    xs.push(n);
+    xs.push(n * 10);
+    return xs;
+}
+
+@Test
+pub fn chunks_groups_and_the_last_may_be_shorter(): void {
+    var shape = 0;
+    for (c in chunks<int>(upTo(7).iter(), 3)) {
+        shape = shape * 10 + c.length;
+    }
+    assertEq(shape, 331);
+
+    var nothing = 0;
+    for (c in chunks<int>(upTo(3).iter(), 0)) {
+        nothing = nothing + 1;
+    }
+    assertEq(nothing, 0);
+}
+
+@Test
+pub fn reduce_folds_without_a_seed_and_reports_emptiness(): void {
+    assertEq(reduce<int>(upTo(4).iter(), (a: int, b: int) => a + b) ?? -1, 10);
+    assertTrue(
+        reduce<int>(upTo(0).iter(), (a: int, b: int) => a + b) == null,
+        "an empty source reduces to null"
+    );
+}
+
+@Test
+pub fn first_takes_one_element_or_null(): void {
+    assertEq(first<int>(upTo(9).iter()) ?? -1, 1);
+    assertTrue(first<int>(upTo(0).iter()) == null, "an empty source has no first");
+}
+
+// ---------------------------------------------------------------------------- the entrances
+
+@Test
+pub fn over_starts_a_chain_from_an_array(): void {
+    assertEq(sum(over<int>([1, 2, 3])), 6);
+    assertEq(sum(over<int>([1, 2, 3]).map<int>((n: int) => n * 10)), 60);
+    assertEq(count<int>(over<int>([])), 0);
+}
+
+@Test
+pub fn two_chains_over_one_array_do_not_disturb_each_other(): void {
+    // The index belongs to the cursor, not to the array. Were it otherwise, the second sum would
+    // find the array already walked.
+    let xs = [1, 2, 3];
+    assertEq(sum(over<int>(xs)), 6);
+    assertEq(sum(over<int>(xs)), 6);
+}
+
+@Test
+pub fn range_walks_up_to_but_not_including_its_end(): void {
+    assertEq(sum(range(1, 4)), 6);
+    assertEq(count<int>(range(0, 0)), 0);
+    assertEq(count<int>(range(5, 1)), 0);
+}
+
+@Test
+pub fn range_inclusive_takes_its_last_value(): void {
+    assertEq(sum(rangeInclusive(1, 4)), 10);
+    assertEq(count<int>(rangeInclusive(3, 3)), 1);
+    assertEq(count<int>(rangeInclusive(4, 3)), 0);
+}
+
+@Test
+pub fn an_inclusive_range_ending_at_the_maximum_still_terminates(): void {
+    // The reason 'rangeInclusive' is its own function rather than 'range(low, high + 1)': at the
+    // maximum that '+ 1' wraps and the chain would yield nothing at all.
+    let top = 9223372036854775807;
+    assertEq(count<int>(rangeInclusive(top - 2, top)), 3);
+}
+
+@Test
+pub fn compact_drops_the_empty_slots(): void {
+    let places: (?int)[] = [10, null, 20, null, 30];
+    assertEq(sum(compact<int>(places)), 60);
+    assertEq(count<int>(compact<int>(places)), 3);
+}
+
+@Test
+pub fn compact_survives_the_edges(): void {
+    let empty: (?int)[] = [];
+    assertEq(count<int>(compact<int>(empty)), 0);
+
+    let allNull: (?int)[] = [null, null];
+    assertEq(count<int>(compact<int>(allNull)), 0);
+
+    let noNull: (?int)[] = [1, 2];
+    assertEq(sum(compact<int>(noNull)), 3);
+
+    // Nulls at both ends, which is where an off-by-one would show.
+    let edged: (?int)[] = [null, 7, null];
+    assertEq(sum(compact<int>(edged)), 7);
+}
+
+@Test
+pub fn compact_composes_like_any_other_source(): void {
+    let places: (?int)[] = [1, null, 2, null, 3];
+    assertEq(sum(compact<int>(places).filter((n: int) => n % 2 == 1)), 4);
+    assertEq(first<int>(compact<int>(places).skip(1)) ?? -1, 2);
+}
+
+// ------------------------------------------------------------ 4.5: terminators as methods
+
+@Test
+pub fn terminators_end_a_chain_without_turning_it_inside_out(): void {
+    assertEq(upTo(6).iter().filter((n: int) => n % 2 == 0).count(), 3);
+    assertEq(upTo(4).iter().fold<int>(100, (acc: int, n: int) => acc + n), 110);
+    assertEq(upTo(4).iter().reduce((a: int, b: int) => a * b)!, 24);
+    assertTrue(upTo(0).iter().reduce((a: int, b: int) => a + b) == null, "empty reduces to null");
+    assertEq(upTo(5).iter().first()!, 1);
+    assertEq(upTo(5).iter().last()!, 5);
+    assertTrue(upTo(0).iter().last() == null, "empty has no last");
+    assertEq(upTo(5).iter().nth(2)!, 3);
+    assertTrue(upTo(5).iter().nth(9) == null, "past the end");
+    assertTrue(upTo(5).iter().nth(0 - 1) == null, "a negative position");
+}
+
+@Test
+pub fn predicate_terminators_short_circuit(): void {
+    assertTrue(upTo(5).iter().any((n: int) => n == 3), "3 is in it");
+    assertTrue(upTo(5).iter().all((n: int) => n > 0), "all positive");
+    assertTrue(upTo(5).iter().none((n: int) => n > 5), "none above 5");
+    assertEq(upTo(5).iter().find((n: int) => n > 3)!, 4);
+    assertEq(upTo(5).iter().position((n: int) => n > 3)!, 3);
+    assertTrue(upTo(5).iter().position((n: int) => n > 9) == null, "no position");
+    assertEq(upTo(10).iter().countWhere((n: int) => n % 3 == 0), 3);
+}
+
+@Test
+pub fn for_each_and_to_array_drain(): void {
+    var total = 0;
+    upTo(4).iter().forEach(
+        (n: int) => {
+            total = total + n;
+        }
+    );
+    assertEq(total, 10);
+    let arr = upTo(3).iter().map<int>((n: int) => n * n).toArray();
+    assertEq(arr.length, 3);
+    assertEq(arr[2], 9);
+}
+
+@Test
+pub fn skip_while_drops_the_front_only(): void {
+    let rest = upTo(6).iter().skipWhile((n: int) => n < 3).toArray();
+    assertEq(rest.length, 4);
+    assertEq(rest[0], 3);
+    // Unlike filter: once the front is gone, a later small value passes.
+    let mixed = over<int>([1, 5, 2, 6]).skipWhile((n: int) => n < 3).toArray();
+    assertEq(mixed.length, 3);
+    assertEq(mixed[1], 2);
+}
+
+@Test
+pub fn step_by_keeps_the_first_and_every_nth(): void {
+    let stepped = upTo(7).iter().stepBy(3).toArray();
+    assertEq(stepped.length, 3);
+    assertEq(stepped[0], 1);
+    assertEq(stepped[1], 4);
+    assertEq(stepped[2], 7);
+    assertEq(upTo(7).iter().stepBy(0).count(), 0);
+    assertEq(upTo(7).iter().stepBy(1).count(), 7);
+}
+
+@Test
+pub fn inspect_sees_every_element_on_the_way_past(): void {
+    var seen = 0;
+    let total = upTo(4).iter().inspect(
+        (n: int) => {
+            seen = seen + 1;
+        }
+    ).fold<int>(
+        0,
+        (acc: int, n: int) => acc + n
+    );
+    assertEq(seen, 4);
+    assertEq(total, 10);
+}
+
+@Test
+pub fn dedup_by_drops_consecutive_repeats(): void {
+    let thinned = over<int>([1, 1, 2, 2, 2, 3, 1]).dedupBy((n: int) => n).toArray();
+    assertEq(thinned.length, 4);
+    assertEq(thinned[3], 1);
+    assertEq(over<int>([]).dedupBy((n: int) => n).count(), 0);
+}
+
+@Test
+pub fn zip_with_combines_as_it_draws(): void {
+    let sums = upTo(3).iter().zipWith<int, int>(
+        upTo(5).iter(),
+        (a: int, b: int) => a + b
+    ).toArray();
+    assertEq(sums.length, 3);
+    assertEq(sums[2], 6);
+}

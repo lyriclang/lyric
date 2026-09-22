@@ -1,0 +1,59 @@
+// 13 Enum ohne `static let`; Interface ohne statische Member — IST-STAND (Lyric 4.4.1)
+// Aufgabe: (a) ein Enum `Level` mit einer zugehörigen Konstante DEFAULT und einer Fabrik;
+// (b) ein generisches `sum<T>` das ein neutrales Element `T.zero()` braucht (Monoid).
+// Heute: (a) `static let` im EnumBody ist ein Parsefehler (EnumBody = Varianten ; Methoden),
+// ein `static fn` geht; die Konstante wandert auf Modulebene oder in eine static fn.
+// (b) Interface-Member haben keinen `static` (§3.5: "reached through a vtable slot, which
+// takes a receiver") — der Umweg ist ein WITNESS-Wert (Instanz, die zero liefert) oder ein
+// explizites Seed-Argument.
+import std.io.console { println };
+import std.core { Add };
+
+enum Level {
+    Low,
+    Mid,
+    High;
+
+    // static fn geht; static let nicht (siehe probe-enum-static-let.lyr)
+    static fn defaultLevel(): Level { return Level.Mid; }
+    static fn fromScore(s: int): Level {
+        return if (s < LEVEL_LOW_MAX) Level.Low else if (s < LEVEL_MID_MAX) Level.Mid else Level.High;
+    }
+
+    fn name(): string {
+        return match (this) { Low => "Low", Mid => "Mid", High => "High" };
+    }
+}
+// Die "zugehörigen Konstanten" leben auf Modulebene, mit Präfix als Namensraum-Ersatz.
+let LEVEL_LOW_MAX = 10;
+let LEVEL_MID_MAX = 50;
+
+// (b) Monoid ohne statisches zero(): ein Witness-Interface auf einer INSTANZ …
+interface Monoid<T> {
+    fn zero(): T;              // "zero" muss auf einem Wert aufgerufen werden
+}
+struct IntMonoid :: [Monoid<int>] { fn zero(): int { return 0; } }
+struct Vec2 :: [Add<Vec2, Vec2>] {
+    x: int, y: int,
+    fn add(o: Vec2): Vec2 { return Vec2 { x = this.x + o.x, y = this.y + o.y }; }
+}
+struct Vec2Monoid :: [Monoid<Vec2>] { fn zero(): Vec2 { return Vec2 { x = 0, y = 0 }; } }
+
+// … der als extra Argument mitreist:
+fn sum<T :: [Add<T, T>], M :: [Monoid<T>]>(xs: T[], m: M): T {
+    var acc = m.zero();
+    for (x in xs) { acc = acc + x; }
+    return acc;
+}
+
+fn main(): int {
+    println(Level.defaultLevel().name() + " " + Level.fromScore(7).name() + " " + Level.fromScore(99).name());
+    println(f"{sum([1, 2, 3], IntMonoid { })}");
+    let v = sum([Vec2 { x = 1, y = 2 }, Vec2 { x = 3, y = 4 }], Vec2Monoid { });
+    println(f"({v.x}, {v.y})");
+    return v.x;
+}
+// Ausgabe (lyric run ist.lyr; exit 4):
+// Mid Low High
+// 6
+// (4, 6)

@@ -1,0 +1,97 @@
+import std.test { Test, assertEq, assertTrue };
+import std.math {
+    gcd,
+    lcm,
+    divFloor,
+    modFloor,
+    powInt,
+    clampInt,
+    isNaN,
+    isFinite,
+    sqrt,
+    absInt,
+    intMax,
+    intMin,
+    checkedAdd,
+    checkedSub,
+    checkedMul,
+    checkedAbs,
+    saturatingAdd,
+    saturatingSub,
+    saturatingMul,
+};
+
+@Test
+pub fn gcd_and_lcm_agree(): void {
+    assertEq(gcd(12, 18), 6);
+    assertEq(gcd(-12, 18), 6);
+    assertEq(gcd(0, 5), 5);
+    assertEq(lcm(4, 6), 12);
+    assertEq(lcm(0, 9), 0);
+}
+
+@Test
+pub fn floor_division_rounds_down_not_towards_zero(): void {
+    assertEq(divFloor(-7, 2), -4);
+    assertEq(modFloor(-7, 2), 1);
+    assertEq(divFloor(7, 2), 3);
+    assertEq(modFloor(7, -2), -1);
+}
+
+@Test
+pub fn integer_power_refuses_fractions(): void {
+    assertEq(powInt(2, 10)!, 1024);
+    assertEq(powInt(5, 0)!, 1);
+    assertTrue(powInt(2, -1) == null, "a negative exponent is a fraction");
+}
+
+@Test
+pub fn clamp_holds_the_bounds(): void {
+    assertEq(clampInt(5, 0, 3), 3);
+    assertEq(clampInt(-5, 0, 3), 0);
+    assertEq(clampInt(2, 0, 3), 2);
+}
+
+@Test
+pub fn ieee_special_values_are_recognised(): void {
+    assertTrue(isNaN(sqrt(-1.0)), "the root of a negative is NaN");
+    assertTrue(!isFinite(1.0 / 0.0), "dividing by zero float is infinite");
+    assertTrue(isFinite(1.5), "an ordinary value is finite");
+}
+
+// The generator moved to std.random in v1.14; its tests live in random_tests.lyr now.
+
+@Test
+pub fn integer_power_refuses_overflow(): void {
+    assertEq(powInt(2, 62)!, 4611686018427387904);
+    assertTrue(powInt(2, 63) == null, "2^63 is outside int");
+    assertTrue(powInt(2, 64) == null, "2^64 used to answer 0");
+    assertTrue(powInt(10, 19) == null, "10^19 is outside int");
+    assertEq(powInt(10, 18)!, 1000000000000000000);
+    assertEq(powInt(-2, 63)!, intMin);
+    assertTrue(powInt(-2, 64) == null, "(-2)^64 is outside int");
+    assertEq(powInt(-3, 3)!, -27);
+    assertEq(powInt(1, 1000)!, 1);
+    assertEq(powInt(0, 0)!, 1);
+}
+
+@Test
+pub fn the_bounds_and_the_checked_family(): void {
+    assertEq(intMax + 1, intMin);
+    assertTrue(checkedAdd(intMax, 1) == null, "add overflows");
+    assertEq(checkedAdd(intMax, -1)!, intMax - 1);
+    assertTrue(checkedSub(intMin, 1) == null, "sub overflows");
+    assertEq(checkedSub(5, 7)!, -2);
+    assertTrue(checkedMul(intMax, 2) == null, "mul overflows");
+    assertTrue(checkedMul(intMin, -1) == null, "the one case division cannot see");
+    assertEq(checkedMul(-4, 5)!, -20);
+    assertEq(checkedMul(0, intMin)!, 0);
+    assertTrue(checkedAbs(intMin) == null, "intMin has no absolute value");
+    assertEq(checkedAbs(-3)!, 3);
+    assertEq(absInt(intMin), intMin);
+    assertEq(saturatingAdd(intMax, 5), intMax);
+    assertEq(saturatingAdd(intMin, -5), intMin);
+    assertEq(saturatingSub(intMin, 5), intMin);
+    assertEq(saturatingMul(intMax, -2), intMin);
+    assertEq(saturatingMul(3, 4), 12);
+}

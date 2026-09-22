@@ -1,0 +1,93 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 06 Polymorphie über Werfbarkeit — SOLL-STAND
+//
+// Vorschlag: `throws E` mit einem TYPPARAMETER E, an drei Stellen:
+//   (1) in der Signatur:        fn f<E>(…): T throws E
+//   (2) am Coroutine-Typ:       Coroutine<T> throws E            (Grammatik: ThrowsSuffix, existiert)
+//   (3) am Funktionstyp:        fn(T) -> U throws E              (Grammatik: ThrowsSuffix nach TypeExpr —
+//                                                                  parst HEUTE schon, wird von SEM0084 abgelehnt)
+// Regeln (Spec §9.2 neu, §8.3 Inferenz, §10 Werfbarkeit eines Pulls):
+//   - E wird wie jeder Typparameter aus den Argumenten inferiert (§8.3, Schritt 3, strukturell:
+//     `Coroutine<int> throws Exception` gegen `Coroutine<int> throws E` bindet E = Exception).
+//   - "Wirft nichts" ist die Bindung E = never. `throws never` ist dieselbe Klausel wie keine.
+//     `never` ist bereits der Typ von panic (§9.4); er wird hier erstmals schreibbar, aber nur
+//     als throws-Typ (kein Wert, kein Feld).
+//   - E muss Throwable sein (`E :: [Throwable]` implizit, oder never).
+//   - An der Aufrufstelle wird die Klausel mit der Belegung substituiert (schließt den Befund
+//     ExceptionAnalyzer.cs:218-227 aus Prototyp 01 ein): `evens(numbers())` wirft nichts,
+//     `evens(parsed(…))` wirft Exception.
+//   - Ein Lambda, das an `fn(T) -> U throws E` übergeben wird, DARF werfen; sein E ist die
+//     Menge seiner ungefangenen Throw-Sites (ein Typ oder never; zwei verschiedene → Throwable).
+import std.io.console { println };
+import std.core { Exception };
+import std.string { parseInt };
+
+fn numbers(): Coroutine<int> {
+    yield 1; yield 2; yield 3; yield 4;
+}
+
+fn parsed(lines: string[]): Coroutine<int> throws Exception {
+    for (l in lines) {
+        let n = parseInt(l);
+        if (n == null) { throw Exception { text = "not a number: " + l }; }
+        yield n;
+    }
+}
+
+// Eine Signatur für beide Quellen; E fließt durch.
+fn evens<E>(input: Coroutine<int> throws E): Coroutine<int> throws E {
+    while (true) {
+        let v = input.next();          // Throw-Site vom Typ E — durch die eigene Klausel gedeckt
+        if (v == null) { return; }
+        if (v % 2 == 0) { yield v; }
+    }
+}
+
+fn sumAll<E>(co: Coroutine<int> throws E): int throws E {
+    var sum = 0;
+    while (true) {
+        let v = co.next();
+        if (v == null) { return sum; }
+        sum += v;
+    }
+}
+
+// Funktionstyp mit throws E: die Operation darf werfen, der Grund bleibt erhalten.
+fn mapInts<U, E>(xs: int[], f: fn(int) -> U throws E): U[] throws E {
+    var out: U[] = [f(xs[0])] * xs.length;      // (Platzhalter; echtes Soll: Array.fill o.ä.)
+    for (i in 1..xs.length) { out[i] = f(xs[i]); }
+    return out;
+}
+fn checkedDouble(n: int): int throws Exception {
+    if (n > 100) { throw Exception { text = "too big" }; }
+    return n * 2;
+}
+
+fn main(): int {
+    // E = never: kein try nötig, kein toter catch.
+    let a = sumAll(evens(numbers()));
+    println(f"evens of numbers: {a}");
+
+    // E = Exception: try ist Pflicht, wie heute.
+    var b = 0;
+    try {
+        b = sumAll(evens(parsed(["10", "x", "12"])));
+    } catch (e: Exception) {
+        println("parsed failed: " + e.message());
+    }
+    println(f"evens of parsed: {b}");
+
+    // Das Lambda wirft; mapInts wirft deshalb Exception; der Grund kommt beim Aufrufer an.
+    try {
+        let doubled = mapInts([1, 200, 3], (n: int) => checkedDouble(n));
+        println(f"{doubled[0]} {doubled[1]} {doubled[2]}");
+    } catch (e: Exception) {
+        println("map failed: " + e.message());
+    }
+    return a;
+}
+// Erwartete Ausgabe (exit 6):
+// evens of numbers: 6
+// parsed failed: not a number: x
+// evens of parsed: 0
+// map failed: too big

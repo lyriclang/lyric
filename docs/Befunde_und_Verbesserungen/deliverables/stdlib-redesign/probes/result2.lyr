@@ -1,0 +1,106 @@
+module probe;
+import std.io.console { println };
+import std.string { fromInt };
+import std.core { Exception };
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E);
+
+    pub fn isOk(): bool {
+        return match (this) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+    }
+
+    pub fn ok(): ?T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => null,
+        };
+    }
+
+    pub fn err(): ?E {
+        return match (this) {
+            Ok(_) => null,
+            Err(e) => e,
+        };
+    }
+
+    pub fn unwrapOr(fallback: T): T {
+        return match (this) {
+            Ok(v) => v,
+            Err(_) => fallback,
+        };
+    }
+
+    pub fn unwrapOrElse(fallback: fn(E) -> T): T {
+        return match (this) {
+            Ok(v) => v,
+            Err(e) => fallback(e),
+        };
+    }
+}
+
+pub fn map<T, E, U>(r: Result<T, E>, f: fn(T) -> U): Result<U, E> {
+    return match (r) {
+        Ok(v) => Result<U, E>.Ok(f(v)),
+        Err(e) => Result<U, E>.Err(e),
+    };
+}
+
+pub fn andThen<T, E, U>(r: Result<T, E>, f: fn(T) -> Result<U, E>): Result<U, E> {
+    return match (r) {
+        Ok(v) => f(v),
+        Err(e) => Result<U, E>.Err(e),
+    };
+}
+
+pub fn orThrow<T, E :: [Throwable]>(r: Result<T, E>): T throws E {
+    return match (r) {
+        Ok(v) => v,
+        Err(e) => {
+            throw e;
+        },
+    };
+}
+
+fn parsePort(s: string): Result<int, string> {
+    if (s == "80") {
+        return Result<int, string>.Ok(80);
+    }
+    return Result<int, string>.Err("bad port: " + s);
+}
+
+fn risky(fail: bool): Result<int, Exception> {
+    if (fail) {
+        return Result<int, Exception>.Err(Exception { text = "boom" });
+    }
+    return Result<int, Exception>.Ok(1);
+}
+
+fn main(): int {
+    let r = parsePort("80");
+    let s = parsePort("x");
+    println(r.isOk());
+    println(r.unwrapOr(0));
+    println(s.unwrapOr(-1));
+    println(s.err() ?? "?");
+    println(s.unwrapOrElse((e: string) => e.length()));
+    let doubled = map<int, string, int>(r, (n: int) => n * 2);
+    println(doubled.ok() ?? 0);
+    let chained = andThen<int, string, string>(r, (n: int) => Result<string, string>.Ok("port " + fromInt(n)));
+    println(chained.unwrapOr("?"));
+    match (s) {
+        Ok(v) => println(v),
+        Err(e) => println(e),
+    }
+    try {
+        let v = orThrow<int, Exception>(risky(true));
+        println(v);
+    } catch (e: Throwable) {
+        println("caught " + e.message());
+    }
+    return 0;
+}

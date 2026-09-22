@@ -1,0 +1,26 @@
+// 04 — die Form, die HEUTE abgelehnt wird (LYR-SEM0018), obwohl jeder catch die Funktion verlässt.
+import std.io.console { println };
+
+class UsageError :: [Throwable] {
+    what: string,
+    fn message(): string { return "usage: " + this.what; }
+}
+
+struct Options { limit: int, verbose: bool, }
+
+fn parseArgs(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { what = "need at least one argument" }; }
+    return Options { limit = args.length, verbose = args[0] == "-v" };
+}
+
+fn main(): int {
+    var opts: Options;
+    try {
+        opts = parseArgs(["-v", "x"]);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    println(f"limit {opts.limit}");     // error[LYR-SEM0018]: use of possibly unassigned variable 'opts'
+    return 0;
+}

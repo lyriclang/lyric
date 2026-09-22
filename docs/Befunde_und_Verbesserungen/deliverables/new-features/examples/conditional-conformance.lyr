@@ -1,0 +1,48 @@
+// SOLL (4.5/4.6): bedingte Konformanz — List<int> ist Display, List<Socket> nicht.
+// Kompiliert auf 4.4.1 NICHT: LYR-SEM0047 "extend target must be a plain named type in v1".
+import std.io.console { println };
+import std.core { Display };
+import std.collections { List };
+import std.string { join };
+
+// Die Typparameter stehen VOR dem Ziel (parsebar; `List<T :: [Display]>` ist es nicht).
+extend<T :: [Display]> List<T> :: [Display] {
+    fn show(): string {
+        var parts = [""] * this.length();
+        for (i in 0..this.length()) {
+            parts[i] = this.get(i).show();
+        }
+        return "[" + join(parts, ", ") + "]";
+    }
+}
+
+// Faellt syntaktisch mit ab: bedingte METHODEN ohne Konformanz (Rust: impl<T: Ord> Vec<T>).
+extend<T :: [Ordered<T>]> List<T> {
+    fn max(): ?T {
+        if (this.length() == 0) { return null; }
+        var best = this.get(0);
+        for (i in 1..this.length()) {
+            if (best.compare(this.get(i)) < 0) { best = this.get(i); }
+        }
+        return best;
+    }
+}
+
+struct Socket { fd: int }               // kein Display
+
+fn main(): int {
+    var xs = List<int>.empty();
+    xs.push(3);
+    xs.push(1);
+    println(xs);                        // [3, 1] — Display durch die bedingte Konformanz
+    println(f"{xs} max={xs.max() ?? 0}");
+    // var ss = List<Socket>.empty();
+    // println(ss);                     // Fehler AM AUFRUF, mit Grund:
+    //   'List<Socket>' does not conform to 'Display': requires 'Socket :: [Display]'
+    return 0;
+}
+
+// IST (4.4.1): beides unmoeglich.
+//   - `println(xs)` passiert die Display-Constraint (Satisfies ist zu lax) und stirbt im IR mit
+//     Fehlerort console.lyr:51 — der Nutzer sieht einen Fehler in der stdlib (P0-Bug 8).
+//   - Umweg: eine freie Funktion pro Elementtyp, `showIntList(xs)`, oder join von Hand.

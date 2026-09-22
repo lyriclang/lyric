@@ -139,4 +139,77 @@ public class NarrowingTests
     [Fact]
     public void The_narrowing_ends_with_the_branch() =>
         DoesNotNarrow("fn main(): int { let x: ?int = 1; if (x != null) { } return x; }");
+
+    // ------------------------------------------- an assignment ends a narrowing, and it STAYS ended
+
+    /// <summary>
+    /// §7.4: an assignment ends a narrowing "from that point on". Leaving an inner block used to
+    /// restore the state before it WHOLESALE, so the ending was undone at the closing brace: the
+    /// sema went on believing the value was an <c>int</c>, typed the arithmetic, and the program
+    /// panicked with <c>LYR-VM0007</c>. A sound analysis reporting nothing about a program that
+    /// cannot run is the one failure mode narrowing may not have.
+    /// </summary>
+    [Fact]
+    public void An_assignment_in_an_inner_block_ends_the_narrowing_for_good() =>
+        DoesNotNarrow("""
+            fn main(): int {
+                var o: ?int = 5;
+                let c = true;
+                if (o != null) {
+                    if (c) { o = null; }
+                    return o + 1;
+                }
+                return 0;
+            }
+            """);
+
+    /// <summary>The same shape in a loop body, where the condition re-narrows at the top but the
+    /// assignment still ends it for the rest of the iteration.</summary>
+    [Fact]
+    public void An_assignment_in_a_loop_body_ends_the_narrowing_for_the_rest_of_it() =>
+        DoesNotNarrow("""
+            fn main(): int {
+                var o: ?int = 5;
+                let c = true;
+                while (o != null) {
+                    if (c) { o = null; }
+                    return o + 1;
+                }
+                return 0;
+            }
+            """);
+
+    /// <summary>
+    /// THE COUNTER-CHECK, and the one that a fix reaching too far fails. The two branches are
+    /// EXCLUSIVE: what the then branch ended says nothing about the else branch, which the outer
+    /// narrowing still reaches. Carrying the ending across would report an error here.
+    /// </summary>
+    [Fact]
+    public void The_other_branch_still_sees_the_outer_narrowing() =>
+        Narrows("""
+            fn main(): int {
+                var o: ?int = 5;
+                let c = true;
+                if (o != null) {
+                    if (c) { o = null; } else { return o + 1; }
+                }
+                return 0;
+            }
+            """);
+
+    /// <summary>And a branch that always exits never reaches the code after the <c>if</c>, so what
+    /// it ended does not end anything there.</summary>
+    [Fact]
+    public void A_branch_that_always_exits_does_not_end_the_narrowing_after_the_if() =>
+        Narrows("""
+            fn main(): int {
+                var o: ?int = 5;
+                let c = true;
+                if (o != null) {
+                    if (c) { o = null; return 0; }
+                    return o + 1;
+                }
+                return 0;
+            }
+            """);
 }

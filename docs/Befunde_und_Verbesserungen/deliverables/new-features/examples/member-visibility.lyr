@@ -1,0 +1,46 @@
+// SOLL (5.0, mit Warnstufe ab 4.5): pub/pub(module) auf Membern, Default privat.
+// Kompiliert auf 4.4.1 NICHT (pub vor einem Member ist ein Parsefehler).
+//
+// Modul std.collections (Auszug):
+
+pub class List<T> {
+    items: T[],                     // privat: die Invariante gehoert diesem Modul
+    count: int,                     // privat
+    pub(module) version: int,       // modulweit: die Iteratoren lesen es
+
+    pub fn length(): int { return this.count; }
+    pub mut fn push(v: T): void {
+        if (this.count == this.items.length) { this.grow(); }
+        this.items[this.count] = v;
+        this.count += 1;
+        this.version += 1;
+    }
+    mut fn grow(): void { … }       // privat: kein Teil der API
+}
+
+pub class ListIterator<T> :: [Iterator<T>] {
+    source: List<T>,
+    index: int,
+    seen: int,
+    pub mut fn next(): ?T {
+        if (this.seen != this.source.version) {     // pub(module): erlaubt, weil gleiches Modul
+            panic("list changed while iterating");
+        }
+        …
+    }
+}
+
+// Modul app:
+//
+//     let xs = List<int>.empty();
+//     xs.push(1);              // ok: pub
+//     println(f"{xs.count}");  // 4.5: Warnung "count is private to std.collections — use length()"
+//                              // 5.0: Fehler
+//     xs.count = 99;           // dito — und genau das zerstoert heute still die Invariante
+//     let forged = List<int> { items = [], count = 7, version = 0 };
+//                              // 5.0: Fehler — "making a 'List' is 'std.collections''s privilege",
+//                              // dieselbe Regel, die LYR-SEM0093 fuer opaque types schon kennt
+//
+// IST (4.4.1): alles oben ist erlaubt. std.collections hat 19 oeffentliche Felder, von denen nach
+// der Klassifikation von stdlib-redesign KEINES oeffentlich sein sollte; jede Umbenennung eines
+// internen Feldes ist ein Breaking Change, und keine Invariante ist haltbar.

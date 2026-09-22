@@ -1,0 +1,65 @@
+// 07 Enum-Variantenname / abgeleitetes Display — IST-STAND (Lyric 4.4.1)
+// Aufgabe: Ereignisse loggen ("Dial(host)"), einen Modus aus einem String parsen und
+// zurück in einen String wandeln. Heute: pro Enum eine Namensfunktion (8 Zeilen) und
+// die Rückrichtung noch einmal; jede Variante steht dreimal im Programm (Deklaration,
+// Name, Parse), und ein neuer Variantenname veraltet die Funktionen still —
+// bei der Rückrichtung mit `_ => null` nicht einmal mit einer Exhaustiveness-Warnung.
+import std.io.console { println };
+import std.core { Display };
+
+enum Event { Dial(string), Ack, Data(int), Hangup, }
+
+// (a) Name mit Payload — von Hand, als Display-Konformanz
+extend Event :: [Display] {
+    fn show(): string {
+        return match (this) {
+            Dial(h) => "Dial(" + h + ")",
+            Ack => "Ack",
+            Data(n) => f"Data({n})",
+            Hangup => "Hangup",
+        };
+    }
+}
+
+// (b) Nur der Tag-Name, ohne Payload — noch eine Funktion
+fn kindOf(e: Event): string {
+    return match (e) {
+        Dial(_) => "Dial",
+        Ack => "Ack",
+        Data(_) => "Data",
+        Hangup => "Hangup",
+    };
+}
+
+enum Mode { Fast, Safe, Dry, }
+
+// (c) Hin- und Rückrichtung für ein Unit-Enum: zwei Tabellen, die übereinstimmen müssen
+fn modeName(m: Mode): string {
+    return match (m) { Fast => "fast", Safe => "safe", Dry => "dry" };
+}
+fn parseMode(s: string): ?Mode {
+    return match (s) {
+        "fast" => Mode.Fast,
+        "safe" => Mode.Safe,
+        "dry" => Mode.Dry,
+        _ => null,               // eine neue Variante fällt hier still durch
+    };
+}
+
+fn main(): int {
+    let events = [Event.Dial("host"), Event.Ack, Event.Data(5), Event.Hangup];
+    for (e in events) {
+        println(f"{kindOf(e)}: {e.show()}");
+    }
+    let m = parseMode("safe");
+    println(match (m) { null => "unknown", v => modeName(v) });
+    println(match (parseMode("turbo")) { null => "unknown", v => modeName(v) });
+    return 0;
+}
+// Ausgabe (lyric run ist.lyr; exit 0):
+// Dial: Dial(host)
+// Ack: Ack
+// Data: Data(5)
+// Hangup: Hangup
+// safe
+// unknown

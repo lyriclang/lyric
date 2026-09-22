@@ -1,0 +1,62 @@
+// 11 Labels für break/continue — IST-STAND (Lyric 4.4.1)
+// Aufgabe: (a) in einer Matrix das erste Paar (i, j) mit grid[i][j] == wanted finden und
+// BEIDE Schleifen verlassen; (b) Zeilen überspringen, sobald ein negativer Wert auftaucht
+// ("continue outer"). Heute: `break`/`continue` treffen nur die innerste Schleife (§7.2) —
+// also Flag-Variablen, doppelte Bedingungen oder eine Hilfsfunktion mit `return`.
+import std.io.console { println };
+
+fn main(): int {
+    let grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    let wanted = 5;
+
+    // (a) Umweg 1: Flag + wiederholte Bedingung in der äußeren Schleife
+    var found = false;
+    var fi = -1;
+    var fj = -1;
+    var i = 0;
+    while (i < grid.length && !found) {          // Bedingung doppelt (Flag hier …)
+        var j = 0;
+        while (j < grid[i].length) {
+            if (grid[i][j] == wanted) {
+                found = true;                      // … und Flag setzen …
+                fi = i; fj = j;
+                break;                             // … verlässt nur die innere
+            }
+            j += 1;
+        }
+        i += 1;                                    // läuft noch einmal, Flag verhindert Runde 3
+    }
+    println(f"found at ({fi}, {fj})");
+
+    // (a') Umweg 2: Hilfsfunktion, `return` als Doppel-break
+    let (ri, rj) = findIn(grid, 8);
+    println(f"helper found at ({ri}, {rj})");
+
+    // (b) "continue outer": Zeilen mit negativem Wert überspringen — Flag pro Zeile
+    let rows = [[1, 2], [3, -1, 4], [5]];
+    var sum = 0;
+    for (row in rows) {
+        var skip = false;
+        for (v in row) {
+            if (v < 0) { skip = true; break; }
+            sum += v;                              // 3 wurde schon addiert, bevor -1 kam
+        }
+        if (skip) { continue; }
+        // (weitere Verarbeitung der Zeile)
+    }
+    println(f"sum {sum}");
+    return fi + fj;
+}
+
+fn findIn(grid: int[][], wanted: int): (int, int) {
+    for (i in 0..grid.length) {
+        for (j in 0..grid[i].length) {
+            if (grid[i][j] == wanted) { return (i, j); }
+        }
+    }
+    return (-1, -1);
+}
+// Ausgabe (lyric run ist.lyr; exit 2):
+// found at (1, 1)
+// helper found at (2, 1)
+// sum 11

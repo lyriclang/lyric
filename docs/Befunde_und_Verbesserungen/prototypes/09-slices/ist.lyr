@@ -1,0 +1,52 @@
+// 09 Slices / Teilbereiche — IST-STAND (Lyric 4.4.1)
+// Aufgabe: aus einem Zeichen-Array ein Wort ausschneiden (Tokenizer), aus einem Array die
+// ersten/letzten k Elemente nehmen, einen Präfix eines Strings abschneiden.
+// Heute: Ranges existieren nur im Schleifenkopf (§7.2); ein Teilarray ist Dummy-Array + Kopier-
+// schleife; `substring(start, COUNT)` verlangt Rechnen beim Leser.
+import std.io.console { println };
+
+fn isAlpha(c: char): bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+// Teilarray von Hand: Länge, Dummy-Element, Kopierschleife — 3 Zeilen, ein Off-by-one-Risiko.
+fn sliceChars(cs: char[], from: int, to: int): char[] {
+    var out = [' '] * (to - from);
+    for (k in from..to) { out[k - from] = cs[k]; }
+    return out;
+}
+
+fn firstWord(text: string): string {
+    let cs = text.toChars();
+    var i = 0;
+    while (i < cs.length && isAlpha(cs[i])) { i += 1; }
+    return fromChars(sliceChars(cs, 0, i));
+}
+
+fn fromChars(cs: char[]): string {
+    var s = "";
+    for (c in cs) { s = s + c.show(); }     // char[] -> string ebenfalls von Hand
+    return s;
+}
+
+fn main(): int {
+    println(firstWord("hello, world"));
+
+    let xs = [10, 20, 30, 40, 50];
+    // erste zwei / letzte zwei — jeweils eine Kopierschleife
+    var head = [0] * 2;
+    for (k in 0..2) { head[k] = xs[k]; }
+    var tail = [0] * 2;
+    for (k in 3..5) { tail[k - 3] = xs[k]; }
+    println(f"{head[0]},{head[1]} … {tail[0]},{tail[1]}");
+
+    // String: Präfix "--name=" abschneiden — (start, count), nicht (from, to)
+    let arg = "--name=ada";
+    let value = arg.substring(7, arg.length() - 7);
+    println(value);
+    return xs.length;
+}
+// Ausgabe (lyric run ist.lyr; exit 5):
+// hello
+// 10,20 … 40,50
+// ada

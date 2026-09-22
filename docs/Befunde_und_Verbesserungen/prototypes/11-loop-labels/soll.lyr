@@ -1,0 +1,53 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 11 Labels für break/continue — SOLL-STAND
+//
+// Grammatik (§5):
+//   LabeledStmt  = IDENTIFIER ':' ( WhileStmt | DoWhileStmt | ForInStmt ) .
+//   BreakStmt    = 'break' [ IDENTIFIER ] ';' .
+//   ContinueStmt = 'continue' [ IDENTIFIER ] ';' .
+// Eindeutigkeit: ein Statement, das mit `IDENTIFIER ':'` beginnt, ist heute ein Parsefehler
+//   (ExprStmt erlaubt Aufruf, Zuweisung, resume — §6.8; `x:` ist nichts davon). Rust-Form
+//   `'outer:` (Lifetime-Tick) ist unnötig, weil Lyric kein `'`-Präfix-Token hat außer Char-
+//   Literalen (`'a'` — ein Label `'a:` wäre lexikalisch ein Char-Literal ohne Ende → nicht
+//   nehmen). Labels haben ihren eigenen Namensraum (kein Konflikt mit Variablen), gelten nur
+//   im Körper der markierten Schleife, und ein `break label` außerhalb ist ein Fehler.
+// Semantik (§7.2): `break outer` verlässt die markierte Schleife, `continue outer` beginnt
+//   deren nächste Iteration. `defer` (§7.5): alle Scopes zwischen dem break und dem Ziel werden
+//   verlassen — ihre defers laufen in umgekehrter Reihenfolge (das Lowering kennt das für
+//   `return` durch verschachtelte Scopes bereits).
+import std.io.console { println };
+
+fn main(): int {
+    let grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    let wanted = 5;
+
+    // (a) Doppel-break ohne Flag
+    var fi = -1;
+    var fj = -1;
+    outer: for (i in 0..grid.length) {
+        for (j in 0..grid[i].length) {
+            if (grid[i][j] == wanted) {
+                fi = i; fj = j;
+                break outer;
+            }
+        }
+    }
+    println(f"found at ({fi}, {fj})");
+
+    // (b) continue outer: Zeile verwerfen, sobald ein negativer Wert auftaucht
+    let rows = [[1, 2], [3, -1, 4], [5]];
+    var sum = 0;
+    rows: for (row in rows) {
+        var rowSum = 0;
+        for (v in row) {
+            if (v < 0) { continue rows; }
+            rowSum += v;
+        }
+        sum += rowSum;                             // nur vollständige Zeilen zählen
+    }
+    println(f"sum {sum}");
+    return fi + fj;
+}
+// Erwartete Ausgabe (exit 2):
+// found at (1, 1)
+// sum 8

@@ -1,0 +1,40 @@
+// Die weiteren Stellen, die MaterializeArguments ohne Instanz-Substitution aufrufen:
+// statische Methode einer generischen Instanz, und ein Aufruf über einen Typparameter
+// mit Constraint (der Constraint-Pfad, den pattern-lambda meldet).
+module probe;
+import std.io.console { println };
+
+interface Keeper<T> {
+    fn or(fallback: T): T;
+}
+
+class Box<T> :: [Keeper<T>] {
+    value: T,
+
+    // Statische Methode einer generischen Instanz.
+    pub static fn of(v: T): Box<T> {
+        return Box<T> { value = v };
+    }
+
+    pub fn or(fallback: T): T {
+        return this.value;
+    }
+}
+
+// Der Constraint-Pfad: der Receiver ist ein Typparameter, die Methode kommt aus dem Constraint.
+fn viaConstraint<K :: [Keeper<?int>]>(k: K): ?int {
+    return k.or(3);
+}
+
+fn main(): int {
+    let slot: ?int = 7;
+
+    // 1. statische Methode, Argument-Literal für einen Parameter, der ?int IST
+    let made = Box<?int>.of(3);
+    println(made.or(slot) ?? -1);
+
+    // 2. Constraint-Pfad
+    let b = Box<?int> { value = slot };
+    println(viaConstraint(b) ?? -1);
+    return 0;
+}

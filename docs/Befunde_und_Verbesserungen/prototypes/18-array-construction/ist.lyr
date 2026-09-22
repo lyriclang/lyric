@@ -1,0 +1,41 @@
+// 18 Array-Konstruktion ohne erstes Element — IST-STAND (Lyric 4.4.1)
+// Aufgabe: ein generisches mapArr<T, U>, ein Array aus einem Generator (Quadrate), ein
+// Array fester Länge ohne "Dummy". Heute: `[x] * n` ist DIE Form (§3.3) — sie braucht ein
+// Element x, also den Leer-Sonderfall, einen doppelten Aufruf f(xs[0]) (oder Schleife ab 1)
+// und für Strukturen ein erfundenes Dummy-Element. Lib-Variante: Iterator-Kette.
+import std.io.console { println };
+import std.iter { range, collectArray };
+
+fn mapArr<T, U>(xs: T[], f: fn(T) -> U): U[] {
+    if (xs.length == 0) { return []; }          // Sonderfall: ohne Element kein Array
+    var out = [f(xs[0])] * xs.length;           // f(xs[0]) EINMAL hier …
+    for (i in 1..xs.length) { out[i] = f(xs[i]); }   // … und die Schleife ab 1 — leicht falsch zu machen
+    return out;
+}
+
+struct Slot { id: int, used: bool, }
+
+fn main(): int {
+    let doubled = mapArr([1, 2, 3], (n: int) => n * 2);
+    println(f"{doubled[0]} {doubled[1]} {doubled[2]}");
+
+    // Generator "i -> i*i": Dummy 0, dann überschreiben
+    var squares = [0] * 5;
+    for (i in 0..5) { squares[i] = i * i; }
+    println(f"{squares[4]}");
+
+    // Struct-Array: ein Dummy-Slot, den es fachlich nicht gibt, dann überschreiben
+    var slots = [Slot { id = -1, used = false }] * 3;
+    for (i in 0..3) { slots[i] = Slot { id = i, used = false }; }
+    println(f"{slots[2].id}");
+
+    // Lib-Variante (heute): Iterator-Kette — zwei Imports, drei Allokationen, kein Dummy
+    let cubes = collectArray(range(0, 4).map((i: int) => i * i * i));
+    println(f"{cubes[3]}");
+    return doubled.length + squares.length + slots.length + cubes.length;
+}
+// Ausgabe (lyric run ist.lyr; exit 15):
+// 2 4 6
+// 16
+// 2
+// 27

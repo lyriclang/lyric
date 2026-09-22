@@ -1,0 +1,17 @@
+// Nebenprobe: hat panic(...) in Ausdrucksposition schon den Typ never (LyrType.cs:122)?
+import std.core { panic };
+import std.collections { Map };
+
+fn pick(b: bool): int {
+    return if (b) 1 else panic("no");           // never unifiziert mit int?
+}
+
+fn lookup(id: string, env: Map<string, int>): int {
+    return env.get(id) ?? panic("unbound " + id);   // never rechts von ?? ?
+}
+
+fn main(): int {
+    let env = Map<string, int>.empty();
+    env.set("x", 41);
+    return pick(true) + lookup("x", env);
+}

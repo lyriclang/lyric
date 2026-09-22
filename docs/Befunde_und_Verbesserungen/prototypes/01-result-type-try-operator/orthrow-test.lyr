@@ -1,0 +1,26 @@
+// Nebenprobe: kann ein generisches Result<T, E :: [Throwable]> heute `orThrow(): T throws E` anbieten?
+import std.io.console { println };
+import std.core { Exception };
+
+enum Result<T, E :: [Throwable]> {
+    Ok(T),
+    Err(E);
+
+    fn orThrow(): T throws E {
+        // `throw` ist kein Ausdruck (LYR-PAR0002) — Block-Arm nötig.
+        match (this) {
+            Ok(v) => { return v; }
+            Err(e) => { throw e; }
+        }
+    }
+}
+
+fn main(): int {
+    let r: Result<int, Exception> = Result.Err(Exception { text = "boom" });
+    try {
+        return r.orThrow();
+    } catch (e: Exception) {
+        println("caught " + e.message());
+        return 0;
+    }
+}

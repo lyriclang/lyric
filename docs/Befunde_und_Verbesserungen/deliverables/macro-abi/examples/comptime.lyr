@@ -1,0 +1,58 @@
+// 'comptime e' — the value of 'e', computed by the compiler.
+//
+// The expression is ordinary Lyric and means exactly what it would mean at run time. What
+// the prefix adds is the moment: the compiler lowers each site into a function of its own,
+// runs those in a VM that grants NO capability and counts instructions, and writes the values
+// back as literals. A site may use module-level names and pure functions, never a local,
+// 'this' or a lambda; the module it produces carries the answer, not the computation.
+import std.io.console { println };
+import std.string { StringBuilder };
+
+// A table nobody wants to type by hand: the powers of two up to 2^20, as text.
+fn powersOfTwo(count: int): string {
+    var sb = StringBuilder.new();
+    var value = 1;
+    for (i in 0..count) {
+        if (i > 0) {
+            sb.append(" ");
+        }
+        sb.append(f"{value}");
+        value = value * 2;
+    }
+    return sb.build();
+}
+
+// A check the compiler enforces: a format specification is validated once, while building,
+// and a bad one is a compile error at this line rather than a panic at first use.
+fn checkedSpec(spec: string): string {
+    if (!spec.startsWith(":")) {
+        panic(f"format spec '{spec}' has to start with ':'");
+    }
+    return spec;
+}
+
+// A number that would otherwise be recomputed on every start.
+fn fib(n: int): int {
+    var a = 0;
+    var b = 1;
+    for (_ in 0..n) {
+        let next = a + b;
+        a = b;
+        b = next;
+    }
+    return a;
+}
+
+let TABLE = comptime powersOfTwo(21);
+
+let SPEC = comptime checkedSpec(":08.3f");
+
+let FIB_90 = comptime fib(90);
+
+fn main(): int {
+    println(f"powers: {TABLE}");
+    println(f"spec:   {SPEC}");
+    println(f"fib 90: {FIB_90}");
+    println(f"inline: {comptime (60 * 60 * 24 * 365)}");
+    return 0;
+}

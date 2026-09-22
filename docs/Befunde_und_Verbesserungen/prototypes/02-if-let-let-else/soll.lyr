@@ -1,0 +1,62 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 02 if-let / let-else / while-let — SOLL-STAND
+//
+// Ein einziges neues Konstrukt: die BINDENDE BEDINGUNG `let Pattern = Expr`
+// an drei Stellen, an denen heute ein Expr steht bzw. ein Binding endet:
+//   IfStmt      = 'if' '(' Condition ')' Block [ 'else' … ] .
+//   WhileStmt   = 'while' '(' Condition ')' Block .
+//   Condition   = Expr | 'let' Pattern '=' Expr .
+//   BindingStmt = 'let' Pattern [ ':' TypeExpr ] '=' Expr [ 'else' Block ] ';' .   (let-else)
+// Ein `?T`-Ausdruck matcht mit einem Bindungs-Pattern genau dann, wenn er present ist
+// (die zwei Zustände von ?T, §7.6); ein Enum-Pattern wie heute im match. Ein Pattern, das
+// fehlschlagen kann, verlangt bei `let` den `else`-Block, der die Funktion/Schleife verlassen MUSS
+// (return/throw/break/continue/panic — dieselbe Regel wie beim Narrowing durch frühen Exit, §7.4).
+import std.io.console { println };
+import std.collections { Deque };
+
+class Profile { email: ?string, }
+class User { name: string, profile: ?Profile, }
+
+enum Shape { Circle(int), Rect { w: int, h: int }, Empty, }
+
+// (a) Feld: let-else ersetzt Kopie + if; das Pattern bindet den T-Wert direkt.
+fn emailOf(u: User): string {
+    let p = u.profile else { return "no profile"; };
+    let e = p.email   else { return "no email"; };
+    return e;
+}
+
+// (b) Payload ohne match: if-let mit Enum-Pattern
+fn radiusOrZero(s: Shape): int {
+    if (let Circle(r) = s) { return r; }
+    return 0;
+}
+fn describeIfRect(s: Shape): void {
+    if (let Rect { w, h } = s) { println(f"rect {w}x{h}"); }
+}
+
+// (c) while-let: der Pull steht genau einmal, in der Bedingung
+fn drain(q: Deque<int>): int {
+    var sum = 0;
+    while (let v = q.popFront()) {
+        sum += v;
+    }
+    return sum;
+}
+
+fn main(): int {
+    let ada = User { name = "Ada", profile = Profile { email = "ada@x.org" } };
+    let bob = User { name = "Bob", profile = Profile { email = null } };
+    let kim = User { name = "Kim", profile = null };
+    println(emailOf(ada) + " / " + emailOf(bob) + " / " + emailOf(kim));
+
+    println(f"{radiusOrZero(Shape.Circle(4))} {radiusOrZero(Shape.Empty)}");
+    describeIfRect(Shape.Rect { w = 2, h = 3 });
+    describeIfRect(Shape.Empty);
+
+    let q = Deque<int>.empty();
+    q.pushBack(1); q.pushBack(2); q.pushBack(3);
+    println(f"drain = {drain(q)}");
+    return 0;
+}
+// Erwartete Ausgabe: wie ist.lyr (ohne die emailOfLib-Zeile)

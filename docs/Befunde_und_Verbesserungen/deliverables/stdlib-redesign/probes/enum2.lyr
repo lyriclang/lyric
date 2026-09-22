@@ -1,0 +1,44 @@
+module probe;
+import std.io.console { println };
+
+pub enum Opt<T> {
+    Some(T),
+    None;
+
+    pub fn isSome(): bool {
+        return match (this) {
+            Some(_) => true,
+            None => false,
+        };
+    }
+}
+
+pub enum Plain {
+    A,
+    B;
+
+    pub fn isA(): bool {
+        return match (this) {
+            A => true,
+            B => false,
+        };
+    }
+}
+
+pub class Box<T> {
+    value: T,
+
+    pub fn get(): T {
+        return this.value;
+    }
+}
+
+fn main(): int {
+    let p = Plain.A;
+    println(p.isA());
+    let b = Box<int> { value = 3 };
+    println(b.get());
+    let o = Opt<int>.Some(3);
+    println(o.isSome());
+    return 0;
+}

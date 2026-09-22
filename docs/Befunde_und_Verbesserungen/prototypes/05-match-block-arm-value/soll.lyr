@@ -1,0 +1,67 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 05 Block-Arm im match-Ausdruck liefert einen Wert — SOLL-STAND (Vorschlag A: Tail-Expression)
+//
+// Regel (Spec §6.9, §7.6; Grammatik §5 Block / §6.2 MatchArm):
+//   Ein Block in WERT-POSITION — Arm eines match-Ausdrucks, Body eines Block-Lambdas,
+//   catch-Block eines try-Ausdrucks (Prototyp 04) — darf als LETZTE Anweisung einen
+//   Ausdruck OHNE `;` tragen; das ist der Wert des Blocks (Rust-Tail-Expression).
+//   Grammatik:  ValueBlock = '{' { Statement } [ Expr ] '}' .
+//               MatchArm   = Pattern [ 'if' Expr ] '=>' ( Expr | ValueBlock ) .
+//   Ein Block, der auf jedem Pfad verlässt (return/throw/…), bleibt erlaubt und trägt nichts
+//   bei (heutige Regel). Ein Block ohne Tail und ohne Exit ist weiterhin LYR-SEM0033 —
+//   mit verbesserter Diagnose: "a 'return' inside a block arm leaves the enclosing function;
+//   end the block with an expression instead".
+//   `Name { … }` am Blockende: die Statement-Regel "ein Statement beginnt nie mit einem
+//   Struct-Initializer" (§6.8) gilt für ANWEISUNGEN; die Tail-Expression wird als Ausdruck
+//   geparst, weil ihr kein `;` folgt und ihr `}` das Blockende ist — siehe README zur
+//   Disambiguierung (Zwei-Token-Lookahead genügt).
+import std.io.console { println };
+
+enum Event { Dial(string), Ack, Data(int), Hangup, }
+enum State { Idle, Connecting(string), Connected(string), Closed, }
+
+class Session {
+    state: State,
+    received: int,
+    log: int,
+
+    mut fn step(ev: Event): void {
+        this.state = match (ev) {
+            Dial(host) => { this.log += 1; State.Connecting(host) }     // Tail-Expression
+            Ack => match (this.state) {
+                Connecting(h) => State.Connected(h),
+                _ => this.state,
+            },
+            Data(n) => { this.received += n; this.state }
+            Hangup => { this.log += 1; State.Closed }
+        };
+    }
+
+    fn describe(): string {
+        return match (this.state) {
+            Idle => "Idle",
+            Connecting(h) => "Connecting(" + h + ")",
+            Connected(h) => "Connected(" + h + ")",
+            Closed => "Closed",
+        };
+    }
+}
+
+fn main(): int {
+    let s = Session { state = State.Idle, received = 0, log = 0 };
+    s.step(Event.Dial("host"));
+    s.step(Event.Ack);
+    s.step(Event.Data(5));
+    s.step(Event.Data(7));
+    println(f"{s.describe()} received={s.received} log={s.log}");
+    s.step(Event.Hangup);
+    println(f"{s.describe()} received={s.received} log={s.log}");
+    return s.received;
+}
+// Erwartete Ausgabe: wie ist.lyr (exit 12)
+// Connected(host) received=12 log=1
+// Closed received=12 log=2
+
+// Vorschlag B (Alternative, NICHT empfohlen): `=> { …; break value; }` — `break` mit Wert
+// nur im Block-Arm; kollidiert semantisch mit `break` in einer Schleife, die den match umgibt
+// (welches break ist gemeint?), und braucht ein Label-System, das Lyric nicht hat.

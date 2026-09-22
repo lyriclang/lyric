@@ -1,0 +1,13 @@
+// Nebenprobe 2: nur `??` mit panic rechts (ohne if-Ausdruck)
+import std.core { panic };
+import std.collections { Map };
+
+fn lookup(id: string, env: Map<string, int>): int {
+    return env.get(id) ?? panic("unbound " + id);
+}
+
+fn main(): int {
+    let env = Map<string, int>.empty();
+    env.set("x", 41);
+    return lookup("x", env);
+}

@@ -1,0 +1,28 @@
+module demo;
+import std.io.console { println };
+import std.string { parseInt };
+import std.math { powInt, checkedAdd, intMax, saturatingMul };
+import std.fmt { formatHex, formatInt };
+import std.random { Random };
+
+fn main(): int {
+    println(parseInt("99999999999999999999") ?? -1);
+    println(parseInt("-9223372036854775808") ?? -1);
+    println(powInt(2, 64) ?? -1);
+    println(powInt(2, 62) ?? -1);
+    println(checkedAdd(intMax, 1) ?? -1);
+    println(saturatingMul(intMax, 2));
+    println("\u{00A0}x\u{00A0}".trimStart().trimEnd() == "\u{00A0}x\u{00A0}".trim());
+    println(formatHex(-255) + " " + formatInt(-255, "X"));
+    let r = Random.seeded(1);
+    var low = 0;
+    var i = 0;
+    while (i < 1000) {
+        if (r.nextIntRange(-3, 3) < 0) {
+            low = low + 1;
+        }
+        i = i + 1;
+    }
+    println(low > 400 && low < 600);
+    return 0;
+}

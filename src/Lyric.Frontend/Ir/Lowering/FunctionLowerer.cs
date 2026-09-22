@@ -785,17 +785,29 @@ internal sealed class FunctionLowerer
         {
             fallsThrough = LowerStatements(block);
             pending = _defers.Peek();
-
-            // The normal path gets the bodies directly: no handler, no runtime cost.
-            if (fallsThrough) EmitDefers(pending);
         }
         finally
         {
             _defers.Pop();
         }
 
+        // The region ends with the BODY. Fixed after the inline copy below, it covered that copy
+        // too — and then a defer body that throws was caught by the very finally region those
+        // bodies are, which ran every defer of the scope a second time: the throwing one twice and
+        // the ones registered before it never, because the second pass threw at the same place.
         var end = new BlockId(_blocks.Count);
         var afterBody = _b.CurrentId;
+
+        // The normal path gets the bodies directly — no handler, no runtime cost — in a block of
+        // its own behind the region.
+        if (fallsThrough)
+        {
+            var normal = _b.NewBlock();
+            _b.SealBlock(afterBody, new Branch(normal, block.Span));
+            _b.SwitchTo(normal);
+            EmitDefers(pending);
+            afterBody = _b.CurrentId; // a defer body may have produced blocks of its own
+        }
 
         // And the same body once more as a finally region, for the case where an exception runs through
         // this scope. A defer runs on every scope exit, exceptions included; the normal exits are served
@@ -1363,6 +1375,13 @@ internal sealed class FunctionLowerer
 
         _b.SwitchTo(bodyBlock);
         var loop = new LoopScope(_b) { DeferDepth = _defers.Count };
+
+        // The targets a 'break' or 'continue' really reaches are reserved HERE, before the body:
+        // created on demand from inside a try or a defer scope they would land in that region's
+        // block range and put the code after the loop under its handler. See LoopScope.Reserve.
+        if (Flow.ReachesJump(stmt.Body, wantContinue: true, _types)) loop.Reserve(continueTarget: true);
+        if (Flow.ReachesJump(stmt.Body, wantContinue: false, _types)) loop.Reserve(continueTarget: false);
+
         _loops.Push(loop);
         var fallsThrough = LowerScope(stmt.Body);
         _loops.Pop();
@@ -2017,8 +2036,16 @@ internal sealed class FunctionLowerer
         var enumType = RequireEnum(_types.TypeOf(constructed), span);
         var variant = _typeTable.VariantOf(enumType.Type, callee.Member, span);
 
+        // Adapted to the declared payload type, exactly as an object initializer adapts a field:
+        // slot 0 is the tag, the payload starts at 1. Lowered raw, a struct payload would share the
+        // slot array with its source — value semantics broken — and a '?T' or interface payload
+        // would arrive as the bare value, which the verifier calls malformed IR.
+        var layout = _typeTable.Defs[variant.Value];
         var fields = new TempId[arguments.Length];
-        for (var i = 0; i < arguments.Length; i++) fields[i] = LowerExpr(arguments[i]);
+        for (var i = 0; i < arguments.Length; i++)
+            fields[i] = i + 1 < layout.FieldTypes.Length
+                ? LowerExprAs(arguments[i], layout.FieldTypes[i + 1])
+                : LowerExpr(arguments[i]);
 
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variant, enumType.Type, fields, span));
@@ -2035,8 +2062,16 @@ internal sealed class FunctionLowerer
         var variant = _typeTable.VariantOf(enumType.Type, variantName, expr.Span);
         var layout = _typeTable.Defs[variant.Value];
 
+        // Adapted to the declared field type, the same step an object initializer takes — see
+        // LowerVariantCall for what a raw payload costs.
         var values = new Dictionary<string, TempId>(StringComparer.Ordinal);
-        foreach (var field in expr.Fields) values[field.Name] = LowerExpr(field.Value);
+        foreach (var field in expr.Fields)
+        {
+            var fieldIndex = Array.IndexOf(layout.FieldNames, field.Name);
+            values[field.Name] = fieldIndex >= 0
+                ? LowerExprAs(field.Value, layout.FieldTypes[fieldIndex])
+                : LowerExpr(field.Value);
+        }
 
         var fields = new TempId[layout.FieldNames.Length - 1];
         for (var i = 1; i < layout.FieldNames.Length; i++)
@@ -2423,11 +2458,12 @@ internal sealed class FunctionLowerer
             {
                 var unwrapped = _slots.NewTemp(slotType);
                 _b.Emit(new OptGet(unwrapped, value, slotType, binding.Span));
-                _b.Emit(new StoreLocal(slot, unwrapped, binding.Span));
+                _b.Emit(new StoreLocal(slot, CopyIfStruct(unwrapped, slotType, binding.Span),
+                    binding.Span));
                 return;
             }
 
-            _b.Emit(new StoreLocal(slot, value, binding.Span));
+            _b.Emit(new StoreLocal(slot, CopyIfStruct(value, slotType, binding.Span), binding.Span));
             return;
         }
 
@@ -2603,10 +2639,21 @@ internal sealed class FunctionLowerer
         // original through its own name changed what the pattern had bound: measured at 99 where
         // an ordinary `let` of the same field answered 1. Unobservable on the variant path, which
         // shares this helper, only because an enum's payload cannot be reached to mutate.
-        if (type is IrStructType structType) loaded = CopyStructValue(loaded, structType, span);
-
-        _b.Emit(new StoreLocal(slot, loaded, span));
+        _b.Emit(new StoreLocal(slot, CopyIfStruct(loaded, type, span), span));
     }
+
+    /// <summary>
+    /// A struct value entering a binding, copied; anything else passed through.
+    ///
+    /// <para>A binding is where a value gets a new home, and a struct detaches there. Without it the
+    /// name aliases what it was read from, so mutating the original through ITS name changes what the
+    /// binding holds — measured at 99 where an ordinary <c>let</c> of the same value answered 1. A
+    /// freshly built value has no other owner and needs none.</para>
+    /// </summary>
+    private TempId CopyIfStruct(TempId value, IrType type, Span span) =>
+        type is IrStructType structType && !_fresh.Contains(value)
+            ? CopyStructValue(value, structType, span)
+            : value;
 
     // ------------------------------------------------------------------ optionals
 
@@ -3771,12 +3818,15 @@ internal sealed class FunctionLowerer
             // route LowerConstraintCall takes.
             //
             // 'An own member beats a default' sits in the LookupLocal condition: when the concrete type
-            // has the method itself, this case falls through to the direct call.
+            // has the method itself, this case falls through to the direct call. A visible EXTENSION
+            // beats it too (§5.4), and that half was missing: the question asked was whether the TYPE
+            // carries the member, never what the sema had already BOUND.
             case MemberExpr member
                 when ReceiverType(member.Target) is NamedRef
                      { Symbol: { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct
                          or TypeSymbolKind.Enum } concrete }
                      && concrete.Members.LookupLocal(member.Member) is not FunctionSymbol
+                     && !BoundToExtension(member)
                      && _typeTable.InterfaceProviding(concrete, member.Member) is { } provider:
             {
                 // As the concrete type DECLARES it: 'Iterator<int>', not 'Iterator'. A generic
@@ -4503,6 +4553,19 @@ internal sealed class FunctionLowerer
     /// the distinction every program carries the five Display extensions from <c>std.core</c>, because
     /// that module is always loaded.</para>
     /// </summary>
+    /// <summary>
+    /// Did the sema bind this member to a visible EXTENSION method?
+    ///
+    /// <para>§5.4 fixes the order as own member, then extension, then a default of a conformed
+    /// interface. The sema follows it; the lowering asked only whether the concrete TYPE carried
+    /// the member, so an extension on a type whose interface supplies the same name as a default
+    /// was never called directly — the receiver was lifted and dispatched virtually, and the
+    /// vtable row found the default. Asking what was BOUND is asking the question once.</para>
+    /// </summary>
+    private bool BoundToExtension(MemberExpr member) =>
+        _types.RefOf(member) is FunctionSymbol bound
+        && _typeTable.ExtensionOwnerOf(bound) is not null;
+
     private bool TryResolveFunction(FunctionSymbol symbol, out FunctionId id)
     {
         if (_functions.TryGetValue(symbol, out id)) return true;

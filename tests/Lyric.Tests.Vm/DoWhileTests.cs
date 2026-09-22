@@ -127,4 +127,95 @@ public class DoWhileTests
                 return i;
             }
             """));
+
+    // --- the jump target's POSITION: a protected region is a contiguous range of block ids ---
+
+    /// <summary>
+    /// A <c>break</c> out of a <c>try</c> used to create the exit block INSIDE the handler's block
+    /// range, because the target arose where the jump stood. Everything after the loop was then
+    /// protected by a <c>catch</c> that belongs inside it: the <c>throw</c> behind the loop landed
+    /// in the loop's own handler, control returned to the condition, and the program looped forever
+    /// while running the code after the loop again on every turn.
+    /// </summary>
+    [Fact]
+    public void A_break_out_of_a_try_does_not_put_the_code_after_the_loop_under_its_handler() =>
+        Assert.Equal(7, Run("""
+            class Boom :: [Throwable] {
+                n: int,
+                fn message(): string { return "boom"; }
+            }
+
+            fn work(): int throws Boom {
+                do {
+                    try { break; }
+                    catch (e: Boom) { return 99; }
+                } while (false);
+                throw Boom { n = 1 };
+            }
+
+            fn main(): int {
+                try { return work(); }
+                catch (e: Boom) { return 7; }
+            }
+            """));
+
+    /// <summary>The same for <c>continue</c>, whose target is the CONDITION: the condition's own
+    /// exception was caught by the handler in the body it had just left.</summary>
+    [Fact]
+    public void A_continue_out_of_a_try_does_not_put_the_condition_under_its_handler() =>
+        Assert.Equal(7, Run("""
+            class Boom :: [Throwable] {
+                n: int,
+                fn message(): string { return "boom"; }
+            }
+
+            fn again(calls: int): bool throws Boom {
+                if (calls >= 2) { throw Boom { n = calls }; }
+                return true;
+            }
+
+            fn work(): int throws Boom {
+                var calls = 0;
+                do {
+                    try { calls = calls + 1; continue; }
+                    catch (e: Boom) { return 99; }
+                } while (again(calls));
+                return 0;
+            }
+
+            fn main(): int {
+                try { return work(); }
+                catch (e: Boom) { return 7; }
+            }
+            """));
+
+    /// <summary>A <c>defer</c> scope opens the same kind of region, and there the price was a body
+    /// that ran TWICE: once at the <c>break</c>, once more while the <c>throw</c> behind the loop
+    /// unwound through a finally region that should never have covered it.</summary>
+    [Fact]
+    public void A_break_out_of_a_defer_scope_runs_the_defer_once() =>
+        Assert.Equal(1, Run("""
+            class Boom :: [Throwable] {
+                n: int,
+                fn message(): string { return "boom"; }
+            }
+
+            class Counter { n: int }
+
+            fn work(c: Counter): int throws Boom {
+                do {
+                    {
+                        defer { c.n = c.n + 1; }
+                        break;
+                    }
+                } while (false);
+                throw Boom { n = 1 };
+            }
+
+            fn main(): int {
+                let c = Counter { n = 0 };
+                try { return work(c); }
+                catch (e: Boom) { return c.n; }
+            }
+            """));
 }

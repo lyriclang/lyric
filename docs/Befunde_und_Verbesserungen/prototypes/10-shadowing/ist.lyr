@@ -1,0 +1,51 @@
+// 10 Shadowing / Redeklaration einer Lokalen — IST-STAND (Lyric 4.4.1)
+// Aufgabe: einen Eingabewert schrittweise "verfeinern" (Optional auffüllen, trimmen, parsen)
+// ohne für jeden Schritt einen neuen Namen zu erfinden. Heute: eine zweite `let x` im SELBEN
+// Block wird still verworfen (probe-silent.lyr druckt 1 statt 11) — also braucht jeder
+// Schritt einen eigenen Namen (rawName, name1, name2 …) oder ein `var`, das seine Optionalität
+// nicht verlieren kann. In einem INNEREN Block funktioniert Shadowing dagegen bereits.
+import std.io.console { println };
+import std.string { parseInt };
+
+fn describe(input: ?string, fallback: string): string {
+    // Schritt 1: Optional auffüllen — neuer Name nötig
+    let filled = input ?? fallback;
+    // Schritt 2: trimmen — noch ein Name
+    let trimmed = filled.trim();
+    // Schritt 3: parsen — und noch einer
+    let parsed = parseInt(trimmed);
+    if (parsed == null) { return "not a number: '" + trimmed + "'"; }
+    return f"number {parsed}";
+}
+
+// Die `var`-Variante spart Namen, aber der Typ bleibt ?string — Narrowing endet bei jeder
+// Zuweisung (§7.4), also hilft `x = x ?? d` nicht: x ist danach immer noch ?string.
+fn describeVar(input: ?string, fallback: string): string {
+    var x = input;
+    x = x ?? fallback;                 // x: ?string bleibt ?string
+    let y = x!;                        // Unwrap nötig — obwohl x nie null sein kann
+    return y.trim();
+}
+
+fn main(): int {
+    println(describe(" 42 ", "0"));
+    println(describe(null, "7"));
+    println(describe("abc", "0"));
+    println(describeVar(null, " z "));
+
+    // Shadowing in einem INNEREN Block geht heute:
+    let n = 1;
+    {
+        let n = n + 10;
+        println(f"inner {n}");
+    }
+    println(f"outer {n}");
+    return n;
+}
+// Ausgabe (lyric run ist.lyr; exit 1):
+// number 42
+// number 7
+// not a number: 'abc'
+// z
+// inner 11
+// outer 1

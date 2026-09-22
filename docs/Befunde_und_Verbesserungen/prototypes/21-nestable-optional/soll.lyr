@@ -1,0 +1,45 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 21 Nestbare Optionals — SOLL-STAND, Variante A (`??T` als Typ) zur Gegenüberstellung
+//
+// Variante A (Sprache, Major): `?` nestet. `??T` ist ein Typ; `null` ist die ÄUSSERSTE Absenz;
+//   die innere Absenz braucht eine Schreibweise. Vorschlag: eine implizite Hebung bei
+//   Zuweisung `?T → ??T` (ein vorhandenes inneres null wird zu Some(null)) — das ist die
+//   Regel, die Swift/Rust über den Enum-Konstruktor ausdrücken; Lyric hätte sie als Widerung
+//   (§3.7: "T assigns to ?T" gilt dann für T = ?U ebenso). Narrowing `x != null` schält EINE
+//   Ebene. Laufzeit: heute ist ein ?T ein Wert + Sentinel/Tag im Slot; ein ??T braucht einen
+//   zweiten Tag → Layout-Änderung → FORMAT-MAJOR (§13). Deshalb ist A nur sinnvoll, wenn ein
+//   Format-Major ohnehin ansteht.
+// Variante B (stdlib, lib-variante.lyr): `Option<T>` als Enum neben `?T`, nur im generischen
+//   Protokoll (`Iterator<T>.next(): Option<T>`). Kein Laufzeitumbau, aber zwei Absenzformen und
+//   ein Bruch aller `next()`-Implementierungen (5.0 mit Uhr).
+import std.io.console { println };
+import std.collections { List };
+
+fn firstOf<T>(xs: T[]): ?T {
+    return if (xs.length == 0) null else xs[0];    // für T = ?int: Ergebnis ??int
+}
+
+fn main(): int {
+    let slots: (?int)[] = [null, 5, null];
+    let empty: (?int)[] = [];
+
+    for (x in slots) {                               // (1) Protokoll spendet das ÄUSSERE null
+        if (x != null) { println(f"{x}"); }
+    }
+
+    let a: ??int = firstOf(slots);                   // Some(null): Array nicht leer, Element null
+    let b: ??int = firstOf(empty);                   // null: Array leer
+    println(if (a != null) (if (a != null) "a: element present but null" else "a: value") else "a: empty");
+    println(if (b != null) "b: element" else "b: empty");
+
+    let cells = List<?int>.empty();                  // (3) Backing (?T)[] wird ((?int)?)[] — kein Kollaps
+    cells.push(null);
+    cells.push(7);
+    println(f"cells {cells.length()}");
+    return 0;
+}
+// Erwartete Ausgabe:
+// 5
+// a: element present but null
+// b: empty
+// cells 2

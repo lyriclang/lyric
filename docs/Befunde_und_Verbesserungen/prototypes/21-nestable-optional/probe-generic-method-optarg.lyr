@@ -1,0 +1,17 @@
+// Nebenprobe: Methoden eines generischen Typs mit OPTIONALEM Typargument (T = ?int)
+enum Option<T> {
+    Some(T),
+    None;
+    fn isSome(): bool { return match (this) { Some(_) => true, None => false }; }
+}
+class Box<T> {
+    v: T,
+    fn get(): T { return this.v; }
+}
+fn main(): int {
+    let b = Box<?int> { v = 4 };
+    let g = b.get();                    // Klasse: geht das?
+    let a: Option<?int> = Option<?int>.Some(3);
+    let x = a.isSome();                 // Enum: error[LYR-IR0001]: call to 'isSome' (external or bodiless)
+    return if (x && g != null) g else 0;
+}

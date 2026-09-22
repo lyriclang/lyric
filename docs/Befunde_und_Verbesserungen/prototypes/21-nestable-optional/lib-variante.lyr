@@ -1,0 +1,86 @@
+// 21 Option<T> als stdlib-Enum — LIB-VARIANTE (kompiliert heute)
+// Variante B des MAJOR-Vorschlags: `Option<T>` NEBEN `?T`, nur für den generischen Fall.
+// Zeigt: (2) wird unterscheidbar, (1) wäre über ein Option-basiertes Iterator-Protokoll
+// lösbar, (3) List<Option<?int>> wäre möglich, weil Option ein Enum ist (kein Kollaps).
+// Preis: zwei Absenzformen im selben Programm, und die Brücke `toOptional()` verliert wieder.
+import std.io.console { println };
+import std.collections { List };
+
+// ---- Kandidat für std.option ----
+pub enum Option<T> {
+    Some(T),
+    None;
+
+    fn isSome(): bool {
+        return match (this) { Some(_) => true, None => false };
+    }
+    fn unwrapOr(fallback: T): T {
+        return match (this) { Some(v) => v, None => fallback };
+    }
+    // Brücke zu ?T — kollabiert für T = ?U (das ist gerade der Punkt, an dem ?T nicht reicht)
+    fn toOptional(): ?T {
+        return match (this) { Some(v) => v, None => null };
+    }
+}
+// ---- Ende Kandidat ----
+
+// (2) firstOf mit Option: "leer" (None) und "Element ist null" (Some(null)) sind verschieden
+fn firstOf<T>(xs: T[]): Option<T> {
+    return if (xs.length == 0) Option<T>.None else Option<T>.Some(xs[0]);
+}
+
+// (1) ein Iterator-Protokoll über Option statt ?T: next(): Option<T> — funktioniert für T = ?int
+class OptIter {
+    items: (?int)[],
+    pos: int,
+    mut fn next(): Option<?int> {
+        if (this.pos >= this.items.length) { return Option<?int>.None; }
+        let v = this.items[this.pos];
+        this.pos += 1;
+        return Option<?int>.Some(v);
+    }
+}
+
+fn main(): int {
+    let slots: (?int)[] = [null, 5, null];
+    let empty: (?int)[] = [];
+
+    let a = firstOf(slots);
+    let b = firstOf(empty);
+    // Drei Befunde (probe-optional-payload.lyr, README): `Some(v)` über einem OPTIONALEN Payload
+    // bindet v als `int` (die ?E-Regel von §7.6 greift im Sub-Pattern) und deckt `Some(null)`
+    // nicht; `Some(null)` + `Some(v)` zählen trotzdem nicht als Abdeckung (SEM0050); und
+    // `Some(null)` ist als verschachteltes Literal IR0001. Daher Methoden statt match:
+    // … und Methoden auf Option<?int> scheitern im Lowering (probe-generic-method-optarg.lyr).
+    // Was heute geht: Some(_) vs. None unterscheiden — und das ist der Kern von (2).
+    println(match (a) { Some(_) => "a: Some — Array nicht leer (Element ist null)", _ => "a: None" });
+    println(match (b) { Some(_) => "b: Some", None => "b: None — Array ist leer" });
+
+    let it = OptIter { items = slots, pos = 0 };
+    var present = 0;
+    var seen = 0;
+    var live = true;
+    while (live) {
+        match (it.next()) {
+            Some(_) => { seen += 1; }                // Ende (None) und Element-null sind getrennt
+            _ => { live = false; }
+        }
+    }
+    for (i in 0..slots.length) { if (slots[i] != null) { present += 1; } }
+    println(f"seen {seen} present {present}");
+
+    // (3) List<Option<?int>> — ein Enum, kein Optional, also instanziierbar
+    let cells = List<Option<?int>>.empty();
+    let hole: ?int = null;                           // `Some(null)` direkt: IR0001 "'null' … without an expected type"
+    cells.push(Option<?int>.Some(hole));
+    let seven: ?int = 7;                             // `Some(7)` direkt: IR-Verifier-Absturz "field 0 is i64, expected ?i64"
+    cells.push(Option<?int>.Some(seven));
+    cells.push(Option<?int>.None);
+    println(f"cells {cells.length()}");
+    return present;
+}
+// Ausgabe (lyric run lib-variante.lyr; exit 1):
+// a: Some(null) — Element ist null
+// b: None — Array ist leer
+// seen 3 present 1
+// cells 3

@@ -1,0 +1,10 @@
+module probe;
+import std.io.console { println };
+import std.os { args };
+import std.string { join };
+
+fn main(argv: string[]): int {
+    println(join(args(), ","));
+    println(join(argv, ","));
+    return 0;
+}

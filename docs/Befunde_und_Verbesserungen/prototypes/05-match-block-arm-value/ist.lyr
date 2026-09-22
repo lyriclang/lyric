@@ -1,0 +1,78 @@
+// 05 Block-Arm im match-Ausdruck liefert keinen Wert — IST-STAND (Lyric 4.4.1)
+// Aufgabe: Zustandsmaschine; ein Übergang hat Seiteneffekt UND liefert den neuen Zustand.
+// Heute: ein Block-Arm im match-AUSDRUCK muss return/throw (LYR-SEM0033), und `return`
+// verlässt die ganze Methode. Umwege: (A) match-STATEMENT mit Zuweisung an ein `var`
+// (Definite Assignment über exhaustives match, §7.7); (B) Seiteneffekt in ein zweites
+// match-Statement heben; (C) Helfermethode pro Arm.
+// (Kein Tupel-Scrutinee `(state, ev)` — der stürzt den Compiler ab, FunctionLowerer.cs:943.)
+import std.io.console { println };
+
+enum Event { Dial(string), Ack, Data(int), Hangup, }
+enum State { Idle, Connecting(string), Connected(string), Closed, }
+
+class Session {
+    state: State,
+    received: int,
+    log: int,
+
+    // Umweg A: match-Statement, `var next` in jedem Arm zugewiesen.
+    mut fn step(ev: Event): void {
+        var next: State;
+        match (ev) {
+            Dial(host) => { this.log += 1; next = State.Connecting(host); }
+            Ack => {
+                next = match (this.state) {
+                    Connecting(h) => State.Connected(h),
+                    _ => this.state,
+                };
+            }
+            Data(n) => {
+                this.received += n;               // Seiteneffekt …
+                next = this.state;                // … und Wert, in zwei Statements
+            }
+            Hangup => { this.log += 1; next = State.Closed; }
+        }
+        this.state = next;
+    }
+
+    // Umweg B: Seiteneffekte zuerst (Statement), dann der reine Wert (Ausdruck) —
+    // die Fallunterscheidung steht zweimal und kann auseinanderlaufen.
+    mut fn stepB(ev: Event): void {
+        match (ev) {
+            Data(n) => { this.received += n; }
+            Dial(_) => { this.log += 1; }      // `Dial(_) | Hangup` wird als "bindendes
+            Hangup => { this.log += 1; }       // Or-Pattern" abgelehnt (LYR-IR0001), obwohl
+            _ => { }                           // `_` nichts bindet — siehe README (Bug)
+        }
+        this.state = match (ev) {
+            Dial(host) => State.Connecting(host),
+            Ack => match (this.state) { Connecting(h) => State.Connected(h), _ => this.state },
+            Data(_) => this.state,
+            Hangup => State.Closed,
+        };
+    }
+
+    fn describe(): string {
+        return match (this.state) {
+            Idle => "Idle",
+            Connecting(h) => "Connecting(" + h + ")",
+            Connected(h) => "Connected(" + h + ")",
+            Closed => "Closed",
+        };
+    }
+}
+
+fn main(): int {
+    let s = Session { state = State.Idle, received = 0, log = 0 };
+    s.step(Event.Dial("host"));
+    s.step(Event.Ack);
+    s.step(Event.Data(5));
+    s.stepB(Event.Data(7));
+    println(f"{s.describe()} received={s.received} log={s.log}");
+    s.stepB(Event.Hangup);
+    println(f"{s.describe()} received={s.received} log={s.log}");
+    return s.received;
+}
+// Ausgabe (lyric run ist.lyr; exit 12):
+// Connected(host) received=12 log=1
+// Closed received=12 log=2

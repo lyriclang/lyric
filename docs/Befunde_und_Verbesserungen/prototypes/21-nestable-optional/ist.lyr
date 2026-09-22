@@ -1,0 +1,51 @@
+// 21 Nestbare Optionals / Option<T> — IST-STAND (Lyric 4.4.1)
+// Drei Stellen, an denen "?? kollabiert" (§3.3) in Generics ankommt:
+//  (1) `for (x in slots)` über `(?int)[]` ist LYR-SEM0091 (Iterator-Protokoll spendet null
+//      für "Ende") — Umgehung: Index-Schleife.
+//  (2) `fn firstOf<T>(xs: T[]): ?T` kann bei T = ?int "leer" nicht von "erstes Element ist
+//      null" trennen — der Aufrufer sieht in beiden Fällen null.
+//  (3) `List<?int>` ist nicht instanziierbar (stdlib-review) — Umgehung: Wrapper-Struct
+//      `Slot { value: ?int }`, der die Absenz eine Ebene tiefer versteckt.
+import std.io.console { println };
+import std.collections { List };
+
+fn firstOf<T>(xs: T[]): ?T {
+    return if (xs.length == 0) null else xs[0];
+}
+
+struct Slot { value: ?int, }                   // (3) Wrapper: ?int als Feld, Slot selbst nie null
+
+fn main(): int {
+    let slots: (?int)[] = [null, 5, null];
+
+    // (1) for-in über (?int)[] → SEM0091; Index-Schleife stattdessen
+    var present = 0;
+    for (i in 0..slots.length) {
+        if (slots[i] != null) { present += 1; }
+    }
+    println(f"present {present}");
+
+    // (2) firstOf auf (?int)[] wird ABGELEHNT: LYR-IR0001 "a nested optional '??T'" — im
+    //     Lowering, nicht in der Sema (probe-nested.lyr). Sauber, aber: die generische Funktion
+    //     ist damit für T = ?int unbenutzbar. Umgehung: Wrapper-Struct auch hier.
+    let wrapped: Slot[] = [Slot { value = null }, Slot { value = 5 }];
+    let empty: Slot[] = [];
+    let a = firstOf(wrapped);                   // ?Slot: present, .value ist null
+    let b = firstOf(empty);                     // ?Slot: null — leer
+    println(if (a != null) (if (a.value == null) "a: element present, value null" else "a: value") else "a: empty");
+    println(if (b != null) "b: element" else "b: empty");
+
+    // (3) List<?int> geht nicht; List<Slot> als Umgehung
+    let cells = List<Slot>.empty();
+    cells.push(Slot { value = null });
+    cells.push(Slot { value = 7 });
+    var sum = 0;
+    for (c in cells) { sum += c.value ?? 0; }
+    println(f"cells {cells.length()} sum {sum}");
+    return present + sum;
+}
+// Ausgabe (lyric run ist.lyr; exit 8):
+// present 1
+// a: null (Element null? oder leer?)
+// b: null (Element null? oder leer?)
+// cells 2 sum 7

@@ -1,0 +1,62 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 08 `throw` als Ausdruck vom Typ `never` — SOLL-STAND
+//
+// Grammatik (§6.2): Primary += ThrowExpr ;  ThrowExpr = 'throw' UnaryExpr .
+//   `ThrowStmt = 'throw' Expr ';'` wird zum ExprStmt-Fall (§6.8: ExprStmt admits … or a throw).
+//   Eindeutig: `throw` ist reserviert und beginnt heute nur das Statement; in Ausdrucksposition
+//   ist es heute LYR-PAR0002.
+// Typregel (§6.9, §9.4): `throw e` hat den Typ `never`. `never` unifiziert mit JEDEM Typ und
+//   trägt selbst nichts bei — ein match mit Armen `int` und `never` ist `int`; `a ?? throw e` ist
+//   `T` (der rechte Operand hat keinen Wert, also keine Widerung zu `?T`); `if (c) x else throw e`
+//   ist der Typ von x. `panic`, `todo`, `unreachable` (std.core) bekommen den Rückgabetyp `never`
+//   statt `void` — §9.4 sagt es bereits, der Typ sagt es noch nicht. Ein `never`-Ausdruck als
+//   Statement ist erlaubt (das ist das heutige throw-Statement).
+// Flow (§7.3, §7.7): nach einem never-Ausdruck ist der Pfad beendet — Coverage und Definite
+//   Assignment behandeln ihn wie heute `throw;`/`panic(…)`.
+import std.io.console { println };
+import std.collections { Map };
+
+class EvalError :: [Throwable] {
+    what: string,
+    fn message(): string { return "eval: " + this.what; }
+}
+
+enum Token { Num(int), Name(string), Plus, Bad, }
+
+fn value(t: Token, env: Map<string, int>): int throws EvalError {
+    return match (t) {
+        Num(n) => n,
+        Name(id) => lookup(id, env),
+        _ => throw EvalError { what = "not a value" },          // (1) Arm vom Typ never
+    };
+}
+
+fn lookup(id: string, env: Map<string, int>): int throws EvalError {
+    return env.get(id) ?? throw EvalError { what = "unbound " + id };   // (2) Kotlin-Idiom
+}
+
+fn checkedDiv(a: int, b: int): int throws EvalError {
+    return if (b != 0) a / b else throw EvalError { what = "division by zero" };   // (3)
+}
+
+fn main(): int {
+    let env = Map<string, int>.empty();
+    env.set("x", 42);
+    var sum = 0;
+    let tokens = [Token.Num(1), Token.Name("x"), Token.Name("y"), Token.Plus];
+    for (t in tokens) {
+        try {
+            sum += value(t, env);
+        } catch (e: EvalError) {
+            println(e.message());
+        }
+    }
+    try {
+        sum += checkedDiv(sum, 0);
+    } catch (e: EvalError) {
+        println(e.message());
+    }
+    println(f"sum {sum}");
+    return sum;
+}
+// Erwartete Ausgabe: identisch mit ist.lyr (exit 43)

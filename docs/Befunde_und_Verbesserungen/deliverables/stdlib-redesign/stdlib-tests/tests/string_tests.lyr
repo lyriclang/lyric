@@ -1,0 +1,165 @@
+import std.test { Test, assertEq, assertTrue };
+import std.string {
+    join,
+    parseInt,
+    parseFloat,
+    fromFloat,
+    fromInt,
+    StringBuilder,
+    utf8DecodeOrThrow,
+    Utf8Error,
+};
+import std.math { isInfinite };
+
+@Test
+pub fn trim_takes_both_ends(): void {
+    assertEq("  ab  ".trim(), "ab");
+    assertEq("".trim(), "");
+}
+
+@Test
+pub fn split_and_join_are_inverse(): void {
+    let parts = "a,b,c".split(",");
+    assertEq(parts.length, 3);
+    assertEq(join(parts, ","), "a,b,c");
+}
+
+@Test
+pub fn indexOf_answers_minus_one_for_absence(): void {
+    assertEq("abc".indexOf("z"), -1);
+    assertEq("abcabc".indexOf("bc"), 1);
+    assertEq("abcabc".lastIndexOf("bc"), 4);
+}
+
+@Test
+pub fn replace_takes_every_occurrence_without_overlap(): void {
+    assertEq("aaa".replace("aa", "b"), "ba");
+    assertEq("aaa".count("aa"), 1);
+}
+
+@Test
+pub fn parseInt_handles_signs_and_refuses_junk(): void {
+    assertEq(parseInt("-42")!, -42);
+    assertEq(parseInt("+7")!, 7);
+    assertTrue(parseInt("") == null, "empty is not a number");
+    assertTrue(parseInt("-") == null, "a sign alone is not a number");
+    assertTrue(parseInt("4x2") == null, "junk is not a number");
+}
+
+@Test
+pub fn padStart_never_truncates(): void {
+    assertEq("7".padStart(3, '0'), "007");
+    assertEq("1234".padStart(3, '0'), "1234");
+}
+
+@Test
+pub fn isBlank_sees_whitespace_only(): void {
+    assertTrue("  \t".isBlank(), "whitespace is blank");
+    assertTrue(!" x ".isBlank(), "content is not blank");
+}
+
+@Test
+pub fn a_builder_joins_its_pieces(): void {
+    let sb = StringBuilder.new();
+    sb.append("a");
+    sb.appendChar('b');
+    sb.appendLine("c");
+    assertEq(sb.build(), "abc\n");
+}
+
+// The balanced concatenation (v1.14): many pieces, one linear-ish build — and building twice
+// must yield the same string, because `build` reads and never consumes.
+@Test
+pub fn a_builder_with_many_pieces_builds_repeatably(): void {
+    let b = StringBuilder.new();
+    var i = 0;
+    while (i < 100) {
+        b.append("x");
+        i = i + 1;
+    }
+    let first = b.build();
+    assertEq(first, b.build());
+    assertTrue(first.count("x") == 100, "expected 100 pieces in the built string");
+}
+
+@Test
+pub fn join_weaves_the_separator_between_all_parts(): void {
+    assertEq(join(["a", "b", "c", "d", "e"], "-"), "a-b-c-d-e");
+    assertEq(join([], "-"), "");
+    assertEq(join(["solo"], "-"), "solo");
+}
+
+@Test
+pub fn replace_leaves_a_string_without_matches_untouched(): void {
+    assertEq("abc".replace("zz", "y"), "abc");
+    assertEq("start middle end".replace("middle", ""), "start  end");
+}
+
+@Test
+pub fn parseFloat_reads_every_decimal_shape(): void {
+    assertEq(parseFloat("3.5") ?? -1.0, 3.5);
+    assertEq(parseFloat("-0.25") ?? -1.0, -0.25);
+    assertEq(parseFloat("42") ?? -1.0, 42.0);
+    assertEq(parseFloat("+42") ?? -1.0, 42.0);
+    assertEq(parseFloat(".5") ?? -1.0, 0.5);
+    assertEq(parseFloat("-.5") ?? 1.0, -0.5);
+    assertEq(parseFloat("1e2") ?? -1.0, 100.0);
+    assertEq(parseFloat("2.5E-1") ?? -1.0, 0.25);
+    assertEq(parseFloat("1e+3") ?? -1.0, 1000.0);
+    assertEq(parseFloat("+.5") ?? -1.0, 0.5);
+    assertEq(parseFloat(".5e3") ?? -1.0, 500.0);
+}
+
+/// Correct rounding is the contract: what `fromFloat` writes comes back as the same value, and
+/// a seventeen-digit fraction lands on the exact float it names.
+@Test
+pub fn parseFloat_is_the_exact_inverse_of_fromFloat(): void {
+    let awkward = 0.1 + 0.2;
+    assertEq(parseFloat(fromFloat(awkward)) ?? -1.0, awkward);
+    assertEq(parseFloat("0.30000000000000004") ?? -1.0, awkward);
+    assertEq(parseFloat(fromFloat(1.0e300)) ?? -1.0, 1.0e300);
+    // A magnitude beyond the type rounds to infinity rather than failing.
+    assertTrue(isInfinite(parseFloat("1e999") ?? 0.0), "overflow rounds to infinity");
+}
+
+@Test
+pub fn parseFloat_refuses_what_spells_no_number(): void {
+    assertTrue(parseFloat("") == null, "the empty string");
+    assertTrue(parseFloat("-") == null, "a sign alone");
+    assertTrue(parseFloat("1.") == null, "a point without digits behind it");
+    assertTrue(parseFloat(".") == null, "a point alone");
+    assertTrue(parseFloat("1e") == null, "an exponent without digits");
+    assertTrue(parseFloat("1e+") == null, "an exponent sign without digits");
+    assertTrue(parseFloat(" 3.5") == null, "leading whitespace");
+    assertTrue(parseFloat("3.5 ") == null, "trailing whitespace");
+    assertTrue(parseFloat("1,5") == null, "a comma is not a decimal point");
+    assertTrue(parseFloat("NaN") == null, "the word NaN");
+    assertTrue(parseFloat("Infinity") == null, "the word Infinity");
+    assertTrue(parseFloat("0x10") == null, "hex is not decimal");
+    assertTrue(parseFloat("1.2.3") == null, "a second point");
+}
+
+@Test
+pub fn utf8DecodeOrThrow_names_the_byte(): void {
+    var at = -1;
+    try {
+        let text = utf8DecodeOrThrow([65 as uint8, 255 as uint8]);
+        assertTrue(false, "0xFF is not UTF-8, got " + text);
+    } catch (e: Utf8Error) {
+        at = e.offset;
+    }
+    assertEq(at, 1);
+}
+
+@Test
+pub fn trimming_uses_one_notion_of_whitespace(): void {
+    // U+00A0 (no-break space) and U+2003 (em space) are white space to `trim` since the
+    // beginning; `trimStart`, `trimEnd` and `isBlank` agree since 4.5.
+    let padded = "\u{00A0}\u{2003} x \u{00A0}";
+    assertEq(padded.trim(), "x");
+    assertEq(padded.trimStart().trimEnd(), padded.trim());
+    assertEq(padded.trimStart(), "x \u{00A0}");
+    assertEq(padded.trimEnd(), "\u{00A0}\u{2003} x");
+    assertTrue("\u{00A0}\t\u{3000}".isBlank(), "exotic spaces are blank");
+    assertTrue(!"\u{200B}".isBlank(), "a zero-width space is not white space");
+}

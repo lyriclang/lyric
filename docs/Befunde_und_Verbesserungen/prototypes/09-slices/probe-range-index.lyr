@@ -1,0 +1,6 @@
+// Nebenprobe: was sagt der Compiler heute zu xs[1..3]?
+fn main(): int {
+    let xs = [10, 20, 30, 40, 50];
+    let mid = xs[1..3];
+    return mid.length;
+}

@@ -100,6 +100,11 @@ internal sealed class ExceptionAnalyzer
         {
             case Block b: foreach (var s in b.Statements) AnalyzeStmt(s); break;
             case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
+            // A destructuring binding REQUIRES its initializer, and that initializer is a call like
+            // any other. Missing here, a throwing one escaped the walk entirely: `let (a, b) = mk();`
+            // in a `main` that declares nothing compiled clean and ended as LYR-VM0010 — the panic
+            // §9.2 calls unreachable from source.
+            case DestructuringStmt ds: AnalyzeExpr(ds.Initializer); break;
             case ExprStmt es: AnalyzeExpr(es.Expr); break;
             case IfStmt f:
                 AnalyzeExpr(f.Condition);

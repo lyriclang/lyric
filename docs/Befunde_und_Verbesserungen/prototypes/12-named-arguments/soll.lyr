@@ -1,0 +1,43 @@
+// PROPOSAL: kompiliert nicht mit 4.4.1
+// 12 Benannte Argumente — SOLL-STAND
+//
+// Grammatik (§6.2):
+//   CallArgs = [ '<' TypeExpr { ',' TypeExpr } '>' ] '(' [ CallArg { ',' CallArg } ] ')' .
+//   CallArg  = [ IDENTIFIER ':' ] Expr .
+// Trenner ist `:`, NICHT `=`: `f(x = 3)` ist heute eine Zuweisung als Ausdruck (ist.lyr (C)),
+//   `f(x: 3)` ist heute ein Parsefehler (LYR-PAR0002 nach dem Identifier) — also frei.
+//   Eindeutig: in einem Argument kann auf einen Identifier heute kein `:` folgen (kein
+//   Ternär-Operator, keine Typannotation in Ausdrücken).
+// Regeln (§7.1a, §4.3a Überladung):
+//   - Benannte Argumente stehen nach den positionalen; ein positionales nach einem benannten
+//     ist ein Fehler (Swift/Kotlin-Regel — Python ebenso).
+//   - Jeder Name muss ein Parameter des Callees sein und darf nicht doppelt (positional +
+//     benannt) belegt werden; nicht genannte Parameter nehmen ihren Default, ein Parameter
+//     ohne Default, der fehlt, ist ein Fehler.
+//   - Überladungsauflösung (§4.3a): ein Kandidat, dem ein genannter Name fehlt, scheidet VOR
+//     dem Zählen aus; danach die bestehenden Regeln.
+//   - `params`-Parameter können nicht benannt werden (sie sammeln den Rest).
+//   - Funktionswerte (fn-Typen) haben keine Parameternamen (§7.1a: Defaults/params sind
+//     Call-Site-Transformationen gegen die DEKLARATION) — benannte Argumente nur bei
+//     Aufrufen einer deklarierten Funktion/Methode, nicht über einen Funktionswert.
+import std.io.console { println };
+
+fn connect(host: string, port: int = 80, secure: bool = false, retries: int = 3, timeoutMs: int = 1000): string {
+    return f"{host}:{port} secure={secure} retries={retries} timeout={timeoutMs}";
+}
+
+fn main(): int {
+    println(connect("a", timeoutMs: 500));                  // nur der fünfte
+    println(connect("a", retries: 80, port: 3));            // Reihenfolge frei, Namen tragen die Absicht
+    println(connect("b", secure: true, retries: 5));
+    var port = 0;
+    println(connect("c", port: 8080));                      // keine Zuweisung an `port`
+    println(f"port is still {port}");
+    return 0;
+}
+// Erwartete Ausgabe (exit 0):
+// a:80 secure=false retries=3 timeout=500
+// a:3 secure=false retries=80 timeout=1000
+// b:80 secure=true retries=5 timeout=1000
+// c:8080 secure=false retries=3 timeout=1000
+// port is still 0
