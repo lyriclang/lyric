@@ -72,13 +72,70 @@ public sealed partial class Parser
         // introduce nothing else: a binding name is an identifier.
         if (_buffer.Check(TokenKind.LParen)) return ParseDestructuring(kw, isMutable);
 
+        // 'let Circle(r) = …', 'let Point { x, y } = …', 'let Shape.Empty = …': a name followed
+        // by '(', '{' or '.' opens a pattern, never a binding — a binding name is followed by
+        // ':', '=' or ';'.
+        if (_buffer.Check(TokenKind.Identifier)
+            && _buffer.Peek(1).TokenKind is TokenKind.LParen or TokenKind.LBrace or TokenKind.Dot)
+            return ParseLetPattern(kw, isMutable);
+
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
             $"expected binding name, got {_buffer.Current.TokenKind}");
         TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
         Expr? init = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
+
+        // 'let x = opt else { return; };' — the plain name is a pattern too, and the 'else'
+        // makes it a let-else. An if-expression initializer has already consumed its own
+        // 'else', so the one seen here is unambiguous.
+        if (init is not null && _buffer.Check(TokenKind.Else))
+        {
+            _buffer.Advance();
+            var elseBlock = ParseBlock();
+            var end = ExpectSemicolon();
+            return new LetPatternStmt(isMutable, new BindingPattern(_sm.Slice(nameTok.Span).ToString(), nameTok.Span),
+                type, init, elseBlock, Span.Union(kw.Span, end.Span));
+        }
+
         var semi = ExpectSemicolon();
         return new BindingStmt(isMutable, _sm.Slice(nameTok.Span).ToString(), type, init,
             Span.Union(kw.Span, semi.Span)) { NameSpan = nameTok.Span };
+    }
+
+    /// <summary>
+    /// <c>let Pattern [: Type] = Expr [else Block];</c> — a binding through any pattern. The
+    /// else block is what makes a pattern that can fail legal here; whether it is needed is the
+    /// sema's question (LYR-SEM0098), the grammar takes both forms.
+    /// </summary>
+    private Stmt ParseLetPattern(Token kw, bool isMutable)
+    {
+        var pattern = ParseOrPattern();
+        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        if (!_buffer.Match(TokenKind.Equal))
+        {
+            _de.Report("LYR-PAR0020", Severity.Error, _buffer.Current.Span,
+                "a pattern binding needs an initializer ('let Circle(r) = …;')");
+            var bad = ExpectSemicolon();
+            return new LetPatternStmt(isMutable, pattern, type, new ErrorExpr(bad.Span), null,
+                Span.Union(kw.Span, bad.Span));
+        }
+        var init = ParseExpr(0);
+        Block? elseBlock = _buffer.Match(TokenKind.Else) ? ParseBlock() : null;
+        var semi = ExpectSemicolon();
+        return new LetPatternStmt(isMutable, pattern, type, init, elseBlock, Span.Union(kw.Span, semi.Span));
+    }
+
+    /// <summary>
+    /// The condition of an <c>if</c> or a <c>while</c>: an expression, or <c>let Pattern = Expr</c>.
+    /// Unambiguous, because <c>let</c> is a keyword and begins no expression.
+    /// </summary>
+    private Expr ParseCondition()
+    {
+        if (!_buffer.Check(TokenKind.Let)) return ParseExpr(0);
+        var kw = _buffer.Advance();
+        var pattern = ParseOrPattern();
+        _buffer.Expect(TokenKind.Equal, "LYR-PAR0020", "expected '=' after the pattern of a 'let' condition");
+        var init = ParseExpr(0);
+        return new LetCondExpr(pattern, init, Span.Union(kw.Span, init.Span));
     }
 
     /// <summary>
@@ -122,7 +179,7 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance(); // if
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'if'");
-        var cond = ParseExpr(0);
+        var cond = ParseCondition();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after if-condition");
         var then = ParseBlock();
 
@@ -140,7 +197,7 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance(); // while
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'while'");
-        var cond = ParseExpr(0);
+        var cond = ParseCondition();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after while-condition");
         var body = ParseBlock();
         return new WhileStmt(cond, body, Span.Union(kw.Span, body.Span));

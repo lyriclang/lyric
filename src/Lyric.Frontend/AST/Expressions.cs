@@ -70,6 +70,11 @@ public sealed record InterpHole(Expr Expr, string? FormatSpec, Span Span) : Inte
 
 // --- lambdas ---
 public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, Node Body, Span Span) : Expr(Span); // Body is an Expr or a Block
+
+/// <summary><c>let Pattern = Expr</c> as the condition of an <c>if</c> or a <c>while</c>: true
+/// when the pattern matches, and the names it binds are in scope in the branch or the body.
+/// Only there — anywhere else it is <c>LYR-SEM0098</c>.</summary>
+public sealed record LetCondExpr(Pattern Pattern, Expr Initializer, Span Span) : Expr(Span);
 public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }

@@ -288,6 +288,13 @@ public static class AstDumper
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 Write(n.Initializer, indent + 1, sb);
                 break;
+            case LetPatternStmt n:
+                Line(sb, indent, n.IsMutable ? "LetPatternVar" : "LetPattern", n.Span);
+                Write(n.Pattern, indent + 1, sb);
+                if (n.Type is not null) Write(n.Type, indent + 1, sb);
+                Write(n.Initializer, indent + 1, sb);
+                if (n.Else is not null) Write(n.Else, indent + 1, sb);
+                break;
             case IfStmt n:
                 Line(sb, indent, "If", n.Span);
                 Write(n.Condition, indent + 1, sb);
@@ -354,6 +361,11 @@ public static class AstDumper
                 break;
 
             // --- control flow as an expression ---
+            case LetCondExpr n:
+                Line(sb, indent, "LetCond", n.Span);
+                Write(n.Pattern, indent + 1, sb);
+                Write(n.Initializer, indent + 1, sb);
+                break;
             case IfExpr n:
                 Line(sb, indent, "IfExpr", n.Span);
                 Write(n.Condition, indent + 1, sb);

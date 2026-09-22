@@ -578,6 +578,7 @@ internal sealed class FunctionLowerer
             case Block b: return LowerScope(b);
             case BindingStmt b: return LowerBinding(b);
             case DestructuringStmt d: return LowerDestructuring(d);
+            case LetPatternStmt lp: return LowerLetPattern(lp);
             // 'panic(…)' has the return type 'never' and seals its block. An expression can therefore
             // end control flow, and the return value has to report that, or the caller later tries to
             // seal the same block a second time.
@@ -962,6 +963,8 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerIf(IfStmt stmt)
     {
+        if (stmt.Condition is LetCondExpr letCond) return LowerIfLet(stmt, letCond);
+
         var condition = LowerExpr(stmt.Condition);
         var thenBlock = _b.NewBlock();
 
@@ -1275,6 +1278,8 @@ internal sealed class FunctionLowerer
 
     private bool LowerWhile(WhileStmt stmt)
     {
+        if (stmt.Condition is LetCondExpr letCond) return LowerWhileLet(stmt, letCond);
+
         var condBlock = _b.NewBlock();
         _b.Seal(new Branch(condBlock, stmt.Span));
 
@@ -1296,6 +1301,101 @@ internal sealed class FunctionLowerer
 
         _b.SwitchTo(exitBlock);
         return true; // always reachable through the condition's false edge
+    }
+
+    // ------------------------------------------------------------------ binding conditions
+
+    /// <summary>
+    /// <c>if (let P = e) { … } else { … }</c>: the pattern compiler tests and binds, and its failure
+    /// target IS the else branch (or the merge, without one). No bool temp exists — the pattern's
+    /// tests branch directly, as a match arm's do.
+    /// </summary>
+    private bool LowerIfLet(IfStmt stmt, LetCondExpr letCond)
+    {
+        var type = TypeOfExpr(letCond.Initializer);
+        var value = LowerExpr(letCond.Initializer);
+
+        BlockId? elseBlock = null;
+        BlockId Fail() => elseBlock ??= _b.NewBlock();
+        LowerPattern(letCond.Pattern, value, type, Fail, assumeMatch: false);
+
+        var thenBlock = _b.NewBlock();
+        _b.Seal(new Branch(thenBlock, stmt.Span));
+        _b.SwitchTo(thenBlock);
+        var thenFallsThrough = LowerStatements(stmt.Then);
+        var thenExit = _b.CurrentId;
+
+        // The pattern cannot fail (the sema warned): the else branch is dead and gets no block,
+        // because a block nobody can reach is what the verifier refuses.
+        if (elseBlock is not { } onFail) return thenFallsThrough;
+
+        _b.SwitchTo(onFail);
+        var elseFallsThrough = stmt.Else is null || LowerStmt(stmt.Else);
+        var elseExit = _b.CurrentId;
+
+        if (!thenFallsThrough && !elseFallsThrough) return false;
+
+        var mergeBlock = _b.NewBlock();
+        if (thenFallsThrough) _b.SealBlock(thenExit, new Branch(mergeBlock, stmt.Then.Span));
+        if (elseFallsThrough) _b.SealBlock(elseExit, new Branch(mergeBlock, stmt.Span));
+        _b.SwitchTo(mergeBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>while (let P = e) { … }</c>: the initializer is evaluated and the pattern tried before
+    /// every iteration; a miss leaves the loop. The exit block arises on demand — from the
+    /// pattern's failure path or from a <c>break</c> — so an irrefutable pattern without a break
+    /// creates no unreachable block.
+    /// </summary>
+    private bool LowerWhileLet(WhileStmt stmt, LetCondExpr letCond)
+    {
+        var condBlock = _b.NewBlock();
+        _b.Seal(new Branch(condBlock, stmt.Span));
+        _b.SwitchTo(condBlock);
+
+        var loop = new LoopScope(_b, condBlock) { DeferDepth = _defers.Count };
+        var type = TypeOfExpr(letCond.Initializer);
+        var value = LowerExpr(letCond.Initializer);
+        LowerPattern(letCond.Pattern, value, type, () => loop.BreakTarget, assumeMatch: false);
+
+        var bodyBlock = _b.NewBlock();
+        _b.Seal(new Branch(bodyBlock, stmt.Span));
+        _b.SwitchTo(bodyBlock);
+        _loops.Push(loop);
+        if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
+        _loops.Pop();
+
+        if (!loop.BreakRequested) return false; // the loop never ends: nothing behind it is reachable
+        _b.SwitchTo(loop.BreakTarget);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>let P = e;</c> and <c>let P = e else { … };</c> — the value once into a temp, then the
+    /// pattern compiler binds; with an else, its failure path runs the block, which the sema
+    /// proved leaves. Without one the pattern is irrefutable and no test is emitted.
+    /// </summary>
+    private bool LowerLetPattern(LetPatternStmt stmt)
+    {
+        var type = TypeOfExpr(stmt.Initializer);
+        var value = LowerExprAs(stmt.Initializer, type);
+
+        BlockId? elseBlock = null;
+        LowerPattern(stmt.Pattern, value, type, () => elseBlock ??= _b.NewBlock(),
+            assumeMatch: stmt.Else is null);
+        if (elseBlock is not { } onFail) return true; // nothing could fail: no else path exists
+
+        var after = _b.NewBlock();
+        _b.Seal(new Branch(after, stmt.Span));
+
+        _b.SwitchTo(onFail);
+        // The block leaves on every path (LYR-SEM0098); should it fall through regardless, the
+        // continuation would run with unbound names, and 'unreachable' is the honest terminator.
+        if (LowerScope(stmt.Else!)) _b.Seal(new Unreachable(stmt.Else!.Span));
+
+        _b.SwitchTo(after);
+        return true;
     }
 
     /// <summary>
@@ -3737,7 +3837,7 @@ internal sealed class FunctionLowerer
             // INSTANCE rather than to the definition, and its return type may be T.
             case MemberExpr member
                 when SubstituteType(ReceiverType(member.Target)) is GenericInstance owner
-                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct:
+                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum:
                 return LowerGenericMethodCall(member, owner, expr);
 
             // An extension on a builtin: 'n.double()' with 'extend int'. The receiver is a scalar and

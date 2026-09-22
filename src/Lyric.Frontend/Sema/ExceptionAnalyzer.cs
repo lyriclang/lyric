@@ -100,6 +100,11 @@ internal sealed class ExceptionAnalyzer
         {
             case Block b: foreach (var s in b.Statements) AnalyzeStmt(s); break;
             case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
+            case DestructuringStmt ds: AnalyzeExpr(ds.Initializer); break;
+            case LetPatternStmt lp:
+                AnalyzeExpr(lp.Initializer);
+                if (lp.Else is not null) AnalyzeStmt(lp.Else);
+                break;
             case ExprStmt es: AnalyzeExpr(es.Expr); break;
             case IfStmt f:
                 AnalyzeExpr(f.Condition);
@@ -181,6 +186,7 @@ internal sealed class ExceptionAnalyzer
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr);
                 break;
+            case LetCondExpr lc: AnalyzeExpr(lc.Initializer); break;
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition); AnalyzeExpr(iff.Then); AnalyzeExpr(iff.Else);
                 break;

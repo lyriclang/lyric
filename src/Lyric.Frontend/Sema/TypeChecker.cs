@@ -958,6 +958,7 @@ public sealed class TypeChecker
             case Block b: CheckBlock(b, scope); break;
             case BindingStmt bnd: CheckBinding(bnd, scope); break;
             case DestructuringStmt d: CheckDestructuring(d, scope); break;
+            case LetPatternStmt lp: CheckLetPattern(lp, scope); break;
             case IfStmt f: CheckIf(f, scope); break;
             case WhileStmt w: CheckWhile(w, scope); break;
             case DoWhileStmt d: CheckBlock(d.Body, scope); CheckCondition(d.Condition, scope); break;
@@ -1234,6 +1235,8 @@ public sealed class TypeChecker
     // 'if (x == null) { return; }' narrows x afterwards through the early exit.
     private void CheckIf(IfStmt f, SymbolTable scope)
     {
+        if (f.Condition is LetCondExpr letCond) { CheckIfLet(f, letCond, scope); return; }
+
         CheckCondition(f.Condition, scope);
         var (thenFacts, elseFacts) = NarrowingFacts(f.Condition);
 
@@ -1268,6 +1271,14 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckWhile(WhileStmt w, SymbolTable scope)
     {
+        if (w.Condition is LetCondExpr letCond)
+        {
+            // 'while (let x = it.next())': the pattern is tried before EVERY iteration, and the
+            // body sees its names — the loop form of the iterator protocol (§7.2).
+            CheckBlock(w.Body, BindLetCondition(letCond, scope, "'while let'"));
+            return;
+        }
+
         CheckCondition(w.Condition, scope);
 
         var (thenFacts, _) = NarrowingFacts(w.Condition);
@@ -1281,6 +1292,71 @@ public sealed class TypeChecker
     private void Apply(Dictionary<Symbol, LyrType> facts)
     {
         foreach (var (sym, type) in facts) _narrowed[sym] = type;
+    }
+
+    // --- binding conditions and pattern bindings: if-let, while-let, let-else (§7.1, §7.4) ---
+
+    /// <summary>
+    /// <c>if (let Pattern = e) { … } else { … }</c>. The pattern's names live in the then
+    /// branch only; the else branch sees the scope as it was. Nothing narrows: the binding IS
+    /// the proof, and a fresh local of the narrowed type is what the branch gets (§7.4).
+    /// </summary>
+    private void CheckIfLet(IfStmt f, LetCondExpr letCond, SymbolTable scope)
+    {
+        var thenScope = BindLetCondition(letCond, scope, "'if let'");
+        var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+        CheckBlock(f.Then, thenScope);
+        _narrowed = snapshot;
+        if (f.Else is not null) CheckStmt(f.Else, scope);
+    }
+
+    /// <summary>Checks the initializer, binds the pattern into a scope of its own — the one the
+    /// branch or body is checked in — and warns when the pattern cannot fail, because then the
+    /// form promises a test it never performs.</summary>
+    private SymbolTable BindLetCondition(LetCondExpr letCond, SymbolTable scope, string form)
+    {
+        var type = CheckExpr(letCond.Initializer, scope);
+        _result.SetType(letCond, LyrType.Bool);
+        var inner = new SymbolTable(scope);
+        BindPattern(letCond.Pattern, type, inner);
+        if (!type.IsError && IsIrrefutable(letCond.Pattern, type))
+            _de.Report("LYR-SEM0099", Severity.Warning, letCond.Pattern.Span,
+                $"this pattern matches every '{TypeFacts.Display(type)}' — the {form} never fails");
+        return inner;
+    }
+
+    /// <summary>
+    /// <c>let Pattern = e;</c> and <c>let Pattern = e else { … };</c>. The names are bound into
+    /// the surrounding block; the else block is checked BEFORE them, because it runs when they
+    /// do not exist, and it has to leave — the same rule the early exit of §7.4 follows, and
+    /// what lets §7.7 count every name as assigned afterwards.
+    /// </summary>
+    private void CheckLetPattern(LetPatternStmt stmt, SymbolTable scope)
+    {
+        var declared = stmt.Type is null ? null : ResolveType(stmt.Type, scope);
+        var actual = CheckExpr(stmt.Initializer, scope, declared);
+        if (declared is not null) CheckAssignable(stmt.Initializer, actual, declared, stmt.Span);
+        var source = declared ?? actual;
+
+        if (stmt.Else is { } els)
+        {
+            CheckBlock(els, scope);
+            if (!Flow.AlwaysExits(els, _result))
+                _de.Report("LYR-SEM0098", Severity.Error, els.Span,
+                    "the 'else' of a 'let … else' must leave on every path — return, throw, break, continue or panic — because the names are not bound when it runs");
+        }
+
+        if (source.IsError) { BindPoison(stmt.Pattern, scope); return; }
+
+        var refutable = !IsIrrefutable(stmt.Pattern, source);
+        if (refutable && stmt.Else is null)
+            _de.Report("LYR-SEM0098", Severity.Error, stmt.Pattern.Span,
+                $"this pattern can fail on a '{TypeFacts.Display(source)}' — add 'else {{ … }}' that leaves, or use 'match'");
+        else if (!refutable && stmt.Else is not null)
+            _de.Report("LYR-SEM0099", Severity.Warning, stmt.Else.Span,
+                $"this pattern matches every '{TypeFacts.Display(source)}' — the 'else' never runs");
+
+        BindPattern(stmt.Pattern, source, scope, stmt.IsMutable);
     }
 
     /// <summary>
@@ -1418,6 +1494,13 @@ public sealed class TypeChecker
             case StructInitExpr si: return CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
+            case LetCondExpr lc:
+                // Reached only OUTSIDE an if/while head, where CheckIf/CheckWhile take it first.
+                _de.Report("LYR-SEM0098", Severity.Error, lc.Span,
+                    "a 'let' condition belongs directly in 'if (…)' or 'while (…)' — it cannot be combined or nested");
+                CheckExpr(lc.Initializer, scope);
+                BindPoison(lc.Pattern, new SymbolTable(scope));
+                return LyrType.Bool;
             case MatchExpr ma:
             {
                 var armTypes = CheckMatch(ma, ma.Scrutinee, ma.Arms, scope, asExpression: true, expected);
@@ -4423,7 +4506,7 @@ public sealed class TypeChecker
                 return;
 
             case VariantPattern v:
-                BindVariantPattern(v, scrutinee, scope);
+                BindVariantPattern(v, scrutinee, scope, mutable);
                 return;
 
             case RangePattern r:
@@ -4480,7 +4563,7 @@ public sealed class TypeChecker
         AdaptLiteralType(r.High, scrutinee);
     }
 
-    private void BindVariantPattern(VariantPattern v, LyrType scrutinee, SymbolTable scope)
+    private void BindVariantPattern(VariantPattern v, LyrType scrutinee, SymbolTable scope, bool mutable = false)
     {
         if (EnumDefOf(scrutinee) is { } enumTs)
         {
@@ -4506,7 +4589,7 @@ public sealed class TypeChecker
                 return;
             }
             _result.BindRef(v, ev);
-            BindVariantPayload(v, ev, scrutinee, enumTs, scope);
+            BindVariantPayload(v, ev, scrutinee, enumTs, scope, mutable);
             return;
         }
 
@@ -4536,7 +4619,7 @@ public sealed class TypeChecker
         {
             if (def.Members.LookupLocal(fp.Name) is FieldSymbol fs)
             {
-                BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope);
+                BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope, mutable);
             }
             else
             {
@@ -4547,7 +4630,7 @@ public sealed class TypeChecker
     }
 
     private void BindVariantPayload(VariantPattern v, EnumVariantSymbol ev, LyrType scrutinee,
-        TypeSymbol enumTs, SymbolTable scope)
+        TypeSymbol enumTs, SymbolTable scope, bool mutable = false)
     {
         var variant = (EnumVariant)ev.Declaration!;
         var subst = scrutinee is GenericInstance gi ? SubstMap(gi) : EmptySubst;
@@ -4570,7 +4653,7 @@ public sealed class TypeChecker
                 return;
             }
             for (var i = 0; i < elems.Length; i++)
-                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope, nested: true);
+                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope, mutable, nested: true);
             return;
         }
 
@@ -4588,7 +4671,7 @@ public sealed class TypeChecker
             {
                 if (Array.Find(decls, f => f.Name == fp.Name) is { } fd)
                 {
-                    BindFieldPattern(fp, Substitute(ResolveType(fd.Type, enumTs.Members), subst), scope);
+                    BindFieldPattern(fp, Substitute(ResolveType(fd.Type, enumTs.Members), subst), scope, mutable);
                 }
                 else
                 {
@@ -4625,10 +4708,10 @@ public sealed class TypeChecker
             + "one would be dropped");
     }
 
-    private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope)
+    private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope, bool mutable = false)
     {
-        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope, nested: true); return; }
-        var local = new LocalSymbol(fp.Name, type, false, fp); // short form: the field name binds
+        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope, mutable, nested: true); return; }
+        var local = new LocalSymbol(fp.Name, type, mutable, fp); // short form: the field name binds
         DeclareBinding(scope, local, fp.Span);
         _result.BindRef(fp, local);
     }
@@ -4886,6 +4969,7 @@ public sealed class TypeChecker
         DoWhileStmt d => HasValueReturn(d.Body),
         ForInStmt fo => HasValueReturn(fo.Body),
         DeferStmt de => HasValueReturn(de.Body),
+        LetPatternStmt lp => lp.Else is not null && HasValueReturn(lp.Else),
         TryStmt t => HasValueReturn(t.Body) || t.Catches.Any(c => HasValueReturn(c.Body)),
         MatchStmt m => m.Arms.Any(a => a.Body is Block ab && HasValueReturn(ab)),
         _ => false
@@ -4928,6 +5012,9 @@ public sealed class TypeChecker
                     return;
                 case Block b: foreach (var s in b.Statements) WalkNode(s); return;
                 case BindingStmt bd: WalkNode(bd.Initializer); return;
+                case DestructuringStmt ds: WalkNode(ds.Initializer); return;
+                case LetPatternStmt lp: WalkNode(lp.Initializer); WalkNode(lp.Else); return;
+                case LetCondExpr lc: WalkNode(lc.Initializer); return;
                 case IfStmt f: WalkNode(f.Condition); WalkNode(f.Then); WalkNode(f.Else); return;
                 case WhileStmt w: WalkNode(w.Condition); WalkNode(w.Body); return;
                 case DoWhileStmt d: WalkNode(d.Body); WalkNode(d.Condition); return;

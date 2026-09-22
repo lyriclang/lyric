@@ -495,6 +495,7 @@ public sealed class AstFormatter
         Block b => BlockDoc(b),
         BindingStmt b => BindingDoc(b),
         DestructuringStmt d => DestructuringDoc(d),
+        LetPatternStmt lp => LetPatternDoc(lp),
         IfStmt s => IfStmtDoc(s),
         WhileStmt s => Doc.Of(Doc.From("while ("), ExprDoc(s.Condition, Assign),
             Doc.From(") "), BlockDoc(s.Body)),
@@ -540,6 +541,29 @@ public sealed class AstFormatter
             parts.Add(ExprDoc(init, Assign));
         }
 
+        parts.Add(Doc.From(";"));
+        return new Doc.Concat(parts);
+    }
+
+    private Doc LetPatternDoc(LetPatternStmt stmt)
+    {
+        var parts = new List<Doc>
+        {
+            Doc.From(stmt.IsMutable ? "var " : "let "), PatternDoc(stmt.Pattern),
+        };
+        if (stmt.Type is { } type)
+        {
+            parts.Add(Doc.From(": "));
+            parts.Add(TypeDoc(type));
+        }
+
+        parts.Add(Doc.From(" = "));
+        parts.Add(ExprDoc(stmt.Initializer, Assign));
+        if (stmt.Else is { } els)
+        {
+            parts.Add(Doc.From(" else "));
+            parts.Add(BlockDoc(els));
+        }
         parts.Add(Doc.From(";"));
         return new Doc.Concat(parts);
     }
@@ -689,6 +713,8 @@ public sealed class AstFormatter
         BoolLiteralExpr b => Doc.From(b.Value ? "true" : "false"),
         NullLiteralExpr => Doc.From("null"),
         ThisExpr => Doc.From("this"),
+        LetCondExpr lc => Doc.Of(Doc.From("let "), PatternDoc(lc.Pattern), Doc.From(" = "),
+            ExprDoc(lc.Initializer, Assign)),
         IdentifierExpr i => Doc.From(i.Name),
         AtIdentifierExpr a => AtIdentifierDoc(a),
         TypePathExpr t => Doc.Of(Doc.From(string.Join(".", t.Path)), TypeArgsDoc(t.TypeArguments)),

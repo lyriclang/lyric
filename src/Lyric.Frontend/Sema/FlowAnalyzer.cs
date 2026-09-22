@@ -93,8 +93,15 @@ internal sealed class FlowAnalyzer
             // on the first use.
             case DestructuringStmt d:
                 AnalyzeExpr(d.Initializer, assigned);
-                foreach (var name in BoundNames(d.Pattern))
-                    if (_types.RefOf(name) is { } bound) assigned.Add(bound);
+                AddPatternBindings(d.Pattern, assigned);
+                return assigned;
+
+            // 'let P = e else { … };' — the else block leaves (the checker proved it), so after
+            // the statement every name the pattern binds is assigned.
+            case LetPatternStmt lp:
+                AnalyzeExpr(lp.Initializer, assigned);
+                if (lp.Else is not null) AnalyzeStatements(lp.Else.Statements, Clone(assigned));
+                AddPatternBindings(lp.Pattern, assigned);
                 return assigned;
             case ExprStmt es:
                 AnalyzeExpr(es.Expr, assigned);
@@ -221,6 +228,12 @@ internal sealed class FlowAnalyzer
             case StructInitExpr si: foreach (var fld in si.Fields) AnalyzeExpr(fld.Value, assigned); return;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr, assigned);
+                return;
+            // The names of an if-let/while-let are assigned where they are in scope: the branch
+            // or the body, whose sets are cloned from this one right after the condition.
+            case LetCondExpr lc:
+                AnalyzeExpr(lc.Initializer, assigned);
+                AddPatternBindings(lc.Pattern, assigned);
                 return;
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition, assigned); AnalyzeExpr(iff.Then, assigned); AnalyzeExpr(iff.Else, assigned);

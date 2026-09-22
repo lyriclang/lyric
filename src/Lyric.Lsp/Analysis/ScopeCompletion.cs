@@ -89,6 +89,14 @@ public static class ScopeCompletion
 
             // A loop or catch variable belongs to the body, not to the head: in
             // 'for (n in ns)' the iterable is evaluated where 'n' does not yet exist.
+            // An if-let binds into its then branch, a while-let into its body.
+            case IfStmt { Condition: LetCondExpr ifLet } iff when Covers(iff.Then, offset):
+                foreach (var symbol in PatternNames(model, ifLet.Pattern)) yield return symbol;
+                break;
+            case WhileStmt { Condition: LetCondExpr whileLet } loopLet when Covers(loopLet.Body, offset):
+                foreach (var symbol in PatternNames(model, whileLet.Pattern)) yield return symbol;
+                break;
+
             case ForInStmt loop when Covers(loop.Body, offset):
                 if (model.Types.RefOf(loop) is { } loopVar) yield return loopVar;
                 break;
@@ -114,6 +122,10 @@ public static class ScopeCompletion
 
             case DestructuringStmt destructuring:
                 foreach (var symbol in PatternNames(model, destructuring.Pattern)) yield return symbol;
+                break;
+
+            case LetPatternStmt letPattern:
+                foreach (var symbol in PatternNames(model, letPattern.Pattern)) yield return symbol;
                 break;
         }
     }

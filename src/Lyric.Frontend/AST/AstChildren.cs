@@ -143,6 +143,13 @@ public static class AstChildren
                 yield return d.Initializer;
                 break;
 
+            case LetPatternStmt lp:
+                yield return lp.Pattern;
+                if (lp.Type is not null) yield return lp.Type;
+                yield return lp.Initializer;
+                if (lp.Else is not null) yield return lp.Else;
+                break;
+
             case IfStmt i:
                 yield return i.Condition;
                 yield return i.Then;
@@ -299,6 +306,11 @@ public static class AstChildren
 
             case LambdaParam p:
                 if (p.Type is not null) yield return p.Type;
+                break;
+
+            case LetCondExpr lc:
+                yield return lc.Pattern;
+                yield return lc.Initializer;
                 break;
 
             case IfExpr i:

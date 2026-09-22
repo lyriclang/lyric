@@ -27,6 +27,15 @@ public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Ex
 public sealed record DestructuringStmt(bool IsMutable, TuplePattern Pattern, TypeNode? Type,
     Expr Initializer, Span Span) : Stmt(Span);
 
+/// <summary>
+/// <c>let Pattern = Expr;</c> with any pattern, and <c>let Pattern = Expr else { … };</c> when it
+/// can fail. The names the pattern binds live in the block around the statement; the else block
+/// runs when the pattern does not match and has to leave (return, throw, break, continue or
+/// panic), so afterwards the names are bound on every path (§7.7).
+/// </summary>
+public sealed record LetPatternStmt(bool IsMutable, Pattern Pattern, TypeNode? Type,
+    Expr Initializer, Block? Else, Span Span) : Stmt(Span);
+
 // Else is a block, an IfStmt (else-if) or null.
 public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span);
 

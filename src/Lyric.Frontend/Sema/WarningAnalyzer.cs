@@ -489,6 +489,10 @@ internal sealed class WarningAnalyzer
             case Block b: WalkBlock(b); break;
             case BindingStmt { Initializer: { } init }: WalkExpr(init); break;
             case DestructuringStmt d: WalkExpr(d.Initializer); break;
+            case LetPatternStmt lp:
+                WalkExpr(lp.Initializer);
+                if (lp.Else is { } le) WalkBlock(le);
+                break;
             case ExprStmt es: WalkExpr(es.Expr); break;
             case ReturnStmt { Value: { } v }: WalkExpr(v); break;
             case YieldStmt { Value: { } v }: WalkExpr(v); break;
@@ -551,6 +555,7 @@ internal sealed class WarningAnalyzer
                 WalkExpr(ma.Scrutinee);
                 foreach (var arm in ma.Arms) WalkArm(arm);
                 break;
+            case LetCondExpr lc: WalkExpr(lc.Initializer); break;
             case IfExpr iff: WalkExpr(iff.Condition); WalkExpr(iff.Then); WalkExpr(iff.Else); break;
             case BinaryExpr bi: WalkExpr(bi.Left); WalkExpr(bi.Right); break;
             case UnaryExpr u:
