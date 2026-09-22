@@ -114,3 +114,46 @@ gewinnt). **Beides ist besser als heute** — der heutige Zustand ist keine der 
 sondern die dritte, stille. Liegt als **Prototyp 10** vor und gehört in die Prototyp-Runde.
 
 Betroffen: §7.1.
+
+---
+
+## 5. Was tut ein `defer`-Body, der wirft?
+
+**Gemessen.** `defer println("A"); defer boom();` mit werfendem `boom()`: vor dem Fix lief
+`boom()` **zweimal** und `"A"` **nie**; nach dem Fix läuft `boom()` einmal und `"A"` weiterhin
+nie. Die Doppelausführung war ein Fehler (die Inline-Kopie der defer-Bodies lag in der eigenen
+finally-Region) und ist auf dem Durchfall-Pfad behoben. Dass `"A"` nicht läuft, ist keiner —
+das ist die offene Frage.
+
+**Was die Spec sagt.** §7.5: „Scheduled statements run in reverse scheduling order", und zwei
+Dinge laufen keine defers (`std.os.exit` und eine Panik). Zu einem defer-Body, der **wirft**,
+steht dort nichts.
+
+**Zu entscheiden.** Läuft der Rest der LIFO-Kette weiter, wenn einer wirft? **Go, dem dieses
+`defer` nachgebaut ist, sagt ja** — eine Panik in einem deferred call hält die übrigen defers
+nicht auf. Sagt Lyric auch ja, muss die Kette gegen eine werfende Stufe abgesichert werden, und
+es braucht einen Satz dazu, was mit der Ausnahme geschieht, wenn eine spätere Stufe ebenfalls
+wirft (erste gewinnt? letzte?).
+
+**Ein zweiter Fall hängt an der Antwort.** Dieselbe Doppelausführung steckt noch im
+`return`-Pfad (und analog bei `break`/`continue`): der Drain passiert an der return-Stelle, und
+die liegt lexikalisch **innerhalb** der Region — das Ende der Region lässt sich nicht daran
+vorbeischieben. Ihn herauszuholen heißt, jeden `return` eines defer-Scopes über **einen**
+Epilog hinter der Region zu leiten, mit dem Rückgabewert in einem synthetischen Local. Das ist
+eine echte Umstrukturierung der Form, die jede Funktion mit `defer` + `return` betrifft — sie
+lohnt, sobald oben entschieden ist, vorher nicht.
+
+Betroffen: §7.5, §9 (Unwinding), §13 (finally-Regionen).
+
+---
+
+## 6. Ist ein Parameter dasselbe wie ein `let`?
+
+Steht hier, weil Frage 3 sie aufgeworfen hat und sie größer ist als der Struct-Fall. Ein
+Parameter ist heute eine **unveränderliche Bindung mit veränderlichen Struct-Feldern**:
+`s = other` ist `LYR-SEM0019` (ein `ParameterSymbol` ist kein `LocalSymbol { IsMutable }`),
+`s.v = 9` ist erlaubt und ausdrücklich getestet. Ein `let`-Local verhält sich heute genauso —
+aber nur, weil die Feldprüfung gar nicht bis zur Wurzel läuft, nicht weil es jemand so
+entschieden hätte. Welche der beiden Bindungsarten die Regel setzt, ist die Frage.
+
+Betroffen: §7.1, §3.4, §4.3 (Parameter).
