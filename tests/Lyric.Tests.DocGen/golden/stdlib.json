@@ -6725,7 +6725,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 34
+                "Line": 41
               }
             },
             {
@@ -6736,7 +6736,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 36
+                "Line": 43
               }
             },
             {
@@ -6747,7 +6747,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 39
+                "Line": 46
               }
             },
             {
@@ -6758,18 +6758,18 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 47
+                "Line": 54
               }
             },
             {
               "Kind": "Method",
               "Name": "ok",
               "Signature": "pub fn ok(): ?T",
-              "Doc": "The value as an optional: `null` for an `Err`, which drops the reason — the bridge to\n`??` and to every function that takes a `?T`.",
+              "Doc": "The value as an optional: `null` for an `Err`, which drops the reason — the bridge to\n`??` and to every function that takes a `?T`.\n\nNot available when `T` is itself optional: the answer would be `??T`. A `match` tells\n`Ok(null)` from `Ok(v)` there, which is the distinction this would have collapsed anyway.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 56
+                "Line": 66
               }
             },
             {
@@ -6780,7 +6780,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 64
+                "Line": 74
               }
             },
             {
@@ -6791,7 +6791,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 73
+                "Line": 83
               }
             },
             {
@@ -6802,7 +6802,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 82
+                "Line": 92
               }
             },
             {
@@ -6813,13 +6813,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/result.lyr",
-                "Line": 91
+                "Line": 101
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 32
+            "Line": 39
           }
         },
         {
@@ -6830,7 +6830,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 103
+            "Line": 113
           }
         },
         {
@@ -6841,7 +6841,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 112
+            "Line": 122
           }
         },
         {
@@ -6852,7 +6852,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 121
+            "Line": 131
           }
         },
         {
@@ -6863,7 +6863,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 130
+            "Line": 140
           }
         },
         {
@@ -6874,18 +6874,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 145
+            "Line": 155
           }
         },
         {
           "Kind": "Function",
           "Name": "fromOptional",
           "Signature": "pub fn fromOptional<T, E>(o: ?T, error: E): Result<T, E>",
-          "Doc": "An optional with a reason attached: the value when there is one, `error` when there is not.\nWhat turns a `Map.get` or a `parseInt` into a result without a `match` at every site.",
+          "Doc": "An optional with a reason attached: the value when there is one, `error` when there is not.\nWhat turns a `Map.get` or a `parseInt` into a result without a `match` at every site.\n\nNot instantiable for an optional `T`, for the reason `ok` is not: the parameter would read\n`??T`. `Result<?U, E>.Ok(value)` is the direct construction there.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
-            "Line": 156
+            "Line": 169
           }
         }
       ]

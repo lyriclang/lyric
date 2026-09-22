@@ -13,6 +13,13 @@
 // generic type cannot introduce a type parameter of its own today, and each of them does (`U`
 // or `F`). They become methods the day the compiler allows it; the free names stay as they are.
 //
+// AN OPTIONAL PAYLOAD — `Result<?T, E>` — is a type like any other here, and matching,
+// constructing, `unwrapOr`, `map` and `isOk` all work on it. What does NOT work are the two
+// members whose own signature spells `?T`: `ok()` answers `?T`, and `fromOptional` takes one,
+// so with `T = ?U` both would read `??U`, which is not a type. That is the library surface of
+// a language rule, not a gap to be fixed here: `match` separates `Ok(null)` from `Ok(v)`, and
+// `Result<?U, E>.Ok(value)` constructs one, which is what those two would have been for.
+//
 // This module imports nothing, deliberately: `std.string` reads it for `parseIntOrErr`, and
 // `std.core` imports `std.string`, so anything imported here could never import `std.core`
 // back (LYR-RES0005). `panic` needs no import — the compiler binds it.
@@ -53,6 +60,9 @@ pub enum Result<T, E> {
 
     /// The value as an optional: `null` for an `Err`, which drops the reason — the bridge to
     /// `??` and to every function that takes a `?T`.
+    ///
+    /// Not available when `T` is itself optional: the answer would be `??T`. A `match` tells
+    /// `Ok(null)` from `Ok(v)` there, which is the distinction this would have collapsed anyway.
     pub fn ok(): ?T {
         return match (this) {
             Ok(v) => v,
@@ -153,6 +163,9 @@ pub fn orThrow<T, E :: [Throwable]>(r: Result<T, E>): T throws E {
 
 /// An optional with a reason attached: the value when there is one, `error` when there is not.
 /// What turns a `Map.get` or a `parseInt` into a result without a `match` at every site.
+///
+/// Not instantiable for an optional `T`, for the reason `ok` is not: the parameter would read
+/// `??T`. `Result<?U, E>.Ok(value)` is the direct construction there.
 pub fn fromOptional<T, E>(o: ?T, error: E): Result<T, E> {
     if (o == null) {
         return Result<T, E>.Err(error);
