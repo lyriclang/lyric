@@ -4,6 +4,23 @@ Stand: 2026-09-22, Basis v4.4.1 (dc32100c), Branch `worktree-agent-a1c2eb789de86
 Autor: pattern-lambda (Evolution-Team 3). Vorarbeiten: Usability-Review (Prototypen 02/05/14),
 Bug-Hunt (Struct-Aliasing-Familie, Tupel-/Varianten-Lowering, Literal-Adaption).
 
+## 0. Was auf dem Branch steht
+
+| Commit | Inhalt |
+|---|---|
+| `fc1aecb7` | Pattern-Compiler: ein rekursiver Test-und-Bind-Pass ersetzt die zwei getrennten (§2) |
+| `81c4bbef` | `if let` / `while let` / `let … else` (§3.1) |
+| `8cd174b7` | Kurzsyntax `x => …`, Trailing-Lambda `f { it }`, Patterns in Lambda-Parametern und for-Köpfen (§3.5, design/lambdas.md) |
+| `06325fe4` | Array-Patterns (§3.3) und SEM0050 mit Zeugen-Pattern (§3.6) |
+
+Tests: Vm 1551, Sema 807, Ir 175, Parsing 475, Formatting 190, Lsp 279, Resolver 22 — alle grün.
+Beispiele: `examples/patterns/{state-machine,simplifier,binding-conditions,array-patterns}.lyr`
+und `examples/lambdas/{shorthand,destructuring}.lyr` — alle laufen, Ausgabe im Dateikopf.
+
+Nur Design, kein Prototyp: `@`-Bindungen (§3.2, braucht eine Lexer-/Spec-Entscheidung),
+String-Präfix-Patterns (§3.4, Empfehlung: stdlib statt Sprache), volle Maranget-Matrix und
+`@NonExhaustive` (§3.6), `match` ohne Klammern (§3.7).
+
 ## 1. Ist-Stand vor dem Umbau — zwölf verifizierte Defekte
 
 | # | Programm | Verhalten 4.4.1 | Ursache |
@@ -122,7 +139,7 @@ Swift (`if let`/`guard let` nur Optionals, `if case` für Enums — zwei Syntaxe
 Kotlin (`?: return` nur Optionals), Zig (`if (opt) |v|` nur Optionals/Error-Unions).
 Empfehlung: **Minor 4.5**, so umgesetzt.
 
-### 3.2 `@`-Bindungen (`n @ 1..=9`, `whole @ Add(l, r)`) — Design
+### 3.2 `@`-Bindungen (`n @ 1..=9`, `whole @ Add(l, r)`) — Design, mit einer Spec-Frage
 
 ```
 Pattern = … | IDENTIFIER '@' Pattern .
@@ -131,11 +148,23 @@ Bindet den ganzen Wert *und* prüft/zerlegt ihn. Eindeutig: `@` steht heute nur 
 (`@Deprecated`) in Deklarationsposition, nie in einem Pattern. Sema: `BindingPattern` + Sub-Pattern
 im selben Scope (SEM0097 bei Doppelname). Lowering: `BindLocal(value)` und dann Rekursion —
 zwei Zeilen im Compiler. Irrefutabilität = die des Sub-Patterns. Exhaustiveness unverändert.
-Vergleich: Rust `n @ 1..=9`, Haskell `whole@(x:xs)`, Scala `whole @ Add(l, r)`, Swift: fehlt
-(man schreibt `case let x where 1...9 ~= x`), Kotlin: fehlt. Falle: Rust erlaubte lange keine
-Bindungen *innerhalb* eines `@`-Sub-Patterns (E0303, seit 1.56 erlaubt) — Lyric erlaubt sie
-von Anfang an, weil beide Bindungen Kopien sind. Aufwand: Parser 10, Sema 15, Lowering 5 Zeilen.
-**Minor, empfohlen**, §2 Grammatik, §7.6.
+**Die Spec-Frage, die zuerst zu beantworten ist.** Der Lexer liest `@` *nur* zusammen mit dem
+folgenden Bezeichner (`@Deprecated`) oder als `@[`; alles andere ist LYR-LEX0012, und der Code
+steht so in `appendix-a-diagnostics.md` (§1.1). `n @ 1..=9` und `whole @ Add(l, r)` brauchen
+also ein **eigenstaendiges `@`-Token**, wenn kein Bezeichner direkt folgt — eine kleine, klar
+formulierbare Regelaenderung ("`@` ist ein Token fuer sich; `@ident` bleibt eines, wenn der
+Bezeichner unmittelbar anschliesst"), die LEX0012 faktisch entfallen laesst (der Parser meldet
+dann). Deshalb hier **kein Prototyp**: das ist eine Spec-Entscheidung, keine Compiler-Frage.
+Ohne sie bliebe nur die klebende Schreibweise `n @Add(l, r)`, und `n @1..=9` waere gar nicht
+lexierbar — eine halbe Syntax ist schlechter als keine.
+
+Vergleich: Rust `n @ 1..=9`, Haskell `whole@(x:xs)`, Scala `whole @ Add(l, r)`, OCaml
+`(Add(l, r) as whole)`, Swift: fehlt (man schreibt `case let x where 1...9 ~= x`), Kotlin: fehlt.
+Falle: Rust erlaubte lange keine Bindungen *innerhalb* eines `@`-Sub-Patterns (E0303, seit 1.56
+erlaubt) — Lyric erlaubte sie von Anfang an, weil beide Bindungen Kopien sind. Aufwand nach der
+Spec-Entscheidung: Lexer 5, Parser 10, Sema 15, Lowering 5 Zeilen (`BindLocal`, dann rekursiv
+weiter — der Pattern-Compiler kann es bereits).
+**Minor, empfohlen**, §1.1 (Lexer), §2 Grammatik, §7.6.
 
 ### 3.3 Array-Patterns `[]`, `[x]`, `[a, b]`, `[first, ..]`, `[.., last]` — IMPLEMENTIERT (Commit 4)
 

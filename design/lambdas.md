@@ -4,6 +4,10 @@ Stand: 2026-09-22, Basis v4.4.1 (dc32100c), Branch `worktree-agent-a1c2eb789de86
 Autor: pattern-lambda (Evolution-Team 3). Abgestimmt mit stdlib-redesign (Iterator-Ergonomie)
 und new-features (typed throws, ValueBlock).
 
+Beispiele: `examples/lambdas/shorthand.lyr` (die drei Schreibweisen nebeneinander) und
+`examples/lambdas/destructuring.lyr` (Patterns in Parameter und Schleifenkopf) — beide laufen,
+die erwartete Ausgabe steht im Dateikopf. Tests: `tests/Lyric.Tests.Vm/LambdaFormTests.cs`.
+
 ## 1. Ist-Stand, gemessen statt behauptet
 
 Alle Aussagen mit lauffähigen Proben belegt (`scratchpad/team3/pl-probes/l1…l4`).
@@ -34,7 +38,7 @@ Die echte Grenze ist eng und dokumentiert (§7.3): **ein Lambda nimmt an der Üb
 teil**, also müssen die übrigen Argumente die Kandidaten trennen. stdlib-redesign hat das
 gegengeprüft und als Nicht-Blocker vermerkt.
 
-## 2. Implementiert (Commit 3 auf dem Branch)
+## 2. Implementiert (Commit `8cd174b7`)
 
 ### 2.1 Bare Lambda `x => …`
 
