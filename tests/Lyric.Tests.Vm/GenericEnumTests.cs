@@ -23,7 +23,15 @@ namespace Lyric.Tests.Vm;
 /// </summary>
 public class GenericEnumTests
 {
-    private static long Run(string source)
+    private static long Run(string source) => Run(source, optimize: true);
+
+    /// <summary>
+    /// With <paramref name="optimize"/> false the verifier sees the lowering as it was written.
+    /// That matters for anything whose witness is a CALL: the verifier runs after the optimizer,
+    /// so the inliner can carry a faulty call — and the defect in it — out of sight. A test that
+    /// wants to see one has to ask for the unoptimized module.
+    /// </summary>
+    private static long Run(string source, bool optimize)
     {
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", source);
@@ -39,7 +47,7 @@ public class GenericEnumTests
 
         // verify: true — the IR verifier is the real witness here. A shared variant layout shows as a
         // slot type conflict long before it produces a wrong value.
-        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true);
+        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true, optimize: optimize);
         var lowering = new StringWriter();
         de.RenderText(lowering);
         Assert.True(ir is not null, "lowering failed: " + lowering);
@@ -327,19 +335,21 @@ public class GenericEnumTests
     /// instance (<c>LowerGenericStaticCall</c>) and the constraint path with a generic receiver.
     /// All four are pinned here because none of them is covered by another.</para>
     ///
-    /// <para>MEASURED, not assumed: with the substitution taken out of
-    /// <c>LowerGenericMethodCall</c>, the ENUM row fails here and both class rows keep passing —
-    /// with an interface conformance and without one. With it taken out of
-    /// <c>LowerGenericStaticCall</c>, both static rows fail. So on THIS tree a conformance
-    /// decides nothing, and which route a class instance method takes instead was not
-    /// established; this comment does not claim it.</para>
+    /// <para>MEASURED per call site: taking the substitution out of
+    /// <c>LowerGenericMethodCall</c> fails the enum rows, taking it out of
+    /// <c>LowerGenericStaticCall</c> fails the static rows. A class row fails with it too — but
+    /// only when the method body is big enough to survive the INLINER. With a body like
+    /// <c>return this.value;</c> the call is inlined away and the faulty argument goes with it;
+    /// the same class with a loop in that method reports
+    /// <c>call to Box&lt;?int&gt;.or: arg 1 is i64, expected ?i64</c>. The enum rows break either
+    /// way because a <c>match</c> body is too large to inline.</para>
     ///
-    /// <para>The same experiment on the stdlib branch, where the defect was found in parallel,
-    /// reports the class row failing together with the enum row. Both measurements were taken
-    /// per call site with literal arguments, and the probe written to tell them apart is green
-    /// here and red there — so the two trees genuinely differ, and neither result generalises to
-    /// the other. It is inconsequential for the fix, which covers every route either way, and it
-    /// is the one open question a merge should settle by measuring once.</para>
+    /// <para>Which is why THIS test has to reach the verifier unoptimized — and why a green
+    /// <c>lyric run</c> proves nothing about well-formed IR. The verifier runs AFTER the
+    /// optimizer, so an optimization can carry a lowering defect out of sight; two independent
+    /// measurements of this very bug disagreed for a whole round because one went through the
+    /// test path (unoptimized) and the other through <c>lyric run</c>, and both were read as
+    /// statements about the compiler. Found by stdlib-redesign, confirmed here.</para>
     ///
     /// <para>The argument has to be a LITERAL. Passing an expression that is already a
     /// <c>?int</c> needs no coercion, so it passes through the gap without touching it — a
@@ -356,7 +366,8 @@ public class GenericEnumTests
     [InlineData("viaConstraint(Box<?int> { v = x })", 5)] // constraint path, generic receiver
     public void A_parameter_written_as_the_type_parameter_is_lowered_under_the_instance(
         string call, long expected) =>
-        Assert.Equal(expected, Run($$"""
+        // UNOPTIMIZED on purpose: the witness is a call, and the inliner eats the small ones.
+        Assert.Equal(expected, Run(optimize: false, source: $$"""
             interface Keeper<T> { fn or(fallback: T): T; }
 
             enum Holder<T> {
