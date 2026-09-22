@@ -322,13 +322,18 @@ public class GenericEnumTests
     /// "optissome expects an optional, found i64" — malformed IR reported at the callee's slot,
     /// with nothing at the call site to point at.
     ///
-    /// <para>FOUR ROUTES lead to the one helper, and each had to be pinned separately because
-    /// each was wired on its own: the instance method of a class and of an enum
-    /// (<c>LowerGenericMethodCall</c>), the STATIC method of an instance
-    /// (<c>LowerGenericStaticCall</c>) and the constraint path with a generic receiver. Only the
-    /// interface path had carried the substitution all along, and a class WITH a conformance
-    /// takes that one — which is why the defect hid for so long: whichever repro someone wrote
-    /// first tended to take the one route that worked.</para>
+    /// <para>FOUR ROUTES lead to the one helper, and each is wired on its own: the instance
+    /// method of a class and of an enum (<c>LowerGenericMethodCall</c>), the STATIC method of an
+    /// instance (<c>LowerGenericStaticCall</c>) and the constraint path with a generic receiver.
+    /// All four are pinned here because none of them is covered by another.</para>
+    ///
+    /// <para>MEASURED, not assumed: with the substitution taken out of
+    /// <c>LowerGenericMethodCall</c>, the ENUM row fails and both class rows keep passing — with
+    /// an interface conformance and without one. So a conformance is NOT what decides it; which
+    /// route a class instance method actually takes was not established, and this comment does
+    /// not claim it. With the substitution taken out of <c>LowerGenericStaticCall</c>, both
+    /// static rows fail. That asymmetry is the reason the defect survived: a repro written with
+    /// a class shows nothing, and the first two written for it were.</para>
     ///
     /// <para>The argument has to be a LITERAL. Passing an expression that is already a
     /// <c>?int</c> needs no coercion, so it passes through the gap without touching it — a
