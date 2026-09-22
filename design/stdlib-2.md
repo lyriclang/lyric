@@ -593,6 +593,13 @@ Fallback-Zeile, nicht die Ursache). Fix: `or TypeSymbolKind.Enum`. Ir/Sema/Vm-Su
 | 2dd73b36 | (c) Container-Paket + Verdichtung | collections.lyr | collections_tests.lyr (+9) |
 | 1eb318f8 | (d) powInt, checked/saturating, Unicode-Whitespace, formatHex-Doku, Random | math.lyr, string.lyr, fmt.lyr, random.lyr | math/string/random/fmt_tests (+5) |
 | 6014114c | (e) std.hash + combineHash + Anker + Test-Familie | hash.lyr (neu), NativeRegistry.cs, core.lyr, test.lyr | hash_tests (5), test_tests (1) |
-| (folgt) | Doku: Guide 13, DocGen-Ratchet 554→683, Site 23→25 Seiten, Snapshot | docs/guide/13, tests/Lyric.Tests.DocGen | — |
+| 6bd1a6e9 | Doku: Guide 13, DocGen-Ratchet 554→683, Site 23→25 Seiten, Snapshot | docs/guide/13, tests/Lyric.Tests.DocGen | — |
+| 2656bcb9 | arrayOf/arrayFilled ohne Native (Prototyp 18, Form A) | collections.lyr | collections_tests (+1) |
 
-208/208 stdlib-Tests (166 alt + 42 neu).
+209/209 stdlib-Tests (166 alt + 43 neu); Ir 175, Sema 770, Vm 1453, Formatting 190, DocGen 201
+grün. new-features hat den Enum-Methoden-Fix als Voraussetzung in seine Roadmap übernommen
+(er bleibt auf diesem Branch, um einen doppelten Einzeiler-Konflikt in FunctionLowerer.cs zu
+vermeiden), die generische Methode auf generischem Typ als HIGH-Bug für 4.5, `try e` → Result als
+Option B seines try-Ausdruck-Designs (Empfehlung: 5.0, zusammen mit dem Wegfall der Zwillinge),
+`pub(module)` in sein Sichtbarkeits-Design, und entscheidet `??T` gegen nestbare Optionals —
+womit `rawArrayAlloc` die 5.0-Lösung für `List<?T>` bleibt.
