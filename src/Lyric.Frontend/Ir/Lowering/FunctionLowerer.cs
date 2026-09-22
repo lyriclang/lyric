@@ -4266,9 +4266,14 @@ internal sealed class FunctionLowerer
 
                 case InterpHole hole:
                     FlushText(hole.Span);
-                    parts.Add(hole.FormatSpec is { } spec
-                        ? FormattedValue(hole.Expr, spec)
-                        : ToStringValue(hole.Expr));
+                    // A hole the sema routed through 'Display' IS the 'show()' call it stored —
+                    // the same seam as the operators; the value lowers once, as its receiver.
+                    if (_types.OperatorCallOf(hole) is { } shown)
+                        parts.Add(LowerCall(shown) ?? throw Bug("'show()' returned no value"));
+                    else
+                        parts.Add(hole.FormatSpec is { } spec
+                            ? FormattedValue(hole.Expr, spec)
+                            : ToStringValue(hole.Expr));
                     break;
 
                 default:

@@ -132,6 +132,7 @@ public sealed class TypeChecker
         _mul = core?.LookupLocal("Mul") as TypeSymbol;
         _div = core?.LookupLocal("Div") as TypeSymbol;
         _into = core?.LookupLocal("Into") as TypeSymbol;
+        _display = core?.LookupLocal("Display") as TypeSymbol;
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
@@ -155,6 +156,11 @@ public sealed class TypeChecker
 
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
+
+    /// <summary>What an f-string hole renders a non-scalar value through (§6.6): the hole becomes
+    /// <c>value.show()</c> when the type conforms. Null without a standard library, and such a hole
+    /// is then the diagnostic it always was.</summary>
+    private readonly TypeSymbol? _display;
 
     /// <summary>The four arithmetic interfaces, under the same rules as <see cref="_equatable"/>.</summary>
     private readonly TypeSymbol? _add;
@@ -1409,6 +1415,8 @@ public sealed class TypeChecker
                                 $"'{TypeFacts.Display(hole)}' is opaque and does not render in "
                                 + "an f-string — convert explicitly: "
                                 + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
+                        else if (hole is not PrimitiveType && !hole.IsError)
+                            CheckDisplayHole(h, hole, scope);
                     }
                 return LyrType.String;
             case ErrorExpr: return LyrType.Error;
@@ -2526,6 +2534,45 @@ public sealed class TypeChecker
             + $"conversion comes from 'Into': give '{TypeFacts.Display(op)}' the conformance "
             + $":: [Into<{TypeFacts.Display(target)}>]' with a 'fn into(): {TypeFacts.Display(target)}'");
         return target;
+    }
+
+    /// <summary>
+    /// A hole whose value is not a scalar renders through <c>Display</c> (§6.6): <c>{p}</c> means
+    /// <c>{p.show()}</c> when the type conforms, and the call is recorded as what the hole means —
+    /// the same seam the operators and <c>as</c> use, so the lowering sees an ordinary method call.
+    ///
+    /// <para>A format specifier on such a hole is refused: <c>Display</c> has no spec language, and
+    /// silently ignoring one would be the classic "it printed, but not what I asked for". What does
+    /// not conform stays the error it was, with the conformance named instead of the converter.</para>
+    /// </summary>
+    private void CheckDisplayHole(InterpHole hole, LyrType type, SymbolTable scope)
+    {
+        // An interface VALUE renders through its vtable when the interface reaches Display —
+        // 'd.show()' on a 'd: Display' is a dispatch, not a conformance question.
+        var conforms = _display is { } display
+                       && (type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } iface
+                           ? Conformance.WithParents(iface.Symbol, _binding).Any(i => ReferenceEquals(i, display))
+                           : CanConform(type) && Satisfies(type, display, new NamedRef(display)));
+        if (!conforms)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+                $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
+                + "through 'Display': give the type the conformance ':: [Display]' with a "
+                + "'fn show(): string', or narrow and convert it explicitly");
+            return;
+        }
+        if (hole.FormatSpec is { } spec)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Span,
+                $"a format specifier ':{spec}' does not apply to '{TypeFacts.Display(type)}' — "
+                + "'Display' renders one way; format the text 'show()' answers instead");
+            return;
+        }
+        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
+        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span)
+            { MemberSpan = default };
+        var call = new CallExpr(member, [], hole.Expr.Span);
+        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
     }
 
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
