@@ -596,6 +596,15 @@ bestehen **die gesamte stdlib, ihre 211 Tests und alle 47 Beispiele des Reposito
 Prüfung ohne einen einzigen Befund. Es gibt also heute nichts, was der Optimierer stillschweigend
 reparieren müsste.
 
+**Diese Messung hat ihre eigene Kontrolle** (`probes/control_corpus.py`), weil eine grüne
+Messung ohne sie nichts aussagt — die Regel, die diese Runde gelehrt hat, auf sie selbst
+angewandt: mit zusätzlich entfernter Instanz-Substitution und einer Datei, die den Defekt
+sicher auslöst, melden BEIDE Messpfade (`lyric test` über die stdlib-Tests: vier Findings;
+`lyrc build` über ein Beispiel: eines). Die Pfade erreichen den Verifier also nachweislich,
+und die 0 oben ist eine gemessene Null und keine blinde. pattern-lambda hat dieselbe Messung
+samt Kontrolle auf ihrem Branch wiederholt (28 Dateien mit neuem Pattern-Lowering, 0 Befunde),
+womit die Empfehlung auf beiden Korpora belegt ist.
+
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
 der schon `?int` ist, braucht keine Widerung und reist durch die Lücke, ohne sie zu berühren.
