@@ -318,31 +318,54 @@ public class GenericEnumTests
     /// <summary>
     /// A method on an instance lowers its arguments UNDER THE INSTANCE'S SUBSTITUTION. With
     /// <c>T = ?int</c> a parameter written <c>T</c> is a <c>?int</c>, so an int literal argument
-    /// has to be wrapped; lowered bare it produced "store of t3 (i64) into l9 (?i64)" — malformed
-    /// IR reported at the callee's slot, with nothing at the call site to point at.
+    /// has to be wrapped; lowered bare it produced "store of t3 (i64) into l9 (?i64)" and
+    /// "optissome expects an optional, found i64" — malformed IR reported at the callee's slot,
+    /// with nothing at the call site to point at.
     ///
-    /// <para>Both shapes are pinned because they take different routes to the same helper, and
-    /// only one of them was ever exercised: the class path reached it through
-    /// <c>LowerGenericMethodCall</c>, the enum path could not be reached at all until a generic
-    /// enum's methods began to lower.</para>
+    /// <para>FOUR ROUTES lead to the one helper, and each had to be pinned separately because
+    /// each was wired on its own: the instance method of a class and of an enum
+    /// (<c>LowerGenericMethodCall</c>), the STATIC method of an instance
+    /// (<c>LowerGenericStaticCall</c>) and the constraint path with a generic receiver. Only the
+    /// interface path had carried the substitution all along, and a class WITH a conformance
+    /// takes that one — which is why the defect hid for so long: whichever repro someone wrote
+    /// first tended to take the one route that worked.</para>
+    ///
+    /// <para>The argument has to be a LITERAL. Passing an expression that is already a
+    /// <c>?int</c> needs no coercion, so it passes through the gap without touching it — a
+    /// version of this test written with <c>x</c> instead of <c>3</c> was green while three of
+    /// the four routes were still broken.</para>
     /// </summary>
     [Theory]
-    [InlineData("Holder<?int>.Full(x).or(3)", 5)]
-    [InlineData("Holder<?int>.Empty.or(3)", 3)]
-    [InlineData("Box<?int> { v = x }.or(3)", 5)]
+    [InlineData("Holder<?int>.Full(x).or(3)", 5)]        // enum instance method
+    [InlineData("Holder<?int>.Empty.or(3)", 3)]          // the same, taking the fallback
+    [InlineData("Plain<?int> { v = x }.or(3)", 5)]       // class instance method, no conformance
+    [InlineData("Box<?int> { v = x }.or(3)", 5)]         // class instance method, with one
+    [InlineData("Plain<?int>.of(3).or(9)", 3)]           // STATIC method, literal into 'T'
+    [InlineData("Box<?int>.of(3).or(9)", 3)]
+    [InlineData("viaConstraint(Box<?int> { v = x })", 5)] // constraint path, generic receiver
     public void A_parameter_written_as_the_type_parameter_is_lowered_under_the_instance(
         string call, long expected) =>
         Assert.Equal(expected, Run($$"""
+            interface Keeper<T> { fn or(fallback: T): T; }
+
             enum Holder<T> {
                 Full(T),
                 Empty;
 
                 fn or(fallback: T): T { return match (this) { Full(v) => v, Empty => fallback }; }
             }
-            class Box<T> {
+            class Box<T> :: [Keeper<T>] {
                 v: T,
                 fn or(fallback: T): T { return this.v; }
+                static fn of(value: T): Box<T> { return Box<T> { v = value }; }
             }
+            class Plain<T> {
+                v: T,
+                fn or(fallback: T): T { return this.v; }
+                static fn of(value: T): Plain<T> { return Plain<T> { v = value }; }
+            }
+            fn viaConstraint<K :: [Keeper<?int>]>(k: K): ?int { return k.or(3); }
+
             fn main(): int { let x: ?int = 5; return {{call}} ?? -1; }
             """));
 }

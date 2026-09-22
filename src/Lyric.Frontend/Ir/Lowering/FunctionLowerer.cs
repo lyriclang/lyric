@@ -3563,7 +3563,13 @@ internal sealed class FunctionLowerer
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
-        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+
+        // Under the instance's substitution, for the same reason as the instance-method path:
+        // 'Box<?int>.of(3)' writes its parameter 'T', which is a '?int' here, and the 3 has to
+        // be wrapped. A STATIC call needs it just as much — the receiver is absent, the type
+        // arguments are not.
+        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            InstanceSubstitution(owner));
 
         var returns = ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
         if (IsVoid(returns))
