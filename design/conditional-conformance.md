@@ -155,10 +155,14 @@ stdlib), dann das Lowering.
    Fehler, aber ein **verständlicher**, sobald `Satisfies` strenger antwortet.
 2. **Bedingte Methoden ohne Konformanz** im selben Zug? Vorschlag: ja, es ist dieselbe Grammatik.
 3. **Rekursionsgrenze** 32 oder konfigurierbar? Vorschlag: fest, mit Diagnose.
-4. Soll `?T :: [Display]` bedingt definierbar sein (`extend<T :: [Display]> ?T :: [Display]`)? Das würde
-   `f"{opt}"` erlauben und meiner Entscheidung in `design/fstring-display.md` („`?T` rendert nicht")
-   widersprechen. **Vorschlag: nein** — die stdlib darf es nicht definieren; wer eine Abwesenheit drucken
-   will, schreibt `?? "none"`. Als `decision` in der Taskliste vermerkt.
+4. **`?T :: [Display]` bedingt definierbar? ENTSCHIEDEN: nein** (mit stdlib-redesign abgestimmt, von
+   ihnen angenommen). Es würde `f"{opt}"` erlauben und der Entscheidung in `design/fstring-display.md`
+   („`?T` rendert nicht") widersprechen; Rust hält es genauso (`Option<T>` ist `Debug`, nicht
+   `Display`). Wer eine Abwesenheit drucken will, schreibt `?? "none"` oder ruft
+   `std.option.showOptional(o, ifNone)`, das stdlib-redesign für 4.5 aufnimmt. **Die Ausnahme ist der
+   Testbericht:** `assertEq` rendert Optionals selbst und schreibt `null` als sichtbares Wort — dort ist
+   genau das gewollt, was in Programmausgabe eine Abwesenheit verstecken würde. Der Unterschied liegt
+   im Leser, nicht im Typ, und deshalb gehört er in eine Funktion und nicht in eine Konformanz.
 
 ## Spec-Diff
 

@@ -35,6 +35,16 @@ Thema: was in Ausdrucksposition stehen darf, und was ein Wert rendert. Alles add
   Methoden. Von stdlib-redesign gemeldet.
 - **Methode eines generischen Enums unaufrufbar** (`FunctionLowerer.cs:3898`, ein Wort `or Enum`) —
   Fix liegt auf stdlib-redesigns Branch.
+- **Argumente einer generischen Methode werden nicht substituiert** (`LowerGenericMethodCall` reicht
+  keine `calleeSubstitution` an `MaterializeArguments`): ein Parameter, der `T` geschrieben steht,
+  bleibt ein Name, und bei `T = ?int` unterbleibt die Widerung (`store of i64 into ?i64`). Fix und
+  Test liegen auf stdlib-redesigns Branch (`a8df8a5d`). Der Pfad für generische **Interface**-Member
+  baute dieselbe Abbildung längst — die Lücke war verdeckt, weil der Klassen-Pfad sie zuerst erreicht.
+- **`rawArrayAlloc<T>(n): T[]` als privates Native** (~15 VM-Zeilen): hängt inzwischen doppelt —
+  `List<?T>`/`Map<K, ?V>` brauchen es für ihre Backing-Arrays (stdlib-redesign), und pattern-lambdas
+  benannter Rest `[first, ..rest]` braucht es, weil das Lowering kein Array unbekannter Länge bauen
+  kann. **Zwei Features, ein Native, und es ist der billigste Posten der ganzen Liste** — deshalb
+  hier und nicht mehr nur als Fußnote unter „nestbare Optionals".
 - `Satisfies` straffen, damit `println([1,2,3])` in der **Nutzerdatei** scheitert statt in `console.lyr:51`.
 - `p.field ??= x` lowern (heute IR0001, von lyriclings gemeldet).
 - Interface-Wert erfüllt seine eigene Constraint nicht (`Satisfies`, von mir gemeldet).
@@ -81,8 +91,15 @@ Thema: Entscheidungen mit Deprecation-Uhr. Jede braucht eine 4.x-Warnstufe, bevo
 | 22 | **Shadowing-Regel in §7.1** | Usability-Analyse (heute ein Bug) | klein | sofort als Bugfix |
 
 **Bewusst NICHT in der Roadmap:**
-- **Nestbare Optionals** (`??T`) — Major, Formatwechsel, und die stdlib hat mit `rawArrayAlloc` einen
-  Weg ohne Sprachänderung (mit stdlib-redesign abgestimmt).
+- **Nestbare Optionals** (`??T`) — Major, Formatwechsel, und die beiden Stellen, die danach riefen
+  (Backing-Arrays, `..rest`), lösen sich mit `rawArrayAlloc` ohne Sprachänderung.
+  **Der Preis der Regel ist jetzt gemessen und benannt** (stdlib-redesign, Gegenprobe an `std.result`):
+  jede Signatur, die `?T` schreibt, ist für `T = ?U` ein `??U` und damit nicht instanziierbar — konkret
+  `Result.ok(): ?T` und `fromOptional(o: ?T)` für optionale Payloads. `Result<?int, E>` selbst trägt
+  (Konstruktion, Matchen, `isOk`/`unwrapOr`/`err`/`map`); es fehlen genau die Methoden, die eine
+  Abwesenheit als Rückgabe verwenden. Das ist die Bibliotheksoberfläche der Sprachregel, in `std.result`
+  dokumentiert, und **kein Argument für `??T`**: wer beides will, hat zwei Abwesenheiten, die niemand
+  auseinanderhalten kann — genau die Unterscheidung, die `?` nicht treffen soll.
 - **`Option<T>` als Enum statt `?T`** — stdlib-redesign empfiehlt `Iterator.next(): ?T` auch für 5.0;
   ich stimme zu: `?T` ist die eine Antwortform, und ein zweiter Optionaltyp wäre ein zweiter Mechanismus.
 - **`?`-Operator auf `Result`** — Prototyp 01 hat belegt, dass `throws` bereits Rusts `?` ist.
@@ -136,9 +153,14 @@ Member-Sichtbarkeit (5.0) ◄── @Deprecated auf Membern (4.5) ◄── stdl
 - Braucht von mir: bedingte Konformanz (12), typed throws (9/10/13), Konformanz-Synthese (8),
   `?T == ?T` (7), `pub(module)` (18), und den `try`-Ausdruck (11/19).
 - Liefert mir: `combineHash`, `OnMethod`, `NonExhaustive`, `Result<T,E>`, `Display`-Implementierungen.
-- **Ein Dissens, dokumentiert:** sie hätten gern `?T :: [Display]`, damit `assertEq` Optionals drucken
-  kann; ich lehne es ab (eine Abwesenheit soll nicht still als Text erscheinen) und schlage
-  `showOptional` als Funktion vor.
+- **Der eine Dissens ist aufgelöst** (ihr Nachtrag): `?T :: [Display]` bleibt undefiniert — eine
+  Abwesenheit soll nicht still als Text erscheinen, und Rust hält es genauso. Sie nehmen
+  `showOptional(o, ifNone)` in std.option auf; `assertEq` rendert Optionals selbst und schreibt `null`
+  als sichtbares Wort, was in einem **Testbericht** gewollt ist und in Programmausgabe nicht. Keine
+  offenen Punkte zwischen uns.
+- **Korrektur zu ihrem ersten Stand:** `Result<?T, E>` ist nicht allgemein blockiert (Vollständigkeits-
+  test liegt vor); offen bleibt nur die Payload-Bindung im Pattern (bei pattern-lambda gebaut) und die
+  strukturelle `??U`-Grenze oben.
 
 **macro-abi** (Branch `worktree-agent-ab3c14434f8eda027`, fertig):
 - Ihre Makro-Stufe 1 **ist** meine Konformanz-Synthese; die Schema-Tabelle in
