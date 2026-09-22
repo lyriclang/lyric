@@ -18,6 +18,8 @@ import std.collections {
     slice,
     groupBy,
     mapList,
+    arrayOf,
+    arrayFilled,
 };
 import std.string { fromInt };
 
@@ -363,4 +365,18 @@ pub fn sorting_by_key_and_arrays(): void {
     assertEq(part.length, 2);
     assertEq(part[0], 3);
     assertEq(slice<int>(arr, 4, 4).length, 0);
+}
+
+@Test
+pub fn arrays_come_from_a_function_or_a_value(): void {
+    let squares = arrayOf<int>(4, (i: int) => i * i);
+    assertEq(squares.length, 4);
+    assertEq(squares[3], 9);
+    assertEq(arrayOf<string>(0, (i: int) => "x").length, 0);
+    let names = arrayOf<string>(2, (i: int) => "n" + fromInt(i));
+    assertEq(names[1], "n1");
+    let filled = arrayFilled<int>(3, 7);
+    assertEq(filled.length, 3);
+    assertEq(filled[2], 7);
+    assertEq(arrayFilled<int>(0, 7).length, 0);
 }

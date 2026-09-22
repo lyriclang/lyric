@@ -1359,13 +1359,35 @@
         },
         {
           "Kind": "Function",
+          "Name": "arrayOf",
+          "Signature": "pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[]",
+          "Doc": "An array of `n` values, the one at position `i` being `f(i)`: `arrayOf(3, (i) => i * i)`\nis `[0, 1, 4]`. `f` runs once per slot, in order, and never for `n <= 0`, which answers\nthe empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1271
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "arrayFilled",
+          "Signature": "pub fn arrayFilled<T>(n: int, value: T): T[]",
+          "Doc": "`n` copies of `value` — `[value] * n`, except that `n <= 0` answers the empty array\nwithout an element to write down.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1283
+          }
+        },
+        {
+          "Kind": "Function",
           "Name": "mapList",
           "Signature": "pub fn mapList<T, U>(xs: List<T>, f: fn(T) -> U): List<U>",
           "Doc": "A new list of `f` applied to every element, EAGERLY: the work happens here, once.\n`xs.iter().map(f)` is the lazy form for a chain that goes on.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1269
+            "Line": 1298
           }
         },
         {
@@ -1376,7 +1398,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1285
+            "Line": 1314
           }
         },
         {
@@ -1387,7 +1409,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1291
+            "Line": 1320
           }
         },
         {
@@ -1398,7 +1420,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1302
+            "Line": 1331
           }
         },
         {
@@ -1409,7 +1431,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1322
+            "Line": 1351
           }
         },
         {
@@ -1420,7 +1442,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1343
+            "Line": 1372
           }
         },
         {
@@ -1431,7 +1453,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1360
+            "Line": 1389
           }
         },
         {
@@ -1442,7 +1464,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1371
+            "Line": 1400
           }
         },
         {
@@ -1453,7 +1475,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1389
+            "Line": 1418
           }
         },
         {
@@ -1464,7 +1486,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1401
+            "Line": 1430
           }
         }
       ]

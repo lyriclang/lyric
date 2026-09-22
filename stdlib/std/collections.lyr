@@ -1258,6 +1258,35 @@ pub fn entries<K :: [Hashable<K>], V>(m: Map<K, V>): Iterator<(K, V)> {
     return m.entries();
 }
 
+// ------------------------------------------------------- 4.5: arrays without a first element
+//
+// `[x] * n` needs an `x`, and often there is none: the values come from a function of the
+// position, or the array is empty and the element type has no default. Neither function
+// needs a native — a list gathers the values and `toArray` hands them over — at the price of
+// one copy, which is what a list costs anyway.
+
+/// An array of `n` values, the one at position `i` being `f(i)`: `arrayOf(3, (i) => i * i)`
+/// is `[0, 1, 4]`. `f` runs once per slot, in order, and never for `n <= 0`, which answers
+/// the empty array.
+pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
+    let values = List<T>.empty();
+    var i = 0;
+    while (i < n) {
+        values.push(f(i));
+        i = i + 1;
+    }
+    return values.toArray();
+}
+
+/// `n` copies of `value` — `[value] * n`, except that `n <= 0` answers the empty array
+/// without an element to write down.
+pub fn arrayFilled<T>(n: int, value: T): T[] {
+    if (n <= 0) {
+        return [];
+    }
+    return [value] * n;
+}
+
 // ------------------------------------------------------- 4.5: mapping a List
 //
 // A free function rather than `xs.map(f)`: a method of a generic type cannot introduce a type
