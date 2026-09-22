@@ -63,6 +63,216 @@ pub interface Iterator<T> {
         return FlatMapIterator<T, U> { source = this, f = f };
     }
 
+    /// Elements from the first one `drop` refuses, lazily — the complement of `takeWhile`.
+    fn skipWhile(drop: fn(T) -> bool): Iterator<T> {
+        return SkipWhileIterator<T> { source = this, drop = drop };
+    }
+
+    /// Every `step`-th element, the first one included: `stepBy(3)` over `a, b, c, d, e, f, g`
+    /// yields `a, d, g`. A step below one yields nothing, the `take` convention.
+    fn stepBy(step: int): Iterator<T> {
+        return StepByIterator<T> { source = this, step = step };
+    }
+
+    /// Passes every element through `look` on its way past — for a print or a counter in the
+    /// middle of a chain, where a `map` would have to return the element it merely looked at.
+    fn inspect(look: fn(T) -> void): Iterator<T> {
+        return InspectIterator<T> { source = this, look = look };
+    }
+
+    /// Drops an element whose `key` equals the previous element's key — CONSECUTIVE duplicates,
+    /// so a sorted source becomes distinct and an unsorted one keeps its far-apart repeats.
+    /// Keys rather than elements, because the element type carries no equality here.
+    fn dedupBy(key: fn(T) -> int): Iterator<T> {
+        return DedupIterator<T> { source = this, key = key };
+    }
+
+    /// Pairs combined by `f` as they are drawn, ending when either side does: `zip` and `map`
+    /// in one step, without the tuple in between.
+    fn zipWith<B, R>(right: Iterator<B>, f: fn(T, B) -> R): Iterator<R> {
+        return ZipWithIterator<T, B, R> { left = this, right = right, f = f };
+    }
+
+    // ---------------------------------------------------------------------- terminators
+    //
+    // A terminator drains the iterator and produces a value; the chain ends there, and that is
+    // where anything happens at all, because the adapters above are lazy. After one, the
+    // iterator is spent: terminating it twice yields nothing the second time.
+    //
+    // Methods since 4.5, so a chain reads to its end without turning inside out — and only the
+    // ones that ask nothing of `T`: `sum` and `minValue` need a number or an order, which an
+    // interface cannot require of its own parameter, and they stay free.
+
+    /// Folds from the left: `range(1, 4).fold(0, (acc, n) => acc + n)` is `((0+1)+2)+3`.
+    ///
+    /// The most general terminator; `count`, `any` and `all` are special cases of it that exist
+    /// because a closure is too much ceremony for counting.
+    fn fold<A>(seed: A, step: fn(A, T) -> A): A {
+        var acc = seed;
+        var value = this.next();
+        while (value != null) {
+            acc = step(acc, value);
+            value = this.next();
+        }
+        return acc;
+    }
+
+    /// Folds without a seed: the first element starts the accumulator, and `null` says the
+    /// source was empty — the case a seed would have answered.
+    fn reduce(step: fn(T, T) -> T): ?T {
+        var acc = this.next();
+        if (acc == null) {
+            return null;
+        }
+        var value = this.next();
+        while (value != null) {
+            acc = step(acc, value);
+            value = this.next();
+        }
+        return acc;
+    }
+
+    /// How many elements are left; drains the iterator.
+    fn count(): int {
+        var n = 0;
+        var value = this.next();
+        while (value != null) {
+            n = n + 1;
+            value = this.next();
+        }
+        return n;
+    }
+
+    /// The first element, or `null` for an empty source. One `next`, named for the chain that
+    /// ends on it.
+    fn first(): ?T {
+        return this.next();
+    }
+
+    /// The last element, or `null` for an empty source; drains the iterator.
+    fn last(): ?T {
+        var held = this.next();
+        if (held == null) {
+            return null;
+        }
+        var value = this.next();
+        while (value != null) {
+            held = value;
+            value = this.next();
+        }
+        return held;
+    }
+
+    /// The element at position `n`, counting from zero, or `null` when the source ends first.
+    /// The elements before it are consumed.
+    fn nth(n: int): ?T {
+        if (n < 0) {
+            return null;
+        }
+        var remaining = n;
+        var value = this.next();
+        while (value != null && remaining > 0) {
+            remaining = remaining - 1;
+            value = this.next();
+        }
+        return value;
+    }
+
+    /// Stops at the first match; the rest is never evaluated.
+    fn any(test: fn(T) -> bool): bool {
+        var value = this.next();
+        while (value != null) {
+            if (test(value)) {
+                return true;
+            }
+            value = this.next();
+        }
+        return false;
+    }
+
+    /// Stops at the first counterexample. An empty iterator yields `true`, the only convention
+    /// for which `a.all(p) && b.all(p) == a.chain(b).all(p)` holds.
+    fn all(test: fn(T) -> bool): bool {
+        var value = this.next();
+        while (value != null) {
+            if (!test(value)) {
+                return false;
+            }
+            value = this.next();
+        }
+        return true;
+    }
+
+    /// Whether nothing matches: `!any`.
+    fn none(test: fn(T) -> bool): bool {
+        return !this.any(test);
+    }
+
+    /// The first element that matches, or `null`.
+    fn find(test: fn(T) -> bool): ?T {
+        var value = this.next();
+        while (value != null) {
+            if (test(value)) {
+                return value;
+            }
+            value = this.next();
+        }
+        return null;
+    }
+
+    /// The position of the first match, or `null`. Separate from `find`, because an `(int, T)`
+    /// tuple would cost the common case where only one of the two is needed.
+    fn position(test: fn(T) -> bool): ?int {
+        var index = 0;
+        var value = this.next();
+        while (value != null) {
+            if (test(value)) {
+                return index;
+            }
+            index = index + 1;
+            value = this.next();
+        }
+        return null;
+    }
+
+    /// How many elements match; drains the iterator. `filter(test).count()` in one step.
+    fn countWhere(test: fn(T) -> bool): int {
+        var n = 0;
+        var value = this.next();
+        while (value != null) {
+            if (test(value)) {
+                n = n + 1;
+            }
+            value = this.next();
+        }
+        return n;
+    }
+
+    /// Calls `f` on every element, in order; drains the iterator. The terminator for a chain
+    /// whose point is the side effect.
+    fn forEach(f: fn(T) -> void): void {
+        var value = this.next();
+        while (value != null) {
+            f(value);
+            value = this.next();
+        }
+    }
+
+    /// Everything into an array.
+    ///
+    /// Quadratic: a `T[]` has a fixed length, so every append copies. For a large source
+    /// `std.collections.collect` gathers into a doubling `List<T>`; it lives there because
+    /// `std.iter` must not import `std.collections` — the dependency runs the other way.
+    fn toArray(): T[] {
+        var result: T[] = [];
+        var value = this.next();
+        while (value != null) {
+            result = result + [value];
+            value = this.next();
+        }
+        return result;
+    }
+
     // 'enumerate' and 'chunks' are NOT methods, and the reason is a rule worth stating: a
     // chainable method may not change the element type unless it is GENERIC. A non-generic method
     // has a slot, every implementing instance must fill it, and one returning 'Iterator<(int, T)>'
@@ -524,6 +734,129 @@ pub fn chunks<T>(source: Iterator<T>, size: int): Iterator<T[]> {
     };
 }
 
+/// The lazy machinery behind `skipWhile`.
+pub class SkipWhileIterator<T> :: [Iterator<T>] {
+    /// The values whose front is being dropped.
+    source: Iterator<T>,
+    /// Decides where the dropped front ends.
+    drop: fn(T) -> bool,
+    /// Set once the front has been dropped; from then on everything passes.
+    passing: bool = false,
+
+    /// The next value past the dropped front, or `null` at the end.
+    pub mut fn next(): ?T {
+        if (this.passing) {
+            return this.source.next();
+        }
+        var value = this.source.next();
+        let p = this.drop;
+        while (value != null && p(value)) {
+            value = this.source.next();
+        }
+        this.passing = true;
+        return value;
+    }
+}
+
+/// The lazy machinery behind `stepBy`.
+pub class StepByIterator<T> :: [Iterator<T>] {
+    /// The values being thinned.
+    source: Iterator<T>,
+    /// The distance between two yielded values.
+    step: int,
+    /// Whether the first value is still to come — it is yielded without skipping.
+    atStart: bool = true,
+
+    /// The next value on the step, or `null` at the end.
+    pub mut fn next(): ?T {
+        if (this.step < 1) {
+            return null;
+        }
+        if (this.atStart) {
+            this.atStart = false;
+            return this.source.next();
+        }
+        var skipped = 1;
+        while (skipped < this.step) {
+            if (this.source.next() == null) {
+                return null;
+            }
+            skipped = skipped + 1;
+        }
+        return this.source.next();
+    }
+}
+
+/// The lazy machinery behind `inspect`.
+pub class InspectIterator<T> :: [Iterator<T>] {
+    /// The values being looked at.
+    source: Iterator<T>,
+    /// Sees every value on its way past.
+    look: fn(T) -> void,
+
+    /// The next value, after `look` has seen it, or `null` at the end.
+    pub mut fn next(): ?T {
+        let value = this.source.next();
+        if (value != null) {
+            let f = this.look;
+            f(value);
+        }
+        return value;
+    }
+}
+
+/// The lazy machinery behind `dedupBy`.
+pub class DedupIterator<T> :: [Iterator<T>] {
+    /// The values being thinned.
+    source: Iterator<T>,
+    /// What decides whether two neighbours are the same.
+    key: fn(T) -> int,
+    /// The key of the last yielded value.
+    lastKey: int = 0,
+    /// Whether anything has been yielded yet — before that, `lastKey` means nothing.
+    started: bool = false,
+
+    /// The next value whose key differs from the previous one's, or `null` at the end.
+    pub mut fn next(): ?T {
+        var value = this.source.next();
+        let k = this.key;
+        while (value != null) {
+            let current = k(value);
+            if (!this.started || current != this.lastKey) {
+                this.started = true;
+                this.lastKey = current;
+                return value;
+            }
+            value = this.source.next();
+        }
+        return null;
+    }
+}
+
+/// The lazy machinery behind `zipWith`.
+pub class ZipWithIterator<A, B, R> :: [Iterator<R>] {
+    /// The first column.
+    left: Iterator<A>,
+    /// The second column.
+    right: Iterator<B>,
+    /// Combines one value of each.
+    f: fn(A, B) -> R,
+
+    /// The next combined value, or `null` when either side ends.
+    pub mut fn next(): ?R {
+        let a = this.left.next();
+        if (a == null) {
+            return null;
+        }
+        let b = this.right.next();
+        if (b == null) {
+            return null;
+        }
+        let g = this.f;
+        return g(a, b);
+    }
+}
+
 /// The iterator with nothing in it — what an empty selection collapses to.
 pub class EmptyIterator<T> :: [Iterator<T>] {
     /// Always `null`.
@@ -534,59 +867,38 @@ pub class EmptyIterator<T> :: [Iterator<T>] {
 
 // =============================================================================== terminators
 //
-// A terminator drains the iterator and produces a value. A chain ends there, and that is where
-// anything happens at all, because the adapters above are lazy.
+// Since 4.5 the terminators that ask nothing of `T` are METHODS on `Iterator<T>` (above), and
+// the free forms below forward to them. They stay through the 4.x line and go with 5.0, the
+// ordinary deprecation policy; `@Deprecated` cannot mark them yet, because the warning would
+// fire inside the standard library's own tests, which still exercise both forms.
 //
-// After a terminator the iterator is spent. The language cannot express that, so it is a promise
-// to the reader rather than one the compiler keeps: terminating the same iterator twice yields
-// nothing the second time.
+// `sum`, `sumFloat`, `minValue` and `maxValue` are not deprecated: they ask something of the
+// element type — a number, an order — and an interface cannot require that of its own
+// parameter, so they have no method to forward to.
 
 /// Folds from the left: `fold(1..4, 0, (acc, n) => acc + n)` is `((0+1)+2)+3`.
 ///
 /// The most general terminator; `count`, `sum`, `any` and `all` are special cases of it. They
 /// exist separately because `fold` with a closure is too much ceremony for counting.
 pub fn fold<T, A>(source: Iterator<T>, seed: A, step: fn(A, T) -> A): A {
-    var acc = seed;
-    var value = source.next();
-    while (value != null) {
-        let f = step;
-        acc = f(acc, value);
-        value = source.next();
-    }
-    return acc;
+    return source.fold<A>(seed, step);
 }
 
 /// Folds without a seed: the first element starts the accumulator, so the result carries the
 /// element type — and `null` says the source was empty, the case a seed would have answered.
 pub fn reduce<T>(source: Iterator<T>, step: fn(T, T) -> T): ?T {
-    var acc = source.next();
-    if (acc == null) {
-        return null;
-    }
-    var value = source.next();
-    while (value != null) {
-        let f = step;
-        acc = f(acc, value);
-        value = source.next();
-    }
-    return acc;
+    return source.reduce(step);
 }
 
 /// The first element, or `null` for an empty source. One `next`, named for the chain that ends
 /// on it.
 pub fn first<T>(source: Iterator<T>): ?T {
-    return source.next();
+    return source.first();
 }
 
 /// How many elements the iterator yields; drains it.
 pub fn count<T>(source: Iterator<T>): int {
-    var n = 0;
-    var value = source.next();
-    while (value != null) {
-        n = n + 1;
-        value = source.next();
-    }
-    return n;
+    return source.count();
 }
 
 /// The sum of an `int` iterator.
@@ -614,63 +926,29 @@ pub fn sumFloat(source: Iterator<float>): float {
 
 /// Stops at the first match; the rest is never evaluated.
 pub fn any<T>(source: Iterator<T>, test: fn(T) -> bool): bool {
-    var value = source.next();
-    while (value != null) {
-        let p = test;
-        if (p(value)) {
-            return true;
-        }
-        value = source.next();
-    }
-    return false;
+    return source.any(test);
 }
 
 /// Stops at the first counterexample. An empty iterator yields `true`, the only convention for
 /// which `all(a) && all(b) == all(chain(a, b))` holds.
 pub fn all<T>(source: Iterator<T>, test: fn(T) -> bool): bool {
-    var value = source.next();
-    while (value != null) {
-        let p = test;
-        if (!p(value)) {
-            return false;
-        }
-        value = source.next();
-    }
-    return true;
+    return source.all(test);
 }
 
 /// Whether nothing matches: `!any`.
 pub fn none<T>(source: Iterator<T>, test: fn(T) -> bool): bool {
-    return !any<T>(source, test);
+    return source.none(test);
 }
 
-/// The first element that matches, or `null`.
+/// The first element that matches, or `null`. The method `find` since 4.5.
 pub fn find<T>(source: Iterator<T>, test: fn(T) -> bool): ?T {
-    var value = source.next();
-    while (value != null) {
-        let p = test;
-        if (p(value)) {
-            return value;
-        }
-        value = source.next();
-    }
-    return null;
+    return source.find(test);
 }
 
 /// The position of the first match. Separate from `find`, because a `(int, T)` tuple would cost
 /// the common case where only one of the two is needed.
 pub fn position<T>(source: Iterator<T>, test: fn(T) -> bool): ?int {
-    var index = 0;
-    var value = source.next();
-    while (value != null) {
-        let p = test;
-        if (p(value)) {
-            return index;
-        }
-        index = index + 1;
-        value = source.next();
-    }
-    return null;
+    return source.position(test);
 }
 
 /// Everything into an array.
@@ -679,13 +957,7 @@ pub fn position<T>(source: Iterator<T>, test: fn(T) -> bool): ?int {
 /// `std.collections.collect`, which gathers into a doubling `List<T>`. It stands here because
 /// `std.iter` must not import `std.collections`; the dependency runs the other way.
 pub fn collectArray<T>(source: Iterator<T>): T[] {
-    var result: T[] = [];
-    var value = source.next();
-    while (value != null) {
-        result = result + [value];
-        value = source.next();
-    }
-    return result;
+    return source.toArray();
 }
 
 /// The smallest element, or `null` for an empty source.
