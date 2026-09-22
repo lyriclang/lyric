@@ -132,6 +132,27 @@ public class ComptimeTests
     }
 
     [Fact]
+    public void A_draw_that_cannot_be_repeated_is_refused_while_a_seeded_one_evaluates()
+    {
+        // 'secureRandom' needs no capability and is refused all the same: a literal that
+        // differs from build to build is the one thing comptime must not produce. A seeded
+        // generator is ordinary arithmetic and evaluates.
+        var refused = Compile("""
+            import std.random { secureRandom };
+            fn main(): int { return comptime (secureRandom(1)[0] as int); }
+            """);
+        var error = Assert.Single(refused.Diagnostics.Diagnostics, d => d.Code == "LYR-CT0002");
+        Assert.Contains("secureRandom", error.Message);
+
+        var seeded = Run(Ok("""
+            import std.random { Random };
+            fn draw(): int { var r = Random.seeded(7); return r.nextIntRange(0, 100); }
+            fn main(): int { return comptime draw(); }
+            """));
+        Assert.InRange(seeded, 0, 99);
+    }
+
+    [Fact]
     public void A_pure_site_evaluates_in_a_program_that_reads_files_elsewhere()
     {
         // The evaluation module is pruned to what the sites reach, so the program's own

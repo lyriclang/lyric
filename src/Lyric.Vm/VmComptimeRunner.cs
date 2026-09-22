@@ -25,9 +25,25 @@ public sealed class VmComptimeRunner : IComptimeRunner
     /// a build that never finishes is worse than one that says why.</summary>
     public long Budget { get; init; } = 100_000_000;
 
+    /// <summary>
+    /// The natives a compile-time evaluation refuses although no capability gates them: the
+    /// draws whose whole point is that a run cannot be repeated. A site reaching one would
+    /// compile to a different literal on every build, which is the one thing <c>comptime</c>
+    /// must never do. Refused by import name — the name is symbolic in the module (§11) — rather
+    /// than by a capability the rest of the language would then have to carry.
+    /// </summary>
+    private static readonly string[] NonDeterministic = ["std.random.secureRandom"];
+
     public IReadOnlyList<ComptimeOutcome> Evaluate(byte[] bytes, IReadOnlyList<string> functions)
     {
         var module = BytecodeReader.ReadOrThrow(bytes);
+
+        foreach (var import in module.Imports)
+            if (NonDeterministic.Contains(import.Name, StringComparer.Ordinal))
+                return functions.Select(_ => ComptimeOutcome.Failed(
+                    $"it reaches '{import.Name}', whose result differs from run to run — a value "
+                    + "computed at compile time has to be the same on every build")).ToArray();
+
         using var natives = NativeRegistry.CreateDefault(TextWriter.Null, TextWriter.Null);
 
         LoadedProgram program;
