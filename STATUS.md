@@ -11,6 +11,146 @@
 
 ## Current milestone
 
+**M37 — the project system, build v2 and profiles — SHIPPED as v4.5.0** (2026-09-22, branch
+`feature/m37-profiles`). Stage A of the 2026-09-17 design round: a compile is a named PROFILE,
+`lyric.json` learns `name`, `dependencies` and `toolchain`, a project without `build.lyr` builds
+by convention, and `std.build` v2 moves its model into Lyric. **A minor, not a major**: every
+4.4 project still builds, and the one form that changed shape — `addExecutable(entry, output)` —
+still works and warns until 5.0. Bytecode format stays 4.0; nothing about a module changed, only
+which shape of one a compile produces by default. The delivery list:
+
+- [x] **slice 0 — the measurement**, before the default fell. Both shapes through `tools/Bench`
+      in one session, Release configuration, the control cases (`loopOnly`, `intAdd`, `floatAdd`,
+      `maskOnly`, `nativeSqrt`) at identical instruction counts in both:
+
+      | case | release | debug |
+      |---|---:|---:|
+      | `construct_call` (a struct built and added) | 55.0 ns, 0 B | 141.0 ns, 112 B |
+      | `operator` (`a + b` through `Add`) | 58.4 ns | 136.6 ns |
+      | `native_vec2_arg` | 37.9 ns, 0 B | 101.7 ns, 56 B |
+      | `forin_range` | 73.2 ns | 116.8 ns |
+      | `call` | 63.6 ns | 64.6 ns |
+      | `forin_array` | 154.3 ns | 140.4 ns |
+      | `set_iter` | 408.9 ns | 351.3 ns |
+      | `arrayRead` (interpreter table) | 13 instr, 58.8 ns | 11 instr, 47.2 ns |
+      | lyrtest over `stdlib-tests` (min of 3) | 3 959 ms | 3 448 ms |
+      | `lyrc check` of `collections_tests.lyr`, `lower` phase | 115 ms | 87 ms |
+
+      **The price of the debug profile is at most 2.7× on struct-heavy loops and 1.6× on a range
+      loop**, not the 30× the M14 baseline-to-optimized figures suggested: frame pooling is
+      VM-side and stays. And the release shape LOSES on three cases, which is a finding about the
+      optimizer, not about the profile — **three findings, recorded, not fixed here**: (1)
+      `ScalarReplacement.ForwardLocals` forwards a single-store local across BLOCK boundaries, so
+      the emitter spills the temp into a synthetic slot and has to spill the already-computed
+      index beside it (`arrayRead`: 13 instructions where 11 do); a non-struct value forwarded
+      across a block cannot gain anything, the temp becomes a slot again. (2) The inlined `call`
+      executes 15 instructions where the real call executes 11: the callee is spliced as its own
+      blocks, so the argument, a constant and the result each travel through a slot and three
+      block hops — inlining alone buys nothing since pooling made a frame cheap; what pays is the
+      scalar replacement behind it. (3) `forin_array` and `set_iter` carry same-block copies
+      (`stloc 13; ldloc 13`) the forwarding does not remove while it removes the cross-block ones
+      that hurt. Correctness in the debug shape: Ir 175, Vm 1453, Embedding 222, lyrtest 166 all
+      green; Cli 276 of 277, the one red a backtrace pin of the inlined shape. **Zero wrong
+      answers.** The optimizer round is its own milestone after this one.
+
+      **A fourth finding, from the CI's other engine, after the release merged**: a panic that
+      passes through COMPILED code loses every frame below the function that failed. Measured on
+      one debug build of a `divide` called by `main`: interpreted it reports `main.divide` and
+      `main.main`, compiled only `main.divide`; the release build of the same program reports
+      one frame on both engines, because the callee was inlined away. So this is not new — it is
+      the documented cost of compiling (`Interpreter.Execute`: "a backtrace of one line") — and
+      the debug default is what made it VISIBLE, by keeping small callees as real calls. The
+      pin now states both engines instead of skipping one. Worth its own decision in the round:
+      a backtrace that ends where the compiled code begins is a poor thing to ship, and
+      `HostOptions.Compile = true` is what a host that ships sets.
+- [x] **slice 1 — profiles** (this branch): `Profile` (debug, release; ONE table in
+      `Lyric.Frontend/Compiler/Profile.cs`, read by lyrc, lyrbuild, lyrtest, lyrdbg, the REPL and
+      `LangVm`), `--profile`/`--release`/`--debug` plus the six field flags, `LYRIC_PROFILE` as the
+      process default (the `LYRIC_JIT` shape), `HostOptions.Profile`, the four diagnostic switches
+      (`--no-inline`, `--no-scalar-replacement`, `--no-devirtualize`, `--no-fusion`) over
+      `IrPasses` and the emitter's fusion switch, `lyrvm run --jit`, strict option parsing in
+      lyrc and lyrvm, the driver's routing table (compile flags to lyrc, `--jit`/`--grant` to
+      lyrvm), `lyric pack` release by default, a CI job with `LYRIC_PROFILE=release`, guides 1,
+      14, 16, 17, 20, 21, CHANGELOG Unreleased
+- [x] **slice 2 — `lyric.json` v2**: `name`, `dependencies` and `toolchain`. A dependency owns
+      its first segment as a native root does; the reader (moved to `Lyric.Core`, because the
+      driver will read it and references no compiler) computes the FLAT closure over every
+      dependency's own manifest — its `dependencies` and `nativeRoots` join the table, a diamond
+      is read once, a cycle ends — and refuses two projects that want one segment to mean two
+      directories, naming both, while the root project's own entry pins a segment for everybody
+      under it (Go's `replace`, Cargo's `[patch]`). No `ModuleRoots` class after all: the flat
+      table IS the project file's properties, and the loader gained one branch. `toolchain` is a
+      minimum, checked at the read, its own code (`LYR-CLI0018`) because "upgrade" is different
+      advice from "edit the file"; a dependency's minimum counts too. `CompilerOptions` and
+      `HostOptions` gained `DependencyRoots`, every tool passes it, the LSP included. Templates
+      carry `name`. Thirteen CLI tests over sibling temp projects, guide 12 and 16, CHANGELOG.
+      **The spec sentence**: §4.1 lists the roots a dotted path resolves under and gains the
+      dependency root (`lyric-spec`, spec-first, this slice's twin)
+- [x] **slice 3 — `std.build` v2 and `lyrbuild` v2**: the MODEL moved into Lyric. `Artifact` is
+      an ordinary class — kind, name, entry, the four option fields, an optional `output` — and
+      `Profile` a struct of scalars; `executable(name, entry)`, `library(name, root)`,
+      `packed(app)`, `option(name, help)` and `flag(name, help)` declare, `use(profile)` takes a
+      bundle, and the derivation `out/<profile>/<name>.lyrbc` is a Lyric method with its own
+      `stdlib-tests` (six, host-free: the natives are reached only through `executable` and
+      `Profile.selected`, so the literals stand in). The runner writes an ENTRY around the
+      script — `build()`, then `std.build.finish()`, then `after()` when the script has one and
+      nothing failed — because a standard library function is nobody's root and the hand-over
+      has to run after `build` has returned; the script is checked first, alone, so its errors
+      carry its spans and the hooks are known before the entry is written. Seven natives, all
+      private, all scalar (`?string` and a struct cannot cross the boundary, so `option` is
+      `hasOption` plus `optionValue` in Lyric, and a profile is asked field by field): the
+      table stays in C#. `-D name[=value]` and `--only <name>`, both checked against what the
+      script declared ONCE IT HAS RUN — a `-D` nobody asked about is `LYR-CLI0003` with the
+      declared names, an `--only` nobody declared is `LYR-CLI0019` — and `lyrbuild --help` in a
+      project runs `build` to list its options. Without a script, the convention: `main.lyr`
+      under the source root is the program, named after the project, a source root without
+      one is a library and is checked, neither is `LYR-CLI0011` naming both. `packed` goes
+      through the `lyrpack` PROCESS, so `Tool` moved to `Lyric.Core` where the driver and the
+      runner share one ladder; a library check goes through `CheckProject` with the module
+      naming the LSP uses, now `ScriptSource.ModuleNameUnder`. `denyWarnings` is per artifact.
+      `addExecutable` stays, `@Deprecated` until 5.0, named after the output's stem; the 4.x
+      arguments in the 4.5 call are refused at the call with the message naming which way round.
+      The driver learned which of `build`'s options take a value (`--profile release` went to
+      the COMPILER as a file before). The app template declares `executable("__name__", …)`;
+      twenty CLI tests, guide 16 rewritten, guide 13, CHANGELOG
+- [x] **slice 4 — the verbs without a file**. In a project `lyric run` builds the default
+      artifact — the FIRST executable the script declares, explicit and in the script's order —
+      and runs it; `lyric run mktex` runs that one; `lyric pack` builds it in the release
+      profile and packs it. The rule that decides is one rule, the one `build` already used: an
+      argument on disk or carrying `.lyr`/`.lyrbc` is a file, everything else is a name. The
+      driver asks the RUNNER where an artifact landed rather than deriving it a second time —
+      `lyrbuild --print-path` writes exactly one line on stdout and moves everything else,
+      the script's own `println` included, to stderr, and `Tool.Capture` reads it. `lyrc check`
+      takes a directory or nothing: the source root as one compilation, the test root as a
+      second that imports it, which is the question a per-file check cannot answer (a test
+      calling a renamed function). `lyrtest --filter <text>` selects on the name a result line
+      shows, and a filter matching nothing is an ERROR. `lyric new` writes a `tests/` directory
+      with a test in it, and the app template gains a module for it to import.
+      **A third finding, and the oldest: the corpus-silence rule was VACUOUS for every file
+      under `stdlib-tests/`.** The branch that decides how a corpus file is checked tested the
+      PREFIX — `relativePath.StartsWith("stdlib")` — and `stdlib-tests\tests\math_tests.lyr`
+      starts with `stdlib`, so all sixteen went through the probe meant for library modules, as
+      `import tests.math_tests`: a path that resolves nowhere, whose error landed in the probe
+      file and was dropped there as the harness's own noise. Sixteen files stood in the corpus
+      and not one of them was read. The test is on the first SEGMENT now, and the corpus files
+      are checked with the roots their project declares — the way they are actually compiled.
+      It found dirt in the first run: an unused import in `math_tests` and in `string_tests`,
+      and an unused loop variable in `iter_tests`, all three cleaned here as the rule demands.
+      **Two more findings**, both from running the thing by hand: a project check read
+      only the DECLARED test root, so the conventional `tests/` went unchecked (it is the one
+      `lyrtest` uses, and a project whose tests only one tool finds is worse than none); and
+      `lyric test` could not find `lyrtest` at all in a source build — the one tool the
+      driver's output directory never got a copy of, invisible because the release archive
+      carries it and every test called the binary directly. Seventeen CLI tests, guides 1, 16,
+      17, 20, CHANGELOG
+- [x] **slice 5 — the release**. The spec sentence landed first, as the process asks
+      (`lyric-spec#36`, merged): §4.1 lists the roots a dotted path resolves under and gains the
+      dependency root, "since 4.5". No conformance case with it — the rule is about the project
+      file and the file system, which the suite does not model — so the suite is unchanged at
+      158 and the spec pin moves to 4.5 after this release, last, as it always does. The tree
+      claims **4.5.0**: version, README, CHANGELOG and this file in one commit, the tag after
+      green CI on main.
+
 **Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither
 is M36's**: both are older, and the feature only made them findable.
 

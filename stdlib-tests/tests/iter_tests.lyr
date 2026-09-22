@@ -93,7 +93,7 @@ pub fn chunks_groups_and_the_last_may_be_shorter(): void {
     assertEq(shape, 331);
 
     var nothing = 0;
-    for (c in chunks<int>(upTo(3).iter(), 0)) {
+    for (_ in chunks<int>(upTo(3).iter(), 0)) {
         nothing = nothing + 1;
     }
     assertEq(nothing, 0);

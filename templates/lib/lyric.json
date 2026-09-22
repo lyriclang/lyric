@@ -1,4 +1,8 @@
 {
-  // Where the modules live. Someone importing this library points their own sourceRoot here.
+  // The library's name, and the name of the module file under src/.
+  "name": "__name__",
+
+  // Where the modules live. A program depends on this library by naming this
+  // directory under "dependencies" in its own lyric.json.
   "sourceRoot": "src"
 }

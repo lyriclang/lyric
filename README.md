@@ -12,7 +12,7 @@ The compiler, the bytecode VM and the standard library work end to end; every co
 [`docs/Grammar.md`](docs/Grammar.md) compiles and runs. From v1.0 the language and the `.lyrbc`
 format carry the promise the versioning describes: a minor may add, a major may break.
 
-Current version: **4.4.1**, bytecode format **4.0**.
+Current version: **4.5.0**, bytecode format **4.0**.
 
 ## Targets
 
@@ -120,11 +120,11 @@ That is what a release ships, one archive per platform.
 
 | Binary | Role |
 |---|---|
-| `lyric` | Driver: `run`, `build`, `pack`, `fmt`, `test`, `check`, `disasm`, `repl` — dispatches to the tools below |
+| `lyric` | Driver: `new`, `run`, `build`, `pack`, `fmt`, `test`, `check`, `disasm`, `repl` — dispatches to the tools below, and in a project the verbs take no file |
 | `lyrc` | Compiler: `build`, `check`, and the `lower`/`parse`/`tokenize` dumps |
 | `lyrvm` | Runtime: `run`, `disasm`, `verify` on `.lyrbc` |
 | `lyrrepl` | Interactive prompt |
-| `lyrbuild` | Runs a `build.lyr` and compiles what it declares |
+| `lyrbuild` | Builds a project: its `build.lyr`, or `main.lyr` under the source root by convention |
 | `lyrpack` | Packs a compiled module and the stub runtime into one standalone executable |
 | `lyrfmt` | The formatter: in place, `--check` for CI, `--stdin` for editors — no style options |
 | `lyrtest` | Runs every function marked `@Test` in the project's test root, one fresh instance per test |
@@ -135,7 +135,7 @@ That is what a release ships, one archive per platform.
 
 ```
 $ lyric repl
-Lyric 4.4.1 — :help for commands, :quit to leave
+Lyric 4.5.0 — :help for commands, :quit to leave
 lyr> let x = 5
 lyr> x * 2
 10

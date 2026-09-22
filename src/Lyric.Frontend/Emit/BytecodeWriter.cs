@@ -23,8 +23,11 @@ public static class BytecodeWriter
     /// <param name="debugInfo">Whether the DebugInfo section (slot names) and the Names entries no
     /// attribute row demands are written. Stripping them leaves a valid module; a debugger then
     /// shows slot indices.</param>
+    /// <param name="fusion">Whether the fused instruction forms (3.6) are selected. A producer may
+    /// emit either; the unfused sequence is what a diagnostic switch asks for when a finding has
+    /// to be bisected down to the encoding.</param>
     public static byte[] Write(IrModule module, SourceMapContext? sourceMap = null,
-        bool debugInfo = true)
+        bool debugInfo = true, bool fusion = true)
     {
         var strings = new StringPool();
         var layouts = new List<FunctionLayout>(module.Functions.Count);
@@ -53,7 +56,7 @@ public static class BytecodeWriter
         var bodies = new List<byte[]>(module.Functions.Count);
         for (var i = 0; i < module.Functions.Count; i++)
             bodies.Add(WriteFunction(module.Functions[i], layouts[i], strings, module.Imports.Count,
-                positions));
+                positions, fusion));
 
         // The file names go into the pool here, for the same reason the type names do above: the
         // Strings section is serialized below, long before section 6 is written.
@@ -417,7 +420,7 @@ public static class BytecodeWriter
     }
 
     private static byte[] WriteFunction(IrFunction function, FunctionLayout layout, StringPool strings,
-        int importCount, SourceMapBuilder? positions)
+        int importCount, SourceMapBuilder? positions, bool fusion)
     {
         var code = new ByteWriter();
         var blockOffsets = new int[function.Blocks.Count];
@@ -432,7 +435,7 @@ public static class BytecodeWriter
 
             // Which runs of operations become one instruction (3.6). The plan is computed per
             // block and consulted here; an empty plan emits exactly what this loop emitted before.
-            var plan = Fusion.Of(function, block, layout);
+            var plan = fusion ? Fusion.Of(function, block, layout) : FusionPlan.None;
 
             for (var i = 0; i < block.Insts.Count; i++)
             {

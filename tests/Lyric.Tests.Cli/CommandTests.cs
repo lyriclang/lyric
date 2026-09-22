@@ -185,10 +185,13 @@ public sealed class CommandTests
         using var mapped = Toolchain.Temp(".lyrbc");
         using var stripped = Toolchain.Temp(".lyrbc");
 
+        // The profile is named, so the test says the same thing under LYRIC_PROFILE=release: it
+        // is about the map, and the debug profile is the one with every frame.
         Assert.Equal(ExitCodes.Success,
-            Toolchain.Lyrc("build", source.Path, "-o", mapped.Path).ExitCode);
+            Toolchain.Lyrc("build", source.Path, "-o", mapped.Path, "--debug").ExitCode);
         Assert.Equal(ExitCodes.Success,
-            Toolchain.Lyrc("build", source.Path, "-o", stripped.Path, "--no-source-map").ExitCode);
+            Toolchain.Lyrc("build", source.Path, "-o", stripped.Path, "--debug",
+                "--no-source-map").ExitCode);
 
         var withMap = Toolchain.Lyrvm("run", mapped.Path);
         var without = Toolchain.Lyrvm("run", stripped.Path);
@@ -197,13 +200,35 @@ public sealed class CommandTests
         Assert.Equal(withMap.ExitCode, without.ExitCode);
 
         // The expression stands on its own line, so the faulting division is line 3 and not the
-        // line of the return it belongs to. 'divide' is small and inlined, so one frame remains:
-        // the caller's name, the callee's line — spliced instructions keep their spans.
+        // line of the return it belongs to. In the debug profile 'divide' keeps its frame and
+        // the backtrace names both: the callee's line first, then the caller.
         var name = Path.GetFileName(source.Path);
-        Assert.Contains($"in main.main ({name}:3)", withMap.Err, StringComparison.Ordinal);
+        Assert.Contains($"in main.divide ({name}:3)", withMap.Err, StringComparison.Ordinal);
 
-        Assert.Contains("in main.main", without.Err, StringComparison.Ordinal);
+        // THE CALLER'S FRAME IS THE INTERPRETER'S TO GIVE. Compiled code keeps no frames, so a
+        // panic that passes through it loses everything below the function that failed — the
+        // cost the compiled engine documents, measured here from the outside: one build, two
+        // frames interpreted and one compiled. It was invisible until the debug profile became
+        // the default, because an optimized build had inlined the callee away and left one
+        // frame either way. Both engines are pinned rather than one skipped.
+        if (Toolchain.Compiled)
+            Assert.DoesNotContain("in main.main", withMap.Err, StringComparison.Ordinal);
+        else
+            Assert.Contains($"in main.main ({name}:8)", withMap.Err, StringComparison.Ordinal);
+
+        Assert.Contains("in main.divide", without.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(name, without.Err, StringComparison.Ordinal);
+
+        // In the release profile 'divide' is small and inlined, so one frame remains: the
+        // caller's name, the callee's line — spliced instructions keep their spans. That is the
+        // price of the profile, and the reason it is not the one a build starts from.
+        using var released = Toolchain.Temp(".lyrbc");
+        Assert.Equal(ExitCodes.Success,
+            Toolchain.Lyrc("build", source.Path, "-o", released.Path, "--release").ExitCode);
+        var optimized = Toolchain.Lyrvm("run", released.Path);
+        Assert.Equal(withMap.ExitCode, optimized.ExitCode);
+        Assert.Contains($"in main.main ({name}:3)", optimized.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("main.divide", optimized.Err, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,4 +1,7 @@
 {
+  // The project's name: what an implicit build calls its artifact.
+  "name": "__name__",
+
   // Where our own modules live. 'import shapes.circle' reads src/shapes/circle.lyr.
   "sourceRoot": "src"
 }

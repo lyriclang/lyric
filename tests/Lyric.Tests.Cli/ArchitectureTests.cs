@@ -78,7 +78,8 @@ public sealed class ArchitectureTests
         Assert.Contains("lyrrepl.dll", shipped);  // the REPL
         Assert.Contains("lyrbuild.dll", shipped); // the build runner
         Assert.Contains("lyrpack.dll", shipped);  // the packer
-        Assert.Contains("lyrfmt.dll", shipped);   // and the formatter
+        Assert.Contains("lyrfmt.dll", shipped);   // the formatter
+        Assert.Contains("lyrtest.dll", shipped);  // and the test runner
     }
 
     [Fact]
@@ -90,7 +91,7 @@ public sealed class ArchitectureTests
         var shipped = LyricAssemblies("Lyric.Cli");
 
         foreach (var tool in new[] { "lyrc.dll", "lyrvm.dll", "lyrrepl.dll", "lyrbuild.dll",
-                     "lyrpack.dll", "lyrfmt.dll" })
+                     "lyrpack.dll", "lyrfmt.dll", "lyrtest.dll" })
             Assert.Contains(tool, shipped);
     }
 

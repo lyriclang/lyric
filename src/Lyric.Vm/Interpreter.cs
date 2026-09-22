@@ -144,9 +144,11 @@ public static class Interpreter
 
     /// <param name="arguments">The program arguments. They go into the <c>string[]</c> a
     /// <c>fn main(args: string[])</c> receives; a parameterless <c>main</c> ignores them.</param>
+    /// <param name="jit">Whether functions are compiled as they are first called; see
+    /// <see cref="LoadedProgram.Load"/>.</param>
     public static LyrValue Run(BytecodeModule module, IReadOnlyList<string> arguments,
-        NativeRegistry? natives = null, Capability granted = Capability.All) =>
-        LoadedProgram.Load(module, natives, granted).RunEntry(arguments);
+        NativeRegistry? natives = null, Capability granted = Capability.All, bool jit = false) =>
+        LoadedProgram.Load(module, natives, granted, jit: jit).RunEntry(arguments);
 
     /// <summary>The program arguments as a Lyric <c>string[]</c>: the same representation as any
     /// other array.</summary>

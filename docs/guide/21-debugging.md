@@ -19,10 +19,10 @@ A `launch.json` is only needed to pass arguments or to pin a file:
 ```
 
 `program` may be a `.lyr` source or an already-built `.lyrbc`. A source file is compiled by the
-debugger itself, in the **debug shape**: with the source map, with debug info, and with the
-optimizations off — an inlined function has no frame to show, and a debugger that shows you the
-optimizer's world instead of your program's is lying politely. The compile costs tens of
-milliseconds; what runs is always the file in the editor.
+debugger itself, in the **debug profile** ([chapter 16](16-building.md#two-profiles)): with the
+source map, with debug info, and with the optimizations off — an inlined function has no frame
+to show, and a debugger that shows you the optimizer's world instead of your program's is lying
+politely. The compile costs tens of milliseconds; what runs is always the file in the editor.
 
 ## What the panels show
 
@@ -65,12 +65,13 @@ stderr, the exit code is 101.
 
 ## The machinery, briefly
 
-Debugging works because the compiler writes two strippable sections into every module by
-default: the source map (byte offsets to lines, since 1.0.1) and, since 2.3, **debug info** —
-the names of local and global slots, plus field names for every named type. `lyrc build
---no-debug-info` strips the names, exactly like `--no-source-map` strips the lines; the program
-is byte-for-byte the same otherwise, and a debugger attached to a stripped module falls back to
-slot indices. `lyrvm info` tells you which sections a module carries.
+Debugging works because the compiler writes two strippable sections into a module: the source
+map (byte offsets to lines, since 1.0.1) and, since 2.3, **debug info** — the names of local and
+global slots, plus field names for every named type. The debug profile writes both; the release
+profile drops the names and keeps the lines. `--no-debug-info` strips the names from any build,
+exactly like `--no-source-map` strips the lines; the program is byte-for-byte the same otherwise,
+and a debugger attached to a stripped module falls back to slot indices. `lyrvm info` tells you
+which sections a module carries.
 
 ## Debugging a script inside a host
 
@@ -144,7 +145,7 @@ Three limits, stated rather than discovered:
   scope, when the first line of `main` does.
 - **Standard-library lines are not steppable.** Their files are recorded by bare name, not by
   path, so a step into `List.push` runs through it and stops on your next line.
-- **Debugging optimized bytecode shows the optimizer's world.** A prebuilt `.lyrbc` from
-  `lyrc build` has functions inlined away and structs scattered into scalars; frames and
-  variables show what actually exists. Debug the source instead — the adapter's own compile is
-  the honest shape.
+- **Debugging release bytecode shows the optimizer's world.** A `.lyrbc` built with `--release`
+  has functions inlined away and structs scattered into scalars; frames and variables show what
+  actually exists. A plain `lyric build` is the debug profile and debugs honestly; for a release
+  build, debug the source instead — the adapter's own compile is the honest shape.

@@ -9,18 +9,26 @@ lyric pack app.lyr
 ./app arg1 arg2
 ```
 
-That is the whole workflow. `lyric pack` compiles the file and hands the module to `lyrpack`,
-which copies a prebuilt runtime — the *stub* — and appends the module to it. No compiler ships
-inside the result, nothing is installed on the target machine, and packing takes about as long
-as copying the file, because that is what it is.
+That is the whole workflow. `lyric pack` compiles the file in the release profile ([chapter
+16](16-building.md#two-profiles); `--debug` if you want the other one) and hands the module to
+`lyrpack`, which copies a prebuilt runtime — the *stub* — and appends the module to it. No
+compiler ships inside the result, nothing is installed on the target machine, and packing takes
+about as long as copying the file, because that is what it is.
 
-An already compiled module packs directly, which is how a `build.lyr` project packs its
-artifact:
+In a project you name nothing at all: `lyric pack` builds the default artifact in the release
+profile and packs it beside the module, as `out/release/app` (with the platform's suffix).
+`lyric pack mktex` packs the artifact of that name.
+
+An already compiled module packs directly too:
 
 ```bash
 lyric build
-lyric pack out/app.lyrbc -o dist/app
+lyric pack out/debug/app.lyrbc -o dist/app
 ```
+
+A `build.lyr` can also declare the packed form outright, with `packed(app)`, which is how a
+project that always ships one gets it from a plain `lyric build`. See [chapter
+16](16-building.md#packing-from-the-script).
 
 ## What a packed program is
 

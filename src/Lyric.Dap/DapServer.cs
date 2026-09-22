@@ -388,14 +388,16 @@ public sealed class DapServer
         }
 
         // The project file's layout counts here exactly as it does for 'lyrc build': without it
-        // a program in a project would not find its own modules.
+        // a program in a project would not find its own modules. The profile is the debug one
+        // whatever the process default says: an inlined callee has no frame to show, and a
+        // debugger that shows the optimizer's world instead of the program's is lying politely.
         var project = ProjectFile.Discover(baseDirectory);
-        var result = SourceCompiler.Compile(program, new CompilerOptions
+        var result = SourceCompiler.Compile(program, Profile.Debug.Options() with
         {
             StdlibRoot = _options.StdlibRoot,
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
-            Optimize = false,
+            DependencyRoots = project?.Dependencies,
         });
 
         return result.Bytes is null

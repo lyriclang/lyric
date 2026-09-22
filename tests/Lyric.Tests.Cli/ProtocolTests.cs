@@ -50,9 +50,16 @@ public sealed class ProtocolTests
     {
         Assert.Equal(ExitCodes.Usage, Toolchain.Lyrc("build").ExitCode);
         Assert.Equal(ExitCodes.Usage, Toolchain.Lyrvm("run").ExitCode);
-        Assert.Equal(ExitCodes.Usage, Toolchain.Lyric("run").ExitCode);
+        Assert.Contains(CliDiagnostics.MissingArgument, Toolchain.Lyrc("check").Err);
 
-        Assert.Contains(CliDiagnostics.MissingArgument, Toolchain.Lyric("run").Err);
+        // 'lyric run' without a file is no longer a missing argument: since 4.5 it means the
+        // project in the working directory. The pin moves with the rule — it is a usage error
+        // still, and the message names both ways out, because the working directory here is
+        // the repository root and no project of its own.
+        var run = Toolchain.Lyric("run");
+        Assert.Equal(ExitCodes.Usage, run.ExitCode);
+        Assert.Contains(CliDiagnostics.NoBuildScript, run.Err);
+        Assert.Contains("lyric.json", run.Err);
     }
 
     [Fact]

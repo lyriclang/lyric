@@ -59,14 +59,19 @@ public static class ModuleLowerer
     /// <c>LYR-IR0001</c>; the cause then stands in <paramref name="de"/>.</summary>
     /// <param name="verify"><c>null</c> means <see cref="VerifyByDefault"/>. Tests set the value
     /// explicitly, so their result does not depend on the build configuration.</param>
-    /// <param name="optimize">Whether the inliner runs. On everywhere except in tests that pin
-    /// the SHAPE of lowered code — a test about monomorphization asserts an instance the inliner
-    /// would fold away, and turning the optimizer off there keeps the test about its subject.</param>
+    /// <param name="optimize">Whether the optimizations run at all. Off in the debug profile and in
+    /// tests that pin the SHAPE of lowered code — a test about monomorphization asserts an instance
+    /// the inliner would fold away, and turning the optimizer off there keeps the test about its
+    /// subject.</param>
     /// <param name="libraryRoots">Whether a compile WITHOUT an entry point prunes from its `pub`
     /// functions (§4.6 of the specification, since 2.0). The drivers pass <c>true</c>; the default
     /// stays <c>false</c> so a test lowering a bare snippet keeps every function it wrote.</param>
+    /// <param name="passes">Which of the optimizations run when <paramref name="optimize"/> is on.
+    /// A diagnostic switch takes one out to bisect a finding; without <paramref name="optimize"/>
+    /// the set is not consulted.</param>
     public static IrModule? Lower(Compilation compilation, BindingResult binding, TypeResult types,
-        DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false)
+        DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false,
+        IrPasses passes = IrPasses.All)
     {
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
@@ -465,18 +470,19 @@ public static class ModuleLowerer
         // nobody calls, and the pruning that follows deletes it in the same run. Scalar
         // replacement BEHIND the inliner, because a returned value escapes its own function but
         // not the caller it was inlined into — without that order the analysis finds nothing.
-        if (optimize)
+        var enabled = optimize ? passes : IrPasses.None;
+        if (enabled != IrPasses.None)
         {
-            Inliner.Run(result);
-            ScalarReplacement.Run(result);
+            if (enabled.HasFlag(IrPasses.Inline)) Inliner.Run(result);
+            if (enabled.HasFlag(IrPasses.ScalarReplacement)) ScalarReplacement.Run(result);
 
             // Forwarding just handed receivers to their call sites; when one turns out to be a
             // single mkiface, the callvirt becomes a direct call — which the inliner can see, so
             // the pipeline runs once more behind it.
-            if (Devirtualizer.Run(result))
+            if (enabled.HasFlag(IrPasses.Devirtualize) && Devirtualizer.Run(result))
             {
-                Inliner.Run(result);
-                ScalarReplacement.Run(result);
+                if (enabled.HasFlag(IrPasses.Inline)) Inliner.Run(result);
+                if (enabled.HasFlag(IrPasses.ScalarReplacement)) ScalarReplacement.Run(result);
             }
         }
 

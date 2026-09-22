@@ -10,6 +10,133 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.5.0 — 2026-09-22
+
+**The project system.** A compile is one of two named profiles and the default is `debug`; a
+build script names what it builds; a project builds, runs, packs, checks and tests without
+anybody naming a file; and `lyric.json` says what the project is called, what it depends on and
+which toolchain it needs.
+
+### Added
+
+- **Profiles.** A compile is one of two named shapes. `debug` runs no IR optimizations and keeps
+  the source map and the debug info; `release` runs them and drops the debug info, keeping the
+  source map. `lyrc`, `lyrbuild` and `lyrtest` take `--profile <name>`, `--release` and
+  `--debug`, and `lyric run`, `lyric build` and `lyric pack` hand them through. Every field of a
+  profile stays overridable, and a field flag wins: `--optimize`/`--no-optimize`,
+  `--source-map`/`--no-source-map`, `--debug-info`/`--no-debug-info`. `LYRIC_PROFILE` names the
+  default for a whole process, the `LYRIC_JIT` shape; a flag beats it.
+
+- **`HostOptions.Profile`** in the embedding API. A host that ships sets `Profile.Release` beside
+  `Compile = true`; left unset, a VM compiles the process default.
+
+- **Four diagnostic switches on `lyrc`**, part of no profile: `--no-inline`,
+  `--no-scalar-replacement`, `--no-devirtualize` and `--no-fusion`. Each takes one pass or the
+  fused instruction forms out of an optimized build, for bisecting a finding down to the pass.
+
+- **`lyrvm run --jit`**, the engine `HostOptions.Compile` opts into, from the command line.
+  `lyric run app.lyr --jit` hands it through to the runtime.
+
+- **`lyric.json` learns three keys.** `dependencies` maps a module path segment to the directory
+  of another project; that project's own source root is where the segment's modules come from,
+  its `nativeRoots` and `dependencies` come along, and the table is flat: one segment, one
+  directory, for the whole program — two dependencies disagreeing are refused with both named,
+  and your own entry pins the segment for everybody under you. `name` is the project's name, a
+  module name. `toolchain` is the oldest toolchain that may build the project; an older one
+  refuses with both numbers (`LYR-CLI0018`) instead of compiling against a language the project
+  was not written for. All three are optional; a file without them means what it meant.
+
+- **`HostOptions.DependencyRoots`**, the same table for a host compiling a project's scripts.
+
+- **`std.build` names what it builds.** `executable(name, entry)` declares a program that lands
+  as `out/<profile>/<name>.lyrbc`; `library(name, root)` checks every module under a root and
+  writes nothing; `packed(app)` declares the packed form of an executable, landing as
+  `out/<profile>/<name>` with the platform's suffix. An artifact is an ordinary object: its
+  fields are the profile's four (`optimize`, `sourceMap`, `debugInfo`, `denyWarnings`), set one
+  by one or all at once with `use(Profile.release())`, and `output` names where it lands
+  outright. `Profile.selected()`, `Profile.debug()` and `Profile.release()` are the toolchain's
+  table, asked rather than copied.
+
+- **A build script takes options.** `option(name, help)` answers `-D name=value` (`null` when
+  not given), `flag(name, help)` answers `-D name`; `lyric build --help` in a project lists
+  them. A `-D` the script never asked about is refused with the ones it did (`LYR-CLI0003`).
+  `--only <name>` builds one artifact; a name nobody declared is refused with the ones that
+  were (`LYR-CLI0019`). A `pub fn after()` in the script runs once every artifact was written,
+  and not otherwise.
+
+- **The verbs take no file in a project.** `lyric run` builds the default artifact — the first
+  executable the script declares — and runs it; `lyric run mktex` runs that one; `lyric pack`
+  builds it in the release profile and packs it. An argument that is on disk or carries
+  `.lyr`/`.lyrbc` is a file and goes to the compiler as before, and anything else is an
+  artifact's name.
+
+- **`lyric check` checks a whole project.** Without a file, or with a directory, the source
+  root is read as one compilation and the test root as a second one that imports it — a test
+  calling a function that was renamed is a question no per-file check can answer. `lyrc check`
+  takes the same directory.
+
+- **`lyric test --filter <text>`** runs the tests whose `module.function` contains the text.
+  A filter that matches nothing is an error, because a green run of nothing is worse.
+
+- **A project builds without a script.** `lyric build` in a directory without a `build.lyr`
+  compiles `main.lyr` under the source root into `out/<profile>/<name>.lyrbc`, named after the
+  project (`lyric.json`'s `name`, or the directory); a source root without a `main.lyr` is a
+  library and is checked as a whole. Neither is `LYR-CLI0011`, naming both ways.
+
+### Changed
+
+- **`lyric new` writes a `tests/` directory** with one test in it, and the app template gains a
+  module beside `main.lyr` for that test to import: a scaffold whose shape is the shape a
+  project keeps. `lyric test` runs it straight away.
+
+- **Build artifacts land under `out/<profile>/`.** `lyric new`'s app builds to
+  `out/debug/<name>.lyrbc`, and `lyric build --release` to `out/release/`, so the two shapes
+  never overwrite each other. A script that wants the old layout sets `output` on the artifact.
+
+- **`addExecutable(entry, output)` is deprecated** (`LYR-SEM0076`, kept until 5.0). It still
+  builds, named after the output's stem; the new spelling is `executable(name, entry)` with
+  `output` set when the derivation is not wanted. The old arguments in the new call are refused
+  at the call with a message saying which way round they go. Its one setter,
+  `app.sourceMap(false)`, is the field now — `app.sourceMap = false` — and a script calling the
+  method gets a compile error at the call: a field and a method cannot share the name, and the
+  field is the one the other three options have.
+
+
+- **`lyric build`, `lyric run`, `lyric check`, `lyric test`, the REPL and the embedding API
+  compile the debug profile by default.** Before, every compile ran the optimizations and kept
+  the names, the shape `--release --debug-info` produces now. `lyric pack` compiles the release
+  profile by default. The measurement behind the change, on this interpreter (`tools/Bench`,
+  Release configuration, both shapes in one session):
+
+  | shape | release | debug |
+  |---|---:|---:|
+  | struct built and added per iteration (`construct_call`) | 55 ns | 141 ns |
+  | `for-in` over a range | 73 ns | 117 ns |
+  | `for-in` over an array | 154 ns | 140 ns |
+  | `Set.iter()` loop | 409 ns | 351 ns |
+  | one call per iteration | 64 ns | 65 ns |
+  | the standard library's test suite | 3.96 s | 3.45 s |
+
+  A backtrace from a default build names every frame, small callees included; the release
+  profile still splices them away.
+
+- **Every tool refuses an option it does not know** (`LYR-CLI0003`, exit code 2). `lyrc` and
+  `lyrvm` used to overlook one in silence, so `lyric run app.lyr --grant none` sent `--grant` to
+  the compiler, which ignored it, and the program ran with every capability.
+
+### Fixed
+
+- **The standard library's own tests are checked for warnings again.** The repository holds
+  every Lyric file it tracks to complete diagnostic silence, and the sixteen files under
+  `stdlib-tests/` were exempt by accident for as long as the rule has existed — the check that
+  routes a standard library module through an importing probe matched them on their path's
+  prefix. Three findings fell out of it at once, all cleaned: two unused imports and an unused
+  loop variable.
+
+- **`lyric test` could not find `lyrtest`** in a source build: the test runner was the one tool
+  the driver's output directory did not get a copy of. The release archive always carried it,
+  so the failure was a developer's, which is why nothing caught it.
+
 ## v4.4.1 — 2026-09-04
 
 **Round 1 of the sweep after M36.** Two findings, both older than the feature that surfaced them.

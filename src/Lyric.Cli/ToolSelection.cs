@@ -1,3 +1,5 @@
+using Lyric.Core;
+
 namespace Lyric.Cli;
 
 /// <summary>

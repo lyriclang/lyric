@@ -1,22 +1,279 @@
 module std.build;
 
-/// One thing a build produces: a `.lyrbc` compiled from an entry file.
+import std.core { Deprecated };
+import std.collections { List };
+import std.string { isDigit, isAlphanumeric };
+import std.io.path { stem };
+
+/// A bundle of compiler options under a name. The toolchain knows `debug` and `release`, and
+/// `lyric build --release` chooses one for the whole build.
 ///
-/// Returned by `addExecutable`, and configured after the fact — the compile itself happens once
-/// `build` has returned, so an option set on the next line still applies.
-pub class Artifact {
-    /// Whether the module carries a source map. On by default, as for `lyric build`.
-    ///
-    /// Without one a panic names the function it happened in rather than the line.
-    fn sourceMap(on: bool): void;
+/// The table lives in the toolchain, not here: this asks it, so a build script and `lyrc` can
+/// never disagree about what `release` means.
+pub struct Profile {
+    /// `debug` or `release`.
+    name: string,
+    /// Whether the IR optimizations run: inlining, scalar replacement, devirtualization.
+    optimize: bool,
+    /// Whether the module carries line numbers, for a backtrace that names its line.
+    sourceMap: bool,
+    /// Whether the module carries slot and field names, for a debugger.
+    debugInfo: bool,
+    /// Whether a warning fails the compile.
+    denyWarnings: bool,
+
+    /// The profile the command line chose (`--release`, `--profile x`); `debug` without a choice.
+    pub static fn selected(): Profile {
+        return Profile.named(selectedProfile());
+    }
+
+    /// The debug profile: no optimizations, every name and line kept.
+    pub static fn debug(): Profile {
+        return Profile.named("debug");
+    }
+
+    /// The release profile: optimized, the line numbers kept, the debug info dropped.
+    pub static fn release(): Profile {
+        return Profile.named("release");
+    }
+
+    /// The toolchain's profile of that name. A name it does not know ends the build.
+    pub static fn named(name: string): Profile {
+        return Profile {
+            name = name,
+            optimize = profileField(name, "optimize"),
+            sourceMap = profileField(name, "sourceMap"),
+            debugInfo = profileField(name, "debugInfo"),
+            denyWarnings = profileField(name, "denyWarnings"),
+        };
+    }
 }
 
-/// Declares a program to compile: `entry` is its main file, `output` the `.lyrbc` to write.
+/// What an artifact is.
+pub enum Kind {
+    /// A program: one `.lyrbc`, compiled whole from its entry file.
+    Executable,
+    /// A library: every module under its root checked as a whole, nothing written.
+    Library,
+    /// A program packed with the stub runtime into one executable.
+    Packed,
+}
+
+/// One thing a build produces.
 ///
-/// Both are relative to the directory holding `build.lyr`. The module root and the native roots
-/// come from `lyric.json`; this does not repeat them.
-///
-/// Nothing is compiled while `build` runs. The artifacts are collected and built afterwards, so
-/// work the script does in between — writing a generated source file, for instance — is finished
-/// before any of them is read.
-pub fn addExecutable(entry: string, output: string): Artifact;
+/// A script holds it and configures it after the call that produced it; nothing is read from it
+/// until `build` has returned, so a field set on the next line still applies. Every option
+/// starts from the profile the build was started with, and `use` takes another.
+pub class Artifact {
+    /// What it is.
+    kind: Kind,
+    /// Its name: an identifier, and the stem of the file it lands in.
+    name: string,
+    /// The entry file of a program, or the root directory of a library, relative to the
+    /// directory holding `build.lyr`.
+    entry: string,
+    /// The profile the options came from. It names the directory under `out/`.
+    profileName: string,
+    /// Whether the IR optimizations run.
+    optimize: bool,
+    /// Whether the module carries line numbers.
+    sourceMap: bool,
+    /// Whether the module carries slot and field names.
+    debugInfo: bool,
+    /// Whether a warning fails this artifact.
+    denyWarnings: bool,
+    /// Where it lands. `null` means `out/<profile>/<name>.lyrbc`, or `out/<profile>/<name>` for a
+    /// packed program, where the toolchain adds the platform's executable suffix to an output
+    /// without one.
+    output: ?string = null,
+
+    /// Takes the options of `profile`, its name included: a tool shipped beside a game that is
+    /// still being debugged is `tool.use(Profile.release())`.
+    pub mut fn use(profile: Profile): void {
+        this.profileName = profile.name;
+        this.optimize = profile.optimize;
+        this.sourceMap = profile.sourceMap;
+        this.debugInfo = profile.debugInfo;
+        this.denyWarnings = profile.denyWarnings;
+    }
+
+    /// The path it is written to: `output` when set, the derivation above otherwise. Empty for a
+    /// library, which writes nothing.
+    pub fn outputPath(): string {
+        let derived = match (this.kind) {
+            Kind.Executable => "out/" + this.profileName + "/" + this.name + ".lyrbc",
+            Kind.Library => "",
+            Kind.Packed => "out/" + this.profileName + "/" + this.name,
+        };
+        return this.output ?? derived;
+    }
+}
+
+/// Everything declared so far, in the order it was declared.
+let artifacts = List<Artifact>.empty();
+
+/// Declares a program: `name` is an identifier, `entry` its main file relative to the project.
+/// It starts with the profile the build was started with.
+pub fn executable(name: string, entry: string): Artifact {
+    if (!isArtifactName(name)) {
+        panic(
+            "'"
+                + name
+                + "' is not an artifact name: letters, digits and '_', not starting "
+                + "with a digit. The name comes first, executable(\"app\", \"src/main.lyr\"), where the "
+                + "4.x form addExecutable(entry, output) took the entry file"
+        );
+    }
+    return register(Kind.Executable, name, entry);
+}
+
+/// Declares a library: every module under `root` is checked as a whole, and nothing is written.
+pub fn library(name: string, root: string): Artifact {
+    if (!isArtifactName(name)) {
+        panic(
+            "'"
+                + name
+                + "' is not an artifact name: letters, digits and '_', not starting "
+                + "with a digit"
+        );
+    }
+    return register(Kind.Library, name, root);
+}
+
+/// Declares a packed program from an executable's artifact: the same name, entry and options,
+/// packed with the stub runtime once compiled. It lands as `out/<profile>/<name>`.
+pub fn packed(app: Artifact): Artifact {
+    let artifact = Artifact {
+        kind = Kind.Packed,
+        name = app.name,
+        entry = app.entry,
+        profileName = app.profileName,
+        optimize = app.optimize,
+        sourceMap = app.sourceMap,
+        debugInfo = app.debugInfo,
+        denyWarnings = app.denyWarnings,
+    };
+    artifacts.push(artifact);
+    return artifact;
+}
+
+/// A value from the command line, `-D name=value`: `null` when it was not given, and `""` when
+/// it was given without a value. `help` is what `lyric build --help` shows beside the name.
+pub fn option(name: string, help: string): ?string {
+    declareOption(name, help, false);
+    if (!hasOption(name)) {
+        return null;
+    }
+    return optionValue(name);
+}
+
+/// A switch from the command line, `-D name`. `help` is what `lyric build --help` shows.
+pub fn flag(name: string, help: string): bool {
+    declareOption(name, help, true);
+    return hasOption(name);
+}
+
+/// The 4.x form: the entry first, and the output named outright. It builds as it always did,
+/// named after the output's stem; the name rule is not applied, because a 4.x script never
+/// chose a name.
+@Deprecated {
+    message = "use executable(name, entry); the output follows the profile",
+    until = "5.0",
+}
+pub fn addExecutable(entry: string, output: string): Artifact {
+    let artifact = register(Kind.Executable, stem(output), entry);
+    artifact.output = output;
+    return artifact;
+}
+
+/// Hands every declared artifact to the toolchain and compiles them. Called by `lyric build`
+/// once `build` has returned, never by a script. Returns how many failed.
+pub fn finish(): int {
+    for (artifact in artifacts) {
+        declare(
+            kindName(artifact.kind),
+            artifact.name,
+            artifact.entry,
+            artifact.outputPath(),
+            artifact.optimize,
+            artifact.sourceMap,
+            artifact.debugInfo,
+            artifact.denyWarnings
+        );
+    }
+    return compileAll();
+}
+
+fn register(kind: Kind, name: string, entry: string): Artifact {
+    let profile = Profile.selected();
+    let artifact = Artifact {
+        kind = kind,
+        name = name,
+        entry = entry,
+        profileName = profile.name,
+        optimize = profile.optimize,
+        sourceMap = profile.sourceMap,
+        debugInfo = profile.debugInfo,
+        denyWarnings = profile.denyWarnings,
+    };
+    artifacts.push(artifact);
+    return artifact;
+}
+
+fn kindName(kind: Kind): string {
+    return match (kind) {
+        Kind.Executable => "executable",
+        Kind.Library => "library",
+        Kind.Packed => "packed",
+    };
+}
+
+/// Letters, digits and `_`, not starting with a digit: what a file stem and a name on the
+/// command line both take without quoting.
+fn isArtifactName(name: string): bool {
+    if (name.length() == 0 || isDigit(name.charAt(0))) {
+        return false;
+    }
+    var i = 0;
+    while (i < name.length()) {
+        let c = name.charAt(i);
+        if (!isAlphanumeric(c) && c != '_') {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+// The questions only the toolchain can answer, bound by `lyric build` under these names.
+
+/// The name of the profile the build was started with.
+fn selectedProfile(): string;
+
+/// One field of the toolchain's profile table: `optimize`, `sourceMap`, `debugInfo` or
+/// `denyWarnings`.
+fn profileField(profile: string, field: string): bool;
+
+/// Records an option the script asked about, for `--help`.
+fn declareOption(name: string, help: string, isFlag: bool): void;
+
+/// Whether `-D name` or `-D name=value` was given.
+fn hasOption(name: string): bool;
+
+/// The value behind `-D name=value`; empty without one.
+fn optionValue(name: string): string;
+
+/// One artifact, handed over as its fields.
+fn declare(
+    kind: string,
+    name: string,
+    entry: string,
+    output: string,
+    optimize: bool,
+    sourceMap: bool,
+    debugInfo: bool,
+    denyWarnings: bool
+): void;
+
+/// Compiles everything handed over and returns how many failed.
+fn compileAll(): int;

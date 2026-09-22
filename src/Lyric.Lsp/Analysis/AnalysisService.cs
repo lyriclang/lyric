@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Lyric.AST;
 using Lyric.Compiler;
+using Lyric.Core;
 using Lyric.Lsp.Documents;
 using Lyric.Lsp.Protocol;
 
@@ -381,6 +382,7 @@ public sealed class AnalysisService : IDisposable
         StdlibRoot = _stdlibRoot,
         SourceRoot = project?.SourceRoot,
         NativeRoots = project?.NativeRoots,
+        DependencyRoots = project?.Dependencies,
 
         // Everything the editor holds, not only the files this run starts from. Without it a
         // program is checked against the last SAVE of every module it imports, and the two
@@ -691,16 +693,8 @@ public sealed class AnalysisService : IDisposable
     /// an importable module path — a hyphen, a space — still gets its derived name: nothing can
     /// import it either way, and the file still checks.</para>
     /// </summary>
-    private static string ModuleNameFor(string sourceRoot, string path)
-    {
-        var relative = Path.GetRelativePath(sourceRoot, path);
-        var stem = relative.EndsWith(".lyr", StringComparison.OrdinalIgnoreCase)
-            ? relative[..^".lyr".Length]
-            : relative;
-
-        return string.Join('.',
-            stem.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-    }
+    private static string ModuleNameFor(string sourceRoot, string path) =>
+        ScriptSource.ModuleNameUnder(sourceRoot, path);
 
     /// <summary>The module AST a file was parsed into, or <c>null</c> for a file that holds no
     /// module of this compilation — which happens when the file could not be read.</summary>

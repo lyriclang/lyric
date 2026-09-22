@@ -56,20 +56,31 @@ public static class Program
         var positional = separator < 0 ? args : args[..separator];
         var programArguments = separator < 0 ? [] : args[(separator + 1)..];
 
-        if (positional.Length < 2)
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
-                "run: missing file argument", ExitCodes.Usage);
-
-        var path = positional[1];
-        var passThrough = positional[2..];
+        var (target, options) = FirstPositional(positional[1..]);
 
         // Checked before the compile step so a misconfigured runtime is reported without one.
         if (Missing(selection, Tool.Runtime) is { } runtimeError) return runtimeError;
 
+        // No file, a directory, or a name: the project answers it. A file is the argument that
+        // exists on disk or carries a Lyric extension — the same rule 'build' uses to tell
+        // "compile this file" from "build this project".
+        if (target is null || !IsFile(target))
+            return RunProject(target, options, programArguments, selection);
+
+        var path = target;
+
+        // A module needs no compile, so every option is the runtime's — and one the runtime does
+        // not know is refused there, by name.
         if (path.EndsWith(".lyrbc", StringComparison.OrdinalIgnoreCase))
-            return Execute(selection, path, passThrough, programArguments);
+            return Execute(selection, path, options, programArguments);
 
         if (Missing(selection, Tool.Compiler) is { } compilerError) return compilerError;
+
+        // Two tools, one option list: what says how to RUN goes to the runtime, everything else
+        // says how to COMPILE and goes to the compiler. A table rather than everything to one of
+        // them, because a flag the wrong tool receives is refused there — rightly, once the right
+        // tool has had its chance to take it.
+        var (compilerOptions, runtimeOptions) = Split(options);
 
         // The name carries the source file name so a backtrace from the runtime stays readable.
         var module = Path.Combine(Path.GetTempPath(),
@@ -80,10 +91,10 @@ public static class Program
             // '--quiet' suppresses the compiler's summary of an artifact that is about to be
             // deleted. Passing it twice is harmless.
             var built = Tool.Run(selection.PathOf(Tool.Compiler),
-                ["build", path, "-o", module, "--quiet", .. passThrough], Console.Error);
+                ["build", path, "-o", module, "--quiet", .. compilerOptions], Console.Error);
             if (built != ExitCodes.Success) return built;
 
-            return Execute(selection, module, [], programArguments);
+            return Execute(selection, module, runtimeOptions, programArguments);
         }
         finally
         {
@@ -101,6 +112,130 @@ public static class Program
     }
 
     /// <summary>
+    /// Build the project and run what came out: the composition of <c>build</c> and
+    /// <c>run</c>, for a project that says what it builds.
+    ///
+    /// <para><paramref name="target"/> is the directory to build in, the name of the artifact
+    /// to run, or <c>null</c> for the default artifact of the working directory's project. The
+    /// runner is the one that knows where an artifact lands, so it is asked rather than
+    /// second-guessed: <c>--print-path</c> is that answer.</para>
+    /// </summary>
+    private static int RunProject(string? target, string[] options, string[] programArguments,
+        ToolSelection selection)
+    {
+        if (Missing(selection, Tool.Builder) is { } error) return error;
+
+        if (Built(target, options, selection) is not { } module) return ExitCodes.Failure;
+        if (module.ExitCode != ExitCodes.Success) return module.ExitCode;
+
+        var (_, runtimeOptions) = Split(options);
+        return Execute(selection, module.Path, runtimeOptions, programArguments);
+    }
+
+    /// <summary>The path of the program a build produced, or <c>null</c> when the runner said
+    /// something the driver cannot use. A nonzero exit code travels out as it is: the runner
+    /// has reported why.</summary>
+    private static (int ExitCode, string Path)? Built(string? target, string[] options,
+        ToolSelection selection)
+    {
+        string[] where = target is null || !Directory.Exists(target) ? [] : [target];
+        string[] only = target is null || Directory.Exists(target) ? [] : ["--only", target];
+
+        // What says how to RUN is the runtime's and has no business in a build.
+        var (buildOptions, _) = Split(options);
+
+        var (exitCode, output) = Tool.Capture(selection.PathOf(Tool.Builder),
+            [.. where, .. only, "--print-path", .. buildOptions], Console.Error);
+        if (exitCode != ExitCodes.Success) return (exitCode, "");
+
+        var path = output.Trim();
+        if (path.Length == 0 || path.Contains('\n'))
+            return NotAPath(path);
+
+        return (ExitCodes.Success, path);
+    }
+
+    /// <summary>The runner promises ONE line on stdout under <c>--print-path</c>. Anything else
+    /// is a bug in a tool rather than a mistake by the user, and saying so beats running
+    /// whatever the first line happened to be.</summary>
+    private static (int, string)? NotAPath(string output)
+    {
+        CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+            $"{Tool.Builder.Name} did not name one program to run"
+            + (output.Length == 0 ? "" : $", it wrote:\n{output}"), ExitCodes.Failure);
+        return null;
+    }
+
+    /// <summary>
+    /// The first argument that is neither an option nor an option's VALUE, and everything else
+    /// in the order it stood.
+    ///
+    /// <para>What follows an option that takes a value belongs to it: <c>lyric run --profile
+    /// release</c> names no artifact called release. The alternative — every tool's option
+    /// table in the driver — is the same knowledge twice, so this is the one list, and it
+    /// holds the options that take a value rather than all of them.</para>
+    /// </summary>
+    private static (string? Target, string[] Remaining) FirstPositional(string[] arguments)
+    {
+        string? target = null;
+        var rest = new List<string>(arguments.Length);
+
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            if (target is null && !arguments[i].StartsWith('-')) { target = arguments[i]; continue; }
+
+            rest.Add(arguments[i]);
+            if (ValueOptions.Contains(arguments[i]) && i + 1 < arguments.Length)
+                rest.Add(arguments[++i]);
+        }
+
+        return (target, rest.ToArray());
+    }
+
+    /// <summary>The options of the tools that take a value, on either side of a verb.</summary>
+    private static readonly HashSet<string> ValueOptions = new(StringComparer.Ordinal)
+    {
+        "-o", "--output", "--profile", "--stdlib", "-D", "--only", "--grant", "--stub",
+        "--filter",
+    };
+
+    /// <summary>Whether an argument names a FILE rather than a project or an artifact: it is
+    /// there on disk, or it carries a Lyric extension. A name that is neither is a name.
+    /// </summary>
+    private static bool IsFile(string target) =>
+        (File.Exists(target) && !Directory.Exists(target))
+        || target.EndsWith(".lyr", StringComparison.OrdinalIgnoreCase)
+        || target.EndsWith(".lyrbc", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>What the runtime takes out of a <c>run</c>'s options: <c>--jit</c>, and
+    /// <c>--grant</c> with its list. Everything else is the compiler's.</summary>
+    private static (string[] Compiler, string[] Runtime) Split(string[] options)
+    {
+        var compiler = new List<string>();
+        var runtime = new List<string>();
+        for (var i = 0; i < options.Length; i++)
+        {
+            switch (options[i])
+            {
+                case "--jit":
+                    runtime.Add(options[i]);
+                    break;
+
+                case "--grant":
+                    runtime.Add(options[i]);
+                    if (i + 1 < options.Length) runtime.Add(options[++i]);
+                    break;
+
+                default:
+                    compiler.Add(options[i]);
+                    break;
+            }
+        }
+
+        return (compiler.ToArray(), runtime.ToArray());
+    }
+
+    /// <summary>
     /// Compile and pack, or pack alone: a <c>.lyrbc</c> goes to the packer as it stands, a source
     /// is compiled into a temporary module first — the composition of <c>run</c>, with an
     /// executable instead of an execution.
@@ -114,8 +249,8 @@ public static class Program
     {
         if (Missing(selection, Tool.Packer) is { } packerError) return packerError;
 
-        string? file = null, output = null, stub = null;
-        var compilerArguments = new List<string>();
+        string? output = null, stub = null;
+        var remaining = new List<string>();
         for (var i = 1; i < args.Length; i++)
         {
             switch (args[i])
@@ -135,17 +270,33 @@ public static class Program
                     break;
 
                 default:
-                    if (file is null && !args[i].StartsWith('-')) file = args[i];
-                    else compilerArguments.Add(args[i]);
+                    remaining.Add(args[i]);
                     break;
             }
         }
 
-        if (file is null)
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
-                "pack: missing file argument", ExitCodes.Usage);
+        var (file, compilerArguments) = FirstPositional(remaining.ToArray());
 
         string[] stubOption = stub is null ? [] : ["--stub", stub];
+
+        // Packing is shipping: the release profile, unless the caller named one.
+        var arguments = compilerArguments.ToList();
+        if (!arguments.Any(a => a is "--profile" or "--release" or "--debug"))
+            arguments.Insert(0, "--release");
+
+        // No file, a directory or a name: the project's program is what gets packed. The
+        // packer's own default names the executable after the module, which under
+        // out/<profile>/ is exactly where a packed artifact belongs.
+        if (file is null || !IsFile(file))
+        {
+            if (Missing(selection, Tool.Builder) is { } builderError) return builderError;
+            if (Built(file, arguments.ToArray(), selection) is not { } program) return ExitCodes.Failure;
+            if (program.ExitCode != ExitCodes.Success) return program.ExitCode;
+
+            string[] into = output is null ? [] : ["-o", output];
+            return Tool.Run(selection.PathOf(Tool.Packer),
+                [program.Path, .. into, .. stubOption], Console.Error);
+        }
 
         if (file.EndsWith(".lyrbc", StringComparison.OrdinalIgnoreCase))
         {
@@ -163,7 +314,7 @@ public static class Program
         try
         {
             var built = Tool.Run(selection.PathOf(Tool.Compiler),
-                ["build", file, "-o", module, "--quiet", .. compilerArguments], Console.Error);
+                ["build", file, "-o", module, "--quiet", .. arguments], Console.Error);
             if (built != ExitCodes.Success) return built;
 
             return Tool.Run(selection.PathOf(Tool.Packer),
@@ -186,7 +337,7 @@ public static class Program
 
     /// <summary>
     /// <c>build</c> with a source file is the compiler; without one, or with a directory, it is the
-    /// build script that lies there.
+    /// project that lies there: its build script, or the convention when it has none.
     ///
     /// <para>Decided on the argument rather than on a flag, because the two are different
     /// questions: "compile this file" and "build this project". A path that does not exist stays
@@ -194,7 +345,7 @@ public static class Program
     /// </summary>
     private static int Build(string[] args, ToolSelection selection)
     {
-        var positional = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-'));
+        var (positional, _) = FirstPositional(args[1..]);
 
         if (positional is not null && !Directory.Exists(positional))
             return Forward(Tool.Compiler, selection, args);
@@ -257,8 +408,10 @@ public static class Program
               new <name> [--lib]       Write a new project, an app or a library
               run <file>               Compile and execute (.lyr or .lyrbc)
               build <file> [-o <out>]  Compile .lyr to .lyrbc
-              build [<dir>]            Run the build.lyr there and compile what it declares
-              pack <file> [-o <out>]   Compile and pack into one standalone executable
+              build [<dir>]            Build the project there: its build.lyr, or main.lyr by
+                                       convention (-D name[=value] for the script's options,
+                                       --only <name> for one artifact)
+              pack <file> [-o <out>]   Compile (release profile) and pack into one executable
               fmt <path>... [--check]  Format .lyr files in place (--check only lists)
               test [<dir>]             Run the @Test functions of the project's test root
               check <file> [--emit]    Compile without writing a file (--emit: through the bytes)
@@ -273,7 +426,10 @@ public static class Program
               --version, -v            Show versions and the selected tools
               --help, -h               Show this help
 
-            Every other option is passed straight to the tool that runs the command.
+            Every other option is passed straight to the tool that runs the command; a 'run'
+            hands --jit and --grant to the runtime and everything else (--release, --profile,
+            --no-optimize, ...) to the compiler. Compiles are the debug profile unless told
+            otherwise; 'pack' is the release profile unless told otherwise.
             For compiler internals (tokenize, parse, lower) call 'lyrc' directly;
             to inspect a module (verify, info) call 'lyrvm'.
             """);

@@ -325,11 +325,12 @@ public sealed class LangVm : IDisposable
 
     private ScriptModule Build(ScriptSource source, string name, string? origin)
     {
-        var result = SourceCompiler.Compile(source, new CompilerOptions
+        var result = SourceCompiler.Compile(source, (_options.Profile ?? Profile.Default).Options() with
         {
             StdlibRoot = _options.StdlibRoot,
             SourceRoot = _options.SourceRoot,
             NativeRoots = _options.NativeRoots,
+            DependencyRoots = _options.DependencyRoots,
             NativeModules = HostModuleSource is { } host
                 ? new Dictionary<string, string>(StringComparer.Ordinal) { [HostModule] = host }
                 : null,
