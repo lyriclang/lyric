@@ -859,6 +859,13 @@ public class LoweringTests
     /// <para><b>Every argument here is a LITERAL, and it has to be.</b> Passing a value that is
     /// already a <c>?int</c> needs no widening, so it travels through the gap without touching
     /// it — a probe written that way stays green while the paths are broken.</para>
+    ///
+    /// <para><b>It also matters that this lowers UNOPTIMIZED</b>, which is what
+    /// <c>TryLower</c> does. With the optimizer on, the inliner embeds a body as small as
+    /// <c>or</c>'s and the faulty call disappears with it, so the same source runs clean
+    /// through <c>lyric run</c> while the IR that was built for it is malformed. The enum
+    /// breaks either way, its <c>match</c> body being too big to embed — which is exactly how
+    /// two people measuring the same defect can disagree about whether a class shows it.</para>
     /// </summary>
     [Fact]
     public void An_argument_widens_to_what_the_instance_makes_of_its_parameter_type()

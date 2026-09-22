@@ -562,12 +562,29 @@ anderen Pfad (das konforme `Box` bricht im Instanz-Pfad), noch bleibt eine Klass
 unauffällig: **auf diesem Branch zeigt die Klasse den Defekt genauso wie das Enum.** Mein
 frühes `probes/iso_box.lyr`, das den Klassenfall grün meldete, war ein Messfehler.
 
-**Offen und bewusst nicht weggeschrieben:** pattern-lambda misst auf IHREM Branch das
-Gegenteil — dort bricht bei neutralisiertem `LowerGenericMethodCall` nur das Enum, die Klasse
-läuft, mit und ohne Konformanz. Beide Messungen sind je für sich sauber (Literale als
-Argumente, Stellen einzeln). Entweder unterscheiden sich die Branches an dieser Stelle, oder
-eine der Proben misst etwas anderes, als sie zu messen glaubt. Das ist beim Merge einmal
-nachzumessen; für den Fix ist es folgenlos, weil beide Fassungen alle Stellen abdecken.
+**Die Divergenz im Team ist aufgelöst, und es lag an keinem der beiden Branches.**
+pattern-lambda maß „nur das Enum bricht, die Klasse läuft", ich maß „beide brechen". Zwei
+Messungen auf zwei Bäumen; die Auflösung ergab eine dritte Messung
+(`probes/class_variants.py`, `probes/inliner_hypothesis.py`):
+
+| Klassenform, Instanz-Pfad neutralisiert | über `lyric run` |
+|---|---|
+| ohne Konformanz, ohne statische Methode | grün |
+| mit Konformanz | grün |
+| mit Konformanz und statischer Methode | grün |
+| **dieselbe Klasse, `or` mit einer Schleife im Körper** | **bricht** |
+| Enum (Kontrolle) | bricht |
+
+**Der INLINER kaschiert den Defekt.** Ein Körper wie `return this.value;` wird eingebettet,
+und der fehlerhafte Aufruf verschwindet mit ihm; das Enum bricht immer, weil sein
+`match`-Körper zu groß zum Einbetten ist. Mein Test sah die Klasse, weil `TryLower` mit
+`optimize:false` lowert; pattern-lambdas Probe lief über `lyric run` und damit optimiert.
+Weder Konformanz noch Branch entscheiden — die Optimierung entscheidet.
+
+**Das ist über diesen Fix hinaus wichtig:** fehlerhaftes IR kann vom Optimierer verdeckt
+werden, also ist „läuft durch `lyric run`" kein Beleg für wohlgeformtes IR. Wer einen
+Verifier-Befund sucht, misst unoptimiert (Testpfad) oder mit einem Körper, den der Inliner
+nicht frisst. Der Merge braucht hier nichts mehr nachzumessen.
 
 **Die Falle bei jeder Gegenprobe hier** (von pattern-lambda gefunden, deren Vier-Wege-Probe
 grün war, während drei Wege kaputt waren): **jedes Argument muss ein LITERAL sein.** Ein Wert,
