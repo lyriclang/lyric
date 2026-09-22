@@ -581,7 +581,10 @@ internal sealed class FunctionLowerer
             // 'panic(…)' has the return type 'never' and seals its block. An expression can therefore
             // end control flow, and the return value has to report that, or the caller later tries to
             // seal the same block a second time.
-            case ExprStmt e: LowerExprOrVoid(e.Expr); return !_b.IsSealed;
+            case ExprStmt e:
+                if (Diverges(e.Expr)) { LowerDiverging(e.Expr); return false; }
+                LowerExprOrVoid(e.Expr);
+                return !_b.IsSealed;
 
             // Only in the synthetic global initializer (see GlobalInitializer).
             case GlobalInitStmt g: LowerGlobalInit(g); return true;
@@ -627,6 +630,35 @@ internal sealed class FunctionLowerer
     /// outer one records its handler. Exactly this order is the contract while unwinding.</para>
     /// </summary>
     private readonly List<IrHandler> _handlers = new();
+
+    /// <summary>'throw' in value position: the same terminator as the statement, and no value —
+    /// the type is 'never'. Whoever lowers the enclosing expression asks <see cref="Diverges"/>
+    /// first, and so never asks this one for a temp it cannot give.</summary>
+    private TempId? LowerThrowExpr(ThrowExpr expr)
+    {
+        var value = LowerExpr(expr.Value);
+        var concrete = TypeOfExpr(expr.Value) switch
+        {
+            IrRefType r => (TypeId?)r.Type,
+            _ => null,
+        };
+        _b.Seal(new Throw(value, concrete, expr.Span));
+        return null;
+    }
+
+    /// <summary>Does this expression have the type 'never' — a 'throw', a call to 'panic' or to a
+    /// function declared 'never', an 'if' or 'match' whose every arm diverges? Such an expression
+    /// seals the block when lowered, and the position holding it must not store or branch after it.</summary>
+    private bool Diverges(Expr expr) => _types.TypeOf(expr) is NeverType;
+
+    /// <summary>Lowers a diverging expression for its effect. After it the block is sealed; a
+    /// lowering that did not seal (a never-declared user function, whose call is an ordinary
+    /// 'call') gets the 'unreachable' the sema's type promises.</summary>
+    private void LowerDiverging(Expr expr)
+    {
+        LowerExprOrVoid(expr);
+        if (!_b.IsSealed) _b.Seal(new Unreachable(expr.Span));
+    }
 
     private bool LowerThrow(ThrowStmt stmt)
     {
@@ -1424,6 +1456,7 @@ internal sealed class FunctionLowerer
         StructInitExpr e => LowerObjectInit(e),
         RangeExpr e => throw NotSupported("range expression", e.Span),
         ResumeExpr e => LowerResume(e),
+        ThrowExpr e => LowerThrowExpr(e),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),
@@ -1719,17 +1752,32 @@ internal sealed class FunctionLowerer
         // `LowerExprAs` rather than `LowerExpr`: the branch type need not be the result type.
         // `if (c) 5 else null` is `?int`, and both branches need the target type — the `null` because it
         // has none of its own, and the `5` because it has to be wrapped.
+        // A diverging branch ('else throw e') stores nothing and never reaches the merge: it seals
+        // its own block, and the merge has the other branch as its only predecessor.
         _b.SwitchTo(thenBlock);
-        _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Then, type), expr.Then.Span));
-        var thenExit = _b.CurrentId;
+        BlockId? thenExit = null;
+        if (Diverges(expr.Then)) LowerDiverging(expr.Then);
+        else
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Then, type), expr.Then.Span));
+            thenExit = _b.CurrentId;
+        }
 
         _b.SwitchTo(elseBlock);
-        _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
-        var elseExit = _b.CurrentId;
+        BlockId? elseExit = null;
+        if (Diverges(expr.Else)) LowerDiverging(expr.Else);
+        else
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
+            elseExit = _b.CurrentId;
+        }
+
+        if (thenExit is null && elseExit is null)
+            throw NotSupported("an 'if' expression whose both branches diverge", expr.Span);
 
         var mergeBlock = _b.NewBlock();
-        _b.SealBlock(thenExit, new Branch(mergeBlock, expr.Then.Span));
-        _b.SealBlock(elseExit, new Branch(mergeBlock, expr.Else.Span));
+        if (thenExit is { } t) _b.SealBlock(t, new Branch(mergeBlock, expr.Then.Span));
+        if (elseExit is { } e) _b.SealBlock(e, new Branch(mergeBlock, expr.Else.Span));
 
         _b.SwitchTo(mergeBlock);
         var dest = _slots.NewTemp(type);
@@ -2517,6 +2565,9 @@ internal sealed class FunctionLowerer
     {
         if (arm.Body is Expr expr)
         {
+            // '_ => throw e' or '_ => panic(…)': the arm diverges, stores nothing, and does not
+            // fall through to the merge — exactly like a block arm ending in a 'throw'.
+            if (Diverges(expr)) { LowerDiverging(expr); return false; }
             var produced = resultType is null ? LowerExprOrVoid(expr) : LowerExprAs(expr, resultType);
             if (slot is { } target && produced is { } v) _b.Emit(new StoreLocal(target, v, arm.Span));
             return true;
@@ -2783,9 +2834,14 @@ internal sealed class FunctionLowerer
         _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(whenNone);
-        var fallback = LowerExpr(expr.Right);
-        _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
-        _b.Seal(new Branch(merge, expr.Span));
+        // 'x ?? throw e': the absent path throws and never reaches the merge.
+        if (Diverges(expr.Right)) LowerDiverging(expr.Right);
+        else
+        {
+            var fallback = LowerExpr(expr.Right);
+            _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
+            _b.Seal(new Branch(merge, expr.Span));
+        }
 
         _b.SwitchTo(merge);
         var dest = _slots.NewTemp(type);

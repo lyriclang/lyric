@@ -162,6 +162,12 @@ public sealed partial class Parser
             var co = ParsePrefix();
             return new ResumeExpr(co, Span.Union(kw.Span, co.Span));
         }
+        if (op is TokenKind.Throw) // 'x ?? throw e': a prefix, so 'throw e ?? f' is not 'throw (e ?? f)'
+        {
+            var kw = _buffer.Advance();
+            var value = ParsePrefix();
+            return new ThrowExpr(value, Span.Union(kw.Span, value.Span));
+        }
 
         return ParsePostfix(ParsePrimary());
     }

@@ -11,6 +11,10 @@ namespace Lyric.Ir
             {
                 case PrimitiveType pt:
                     return new IrScalarType(NormalizeScalar(pt.Kind));
+                // 'never' has no values: a function declared to return it comes back never, and
+                // at the machine that is a void function whose call is followed by 'unreachable'.
+                case NeverType:
+                    return new IrScalarType(IrScalar.Void);
                 default:
                     throw new InternalCompilationException("ir: type not lowerable in current version: " +
                                                            TypeFacts.Display(t));

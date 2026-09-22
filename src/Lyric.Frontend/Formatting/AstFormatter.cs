@@ -664,7 +664,7 @@ public sealed class AstFormatter
     private static int LevelOf(Expr expr) => expr switch
     {
         BinaryExpr b => BinaryInfo(b.Operator).Level,
-        UnaryExpr or ResumeExpr => Prefix,
+        UnaryExpr or ResumeExpr or ThrowExpr => Prefix,
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
         RangeExpr => Range,
@@ -695,6 +695,7 @@ public sealed class AstFormatter
 
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
         ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
+        ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),
         BinaryExpr b => BinaryDoc(b),
         AssignExpr a => AssignDoc(a),

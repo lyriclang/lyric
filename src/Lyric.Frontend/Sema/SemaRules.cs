@@ -177,7 +177,7 @@ public sealed class SemaRules
 
     private void CheckExprStmt(ExprStmt es)
     {
-        var ok = es.Expr is CallExpr or AssignExpr or ResumeExpr
+        var ok = es.Expr is CallExpr or AssignExpr or ResumeExpr or ThrowExpr
             or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } or ErrorExpr;
         if (!ok)
             _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls, assignments and resume are allowed)");
@@ -246,6 +246,7 @@ public sealed class SemaRules
         UnaryExpr u => [u.Operand],
         PostfixExpr p => [p.Operand],
         ResumeExpr re => [re.Coroutine],
+        ThrowExpr te => [te.Value],
         BinaryExpr b => [b.Left, b.Right],
         RangeExpr r => [r.Low, r.High],
         CastExpr c => [c.Operand],

@@ -779,6 +779,10 @@ internal sealed class TypeTable
         NamedRef { Symbol.Kind: TypeSymbolKind.Enum } n => EnumOf(n.Symbol),
         NamedRef { Symbol.Kind: TypeSymbolKind.Interface } n => InterfaceOf(n.Symbol),
 
+        // 'never' has no values, so a function returning it needs no return slot: at the machine
+        // it is a void function that happens not to come back.
+        NeverType => new IrScalarType(IrScalar.Void),
+
         // An opaque alias IS its underlying at runtime; identity is the sema's business alone.
         // This one line is why 'x as Entity' costs nothing and why the value crosses the native
         // boundary unchanged.

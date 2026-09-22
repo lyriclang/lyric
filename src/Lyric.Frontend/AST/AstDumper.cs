@@ -327,6 +327,10 @@ public static class AstDumper
                 Line(sb, indent, "Resume", n.Span);
                 Write(n.Coroutine, indent + 1, sb);
                 break;
+            case ThrowExpr n:
+                Line(sb, indent, "ThrowExpr", n.Span);
+                Write(n.Value, indent + 1, sb);
+                break;
             case DeferStmt n:
                 Line(sb, indent, "Defer", n.Span);
                 Write(n.Body, indent + 1, sb);

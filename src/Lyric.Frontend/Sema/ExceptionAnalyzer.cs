@@ -169,6 +169,13 @@ internal sealed class ExceptionAnalyzer
                 if (_types.ThrownByPull(re) is { } resumed)
                     CheckSite(ThrownOf(resumed), re.Span, "'resume'");
                 break;
+            case ThrowExpr te:
+                // A throw site like the statement: the position changes the type, not the fact.
+                AnalyzeExpr(te.Value);
+                var thrownByExpr = _types.TypeOf(te.Value);
+                if (Conformance.IsThrowable(thrownByExpr, _throwable, _binding))
+                    CheckSite(ThrownOf(thrownByExpr), te.Span, "'throw'");
+                break;
             case PostfixExpr p: AnalyzeExpr(p.Operand); break;
             case BinaryExpr b: AnalyzeExpr(b.Left); AnalyzeExpr(b.Right); break;
             case AssignExpr a: AnalyzeExpr(a.Target); AnalyzeExpr(a.Value); break;

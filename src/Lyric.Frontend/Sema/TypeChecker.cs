@@ -1435,6 +1435,17 @@ public sealed class TypeChecker
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ResumeExpr re: return CheckResume(re, scope);
+            case ThrowExpr te:
+            {
+                // The same rule as the statement (SEM0030); the difference is the type. 'never'
+                // fits anywhere (IsAssignable) and drops out of every unification, so
+                // 'x ?? throw e' is 'T' and a throwing arm leaves the other arms' type alone.
+                var thrownValue = CheckExpr(te.Value, scope);
+                if (!Conformance.IsThrowable(thrownValue, _throwable, _binding))
+                    _de.Report("LYR-SEM0030", Severity.Error, te.Span,
+                        $"cannot throw '{TypeFacts.Display(thrownValue)}' — only types implementing 'Throwable' can be thrown");
+                return LyrType.Never;
+            }
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -4165,6 +4176,9 @@ public sealed class TypeChecker
         if (LyrType.Equal(a, b)) return a;
         if (a.IsError) return b;
         if (b.IsError) return a;
+        // A diverging branch contributes nothing (§6.9): 'if (c) v else throw e' is the type of 'v'.
+        if (a is NeverType) return b;
+        if (b is NeverType) return a;
 
         // A `null` branch makes the other one optional: `if (c) 5 else null` is `?int`.
         //
@@ -4370,6 +4384,10 @@ public sealed class TypeChecker
         {
             if (bodies[i].IsError) continue;
             if (result.IsError) { result = bodies[i]; continue; }
+            // A diverging arm ('throw', 'panic') contributes nothing (§6.9): it never delivers a
+            // value the others would have to agree with. All arms diverging is 'never'.
+            if (bodies[i] is NeverType) continue;
+            if (result is NeverType) { result = bodies[i]; continue; }
             if (LyrType.Equal(result, bodies[i])) continue;
             if (WidenAgainstNull(result, bodies[i]) is { } widened) { result = widened; continue; }
             _de.Report("LYR-SEM0016", Severity.Error, span, $"{what} have incompatible types: '{TypeFacts.Display(result)}' vs '{TypeFacts.Display(bodies[i])}'");
@@ -4952,6 +4970,7 @@ public sealed class TypeChecker
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
+                case ThrowExpr te: WalkNode(te.Value); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

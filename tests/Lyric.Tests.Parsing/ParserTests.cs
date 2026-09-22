@@ -30,6 +30,38 @@ public class ParserTests
         return (stmt, de);
     }
 
+    // --- throw as a prefix expression ---
+
+    /// <summary>'throw' binds like a prefix operator: 'x ?? throw e' is the coalesce with a throw on
+    /// the right, and 'throw e ?? f' is NOT 'throw (e ?? f)' — the operand is a unary expression.</summary>
+    [Fact]
+    public void Throw_in_expression_position_is_a_prefix_operand()
+    {
+        var (expr, de) = Parse("x ?? throw e");
+        Assert.False(de.HasErrors);
+        var top = Assert.IsType<BinaryExpr>(expr);
+        Assert.Equal(BinaryOp.Coalesce, top.Operator);
+        var thrown = Assert.IsType<ThrowExpr>(top.Right);
+        Assert.IsType<IdentifierExpr>(thrown.Value);
+    }
+
+    [Fact]
+    public void Throw_takes_a_unary_operand_not_a_binary_one()
+    {
+        var (expr, de) = Parse("throw e ?? f");
+        Assert.False(de.HasErrors);
+        var top = Assert.IsType<BinaryExpr>(expr);
+        Assert.IsType<ThrowExpr>(top.Left);
+    }
+
+    [Fact]
+    public void A_throw_statement_stays_a_statement()
+    {
+        var (stmt, de) = ParseStatement("throw e;");
+        Assert.False(de.HasErrors);
+        Assert.IsType<ThrowStmt>(stmt);
+    }
+
     // --- associativity ---
 
     [Fact]

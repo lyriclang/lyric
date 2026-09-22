@@ -570,6 +570,7 @@ internal sealed class WarningAnalyzer
                 WalkExpr(p.Operand);
                 break;
             case ResumeExpr re: WalkExpr(re.Coroutine); break;
+            case ThrowExpr te: WalkExpr(te.Value); break;
             case AssignExpr a:
                 MarkMutated(a.Target);
                 WalkExpr(a.Target);

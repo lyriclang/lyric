@@ -164,3 +164,42 @@ fn main(): int {
     }
 }
 ```
+
+## `throw` as an expression
+
+`throw` may stand where a value is expected. It has the type `never` — the type of an
+expression that does not deliver a value — and so it fits anywhere and takes part in no
+unification: the absent path of `??`, the other branch of an `if`, an arm of a `match`.
+
+```lyr
+fn need(o: ?int, key: string): int throws NotFound {
+    return o ?? throw NotFound { what = key };
+}
+
+fn code(c: Cmd): int throws NotFound {
+    return match (c) {
+        Cmd.Go => 1,
+        Cmd.Dial(n) if n > 0 => n,
+        _ => throw NotFound { what = "dial" },
+    };
+}
+```
+
+`throw` binds like a prefix operator: `x ?? throw e` reads as intended, and `throw e ?? f` is a
+throw of `e`, not of `e ?? f`. The throw site is checked exactly as the statement form is — the
+enclosing function declares `throws` or a `try` around it catches.
+
+A function of your own may declare `never` as its return type. Its body must throw or panic on
+every path, and a call to it ends the path the way `panic` does — the flow analysis counts it as
+a return and narrows what follows:
+
+```lyr
+fn fail(message: string): never {
+    panic("fatal: " + message);
+}
+
+fn guard(o: ?int): int {
+    if (o == null) { fail("no value"); }
+    return o;
+}
+```

@@ -231,6 +231,10 @@ public static class AstChildren
                 yield return r.Coroutine;
                 break;
 
+            case ThrowExpr te:
+                yield return te.Value;
+                break;
+
             case PostfixExpr p:
                 yield return p.Operand;
                 break;
