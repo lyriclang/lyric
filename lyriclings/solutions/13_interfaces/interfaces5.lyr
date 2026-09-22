@@ -1,0 +1,19 @@
+// interfaces5.lyr — solution
+
+import std.io.console { println };
+import std.core { Add };
+
+struct Money :: [Add<Money, Money>] {
+    cents: int,
+    fn add(other: Money): Money {
+        return Money { cents = this.cents + other.cents };
+    }
+}
+
+fn main(): int {
+    let coffee = Money { cents = 250 };
+    let cookie = Money { cents = 100 };
+    let total = coffee + cookie;
+    println(f"total: {total.cents} cents");
+    return 0;
+}

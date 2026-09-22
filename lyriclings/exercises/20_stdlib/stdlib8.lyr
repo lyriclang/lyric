@@ -1,0 +1,32 @@
+// stdlib8.lyr
+//
+// `std.io.file` has exactly two shapes. A READ answers `?T` — `text`, `bytes`, `lines` give
+// `null` when the file cannot be read, and an empty result means an empty file. An
+// OPERATION answers `bool` — `writeText`, `remove`, `copy` say whether it happened. Each
+// has an `OrThrow` twin that says why. `tempDir()` is a place you may write.
+//                                                                (guide chapter 13, 10)
+//
+// Expected output:
+//   written: true
+//   hello file
+//   missing
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.io.file { writeText, text, remove, tempDir };
+import std.io.path { joinPath };
+
+fn main(): int {
+    let path = joinPath(tempDir(), "lyriclings-stdlib8.txt");
+    let written = writeText(path, "hello file");
+    println(f"written: {written}");
+
+    let content: string = text(path);
+    println(content);
+
+    remove(path);
+    let again: string = text(path);
+    println(again);
+    return 0;
+}

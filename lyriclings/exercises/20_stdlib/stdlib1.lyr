@@ -1,0 +1,25 @@
+// stdlib1.lyr
+//
+// The standard library answers "whether" with a VALUE: a read that may fail answers `?T`,
+// an operation answers `bool`. `std.string.parseInt` answers `?int` — `null` for text that
+// is not a number, and that is the whole truth, so there is no throwing twin. The
+// type-directed families keep their names: `fromInt`/`fromFloat`, `parseInt`/`parseFloat`.
+//                                                                (spec §11, guide chapter 13)
+//
+// Expected output:
+//   total: 42
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.string { parseInt };
+
+fn main(): int {
+    let parts = "40,x,2".split(",");
+    var total = 0;
+    for (part in parts) {
+        total += parseInt(part);
+    }
+    println(f"total: {total}");
+    return 0;
+}

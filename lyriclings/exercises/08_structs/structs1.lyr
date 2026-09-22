@@ -1,0 +1,25 @@
+// structs1.lyr
+//
+// A struct groups named fields. An initializer `Point { x = 3, y = 4 }` names every field
+// that has no default; a field the type does not declare is LYR-SEM0015. Members inside the
+// braces are separated by commas — fields and methods alike.    (spec §3.4, guide chapter 5)
+//
+// Expected output:
+//   (3, 4)
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int,
+
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+fn main(): int {
+    let p = Point { x = 3, z = 4 };
+    println(p.show());
+    return 0;
+}

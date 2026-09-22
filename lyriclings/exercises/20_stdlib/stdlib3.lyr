@@ -1,0 +1,34 @@
+// stdlib3.lyr
+//
+// `Map<K, V>` hashes its keys. `get(key)` answers `?V` — a key the map does not hold is an
+// ordinary answer, not an error — and `getOr(key, fallback)` answers `V`. Iteration order of
+// a map is unspecified, which is why the keys are collected and sorted before printing.
+//                                                                (guide chapter 13)
+//
+// Expected output:
+//   apple: 2
+//   fig: 1
+//   pear: 3
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.collections { Map, List, keys, sortList };
+import std.string as strings;
+
+fn main(): int {
+    let words = "pear apple fig pear apple pear".split(" ");
+    let counts = Map<string, int>.empty();
+    for (word in words) {
+        let seen: int = counts.get(word);
+        counts.set(word, seen + 1);
+    }
+
+    let sorted = List<string>.empty();
+    for (k in keys(counts)) { sorted.push(k); }
+    sortList(sorted);
+    for (k in sorted) {
+        println(f"{k}: {counts.getOr(k, 0)}");
+    }
+    return 0;
+}

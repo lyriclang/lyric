@@ -1,0 +1,29 @@
+// errors2.lyr
+//
+// Any type can be thrown — as long as it satisfies `Throwable`, the built-in interface with
+// one method, `message(): string`. A plain class is not throwable (LYR-SEM0030), however
+// error-like its name. `Throwable` needs no import.             (spec §9.1, guide chapter 10)
+//
+// Expected output:
+//   not found: key
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+class NotFound {
+    what: string,
+}
+
+fn lookup(key: string): int throws NotFound {
+    throw NotFound { what = key };
+}
+
+fn main(): int {
+    try {
+        println(f"{lookup("key")}");
+    } catch (e: NotFound) {
+        println(e.message());
+    }
+    return 0;
+}

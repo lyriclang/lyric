@@ -1,0 +1,32 @@
+// structs3.lyr
+//
+// A struct is a VALUE. Assigning it copies; the copy and the original then live their own
+// lives. Compare with the array in the previous chapter, which was a reference — and with
+// the class in the next one.                                     (spec §3.4, guide chapter 5)
+//
+// Fill in what the two reads really give. `assert` panics when you are wrong.
+//
+// Expected output:
+//   a.x = 1, b.x = 99
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { assert };
+
+struct Point { x: int, y: int, }
+
+fn main(): int {
+    var a = Point { x = 1, y = 2 };
+    var b = a;
+    b.x = 99;
+
+    // TODO: what does each variable hold now?
+    let expectedA = 0;
+    let expectedB = 0;
+
+    assert(a.x == expectedA, "a.x");
+    assert(b.x == expectedB, "b.x");
+    println(f"a.x = {a.x}, b.x = {b.x}");
+    return 0;
+}

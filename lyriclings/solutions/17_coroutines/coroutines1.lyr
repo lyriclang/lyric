@@ -1,0 +1,21 @@
+// coroutines1.lyr — solution
+
+import std.io.console { println, print };
+
+fn counter(): Coroutine<int> {
+    var n = 0;
+    while (n < 5) {
+        yield n;
+        n += 1;
+    }
+}
+
+fn main(): int {
+    let c = counter();
+    for (i in 0..5) {
+        if (i > 0) { print(" "); }
+        print(f"{resume c}");
+    }
+    println("");
+    return 0;
+}

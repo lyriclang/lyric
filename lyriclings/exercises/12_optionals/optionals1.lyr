@@ -1,0 +1,38 @@
+// optionals1.lyr
+//
+// `?T` is a value that may be absent, and it is the ONLY way to say "no value" — there is no
+// null reference for an ordinary type. A `?T` is not a `T`: nothing can be done with it until
+// you say what happens when it is absent. `a ?? b` takes `a` when present and `b` otherwise;
+// a comparison with `null` NARROWS the value in the branch that follows.
+//                                                                (spec §3.3, §7.4, guide chapter 9)
+//
+// Expected output:
+//   index 1
+//   not found
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn find(names: string[], wanted: string): ?int {
+    for (i in 0..names.length) {
+        if (names[i] == wanted) { return i; }
+    }
+    return null;
+}
+
+fn report(names: string[], wanted: string): void {
+    let hit = find(names, wanted);
+    if (hit + 1 > 0) {
+        println(f"index {hit}");
+    } else {
+        println("not found");
+    }
+}
+
+fn main(): int {
+    let names = ["Ada", "Grace"];
+    report(names, "Grace");
+    report(names, "Lin");
+    return 0;
+}

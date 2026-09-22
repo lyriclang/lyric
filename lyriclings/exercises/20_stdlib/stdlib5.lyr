@@ -1,0 +1,20 @@
+// stdlib5.lyr
+//
+// `std.iter` chains adapters on an `Iterator<T>`: `map`, `filter`, `take`, `skip`, `zip` are
+// METHODS, so a pipeline reads left to right. A chain has to start somewhere, and an array
+// or a range is not an iterator: `over(xs)` walks an array, `range(lo, hi)` the numbers of
+// `lo..hi`. `sum`, `count`, `collectArray` consume the chain.   (guide chapter 13)
+//
+// Expected output:
+//   evens: 4, sum: 20
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.iter { range, over, sum, collectArray };
+
+fn main(): int {
+    let evens = collectArray<int>(range(1, 10).filter((n: int) => n % 2 == 0));
+    println(f"evens: {evens.length}, sum: {sum(evens)}");
+    return 0;
+}

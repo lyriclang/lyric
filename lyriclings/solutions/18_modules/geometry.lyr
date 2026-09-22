@@ -1,0 +1,8 @@
+// geometry.lyr — solution: `area` is exported.
+module geometry;
+
+pub struct Rect { w: int, h: int, }
+
+pub fn area(r: Rect): int {
+    return r.w * r.h;
+}

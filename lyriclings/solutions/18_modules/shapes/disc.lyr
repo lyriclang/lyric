@@ -1,0 +1,6 @@
+// shapes/disc.lyr — unchanged; the import path in modules2.lyr was wrong.
+module shapes.disc;
+
+pub fn area(radius: float): float {
+    return 3.14159 * radius * radius;
+}

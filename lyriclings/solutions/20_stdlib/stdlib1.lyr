@@ -1,0 +1,16 @@
+// stdlib1.lyr — solution
+//
+// (`import std.string { parseInt }` also brings the string methods, so `split` is visible.)
+
+import std.io.console { println };
+import std.string { parseInt };
+
+fn main(): int {
+    let parts = "40,x,2".split(",");
+    var total = 0;
+    for (part in parts) {
+        total += parseInt(part) ?? 0;
+    }
+    println(f"total: {total}");
+    return 0;
+}

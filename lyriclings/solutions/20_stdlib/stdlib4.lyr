@@ -1,0 +1,24 @@
+// stdlib4.lyr — solution
+//
+// Two equal points must hash alike; a hash built from the same fields `equals` compares
+// guarantees that.
+
+import std.io.console { println };
+import std.collections { Set };
+import std.core { Hashable };
+
+struct Point :: [Hashable<Point>] {
+    x: int,
+    y: int,
+    fn equals(other: Point): bool { return this.x == other.x && this.y == other.y; }
+    fn hash(): int { return this.x * 31 + this.y; }
+}
+
+fn main(): int {
+    let seen = Set<Point>.empty();
+    seen.add(Point { x = 1, y = 2 });
+    seen.add(Point { x = 3, y = 4 });
+    seen.add(Point { x = 1, y = 2 });
+    println(f"{seen.length()} distinct points");
+    return 0;
+}

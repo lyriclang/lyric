@@ -1,0 +1,35 @@
+// enums4.lyr
+//
+// An enum can be generic, and the type arguments belong to the ENUM, written before the
+// variant: `Outcome<int>.Ok(21)`. Where the expected type is already known — an annotated
+// binding, a return, an argument — they may be left out and are taken from the context.
+// A plain `let` with no annotation provides no context, so there they must be written
+// (LYR-SEM0063).                                                 (spec §8, guide chapter 6)
+//
+// Expected output:
+//   42
+//   failed: empty
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Outcome<T> {
+    Ok(T),
+    Failed { reason: string },
+}
+
+fn report(o: Outcome<int>): void {
+    match (o) {
+        Ok(v) => { println(f"{v * 2}"); },
+        Failed { reason } => { println("failed: " + reason); },
+    }
+}
+
+fn main(): int {
+    let good = Outcome.Ok(21);
+    let bad = Outcome.Failed { reason = "empty" };
+    report(good);
+    report(bad);
+    return 0;
+}

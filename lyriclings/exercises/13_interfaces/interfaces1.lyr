@@ -1,0 +1,37 @@
+// interfaces1.lyr
+//
+// An interface names methods. A type declares which interfaces it satisfies with `::` and
+// then has to provide every abstract method (LYR-SEM0020 names the missing one). A value
+// used THROUGH its interface dispatches dynamically — the only dynamic dispatch in the
+// language. There is no inheritance between types.              (spec §5.1, guide chapter 7)
+//
+// Expected output:
+//   circle
+//   square
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+interface Drawable {
+    fn draw(): string;
+}
+
+class Circle :: [Drawable] {
+    radius: float,
+    fn draw(): string { return "circle"; }
+}
+
+class Square :: [Drawable] {
+    side: float,
+}
+
+fn show(d: Drawable): void {
+    println(d.draw());
+}
+
+fn main(): int {
+    show(Circle { radius = 1.0 });
+    show(Square { side = 2.0 });
+    return 0;
+}

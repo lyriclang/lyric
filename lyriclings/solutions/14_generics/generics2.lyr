@@ -1,0 +1,20 @@
+// generics2.lyr — solution
+
+import std.io.console { println };
+
+interface Describable {
+    fn describe(): string;
+}
+
+class Coin :: [Describable] {
+    fn describe(): string { return "coin"; }
+}
+
+fn report<T :: [Describable]>(item: T): void {
+    println(item.describe());
+}
+
+fn main(): int {
+    report(Coin { });
+    return 0;
+}

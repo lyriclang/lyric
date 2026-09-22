@@ -1,0 +1,20 @@
+// optionals6.lyr — solution
+//
+// `let slot = slots[i];` makes a local, and a local narrows.
+
+import std.io.console { println };
+
+fn main(): int {
+    let slots: (?int)[] = [10, null, 20, null, 30];
+    var present = 0;
+    var total = 0;
+    for (i in 0..slots.length) {
+        let slot = slots[i];
+        if (slot != null) {
+            present += 1;
+            total += slot;
+        }
+    }
+    println(f"present: {present}, total: {total}");
+    return 0;
+}

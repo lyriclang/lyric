@@ -1,0 +1,14 @@
+// generics3.lyr — solution
+
+import std.io.console { println };
+import std.collections { List };
+
+fn emptyOf<T>(): List<T> {
+    return List<T>.empty();
+}
+
+fn main(): int {
+    let names = emptyOf<string>();
+    println(f"{names.length()} items");
+    return 0;
+}

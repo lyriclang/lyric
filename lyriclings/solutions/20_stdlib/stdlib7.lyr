@@ -1,0 +1,20 @@
+// stdlib7.lyr — solution
+
+import std.io.console { println };
+import std.json { parse };
+
+fn describe(text: string): string {
+    let doc = parse(text);
+    if (doc == null) {
+        return "not JSON";
+    }
+    let name = doc.field("name")?.asString() ?? "?";
+    let level = doc.field("level")?.asInt() ?? 0;
+    return f"{name}, level {level}";
+}
+
+fn main(): int {
+    println(describe("{\"name\": \"aria\", \"level\": 3}"));
+    println(describe("{oops"));
+    return 0;
+}

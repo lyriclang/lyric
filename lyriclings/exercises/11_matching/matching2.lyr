@@ -1,0 +1,31 @@
+// matching2.lyr
+//
+// An arm may carry a GUARD: `Circle(r) if r > 1.0 => …` runs only when the pattern matched
+// AND the guard holds. A guarded arm never counts toward exhaustiveness — the compiler does
+// not know when a guard is true — so the variant still needs an unguarded arm after it.
+//                                                                (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   big circle
+//   small circle
+//   square
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Shape { Circle(float), Square(float), }
+
+fn describe(s: Shape): string {
+    return match (s) {
+        Circle(r) if r > 1.0 => "big circle",
+        Square(side)         => "square",
+    };
+}
+
+fn main(): int {
+    println(describe(Shape.Circle(2.0)));
+    println(describe(Shape.Circle(0.5)));
+    println(describe(Shape.Square(1.0)));
+    return 0;
+}

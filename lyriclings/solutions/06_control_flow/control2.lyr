@@ -1,0 +1,13 @@
+// control2.lyr — solution
+
+import std.io.console { println };
+
+fn main(): int {
+    var remaining = 3;
+    while (remaining > 0) {
+        println(f"{remaining}");
+        remaining -= 1;
+    }
+    println("liftoff");
+    return 0;
+}

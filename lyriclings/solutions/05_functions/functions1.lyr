@@ -1,0 +1,15 @@
+// functions1.lyr — solution
+//
+// The defaulted parameter goes last; the calls pass the name first.
+
+import std.io.console { println };
+
+fn greet(name: string, greeting: string = "Hello"): string {
+    return greeting + ", " + name;
+}
+
+fn main(): int {
+    println(greet("Ada"));
+    println(greet("Grace", "Good evening"));
+    return 0;
+}

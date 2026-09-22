@@ -1,0 +1,33 @@
+// coroutines3.lyr
+//
+// A coroutine body may throw, and the exception comes out of the `resume` or `next()` that
+// was running it — never out of the call that made the coroutine, which runs no body. The
+// throwability is part of the TYPE: `steps()` produces a `Coroutine<int> throws Exception`,
+// and every pull of it is a throw site the puller has to handle (LYR-SEM0034 otherwise).
+//                                                                (spec §10, guide chapter 11)
+//
+// Expected output:
+//   step 1
+//   step 2
+//   stopped: the third step failed
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    yield 2;
+    throw Exception { text = "the third step failed" };
+}
+
+fn main(): int {
+    let co = steps();
+    while (true) {
+        let step = co.next();
+        if (step == null) { break; }
+        println(f"step {step}");
+    }
+    return 0;
+}

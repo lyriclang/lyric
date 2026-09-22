@@ -1,0 +1,17 @@
+// generics4.lyr — solution
+
+import std.io.console { println };
+
+class Box<T> {
+    value: T,
+
+    fn get(): T { return this.value; }
+}
+
+fn main(): int {
+    let number = Box<int> { value = 9 };
+    let word = Box<string> { value = "nine" };
+    println(f"{number.get()}");
+    println(word.get());
+    return 0;
+}

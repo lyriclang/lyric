@@ -1,0 +1,33 @@
+// control5.lyr
+//
+// Definite assignment (chapter 2) follows the shape of the loops. A `while` body MAY not run,
+// so what it assigns does not count after the loop. A `do-while` body runs at least once, so
+// its assignments do count. Here the compiler is right: if `attempt()` were never called,
+// `result` would be read unassigned.                             (spec §7.7, guide chapter 4)
+//
+// Expected output:
+//   tries: 3
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+class Counter {
+    n: int = 0,
+    mut fn attempt(): bool {
+        this.n += 1;
+        return this.n >= 3;
+    }
+}
+
+fn main(): int {
+    let c = Counter { };
+    var result: bool;
+    var tries = 0;
+    while (!result) {
+        result = c.attempt();
+        tries += 1;
+    }
+    println(f"tries: {tries}");
+    return 0;
+}

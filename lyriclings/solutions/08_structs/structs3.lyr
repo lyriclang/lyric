@@ -1,0 +1,22 @@
+// structs3.lyr — solution
+//
+// `b` is a copy; the write reaches only the copy.
+
+import std.io.console { println };
+import std.core { assert };
+
+struct Point { x: int, y: int, }
+
+fn main(): int {
+    var a = Point { x = 1, y = 2 };
+    var b = a;
+    b.x = 99;
+
+    let expectedA = 1;
+    let expectedB = 99;
+
+    assert(a.x == expectedA, "a.x");
+    assert(b.x == expectedB, "b.x");
+    println(f"a.x = {a.x}, b.x = {b.x}");
+    return 0;
+}

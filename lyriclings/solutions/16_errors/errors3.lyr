@@ -1,0 +1,26 @@
+// errors3.lyr — solution
+//
+// `defer` runs "closed" while the exception unwinds through `process`; the `try` in
+// `process` is gone, because `process` declares `throws` and lets `main` handle it.
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn save(): void throws Exception {
+    throw Exception { text = "disk full" };
+}
+
+fn process(): void throws Exception {
+    println("opened");
+    defer println("closed");
+    save();
+}
+
+fn main(): int {
+    try {
+        process();
+    } catch (e: Exception) {
+        println("error: " + e.message());
+    }
+    return 0;
+}

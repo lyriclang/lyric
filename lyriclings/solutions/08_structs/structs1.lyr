@@ -1,0 +1,16 @@
+// structs1.lyr — solution
+
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int,
+
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+fn main(): int {
+    let p = Point { x = 3, y = 4 };
+    println(p.show());
+    return 0;
+}

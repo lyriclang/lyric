@@ -1,0 +1,29 @@
+// strings2.lyr
+//
+// A string is NOT indexable — by decision, not by omission. Finding code point number i costs
+// O(n) in UTF-8, and an `s[i]` operator would hide a quadratic loop. `for (c in s)` walks the
+// code points in one pass; `s.charAt(i)` from std.string exists for the rare single position.
+//                                                                (spec §3.3, guide chapter 2)
+//
+// Expected output:
+//   L, y, r, i, c
+//   5 characters
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let word = "Lyric";
+    var count = 0;
+    var i = 0;
+    while (i < 5) {
+        if (i > 0) { print(", "); }
+        print(f"{word[i]}");
+        count += 1;
+        i += 1;
+    }
+    println("");
+    println(f"{count} characters");
+    return 0;
+}

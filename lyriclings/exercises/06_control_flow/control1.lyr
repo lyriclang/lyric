@@ -1,0 +1,23 @@
+// control1.lyr
+//
+// `if` has two forms. As a STATEMENT it takes blocks and `else` is optional. As an
+// EXPRESSION it takes expressions and must produce a value whichever way the condition
+// goes — so `else` is mandatory there (LYR-PAR0036).            (spec §6.9, guide chapter 4)
+//
+// Expected output:
+//   bonus: 10
+//   bonus: 0
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn bonus(score: int): int {
+    return if (score > 50) 10;
+}
+
+fn main(): int {
+    println(f"bonus: {bonus(70)}");
+    println(f"bonus: {bonus(20)}");
+    return 0;
+}

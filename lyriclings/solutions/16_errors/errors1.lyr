@@ -1,0 +1,21 @@
+// errors1.lyr — solution
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn parse(text: string): int throws Exception {
+    if (text == "") {
+        throw Exception { text = "empty input" };
+    }
+    return 42;
+}
+
+fn main(): int {
+    try {
+        println(f"parsed {parse("42")}");
+        println(f"parsed {parse("")}");
+    } catch (e: Exception) {
+        println("error: " + e.message());
+    }
+    return 0;
+}

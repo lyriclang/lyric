@@ -1,0 +1,23 @@
+// generics3.lyr
+//
+// Type arguments are INFERRED from the call's arguments where possible. When no argument
+// mentions `T` — a function that only produces one — nothing determines it, and the call
+// has to write the type argument explicitly (LYR-SEM0060).      (spec §8.3, guide chapter 8)
+//
+// Expected output:
+//   0 items
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.collections { List };
+
+fn emptyOf<T>(): List<T> {
+    return List<T>.empty();
+}
+
+fn main(): int {
+    let names = emptyOf();
+    println(f"{names.length()} items");
+    return 0;
+}

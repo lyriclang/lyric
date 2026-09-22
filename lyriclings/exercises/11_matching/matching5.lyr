@@ -1,0 +1,31 @@
+// matching5.lyr
+//
+// A `?E` of an enum takes BOTH its states in one match: `null` for the absent one and the
+// variants for the present one. Exhaustiveness counts the `null` case too, so leaving it
+// out is LYR-SEM0050 naming 'null'. The variant arms write the enum's name, because the
+// scrutinee's type is `?Shape`, not `Shape`.                     (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   0
+//   12
+//   -1
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Shape { Dot, Rect { w: int, h: int }, }
+
+fn area(s: ?Shape): int {
+    return match (s) {
+        Shape.Dot           => 0,
+        Shape.Rect { w, h } => w * h,
+    };
+}
+
+fn main(): int {
+    println(f"{area(Shape.Dot)}");
+    println(f"{area(Shape.Rect { w = 3, h = 4 })}");
+    println(f"{area(null)}");
+    return 0;
+}

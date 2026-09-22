@@ -1,0 +1,21 @@
+// control4.lyr — solution
+
+import std.io.console { println, print };
+
+fn main(): int {
+    var printed = 0;
+    for (n in 1..=20) {
+        if (n % 2 == 0) {
+            continue;
+        }
+        if (n > 7) {
+            break;
+        }
+        if (printed > 0) { print(" "); }
+        print(f"{n}");
+        printed += 1;
+    }
+    println("");
+    println("done");
+    return 0;
+}

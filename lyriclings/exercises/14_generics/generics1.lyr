@@ -1,0 +1,33 @@
+// generics1.lyr
+//
+// Functions, structs, classes, enums and interfaces take type parameters. Inside a generic
+// function `T` is opaque: the only members and operators available on a `T` are those a
+// CONSTRAINT provides (an operator on a bare `T` is LYR-SEM0003, a member LYR-SEM0027).
+// Constraints are written after `::`:
+// `<T :: [Ordered<T>]>` promises `<`, `<T :: [Display]>` promises `show()`.
+// Each use with its own type arguments becomes its own function — monomorphization.
+//                                                                (spec §8, guide chapter 8)
+//
+// Expected output:
+//   9
+//   zebra
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn largest<T>(items: T[]): T {
+    var best = items[0];
+    for (item in items) {
+        if (item > best) {
+            best = item;
+        }
+    }
+    return best;
+}
+
+fn main(): int {
+    println(f"{largest([3, 9, 4])}");
+    println(largest(["apple", "zebra", "mango"]));
+    return 0;
+}

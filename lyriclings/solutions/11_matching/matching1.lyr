@@ -1,0 +1,21 @@
+// matching1.lyr — solution
+//
+// Or-patterns fold the two warm colours into one arm; the remaining variant gets its own.
+
+import std.io.console { println };
+
+enum Color { Red, Blue, Yellow, }
+
+fn feel(c: Color): string {
+    return match (c) {
+        Red | Yellow => "warm",
+        Blue         => "cold",
+    };
+}
+
+fn main(): int {
+    println(feel(Color.Red));
+    println(feel(Color.Blue));
+    println(feel(Color.Yellow));
+    return 0;
+}

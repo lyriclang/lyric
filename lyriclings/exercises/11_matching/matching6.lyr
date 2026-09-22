@@ -1,0 +1,26 @@
+// matching6.lyr
+//
+// A `match` also DESTRUCTURES a struct or class: `Point { x, y }` binds each field to its own
+// name, `Point { x = across }` chooses another name, and `_` skips. It tests nothing — the
+// value already has that type — so one arm covers the match. A name binds once per pattern:
+// naming it twice is LYR-SEM0097.                                (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   12
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Point { x: int, y: int, }
+
+fn product(p: Point): int {
+    return match (p) {
+        Point { x = a, y = a } => a * a,
+    };
+}
+
+fn main(): int {
+    println(f"{product(Point { x = 3, y = 4 })}");
+    return 0;
+}

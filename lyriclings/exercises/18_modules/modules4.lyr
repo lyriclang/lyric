@@ -1,0 +1,20 @@
+// modules4.lyr
+//
+// Three import forms. QUALIFIED — `import std.math;` — binds the last path segment, so the
+// names are reached as `math.sqrt`. SELECTIVE — `import std.math { sqrt };` — binds the
+// listed names directly. ALIASED — `import std.math as m;` — renames the module. A
+// qualified import never puts the bare names in scope (LYR-SEM0002 for `println` here).
+//                                                                (spec §4.2, guide chapter 12)
+//
+// Expected output:
+//   4.00
+
+// I AM NOT DONE
+
+import std.io.console;
+import std.math { sqrt };
+
+fn main(): int {
+    println(f"{sqrt(16.0):N2}");
+    return 0;
+}

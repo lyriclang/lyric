@@ -1,0 +1,36 @@
+// enums1.lyr
+//
+// An enum lists alternatives. A variant may carry a PAYLOAD — positional, `Circle(float)`, or
+// by name, `Triangle { a: float, b: float, c: float }` — or none at all. Constructing a
+// variant is a call through the type, `Shape.Circle(2.5)`, checked like any call
+// (LYR-SEM0014 on the wrong count).                              (spec §3.4, guide chapter 6)
+//
+// Expected output:
+//   circle 2.5
+//   rectangle 3 by 4
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Shape {
+    Circle(float),
+    Rectangle(float, float),
+    Empty;
+
+    fn describe(): string {
+        return match (this) {
+            Circle(r)       => f"circle {r}",
+            Rectangle(w, h) => f"rectangle {w} by {h}",
+            Empty           => "empty",
+        };
+    }
+}
+
+fn main(): int {
+    let a = Shape.Circle(2.5);
+    let b = Shape.Circle(3.0, 4.0);
+    println(a.describe());
+    println(b.describe());
+    return 0;
+}

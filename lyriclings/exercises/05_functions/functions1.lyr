@@ -1,0 +1,23 @@
+// functions1.lyr
+//
+// A parameter may carry a default. Defaults are filled in at the CALL SITE, from the end:
+// a call that leaves arguments out leaves out the last ones. That is why a required
+// parameter may not follow a defaulted one (LYR-SEM0025).       (spec §7.1a, guide chapter 3)
+//
+// Expected output:
+//   Hello, Ada
+//   Good evening, Grace
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn greet(greeting: string = "Hello", name: string): string {
+    return greeting + ", " + name;
+}
+
+fn main(): int {
+    println(greet("Ada"));
+    println(greet("Grace", "Good evening"));
+    return 0;
+}

@@ -1,0 +1,6 @@
+// shapes/disc.lyr — a module imported by modules2.lyr as `shapes.disc`.
+module shapes.disc;
+
+pub fn area(radius: float): float {
+    return 3.14159 * radius * radius;
+}

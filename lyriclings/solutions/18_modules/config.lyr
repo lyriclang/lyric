@@ -1,0 +1,5 @@
+// config.lyr — solution: the header agrees with the path.
+module config;
+
+pub let width = 10;
+pub let height = 20;

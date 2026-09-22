@@ -2,7 +2,9 @@
 //
 // `main` is declared to return an `int`: that number becomes the exit code of the process
 // (masked with & 0xFF). A function with a return type must return a value on EVERY path —
-// falling off the end is an error, not an implicit `return 0`.   (spec §7.3, guide chapter 1)
+// falling off the end is an error, not an implicit `return 0`. (The entry point has exactly
+// two allowed shapes, `fn main(): int` and `fn main(args: string[]): int`; anything else is
+// LYR-SEM0021.)                                                  (spec §7.3, §4.3, guide chapter 1)
 //
 // Expected output:
 //   one

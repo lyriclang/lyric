@@ -1,0 +1,27 @@
+// errors4.lyr — solution
+
+import std.io.console { println };
+
+class NotFound :: [Throwable] {
+    what: string,
+    fn message(): string { return "missing: " + this.what; }
+}
+
+fn lookup(key: string): int throws NotFound {
+    if (key == "one") { return 1; }
+    throw NotFound { what = key };
+}
+
+fn show(key: string): void {
+    try {
+        println(f"found {lookup(key)}");
+    } catch (e: NotFound) {
+        println(e.message());
+    }
+}
+
+fn main(): int {
+    show("one");
+    show("two");
+    return 0;
+}

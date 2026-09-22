@@ -1,0 +1,30 @@
+// generics2.lyr
+//
+// A constraint is checked at the CALL: the type argument must satisfy every interface the
+// parameter names, or the call is refused (LYR-SEM0028). Nothing is checked at runtime —
+// there is no runtime type information — so the compiler has to be sure here.
+//                                                                (spec §8, guide chapter 8)
+//
+// Expected output:
+//   coin
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+interface Describable {
+    fn describe(): string;
+}
+
+class Coin :: [Describable] {
+    fn describe(): string { return "coin"; }
+}
+
+fn report<T :: [Describable]>(item: T): void {
+    println(item.describe());
+}
+
+fn main(): int {
+    report(42);
+    return 0;
+}

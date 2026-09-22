@@ -1,0 +1,22 @@
+// modules3.lyr
+//
+// The header `module name;` names the module. It is optional — without one the name comes
+// from the file — but when present it has to AGREE with the path the import wrote down: a
+// file loaded as `config` that declares `module settings;` is LYR-RES0006. A qualified
+// import (`import config;`) reaches the exports as `config.width`.
+//
+// The fix is in config.lyr, beside this file.                    (spec §4.1, guide chapter 12)
+//
+// Expected output:
+//   10 x 20 = 200 cells
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import config;
+
+fn main(): int {
+    let cells = config.width * config.height;
+    println(f"{config.width} x {config.height} = {cells} cells");
+    return 0;
+}

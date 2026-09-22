@@ -1,0 +1,25 @@
+// strings4.lyr
+//
+// Inside an f-string a colon introduces a FORMAT SPECIFIER: `{x:N2}` renders a number with
+// two decimals, `{n:D3}` pads an integer with zeros to three digits. A literal brace is
+// written twice: `{{` and `}}`.                                  (spec §1.7, guide chapter 2)
+//
+// This one compiles and runs — but prints the wrong thing. Make the output match.
+//
+// Expected output:
+//   pi is roughly 3.14
+//   item 007
+//   {braces}
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let pi = 3.14159;
+    let item = 7;
+    println(f"pi is roughly {pi}");
+    println(f"item {item}");
+    println("{braces}");
+    return 0;
+}

@@ -1,0 +1,29 @@
+// enums3.lyr
+//
+// An enum has no `==` of its own: equality in Lyric always comes from the `Equatable`
+// interface (chapter 13), and a plain enum does not declare it. The idiomatic way to ask
+// "which variant is this?" is `match` — it needs no conformance and the compiler checks that
+// every variant is handled.                                      (spec §6.4, §7.6, guide chapter 6)
+//
+// Expected output:
+//   stop
+//   go
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Light { Red, Yellow, Green, }
+
+fn advice(light: Light): string {
+    if (light == Light.Red) {
+        return "stop";
+    }
+    return "go";
+}
+
+fn main(): int {
+    println(advice(Light.Red));
+    println(advice(Light.Green));
+    return 0;
+}

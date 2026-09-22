@@ -1,0 +1,18 @@
+// attributes1.lyr — solution
+//
+// The attribute describes and does nothing: `start` runs exactly as it would without it.
+
+import std.io.console { println };
+import std.core { OnFunction };
+
+pub struct Command :: [OnFunction] { name: string = "" }
+
+@Command { name = "start" }
+pub fn start(): void {
+    println("ready");
+}
+
+fn main(): int {
+    start();
+    return 0;
+}

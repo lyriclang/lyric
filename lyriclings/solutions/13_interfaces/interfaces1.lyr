@@ -1,0 +1,27 @@
+// interfaces1.lyr — solution
+
+import std.io.console { println };
+
+interface Drawable {
+    fn draw(): string;
+}
+
+class Circle :: [Drawable] {
+    radius: float,
+    fn draw(): string { return "circle"; }
+}
+
+class Square :: [Drawable] {
+    side: float,
+    fn draw(): string { return "square"; }
+}
+
+fn show(d: Drawable): void {
+    println(d.draw());
+}
+
+fn main(): int {
+    show(Circle { radius = 1.0 });
+    show(Square { side = 2.0 });
+    return 0;
+}

@@ -1,0 +1,34 @@
+// classes2.lyr
+//
+// Value or reference decides what a FUNCTION CALL does. A struct argument is copied into the
+// parameter: whatever the function changes, the caller's variable keeps its old contents. A
+// class argument is a reference to the caller's object, so a change is seen by everyone.
+// This program compiles and runs — and counts nothing.           (spec §3.4, guide chapter 5)
+//
+// Expected output:
+//   seen: 3
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Tracker {
+    count: int = 0,
+
+    mut fn bump(): void {
+        this.count = this.count + 1;
+    }
+}
+
+fn record(t: Tracker): void {
+    t.bump();
+}
+
+fn main(): int {
+    let tracker = Tracker { };
+    record(tracker);
+    record(tracker);
+    record(tracker);
+    println(f"seen: {tracker.count}");
+    return 0;
+}

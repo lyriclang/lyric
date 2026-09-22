@@ -1,0 +1,48 @@
+// quiz4.lyr — solution
+//
+// The iterator walks from the top of the stack down; a fresh one per `iter()` call keeps
+// two loops over the same stack independent.
+
+import std.io.console { println, print };
+import std.collections { List };
+import std.iter { Iterable, Iterator };
+
+class Stack<T> :: [Iterable<T>] {
+    items: List<T>,
+
+    static fn empty(): Stack<T> { return Stack<T> { items = List<T>.empty() }; }
+
+    mut fn push(value: T): void { this.items.push(value); }
+    fn size(): int { return this.items.length(); }
+
+    fn iter(): Iterator<T> {
+        return StackIterator<T> { items = this.items, position = this.items.length() - 1 };
+    }
+}
+
+class StackIterator<T> :: [Iterator<T>] {
+    items: List<T>,
+    position: int,
+
+    mut fn next(): ?T {
+        if (this.position < 0) { return null; }
+        let value = this.items.get(this.position);
+        this.position -= 1;
+        return value;
+    }
+}
+
+fn main(): int {
+    let s = Stack<int>.empty();
+    s.push(1);
+    s.push(2);
+    s.push(3);
+    var first = true;
+    for (n in s) {
+        if (!first) { print(" "); }
+        print(f"{n}");
+        first = false;
+    }
+    println("");
+    return 0;
+}

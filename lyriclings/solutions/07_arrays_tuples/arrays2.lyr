@@ -1,0 +1,15 @@
+// arrays2.lyr — solution
+//
+// `0..xs.length` stops before the length. (`for (x in xs)` avoids the index altogether.)
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let xs = [10, 20, 30];
+    for (i in 0..xs.length) {
+        if (i > 0) { print(" "); }
+        print(f"{xs[i]}");
+    }
+    println("");
+    return 0;
+}

@@ -1,0 +1,19 @@
+// extend3.lyr — solution
+
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int,
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+extend Point {
+    static fn unit(): Point { return Point { x = 1, y = 1 }; }
+}
+
+fn main(): int {
+    let u = Point.unit();
+    println(u.show());
+    return 0;
+}

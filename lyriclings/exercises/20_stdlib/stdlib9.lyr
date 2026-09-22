@@ -1,0 +1,30 @@
+// stdlib9.lyr
+//
+// `std.test` holds the assertions: `assertEq(actual, expected)` wants `[Equatable<T>,
+// Display]` so it can compare and name both values; `assertTrue(cond, message)`. A failed
+// assertion PANICS — in a program that is exit code 101, and under `lyric test` it is one
+// failed `@Test` function. Here the assertions are right and the code under test is not.
+//                                                                (guide chapter 20)
+//
+// Expected output:
+//   all assertions hold
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.test { assertEq, assertTrue };
+
+fn clamp(value: int, low: int, high: int): int {
+    if (value < low) { return high; }
+    if (value > high) { return low; }
+    return value;
+}
+
+fn main(): int {
+    assertEq(clamp(5, 0, 10), 5);
+    assertEq(clamp(15, 0, 10), 10);
+    assertEq(clamp(-3, 0, 10), 0);
+    assertTrue(clamp(7, 7, 7) == 7, "a one-point range answers its point");
+    println("all assertions hold");
+    return 0;
+}

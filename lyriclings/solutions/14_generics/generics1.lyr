@@ -1,0 +1,22 @@
+// generics1.lyr — solution
+//
+// `int` and `string` conform to `Ordered` in std.core, so both calls satisfy the constraint.
+
+import std.io.console { println };
+import std.core { Ordered };
+
+fn largest<T :: [Ordered<T>]>(items: T[]): T {
+    var best = items[0];
+    for (item in items) {
+        if (item > best) {
+            best = item;
+        }
+    }
+    return best;
+}
+
+fn main(): int {
+    println(f"{largest([3, 9, 4])}");
+    println(largest(["apple", "zebra", "mango"]));
+    return 0;
+}

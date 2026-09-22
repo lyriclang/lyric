@@ -1,0 +1,21 @@
+// modules2.lyr
+//
+// A module path becomes a file path under the directory of the file being compiled:
+// `import shapes.circle` reads `shapes/circle.lyr`. A module that is not there is
+// LYR-RES0003. (`std` is the exception: it always means the standard library, and a
+// `std/` directory of your own is never consulted.)              (spec §4.1, guide chapter 12)
+//
+// The module beside this file is shapes/disc.lyr.
+//
+// Expected output:
+//   disc: 78.54
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import shapes.circle { area };
+
+fn main(): int {
+    println(f"disc: {area(5.0):N2}");
+    return 0;
+}

@@ -1,0 +1,19 @@
+// matching3.lyr — solution
+
+import std.io.console { println };
+
+fn amount(n: int): string {
+    return match (n) {
+        0          => "none",
+        1 | 2 | 3  => "a few",
+        4..=9      => "several",
+        _          => "many",
+    };
+}
+
+fn main(): int {
+    for (n in [0, 2, 7, 40]) {
+        println(f"{n} -> {amount(n)}");
+    }
+    return 0;
+}

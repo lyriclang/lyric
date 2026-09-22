@@ -1,0 +1,32 @@
+// interfaces3.lyr
+//
+// `==` and `!=` work on any type that conforms to `Equatable<T>` from std.core: `a == b`
+// IS the call `a.equals(b)`. The conformance enables the operator, not the method — a type
+// with an `equals` method that never declares `:: [Equatable<Point>]` keeps its method and
+// `==` stays an error (LYR-SEM0059). Nothing becomes an operator by accident.
+//                                                                (spec §6.4, guide chapter 7)
+//
+// Expected output:
+//   same place
+//   different
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int,
+    fn equals(other: Point): bool {
+        return this.x == other.x && this.y == other.y;
+    }
+}
+
+fn main(): int {
+    let a = Point { x = 1, y = 2 };
+    let b = Point { x = 1, y = 2 };
+    let c = Point { x = 5, y = 2 };
+    println(if (a == b) "same place" else "different");
+    println(if (a == c) "same place" else "different");
+    return 0;
+}

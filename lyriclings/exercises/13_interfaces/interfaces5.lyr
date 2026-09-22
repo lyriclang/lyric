@@ -1,0 +1,25 @@
+// interfaces5.lyr
+//
+// Arithmetic follows the same rule, one interface per operator: `Add`, `Sub`, `Mul`, `Div`
+// from std.core, each with a method of the same name. They take two type arguments — what
+// stands on the RIGHT of the operator and what comes OUT — so `Add<Money, Money>` reads
+// "Money plus Money gives Money".                                (spec §6.4, guide chapter 7)
+//
+// Expected output:
+//   total: 350 cents
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Money {
+    cents: int,
+}
+
+fn main(): int {
+    let coffee = Money { cents = 250 };
+    let cookie = Money { cents = 100 };
+    let total = coffee + cookie;
+    println(f"total: {total.cents} cents");
+    return 0;
+}

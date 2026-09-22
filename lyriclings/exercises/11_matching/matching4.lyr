@@ -1,0 +1,32 @@
+// matching4.lyr
+//
+// An arm's body is an EXPRESSION, ending with a comma — or a BLOCK. A block has no value, so
+// in a match used as an expression a block arm must leave by `return` or `throw` on every
+// path (LYR-SEM0033); falling out of it would leave the match without a result.
+//                                                                (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   8
+//   0
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Day { Weekday, Weekend, }
+
+fn hours(d: Day): int {
+    return match (d) {
+        Weekday => 8,
+        Weekend => {
+            let rest = 0;
+            println(f"{rest}");
+        },
+    };
+}
+
+fn main(): int {
+    println(f"{hours(Day.Weekday)}");
+    hours(Day.Weekend);
+    return 0;
+}

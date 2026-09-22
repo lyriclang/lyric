@@ -1,0 +1,27 @@
+// attributes1.lyr
+//
+// An attribute attaches DATA to a declaration — data the program never reads, but a tool
+// outside it can (a test runner finds `@Test`, a game engine finds its systems). There is
+// no separate attribute declaration form: an attribute is an ordinary struct that declares
+// a MARKER interface from std.core — `OnFunction`, `OnType` or `OnModule` — saying where it
+// may sit. A struct without the marker cannot sit there (LYR-SEM0065).
+//                                                                (spec §4.7, guide chapter 15)
+//
+// Expected output:
+//   ready
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+pub struct Command { name: string = "" }
+
+@Command { name = "start" }
+pub fn start(): void {
+    println("ready");
+}
+
+fn main(): int {
+    start();
+    return 0;
+}

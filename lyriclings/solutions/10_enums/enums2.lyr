@@ -1,0 +1,21 @@
+// enums2.lyr — solution
+
+import std.io.console { println };
+
+enum Shape {
+    Circle(float),
+    Triangle { a: float, b: float, c: float };
+
+    fn perimeter(): float {
+        return match (this) {
+            Circle(r)            => 2.0 * 3.14159 * r,
+            Triangle { a, b, c } => a + b + c,
+        };
+    }
+}
+
+fn main(): int {
+    let t = Shape.Triangle { a = 3.0, b = 4.0, c = 5.0 };
+    println(f"perimeter {t.perimeter()}");
+    return 0;
+}

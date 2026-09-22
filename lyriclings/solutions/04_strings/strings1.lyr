@@ -1,0 +1,12 @@
+// strings1.lyr — solution
+//
+// An interpolation holds a scalar: a number, a bool, a char or a string.
+
+import std.io.console { println };
+
+fn main(): int {
+    let name = "Ada";
+    let age = 36;
+    println(f"Hello, {name}, you are {age}");
+    return 0;
+}

@@ -1,0 +1,27 @@
+// enums1.lyr — solution
+//
+// The `;` after the last variant separates the variants from the methods.
+
+import std.io.console { println };
+
+enum Shape {
+    Circle(float),
+    Rectangle(float, float),
+    Empty;
+
+    fn describe(): string {
+        return match (this) {
+            Circle(r)       => f"circle {r}",
+            Rectangle(w, h) => f"rectangle {w} by {h}",
+            Empty           => "empty",
+        };
+    }
+}
+
+fn main(): int {
+    let a = Shape.Circle(2.5);
+    let b = Shape.Rectangle(3.0, 4.0);
+    println(a.describe());
+    println(b.describe());
+    return 0;
+}

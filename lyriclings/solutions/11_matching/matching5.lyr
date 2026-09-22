@@ -1,0 +1,20 @@
+// matching5.lyr — solution
+
+import std.io.console { println };
+
+enum Shape { Dot, Rect { w: int, h: int }, }
+
+fn area(s: ?Shape): int {
+    return match (s) {
+        null                => -1,
+        Shape.Dot           => 0,
+        Shape.Rect { w, h } => w * h,
+    };
+}
+
+fn main(): int {
+    println(f"{area(Shape.Dot)}");
+    println(f"{area(Shape.Rect { w = 3, h = 4 })}");
+    println(f"{area(null)}");
+    return 0;
+}

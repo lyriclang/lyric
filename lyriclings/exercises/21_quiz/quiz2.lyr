@@ -1,0 +1,56 @@
+// quiz2.lyr
+//
+// An enum with three payload shapes, a `Display` conformance so `println` takes the value
+// directly, an `area` method, and a loop summing over an array of shapes. One arm is
+// missing.
+//
+// Expected output:
+//   circle r=1.5
+//   rectangle 2x3
+//   triangle 3/4/5
+//   total area: 19.07
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Display };
+import std.math { sqrt };
+
+enum Shape :: [Display] {
+    Circle(float),
+    Rectangle(float, float),
+    Triangle { a: float, b: float, c: float };
+
+    fn area(): float {
+        return match (this) {
+            Circle(r)            => 3.14159 * r * r,
+            Rectangle(w, h)      => w * h,
+            Triangle { a, b, c } => {
+                let s = (a + b + c) / 2.0;
+                return sqrt(s * (s - a) * (s - b) * (s - c));
+            },
+        };
+    }
+
+    fn show(): string {
+        return match (this) {
+            Circle(r)       => f"circle r={r}",
+            Rectangle(w, h) => f"rectangle {w}x{h}",
+        };
+    }
+}
+
+fn main(): int {
+    let shapes = [
+        Shape.Circle(1.5),
+        Shape.Rectangle(2.0, 3.0),
+        Shape.Triangle { a = 3.0, b = 4.0, c = 5.0 },
+    ];
+    var total = 0.0;
+    for (s in shapes) {
+        println(s);
+        total += s.area();
+    }
+    println(f"total area: {total:N2}");
+    return 0;
+}

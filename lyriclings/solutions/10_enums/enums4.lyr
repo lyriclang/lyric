@@ -1,0 +1,25 @@
+// enums4.lyr — solution
+//
+// `let good: Outcome<int> = Outcome.Ok(21);` would work as well — the annotation is context.
+
+import std.io.console { println };
+
+enum Outcome<T> {
+    Ok(T),
+    Failed { reason: string },
+}
+
+fn report(o: Outcome<int>): void {
+    match (o) {
+        Ok(v) => { println(f"{v * 2}"); },
+        Failed { reason } => { println("failed: " + reason); },
+    }
+}
+
+fn main(): int {
+    let good = Outcome<int>.Ok(21);
+    let bad = Outcome<int>.Failed { reason = "empty" };
+    report(good);
+    report(bad);
+    return 0;
+}

@@ -1,0 +1,28 @@
+// generics4.lyr
+//
+// A generic TYPE is different from a generic function: in a value position it always takes
+// its arguments explicitly — `Box<int> { value = 9 }` — and never infers them from the
+// field values (LYR-SEM0026). `Box<int>` and `Box<string>` are two types with two layouts.
+//                                                                (spec §8, guide chapter 8)
+//
+// Expected output:
+//   9
+//   nine
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+class Box<T> {
+    value: T,
+
+    fn get(): T { return this.value; }
+}
+
+fn main(): int {
+    let number = Box { value = 9 };
+    let word = Box { value = "nine" };
+    println(f"{number.get()}");
+    println(word.get());
+    return 0;
+}

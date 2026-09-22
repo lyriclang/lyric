@@ -1,0 +1,17 @@
+// functions3.lyr — solution
+//
+// The stored lambda is annotated; the one passed directly keeps taking its types from
+// `apply`'s parameter.
+
+import std.io.console { println };
+
+fn apply(f: fn(int) -> int, value: int): int {
+    return f(value);
+}
+
+fn main(): int {
+    let triple = (n: int) => n * 3;
+    println(f"{apply(triple, 3)}");
+    println(f"{apply((n) => n * 2, 5)}");
+    return 0;
+}

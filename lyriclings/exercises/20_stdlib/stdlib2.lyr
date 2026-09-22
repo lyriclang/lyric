@@ -1,0 +1,25 @@
+// stdlib2.lyr
+//
+// `T[]` does not grow; `std.collections.List<T>` does. Constructors live on the types —
+// `List<int>.empty()`, `Map<string, int>.empty()`, `StringBuilder.new()` — and a static
+// member of a generic type is reached through the type WITH its arguments (LYR-SEM0063).
+// `push`, `pop` (answers `?T`), `get`, `length()`, `last()`; `for-in` walks it.
+//                                                                (guide chapter 13)
+//
+// Expected output:
+//   2 left, last was cherry
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.collections { List };
+
+fn main(): int {
+    let basket = List.empty();
+    basket.push("apple");
+    basket.push("banana");
+    basket.push("cherry");
+    let taken = basket.pop() ?? "nothing";
+    println(f"{basket.length()} left, last was {taken}");
+    return 0;
+}

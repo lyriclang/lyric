@@ -1,0 +1,24 @@
+// arrays1.lyr
+//
+// `T[]` is a fixed-length array of ONE element type. The literal `[1, 2, 3]` is an `int[]`;
+// mixing types in a literal is LYR-SEM0009, and a literal adapts only where a context type
+// says so (`let xs: float[] = [1, 2, 3];` is fine). The length belongs to the VALUE, never
+// to the type: `int[3]` is refused, and five zeros are built with `[0] * 5`.
+//                                                                (spec §3.3, §3.1, guide chapter 2)
+//
+// Expected output:
+//   6
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let numbers = [1, 2, 3.0];
+    var sum = 0;
+    for (n in numbers) {
+        sum += n;
+    }
+    println(f"{sum}");
+    return 0;
+}

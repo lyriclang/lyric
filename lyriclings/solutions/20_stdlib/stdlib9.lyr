@@ -1,0 +1,19 @@
+// stdlib9.lyr — solution
+
+import std.io.console { println };
+import std.test { assertEq, assertTrue };
+
+fn clamp(value: int, low: int, high: int): int {
+    if (value < low) { return low; }
+    if (value > high) { return high; }
+    return value;
+}
+
+fn main(): int {
+    assertEq(clamp(5, 0, 10), 5);
+    assertEq(clamp(15, 0, 10), 10);
+    assertEq(clamp(-3, 0, 10), 0);
+    assertTrue(clamp(7, 7, 7) == 7, "a one-point range answers its point");
+    println("all assertions hold");
+    return 0;
+}

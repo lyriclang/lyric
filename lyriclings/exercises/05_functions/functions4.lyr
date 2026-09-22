@@ -1,0 +1,28 @@
+// functions4.lyr
+//
+// `params` on the last parameter collects the remaining arguments into an array: `total(1,
+// 2, 3)` sees `values = [1, 2, 3]`, and `total()` sees an empty array. It has to be the last
+// parameter (LYR-SEM0024) — everything after it would be unreachable.
+//                                                                (spec §7.1a, guide chapter 3)
+//
+// Expected output:
+//   sum: 6
+//   nothing: 0
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn total(params values: int[], label: string): void {
+    var sum = 0;
+    for (v in values) {
+        sum += v;
+    }
+    println(f"{label}: {sum}");
+}
+
+fn main(): int {
+    total(1, 2, 3, "sum");
+    total("nothing");
+    return 0;
+}

@@ -1,0 +1,16 @@
+// matching6.lyr — solution
+
+import std.io.console { println };
+
+struct Point { x: int, y: int, }
+
+fn product(p: Point): int {
+    return match (p) {
+        Point { x = a, y = b } => a * b,
+    };
+}
+
+fn main(): int {
+    println(f"{product(Point { x = 3, y = 4 })}");
+    return 0;
+}

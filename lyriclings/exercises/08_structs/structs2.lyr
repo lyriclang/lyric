@@ -1,0 +1,28 @@
+// structs2.lyr
+//
+// A method reads its receiver through `this`. One that WRITES to `this` must be declared
+// `mut fn`; in an ordinary method `this` is not a mutable target (LYR-SEM0019). For a struct,
+// `mut` also means the changed value is written back to the caller's variable — which is why
+// the caller's binding has to be a `var`.                        (spec §3.4, guide chapter 5)
+//
+// Expected output:
+//   balance: 150
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Account {
+    balance: int,
+
+    fn deposit(amount: int): void {
+        this.balance = this.balance + amount;
+    }
+}
+
+fn main(): int {
+    var acct = Account { balance = 100 };
+    acct.deposit(50);
+    println(f"balance: {acct.balance}");
+    return 0;
+}

@@ -1,0 +1,19 @@
+// interfaces6.lyr — solution
+
+import std.io.console { println };
+import std.collections { Indexable };
+
+class Grid :: [Indexable<int>] {
+    cells: int[],
+    width: int,
+
+    fn get(index: int): int { return this.cells[index]; }
+    mut fn set(index: int, value: int): void { this.cells[index] = value; }
+}
+
+fn main(): int {
+    let g = Grid { cells = [0] * 4, width = 2 };
+    g[3] = 9;
+    println(f"corner: {g[3]}");
+    return 0;
+}

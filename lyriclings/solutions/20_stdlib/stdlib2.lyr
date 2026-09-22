@@ -1,0 +1,14 @@
+// stdlib2.lyr — solution
+
+import std.io.console { println };
+import std.collections { List };
+
+fn main(): int {
+    let basket = List<string>.empty();
+    basket.push("apple");
+    basket.push("banana");
+    basket.push("cherry");
+    let taken = basket.pop() ?? "nothing";
+    println(f"{basket.length()} left, last was {taken}");
+    return 0;
+}

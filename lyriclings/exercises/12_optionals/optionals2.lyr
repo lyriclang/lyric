@@ -1,0 +1,33 @@
+// optionals2.lyr
+//
+// Narrowing has exactly one source: a direct `==`/`!=` against `null` on a LOCAL or a
+// PARAMETER. A field never narrows — `if (p.nickname != null)` proves nothing about the
+// `p.nickname` on the next line, because a field can be written by anyone in between. The
+// idiom is to read the field into a local and test that.        (spec §7.4, guide chapter 9)
+//
+// Expected output:
+//   Ada is ada42
+//   Grace has no nickname
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+class Profile {
+    name: string,
+    nickname: ?string = null,
+}
+
+fn describe(p: Profile): string {
+    if (p.nickname != null) {
+        let nick: string = p.nickname;
+        return p.name + " is " + nick;
+    }
+    return p.name + " has no nickname";
+}
+
+fn main(): int {
+    println(describe(Profile { name = "Ada", nickname = "ada42" }));
+    println(describe(Profile { name = "Grace" }));
+    return 0;
+}

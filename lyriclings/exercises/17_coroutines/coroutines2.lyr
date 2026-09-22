@@ -1,0 +1,36 @@
+// coroutines2.lyr
+//
+// A coroutine may be FINITE: when its body runs to the end it is exhausted, and a further
+// `resume` is a panic. `co.next()` is the safe pull — it advances exactly like `resume` and
+// answers `?T`: the value, or `null` once the body is done. The name and shape are
+// `Iterator<T>.next()`'s on purpose.                             (spec §10, guide chapter 11)
+//
+// Expected output:
+//   10 20 30
+//   sum: 60
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    let co = three();
+    var sum = 0;
+    var i = 0;
+    while (i < 4) {
+        let v = resume co;
+        if (i > 0) { print(" "); }
+        print(f"{v}");
+        sum += v;
+        i += 1;
+    }
+    println("");
+    println(f"sum: {sum}");
+    return 0;
+}

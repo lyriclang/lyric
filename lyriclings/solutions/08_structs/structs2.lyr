@@ -1,0 +1,18 @@
+// structs2.lyr — solution
+
+import std.io.console { println };
+
+struct Account {
+    balance: int,
+
+    mut fn deposit(amount: int): void {
+        this.balance = this.balance + amount;
+    }
+}
+
+fn main(): int {
+    var acct = Account { balance = 100 };
+    acct.deposit(50);
+    println(f"balance: {acct.balance}");
+    return 0;
+}

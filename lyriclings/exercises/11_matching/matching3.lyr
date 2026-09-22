@@ -1,0 +1,32 @@
+// matching3.lyr
+//
+// Patterns over an open type — `int`, `string`, `char` — can be LITERALS (`0`), or-patterns
+// (`1 | 2 | 3`), RANGES (`4..=9`), and bindings; a pattern of another type than the
+// scrutinee is LYR-SEM0029. An open type is never exhaustive by cases, so the last arm is
+// a binding or `_`.                                              (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   0 -> none
+//   2 -> a few
+//   7 -> several
+//   40 -> many
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn amount(n: int): string {
+    return match (n) {
+        "zero"          => "none",
+        "one" | "two"   => "a few",
+        "some"          => "several",
+        _               => "many",
+    };
+}
+
+fn main(): int {
+    for (n in [0, 2, 7, 40]) {
+        println(f"{n} -> {amount(n)}");
+    }
+    return 0;
+}

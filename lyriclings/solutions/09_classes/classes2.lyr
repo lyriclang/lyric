@@ -1,0 +1,26 @@
+// classes2.lyr — solution
+//
+// With a class, `record` and `main` hold the same object.
+
+import std.io.console { println };
+
+class Tracker {
+    count: int = 0,
+
+    mut fn bump(): void {
+        this.count = this.count + 1;
+    }
+}
+
+fn record(t: Tracker): void {
+    t.bump();
+}
+
+fn main(): int {
+    let tracker = Tracker { };
+    record(tracker);
+    record(tracker);
+    record(tracker);
+    println(f"seen: {tracker.count}");
+    return 0;
+}

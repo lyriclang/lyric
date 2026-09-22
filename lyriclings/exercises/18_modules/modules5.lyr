@@ -1,0 +1,22 @@
+// modules5.lyr
+//
+// A module-level `let` is a CONSTANT, initialized once before `main` runs, in declaration
+// order. An initializer may read a constant declared before it, not one after
+// (LYR-SEM0057). There is no module-level `var`. Across files the order follows the
+// imports: a module's constants are initialized after those of everything it imports.
+//                                                                (spec §4.3, guide chapter 12)
+//
+// Expected output:
+//   lyric 4.4
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+let BANNER = "lyric " + VERSION;
+let VERSION = "4.4";
+
+fn main(): int {
+    println(BANNER);
+    return 0;
+}

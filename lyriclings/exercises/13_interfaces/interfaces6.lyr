@@ -1,0 +1,28 @@
+// interfaces6.lyr
+//
+// Index syntax is an interface too: `Indexable<T>` from std.collections declares
+// `fn get(index: int): T` and `mut fn set(index: int, value: T): void`, and `g[i]` on a
+// conforming type is the call. A type without the conformance is not indexable
+// (LYR-SEM0007), whatever its methods are called.                (spec §5, §6.4, guide chapter 13)
+//
+// Expected output:
+//   corner: 9
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+class Grid {
+    cells: int[],
+    width: int,
+
+    fn at(index: int): int { return this.cells[index]; }
+    mut fn put(index: int, value: int): void { this.cells[index] = value; }
+}
+
+fn main(): int {
+    let g = Grid { cells = [0] * 4, width = 2 };
+    g[3] = 9;
+    println(f"corner: {g[3]}");
+    return 0;
+}

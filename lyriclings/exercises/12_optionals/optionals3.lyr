@@ -1,0 +1,25 @@
+// optionals3.lyr
+//
+// `x!` unwraps an optional and PANICS when it is absent (LYR-VM0007, exit code 101). It is
+// the right tool when absence would be a bug in your program — and the wrong one when
+// absence is an ordinary answer, as a missing config key is. `??` names the fallback.
+//                                                                (spec §3.3, §9.4, guide chapter 9)
+//
+// Expected output:
+//   host = example.org
+//   port = unset
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn lookup(key: string): ?string {
+    if (key == "host") { return "example.org"; }
+    return null;
+}
+
+fn main(): int {
+    println("host = " + lookup("host")!);
+    println("port = " + lookup("port")!);
+    return 0;
+}

@@ -1,0 +1,35 @@
+// coroutines1.lyr
+//
+// A function whose body contains `yield` is a COROUTINE. Its return type is `Coroutine<T>`,
+// where `T` is what it yields; calling it runs nothing and produces a suspended coroutine
+// value. `resume co` runs the body until its next `yield` and produces that value — the
+// locals and the position in the loop survive in between. A coroutine cannot `return` a
+// value (LYR-SEM0039) — its values all travel through `yield`; it ends with a bare
+// `return;` or by running off the end.
+//                                                                (spec §10, guide chapter 11)
+//
+// Expected output:
+//   0 1 2 3 4
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+
+fn counter(): Coroutine<int> {
+    var n = 0;
+    while (n < 5) {
+        yield n;
+        n += 1;
+    }
+    return n;
+}
+
+fn main(): int {
+    let c = counter();
+    for (i in 0..5) {
+        if (i > 0) { print(" "); }
+        print(f"{resume c}");
+    }
+    println("");
+    return 0;
+}

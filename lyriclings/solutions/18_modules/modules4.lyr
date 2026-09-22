@@ -1,0 +1,9 @@
+// modules4.lyr — solution
+
+import std.io.console;
+import std.math { sqrt };
+
+fn main(): int {
+    console.println(f"{sqrt(16.0):N2}");
+    return 0;
+}

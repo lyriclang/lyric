@@ -1,0 +1,31 @@
+// enums2.lyr
+//
+// A variant's payload has a SHAPE: parentheses for positional values, braces for named
+// fields. Construction and patterns both follow the declaration — a struct-like variant is
+// built with `Shape.Triangle { a = …, b = …, c = … }`, and using the other form is
+// LYR-SEM0031.                                                   (spec §3.4, guide chapter 6)
+//
+// Expected output:
+//   perimeter 12
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Shape {
+    Circle(float),
+    Triangle { a: float, b: float, c: float };
+
+    fn perimeter(): float {
+        return match (this) {
+            Circle(r)            => 2.0 * 3.14159 * r,
+            Triangle { a, b, c } => a + b + c,
+        };
+    }
+}
+
+fn main(): int {
+    let t = Shape.Triangle(3.0, 4.0, 5.0);
+    println(f"perimeter {t.perimeter()}");
+    return 0;
+}

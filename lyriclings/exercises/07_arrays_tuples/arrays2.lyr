@@ -1,0 +1,22 @@
+// arrays2.lyr
+//
+// Element access is bounds-checked at runtime: an index outside 0..length-1 is a PANIC
+// (LYR-VM0006, exit code 101), not a garbage read. `xs.length` is the count, so the last
+// valid index is `xs.length - 1`.                                (spec §3.3, appendix A.9)
+//
+// Expected output:
+//   10 20 30
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let xs = [10, 20, 30];
+    for (i in 0..=xs.length) {
+        if (i > 0) { print(" "); }
+        print(f"{xs[i]}");
+    }
+    println("");
+    return 0;
+}

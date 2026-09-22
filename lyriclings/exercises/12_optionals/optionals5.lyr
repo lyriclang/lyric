@@ -1,0 +1,32 @@
+// optionals5.lyr
+//
+// A `?int` is compared against `null` — and against nothing else: `age >= 18` on a `?int`
+// is an error, because an absent age is neither below nor above 18. Narrowing composes with
+// `&&`: in `age != null && age >= 18` the right side already sees an `int`.
+//                                                                (spec §7.4, §6.4, guide chapter 9)
+//
+// Expected output:
+//   Ada: adult
+//   Grace: age unknown
+//   Lin: minor
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn classify(name: string, age: ?int): string {
+    if (age >= 18) {
+        return name + ": adult";
+    }
+    if (age == null) {
+        return name + ": age unknown";
+    }
+    return name + ": minor";
+}
+
+fn main(): int {
+    println(classify("Ada", 36));
+    println(classify("Grace", null));
+    println(classify("Lin", 12));
+    return 0;
+}

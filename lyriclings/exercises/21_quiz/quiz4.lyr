@@ -1,0 +1,40 @@
+// quiz4.lyr
+//
+// A generic stack over a `List<T>`, and a `for-in` over it. `for-in` walks a range, an
+// array, a string, an `Iterable<T>` or an `Iterator<T>` — and nothing else (LYR-SEM0007).
+// Making your own type iterable means conforming to `Iterable<T>` from std.iter and handing
+// out a fresh `Iterator<T>` per loop; the iterator's `mut fn next(): ?T` answers `null` at
+// the end. Both interfaces are generic; a class conforming to `Iterator<T>` is generic too.
+//
+// Expected output:
+//   3 2 1
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+import std.collections { List };
+import std.iter { Iterable, Iterator };
+
+class Stack<T> {
+    items: List<T>,
+
+    static fn empty(): Stack<T> { return Stack<T> { items = List<T>.empty() }; }
+
+    mut fn push(value: T): void { this.items.push(value); }
+    fn size(): int { return this.items.length(); }
+}
+
+fn main(): int {
+    let s = Stack<int>.empty();
+    s.push(1);
+    s.push(2);
+    s.push(3);
+    var first = true;
+    for (n in s) {
+        if (!first) { print(" "); }
+        print(f"{n}");
+        first = false;
+    }
+    println("");
+    return 0;
+}

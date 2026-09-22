@@ -1,0 +1,20 @@
+// enums3.lyr — solution
+//
+// `_` covers every other variant; without it the match would have to list all three.
+
+import std.io.console { println };
+
+enum Light { Red, Yellow, Green, }
+
+fn advice(light: Light): string {
+    return match (light) {
+        Red => "stop",
+        _   => "go",
+    };
+}
+
+fn main(): int {
+    println(advice(Light.Red));
+    println(advice(Light.Green));
+    return 0;
+}

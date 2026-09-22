@@ -1,0 +1,11 @@
+// modules5.lyr — solution
+
+import std.io.console { println };
+
+let VERSION = "4.4";
+let BANNER = "lyric " + VERSION;
+
+fn main(): int {
+    println(BANNER);
+    return 0;
+}

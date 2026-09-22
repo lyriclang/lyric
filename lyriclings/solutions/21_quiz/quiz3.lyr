@@ -1,0 +1,47 @@
+// quiz3.lyr — solution
+
+import std.io.console { println };
+
+class InsufficientFunds :: [Throwable] {
+    who: string,
+    balance: int,
+    needed: int,
+    fn message(): string {
+        return f"{this.who} has {this.balance}, needs {this.needed}";
+    }
+}
+
+class Account {
+    owner: string,
+    balance: int,
+
+    mut fn withdraw(amount: int): void throws InsufficientFunds {
+        if (amount > this.balance) {
+            throw InsufficientFunds { who = this.owner, balance = this.balance, needed = amount };
+        }
+        this.balance -= amount;
+    }
+
+    mut fn deposit(amount: int): void {
+        this.balance += amount;
+    }
+}
+
+fn transfer(from: Account, to: Account, amount: int): void throws InsufficientFunds {
+    from.withdraw(amount);
+    to.deposit(amount);
+}
+
+fn main(): int {
+    let alice = Account { owner = "alice", balance = 100 };
+    let bob = Account { owner = "bob", balance = 100 };
+    try {
+        transfer(alice, bob, 30);
+        println(f"alice: {alice.balance}, bob: {bob.balance}");
+        transfer(alice, bob, 500);
+        println("unreachable");
+    } catch (e: InsufficientFunds) {
+        println("transfer failed: " + e.message());
+    }
+    return 0;
+}

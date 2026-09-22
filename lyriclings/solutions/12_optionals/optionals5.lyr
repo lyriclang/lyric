@@ -1,0 +1,22 @@
+// optionals5.lyr — solution
+//
+// The other order works too: an early `return` on `age == null` narrows everything after it.
+
+import std.io.console { println };
+
+fn classify(name: string, age: ?int): string {
+    if (age != null && age >= 18) {
+        return name + ": adult";
+    }
+    if (age == null) {
+        return name + ": age unknown";
+    }
+    return name + ": minor";
+}
+
+fn main(): int {
+    println(classify("Ada", 36));
+    println(classify("Grace", null));
+    println(classify("Lin", 12));
+    return 0;
+}

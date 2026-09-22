@@ -1,0 +1,32 @@
+// classes1.lyr
+//
+// A class looks like a struct and differs in ONE thing: it is a reference. Assigning shares
+// the object instead of copying it. `let` binds the reference immutably; the object behind
+// it may still change.                                           (spec §3.4, §7.1, guide chapter 5)
+//
+// Fill in what the two reads really give. `assert` panics when you are wrong.
+//
+// Expected output:
+//   first.value = 5, second.value = 5
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { assert };
+
+class Counter { value: int, }
+
+fn main(): int {
+    let first = Counter { value = 0 };
+    let second = first;
+    second.value = 5;
+
+    // TODO: what does each name see now?
+    let expectedFirst = 0;
+    let expectedSecond = 0;
+
+    assert(first.value == expectedFirst, "first.value");
+    assert(second.value == expectedSecond, "second.value");
+    println(f"first.value = {first.value}, second.value = {second.value}");
+    return 0;
+}

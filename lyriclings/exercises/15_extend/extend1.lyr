@@ -1,0 +1,23 @@
+// extend1.lyr
+//
+// `extend` adds methods to a type you did not declare — a built-in one included. Inside the
+// block `this` is the receiver, and the methods are visible wherever the extending module is
+// imported (that is how the string methods of chapter 4 reach you). Without an extension,
+// `int` has no members at all (LYR-SEM0012).                    (spec §5.5, guide chapter 7)
+//
+// Expected output:
+//   4 is even
+//   7 is odd
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+// TODO: give int an `isEven` method.
+
+fn main(): int {
+    for (n in [4, 7]) {
+        println(f"{n} is " + (if (n.isEven()) "even" else "odd"));
+    }
+    return 0;
+}

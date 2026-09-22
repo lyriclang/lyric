@@ -1,0 +1,20 @@
+// functions2.lyr — solution
+//
+// `describe(int)` and `describe(string)` are an overload set; `describe("seven")` picks the
+// second by its argument.
+
+import std.io.console { println };
+
+fn describe(n: int): string {
+    return f"the number {n}";
+}
+
+fn describe(s: string): string {
+    return f"the word {s}";
+}
+
+fn main(): int {
+    println(describe(7));
+    println(describe("seven"));
+    return 0;
+}

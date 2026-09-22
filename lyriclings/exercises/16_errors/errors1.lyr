@@ -1,0 +1,30 @@
+// errors1.lyr
+//
+// A function that can throw declares `throws` (optionally with the type it throws). Every
+// call to it is a THROW SITE: the caller either handles it with `try`/`catch` or declares
+// `throws` itself — a call with nothing handling it is LYR-SEM0034. `main` cannot declare
+// `throws`, so an exception has to be handled by the time it gets there.
+// `std.core.Exception` is the ready-made throwable: field `text`, method `message()`.
+//                                                                (spec §9.2, guide chapter 10)
+//
+// Expected output:
+//   parsed 42
+//   error: empty input
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn parse(text: string): int throws Exception {
+    if (text == "") {
+        throw Exception { text = "empty input" };
+    }
+    return 42;
+}
+
+fn main(): int {
+    println(f"parsed {parse("42")}");
+    println(f"parsed {parse("")}");
+    return 0;
+}

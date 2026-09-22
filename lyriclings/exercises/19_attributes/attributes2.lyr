@@ -1,0 +1,29 @@
+// attributes2.lyr
+//
+// Exactly one attribute means something to the compiler: `@Deprecated` from std.core. Every
+// use of the marked declaration warns (LYR-SEM0076) with the message naming the way forward.
+// `until` names the version that REMOVES it — and a toolchain that has reached that version
+// refuses the declaration itself (LYR-SEM0081), whether or not anything still calls it. A
+// deprecation is a promise, and the compiler keeps it.          (spec §4.7, guide chapter 15)
+//
+// Expected output:
+//   2
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Deprecated };
+
+@Deprecated { message = "use renew", until = "4.0" }
+pub fn old(): int {
+    return 1;
+}
+
+pub fn renew(): int {
+    return 2;
+}
+
+fn main(): int {
+    println(f"{renew()}");
+    return 0;
+}

@@ -1,0 +1,31 @@
+// matching1.lyr
+//
+// `match` is EXHAUSTIVE where the scrutinee is enumerable: an enum, a bool, the two states
+// of an optional. A gap is an error that names the missing case (LYR-SEM0050). The arms are
+// tried in order; the first that matches wins, and `_` matches anything.
+//                                                                (spec §7.6, guide chapter 6)
+//
+// Expected output:
+//   warm
+//   cold
+//   warm
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+enum Color { Red, Blue, Yellow, }
+
+fn feel(c: Color): string {
+    return match (c) {
+        Red    => "warm",
+        Yellow => "warm",
+    };
+}
+
+fn main(): int {
+    println(feel(Color.Red));
+    println(feel(Color.Blue));
+    println(feel(Color.Yellow));
+    return 0;
+}

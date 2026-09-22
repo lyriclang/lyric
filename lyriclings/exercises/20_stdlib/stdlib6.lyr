@@ -1,0 +1,26 @@
+// stdlib6.lyr
+//
+// `std.option` works on an optional WITHOUT unwrapping it: `map(o, f)` applies `f` to a
+// present value and passes `null` through, `filter`, `andThen`, `zip` likewise. `expect(o,
+// message)` is the one that unwraps — and panics with the message when `o` is absent; it
+// belongs where absence would be a bug.                          (guide chapter 9)
+//
+// Expected output:
+//   next year: 37
+//   next year: unknown
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.option { map, expect };
+
+fn nextYear(age: ?int): string {
+    let n = expect(age, "age is required");
+    return f"next year: {n + 1}";
+}
+
+fn main(): int {
+    println(nextYear(36));
+    println(nextYear(null));
+    return 0;
+}

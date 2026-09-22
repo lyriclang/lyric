@@ -1,0 +1,14 @@
+// optionals3.lyr — solution
+
+import std.io.console { println };
+
+fn lookup(key: string): ?string {
+    if (key == "host") { return "example.org"; }
+    return null;
+}
+
+fn main(): int {
+    println("host = " + (lookup("host") ?? "unset"));
+    println("port = " + (lookup("port") ?? "unset"));
+    return 0;
+}

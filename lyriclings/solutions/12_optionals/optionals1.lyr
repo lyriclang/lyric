@@ -1,0 +1,28 @@
+// optionals1.lyr — solution
+//
+// Inside `if (hit != null)` the type of `hit` is `int`; the f-string sees a plain number.
+
+import std.io.console { println };
+
+fn find(names: string[], wanted: string): ?int {
+    for (i in 0..names.length) {
+        if (names[i] == wanted) { return i; }
+    }
+    return null;
+}
+
+fn report(names: string[], wanted: string): void {
+    let hit = find(names, wanted);
+    if (hit != null) {
+        println(f"index {hit}");
+    } else {
+        println("not found");
+    }
+}
+
+fn main(): int {
+    let names = ["Ada", "Grace"];
+    report(names, "Grace");
+    report(names, "Lin");
+    return 0;
+}

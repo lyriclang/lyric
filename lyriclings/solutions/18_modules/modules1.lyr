@@ -1,0 +1,10 @@
+// modules1.lyr — solution (the change is in geometry.lyr)
+
+import std.io.console { println };
+import geometry { Rect, area };
+
+fn main(): int {
+    let r = Rect { w = 3, h = 4 };
+    println(f"area: {area(r)}");
+    return 0;
+}

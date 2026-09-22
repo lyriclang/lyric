@@ -1,0 +1,28 @@
+// optionals6.lyr
+//
+// Optionals do not nest: `??T` is not a type, and `null` is the one empty value at every
+// depth. That has a consequence for iteration — an iterator answers `?T` and spends `null` on
+// "the end", so an element that is itself `?T` could not be told apart from it. `for-in`
+// over a `(?T)[]` is therefore refused (LYR-SEM0091); an index loop reads the slots directly.
+//                                                                (spec §3.3, §7.2, guide chapter 13)
+//
+// Expected output:
+//   present: 3, total: 60
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let slots: (?int)[] = [10, null, 20, null, 30];
+    var present = 0;
+    var total = 0;
+    for (slot in slots) {
+        if (slot != null) {
+            present += 1;
+            total += slot;
+        }
+    }
+    println(f"present: {present}, total: {total}");
+    return 0;
+}

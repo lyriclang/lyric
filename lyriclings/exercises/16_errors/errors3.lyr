@@ -1,0 +1,37 @@
+// errors3.lyr
+//
+// There is no `finally`. A `try` exists to CATCH, and needs at least one `catch` clause
+// (LYR-PAR0023). Cleanup that must happen whichever way a scope ends is `defer`: the
+// deferred statement runs when the enclosing scope exits — on the normal path and while
+// unwinding — in reverse order of registration.                 (spec §7.5, §9.3, guide chapter 10)
+//
+// Expected output:
+//   opened
+//   closed
+//   error: disk full
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn save(): void throws Exception {
+    throw Exception { text = "disk full" };
+}
+
+fn process(): void throws Exception {
+    println("opened");
+    try {
+        save();
+    }
+    println("closed");
+}
+
+fn main(): int {
+    try {
+        process();
+    } catch (e: Exception) {
+        println("error: " + e.message());
+    }
+    return 0;
+}

@@ -1,0 +1,26 @@
+// optionals4.lyr
+//
+// Three operators work on an optional without unwrapping it. `a ?? b` is `a` if present,
+// else `b`. `a ??= b` assigns `b` only when `a` is absent. `x?.member` reaches a member when
+// `x` is present and yields `null` otherwise. This program runs; it just throws away a
+// nickname the user chose.                                       (spec §6.3, guide chapter 9)
+//
+// Expected output:
+//   ada42
+//   anonymous
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn displayName(chosen: ?string): string {
+    var nick = chosen;
+    nick = "anonymous";
+    return nick ?? "?";
+}
+
+fn main(): int {
+    println(displayName("ada42"));
+    println(displayName(null));
+    return 0;
+}

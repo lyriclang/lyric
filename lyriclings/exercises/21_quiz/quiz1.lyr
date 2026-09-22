@@ -1,0 +1,52 @@
+// quiz1.lyr
+//
+// Quiz time: no new concept, several old ones at once. This program counts words, sorts
+// them by frequency (ties by name) and prints the top three. Strings, `Map`, `List`, a
+// struct with `Ordered`, optionals, `sortList` — everything from the earlier chapters.
+//
+// Expected output:
+//   the: 3
+//   fox: 2
+//   dog: 1
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.collections { Map, List, sortList, entries };
+import std.core { Ordered };
+import std.string as strings;
+
+struct WordCount :: [Ordered<WordCount>] {
+    word: string,
+    count: int,
+
+    // Most frequent first; equal counts alphabetically.
+    fn compare(other: WordCount): int {
+        if (this.count != other.count) {
+            return if (this.count > other.count) -1 else 1;
+        }
+        return this.word.compare(other.word);
+    }
+}
+
+fn main(): int {
+    let text = "the quick fox and the lazy dog and the fox";
+    let counts = Map<string, int>.empty();
+    for (word in text.split(" ")) {
+        if (word == "and" || word == "quick" || word == "lazy") { continue; }
+        counts.set(word, counts.get(word) + 1);
+    }
+
+    let ranked = List<WordCount>.empty();
+    for (entry in entries(counts)) {
+        let (word, count) = entry;
+        ranked.push(WordCount { word = word, count = count });
+    }
+    sortList(ranked);
+
+    for (i in 0..3) {
+        let wc = ranked.get(i);
+        println(f"{wc.word}: {wc.count}");
+    }
+    return 0;
+}

@@ -1,0 +1,13 @@
+// arrays1.lyr — solution
+
+import std.io.console { println };
+
+fn main(): int {
+    let numbers = [1, 2, 3];
+    var sum = 0;
+    for (n in numbers) {
+        sum += n;
+    }
+    println(f"{sum}");
+    return 0;
+}

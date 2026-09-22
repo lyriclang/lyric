@@ -1,0 +1,26 @@
+// control3.lyr
+//
+// `for (x in a..b)` walks a..b-1 and `a..=b` includes b. A range is an ITERATION FORM, not
+// a value: there is no range type, so one cannot be bound, stored or passed — it stands in a
+// loop head and nowhere else (LYR-SEM0090). (`std.iter.range` makes an iterator when you
+// need a value.)                                                 (spec §3.3, §7.2, guide chapter 4)
+//
+// Expected output:
+//   1 4 9 16 25
+
+// I AM NOT DONE
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let limit = 5;
+    let squares = 1..=limit;
+    var first = true;
+    for (n in squares) {
+        if (!first) { print(" "); }
+        print(f"{n * n}");
+        first = false;
+    }
+    println("");
+    return 0;
+}

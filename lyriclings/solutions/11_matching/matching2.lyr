@@ -1,0 +1,23 @@
+// matching2.lyr — solution
+//
+// The unguarded `Circle(_)` catches what the guard let through. `_` in the payload says the
+// radius is not needed there.
+
+import std.io.console { println };
+
+enum Shape { Circle(float), Square(float), }
+
+fn describe(s: Shape): string {
+    return match (s) {
+        Circle(r) if r > 1.0 => "big circle",
+        Circle(_)            => "small circle",
+        Square(_)            => "square",
+    };
+}
+
+fn main(): int {
+    println(describe(Shape.Circle(2.0)));
+    println(describe(Shape.Circle(0.5)));
+    println(describe(Shape.Square(1.0)));
+    return 0;
+}

@@ -1,0 +1,21 @@
+// interfaces3.lyr — solution
+
+import std.io.console { println };
+import std.core { Equatable };
+
+struct Point :: [Equatable<Point>] {
+    x: int,
+    y: int,
+    fn equals(other: Point): bool {
+        return this.x == other.x && this.y == other.y;
+    }
+}
+
+fn main(): int {
+    let a = Point { x = 1, y = 2 };
+    let b = Point { x = 1, y = 2 };
+    let c = Point { x = 5, y = 2 };
+    println(if (a == b) "same place" else "different");
+    println(if (a == c) "same place" else "different");
+    return 0;
+}

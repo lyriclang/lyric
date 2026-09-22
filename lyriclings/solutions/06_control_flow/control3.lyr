@@ -1,0 +1,15 @@
+// control3.lyr — solution
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let limit = 5;
+    var first = true;
+    for (n in 1..=limit) {
+        if (!first) { print(" "); }
+        print(f"{n * n}");
+        first = false;
+    }
+    println("");
+    return 0;
+}

@@ -1,0 +1,29 @@
+// functions2.lyr
+//
+// Two functions may share a name when their PARAMETERS tell them apart; the call picks by
+// what you pass. What you do with the result never takes part — a call has to mean one
+// thing before anyone looks at where it goes. Two functions with the same parameter list
+// are therefore a redeclaration (LYR-SEM0085), whatever they return.
+//                                                                (spec §4.3a, guide chapter 3)
+//
+// Expected output:
+//   the number 7
+//   the word seven
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn describe(n: int): string {
+    return f"the number {n}";
+}
+
+fn describe(s: int): string {
+    return f"the word {s}";
+}
+
+fn main(): int {
+    println(describe(7));
+    println(describe("seven"));
+    return 0;
+}

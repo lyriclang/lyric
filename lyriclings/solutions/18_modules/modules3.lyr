@@ -1,0 +1,10 @@
+// modules3.lyr — solution (the change is in config.lyr)
+
+import std.io.console { println };
+import config;
+
+fn main(): int {
+    let cells = config.width * config.height;
+    println(f"{config.width} x {config.height} = {cells} cells");
+    return 0;
+}

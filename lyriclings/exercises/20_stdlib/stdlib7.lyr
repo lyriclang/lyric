@@ -1,0 +1,29 @@
+// stdlib7.lyr
+//
+// `std.json` reads a whole document into ONE value: `JsonValue`, an enum over the six JSON
+// shapes. `parse(text)` answers `?JsonValue` — `null` when the text is not JSON — and the
+// accessors (`field`, `at`, `asString`, `asInt`, …) answer `null` when the value is not the
+// asked shape. A walk through a document is a series of null checks.
+//                                                                (guide chapter 13)
+//
+// Expected output:
+//   aria, level 3
+//   not JSON
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.json { parse };
+
+fn describe(text: string): string {
+    let doc = parse(text);
+    let name = doc.field("name")?.asString() ?? "?";
+    let level = doc.field("level")?.asInt() ?? 0;
+    return f"{name}, level {level}";
+}
+
+fn main(): int {
+    println(describe("{\"name\": \"aria\", \"level\": 3}"));
+    println(describe("{oops"));
+    return 0;
+}

@@ -1,0 +1,32 @@
+// errors5.lyr
+//
+// Panic or exception — the difference shows in what happens next. A PANIC aborts the
+// process: no catch sees it, no `defer` runs, the exit code is 101. An EXCEPTION unwinds:
+// every `defer` on the way runs, and the nearest matching `catch` answers. Reserve panics
+// for bugs (`assert`, an impossible state); an expected failure is thrown.
+//                                                                (spec §9.4, §7.5, guide chapter 10)
+//
+// Expected output:
+//   working
+//   released
+//   caught: failed
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Exception, panic };
+
+fn work(): void throws Exception {
+    defer println("released");
+    println("working");
+    panic("failed");
+}
+
+fn main(): int {
+    try {
+        work();
+    } catch (e: Exception) {
+        println("caught: " + e.message());
+    }
+    return 0;
+}

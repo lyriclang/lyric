@@ -1,0 +1,18 @@
+// stdlib6.lyr — solution
+
+import std.io.console { println };
+import std.option { map };
+
+fn nextYear(age: ?int): string {
+    let next = map(age, (n: int) => n + 1);
+    if (next == null) {
+        return "next year: unknown";
+    }
+    return f"next year: {next}";
+}
+
+fn main(): int {
+    println(nextYear(36));
+    println(nextYear(null));
+    return 0;
+}

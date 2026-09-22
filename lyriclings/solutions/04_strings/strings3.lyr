@@ -1,0 +1,14 @@
+// strings3.lyr — solution
+//
+// `import std.string as strings;` makes the extensions visible without binding any free name.
+
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let greeting = "  grüße  ";
+    println(greeting.trim().toUpper());
+    let sentence = "one two three";
+    println(f"{sentence.split(" ").length} words");
+    return 0;
+}

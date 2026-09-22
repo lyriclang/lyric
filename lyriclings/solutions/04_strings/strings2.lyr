@@ -1,0 +1,18 @@
+// strings2.lyr — solution
+//
+// `for-in` over a string yields its code points, one `char` at a time.
+
+import std.io.console { println, print };
+
+fn main(): int {
+    let word = "Lyric";
+    var count = 0;
+    for (c in word) {
+        if (count > 0) { print(", "); }
+        print(f"{c}");
+        count += 1;
+    }
+    println("");
+    println(f"{count} characters");
+    return 0;
+}

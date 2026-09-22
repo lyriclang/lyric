@@ -1,0 +1,25 @@
+// functions3.lyr
+//
+// A lambda is written with `=>`. Its parameter types come from the CONTEXT when there is
+// one — passed straight to `apply(f: fn(int) -> int, …)` it needs no annotations. Bound with
+// `let` first, the lambda has no context, so its parameters must say what they are
+// (LYR-SEM0045).                                                 (spec §7.3, guide chapter 3)
+//
+// Expected output:
+//   9
+//   10
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn apply(f: fn(int) -> int, value: int): int {
+    return f(value);
+}
+
+fn main(): int {
+    let triple = (n) => n * 3;
+    println(f"{apply(triple, 3)}");
+    println(f"{apply((n) => n * 2, 5)}");
+    return 0;
+}

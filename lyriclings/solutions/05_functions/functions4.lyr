@@ -1,0 +1,17 @@
+// functions4.lyr — solution
+
+import std.io.console { println };
+
+fn total(label: string, params values: int[]): void {
+    var sum = 0;
+    for (v in values) {
+        sum += v;
+    }
+    println(f"{label}: {sum}");
+}
+
+fn main(): int {
+    total("sum", 1, 2, 3);
+    total("nothing");
+    return 0;
+}

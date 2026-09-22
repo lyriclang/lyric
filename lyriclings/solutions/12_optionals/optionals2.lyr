@@ -1,0 +1,22 @@
+// optionals2.lyr — solution
+
+import std.io.console { println };
+
+class Profile {
+    name: string,
+    nickname: ?string = null,
+}
+
+fn describe(p: Profile): string {
+    let nick = p.nickname;
+    if (nick != null) {
+        return p.name + " is " + nick;
+    }
+    return p.name + " has no nickname";
+}
+
+fn main(): int {
+    println(describe(Profile { name = "Ada", nickname = "ada42" }));
+    println(describe(Profile { name = "Grace" }));
+    return 0;
+}

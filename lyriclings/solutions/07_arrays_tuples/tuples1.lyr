@@ -1,0 +1,13 @@
+// tuples1.lyr — solution
+
+import std.io.console { println };
+
+fn divide(a: int, b: int): (int, int) {
+    return (a / b, a % b);
+}
+
+fn main(): int {
+    let (quotient, remainder) = divide(17, 5);
+    println(f"17 = {quotient} * 5 + {remainder}");
+    return 0;
+}

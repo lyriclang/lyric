@@ -1,0 +1,30 @@
+// extend3.lyr
+//
+// An `extend` block may hold `static fn` members too, and they follow the rule of every
+// static member: they belong to the TYPE and are called through it. The instance form,
+// `value.staticMethod()`, was a warning in 1.x and is an error since 2.0 (LYR-SEM0074).
+//                                                                (spec §5.5, guide chapter 19)
+//
+// Expected output:
+//   (1, 1)
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int,
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+extend Point {
+    static fn unit(): Point { return Point { x = 1, y = 1 }; }
+}
+
+fn main(): int {
+    let origin = Point { x = 0, y = 0 };
+    let u = origin.unit();
+    println(u.show());
+    return 0;
+}

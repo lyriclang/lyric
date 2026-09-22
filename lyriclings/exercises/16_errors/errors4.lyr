@@ -1,0 +1,40 @@
+// errors4.lyr
+//
+// `throws` without a type means `Throwable` — anything. NAMING a type narrows the
+// declaration, and then a `catch` for exactly that type covers the call completely. The
+// coverage is typed: catching `Exception` does not cover a call that throws `NotFound`,
+// and the uncovered call is LYR-SEM0034 like any unhandled one.
+//                                                                (spec §9.2, guide chapter 10)
+//
+// Expected output:
+//   found 1
+//   missing: two
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { Exception };
+
+class NotFound :: [Throwable] {
+    what: string,
+    fn message(): string { return "missing: " + this.what; }
+}
+
+fn lookup(key: string): int throws NotFound {
+    if (key == "one") { return 1; }
+    throw NotFound { what = key };
+}
+
+fn show(key: string): void {
+    try {
+        println(f"found {lookup(key)}");
+    } catch (e: Exception) {
+        println(e.message());
+    }
+}
+
+fn main(): int {
+    show("one");
+    show("two");
+    return 0;
+}

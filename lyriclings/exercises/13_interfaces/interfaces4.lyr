@@ -1,0 +1,36 @@
+// interfaces4.lyr
+//
+// Ordering works the same way: `Ordered<T>` has one method, `compare(other: T): int` —
+// negative, zero or positive, as strcmp — and all four comparison operators derive from it.
+// `string` conforms in the standard library, which is why `"apple" < "banana"` just works.
+//                                                                (spec §6.4, guide chapter 7)
+//
+// Expected output:
+//   1.4 < 1.5
+//   2.0 > 1.5
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+struct Version {
+    major: int,
+    minor: int,
+}
+
+fn relate(a: Version, b: Version): string {
+    let left = f"{a.major}.{a.minor}";
+    let right = f"{b.major}.{b.minor}";
+    if (a < b) { return left + " < " + right; }
+    if (a > b) { return left + " > " + right; }
+    return left + " = " + right;
+}
+
+fn main(): int {
+    let old = Version { major = 1, minor = 4 };
+    let mid = Version { major = 1, minor = 5 };
+    let new = Version { major = 2, minor = 0 };
+    println(relate(old, mid));
+    println(relate(new, mid));
+    return 0;
+}

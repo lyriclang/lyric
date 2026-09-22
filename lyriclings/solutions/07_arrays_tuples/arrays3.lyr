@@ -1,0 +1,20 @@
+// arrays3.lyr — solution
+//
+// One array, two names: both see the write.
+
+import std.io.console { println };
+import std.core { assert };
+
+fn main(): int {
+    let a = [1, 2, 3];
+    let b = a;
+    b[0] = 99;
+
+    let expectedA = 99;
+    let expectedB = 99;
+
+    assert(a[0] == expectedA, "a[0]");
+    assert(b[0] == expectedB, "b[0]");
+    println(f"a[0] = {a[0]}, b[0] = {b[0]}");
+    return 0;
+}

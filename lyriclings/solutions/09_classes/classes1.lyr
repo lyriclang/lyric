@@ -1,0 +1,22 @@
+// classes1.lyr — solution
+//
+// One object, two references.
+
+import std.io.console { println };
+import std.core { assert };
+
+class Counter { value: int, }
+
+fn main(): int {
+    let first = Counter { value = 0 };
+    let second = first;
+    second.value = 5;
+
+    let expectedFirst = 5;
+    let expectedSecond = 5;
+
+    assert(first.value == expectedFirst, "first.value");
+    assert(second.value == expectedSecond, "second.value");
+    println(f"first.value = {first.value}, second.value = {second.value}");
+    return 0;
+}

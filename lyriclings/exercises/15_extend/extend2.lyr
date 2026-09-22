@@ -1,0 +1,32 @@
+// extend2.lyr
+//
+// An `extend` block may also declare that the type satisfies an interface — the way to make
+// a type you do not own conform to an interface you do (or the other way round). A method
+// of the right name is not enough: the CONFORMANCE is what lets the value stand where the
+// interface is expected.                                         (spec §5.5, guide chapter 7)
+//
+// Expected output:
+//   plain
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+interface Drawable {
+    fn draw(): string;
+}
+
+class Plain { }
+
+extend Plain {
+    fn draw(): string { return "plain"; }
+}
+
+fn show(d: Drawable): void {
+    println(d.draw());
+}
+
+fn main(): int {
+    show(Plain { });
+    return 0;
+}

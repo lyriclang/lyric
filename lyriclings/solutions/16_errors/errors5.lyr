@@ -1,0 +1,19 @@
+// errors5.lyr — solution
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn work(): void throws Exception {
+    defer println("released");
+    println("working");
+    throw Exception { text = "failed" };
+}
+
+fn main(): int {
+    try {
+        work();
+    } catch (e: Exception) {
+        println("caught: " + e.message());
+    }
+    return 0;
+}

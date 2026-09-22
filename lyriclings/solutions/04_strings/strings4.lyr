@@ -1,0 +1,15 @@
+// strings4.lyr — solution
+//
+// The last line was already right: a plain string has no interpolation, so its braces are
+// literal. It is only inside an f-string that they need doubling.
+
+import std.io.console { println };
+
+fn main(): int {
+    let pi = 3.14159;
+    let item = 7;
+    println(f"pi is roughly {pi:N2}");
+    println(f"item {item:D3}");
+    println(f"{{braces}}");
+    return 0;
+}

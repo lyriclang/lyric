@@ -1,0 +1,23 @@
+// interfaces7.lyr — solution
+
+import std.io.console { println };
+
+interface Greeter {
+    fn name(): string;
+    fn greet(): string { return "Hello, " + this.name(); }
+}
+
+class Formal :: [Greeter] {
+    fn name(): string { return "Ada"; }
+    fn greet(): string { return "Good evening, " + this.name(); }
+}
+
+class Casual :: [Greeter] {
+    fn name(): string { return "Grace"; }
+}
+
+fn main(): int {
+    println(Formal { }.greet());
+    println(Casual { }.greet());
+    return 0;
+}

@@ -1,0 +1,13 @@
+// control1.lyr — solution
+
+import std.io.console { println };
+
+fn bonus(score: int): int {
+    return if (score > 50) 10 else 0;
+}
+
+fn main(): int {
+    println(f"bonus: {bonus(70)}");
+    println(f"bonus: {bonus(20)}");
+    return 0;
+}

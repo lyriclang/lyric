@@ -1,0 +1,10 @@
+// stdlib5.lyr — solution
+
+import std.io.console { println };
+import std.iter { range, over, sum, collectArray };
+
+fn main(): int {
+    let evens = collectArray<int>(range(1, 10).filter((n: int) => n % 2 == 0));
+    println(f"evens: {evens.length}, sum: {sum(over<int>(evens))}");
+    return 0;
+}

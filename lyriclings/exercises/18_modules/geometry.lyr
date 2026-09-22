@@ -1,0 +1,8 @@
+// geometry.lyr — a module imported by modules1.lyr. This file is part of exercise modules1.
+module geometry;
+
+pub struct Rect { w: int, h: int, }
+
+fn area(r: Rect): int {
+    return r.w * r.h;
+}

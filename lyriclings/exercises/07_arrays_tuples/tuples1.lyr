@@ -1,0 +1,23 @@
+// tuples1.lyr
+//
+// A tuple groups values of different types: `(int, int)` here, `(string, bool)` elsewhere.
+// It has no field names — you take it apart by DESTRUCTURING, `let (a, b) = pair;`, and the
+// pattern must bind exactly as many names as the tuple has elements (LYR-SEM0058).
+//                                                                (spec §3.3, §7.1, guide chapter 2)
+//
+// Expected output:
+//   17 = 3 * 5 + 2
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn divide(a: int, b: int): (int, int) {
+    return (a / b, a % b);
+}
+
+fn main(): int {
+    let (quotient, remainder, sign) = divide(17, 5);
+    println(f"17 = {quotient} * 5 + {remainder}");
+    return 0;
+}

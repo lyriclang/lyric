@@ -1,0 +1,40 @@
+// quiz1.lyr — solution
+
+import std.io.console { println };
+import std.collections { Map, List, sortList, entries };
+import std.core { Ordered };
+import std.string as strings;
+
+struct WordCount :: [Ordered<WordCount>] {
+    word: string,
+    count: int,
+
+    fn compare(other: WordCount): int {
+        if (this.count != other.count) {
+            return if (this.count > other.count) -1 else 1;
+        }
+        return this.word.compare(other.word);
+    }
+}
+
+fn main(): int {
+    let text = "the quick fox and the lazy dog and the fox";
+    let counts = Map<string, int>.empty();
+    for (word in text.split(" ")) {
+        if (word == "and" || word == "quick" || word == "lazy") { continue; }
+        counts.set(word, counts.getOr(word, 0) + 1);
+    }
+
+    let ranked = List<WordCount>.empty();
+    for (entry in entries(counts)) {
+        let (word, count) = entry;
+        ranked.push(WordCount { word = word, count = count });
+    }
+    sortList(ranked);
+
+    for (i in 0..3) {
+        let wc = ranked.get(i);
+        println(f"{wc.word}: {wc.count}");
+    }
+    return 0;
+}

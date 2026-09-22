@@ -1,0 +1,25 @@
+// control5.lyr — solution
+//
+// The first attempt has to happen anyway, so the loop condition belongs at the end.
+
+import std.io.console { println };
+
+class Counter {
+    n: int = 0,
+    mut fn attempt(): bool {
+        this.n += 1;
+        return this.n >= 3;
+    }
+}
+
+fn main(): int {
+    let c = Counter { };
+    var result: bool;
+    var tries = 0;
+    do {
+        result = c.attempt();
+        tries += 1;
+    } while (!result);
+    println(f"tries: {tries}");
+    return 0;
+}

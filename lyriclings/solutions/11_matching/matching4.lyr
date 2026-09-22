@@ -1,0 +1,24 @@
+// matching4.lyr — solution
+//
+// The block now returns — from the whole function, which is what `return` in an arm means.
+
+import std.io.console { println };
+
+enum Day { Weekday, Weekend, }
+
+fn hours(d: Day): int {
+    return match (d) {
+        Weekday => 8,
+        Weekend => {
+            let rest = 0;
+            println(f"{rest}");
+            return rest;
+        },
+    };
+}
+
+fn main(): int {
+    println(f"{hours(Day.Weekday)}");
+    hours(Day.Weekend);
+    return 0;
+}

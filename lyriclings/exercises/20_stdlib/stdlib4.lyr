@@ -1,0 +1,29 @@
+// stdlib4.lyr
+//
+// `Set<T>` and `Map<K, V>` need to hash, so their element and key types are constrained to
+// `Hashable<T>` from std.core — an interface that inherits `Equatable<T>`, so a conforming
+// type provides both `hash(): int` and `equals(other: T): bool`. Every built-in scalar and
+// `string` conform already; your own types declare it (LYR-SEM0028 until they do).
+//                                                                (spec §8, guide chapter 8, 13)
+//
+// Expected output:
+//   2 distinct points
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.collections { Set };
+
+struct Point {
+    x: int,
+    y: int,
+}
+
+fn main(): int {
+    let seen = Set<Point>.empty();
+    seen.add(Point { x = 1, y = 2 });
+    seen.add(Point { x = 3, y = 4 });
+    seen.add(Point { x = 1, y = 2 });
+    println(f"{seen.length()} distinct points");
+    return 0;
+}

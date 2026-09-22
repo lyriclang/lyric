@@ -1,0 +1,21 @@
+// errors2.lyr — solution
+
+import std.io.console { println };
+
+class NotFound :: [Throwable] {
+    what: string,
+    fn message(): string { return "not found: " + this.what; }
+}
+
+fn lookup(key: string): int throws NotFound {
+    throw NotFound { what = key };
+}
+
+fn main(): int {
+    try {
+        println(f"{lookup("key")}");
+    } catch (e: NotFound) {
+        println(e.message());
+    }
+    return 0;
+}

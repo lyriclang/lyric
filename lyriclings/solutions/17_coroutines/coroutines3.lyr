@@ -1,0 +1,24 @@
+// coroutines3.lyr — solution
+
+import std.io.console { println };
+import std.core { Exception };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    yield 2;
+    throw Exception { text = "the third step failed" };
+}
+
+fn main(): int {
+    let co = steps();
+    try {
+        while (true) {
+            let step = co.next();
+            if (step == null) { break; }
+            println(f"step {step}");
+        }
+    } catch (e: Exception) {
+        println("stopped: " + e.message());
+    }
+    return 0;
+}

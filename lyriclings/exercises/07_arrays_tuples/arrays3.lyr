@@ -1,0 +1,31 @@
+// arrays3.lyr
+//
+// An array is a REFERENCE value. `let b = a;` does not copy the elements; it makes a second
+// name for the same array, and a write through one name is visible through the other. (A
+// struct, in the next chapter, is the opposite: a value that copies.)
+//                                                                (spec §3.3, guide chapter 5)
+//
+// Fill in what the two reads really give. `assert` panics when you are wrong.
+//
+// Expected output:
+//   a[0] = 99, b[0] = 99
+
+// I AM NOT DONE
+
+import std.io.console { println };
+import std.core { assert };
+
+fn main(): int {
+    let a = [1, 2, 3];
+    let b = a;
+    b[0] = 99;
+
+    // TODO: what does each name see now?
+    let expectedA = 0;
+    let expectedB = 0;
+
+    assert(a[0] == expectedA, "a[0]");
+    assert(b[0] == expectedB, "b[0]");
+    println(f"a[0] = {a[0]}, b[0] = {b[0]}");
+    return 0;
+}

@@ -1,0 +1,25 @@
+// control2.lyr
+//
+// A condition is a `bool` and nothing else. There is no notion of a "truthy" number or an
+// empty string standing for false: `while (remaining)` with an `int` is LYR-SEM0004.
+//                                                                (spec §7.2, guide chapter 4)
+//
+// Expected output:
+//   3
+//   2
+//   1
+//   liftoff
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    var remaining = 3;
+    while (remaining) {
+        println(f"{remaining}");
+        remaining -= 1;
+    }
+    println("liftoff");
+    return 0;
+}

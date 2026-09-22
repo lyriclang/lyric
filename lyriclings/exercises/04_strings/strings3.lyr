@@ -1,0 +1,22 @@
+// strings3.lyr
+//
+// The string API is method-shaped — `s.trim()`, `s.toUpper()`, `s.split(" ")`, `s.length()` —
+// but the methods are EXTENSIONS declared in std.string, and an extension is visible only
+// where its module is imported. Without the import, `string` has no member `trim`.
+// `s.length()` is a call because it costs O(n).                  (spec §5.5, guide chapter 13)
+//
+// Expected output:
+//   GRÜßE
+//   3 words
+
+// I AM NOT DONE
+
+import std.io.console { println };
+
+fn main(): int {
+    let greeting = "  grüße  ";
+    println(greeting.trim().toUpper());
+    let sentence = "one two three";
+    println(f"{sentence.split(" ").length} words");
+    return 0;
+}

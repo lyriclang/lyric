@@ -1,0 +1,21 @@
+// stdlib3.lyr — solution
+
+import std.io.console { println };
+import std.collections { Map, List, keys, sortList };
+import std.string as strings;
+
+fn main(): int {
+    let words = "pear apple fig pear apple pear".split(" ");
+    let counts = Map<string, int>.empty();
+    for (word in words) {
+        counts.set(word, counts.getOr(word, 0) + 1);
+    }
+
+    let sorted = List<string>.empty();
+    for (k in keys(counts)) { sorted.push(k); }
+    sortList(sorted);
+    for (k in sorted) {
+        println(f"{k}: {counts.getOr(k, 0)}");
+    }
+    return 0;
+}

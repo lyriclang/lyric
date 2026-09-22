@@ -1,0 +1,5 @@
+// config.lyr — a module imported by modules3.lyr as `config`. Part of exercise modules3.
+module settings;
+
+pub let width = 10;
+pub let height = 20;
