@@ -281,6 +281,8 @@ internal sealed class FlowAnalyzer
                     else if (_types.RefOf(f) is { } fs) set.Add(fs);
                 }
                 return;
+            case ArrayPattern ap: foreach (var sub in ap.Elements) AddPatternBindings(sub, set); return;
+            case RestPattern rp: if (_types.RefOf(rp) is { } rs) set.Add(rs); return;
             case TuplePattern t: foreach (var sub in t.Elements) AddPatternBindings(sub, set); return;
             case OrPattern o: if (o.Alternatives.Length > 0) AddPatternBindings(o.Alternatives[0], set); return;
         }

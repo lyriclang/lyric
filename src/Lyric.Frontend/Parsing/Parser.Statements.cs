@@ -72,6 +72,9 @@ public sealed partial class Parser
         // introduce nothing else: a binding name is an identifier.
         if (_buffer.Check(TokenKind.LParen)) return ParseDestructuring(kw, isMutable);
 
+        // 'let [a, b] = …': a bracket where a name stands opens an array pattern.
+        if (_buffer.Check(TokenKind.LBracket)) return ParseLetPattern(kw, isMutable);
+
         // 'let Circle(r) = …', 'let Point { x, y } = …', 'let Shape.Empty = …': a name followed
         // by '(', '{' or '.' opens a pattern, never a binding — a binding name is followed by
         // ':', '=' or ';'.

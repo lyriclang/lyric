@@ -970,6 +970,9 @@ public sealed class AstFormatter
     private Doc PatternDoc(Pattern pattern) => pattern switch
     {
         WildcardPattern => Doc.From("_"),
+        ArrayPattern a => Doc.Of(Doc.From("["),
+            Doc.Join(Doc.From(", "), a.Elements.Select(PatternDoc).ToArray()), Doc.From("]")),
+        RestPattern r => Doc.From(r.Name is null ? ".." : ".." + r.Name),
         LiteralPattern l => LiteralPatternDoc(l),
         BindingPattern b => Doc.From(b.Name),
         VariantPattern v => VariantPatternDoc(v),

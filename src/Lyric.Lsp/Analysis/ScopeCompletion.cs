@@ -150,7 +150,7 @@ public static class ScopeCompletion
 
             // A BindingPattern is a binding or a unit variant, and the sema decides which. The
             // table says so: a variant is bound to its EnumVariantSymbol and is not a name in scope.
-            if (node is BindingPattern or FieldPattern
+            if (node is BindingPattern or FieldPattern or RestPattern
                 && model.Types.RefOf(node) is LocalSymbol local)
                 yield return local;
 

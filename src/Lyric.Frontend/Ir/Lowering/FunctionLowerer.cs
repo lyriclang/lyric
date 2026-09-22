@@ -2496,6 +2496,72 @@ internal sealed class FunctionLowerer
             case VariantPattern unresolved:
                 throw Bug($"variant pattern '{string.Join('.', unresolved.Path)}' was not resolved by the type checker");
 
+            // An array asks about its LENGTH first — exactly, or at least, depending on whether
+            // a rest stands among the elements — and only then about the elements at the fixed
+            // positions. The ones before the rest are counted from the front, the ones after it
+            // from the back, so '[first, .., last]' needs no arithmetic on the rest's size.
+            case ArrayPattern array:
+            {
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, array.Span);
+                var arrayType = valueType is IrOptionalType o ? o.Inner : valueType;
+                if (arrayType is not IrArrayType { Element: var elementType })
+                    throw Bug("array pattern on a value that is not an array");
+
+                var restIndex = Array.FindIndex(array.Elements, e => e is RestPattern);
+                var before = restIndex < 0 ? array.Elements : array.Elements[..restIndex];
+                var after = restIndex < 0 ? [] : array.Elements[(restIndex + 1)..];
+                var fixedCount = before.Length + after.Length;
+
+                var i64 = new IrScalarType(IrScalar.I64);
+                var length = _slots.NewTemp(i64);
+                _b.Emit(new ArrayLen(length, value, array.Span));
+
+                // '[..]' and '[..rest]' test nothing: every array has at least no elements.
+                var needsTest = !assumeMatch && (restIndex < 0 || fixedCount > 0);
+                if (needsTest)
+                {
+                    var wanted = EmitConst(new IntConst((ulong)fixedCount), i64, array.Span);
+                    var fits = _slots.NewTemp(BoolType);
+                    _b.Emit(new BinOp(fits, restIndex < 0 ? IrBinKind.Eq : IrBinKind.Ge, BoolType,
+                        length, wanted, array.Span));
+                    var matched = _b.NewBlock();
+                    _b.Seal(new CondBranch(fits, matched, onFail(), array.Span));
+                    _b.SwitchTo(matched);
+                }
+
+                for (var i = 0; i < before.Length; i++)
+                {
+                    if (before[i] is WildcardPattern) continue;
+                    var index = EmitConst(new IntConst((ulong)i), i64, before[i].Span);
+                    var element = _slots.NewTemp(elementType);
+                    _b.Emit(new LoadElem(element, value, index, elementType, before[i].Span));
+                    LowerPattern(before[i], element, elementType, onFail, assumeMatch);
+                }
+
+                for (var i = 0; i < after.Length; i++)
+                {
+                    if (after[i] is WildcardPattern) continue;
+                    var fromEnd = EmitConst(new IntConst((ulong)(after.Length - i)), i64, after[i].Span);
+                    var index = _slots.NewTemp(i64);
+                    _b.Emit(new BinOp(index, IrBinKind.Sub, i64, length, fromEnd, after[i].Span));
+                    var element = _slots.NewTemp(elementType);
+                    _b.Emit(new LoadElem(element, value, index, elementType, after[i].Span));
+                    LowerPattern(after[i], element, elementType, onFail, assumeMatch);
+                }
+
+                if (restIndex >= 0 && array.Elements[restIndex] is RestPattern { Name: not null } named)
+                    throw NotSupported(
+                        "a NAMED rest in an array pattern — the elements it covers would have to be "
+                        + "copied into an array of their own, and this compiler version has no way to "
+                        + "build one of a length it learns at runtime; bind the positions you need and "
+                        + "take the tail with 'slice'", named.Span);
+                return;
+            }
+
+            case RestPattern lone:
+                throw Bug($"a rest pattern outside an array pattern at {lone.Span}");
+
             // Every alternative gets its own attempt; the first that matches wins, and all of them
             // arrive in one block with the same names bound: the sema pointed every alternative's
             // bindings at the first alternative's symbols, so they share slots.

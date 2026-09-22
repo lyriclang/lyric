@@ -342,6 +342,7 @@ public static class AstChildren
             // --- patterns ---
             case WildcardPattern:
             case BindingPattern:
+            case RestPattern:
             case ErrorPattern:
                 break;
 
@@ -352,6 +353,10 @@ public static class AstChildren
             case VariantPattern v:
                 foreach (var e in v.TupleElements ?? []) yield return e;
                 foreach (var f in v.StructFields ?? []) yield return f;
+                break;
+
+            case ArrayPattern ap:
+                foreach (var element in ap.Elements) yield return element;
                 break;
 
             case TuplePattern t:

@@ -411,6 +411,13 @@ public static class AstDumper
                 foreach (var p in n.TupleElements ?? []) Write(p, indent + 1, sb);
                 foreach (var f in n.StructFields ?? []) Write(f, indent + 1, sb);
                 break;
+            case ArrayPattern n:
+                Line(sb, indent, "ArrayPattern", n.Span);
+                foreach (var e in n.Elements) Write(e, indent + 1, sb);
+                break;
+            case RestPattern n:
+                Line(sb, indent, n.Name is null ? "Rest" : $"Rest {n.Name}", n.Span);
+                break;
             case TuplePattern n:
                 Line(sb, indent, "TuplePattern", n.Span);
                 foreach (var p in n.Elements) Write(p, indent + 1, sb);

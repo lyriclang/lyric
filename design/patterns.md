@@ -137,24 +137,37 @@ Bindungen *innerhalb* eines `@`-Sub-Patterns (E0303, seit 1.56 erlaubt) — Lyri
 von Anfang an, weil beide Bindungen Kopien sind. Aufwand: Parser 10, Sema 15, Lowering 5 Zeilen.
 **Minor, empfohlen**, §2 Grammatik, §7.6.
 
-### 3.3 Array-Patterns `[]`, `[x]`, `[a, b]`, `[first, ..rest]`, `[.., last]` — Design
+### 3.3 Array-Patterns `[]`, `[x]`, `[a, b]`, `[first, ..]`, `[.., last]` — IMPLEMENTIERT (Commit 4)
 
 ```
 ArrayPattern = '[' [ ArrayElem { ',' ArrayElem } ] ']' .
 ArrayElem    = Pattern | '..' [ IDENTIFIER ] .
 ```
-Höchstens ein Rest (`..` oder `..rest`); `rest` bindet ein *neues* Array (Kopie, `T[]`) — Lyric
-hat keine Slices, Kopie ist die ehrliche Semantik (stdlib-redesign baut `slice()` separat).
-Tests: Länge `== n` (ohne Rest) bzw. `>= n` (mit Rest), dann elementweise Rekursion; Elemente
-werden per `ldelem` geladen. Irrefutabel: nur `[..]`/`[..rest]`. Exhaustiveness über Arrays:
-`[]`, `[x]`, `[x, ..rest]` sind erschöpfend (Längenklassen 0, 1, ≥2) — der Matrix-Algorithmus in
-§3.6 behandelt Länge als Konstruktor. Vergleich: Rust `[first, rest @ ..]` (Slice, keine Kopie),
-Swift: keine Array-Patterns (nur `case [let a, let b]` über Tupel-ähnliche Enums nicht — Swift
-hat es tatsächlich nicht), Python `case [x, *rest]` (Kopie, wie Lyric), JavaScript/TS-Destructuring
-`[a, ...rest]` (irrefutabel). Falle: `..rest` in der Mitte (`[a, ..mid, z]`) ist in Rust/Python
-erlaubt und kostet zwei Längenrechnungen — Lyric erlaubt es ebenfalls (Länge ≥ n, Indizes von
-hinten). Anwendungsfälle stdlib-redesign: `os.args()`, `splitFirst`, Tokenizer.
-Aufwand: Parser 30, Sema 60 (Typ des Rests, Länge), Lowering 60, VM 0. **Minor, empfohlen.**
+Höchstens ein Rest; ein zweiter ist PAR0033 („die Positionen dazwischen wären nicht platzierbar").
+**Lowering**: zuerst die Länge — `== n` ohne Rest, `>= n` mit Rest —, dann die Positionen *vor*
+dem Rest von vorne (`ldelem` mit Konstante) und die *danach* von hinten (`len - k`), sodass
+`[first, .., last]` ohne Arithmetik über die Mitte auskommt. Positionen sind gewöhnliche
+Patterns, also nesten sie (`[Word("add"), Number(n), End]`). Irrefutabel ist nur `[..]`.
+**Exhaustiveness über Längenklassen** (implementiert, §3.6): ein Arm, dessen feste Positionen
+alle binden ohne zu testen, deckt seine Länge exakt bzw. ab dort alles; `[] | [x] | [a, ..]` ist
+damit erschöpfend und braucht kein `_`, und eine Lücke wird als `[_]`/`[_, _]` benannt.
+
+**Nicht implementiert: der benannte Rest** `[first, ..rest]`. Er müsste die abgedeckten Elemente
+in ein eigenes Array kopieren, und diese Compilerversion kann kein Array einer erst zur Laufzeit
+bekannten Länge bauen (es gibt nur `newarr` mit ausgeschriebenen Elementen, kein Slice-Opcode und
+kein `rawArrayAlloc`-Native). Parser und Sema nehmen die Form (`rest: T[]`), das Lowering lehnt
+sie mit LYR-IR0001 und dem Hinweis auf `slice` ab — §12.1 reserviert IR0001 genau dafür: gültiges
+Lyric, das diese Version nicht lowern kann. Auflösung in 4.6: ein `arrslice`-Opcode oder das
+`rawArrayAlloc`-Native, das stdlib-redesign ohnehin für `List<?T>` braucht.
+
+Vergleich: Rust `[first, rest @ ..]` (Slice, keine Kopie — geht nur, weil Rust Slices hat),
+Python `case [x, *rest]` (Kopie, wie Lyric es täte), JS/TS-Destructuring `[a, ...rest]`
+(irrefutabel, kein Test), Swift: **hat keine Array-Patterns** (man schreibt `if xs.count == 2`),
+Scala `case List(a, b)` / `case x :: rest` (über Extraktoren), OCaml `a :: rest` (Listen, nicht
+Arrays). Falle aus Python: ein Rest in der Mitte macht die hinteren Indizes von der Länge
+abhängig — deshalb zählt Lyric sie von hinten statt `restLen` auszurechnen.
+Aufwand real: Parser 45, Sema 55, Lowering 60, VM 0. Anwendungsfälle stdlib-redesign:
+`os.args()`-Auswertung, `splitFirst`, Tokenizer — alle ohne benannten Rest schreibbar.
 
 ### 3.4 String-Patterns — Stand und Design
 
@@ -164,7 +177,7 @@ Haskell (ViewPatterns) und Elixir (`"GET " <> rest`) Standard; Rust/Swift/Kotlin
 `strip_prefix`/`hasPrefix`. Empfehlung: **nicht als Sprachfeature**, sondern `string.stripPrefix`
 (liefert `?string`) + let-else: `let rest = s.stripPrefix("GET ") else { … };` liest genauso.
 
-### 3.5 Patterns in Lambda-Parametern und for-Köpfen — Design (Prototyp 14), Prototyp geplant
+### 3.5 Patterns in Lambda-Parametern und for-Köpfen — IMPLEMENTIERT (Commit 3)
 
 ```
 ForInStmt   = 'for' '(' ( IDENTIFIER | Pattern ) 'in' Expr ')' Block .
@@ -178,15 +191,31 @@ Tupel-Parameter — die Swift-Regel wäre für Lyric breaking). Lowering: `Lower
 `assumeMatch: true` als erste Anweisung des Bodies — der Compiler existiert schon.
 Aufwand: Parser 30, Sema 40, Lowering 20. **Minor, empfohlen.**
 
-### 3.6 Exhaustiveness-Verbesserungen und Diagnosen mit Beispielwert — Design
+### 3.6 Exhaustiveness mit Zeugen-Diagnose — TEILWEISE IMPLEMENTIERT (Commit 4)
 
-Heute: `MissingCases` prüft pro Variante, ob *ein* Pattern sie irrefutabel abdeckt; Bool und
-`?T` sind aufgezählt; alles andere braucht `_`. Nicht erkannt: `Some(true), Some(false)`
-(deckt `Some` über `bool`), `(true, _), (false, _)`, `Ok(Some(_)), Ok(None), Err(_)` mit
-verschachtelten Enums, Ranges über die volle int-Breite (`0..=255` über `uint8`), Tupel aus
-Enums (`(Idle, _), (Connecting, _), …`).
+**Vorher**: `MissingCases` prüfte pro Variante, ob *ein* Pattern sie irrefutabel abdeckt, und gab
+Variantennamen aus: „missing case(s): 'Some'" — auch dann, wenn `Some` sehr wohl vorkam und nur
+sein Payload eine Lücke hatte. Bool und `?T` waren aufgezählt, alles andere brauchte `_`.
 
-Vorschlag: Maranget-Usefulness (Matrix über Konstruktoren) wie in rustc/OCaml/Swift:
+**Jetzt**: die Antwort ist ein **Zeugen-Pattern**, geschrieben wie ein Pattern:
+
+| Scrutinee und Arme | Diagnose |
+|---|---|
+| `Opt<bool>`: `Some(true)`, `None` | `no arm matches 'Some(false)'` |
+| `Res<Opt<int>, string>`: `Ok(Some(_))`, `Err(_)` | `no arm matches 'Ok(None)'` |
+| `Shape`: `Circle(_)`, `Empty` | `no arm matches 'Rect { … }'` |
+| `?Shape`: `Circle(_)`, `Rect{…}`, `Empty` | `no arm matches 'null'` |
+| `int[]`: `[]`, `[_, _]` | `no arm matches '[_]'` |
+
+Regel: **exakt, wo geantwortet wird.** Eine Variante mit *einem* Payload-Feld wird verfolgt (die
+Rekursion nennt die Lücke darin), eine Variante mit mehreren Feldern wird als Ganzes gemeldet,
+wenn nichts sie deckt, und sonst als gedeckt behandelt — ein Zeuge, der sich als doch abgedeckt
+herausstellt, wäre schlimmer als keiner. Arrays über Längenklassen wie in §3.3. Das `nested`-Flag
+aus §2 wandert mit: oben lässt ein Name über `?T` `null` offen, im Payload deckt er alles.
+
+**Noch offen (vollständige Matrix, Maranget/rustc):** Tupel aus Enums
+(`(Idle, _), (Connecting, _), …`), Varianten mit mehreren Feldern spaltenweise, Ranges über die
+volle Integer-Breite (`0..=255` über `uint8`), unreachable-arm-Warnung. Der Weg dahin:
 - Konstruktoren: Varianten (Arity aus Payload), Bool (`true`/`false`), Optional (`null`,
   `present`), Tupel (ein Konstruktor), Array-Längen (0..n, `≥n`), Literale/Ranges über
   Integer-Typen mit *Intervallarithmetik* über die Typbreite (`int8`: −128..127), Char als

@@ -4289,9 +4289,15 @@ public sealed class TypeChecker
             _result.MarkMatchExhaustive(match);
             return;
         }
+        // The witness is the point: a name for what is missing beats a count of it. "no arm
+        // matches 'Some(false)'" says which value falls through and what to write; "missing
+        // case(s): 'Some'" said only that something about 'Some' was wrong, and for a nested
+        // payload it was not even that.
         var what = missing is ["_"]
             ? "add a '_' or binding arm to cover the remaining values"
-            : $"missing case(s): {string.Join(", ", missing.Select(m => $"'{m}'"))}";
+            : missing is [var only]
+                ? $"no arm matches '{only}'"
+                : $"no arm matches {string.Join(", ", missing.Select(m => $"'{m}'"))}";
         _de.Report("LYR-SEM0050", Severity.Error, match.Span,
             $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
     }
@@ -4302,16 +4308,30 @@ public sealed class TypeChecker
         else into.Add(p);
     }
 
-    private List<string> MissingCases(LyrType type, List<Pattern> pats)
+    /// <summary>
+    /// What the arms leave uncovered, as WITNESS PATTERNS: values written the way a pattern is
+    /// written, so the answer names what to add rather than what is wrong. Empty means exhaustive.
+    ///
+    /// <para>Exact where it answers at all. A variant with ONE payload field recurses into that
+    /// field, so <c>Some(true)</c> and <c>None</c> over an <c>Opt&lt;bool&gt;</c> report
+    /// <c>Some(false)</c>. A variant with several fields is reported as a whole when nothing
+    /// covers it and considered covered otherwise — a partial answer per column needs the
+    /// pattern matrix, and a witness that turns out to BE covered is worse than none.</para>
+    ///
+    /// <para><paramref name="nested"/> travels with the meaning of a bare name: at the top of a
+    /// match a name over a <c>?T</c> leaves <c>null</c> uncovered, inside a payload it binds the
+    /// whole optional and covers it (§7.6).</para>
+    /// </summary>
+    private List<string> MissingCases(LyrType type, List<Pattern> pats, bool nested = false)
     {
-        if (pats.Any(p => IsIrrefutable(p, type))) return [];
+        if (pats.Any(p => IsIrrefutable(p, type, nested))) return [];
         switch (type)
         {
             case Optional o:
             {
                 var missing = new List<string>();
                 if (!pats.Any(IsNullPattern)) missing.Add("null");
-                missing.AddRange(MissingCases(o.Inner, pats.Where(p => !IsNullPattern(p)).ToList()));
+                missing.AddRange(MissingCases(o.Inner, pats.Where(p => !IsNullPattern(p)).ToList(), nested));
                 return missing;
             }
             case PrimitiveType { Kind: PrimitiveKind.Bool }:
@@ -4321,16 +4341,89 @@ public sealed class TypeChecker
                 if (!pats.Any(p => p is LiteralPattern { Literal: BoolLiteralExpr { Value: false } })) missing.Add("false");
                 return missing;
             }
+            case ArrayOf array:
+                return MissingArrayCases(array, pats);
             default:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
-                {
-                    var covered = new HashSet<string>();
-                    foreach (var p in pats)
-                        if (CoveredVariant(p, type, enumTs) is { } name) covered.Add(name);
-                    return ed.Variants.Where(v => !covered.Contains(v.Name)).Select(v => v.Name).ToList();
-                }
+                    return MissingVariants(type, ed, enumTs, pats);
                 return ["_"]; // an open type is coverable only by a default
         }
+    }
+
+    /// <summary>The variants no arm covers, each as a witness. A variant with one payload field
+    /// is followed into that field, which is where a nested hole usually is.</summary>
+    private List<string> MissingVariants(LyrType type, EnumDecl ed, TypeSymbol enumTs, List<Pattern> pats)
+    {
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        var missing = new List<string>();
+
+        foreach (var variant in ed.Variants)
+        {
+            var rows = pats.Where(p => NamesVariant(p, variant.Name, enumTs)).ToList();
+            if (rows.Count == 0) { missing.Add(WitnessOf(variant)); continue; }
+            if (rows.Any(p => CoveredVariant(p, type, enumTs) == variant.Name)) continue;
+
+            // One payload field: the hole is inside it, and the recursion names it.
+            if (variant.TupleFields is { Length: 1 } fields)
+            {
+                var column = new List<Pattern>();
+                foreach (var row in rows)
+                    if (row is VariantPattern { TupleElements: [var only] }) Flatten(only, column);
+                var fieldType = Substitute(ResolveType(fields[0], enumTs.Members), subst);
+                foreach (var witness in MissingCases(fieldType, column, nested: true))
+                    missing.Add($"{variant.Name}({witness})");
+                continue;
+            }
+
+            missing.Add(WitnessOf(variant));
+        }
+        return missing;
+    }
+
+    /// <summary>Does this pattern name that variant at all — covering it or only partly?</summary>
+    private bool NamesVariant(Pattern p, string variant, TypeSymbol enumTs) => p switch
+    {
+        BindingPattern b => b.Name == variant && VariantOf(enumTs, b.Name) is not null,
+        VariantPattern v => v.Path[^1] == variant,
+        _ => false,
+    };
+
+    /// <summary>A variant written as a pattern, with its payload left open.</summary>
+    private static string WitnessOf(EnumVariant variant) => variant switch
+    {
+        { TupleFields: { } tuple } => $"{variant.Name}({string.Join(", ", tuple.Select(_ => "_"))})",
+        { StructFields: not null } => variant.Name + " { … }",
+        _ => variant.Name,
+    };
+
+    /// <summary>
+    /// The lengths an array match leaves open. An arm whose fixed positions all bind without
+    /// testing covers its length exactly, or every length from there up when it carries a rest;
+    /// the answer is the smallest length nothing covers, written as a pattern.
+    /// </summary>
+    private List<string> MissingArrayCases(ArrayOf array, List<Pattern> pats)
+    {
+        var exact = new HashSet<int>();
+        var open = int.MaxValue; // the smallest length from which on everything is covered
+
+        foreach (var p in pats)
+        {
+            if (p is not ArrayPattern ap) continue;
+            var positions = ap.Elements.Where(e => e is not RestPattern).ToArray();
+
+            // A test inside a position says nothing about the LENGTH class: '[0, y]' covers
+            // some arrays of length two, not all of them.
+            if (!positions.All(e => IsIrrefutable(e, array.Element, nested: true))) continue;
+
+            if (ap.Elements.Any(e => e is RestPattern)) open = Math.Min(open, positions.Length);
+            else exact.Add(positions.Length);
+        }
+
+        for (var n = 0; n < open && n <= 64; n++)
+            if (!exact.Contains(n))
+                return [n == 0 ? "[]" : "[" + string.Join(", ", Enumerable.Repeat("_", n)) + "]"];
+
+        return [];
     }
 
     // Which variant does this pattern cover completely, with an irrefutable payload?
@@ -4390,6 +4483,10 @@ public sealed class TypeChecker
                 // nested it binds the whole optional (BindPattern) and covers it.
                 if (type is Optional opt) return nested && BindsWholeOptional(b, opt);
                 return EnumDefOf(type) is not { } e || VariantOf(e, b.Name) is null; // a variant name is a test
+            // An array pattern only covers everything when it tests no length: '[..]' and
+            // '[..rest]' match every array, anything else asks how many elements there are.
+            case ArrayPattern ap:
+                return ap.Elements is [RestPattern];
             case TuplePattern t:
                 if (type is not TupleOf tt || tt.Elements.Length != t.Elements.Length) return false;
                 for (var i = 0; i < t.Elements.Length; i++)
@@ -4523,6 +4620,15 @@ public sealed class TypeChecker
                 BindPoison(t, scope);
                 return;
 
+            case ArrayPattern ap:
+                BindArrayPattern(ap, scrutinee, scope, mutable);
+                return;
+
+            case RestPattern:
+                // Only inside an array pattern, where BindArrayPattern takes it; anywhere else
+                // the parser never produces one.
+                return;
+
             case VariantPattern v:
                 BindVariantPattern(v, scrutinee, scope, mutable);
                 return;
@@ -4543,6 +4649,33 @@ public sealed class TypeChecker
     /// a test and still matches against 'T'.</summary>
     private static bool BindsWholeOptional(Pattern pattern, Optional opt) =>
         pattern is BindingPattern b && !(EnumDefOf(opt.Inner) is { } e && VariantOf(e, b.Name) is not null);
+
+    /// <summary><c>[a, b]</c> over a <c>T[]</c>: every fixed position binds a <c>T</c>, a named
+    /// rest binds a <c>T[]</c> of its own. The length is a TEST, so the pattern is refutable
+    /// unless it is nothing but a rest.</summary>
+    private void BindArrayPattern(ArrayPattern ap, LyrType scrutinee, SymbolTable scope, bool mutable)
+    {
+        if (scrutinee is not ArrayOf array)
+        {
+            Report(ap.Span, "LYR-SEM0029",
+                $"array pattern cannot match '{TypeFacts.Display(scrutinee)}' — only an array has elements at positions");
+            BindPoison(ap, scope);
+            return;
+        }
+
+        foreach (var element in ap.Elements)
+        {
+            if (element is RestPattern { Name: { } restName } rest)
+            {
+                var local = new LocalSymbol(restName, new ArrayOf(array.Element), mutable, rest);
+                DeclareBinding(scope, local, rest.Span);
+                _result.BindRef(rest, local);
+                continue;
+            }
+            if (element is RestPattern) continue;
+            BindPattern(element, array.Element, scope, mutable, nested: true);
+        }
+    }
 
     private void CheckLiteralPattern(LiteralPattern lit, LyrType scrutinee, SymbolTable scope)
     {
@@ -4857,6 +4990,18 @@ public sealed class TypeChecker
                         scope.TryDeclare(fl);
                         _result.BindRef(f, fl);
                     }
+                }
+                return;
+            case ArrayPattern ap:
+                foreach (var sub in ap.Elements)
+                {
+                    if (sub is RestPattern { Name: { } n } rest)
+                    {
+                        var lr = new LocalSymbol(n, LyrType.Error, false, rest);
+                        scope.TryDeclare(lr);
+                        _result.BindRef(rest, lr);
+                    }
+                    else BindPoison(sub, scope);
                 }
                 return;
             case TuplePattern t: foreach (var sub in t.Elements) BindPoison(sub, scope); return;
