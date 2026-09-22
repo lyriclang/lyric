@@ -518,6 +518,7 @@ public sealed class AstFormatter
         MatchStmt s => MatchDoc(s.Scrutinee, s.Arms, s.Span),
         TryStmt s => TryDoc(s),
         ExprStmt s => Doc.Of(ExprDoc(s.Expr, Assign), Doc.From(";")),
+        TailExprStmt t => ExprDoc(t.Expr, Assign), // the tail: no ';', that is what makes it one
         _ => throw new InternalCompilationException($"unreachable: unformatted {stmt.GetType().Name}"),
     };
 

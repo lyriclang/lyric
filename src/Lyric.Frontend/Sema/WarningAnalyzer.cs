@@ -490,6 +490,7 @@ internal sealed class WarningAnalyzer
             case BindingStmt { Initializer: { } init }: WalkExpr(init); break;
             case DestructuringStmt d: WalkExpr(d.Initializer); break;
             case ExprStmt es: WalkExpr(es.Expr); break;
+            case TailExprStmt tail: WalkExpr(tail.Expr); break;
             case ReturnStmt { Value: { } v }: WalkExpr(v); break;
             case YieldStmt { Value: { } v }: WalkExpr(v); break;
             case ThrowStmt t: WalkExpr(t.Value); break;

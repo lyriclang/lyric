@@ -99,6 +99,9 @@ internal sealed class FlowAnalyzer
             case ExprStmt es:
                 AnalyzeExpr(es.Expr, assigned);
                 return assigned;
+            case TailExprStmt tail:
+                AnalyzeExpr(tail.Expr, assigned);
+                return assigned;
             case ReturnStmt r:
                 if (r.Value is not null) AnalyzeExpr(r.Value, assigned);
                 return assigned;
@@ -245,6 +248,7 @@ internal sealed class FlowAnalyzer
                     AddPatternBindings(arm.Pattern, armSet);
                     if (arm.Guard is not null) AnalyzeExpr(arm.Guard, armSet);
                     if (arm.Body is Expr ae) AnalyzeExpr(ae, armSet);
+                    else if (arm.Body is Block ab) AnalyzeStatements(ab.Statements, armSet);
                 }
                 return;
             // Literals, this and @ident are no reads.

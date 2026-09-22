@@ -99,6 +99,7 @@ internal sealed class ExceptionAnalyzer
         switch (stmt)
         {
             case Block b: foreach (var s in b.Statements) AnalyzeStmt(s); break;
+            case TailExprStmt tail: AnalyzeExpr(tail.Expr); break;
             case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
             case ExprStmt es: AnalyzeExpr(es.Expr); break;
             case IfStmt f:

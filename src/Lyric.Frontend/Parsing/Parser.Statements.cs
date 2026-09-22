@@ -84,10 +84,16 @@ public sealed partial class Parser
         return new MatchStmt(scrutinee, arms, Span.Union(kw.Span, end));
     }
 
-    private Block ParseBlock()
+    /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
+    /// a lambda body — whose last statement may be a tail expression without ';' (§6.9). The flag
+    /// holds for the block's OWN statements only: a nested statement block resets it, so a tail
+    /// can stand exactly where its value has somewhere to go.</summary>
+    private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
         var stmts = new List<Stmt>();
+        var savedTail = _allowTail;
+        _allowTail = valueBlock;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
             var before = _buffer.Position;
@@ -96,6 +102,7 @@ public sealed partial class Parser
                 _buffer.Advance(); // force progress, so an unconsumed token cannot loop forever
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close block");
+        _allowTail = savedTail;
         return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
     }
 
@@ -271,6 +278,13 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance();
         var value = ParseExpr(0);
+        // 'throw e' as the tail of a value block: the arm's value is 'never' (§6.9), and the
+        // block diverges — the same thing 'throw e;' says, in the position a tail stands in.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+        {
+            var span = Span.Union(kw.Span, value.Span);
+            return new TailExprStmt(new ThrowExpr(value, span), span);
+        }
         var semi = ExpectSemicolon();
         return new ThrowStmt(value, Span.Union(kw.Span, semi.Span));
     }
@@ -312,9 +326,15 @@ public sealed partial class Parser
         _allowStructInit = false;
         var expr = ParseExpr(0);
         _allowStructInit = saved;
+        // In a value block an expression followed by the closing brace is the block's tail: the
+        // one place a missing ';' is not an error (it was one before 4.5, so nothing changes
+        // meaning). A tail struct initializer needs parentheses, like any statement-first one.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+            return new TailExprStmt(expr, expr.Span);
         var semi = ExpectSemicolon();
         return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
     }
+
 
     private Token ExpectSemicolon() =>
         _buffer.Expect(TokenKind.Semicolon, "LYR-PAR0016", "expected ';'");

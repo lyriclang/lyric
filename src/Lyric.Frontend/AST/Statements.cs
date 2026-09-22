@@ -7,7 +7,17 @@ namespace Lyric.AST;
 
 public abstract record Stmt(Span Span) : Node(Span);
 
-public sealed record Block(Stmt[] Statements, Span Span) : Stmt(Span);
+public sealed record Block(Stmt[] Statements, Span Span) : Stmt(Span)
+{
+    /// <summary>The tail expression of a VALUE block — the last statement, written without a ';',
+    /// whose value the block delivers (§6.9). Only a block in value position (a match arm, a block
+    /// lambda's body) may carry one; the parser produces it nowhere else.</summary>
+    public TailExprStmt? Tail => Statements.Length > 0 ? Statements[^1] as TailExprStmt : null;
+}
+
+/// <summary>The tail of a value block: an expression standing last, with no ';'. Never anywhere
+/// but as the last statement of a <see cref="Block"/> in value position.</summary>
+public sealed record TailExprStmt(Expr Expr, Span Span) : Stmt(Span);
 
 // let (immutable) / var (mutable); type and initializer each optional.
 public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Expr? Initializer, Span Span) : Stmt(Span), INamedDecl

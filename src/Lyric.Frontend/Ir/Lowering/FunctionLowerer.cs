@@ -524,6 +524,7 @@ internal sealed class FunctionLowerer
         switch (_lambda!.Body)
         {
             case Block block:
+                _tailSink = new TailSink(null, null, AsReturn: true); // a tail is the lambda's return
                 if (LowerScope(block))
                     _b.Seal(IsVoid(_returnType)
                         ? new Return(null, block.Span)
@@ -568,6 +569,44 @@ internal sealed class FunctionLowerer
         return true;
     }
 
+    /// <summary>Where a value block's tail goes: into a match arm's result slot, out of a lambda
+    /// as its return, or nowhere (a block arm of a match statement). Set by the owner of the block
+    /// around its <see cref="LowerScope"/>; the tail is the last statement, so the scope's defers
+    /// run AFTER the value is taken — a store before the exit, or the return path's own drain.</summary>
+    private TailSink? _tailSink;
+
+    private readonly record struct TailSink(LocalId? Slot, IrType? Type, bool AsReturn);
+
+    private bool LowerTail(TailExprStmt tail)
+    {
+        var sink = _tailSink ?? throw Bug($"a tail expression without a value position at {tail.Span}");
+        if (Diverges(tail.Expr)) { LowerDiverging(tail.Expr); return false; }
+
+        if (sink.AsReturn)
+        {
+            // Exactly what 'return tail;' lowers to: the value first, then every pending defer.
+            var returned = IsVoid(_returnType) ? LowerExprOrVoidDiscarding(tail.Expr) : LowerExprAs(tail.Expr, _returnType);
+            EmitAllPendingDefers();
+            _b.Seal(new Return(returned, tail.Span));
+            return false;
+        }
+
+        if (sink.Slot is { } slot && sink.Type is { } type)
+        {
+            _b.Emit(new StoreLocal(slot, LowerExprAs(tail.Expr, type), tail.Span));
+            return true;
+        }
+
+        LowerExprOrVoid(tail.Expr); // a match statement's arm: the value goes nowhere
+        return !_b.IsSealed;
+    }
+
+    private TempId? LowerExprOrVoidDiscarding(Expr expr)
+    {
+        LowerExprOrVoid(expr);
+        return null;
+    }
+
     /// <summary>true means control flow falls through, false means the block is sealed.</summary>
     private bool LowerStmt(Stmt stmt)
     {
@@ -585,6 +624,7 @@ internal sealed class FunctionLowerer
                 if (Diverges(e.Expr)) { LowerDiverging(e.Expr); return false; }
                 LowerExprOrVoid(e.Expr);
                 return !_b.IsSealed;
+            case TailExprStmt tail: return LowerTail(tail);
 
             // Only in the synthetic global initializer (see GlobalInitializer).
             case GlobalInitStmt g: LowerGlobalInit(g); return true;
@@ -1007,6 +1047,10 @@ internal sealed class FunctionLowerer
         // body is a void function since format 4.0, and the chain's end is the frame ending —
         // the interpreter marks exhaustion when this frame pops through the resume boundary.
         // A valued return in a coroutine is LYR-SEM0039 and never reaches this point.
+
+        // 'return match (…) { … }' whose every arm leaves: the sema typed the value 'never', so
+        // there is nothing to return — the arms already did. Lowered for its effect, sealed by it.
+        if (stmt.Value is { } diverging && Diverges(diverging)) { LowerDiverging(diverging); return false; }
 
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
@@ -2588,7 +2632,12 @@ internal sealed class FunctionLowerer
             return true;
         }
 
-        return LowerScope((Block)arm.Body);
+        // A block arm: its tail, when it has one, lands in the result slot before the scope's
+        // defers run and the arm falls through to the merge.
+        var savedSink = _tailSink;
+        _tailSink = new TailSink(slot, resultType, AsReturn: false);
+        try { return LowerScope((Block)arm.Body); }
+        finally { _tailSink = savedSink; }
     }
 
     /// <summary>The tag a pattern matches. A unit variant parses as a <see cref="BindingPattern"/>;

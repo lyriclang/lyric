@@ -178,6 +178,11 @@ public sealed class TypeChecker
     /// <summary>The native declaration from <c>std.core</c>. See the constructor.</summary>
     private readonly FunctionSymbol? _stdPanic;
 
+    /// <summary>The context type a value block's tail checks against (§3.1, §6.9): the match
+    /// expression's context for a block arm, the lambda's return type for a block body. Set by
+    /// the owner around <see cref="CheckBlock"/>, and only read by the tail itself.</summary>
+    private LyrType? _tailExpected;
+
     /// <summary>Is <paramref name="f"/> the <c>panic</c> function, no matter which of the two names
     /// reached it?</summary>
     private bool IsPanic(FunctionSymbol f) =>
@@ -962,6 +967,10 @@ public sealed class TypeChecker
         switch (stmt)
         {
             case Block b: CheckBlock(b, scope); break;
+            // The tail of a value block: checked against the context the block stands in, so a
+            // literal tail adapts like an expression arm would (§3.1). Its type is read back by
+            // whoever owns the block — a match arm, a lambda — through the side table.
+            case TailExprStmt tail: CheckExpr(tail.Expr, scope, _tailExpected); break;
             case BindingStmt bnd: CheckBinding(bnd, scope); break;
             case DestructuringStmt d: CheckDestructuring(d, scope); break;
             case IfStmt f: CheckIf(f, scope); break;
@@ -4212,13 +4221,40 @@ public sealed class TypeChecker
             switch (arm.Body)
             {
                 case Block b:
+                {
+                    var savedTail = _tailExpected;
+                    _tailExpected = asExpression ? expected : null;
                     CheckBlock(b, armScope);
-                    // Blocks have no value: in a match EXPRESSION a block arm has to leave the
-                    // function on every path, and it contributes nothing to the unification.
+                    _tailExpected = savedTail;
+
+                    if (b.Tail is { } tail)
+                    {
+                        // A block arm WITH a tail delivers the tail's value (§6.9): it takes part
+                        // in the unification exactly as an expression arm does. In a match
+                        // STATEMENT the value goes nowhere, so the tail is held to the expression
+                        // statement rule — a bare value there is the same mistake as 'x;'.
+                        var tt = _result.TypeOf(tail.Expr);
+                        if (!asExpression)
+                        {
+                            if (tail.Expr is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
+                                _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
+                                    "expression statement has no effect (only calls, assignments and resume are allowed)");
+                            break;
+                        }
+                        if (expected is not null && !expected.IsError)
+                            CheckAssignable(tail.Expr, tt, expected, tail.Span);
+                        bodies.Add(tt);
+                        break;
+                    }
+
+                    // Without a tail a block has no value: in a match EXPRESSION it has to leave
+                    // the function on every path, and it contributes nothing to the unification.
                     if (asExpression && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0033", Severity.Error, arm.Span,
-                            "a block arm of a match expression must return or throw on every path (blocks have no value)");
+                            "a block arm of a match expression must return or throw on every path, "
+                            + "or end in a tail expression without ';' that is the arm's value");
                     break;
+                }
                 case Expr e:
                     var bt = CheckExpr(e, armScope, expected);
                     // With a context the arm checks AGAINST it (§3.1/§6.9 since 2.1): a
@@ -4837,12 +4873,18 @@ public sealed class TypeChecker
                 }
                 break;
             case Block b:
-                if (contextRet is null && !openGeneric && !HasValueReturn(b))
+            {
+                // A tail is 'return tail;' at the block's end (§6.9, §7.3): it counts as a value
+                // return for the void default, joins the inferred returns, checks against the
+                // context, and covers the block's end.
+                var savedTail = _tailExpected;
+                if (contextRet is null && !openGeneric && !HasValueReturn(b) && b.Tail is null)
                 {
                     // A block lambda without context that returns no value becomes void, so
                     // side-effect closures (`() => { doStuff(); }`) need no `: void`.
                     ret = LyrType.Void;
                     _currentReturn = LyrType.Void;
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                 }
                 else if (contextRet is null || openGeneric)
@@ -4853,12 +4895,14 @@ public sealed class TypeChecker
                     var collected = new List<LyrType>();
                     _returnInference = collected;
                     _currentReturn = LyrType.Error; // nothing reads it while collecting
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                     _returnInference = null;
+                    if (b.Tail is { } inferredTail) collected.Add(_result.TypeOf(inferredTail.Expr));
                     ret = collected.Count == 0
                         ? LyrType.Void // openGeneric without a value return: U binds to void
                         : UnifyArms(collected, lam.Span, "the returns of this block lambda");
-                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
@@ -4866,12 +4910,17 @@ public sealed class TypeChecker
                 {
                     ret = contextRet;
                     _currentReturn = contextRet; // 'return' belongs to the LAMBDA, not to the enclosing function
+                    _tailExpected = TypeFacts.IsVoid(contextRet) ? null : contextRet;
                     CheckBlock(b, lambdaScope);
-                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (b.Tail is { } contextTail && !TypeFacts.IsVoid(contextRet)) // a void context discards the value
+                        CheckAssignable(contextTail.Expr, _result.TypeOf(contextTail.Expr), contextRet, contextTail.Span);
+                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
+                _tailExpected = savedTail;
                 break;
+            }
             default:
                 ret = LyrType.Error;
                 break;
@@ -4971,6 +5020,7 @@ public sealed class TypeChecker
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
+                case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

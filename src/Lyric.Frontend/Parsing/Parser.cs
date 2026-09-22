@@ -23,6 +23,7 @@ public sealed partial class Parser
     // false at the start of a statement, where it would be ambiguous with a block, and true again
     // inside delimiters through ParseSubExpr.
     private bool _allowStructInit = true;
+    private bool _allowTail; // inside a value block's own statement list (see ParseBlock)
 
     public Parser(SourceManager sm, FileId id, DiagnosticEngine de)
     {
@@ -673,8 +674,9 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012",
             $"expected '=>' in lambda, got {_buffer.Current.TokenKind}");
 
-        // Body: an expression or a block, '=> expr' or '=> { ... }'.
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
+        // its tail is the lambda's result, like 'return tail;' at its end.
+        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
         return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span));
     }
 

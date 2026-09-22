@@ -277,6 +277,10 @@ public static class AstDumper
                 Line(sb, indent, "Block", n.Span);
                 foreach (var s in n.Statements) Write(s, indent + 1, sb);
                 break;
+            case TailExprStmt n:
+                Line(sb, indent, "Tail", n.Span);
+                Write(n.Expr, indent + 1, sb);
+                break;
             case BindingStmt n:
                 Line(sb, indent, $"{(n.IsMutable ? "Var" : "Let")} {n.Name}", n.Span);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
