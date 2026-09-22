@@ -522,21 +522,38 @@ null statt 0, `trimStart` entfernt NBSP — drei Bugfixes, im CHANGELOG als solc
 
 ## 15. Blocker durch Compiler-Bugs — exakte Anforderungen
 
-### 15.1 Behoben im Prototyp (1 Zeile)
+### 15.1 Behoben im Prototyp (zwei Fixes, beide im Lowering)
 
-`FunctionLowerer.cs:3827`: der Fall „Receiver ist `GenericInstance`“ nannte nur Class/Struct;
-ein generisches **Enum** fiel in den Fallback `TryResolveFunction` → `LYR-IR0001 call to 'isOk'
-(external or bodiless)`. Damit war JEDE Methode auf `Result<int, string>` unaufrufbar —
-Prototyp 21 hatte den Fall nur für `Option<?int>` gesehen (FunctionLowerer.cs:3914 ist die
-Fallback-Zeile, nicht die Ursache). Fix: `or TypeSymbolKind.Enum`. Ir/Sema/Vm-Suiten grün.
+**(a) Methoden generischer Enums wurden nie gelowert.** `FunctionLowerer.cs:3827`: der Fall
+„Receiver ist `GenericInstance`“ nannte nur Class/Struct; ein generisches **Enum** fiel in den
+Fallback `TryResolveFunction` → `LYR-IR0001 call to 'isOk' (external or bodiless)`. Damit war
+JEDE Methode auf `Result<int, string>` unaufrufbar — Prototyp 21 hatte den Fall nur für
+`Option<?int>` gesehen (FunctionLowerer.cs:3914 ist die Fallback-Zeile, nicht die Ursache).
+Fix: `or TypeSymbolKind.Enum`. pattern-lambda hat ihn übernommen, der Merge ist deckungsgleich.
+
+**(b) Argumente wurden nicht gegen die Substitution der Instanz gewidert** — der Folgefund von
+(a), gefunden bei der Gegenprobe gegen pattern-lambdas Branch. `LowerGenericMethodCall` reichte
+keine `calleeSubstitution` an `MaterializeArguments`, also blieb ein Parameter, der `T`
+geschrieben steht, ein Name: bei `T = ?int` lowerte ein `int`-Literal zum blanken Skalar, und
+der Store in den Optional-Slot war fehlerhaft — der Verifier fing es einen Schritt später im
+AUFRUFER, ohne Zeile zum Hinzeigen (`store of t10 (i64) into l8 (?i64)`). Der Pfad für
+generische Interface-Member baute dieselbe Abbildung längst; jetzt tut es der Instanz-Pfad
+auch. Minimaler Repro (`probes/iso_enum.lyr`): `Holder<?int>.Full(x).or(3)` stürzte ab,
+`Box<?int> { … }.or(3)` nicht — die Klasse erreichte den Pfad vor dem Enum, was die Lücke
+verdeckte. Test: `tests/Lyric.Tests.Ir/LoweringTests.cs`, beide Arten gepinnt.
+
+**Was damit geht:** `Result<?T, E>` wird konstruiert, gematcht (über `Ok(_)`), `isOk`/`isErr`/
+`unwrapOr`/`err`/`map` arbeiten darauf — Vollständigkeitstest in
+`stdlib-tests/tests/result_optional_tests.lyr`.
 
 ### 15.2 Offen — was daran hängt
 
 | Blocker | Stelle | Hängt daran | Anforderung an | Umgehung im Prototyp |
 |---|---|---|---|---|
 | Generische Methode auf generischem Typ (`fn map<U>` in `Result<T,E>`, `List<T>.map<U>`) → `LYR-IR0001 this type argument` | `ReturnTypeOfInstanceMethod` (FunctionLowerer.cs:3456) kennt nur die Owner-Substitution, nicht die der Methode | `Result.map/andThen/mapErr/orElse`, `List.map`, `Iterator.toList` als Methoden | **new-features** (Instanztabelle: Request mit Owner- UND Methoden-Argumenten; Interface-Default-Methoden können es schon — `Iterator.map<U>` — der Klassen-/Enum-Pfad nicht) | freie Funktionen `map(r, f)`, `mapList(xs, f)` |
-| Generisches Enum mit optionalem Typargument (`Result<?int, E>`, `Option<?int>`) | IrVerifier.cs:291 (Payload-Widerung int→?int nach Substitution), TypeChecker.cs:4288 (`Some(v)` über `?U` deckt nicht) | `attempt(() => map.get(k))`, `Result<?T, E>` allgemein, `fromOptional` mit `T = ?U` | **pattern-lambda** (Pattern-Lowering-Umbau deckt 4288 + Optional-Payload), **new-features** (Widerung 291) | Result nur mit nicht-optionalem T getestet |
-| `List<?T>`/`Map<K, ?V>` nicht instanziierbar (`??T`) | collections.lyr `data: (?T)[]`, TypeLowering | jede Sammlung optionaler Werte, `Iterator<?T>` per compact | **new-features**: entweder privates Native `rawArrayAlloc<T>(n): T[]` (VM 15 Z., unbeobachtbar uninitialisiert — von new-features als „in Ordnung“ bewertet) → List/Map halten `T[]` + `states[]`; oder `??T` (5.0, Format-Major) | Wrapper-Struct im Nutzercode |
+| Enum mit optionalem Typargument: `Ok(v)`/`Ok(null)` deckt die Variante nicht (nur `Ok(_)`) | TypeChecker.cs:4288 | den Payload BINDEN oder `Ok(null)` von `Ok(v)` trennen | **pattern-lambda** — auf ihrem Branch gebaut und gegengeprüft: die neue Regel bindet den Payload als `?T` und deckt ab | `Ok(_)` plus `isErr`/`unwrapOr`; der Test sagt, welche Form nach dem Merge dazukommt |
+| **Strukturell, kein Bug:** jede Signatur mit `?T` ist für `T = ?U` ein `??U` — `Result.ok(): ?T` und `fromOptional(o: ?T)` sind für optionale Payloads nicht instanziierbar | Sprachregel „`?` schachtelt nicht“ | zwei Bibliotheksmitglieder, nicht der Typ | **niemanden** — `match` trennt `Ok(null)` von `Ok(v)`, `Result<?U, E>.Ok(x)` konstruiert; beide Stellen dokumentieren es | dokumentiert in `std.result` und im Test |
+| `List<?T>`/`Map<K, ?V>` nicht instanziierbar (`??T`) | collections.lyr `data: (?T)[]`, TypeLowering | jede Sammlung optionaler Werte, `Iterator<?T>` per compact, UND pattern-lambdas benannter Rest `[first, ..rest]` (das Lowering kann kein Array unbekannter Länge bauen) | **new-features**: privates Native `rawArrayAlloc<T>(n): T[]` (VM ~15 Z., unbeobachtbar uninitialisiert — von new-features als „in Ordnung“ bewertet) → List/Map halten `T[]` + `states[]`, und `..rest` bekommt sein Array. `??T` bleibt abgelehnt (5.0, Format-Major). **Zwei Features hängen am selben Haken, was die Priorität hebt.** | Wrapper-Struct im Nutzercode; `..` ohne Namen plus `slice` |
 | Display-Constraint zu lax (`println([1,2,3])` stirbt im IR, console.lyr:51) | TypeChecker Satisfies für Array/Optional/Tupel | Display für Container | **new-features**: (a) Satisfies straffen (Fehler in der Nutzerdatei), (b) conditional conformance `extend<T :: [Display]> List<T> :: [Display]` | freie `showList` möglich, nicht gebaut |
 | `throws E` mit Typparameter wird nie substituiert (ExceptionAnalyzer.cs:218) | — | `orThrow(): T throws E` mit `catch (e: IoError)`; `assertThrows<E>` | **new-features** (F) | `catch (e: Throwable)` |
 | Lambda darf nicht werfen (`fn() -> void throws E` als Parametertyp: LYR-SEM0084) | — | `assertThrows`, `attempt(f)`, werfende `map`-Lambdas | **new-features** (F, vorgezogen) | assertThrows fehlt, Kommentar in test.lyr |
@@ -609,8 +626,10 @@ Fallback-Zeile, nicht die Ursache). Fix: `or TypeSymbolKind.Enum`. Ir/Sema/Vm-Su
 | 6bd1a6e9 | Doku: Guide 13, DocGen-Ratchet 554→683, Site 23→25 Seiten, Snapshot | docs/guide/13, tests/Lyric.Tests.DocGen | — |
 | 2656bcb9 | arrayOf/arrayFilled ohne Native (Prototyp 18, Form A) | collections.lyr | collections_tests (+1) |
 | 4fe6381e | `std.os.args()` liefert die Programmargumente (Bug, lyriclings-Fund); `file.modifiedMillis` | NativeRegistry.cs, io/file.lyr | file_tests (+1) |
+| a8df8a5d | Argument-Widerung gegen die Substitution der Instanz (Folgefund der Gegenprobe) | FunctionLowerer.cs | LoweringTests (+1) |
+| 881accbd | `Result<?T, E>`: was trägt, und wo die Nicht-Schachtelung die Grenze zieht | result.lyr | result_optional_tests (+1) |
 
-210/210 stdlib-Tests (166 alt + 44 neu); Ir 175, Sema 770, Vm 1453, Formatting 190, DocGen 201,
+211/211 stdlib-Tests (166 alt + 45 neu); Ir 176, Sema 770, Vm 1453, Formatting 190, DocGen 201,
 Lsp 281, Embedding 222 grün; Cli 276/277 — `InterruptTests.Sigint` fällt in der WSL-Sandbox auch
 auf unveränderten Branches (macro-abi bestätigt), umgebungsbedingt. new-features hat den Enum-Methoden-Fix als Voraussetzung in seine Roadmap übernommen
 (er bleibt auf diesem Branch, um einen doppelten Einzeiler-Konflikt in FunctionLowerer.cs zu
