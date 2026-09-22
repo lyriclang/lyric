@@ -499,13 +499,15 @@ public sealed class AstFormatter
         Block b => BlockDoc(b),
         BindingStmt b => BindingDoc(b),
         DestructuringStmt d => DestructuringDoc(d),
+        LetPatternStmt lp => LetPatternDoc(lp),
         IfStmt s => IfStmtDoc(s),
         WhileStmt s => Doc.Of(Doc.From("while ("), ExprDoc(s.Condition, Assign),
             Doc.From(") "), BlockDoc(s.Body)),
         DoWhileStmt s => Doc.Of(Doc.From("do "), BlockDoc(s.Body),
             Doc.From(" while ("), ExprDoc(s.Condition, Assign), Doc.From(");")),
-        ForInStmt s => Doc.Of(Doc.From($"for ({s.Variable} in "), ExprDoc(s.Iterable, Assign),
-            Doc.From(") "), BlockDoc(s.Body)),
+        ForInStmt s => Doc.Of(Doc.From("for ("),
+            s.Pattern is { } loopPattern ? PatternDoc(loopPattern) : Doc.From(s.Variable),
+            Doc.From(" in "), ExprDoc(s.Iterable, Assign), Doc.From(") "), BlockDoc(s.Body)),
         BreakStmt => Doc.From("break;"),
         ContinueStmt => Doc.From("continue;"),
         ReturnStmt s => s.Value is null
@@ -518,6 +520,7 @@ public sealed class AstFormatter
         ThrowStmt s => Doc.Of(Doc.From("throw "), ExprDoc(s.Value, Assign), Doc.From(";")),
         MatchStmt s => MatchDoc(s.Scrutinee, s.Arms, s.Span),
         TryStmt s => TryDoc(s),
+        ExprStmt { Expr: CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } } s => ExprDoc(s.Expr, Assign),
         ExprStmt s => Doc.Of(ExprDoc(s.Expr, Assign), Doc.From(";")),
         _ => throw new InternalCompilationException($"unreachable: unformatted {stmt.GetType().Name}"),
     };
@@ -544,6 +547,29 @@ public sealed class AstFormatter
             parts.Add(ExprDoc(init, Assign));
         }
 
+        parts.Add(Doc.From(";"));
+        return new Doc.Concat(parts);
+    }
+
+    private Doc LetPatternDoc(LetPatternStmt stmt)
+    {
+        var parts = new List<Doc>
+        {
+            Doc.From(stmt.IsMutable ? "var " : "let "), PatternDoc(stmt.Pattern),
+        };
+        if (stmt.Type is { } type)
+        {
+            parts.Add(Doc.From(": "));
+            parts.Add(TypeDoc(type));
+        }
+
+        parts.Add(Doc.From(" = "));
+        parts.Add(ExprDoc(stmt.Initializer, Assign));
+        if (stmt.Else is { } els)
+        {
+            parts.Add(Doc.From(" else "));
+            parts.Add(BlockDoc(els));
+        }
         parts.Add(Doc.From(";"));
         return new Doc.Concat(parts);
     }
@@ -693,6 +719,8 @@ public sealed class AstFormatter
         BoolLiteralExpr b => Doc.From(b.Value ? "true" : "false"),
         NullLiteralExpr => Doc.From("null"),
         ThisExpr => Doc.From("this"),
+        LetCondExpr lc => Doc.Of(Doc.From("let "), PatternDoc(lc.Pattern), Doc.From(" = "),
+            ExprDoc(lc.Initializer, Assign)),
         IdentifierExpr i => Doc.From(i.Name),
         AtIdentifierExpr a => AtIdentifierDoc(a),
         TypePathExpr t => Doc.Of(Doc.From(string.Join(".", t.Path)), TypeArgsDoc(t.TypeArguments)),
@@ -857,14 +885,27 @@ public sealed class AstFormatter
     {
         var head = Doc.Of(ExprDoc(call.Callee, Postfix),
             TypeArgsDoc(call.TypeArguments ?? []));
-        if (call.Arguments.Length == 0) return Doc.Of(head, Doc.From("()"));
+
+        // 'xs.map { it * 2 }' / 'fold(0) { acc + it }': the trailing lambda stays outside the
+        // parentheses, and the parentheses vanish when it was the only argument.
+        var arguments = call.Arguments;
+        Doc? trailing = null;
+        if (arguments is [.., LambdaExpr { Form: LambdaForm.Trailing } last])
+        {
+            trailing = Doc.Of(Doc.From(" "), LambdaDoc(last));
+            arguments = arguments[..^1];
+            if (arguments.Length == 0) return Doc.Of(head, trailing);
+        }
+
+        if (arguments.Length == 0) return Doc.Of(head, Doc.From("()"));
 
         // No trailing comma: the call grammar does not allow one.
-        return Doc.GroupOf(head, Doc.From("("),
+        var parenthesized = Doc.GroupOf(head, Doc.From("("),
             Doc.IndentOf(Doc.LineOrNothing,
                 Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                    call.Arguments.Select(a => ExprDoc(a, Assign)).ToArray())),
+                    arguments.Select(a => ExprDoc(a, Assign)).ToArray())),
             Doc.LineOrNothing, Doc.From(")"));
+        return trailing is null ? parenthesized : Doc.Of(parenthesized, trailing);
     }
 
     private Doc ArrayDoc(ArrayLitExpr array)
@@ -881,12 +922,24 @@ public sealed class AstFormatter
 
     private Doc LambdaDoc(LambdaExpr lambda)
     {
+        if (lambda.Form == LambdaForm.Trailing)
+            return lambda.Body is Block trailingBlock
+                ? BlockDoc(trailingBlock)
+                : Doc.GroupOf(Doc.From("{"), Doc.IndentOf(Doc.LineOrSpace, ExprDoc((Expr)lambda.Body, Assign)),
+                    Doc.LineOrSpace, Doc.From("}"));
+
+        if (lambda.Form == LambdaForm.Bare)
+            return Doc.Of(Doc.From($"{lambda.Parameters[0].Name} => "),
+                lambda.Body is Block bareBlock ? BlockDoc(bareBlock) : ExprDoc((Expr)lambda.Body, Assign));
+
         var parts = new List<Doc>
         {
             Doc.From("("),
-            Doc.Join(Doc.From(", "), lambda.Parameters.Select(p => p.Type is { } type
-                ? Doc.Of(Doc.From($"{p.Name}: "), TypeDoc(type))
-                : Doc.From(p.Name)).ToArray()),
+            Doc.Join(Doc.From(", "), lambda.Parameters.Select(p =>
+            {
+                var head = p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From(p.Name);
+                return p.Type is { } type ? Doc.Of(head, Doc.From(": "), TypeDoc(type)) : head;
+            }).ToArray()),
             Doc.From(")"),
         };
 
@@ -922,6 +975,9 @@ public sealed class AstFormatter
     private Doc PatternDoc(Pattern pattern) => pattern switch
     {
         WildcardPattern => Doc.From("_"),
+        ArrayPattern a => Doc.Of(Doc.From("["),
+            Doc.Join(Doc.From(", "), a.Elements.Select(PatternDoc).ToArray()), Doc.From("]")),
+        RestPattern r => Doc.From(r.Name is null ? ".." : ".." + r.Name),
         LiteralPattern l => LiteralPatternDoc(l),
         BindingPattern b => Doc.From(b.Name),
         VariantPattern v => VariantPatternDoc(v),

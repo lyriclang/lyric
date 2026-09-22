@@ -38,6 +38,14 @@ internal sealed class LoopScope(BlockBuilder blocks)
         _break = breakTarget;
     }
 
+    /// <summary>For <c>while let</c>: the condition is always reachable, but the exit exists only
+    /// when the pattern can fail or a <c>break</c> asks for it — an irrefutable pattern without a
+    /// break never leaves the loop, and a block for it would be unreachable.</summary>
+    public LoopScope(BlockBuilder blocks, BlockId continueTarget) : this(blocks)
+    {
+        _continue = continueTarget;
+    }
+
     /// <summary>The target of <c>continue</c>: the condition for <c>while</c> and <c>do-while</c>, the
     /// loop head for <c>for-in</c>.</summary>
     public BlockId ContinueTarget => _continue ??= blocks.NewBlock();

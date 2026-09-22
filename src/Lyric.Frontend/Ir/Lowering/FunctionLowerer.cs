@@ -283,11 +283,19 @@ internal sealed class FunctionLowerer
 
         foreach (var p in lambda.Parameters)
         {
+            // The implicit 'it' of a trailing lambda in a context that takes nothing: the
+            // checker dropped it, so it has no symbol and no slot.
+            if (p.Implicit && _types.RefOf(p) is null) continue;
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"lambda parameter '{p.Name}' was not bound by the type checker");
             _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
+            _lambdaParameterCount++;
         }
     }
+
+    /// <summary>The parameters the lambda really has — its declared ones minus a dropped
+    /// implicit 'it'.</summary>
+    private int _lambdaParameterCount;
 
     /// <summary>
     /// The lowerer for the BODY OF A COROUTINE (format 4.0): an ordinary void function whose
@@ -525,6 +533,19 @@ internal sealed class FunctionLowerer
     /// </summary>
     private IrFunction RunLambda()
     {
+        // '((k, v)) => …': a pattern parameter is taken apart before the body runs, from the
+        // slot the caller filled — the same compiler a 'let' pattern uses, and it cannot fail.
+        foreach (var p in _lambda!.Parameters)
+        {
+            if (p.Pattern is not { } pattern || _types.RefOf(p) is not ParameterSymbol ps) continue;
+            if (!_slots.TryLookup(ps, out var slot)) continue;
+            var type = _slots.TypeOfLocal(slot);
+            var value = _slots.NewTemp(type);
+            _b.Emit(new LoadLocal(value, slot, type, p.Span));
+            LowerPattern(pattern, value, type,
+                () => throw Bug("an irrefutable parameter pattern asked for a failure path"), assumeMatch: true);
+        }
+
         switch (_lambda!.Body)
         {
             case Block block:
@@ -554,7 +575,7 @@ internal sealed class FunctionLowerer
 
         // The environment counts as parameter 0, the same arithmetic as for the receiver.
         return new IrFunction(_name, _returnType,
-            _lambda.Parameters.Length + (_envSlot is null ? 0 : 1),
+            _lambdaParameterCount + (_envSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
             Entry = new BlockId(0), Handlers = _handlers,
@@ -582,6 +603,7 @@ internal sealed class FunctionLowerer
             case Block b: return LowerScope(b);
             case BindingStmt b: return LowerBinding(b);
             case DestructuringStmt d: return LowerDestructuring(d);
+            case LetPatternStmt lp: return LowerLetPattern(lp);
             // 'panic(…)' has the return type 'never' and seals its block. An expression can therefore
             // end control flow, and the return value has to report that, or the caller later tries to
             // seal the same block a second time.
@@ -930,59 +952,12 @@ internal sealed class FunctionLowerer
             throw Bug("destructuring a value that is not a tuple");
 
         var source = LowerExprAs(stmt.Initializer, type);
-        BindTupleElements(stmt.Pattern, source, type.Type, stmt.Span);
+        // Irrefutable by the sema's proof: no test is emitted, so the failure path is never asked
+        // for — and asking for it is a lowering bug rather than a program error.
+        LowerPattern(stmt.Pattern, source, type,
+            () => throw Bug("an irrefutable destructuring pattern asked for a failure path"),
+            assumeMatch: true);
         return true;
-    }
-
-    /// <summary>
-    /// Binds the names of a tuple pattern to the fields of an object, recursively, because patterns nest
-    /// (<c>let (a, (b, c)) = …</c>).
-    /// </summary>
-    private void BindTupleElements(TuplePattern pattern, TempId source, TypeId type, Core.Span span)
-    {
-        var layout = _typeTable.Defs[type.Value];
-
-        for (var i = 0; i < pattern.Elements.Length; i++)
-        {
-            var fieldType = layout.FieldTypes[i];
-
-            switch (pattern.Elements[i])
-            {
-                // '_' binds nothing, so the field is not even read: an 'ldfld' whose result nobody uses
-                // would be dead code in the bytecode.
-                case WildcardPattern:
-                    continue;
-
-                case BindingPattern binding:
-                {
-                    if (_types.RefOf(binding) is not LocalSymbol local)
-                        throw Bug($"'{binding.Name}' in a destructuring was not bound by the type checker");
-
-                    var value = _slots.NewTemp(fieldType);
-                    _b.Emit(new LoadField(value, source, type, new FieldId(i), fieldType, span));
-
-                    var slot = _slots.DeclareFor(local, fieldType);
-                    _b.Emit(new StoreLocal(slot, value, span));
-                    break;
-                }
-
-                case TuplePattern nested:
-                {
-                    if (fieldType is not IrRefType inner)
-                        throw Bug("nested tuple pattern on a field that is not a tuple");
-
-                    var value = _slots.NewTemp(fieldType);
-                    _b.Emit(new LoadField(value, source, type, new FieldId(i), fieldType, span));
-                    BindTupleElements(nested, value, inner.Type, span);
-                    break;
-                }
-
-                default:
-                    throw NotSupported(
-                        "this pattern in a destructuring binding (only names, '_' and nested "
-                        + "tuples — a binding cannot fail, so it cannot test)", span);
-            }
-        }
     }
 
     private bool LowerReturn(ReturnStmt stmt)
@@ -994,6 +969,16 @@ internal sealed class FunctionLowerer
 
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
+        // 'return match (…) { A => { return 1; }, B => { return 2; } }': the value diverges — its
+        // type is 'never' — so it is lowered for its effect, and it seals the block itself.
+        if (stmt.Value is { } diverging && _types.TypeOf(diverging) is NeverType)
+        {
+            LowerExprOrVoid(diverging);
+            if (_b.IsSealed) return false;
+            _b.Seal(new Unreachable(stmt.Span));
+            return false;
+        }
+
         var returned = stmt.Value is null ? null : (TempId?)LowerExprAs(stmt.Value, _returnType);
         EmitAllPendingDefers();
         _b.Seal(new Return(returned, stmt.Span));
@@ -1025,6 +1010,8 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerIf(IfStmt stmt)
     {
+        if (stmt.Condition is LetCondExpr letCond) return LowerIfLet(stmt, letCond);
+
         var condition = LowerExpr(stmt.Condition);
         var thenBlock = _b.NewBlock();
 
@@ -1126,6 +1113,12 @@ internal sealed class FunctionLowerer
 
         var variable = _slots.DeclareFor(loopVar, elementType);
         _b.Emit(new StoreLocal(variable, value, stmt.Span));
+
+        // 'for ((k, v) in …)': the element is taken apart at the top of every iteration. The
+        // checker proved the pattern cannot fail, so no failure path is ever asked for.
+        if (stmt.Pattern is { } pattern)
+            LowerPattern(pattern, value, elementType,
+                () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
 
         _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count });
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
@@ -1338,6 +1331,8 @@ internal sealed class FunctionLowerer
 
     private bool LowerWhile(WhileStmt stmt)
     {
+        if (stmt.Condition is LetCondExpr letCond) return LowerWhileLet(stmt, letCond);
+
         var condBlock = _b.NewBlock();
         _b.Seal(new Branch(condBlock, stmt.Span));
 
@@ -1359,6 +1354,101 @@ internal sealed class FunctionLowerer
 
         _b.SwitchTo(exitBlock);
         return true; // always reachable through the condition's false edge
+    }
+
+    // ------------------------------------------------------------------ binding conditions
+
+    /// <summary>
+    /// <c>if (let P = e) { … } else { … }</c>: the pattern compiler tests and binds, and its failure
+    /// target IS the else branch (or the merge, without one). No bool temp exists — the pattern's
+    /// tests branch directly, as a match arm's do.
+    /// </summary>
+    private bool LowerIfLet(IfStmt stmt, LetCondExpr letCond)
+    {
+        var type = TypeOfExpr(letCond.Initializer);
+        var value = LowerExpr(letCond.Initializer);
+
+        BlockId? elseBlock = null;
+        BlockId Fail() => elseBlock ??= _b.NewBlock();
+        LowerPattern(letCond.Pattern, value, type, Fail, assumeMatch: false);
+
+        var thenBlock = _b.NewBlock();
+        _b.Seal(new Branch(thenBlock, stmt.Span));
+        _b.SwitchTo(thenBlock);
+        var thenFallsThrough = LowerScope(stmt.Then); // a scope: its defers run at its end (§7.5)
+        var thenExit = _b.CurrentId;
+
+        // The pattern cannot fail (the sema warned): the else branch is dead and gets no block,
+        // because a block nobody can reach is what the verifier refuses.
+        if (elseBlock is not { } onFail) return thenFallsThrough;
+
+        _b.SwitchTo(onFail);
+        var elseFallsThrough = stmt.Else is null || LowerStmt(stmt.Else);
+        var elseExit = _b.CurrentId;
+
+        if (!thenFallsThrough && !elseFallsThrough) return false;
+
+        var mergeBlock = _b.NewBlock();
+        if (thenFallsThrough) _b.SealBlock(thenExit, new Branch(mergeBlock, stmt.Then.Span));
+        if (elseFallsThrough) _b.SealBlock(elseExit, new Branch(mergeBlock, stmt.Span));
+        _b.SwitchTo(mergeBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>while (let P = e) { … }</c>: the initializer is evaluated and the pattern tried before
+    /// every iteration; a miss leaves the loop. The exit block arises on demand — from the
+    /// pattern's failure path or from a <c>break</c> — so an irrefutable pattern without a break
+    /// creates no unreachable block.
+    /// </summary>
+    private bool LowerWhileLet(WhileStmt stmt, LetCondExpr letCond)
+    {
+        var condBlock = _b.NewBlock();
+        _b.Seal(new Branch(condBlock, stmt.Span));
+        _b.SwitchTo(condBlock);
+
+        var loop = new LoopScope(_b, condBlock) { DeferDepth = _defers.Count };
+        var type = TypeOfExpr(letCond.Initializer);
+        var value = LowerExpr(letCond.Initializer);
+        LowerPattern(letCond.Pattern, value, type, () => loop.BreakTarget, assumeMatch: false);
+
+        var bodyBlock = _b.NewBlock();
+        _b.Seal(new Branch(bodyBlock, stmt.Span));
+        _b.SwitchTo(bodyBlock);
+        _loops.Push(loop);
+        if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
+        _loops.Pop();
+
+        if (!loop.BreakRequested) return false; // the loop never ends: nothing behind it is reachable
+        _b.SwitchTo(loop.BreakTarget);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>let P = e;</c> and <c>let P = e else { … };</c> — the value once into a temp, then the
+    /// pattern compiler binds; with an else, its failure path runs the block, which the sema
+    /// proved leaves. Without one the pattern is irrefutable and no test is emitted.
+    /// </summary>
+    private bool LowerLetPattern(LetPatternStmt stmt)
+    {
+        var type = TypeOfExpr(stmt.Initializer);
+        var value = LowerExprAs(stmt.Initializer, type);
+
+        BlockId? elseBlock = null;
+        LowerPattern(stmt.Pattern, value, type, () => elseBlock ??= _b.NewBlock(),
+            assumeMatch: stmt.Else is null);
+        if (elseBlock is not { } onFail) return true; // nothing could fail: no else path exists
+
+        var after = _b.NewBlock();
+        _b.Seal(new Branch(after, stmt.Span));
+
+        _b.SwitchTo(onFail);
+        // The block leaves on every path (LYR-SEM0098); should it fall through regardless, the
+        // continuation would run with unbound names, and 'unreachable' is the honest terminator.
+        if (LowerScope(stmt.Else!)) _b.Seal(new Unreachable(stmt.Else!.Span));
+
+        _b.SwitchTo(after);
+        return true;
     }
 
     /// <summary>
@@ -1439,8 +1529,12 @@ internal sealed class FunctionLowerer
         NullLiteralExpr e => LowerNull(e),
         LambdaExpr e => LowerLambda(e),
         TupleLitExpr e => LowerTupleLiteral(e),
-        MatchExpr e => LowerMatch(e.Scrutinee, e.Arms, TypeOfExpr(e), e.Span)
-                       ?? throw Bug($"match expression produced no value at {e.Span}"),
+        // A match whose arms all leave has the type 'never' and no result slot: nothing ever
+        // flows out of it, and 'never' has no IR type to give a slot.
+        MatchExpr e => _types.TypeOf(e) is NeverType
+            ? LowerMatch(e.Scrutinee, e.Arms, null, e.Span) // null: it diverges, and the caller sees the sealed block
+            : LowerMatch(e.Scrutinee, e.Arms, TypeOfExpr(e), e.Span)
+              ?? throw Bug($"match expression produced no value at {e.Span}"),
         MemberExpr e => LowerFieldRead(e),
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
@@ -2058,17 +2152,16 @@ internal sealed class FunctionLowerer
         RefEnumSymbol(callee.Target, callee.Span);
         var enumType = RequireEnum(_types.TypeOf(constructed), span);
         var variant = _typeTable.VariantOf(enumType.Type, callee.Member, span);
-
-        // Adapted to the declared payload type, exactly as an object initializer adapts a field:
-        // slot 0 is the tag, the payload starts at 1. Lowered raw, a struct payload would share the
-        // slot array with its source — value semantics broken — and a '?T' or interface payload
-        // would arrive as the bare value, which the verifier calls malformed IR.
         var layout = _typeTable.Defs[variant.Value];
+
+        // Against the FIELD'S type, as an argument is lowered against its parameter: the payload
+        // of 'Result<?int, E>.Ok(4)' is a '?int' and the 4 has to be wrapped, a 'null' has no
+        // type of its own, and a struct payload is a copy — lowered bare it would share the slot
+        // array with its source. Lowered bare, the verifier refused the 'newvariant' ("field 0 is
+        // i64, expected ?i64"). Slot 0 is the tag, so the payload starts at 1.
         var fields = new TempId[arguments.Length];
         for (var i = 0; i < arguments.Length; i++)
-            fields[i] = i + 1 < layout.FieldTypes.Length
-                ? LowerExprAs(arguments[i], layout.FieldTypes[i + 1])
-                : LowerExpr(arguments[i]);
+            fields[i] = LowerExprAs(arguments[i], layout.FieldTypes[i + 1]);
 
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variant, enumType.Type, fields, span));
@@ -2090,10 +2183,9 @@ internal sealed class FunctionLowerer
         var values = new Dictionary<string, TempId>(StringComparer.Ordinal);
         foreach (var field in expr.Fields)
         {
-            var fieldIndex = Array.IndexOf(layout.FieldNames, field.Name);
-            values[field.Name] = fieldIndex >= 0
-                ? LowerExprAs(field.Value, layout.FieldTypes[fieldIndex])
-                : LowerExpr(field.Value);
+            var index = Array.IndexOf(layout.FieldNames, field.Name);
+            if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a variant initializer", field.Span);
+            values[field.Name] = LowerExprAs(field.Value, layout.FieldTypes[index]); // wraps into ?T, copies a struct
         }
 
         var fields = new TempId[layout.FieldNames.Length - 1];
@@ -2118,101 +2210,42 @@ internal sealed class FunctionLowerer
         throw NotSupported("variant construction on something that is not an enum", span);
     }
 
-    /// <summary>
-    /// <c>match</c> as an expression and as a statement — the same code, only the result slot is missing
-    /// in the statement case.
-    ///
-    /// <para>NO JUMP TABLE OPCODE. The tag is read, compared against a constant, and branched on as
-    /// everywhere else. A jump table would be an optimization; the semantics are a chain of comparisons,
-    /// and exhaustiveness was already proven by the sema (<c>LYR-SEM0050</c>), which is why the last arm
-    /// needs no fallback.</para>
-    /// </summary>
-    /// <summary>
-    /// <c>match</c> as an expression and as a statement, over enums AND over scalars.
-    ///
-    /// <para>NO OPCODE OF ITS OWN. A <c>match</c> branches over a sequence of tests like any other case
-    /// distinction — over its tag for an enum, over the value itself otherwise. A jump table would be an
-    /// optimization, not semantics.</para>
-    ///
-    /// <para>The last arm is taken unchecked only when its pattern is irrefutable (<c>_</c> or a plain
-    /// binding) and it has no guard. The sema proved exhaustiveness, but a guard can still fail, and a
-    /// literal arm at the end is exhaustive only because another arm covers the gap. The failure path
-    /// then becomes <c>unreachable</c>: reachable in the CFG, impossible at runtime.</para>
-    /// </summary>
     /// <summary>Whether the last lowered <c>match</c> continues behind itself. A return value would be
     /// cleaner, but <see cref="LowerMatch"/> already yields the result temp of the expression case, and a
     /// second channel for a question only the statement case asks would have widened every call
     /// site.</summary>
     private bool _matchFellThrough = true;
 
-    /// <summary>The tag an ABSENT optional enum reports. Variant tags are numbered from zero, so
-    /// no variant can claim it, which is what lets a 'null' arm be tested like any other.</summary>
-    private const long AbsentTag = -1;
-
+    /// <summary>
+    /// <c>match</c> as an expression and as a statement — the same code, only the result slot is
+    /// missing in the statement case. Over enums AND over scalars.
+    ///
+    /// <para>NO OPCODE OF ITS OWN. A <c>match</c> branches over a sequence of tests like any other
+    /// case distinction — over its tag for an enum, over the value itself otherwise, and into its
+    /// payloads for a nested pattern (<see cref="LowerPattern"/>). A jump table would be an
+    /// optimization, not semantics; the arms are tried in the order written (§7.6).</para>
+    ///
+    /// <para>The last arm is taken unchecked when it has no guard: the sema proved exhaustiveness
+    /// (<c>LYR-SEM0050</c>). A guard can still fail, and then the failure path becomes
+    /// <c>unreachable</c>: reachable in the CFG, impossible at runtime.</para>
+    /// </summary>
     private TempId? LowerMatch(Expr scrutinee, MatchArm[] arms, IrType? resultType, Span span)
     {
         var scrutineeType = TypeOfExpr(scrutinee);
         var value = LowerExpr(scrutinee);
         var slot = resultType is null ? (LocalId?)null : _slots.DeclareSynthetic("match", resultType);
 
-        // For an enum the comparison goes over the tag rather than over the value: which variant is
-        // present stands in slot 0 and nowhere else.
-        TypeId? enumId = null;
-        TempId subject = value;
-        IrType subjectType = scrutineeType;
-
+        // For an enum the tag is read ONCE, in the entry block, and every arm compares against
+        // that temp: the entry dominates every arm, so the reuse is legal, and it keeps the
+        // per-arm cost at one comparison — what the tag-first lowering before the pattern
+        // compiler paid as well.
+        var outerTag = _scrutineeTag; // a match inside an arm must not forget the outer one
+        _scrutineeTag = null;
         if (scrutineeType is IrEnumType)
         {
-            enumId = RequireEnum(scrutinee).Type;
             var tag = _slots.NewTemp(new IrScalarType(IrScalar.I64));
             _b.Emit(new EnumTag(tag, value, span));
-            subject = tag;
-            subjectType = new IrScalarType(IrScalar.I64);
-        }
-        else if (scrutineeType is IrOptionalType { Inner: IrEnumType inner })
-        {
-            // An OPTIONAL enum carries its tag INSIDE the optional, so the tag cannot be read
-            // before presence is known — whatever order the arms are written in. Both facts are
-            // folded into one value: a tag local that holds the real tag when the value is there
-            // and ABSENT_TAG when it is not. No variant can carry that number, so a 'null' arm
-            // becomes an ordinary tag comparison and every arm is tested the same way, in the
-            // order it was written (§7.6).
-            //
-            // One local, not two: the unwrapped VALUE would need one as well, and there is no
-            // value to store on the absent path. A variant arm's payload is unwrapped inside its
-            // own body instead, where the tag test has already proved the value is present.
-            // Already lowered: the inner type carries the table id the tag is read against.
-            enumId = inner.Type;
-
-            var i64 = new IrScalarType(IrScalar.I64);
-            var tagLocal = _slots.DeclareSynthetic("matchTag", i64);
-
-            var isSome = _slots.NewTemp(BoolType);
-            _b.Emit(new OptIsSome(isSome, value, span));
-
-            var present = _b.NewBlock();
-            var absent = _b.NewBlock();
-            var tested = _b.NewBlock();
-            _b.Seal(new CondBranch(isSome, present, absent, span));
-
-            _b.SwitchTo(present);
-            var unwrapped = _slots.NewTemp(inner);
-            _b.Emit(new OptGet(unwrapped, value, inner, span));
-            var presentTag = _slots.NewTemp(i64);
-            _b.Emit(new EnumTag(presentTag, unwrapped, span));
-            _b.Emit(new StoreLocal(tagLocal, presentTag, span));
-            _b.Seal(new Branch(tested, span));
-
-            _b.SwitchTo(absent);
-            _b.Emit(new StoreLocal(tagLocal, EmitConst(new IntConst(unchecked((ulong)AbsentTag)),
-                i64, span), span));
-            _b.Seal(new Branch(tested, span));
-
-            _b.SwitchTo(tested);
-            var loaded = _slots.NewTemp(i64);
-            _b.Emit(new LoadLocal(loaded, tagLocal, i64, span));
-            subject = loaded;
-            subjectType = i64;
+            _scrutineeTag = (value, tag);
         }
 
         // The merge block arises ONLY when an arm needs it. If none falls through — every arm returns,
@@ -2226,30 +2259,29 @@ internal sealed class FunctionLowerer
             var arm = arms[i];
             var last = i == arms.Length - 1;
 
-            // The last arm is not checked: the sema proved exhaustiveness (LYR-SEM0050), so it matches
-            // when none before it did. The test would always be true, and for an enum it would be an
-            // extra comparison per match.
+            // The last arm is not tested: the sema proved exhaustiveness (LYR-SEM0050), so it matches
+            // when none before it did. Its bindings still run — the pattern compiler unwraps and
+            // narrows without testing when told the match is certain. Only an or-pattern keeps
+            // its tests, because WHICH alternative matched decides what is bound.
             //
             // With a guard that does not hold: a guard can fail, and then a failure path is needed. It
             // becomes 'unreachable' — reachable in the CFG, impossible at runtime.
             var unconditional = last && arm.Guard is null;
 
-            var body = _b.NewBlock();
-            var next = unconditional ? (BlockId?)null : _b.NewBlock();
+            BlockId? next = null;
+            BlockId Fail()
+            {
+                next ??= _b.NewBlock();
+                return next.Value;
+            }
 
-            if (unconditional) _b.Seal(new Branch(body, arm.Span));
-            else EmitPatternBranch(arm.Pattern, subject, subjectType, scrutineeType, enumId,
-                body, next!.Value, arm.Span);
-
-            _b.SwitchTo(body);
-
-            // Bindings come before the guard: 'n if n > 0' needs 'n'.
-            BindPattern(arm.Pattern, value, scrutineeType, enumId);
+            // Tests and bindings come in one pass, and before the guard: 'n if n > 0' needs 'n'.
+            LowerPattern(arm.Pattern, value, scrutineeType, Fail, assumeMatch: unconditional);
 
             if (arm.Guard is { } guard)
             {
                 var guarded = _b.NewBlock();
-                _b.Seal(new CondBranch(LowerExpr(guard), guarded, next!.Value, guard.Span));
+                _b.Seal(new CondBranch(LowerExpr(guard), guarded, Fail(), guard.Span));
                 _b.SwitchTo(guarded);
             }
 
@@ -2267,7 +2299,20 @@ internal sealed class FunctionLowerer
                 // 'unreachable' is exactly that statement.
                 if (last) _b.Seal(new Unreachable(span));
             }
+            else if (unconditional)
+            {
+                // Nothing to do: the last arm tested nothing, so no block waits for a terminator.
+            }
+            else if (!last)
+            {
+                // An arm before the last one that could not fail: whatever follows it is dead at
+                // runtime, and a block for it would be unreachable from the entry — which the
+                // verifier refuses. The remaining arms are not lowered at all.
+                break;
+            }
         }
+
+        _scrutineeTag = outerTag;
 
         // No arm falls through — every one returns, throws or jumps. Control flow then ends here and the
         // merge block is unreachable.
@@ -2291,284 +2336,429 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    // ------------------------------------------------------------------ pattern compiler
+
+    /// <summary>The enum scrutinee of the match being lowered and its tag, read once in the entry
+    /// block. <see cref="TagOf"/> reuses it instead of reading the tag again per arm.</summary>
+    private (TempId Value, TempId Tag)? _scrutineeTag;
+
     /// <summary>
-    /// Branches to <paramref name="onMatch"/> or <paramref name="onFail"/> depending on whether the
-    /// pattern matches. Seals the current block while doing so.
+    /// Compiles one pattern against a value: emits the tests it needs, branching to
+    /// <paramref name="onFail"/> when one fails, and stores every name it binds — in ONE recursive
+    /// pass, so a pattern nests to any depth. On return the current block is the one in which the
+    /// whole pattern has matched and all its bindings are in their slots.
+    ///
+    /// <para>This is a backtracking automaton rather than a decision tree: the arms are tried in
+    /// the order written (§7.6), each arm tests its pattern left to right, and a failed test jumps
+    /// to the next arm. Bindings written before a later test failed are dead stores, which is
+    /// harmless — the slots belong to the arm alone. A decision tree would test each column once
+    /// but duplicate arm bodies and reorder guards; the language promises the written order.</para>
+    ///
+    /// <para><paramref name="assumeMatch"/> says the sema proved the pattern matches (the last arm
+    /// of an exhaustive match, or an irrefutable binding): tests are then skipped and only the
+    /// unwrapping and binding remain. It does not survive into an or-pattern, whose alternatives
+    /// must be told apart, except for the last alternative.</para>
     ///
     /// <para>A BRANCH RATHER THAN A bool TEMP, and that is no matter of style: a range needs two
     /// comparisons, an or-pattern arbitrarily many, and combining them into a value would mean
-    /// <c>and</c>/<c>or</c> on <c>bool</c> — both are integral in this IR, and the verifier says so. The
-    /// same solution as for <c>&amp;&amp;</c> and <c>||</c>, which are control flow for the same reason
-    /// rather than opcodes.</para>
+    /// <c>and</c>/<c>or</c> on <c>bool</c> — both are integral in this IR, and the verifier says
+    /// so. The same solution as for <c>&amp;&amp;</c> and <c>||</c>.</para>
     /// </summary>
-    private void EmitPatternBranch(Pattern pattern, TempId subject, IrType subjectType,
-        IrType scrutineeType, TypeId? enumId, BlockId onMatch, BlockId onFail, Span span)
+    private void LowerPattern(Pattern pattern, TempId value, IrType valueType, Func<BlockId> onFail,
+        bool assumeMatch)
     {
         switch (pattern)
         {
-            // Catches everything: no test needed.
-            case WildcardPattern:
-                _b.Seal(new Branch(onMatch, span));
+            case WildcardPattern or ErrorPattern:
                 return;
 
-            // A tuple pattern cannot FAIL: the arity stands in the type and the sema checked it. It is
-            // therefore pure binding, which BindPattern does rather than this branch. Patterns INSIDE
-            // the tuple that could test are reported as a scope boundary by BindTupleElements.
-            case TuplePattern:
-                _b.Seal(new Branch(onMatch, span));
-                return;
-
-            // A field pattern over a STRUCT or CLASS cannot fail either, and for a plainer reason
-            // than the tuple's: the scrutinee's type already IS the pattern's type, so there is
-            // nothing left to test — the pattern only says which fields to read (§7.6). Binding is
-            // BindPattern's job; this branch always matches.
-            case VariantPattern { StructFields: { } named } when enumId is null:
+            case BindingPattern binding when _types.RefOf(pattern) is LocalSymbol local:
             {
-                // The limit §7.6 records: a sub-pattern that could fail would be a test inside a
-                // pattern that performs none, and this lowering has nowhere to put it. Refused by
-                // the FIELD it sits on, so the message points at what was written.
-                foreach (var field in named)
-                    if (field.Pattern is not (null or BindingPattern or WildcardPattern))
-                        throw NotSupported(
-                            $"a field pattern that can fail — '{field.Name}' carries a test, and a "
-                            + "field pattern only binds", field.Span);
+                var slotType = LowerType(local.Type, binding.Span);
 
-                _b.Seal(new Branch(onMatch, span));
+                // When a binding takes the rest of a '?T' at the top of a match (or an if-let), the
+                // sema gives the name the NARROWED type 'T': the value has to be present, and here
+                // that is a test. Nested inside a payload the sema binds '?T' as it is, and the
+                // slot type says so — then nothing is unwrapped.
+                if (valueType is IrOptionalType optional && slotType is not IrOptionalType)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, binding.Span);
+
+                BindLocal(binding, local, value, slotType, binding.Span);
                 return;
             }
 
-            case BindingPattern binding when _types.RefOf(pattern) is EnumVariantSymbol:
-                _b.Seal(new CondBranch(
-                    EmitTagTest(enumId, binding.Name, subject, subjectType, binding.Span),
-                    onMatch, onFail, binding.Span));
+            // A bare name that the sema resolved to a unit variant: a tag test, nothing bound.
+            case BindingPattern unit when _types.RefOf(pattern) is EnumVariantSymbol:
+                EmitVariantTest(unit.Name, ref value, ref valueType, onFail, assumeMatch, unit.Span);
                 return;
 
-            case BindingPattern:
-                _b.Seal(new Branch(onMatch, span));
-                return;
-
-            case VariantPattern variant:
-                _b.Seal(new CondBranch(
-                    EmitTagTest(enumId, variant.Path[^1], subject, subjectType, variant.Span),
-                    onMatch, onFail, variant.Span));
-                return;
+            case BindingPattern other:
+                throw Bug($"pattern binding '{other.Name}' was not bound by the type checker");
 
             // 'null' as a pattern is NO comparison but the question of a value's presence — the same
-            // answer as for 'x == null' (TryLowerNullTest). A real equality comparison would need a null
-            // value as an operand, and there is none; the verifier says so too ("equality comparison on
-            // type ?…").
+            // answer as for 'x == null' (TryLowerNullTest). A real equality comparison would need a
+            // null value as an operand, and there is none.
             case LiteralPattern { Literal: NullLiteralExpr } nullPattern:
             {
-                // Over an optional ENUM the subject is already the tag, and absence is the one
-                // number no variant carries — so 'null' is tested exactly like a variant is,
-                // which is what keeps the arms in one order instead of two groups.
-                if (scrutineeType is IrOptionalType { Inner: IrEnumType } && enumId is not null)
-                {
-                    var absent = EmitConst(new IntConst(unchecked((ulong)AbsentTag)),
-                        subjectType, nullPattern.Span);
-                    var matchesAbsent = _slots.NewTemp(BoolType);
-                    _b.Emit(new BinOp(matchesAbsent, IrBinKind.Eq, BoolType, subject, absent,
-                        nullPattern.Span));
-                    _b.Seal(new CondBranch(matchesAbsent, onMatch, onFail, nullPattern.Span));
-                    return;
-                }
-
-                if (subjectType is not IrOptionalType)
+                if (valueType is not IrOptionalType)
                     throw NotSupported("'null' pattern on a non-optional", nullPattern.Span, LoweringDiagnostics.NeverNull);
+                if (assumeMatch) return;
 
                 var isSome = _slots.NewTemp(BoolType);
-                _b.Emit(new OptIsSome(isSome, subject, nullPattern.Span));
-                var isNone = _slots.NewTemp(BoolType);
-                _b.Emit(new UnOp(isNone, IrUnKind.Not, BoolType, isSome, nullPattern.Span));
-                _b.Seal(new CondBranch(isNone, onMatch, onFail, nullPattern.Span));
+                _b.Emit(new OptIsSome(isSome, value, nullPattern.Span));
+                var matched = _b.NewBlock();
+                _b.Seal(new CondBranch(isSome, onFail(), matched, nullPattern.Span));
+                _b.SwitchTo(matched);
                 return;
             }
 
             case LiteralPattern literal:
             {
-                var expected = LowerExprAs(literal.Literal, subjectType);
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, literal.Span);
+                if (assumeMatch) return;
+
+                var scalar = valueType is IrOptionalType o ? o.Inner : valueType;
+                var expected = LowerExprAs(literal.Literal, scalar);
                 var matches = _slots.NewTemp(BoolType);
-                _b.Emit(new BinOp(matches, IrBinKind.Eq, BoolType, subject, expected, literal.Span));
-                _b.Seal(new CondBranch(matches, onMatch, onFail, literal.Span));
+                _b.Emit(new BinOp(matches, IrBinKind.Eq, BoolType, value, expected, literal.Span));
+                var matched = _b.NewBlock();
+                _b.Seal(new CondBranch(matches, matched, onFail(), literal.Span));
+                _b.SwitchTo(matched);
                 return;
             }
 
             // 'lo <= v' and then 'v <= hi': two blocks rather than one combination.
             case RangePattern range:
             {
-                var low = LowerExprAs(range.Low, subjectType);
-                var atLeast = _slots.NewTemp(BoolType);
-                _b.Emit(new BinOp(atLeast, IrBinKind.Ge, BoolType, subject, low, range.Span));
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, range.Span);
+                if (assumeMatch) return;
 
+                var scalar = valueType is IrOptionalType o ? o.Inner : valueType;
+                var low = LowerExprAs(range.Low, scalar);
+                var atLeast = _slots.NewTemp(BoolType);
+                _b.Emit(new BinOp(atLeast, IrBinKind.Ge, BoolType, value, low, range.Span));
                 var upper = _b.NewBlock();
-                _b.Seal(new CondBranch(atLeast, upper, onFail, range.Span));
+                _b.Seal(new CondBranch(atLeast, upper, onFail(), range.Span));
                 _b.SwitchTo(upper);
 
-                var high = LowerExprAs(range.High, subjectType);
+                var high = LowerExprAs(range.High, scalar);
                 var atMost = _slots.NewTemp(BoolType);
                 _b.Emit(new BinOp(atMost, range.IsInclusive ? IrBinKind.Le : IrBinKind.Lt,
-                    BoolType, subject, high, range.Span));
-                _b.Seal(new CondBranch(atMost, onMatch, onFail, range.Span));
+                    BoolType, value, high, range.Span));
+                var matched = _b.NewBlock();
+                _b.Seal(new CondBranch(atMost, matched, onFail(), range.Span));
+                _b.SwitchTo(matched);
                 return;
             }
 
-            // Every alternative gets its own attempt; the first that matches wins.
+            // Field by field: every element is loaded and compiled against its own sub-pattern.
+            // The value is evaluated ONCE — it already sits in a temp — so 'let (a, b) = f();' calls
+            // f once, whatever the pattern does with the parts.
+            case TuplePattern tuple:
+            {
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, tuple.Span);
+                var tupleType = valueType is IrOptionalType o ? o.Inner : valueType;
+                if (tupleType is not IrRefType { Type: var tupleId })
+                    throw Bug("tuple pattern on a value that is not a tuple");
+
+                var layout = _typeTable.Defs[tupleId.Value];
+                for (var i = 0; i < tuple.Elements.Length; i++)
+                {
+                    // '_' binds nothing, so the field is not even read: an 'ldfld' whose result
+                    // nobody uses would be dead code in the bytecode.
+                    if (tuple.Elements[i] is WildcardPattern) continue;
+
+                    var fieldType = layout.FieldTypes[i];
+                    var element = _slots.NewTemp(fieldType);
+                    _b.Emit(new LoadField(element, value, tupleId, new FieldId(i), fieldType, tuple.Span));
+                    LowerPattern(tuple.Elements[i], element, fieldType, onFail, assumeMatch);
+                }
+                return;
+            }
+
+            // A variant of an enum: tag test, then 'enumas' narrows, after which every payload
+            // field is an ordinary 'ldfld' with the variant's layout — and each field's pattern
+            // is compiled recursively, so 'Neg(Neg(x))' and 'Add(Lit(0), r)' are nothing special.
+            case VariantPattern variant when _types.RefOf(pattern) is EnumVariantSymbol:
+            {
+                var variantType = EmitVariantTest(variant.Path[^1], ref value, ref valueType,
+                    onFail, assumeMatch, variant.Span);
+                if (variant.TupleElements is null && variant.StructFields is null) return;
+
+                var narrowed = _slots.NewTemp(new IrRefType(variantType));
+                _b.Emit(new EnumAs(narrowed, value, variantType, variant.Span));
+                var layout = _typeTable.Defs[variantType.Value];
+
+                if (variant.TupleElements is { } elements)
+                    for (var i = 0; i < elements.Length; i++)
+                        LowerFieldPattern(elements[i], null, narrowed, variantType,
+                            new FieldId(i + 1), layout.FieldTypes[i + 1], onFail, assumeMatch);
+
+                if (variant.StructFields is { } fields)
+                    foreach (var field in fields)
+                    {
+                        var index = Array.IndexOf(layout.FieldNames, field.Name);
+                        if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a pattern", field.Span);
+                        LowerFieldPattern(field.Pattern, field, narrowed, variantType,
+                            new FieldId(index), layout.FieldTypes[index], onFail, assumeMatch);
+                    }
+                return;
+            }
+
+            // A field pattern over a STRUCT or CLASS: the scrutinee's type already IS the
+            // pattern's type, so there is no tag to test — the pattern says which fields to read,
+            // and a sub-pattern with a test ('P { x = 0, y }') is compiled like any other (§7.6).
+            case VariantPattern { StructFields: { } structFields } destructure:
+            {
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, destructure.Span);
+                var holderType = valueType is IrOptionalType o ? o.Inner : valueType;
+
+                // A class is a reference and a struct a value, and both carry their layout id: the
+                // difference decides how the value travels, not how a field is read out of it.
+                var holder = holderType switch
+                {
+                    IrRefType reference => reference.Type,
+                    IrStructType structure => structure.Type,
+                    _ => throw NotSupported(
+                        "a field pattern over a value that carries no fields here", destructure.Span),
+                };
+
+                var layout = _typeTable.Defs[holder.Value];
+                foreach (var field in structFields)
+                {
+                    var index = Array.IndexOf(layout.FieldNames, field.Name);
+                    if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a pattern", field.Span);
+                    LowerFieldPattern(field.Pattern, field, value, holder,
+                        new FieldId(index), layout.FieldTypes[index], onFail, assumeMatch);
+                }
+                return;
+            }
+
+            case VariantPattern unresolved:
+                throw Bug($"variant pattern '{string.Join('.', unresolved.Path)}' was not resolved by the type checker");
+
+            // An array asks about its LENGTH first — exactly, or at least, depending on whether
+            // a rest stands among the elements — and only then about the elements at the fixed
+            // positions. The ones before the rest are counted from the front, the ones after it
+            // from the back, so '[first, .., last]' needs no arithmetic on the rest's size.
+            case ArrayPattern array:
+            {
+                if (valueType is IrOptionalType optional)
+                    value = UnwrapPresent(value, optional, onFail, assumeMatch, array.Span);
+                var arrayType = valueType is IrOptionalType o ? o.Inner : valueType;
+                if (arrayType is not IrArrayType { Element: var elementType })
+                    throw Bug("array pattern on a value that is not an array");
+
+                var restIndex = Array.FindIndex(array.Elements, e => e is RestPattern);
+                var before = restIndex < 0 ? array.Elements : array.Elements[..restIndex];
+                var after = restIndex < 0 ? [] : array.Elements[(restIndex + 1)..];
+                var fixedCount = before.Length + after.Length;
+
+                var i64 = new IrScalarType(IrScalar.I64);
+                var length = _slots.NewTemp(i64);
+                _b.Emit(new ArrayLen(length, value, array.Span));
+
+                // '[..]' and '[..rest]' test nothing: every array has at least no elements.
+                var needsTest = !assumeMatch && (restIndex < 0 || fixedCount > 0);
+                if (needsTest)
+                {
+                    var wanted = EmitConst(new IntConst((ulong)fixedCount), i64, array.Span);
+                    var fits = _slots.NewTemp(BoolType);
+                    _b.Emit(new BinOp(fits, restIndex < 0 ? IrBinKind.Eq : IrBinKind.Ge, BoolType,
+                        length, wanted, array.Span));
+                    var matched = _b.NewBlock();
+                    _b.Seal(new CondBranch(fits, matched, onFail(), array.Span));
+                    _b.SwitchTo(matched);
+                }
+
+                for (var i = 0; i < before.Length; i++)
+                {
+                    if (before[i] is WildcardPattern) continue;
+                    var index = EmitConst(new IntConst((ulong)i), i64, before[i].Span);
+                    var element = _slots.NewTemp(elementType);
+                    _b.Emit(new LoadElem(element, value, index, elementType, before[i].Span));
+                    LowerPattern(before[i], element, elementType, onFail, assumeMatch);
+                }
+
+                for (var i = 0; i < after.Length; i++)
+                {
+                    if (after[i] is WildcardPattern) continue;
+                    var fromEnd = EmitConst(new IntConst((ulong)(after.Length - i)), i64, after[i].Span);
+                    var index = _slots.NewTemp(i64);
+                    _b.Emit(new BinOp(index, IrBinKind.Sub, i64, length, fromEnd, after[i].Span));
+                    var element = _slots.NewTemp(elementType);
+                    _b.Emit(new LoadElem(element, value, index, elementType, after[i].Span));
+                    LowerPattern(after[i], element, elementType, onFail, assumeMatch);
+                }
+
+                if (restIndex >= 0 && array.Elements[restIndex] is RestPattern { Name: not null } named)
+                    throw NotSupported(
+                        "a NAMED rest in an array pattern — the elements it covers would have to be "
+                        + "copied into an array of their own, and this compiler version has no way to "
+                        + "build one of a length it learns at runtime; bind the positions you need and "
+                        + "take the tail with 'slice'", named.Span);
+                return;
+            }
+
+            case RestPattern lone:
+                throw Bug($"a rest pattern outside an array pattern at {lone.Span}");
+
+            // Every alternative gets its own attempt; the first that matches wins, and all of them
+            // arrive in one block with the same names bound: the sema pointed every alternative's
+            // bindings at the first alternative's symbols, so they share slots.
             case OrPattern or:
             {
+                var joined = _b.NewBlock();
                 for (var i = 0; i < or.Alternatives.Length; i++)
                 {
                     var lastAlternative = i == or.Alternatives.Length - 1;
-                    var nextAlternative = lastAlternative ? onFail : _b.NewBlock();
+                    BlockId? nextAlternative = null;
+                    BlockId FailAlternative()
+                    {
+                        if (lastAlternative) return onFail();
+                        nextAlternative ??= _b.NewBlock();
+                        return nextAlternative.Value;
+                    }
 
-                    EmitPatternBranch(or.Alternatives[i], subject, subjectType, scrutineeType,
-                        enumId, onMatch, nextAlternative, or.Span);
+                    LowerPattern(or.Alternatives[i], value, valueType, FailAlternative,
+                        assumeMatch && lastAlternative);
+                    _b.Seal(new Branch(joined, or.Span));
 
-                    if (!lastAlternative) _b.SwitchTo(nextAlternative);
+                    if (lastAlternative) break;
+                    if (nextAlternative is not { } fallthrough) break; // this alternative cannot fail: the rest is dead
+                    _b.SwitchTo(fallthrough);
                 }
-
+                _b.SwitchTo(joined);
                 return;
             }
 
             default:
-                throw NotSupported($"a {pattern.GetType().Name} in a match", pattern.Span);
+                throw NotSupported($"a {pattern.GetType().Name} in a pattern", pattern.Span);
         }
     }
 
-    private TempId EmitTagTest(TypeId? enumId, string variant, TempId tag, IrType subjectType,
-        Span span)
+    /// <summary>Loads one field of a payload or a struct and compiles the sub-pattern against it.
+    /// The short form <c>{ n }</c> has no sub-pattern: the field name IS the binding, and the sema
+    /// bound it on the <see cref="FieldPattern"/> node itself.</summary>
+    private void LowerFieldPattern(Pattern? sub, FieldPattern? field, TempId obj, TypeId holder,
+        FieldId fieldId, IrType type, Func<BlockId> onFail, bool assumeMatch)
     {
-        if (enumId is not { } id)
-        {
-            // An OPTIONAL enum is not "a non-enum", and saying so sent the reader looking for a
-            // mistake in the type rather than at the missing lowering. The tag lives inside the
-            // optional, so a variant arm needs the unwrapped value while the 'null' arm needs
-            // the optional itself — two subjects where this lowering carries one. Narrowing
-            // first is what the language already offers for it.
-            if (subjectType is IrOptionalType { Inner: IrEnumType })
-                throw NotSupported(
-                    "a variant pattern in a match over an optional enum — narrow it first, "
-                    + "then match the value", span);
+        if (sub is WildcardPattern) return;
+        var span = sub?.Span ?? field!.Span;
 
-            throw NotSupported("a variant pattern in a match over a non-enum", span);
+        var loaded = _slots.NewTemp(type);
+        _b.Emit(new LoadField(loaded, obj, holder, fieldId, type, span));
+
+        if (sub is not null)
+        {
+            LowerPattern(sub, loaded, type, onFail, assumeMatch);
+            return;
         }
 
-        var expected = EmitConst(new IntConst((ulong)_typeTable.TagOf(id, variant, span)),
+        if (_types.RefOf(field!) is not LocalSymbol local)
+            throw Bug($"pattern binding '{field!.Name}' was not bound by the type checker");
+        BindLocal(field, local, loaded, LowerType(local.Type, span), span);
+    }
+
+    /// <summary>The value present, or a jump to <paramref name="onFail"/>: 'optissome' decides,
+    /// 'optget' unwraps. With the match already proven the unwrap stands alone — the 'optget'
+    /// cannot panic then, the proof is in the arms before it.</summary>
+    private TempId UnwrapPresent(TempId value, IrOptionalType optional, Func<BlockId> onFail,
+        bool assumeMatch, Span span)
+    {
+        if (!assumeMatch)
+        {
+            var isSome = _slots.NewTemp(BoolType);
+            _b.Emit(new OptIsSome(isSome, value, span));
+            var present = _b.NewBlock();
+            _b.Seal(new CondBranch(isSome, present, onFail(), span));
+            _b.SwitchTo(present);
+        }
+
+        var unwrapped = _slots.NewTemp(optional.Inner);
+        _b.Emit(new OptGet(unwrapped, value, optional.Inner, span));
+        return unwrapped;
+    }
+
+    /// <summary>Tests that an enum value (or an optional enum, which is unwrapped first) carries
+    /// the named variant. Returns the variant's layout id; <paramref name="value"/> and
+    /// <paramref name="valueType"/> are the unwrapped enum afterwards.</summary>
+    private TypeId EmitVariantTest(string variantName, ref TempId value, ref IrType valueType,
+        Func<BlockId> onFail, bool assumeMatch, Span span)
+    {
+        if (valueType is IrOptionalType optional)
+        {
+            value = UnwrapPresent(value, optional, onFail, assumeMatch, span);
+            valueType = optional.Inner;
+        }
+
+        if (valueType is not IrEnumType { Type: var enumId })
+            throw NotSupported("a variant pattern over a value that is not an enum", span);
+
+        var variantType = _typeTable.VariantOf(enumId, variantName, span);
+        if (assumeMatch) return variantType;
+
+        var expected = EmitConst(new IntConst((ulong)_typeTable.TagOf(enumId, variantName, span)),
             new IrScalarType(IrScalar.I64), span);
 
-        // The Type field of a comparison is its RESULT type (bool); the emitter looks the operand type up
-        // in the temp table, because signed and unsigned are different opcodes.
+        // The Type field of a comparison is its RESULT type (bool); the emitter looks the operand
+        // type up in the temp table, because signed and unsigned are different opcodes.
         var matches = _slots.NewTemp(BoolType);
-        _b.Emit(new BinOp(matches, IrBinKind.Eq, BoolType, tag, expected, span));
-        return matches;
+        _b.Emit(new BinOp(matches, IrBinKind.Eq, BoolType, TagOf(value, span), expected, span));
+        var matched = _b.NewBlock();
+        _b.Seal(new CondBranch(matches, matched, onFail(), span));
+        _b.SwitchTo(matched);
+        return variantType;
     }
 
-    /// <summary>Binds what the pattern binds: a plain binding the value itself, a variant pattern its
-    /// fields.</summary>
-    private void BindPattern(Pattern pattern, TempId value, IrType valueType,
-        TypeId? enumId)
+    /// <summary>The tag of an enum value: the one read in the match entry when this is the
+    /// scrutinee itself, a fresh 'enumtag' for a payload reached by nesting.</summary>
+    private TempId TagOf(TempId value, Span span)
     {
-        if (pattern is BindingPattern binding && _types.RefOf(pattern) is LocalSymbol local)
+        if (_scrutineeTag is { } known && known.Value == value) return known.Tag;
+        var tag = _slots.NewTemp(new IrScalarType(IrScalar.I64));
+        _b.Emit(new EnumTag(tag, value, span));
+        return tag;
+    }
+
+    /// <summary>Stores a bound value into the local's slot, declaring the slot on first sight.
+    ///
+    /// <para>A STRUCT is a value, and binding it takes a copy — the same thing <c>let q = p;</c>
+    /// does. Without this the binding aliased what it was read from, so mutating the original
+    /// through its own name changed what the pattern had bound: measured at 99 where an ordinary
+    /// <c>let</c> answered 1. A freshly built value has no other owner and needs no copy.</para>
+    ///
+    /// <para>A captured <c>var</c> binding (a mutable destructuring) lives in a cell, like every
+    /// other boxed local; the slot then holds the cell and the value goes through it.</para></summary>
+    private void BindLocal(Node node, LocalSymbol local, TempId value, IrType type, Span span)
+    {
+        if (type is IrStructType structType && !_fresh.Contains(value))
+            value = CopyStructValue(value, structType, span);
+
+        if (_slots.TryLookup(local, out var existing))
         {
-            var slotType = LowerType(local.Type, binding.Span);
-            var slot = _slots.DeclareFor(local, slotType);
-
-            // When an arm binds the rest of a '?T', the sema gives the name the NARROWED type 'T': the
-            // arm is reachable only when a value is present. The value in the subject still carries
-            // '?T', because the narrowing is a statement about control flow rather than about memory.
-            // It is therefore unwrapped here, exactly as everywhere else the sema expects 'T'. The
-            // 'optget' can never panic — the proof stands in the 'optissome' of the null arm before it.
-            if (valueType is IrOptionalType && slotType is not IrOptionalType)
-            {
-                var unwrapped = _slots.NewTemp(slotType);
-                _b.Emit(new OptGet(unwrapped, value, slotType, binding.Span));
-                _b.Emit(new StoreLocal(slot, CopyIfStruct(unwrapped, slotType, binding.Span),
-                    binding.Span));
-                return;
-            }
-
-            _b.Emit(new StoreLocal(slot, CopyIfStruct(value, slotType, binding.Span), binding.Span));
+            StoreValue(existing, value, span);
             return;
         }
 
-        // A tuple pattern binds field by field, the same routine as for a destructuring binding. It has
-        // to stand HERE rather than in the branching path: the last arm of a 'match' is not checked at
-        // all, because the sema proved exhaustiveness, so no binding would run there.
-        if (pattern is TuplePattern tuple)
+        if (_types.IsBoxed(local))
         {
-            // The type comes from the VALUE rather than from the pattern: '_' binds nothing and therefore
-            // has none to read off.
-            if (valueType is not IrRefType tupleType)
-                throw Bug("tuple pattern on a value that is not a tuple");
-
-            BindTupleElements(tuple, value, tupleType.Type, tuple.Span);
+            var cellType = _typeTable.CellOf(type);
+            var slotForCell = _slots.DeclareFor(local, cellType);
+            _cells[slotForCell] = (cellType.Type, type);
+            var cell = _slots.NewTemp(cellType);
+            _b.Emit(new NewObject(cell, cellType.Type, cellType, span));
+            _b.Emit(new StoreLocal(slotForCell, cell, span));
+            StoreValue(slotForCell, value, span);
             return;
         }
 
-        // A struct or class destructure: the same field-by-field binding an enum variant gets,
-        // MINUS the narrowing step. There the value must be pushed to its variant first, because
-        // the tag says which layout it carries; here the value already is what the pattern names,
-        // so the object to read from is the subject itself.
-        if (pattern is VariantPattern { StructFields: { } structFields } && enumId is null)
-        {
-            // A class is a reference and a struct a value, and both carry their layout id: the
-            // difference decides how the value travels, not how a field is read out of it. A type
-            // that is neither — an optional, say — has no layout to read here, and the value would
-            // have to be narrowed first.
-            var holder = valueType switch
-            {
-                IrRefType reference => reference.Type,
-                IrStructType structure => structure.Type,
-                _ => throw NotSupported(
-                    "a field pattern over a value that carries no fields here — narrow it first",
-                    pattern.Span),
-            };
-
-            var layout = _typeTable.Defs[holder.Value];
-            foreach (var field in structFields)
-            {
-                var index = Array.IndexOf(layout.FieldNames, field.Name);
-                if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a pattern", field.Span);
-
-                // Short form `{ n }`: the sema bound the name on the FieldPattern node itself, so
-                // that node IS the binding — the same rule the variant path follows.
-                BindOne(field.Pattern ?? (Node)field, value, holder,
-                    new FieldId(index), layout.FieldTypes[index], field.Name, field.Span);
-            }
-
-            return;
-        }
-
-        // An OR-PATTERN that binds reaches here and binds NOTHING: each alternative is a branch
-        // of its own in EmitPatternBranch, while this runs once for the whole pattern, and
-        // BindPatternFields wants a variant. The sema is complete — LYR-SEM0032 already checks
-        // that every alternative binds the same names at the same types — so the missing half is
-        // here, and until 4.4.1 it said nothing: the first USE of a bound name failed as an
-        // unknown reference. That is the shape 4.3.2 and 4.3.3 found twice and M36 closed twice;
-        // this is the third member of the family, named rather than left silent.
-        if (pattern is OrPattern { Alternatives: { } alternatives } && alternatives.Any(PatternBinds))
-            throw NotSupported(
-                "an or-pattern that binds — every alternative would have to bind in its own branch",
-                pattern.Span);
-
-        if (enumId is { } id)
-        {
-            // Over an OPTIONAL enum the payload sits inside the optional. This arm is reached only
-            // when the tag matched a real variant, and the absent value carries a tag no variant
-            // has — so the value is present here and the unwrap cannot fail. It happens at this
-            // point rather than up front for the reason the tag local exists: the absent path has
-            // no value to unwrap, and nothing could have carried one across.
-            var payloadSource = value;
-            if (pattern is VariantPattern { TupleElements: not null }
-                    or VariantPattern { StructFields: not null }
-                && valueType is IrOptionalType optional)
-            {
-                var unwrapped = _slots.NewTemp(optional.Inner);
-                _b.Emit(new OptGet(unwrapped, value, optional.Inner, pattern.Span));
-                payloadSource = unwrapped;
-            }
-
-            BindPatternFields(pattern, id, payloadSource);
-        }
+        var slot = _slots.DeclareFor(local, type);
+        _b.Emit(new StoreLocal(slot, value, span));
     }
 
     /// <summary>Lowers the body of an arm. Returns whether it falls through.</summary>
@@ -2583,101 +2773,6 @@ internal sealed class FunctionLowerer
 
         return LowerScope((Block)arm.Body);
     }
-
-    /// <summary>The tag a pattern matches. A unit variant parses as a <see cref="BindingPattern"/>;
-    /// whether it is a binding or a variant is known only to the sema, and it decided.</summary>
-    private int TagOfPattern(TypeId enumId, Pattern pattern) => pattern switch
-    {
-        VariantPattern v => _typeTable.TagOf(enumId, v.Path[^1], v.Span),
-        BindingPattern b when _types.RefOf(pattern) is EnumVariantSymbol
-            => _typeTable.TagOf(enumId, b.Name, b.Span),
-        WildcardPattern => throw NotSupported("'_' anywhere but in the last arm", pattern.Span),
-        _ => throw NotSupported($"a {pattern.GetType().Name} in a match over an enum", pattern.Span),
-    };
-
-    /// <summary>Decomposes a variant: <c>enumas</c> narrows, after which every field is an ordinary
-    /// <c>ldfld</c> with the variant's layout.</summary>
-    private void BindPatternFields(Pattern pattern, TypeId enumId, TempId value)
-    {
-        if (pattern is not VariantPattern variant) return;
-        if (variant.TupleElements is null && variant.StructFields is null) return;
-
-        var variantType = _typeTable.VariantOf(enumId, variant.Path[^1], variant.Span);
-        var narrowed = _slots.NewTemp(new IrRefType(variantType));
-        _b.Emit(new EnumAs(narrowed, value, variantType, variant.Span));
-
-        var layout = _typeTable.Defs[variantType.Value];
-
-        if (variant.TupleElements is { } elements)
-            for (var i = 0; i < elements.Length; i++)
-                BindOne(elements[i], narrowed, variantType, new FieldId(i + 1), layout.FieldTypes[i + 1]);
-
-        if (variant.StructFields is { } fields)
-            foreach (var field in fields)
-            {
-                var index = Array.IndexOf(layout.FieldNames, field.Name);
-                if (index < 0) throw NotSupported($"unknown field '{field.Name}' in a pattern", field.Span);
-
-                // Short form `{ a, b }`: no sub-pattern, the field name IS the binding. The sema bound it
-                // to a LocalSymbol, on the FieldPattern node itself.
-                BindOne(field.Pattern ?? (Node)field, narrowed, variantType,
-                    new FieldId(index), layout.FieldTypes[index], field.Name, field.Span);
-            }
-    }
-
-    /// <summary>Does this pattern introduce a name? A unit variant looks like a binding and is
-    /// not one — only the sema knows which, and it recorded the answer.</summary>
-    private bool PatternBinds(Pattern pattern) => pattern switch
-    {
-        BindingPattern => _types.RefOf(pattern) is LocalSymbol,
-        VariantPattern { TupleElements: not null } or VariantPattern { StructFields: not null } => true,
-        TuplePattern tuple => tuple.Elements.Any(PatternBinds),
-        OrPattern or => or.Alternatives.Any(PatternBinds),
-        _ => false,
-    };
-
-    private void BindOne(Node? sub, TempId obj, TypeId variantType, FieldId field, IrType type,
-        string? shorthandName = null, Span shorthandSpan = default)
-    {
-        // Bindings and '_' only; nested patterns need recursive decomposition and are a later stage.
-        if (sub is null or WildcardPattern) return;
-
-        var name = sub is BindingPattern binding ? binding.Name : shorthandName;
-        if (name is null)
-            throw NotSupported($"a nested {sub.GetType().Name} in a pattern", sub.Span);
-
-        // The sema already gave the pattern binding a LocalSymbol; LowerIdentifier finds the slot again
-        // through the same symbol later. A namespace of its own here would be a second truth about
-        // scoping.
-        if (_types.RefOf(sub) is not LocalSymbol local)
-            throw Bug($"pattern binding '{name}' was not bound by the type checker");
-
-        var span = sub.Span == default ? shorthandSpan : sub.Span;
-        var slot = _slots.DeclareFor(local, type);
-        var loaded = _slots.NewTemp(type);
-        _b.Emit(new LoadField(loaded, obj, variantType, field, type, span));
-
-        // A STRUCT field is a value, and binding it takes a copy — the same thing `let i = o.i;`
-        // does. Without this the binding aliased the field it was read from, so mutating the
-        // original through its own name changed what the pattern had bound: measured at 99 where
-        // an ordinary `let` of the same field answered 1. Unobservable on the variant path, which
-        // shares this helper, only because an enum's payload cannot be reached to mutate.
-        _b.Emit(new StoreLocal(slot, CopyIfStruct(loaded, type, span), span));
-    }
-
-    /// <summary>
-    /// A struct value entering a binding, copied; anything else passed through.
-    ///
-    /// <para>A binding is where a value gets a new home, and a struct detaches there. Without it the
-    /// name aliases what it was read from, so mutating the original through ITS name changes what the
-    /// binding holds — measured at 99 where an ordinary <c>let</c> of the same value answered 1. A
-    /// freshly built value has no other owner and needs none.</para>
-    /// </summary>
-    private TempId CopyIfStruct(TempId value, IrType type, Span span) =>
-        type is IrStructType structType && !_fresh.Contains(value)
-            ? CopyStructValue(value, structType, span)
-            : value;
-
     // ------------------------------------------------------------------ optionals
 
     /// <summary>
@@ -3468,7 +3563,14 @@ internal sealed class FunctionLowerer
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         var receiver = LowerExpr(member.Target);
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+
+        // UNDER THE INSTANCE'S SUBSTITUTION. A parameter written 'T' is the instance's argument
+        // here, and only the call site knows which: with 'T = ?int' an int LITERAL argument
+        // lowered to a bare scalar, and the store into the optional slot was caught a step later
+        // as "store of t3 (i64) into l9 (?i64)" — malformed IR with no line to point at. The
+        // interface path below has carried this mapping all along; this one had not.
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            InstanceSubstitution(owner));
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
         // receiver comes before them, as in every method call.
@@ -3506,7 +3608,13 @@ internal sealed class FunctionLowerer
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
         var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
-        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+
+        // Under the instance's substitution, for the same reason as the instance-method path:
+        // 'Box<?int>.of(3)' writes its parameter 'T', which is a '?int' here, and the 3 has to
+        // be wrapped. A STATIC call needs it just as much — the receiver is absent, the type
+        // arguments are not.
+        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            InstanceSubstitution(owner));
 
         var returns = ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
         if (IsVoid(returns))
@@ -3701,7 +3809,8 @@ internal sealed class FunctionLowerer
                 ? direct
                 : throw NotSupported($"'{owner.Name}.{member.Member}' was not lowered", expr.Span);
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span);
+        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+            concrete is GenericInstance forArguments ? InstanceSubstitution(forArguments) : null);
 
         var args = new TempId[supplied.Length + 1];
         args[0] = LowerExpr(member.Target);
@@ -3897,7 +4006,7 @@ internal sealed class FunctionLowerer
             // INSTANCE rather than to the definition, and its return type may be T.
             case MemberExpr member
                 when SubstituteType(ReceiverType(member.Target)) is GenericInstance owner
-                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct:
+                     && owner.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum:
                 return LowerGenericMethodCall(member, owner, expr);
 
             // An extension on a builtin: 'n.double()' with 'extend int'. The receiver is a scalar and
@@ -4030,6 +4139,17 @@ internal sealed class FunctionLowerer
     /// same choice as in C#. Otherwise it would have to be lowered in a context where the caller's
     /// arguments are not visible.</para>
     /// </summary>
+    /// <summary>What a generic instance says its type parameters are, by NAME — the form
+    /// <see cref="MaterializeArguments"/> and <see cref="LowerArgument"/> want when they lower a
+    /// parameter type that was written with the declaration's own names.</summary>
+    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance instance)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(instance.Definition.Generics.Length, instance.Arguments.Length); i++)
+            mapping[instance.Definition.Generics[i].Name] = instance.Arguments[i];
+        return mapping;
+    }
+
     private TempId[] MaterializeArguments(FunctionDecl callee, Expr[] provided, string name,
         Span span, IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {

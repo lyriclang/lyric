@@ -27,6 +27,15 @@ public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Ex
 public sealed record DestructuringStmt(bool IsMutable, TuplePattern Pattern, TypeNode? Type,
     Expr Initializer, Span Span) : Stmt(Span);
 
+/// <summary>
+/// <c>let Pattern = Expr;</c> with any pattern, and <c>let Pattern = Expr else { … };</c> when it
+/// can fail. The names the pattern binds live in the block around the statement; the else block
+/// runs when the pattern does not match and has to leave (return, throw, break, continue or
+/// panic), so afterwards the names are bound on every path (§7.7).
+/// </summary>
+public sealed record LetPatternStmt(bool IsMutable, Pattern Pattern, TypeNode? Type,
+    Expr Initializer, Block? Else, Span Span) : Stmt(Span);
+
 // Else is a block, an IfStmt (else-if) or null.
 public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span);
 
@@ -37,6 +46,11 @@ public sealed record DoWhileStmt(Block Body, Expr Condition, Span Span) : Stmt(S
 public sealed record ForInStmt(string Variable, Expr Iterable, Block Body, Span Span) : Stmt(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>for ((k, v) in …)</c>: an irrefutable pattern over the element instead of a
+    /// name. <see cref="Variable"/> is then <c>_</c> — the element still gets a slot, and the
+    /// pattern takes it apart at the top of every iteration.</summary>
+    public Pattern? Pattern { get; init; }
 
     string INamedDecl.Name => Variable;
 }

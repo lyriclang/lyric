@@ -526,14 +526,20 @@ public class LoweringTests
     /// sub-pattern that could FAIL would be a test inside a pattern that performs none.</para>
     ///
     /// <para>The message names the FIELD it sits on, so it points at what was written rather than
-    /// at the pattern as a whole.</para></summary>
+    /// at the pattern as a whole.</para>
+    ///
+    /// <para>Since the pattern compiler (4.5) the limit is gone: a field pattern with a test is
+    /// compiled like any other sub-pattern, and the arm's failure path takes the miss. Both
+    /// shapes lower and verify — the VM tests pin the answers.</para></summary>
     [Theory]
-    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n = 3, m } => { return m; }, _ => { return 0; } } }",
-        "a field pattern that can fail")]
-    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n, m = 4 } => { return n; }, _ => { return 0; } } }",
-        "'m' carries a test")]
-    public void A_field_pattern_that_can_fail_is_refused_by_its_field(string source,
-        string expected) => AssertNotSupported(source, expected);
+    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n = 3, m } => { return m; }, _ => { return 0; } } }")]
+    [InlineData("struct P { n: int, m: int } fn f(p: P): int { match (p) { P { n, m = 4 } => { return n; }, _ => { return 0; } } }")]
+    public void A_field_pattern_that_can_fail_is_lowered(string source)
+    {
+        var (ir, de) = TryLower(source);
+        Assert.NotNull(ir);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Severity == Severity.Error);
+    }
 
     /// <summary>An or-pattern that BINDS is refused by name.
     ///
@@ -546,21 +552,17 @@ public class LoweringTests
     ///
     /// <para>An or-pattern that binds NOTHING is the common case and keeps working; the second
     /// row pins that the refusal did not swallow it.</para></summary>
+    /// <para>4.5 closes it: the sema points every alternative's binding at the first
+    /// alternative's symbol, so all of them store into one slot, and the spurious SEM0071 for
+    /// the later alternatives is gone with it — no diagnostic at all remains.</para>
     [Fact]
-    public void An_or_pattern_that_binds_is_refused_by_name()
+    public void An_or_pattern_that_binds_is_lowered_without_diagnostics()
     {
-        // Not AssertNotSupported: that helper demands a LONE diagnostic, and a spurious
-        // SEM0071 rides along here. Alternative 0's bindings become the arm scope, so every
-        // later alternative's binding looks unused — an artifact of how SEM0032 checks the
-        // alternatives, not something the author can act on. It only ever accompanies this
-        // error today, and it is recorded under Still open beside the missing lowering.
         var (ir, de) = TryLower(
             "enum E { A(int), B(int) } fn f(e: E): int { match (e) { E.A(x) | E.B(x) => { return x; } } }");
 
-        Assert.Null(ir);
-        var refusal = Assert.Single(de.Diagnostics.Where(d => d.Severity == Severity.Error));
-        Assert.Equal("LYR-IR0001", refusal.Code);
-        Assert.Contains("an or-pattern that binds", refusal.Message, StringComparison.Ordinal);
+        Assert.NotNull(ir);
+        Assert.Empty(de.Diagnostics);
     }
 
     [Fact]

@@ -103,8 +103,12 @@ internal sealed class ExceptionAnalyzer
             // A destructuring binding REQUIRES its initializer, and that initializer is a call like
             // any other. Missing here, a throwing one escaped the walk entirely: `let (a, b) = mk();`
             // in a `main` that declares nothing compiled clean and ended as LYR-VM0010 — the panic
-            // §9.2 calls unreachable from source.
+            // §9.2 calls unreachable from source. The same holds for the pattern form.
             case DestructuringStmt ds: AnalyzeExpr(ds.Initializer); break;
+            case LetPatternStmt lp:
+                AnalyzeExpr(lp.Initializer);
+                if (lp.Else is not null) AnalyzeStmt(lp.Else);
+                break;
             case ExprStmt es: AnalyzeExpr(es.Expr); break;
             case IfStmt f:
                 AnalyzeExpr(f.Condition);
@@ -187,6 +191,7 @@ internal sealed class ExceptionAnalyzer
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr);
                 break;
+            case LetCondExpr lc: AnalyzeExpr(lc.Initializer); break;
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition); AnalyzeExpr(iff.Then); AnalyzeExpr(iff.Else);
                 break;

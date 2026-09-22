@@ -143,6 +143,7 @@ public sealed class SemaRules
             case ExprStmt es: CheckExprStmt(es); WalkExpr(es.Expr); break;
             case BindingStmt bd: if (bd.Initializer is not null) WalkExpr(bd.Initializer); break;
             case DestructuringStmt d: WalkExpr(d.Initializer); break;
+            case LetPatternStmt lp: WalkExpr(lp.Initializer); if (lp.Else is not null) WalkStmt(lp.Else); break;
             case IfStmt f: WalkExpr(f.Condition); WalkStmt(f.Then); if (f.Else is not null) WalkStmt(f.Else); break;
             case WhileStmt w: WalkExpr(w.Condition); WalkStmt(w.Body); break;
             case DoWhileStmt d: WalkStmt(d.Body); WalkExpr(d.Condition); break;

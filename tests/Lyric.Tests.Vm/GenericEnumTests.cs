@@ -23,7 +23,15 @@ namespace Lyric.Tests.Vm;
 /// </summary>
 public class GenericEnumTests
 {
-    private static long Run(string source)
+    private static long Run(string source) => Run(source, optimize: true);
+
+    /// <summary>
+    /// With <paramref name="optimize"/> false the verifier sees the lowering as it was written.
+    /// That matters for anything whose witness is a CALL: the verifier runs after the optimizer,
+    /// so the inliner can carry a faulty call — and the defect in it — out of sight. A test that
+    /// wants to see one has to ask for the unoptimized module.
+    /// </summary>
+    private static long Run(string source, bool optimize)
     {
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", source);
@@ -39,7 +47,7 @@ public class GenericEnumTests
 
         // verify: true — the IR verifier is the real witness here. A shared variant layout shows as a
         // slot type conflict long before it produces a wrong value.
-        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true);
+        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true, optimize: optimize);
         var lowering = new StringWriter();
         de.RenderText(lowering);
         Assert.True(ir is not null, "lowering failed: " + lowering);
@@ -312,4 +320,74 @@ public class GenericEnumTests
 
         Assert.Contains("write them", reported.Message, StringComparison.Ordinal);
     }
+
+    // --- an argument whose parameter is written 'T' (4.5) ---
+
+    /// <summary>
+    /// A method on an instance lowers its arguments UNDER THE INSTANCE'S SUBSTITUTION. With
+    /// <c>T = ?int</c> a parameter written <c>T</c> is a <c>?int</c>, so an int literal argument
+    /// has to be wrapped; lowered bare it produced "store of t3 (i64) into l9 (?i64)" and
+    /// "optissome expects an optional, found i64" — malformed IR reported at the callee's slot,
+    /// with nothing at the call site to point at.
+    ///
+    /// <para>FOUR ROUTES lead to the one helper, and each is wired on its own: the instance
+    /// method of a class and of an enum (<c>LowerGenericMethodCall</c>), the STATIC method of an
+    /// instance (<c>LowerGenericStaticCall</c>) and the constraint path with a generic receiver.
+    /// All four are pinned here because none of them is covered by another.</para>
+    ///
+    /// <para>MEASURED per call site: taking the substitution out of
+    /// <c>LowerGenericMethodCall</c> fails the enum rows, taking it out of
+    /// <c>LowerGenericStaticCall</c> fails the static rows. A class row fails with it too — but
+    /// only when the method body is big enough to survive the INLINER. With a body like
+    /// <c>return this.value;</c> the call is inlined away and the faulty argument goes with it;
+    /// the same class with a loop in that method reports
+    /// <c>call to Box&lt;?int&gt;.or: arg 1 is i64, expected ?i64</c>. The enum rows break either
+    /// way because a <c>match</c> body is too large to inline.</para>
+    ///
+    /// <para>Which is why THIS test has to reach the verifier unoptimized — and why a green
+    /// <c>lyric run</c> proves nothing about well-formed IR. The verifier runs AFTER the
+    /// optimizer, so an optimization can carry a lowering defect out of sight; two independent
+    /// measurements of this very bug disagreed for a whole round because one went through the
+    /// test path (unoptimized) and the other through <c>lyric run</c>, and both were read as
+    /// statements about the compiler. Found by stdlib-redesign, confirmed here.</para>
+    ///
+    /// <para>The argument has to be a LITERAL. Passing an expression that is already a
+    /// <c>?int</c> needs no coercion, so it passes through the gap without touching it — a
+    /// version of this test written with <c>x</c> instead of <c>3</c> was green while three of
+    /// the four routes were still broken.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("Holder<?int>.Full(x).or(3)", 5)]        // enum instance method
+    [InlineData("Holder<?int>.Empty.or(3)", 3)]          // the same, taking the fallback
+    [InlineData("Plain<?int> { v = x }.or(3)", 5)]       // class instance method, no conformance
+    [InlineData("Box<?int> { v = x }.or(3)", 5)]         // class instance method, with one
+    [InlineData("Plain<?int>.of(3).or(9)", 3)]           // STATIC method, literal into 'T'
+    [InlineData("Box<?int>.of(3).or(9)", 3)]
+    [InlineData("viaConstraint(Box<?int> { v = x })", 5)] // constraint path, generic receiver
+    public void A_parameter_written_as_the_type_parameter_is_lowered_under_the_instance(
+        string call, long expected) =>
+        // UNOPTIMIZED on purpose: the witness is a call, and the inliner eats the small ones.
+        Assert.Equal(expected, Run(optimize: false, source: $$"""
+            interface Keeper<T> { fn or(fallback: T): T; }
+
+            enum Holder<T> {
+                Full(T),
+                Empty;
+
+                fn or(fallback: T): T { return match (this) { Full(v) => v, Empty => fallback }; }
+            }
+            class Box<T> :: [Keeper<T>] {
+                v: T,
+                fn or(fallback: T): T { return this.v; }
+                static fn of(value: T): Box<T> { return Box<T> { v = value }; }
+            }
+            class Plain<T> {
+                v: T,
+                fn or(fallback: T): T { return this.v; }
+                static fn of(value: T): Plain<T> { return Plain<T> { v = value }; }
+            }
+            fn viaConstraint<K :: [Keeper<?int>]>(k: K): ?int { return k.or(3); }
+
+            fn main(): int { let x: ?int = 5; return {{call}} ?? -1; }
+            """));
 }

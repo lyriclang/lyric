@@ -1,0 +1,76 @@
+// Array patterns: the length is a question the pattern may ask.
+//
+//   []            exactly zero elements
+//   [a, b]        exactly two, bound to a and b
+//   [first, ..]   at least one; the rest is not named
+//   [.., last]    at least one; the position counts from the BACK
+//   [a, .., z]    at least two; first and last, whatever lies between
+//
+// Without a rest the length is tested exactly, with one it is a minimum — and a position after
+// the rest is counted from the end, so '[first, .., last]' needs no arithmetic over the middle.
+// Positions nest like any other pattern: '[A(1), B]' tests both the length and what stands at
+// each place.
+//
+// A rest with a NAME ('[first, ..rest]') is refused for now: the elements it covers would have
+// to be copied into an array of their own, and this compiler version cannot build one of a
+// length it learns at runtime. Bind the positions you need and take the tail with 'slice'.
+import std.io.console { println };
+
+enum Token {
+    Word(string),
+    Number(int),
+    End,
+}
+
+fn describe(xs: int[]): string {
+    return match (xs) {
+        [] => "empty",
+        [x] => f"one: {x}",
+        [0, y] => f"leading zero, then {y}",
+        [a, b] => f"pair {a} and {b}",
+        [first, ..] => f"{first} and more",
+    };
+}
+
+// The length classes above are complete — 0, 1, 2 and "at least one" leave nothing open, and
+// the compiler knows it: no '_' arm is needed, and adding one would cover nothing.
+
+fn span(xs: int[]): int {
+    return match (xs) {
+        [a, .., z] => z - a,
+        [_] => 0,
+        _ => -1,
+    };
+}
+
+fn command(ts: Token[]): string {
+    return match (ts) {
+        [Word("add"), Number(n), End] => f"add {n}",
+        [Word("quit"), End] => "quit",
+        [Word(w), ..] => "unknown: " + w,
+        _ => "empty",
+    };
+}
+
+fn main(): int {
+    println(describe([]));
+    println(describe([7]));
+    println(describe([0, 5]));
+    println(describe([3, 4]));
+    println(describe([9, 8, 7]));
+    println(f"{span([2, 5, 9])} {span([4])} {span([])}");
+    println(command([Token.Word("add"), Token.Number(3), Token.End]));
+    println(command([Token.Word("quit"), Token.End]));
+    println(command([Token.Word("dance"), Token.End]));
+    return 0;
+}
+// Output:
+// empty
+// one: 7
+// leading zero, then 5
+// pair 3 and 4
+// 9 and more
+// 7 0 -1
+// add 3
+// quit
+// unknown: dance
