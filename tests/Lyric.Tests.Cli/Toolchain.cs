@@ -48,6 +48,13 @@ public static class Toolchain
     public static string LyrvmPath => BinaryPath("Lyrvm", "lyrvm");
     public static string LyricPath => BinaryPath("Lyric.Cli", "lyric");
 
+    /// <summary>The profile a tool compiles when nobody chooses: what <c>LYRIC_PROFILE</c>
+    /// names, <c>debug</c> otherwise. A test that pins where an artifact lands asks this rather
+    /// than assuming, so the CI job that runs the suite under <c>LYRIC_PROFILE=release</c> pins
+    /// the same rule from the other side.</summary>
+    public static string DefaultProfile =>
+        Environment.GetEnvironmentVariable("LYRIC_PROFILE") == "release" ? "release" : "debug";
+
     /// <summary>The directory a binary and its dependencies lie in: the basis of the architecture test.
     /// </summary>
     public static string OutputDirectory(string project) =>

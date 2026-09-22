@@ -46,41 +46,71 @@ public static class Program
         // program. A parameterless 'main' ignores it.
         var programArguments = ProgramArguments(args);
 
+        // '--grant' limits what the module may reach; without it the standalone mode grants
+        // everything. '--jit' is the engine a host opts into with HostOptions.Compile, offered
+        // on the command line for the same measurement a host would make.
+        var granted = Capability.All;
+        var compile = false;
+        var options = OwnOptions(args);
+        for (var i = 0; i < options.Length; i++)
+        {
+            switch (options[i])
+            {
+                case "--grant":
+                    if (++i >= options.Length)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                            "'--grant' needs a list, e.g. '--grant file,os' or '--grant none'",
+                            ExitCodes.Usage);
+                    if (CapabilityTable.Parse(options[i]) is not { } parsed)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                            $"unknown capability in '{options[i]}' — known are "
+                            + "file, net, os, host, process, all, none", ExitCodes.Usage);
+                    granted = parsed;
+                    break;
+
+                case "--jit":
+                    compile = true;
+                    break;
+
+                default:
+                    return Unknown("run", options[i]);
+            }
+        }
+
         terminal.BeginPhase(Phase.Read, Path.GetFileName(args[1]));
         var module = VmHost.Load(bytes, Console.Error);
         terminal.EndPhase();
         if (module is null) return ExitCodes.Failure;
 
-        // '--grant' limits what the module may reach. Without it the standalone mode grants
-        // everything.
-        var granted = Capability.All;
-        var grantIndex = Array.IndexOf(args, "--grant");
-        if (grantIndex >= 0)
-        {
-            if (grantIndex + 1 >= args.Length)
-                return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                    "'--grant' needs a list, e.g. '--grant file,os' or '--grant none'",
-                    ExitCodes.Usage);
-
-            if (CapabilityTable.Parse(args[grantIndex + 1]) is not { } parsed)
-                return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                    $"unknown capability in '{args[grantIndex + 1]}' — known are "
-                    + "file, net, os, host, all, none", ExitCodes.Usage);
-            granted = parsed;
-        }
-
         terminal.Finish();
-        return VmHost.Execute(module, programArguments, Console.Out, Console.Error, granted);
+        return VmHost.Execute(module, programArguments, Console.Out, Console.Error, granted, compile);
     }
 
     /// <summary>Loads the module completely, then prints it readably. <c>--function</c> narrows
     /// the output to one function; the module header stays.</summary>
     private static int Disasm(byte[] bytes, string[] args, TerminalOutput terminal)
     {
+        string? only = null;
+        var options = OwnOptions(args);
+        for (var i = 0; i < options.Length; i++)
+        {
+            switch (options[i])
+            {
+                case "--function":
+                    if (++i >= options.Length)
+                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                            "'--function' needs a name", ExitCodes.Usage);
+                    only = options[i];
+                    break;
+
+                default:
+                    return Unknown("disasm", options[i]);
+            }
+        }
+
         var module = VmHost.Load(bytes, Console.Error);
         if (module is null) return ExitCodes.Failure;
 
-        var only = Flag(args, "--function");
         var dump = Disassembler.Dump(module, only);
         if (dump is null)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownFunction,
@@ -93,6 +123,8 @@ public static class Program
     /// <summary>Format validation and import binding, without executing an instruction.</summary>
     private static int Verify(byte[] bytes, string[] args, TerminalOutput terminal)
     {
+        if (OwnOptions(args) is [var stray, ..]) return Unknown("verify", stray);
+
         var code = VmHost.Verify(bytes, Console.Out, Console.Error);
         if (code == ExitCodes.Success) terminal.Info($"{args[1]}: ok");
         return code;
@@ -102,6 +134,8 @@ public static class Program
     /// suppress it.</summary>
     private static int Info(byte[] bytes, string[] args, TerminalOutput terminal)
     {
+        if (OwnOptions(args) is [var stray, ..]) return Unknown("info", stray);
+
         var module = VmHost.Load(bytes, Console.Error);
         if (module is null) return ExitCodes.Failure;
 
@@ -150,16 +184,19 @@ public static class Program
         return separator < 0 ? [] : args[(separator + 1)..];
     }
 
-    /// <summary>The value of an option that appears before the <c>--</c>.</summary>
-    private static string? Flag(string[] args, string name)
+    /// <summary>The options between the module and the first <c>--</c>: what belongs to this tool
+    /// rather than to the program. Read strictly by each command, because an option that is
+    /// silently overlooked is the one that costs an afternoon.</summary>
+    private static string[] OwnOptions(string[] args)
     {
-        for (var i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "--") return null;
-            if (args[i] == name) return args[i + 1];
-        }
-        return null;
+        var separator = Array.IndexOf(args, "--");
+        var end = separator < 0 ? args.Length : separator;
+        return end <= 2 ? [] : args[2..end];
     }
+
+    private static int Unknown(string command, string option) =>
+        CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+            $"{command}: unknown option '{option}' — try 'lyrvm --help'", ExitCodes.Usage);
 
     private static int Version(TerminalOutput terminal)
     {
@@ -183,6 +220,8 @@ public static class Program
         Console.Out.WriteLine("  info <file.lyrbc>     Print header, table counts and functions");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
+        Console.Out.WriteLine("  --grant <list>        run: what the program may reach (file,net,os,process; all; none)");
+        Console.Out.WriteLine("  --jit                 run: compile functions to machine code as they are first called");
         Console.Out.WriteLine("  --function <name>     disasm: only this function");
         Console.Out.WriteLine("  --json                Diagnostics (and 'info') as JSON");
         Console.Out.WriteLine("  --quiet, -q           Suppress success messages");

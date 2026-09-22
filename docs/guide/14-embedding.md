@@ -278,6 +278,27 @@ needs a runtime that can emit IL, and a NativeAOT build has none. There `Compile
 ignored — every function is declined with `no runtime code generation`, every script is
 interpreted, and nothing else about the host changes.
 
+### The other half of fast
+
+`Compile` decides how a script RUNS; `Profile` decides how it is COMPILED, and the two defaults
+agree. A VM compiles the debug profile unless told otherwise ([chapter
+16](16-building.md#two-profiles)): no inlining, no scalar replacement, every frame and every
+name kept, the shape a backtrace and a debugger can read. A host that ships sets both:
+
+```csharp
+var vm = new LangVm(new HostOptions
+{
+    Capabilities = Capability.None,
+    Profile = Profile.Release,   // optimized bytecode, slot names dropped, source map kept
+    Compile = true,              // and machine code for what the emitter accepts
+});
+```
+
+`Profile` left unset takes the process default, which is `debug` unless `LYRIC_PROFILE` names
+`release`. Struct-heavy loops run about two and a half times slower in the debug profile on the
+interpreter; a host whose scripts are mostly glue will not notice, a host whose scripts do
+vector mathematics per frame will, and that host is the one shipping with `Compile` anyway.
+
 ## Registering types
 
 `RegisterType` exposes a C# class to scripts. Scripts receive such an object and pass it on; they

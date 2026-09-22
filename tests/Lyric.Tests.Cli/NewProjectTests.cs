@@ -30,7 +30,8 @@ public class NewProjectTests
         var project = Path.Combine(workspace.Path, "demo");
         Assert.Equal(ExitCodes.Success, Toolchain.Lyric("build", project).ExitCode);
 
-        var run = Toolchain.Lyric("run", Path.Combine(project, "out", "demo.lyrbc"));
+        var run = Toolchain.Lyric("run",
+            Path.Combine(project, "out", Toolchain.DefaultProfile, "demo.lyrbc"));
         Assert.Equal(ExitCodes.Success, run.ExitCode);
         Assert.Contains("Hello, Lyric!", run.Out, StringComparison.Ordinal);
     }
@@ -45,7 +46,8 @@ public class NewProjectTests
 
         Assert.Equal(ExitCodes.Success,
             Toolchain.Lyric("build", Path.Combine(workspace.Path, "tetris")).ExitCode);
-        Assert.True(File.Exists(Path.Combine(workspace.Path, "tetris", "out", "tetris.lyrbc")));
+        Assert.True(File.Exists(Path.Combine(workspace.Path, "tetris", "out",
+            Toolchain.DefaultProfile, "tetris.lyrbc")));
     }
 
     [Fact]

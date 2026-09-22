@@ -80,31 +80,70 @@ A project with a `src/` directory says so in a `lyric.json` beside it:
 
 ```json
 {
+  // what the project is called
+  "name": "game",
+
   // where our own modules live
   "sourceRoot": "src",
 
   /* an SDK whose modules may declare functions without a body */
   "nativeRoots": { "engine": "sdk" },
+
+  // other projects this one imports from, by the segment each owns
+  "dependencies": { "geometry": "../geometry" },
+
+  // the oldest toolchain that may build it
+  "toolchain": "4.5",
 }
 ```
 
 ```
 lyric.json
-src/main.lyr          <- import shapes.area
+src/main.lyr                  <- import shapes.area
 src/shapes/area.lyr
-sdk/engine/input.lyr  <- import engine.input
+sdk/engine/input.lyr          <- import engine.input
+../geometry/src/geometry.lyr  <- import geometry
 ```
 
 The file is searched for upwards from the file being compiled, so it is found from anywhere in the
 project. Comments and trailing commas are allowed; it is meant to be edited by hand.
 
+- **`name`** is the project's name — a module name, so letters, digits and `_`. Without it the
+  directory's name serves.
 - **`sourceRoot`** replaces "the directory of the entry file" as the module root.
 - **`nativeRoots`** maps a module path segment to a directory whose modules may declare functions
   without a body. That segment then belongs to the root, and is no longer looked for under
   `sourceRoot`.
+- **`dependencies`** maps a module path segment to the directory of another project. That
+  project's own `sourceRoot` (or its directory, when it has no `lyric.json`) is where the segment's
+  modules come from: `import geometry` reads `geometry.lyr` there and `import geometry.shapes`
+  reads `geometry/shapes.lyr`, the same derivation `std` uses. The segment belongs to the
+  dependency and is no longer looked for under your own root.
+- **`toolchain`** names the oldest toolchain version that may build the project. An older one
+  refuses with both numbers (`LYR-CLI0018`) instead of compiling against a language the project
+  was not written for. A minimum, nothing more: a newer toolchain builds it.
 
-Both are optional, and **without the file nothing changes**: the entry file's directory is the root
-and no module of your own may declare a native.
+Every key is optional, and **without the file nothing changes**: the entry file's directory is the
+root and no module of your own may declare a native.
+
+### Depending on another project
+
+A dependency is a directory: a library `lyric new mylib --lib` wrote, a checkout beside yours, a
+subdirectory. Its modules are ordinary Lyric — a function without a body is an error there as it
+is here — and its own `lyric.json` counts: its `nativeRoots` come along, and its `dependencies`
+do too, so a library that stands on another library needs no help from the program using it.
+
+Three rules follow from the namespace being one namespace:
+
+- **A segment belongs to one root.** Two of your dependencies that want `mathx` to mean two
+  different directories are a conflict, refused with both named. Your own `lyric.json` decides
+  it: name `mathx` yourself, and your word stands for everybody under you.
+- **`std` is nobody's dependency**, and neither is a segment a native root already owns.
+- **A dependency's `toolchain` is a requirement of your build too.** A library written for a
+  newer toolchain refuses under an older one, naming its own file.
+
+Nothing is fetched and nothing is versioned: a dependency is where you say it is. What is fetched
+from where, pinned and verified, is a later chapter.
 
 A key nobody knows is a warning rather than an error, so a file written for a later version still
 loads — but the warning is there, because a typo that does nothing is worse than one that complains.

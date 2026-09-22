@@ -5,25 +5,369 @@
       "Doc": null,
       "Items": [
         {
+          "Kind": "Struct",
+          "Name": "Profile",
+          "Signature": "pub struct Profile",
+          "Doc": "A bundle of compiler options under a name. The toolchain knows `debug` and `release`, and\n`lyric build --release` chooses one for the whole build.\n\nThe table lives in the toolchain, not here: this asks it, so a build script and `lyrc` can\nnever disagree about what `release` means.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "name",
+              "Signature": "name: string",
+              "Doc": "`debug` or `release`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 15
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "optimize",
+              "Signature": "optimize: bool",
+              "Doc": "Whether the IR optimizations run: inlining, scalar replacement, devirtualization.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 17
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "sourceMap",
+              "Signature": "sourceMap: bool",
+              "Doc": "Whether the module carries line numbers, for a backtrace that names its line.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 19
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "debugInfo",
+              "Signature": "debugInfo: bool",
+              "Doc": "Whether the module carries slot and field names, for a debugger.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 21
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "denyWarnings",
+              "Signature": "denyWarnings: bool",
+              "Doc": "Whether a warning fails the compile.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 23
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "selected",
+              "Signature": "pub static fn selected(): Profile",
+              "Doc": "The profile the command line chose (`--release`, `--profile x`); `debug` without a choice.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 26
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "debug",
+              "Signature": "pub static fn debug(): Profile",
+              "Doc": "The debug profile: no optimizations, every name and line kept.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 31
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "release",
+              "Signature": "pub static fn release(): Profile",
+              "Doc": "The release profile: optimized, the line numbers kept, the debug info dropped.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 36
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "named",
+              "Signature": "pub static fn named(name: string): Profile",
+              "Doc": "The toolchain's profile of that name. A name it does not know ends the build.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 41
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 13
+          }
+        },
+        {
+          "Kind": "Enum",
+          "Name": "Kind",
+          "Signature": "pub enum Kind",
+          "Doc": "What an artifact is.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "Executable",
+              "Signature": "Executable",
+              "Doc": "A program: one `.lyrbc`, compiled whole from its entry file.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 55
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Library",
+              "Signature": "Library",
+              "Doc": "A library: every module under its root checked as a whole, nothing written.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 57
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Packed",
+              "Signature": "Packed",
+              "Doc": "A program packed with the stub runtime into one executable.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 59
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 53
+          }
+        },
+        {
           "Kind": "Class",
           "Name": "Artifact",
           "Signature": "pub class Artifact",
-          "Doc": "One thing a build produces: a `.lyrbc` compiled from an entry file.\n\nReturned by `addExecutable`, and configured after the fact — the compile itself happens once\n`build` has returned, so an option set on the next line still applies.",
+          "Doc": "One thing a build produces.\n\nA script holds it and configures it after the call that produced it; nothing is read from it\nuntil `build` has returned, so a field set on the next line still applies. Every option\nstarts from the profile the build was started with, and `use` takes another.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "kind",
+              "Signature": "kind: Kind",
+              "Doc": "What it is.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 69
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "name",
+              "Signature": "name: string",
+              "Doc": "Its name: an identifier, and the stem of the file it lands in.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 71
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "entry",
+              "Signature": "entry: string",
+              "Doc": "The entry file of a program, or the root directory of a library, relative to the\ndirectory holding `build.lyr`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 74
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "profileName",
+              "Signature": "profileName: string",
+              "Doc": "The profile the options came from. It names the directory under `out/`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 76
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "optimize",
+              "Signature": "optimize: bool",
+              "Doc": "Whether the IR optimizations run.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 78
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "sourceMap",
+              "Signature": "sourceMap: bool",
+              "Doc": "Whether the module carries line numbers.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 80
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "debugInfo",
+              "Signature": "debugInfo: bool",
+              "Doc": "Whether the module carries slot and field names.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 82
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "denyWarnings",
+              "Signature": "denyWarnings: bool",
+              "Doc": "Whether a warning fails this artifact.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 84
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "output",
+              "Signature": "output: ?string",
+              "Doc": "Where it lands. `null` means `out/<profile>/<name>.lyrbc`, or `out/<profile>/<name>` for a\npacked program, where the toolchain adds the platform's executable suffix to an output\nwithout one.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 88
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "use",
+              "Signature": "pub mut fn use(profile: Profile): void",
+              "Doc": "Takes the options of `profile`, its name included: a tool shipped beside a game that is\nstill being debugged is `tool.use(Profile.release())`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 92
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "outputPath",
+              "Signature": "pub fn outputPath(): string",
+              "Doc": "The path it is written to: `output` when set, the derivation above otherwise. Empty for a\nlibrary, which writes nothing.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/build.lyr",
+                "Line": 102
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 67
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "executable",
+          "Signature": "pub fn executable(name: string, entry: string): Artifact",
+          "Doc": "Declares a program: `name` is an identifier, `entry` its main file relative to the project.\nIt starts with the profile the build was started with.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/build.lyr",
-            "Line": 7
+            "Line": 117
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "library",
+          "Signature": "pub fn library(name: string, root: string): Artifact",
+          "Doc": "Declares a library: every module under `root` is checked as a whole, and nothing is written.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 131
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "packed",
+          "Signature": "pub fn packed(app: Artifact): Artifact",
+          "Doc": "Declares a packed program from an executable's artifact: the same name, entry and options,\npacked with the stub runtime once compiled. It lands as `out/<profile>/<name>`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 145
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "option",
+          "Signature": "pub fn option(name: string, help: string): ?string",
+          "Doc": "A value from the command line, `-D name=value`: `null` when it was not given, and `\"\"` when\nit was given without a value. `help` is what `lyric build --help` shows beside the name.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 162
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "flag",
+          "Signature": "pub fn flag(name: string, help: string): bool",
+          "Doc": "A switch from the command line, `-D name`. `help` is what `lyric build --help` shows.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 171
           }
         },
         {
           "Kind": "Function",
           "Name": "addExecutable",
           "Signature": "pub fn addExecutable(entry: string, output: string): Artifact",
-          "Doc": "Declares a program to compile: `entry` is its main file, `output` the `.lyrbc` to write.\n\nBoth are relative to the directory holding `build.lyr`. The module root and the native roots\ncome from `lyric.json`; this does not repeat them.\n\nNothing is compiled while `build` runs. The artifacts are collected and built afterwards, so\nwork the script does in between — writing a generated source file, for instance — is finished\nbefore any of them is read.",
+          "Doc": "The 4.x form: the entry first, and the output named outright. It builds as it always did,\nnamed after the output's stem; the name rule is not applied, because a 4.x script never\nchose a name.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/build.lyr",
-            "Line": 22
+            "Line": 179
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "finish",
+          "Signature": "pub fn finish(): int",
+          "Doc": "Hands every declared artifact to the toolchain and compiles them. Called by `lyric build`\nonce `build` has returned, never by a script. Returns how many failed.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/build.lyr",
+            "Line": 191
           }
         }
       ]

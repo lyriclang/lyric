@@ -91,6 +91,31 @@ jobs:
           LYRIC_JIT: '1'
         run: dotnet test --configuration Release --no-build --verbosity normal
 
+  release-profile:
+    # The OTHER compile shape. A compile is the debug profile unless told otherwise, so the two
+    # jobs above exercise the unoptimized IR; this one sets LYRIC_PROFILE=release and runs the
+    # same suite against the inliner, the scalar replacement and the devirtualizer — the same
+    # reasoning as the compiled job, one layer up: an optimizer that changes an answer has to be
+    # caught by a suite that sees both answers.
+    name: Build and test (release profile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test with the release profile
+        env:
+          LYRIC_PROFILE: 'release'
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
   spec-sync:
     # docs/Grammar.md and docs/Bytecode.md are MIRRORS of the spec repository's chapters 02
     # and 13: everything below the '<!-- sync:body -->' marker must be byte-identical. This
@@ -159,9 +184,10 @@ jobs:
   publish:
     # Runs after the tests so no artifact is produced from a red build.
     name: Publish toolchain
-    # Both engines, not one: an artifact whose compiled run disagrees with its interpreted one
-    # is an artifact nobody should install.
-    needs: [build-and-test, compiled]
+    # Both engines and both profiles, not one: an artifact whose compiled run disagrees with its
+    # interpreted one, or whose optimized shape disagrees with its debug shape, is an artifact
+    # nobody should install.
+    needs: [build-and-test, compiled, release-profile]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

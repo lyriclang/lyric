@@ -1,6 +1,7 @@
 import std.io.console { println };
+import greeting { text };
 
 fn main(): int {
-    println("Hello, Lyric!");
+    println(text("Lyric"));
     return 0;
 }

@@ -62,8 +62,9 @@ public static class NewProject
 
         Console.Out.WriteLine($"{target}: {template} project '{name}'");
         Console.Out.WriteLine(template == "app"
-            ? $"  cd {name} && lyric build && lyric run src/main.lyr"
-            : $"  cd {name} — point a program's sourceRoot here and import {name}");
+            ? $"  cd {name} && lyric run        (and 'lyric test' for the tests/ directory)"
+            : $"  cd {name} && lyric test       (name this directory under another project's "
+              + "dependencies to import it)");
 
         return ExitCodes.Success;
     }

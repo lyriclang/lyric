@@ -4,7 +4,6 @@ import std.string {
     parseInt,
     parseFloat,
     fromFloat,
-    fromInt,
     StringBuilder,
     utf8DecodeOrThrow,
     Utf8Error,
