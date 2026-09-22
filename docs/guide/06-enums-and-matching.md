@@ -84,6 +84,11 @@ block arm delivers a value through its **tail**: an expression standing last, wi
 block arm without a tail must `return` or `throw` — it contributes no value.
 
 ```lyr
+import std.io.console { println };
+
+enum State { Idle, Busy(int), Closed }
+enum Event { Start, Tick, Stop }
+
 fn step(s: State, e: Event): State {
     return match (e) {
         Event.Start => State.Busy(0),

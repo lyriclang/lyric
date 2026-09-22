@@ -1,0 +1,177 @@
+import std.test { Test, assertEq, assertTrue };
+import std.result { Result, map, mapErr, andThen, orElse, orThrow, fromOptional };
+import std.string { parseInt, parseIntOrErr, parseIntRadixOrErr, ParseErrorKind };
+import std.core { Exception };
+import std.collections { List };
+import std.json { parseOrErr };
+import std.io.file as file;
+
+// The kinds are not `Equatable` (std.string cannot import std.core), so a test names them.
+fn kindName(kind: ParseErrorKind): string {
+    return match (kind) {
+        ParseErrorKind.Empty => "Empty",
+        ParseErrorKind.InvalidDigit => "InvalidDigit",
+        ParseErrorKind.Overflow => "Overflow",
+    };
+}
+
+fn parsePort(text: string): Result<int, string> {
+    let n = parseInt(text);
+    if (n == null) {
+        return Result<int, string>.Err("not a number: " + text);
+    }
+    if (n < 1 || n > 65535) {
+        return Result<int, string>.Err("out of range: " + text);
+    }
+    return Result<int, string>.Ok(n);
+}
+
+@Test
+pub fn ok_and_err_answer_the_predicates(): void {
+    assertTrue(parsePort("80").isOk(), "80 is a port");
+    assertTrue(parsePort("x").isErr(), "x is not");
+    assertTrue(!parsePort("x").isOk(), "isOk is the negation");
+}
+
+@Test
+pub fn ok_and_err_bridge_to_optionals(): void {
+    assertEq(parsePort("80").ok()!, 80);
+    assertTrue(parsePort("x").ok() == null, "an Err has no value");
+    assertEq(parsePort("x").err()!, "not a number: x");
+    assertTrue(parsePort("80").err() == null, "an Ok has no reason");
+}
+
+@Test
+pub fn unwrap_or_takes_the_fallback_only_for_err(): void {
+    assertEq(parsePort("80").unwrapOr(0), 80);
+    assertEq(parsePort("70000").unwrapOr(0), 0);
+    assertEq(parsePort("x").unwrapOrElse((e: string) => e.length()), 15);
+    assertEq(parsePort("80").expect("a port"), 80);
+}
+
+@Test
+pub fn map_transforms_the_value_and_keeps_the_reason(): void {
+    let doubled = map<int, string, int>(parsePort("80"), (n: int) => n * 2);
+    assertEq(doubled.unwrapOr(0), 160);
+    let failed = map<int, string, int>(parsePort("x"), (n: int) => n * 2);
+    assertEq(failed.err()!, "not a number: x");
+}
+
+@Test
+pub fn map_err_translates_the_reason(): void {
+    let coded = mapErr<int, string, int>(parsePort("x"), (e: string) => e.length());
+    assertEq(coded.err()!, 15);
+    assertEq(mapErr<int, string, int>(parsePort("80"), (e: string) => 0).unwrapOr(1), 80);
+}
+
+@Test
+pub fn and_then_stops_at_the_first_err(): void {
+    let even = andThen<int, string, int>(
+        parsePort("80"),
+        (n: int) => if (n % 2 == 0) Result<int, string>.Ok(n / 2)
+        else Result<int, string>.Err("odd")
+    );
+    assertEq(even.unwrapOr(0), 40);
+    let odd = andThen<int, string, int>(
+        parsePort("81"),
+        (n: int) => if (n % 2 == 0) Result<int, string>.Ok(n / 2)
+        else Result<int, string>.Err("odd")
+    );
+    assertEq(odd.err()!, "odd");
+    let skipped = andThen<int, string, int>(parsePort("x"), (n: int) => Result<int, string>.Ok(n));
+    assertEq(skipped.err()!, "not a number: x");
+}
+
+@Test
+pub fn or_else_is_the_second_attempt(): void {
+    let recovered = orElse<int, string, string>(parsePort("x"), (e: string) => parsePort("8080"));
+    assertEq(recovered.unwrapOr(0), 8080);
+    let kept = orElse<int, string, string>(parsePort("80"), (e: string) => parsePort("8080"));
+    assertEq(kept.unwrapOr(0), 80);
+}
+
+@Test
+pub fn from_optional_attaches_a_reason(): void {
+    let present = fromOptional<int, string>(parseInt("7"), "no number");
+    assertEq(present.unwrapOr(0), 7);
+    let absent = fromOptional<int, string>(parseInt("z"), "no number");
+    assertEq(absent.err()!, "no number");
+}
+
+@Test
+pub fn or_throw_throws_the_reason(): void {
+    let failed = Result<int, Exception>.Err(Exception { text = "boom" });
+    var caught = "";
+    try {
+        let v = orThrow<int, Exception>(failed);
+        caught = "value " + v.show();
+    } catch (e: Throwable) {
+        caught = e.message();
+    }
+    assertEq(caught, "boom");
+
+    let fine = Result<int, Exception>.Ok(3);
+    var got = 0;
+    try {
+        got = orThrow<int, Exception>(fine);
+    } catch (_) {
+        got = -1;
+    }
+    assertEq(got, 3);
+}
+
+@Test
+pub fn results_can_be_collected_and_matched_later(): void {
+    let inputs = ["80", "x", "443", "70000"];
+    let results = List<Result<int, string>>.empty();
+    for (text in inputs) {
+        results.push(parsePort(text));
+    }
+    var okCount = 0;
+    var errCount = 0;
+    for (r in results) {
+        match (r) {
+            Ok(_) => {
+                okCount = okCount + 1;
+            }
+            Err(_) => {
+                errCount = errCount + 1;
+            }
+        }
+    }
+    assertEq(okCount, 2);
+    assertEq(errCount, 2);
+}
+
+@Test
+pub fn parse_int_or_err_names_the_reason(): void {
+    assertEq(parseIntOrErr("42").unwrapOr(0), 42);
+    assertEq(parseIntOrErr("-42").unwrapOr(0), -42);
+
+    let empty = parseIntOrErr("").err()!;
+    assertTrue(kindName(empty.kind) == "Empty", "empty text");
+    let sign = parseIntOrErr("-").err()!;
+    assertTrue(kindName(sign.kind) == "Empty", "a sign alone");
+
+    let letter = parseIntOrErr("12a4").err()!;
+    assertTrue(kindName(letter.kind) == "InvalidDigit", "a letter");
+    assertEq(letter.offset, 2);
+    assertEq(letter.message(), "parse: not a digit at offset 2");
+
+    let big = parseIntOrErr("99999999999999999999").err()!;
+    assertTrue(kindName(big.kind) == "Overflow", "twenty digits overflow");
+    assertEq(parseIntRadixOrErr("zz", 36).unwrapOr(0), 35 * 36 + 35);
+    let base = parseIntRadixOrErr("1", 1).err()!;
+    assertTrue(kindName(base.kind) == "InvalidDigit", "no such base");
+}
+
+@Test
+pub fn text_or_err_and_parse_or_err_carry_the_reason(): void {
+    let missing = file.textOrErr("/definitely/not/here.txt");
+    assertTrue(missing.isErr(), "a missing file is an Err");
+    let doc = parseOrErr("{\"a\": 1}");
+    assertTrue(doc.isOk(), "a document parses");
+    let broken = parseOrErr("{\"a\": }").err()!;
+    assertEq(broken.expected, "a value");
+    assertEq(broken.line, 1);
+}

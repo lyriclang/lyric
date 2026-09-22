@@ -120,6 +120,22 @@ body assigned: a throw mid-way lands in a clause that leaves, so the only way pa
 the body's own end.
 
 ```lyr
+import std.io.console { println };
+
+class UsageError :: [Throwable] {
+    text: string,
+    fn message(): string { return this.text; }
+}
+
+struct Options { verbose: bool }
+
+fn parse(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { text = "nothing to do" }; }
+    return Options { verbose = true };
+}
+
+fn run(opts: Options): int { return if (opts.verbose) 0 else 1; }
+
 fn main(args: string[]): int {
     var opts: Options;
     try {
@@ -189,6 +205,13 @@ expression that does not deliver a value — and so it fits anywhere and takes p
 unification: the absent path of `??`, the other branch of an `if`, an arm of a `match`.
 
 ```lyr
+class NotFound :: [Throwable] {
+    what: string,
+    fn message(): string { return "not found: " + this.what; }
+}
+
+enum Cmd { Go, Dial(int) }
+
 fn need(o: ?int, key: string): int throws NotFound {
     return o ?? throw NotFound { what = key };
 }

@@ -1,0 +1,20 @@
+import std.test { Test, assertEq };
+import std.fmt { formatInt, formatHex, formatRadix, formatHexPadded, formatBytes, center };
+
+@Test
+pub fn the_two_hexadecimal_forms_say_what_they_render(): void {
+    // The value with a sign, and the bit pattern: each name says which.
+    assertEq(formatHex(255), "ff");
+    assertEq(formatHex(-255), "-ff");
+    assertEq(formatInt(-255, "X"), "FFFFFFFFFFFFFF01");
+    assertEq(formatInt(255, "x"), "ff");
+    assertEq(formatRadix(-10, 2), "-1010");
+    assertEq(formatHexPadded(255, 4), "00ff");
+}
+
+@Test
+pub fn sizes_and_centering(): void {
+    assertEq(formatBytes(1536), "1.5 KB");
+    assertEq(formatBytes(512), "512 B");
+    assertEq(center("ab", 5), " ab  ");
+}

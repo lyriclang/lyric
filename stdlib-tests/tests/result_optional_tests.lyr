@@ -1,0 +1,49 @@
+import std.test { Test, assertEq, assertTrue };
+import std.result { Result, map };
+
+// A payload that is itself optional. Everything works but the two members whose own signature
+// spells `?T` — see the note at the top of std.result.
+//
+// The three states are told apart WITHOUT a pattern that binds the payload: on this toolchain
+// only `Ok(_)` counts as covering `Ok` when the payload is optional, so `Ok(v)` and `Ok(null)`
+// are not spellable here. `isErr`, `err` and `unwrapOr` answer the same question, and they are
+// what this pins; the binding forms belong with the exhaustiveness work that makes them legal.
+fn slot(present: bool): ?int {
+    return if (present) 7 else null;
+}
+
+fn describe(r: Result<?int, string>): string {
+    if (r.isErr()) {
+        return "err " + (r.err() ?? "");
+    }
+    // Past the Err there is a payload, and it may still be null — the distinction `ok()` could
+    // not have made, because it would have to answer `??int` to make it.
+    let held = r.unwrapOr(0);
+    return if (held == null) "ok, but empty" else "ok " + held.show();
+}
+
+@Test
+pub fn an_optional_payload_is_carried_and_unwrapped(): void {
+    let full = Result<?int, string>.Ok(slot(true));
+    let empty = Result<?int, string>.Ok(slot(false));
+    let failed = Result<?int, string>.Err("missing");
+
+    assertEq(describe(full), "ok 7");
+    assertEq(describe(empty), "ok, but empty");
+    assertEq(describe(failed), "err missing");
+
+    assertTrue(full.isOk(), "a present payload is still Ok");
+    assertTrue(empty.isOk(), "and so is an absent one — Ok is about the outcome");
+    assertTrue(failed.isErr(), "the Err is the Err");
+
+    // unwrapOr keeps T, so it works: the fallback is a `?int` like the payload.
+    assertEq(full.unwrapOr(0)!, 7);
+    assertEq(failed.unwrapOr(42)!, 42);
+    assertTrue(empty.unwrapOr(42) == null, "an Ok wins over the fallback, even holding null");
+    assertEq(failed.err()!, "missing");
+
+    // map reads the optional payload and answers a plain int.
+    assertEq(map<?int, string, int>(full, (v: ?int) => (v ?? 0) * 2).unwrapOr(-1), 14);
+    assertEq(map<?int, string, int>(empty, (v: ?int) => (v ?? 0) * 2).unwrapOr(-1), 0);
+    assertEq(map<?int, string, int>(failed, (v: ?int) => (v ?? 0) * 2).unwrapOr(-1), -1);
+}

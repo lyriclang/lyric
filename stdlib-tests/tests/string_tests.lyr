@@ -149,3 +149,16 @@ pub fn utf8DecodeOrThrow_names_the_byte(): void {
     }
     assertEq(at, 1);
 }
+
+@Test
+pub fn trimming_uses_one_notion_of_whitespace(): void {
+    // U+00A0 (no-break space) and U+2003 (em space) are white space to `trim` since the
+    // beginning; `trimStart`, `trimEnd` and `isBlank` agree since 4.5.
+    let padded = "\u{00A0}\u{2003} x \u{00A0}";
+    assertEq(padded.trim(), "x");
+    assertEq(padded.trimStart().trimEnd(), padded.trim());
+    assertEq(padded.trimStart(), "x \u{00A0}");
+    assertEq(padded.trimEnd(), "\u{00A0}\u{2003} x");
+    assertTrue("\u{00A0}\t\u{3000}".isBlank(), "exotic spaces are blank");
+    assertTrue(!"\u{200B}".isBlank(), "a zero-width space is not white space");
+}

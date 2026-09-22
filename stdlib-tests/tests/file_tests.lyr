@@ -17,6 +17,7 @@ import std.io.file {
     entriesOrThrow,
     copyOrThrow,
     removeOrThrow,
+    modifiedMillis,
 };
 import std.io.error { IoError, IoErrorKind };
 import std.io.path { joinPath };
@@ -188,4 +189,15 @@ pub fn removeOrThrow_shares_removes_success_semantics(): void {
     } catch (e: IoError) {
         assertTrue(false, "a file that never existed is success, as in remove: " + e.message());
     }
+}
+
+@Test
+pub fn a_written_file_carries_a_modification_time(): void {
+    let path = joinPath(tempDir(), "lyric_stdlib_modified_probe.txt");
+    writeText(path, "one");
+    let stamp = modifiedMillis(path);
+    assertTrue(stamp != null, "a file that exists has a time");
+    assertTrue(stamp! > 1600000000000, "and it lies after 2020");
+    remove(path);
+    assertTrue(modifiedMillis(path) == null, "a missing file has none");
 }

@@ -3663,6 +3663,24 @@ internal sealed class FunctionLowerer
     /// from the call — <c>get()</c> has no type parameters of its own, its <c>T</c> is that of
     /// <c>Box</c>.</para>
     /// </summary>
+    /// <summary>
+    /// What the instance makes of its definition's type parameters, by name.
+    ///
+    /// <para>A parameter written <c>T</c> is a NAME until the instance says otherwise, and the
+    /// declaration alone cannot see that. Without this, an argument whose parameter type only
+    /// BECOMES optional through the substitution — <c>or(fallback: T)</c> on a
+    /// <c>Holder&lt;?int&gt;</c> — is passed as the bare scalar its literal lowered to, and the
+    /// malformed store into the optional slot surfaces one step later, in the caller, with no
+    /// line to point at. Every path that calls a method OF an instance needs it.</para>
+    /// </summary>
+    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance owner)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
+            mapping[owner.Definition.Generics[i].Name] = owner.Arguments[i];
+        return mapping;
+    }
+
     private TempId? LowerGenericMethodCall(MemberExpr member, GenericInstance owner, CallExpr expr)
     {
         if (_types.RefOf(member) is not FunctionSymbol method)
@@ -4251,17 +4269,6 @@ internal sealed class FunctionLowerer
     /// same choice as in C#. Otherwise it would have to be lowered in a context where the caller's
     /// arguments are not visible.</para>
     /// </summary>
-    /// <summary>What a generic instance says its type parameters are, by NAME — the form
-    /// <see cref="MaterializeArguments"/> and <see cref="LowerArgument"/> want when they lower a
-    /// parameter type that was written with the declaration's own names.</summary>
-    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance instance)
-    {
-        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
-        for (var i = 0; i < Math.Min(instance.Definition.Generics.Length, instance.Arguments.Length); i++)
-            mapping[instance.Definition.Generics[i].Name] = instance.Arguments[i];
-        return mapping;
-    }
-
     private TempId[] MaterializeArguments(FunctionDecl callee, Expr[] provided, string name,
         Span span, IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {

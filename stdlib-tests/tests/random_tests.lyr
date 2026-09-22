@@ -114,3 +114,28 @@ pub fn secure_random_answers_the_asked_count_and_never_repeats(): void {
 pub fn secure_random_of_zero_is_the_empty_array(): void {
     assertEq(secureRandom(0).length, 0);
 }
+
+@Test
+pub fn ranges_hold_their_bounds_for_every_draw(): void {
+    let r = Random.seeded(7);
+    var i = 0;
+    while (i < 2000) {
+        let n = r.nextIntRange(-5, 5);
+        assertTrue(n >= -5 && n < 5, "in [-5, 5)");
+        let f = r.nextFloat();
+        assertTrue(f >= 0.0 && f < 1.0, "in [0, 1)");
+        i = i + 1;
+    }
+    // The widest range there is: every raw value is a valid answer.
+    let wide = r.nextIntRange(-9223372036854775807 - 1, 9223372036854775807);
+    assertTrue(wide < 9223372036854775807, "below hi");
+    assertEq(r.nextIntRange(3, 3), 3);
+}
+
+@Test
+pub fn a_fresh_generator_differs_per_run(): void {
+    let a = Random.fresh();
+    let b = Random.fresh();
+    // Two generators seeded from entropy agreeing on the first draw is a 2^-63 event.
+    assertTrue(a.nextInt() != b.nextInt(), "fresh generators differ");
+}

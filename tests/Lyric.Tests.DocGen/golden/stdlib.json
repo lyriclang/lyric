@@ -512,13 +512,101 @@
             },
             {
               "Kind": "Method",
+              "Name": "of",
+              "Signature": "pub static fn of(items: T[]): List<T>",
+              "Doc": "A list holding the elements of an array, in order: `List<int>.of([3, 1, 2])`. The\narray is copied; the list owns its slots.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 65
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "pushAll",
+              "Signature": "pub mut fn pushAll(items: T[]): void",
+              "Doc": "Appends every element of the array, in order.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 72
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "pushAllFrom",
+              "Signature": "pub mut fn pushAllFrom(other: List<T>): void",
+              "Doc": "Appends every element of another list, in order. The other list is unchanged.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 81
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "slice",
+              "Signature": "pub fn slice(from: int, to: int): List<T>",
+              "Doc": "The elements from `from` up to but not including `to`, as a NEW list. The bounds must\nsatisfy `0 <= from <= to <= length()`; anything else is a panic, as an index out of\nrange is — a slice with crossed bounds is a programming error, not an empty answer.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 93
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "filter",
+              "Signature": "pub fn filter(keep: fn(T) -> bool): List<T>",
+              "Doc": "A new list of the elements `keep` accepts, in order, eagerly.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 107
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "forEach",
+              "Signature": "pub fn forEach(f: fn(T) -> void): void",
+              "Doc": "Calls `f` on every element, in order.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 121
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "removeWhere",
+              "Signature": "pub mut fn removeWhere(drop: fn(T) -> bool): int",
+              "Doc": "Removes every element `drop` accepts, keeping the order of the rest; answers how many\nwent. One pass, so removing many is O(n) rather than O(n) per removal.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 131
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "toReversed",
+              "Signature": "pub fn toReversed(): List<T>",
+              "Doc": "A reversed COPY; `reverse` is the in-place form.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 153
+              }
+            },
+            {
+              "Kind": "Method",
               "Name": "isEmpty",
               "Signature": "pub fn isEmpty(): bool",
               "Doc": "Whether nothing is in it.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 64
+                "Line": 164
               }
             },
             {
@@ -529,7 +617,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 70
+                "Line": 170
               }
             },
             {
@@ -540,7 +628,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 87
+                "Line": 187
               }
             },
             {
@@ -551,7 +639,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 103
+                "Line": 203
               }
             },
             {
@@ -562,7 +650,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 121
+                "Line": 221
               }
             },
             {
@@ -573,7 +661,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 130
+                "Line": 230
               }
             },
             {
@@ -584,7 +672,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 140
+                "Line": 240
               }
             },
             {
@@ -595,7 +683,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 150
+                "Line": 250
               }
             },
             {
@@ -606,7 +694,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 158
+                "Line": 258
               }
             },
             {
@@ -617,7 +705,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 167
+                "Line": 267
               }
             },
             {
@@ -628,7 +716,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 183
+                "Line": 283
               }
             },
             {
@@ -639,7 +727,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 205
+                "Line": 305
               }
             },
             {
@@ -650,7 +738,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 218
+                "Line": 318
               }
             },
             {
@@ -661,7 +749,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 234
+                "Line": 334
               }
             }
           ],
@@ -684,7 +772,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 255
+                "Line": 355
               }
             },
             {
@@ -695,7 +783,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 257
+                "Line": 357
               }
             },
             {
@@ -706,13 +794,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 260
+                "Line": 360
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 253
+            "Line": 353
           }
         },
         {
@@ -723,7 +811,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 275
+            "Line": 375
           }
         },
         {
@@ -740,7 +828,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 303
+                "Line": 403
               }
             },
             {
@@ -751,7 +839,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 305
+                "Line": 405
               }
             },
             {
@@ -762,7 +850,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 307
+                "Line": 407
               }
             },
             {
@@ -773,7 +861,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 310
+                "Line": 410
               }
             },
             {
@@ -784,7 +872,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 316
+                "Line": 416
               }
             },
             {
@@ -795,7 +883,18 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 321
+                "Line": 421
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "toArray",
+              "Signature": "pub fn toArray(): T[]",
+              "Doc": "The elements front to back as an array — a look at the queue without draining it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 426
               }
             },
             {
@@ -806,7 +905,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 327
+                "Line": 438
               }
             },
             {
@@ -817,7 +916,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 357
+                "Line": 468
               }
             },
             {
@@ -828,7 +927,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 364
+                "Line": 475
               }
             },
             {
@@ -839,7 +938,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 374
+                "Line": 485
               }
             },
             {
@@ -850,7 +949,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 386
+                "Line": 497
               }
             },
             {
@@ -861,7 +960,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 398
+                "Line": 509
               }
             },
             {
@@ -872,7 +971,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 406
+                "Line": 517
               }
             },
             {
@@ -883,13 +982,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 414
+                "Line": 525
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 301
+            "Line": 401
           }
         },
         {
@@ -900,24 +999,24 @@
           "Members": [
             {
               "Kind": "Field",
-              "Name": "keys",
-              "Signature": "keys: (?K)[]",
+              "Name": "keyColumn",
+              "Signature": "keyColumn: (?K)[]",
               "Doc": "The key column; `states` says which slots are real.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 438
+                "Line": 549
               }
             },
             {
               "Kind": "Field",
-              "Name": "values",
-              "Signature": "values: (?V)[]",
-              "Doc": "The value column, parallel to `keys`.",
+              "Name": "valueColumn",
+              "Signature": "valueColumn: (?V)[]",
+              "Doc": "The value column, parallel to `keyColumn`.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 440
+                "Line": 551
               }
             },
             {
@@ -928,7 +1027,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 442
+                "Line": 553
               }
             },
             {
@@ -939,7 +1038,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 444
+                "Line": 555
               }
             },
             {
@@ -950,7 +1049,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 446
+                "Line": 557
               }
             },
             {
@@ -961,7 +1060,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 449
+                "Line": 560
               }
             },
             {
@@ -972,7 +1071,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 454
+                "Line": 565
               }
             },
             {
@@ -983,7 +1082,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 491
+                "Line": 602
               }
             },
             {
@@ -994,7 +1093,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 504
+                "Line": 615
               }
             },
             {
@@ -1005,7 +1104,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 509
+                "Line": 620
               }
             },
             {
@@ -1016,7 +1115,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 518
+                "Line": 633
               }
             },
             {
@@ -1027,7 +1126,84 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 558
+                "Line": 678
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "getOrInsert",
+              "Signature": "pub mut fn getOrInsert(key: K, make: fn() -> V): V",
+              "Doc": "The value for the key, inserting what `make` produces first when the key is absent —\n`groups.getOrInsert(k, () => List<string>.empty()).push(v)` is the whole of a group-by.\n`make` runs only on a miss.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 686
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "update",
+              "Signature": "pub mut fn update(key: K, f: fn(?V) -> V): void",
+              "Doc": "Replaces the value for the key with what `f` makes of the current one — `null` when the\nkey is absent — and stores the answer: `counts.update(word, (n) => (n ?? 0) + 1)`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 698
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "keys",
+              "Signature": "pub fn keys(): Iterator<K>",
+              "Doc": "A fresh cursor over the keys; the order follows the hashes and is UNSPECIFIED.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 703
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "values",
+              "Signature": "pub fn values(): Iterator<V>",
+              "Doc": "A fresh cursor over the values, in the same unspecified order as `keys`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 708
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "entries",
+              "Signature": "pub fn entries(): Iterator<(K, V)>",
+              "Doc": "A fresh cursor over `(key, value)` pairs: `for (entry in m.entries()) { let (k, v) = entry; … }`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 713
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "fromEntries",
+              "Signature": "pub static fn fromEntries(pairs: (K, V)[]): Map<K, V>",
+              "Doc": "A map from `(key, value)` pairs; a later pair with an equal key overwrites, as `set`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 718
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "capacity",
+              "Signature": "pub fn capacity(): int",
+              "Doc": "How many slots the table holds, empty ones included — what the map costs; `length` is\nthe truth for everything else.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 731
               }
             },
             {
@@ -1038,7 +1214,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 565
+                "Line": 737
               }
             },
             {
@@ -1049,13 +1225,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 580
+                "Line": 752
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 436
+            "Line": 547
           }
         },
         {
@@ -1066,7 +1242,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 638
+            "Line": 810
           }
         },
         {
@@ -1077,7 +1253,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 647
+            "Line": 819
           }
         },
         {
@@ -1094,7 +1270,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 740
+                "Line": 912
               }
             },
             {
@@ -1105,7 +1281,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 742
+                "Line": 914
               }
             },
             {
@@ -1116,7 +1292,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 744
+                "Line": 916
               }
             },
             {
@@ -1127,7 +1303,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 746
+                "Line": 918
               }
             },
             {
@@ -1138,7 +1314,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 749
+                "Line": 921
               }
             },
             {
@@ -1149,7 +1325,51 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 754
+                "Line": 926
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "of",
+              "Signature": "pub static fn of(items: T[]): Set<T>",
+              "Doc": "A set holding the elements of an array: `Set<int>.of([3, 1, 3])` has two elements.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 931
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "addAll",
+              "Signature": "pub mut fn addAll(items: T[]): int",
+              "Doc": "Adds every element of the array; answers how many were new.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 938
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "toArray",
+              "Signature": "pub fn toArray(): T[]",
+              "Doc": "The elements as an array, in the unspecified order of the walk.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 951
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "toList",
+              "Signature": "pub fn toList(): List<T>",
+              "Doc": "The elements as a list, in the unspecified order of the walk.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/collections.lyr",
+                "Line": 956
               }
             },
             {
@@ -1160,7 +1380,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 786
+                "Line": 988
               }
             },
             {
@@ -1171,7 +1391,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 792
+                "Line": 994
               }
             },
             {
@@ -1182,7 +1402,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 799
+                "Line": 1001
               }
             },
             {
@@ -1193,7 +1413,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 834
+                "Line": 1042
               }
             },
             {
@@ -1204,7 +1424,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 847
+                "Line": 1055
               }
             },
             {
@@ -1215,13 +1435,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 859
+                "Line": 1067
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 738
+            "Line": 910
           }
         },
         {
@@ -1238,7 +1458,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 890
+                "Line": 1098
               }
             },
             {
@@ -1249,7 +1469,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 892
+                "Line": 1100
               }
             },
             {
@@ -1260,13 +1480,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 895
+                "Line": 1103
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 888
+            "Line": 1096
           }
         },
         {
@@ -1277,7 +1497,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 910
+            "Line": 1118
           }
         },
         {
@@ -1288,7 +1508,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 922
+            "Line": 1130
           }
         },
         {
@@ -1299,7 +1519,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 936
+            "Line": 1144
           }
         },
         {
@@ -1310,7 +1530,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 947
+            "Line": 1155
           }
         },
         {
@@ -1327,7 +1547,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 970
+                "Line": 1180
               }
             },
             {
@@ -1338,7 +1558,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 972
+                "Line": 1182
               }
             },
             {
@@ -1349,13 +1569,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 975
+                "Line": 1185
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 968
+            "Line": 1178
           }
         },
         {
@@ -1372,7 +1592,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 990
+                "Line": 1200
               }
             },
             {
@@ -1383,7 +1603,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 992
+                "Line": 1202
               }
             },
             {
@@ -1394,13 +1614,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 995
+                "Line": 1205
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 988
+            "Line": 1198
           }
         },
         {
@@ -1417,7 +1637,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 1013
+                "Line": 1223
               }
             },
             {
@@ -1428,7 +1648,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 1015
+                "Line": 1225
               }
             },
             {
@@ -1439,13 +1659,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/collections.lyr",
-                "Line": 1018
+                "Line": 1228
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1011
+            "Line": 1221
           }
         },
         {
@@ -1456,7 +1676,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1035
+            "Line": 1245
           }
         },
         {
@@ -1467,7 +1687,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1040
+            "Line": 1250
           }
         },
         {
@@ -1478,7 +1698,117 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1047
+            "Line": 1257
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "arrayOf",
+          "Signature": "pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[]",
+          "Doc": "An array of `n` values, the one at position `i` being `f(i)`: `arrayOf(3, (i) => i * i)`\nis `[0, 1, 4]`. `f` runs once per slot, in order, and never for `n <= 0`, which answers\nthe empty array.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1271
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "arrayFilled",
+          "Signature": "pub fn arrayFilled<T>(n: int, value: T): T[]",
+          "Doc": "`n` copies of `value` — `[value] * n`, except that `n <= 0` answers the empty array\nwithout an element to write down.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1283
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "mapList",
+          "Signature": "pub fn mapList<T, U>(xs: List<T>, f: fn(T) -> U): List<U>",
+          "Doc": "A new list of `f` applied to every element, EAGERLY: the work happens here, once.\n`xs.iter().map(f)` is the lazy form for a chain that goes on.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1298
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sortListByKey",
+          "Signature": "pub fn sortListByKey<T, K :: [Ordered<K>]>(xs: List<T>, key: fn(T) -> K): void",
+          "Doc": "Sorts in place by a key of each element: `sortListByKey(people, (p) => p.age)`. Stable, as\nevery sort here; the key is computed on every comparison, so a costly key wants a `map` to a\ntuple first.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1314
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sortArray",
+          "Signature": "pub fn sortArray<T :: [Ordered<T>]>(xs: T[]): void",
+          "Doc": "Sorts an array in place by the natural order of the type — through a list, because the\nmerge sort lives there; the array's own slots receive the result.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1320
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "maxBy",
+          "Signature": "pub fn maxBy<T, K :: [Ordered<K>]>(xs: List<T>, key: fn(T) -> K): ?T",
+          "Doc": "The element with the largest key, or `null` for an empty list; the FIRST one on a tie.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1331
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "minBy",
+          "Signature": "pub fn minBy<T, K :: [Ordered<K>]>(xs: List<T>, key: fn(T) -> K): ?T",
+          "Doc": "The element with the smallest key, or `null` for an empty list; the FIRST one on a tie.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1351
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "slice",
+          "Signature": "pub fn slice<T>(xs: T[], from: int, to: int): T[]",
+          "Doc": "The elements from `from` up to but not including `to`, as a NEW array — `List.slice`'s\nedges: `0 <= from <= to <= length`, anything else a panic.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1372
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "listRemove",
+          "Signature": "pub fn listRemove<T :: [Equatable<T>]>(xs: List<T>, value: T): bool",
+          "Doc": "Removes the FIRST occurrence of `value`, by `equals`; whether one was there.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1389
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "groupBy",
+          "Signature": "pub fn groupBy<T, K :: [Hashable<K>]>(xs: List<T>, key: fn(T) -> K): Map<K, List<T>>",
+          "Doc": "The elements grouped by a key, in first-seen order within each group. Every step of the\nidiom in one place: `groupBy(words, (w) => w.length())`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/collections.lyr",
+            "Line": 1400
           }
         },
         {
@@ -1489,7 +1819,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1058
+            "Line": 1418
           }
         },
         {
@@ -1500,7 +1830,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/collections.lyr",
-            "Line": 1070
+            "Line": 1430
           }
         }
       ]
@@ -1882,6 +2212,39 @@
             "File": "stdlib/std/core.lyr",
             "Line": 494
           }
+        },
+        {
+          "Kind": "Function",
+          "Name": "combineHash",
+          "Signature": "pub fn combineHash(seed: int, value: int): int",
+          "Doc": "Folds `value` into `seed` — what a `hash()` over several fields is built from:\n`combineHash(combineHash(0, this.x.hash()), this.y.hash())`. Order matters, so `(1, 2)` and\n`(2, 1)` differ. The anchor a synthesized `Hashable` conformance (4.5) combines the fields\nwith, so a hand-written `hash()` and a synthesized one agree.\n\nThe formula is Boost's `hash_combine` at 64 bits: the golden-ratio constant keeps a run of\nsmall values from cancelling, and the two shifts spread each field over the whole word.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 515
+          }
+        },
+        {
+          "Kind": "Interface",
+          "Name": "OnMethod",
+          "Signature": "pub interface OnMethod",
+          "Doc": "A struct declaring this may stand as `@Name` before a METHOD or a field — the seat a\n`@Deprecated` on `List.oldName` needs. An anchor for the compiler (4.5): declared here so a\nlibrary can name it today, honoured once the attribute rows carry members.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 524
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "NonExhaustive",
+          "Signature": "pub struct NonExhaustive :: [OnType]",
+          "Doc": "Marks an enum as one that may GAIN variants without breaking its callers: a `match` over it\noutside the declaring module must carry a `_` arm, so `Wait` or `IoErrorKind` can grow. The\nsame contract Rust's `#[non_exhaustive]` states. An anchor for the compiler (4.5): the\nattribute is data today, the rule follows in the exhaustiveness check.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 530
+          }
         }
       ]
     },
@@ -1903,7 +2266,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/encoding.lyr",
-                "Line": 23
+                "Line": 24
               }
             },
             {
@@ -1914,7 +2277,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/encoding.lyr",
-                "Line": 24
+                "Line": 25
               }
             },
             {
@@ -1925,13 +2288,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/encoding.lyr",
-                "Line": 26
+                "Line": 27
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 22
+            "Line": 23
           }
         },
         {
@@ -1942,7 +2305,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 69
+            "Line": 70
           }
         },
         {
@@ -1953,7 +2316,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 83
+            "Line": 84
           }
         },
         {
@@ -1964,7 +2327,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 89
+            "Line": 90
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "hexDecodeOrErr",
+          "Signature": "pub fn hexDecodeOrErr(text: string): Result<uint8[], EncodingError>",
+          "Doc": "`hexDecode`, with the reason as a VALUE: the bytes, or the `EncodingError` that\n`hexDecodeOrThrow` would throw.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/encoding.lyr",
+            "Line": 101
           }
         },
         {
@@ -1975,7 +2349,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 124
+            "Line": 138
           }
         },
         {
@@ -1986,7 +2360,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 172
+            "Line": 186
           }
         },
         {
@@ -1997,7 +2371,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 178
+            "Line": 192
           }
         }
       ]
@@ -2010,11 +2384,11 @@
           "Kind": "Function",
           "Name": "formatInt",
           "Signature": "pub fn formatInt(value: int, spec: string): string",
-          "Doc": "An `int` through a .NET numeric specifier (`N0`, `D5`, `X`, ...). An invalid specifier is a\npanic rather than an error value: it is a literal in the source and does not depend on the\ninput.",
+          "Doc": "An `int` through a .NET numeric specifier (`N0`, `D5`, `X`, ...). An invalid specifier is a\npanic rather than an error value: it is a literal in the source and does not depend on the\ninput.\n\n`X` renders the BITS: `formatInt(-255, \"X\")` is the two's complement\n`FFFFFFFFFFFFFF01`, as `{:x}` in Rust and `%x` in Go write it. `formatHex` renders the\nVALUE with a sign, `-ff`, as Python's `hex` does; which one a program wants depends on\nwhether the number is a quantity or a bit pattern, and each name says which it gives.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 21
+            "Line": 26
           }
         },
         {
@@ -2025,7 +2399,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 23
+            "Line": 28
           }
         },
         {
@@ -2036,7 +2410,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 25
+            "Line": 30
           }
         },
         {
@@ -2047,7 +2421,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 27
+            "Line": 32
           }
         },
         {
@@ -2058,7 +2432,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 29
+            "Line": 34
           }
         },
         {
@@ -2069,7 +2443,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 33
+            "Line": 38
           }
         },
         {
@@ -2080,18 +2454,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 48
+            "Line": 53
           }
         },
         {
           "Kind": "Function",
           "Name": "formatHex",
           "Signature": "pub fn formatHex(value: int): string",
-          "Doc": "Hexadecimal, lower case, no prefix.",
+          "Doc": "Hexadecimal, lower case, no prefix — the VALUE, so a negative number carries a sign:\n`formatHex(-255)` is `-ff`. The bit pattern is `formatInt(value, \"x\")`.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 82
+            "Line": 88
           }
         },
         {
@@ -2102,7 +2476,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 87
+            "Line": 93
           }
         },
         {
@@ -2113,7 +2487,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 92
+            "Line": 98
           }
         },
         {
@@ -2124,7 +2498,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 98
+            "Line": 104
           }
         },
         {
@@ -2135,7 +2509,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 105
+            "Line": 111
           }
         },
         {
@@ -2146,7 +2520,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 110
+            "Line": 116
           }
         },
         {
@@ -2157,7 +2531,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 117
+            "Line": 123
           }
         },
         {
@@ -2168,7 +2542,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 132
+            "Line": 138
           }
         },
         {
@@ -2179,7 +2553,112 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/fmt.lyr",
-            "Line": 156
+            "Line": 162
+          }
+        }
+      ]
+    },
+    {
+      "Path": "std.hash",
+      "Doc": "Digests and checksums over bytes: `sha256`, `sha1`, `md5` and `crc32`, plus the hex\nconveniences over text and `hashCombine` for a `Hashable` built from several fields.",
+      "Items": [
+        {
+          "Kind": "Function",
+          "Name": "sha256",
+          "Signature": "pub fn sha256(bytes: uint8[]): uint8[]",
+          "Doc": "The SHA-256 digest: 32 bytes. The one to reach for when the digest must resist an\nattacker — content addressing, integrity checks, tokens derived from secrets.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 26
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sha1",
+          "Signature": "pub fn sha1(bytes: uint8[]): uint8[]",
+          "Doc": "The SHA-1 digest: 20 bytes. Broken for collision resistance since 2017; here because git\nand older protocols still speak it, not for anything new.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 30
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "md5",
+          "Signature": "pub fn md5(bytes: uint8[]): uint8[]",
+          "Doc": "The MD5 digest: 16 bytes. Broken; here for legacy checksums and for nothing else.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 33
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "crc32",
+          "Signature": "pub fn crc32(bytes: uint8[]): int",
+          "Doc": "The CRC-32 checksum (IEEE 802.3, the polynomial zip, PNG and Ethernet use), as a\nnon-negative `int` below 2^32. Detects accidental corruption; a deliberate change is\ntrivially hidden from it.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 38
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sha256Hex",
+          "Signature": "pub fn sha256Hex(text: string): string",
+          "Doc": "`sha256` over the UTF-8 bytes of `text`, as lower-case hex — the form a checksum file or a\ncontent id is written in.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 44
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "sha1Hex",
+          "Signature": "pub fn sha1Hex(text: string): string",
+          "Doc": "`sha1` over the UTF-8 bytes of `text`, as lower-case hex.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 49
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "md5Hex",
+          "Signature": "pub fn md5Hex(text: string): string",
+          "Doc": "`md5` over the UTF-8 bytes of `text`, as lower-case hex.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 54
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "hashCombine",
+          "Signature": "pub fn hashCombine(seed: int, value: int): int",
+          "Doc": "Folds `value` into `seed`, for a `hash()` over several fields:\n`hashCombine(hashCombine(0, this.x.hash()), this.y.hash())`. Order matters, so `(1, 2)`\nand `(2, 1)` hash differently. The same function as `std.core.combineHash`, named here\nbeside the digests.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 62
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "hashAll",
+          "Signature": "pub fn hashAll(hashes: int[]): int",
+          "Doc": "The hash of a whole array of hashes, folded in order from a seed of zero.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/hash.lyr",
+            "Line": 67
           }
         }
       ]
@@ -2497,7 +2976,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 41
+            "Line": 42
           }
         },
         {
@@ -2508,7 +2987,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 45
+            "Line": 46
           }
         },
         {
@@ -2519,7 +2998,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 49
+            "Line": 50
           }
         },
         {
@@ -2530,7 +3009,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 52
+            "Line": 53
           }
         },
         {
@@ -2541,7 +3020,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 55
+            "Line": 56
           }
         },
         {
@@ -2552,7 +3031,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 58
+            "Line": 59
           }
         },
         {
@@ -2563,7 +3042,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 61
+            "Line": 62
           }
         },
         {
@@ -2574,7 +3053,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 65
+            "Line": 66
           }
         },
         {
@@ -2585,7 +3064,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 68
+            "Line": 69
           }
         },
         {
@@ -2596,7 +3075,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 91
+            "Line": 92
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "textOrErr",
+          "Signature": "pub fn textOrErr(path: string): Result<string, IoError>",
+          "Doc": "`text`, with the reason as a VALUE: the content, or the `IoError` that `textOrThrow`\nwould throw — for a read whose failure is stored or handled later rather than caught here.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 102
           }
         },
         {
@@ -2607,7 +3097,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 100
+            "Line": 111
           }
         },
         {
@@ -2618,7 +3108,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 109
+            "Line": 120
           }
         },
         {
@@ -2629,7 +3119,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 118
+            "Line": 129
           }
         },
         {
@@ -2640,7 +3130,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 127
+            "Line": 138
           }
         },
         {
@@ -2651,7 +3141,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 140
+            "Line": 151
           }
         },
         {
@@ -2662,7 +3152,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 147
+            "Line": 158
           }
         },
         {
@@ -2673,7 +3163,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 154
+            "Line": 165
           }
         },
         {
@@ -2684,7 +3174,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 161
+            "Line": 172
           }
         },
         {
@@ -2695,7 +3185,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 169
+            "Line": 180
           }
         },
         {
@@ -2706,7 +3196,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 176
+            "Line": 187
           }
         },
         {
@@ -2717,7 +3207,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 183
+            "Line": 194
           }
         },
         {
@@ -2728,7 +3218,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 190
+            "Line": 201
           }
         },
         {
@@ -2739,7 +3229,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 197
+            "Line": 208
           }
         },
         {
@@ -2750,7 +3240,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 204
+            "Line": 215
           }
         },
         {
@@ -2761,7 +3251,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 215
+            "Line": 226
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "modifiedMillis",
+          "Signature": "pub fn modifiedMillis(path: string): ?int",
+          "Doc": "When the file was last written, as milliseconds since the Unix epoch (UTC), or `null` when\nit does not exist — what a watcher compares between two looks without reading the content.\nMilliseconds rather than an `Instant`, because `std.time` costs `osAccess` and a file\nmodule must not; `Instant.ofEpochMillis` turns it into one.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/io/file.lyr",
+            "Line": 232
           }
         },
         {
@@ -2772,7 +3273,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 217
+            "Line": 234
           }
         },
         {
@@ -2783,7 +3284,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 219
+            "Line": 236
           }
         },
         {
@@ -2794,7 +3295,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 222
+            "Line": 239
           }
         },
         {
@@ -2805,7 +3306,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 225
+            "Line": 242
           }
         },
         {
@@ -2816,7 +3317,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 228
+            "Line": 245
           }
         },
         {
@@ -2827,7 +3328,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 231
+            "Line": 248
           }
         },
         {
@@ -2838,7 +3339,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 235
+            "Line": 252
           }
         },
         {
@@ -2849,7 +3350,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 240
+            "Line": 257
           }
         },
         {
@@ -2860,7 +3361,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/file.lyr",
-            "Line": 247
+            "Line": 264
           }
         }
       ]
@@ -3609,6 +4110,215 @@
                 "File": "stdlib/std/iter.lyr",
                 "Line": 62
               }
+            },
+            {
+              "Kind": "Method",
+              "Name": "skipWhile",
+              "Signature": "fn skipWhile(drop: fn(T) -> bool): Iterator<T>",
+              "Doc": "Elements from the first one `drop` refuses, lazily — the complement of `takeWhile`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 67
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "stepBy",
+              "Signature": "fn stepBy(step: int): Iterator<T>",
+              "Doc": "Every `step`-th element, the first one included: `stepBy(3)` over `a, b, c, d, e, f, g`\nyields `a, d, g`. A step below one yields nothing, the `take` convention.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 73
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "inspect",
+              "Signature": "fn inspect(look: fn(T) -> void): Iterator<T>",
+              "Doc": "Passes every element through `look` on its way past — for a print or a counter in the\nmiddle of a chain, where a `map` would have to return the element it merely looked at.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 79
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "dedupBy",
+              "Signature": "fn dedupBy(key: fn(T) -> int): Iterator<T>",
+              "Doc": "Drops an element whose `key` equals the previous element's key — CONSECUTIVE duplicates,\nso a sorted source becomes distinct and an unsorted one keeps its far-apart repeats.\nKeys rather than elements, because the element type carries no equality here.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 86
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "zipWith",
+              "Signature": "fn zipWith<B, R>(right: Iterator<B>, f: fn(T, B) -> R): Iterator<R>",
+              "Doc": "Pairs combined by `f` as they are drawn, ending when either side does: `zip` and `map`\nin one step, without the tuple in between.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 92
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "fold",
+              "Signature": "fn fold<A>(seed: A, step: fn(A, T) -> A): A",
+              "Doc": "Folds from the left: `range(1, 4).fold(0, (acc, n) => acc + n)` is `((0+1)+2)+3`.\n\nThe most general terminator; `count`, `any` and `all` are special cases of it that exist\nbecause a closure is too much ceremony for counting.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 110
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "reduce",
+              "Signature": "fn reduce(step: fn(T, T) -> T): ?T",
+              "Doc": "Folds without a seed: the first element starts the accumulator, and `null` says the\nsource was empty — the case a seed would have answered.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 122
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "count",
+              "Signature": "fn count(): int",
+              "Doc": "How many elements are left; drains the iterator.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 136
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "first",
+              "Signature": "fn first(): ?T",
+              "Doc": "The first element, or `null` for an empty source. One `next`, named for the chain that\nends on it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 148
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "last",
+              "Signature": "fn last(): ?T",
+              "Doc": "The last element, or `null` for an empty source; drains the iterator.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 153
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "nth",
+              "Signature": "fn nth(n: int): ?T",
+              "Doc": "The element at position `n`, counting from zero, or `null` when the source ends first.\nThe elements before it are consumed.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 168
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "any",
+              "Signature": "fn any(test: fn(T) -> bool): bool",
+              "Doc": "Stops at the first match; the rest is never evaluated.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 182
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "all",
+              "Signature": "fn all(test: fn(T) -> bool): bool",
+              "Doc": "Stops at the first counterexample. An empty iterator yields `true`, the only convention\nfor which `a.all(p) && b.all(p) == a.chain(b).all(p)` holds.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 195
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "none",
+              "Signature": "fn none(test: fn(T) -> bool): bool",
+              "Doc": "Whether nothing matches: `!any`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 207
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "find",
+              "Signature": "fn find(test: fn(T) -> bool): ?T",
+              "Doc": "The first element that matches, or `null`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 212
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "position",
+              "Signature": "fn position(test: fn(T) -> bool): ?int",
+              "Doc": "The position of the first match, or `null`. Separate from `find`, because an `(int, T)`\ntuple would cost the common case where only one of the two is needed.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 225
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "countWhere",
+              "Signature": "fn countWhere(test: fn(T) -> bool): int",
+              "Doc": "How many elements match; drains the iterator. `filter(test).count()` in one step.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 239
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "forEach",
+              "Signature": "fn forEach(f: fn(T) -> void): void",
+              "Doc": "Calls `f` on every element, in order; drains the iterator. The terminator for a chain\nwhose point is the side effect.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 253
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "toArray",
+              "Signature": "fn toArray(): T[]",
+              "Doc": "Everything into an array.\n\nQuadratic: a `T[]` has a fixed length, so every append copies. For a large source\n`std.collections.collect` gathers into a doubling `List<T>`; it lives there because\n`std.iter` must not import `std.collections` — the dependency runs the other way.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 266
+              }
             }
           ],
           "Source": {
@@ -3630,7 +4340,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 80
+                "Line": 290
               }
             },
             {
@@ -3641,7 +4351,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 82
+                "Line": 292
               }
             },
             {
@@ -3652,13 +4362,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 85
+                "Line": 295
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 78
+            "Line": 288
           }
         },
         {
@@ -3675,7 +4385,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 172
+                "Line": 382
               }
             },
             {
@@ -3686,7 +4396,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 174
+                "Line": 384
               }
             },
             {
@@ -3697,13 +4407,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 177
+                "Line": 387
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 170
+            "Line": 380
           }
         },
         {
@@ -3720,7 +4430,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 191
+                "Line": 401
               }
             },
             {
@@ -3731,7 +4441,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 193
+                "Line": 403
               }
             },
             {
@@ -3742,13 +4452,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 196
+                "Line": 406
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 189
+            "Line": 399
           }
         },
         {
@@ -3765,13 +4475,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 213
+                "Line": 423
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 211
+            "Line": 421
           }
         },
         {
@@ -3782,7 +4492,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 228
+            "Line": 438
           }
         },
         {
@@ -3793,7 +4503,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 233
+            "Line": 443
           }
         },
         {
@@ -3804,7 +4514,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 241
+            "Line": 451
           }
         },
         {
@@ -3815,7 +4525,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 254
+            "Line": 464
           }
         },
         {
@@ -3832,7 +4542,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 261
+                "Line": 471
               }
             },
             {
@@ -3843,7 +4553,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 263
+                "Line": 473
               }
             },
             {
@@ -3854,13 +4564,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 266
+                "Line": 476
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 259
+            "Line": 469
           }
         },
         {
@@ -3877,7 +4587,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 293
+                "Line": 503
               }
             },
             {
@@ -3888,7 +4598,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 295
+                "Line": 505
               }
             },
             {
@@ -3899,13 +4609,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 298
+                "Line": 508
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 291
+            "Line": 501
           }
         },
         {
@@ -3922,7 +4632,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 311
+                "Line": 521
               }
             },
             {
@@ -3933,7 +4643,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 313
+                "Line": 523
               }
             },
             {
@@ -3944,13 +4654,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 316
+                "Line": 526
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 309
+            "Line": 519
           }
         },
         {
@@ -3967,7 +4677,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 332
+                "Line": 542
               }
             },
             {
@@ -3978,7 +4688,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 334
+                "Line": 544
               }
             },
             {
@@ -3989,13 +4699,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 337
+                "Line": 547
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 330
+            "Line": 540
           }
         },
         {
@@ -4012,7 +4722,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 349
+                "Line": 559
               }
             },
             {
@@ -4023,7 +4733,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 351
+                "Line": 561
               }
             },
             {
@@ -4034,13 +4744,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 354
+                "Line": 564
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 347
+            "Line": 557
           }
         },
         {
@@ -4057,7 +4767,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 369
+                "Line": 579
               }
             },
             {
@@ -4068,7 +4778,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 371
+                "Line": 581
               }
             },
             {
@@ -4079,7 +4789,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 373
+                "Line": 583
               }
             },
             {
@@ -4090,13 +4800,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 376
+                "Line": 586
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 367
+            "Line": 577
           }
         },
         {
@@ -4113,7 +4823,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 399
+                "Line": 609
               }
             },
             {
@@ -4124,7 +4834,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 401
+                "Line": 611
               }
             },
             {
@@ -4135,13 +4845,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 404
+                "Line": 614
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 397
+            "Line": 607
           }
         },
         {
@@ -4152,7 +4862,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 416
+            "Line": 626
           }
         },
         {
@@ -4169,7 +4879,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 423
+                "Line": 633
               }
             },
             {
@@ -4180,7 +4890,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 425
+                "Line": 635
               }
             },
             {
@@ -4191,13 +4901,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 428
+                "Line": 638
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 421
+            "Line": 631
           }
         },
         {
@@ -4214,7 +4924,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 444
+                "Line": 654
               }
             },
             {
@@ -4225,7 +4935,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 446
+                "Line": 656
               }
             },
             {
@@ -4236,7 +4946,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 448
+                "Line": 658
               }
             },
             {
@@ -4247,13 +4957,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 451
+                "Line": 661
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 442
+            "Line": 652
           }
         },
         {
@@ -4270,7 +4980,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 466
+                "Line": 676
               }
             },
             {
@@ -4281,7 +4991,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 468
+                "Line": 678
               }
             },
             {
@@ -4292,7 +5002,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 470
+                "Line": 680
               }
             },
             {
@@ -4303,13 +5013,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 473
+                "Line": 683
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 464
+            "Line": 674
           }
         },
         {
@@ -4326,7 +5036,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 495
+                "Line": 705
               }
             },
             {
@@ -4337,7 +5047,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 497
+                "Line": 707
               }
             },
             {
@@ -4348,13 +5058,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 503
+                "Line": 713
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 493
+            "Line": 703
           }
         },
         {
@@ -4365,7 +5075,287 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 518
+            "Line": 728
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "SkipWhileIterator",
+          "Signature": "pub class SkipWhileIterator<T> :: [Iterator<T>]",
+          "Doc": "The lazy machinery behind `skipWhile`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "source",
+              "Signature": "source: Iterator<T>",
+              "Doc": "The values whose front is being dropped.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 740
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "drop",
+              "Signature": "drop: fn(T) -> bool",
+              "Doc": "Decides where the dropped front ends.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 742
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "passing",
+              "Signature": "passing: bool",
+              "Doc": "Set once the front has been dropped; from then on everything passes.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 744
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?T",
+              "Doc": "The next value past the dropped front, or `null` at the end.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 747
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/iter.lyr",
+            "Line": 738
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "StepByIterator",
+          "Signature": "pub class StepByIterator<T> :: [Iterator<T>]",
+          "Doc": "The lazy machinery behind `stepBy`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "source",
+              "Signature": "source: Iterator<T>",
+              "Doc": "The values being thinned.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 764
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "step",
+              "Signature": "step: int",
+              "Doc": "The distance between two yielded values.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 766
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "atStart",
+              "Signature": "atStart: bool",
+              "Doc": "Whether the first value is still to come — it is yielded without skipping.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 768
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?T",
+              "Doc": "The next value on the step, or `null` at the end.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 771
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/iter.lyr",
+            "Line": 762
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "InspectIterator",
+          "Signature": "pub class InspectIterator<T> :: [Iterator<T>]",
+          "Doc": "The lazy machinery behind `inspect`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "source",
+              "Signature": "source: Iterator<T>",
+              "Doc": "The values being looked at.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 793
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "look",
+              "Signature": "look: fn(T) -> void",
+              "Doc": "Sees every value on its way past.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 795
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?T",
+              "Doc": "The next value, after `look` has seen it, or `null` at the end.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 798
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/iter.lyr",
+            "Line": 791
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "DedupIterator",
+          "Signature": "pub class DedupIterator<T> :: [Iterator<T>]",
+          "Doc": "The lazy machinery behind `dedupBy`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "source",
+              "Signature": "source: Iterator<T>",
+              "Doc": "The values being thinned.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 811
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "key",
+              "Signature": "key: fn(T) -> int",
+              "Doc": "What decides whether two neighbours are the same.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 813
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "lastKey",
+              "Signature": "lastKey: int",
+              "Doc": "The key of the last yielded value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 815
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "started",
+              "Signature": "started: bool",
+              "Doc": "Whether anything has been yielded yet — before that, `lastKey` means nothing.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 817
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?T",
+              "Doc": "The next value whose key differs from the previous one's, or `null` at the end.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 820
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/iter.lyr",
+            "Line": 809
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "ZipWithIterator",
+          "Signature": "pub class ZipWithIterator<A, B, R> :: [Iterator<R>]",
+          "Doc": "The lazy machinery behind `zipWith`.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "left",
+              "Signature": "left: Iterator<A>",
+              "Doc": "The first column.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 839
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "right",
+              "Signature": "right: Iterator<B>",
+              "Doc": "The second column.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 841
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "f",
+              "Signature": "f: fn(A, B) -> R",
+              "Doc": "Combines one value of each.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 843
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "next",
+              "Signature": "pub mut fn next(): ?R",
+              "Doc": "The next combined value, or `null` when either side ends.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/iter.lyr",
+                "Line": 846
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/iter.lyr",
+            "Line": 837
           }
         },
         {
@@ -4382,13 +5372,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/iter.lyr",
-                "Line": 530
+                "Line": 863
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 528
+            "Line": 861
           }
         },
         {
@@ -4399,7 +5389,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 548
+            "Line": 883
           }
         },
         {
@@ -4410,7 +5400,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 561
+            "Line": 889
           }
         },
         {
@@ -4421,7 +5411,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 577
+            "Line": 895
           }
         },
         {
@@ -4432,7 +5422,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 582
+            "Line": 900
           }
         },
         {
@@ -4443,7 +5433,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 594
+            "Line": 906
           }
         },
         {
@@ -4454,7 +5444,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 605
+            "Line": 917
           }
         },
         {
@@ -4465,7 +5455,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 616
+            "Line": 928
           }
         },
         {
@@ -4476,7 +5466,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 630
+            "Line": 934
           }
         },
         {
@@ -4487,18 +5477,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 643
+            "Line": 939
           }
         },
         {
           "Kind": "Function",
           "Name": "find",
           "Signature": "pub fn find<T>(source: Iterator<T>, test: fn(T) -> bool): ?T",
-          "Doc": "The first element that matches, or `null`.",
+          "Doc": "The first element that matches, or `null`. The method `find` since 4.5.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 648
+            "Line": 944
           }
         },
         {
@@ -4509,7 +5499,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 662
+            "Line": 950
           }
         },
         {
@@ -4520,7 +5510,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 681
+            "Line": 959
           }
         },
         {
@@ -4531,7 +5521,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 692
+            "Line": 964
           }
         },
         {
@@ -4542,7 +5532,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/iter.lyr",
-            "Line": 708
+            "Line": 980
           }
         }
       ]
@@ -4565,7 +5555,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 30
+                "Line": 31
               }
             },
             {
@@ -4576,7 +5566,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 32
+                "Line": 33
               }
             },
             {
@@ -4587,7 +5577,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 34
+                "Line": 35
               }
             },
             {
@@ -4598,7 +5588,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 36
+                "Line": 37
               }
             },
             {
@@ -4609,7 +5599,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 38
+                "Line": 39
               }
             },
             {
@@ -4620,7 +5610,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 40
+                "Line": 41
               }
             },
             {
@@ -4631,7 +5621,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 42
+                "Line": 43
               }
             },
             {
@@ -4642,7 +5632,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 45
+                "Line": 46
               }
             },
             {
@@ -4653,7 +5643,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 53
+                "Line": 54
               }
             },
             {
@@ -4664,7 +5654,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 62
+                "Line": 63
               }
             },
             {
@@ -4675,7 +5665,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 72
+                "Line": 73
               }
             },
             {
@@ -4686,7 +5676,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 81
+                "Line": 82
               }
             },
             {
@@ -4697,7 +5687,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 90
+                "Line": 91
               }
             },
             {
@@ -4708,7 +5698,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 99
+                "Line": 100
               }
             },
             {
@@ -4719,7 +5709,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 107
+                "Line": 108
               }
             },
             {
@@ -4730,13 +5720,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 115
+                "Line": 116
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 28
+            "Line": 29
           }
         },
         {
@@ -4747,7 +5737,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 124
+            "Line": 125
           }
         },
         {
@@ -4758,7 +5748,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 132
+            "Line": 133
           }
         },
         {
@@ -4775,7 +5765,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 304
+                "Line": 305
               }
             },
             {
@@ -4786,7 +5776,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 305
+                "Line": 306
               }
             },
             {
@@ -4797,7 +5787,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 307
+                "Line": 308
               }
             },
             {
@@ -4808,7 +5798,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 309
+                "Line": 310
               }
             },
             {
@@ -4819,13 +5809,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/json.lyr",
-                "Line": 311
+                "Line": 312
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 303
+            "Line": 304
           }
         },
         {
@@ -4836,7 +5826,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 331
+            "Line": 332
           }
         },
         {
@@ -4847,7 +5837,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/json.lyr",
-            "Line": 347
+            "Line": 348
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parseOrErr",
+          "Signature": "pub fn parseOrErr(text: string): Result<JsonValue, JsonError>",
+          "Doc": "`parse`, with the reason as a VALUE: the document, or the `JsonError` that `parseOrThrow`\nwould throw — for a batch of documents whose failures are collected rather than caught.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/json.lyr",
+            "Line": 364
           }
         }
       ]
@@ -5066,14 +6067,113 @@
           }
         },
         {
-          "Kind": "Function",
-          "Name": "absInt",
-          "Signature": "pub fn absInt(value: int): int",
-          "Doc": "The absolute value. The most negative `int` has no positive twin and comes back\nunchanged — arithmetic wraps.",
+          "Kind": "Binding",
+          "Name": "intMax",
+          "Signature": "pub let intMax: int = 9223372036854775807",
+          "Doc": "The largest `int`, 2^63 - 1.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 79
+            "Line": 77
+          }
+        },
+        {
+          "Kind": "Binding",
+          "Name": "intMin",
+          "Signature": "pub let intMin: int",
+          "Doc": "The smallest `int`, -2^63. It has no positive twin: `absInt(intMin)` is `intMin` again, and\n`0 - intMin` too — arithmetic wraps.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 81
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "absInt",
+          "Signature": "pub fn absInt(value: int): int",
+          "Doc": "The absolute value. The most negative `int` has no positive twin and comes back\nunchanged — arithmetic wraps; `checkedAbs` answers `null` there instead.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 85
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "checkedAdd",
+          "Signature": "pub fn checkedAdd(a: int, b: int): ?int",
+          "Doc": "`a + b`, or `null` when the sum does not fit `int`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 97
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "checkedSub",
+          "Signature": "pub fn checkedSub(a: int, b: int): ?int",
+          "Doc": "`a - b`, or `null` when the difference does not fit `int`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 107
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "checkedMul",
+          "Signature": "pub fn checkedMul(a: int, b: int): ?int",
+          "Doc": "`a * b`, or `null` when the product does not fit `int`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 117
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "checkedAbs",
+          "Signature": "pub fn checkedAbs(value: int): ?int",
+          "Doc": "The absolute value, or `null` for `intMin`, the one value without one.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 131
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "saturatingAdd",
+          "Signature": "pub fn saturatingAdd(a: int, b: int): int",
+          "Doc": "`a + b`, held at `intMax` or `intMin` instead of wrapping.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 139
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "saturatingSub",
+          "Signature": "pub fn saturatingSub(a: int, b: int): int",
+          "Doc": "`a - b`, held at the bounds instead of wrapping.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 148
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "saturatingMul",
+          "Signature": "pub fn saturatingMul(a: int, b: int): int",
+          "Doc": "`a * b`, held at the bounds instead of wrapping.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/math.lyr",
+            "Line": 157
           }
         },
         {
@@ -5084,7 +6184,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 84
+            "Line": 166
           }
         },
         {
@@ -5095,7 +6195,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 89
+            "Line": 171
           }
         },
         {
@@ -5106,7 +6206,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 94
+            "Line": 176
           }
         },
         {
@@ -5117,7 +6217,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 102
+            "Line": 184
           }
         },
         {
@@ -5128,7 +6228,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 110
+            "Line": 192
           }
         },
         {
@@ -5139,18 +6239,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 122
+            "Line": 204
           }
         },
         {
           "Kind": "Function",
           "Name": "powInt",
           "Signature": "pub fn powInt(base: int, exponent: int): ?int",
-          "Doc": "Integer power by repeated squaring.\n\nA negative exponent yields `null`: the result would be a fraction.",
+          "Doc": "Integer power by repeated squaring.\n\n`null` for a negative exponent — the result would be a fraction — and since 4.5 for a result\nbeyond `int`, which used to wrap silently: `powInt(2, 64)` answered 0.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 134
+            "Line": 217
           }
         },
         {
@@ -5161,7 +6261,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 157
+            "Line": 252
           }
         },
         {
@@ -5172,7 +6272,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 167
+            "Line": 262
           }
         },
         {
@@ -5183,7 +6283,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 178
+            "Line": 273
           }
         },
         {
@@ -5194,7 +6294,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 186
+            "Line": 281
           }
         },
         {
@@ -5205,7 +6305,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 194
+            "Line": 289
           }
         },
         {
@@ -5216,7 +6316,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 200
+            "Line": 295
           }
         },
         {
@@ -5227,7 +6327,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 205
+            "Line": 300
           }
         },
         {
@@ -5238,7 +6338,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 214
+            "Line": 309
           }
         },
         {
@@ -5249,7 +6349,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 219
+            "Line": 314
           }
         },
         {
@@ -5260,7 +6360,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 226
+            "Line": 321
           }
         },
         {
@@ -5271,7 +6371,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 228
+            "Line": 323
           }
         },
         {
@@ -5282,7 +6382,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 231
+            "Line": 326
           }
         },
         {
@@ -5293,7 +6393,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 239
+            "Line": 334
           }
         },
         {
@@ -5304,7 +6404,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 247
+            "Line": 342
           }
         },
         {
@@ -5315,7 +6415,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 252
+            "Line": 347
           }
         },
         {
@@ -5326,7 +6426,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 257
+            "Line": 352
           }
         },
         {
@@ -5337,7 +6437,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 262
+            "Line": 357
           }
         },
         {
@@ -5348,7 +6448,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 267
+            "Line": 362
           }
         },
         {
@@ -5359,7 +6459,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/math.lyr",
-            "Line": 272
+            "Line": 367
           }
         }
       ]
@@ -5857,13 +6957,24 @@
             },
             {
               "Kind": "Method",
+              "Name": "fresh",
+              "Signature": "pub static fn fresh(): Random",
+              "Doc": "A generator seeded from the operating system's entropy — for a game or a shuffle that\nshould differ per run, and that nobody needs to replay. `seeded` is the reproducible\nform; this one says in its name that the run cannot be repeated.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/random.lyr",
+                "Line": 52
+              }
+            },
+            {
+              "Kind": "Method",
               "Name": "nextInt",
               "Signature": "pub mut fn nextInt(): int",
               "Doc": "The next raw value. It may have either sign.",
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 50
+                "Line": 64
               }
             },
             {
@@ -5874,7 +6985,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 57
+                "Line": 81
               }
             },
             {
@@ -5885,7 +6996,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 66
+                "Line": 100
               }
             },
             {
@@ -5896,7 +7007,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 73
+                "Line": 108
               }
             },
             {
@@ -5907,7 +7018,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/random.lyr",
-                "Line": 78
+                "Line": 113
               }
             }
           ],
@@ -5924,7 +7035,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/random.lyr",
-            "Line": 93
+            "Line": 128
           }
         },
         {
@@ -5935,7 +7046,190 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/random.lyr",
-            "Line": 103
+            "Line": 138
+          }
+        }
+      ]
+    },
+    {
+      "Path": "std.result",
+      "Doc": "A failure as a value: `Ok(value)` or `Err(reason)`, and the combinators that compute with\neither without testing first.\n\n`throws` remains the language's mechanism; this is the holder for a failure that is stored,\ncollected or handled later. `orThrow` and `fromOptional` are the bridges to `throws` and `?T`.",
+      "Items": [
+        {
+          "Kind": "Enum",
+          "Name": "Result",
+          "Signature": "pub enum Result<T, E>",
+          "Doc": "The outcome of something that can fail: the value, or the reason it did not happen.\n\nTwo variants and nothing else, so a `match` covers it with two arms. The reason type `E` is\nunconstrained — a `string` is a fine reason for a config line, and `orThrow` alone asks for\na `Throwable`.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "Ok",
+              "Signature": "Ok(T)",
+              "Doc": "It happened, and this is the value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 41
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Err",
+              "Signature": "Err(E)",
+              "Doc": "It did not, and this says why.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 43
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "isOk",
+              "Signature": "pub fn isOk(): bool",
+              "Doc": "Whether this is an `Ok`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 46
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "isErr",
+              "Signature": "pub fn isErr(): bool",
+              "Doc": "Whether this is an `Err`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 54
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "ok",
+              "Signature": "pub fn ok(): ?T",
+              "Doc": "The value as an optional: `null` for an `Err`, which drops the reason — the bridge to\n`??` and to every function that takes a `?T`.\n\nNot available when `T` is itself optional: the answer would be `??T`. A `match` tells\n`Ok(null)` from `Ok(v)` there, which is the distinction this would have collapsed anyway.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 66
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "err",
+              "Signature": "pub fn err(): ?E",
+              "Doc": "The reason as an optional: `null` for an `Ok`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 74
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "unwrapOr",
+              "Signature": "pub fn unwrapOr(fallback: T): T",
+              "Doc": "The value, or `fallback` for an `Err`. The fallback is evaluated either way; for one that\ncosts something, `unwrapOrElse` takes a function.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 83
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "unwrapOrElse",
+              "Signature": "pub fn unwrapOrElse(fallback: fn(E) -> T): T",
+              "Doc": "The value, or what `fallback` makes of the reason — the reason is not lost, it is handed\nto the function that decides what stands in for the value.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 92
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "expect",
+              "Signature": "pub fn expect(message: string): T",
+              "Doc": "The value, or a panic carrying `message` — for a result that CANNOT be an `Err` here,\nwhere being wrong about that is a programming error. As `std.option.expect` for `?T`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/result.lyr",
+                "Line": 101
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 39
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "map",
+          "Signature": "pub fn map<T, E, U>(r: Result<T, E>, f: fn(T) -> U): Result<U, E>",
+          "Doc": "Applies `f` to the value when there is one; an `Err` passes through unchanged.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 113
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "mapErr",
+          "Signature": "pub fn mapErr<T, E, F>(r: Result<T, E>, f: fn(E) -> F): Result<T, F>",
+          "Doc": "Applies `f` to the REASON when there is one; an `Ok` passes through unchanged. What a\nlayer uses to translate a lower layer's reason into its own.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 122
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "andThen",
+          "Signature": "pub fn andThen<T, E, U>(r: Result<T, E>, f: fn(T) -> Result<U, E>): Result<U, E>",
+          "Doc": "As `map`, but `f` may itself fail: the first `Err` in a chain wins, and everything after it\nis skipped. `andThen(andThen(parse(a), lookup), validate)` reads as the three steps it is.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 131
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "orElse",
+          "Signature": "pub fn orElse<T, E, F>(r: Result<T, E>, f: fn(E) -> Result<T, F>): Result<T, F>",
+          "Doc": "A second attempt when the first failed: `f` gets the reason and answers a result of its own.\nThe mirror image of `andThen`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 140
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "orThrow",
+          "Signature": "pub fn orThrow<T, E :: [Throwable]>(r: Result<T, E>): T throws E",
+          "Doc": "The value, or the reason THROWN — the bridge from the value form back to the language's\nmechanism, for the moment a stored failure is finally handled.\n\nThe catch that goes with it is `catch (e: Throwable)` today: the compiler substitutes a\nthrows clause's type parameter at no call site yet, so a `catch (e: IoError)` beside it is\nreported as not covering. That is a compiler limitation, not a property of this function.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 155
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "fromOptional",
+          "Signature": "pub fn fromOptional<T, E>(o: ?T, error: E): Result<T, E>",
+          "Doc": "An optional with a reason attached: the value when there is one, `error` when there is not.\nWhat turns a `Map.get` or a `parseInt` into a result without a `match` at every site.\n\nNot instantiable for an optional `T`, for the reason `ok` is not: the parameter would read\n`??T`. `Result<?U, E>.Ok(value)` is the direct construction there.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/result.lyr",
+            "Line": 169
           }
         }
       ]
@@ -5952,7 +7246,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 15
+            "Line": 19
           }
         },
         {
@@ -5963,7 +7257,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 18
+            "Line": 22
           }
         },
         {
@@ -5974,7 +7268,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 23
+            "Line": 27
           }
         },
         {
@@ -5985,7 +7279,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 25
+            "Line": 29
           }
         },
         {
@@ -5996,7 +7290,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 27
+            "Line": 31
           }
         },
         {
@@ -6007,7 +7301,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 29
+            "Line": 33
           }
         },
         {
@@ -6018,7 +7312,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 34
+            "Line": 38
           }
         },
         {
@@ -6029,7 +7323,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 46
+            "Line": 50
           }
         },
         {
@@ -6040,7 +7334,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 56
+            "Line": 60
           }
         },
         {
@@ -6057,7 +7351,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 60
+                "Line": 64
               }
             },
             {
@@ -6068,13 +7362,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 62
+                "Line": 66
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 59
+            "Line": 63
           }
         },
         {
@@ -6085,7 +7379,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 72
+            "Line": 76
           }
         },
         {
@@ -6096,7 +7390,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 387
+            "Line": 391
           }
         },
         {
@@ -6107,7 +7401,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 393
+            "Line": 397
           }
         },
         {
@@ -6118,18 +7412,18 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 398
+            "Line": 402
           }
         },
         {
           "Kind": "Function",
           "Name": "isWhitespace",
           "Signature": "pub fn isWhitespace(c: char): bool",
-          "Doc": "Space, tab, `\\n` or `\\r`.",
+          "Doc": "Whether the character is white space in the Unicode sense — the same set `trim` removes,\nso `s.trim() == s.trimStart().trimEnd()` and `isBlank` agree with it: the ASCII controls\n`\\t`..`\\r` and the space, U+0085, U+00A0 and the other space separators (U+1680,\nU+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000). Before 4.5 only four ASCII\ncharacters counted here while `trim` already used this set.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 403
+            "Line": 411
           }
         },
         {
@@ -6140,7 +7434,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 408
+            "Line": 431
           }
         },
         {
@@ -6151,7 +7445,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 413
+            "Line": 436
           }
         },
         {
@@ -6162,7 +7456,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 420
+            "Line": 443
           }
         },
         {
@@ -6173,7 +7467,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 428
+            "Line": 451
           }
         },
         {
@@ -6184,29 +7478,141 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 455
+            "Line": 478
           }
         },
         {
           "Kind": "Function",
           "Name": "parseInt",
           "Signature": "pub fn parseInt(value: string): ?int",
-          "Doc": "`\"-42\"` becomes `-42`, anything else `null`.\n\nNo overflow protection: a number beyond `int64` wraps rather than yielding `null`. Detecting\nit would need a division per digit.",
+          "Doc": "`\"-42\"` becomes `-42`, anything else `null` — an empty text, a sign on its own, a character\nthat is no digit, and since 4.5 a magnitude beyond `int`, which used to wrap silently. The\nreason is what `parseIntOrErr` says.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 470
+            "Line": 492
           }
         },
         {
           "Kind": "Function",
           "Name": "parseIntRadix",
           "Signature": "pub fn parseIntRadix(value: string, radix: int): ?int",
-          "Doc": "From a base of 2 to 36. Letters continue from `a`/`A`.",
+          "Doc": "From a base of 2 to 36. Letters continue from `a`/`A`. `null` on anything `parseInt`\nrefuses, and on a base outside `2..=36`.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 504
+            "Line": 498
+          }
+        },
+        {
+          "Kind": "Enum",
+          "Name": "ParseErrorKind",
+          "Signature": "pub enum ParseErrorKind",
+          "Doc": "What kept a text from being a number.",
+          "Members": [
+            {
+              "Kind": "Variant",
+              "Name": "Empty",
+              "Signature": "Empty",
+              "Doc": "Nothing to read: the text is empty, or a sign with nothing after it.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 507
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "InvalidDigit",
+              "Signature": "InvalidDigit",
+              "Doc": "A character that is no digit of the base — `offset` says which.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 509
+              }
+            },
+            {
+              "Kind": "Variant",
+              "Name": "Overflow",
+              "Signature": "Overflow",
+              "Doc": "The digits are fine and the number is not: it lies outside `int`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 511
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 505
+          }
+        },
+        {
+          "Kind": "Class",
+          "Name": "ParseError",
+          "Signature": "pub class ParseError :: [Throwable]",
+          "Doc": "Why a text is not a number: which kind, and at which code-point offset the reading stopped.\n\nThe carrier-plus-kind shape of `std.io.error.IoError`: a class that throws, holding an enum\nthat matches, so a kind can be added without breaking a `match` over the ones known.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "kind",
+              "Signature": "kind: ParseErrorKind",
+              "Doc": "What went wrong.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 520
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "offset",
+              "Signature": "offset: int",
+              "Doc": "Where the reading stopped, in code points; the text's length for `Overflow` and `Empty`.",
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 522
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "pub fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/string.lyr",
+                "Line": 524
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 518
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parseIntOrErr",
+          "Signature": "pub fn parseIntOrErr(value: string): Result<int, ParseError>",
+          "Doc": "`parseInt`, with the reason when the text is not a number: the value, or a `ParseError`\nsaying what stopped the reading and where.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 536
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "parseIntRadixOrErr",
+          "Signature": "pub fn parseIntRadixOrErr(value: string, radix: int): Result<int, ParseError>",
+          "Doc": "`parseIntRadix`, with the reason. A base outside `2..=36` is reported as `InvalidDigit` at\noffset 0: no character of any text is a digit of a base that does not exist.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/string.lyr",
+            "Line": 542
           }
         },
         {
@@ -6217,7 +7623,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 549
+            "Line": 610
           }
         },
         {
@@ -6228,7 +7634,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 567
+            "Line": 628
           }
         },
         {
@@ -6245,7 +7651,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 580
+                "Line": 641
               }
             },
             {
@@ -6256,7 +7662,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 582
+                "Line": 643
               }
             },
             {
@@ -6267,7 +7673,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 585
+                "Line": 646
               }
             },
             {
@@ -6278,7 +7684,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 590
+                "Line": 651
               }
             },
             {
@@ -6289,7 +7695,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 605
+                "Line": 666
               }
             },
             {
@@ -6300,7 +7706,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 611
+                "Line": 672
               }
             },
             {
@@ -6311,13 +7717,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/string.lyr",
-                "Line": 619
+                "Line": 680
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/string.lyr",
-            "Line": 578
+            "Line": 639
           }
         }
       ]
@@ -6451,7 +7857,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/test.lyr",
-            "Line": 16
+            "Line": 17
           }
         },
         {
@@ -6462,7 +7868,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/test.lyr",
-            "Line": 22
+            "Line": 23
           }
         },
         {
@@ -6473,7 +7879,84 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/test.lyr",
-            "Line": 27
+            "Line": 28
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertNotEq",
+          "Signature": "pub fn assertNotEq<T :: [Equatable<T>, Display]>(actual: T, unexpected: T): void",
+          "Doc": "Fails the test when the two values are EQUAL, naming the value — the assertion for \"it\nchanged\", where `assertEq` says \"it is\".",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 36
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertNull",
+          "Signature": "pub fn assertNull<T :: [Display]>(value: ?T): void",
+          "Doc": "Fails the test when the value is present, naming it.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 43
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertNotNull",
+          "Signature": "pub fn assertNotNull<T>(value: ?T, message: string): void",
+          "Doc": "Fails the test when the value is absent.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 50
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertClose",
+          "Signature": "pub fn assertClose(actual: float, expected: float, tolerance: float): void",
+          "Doc": "Fails the test when the two floats lie further apart than `tolerance` — the comparison\n`assertEq` cannot make for floating point, where `0.1 + 0.2` is not `0.3`. NaN on either\nside fails: it is close to nothing.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 59
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertLess",
+          "Signature": "pub fn assertLess<T :: [Ordered<T>, Display]>(actual: T, bound: T): void",
+          "Doc": "Fails the test when `actual` is not strictly less than `bound`, naming both.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 74
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "assertContains",
+          "Signature": "pub fn assertContains(haystack: string, needle: string): void",
+          "Doc": "Fails the test when the text does not contain `needle`, quoting both.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 81
+          }
+        },
+        {
+          "Kind": "Function",
+          "Name": "fail",
+          "Signature": "pub fn fail(message: string): void",
+          "Doc": "Fails the test outright, with `message` — for a branch a test must never reach.\n\n`void` rather than `never` like `panic`: it does not count as a `return` for the flow\nanalysis until the language lets a library function say `never`.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/test.lyr",
+            "Line": 91
           }
         }
       ]

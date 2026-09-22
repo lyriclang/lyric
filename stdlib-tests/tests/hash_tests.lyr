@@ -1,0 +1,45 @@
+import std.test { Test, assertEq, assertNotEq };
+import std.hash { sha256, sha1, md5, crc32, sha256Hex, sha1Hex, md5Hex, hashCombine, hashAll };
+import std.encoding { hexEncode };
+import std.string as strings;
+
+@Test
+pub fn sha256_matches_the_published_vectors(): void {
+    assertEq(sha256Hex(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    assertEq(sha256Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    assertEq(sha256("abc".utf8Encode()).length, 32);
+}
+
+@Test
+pub fn sha1_and_md5_match_the_published_vectors(): void {
+    assertEq(sha1Hex("abc"), "a9993e364706816aba3e25717850c26c9cd0d89d");
+    assertEq(md5Hex(""), "d41d8cd98f00b204e9800998ecf8427e");
+    assertEq(
+        md5Hex("The quick brown fox jumps over the lazy dog"),
+        "9e107d9d372bb6826bd81d3542a419d6"
+    );
+    assertEq(sha1("abc".utf8Encode()).length, 20);
+    assertEq(md5("abc".utf8Encode()).length, 16);
+}
+
+@Test
+pub fn crc32_is_the_zip_polynomial(): void {
+    assertEq(crc32("123456789".utf8Encode()), 0xCBF43926);
+    assertEq(crc32([]), 0);
+    assertEq(crc32("The quick brown fox jumps over the lazy dog".utf8Encode()), 0x414FA339);
+}
+
+@Test
+pub fn digests_are_over_bytes_not_text(): void {
+    let bytes = "Grüße".utf8Encode();
+    assertEq(hexEncode(sha256(bytes)), sha256Hex("Grüße"));
+    assertNotEq(sha256Hex("Grüße"), sha256Hex("Grusse"));
+}
+
+@Test
+pub fn combining_hashes_depends_on_the_order(): void {
+    assertNotEq(hashCombine(hashCombine(0, 1), 2), hashCombine(hashCombine(0, 2), 1));
+    assertEq(hashAll([1, 2]), hashCombine(hashCombine(0, 1), 2));
+    assertEq(hashAll([]), 0);
+    assertNotEq(hashCombine(0, 0), 0);
+}
