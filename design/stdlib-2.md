@@ -414,6 +414,19 @@ Zeitzonen sind ein Paket, kein stdlib-Versprechen.
 einem Seed aus `std.os` — deshalb ohne osAccess); `nextIntRange` per Rejection Sampling über 63
 Bits (Go `rand.Int63n`, Java `nextInt(bound)`); `nextFloat` aus den oberen 53 Bits (Java
 `nextDouble`). Design: `nextFloatRange(lo, hi)`, `shuffleArray`, `choiceArray`, `sample(k)`.
+**Determinismus-Regel (mit macro-abi abgestimmt):** `secureRandom` und `Random.fresh()` sind
+die zwei nicht-deterministischen Züge des Moduls; ein Compile-Zeit-Runner (`comptime`) lehnt den
+Import `std.random.secureRandom` per Namen ab (LYR-CT0002) statt eine Capability einzuführen;
+`Random.seeded(n)` bleibt überall auswertbar.
+
+**Nativ oder `extern "dotnet"` (mit macro-abi abgestimmt):** In der stdlib nativ bleibt, was ein
+Programm ohne `hostAccess` braucht — Digests, UTF-8, Base64/Hex, Zeit, Datei, Netz, Prozess.
+Über die Host-ABI im Nutzercode bleiben Kompression, HTTP-Client, Regex, Zeitzonen
+(`TimeZoneInfo`), Kryptografie jenseits Digests (AES/RSA): für keines davon ist ein stdlib-Modul
+vor 5.x geplant. §11-Zusage zu Bytes (Vorschlag, bei Punkt 5): „`uint8[]` ist der Bytepuffer der
+Bibliothek: jede Funktion, die Bytes liest oder liefert, spricht ihn, und ein Host hält ihn als
+EIN zusammenhängendes Array fester Länge, dessen Elemente die Bytes in Reihenfolge sind — eine
+Fremdschnittstelle darf ihn per Kopie an der Grenze übergeben.“
 
 **Hash (Prototyp):** `std.hash` mit sha256/sha1/md5/crc32 nativ, `*Hex`, `hashCombine`.
 Python (hashlib/zlib) und Go (crypto/*, hash/crc32) haben Digests in der stdlib; Rust nicht
@@ -595,9 +608,11 @@ Fallback-Zeile, nicht die Ursache). Fix: `or TypeSymbolKind.Enum`. Ir/Sema/Vm-Su
 | 6014114c | (e) std.hash + combineHash + Anker + Test-Familie | hash.lyr (neu), NativeRegistry.cs, core.lyr, test.lyr | hash_tests (5), test_tests (1) |
 | 6bd1a6e9 | Doku: Guide 13, DocGen-Ratchet 554→683, Site 23→25 Seiten, Snapshot | docs/guide/13, tests/Lyric.Tests.DocGen | — |
 | 2656bcb9 | arrayOf/arrayFilled ohne Native (Prototyp 18, Form A) | collections.lyr | collections_tests (+1) |
+| 4fe6381e | `std.os.args()` liefert die Programmargumente (Bug, lyriclings-Fund); `file.modifiedMillis` | NativeRegistry.cs, io/file.lyr | file_tests (+1) |
 
-209/209 stdlib-Tests (166 alt + 43 neu); Ir 175, Sema 770, Vm 1453, Formatting 190, DocGen 201
-grün. new-features hat den Enum-Methoden-Fix als Voraussetzung in seine Roadmap übernommen
+210/210 stdlib-Tests (166 alt + 44 neu); Ir 175, Sema 770, Vm 1453, Formatting 190, DocGen 201,
+Lsp 281, Embedding 222 grün; Cli 276/277 — `InterruptTests.Sigint` fällt in der WSL-Sandbox auch
+auf unveränderten Branches (macro-abi bestätigt), umgebungsbedingt. new-features hat den Enum-Methoden-Fix als Voraussetzung in seine Roadmap übernommen
 (er bleibt auf diesem Branch, um einen doppelten Einzeiler-Konflikt in FunctionLowerer.cs zu
 vermeiden), die generische Methode auf generischem Typ als HIGH-Bug für 4.5, `try e` → Result als
 Option B seines try-Ausdruck-Designs (Empfehlung: 5.0, zusammen mit dem Wegfall der Zwillinge),
