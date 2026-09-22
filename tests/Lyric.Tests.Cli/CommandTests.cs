@@ -204,7 +204,17 @@ public sealed class CommandTests
         // the backtrace names both: the callee's line first, then the caller.
         var name = Path.GetFileName(source.Path);
         Assert.Contains($"in main.divide ({name}:3)", withMap.Err, StringComparison.Ordinal);
-        Assert.Contains($"in main.main ({name}:8)", withMap.Err, StringComparison.Ordinal);
+
+        // THE CALLER'S FRAME IS THE INTERPRETER'S TO GIVE. Compiled code keeps no frames, so a
+        // panic that passes through it loses everything below the function that failed — the
+        // cost the compiled engine documents, measured here from the outside: one build, two
+        // frames interpreted and one compiled. It was invisible until the debug profile became
+        // the default, because an optimized build had inlined the callee away and left one
+        // frame either way. Both engines are pinned rather than one skipped.
+        if (Toolchain.Compiled)
+            Assert.DoesNotContain("in main.main", withMap.Err, StringComparison.Ordinal);
+        else
+            Assert.Contains($"in main.main ({name}:8)", withMap.Err, StringComparison.Ordinal);
 
         Assert.Contains("in main.divide", without.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(name, without.Err, StringComparison.Ordinal);
