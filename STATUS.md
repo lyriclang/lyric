@@ -72,10 +72,35 @@ by convention, and `std.build` v2 moves its model into Lyric. The delivery list:
       carry `name`. Thirteen CLI tests over sibling temp projects, guide 12 and 16, CHANGELOG.
       **The spec sentence**: §4.1 lists the roots a dotted path resolves under and gains the
       dependency root (`lyric-spec`, spec-first, this slice's twin)
-- [ ] slice 3 — `std.build` v2 and `lyrbuild` v2 (synthetic entry, the model in Lyric, implicit
-      build, `packed`, options, `after`)
-- [ ] slice 4 — the driver's verbs without a file argument, artifact names, `out/<profile>/`,
-      templates, project-wide `check`
+- [x] **slice 3 — `std.build` v2 and `lyrbuild` v2**: the MODEL moved into Lyric. `Artifact` is
+      an ordinary class — kind, name, entry, the four option fields, an optional `output` — and
+      `Profile` a struct of scalars; `executable(name, entry)`, `library(name, root)`,
+      `packed(app)`, `option(name, help)` and `flag(name, help)` declare, `use(profile)` takes a
+      bundle, and the derivation `out/<profile>/<name>.lyrbc` is a Lyric method with its own
+      `stdlib-tests` (six, host-free: the natives are reached only through `executable` and
+      `Profile.selected`, so the literals stand in). The runner writes an ENTRY around the
+      script — `build()`, then `std.build.finish()`, then `after()` when the script has one and
+      nothing failed — because a standard library function is nobody's root and the hand-over
+      has to run after `build` has returned; the script is checked first, alone, so its errors
+      carry its spans and the hooks are known before the entry is written. Seven natives, all
+      private, all scalar (`?string` and a struct cannot cross the boundary, so `option` is
+      `hasOption` plus `optionValue` in Lyric, and a profile is asked field by field): the
+      table stays in C#. `-D name[=value]` and `--only <name>`, both checked against what the
+      script declared ONCE IT HAS RUN — a `-D` nobody asked about is `LYR-CLI0003` with the
+      declared names, an `--only` nobody declared is `LYR-CLI0019` — and `lyrbuild --help` in a
+      project runs `build` to list its options. Without a script, the convention: `main.lyr`
+      under the source root is the program, named after the project, a source root without
+      one is a library and is checked, neither is `LYR-CLI0011` naming both. `packed` goes
+      through the `lyrpack` PROCESS, so `Tool` moved to `Lyric.Core` where the driver and the
+      runner share one ladder; a library check goes through `CheckProject` with the module
+      naming the LSP uses, now `ScriptSource.ModuleNameUnder`. `denyWarnings` is per artifact.
+      `addExecutable` stays, `@Deprecated` until 5.0, named after the output's stem; the 4.x
+      arguments in the 4.5 call are refused at the call with the message naming which way round.
+      The driver learned which of `build`'s options take a value (`--profile release` went to
+      the COMPILER as a file before). The app template declares `executable("__name__", …)`;
+      twenty CLI tests, guide 16 rewritten, guide 13, CHANGELOG
+- [ ] slice 4 — the driver's verbs without a file argument (`run`, `pack` on the default
+      artifact, by name), templates (a `tests/` directory, `.gitignore`), project-wide `check`
 - [ ] slice 5 — the spec sentence (§4, a dependency root), the release
 
 **Sweep round 1 after M36 ships as v4.4.1** (2026-09-04) — not clean. **Two findings, and neither

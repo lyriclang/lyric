@@ -65,7 +65,7 @@ public class BuildScriptTests
 
             pub fn build() {
                 let app = addExecutable("src/main.lyr", "out/stripped.lyrbc");
-                app.sourceMap(false);
+                app.sourceMap = false;
 
                 addExecutable("src/main.lyr", "out/mapped.lyrbc");
             }

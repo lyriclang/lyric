@@ -12,7 +12,8 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ## Unreleased
 
-**Two profiles, and a compile is the debug one unless you say otherwise.**
+**Two profiles, and a compile is the debug one unless you say otherwise. A build script names
+what it builds, and a project builds without one.**
 
 ### Added
 
@@ -45,7 +46,41 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 - **`HostOptions.DependencyRoots`**, the same table for a host compiling a project's scripts.
 
+- **`std.build` names what it builds.** `executable(name, entry)` declares a program that lands
+  as `out/<profile>/<name>.lyrbc`; `library(name, root)` checks every module under a root and
+  writes nothing; `packed(app)` declares the packed form of an executable, landing as
+  `out/<profile>/<name>` with the platform's suffix. An artifact is an ordinary object: its
+  fields are the profile's four (`optimize`, `sourceMap`, `debugInfo`, `denyWarnings`), set one
+  by one or all at once with `use(Profile.release())`, and `output` names where it lands
+  outright. `Profile.selected()`, `Profile.debug()` and `Profile.release()` are the toolchain's
+  table, asked rather than copied.
+
+- **A build script takes options.** `option(name, help)` answers `-D name=value` (`null` when
+  not given), `flag(name, help)` answers `-D name`; `lyric build --help` in a project lists
+  them. A `-D` the script never asked about is refused with the ones it did (`LYR-CLI0003`).
+  `--only <name>` builds one artifact; a name nobody declared is refused with the ones that
+  were (`LYR-CLI0019`). A `pub fn after()` in the script runs once every artifact was written,
+  and not otherwise.
+
+- **A project builds without a script.** `lyric build` in a directory without a `build.lyr`
+  compiles `main.lyr` under the source root into `out/<profile>/<name>.lyrbc`, named after the
+  project (`lyric.json`'s `name`, or the directory); a source root without a `main.lyr` is a
+  library and is checked as a whole. Neither is `LYR-CLI0011`, naming both ways.
+
 ### Changed
+
+- **Build artifacts land under `out/<profile>/`.** `lyric new`'s app builds to
+  `out/debug/<name>.lyrbc`, and `lyric build --release` to `out/release/`, so the two shapes
+  never overwrite each other. A script that wants the old layout sets `output` on the artifact.
+
+- **`addExecutable(entry, output)` is deprecated** (`LYR-SEM0076`, kept until 5.0). It still
+  builds, named after the output's stem; the new spelling is `executable(name, entry)` with
+  `output` set when the derivation is not wanted. The old arguments in the new call are refused
+  at the call with a message saying which way round they go. Its one setter,
+  `app.sourceMap(false)`, is the field now — `app.sourceMap = false` — and a script calling the
+  method gets a compile error at the call: a field and a method cannot share the name, and the
+  field is the one the other three options have.
+
 
 - **`lyric build`, `lyric run`, `lyric check`, `lyric test`, the REPL and the embedding API
   compile the debug profile by default.** Before, every compile ran the optimizations and kept

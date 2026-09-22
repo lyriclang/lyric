@@ -1,9 +1,12 @@
 using System.Diagnostics;
-using Lyric.Core;
 
-namespace Lyric.Cli;
+namespace Lyric.Core;
 
 /// <summary>A tool of the suite: its name, its selection flag and its environment variable.
+///
+/// <para>In the shared library rather than in the driver, because the driver is not the only
+/// tool that starts another: the build runner packs through <c>lyrpack</c>, and it finds it the
+/// way the driver does — one ladder, not two.</para>
 /// </summary>
 public sealed record Tool(string Name, string Flag, string EnvironmentVariable)
 {

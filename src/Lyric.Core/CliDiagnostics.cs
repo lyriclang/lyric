@@ -79,6 +79,11 @@ public static class CliDiagnostics
     /// file is wrong, the toolchain is too old.</summary>
     public const string ToolchainTooOld = "LYR-CLI0018";
 
+    /// <summary>A build was told <c>--only &lt;name&gt;</c> and the script declared no artifact
+    /// of that name. An error rather than an empty build, which would report success having
+    /// written nothing; the message lists the names that exist.</summary>
+    public const string UnknownArtifact = "LYR-CLI0019";
+
     /// <summary>Reports a CLI diagnostic and renders it immediately. It has no source span, so
     /// there is nothing to collect or order.</summary>
     public static int Fail(TextWriter error, string code, string message, int exitCode)

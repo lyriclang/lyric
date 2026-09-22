@@ -1,0 +1,86 @@
+import std.test { Test, assertEq, assertTrue };
+import std.build { Artifact, Kind, Profile, packed };
+
+// The Lyric half of std.build: what an artifact derives and what a profile changes on it.
+// Everything that asks the toolchain — Profile.selected(), executable(), option() — is bound
+// only by `lyric build`, so the profile and the artifact stand here as literals.
+
+fn release(): Profile {
+    return Profile {
+        name = "release",
+        optimize = true,
+        sourceMap = true,
+        debugInfo = false,
+        denyWarnings = false,
+    };
+}
+
+fn app(): Artifact {
+    return Artifact {
+        kind = Kind.Executable,
+        name = "game",
+        entry = "src/main.lyr",
+        profileName = "debug",
+        optimize = false,
+        sourceMap = true,
+        debugInfo = true,
+        denyWarnings = false,
+    };
+}
+
+@Test
+pub fn an_executable_lands_under_its_profile(): void {
+    assertEq(app().outputPath(), "out/debug/game.lyrbc");
+}
+
+@Test
+pub fn an_explicit_output_wins(): void {
+    let a = app();
+    a.output = "dist/game.lyrbc";
+    assertEq(a.outputPath(), "dist/game.lyrbc");
+}
+
+@Test
+pub fn use_takes_the_four_fields_and_the_name(): void {
+    let a = app();
+    a.use(release());
+    assertTrue(a.optimize, "optimize follows the profile");
+    assertTrue(!a.debugInfo, "debug info follows the profile");
+    assertEq(a.profileName, "release");
+    assertEq(a.outputPath(), "out/release/game.lyrbc");
+}
+
+@Test
+pub fn a_field_set_after_use_stands(): void {
+    let a = app();
+    a.use(release());
+    a.sourceMap = false;
+    assertTrue(!a.sourceMap, "the script's word stands beside the profile's");
+    assertTrue(a.optimize, "and the other fields keep the profile's");
+}
+
+@Test
+pub fn a_packed_program_inherits_and_lands_without_an_extension(): void {
+    let a = app();
+    a.use(release());
+    let p = packed(a);
+    assertEq(p.name, "game");
+    assertEq(p.entry, "src/main.lyr");
+    assertTrue(p.optimize, "packed inherits the fields");
+    assertEq(p.outputPath(), "out/release/game");
+}
+
+@Test
+pub fn a_library_writes_nothing(): void {
+    let lib = Artifact {
+        kind = Kind.Library,
+        name = "geometry",
+        entry = "src",
+        profileName = "debug",
+        optimize = false,
+        sourceMap = true,
+        debugInfo = true,
+        denyWarnings = false,
+    };
+    assertEq(lib.outputPath(), "");
+}

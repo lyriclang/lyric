@@ -224,9 +224,17 @@ public static class Program
         return Path.Combine(directory, OperatingSystem.IsWindows() ? $"{name}.exe" : name);
     }
 
+    /// <summary>The options of <c>build</c> that take a value, on either side of the verb —
+    /// the compiler's <c>-o</c>, the runner's <c>-D</c> — so the value is never mistaken for
+    /// the path.</summary>
+    private static readonly HashSet<string> BuildValueOptions = new(StringComparer.Ordinal)
+    {
+        "-o", "--output", "--profile", "--stdlib", "-D", "--only",
+    };
+
     /// <summary>
     /// <c>build</c> with a source file is the compiler; without one, or with a directory, it is the
-    /// build script that lies there.
+    /// project that lies there: its build script, or the convention when it has none.
     ///
     /// <para>Decided on the argument rather than on a flag, because the two are different
     /// questions: "compile this file" and "build this project". A path that does not exist stays
@@ -234,7 +242,16 @@ public static class Program
     /// </summary>
     private static int Build(string[] args, ToolSelection selection)
     {
-        var positional = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-'));
+        string? positional = null;
+        for (var i = 1; i < args.Length; i++)
+        {
+            // What follows an option that takes a value is its value, not the path: 'lyric
+            // build --profile release' names no file called release.
+            if (BuildValueOptions.Contains(args[i])) { i++; continue; }
+            if (args[i].StartsWith('-')) continue;
+            positional = args[i];
+            break;
+        }
 
         if (positional is not null && !Directory.Exists(positional))
             return Forward(Tool.Compiler, selection, args);
@@ -297,7 +314,9 @@ public static class Program
               new <name> [--lib]       Write a new project, an app or a library
               run <file>               Compile and execute (.lyr or .lyrbc)
               build <file> [-o <out>]  Compile .lyr to .lyrbc
-              build [<dir>]            Run the build.lyr there and compile what it declares
+              build [<dir>]            Build the project there: its build.lyr, or main.lyr by
+                                       convention (-D name[=value] for the script's options,
+                                       --only <name> for one artifact)
               pack <file> [-o <out>]   Compile (release profile) and pack into one executable
               fmt <path>... [--check]  Format .lyr files in place (--check only lists)
               test [<dir>]             Run the @Test functions of the project's test root

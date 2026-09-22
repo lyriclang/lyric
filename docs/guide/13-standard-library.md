@@ -21,7 +21,7 @@ The standard library is written in Lyric and ships as source alongside the toolc
 | `std.io.stream` | open files read and written in pieces, inside tasks — requires `fileAccess` + `osAccess` |
 | `std.json` | `JsonValue`, `parse`, `serialize`, `serializePretty` — JSON, RFC 8259 |
 | `std.encoding` | `hexEncode`/`hexDecode`, `base64Encode`/`base64Decode` — RFC 4648 |
-| `std.build` | `addExecutable` — only a `build.lyr` run by `lyric build` can use it |
+| `std.build` | `executable`, `library`, `packed`, `option`, `flag`, `Profile` — only a `build.lyr` run by `lyric build` can use it |
 
 ## Whether, or why: the `OrThrow` twins
 

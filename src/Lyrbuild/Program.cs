@@ -1,3 +1,4 @@
+using Lyric.AST;
 using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Embedding;
@@ -5,35 +6,23 @@ using Lyric.Embedding;
 namespace Lyric.Cli.Build;
 
 /// <summary>
-/// What a build script declares: one program to compile.
-///
-/// <para>A host object, so the script holds it as a value and configures it after the call that
-/// produced it. Everything on it is read after <c>build</c> has returned.</para>
-/// </summary>
-public sealed class Artifact
-{
-    public required string Entry { get; init; }
-    public required string Output { get; init; }
-
-    /// <summary>Whether the module carries a source map. The default of <c>lyric build</c>.</summary>
-    public bool SourceMap { get; set; } = true;
-}
-
-/// <summary>
-/// <c>lyrbuild</c> — runs a <c>build.lyr</c> and compiles what it declares.
+/// <c>lyrbuild</c> — builds a project: runs its <c>build.lyr</c> and compiles what it declares,
+/// or builds by convention when there is no script.
 ///
 /// <para>The second binary that holds both libraries, for the same reason as <c>lyrrepl</c>: a
 /// build script is a Lyric program that has to RUN, and what it declares has to be COMPILED
 /// afterwards. Two subprocesses cannot do it — the artifacts live in the objects the script was
 /// handed.</para>
 ///
-/// <para>NOTHING IS COMPILED WHILE THE SCRIPT RUNS. It collects, and the compiles happen once
-/// <c>build</c> has returned, so an option set on the line after <c>addExecutable</c> still applies
-/// and any file the script generates is finished before it is read.</para>
+/// <para>The script is never the entry point. The runner writes an entry AROUND it — an import
+/// of <c>build.lyr</c>, a <c>main</c> that calls <c>build()</c>, then <c>std.build.finish()</c>,
+/// then <c>after()</c> if the script has one — and compiles that. Everything the script says
+/// about its artifacts is Lyric, in <c>std.build</c>; the entry is what lets that Lyric run
+/// after <c>build</c> has returned, because a standard library function is nobody's root.</para>
 ///
-/// <para>A build script runs with every capability. It writes files and starts processes, which is
-/// the point of it being a script rather than a manifest — and it means <c>lyric build</c> in a
-/// repository you did not write runs code you did not write, exactly as <c>make</c> and
+/// <para>A build script runs with every capability. It writes files and starts processes, which
+/// is the point of it being a script rather than a manifest — and it means <c>lyric build</c>
+/// in a repository you did not write runs code you did not write, exactly as <c>make</c> and
 /// <c>cmake</c> do.</para>
 /// </summary>
 public static class Program
@@ -41,40 +30,94 @@ public static class Program
     /// <summary>The file searched for in the directory the build was pointed at.</summary>
     public const string FileName = "build.lyr";
 
+    /// <summary>The module name of the entry the runner writes around the script: never on
+    /// disk, and an identifier no script would take.</summary>
+    private const string EntryName = "__lyrbuild";
+
+    private sealed record Flags(string? Directory, string? Stdlib, Profile Profile,
+        IReadOnlyDictionary<string, string> Defines, IReadOnlyList<string> Only,
+        bool Help, bool Version);
+
     public static int Main(string[] args)
     {
         ConsoleStreams.UseUtf8WhenRedirected();
 
-        string? directoryArgument = null;
-        string? stdlib = null;
+        if (Parse(args) is not { } flags) return ExitCodes.Usage;
+
+        if (flags.Version)
+        {
+            Console.Out.WriteLine($"lyrbuild {ToolchainVersion.Value}");
+            return ExitCodes.Success;
+        }
+
+        var directory = Path.GetFullPath(flags.Directory ?? Directory.GetCurrentDirectory());
+        var script = Path.Combine(directory, FileName);
+
+        if (flags.Help)
+        {
+            PrintHelp();
+            // In a project, the script's own options follow the fixed ones. They exist only
+            // once the script has run, so it runs: 'build' collects, and nothing is compiled.
+            return File.Exists(script) ? DescribeOptions(script, directory, flags) : ExitCodes.Success;
+        }
+
+        try
+        {
+            // The roots belong to the project and not to the build: lyric.json answers them
+            // once, for the script itself and for everything it declares.
+            var project = ProjectFile.Discover(directory);
+            foreach (var warning in project?.Warnings ?? [])
+                Console.Error.WriteLine(
+                    $"warning: {Path.Combine(project!.Directory, ProjectFile.FileName)}: {warning}");
+
+            return File.Exists(script)
+                ? RunScript(script, directory, project, flags)
+                : BuildByConvention(directory, project, flags);
+        }
+        catch (ProjectFileException broken)
+        {
+            return CliDiagnostics.Fail(Console.Error, broken.Code,
+                $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
+        }
+    }
+
+    /// <summary>Strict: an option nobody knows is refused by name, because an option that is
+    /// accepted and does nothing is the one that costs an afternoon.</summary>
+    private static Flags? Parse(string[] args)
+    {
+        string? directory = null, stdlib = null;
         var profile = Profile.Default;
+        var defines = new Dictionary<string, string>(StringComparer.Ordinal);
+        var only = new List<string>();
+        var help = false;
+        var version = false;
+
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
                 case "--help" or "-h":
-                    PrintHelp();
-                    return ExitCodes.Success;
+                    help = true;
+                    break;
 
                 case "--version" or "-v":
-                    Console.Out.WriteLine($"lyrbuild {ToolchainVersion.Value}");
-                    return ExitCodes.Success;
+                    version = true;
+                    break;
 
                 case "--stdlib":
-                    if (++i >= args.Length)
-                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
-                            "--stdlib: missing directory argument", ExitCodes.Usage);
-                    stdlib = args[i];
+                    if (Value(args, ref i, "directory") is not { } stdlibValue) return null;
+                    stdlib = stdlibValue;
                     break;
 
                 case "--profile":
-                    if (++i >= args.Length)
-                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
-                            "--profile: missing name (debug or release)", ExitCodes.Usage);
-                    if (Profile.Named(args[i]) is not { } named)
-                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                            $"--profile: unknown profile '{args[i]}' (expected debug or release)",
+                    if (Value(args, ref i, "name (debug or release)") is not { } name) return null;
+                    if (Profile.Named(name) is not { } named)
+                    {
+                        CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                            $"--profile: unknown profile '{name}' (expected debug or release)",
                             ExitCodes.Usage);
+                        return null;
+                    }
                     profile = named;
                     break;
 
@@ -86,188 +129,304 @@ public static class Program
                     profile = Profile.Debug;
                     break;
 
+                case "--only":
+                    if (Value(args, ref i, "artifact name") is not { } artifact) return null;
+                    only.Add(artifact);
+                    break;
+
+                case "-D":
+                    if (Value(args, ref i, "name or name=value") is not { } define) return null;
+                    if (!Define(defines, define)) return null;
+                    break;
+
                 default:
-                    if (args[i].StartsWith('-') || directoryArgument is not null)
-                        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                    // '-Dname=value', the spelling every C compiler taught.
+                    if (args[i].StartsWith("-D", StringComparison.Ordinal) && args[i].Length > 2)
+                    {
+                        if (!Define(defines, args[i][2..])) return null;
+                        break;
+                    }
+
+                    if (args[i].StartsWith('-') || directory is not null)
+                    {
+                        CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
                             $"unknown argument: {args[i]} — try 'lyrbuild --help'", ExitCodes.Usage);
-                    directoryArgument = args[i];
+                        return null;
+                    }
+
+                    directory = args[i];
                     break;
             }
         }
 
-        var directory = Path.GetFullPath(directoryArgument ?? Directory.GetCurrentDirectory());
-
-        var script = Path.Combine(directory, FileName);
-        if (!File.Exists(script))
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.NoBuildScript,
-                $"no {FileName} in {directory}", ExitCodes.Usage);
-
-        try
-        {
-            return Run(script, directory, stdlib, profile);
-        }
-        catch (ProjectFileException broken)
-        {
-            return CliDiagnostics.Fail(Console.Error, broken.Code,
-                $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
-        }
+        return new Flags(directory, stdlib, profile, defines, only, help, version);
     }
 
-    private static int Run(string script, string directory, string? stdlibRoot, Profile profile)
+    private static string? Value(string[] args, ref int i, string what)
     {
-        // The roots belong to the project and not to the build: lyric.json answers them once, for
-        // the script itself and for everything it declares.
-        var project = ProjectFile.Discover(directory);
-        foreach (var warning in project?.Warnings ?? [])
-            Console.Error.WriteLine(
-                $"warning: {Path.Combine(project!.Directory, ProjectFile.FileName)}: {warning}");
+        if (++i < args.Length) return args[i];
 
-        var artifacts = new List<Artifact>();
+        CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+            $"{args[i - 1]}: missing {what} argument", ExitCodes.Usage);
+        return null;
+    }
+
+    /// <summary><c>name</c> or <c>name=value</c>. A name given twice keeps the last value, as
+    /// every other option does.</summary>
+    private static bool Define(Dictionary<string, string> defines, string text)
+    {
+        var separator = text.IndexOf('=');
+        var name = separator < 0 ? text : text[..separator];
+        if (name.Length == 0)
+        {
+            CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                "-D: missing the option's name", ExitCodes.Usage);
+            return false;
+        }
+
+        defines[name] = separator < 0 ? "" : text[(separator + 1)..];
+        return true;
+    }
+
+    /// <summary>The compile of the SCRIPT: the debug profile whatever the build's is, because
+    /// a script is run and never shipped, and its own root is the project directory, where
+    /// <c>build.lyr</c> lies — the project's <c>sourceRoot</c> is for the artifacts.</summary>
+    private static CompilerOptions ScriptOptions(string directory, Flags flags) =>
+        Profile.Debug.Options() with { StdlibRoot = flags.Stdlib, SourceRoot = directory };
+
+    private static int RunScript(string script, string directory, ProjectFile? project, Flags flags)
+    {
+        var scriptOptions = ScriptOptions(directory, flags);
+
+        // Checked first, on its own. The entry the runner writes imports the script, and an
+        // error in the script has to be reported against the script — with file, line and
+        // column like every other Lyric error — rather than as an import that failed inside a
+        // file nobody wrote. The check also says which hooks the script has.
+        var analysis = SourceCompiler.Check(script, scriptOptions);
+        analysis.Diagnostics.RenderText(Console.Error);
+        if (!analysis.Ok || analysis.Model is null) return ExitCodes.Failure;
+
+        if (Hook(analysis.Model, "build") is not { } build)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+                $"{FileName}: no 'build' function — a build script declares 'pub fn build() {{ … }}'",
+                ExitCodes.Failure);
+        if (build.Parameters.Length > 0)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+                $"{FileName}: 'build' takes no parameters", ExitCodes.Failure);
+
+        var after = Hook(analysis.Model, "after");
+        if (after is { Parameters.Length: > 0 })
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+                $"{FileName}: 'after' takes no parameters", ExitCodes.Failure);
+
+        var session = new BuildSession(directory, project, flags.Stdlib, flags.Profile,
+            flags.Defines, flags.Only, Console.Out, Console.Error);
+
+        if (Execute(Entry(after is not null), directory, scriptOptions, session) is not { } exit)
+            return ExitCodes.Failure;
+
+        return exit == ExitCodes.Success ? ExitCodes.Success
+            : session.UsageError ? ExitCodes.Usage
+            : ExitCodes.Failure;
+    }
+
+    /// <summary>A <c>pub fn</c> of the script by name, or <c>null</c>. The script's own
+    /// declarations only; what it imports is nobody's hook.</summary>
+    private static FunctionDecl? Hook(SemanticModel model, string name) =>
+        model.Entry.Declarations.OfType<FunctionDecl>()
+            .FirstOrDefault(f => f.IsPublic && f.Name == name);
+
+    /// <summary>
+    /// The entry around the script. <c>build</c> runs first and alone; <c>finish</c> hands the
+    /// artifacts over and compiles them; <c>after</c>, when the script has one, runs only when
+    /// every artifact was written. The exit code is one bit: the failures were reported where
+    /// they happened.
+    /// </summary>
+    private static string Entry(bool withAfter) => withAfter
+        ? """
+          import build { build, after };
+          import std.build as b;
+
+          fn main(): int {
+              build();
+              let failed = b.finish();
+              if (failed == 0) {
+                  after();
+              }
+              return if (failed == 0) 0 else 1;
+          }
+          """
+        : """
+          import build { build };
+          import std.build as b;
+
+          fn main(): int {
+              build();
+              return if (b.finish() == 0) 0 else 1;
+          }
+          """;
+
+    /// <summary>The entry for <c>--help</c>: <c>build</c> runs and collects, nothing is
+    /// compiled and nothing runs after.</summary>
+    private const string HelpEntry = """
+        import build { build };
+
+        fn main(): int {
+            build();
+            return 0;
+        }
+        """;
+
+    /// <summary>
+    /// Compiles the entry, binds the natives and runs it in the project directory.
+    ///
+    /// <para>Returns the entry's exit code, or <c>null</c> for a failure it has already
+    /// reported: the seam between entry and script, a panic, a question the toolchain could
+    /// not answer.</para>
+    /// </summary>
+    private static int? Execute(string entry, string directory, CompilerOptions scriptOptions,
+        BuildSession session)
+    {
         // Disposed with the build: a build script that leaves a file open holds it until this
         // process ends otherwise, and on Windows that locks it against whatever runs next.
         using var vm = new LangVm(new HostOptions
         {
             // A build script writes files and starts processes. Withholding that would leave a
             // manifest with parentheses.
-            Capabilities = Capability.FileAccess | Capability.NetworkAccess | Capability.OsAccess,
-            StdlibRoot = stdlibRoot,
+            Capabilities = Capability.All,
+            StdlibRoot = scriptOptions.StdlibRoot,
+            SourceRoot = directory,
+            Profile = Profile.Debug,
             Output = Console.Out,
             Error = Console.Error,
         });
 
-        // Opaque: the script holds an Artifact and configures it, and never looks inside.
-        vm.RegisterType<Artifact>("Artifact");
+        session.Register(vm);
 
-        // Registered under the names the DECLARATIONS in stdlib/std/build.lyr produce. The lowering
-        // mangles a method as '<module>.<Type>.<method>', which is what a native is looked up by.
-        vm.RegisterNative("std.build.addExecutable", (string entry, string output) =>
-        {
-            var artifact = new Artifact
-            {
-                Entry = Path.GetFullPath(Path.Combine(directory, entry)),
-                Output = Path.GetFullPath(Path.Combine(directory, output)),
-            };
-            artifacts.Add(artifact);
-            return artifact;
-        });
-
-        // A BLOCK body, not an expression one: 'artifact.SourceMap = on' is an assignment
-        // expression and would make this a Func<Artifact, bool, bool>, which does not match the
-        // 'void' the declaration promises.
-        vm.RegisterNative("std.build.Artifact.sourceMap",
-            (Artifact artifact, bool on) => { artifact.SourceMap = on; });
-
-        ScriptInstance instance;
+        ScriptModule module;
         try
         {
-            instance = vm.Instantiate(vm.CompileFile(script));
+            module = vm.Compile(entry, EntryName);
         }
         catch (EmbeddingException)
         {
-            // Compiled again to report it. EmbeddingException carries the diagnostics as data but
-            // not the SourceManager their spans point into, and a message without a line is worse
-            // than the second compile is slow — this path ends the build either way.
-            var result = SourceCompiler.Check(script, new CompilerOptions { StdlibRoot = stdlibRoot });
-            var writer = new StringWriter();
-            result.Diagnostics.RenderText(writer);
-            Console.Error.Write(writer.ToString());
-            return ExitCodes.Failure;
-        }
-        catch (ScriptException refused)
-        {
-            // The module loaded and could not be bound or run: a native the host did not register,
-            // a capability it does not grant.
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
-                $"{FileName}: {refused.Message}", ExitCodes.Failure);
+            // The script checked clean, so what failed is the seam: a 'build' the entry cannot
+            // call as it is written. Compiled once more to render it with its spans — the
+            // exception carries the diagnostics as data but not the sources they point into.
+            SourceCompiler.Compile(ScriptSource.FromText(EntryName, entry), scriptOptions)
+                .Diagnostics.RenderText(Console.Error);
+            return null;
         }
 
-        // A relative path has to mean the same thing everywhere in the script. 'addExecutable'
-        // resolves against the project; without this, a 'writeText("src/x.lyr", …)' beside it would
-        // resolve against whatever directory the build was started from.
-        var callerDirectory = Directory.GetCurrentDirectory();
+        // A relative path has to mean the same thing everywhere in the script: a
+        // 'writeText("src/x.lyr", …)' resolves against the project, as the declarations do.
+        var caller = Directory.GetCurrentDirectory();
         Directory.SetCurrentDirectory(directory);
-
         try
         {
-            instance.CallVoid("build");
+            return vm.Run(module);
         }
         catch (ScriptPanicException panic)
         {
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+            CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
                 $"{FileName}: {panic.Message}", ExitCodes.Failure);
+            foreach (var frame in panic.Backtrace)
+                Console.Error.WriteLine($"    in {frame}");
+            return null;
+        }
+        catch (HostFunctionException host)
+        {
+            // A question the script asked that the toolchain could not answer — a profile it
+            // does not know. Its own words, without the wrapper's.
+            CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+                $"{FileName}: {host.InnerException?.Message ?? host.Message}", ExitCodes.Failure);
+            return null;
         }
         catch (ScriptException refused)
         {
-            // No 'build' function, or one with a shape nobody can call. ScriptPanicException is
-            // caught above, so what reaches here is a script that never ran rather than one that
-            // failed while running.
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+            // The module loaded and could not be bound or run: a native the toolchain did not
+            // register, a capability it does not grant.
+            CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
                 $"{FileName}: {refused.Message}", ExitCodes.Failure);
+            return null;
         }
         finally
         {
-            Directory.SetCurrentDirectory(callerDirectory);
+            Directory.SetCurrentDirectory(caller);
         }
-
-        if (artifacts.Count == 0)
-            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
-                $"{FileName}: 'build' declared nothing to compile", ExitCodes.Failure);
-
-        return Compile(artifacts, project, stdlibRoot, profile);
     }
 
-    /// <summary>Compiles what the script collected. Every artifact is a whole program of its own;
-    /// there is no link step and nothing is shared between them but the source on disk.</summary>
-    private static int Compile(List<Artifact> artifacts, ProjectFile? project, string? stdlibRoot,
-        Profile profile)
+    /// <summary>
+    /// Without a script, the convention: <c>main.lyr</c> under the source root is the one
+    /// program, named after the project, landing in <c>out/&lt;profile&gt;/</c>; a source root
+    /// without a <c>main.lyr</c> is a library and is checked; neither is an error that names
+    /// both ways.
+    /// </summary>
+    private static int BuildByConvention(string directory, ProjectFile? project, Flags flags)
     {
-        var failed = false;
+        if (flags.Defines.Count > 0 || flags.Only.Count > 0)
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
+                $"-D and --only are answered by a {FileName}, and {directory} has none",
+                ExitCodes.Usage);
 
-        foreach (var artifact in artifacts)
+        var sourceRoot = Path.GetFullPath(project?.SourceRoot ?? directory);
+        var name = project?.Name ?? new DirectoryInfo(directory).Name;
+        var profile = flags.Profile;
+        var session = new BuildSession(directory, project, flags.Stdlib, profile,
+            flags.Defines, flags.Only, Console.Out, Console.Error);
+
+        var main = Path.Combine(sourceRoot, "main.lyr");
+        if (File.Exists(main))
         {
-            if (!File.Exists(artifact.Entry))
-            {
-                CliDiagnostics.Fail(Console.Error, CliDiagnostics.FileUnreadable,
-                    $"{artifact.Entry}: no such file", ExitCodes.Failure);
-                failed = true;
-                continue;
-            }
-
-            var result = SourceCompiler.Compile(artifact.Entry, profile.Options() with
-            {
-                StdlibRoot = stdlibRoot,
-                SourceRoot = project?.SourceRoot,
-                NativeRoots = project?.NativeRoots,
-                DependencyRoots = project?.Dependencies,
-                // The script's word stands beside the profile's: 'sourceMap(false)' strips even
-                // where the profile would keep the map, and never adds one the profile omits.
-                SourceMap = artifact.SourceMap && profile.SourceMap,
-            });
-
-            var writer = new StringWriter();
-            result.Diagnostics.RenderText(writer);
-            Console.Error.Write(writer.ToString());
-
-            if (!result.Ok || result.Bytes is null) { failed = true; continue; }
-
-            try
-            {
-                var parent = Path.GetDirectoryName(artifact.Output);
-                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
-                File.WriteAllBytes(artifact.Output, result.Bytes);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                CliDiagnostics.Fail(Console.Error, CliDiagnostics.OutputUnwritable,
-                    $"{artifact.Output}: {ex.Message}", ExitCodes.Failure);
-                failed = true;
-                continue;
-            }
-
-            Console.Out.WriteLine($"{artifact.Output}: {result.Bytes.Length} bytes");
+            var program = new Declared(Declared.Executable, name, main,
+                Path.Combine(directory, "out", profile.Name, $"{name}.lyrbc"),
+                profile.Optimize, profile.SourceMap, profile.DebugInfo, profile.DenyWarnings);
+            return session.Build(program) ? ExitCodes.Success : ExitCodes.Failure;
         }
 
-        return failed ? ExitCodes.Failure : ExitCodes.Success;
+        if (Directory.Exists(sourceRoot)
+            && Directory.EnumerateFiles(sourceRoot, "*.lyr", SearchOption.AllDirectories).Any())
+        {
+            var library = new Declared(Declared.Library, name, sourceRoot, "",
+                profile.Optimize, profile.SourceMap, profile.DebugInfo, profile.DenyWarnings);
+            return session.Build(library) ? ExitCodes.Success : ExitCodes.Failure;
+        }
+
+        return CliDiagnostics.Fail(Console.Error, CliDiagnostics.NoBuildScript,
+            $"nothing to build in {directory}: no {FileName}, and no main.lyr under "
+            + $"{sourceRoot} to build by convention", ExitCodes.Usage);
+    }
+
+    /// <summary>The script's options after the fixed help: <c>build</c> runs so the script can
+    /// ask, and what it asked about is listed.</summary>
+    private static int DescribeOptions(string script, string directory, Flags flags)
+    {
+        var scriptOptions = ScriptOptions(directory, flags);
+        var analysis = SourceCompiler.Check(script, scriptOptions);
+        if (!analysis.Ok || analysis.Model is null || Hook(analysis.Model, "build") is null)
+        {
+            analysis.Diagnostics.RenderText(Console.Error);
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.BuildScriptFailed,
+                $"{FileName}: cannot list its options, because it does not run", ExitCodes.Failure);
+        }
+
+        var session = new BuildSession(directory, project: null, flags.Stdlib, flags.Profile,
+            flags.Defines, flags.Only, TextWriter.Null, Console.Error);
+        if (Execute(HelpEntry, directory, scriptOptions, session) is null) return ExitCodes.Failure;
+
+        Console.Out.WriteLine();
+        if (session.Options.Count == 0)
+        {
+            Console.Out.WriteLine($"{FileName} declares no options.");
+            return ExitCodes.Success;
+        }
+
+        Console.Out.WriteLine($"Options of {FileName} (-D name, or -D name=value):");
+        var width = session.Options.Max(o => o.Name.Length);
+        foreach (var option in session.Options)
+            Console.Out.WriteLine(
+                $"  {option.Name.PadRight(width)}   {option.Help}{(option.IsFlag ? "" : " (takes a value)")}");
+        return ExitCodes.Success;
     }
 
     private static void PrintHelp()
@@ -275,15 +434,20 @@ public static class Program
         Console.Out.WriteLine("Usage: lyrbuild [directory] [options]");
         Console.Out.WriteLine();
         Console.Out.WriteLine($"Runs the {FileName} in the directory and compiles what it declares.");
-        Console.Out.WriteLine("Without a directory, the working directory.");
+        Console.Out.WriteLine("Without one, builds by convention: main.lyr under the source root");
+        Console.Out.WriteLine("is the program, named after the project; without that, the source");
+        Console.Out.WriteLine("root is a library and is checked. Without a directory, the working");
+        Console.Out.WriteLine("directory.");
         Console.Out.WriteLine();
         Console.Out.WriteLine("Options:");
-        Console.Out.WriteLine("  --profile <name>   The profile every artifact is compiled with:");
+        Console.Out.WriteLine("  --profile <name>   The profile the build starts from:");
         Console.Out.WriteLine("                     debug (the default) or release");
         Console.Out.WriteLine("  --debug, --release The same, shorter");
+        Console.Out.WriteLine("  -D <name[=value]>  An option for the script; -D name for a flag");
+        Console.Out.WriteLine("  --only <name>      Build this artifact alone; may be repeated");
         Console.Out.WriteLine("  --stdlib <dir>     Where the stdlib lives (beats $LYRIC_STDLIB)");
         Console.Out.WriteLine("  --version, -v      Show the toolchain version");
-        Console.Out.WriteLine("  --help, -h         Show this help");
+        Console.Out.WriteLine("  --help, -h         Show this help, and the script's options");
         Console.Out.WriteLine();
         Console.Out.WriteLine("A build script runs with every capability: it may write files and");
         Console.Out.WriteLine("start processes, like make or cmake.");

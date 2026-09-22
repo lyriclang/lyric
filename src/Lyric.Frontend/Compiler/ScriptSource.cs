@@ -59,6 +59,27 @@ public sealed class ScriptSource
         new(Path.GetFileName(path), moduleName, path, null);
 
     /// <summary>
+    /// The module name a file takes under a root: the path relative to the root, without its
+    /// <c>.lyr</c>, with the separators as dots — the inverse of what an import does with a
+    /// dotted path, so a file registered as a root under this name is the module an import of
+    /// that path finds already there instead of reading the file a second time.
+    ///
+    /// <para>A file whose name is not an importable module path — a hyphen, a space — still
+    /// gets its derived name: nothing can import it either way, and the file still checks. It
+    /// is what the language server and the build runner both name a project's files by.</para>
+    /// </summary>
+    public static string ModuleNameUnder(string root, string path)
+    {
+        var relative = Path.GetRelativePath(root, path);
+        var stem = relative.EndsWith(".lyr", StringComparison.OrdinalIgnoreCase)
+            ? relative[..^".lyr".Length]
+            : relative;
+
+        return string.Join('.',
+            stem.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+    }
+
+    /// <summary>
     /// Source held in memory, under a name chosen by the caller.
     ///
     /// <para>The name is required: two scripts without a path would collide silently under the
