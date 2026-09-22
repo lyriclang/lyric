@@ -506,6 +506,28 @@ public sealed class NativeRegistry : IDisposable
         var f1 = new[] { TypeTag.F64 };
         var f2 = new[] { TypeTag.F64, TypeTag.F64 };
 
+        // --- std.hash (ungated) ----------------------------------------------------------
+        //
+        // Digests over bytes. Native for the same reason parseFloat is: the algorithms are
+        // specified to the bit, the host has audited implementations, and a Lyric SHA-256 would
+        // spend its time dispatching rotates. CRC-32 (IEEE 802.3, the zip/PNG polynomial) is the
+        // one written here — the BCL carries no CRC.
+
+        var bytesIn = new[] { TypeTag.Array };
+        var byteElement = new TypeTag?[] { TypeTag.U8 };
+
+        RegisterWithArrayParams("std.hash.sha256", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.SHA256.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.sha1", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.SHA1.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.md5", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.MD5.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.crc32", bytesIn, byteElement, TypeTag.I64,
+            args => LyrValue.FromI64(Crc32(ToBytes(args[0]))));
+
         // --- std.random (ungated) --------------------------------------------------------
         //
         // One xorshift64 round. In Lyric it was 53 instructions -- three shifts, three exclusive
@@ -2604,6 +2626,31 @@ public sealed class NativeRegistry : IDisposable
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>
+    private static readonly uint[] Crc32Table = BuildCrc32Table();
+
+    private static uint[] BuildCrc32Table()
+    {
+        var table = new uint[256];
+        for (uint n = 0; n < 256; n++)
+        {
+            var c = n;
+            for (var k = 0; k < 8; k++)
+                c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            table[n] = c;
+        }
+        return table;
+    }
+
+    /// <summary>CRC-32 as zip, PNG and Ethernet compute it: reflected polynomial 0xEDB88320,
+    /// initial and final complement, table-driven.</summary>
+    private static long Crc32(byte[] data)
+    {
+        var crc = 0xFFFFFFFFu;
+        foreach (var b in data)
+            crc = Crc32Table[(crc ^ b) & 0xFF] ^ (crc >> 8);
+        return crc ^ 0xFFFFFFFFu;
+    }
+
     private static LyrValue Bytes(byte[]? content)
     {
         if (content is null) return LyrValue.FromObject(Array.Empty<LyrValue>());

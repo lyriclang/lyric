@@ -1,0 +1,26 @@
+import std.test {
+    Test,
+    assertEq,
+    assertNotEq,
+    assertNull,
+    assertNotNull,
+    assertClose,
+    assertLess,
+    assertContains,
+    assertTrue,
+};
+import std.string { parseInt };
+
+@Test
+pub fn the_assertions_pass_on_what_they_state(): void {
+    assertNotEq(1, 2);
+    assertNotEq("a", "b");
+    assertNull<int>(parseInt("x"));
+    assertNotNull<int>(parseInt("7"), "seven parses");
+    assertClose(0.1 + 0.2, 0.3, 0.000000001);
+    assertClose(-1.0, -1.0, 0.0);
+    assertLess(1, 2);
+    assertLess("a", "b");
+    assertContains("hello world", "lo w");
+    assertTrue(true, "still there");
+}

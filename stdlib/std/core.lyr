@@ -503,6 +503,32 @@ pub struct Deprecated :: [OnModule, OnType, OnFunction] {
     until: string = "",
 }
 
+// ------------------------------------------------------------------------------- hashing
+
+/// Folds `value` into `seed` — what a `hash()` over several fields is built from:
+/// `combineHash(combineHash(0, this.x.hash()), this.y.hash())`. Order matters, so `(1, 2)` and
+/// `(2, 1)` differ. The anchor a synthesized `Hashable` conformance (4.5) combines the fields
+/// with, so a hand-written `hash()` and a synthesized one agree.
+///
+/// The formula is Boost's `hash_combine` at 64 bits: the golden-ratio constant keeps a run of
+/// small values from cancelling, and the two shifts spread each field over the whole word.
+pub fn combineHash(seed: int, value: int): int {
+    return seed ^ value + (0 - 7046029254386353131) + (seed << 6) + (seed >> 2);
+}
+
+// ------------------------------------------------------------------- attribute anchors (4.5)
+
+/// A struct declaring this may stand as `@Name` before a METHOD or a field — the seat a
+/// `@Deprecated` on `List.oldName` needs. An anchor for the compiler (4.5): declared here so a
+/// library can name it today, honoured once the attribute rows carry members.
+pub interface OnMethod { }
+
+/// Marks an enum as one that may GAIN variants without breaking its callers: a `match` over it
+/// outside the declaring module must carry a `_` arm, so `Wait` or `IoErrorKind` can grow. The
+/// same contract Rust's `#[non_exhaustive]` states. An anchor for the compiler (4.5): the
+/// attribute is data today, the rule follows in the exhaustiveness check.
+pub struct NonExhaustive :: [OnType] { }
+
 // No `Hashable` for `float`, deliberately.
 //
 // A hash table requires equal values to hash equally. Floating point breaks the premise rather
