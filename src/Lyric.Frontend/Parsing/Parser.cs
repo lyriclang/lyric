@@ -101,7 +101,46 @@ public sealed partial class Parser
         _ => (-1, -1)
     };
 
+    /// <summary>
+    /// How deeply expressions and types may nest before the parse refuses (§12.4).
+    ///
+    /// <para>NOT a language rule, and the specification says so: the depth belongs to a thread's
+    /// stack, not to Lyric, so §12.4 fixes only a FLOOR of 128 and that reaching the bound is
+    /// reported rather than crashed into. Without it a file of 50,000 nested parentheses took the
+    /// whole process down — `Stack overflow.` on stderr, no code, no position — and it killed
+    /// `lyrls` and `lyrdbg` just as readily, because they run this parser.</para>
+    ///
+    /// <para>MEASURED on the whole pipeline rather than on this file: nesting of 350 compiles, 450
+    /// takes the process down. So the bound is not "as much as we can get away with" — 192 is 1.5x
+    /// the floor the specification requires and roughly half the shallowest measured failure, which
+    /// leaves room for a host with less stack than a console process, such as a language server's
+    /// thread pool. The first attempt was 512, ABOVE the ceiling, and changed nothing at all.</para>
+    /// </summary>
+    internal const int MaxNesting = 192;
+
+    private int _depth;
+
+    /// <summary>
+    /// Thrown when the bound is reached and caught in <c>ParseModule</c>, which reports it once.
+    ///
+    /// <para>An exception rather than an error node: the recursion has to STOP, and every frame
+    /// between here and the top would otherwise have to check a flag and invent something to
+    /// return. Nothing else in this parser unwinds, which is the point — this is the one failure
+    /// that cannot be recovered from where it happens.</para>
+    /// </summary>
+    private sealed class NestingTooDeep(Span at) : Exception
+    {
+        public Span At { get; } = at;
+    }
+
     private Expr ParseExpr(int minBp)
+    {
+        if (++_depth > MaxNesting) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
+        try { return ParseExprInner(minBp); }
+        finally { _depth--; }
+    }
+
+    private Expr ParseExprInner(int minBp)
     {
         var left = ParsePrefix();
 
@@ -905,6 +944,13 @@ public sealed partial class Parser
     /// signature. A coroutine function needs nothing there — the checker moves its clause into the
     /// coroutine type, which is what that clause has always meant.</param>
     private TypeNode ParseType(bool allowThrows = true)
+    {
+        if (++_depth > MaxNesting) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
+        try { return ParseTypeInner(allowThrows); }
+        finally { _depth--; }
+    }
+
+    private TypeNode ParseTypeInner(bool allowThrows)
     {
         var qTok = _buffer.Current;
         var nullable = _buffer.Match(TokenKind.Question);

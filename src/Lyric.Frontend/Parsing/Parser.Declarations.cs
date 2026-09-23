@@ -19,6 +19,25 @@ public sealed partial class Parser
     /// <summary>Entry point for a whole file: an optional module header plus top-level declarations.</summary>
     public Module ParseModule()
     {
+        try
+        {
+            return ParseModuleInner();
+        }
+        catch (NestingTooDeep deep)
+        {
+            // §12.4. Reported once, here, because the recursion that hit the bound has unwound
+            // past every position that could have reported it — and a second diagnostic from the
+            // recovery that followed would only describe the wreckage.
+            _de.Report("LYR-PAR0045", Severity.Error, deep.At,
+                $"nesting is deeper than this parser carries ({MaxNesting} levels) — the language "
+                + "sets no limit, this implementation does, and the alternative was taking the "
+                + "process down");
+            return new Module(null, [], deep.At);
+        }
+    }
+
+    private Module ParseModuleInner()
+    {
         var start = _buffer.Current.Span;
 
         // Attributes at the top of the file bind to the HEADER when one follows, and to the first

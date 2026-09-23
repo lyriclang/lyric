@@ -74,6 +74,22 @@ public static class CliDiagnostics
     /// not silent.</summary>
     public const string ProjectFileSuspect = "LYR-CLI0017";
 
+    /// <summary>
+    /// The implementation failed internally: a state it believes impossible, not a program it
+    /// cannot accept (§12.4, since 4.6). CLI0018 and CLI0019 were already taken — by this file, not
+    /// by the appendix, which is the finding that went with this one.
+    ///
+    /// <para>The opposite end of <c>LYR-IR0001</c>, and the two must not be confused: <c>IR0001</c>
+    /// is valid Lyric this implementation cannot lower — the program is right and the compiler is
+    /// limited — while this one is the compiler being wrong. It asks for a report rather than an
+    /// edit, because there is nothing in the program to edit.</para>
+    ///
+    /// <para>Before it existed, an <c>InternalCompilationException</c> escaped to the runtime: a
+    /// stack trace with no code, no position and no file, and under <c>--json</c> it landed in the
+    /// middle of the document and destroyed it for whatever was reading.</para>
+    /// </summary>
+    public const string InternalFailure = "LYR-CLI0020";
+
     /// <summary>A <c>lyric.json</c> names a minimum toolchain this one does not reach. Its own
     /// code rather than <see cref="BadProjectFile"/>, because the advice differs: nothing in the
     /// file is wrong, the toolchain is too old.</summary>
@@ -93,6 +109,25 @@ public static class CliDiagnostics
         engine.RenderText(error);
         return exitCode;
     }
+
+    /// <summary>
+    /// Reports an internal failure of the implementation as <see cref="InternalFailure"/>.
+    ///
+    /// <para>One place for it because every driver owes the same thing, and because the shape of
+    /// the message is the point: whoever reads it has a working program and a broken compiler, so
+    /// the sentence asks for a report and names what to attach rather than suggesting an edit.
+    /// The exception's own message is the only description of the impossible state there is, so it
+    /// is carried through verbatim.</para>
+    ///
+    /// <para>Exit code 1, the same as a rejected compile. §12.3 fixes 1 for rejection and says
+    /// nothing about this case; a code of its own would be a CLI contract this specification does
+    /// not ask for, and a script that checks for zero is served either way.</para>
+    /// </summary>
+    public static int FailInternal(TextWriter error, InternalCompilationException bug) =>
+        Fail(error, InternalFailure,
+            $"{bug.Message} — this is a defect in the compiler, not in the program. "
+            + "Please report it with the source that produced it.",
+            ExitCodes.Failure);
 
     /// <summary>As <see cref="Fail"/>, at warning severity: rendered immediately, no exit
     /// code — a warning by itself ends nothing.</summary>

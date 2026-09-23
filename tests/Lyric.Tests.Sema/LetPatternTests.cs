@@ -10,7 +10,7 @@ namespace Lyric.Tests.Sema;
 /// <summary>
 /// The rules of the binding forms (4.5): a <c>let … else</c> needs its else exactly when the
 /// pattern can fail (LYR-SEM0098), the else has to leave (LYR-SEM0098), a pattern that never
-/// fails in an if-let/while-let/let-else is a warning (LYR-SEM0099), a <c>let</c> condition
+/// fails in an if-let/while-let/let-else is a warning (LYR-SEM0104), a <c>let</c> condition
 /// lives in an if or while head only, and the names are in scope where the pattern holds.
 /// </summary>
 public class LetPatternTests
@@ -67,7 +67,7 @@ public class LetPatternTests
     {
         var de = Check("fn f(): int { let x: int = 5 else { return 0; }; return x; }");
         AssertClean(de);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0099");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0104");
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class LetPatternTests
     {
         var de = Check("struct P { x: int, y: int } fn f(p: P): int { let P { x, y } = p; return x + y; }");
         AssertClean(de);
-        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0099");
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0104");
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class LetPatternTests
     {
         var de = Check("fn f(n: int): int { if (let x = n) { return x; } return 0; }");
         AssertClean(de);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0099" && d.Message.Contains("'if let'"));
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0104" && d.Message.Contains("'if let'"));
     }
 
     [Fact]

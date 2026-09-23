@@ -96,6 +96,17 @@ public static class VmDiagnostics
     /// mapping onto <c>throws</c> is an open design item, and until it is decided the failure is
     /// not silently turned into a value.</summary>
     public const string HostCallFailed = "LYR-VM0016";
+
+    /// <summary>
+    /// A global read before its initializer ran (§4.3, since 4.6).
+    ///
+    /// <para><c>LYR-SEM0057</c> catches the read an initializer NAMES. One that travels through a
+    /// CALL is not named there — <c>let a = readB();</c> above <c>let b = 7;</c>, where
+    /// <c>readB</c> returns <c>b</c> — and no order of declarations makes it legal. Until this
+    /// existed the read answered the slot's unwritten contents, a zero of the right type, and said
+    /// nothing at all.</para>
+    /// </summary>
+    public const string GlobalNotInitialized = "LYR-VM0017";
 }
 
 /// <summary>

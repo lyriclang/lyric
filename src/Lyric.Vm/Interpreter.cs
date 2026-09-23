@@ -233,7 +233,7 @@ public static class Interpreter
         IReadOnlyList<BytecodeType> globalTypes,
         ArgumentPool arguments, LyrValue[]? entryArguments = null,
         BytecodeSourceMap? sourceMap = null, DebugController? debug = null,
-        ExecutionBudget? budget = null, Jit.JitContext? jit = null)
+        ExecutionBudget? budget = null, Jit.JitContext? jit = null, bool[]? globalsReady = null)
     {
         // THE NESTING GUARD STANDS ABOVE BOTH ENGINES, and it has to. It sat below the compiled
         // fast path at first, which left the compiled engine with no guard at all: that path
@@ -289,17 +289,17 @@ public static class Interpreter
             // toolchain combines them — the debugger runs a program, a budget runs foreign code.
             if (debug is not null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, outer, new DebugPolicy(debug), jit);
+                    ref frame, outer, globalsReady, new DebugPolicy(debug), jit);
 
             if (Profiling && budget is null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes,
-                    arguments, frames, ref frame, outer, default(ProfilePolicy), jit);
+                    arguments, frames, ref frame, outer, globalsReady, default(ProfilePolicy), jit);
 
             return budget is null
                 ? Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, outer, default(ReleasePolicy), jit)
+                    ref frame, outer, globalsReady, default(ReleasePolicy), jit)
                 : Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, outer, new BudgetPolicy(budget), jit);
+                    ref frame, outer, globalsReady, new BudgetPolicy(budget), jit);
         }
         catch (LyricPanic panic) when (panic.CallStack.Count == 0)
         {
@@ -357,7 +357,8 @@ public static class Interpreter
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
         NativeRegistry.BoundNative[] natives, LyrValue[] globals,
         IReadOnlyList<BytecodeType> globalTypes, ArgumentPool arguments,
-        Stack<Frame> frames, ref Frame frame, int outer, TPolicy policy, Jit.JitContext? jit)
+        Stack<Frame> frames, ref Frame frame, int outer, bool[]? globalsReady,
+        TPolicy policy, Jit.JitContext? jit)
         where TPolicy : struct, IExecutionPolicy
     {
         // The resumes in flight. Grows only when a program nests chains, so an ordinary run
@@ -406,12 +407,31 @@ public static class Interpreter
                 // As ldloc/stloc but module-wide. The index was checked at load time, so this is
                 // an unchecked array access.
                 case Op.LoadGlobal:
-                    stack[sp++] = globals[(int)instruction.Immediate];
+                {
+                    var slot = (int)instruction.Immediate;
+
+                    // globalsReady is NON-NULL ONLY WHILE THE INITIALIZER RUNS, which is the only
+                    // window in which a global can still be unwritten: once it has finished, every
+                    // slot holds its value and there is nothing left to ask. So an ordinary program
+                    // pays one null test per global read and the check costs nothing after startup.
+                    if (globalsReady is not null && !globalsReady[slot])
+                        throw new LyricPanic(VmDiagnostics.GlobalNotInitialized,
+                            "a global is read before its initializer ran — module-level 'let's are "
+                            + "initialized in declaration order, and this read reaches one that "
+                            + "comes later. LYR-SEM0057 catches it where an initializer NAMES the "
+                            + "global; reached through a call it can only be caught here");
+
+                    stack[sp++] = globals[slot];
                     break;
+                }
 
                 case Op.StoreGlobal:
-                    globals[(int)instruction.Immediate] = stack[--sp];
+                {
+                    var slot = (int)instruction.Immediate;
+                    globals[slot] = stack[--sp];
+                    if (globalsReady is not null) globalsReady[slot] = true;
                     break;
+                }
 
                 case Op.Pop:
                     sp--;
