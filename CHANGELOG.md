@@ -107,11 +107,23 @@ they are the only way this release can break a build.
 - **`std.os.args()` answered the VM's arguments**, not the program's.
 - **`Random.nextIntRange` and `nextFloat` could fall below their lower bound**, because
   `absInt(int.min)` stays negative.
+- **Two extension overloads on one type shared one name in the bytecode.** `extend Box { fn
+  tell(n: int) … }` beside `fn tell(s: string)` — in one block or in two — both became
+  `main.<extend>.Box.tell`, so a disassembly, a stack trace and a debugger could not tell the two
+  apart, and neither could a reader of `lyrc lower`. Free functions and methods had carried an
+  overload suffix since 3.0; extensions now do too. Programs without overloaded extensions keep
+  the bytes they had.
 
 ### Changed
 
 - The grammar (§2) describes the forms above. Seven of them were shipping without being in it.
 - `LYR-IR0001` covers two constructs fewer; the appendix says which.
+- **`LYRIC_VERIFY_IR=1` turns the IR verifier on in any build**, and `=0` off. It checks the
+  compiler's own intermediate form twice per compile — once on what the lowering produced, once
+  on what the optimizations left of it — and a finding is a compiler bug, so it aborts naming
+  which of the two runs found it. `--verbose` shows the cost as its own `verify` row. It used to
+  be a debug build's alone, which meant no automated run of this project verified anything; the
+  extension-overload collision above is what it found on being switched on.
 
 ---
 

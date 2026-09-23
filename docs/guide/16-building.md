@@ -375,6 +375,18 @@ diagnostic aids and carry no compatibility promise beyond that.
 Every tool refuses an option it does not know, by name (`LYR-CLI0003`). A flag that is accepted
 and does nothing is the one that costs an afternoon.
 
+`LYRIC_VERIFY_IR=1` is the fifth, and it is an environment variable rather than a flag because it
+has to reach every compiler a script or a test suite starts. It turns on the IR verifier, which
+checks the compiler's own intermediate form twice per compile — once on what the lowering
+produced, once on what the optimizations left of it — and aborts with `ir-verifier (<which run>)`
+on a finding. A finding is a bug in the compiler, never in your program, so the message asks for a
+report rather than an edit. `LYRIC_VERIFY_IR=0` turns it off where it would otherwise run.
+
+It is not free — `--verbose` shows it as its own `verify` row, with `2 runs` beside the function
+count when the optimizer ran, so you can read the price off your own project rather than take a
+number from here. That is why a released `lyric` leaves it off and this repository's CI turns it
+on.
+
 ## The form before 4.5
 
 `addExecutable("src/main.lyr", "out/app.lyrbc")`, the entry first and the output named outright,
