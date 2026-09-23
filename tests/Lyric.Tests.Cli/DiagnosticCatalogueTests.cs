@@ -20,6 +20,14 @@ namespace Lyric.Tests.Cli;
 /// <para>Checked over the SOURCE rather than over emitted diagnostics, for the reason the sibling
 /// file <c>DiagnosticTextTests</c> gives: there is no way to make a compiler emit every diagnostic
 /// it can. A literal is the thing being constrained, so a literal is what is inspected.</para>
+///
+/// <para>WHAT THIS CANNOT DECIDE: whether two sites reporting one code mean one rule. Nothing
+/// mechanical can — and "one file per code" is not the proxy, measured: seventeen codes span the
+/// parser's partial classes or the pair <c>WarningAnalyzer</c>/<c>DiagnosticMapper</c>, every one
+/// of them legitimately. So the failure message lists every SITE rather than only the code, and a
+/// fourth collision (<c>LYR-PAR0044</c>, a loop label and an <c>extern</c> symbol) was found by
+/// reading that list. The severity test below catches the subset that can be decided; the rest is
+/// caught by a person seeing two files that have no business sharing a number.</para>
 /// </summary>
 public sealed class DiagnosticCatalogueTests
 {
