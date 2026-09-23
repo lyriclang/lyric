@@ -244,16 +244,16 @@ public sealed class TypeChecker
             if (g.Binding.Initializer is not null)
             {
                 _inGlobalInitializer = true;
+                var quiet = _de.ErrorCount;
                 var initT = CheckExpr(g.Binding.Initializer, module.Members);
+                quiet = _de.ErrorCount - quiet;
                 _inGlobalInitializer = false;
                 if (declared is not null) { CheckAssignable(g.Binding.Initializer, initT, declared, g.Span); type = declared; }
                 // The same rule as a local binding (§7.1): 'null' and '[]' fix no type.
-                else if (initT is NullType
-                         || (g.Binding.Initializer is ArrayLitExpr { Elements.Length: 0 } && initT is ArrayOf { Element: ErrorType }))
+                else if (quiet == 0 && Unfixed(initT) is { } nothing)
                 {
                     _de.Report("LYR-SEM0010", Severity.Error, g.Span,
-                        $"'{g.Binding.Name}' needs a type — "
-                        + (initT is NullType ? "'null'" : "'[]'") + " fixes none on its own");
+                        $"'{g.Binding.Name}' needs a type — '{nothing}' fixes none on its own");
                     type = LyrType.Error;
                 }
                 else type = initT;
@@ -552,19 +552,19 @@ public sealed class TypeChecker
         // As with a module 'let': inside an initializer a global that has not been computed yet is an
         // error, not an unknown type.
         _inGlobalInitializer = true;
+        var quiet = _de.ErrorCount;
         var init = sb.Binding.Initializer is { } e ? CheckExpr(e, ts.Members, declared) : null;
+        quiet = _de.ErrorCount - quiet;
         _inGlobalInitializer = false;
 
         if (declared is null && init is null)
             _de.Report("LYR-SEM0010", Severity.Error, sb.Span,
                 $"'{sb.Binding.Name}' needs a type or an initializer");
         // The same rule as a local binding (§7.1): 'null' and '[]' fix no type on their own.
-        else if (declared is null && (init is NullType
-                 || (sb.Binding.Initializer is ArrayLitExpr { Elements.Length: 0 } && init is ArrayOf { Element: ErrorType })))
+        else if (declared is null && quiet == 0 && Unfixed(init) is { } nothing)
         {
             _de.Report("LYR-SEM0010", Severity.Error, sb.Span,
-                $"'{sb.Binding.Name}' needs a type — "
-                + (init is NullType ? "'null'" : "'[]'") + " fixes none on its own");
+                $"'{sb.Binding.Name}' needs a type — '{nothing}' fixes none on its own");
             init = LyrType.Error;
         }
         else if (declared is not null && init is not null)
@@ -1114,7 +1114,9 @@ public sealed class TypeChecker
     private void CheckBinding(BindingStmt bnd, SymbolTable scope)
     {
         var declared = bnd.Type is not null ? ResolveType(bnd.Type, scope) : null;
+        var quiet = _de.ErrorCount;
         var initT = bnd.Initializer is not null ? CheckExpr(bnd.Initializer, scope, declared) : null;
+        quiet = _de.ErrorCount - quiet;
 
         LyrType type;
         if (declared is not null && initT is not null) { CheckAssignable(bnd.Initializer!, initT, declared, bnd.Span); type = declared; }
@@ -1122,11 +1124,10 @@ public sealed class TypeChecker
         // 'null' and '[]' fix no type of their own (§7.1 of the specification). Without this
         // report the null type or the empty array's error element flowed SILENTLY into the
         // lowering, which died on it as an internal exception — a crash for a two-line program.
-        else if (initT is NullType || (bnd.Initializer is ArrayLitExpr { Elements.Length: 0 } && initT is ArrayOf { Element: ErrorType }))
+        else if (quiet == 0 && Unfixed(initT) is { } nothing)
         {
             _de.Report("LYR-SEM0010", Severity.Error, bnd.Span,
-                $"binding '{bnd.Name}' needs a type — "
-                + (initT is NullType ? "'null'" : "'[]'") + " fixes none on its own");
+                $"binding '{bnd.Name}' needs a type — '{nothing}' fixes none on its own");
             type = LyrType.Error;
         }
         else if (initT is not null) type = initT;
@@ -1136,6 +1137,32 @@ public sealed class TypeChecker
         scope.TryDeclare(local);
         _result.BindRef(bnd, local); // for definite-assignment analysis
     }
+
+    /// <summary>
+    /// The written form inside an inferred type that fixes NO type — <c>"null"</c> or <c>"[]"</c> —
+    /// or <c>null</c> when the type is fixed and the binding needs no annotation.
+    ///
+    /// <para>ASKED OF THE TYPE, NOT OF THE WRITTEN FORM. The test used to be syntactic —
+    /// "is the initializer an empty array literal" — and therefore saw only the outermost one.
+    /// Six shapes got past it and died in the lowering as an internal exception:
+    /// <c>[[]]</c>, <c>[[[]]]</c>, <c>(1, [])</c>, <c>[null]</c>, <c>([], [])</c> and the same at
+    /// module level. The unfixed element sits at an arbitrary depth, so the depth is where it is
+    /// looked for.</para>
+    ///
+    /// <para>A BARE <see cref="ErrorType"/> answers <c>null</c> deliberately: reached through an
+    /// array it is the empty literal's marker and <c>"[]"</c> names it, but standing alone it is
+    /// some other failure and this diagnostic would guess at its cause. The caller asks only when
+    /// the initializer reported nothing, so an error that named itself is never spoken over.</para>
+    /// </summary>
+    private static string? Unfixed(LyrType? type, bool inArray = false) => type switch
+    {
+        NullType => "null",
+        ErrorType => inArray ? "[]" : null,
+        ArrayOf a => Unfixed(a.Element, true),
+        Optional o => Unfixed(o.Inner, inArray),
+        TupleOf t => t.Elements.Select(e => Unfixed(e, inArray)).FirstOrDefault(n => n is not null),
+        _ => null,
+    };
 
     /// <summary>The one <c>RangeExpr</c> that may stand as a value: the iterable of the
     /// <c>for-in</c> currently being checked. See <see cref="CheckRange"/>.</summary>

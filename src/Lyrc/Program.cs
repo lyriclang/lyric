@@ -102,6 +102,15 @@ public static class Program
                             $"{args[i]}: only 'build' writes a file");
                     if (++i >= args.Length)
                         return Refuse(CliDiagnostics.MissingArgument, "-o: missing path argument");
+                    // An EMPTY path is the same failure as a missing one, and it has to be caught
+                    // here: further down it reaches File.WriteAllBytes, which throws
+                    // ArgumentException, which nothing catches — the compiler ended a successful
+                    // build with a stack trace. A shell writes it by accident often enough
+                    // ('-o "$OUT"' with OUT unset) that the message names the shape.
+                    if (string.IsNullOrWhiteSpace(args[i]))
+                        return Refuse(CliDiagnostics.MissingArgument,
+                            "-o: the path is empty — an unset variable in the command line looks "
+                            + "exactly like this");
                     flags = flags with { Output = args[i] };
                     break;
 

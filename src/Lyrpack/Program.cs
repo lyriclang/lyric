@@ -56,6 +56,15 @@ public static class Program
 
         var output = Flag(args, "-o") ?? Flag(args, "--output") ?? DefaultOutput(input);
 
+        // An EMPTY path before Path.GetFullPath, which throws ArgumentException on one, and
+        // nothing above catches it: the tool ended with a stack trace instead of a message.
+        // The same hole 'lyrc build -o ""' had, and the same shape produces it — a shell
+        // expanding an unset variable.
+        if (string.IsNullOrWhiteSpace(output))
+            return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
+                "-o: the path is empty — an unset variable in the command line looks exactly "
+                + "like this", ExitCodes.Usage);
+
         // Refuse to write over either input. '-o' on the stub would destroy the template of
         // every later pack; '-o' on the module would eat the program being packed.
         var outputFull = Path.GetFullPath(output);
