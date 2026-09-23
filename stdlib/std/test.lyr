@@ -9,7 +9,8 @@
 /// here do.
 module std.test;
 
-import std.core { Display, Equatable, OnFunction, assert, panic };
+import std.core { Display, Equatable, Ordered, OnFunction, assert, panic };
+import std.string { fromFloat };
 
 /// Marks a top-level function as a test. `lyric test` finds it through the attribute row and
 /// runs it in a fresh instance; the function takes no parameters and returns nothing.
@@ -29,3 +30,70 @@ pub fn assertEq<T :: [Equatable<T>, Display]>(actual: T, expected: T): void {
         panic("expected " + expected.show() + ", got " + actual.show());
     }
 }
+
+/// Fails the test when the two values are EQUAL, naming the value — the assertion for "it
+/// changed", where `assertEq` says "it is".
+pub fn assertNotEq<T :: [Equatable<T>, Display]>(actual: T, unexpected: T): void {
+    if (actual.equals(unexpected)) {
+        panic("expected anything but " + unexpected.show() + ", got it");
+    }
+}
+
+/// Fails the test when the value is present, naming it.
+pub fn assertNull<T :: [Display]>(value: ?T): void {
+    if (value != null) {
+        panic("expected null, got " + value.show());
+    }
+}
+
+/// Fails the test when the value is absent.
+pub fn assertNotNull<T>(value: ?T, message: string): void {
+    if (value == null) {
+        panic(message);
+    }
+}
+
+/// Fails the test when the two floats lie further apart than `tolerance` — the comparison
+/// `assertEq` cannot make for floating point, where `0.1 + 0.2` is not `0.3`. NaN on either
+/// side fails: it is close to nothing.
+pub fn assertClose(actual: float, expected: float, tolerance: float): void {
+    let gap = if (actual > expected) actual - expected else expected - actual;
+    if (!(gap <= tolerance)) {
+        panic(
+            "expected "
+                + fromFloat(expected)
+                + " within "
+                + fromFloat(tolerance)
+                + ", got "
+                + fromFloat(actual)
+        );
+    }
+}
+
+/// Fails the test when `actual` is not strictly less than `bound`, naming both.
+pub fn assertLess<T :: [Ordered<T>, Display]>(actual: T, bound: T): void {
+    if (actual.compare(bound) >= 0) {
+        panic("expected less than " + bound.show() + ", got " + actual.show());
+    }
+}
+
+/// Fails the test when the text does not contain `needle`, quoting both.
+pub fn assertContains(haystack: string, needle: string): void {
+    if (!haystack.contains(needle)) {
+        panic("expected \"" + haystack + "\" to contain \"" + needle + "\"");
+    }
+}
+
+/// Fails the test outright, with `message` — for a branch a test must never reach.
+///
+/// `void` rather than `never` like `panic`: it does not count as a `return` for the flow
+/// analysis until the language lets a library function say `never`.
+pub fn fail(message: string): void {
+    panic(message);
+}
+
+// `assertThrows(f)` is not here yet, and the reason is worth stating: a lambda cannot carry a
+// `throws` clause (`fn() -> void throws E` is refused as a parameter type, LYR-SEM0084), so
+// there is no way to hand a throwing action to a function. It arrives with typed throws on
+// function types, as `assertThrows<E :: [Throwable]>(f: fn() -> void throws E): E` — the
+// exception itself is the answer, for the test to inspect.

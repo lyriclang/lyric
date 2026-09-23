@@ -1,0 +1,63 @@
+// Value-Block (4.5): ein Block-Arm im match-Ausdruck und ein Block-Lambda liefern ihren
+// Tail — den letzten Ausdruck ohne `;` — als Wert.
+//
+// Ist-Stand (4.4), Umweg A (Prototyp 05):
+//     var next: State;
+//     match (e) {
+//         Event.Tick => { let n = …; println(f"tick {n}"); next = State.Busy(n); }
+//         …
+//     }
+//     return next;
+import std.io.console { println };
+
+enum State { Idle, Busy(int), Closed }
+enum Event { Start, Tick, Stop }
+
+fn step(s: State, e: Event): State {
+    return match (e) {
+        Event.Start => State.Busy(0),
+        Event.Tick => {
+            let n = match (s) { State.Busy(k) => k + 1, _ => 0 };
+            println(f"tick {n}");
+            State.Busy(n)                       // Tail: Wert des Arms
+        },
+        Event.Stop => {
+            println("stopping");
+            State.Closed
+        },
+    };
+}
+
+fn describe(s: State): string {
+    return match (s) {
+        State.Idle => "idle",
+        State.Busy(n) => {
+            let base = "busy";
+            f"{base}({n})"
+        },
+        State.Closed => { return "closed"; },   // return bleibt erlaubt: verlaesst die Funktion
+    };
+}
+
+fn main(): int {
+    var s = State.Idle;
+    s = step(s, Event.Start);
+    s = step(s, Event.Tick);
+    s = step(s, Event.Tick);
+    println(describe(s));
+    s = step(s, Event.Stop);
+    println(describe(s));
+
+    let twice = (x: int) => {
+        let y = x * 2;
+        y + 1                                   // Tail im Block-Lambda == return y + 1;
+    };
+    println(f"{twice(20)}");
+
+    match (s) {                                 // match-Statement: Tail muss ein Aufruf sein
+        State.Closed => { println("done") },
+        _ => { println("?") },
+    }
+    return 0;
+}
+// Ausgabe: tick 1 / tick 2 / busy(2) / stopping / closed / 41 / done

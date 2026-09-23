@@ -1,0 +1,66 @@
+// SOLL (4.5/4.6): throws E mit Typparameter, throws auf Funktionstypen, werfende Lambdas.
+// Kompiliert auf 4.4.1 NICHT (SEM0084 auf dem Funktionstyp; E wird nie substituiert).
+import std.io.console { println };
+
+class ParseError :: [Throwable] {
+    line: string,
+    fn message(): string { return "bad port: " + this.line; }
+}
+
+// Eine Stufe, beide Quellen: E wird aus dem Argument inferiert.
+fn evens<E>(input: Coroutine<int> throws E): Coroutine<int> throws E {
+    for (n in input) {
+        if (n % 2 == 0) { yield n; }
+    }
+}
+
+fn numbers(): Coroutine<int> {
+    for (n in 0..6) { yield n; }
+}
+
+fn parsed(lines: string[]): Coroutine<int> throws ParseError {
+    for (l in lines) {
+        yield parsePort(l);
+    }
+}
+
+fn parsePort(line: string): int throws ParseError {
+    let n = parseInt(line);
+    return n ?? throw ParseError { line = line };       // throw-Ausdruck: 4.5, implementiert
+}
+
+// Werfender Funktionstyp: das Lambda DARF werfen, weil der Parametertyp es erlaubt.
+fn mapInts<E>(xs: string[], f: fn(string) -> int throws E): int[] throws E {
+    var out = [0] * xs.length;
+    for (i in 0..xs.length) {
+        out[i] = f(xs[i]);
+    }
+    return out;
+}
+
+fn main(): int {
+    for (n in evens(numbers())) {          // E = never → KEIN try noetig
+        println(f"{n}");
+    }
+    try {
+        for (n in evens(parsed(["2", "x"]))) {   // E = ParseError
+            println(f"{n}");
+        }
+        let ports = mapInts(["80", "x"], (s) => parsePort(s));  // Lambda wirft ParseError
+        println(f"{ports.length}");
+    } catch (e: ParseError) {              // typisiertes catch DECKT — heute nie (Bug, Stufe 1)
+        println(e.message());
+    }
+    return 0;
+}
+
+// IST (4.4.1): zwei Wege, beide schlecht.
+//
+// (a) Alles werfend:
+//     fn evens(input: Coroutine<int> throws Exception): Coroutine<int> throws Exception { … }
+//     → evens(numbers()) ist werfend, obwohl nichts werfen kann; main braucht ein try/catch,
+//       das TOTER CODE ist und spaeter einen echten Fehler aus anderer Quelle verschluckt.
+//
+// (b) Nicht-werfend + Sentinel im Lambda:
+//     fn mapInts(xs: string[], f: fn(string) -> ?int): int[] { … }   // Lambda darf nicht werfen
+//     → der GRUND geht verloren (?int sagt nicht WARUM), gegen §9.0.

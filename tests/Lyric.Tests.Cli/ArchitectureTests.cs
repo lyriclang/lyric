@@ -46,22 +46,26 @@ public sealed class ArchitectureTests
     }
 
     [Fact]
-    public void Lyrc_ships_exactly_the_shared_contract_and_the_frontend()
+    public void Lyrc_ships_exactly_the_shared_contract_the_frontend_and_the_evaluator()
     {
-        AssertShips("Lyrc", Shared, Frontend, "lyrc.dll");
+        // Since 'comptime' the compiler carries the runtime — as the EVALUATOR of compile-time
+        // expressions, in a sandbox that grants no capability, and for nothing else. What the
+        // previous statement protected still holds and is now stated at the seam instead:
+        // 'lyrc' never runs a program, and the front end never references the runtime (the
+        // evaluator arrives through IComptimeRunner in lyrcore, so the front end stays free of it).
+        AssertShips("Lyrc", Shared, Frontend, Runtime, "lyrc.dll");
     }
 
     [Fact]
-    public void Lyrc_ships_no_runtime()
+    public void The_frontend_references_no_runtime()
     {
-        // The other direction. It is less dramatic — a compiler with an interpreter would merely be fat
-        // rather than contradictory — but it keeps the roles clean: 'lyrc' executes nothing, so it has
-        // nothing to execute with.
-        //
-        // It is also the reason the reading side of the format lives in lyrcore rather than at the VM:
-        // the bytecode writer needs the same opcodes and type tags. Were reading at the runtime, every
-        // compiler build would drag the interpreter along and this test would fail.
-        Assert.DoesNotContain(Runtime, LyricAssemblies("Lyrc"));
+        // The reading side of the format lives in lyrcore rather than at the VM for this reason:
+        // the bytecode writer needs the same opcodes and type tags, and were reading at the
+        // runtime, the front end would drag the interpreter along.
+        var frontend = System.Reflection.Assembly.LoadFile(
+            Path.Combine(Toolchain.OutputDirectory("Lyrc"), Frontend));
+        Assert.DoesNotContain(frontend.GetReferencedAssemblies(),
+            reference => string.Equals(reference.Name, "lyrrt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

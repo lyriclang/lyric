@@ -93,11 +93,21 @@ internal sealed class FlowAnalyzer
             // on the first use.
             case DestructuringStmt d:
                 AnalyzeExpr(d.Initializer, assigned);
-                foreach (var name in BoundNames(d.Pattern))
-                    if (_types.RefOf(name) is { } bound) assigned.Add(bound);
+                AddPatternBindings(d.Pattern, assigned);
+                return assigned;
+
+            // 'let P = e else { … };' — the else block leaves (the checker proved it), so after
+            // the statement every name the pattern binds is assigned.
+            case LetPatternStmt lp:
+                AnalyzeExpr(lp.Initializer, assigned);
+                if (lp.Else is not null) AnalyzeStatements(lp.Else.Statements, Clone(assigned));
+                AddPatternBindings(lp.Pattern, assigned);
                 return assigned;
             case ExprStmt es:
                 AnalyzeExpr(es.Expr, assigned);
+                return assigned;
+            case TailExprStmt tail:
+                AnalyzeExpr(tail.Expr, assigned);
                 return assigned;
             case ReturnStmt r:
                 if (r.Value is not null) AnalyzeExpr(r.Value, assigned);
@@ -124,17 +134,25 @@ internal sealed class FlowAnalyzer
                 AnalyzeExpr(fo.Iterable, assigned);
                 var loopSet = Clone(assigned);
                 if (_types.RefOf(fo) is { } lv) loopSet.Add(lv);
+                if (fo.Pattern is not null) AddPatternBindings(fo.Pattern, loopSet);
                 AnalyzeStatements(fo.Body.Statements, loopSet);
                 return assigned;
             case TryStmt tr:
-                AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+            {
+                var afterBody = AnalyzeStatements(tr.Body.Statements, Clone(assigned));
+                var everyCatchLeaves = true;
                 foreach (var c in tr.Catches)
                 {
                     var catchSet = Clone(assigned);
                     if (_types.RefOf(c) is { } bind) catchSet.Add(bind); // the catch assigns the binding
                     AnalyzeStatements(c.Body.Statements, catchSet);
+                    if (!Flow.AlwaysExits(c.Body, _types)) everyCatchLeaves = false;
                 }
-                return assigned;
+                // The body may have thrown mid-way, so what it assigns counts afterwards only
+                // when the throw cannot lead past the try: every catch leaves. Then the one way
+                // to the statement after it is the body's own end (§7.7).
+                return everyCatchLeaves ? afterBody : assigned;
+            }
             case MatchStmt m:
             {
                 AnalyzeExpr(m.Scrutinee, assigned);
@@ -207,6 +225,8 @@ internal sealed class FlowAnalyzer
             case BinaryExpr b: AnalyzeExpr(b.Left, assigned); AnalyzeExpr(b.Right, assigned); return;
             case UnaryExpr u: AnalyzeExpr(u.Operand, assigned); return;
             case ResumeExpr re: AnalyzeExpr(re.Coroutine, assigned); return;
+            case ComptimeExpr ct: AnalyzeExpr(ct.Inner, assigned); return;
+            case ThrowExpr te: AnalyzeExpr(te.Value, assigned); return;
             case PostfixExpr p: AnalyzeExpr(p.Operand, assigned); return;
             case CallExpr c:
                 AnalyzeExpr(c.Callee, assigned);
@@ -222,6 +242,12 @@ internal sealed class FlowAnalyzer
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr, assigned);
                 return;
+            // The names of an if-let/while-let are assigned where they are in scope: the branch
+            // or the body, whose sets are cloned from this one right after the condition.
+            case LetCondExpr lc:
+                AnalyzeExpr(lc.Initializer, assigned);
+                AddPatternBindings(lc.Pattern, assigned);
+                return;
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition, assigned); AnalyzeExpr(iff.Then, assigned); AnalyzeExpr(iff.Else, assigned);
                 return;
@@ -231,7 +257,10 @@ internal sealed class FlowAnalyzer
                 // with a snapshot of the current set plus the lambda's own parameters.
                 var lamSet = Clone(assigned);
                 foreach (var p in lam.Parameters)
+                {
                     if (_types.RefOf(p) is { } ps) lamSet.Add(ps);
+                    if (p.Pattern is not null) AddPatternBindings(p.Pattern, lamSet);
+                }
                 if (lam.Body is Block lb) AnalyzeStatements(lb.Statements, lamSet);
                 else if (lam.Body is Expr le) AnalyzeExpr(le, lamSet);
                 return;
@@ -244,6 +273,7 @@ internal sealed class FlowAnalyzer
                     AddPatternBindings(arm.Pattern, armSet);
                     if (arm.Guard is not null) AnalyzeExpr(arm.Guard, armSet);
                     if (arm.Body is Expr ae) AnalyzeExpr(ae, armSet);
+                    else if (arm.Body is Block ab) AnalyzeStatements(ab.Statements, armSet);
                 }
                 return;
             // Literals, this and @ident are no reads.
@@ -264,6 +294,8 @@ internal sealed class FlowAnalyzer
                     else if (_types.RefOf(f) is { } fs) set.Add(fs);
                 }
                 return;
+            case ArrayPattern ap: foreach (var sub in ap.Elements) AddPatternBindings(sub, set); return;
+            case RestPattern rp: if (_types.RefOf(rp) is { } rs) set.Add(rs); return;
             case TuplePattern t: foreach (var sub in t.Elements) AddPatternBindings(sub, set); return;
             case OrPattern o: if (o.Alternatives.Length > 0) AddPatternBindings(o.Alternatives[0], set); return;
         }

@@ -157,3 +157,35 @@ aber nur, weil die Feldprüfung gar nicht bis zur Wurzel läuft, nicht weil es j
 entschieden hätte. Welche der beiden Bindungsarten die Regel setzt, ist die Frage.
 
 Betroffen: §7.1, §3.4, §4.3 (Parameter).
+
+---
+
+## 7. Zwei Einschränkungen in §7.6 sind weg — die Spec weiß es noch nicht
+
+**Gemessen.** Die Konformanz-Suite gegen den Integrationsstand: **157/158, 1 skipped**. Der eine
+Fehlschlag ist kein Rückschritt, sondern das Gegenteil:
+
+```
+FAIL 07-statements/field_pattern_that_can_fail_is_a_diagnosed_limit.lyr:
+     expected rejection, compiled cleanly
+```
+
+Der Fall pinnt eine Einschränkung, und pattern-compiler hat sie gebaut. Dieselbe Lage für die
+zweite: ein bindendes Or-Pattern (`A(x) | B(x)`) läuft jetzt ebenfalls — das war seit 4.4.1 ein
+offener Faden in `STATUS.md`.
+
+**Was die Spec sagt.** §7.6 trägt beide noch als `*Implementation limit (diagnosed, LYR-IR0001)*`,
+und die Appendix-A-Zeile zu `LYR-IR0001` zählt auf, was der Code „currently covers".
+
+**Zu tun, nicht zu entscheiden.** Die Regeln sind gefallen, also retirieren die Sätze mit ihnen:
+beide Limit-Absätze in §7.6 raus, die Appendix-Zeile nachziehen (sie führt schon zwei „former
+entries" — dieselbe Form), und der Konformanzfall wird durch seinen Zwilling ersetzt, der das
+Gegenteil pinnt. Das ist der spec-first-Weg in umgekehrter Richtung, und er ist Voraussetzung
+dafür, dass die Suite den Integrationsstand überhaupt beurteilen kann.
+
+**Offen bleibt eine echte Lücke**, die derselbe Branch nicht geschlossen hat: Erschöpfung über ein
+Tupel, das ein Enum ENTHÄLT. `match ((E.A(n), m))` über `(E, int)` ist weiterhin `LYR-SEM0050`,
+obwohl die Arme alle Varianten abdecken — das Lowering kennt die Form jetzt, die Abdeckungsrechnung
+der Sema nicht.
+
+Betroffen: §7.6, Appendix A (`LYR-IR0001`), conformance/cases/07-statements.

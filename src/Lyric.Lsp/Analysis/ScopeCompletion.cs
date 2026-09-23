@@ -84,13 +84,27 @@ public static class ScopeCompletion
 
             case LambdaExpr lambda:
                 foreach (var parameter in lambda.Parameters)
-                    if (model.Types.RefOf(parameter) is { } symbol) yield return symbol;
+                {
+                    if (parameter.Pattern is { } parameterPattern)
+                        foreach (var bound in PatternNames(model, parameterPattern)) yield return bound;
+                    else if (model.Types.RefOf(parameter) is { } symbol) yield return symbol;
+                }
                 break;
 
             // A loop or catch variable belongs to the body, not to the head: in
             // 'for (n in ns)' the iterable is evaluated where 'n' does not yet exist.
+            // An if-let binds into its then branch, a while-let into its body.
+            case IfStmt { Condition: LetCondExpr ifLet } iff when Covers(iff.Then, offset):
+                foreach (var symbol in PatternNames(model, ifLet.Pattern)) yield return symbol;
+                break;
+            case WhileStmt { Condition: LetCondExpr whileLet } loopLet when Covers(loopLet.Body, offset):
+                foreach (var symbol in PatternNames(model, whileLet.Pattern)) yield return symbol;
+                break;
+
             case ForInStmt loop when Covers(loop.Body, offset):
-                if (model.Types.RefOf(loop) is { } loopVar) yield return loopVar;
+                if (loop.Pattern is { } loopPattern)
+                    foreach (var bound in PatternNames(model, loopPattern)) yield return bound;
+                else if (model.Types.RefOf(loop) is { } loopVar) yield return loopVar;
                 break;
 
             case CatchClause catchClause when Covers(catchClause.Body, offset):
@@ -115,6 +129,10 @@ public static class ScopeCompletion
             case DestructuringStmt destructuring:
                 foreach (var symbol in PatternNames(model, destructuring.Pattern)) yield return symbol;
                 break;
+
+            case LetPatternStmt letPattern:
+                foreach (var symbol in PatternNames(model, letPattern.Pattern)) yield return symbol;
+                break;
         }
     }
 
@@ -132,7 +150,7 @@ public static class ScopeCompletion
 
             // A BindingPattern is a binding or a unit variant, and the sema decides which. The
             // table says so: a variant is bound to its EnumVariantSymbol and is not a name in scope.
-            if (node is BindingPattern or FieldPattern
+            if (node is BindingPattern or FieldPattern or RestPattern
                 && model.Types.RefOf(node) is LocalSymbol local)
                 yield return local;
 

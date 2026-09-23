@@ -13,7 +13,7 @@
 module std.random;
 
 import std.collections { List };
-import std.math { absInt, sqrt, log, cos, tau };
+import std.math { sqrt, log, cos, tau };
 
 /// `count` bytes from the operating system's cryptographic source — the ONE thing in this
 /// module that is not deterministic, and deliberately so marked: keys, tokens and session ids
@@ -46,6 +46,20 @@ pub class Random {
         return Random { state = if (seed == 0) 0x2545F4914F6CDD1D else seed };
     }
 
+    /// A generator seeded from the operating system's entropy — for a game or a shuffle that
+    /// should differ per run, and that nobody needs to replay. `seeded` is the reproducible
+    /// form; this one says in its name that the run cannot be repeated.
+    pub static fn fresh(): Random {
+        let bytes = secureRandom(8);
+        var seed = 0;
+        var i = 0;
+        while (i < 8) {
+            seed = seed << 8 | bytes[i] as int;
+            i = i + 1;
+        }
+        return Random.seeded(seed);
+    }
+
     /// The next raw value. It may have either sign.
     pub mut fn nextInt(): int {
         let x = xorshift(this.state);
@@ -53,19 +67,40 @@ pub class Random {
         return x;
     }
 
+    // The raw value with the sign bit cleared: 63 uniform bits. Not `absInt`, whose one
+    // failure — `intMin` stays negative — landed a draw below `lo` once in 2^63.
+    mut fn nextBits(): int {
+        return this.nextInt() & 0x7FFFFFFFFFFFFFFF;
+    }
+
     /// Uniformly distributed in `[lo, hi)`. An empty range yields `lo`.
+    // Rejection rather than a bare modulo: `bits % n` favours the low residues whenever 2^63 is
+    // no multiple of `n`, by up to one part in 2^63 / n — invisible for small ranges, real for
+    // large ones. A draw at or above the largest multiple of `n` below 2^63 is thrown away; the
+    // expected number of redraws is below one.
     pub mut fn nextIntRange(lo: int, hi: int): int {
         if (hi <= lo) {
             return lo;
         }
-        // Magnitude first, then modulo: a negative raw value would otherwise land below `lo`.
-        return lo + absInt(this.nextInt()) % (hi - lo);
+        let span = hi - lo;
+        if (span < 0) {
+            // The range covers more than half of int: every raw value is a valid offset from
+            // `lo` and nothing can be rejected, so the raw draw is the answer.
+            return lo + this.nextInt();
+        }
+        let limit = 9223372036854775807 - 9223372036854775807 % span;
+        var draw = this.nextBits();
+        while (draw >= limit) {
+            draw = this.nextBits();
+        }
+        return lo + draw % span;
     }
 
     /// Uniformly distributed in `[0, 1)`.
     pub mut fn nextFloat(): float {
-        // 53 bits are exactly the mantissa of a float64; more would not be representable.
-        let bits = absInt(this.nextInt()) % 9007199254740992;
+        // The top 53 bits of the draw: exactly a float64 mantissa, so every value is
+        // representable and the low bits, the weakest of a xorshift, are not used.
+        let bits = this.nextBits() >> 10;
         return bits as float / 9007199254740992.0;
     }
 

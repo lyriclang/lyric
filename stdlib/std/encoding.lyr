@@ -16,6 +16,7 @@
 module std.encoding;
 
 import std.string as strings;
+import std.result { Result };
 
 /// Where and why a text was refused: the 0-based character offset of the refusal, and what the
 /// decoder expected there.
@@ -93,6 +94,19 @@ pub fn hexDecodeOrThrow(text: string): uint8[] throws EncodingError {
         throw EncodingError { offset = attempt.at, expected = attempt.what };
     }
     return value;
+}
+
+/// `hexDecode`, with the reason as a VALUE: the bytes, or the `EncodingError` that
+/// `hexDecodeOrThrow` would throw.
+pub fn hexDecodeOrErr(text: string): Result<uint8[], EncodingError> {
+    let attempt = hexDecodeCore(text);
+    let value = attempt.value;
+    if (value == null) {
+        return Result<uint8[], EncodingError>.Err(
+            EncodingError { offset = attempt.at, expected = attempt.what }
+        );
+    }
+    return Result<uint8[], EncodingError>.Ok(value);
 }
 
 // The one implementation behind both forms: the value, or where and what it expected.

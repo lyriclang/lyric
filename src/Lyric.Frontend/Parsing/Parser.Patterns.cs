@@ -60,6 +60,8 @@ public sealed partial class Parser
                 return ParsePathPattern();
             case TokenKind.LParen:
                 return ParseTuplePattern();
+            case TokenKind.LBracket:
+                return ParseArrayPattern();
             default:
                 _de.Report("LYR-PAR0033", Severity.Error, cur.Span, $"expected a pattern, got {cur.TokenKind}");
                 if (cur.TokenKind is not (TokenKind.Eof or TokenKind.RParen or TokenKind.RBrace
@@ -160,6 +162,51 @@ public sealed partial class Parser
         return new FieldPattern(_sm.Slice(nameTok.Span).ToString(), sub, Span.Union(nameTok.Span, end));
     }
 
+    /// <summary>
+    /// <c>[]</c>, <c>[a, b]</c>, <c>[first, ..]</c>, <c>[.., last]</c>, <c>[a, ..rest, z]</c>.
+    ///
+    /// <para>At most ONE rest: two would leave the positions between them unplaceable. The
+    /// check is here rather than in the sema because it is a question about the written form.</para>
+    /// </summary>
+    private Pattern ParseArrayPattern()
+    {
+        var open = _buffer.Advance(); // '['
+        var elements = new List<Pattern>();
+        var rests = 0;
+        while (!_buffer.Check(TokenKind.RBracket) && !_buffer.AtEnd)
+        {
+            if (_buffer.Check(TokenKind.DotDot))
+            {
+                var dots = _buffer.Advance();
+                string? name = null;
+                var end = dots.Span;
+                var nameSpan = new Span(dots.Span.File, dots.Span.End, dots.Span.End); // no name
+                if (_buffer.Check(TokenKind.Identifier) && !AtContextual("_"))
+                {
+                    var nameTok = _buffer.Advance();
+                    name = _sm.Slice(nameTok.Span).ToString();
+                    end = nameTok.Span;
+                    nameSpan = nameTok.Span;
+                }
+                else if (AtContextual("_"))
+                {
+                    end = _buffer.Advance().Span; // '.._' is the anonymous rest spelled out
+                }
+                if (++rests == 2)
+                    _de.Report("LYR-PAR0033", Severity.Error, dots.Span,
+                        "an array pattern takes at most one '..' — with two, the positions between them could not be placed");
+                elements.Add(new RestPattern(name, Span.Union(dots.Span, end)) { NameSpan = nameSpan });
+            }
+            else
+            {
+                elements.Add(ParseOrPattern());
+            }
+            if (!_buffer.Match(TokenKind.Comma)) break;
+        }
+        var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close array pattern");
+        return new ArrayPattern(elements.ToArray(), Span.Union(open.Span, close.Span));
+    }
+
     private Pattern ParseTuplePattern()
     {
         var open = _buffer.Advance(); // '('
@@ -216,9 +263,22 @@ public sealed partial class Parser
     private MatchArm ParseMatchArm()
     {
         var pattern = ParseOrPattern();
-        Expr? guard = _buffer.Match(TokenKind.If) ? ParseExpr(0) : null;
+
+        // A guard is followed by '=>', so a parenthesized guard '(x > 0) => …' looks exactly
+        // like a lambda to the lookahead. The first '(' of a guard opens a group, never a
+        // lambda; a lambda inside the guard ('xs.any((y) => y > 0)') is deeper and unaffected.
+        Expr? guard = null;
+        if (_buffer.Match(TokenKind.If))
+        {
+            _guardHead = true;
+            _inGuard = true;
+            guard = ParseExpr(0);
+            _guardHead = false;
+            _inGuard = false;
+        }
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        // A block arm is a value block: in a match expression its tail is the arm's value.
+        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
         return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, body.Span));
     }
 

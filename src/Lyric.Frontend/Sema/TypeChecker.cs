@@ -132,6 +132,7 @@ public sealed class TypeChecker
         _mul = core?.LookupLocal("Mul") as TypeSymbol;
         _div = core?.LookupLocal("Div") as TypeSymbol;
         _into = core?.LookupLocal("Into") as TypeSymbol;
+        _display = core?.LookupLocal("Display") as TypeSymbol;
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
@@ -156,6 +157,11 @@ public sealed class TypeChecker
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
 
+    /// <summary>What an f-string hole renders a non-scalar value through (§6.6): the hole becomes
+    /// <c>value.show()</c> when the type conforms. Null without a standard library, and such a hole
+    /// is then the diagnostic it always was.</summary>
+    private readonly TypeSymbol? _display;
+
     /// <summary>The four arithmetic interfaces, under the same rules as <see cref="_equatable"/>.</summary>
     private readonly TypeSymbol? _add;
     private readonly TypeSymbol? _sub;
@@ -171,6 +177,11 @@ public sealed class TypeChecker
 
     /// <summary>The native declaration from <c>std.core</c>. See the constructor.</summary>
     private readonly FunctionSymbol? _stdPanic;
+
+    /// <summary>The context type a value block's tail checks against (§3.1, §6.9): the match
+    /// expression's context for a block arm, the lambda's return type for a block body. Set by
+    /// the owner around <see cref="CheckBlock"/>, and only read by the tail itself.</summary>
+    private LyrType? _tailExpected;
 
     /// <summary>Is <paramref name="f"/> the <c>panic</c> function, no matter which of the two names
     /// reached it?</summary>
@@ -386,9 +397,73 @@ public sealed class TypeChecker
     {
         if (fn.Body is not null || _comp.IsNative(module)) return;
 
+        // An 'extern' declaration is the one bodyless form user code may write: the body lives
+        // in the host, the runtime binds it by symbol, and the capability the ABI needs is
+        // recorded in the module (hostAccess for "dotnet").
+        if (fn.Extern is { } spec)
+        {
+            CheckExtern(fn, spec, module);
+            return;
+        }
+
         _de.Report("LYR-SEM0051", Severity.Error, fn.Span,
             $"'{fn.Name}' has no body; only standard-library modules may declare native functions");
     }
+
+    /// <summary>
+    /// What may cross an <c>extern</c> boundary, checked where the declaration stands so a
+    /// signature nobody can bind is refused at the declaration rather than at load time.
+    ///
+    /// <para>Stage 1 of the ABI: the <c>"dotnet"</c> ABI, and the marshalling set is the
+    /// scalars, <c>bool</c>, <c>char</c> and <c>string</c>, with <c>void</c> as a return. Every
+    /// other type is a question the design leaves to a later stage (optionals as
+    /// <c>Nullable</c>/null, arrays as <c>Span</c>, structs by field), and until it is answered
+    /// the checker says so rather than letting the binder guess.</para>
+    /// </summary>
+    private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
+    {
+        if (spec.Abi != "dotnet")
+        {
+            _de.Report("LYR-SEM0098", Severity.Error, spec.Span,
+                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"dotnet\"");
+            return;
+        }
+
+        // The symbol carries the type; a bare function name could not say where to look.
+        if (spec.Symbol is null || !spec.Symbol.Contains("::", StringComparison.Ordinal))
+            _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
+                $"extern '{fn.Name}' needs a symbol of the form \"Type::Method\" after '=' — "
+                + "the \"dotnet\" ABI binds a public static method of a named type");
+
+        if (fn.Generics.Length > 0)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Span,
+                $"'{fn.Name}' is extern and cannot have type parameters — a host symbol is one signature");
+
+        if (fn.Throws is not null)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span,
+                $"'{fn.Name}' is extern and cannot declare 'throws' — a host exception arrives as a panic in stage 1");
+
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: false))
+                _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
+                    $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
+                    + "cross the \"dotnet\" boundary — scalars, bool, char and string do");
+        }
+
+        if (fn.ReturnType is { } ret)
+        {
+            var type = ResolveType(ret, module.Members);
+            if (!CrossesHostBoundary(type, asReturn: true))
+                _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
+                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not cross the \"dotnet\" "
+                    + "boundary — scalars, bool, char, string and void do");
+        }
+    }
+
+    private static bool CrossesHostBoundary(LyrType type, bool asReturn) =>
+        type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
 
     private void CheckMethods(string typeName, Decl[] members, ModuleSymbol module)
     {
@@ -972,8 +1047,13 @@ public sealed class TypeChecker
         switch (stmt)
         {
             case Block b: CheckBlock(b, scope); break;
+            // The tail of a value block: checked against the context the block stands in, so a
+            // literal tail adapts like an expression arm would (§3.1). Its type is read back by
+            // whoever owns the block — a match arm, a lambda — through the side table.
+            case TailExprStmt tail: CheckExpr(tail.Expr, scope, _tailExpected); break;
             case BindingStmt bnd: CheckBinding(bnd, scope); break;
             case DestructuringStmt d: CheckDestructuring(d, scope); break;
+            case LetPatternStmt lp: CheckLetPattern(lp, scope); break;
             case IfStmt f: CheckIf(f, scope); break;
             case WhileStmt w: CheckWhile(w, scope); break;
             case DoWhileStmt d: CheckBlock(d.Body, scope); CheckCondition(d.Condition, scope); break;
@@ -1109,7 +1189,22 @@ public sealed class TypeChecker
             false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
+
+        // 'for ((k, v) in …)': the element still has its (hidden) slot; the pattern binds the
+        // names from it. It has to hold for every element — a test has no failure path here.
+        if (fo.Pattern is { } pattern) BindIrrefutable(pattern, loopVar.Type, loopScope, "a for-loop head");
+
         CheckBlock(fo.Body, loopScope);
+    }
+
+    /// <summary>Binds a pattern that is not allowed to fail — a for-loop head or a lambda
+    /// parameter. A refutable pattern is LYR-SEM0098 with the way out named.</summary>
+    private void BindIrrefutable(Pattern pattern, LyrType type, SymbolTable scope, string where)
+    {
+        if (!type.IsError && !IsIrrefutable(pattern, type))
+            _de.Report("LYR-SEM0098", Severity.Error, pattern.Span,
+                $"this pattern can fail on a '{TypeFacts.Display(type)}', and {where} has no path for a miss — bind a name and use 'let … else' in the body");
+        BindPattern(pattern, type, scope);
     }
 
     /// <summary>
@@ -1250,6 +1345,8 @@ public sealed class TypeChecker
     // 'if (x == null) { return; }' narrows x afterwards through the early exit.
     private void CheckIf(IfStmt f, SymbolTable scope)
     {
+        if (f.Condition is LetCondExpr letCond) { CheckIfLet(f, letCond, scope); return; }
+
         CheckCondition(f.Condition, scope);
         var (thenFacts, elseFacts) = NarrowingFacts(f.Condition);
 
@@ -1300,6 +1397,14 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckWhile(WhileStmt w, SymbolTable scope)
     {
+        if (w.Condition is LetCondExpr letCond)
+        {
+            // 'while (let x = it.next())': the pattern is tried before EVERY iteration, and the
+            // body sees its names — the loop form of the iterator protocol (§7.2).
+            CheckBlock(w.Body, BindLetCondition(letCond, scope, "'while let'"));
+            return;
+        }
+
         CheckCondition(w.Condition, scope);
 
         var (thenFacts, _) = NarrowingFacts(w.Condition);
@@ -1313,6 +1418,71 @@ public sealed class TypeChecker
     private void Apply(Dictionary<Symbol, LyrType> facts)
     {
         foreach (var (sym, type) in facts) _narrowed[sym] = type;
+    }
+
+    // --- binding conditions and pattern bindings: if-let, while-let, let-else (§7.1, §7.4) ---
+
+    /// <summary>
+    /// <c>if (let Pattern = e) { … } else { … }</c>. The pattern's names live in the then
+    /// branch only; the else branch sees the scope as it was. Nothing narrows: the binding IS
+    /// the proof, and a fresh local of the narrowed type is what the branch gets (§7.4).
+    /// </summary>
+    private void CheckIfLet(IfStmt f, LetCondExpr letCond, SymbolTable scope)
+    {
+        var thenScope = BindLetCondition(letCond, scope, "'if let'");
+        var snapshot = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+        CheckBlock(f.Then, thenScope);
+        _narrowed = snapshot;
+        if (f.Else is not null) CheckStmt(f.Else, scope);
+    }
+
+    /// <summary>Checks the initializer, binds the pattern into a scope of its own — the one the
+    /// branch or body is checked in — and warns when the pattern cannot fail, because then the
+    /// form promises a test it never performs.</summary>
+    private SymbolTable BindLetCondition(LetCondExpr letCond, SymbolTable scope, string form)
+    {
+        var type = CheckExpr(letCond.Initializer, scope);
+        _result.SetType(letCond, LyrType.Bool);
+        var inner = new SymbolTable(scope);
+        BindPattern(letCond.Pattern, type, inner);
+        if (!type.IsError && IsIrrefutable(letCond.Pattern, type))
+            _de.Report("LYR-SEM0099", Severity.Warning, letCond.Pattern.Span,
+                $"this pattern matches every '{TypeFacts.Display(type)}' — the {form} never fails");
+        return inner;
+    }
+
+    /// <summary>
+    /// <c>let Pattern = e;</c> and <c>let Pattern = e else { … };</c>. The names are bound into
+    /// the surrounding block; the else block is checked BEFORE them, because it runs when they
+    /// do not exist, and it has to leave — the same rule the early exit of §7.4 follows, and
+    /// what lets §7.7 count every name as assigned afterwards.
+    /// </summary>
+    private void CheckLetPattern(LetPatternStmt stmt, SymbolTable scope)
+    {
+        var declared = stmt.Type is null ? null : ResolveType(stmt.Type, scope);
+        var actual = CheckExpr(stmt.Initializer, scope, declared);
+        if (declared is not null) CheckAssignable(stmt.Initializer, actual, declared, stmt.Span);
+        var source = declared ?? actual;
+
+        if (stmt.Else is { } els)
+        {
+            CheckBlock(els, scope);
+            if (!Flow.AlwaysExits(els, _result))
+                _de.Report("LYR-SEM0098", Severity.Error, els.Span,
+                    "the 'else' of a 'let … else' must leave on every path — return, throw, break, continue or panic — because the names are not bound when it runs");
+        }
+
+        if (source.IsError) { BindPoison(stmt.Pattern, scope); return; }
+
+        var refutable = !IsIrrefutable(stmt.Pattern, source);
+        if (refutable && stmt.Else is null)
+            _de.Report("LYR-SEM0098", Severity.Error, stmt.Pattern.Span,
+                $"this pattern can fail on a '{TypeFacts.Display(source)}' — add 'else {{ … }}' that leaves, or use 'match'");
+        else if (!refutable && stmt.Else is not null)
+            _de.Report("LYR-SEM0099", Severity.Warning, stmt.Else.Span,
+                $"this pattern matches every '{TypeFacts.Display(source)}' — the 'else' never runs");
+
+        BindPattern(stmt.Pattern, source, scope, stmt.IsMutable);
     }
 
     /// <summary>
@@ -1441,6 +1611,8 @@ public sealed class TypeChecker
                                 $"'{TypeFacts.Display(hole)}' is opaque and does not render in "
                                 + "an f-string — convert explicitly: "
                                 + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
+                        else if (hole is not PrimitiveType && !hole.IsError)
+                            CheckDisplayHole(h, hole, scope);
                     }
                 return LyrType.String;
             case ErrorExpr: return LyrType.Error;
@@ -1450,15 +1622,37 @@ public sealed class TypeChecker
             case StructInitExpr si: return CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
+            case LetCondExpr lc:
+                // Reached only OUTSIDE an if/while head, where CheckIf/CheckWhile take it first.
+                _de.Report("LYR-SEM0098", Severity.Error, lc.Span,
+                    "a 'let' condition belongs directly in 'if (…)' or 'while (…)' — it cannot be combined or nested");
+                CheckExpr(lc.Initializer, scope);
+                BindPoison(lc.Pattern, new SymbolTable(scope));
+                return LyrType.Bool;
             case MatchExpr ma:
             {
                 var armTypes = CheckMatch(ma, ma.Scrutinee, ma.Arms, scope, asExpression: true, expected);
+                // No arm delivers a value — every one is a block that leaves: the match never
+                // produces anything, and 'never' says so; the lowering seals it as diverging.
+                if (armTypes.Count == 0 && ma.Arms.Length > 0) return LyrType.Never;
                 // With a context the arms were checked against it inside; the match HAS it.
                 if (expected is not null && !expected.IsError) return expected;
                 return UnifyArms(armTypes, ma.Span);
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ResumeExpr re: return CheckResume(re, scope);
+            case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
+            case ThrowExpr te:
+            {
+                // The same rule as the statement (SEM0030); the difference is the type. 'never'
+                // fits anywhere (IsAssignable) and drops out of every unification, so
+                // 'x ?? throw e' is 'T' and a throwing arm leaves the other arms' type alone.
+                var thrownValue = CheckExpr(te.Value, scope);
+                if (!Conformance.IsThrowable(thrownValue, _throwable, _binding))
+                    _de.Report("LYR-SEM0030", Severity.Error, te.Span,
+                        $"cannot throw '{TypeFacts.Display(thrownValue)}' — only types implementing 'Throwable' can be thrown");
+                return LyrType.Never;
+            }
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -2558,6 +2752,45 @@ public sealed class TypeChecker
             + $"conversion comes from 'Into': give '{TypeFacts.Display(op)}' the conformance "
             + $":: [Into<{TypeFacts.Display(target)}>]' with a 'fn into(): {TypeFacts.Display(target)}'");
         return target;
+    }
+
+    /// <summary>
+    /// A hole whose value is not a scalar renders through <c>Display</c> (§6.6): <c>{p}</c> means
+    /// <c>{p.show()}</c> when the type conforms, and the call is recorded as what the hole means —
+    /// the same seam the operators and <c>as</c> use, so the lowering sees an ordinary method call.
+    ///
+    /// <para>A format specifier on such a hole is refused: <c>Display</c> has no spec language, and
+    /// silently ignoring one would be the classic "it printed, but not what I asked for". What does
+    /// not conform stays the error it was, with the conformance named instead of the converter.</para>
+    /// </summary>
+    private void CheckDisplayHole(InterpHole hole, LyrType type, SymbolTable scope)
+    {
+        // An interface VALUE renders through its vtable when the interface reaches Display —
+        // 'd.show()' on a 'd: Display' is a dispatch, not a conformance question.
+        var conforms = _display is { } display
+                       && (type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } iface
+                           ? Conformance.WithParents(iface.Symbol, _binding).Any(i => ReferenceEquals(i, display))
+                           : CanConform(type) && Satisfies(type, display, new NamedRef(display)));
+        if (!conforms)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+                $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
+                + "through 'Display': give the type the conformance ':: [Display]' with a "
+                + "'fn show(): string', or narrow and convert it explicitly");
+            return;
+        }
+        if (hole.FormatSpec is { } spec)
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Span,
+                $"a format specifier ':{spec}' does not apply to '{TypeFacts.Display(type)}' — "
+                + "'Display' renders one way; format the text 'show()' answers instead");
+            return;
+        }
+        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
+        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span)
+            { MemberSpan = default };
+        var call = new CallExpr(member, [], hole.Expr.Span);
+        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
     }
 
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
@@ -4150,6 +4383,9 @@ public sealed class TypeChecker
         if (LyrType.Equal(a, b)) return a;
         if (a.IsError) return b;
         if (b.IsError) return a;
+        // A diverging branch contributes nothing (§6.9): 'if (c) v else throw e' is the type of 'v'.
+        if (a is NeverType) return b;
+        if (b is NeverType) return a;
 
         // A `null` branch makes the other one optional: `if (c) 5 else null` is `?int`.
         //
@@ -4188,13 +4424,40 @@ public sealed class TypeChecker
             switch (arm.Body)
             {
                 case Block b:
+                {
+                    var savedTail = _tailExpected;
+                    _tailExpected = asExpression ? expected : null;
                     CheckBlock(b, armScope);
-                    // Blocks have no value: in a match EXPRESSION a block arm has to leave the
-                    // function on every path, and it contributes nothing to the unification.
+                    _tailExpected = savedTail;
+
+                    if (b.Tail is { } tail)
+                    {
+                        // A block arm WITH a tail delivers the tail's value (§6.9): it takes part
+                        // in the unification exactly as an expression arm does. In a match
+                        // STATEMENT the value goes nowhere, so the tail is held to the expression
+                        // statement rule — a bare value there is the same mistake as 'x;'.
+                        var tt = _result.TypeOf(tail.Expr);
+                        if (!asExpression)
+                        {
+                            if (tail.Expr is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
+                                _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
+                                    "expression statement has no effect (only calls, assignments and resume are allowed)");
+                            break;
+                        }
+                        if (expected is not null && !expected.IsError)
+                            CheckAssignable(tail.Expr, tt, expected, tail.Span);
+                        bodies.Add(tt);
+                        break;
+                    }
+
+                    // Without a tail a block has no value: in a match EXPRESSION it has to leave
+                    // the function on every path, and it contributes nothing to the unification.
                     if (asExpression && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0033", Severity.Error, arm.Span,
-                            "a block arm of a match expression must return or throw on every path (blocks have no value)");
+                            "a block arm of a match expression must return or throw on every path, "
+                            + "or end in a tail expression without ';' that is the arm's value");
                     break;
+                }
                 case Expr e:
                     var bt = CheckExpr(e, armScope, expected);
                     // With a context the arm checks AGAINST it (§3.1/§6.9 since 2.1): a
@@ -4225,9 +4488,15 @@ public sealed class TypeChecker
             _result.MarkMatchExhaustive(match);
             return;
         }
+        // The witness is the point: a name for what is missing beats a count of it. "no arm
+        // matches 'Some(false)'" says which value falls through and what to write; "missing
+        // case(s): 'Some'" said only that something about 'Some' was wrong, and for a nested
+        // payload it was not even that.
         var what = missing is ["_"]
             ? "add a '_' or binding arm to cover the remaining values"
-            : $"missing case(s): {string.Join(", ", missing.Select(m => $"'{m}'"))}";
+            : missing is [var only]
+                ? $"no arm matches '{only}'"
+                : $"no arm matches {string.Join(", ", missing.Select(m => $"'{m}'"))}";
         _de.Report("LYR-SEM0050", Severity.Error, match.Span,
             $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
     }
@@ -4238,16 +4507,30 @@ public sealed class TypeChecker
         else into.Add(p);
     }
 
-    private List<string> MissingCases(LyrType type, List<Pattern> pats)
+    /// <summary>
+    /// What the arms leave uncovered, as WITNESS PATTERNS: values written the way a pattern is
+    /// written, so the answer names what to add rather than what is wrong. Empty means exhaustive.
+    ///
+    /// <para>Exact where it answers at all. A variant with ONE payload field recurses into that
+    /// field, so <c>Some(true)</c> and <c>None</c> over an <c>Opt&lt;bool&gt;</c> report
+    /// <c>Some(false)</c>. A variant with several fields is reported as a whole when nothing
+    /// covers it and considered covered otherwise — a partial answer per column needs the
+    /// pattern matrix, and a witness that turns out to BE covered is worse than none.</para>
+    ///
+    /// <para><paramref name="nested"/> travels with the meaning of a bare name: at the top of a
+    /// match a name over a <c>?T</c> leaves <c>null</c> uncovered, inside a payload it binds the
+    /// whole optional and covers it (§7.6).</para>
+    /// </summary>
+    private List<string> MissingCases(LyrType type, List<Pattern> pats, bool nested = false)
     {
-        if (pats.Any(p => IsIrrefutable(p, type))) return [];
+        if (pats.Any(p => IsIrrefutable(p, type, nested))) return [];
         switch (type)
         {
             case Optional o:
             {
                 var missing = new List<string>();
                 if (!pats.Any(IsNullPattern)) missing.Add("null");
-                missing.AddRange(MissingCases(o.Inner, pats.Where(p => !IsNullPattern(p)).ToList()));
+                missing.AddRange(MissingCases(o.Inner, pats.Where(p => !IsNullPattern(p)).ToList(), nested));
                 return missing;
             }
             case PrimitiveType { Kind: PrimitiveKind.Bool }:
@@ -4257,16 +4540,89 @@ public sealed class TypeChecker
                 if (!pats.Any(p => p is LiteralPattern { Literal: BoolLiteralExpr { Value: false } })) missing.Add("false");
                 return missing;
             }
+            case ArrayOf array:
+                return MissingArrayCases(array, pats);
             default:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
-                {
-                    var covered = new HashSet<string>();
-                    foreach (var p in pats)
-                        if (CoveredVariant(p, type, enumTs) is { } name) covered.Add(name);
-                    return ed.Variants.Where(v => !covered.Contains(v.Name)).Select(v => v.Name).ToList();
-                }
+                    return MissingVariants(type, ed, enumTs, pats);
                 return ["_"]; // an open type is coverable only by a default
         }
+    }
+
+    /// <summary>The variants no arm covers, each as a witness. A variant with one payload field
+    /// is followed into that field, which is where a nested hole usually is.</summary>
+    private List<string> MissingVariants(LyrType type, EnumDecl ed, TypeSymbol enumTs, List<Pattern> pats)
+    {
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        var missing = new List<string>();
+
+        foreach (var variant in ed.Variants)
+        {
+            var rows = pats.Where(p => NamesVariant(p, variant.Name, enumTs)).ToList();
+            if (rows.Count == 0) { missing.Add(WitnessOf(variant)); continue; }
+            if (rows.Any(p => CoveredVariant(p, type, enumTs) == variant.Name)) continue;
+
+            // One payload field: the hole is inside it, and the recursion names it.
+            if (variant.TupleFields is { Length: 1 } fields)
+            {
+                var column = new List<Pattern>();
+                foreach (var row in rows)
+                    if (row is VariantPattern { TupleElements: [var only] }) Flatten(only, column);
+                var fieldType = Substitute(ResolveType(fields[0], enumTs.Members), subst);
+                foreach (var witness in MissingCases(fieldType, column, nested: true))
+                    missing.Add($"{variant.Name}({witness})");
+                continue;
+            }
+
+            missing.Add(WitnessOf(variant));
+        }
+        return missing;
+    }
+
+    /// <summary>Does this pattern name that variant at all — covering it or only partly?</summary>
+    private bool NamesVariant(Pattern p, string variant, TypeSymbol enumTs) => p switch
+    {
+        BindingPattern b => b.Name == variant && VariantOf(enumTs, b.Name) is not null,
+        VariantPattern v => v.Path[^1] == variant,
+        _ => false,
+    };
+
+    /// <summary>A variant written as a pattern, with its payload left open.</summary>
+    private static string WitnessOf(EnumVariant variant) => variant switch
+    {
+        { TupleFields: { } tuple } => $"{variant.Name}({string.Join(", ", tuple.Select(_ => "_"))})",
+        { StructFields: not null } => variant.Name + " { … }",
+        _ => variant.Name,
+    };
+
+    /// <summary>
+    /// The lengths an array match leaves open. An arm whose fixed positions all bind without
+    /// testing covers its length exactly, or every length from there up when it carries a rest;
+    /// the answer is the smallest length nothing covers, written as a pattern.
+    /// </summary>
+    private List<string> MissingArrayCases(ArrayOf array, List<Pattern> pats)
+    {
+        var exact = new HashSet<int>();
+        var open = int.MaxValue; // the smallest length from which on everything is covered
+
+        foreach (var p in pats)
+        {
+            if (p is not ArrayPattern ap) continue;
+            var positions = ap.Elements.Where(e => e is not RestPattern).ToArray();
+
+            // A test inside a position says nothing about the LENGTH class: '[0, y]' covers
+            // some arrays of length two, not all of them.
+            if (!positions.All(e => IsIrrefutable(e, array.Element, nested: true))) continue;
+
+            if (ap.Elements.Any(e => e is RestPattern)) open = Math.Min(open, positions.Length);
+            else exact.Add(positions.Length);
+        }
+
+        for (var n = 0; n < open && n <= 64; n++)
+            if (!exact.Contains(n))
+                return [n == 0 ? "[]" : "[" + string.Join(", ", Enumerable.Repeat("_", n)) + "]"];
+
+        return [];
     }
 
     // Which variant does this pattern cover completely, with an irrefutable payload?
@@ -4293,7 +4649,7 @@ public sealed class TypeChecker
         {
             if (variant.TupleFields is not { } fields || fields.Length != elems.Length) return false;
             for (var i = 0; i < elems.Length; i++)
-                if (!IsIrrefutable(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst)))
+                if (!IsIrrefutable(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), nested: true))
                     return false;
             return true;
         }
@@ -4304,7 +4660,7 @@ public sealed class TypeChecker
             {
                 if (fp.Pattern is null) continue; // the short form only binds, so it is irrefutable
                 var fd = Array.Find(variant.StructFields, f => f.Name == fp.Name);
-                if (fd is null || !IsIrrefutable(fp.Pattern, Substitute(ResolveType(fd.Type, enumTs.Members), subst)))
+                if (fd is null || !IsIrrefutable(fp.Pattern, Substitute(ResolveType(fd.Type, enumTs.Members), subst), nested: true))
                     return false;
             }
             return true;
@@ -4313,21 +4669,27 @@ public sealed class TypeChecker
     }
 
     // Does this pattern match EVERY value of the type?
-    private bool IsIrrefutable(Pattern p, LyrType type)
+    private bool IsIrrefutable(Pattern p, LyrType type, bool nested = false)
     {
         switch (p)
         {
             case WildcardPattern:
                 return true;
             case OrPattern o:
-                return o.Alternatives.Any(a => IsIrrefutable(a, type));
+                return o.Alternatives.Any(a => IsIrrefutable(a, type, nested));
             case BindingPattern b:
-                if (type is Optional) return false; // binds the inner part and does not cover null
+                // At the top a name binds the present half of a '?T' and leaves null uncovered;
+                // nested it binds the whole optional (BindPattern) and covers it.
+                if (type is Optional opt) return nested && BindsWholeOptional(b, opt);
                 return EnumDefOf(type) is not { } e || VariantOf(e, b.Name) is null; // a variant name is a test
+            // An array pattern only covers everything when it tests no length: '[..]' and
+            // '[..rest]' match every array, anything else asks how many elements there are.
+            case ArrayPattern ap:
+                return ap.Elements is [RestPattern];
             case TuplePattern t:
                 if (type is not TupleOf tt || tt.Elements.Length != t.Elements.Length) return false;
                 for (var i = 0; i < t.Elements.Length; i++)
-                    if (!IsIrrefutable(t.Elements[i], tt.Elements[i])) return false;
+                    if (!IsIrrefutable(t.Elements[i], tt.Elements[i], nested: true)) return false;
                 return true;
             case VariantPattern v:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
@@ -4347,7 +4709,7 @@ public sealed class TypeChecker
         {
             if (fp.Pattern is null) continue;
             if (def.Members.LookupLocal(fp.Name) is not FieldSymbol fs) return false;
-            if (!IsIrrefutable(fp.Pattern, Substitute(FieldType(fs), subst))) return false;
+            if (!IsIrrefutable(fp.Pattern, Substitute(FieldType(fs), subst), nested: true)) return false;
         }
         return true;
     }
@@ -4360,6 +4722,10 @@ public sealed class TypeChecker
         {
             if (bodies[i].IsError) continue;
             if (result.IsError) { result = bodies[i]; continue; }
+            // A diverging arm ('throw', 'panic') contributes nothing (§6.9): it never delivers a
+            // value the others would have to agree with. All arms diverging is 'never'.
+            if (bodies[i] is NeverType) continue;
+            if (result is NeverType) { result = bodies[i]; continue; }
             if (LyrType.Equal(result, bodies[i])) continue;
             if (WidenAgainstNull(result, bodies[i]) is { } widened) { result = widened; continue; }
             _de.Report("LYR-SEM0016", Severity.Error, span, $"{what} have incompatible types: '{TypeFacts.Display(result)}' vs '{TypeFacts.Display(bodies[i])}'");
@@ -4407,12 +4773,20 @@ public sealed class TypeChecker
     }
 
     private void BindPattern(Pattern pattern, LyrType scrutinee, SymbolTable scope,
-        bool mutable = false)
+        bool mutable = false, bool nested = false)
     {
         if (scrutinee.IsError) { BindPoison(pattern, scope); return; }
-        if (scrutinee is Optional opt && pattern is not (WildcardPattern or OrPattern) && !IsNullPattern(pattern))
+
+        // A non-null pattern over a '?T' matches against 'T' (§7.6) — with one exception: a NAME
+        // in nested position ('Some(v)' over 'Opt<?int>', '(a, b)' over '(?int, int)') binds the
+        // '?T' as it is and covers it. At the top of a match the null arm is mandatory anyway, so
+        // the name after it means "the present rest" and narrows; inside a payload there is no
+        // such arm, and a name that silently refused null would leave a hole no arm could name.
+        // Rust's 'Some(v)' binds whatever is inside for the same reason.
+        if (scrutinee is Optional opt && pattern is not (WildcardPattern or OrPattern) && !IsNullPattern(pattern)
+            && !(nested && BindsWholeOptional(pattern, opt)))
         {
-            BindPattern(pattern, opt.Inner, scope, mutable);
+            BindPattern(pattern, opt.Inner, scope, mutable, nested);
             return;
         }
 
@@ -4440,7 +4814,7 @@ public sealed class TypeChecker
                 if (scrutinee is TupleOf tup && tup.Elements.Length == t.Elements.Length)
                 {
                     for (var i = 0; i < t.Elements.Length; i++)
-                        BindPattern(t.Elements[i], tup.Elements[i], scope, mutable);
+                        BindPattern(t.Elements[i], tup.Elements[i], scope, mutable, nested: true);
                     return;
                 }
                 Report(t.Span, "LYR-SEM0029", scrutinee is TupleOf other
@@ -4449,8 +4823,17 @@ public sealed class TypeChecker
                 BindPoison(t, scope);
                 return;
 
+            case ArrayPattern ap:
+                BindArrayPattern(ap, scrutinee, scope, mutable);
+                return;
+
+            case RestPattern:
+                // Only inside an array pattern, where BindArrayPattern takes it; anywhere else
+                // the parser never produces one.
+                return;
+
             case VariantPattern v:
-                BindVariantPattern(v, scrutinee, scope);
+                BindVariantPattern(v, scrutinee, scope, mutable);
                 return;
 
             case RangePattern r:
@@ -4458,9 +4841,42 @@ public sealed class TypeChecker
                 return;
 
             case OrPattern o:
-                BindOrPattern(o, scrutinee, scope);
+                BindOrPattern(o, scrutinee, scope, nested);
                 return;
             // wildcard or error: no binding
+        }
+    }
+
+    /// <summary>Is this a plain name over a '?T' in nested position — one that binds the whole
+    /// optional rather than its present half? A name that spells a variant of the inner enum is
+    /// a test and still matches against 'T'.</summary>
+    private static bool BindsWholeOptional(Pattern pattern, Optional opt) =>
+        pattern is BindingPattern b && !(EnumDefOf(opt.Inner) is { } e && VariantOf(e, b.Name) is not null);
+
+    /// <summary><c>[a, b]</c> over a <c>T[]</c>: every fixed position binds a <c>T</c>, a named
+    /// rest binds a <c>T[]</c> of its own. The length is a TEST, so the pattern is refutable
+    /// unless it is nothing but a rest.</summary>
+    private void BindArrayPattern(ArrayPattern ap, LyrType scrutinee, SymbolTable scope, bool mutable)
+    {
+        if (scrutinee is not ArrayOf array)
+        {
+            Report(ap.Span, "LYR-SEM0029",
+                $"array pattern cannot match '{TypeFacts.Display(scrutinee)}' — only an array has elements at positions");
+            BindPoison(ap, scope);
+            return;
+        }
+
+        foreach (var element in ap.Elements)
+        {
+            if (element is RestPattern { Name: { } restName } rest)
+            {
+                var local = new LocalSymbol(restName, new ArrayOf(array.Element), mutable, rest);
+                DeclareBinding(scope, local, rest.Span);
+                _result.BindRef(rest, local);
+                continue;
+            }
+            if (element is RestPattern) continue;
+            BindPattern(element, array.Element, scope, mutable, nested: true);
         }
     }
 
@@ -4475,8 +4891,14 @@ public sealed class TypeChecker
         }
         var lt = CheckExpr(lit.Literal, scope);
         if (!lt.IsError && !IsAssignable(lit.Literal, lt, scrutinee))
+        {
             _de.Report("LYR-SEM0029", Severity.Error, lit.Span,
                 $"literal pattern of type '{TypeFacts.Display(lt)}' cannot match '{TypeFacts.Display(scrutinee)}'");
+            return;
+        }
+        // The literal IS of the scrutinee's type (§3.1): '1' over an 'int8' is an int8, and the
+        // side table has to say so, or the lowering compares an i8 against an i64 constant.
+        AdaptLiteralType(lit.Literal, scrutinee);
     }
 
     private void CheckRangePattern(RangePattern r, LyrType scrutinee, SymbolTable scope)
@@ -4486,11 +4908,16 @@ public sealed class TypeChecker
         if (lo.IsError || hi.IsError) return;
         var comparable = TypeFacts.IsNumeric(scrutinee) || scrutinee is PrimitiveType { Kind: PrimitiveKind.Char };
         if (!comparable || !IsAssignable(r.Low, lo, scrutinee) || !IsAssignable(r.High, hi, scrutinee))
+        {
             _de.Report("LYR-SEM0029", Severity.Error, r.Span,
                 $"range pattern of '{TypeFacts.Display(lo)}'..'{TypeFacts.Display(hi)}' cannot match '{TypeFacts.Display(scrutinee)}'");
+            return;
+        }
+        AdaptLiteralType(r.Low, scrutinee);
+        AdaptLiteralType(r.High, scrutinee);
     }
 
-    private void BindVariantPattern(VariantPattern v, LyrType scrutinee, SymbolTable scope)
+    private void BindVariantPattern(VariantPattern v, LyrType scrutinee, SymbolTable scope, bool mutable = false)
     {
         if (EnumDefOf(scrutinee) is { } enumTs)
         {
@@ -4516,7 +4943,7 @@ public sealed class TypeChecker
                 return;
             }
             _result.BindRef(v, ev);
-            BindVariantPayload(v, ev, scrutinee, enumTs, scope);
+            BindVariantPayload(v, ev, scrutinee, enumTs, scope, mutable);
             return;
         }
 
@@ -4546,7 +4973,7 @@ public sealed class TypeChecker
         {
             if (def.Members.LookupLocal(fp.Name) is FieldSymbol fs)
             {
-                BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope);
+                BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope, mutable);
             }
             else
             {
@@ -4557,7 +4984,7 @@ public sealed class TypeChecker
     }
 
     private void BindVariantPayload(VariantPattern v, EnumVariantSymbol ev, LyrType scrutinee,
-        TypeSymbol enumTs, SymbolTable scope)
+        TypeSymbol enumTs, SymbolTable scope, bool mutable = false)
     {
         var variant = (EnumVariant)ev.Declaration!;
         var subst = scrutinee is GenericInstance gi ? SubstMap(gi) : EmptySubst;
@@ -4580,7 +5007,7 @@ public sealed class TypeChecker
                 return;
             }
             for (var i = 0; i < elems.Length; i++)
-                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope);
+                BindPattern(elems[i], Substitute(ResolveType(fields[i], enumTs.Members), subst), scope, mutable, nested: true);
             return;
         }
 
@@ -4598,7 +5025,7 @@ public sealed class TypeChecker
             {
                 if (Array.Find(decls, f => f.Name == fp.Name) is { } fd)
                 {
-                    BindFieldPattern(fp, Substitute(ResolveType(fd.Type, enumTs.Members), subst), scope);
+                    BindFieldPattern(fp, Substitute(ResolveType(fd.Type, enumTs.Members), subst), scope, mutable);
                 }
                 else
                 {
@@ -4635,10 +5062,10 @@ public sealed class TypeChecker
             + "one would be dropped");
     }
 
-    private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope)
+    private void BindFieldPattern(FieldPattern fp, LyrType type, SymbolTable scope, bool mutable = false)
     {
-        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope); return; }
-        var local = new LocalSymbol(fp.Name, type, false, fp); // short form: the field name binds
+        if (fp.Pattern is not null) { BindPattern(fp.Pattern, type, scope, mutable, nested: true); return; }
+        var local = new LocalSymbol(fp.Name, type, mutable, fp); // short form: the field name binds
         DeclareBinding(scope, local, fp.Span);
         _result.BindRef(fp, local);
     }
@@ -4654,14 +5081,14 @@ public sealed class TypeChecker
     // Or-pattern: every alternative binds into a table of its own, and all of them have to bind the
     // same names with the same types. The bindings of the FIRST alternative become the arm scope,
     // consistently with the definite-assignment analysis, which uses alternative 0.
-    private void BindOrPattern(OrPattern o, LyrType scrutinee, SymbolTable scope)
+    private void BindOrPattern(OrPattern o, LyrType scrutinee, SymbolTable scope, bool nested = false)
     {
         if (o.Alternatives.Length == 0) return;
         var tables = new List<SymbolTable>(o.Alternatives.Length);
         foreach (var alt in o.Alternatives)
         {
             var t = new SymbolTable(scope);
-            BindPattern(alt, scrutinee, t);
+            BindPattern(alt, scrutinee, t, nested: nested);
             tables.Add(t);
         }
         var reference = tables[0].Symbols.OfType<LocalSymbol>().ToList();
@@ -4681,6 +5108,33 @@ public sealed class TypeChecker
             }
         }
         foreach (var s in reference) scope.TryDeclare(s);
+
+        // The arm body refers to alternative 0's symbols, so every later alternative's binding
+        // node is pointed at the SAME symbol: the lowering then stores into one slot whichever
+        // alternative matched, and the unused-name analysis sees one name with its uses rather
+        // than a second, never-read one per alternative.
+        for (var i = 1; i < o.Alternatives.Length; i++)
+            RebindToCanonical(o.Alternatives[i], reference);
+    }
+
+    private void RebindToCanonical(Node? node, List<LocalSymbol> canonical)
+    {
+        switch (node)
+        {
+            case BindingPattern b when _result.RefOf(b) is LocalSymbol l:
+                if (canonical.Find(c => c.Name == l.Name) is { } cb) _result.BindRef(b, cb);
+                return;
+            case FieldPattern { Pattern: null } f when _result.RefOf(f) is LocalSymbol l:
+                if (canonical.Find(c => c.Name == l.Name) is { } cf) _result.BindRef(f, cf);
+                return;
+            case FieldPattern f: RebindToCanonical(f.Pattern, canonical); return;
+            case TuplePattern t: foreach (var e in t.Elements) RebindToCanonical(e, canonical); return;
+            case VariantPattern v:
+                foreach (var e in v.TupleElements ?? []) RebindToCanonical(e, canonical);
+                foreach (var f in v.StructFields ?? []) RebindToCanonical(f, canonical);
+                return;
+            case OrPattern o: foreach (var a in o.Alternatives) RebindToCanonical(a, canonical); return;
+        }
     }
 
     // --- pattern helpers ---
@@ -4741,12 +5195,78 @@ public sealed class TypeChecker
                     }
                 }
                 return;
+            case ArrayPattern ap:
+                foreach (var sub in ap.Elements)
+                {
+                    if (sub is RestPattern { Name: { } n } rest)
+                    {
+                        var lr = new LocalSymbol(n, LyrType.Error, false, rest);
+                        scope.TryDeclare(lr);
+                        _result.BindRef(rest, lr);
+                    }
+                    else BindPoison(sub, scope);
+                }
+                return;
             case TuplePattern t: foreach (var sub in t.Elements) BindPoison(sub, scope); return;
             case OrPattern o: if (o.Alternatives.Length > 0) BindPoison(o.Alternatives[0], scope); return;
         }
     }
 
     // resume co: yields the value of the next yield.
+    /// <summary>
+    /// <c>comptime e</c>: <c>e</c> is checked exactly as it would be without the prefix — the
+    /// value is the same — and then held to what the evaluator can honour. It runs the
+    /// expression in a VM with no capability and no frame of the enclosing function, so a
+    /// local, a parameter or <c>this</c> has nothing to stand on there; a lambda inside would be
+    /// a value the module cannot hold; and the result has to be a literal the lowering can
+    /// write back, which is a scalar, a <c>bool</c>, a <c>char</c> or a <c>string</c>. A nested
+    /// <c>comptime</c> is simply evaluated as part of the outer one.
+    /// </summary>
+    private LyrType CheckComptime(ComptimeExpr ct, SymbolTable scope, LyrType? expected)
+    {
+        var type = CheckExpr(ct.Inner, scope, expected);
+        if (type.IsError) return type;
+
+        if (type is not PrimitiveType { Kind: not PrimitiveKind.Void })
+            return Report(ct.Span, "LYR-SEM0100",
+                $"a 'comptime' expression has to produce a scalar, a bool, a char or a string — this one "
+                + $"is '{TypeFacts.Display(type)}', which the compiled module has no way to hold as a literal");
+
+        var pure = true;
+        void Walk(Node? node)
+        {
+            switch (node)
+            {
+                case null: return;
+                case ThisExpr t:
+                    pure = false;
+                    Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
+                        + "it is evaluated before any receiver exists");
+                    return;
+                case IdentifierExpr id when _result.RefOf(id) is LocalSymbol or ParameterSymbol:
+                    pure = false;
+                    Report(id.Span, "LYR-SEM0100", $"'{id.Name}' is a local of the enclosing function and "
+                        + "cannot be used in a 'comptime' expression — only module-level names can");
+                    return;
+                case LambdaExpr lam:
+                    pure = false;
+                    Report(lam.Span, "LYR-SEM0100", "a lambda cannot be used in a 'comptime' expression");
+                    return;
+                case AssignExpr a:
+                    pure = false;
+                    Report(a.Span, "LYR-SEM0100", "an assignment cannot be used in a 'comptime' expression");
+                    return;
+                default:
+                    foreach (var child in AstChildren.Of(node)) Walk(child);
+                    return;
+            }
+        }
+        Walk(ct.Inner);
+
+        if (pure) _result.ComptimeSites.Add(ct);
+        return type;
+    }
+
     private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
     {
         var t = CheckExpr(re.Coroutine, scope);
@@ -4765,7 +5285,20 @@ public sealed class TypeChecker
     // returns (v1.13), and a non-void one requires return coverage.
     private LyrType CheckLambda(LambdaExpr lam, SymbolTable scope, LyrType? expected = null)
     {
-        var expFn = expected is FnType ef && ef.Parameters.Length == lam.Parameters.Length ? ef : null;
+        // A trailing lambda has the implicit 'it' — one parameter, or none when the context
+        // takes none: 'run { … }' beside 'xs.map { it * 2 }'. The parameter node is dropped
+        // then, and the lowering skips an unbound implicit parameter.
+        var parameters = lam.Parameters;
+        if (parameters is [{ Implicit: true }] && expected is FnType { Parameters.Length: 0 })
+            parameters = [];
+        if (parameters is [{ Implicit: true }] && expected is not FnType { Parameters.Length: 1 })
+        {
+            Report(lam.Span, "LYR-SEM0045",
+                "a trailing lambda takes one parameter, 'it' — the context has to expect a function of one parameter");
+            expected = null;
+        }
+
+        var expFn = expected is FnType ef && ef.Parameters.Length == parameters.Length ? ef : null;
 
         var savedYield = _currentYield;
         var savedReturn = _currentReturn;
@@ -4776,19 +5309,22 @@ public sealed class TypeChecker
         _returnInference = null; // this lambda's returns are its own, never the outer collection's
 
         var lambdaScope = new SymbolTable(scope);
-        var pTypes = new LyrType[lam.Parameters.Length];
-        for (var i = 0; i < lam.Parameters.Length; i++)
+        var pTypes = new LyrType[parameters.Length];
+        for (var i = 0; i < parameters.Length; i++)
         {
-            var p = lam.Parameters[i];
+            var p = parameters[i];
             LyrType pt;
             if (p.Type is not null) pt = ResolveType(p.Type, scope);
             else if (expFn is not null) pt = expFn.Parameters[i];
             else pt = Report(p.Span, "LYR-SEM0045",
                 $"lambda parameter '{p.Name}' needs a type annotation (no context type available)");
             var ps = new ParameterSymbol(p.Name, pt, p);
-            lambdaScope.TryDeclare(ps);
+            if (p.Pattern is null) lambdaScope.TryDeclare(ps); // a pattern parameter's '_' is not a name in scope
             _result.BindRef(p, ps); // for definite-assignment analysis: lambda parameters are assigned
             pTypes[i] = pt;
+
+            // '((k, v)) => …': the parameter has its slot, the pattern binds the names from it.
+            if (p.Pattern is { } pattern) BindIrrefutable(pattern, pt, lambdaScope, "a lambda parameter");
         }
 
         var contextRet = lam.ReturnType is not null ? ResolveType(lam.ReturnType, scope) : expFn?.Return;
@@ -4809,12 +5345,18 @@ public sealed class TypeChecker
                 }
                 break;
             case Block b:
-                if (contextRet is null && !openGeneric && !HasValueReturn(b))
+            {
+                // A tail is 'return tail;' at the block's end (§6.9, §7.3): it counts as a value
+                // return for the void default, joins the inferred returns, checks against the
+                // context, and covers the block's end.
+                var savedTail = _tailExpected;
+                if (contextRet is null && !openGeneric && !HasValueReturn(b) && b.Tail is null)
                 {
                     // A block lambda without context that returns no value becomes void, so
                     // side-effect closures (`() => { doStuff(); }`) need no `: void`.
                     ret = LyrType.Void;
                     _currentReturn = LyrType.Void;
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                 }
                 else if (contextRet is null || openGeneric)
@@ -4825,12 +5367,14 @@ public sealed class TypeChecker
                     var collected = new List<LyrType>();
                     _returnInference = collected;
                     _currentReturn = LyrType.Error; // nothing reads it while collecting
+                    _tailExpected = null;
                     CheckBlock(b, lambdaScope);
                     _returnInference = null;
+                    if (b.Tail is { } inferredTail) collected.Add(_result.TypeOf(inferredTail.Expr));
                     ret = collected.Count == 0
                         ? LyrType.Void // openGeneric without a value return: U binds to void
                         : UnifyArms(collected, lam.Span, "the returns of this block lambda");
-                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (!TypeFacts.IsVoid(ret) && !ret.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
@@ -4838,12 +5382,17 @@ public sealed class TypeChecker
                 {
                     ret = contextRet;
                     _currentReturn = contextRet; // 'return' belongs to the LAMBDA, not to the enclosing function
+                    _tailExpected = TypeFacts.IsVoid(contextRet) ? null : contextRet;
                     CheckBlock(b, lambdaScope);
-                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && !Flow.AlwaysReturns(b, _result))
+                    if (b.Tail is { } contextTail && !TypeFacts.IsVoid(contextRet)) // a void context discards the value
+                        CheckAssignable(contextTail.Expr, _result.TypeOf(contextTail.Expr), contextRet, contextTail.Span);
+                    if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
                         _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                             "a non-void block lambda must return or throw on every path");
                 }
+                _tailExpected = savedTail;
                 break;
+            }
             default:
                 ret = LyrType.Error;
                 break;
@@ -4869,6 +5418,7 @@ public sealed class TypeChecker
         DoWhileStmt d => HasValueReturn(d.Body),
         ForInStmt fo => HasValueReturn(fo.Body),
         DeferStmt de => HasValueReturn(de.Body),
+        LetPatternStmt lp => lp.Else is not null && HasValueReturn(lp.Else),
         TryStmt t => HasValueReturn(t.Body) || t.Catches.Any(c => HasValueReturn(c.Body)),
         MatchStmt m => m.Arms.Any(a => a.Body is Block ab && HasValueReturn(ab)),
         _ => false
@@ -4911,6 +5461,9 @@ public sealed class TypeChecker
                     return;
                 case Block b: foreach (var s in b.Statements) WalkNode(s); return;
                 case BindingStmt bd: WalkNode(bd.Initializer); return;
+                case DestructuringStmt ds: WalkNode(ds.Initializer); return;
+                case LetPatternStmt lp: WalkNode(lp.Initializer); WalkNode(lp.Else); return;
+                case LetCondExpr lc: WalkNode(lc.Initializer); return;
                 case IfStmt f: WalkNode(f.Condition); WalkNode(f.Then); WalkNode(f.Else); return;
                 case WhileStmt w: WalkNode(w.Condition); WalkNode(w.Body); return;
                 case DoWhileStmt d: WalkNode(d.Body); WalkNode(d.Condition); return;
@@ -4942,6 +5495,9 @@ public sealed class TypeChecker
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
+                case ComptimeExpr ct: WalkNode(ct.Inner); return;
+                case ThrowExpr te: WalkNode(te.Value); return;
+                case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;

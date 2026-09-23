@@ -341,6 +341,11 @@ public sealed class NameSpanTests
             Assert.True(decl.NameSpan.Start >= decl.Span.Start && decl.NameSpan.End <= decl.Span.End,
                 $"{path}: {decl.GetType().Name} '{decl.Name}' has {decl.NameSpan} outside {decl.Span}");
 
+            // An EMPTY span says the source names nothing: the element of 'for ((k, v) in …)'
+            // and the implicit 'it' of a trailing lambda have a slot and no name. Comparing text
+            // there would compare against a name only the compiler knows.
+            if (decl.NameSpan.IsEmpty) continue;
+
             Assert.Equal(decl.Name, text.Substring(decl.NameSpan.Start, decl.NameSpan.Length));
         }
     }

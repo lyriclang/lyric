@@ -183,3 +183,99 @@ pub fn compact_composes_like_any_other_source(): void {
     assertEq(sum(compact<int>(places).filter((n: int) => n % 2 == 1)), 4);
     assertEq(first<int>(compact<int>(places).skip(1)) ?? -1, 2);
 }
+
+// ------------------------------------------------------------ 4.5: terminators as methods
+
+@Test
+pub fn terminators_end_a_chain_without_turning_it_inside_out(): void {
+    assertEq(upTo(6).iter().filter((n: int) => n % 2 == 0).count(), 3);
+    assertEq(upTo(4).iter().fold<int>(100, (acc: int, n: int) => acc + n), 110);
+    assertEq(upTo(4).iter().reduce((a: int, b: int) => a * b)!, 24);
+    assertTrue(upTo(0).iter().reduce((a: int, b: int) => a + b) == null, "empty reduces to null");
+    assertEq(upTo(5).iter().first()!, 1);
+    assertEq(upTo(5).iter().last()!, 5);
+    assertTrue(upTo(0).iter().last() == null, "empty has no last");
+    assertEq(upTo(5).iter().nth(2)!, 3);
+    assertTrue(upTo(5).iter().nth(9) == null, "past the end");
+    assertTrue(upTo(5).iter().nth(0 - 1) == null, "a negative position");
+}
+
+@Test
+pub fn predicate_terminators_short_circuit(): void {
+    assertTrue(upTo(5).iter().any((n: int) => n == 3), "3 is in it");
+    assertTrue(upTo(5).iter().all((n: int) => n > 0), "all positive");
+    assertTrue(upTo(5).iter().none((n: int) => n > 5), "none above 5");
+    assertEq(upTo(5).iter().find((n: int) => n > 3)!, 4);
+    assertEq(upTo(5).iter().position((n: int) => n > 3)!, 3);
+    assertTrue(upTo(5).iter().position((n: int) => n > 9) == null, "no position");
+    assertEq(upTo(10).iter().countWhere((n: int) => n % 3 == 0), 3);
+}
+
+@Test
+pub fn for_each_and_to_array_drain(): void {
+    var total = 0;
+    upTo(4).iter().forEach(
+        (n: int) => {
+            total = total + n;
+        }
+    );
+    assertEq(total, 10);
+    let arr = upTo(3).iter().map<int>((n: int) => n * n).toArray();
+    assertEq(arr.length, 3);
+    assertEq(arr[2], 9);
+}
+
+@Test
+pub fn skip_while_drops_the_front_only(): void {
+    let rest = upTo(6).iter().skipWhile((n: int) => n < 3).toArray();
+    assertEq(rest.length, 4);
+    assertEq(rest[0], 3);
+    // Unlike filter: once the front is gone, a later small value passes.
+    let mixed = over<int>([1, 5, 2, 6]).skipWhile((n: int) => n < 3).toArray();
+    assertEq(mixed.length, 3);
+    assertEq(mixed[1], 2);
+}
+
+@Test
+pub fn step_by_keeps_the_first_and_every_nth(): void {
+    let stepped = upTo(7).iter().stepBy(3).toArray();
+    assertEq(stepped.length, 3);
+    assertEq(stepped[0], 1);
+    assertEq(stepped[1], 4);
+    assertEq(stepped[2], 7);
+    assertEq(upTo(7).iter().stepBy(0).count(), 0);
+    assertEq(upTo(7).iter().stepBy(1).count(), 7);
+}
+
+@Test
+pub fn inspect_sees_every_element_on_the_way_past(): void {
+    var seen = 0;
+    let total = upTo(4).iter().inspect(
+        (n: int) => {
+            seen = seen + 1;
+        }
+    ).fold<int>(
+        0,
+        (acc: int, n: int) => acc + n
+    );
+    assertEq(seen, 4);
+    assertEq(total, 10);
+}
+
+@Test
+pub fn dedup_by_drops_consecutive_repeats(): void {
+    let thinned = over<int>([1, 1, 2, 2, 2, 3, 1]).dedupBy((n: int) => n).toArray();
+    assertEq(thinned.length, 4);
+    assertEq(thinned[3], 1);
+    assertEq(over<int>([]).dedupBy((n: int) => n).count(), 0);
+}
+
+@Test
+pub fn zip_with_combines_as_it_draws(): void {
+    let sums = upTo(3).iter().zipWith<int, int>(
+        upTo(5).iter(),
+        (a: int, b: int) => a + b
+    ).toArray();
+    assertEq(sums.length, 3);
+    assertEq(sums[2], 6);
+}

@@ -47,6 +47,47 @@ public class FormatterTests
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]
+    public void A_throw_expression_keeps_its_place_as_a_prefix()
+    {
+        Assert.Equal("""
+            fn f(o: ?int): int throws E {
+                let v = o ?? throw E { };
+                return if (v > 0) v else throw E { };
+            }
+
+            """, Format("""
+            fn f(o: ?int): int throws E {
+                let v = (o ?? (throw E {}));
+                return if (v > 0) v else (throw E {});
+            }
+            """));
+    }
+
+    [Fact]
+    public void A_loop_label_stays_on_its_loop_and_on_its_jumps()
+    {
+        Assert.Equal("""
+            fn f(): int {
+                outer: for (i in 0..3) {
+                    inner: while (true) {
+                        if (i == 1) {
+                            continue outer;
+                        }
+                        break inner;
+                    }
+                }
+                return 0;
+            }
+
+            """, Format("""
+            fn f(): int {
+                outer:for (i in 0..3) { inner : while (true) { if (i == 1) { continue   outer; } break inner ; } }
+                return 0;
+            }
+            """));
+    }
+
+    [Fact]
     public void Redundant_parentheses_go_and_needed_ones_stay()
     {
         Assert.Equal("""

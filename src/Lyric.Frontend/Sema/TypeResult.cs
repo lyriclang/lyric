@@ -23,6 +23,14 @@ public sealed class TypeResult
 
     public void SetType(Expr expr, LyrType type) => _types[expr] = type;
 
+    /// <summary>
+    /// Every <c>comptime</c> expression the checker accepted, in the order it met them. The
+    /// order is the identity: site <c>i</c> becomes the evaluator's function
+    /// <c>&lt;comptime:i&gt;</c> in the first lowering and reads value <c>i</c> in the second,
+    /// and both runs check the same sources in the same order.
+    /// </summary>
+    public List<ComptimeExpr> ComptimeSites { get; } = new();
+
     /// <summary>Every typed expression with its type. The consumer is the test that checks the
     /// <see cref="ErrorType"/> invariant; without an enumeration it could only be checked where
     /// someone already looks.</summary>

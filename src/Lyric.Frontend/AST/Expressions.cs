@@ -35,6 +35,16 @@ public sealed record UnaryExpr(UnaryOp Operator, Expr Operand, Span Span) : Expr
 // 'resume co': a prefix expression at the unary level, yielding the value of the coroutine's next
 // yield. Send values do not exist.
 public sealed record ResumeExpr(Expr Coroutine, Span Span) : Expr(Span);
+/// <summary>
+/// <c>comptime e</c>: the value of <c>e</c>, computed by the compiler. Semantically the same
+/// value <c>e</c> has at run time — the prefix says WHEN it is computed and what <c>e</c> may
+/// therefore reach: no local, no parameter, no <c>this</c>, no capability. The lowering replaces
+/// the expression by the literal the evaluator produced.
+/// </summary>
+public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
+// 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
+// ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
+public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment
@@ -69,10 +79,30 @@ public sealed record InterpText(string Text, Span Span) : InterpSegment(Span);  
 public sealed record InterpHole(Expr Expr, string? FormatSpec, Span Span) : InterpSegment(Span);   // {expr} and {expr:spec}
 
 // --- lambdas ---
-public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, Node Body, Span Span) : Expr(Span); // Body is an Expr or a Block
+public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, Node Body, Span Span) : Expr(Span) // Body is an Expr or a Block
+{
+    /// <summary>How the lambda was written: with a parenthesized parameter list, as a bare
+    /// <c>x =&gt; …</c>, or as a trailing block <c>f { … }</c> whose single parameter is the
+    /// implicit <c>it</c>. The formatter prints the form back; the meaning is the same.</summary>
+    public LambdaForm Form { get; init; } = LambdaForm.Parenthesized;
+}
+
+public enum LambdaForm { Parenthesized, Bare, Trailing }
+
+/// <summary>A lambda parameter: a name, or an irrefutable pattern (<c>((k, v)) =&gt; …</c>), in
+/// which case <see cref="Name"/> is <c>_</c> and the pattern binds the names. A trailing lambda's
+/// implicit <c>it</c> is a parameter with <see cref="Implicit"/> set; the checker drops it when
+/// the expected function type takes nothing.</summary>
+
+/// <summary><c>let Pattern = Expr</c> as the condition of an <c>if</c> or a <c>while</c>: true
+/// when the pattern matches, and the names it binds are in scope in the branch or the body.
+/// Only there — anywhere else it is <c>LYR-SEM0098</c>.</summary>
+public sealed record LetCondExpr(Pattern Pattern, Expr Initializer, Span Span) : Expr(Span);
 public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+    public Pattern? Pattern { get; init; }
+    public bool Implicit { get; init; }
 }
 
 // --- control flow as an expression ---

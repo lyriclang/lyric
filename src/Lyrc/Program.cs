@@ -485,6 +485,8 @@ public static class Program
             DebugInfo = flags.DebugInfo ?? profile.DebugInfo,
             Passes = flags.Passes,
             Fusion = flags.Fusion,
+            // The VM in a sandbox evaluates 'comptime' sites; see VmComptimeRunner.
+            ComptimeRunner = new Lyric.Vm.VmComptimeRunner(),
         };
     }
 

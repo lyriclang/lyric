@@ -164,8 +164,18 @@ public sealed class NativeRegistry : IDisposable
         {
             var import = module.Imports[i];
             if (!_natives.TryGetValue(import.Name, out var native))
-                throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
-                    $"no native implementation for '{import.Name}'");
+            {
+                // An 'extern "dotnet"' import is resolved by reflection when nobody registered
+                // it by hand; the registered table stays the first word, so a host can still
+                // decide what a symbol means for its scripts. The capability check below
+                // applies to it like to any gated native.
+                if (DotnetBinding.TryBind(import) is { } reflected)
+                    native = new Native(import.ParamTypes.Select(p => p.Tag).ToArray(),
+                        import.ReturnType.Tag, reflected);
+                else
+                    throw new LyricRuntimeException(VmDiagnostics.ImportsNotBound,
+                        $"no native implementation for '{import.Name}'");
+            }
 
             // A gated native may only be bound when the module DECLARED the capability it needs.
             // The load-time check (LoadedProgram.Load) refuses a module that declares more than
@@ -342,6 +352,24 @@ public sealed class NativeRegistry : IDisposable
         Register("std.core.panic", str, TypeTag.Void,
             args => throw new LyricPanic(VmDiagnostics.Panicked, args[0].AsString));
 
+        // An array of n unwritten elements. Registered WITHOUT a return element, so the tag check
+        // in Bind accepts every instantiation the module asks for — the generic-native shape,
+        // the same one 'coroutineIsDone' has had for every coroutine signature.
+        //
+        // The slots hold the default LyrValue until the caller writes them, which is why the
+        // declaration is private: the compiler emits the fill, and nothing else may see it.
+        Register("std.core.rawArrayAlloc", new[] { TypeTag.I64 }, TypeTag.Array, args =>
+        {
+            var count = args[0].AsI64;
+            if (count < 0)
+                throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                    $"array length {count} is negative");
+            if (count > int.MaxValue)
+                throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                    $"array length {count} exceeds what an array can hold");
+            return LyrValue.FromObject(new LyrValue[(int)count]);
+        });
+
         // A 'resume' on an exhausted coroutine. It is a panic, not a catchable error.
         Register("std.core.coroutineEnded", Array.Empty<TypeTag>(), TypeTag.Void,
             _ => throw new LyricPanic(VmDiagnostics.Panicked,
@@ -505,6 +533,28 @@ public sealed class NativeRegistry : IDisposable
         // Special values follow IEEE 754: 'sqrt(-1.0)' is NaN, not a panic.
         var f1 = new[] { TypeTag.F64 };
         var f2 = new[] { TypeTag.F64, TypeTag.F64 };
+
+        // --- std.hash (ungated) ----------------------------------------------------------
+        //
+        // Digests over bytes. Native for the same reason parseFloat is: the algorithms are
+        // specified to the bit, the host has audited implementations, and a Lyric SHA-256 would
+        // spend its time dispatching rotates. CRC-32 (IEEE 802.3, the zip/PNG polynomial) is the
+        // one written here — the BCL carries no CRC.
+
+        var bytesIn = new[] { TypeTag.Array };
+        var byteElement = new TypeTag?[] { TypeTag.U8 };
+
+        RegisterWithArrayParams("std.hash.sha256", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.SHA256.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.sha1", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.SHA1.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.md5", bytesIn, byteElement, TypeTag.Array,
+            args => Bytes(System.Security.Cryptography.MD5.HashData(ToBytes(args[0]))),
+            returnElement: TypeTag.U8);
+        RegisterWithArrayParams("std.hash.crc32", bytesIn, byteElement, TypeTag.I64,
+            args => LyrValue.FromI64(Crc32(ToBytes(args[0]))));
 
         // --- std.random (ungated) --------------------------------------------------------
         //
@@ -709,6 +759,32 @@ public sealed class NativeRegistry : IDisposable
         // are states, reported through the return value.
 
         // Not through 'TryIo', which carries a string; this returns a number.
+        // The last modification as milliseconds since the epoch, UTC — what a watcher compares
+        // between two looks, without reading the content. FileInfo answers "does not exist"
+        // itself, so that case is null without an exception, as in `size`.
+        RegisterOptionalReturning("std.io.file.modifiedMillis", str, TypeTag.I64,
+            args =>
+            {
+                try
+                {
+                    var info = new FileInfo(args[0].AsString);
+                    if (!info.Exists)
+                    {
+                        RecordIoNotFound(args[0].AsString);
+                        return LyrValue.None;
+                    }
+                    // 'Some' as in `size`: a '?int' signals presence through the marker.
+                    return LyrValue.Some(LyrValue.FromI64(
+                        new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds()));
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                              or ArgumentException or NotSupportedException)
+                {
+                    RecordIo(e);
+                    return LyrValue.None;
+                }
+            });
+
         RegisterOptionalReturning("std.io.file.size", str, TypeTag.I64,
             args =>
             {
@@ -828,9 +904,18 @@ public sealed class NativeRegistry : IDisposable
 
         // ------------------------------------------------------ std.os, extended
 
+        // The PROGRAM's arguments — what main(args) receives — not the process's: the runner
+        // (lyrvm, lyric run) passes them after the first `--`, and everything before it is the
+        // runner's own command line. Without a separator there are none, which is also what an
+        // embedding host without a command line sees.
         RegisterArrayReturning("std.os.args", none, TypeTag.String,
-            _ => LyrValue.FromObject(Environment.GetCommandLineArgs()
-                .Select(LyrValue.FromString).ToArray()));
+            _ =>
+            {
+                var all = Environment.GetCommandLineArgs();
+                var separator = Array.IndexOf(all, "--");
+                var own = separator < 0 ? Array.Empty<string>() : all[(separator + 1)..];
+                return LyrValue.FromObject(own.Select(LyrValue.FromString).ToArray());
+            });
 
         Register("std.os.setEnv", new[] { TypeTag.String, TypeTag.String }, TypeTag.Bool,
             args =>
@@ -2604,6 +2689,31 @@ public sealed class NativeRegistry : IDisposable
     }
 
     /// <summary>The bytes as a <c>uint8[]</c> value; unreadable reads as empty.</summary>
+    private static readonly uint[] Crc32Table = BuildCrc32Table();
+
+    private static uint[] BuildCrc32Table()
+    {
+        var table = new uint[256];
+        for (uint n = 0; n < 256; n++)
+        {
+            var c = n;
+            for (var k = 0; k < 8; k++)
+                c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            table[n] = c;
+        }
+        return table;
+    }
+
+    /// <summary>CRC-32 as zip, PNG and Ethernet compute it: reflected polynomial 0xEDB88320,
+    /// initial and final complement, table-driven.</summary>
+    private static long Crc32(byte[] data)
+    {
+        var crc = 0xFFFFFFFFu;
+        foreach (var b in data)
+            crc = Crc32Table[(crc ^ b) & 0xFF] ^ (crc >> 8);
+        return crc ^ 0xFFFFFFFFu;
+    }
+
     private static LyrValue Bytes(byte[]? content)
     {
         if (content is null) return LyrValue.FromObject(Array.Empty<LyrValue>());

@@ -69,16 +69,19 @@ public static class ModuleLowerer
     /// <param name="passes">Which of the optimizations run when <paramref name="optimize"/> is on.
     /// A diagnostic switch takes one out to bisect a finding; without <paramref name="optimize"/>
     /// the set is not consulted.</param>
+    /// <param name="comptime">How <c>comptime</c> sites lower: <c>null</c> as their inner
+    /// expression (a check), hoisted into evaluator functions, or replaced by evaluated values.
+    /// See <see cref="ComptimeTable"/>.</param>
     public static IrModule? Lower(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false,
-        IrPasses passes = IrPasses.All)
+        IrPasses passes = IrPasses.All, ComptimeTable? comptime = null)
     {
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
         var pending = new List<(FunctionDecl Decl, string Name, TypeSymbol? Receiver, TypeNode? ExtendTarget)>();
         var ids = new Dictionary<FunctionSymbol, FunctionId>(ReferenceEqualityComparer.Instance);
         var imports = new ImportTable();
-        var typeTable = new TypeTable(binding) { Compilation = compilation };
+        var typeTable = new TypeTable(binding) { Compilation = compilation, Comptime = comptime };
         var globals = new GlobalTable();
         var exportRoots = new List<FunctionId>();
         FunctionId? entry = null;
@@ -91,7 +94,20 @@ public static class ModuleLowerer
             foreach (var decl in compilation.AstOf(module).Declarations)
             {
                 if (decl is not FunctionDecl function) continue;
-                if (function.Generics.Length > 0) continue;
+
+                // A GENERIC native is a template rather than a row: one import per type argument
+                // tuple a call site asks for, built there and interned by name AND signature —
+                // which the import table has distinguished since coroutines, whose 'isDone' is
+                // emitted once per coroutine signature and bound by one host function.
+                if (function.Generics.Length > 0)
+                {
+                    if (function.Body is null && compilation.IsNative(module)
+                        && module.Members.FunctionFor(function.Name, function) is { } nativeTemplate)
+                        imports.DeclareTemplate(nativeTemplate,
+                            NameMangling.ForFunction(module, function.Name), function, module);
+                    continue;
+                }
+
                 if (module.Members.FunctionFor(function.Name, function) is not { } symbol) continue;
 
                 // Bodyless in a stdlib module means a native declaration. The signature is in Lyric, the
@@ -99,7 +115,10 @@ public static class ModuleLowerer
                 // sema already rejected this as LYR-SEM0051.
                 if (function.Body is null)
                 {
-                    if (!compilation.IsNative(module)) continue;
+                    // An 'extern' declaration is a native the PROGRAM declares: the import is
+                    // named after the ABI and the symbol rather than after the module, so the
+                    // binder knows which side answers for it — 'dotnet:System.Math::Cbrt'.
+                    if (!compilation.IsNative(module) && function.Extern is null) continue;
 
                     // Caught rather than thrown: a native signature with a type the lowering does not
                     // know is a scope boundary like any other, and the user should see a diagnostic with
@@ -123,7 +142,9 @@ public static class ModuleLowerer
                             flattened = [.. flattened, outParam.Declared];
 
                         imports.Declare(symbol, new IrImport(
-                            NameMangling.ForFunction(module, function.Name),
+                            function.Extern is { } spec
+                                ? NameMangling.ForExtern(spec, function.Name)
+                                : NameMangling.ForFunction(module, function.Name),
                             flattened, wireReturn),
                             new ImportShape(parameters, returned is { } ret
                                 ? new ImportReturn(ret.Struct!.Value, ret.Fields)
@@ -258,6 +279,29 @@ public static class ModuleLowerer
         // every other downstream function. The old '+1 if globals' broke the moment PASS 2 both
         // requested an extension AND created a global (a struct-return buffer does) — the
         // initializer then landed on an id the extension already held.
+        // The evaluation pass: every comptime site becomes a parameterless function returning its
+        // expression, and those functions are the module's ONLY roots. The pruning then keeps
+        // exactly what the sites reach, and the capability bits are read off that — so a site
+        // that needs no capability evaluates even in a program that, elsewhere, reads files.
+        var comptimeReturns = new Dictionary<FunctionDecl, IrType>(ReferenceEqualityComparer.Instance);
+        if (comptime is { Hoist: true })
+        {
+            entry = null;
+            exportRoots.Clear();
+            for (var i = 0; i < types.ComptimeSites.Count; i++)
+            {
+                var site = types.ComptimeSites[i];
+                var name = ComptimeTable.FunctionName(i);
+                var decl = new FunctionDecl(IsPublic: true, IsMut: false, IsStatic: false, Name: name,
+                    Generics: [], Parameters: [], ReturnType: null, Throws: null,
+                    Body: new Block([new ReturnStmt(site.Inner, site.Span)], site.Span), Span: site.Span)
+                    { NameSpan = site.Span };
+                comptimeReturns[decl] = typeTable.Lower(types.TypeOf(site), site.Span);
+                exportRoots.Add(new FunctionId(pending.Count));
+                pending.Add((decl, name, null, null));
+            }
+        }
+
         var nextId = new FunctionIds(pending.Count);
         var coroutines = new CoroutineTable(nextId);
         var instances = new InstanceTable(nextId, compilation);
@@ -290,7 +334,8 @@ public static class ModuleLowerer
 
                 functions.Add(new FunctionLowerer(decl, name, types, ids, imports, typeTable,
                     NoSubstitution, globals, lambdas, instances, receiver,
-                    receiverTypeNode: extendTarget).Run());
+                    receiverTypeNode: extendTarget,
+                    returnTypeOverride: comptimeReturns.GetValueOrDefault(decl)).Run());
             }
             catch (UnsupportedConstructException ex)
             {
@@ -489,6 +534,16 @@ public static class ModuleLowerer
         // BEFORE the verifier: what gets deleted does not need checking, and the verifier runs again at
         // load time anyway, so this is the one place where the saving counts twice.
         Reachability.Prune(result);
+
+        // The evaluation module requires what its retained imports require — nothing more. The
+        // whole-program bits would refuse a pure site in a program that also touches the disk.
+        if (comptime is { Hoist: true })
+        {
+            var needed = Capability.None;
+            foreach (var import in result.Imports)
+                needed |= CapabilityTable.RequiredForImport(import.Name);
+            result.Capabilities = needed;
+        }
 
         if (verify ?? VerifyByDefault) IrVerifier.VerifyOrThrow(result);
         return result;
@@ -834,7 +889,16 @@ public static class ModuleLowerer
     {
         var needed = Capability.None;
         foreach (var module in compilation.Modules)
+        {
             needed |= CapabilityTable.RequiredForImport(module.FullName);
+
+            // An extern declaration is a gated import the module itself writes: the bit follows
+            // the ABI, exactly as it follows the module name for 'std.io.file'. Recorded whether
+            // or not the program calls it — the same rule as for an import nobody uses.
+            foreach (var decl in compilation.AstOf(module).Declarations)
+                if (decl is FunctionDecl { Extern: { } spec, Name: var name })
+                    needed |= CapabilityTable.RequiredForImport(NameMangling.ForExtern(spec, name));
+        }
         return needed;
     }
 

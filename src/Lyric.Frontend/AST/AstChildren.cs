@@ -60,8 +60,13 @@ public static class AstChildren
                 if (t.Type is not null) yield return t.Type;
                 break;
 
+            // The ABI and the symbol are strings, not nodes: a leaf.
+            case ExternSpec:
+                break;
+
             case FunctionDecl f:
                 foreach (var a in f.Attributes) yield return a;
+                if (f.Extern is not null) yield return f.Extern;
                 foreach (var g in f.Generics) yield return g;
                 foreach (var p in f.Parameters) yield return p;
                 if (f.ReturnType is not null) yield return f.ReturnType;
@@ -132,6 +137,10 @@ public static class AstChildren
                 foreach (var s in b.Statements) yield return s;
                 break;
 
+            case TailExprStmt t:
+                yield return t.Expr;
+                break;
+
             case BindingStmt b:
                 if (b.Type is not null) yield return b.Type;
                 if (b.Initializer is not null) yield return b.Initializer;
@@ -141,6 +150,13 @@ public static class AstChildren
                 yield return d.Pattern;
                 if (d.Type is not null) yield return d.Type;
                 yield return d.Initializer;
+                break;
+
+            case LetPatternStmt lp:
+                yield return lp.Pattern;
+                if (lp.Type is not null) yield return lp.Type;
+                yield return lp.Initializer;
+                if (lp.Else is not null) yield return lp.Else;
                 break;
 
             case IfStmt i:
@@ -161,6 +177,7 @@ public static class AstChildren
                 break;
 
             case ForInStmt f:
+                if (f.Pattern is not null) yield return f.Pattern;
                 yield return f.Iterable;
                 yield return f.Body;
                 break;
@@ -227,8 +244,16 @@ public static class AstChildren
                 yield return u.Operand;
                 break;
 
+            case ComptimeExpr ct:
+                yield return ct.Inner;
+                break;
+
             case ResumeExpr r:
                 yield return r.Coroutine;
+                break;
+
+            case ThrowExpr te:
+                yield return te.Value;
                 break;
 
             case PostfixExpr p:
@@ -298,7 +323,13 @@ public static class AstChildren
                 break;
 
             case LambdaParam p:
+                if (p.Pattern is not null) yield return p.Pattern;
                 if (p.Type is not null) yield return p.Type;
+                break;
+
+            case LetCondExpr lc:
+                yield return lc.Pattern;
+                yield return lc.Initializer;
                 break;
 
             case IfExpr i:
@@ -328,6 +359,7 @@ public static class AstChildren
             // --- patterns ---
             case WildcardPattern:
             case BindingPattern:
+            case RestPattern:
             case ErrorPattern:
                 break;
 
@@ -338,6 +370,10 @@ public static class AstChildren
             case VariantPattern v:
                 foreach (var e in v.TupleElements ?? []) yield return e;
                 foreach (var f in v.StructFields ?? []) yield return f;
+                break;
+
+            case ArrayPattern ap:
+                foreach (var element in ap.Elements) yield return element;
                 break;
 
             case TuplePattern t:

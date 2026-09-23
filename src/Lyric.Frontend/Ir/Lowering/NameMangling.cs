@@ -21,6 +21,15 @@ internal static class NameMangling
     public static string ForFunction(ModuleSymbol module, string functionName) =>
         $"{module.FullName}.{functionName}";
 
+    /// <summary>
+    /// An extern import: <c>&lt;abi&gt;:&lt;symbol&gt;</c> — <c>dotnet:System.Math::Cbrt</c>. The
+    /// ABI prefix is what the runtime's binder and the capability table key on
+    /// (<see cref="Core.CapabilityTable.RequiredForImport"/>); the symbol is the host's spelling,
+    /// never the module's, so two modules declaring the same host method share one import row.
+    /// </summary>
+    public static string ForExtern(AST.ExternSpec spec, string functionName) =>
+        $"{spec.Abi}:{spec.Symbol ?? functionName}";
+
     /// <summary>A method: <c>&lt;module&gt;.&lt;type&gt;.&lt;method&gt;</c>. The type name has to be in
     /// it, or <c>Account.get</c> and <c>Player.get</c> collide, and the verifier rejects duplicate
     /// function names, because they would be a silent wrong call.</summary>

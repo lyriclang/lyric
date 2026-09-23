@@ -1,0 +1,75 @@
+// std.hash — digests and checksums over bytes.
+//
+// No capability required: a digest reaches nothing.
+//
+// Two families, and the module says which is which. The DIGESTS (`sha256`, `sha1`, `md5`)
+// are the standardized functions, bit-exact, answering the same bytes on every machine; SHA-1
+// and MD5 are here for what still speaks them — git object ids, legacy checksums — and are
+// not for anything that must resist an attacker. The CHECKSUM (`crc32`) detects accidental
+// corruption and nothing else. Neither family is what a `Map` key wants: that is `Hashable`,
+// whose `hash()` is fast and needs no bytes.
+//
+// Native, unlike `string.hash` (FNV-1a in Lyric): the algorithms are specified to the bit and
+// the host has audited implementations, and a SHA-256 written in Lyric would spend its time
+// dispatching rotates.
+
+/// Digests and checksums over bytes: `sha256`, `sha1`, `md5` and `crc32`, plus the hex
+/// conveniences over text and `hashCombine` for a `Hashable` built from several fields.
+module std.hash;
+
+import std.core { combineHash };
+import std.encoding { hexEncode };
+import std.string as strings;
+
+/// The SHA-256 digest: 32 bytes. The one to reach for when the digest must resist an
+/// attacker — content addressing, integrity checks, tokens derived from secrets.
+pub fn sha256(bytes: uint8[]): uint8[];
+
+/// The SHA-1 digest: 20 bytes. Broken for collision resistance since 2017; here because git
+/// and older protocols still speak it, not for anything new.
+pub fn sha1(bytes: uint8[]): uint8[];
+
+/// The MD5 digest: 16 bytes. Broken; here for legacy checksums and for nothing else.
+pub fn md5(bytes: uint8[]): uint8[];
+
+/// The CRC-32 checksum (IEEE 802.3, the polynomial zip, PNG and Ethernet use), as a
+/// non-negative `int` below 2^32. Detects accidental corruption; a deliberate change is
+/// trivially hidden from it.
+pub fn crc32(bytes: uint8[]): int;
+
+// ================================================================== written in Lyric
+
+/// `sha256` over the UTF-8 bytes of `text`, as lower-case hex — the form a checksum file or a
+/// content id is written in.
+pub fn sha256Hex(text: string): string {
+    return hexEncode(sha256(text.utf8Encode()));
+}
+
+/// `sha1` over the UTF-8 bytes of `text`, as lower-case hex.
+pub fn sha1Hex(text: string): string {
+    return hexEncode(sha1(text.utf8Encode()));
+}
+
+/// `md5` over the UTF-8 bytes of `text`, as lower-case hex.
+pub fn md5Hex(text: string): string {
+    return hexEncode(md5(text.utf8Encode()));
+}
+
+/// Folds `value` into `seed`, for a `hash()` over several fields:
+/// `hashCombine(hashCombine(0, this.x.hash()), this.y.hash())`. Order matters, so `(1, 2)`
+/// and `(2, 1)` hash differently. The same function as `std.core.combineHash`, named here
+/// beside the digests.
+pub fn hashCombine(seed: int, value: int): int {
+    return combineHash(seed, value);
+}
+
+/// The hash of a whole array of hashes, folded in order from a seed of zero.
+pub fn hashAll(hashes: int[]): int {
+    var h = 0;
+    var i = 0;
+    while (i < hashes.length) {
+        h = combineHash(h, hashes[i]);
+        i = i + 1;
+    }
+    return h;
+}

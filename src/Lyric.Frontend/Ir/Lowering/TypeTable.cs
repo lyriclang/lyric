@@ -45,6 +45,11 @@ internal sealed class TypeTable
 
     public Compilation? Compilation { get; init; }
 
+    /// <summary>How <c>comptime</c> sites lower in this run; <c>null</c> for a check. Carried
+    /// here because the table reaches every <see cref="FunctionLowerer"/> already — globals,
+    /// instances and extensions included — and a site may stand in any of them.</summary>
+    public ComptimeTable? Comptime { get; init; }
+
     /// <summary>The worklist of used extension methods. It hangs here rather than being threaded through
     /// every lowerer: EVERY one has the TypeTable anyway, and the alternative would be an extra parameter
     /// on four tables (instances, lambdas, coroutines, extensions themselves) — four opportunities to
@@ -778,6 +783,10 @@ internal sealed class TypeTable
         NamedRef { Symbol.Kind: TypeSymbolKind.Struct } n => StructOf(n.Symbol),
         NamedRef { Symbol.Kind: TypeSymbolKind.Enum } n => EnumOf(n.Symbol),
         NamedRef { Symbol.Kind: TypeSymbolKind.Interface } n => InterfaceOf(n.Symbol),
+
+        // 'never' has no values, so a function returning it needs no return slot: at the machine
+        // it is a void function that happens not to come back.
+        NeverType => new IrScalarType(IrScalar.Void),
 
         // An opaque alias IS its underlying at runtime; identity is the sema's business alone.
         // This one line is why 'x as Entity' costs nothing and why the value crosses the native

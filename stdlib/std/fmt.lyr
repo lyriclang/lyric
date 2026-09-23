@@ -18,6 +18,11 @@ module std.fmt;
 /// An `int` through a .NET numeric specifier (`N0`, `D5`, `X`, ...). An invalid specifier is a
 /// panic rather than an error value: it is a literal in the source and does not depend on the
 /// input.
+///
+/// `X` renders the BITS: `formatInt(-255, "X")` is the two's complement
+/// `FFFFFFFFFFFFFF01`, as `{:x}` in Rust and `%x` in Go write it. `formatHex` renders the
+/// VALUE with a sign, `-ff`, as Python's `hex` does; which one a program wants depends on
+/// whether the number is a quantity or a bit pattern, and each name says which it gives.
 pub fn formatInt(value: int, spec: string): string;
 /// A `uint` through a .NET numeric specifier; large values stay positive.
 pub fn formatUint(value: uint, spec: string): string;
@@ -78,7 +83,8 @@ fn digitChar(value: int): string {
     return fromChar(('a' as int + value - 10) as char);
 }
 
-/// Hexadecimal, lower case, no prefix.
+/// Hexadecimal, lower case, no prefix — the VALUE, so a negative number carries a sign:
+/// `formatHex(-255)` is `-ff`. The bit pattern is `formatInt(value, "x")`.
 pub fn formatHex(value: int): string {
     return formatRadix(value, 16);
 }

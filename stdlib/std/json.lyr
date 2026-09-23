@@ -23,6 +23,7 @@ module std.json;
 import std.collections { List, Map, keys };
 import std.string { StringBuilder, fromInt, fromFloat, parseInt, parseFloat };
 import std.math { isNaN, isInfinite };
+import std.result { Result };
 
 /// One JSON value — the tree `parse` answers and `serialize` writes.
 pub enum JsonValue {
@@ -356,6 +357,22 @@ pub fn parseOrThrow(text: string): JsonValue throws JsonError {
         p.fail("end of the document");
     }
     throw errorAt(p);
+}
+
+/// `parse`, with the reason as a VALUE: the document, or the `JsonError` that `parseOrThrow`
+/// would throw — for a batch of documents whose failures are collected rather than caught.
+pub fn parseOrErr(text: string): Result<JsonValue, JsonError> {
+    var p = JsonParser { chars = text.toChars(), pos = 0 };
+    p.skipWhitespace();
+    let value = p.parseValue(0);
+    if (value != null) {
+        p.skipWhitespace();
+        if (p.pos == p.chars.length) {
+            return Result<JsonValue, JsonError>.Ok(value);
+        }
+        p.fail("end of the document");
+    }
+    return Result<JsonValue, JsonError>.Err(errorAt(p));
 }
 
 // Line and column are derived from the offset only when someone asks — the happy path never

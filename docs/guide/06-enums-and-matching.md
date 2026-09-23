@@ -79,8 +79,32 @@ fn classify(n: int): int {
 fn main(): int { return classify(7); }
 ```
 
-An arm whose body is an expression ends with `,`. An arm whose body is a block may omit it, but a
-block arm must `return` or `throw` — it contributes no value.
+An arm whose body is an expression ends with `,`. An arm whose body is a block may omit it. A
+block arm delivers a value through its **tail**: an expression standing last, without `;`. A
+block arm without a tail must `return` or `throw` — it contributes no value.
+
+```lyr
+import std.io.console { println };
+
+enum State { Idle, Busy(int), Closed }
+enum Event { Start, Tick, Stop }
+
+fn step(s: State, e: Event): State {
+    return match (e) {
+        Event.Start => State.Busy(0),
+        Event.Tick => {
+            let n = match (s) { State.Busy(k) => k + 1, _ => 0 };
+            println(f"tick {n}");
+            State.Busy(n)
+        },
+        Event.Stop => { return State.Closed; },
+    };
+}
+```
+
+The tail is taken before the block's `defer`s run. In a `match` statement the value goes
+nowhere, so a tail there is held to the ordinary rule for an expression statement: a call, an
+assignment, `resume` or `throw`.
 
 ## Taking a struct apart
 

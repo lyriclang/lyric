@@ -121,6 +121,20 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, null, model);
 
+        // 'comptime' sites are evaluated before the real lowering, and only when bytes are the
+        // goal: a check lowers them as their inner expression and runs nothing. Without an
+        // evaluator there are no bytes to give — the sites are reported and the run ends here.
+        ComptimeTable? comptime = null;
+        if (types.ComptimeSites.Count > 0 && stage == Stage.Emit)
+        {
+            report?.BeginPhase(Phase.Lower, "comptime");
+            comptime = EvaluateComptime(compilation, binding, types, diagnostics, sources, source,
+                options);
+            report?.EndPhase();
+            if (comptime is null)
+                return new CompileResult(sources, diagnostics, null, null, model);
+        }
+
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
         //
@@ -129,7 +143,8 @@ public static class SourceCompiler
         // so the two durations can be measured separately.
         report?.BeginPhase(Phase.Lower);
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
-            optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
+            optimize: options.Optimize, libraryRoots: true, passes: options.Passes,
+            comptime: comptime);
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));
         report?.EndPhase();
         if (ir is null || stage == Stage.Lower)
@@ -157,6 +172,53 @@ public static class SourceCompiler
         report?.EndPhase();
 
         return new CompileResult(sources, diagnostics, ir, bytes, model);
+    }
+
+    /// <summary>
+    /// The evaluation pass for <c>comptime</c>: lower the program with every site hoisted into a
+    /// function of its own, hand the module to the runner, read the values back as constants.
+    /// The runner is the runtime in a sandbox — no capability, an instruction budget — so a
+    /// site that reaches for a file or loops forever fails HERE, at the site, with the reason.
+    /// </summary>
+    /// <returns>The values for the real lowering, or <c>null</c> after reporting.</returns>
+    private static ComptimeTable? EvaluateComptime(Compilation compilation, BindingResult binding,
+        TypeResult types, DiagnosticEngine diagnostics, SourceManager sources, ScriptSource source,
+        CompilerOptions options)
+    {
+        var sites = types.ComptimeSites;
+
+        if (options.ComptimeRunner is not { } runner)
+        {
+            foreach (var site in sites)
+                diagnostics.Report(ComptimeDiagnostics.NoEvaluator, Severity.Error, site.Span,
+                    "'comptime' needs an evaluator, and this compiler was given none — a build "
+                    + "through 'lyrc', 'lyric build' or the embedding API evaluates it");
+            return null;
+        }
+
+        var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
+            optimize: options.Optimize, libraryRoots: true, comptime: new ComptimeTable { Hoist = true });
+        if (hoisted is null) return null;
+        if (ModuleLowerer.VerifyByDefault) IrVerifier.VerifyOrThrow(hoisted);
+
+        // With a source map, so a panic inside a site names the line it happened on.
+        var bytes = BytecodeWriter.Write(hoisted,
+            new SourceMapContext(sources, source.BaseDirectory), options.DebugInfo);
+        var names = Enumerable.Range(0, sites.Count).Select(ComptimeTable.FunctionName).ToArray();
+        var outcomes = runner.Evaluate(bytes, names);
+
+        var values = new Dictionary<int, IrConstValue>();
+        for (var i = 0; i < sites.Count; i++)
+        {
+            var outcome = i < outcomes.Count ? outcomes[i] : ComptimeOutcome.Failed("the evaluator gave no answer");
+            if (outcome.Failure is { } why)
+                diagnostics.Report(ComptimeDiagnostics.EvaluationFailed, Severity.Error, sites[i].Span,
+                    $"'comptime' expression could not be evaluated: {why}");
+            else
+                values[i] = ComptimeTable.Constant(outcome.Value!, types.TypeOf(sites[i]));
+        }
+
+        return values.Count == sites.Count ? new ComptimeTable { Values = values } : null;
     }
 
     /// <summary>
@@ -483,6 +545,25 @@ public sealed record CompilerOptions
     /// fusion changes the encoding and not the frames, so no debugger is lied to by it. Off only
     /// to bisect a finding down to the encoding.</summary>
     public bool Fusion { get; init; } = true;
+
+    /// <summary>
+    /// What evaluates <c>comptime</c> expressions. <c>null</c> means this compiler cannot: a
+    /// check still type-checks them, a build reports every site as unevaluable
+    /// (<c>LYR-CT0001</c>). The drivers that own a runtime hand in the VM.
+    /// </summary>
+    public IComptimeRunner? ComptimeRunner { get; init; }
+}
+
+/// <summary>The codes of the evaluation pass. Neither sema nor lowering: the program was fine
+/// and lowered fine, and what failed was running a piece of it early.</summary>
+public static class ComptimeDiagnostics
+{
+    /// <summary>A build with <c>comptime</c> sites and no evaluator.</summary>
+    public const string NoEvaluator = "LYR-CT0001";
+
+    /// <summary>A site the evaluator could not finish: a panic, an exhausted budget, a capability
+    /// the sandbox does not grant.</summary>
+    public const string EvaluationFailed = "LYR-CT0002";
 }
 
 /// <summary>

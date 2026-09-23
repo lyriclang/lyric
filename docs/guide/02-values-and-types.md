@@ -81,9 +81,12 @@ fn main(): int {
 
 Write `{{` and `}}` for a literal brace.
 
-**An interpolation holds a SCALAR** — a number, a `bool`, a `char` or a `string`. A struct, a
-class or an enum is refused there even when it conforms to `Display`, so a type that prints
-through `println` still needs `.show()` inside an f-string:
+**An interpolation holds a scalar or a `Display` value.** A number, a `bool`, a `char` or a
+`string` renders through its converter. Anything else renders the way `println` renders it: the
+hole calls `show()` when the type conforms to `Display` — a struct, a class, an enum, a type
+parameter with the constraint, or a value held through the interface — and is refused when it
+does not. A format specifier belongs to the scalars; `{at:N2}` on a `Display` value is an error,
+because `Display` renders one way.
 
 ```lyr
 import std.io.console { println };
@@ -92,10 +95,13 @@ import std.time { Instant };
 fn main(): int {
     let at = Instant.ofEpochMillis(1000);
     println(at);                        // Display, through the constraint
-    println(f"at {at.show()}");         // f"{at}" is refused
+    println(f"at {at}");                // the same call, through the hole
     return 0;
 }
 ```
+
+An optional, an array or a tuple is not `Display` and does not render: narrow the optional,
+or convert the value with a function that returns a `string`.
 
 ## Arrays
 

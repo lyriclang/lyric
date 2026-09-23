@@ -134,7 +134,8 @@ public static class AstDumper
                 Write(n.Body, indent + 1, sb);
                 break;
             case LambdaParam n:
-                Line(sb, indent, $"Param {n.Name}", n.Span);
+                Line(sb, indent, n.Implicit ? "Param it (implicit)" : $"Param {n.Name}", n.Span);
+                if (n.Pattern is not null) Write(n.Pattern, indent + 1, sb);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
 
@@ -204,7 +205,7 @@ public static class AstDumper
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
             case FunctionDecl n:
-                Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Body is null ? " (abstract)" : "")}", n.Span);
+                Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Extern is { } x ? $" extern \"{x.Abi}\"{(x.Symbol is null ? "" : $" = \"{x.Symbol}\"")}" : n.Body is null ? " (abstract)" : "")}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var p in n.Parameters) Write(p, indent + 1, sb);
@@ -277,6 +278,10 @@ public static class AstDumper
                 Line(sb, indent, "Block", n.Span);
                 foreach (var s in n.Statements) Write(s, indent + 1, sb);
                 break;
+            case TailExprStmt n:
+                Line(sb, indent, "Tail", n.Span);
+                Write(n.Expr, indent + 1, sb);
+                break;
             case BindingStmt n:
                 Line(sb, indent, $"{(n.IsMutable ? "Var" : "Let")} {n.Name}", n.Span);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
@@ -287,6 +292,13 @@ public static class AstDumper
                 Write(n.Pattern, indent + 1, sb);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 Write(n.Initializer, indent + 1, sb);
+                break;
+            case LetPatternStmt n:
+                Line(sb, indent, n.IsMutable ? "LetPatternVar" : "LetPattern", n.Span);
+                Write(n.Pattern, indent + 1, sb);
+                if (n.Type is not null) Write(n.Type, indent + 1, sb);
+                Write(n.Initializer, indent + 1, sb);
+                if (n.Else is not null) Write(n.Else, indent + 1, sb);
                 break;
             case IfStmt n:
                 Line(sb, indent, "If", n.Span);
@@ -306,14 +318,15 @@ public static class AstDumper
                 break;
             case ForInStmt n:
                 Line(sb, indent, $"ForIn {n.Variable}", n.Span);
+                if (n.Pattern is not null) Write(n.Pattern, indent + 1, sb);
                 Write(n.Iterable, indent + 1, sb);
                 Write(n.Body, indent + 1, sb);
                 break;
             case BreakStmt n:
-                Line(sb, indent, "Break", n.Span);
+                Line(sb, indent, n.Label is null ? "Break" : $"Break {n.Label}", n.Span);
                 break;
             case ContinueStmt n:
-                Line(sb, indent, "Continue", n.Span);
+                Line(sb, indent, n.Label is null ? "Continue" : $"Continue {n.Label}", n.Span);
                 break;
             case ReturnStmt n:
                 Line(sb, indent, "Return", n.Span);
@@ -326,6 +339,14 @@ public static class AstDumper
             case ResumeExpr n:
                 Line(sb, indent, "Resume", n.Span);
                 Write(n.Coroutine, indent + 1, sb);
+                break;
+            case ComptimeExpr n:
+                Line(sb, indent, "Comptime", n.Span);
+                Write(n.Inner, indent + 1, sb);
+                break;
+            case ThrowExpr n:
+                Line(sb, indent, "ThrowExpr", n.Span);
+                Write(n.Value, indent + 1, sb);
                 break;
             case DeferStmt n:
                 Line(sb, indent, "Defer", n.Span);
@@ -354,6 +375,11 @@ public static class AstDumper
                 break;
 
             // --- control flow as an expression ---
+            case LetCondExpr n:
+                Line(sb, indent, "LetCond", n.Span);
+                Write(n.Pattern, indent + 1, sb);
+                Write(n.Initializer, indent + 1, sb);
+                break;
             case IfExpr n:
                 Line(sb, indent, "IfExpr", n.Span);
                 Write(n.Condition, indent + 1, sb);
@@ -396,6 +422,13 @@ public static class AstDumper
                 Line(sb, indent, $"VariantPattern {string.Join('.', n.Path)}", n.Span);
                 foreach (var p in n.TupleElements ?? []) Write(p, indent + 1, sb);
                 foreach (var f in n.StructFields ?? []) Write(f, indent + 1, sb);
+                break;
+            case ArrayPattern n:
+                Line(sb, indent, "ArrayPattern", n.Span);
+                foreach (var e in n.Elements) Write(e, indent + 1, sb);
+                break;
+            case RestPattern n:
+                Line(sb, indent, n.Name is null ? "Rest" : $"Rest {n.Name}", n.Span);
                 break;
             case TuplePattern n:
                 Line(sb, indent, "TuplePattern", n.Span);

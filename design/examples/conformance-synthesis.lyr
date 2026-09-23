@@ -1,0 +1,66 @@
+// SOLL (4.5): Konformanz ohne Body — der Compiler synthetisiert equals/hash/compare/show.
+// Diese Datei kompiliert auf 4.4.1 NICHT; das Ist-Gegenstueck steht unten.
+import std.io.console { println };
+import std.core { Equatable, Hashable, Ordered, Display };
+import std.collections { Map };
+
+struct Coord :: [Hashable<Coord>, Ordered<Coord>, Display] {
+    x: int,
+    y: int,
+    name: string,
+}                                   // 4 Methoden, 0 Zeilen Koerper
+
+enum Shape :: [Equatable<Shape>, Display] {
+    Dot,
+    Rect { w: int, h: int },
+    Circle(int),
+}
+
+struct Pair<T :: [Equatable<T>]> :: [Equatable<Pair<T>>] {   // Constraint GESCHRIEBEN, nichts implizit
+    left: T,
+    right: T,
+}
+
+fn main(): int {
+    let a = Coord { x = 1, y = 2, name = "a" };
+    let b = Coord { x = 1, y = 2, name = "a" };
+    println(f"{a == b} {a < b} {a}");          // true false Coord { x = 1, y = 2, name = "a" }
+
+    var seen = Map<Coord, int>.empty();        // hash passt zu equals — strukturell, nicht per Kommentar
+    seen.set(a, 1);
+    println(f"{seen.get(b) ?? 0}");            // 1
+
+    println(f"{Shape.Rect { w = 2, h = 3 }}"); // Shape.Rect { w = 2, h = 3 }
+    println(f"{Shape.Dot == Shape.Dot}");      // true
+    return 0;
+}
+
+// IST (4.4.1) — derselbe Typ, 30 Zeilen Handarbeit, und niemand prueft, dass hash zu equals passt:
+//
+// struct Coord :: [Hashable<Coord>, Ordered<Coord>, Display] {
+//     x: int,
+//     y: int,
+//     name: string,
+//     fn equals(other: Coord): bool {
+//         return this.x == other.x && this.y == other.y && this.name == other.name;
+//     }
+//     fn hash(): int {
+//         var h = 17;
+//         h = combineHash(h, this.x.hash());
+//         h = combineHash(h, this.y.hash());
+//         h = combineHash(h, this.name.hash());
+//         return h;                            // ein vergessenes Feld hier = "Map verliert Eintraege"
+//     }
+//     fn compare(other: Coord): int {
+//         let cx = this.x.compare(other.x);
+//         if (cx != 0) { return cx; }
+//         let cy = this.y.compare(other.y);
+//         if (cy != 0) { return cy; }
+//         return this.name.compare(other.name);
+//     }
+//     fn show(): string {
+//         return f"Coord {{ x = {this.x}, y = {this.y}, name = {this.name} }}";
+//     }
+// }
+//
+// und fuer Shape ist `equals` ein verschachteltes match ueber BEIDE Seiten (8 Zeilen fuer 3 Varianten).

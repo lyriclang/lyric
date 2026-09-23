@@ -43,6 +43,11 @@ public enum Capability : ulong
 /// </summary>
 public static class CapabilityTable
 {
+    /// <summary>The import-name prefix of an <c>extern "dotnet"</c> declaration. The compiler
+    /// writes it, the runtime's binder resolves what follows it by reflection, and this table
+    /// gates it with <see cref="Capability.HostAccess"/>.</summary>
+    public const string DotnetPrefix = "dotnet:";
+
     private static readonly (string Module, Capability Needs)[] Gated =
     [
         ("std.io.file", Capability.FileAccess),
@@ -80,6 +85,13 @@ public static class CapabilityTable
     public static Capability RequiredForImport(string moduleName)
     {
         var needed = Capability.None;
+
+        // An extern import names its ABI before the colon: 'dotnet:System.Math::Cbrt'. Reaching
+        // into the host process is what bit 3 was reserved for since 1.0, so the row takes it
+        // whichever module wrote the declaration.
+        if (moduleName.StartsWith(DotnetPrefix, StringComparison.Ordinal))
+            return Capability.HostAccess;
+
         foreach (var (module, needs) in Gated)
             if (moduleName == module || moduleName.StartsWith(module + ".", StringComparison.Ordinal))
                 needed |= needs;
