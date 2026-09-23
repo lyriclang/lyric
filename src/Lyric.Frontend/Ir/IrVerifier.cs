@@ -283,13 +283,17 @@ public static class IrVerifier
         }
     }
 
-    public static void VerifyOrThrow(IrModule module)
+    /// <param name="stage">Which run this is, for the message. The verifier sees the IR twice — once
+    /// as the lowering left it, once as the optimizations left it — and the two findings want
+    /// different culprits: the first names this lowering, the second names a pass. Without the label
+    /// a finding is a stack trace and a guess.</param>
+    public static void VerifyOrThrow(IrModule module, string stage = "after the lowering")
     {
         var findings = Verify(module);
         if (findings.Count == 0) return;
 
         throw new InternalCompilationException(
-            $"ir-verifier: malformed IR ({findings.Count} finding(s))\n  " +
+            $"ir-verifier ({stage}): malformed IR ({findings.Count} finding(s))\n  " +
             string.Join("\n  ", findings));
     }
 

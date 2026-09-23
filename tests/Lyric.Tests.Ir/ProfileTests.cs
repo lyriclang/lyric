@@ -87,7 +87,38 @@ public sealed class ProfileTests
         Assert.Contains("call main.step", IrPrinter.Dump(Lower(source, IrPasses.All, optimize: false)));
     }
 
-    private static IrModule Lower(string source, IrPasses passes, bool optimize = true)
+    /// <summary>
+    /// The verifier runs once when nothing optimized the module and twice when something did.
+    ///
+    /// <para>The count IS the decision, so it is pinned rather than left to the timing table: the first
+    /// run accuses this lowering, the second accuses a pass, and a build that skips the passes has
+    /// nothing for the second to say. That is why the debug profile pays for one and the release
+    /// profile for two.</para>
+    ///
+    /// <para>Pinned against <c>optimize</c> rather than against a profile, because that is the switch
+    /// the lowering sees; the profile only sets it (<see cref="Profile.Debug"/> off,
+    /// <see cref="Profile.Release"/> on, asserted above).</para>
+    /// </summary>
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 2)]
+    public void The_verifier_runs_once_without_the_passes_and_twice_with_them(bool optimize, int runs)
+    {
+        const string source =
+            """
+            fn step(n: int): int { return n + 1; }
+            fn main(): int { return step(1); }
+            """;
+
+        var timings = new LoweringTimings();
+        Lower(source, IrPasses.All, optimize, timings);
+
+        Assert.True(timings.Verified);
+        Assert.Equal(runs, timings.Runs);
+    }
+
+    private static IrModule Lower(string source, IrPasses passes, bool optimize = true,
+        LoweringTimings? timings = null)
     {
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", source);
@@ -107,7 +138,7 @@ public sealed class ProfileTests
         }
 
         var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true, optimize: optimize,
-            passes: passes);
+            passes: passes, timings: timings);
         Assert.NotNull(ir);
         return ir!;
     }

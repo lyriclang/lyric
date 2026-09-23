@@ -37,10 +37,11 @@ public enum Phase
 /// <summary>
 /// Which phases THIS BUILD actually runs.
 ///
-/// <para>The list is no constant: the verifier runs in debug builds only, as LLVM's does in assert
-/// builds; the reasoning is at <c>ModuleLowerer.VerifyByDefault</c>. It stands here rather than in the
-/// frontend, because the tooling tests need it too — they drive the binaries as processes and
-/// deliberately do not reference the frontend.</para>
+/// <para>The list is no constant: the verifier is a debug build's by default and a switch for
+/// everyone else, as LLVM's is on in assert builds and reachable otherwise; the reasoning is at
+/// <c>ModuleLowerer.VerifyByDefault</c>. It stands here rather than in the frontend, because the
+/// tooling tests need it too — they drive the binaries as processes and deliberately do not
+/// reference the frontend.</para>
 ///
 /// <para>Written twice, it drifts: the test of the <c>--verbose</c> table carried the phase list as a
 /// literal and was therefore red in release while debug stayed green. A rule two places have to know
@@ -48,8 +49,32 @@ public enum Phase
 /// </summary>
 public static class Pipeline
 {
-    /// <summary>Does this build check the IR invariants after the lowering?</summary>
-    public static bool VerifiesIr =>
+    /// <summary>The environment variable that turns the IR verification on or off explicitly.</summary>
+    public const string VerifyEnvironmentVariable = "LYRIC_VERIFY_IR";
+
+    /// <summary>
+    /// Does this process check the IR invariants?
+    ///
+    /// <para>A debug build says yes, a release build says no, and <c>LYRIC_VERIFY_IR</c> overrides
+    /// both. The variable exists because the answer used to be the build configuration alone, and
+    /// every CI job of this repository builds <c>--configuration Release</c>: the verifier ran on no
+    /// path that went through <c>SourceCompiler</c> — not the tooling tests, not the conformance
+    /// suite, not the examples. The unit tests were unaffected only because every one of them passes
+    /// <c>verify:</c> explicitly, which is a discipline, not a guarantee.</para>
+    ///
+    /// <para>A diagnostic switch of the same kind as <c>LYRIC_PROFILE</c> and <c>LYRIC_JIT</c>, and
+    /// read once: a value arriving mid-process would make two compilations in one run disagree.</para>
+    /// </summary>
+    public static bool VerifiesIr { get; } =
+        Environment.GetEnvironmentVariable(VerifyEnvironmentVariable) switch
+        {
+            "1" or "on" or "true" => true,
+            "0" or "off" or "false" => false,
+            _ => BuiltWithAssertions,
+        };
+
+    /// <summary>What the build configuration says, before the variable is consulted.</summary>
+    public static bool BuiltWithAssertions =>
 #if DEBUG
         true;
 #else
