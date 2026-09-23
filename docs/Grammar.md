@@ -350,6 +350,8 @@ Block           = '{' { Statement } '}' .
 Statement       = Block
                 | BindingStmt
                 | DestructuringStmt
+                | LetPatternStmt
+                | LabeledStmt
                 | IfStmt
                 | WhileStmt
                 | DoWhileStmt
@@ -362,23 +364,29 @@ Statement       = Block
                 | DeferStmt
                 | ThrowStmt
                 | TryStmt
-                | ExprStmt .
+                | ExprStmt
+                | TailExprStmt .
 
 BindingStmt     = ( 'let' | 'var' ) IDENTIFIER [ ':' TypeExpr ] [ '=' Expr ] ';' .
 DestructuringStmt = ( 'let' | 'var' ) TuplePattern [ ':' TypeExpr ] '=' Expr ';' .
+LetPatternStmt  = ( 'let' | 'var' ) Pattern [ ':' TypeExpr ] '=' Expr [ 'else' Block ] ';' .
 
-IfStmt          = 'if' '(' Expr ')' Block [ 'else' ( Block | IfStmt ) ] .
+LabeledStmt     = IDENTIFIER ':' ( WhileStmt | DoWhileStmt | ForInStmt ) .
 
-WhileStmt       = 'while' '(' Expr ')' Block .
+IfStmt          = 'if' '(' Condition ')' Block [ 'else' ( Block | IfStmt ) ] .
+Condition       = Expr | LetCondition .
+LetCondition    = 'let' Pattern '=' Expr .
+
+WhileStmt       = 'while' '(' Condition ')' Block .
 DoWhileStmt     = 'do' Block 'while' '(' Expr ')' ';' .
-ForInStmt       = 'for' '(' IDENTIFIER 'in' ( RangeExpr | Expr ) ')' Block .
+ForInStmt       = 'for' '(' ( IDENTIFIER | TuplePattern ) 'in' ( RangeExpr | Expr ) ')' Block .
 RangeExpr       = Expr ( '..' | '..=' ) Expr .
 
 MatchStmt       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 MatchArm        = Pattern [ 'if' Expr ] '=>' ( Expr | Block ) .
 
-BreakStmt       = 'break' ';' .
-ContinueStmt    = 'continue' ';' .
+BreakStmt       = 'break' [ IDENTIFIER ] ';' .
+ContinueStmt    = 'continue' [ IDENTIFIER ] ';' .
 ReturnStmt      = 'return' [ Expr ] ';' .
 YieldStmt       = 'yield' [ Expr ] ';' .
 DeferStmt       = 'defer' ( Block | Expr ';' ) .
@@ -391,10 +399,26 @@ CatchBinding    = '_'
                 | IDENTIFIER .
 
 ExprStmt        = Expr ';' .
+TailExprStmt    = Expr .                          (* only as the last statement of a value block *)
 ```
 
 A destructuring binding requires an initializer. Its pattern admits names, `_` and nested tuple
-patterns; no form that can fail.
+patterns; no form that can fail. `LetPatternStmt` is the form that admits one: a pattern that CAN
+fail needs an `else` block, which the flow rules require to leave the scope. Without `else` the
+pattern must be irrefutable, and the two productions then describe the same statement — the
+tuple form is the older spelling of it.
+
+A **label** names the loop that follows it and only a loop; `break L` and `continue L` name a
+label that is in scope, meaning a loop this statement stands inside. Without a name they take the
+innermost loop, as they always have.
+
+A `let` **condition** stands in an `if` or a `while` head and nowhere else. It is true when the
+pattern matches, and the names it binds are in scope in the branch or the body — for a `while`,
+on every iteration.
+
+A `TailExprStmt` is an expression without `;` standing last in a block that delivers a VALUE
+(§6.9) — the block of a `match` arm — and it is that block's value. Everywhere else, an ordinary
+block and a lambda's block included, a missing `;` stays the error it always was.
 
 `RangeExpr` appears in `ForInStmt` and nowhere else — it is a loop head, not a value. There is no
 range type: `0..9` says which numbers the loop walks, and a program that binds one, stores one or
@@ -456,19 +480,24 @@ Primary         = IntLit | FloatLit | StringLit | InterpolatedStr
                 | TupleLit
                 | Lambda .
 
-Lambda          = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
+Lambda          = ParenLambda | BareLambda .
+ParenLambda     = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
                   '=>' ( Expr | Block ) .
-LambdaParam     = IDENTIFIER [ ':' TypeExpr ] .
+BareLambda      = IDENTIFIER '=>' ( Expr | Block ) .
+LambdaParam     = IDENTIFIER [ ':' TypeExpr ]
+                | TuplePattern .
 
 ResumeExpr      = 'resume' UnaryExpr .
-ComptimeExpr    = 'comptime' UnaryExpr .        (* contextual: only before an expression *)
+ComptimeExpr    = 'comptime' UnaryExpr .          (* contextual: only before an expression *)
+ThrowExpr       = 'throw' UnaryExpr .
 
 StructInit      = TypePath '{' [ StructInitField { ',' StructInitField } [ ',' ] ] '}' .
 StructInitField = IDENTIFIER '=' Expr .
 
 TypePath        = ModulePath [ '<' TypeExpr { ',' TypeExpr } '>' ] [ '.' IDENTIFIER ] .
 
-CallArgs        = [ '<' TypeExpr { ',' TypeExpr } '>' ] '(' [ Expr { ',' Expr } ] ')' .
+CallArgs        = [ '<' TypeExpr { ',' TypeExpr } '>' ] '(' [ Expr { ',' Expr } ] ')' [ Block ]
+                | [ '<' TypeExpr { ',' TypeExpr } '>' ] Block .   (* a trailing lambda *)
 
 ArrayLit        = '[' [ Expr { ',' Expr } [ ',' ] ] ']' .
 TupleLit        = '(' Expr ',' Expr { ',' Expr } ')' .
@@ -478,6 +507,19 @@ MatchExpr       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 ```
 
 `else` is mandatory in `IfExpr`; `else if` is a nested `IfExpr`.
+
+A **bare lambda** takes one parameter and names it: `x => x * 2`. A **trailing lambda** is a block
+standing after a call, or in place of its argument list — `xs.map { it * 2 }`, `fold(0) { acc + it }`
+— and is that call's last argument, a lambda whose one parameter is the implicit `it`. A `{` after
+an expression opened nothing before, so no earlier program changes meaning; the one look-alike, a
+struct initializer at the start of a statement, is what §6.8 keeps out of that position anyway.
+
+`throw` as an **expression** has the type `never` and therefore stands wherever a value is expected
+without constraining the others: the absent side of `??`, a branch of an `if`, an arm of a `match`.
+`throw e;` at the start of a statement stays a `ThrowStmt` — one form per position.
+
+`comptime e` is the value of `e`, computed while compiling. The prefix says WHEN the expression is
+evaluated, not what it means.
 
 In a `TypePath`, the trailing `'.' IDENTIFIER` names an enum variant: `Opt<int>.Some`. The type
 arguments belong to the type and precede that segment.
@@ -506,13 +548,21 @@ Pattern         = '_'
                 | TypePath [ '(' Pattern { ',' Pattern } ')' ]
                 | TypePath '{' [ FieldPattern { ',' FieldPattern } [ ',' ] ] '}'
                 | TuplePattern
+                | ArrayPattern
                 | Pattern '|' Pattern
                 | RangePattern .
 
 FieldPattern    = IDENTIFIER [ '=' Pattern ] .
 TuplePattern    = '(' Pattern ',' Pattern { ',' Pattern } ')' .
+ArrayPattern    = '[' [ ArrayElement { ',' ArrayElement } [ ',' ] ] ']' .
+ArrayElement    = Pattern | RestPattern .
+RestPattern     = '..' [ IDENTIFIER ] .
 RangePattern    = Literal ( '..' | '..=' ) Literal .
 ```
 
 `Literal` is an integer, float, string, char, bool or null literal. A `FieldPattern` without `=`
 binds the field to its own name.
+
+An **array pattern** matches by length: without a `RestPattern` it matches an array of exactly its
+element count, with one it matches any array long enough for the elements beside it. At most one
+rest may appear, and a named one binds the elements it covers as an array.
