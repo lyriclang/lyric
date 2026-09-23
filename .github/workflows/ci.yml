@@ -16,6 +16,15 @@ on:
   pull_request:
     branches: [main]
 
+# THE IR VERIFIER, ON. It is a debug build's by default, and every job here builds
+# --configuration Release -- so until this line the verifier ran on no path that went through
+# SourceCompiler: not the tooling tests, not the conformance suite, not the examples. The unit
+# tests escaped that only because each one passes verify: explicitly, which is a discipline and
+# not a guarantee. The first thing it found on being switched on was real: two extension
+# overloads on one name in the symbol table.
+env:
+  LYRIC_VERIFY_IR: "1"
+
 permissions:
   contents: read
 
