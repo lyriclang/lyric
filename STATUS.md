@@ -11,6 +11,23 @@
 
 ## Current milestone
 
+**4.5 IS TAGGED AND MAIN IS 75 COMMITS PAST IT.** `v4.5.0` sits at `6f138636` and carries M37
+alone. Everything below landed after it, and the tree still claims `4.5.0` — so a build from main
+calls itself a version that does not contain it. **The next release is a MINOR**: the language
+grew forms, the standard library grew modules, and two documented limits were retired. Whoever
+bumps it also moves the `since:` gates of the two conformance cases added with the spec round,
+which say `4.5.0` today and describe something `v4.5.0` cannot do.
+
+**The four evolution branches are merged** (2026-09-23, `integration/v4.5`, PR #162): a recursive
+pattern compiler, five expression forms, `std.result` with the iterator terminators, `comptime`
+and `extern "dotnet"`. Merged in the order the team recommended, onto a main that had meanwhile
+grown M37 and the sweep.
+
+**Measured after every merge, not read off the reports.** Two repro corpora, one per finding the
+branches claim to close: pattern-compiler closes nine of its ten, lang-expression-forms all five,
+stdlib-2's `parseInt`/`powInt` answer `null` where they answered a wrapped number, `comptime
+sq(12)` is 144. The tenth is open and named under §Still open.
+
 **M37 — the project system, build v2 and profiles — SHIPPED as v4.5.0** (2026-09-22, branch
 `feature/m37-profiles`). Stage A of the 2026-09-17 design round: a compile is a named PROFILE,
 `lyric.json` learns `name`, `dependencies` and `toolchain`, a project without `build.lyr` builds
@@ -1581,6 +1598,38 @@ out of them and hands its own functions, types and value structs in.
 
 ## Recently finished
 
+- [x] **Sweep round 2, the four merges and the grammar round** (2026-09-23, PRs #161/#162,
+  `lyric-spec#38`). Eight defects that answered WRONG rather than failing: a `do-while` whose
+  jump target landed inside a handler's block range, a monomorphized instance without its module
+  path — `alpha.twice(1)` ran BETA'S BODY when the call order was reversed — and `if (c) 1 else
+  2.5`, which a release build printed as `5e-324` while a debug build died in the verifier.
+
+  **Three findings worth keeping.** (1) The duplicate-fix rule the evolution team wrote down paid
+  off twice over: of five fixes that existed on two branches, the one that looked smaller was
+  right three times — mine fell back to a raw lower where theirs threw with a position, and
+  deciding by size would have frozen the silent half. (2) `Flow.ReachesJump`, written as a
+  deliberate LOWER bound for the do-while fix, met its first real test at the merge: labels made
+  a `break outer;` reserve a loop's exit block although the jump leaves it. The bound is why it
+  was a compile error and not a wrong answer. (3) The CI mirror job caught `extern`/`comptime` in
+  the toolchain's grammar copy and not in the canonical one — and looking for the cause turned up
+  SEVEN more forms in neither. The language had been shipping ahead of its own contract, and by
+  the project's rule what §2 does not carry does not exist.
+
+  **One harness lesson and one test lesson.** A repro corpus has to check the VALUE, not the exit
+  code: `p9` read as failing for four merges because the program deliberately returned 7. And a
+  pin that is green without the fix is worse than no pin — the narrowed-`?Struct` binding test was
+  removed rather than kept, because wrapping a struct into `?T` already copies and nothing was
+  ever shared for it to catch.
+
+  **Generic natives, which did not exist.** `ModuleLowerer` skipped every function with type
+  parameters BEFORE the native branch. The mechanism was ready one layer down: `ImportTable.Intern`
+  keys by name AND signature because `coroutineIsDone` needs a row per coroutine signature, and
+  the binder compares tags. A bodiless generic `fn` is a template now, and `[first, ..rest]` lowers
+  through `rawArrayAlloc` — a copy, not a view, because the language has no slices.
+
+  Sema 885, Ir 181, Vm 1621, Bytecode 184, Embedding 222, Formatting 218, DocGen 201, Parsing 532,
+  Cli 334; conformance 159/159 with one skipped, measured against a release build of this tree.
+
 - [x] **Spec round 1 + twin** (2026-08-25, `lyric-spec#21` + PR #116, released as v3.6.0).
   Details under §Current milestone. **Three findings worth keeping.** (1) The inference loch was
   REAL and order-dependent: the identical call compiled with `[Sink<int>, Sink<string>]` and
@@ -1630,20 +1679,6 @@ out of them and hands its own functions, types and value structs in.
   fix is the other half: the load check refused declaring MORE than granted, this refuses USING
   more than declared, and together the declared bitset is a verified bound rather than a trusted
   one.
-
-- [x] **A24 — the four entrances a chain can start from** (2026-08-24,
-  `feature/a24-chain-entrances`, PR #110, released as v3.4.0). `over`, `range`,
-  `rangeInclusive` and `compact` in `std.iter`. The last open entry in Erato's register, and it
-  cost no language change at all — which is the part worth keeping, because the entry was filed
-  as a request for `iter()` on arrays and ranges and that shape is not available: an `extend`
-  block cannot bind an element type, and a range is not a value, so `(a..b).iter()` could never
-  exist. The fallback the register offered as second best was the only reachable form and it was
-  already writable in user code; what the standard library adds is that everyone has it.
-
-  **`compact` is the one with a design in it.** `filterNotNull` on an ITERATOR cannot be
-  written — `Iterator<?T>` needs `??T` and `?` does not nest, which is the wall `LYR-SEM0091`
-  names. Taking the ARRAY instead dodges it by construction and stays lazy: an array slot can be
-  read as `?T` without the end-marker being in the way.
 
 ## Measurements
 
@@ -2039,6 +2074,24 @@ answer yet, and it belongs asked before E4 starts.
 
 **Tooling and format:**
 
+- **Exhaustiveness does not see an enum INSIDE a tuple.** `match ((E.A(n), m))` over `(E, int)` is
+  `LYR-SEM0050` although the arms cover every variant. The pattern compiler learned the form; the
+  coverage computation did not. The one defect of its ten that pattern-compiler did not close, and
+  the measurement says so rather than the report.
+
+- **A throwing `defer` still runs the chain twice on the RETURN path.** The fall-through path is
+  fixed; the return drains at the return site, which lies inside the region, so moving the
+  region's end does not reach it. Getting it out means routing every `return` of a defer scope
+  through one epilogue behind the region, with the value in a synthetic local — and that is only
+  worth building once §7.5 says whether the defers scheduled BEFORE a throwing one still run. Go,
+  whose `defer` this is, says yes.
+
+- **Seven rule questions stand collected rather than answered**, in
+  `docs/Befunde_und_Verbesserungen/SPEC-RUNDE.md`: where `+1` comes from (the maintainer set the
+  direction — derived from `Add<T, R>` or its own `Inc`/`Dec`, not built in), whether a `?Struct`
+  is a value, whether a `let` struct's fields are writable, what a second binding of one name
+  means, what a throwing `defer` does to the rest of the chain, and whether a parameter is a
+  `let`. Each records what was measured and what the specification says today.
 
 - **The four ways to ask "is this null?" disagree inside a GENERIC body.** With
   `fn f<T>(x: T)`: `x == null` and `x ?? fallback` COMPILE and behave correctly when `T` is
@@ -2049,14 +2102,6 @@ answer yet, and it belongs asked before E4 starts.
   wait — or it may not, and then the coalesce and the null test belong in the sema. **A spec-round
   candidate, and it is NOT additive either way**: making `??` strict would break any generic body
   that uses it today. Found by the 4.2 sweep, round 2; pre-existing.
-- **An f-string interpolation holds a SCALAR, and a `Display` conformance does not change that.**
-  `f"{p}"` on a struct is `LYR-IR0001: interpolating a non-scalar value` — correctly noted as a
-  backend gap, since calling `show()` and splicing is exactly what the lowering would do — while
-  `println(p)` works through the constraint. 4.1.0 made the gap FELT rather than created it, by
-  giving `Instant` and `Duration` a `Display` and documenting that they print. The limit is now
-  stated in guide 2 and guide 13; whether the lowering learns it is a feature decision, not a
-  sweep fix. Found by the 4.2 sweep, round 2.
-
 - **`lyrtest` isolates module state per test, but not resources — and closing that needs a
   decision.** A file, socket or child belongs to the VM (4.3.0's rule), and the runner uses one VM
   per test FILE since 4.3.5, so two tests in ONE file still share what either of them opens:
@@ -2067,34 +2112,6 @@ answer yet, and it belongs asked before E4 starts.
   reintroducing it as a second lifetime needs an answer to Rule 2: is "end this VM" and "end this
   run inside it" one mechanism or two? Guide 20 documents the limit meanwhile. Found by the 4.3
   sweep, round 7.
-- **An or-pattern that BINDS does not lower, and a spurious warning rides with it.**
-  `E.A(x) | E.B(x)` is the idiomatic spelling and the one `LYR-SEM0032` exists to check — every
-  alternative must bind the same names at the same types — and the lowering binds nothing for it:
-  each alternative is a branch of its own while the binding step runs once for the whole pattern.
-  Refused by name since 4.4.1. Building it means binding on each alternative's own path before it
-  reaches the shared body, which is where the shape differs from every other pattern. The warning
-  half: `SEM0071` calls the binding of every alternative after the first unused, because only
-  alternative 0's symbols become the arm scope; the analyzer has no parent pointers to tell where
-  a binding sits, so it cannot be exempted the way a shorthand field pattern is. It only ever
-  accompanies the refusal today and becomes real the day the lowering is built. Found by the 4.4
-  sweep, round 1; pre-existing.
-- **A variant pattern over an optional enum is refused, and building it is a slice.**
-  `match (e) { null => …, E.A => … }` on a `?E`: the sema accepts it and specifies exhaustiveness
-  over "the two states of a `?T`", and the lowering carries ONE subject per match while this needs
-  two — the tag lives inside the optional, so a variant arm needs the unwrapped value and the
-  `null` arm the optional itself, and the presence test has to run before any tag is read whatever
-  order the arms are written in. Since 4.3.3 the refusal names the optional and points at
-  narrowing. Either the match lowering learns two subjects, or the sema refuses the combination
-  and the guide names the narrowing as the form. Found by the 4.3 sweep, round 6; pre-existing.
-- **Struct destructuring in a `match` is sema-complete and unlowerable, and the decision is which
-  half to keep.** `match (p) { P { n, m } => … }` binds the field types, computes its own
-  irrefutability and has a Sema test asserting it clean; the lowering emits nothing for it and
-  refuses by name since 4.3.2. The form appears in NO normative or user-facing document — §7.6
-  gives the field pattern to enum variants — so nothing promises it either way. Either it is
-  built (the binding side needs field reads off a struct subject, which the enum path already
-  does one level down) or the sema refuses it and the Sema test goes with it. What it must not
-  stay is a feature that exists only in the front end. Found by the 4.3 sweep, round 5;
-  pre-existing.
 - **The REPL repeats every side effect it has accumulated.** A session re-runs its declarations
   on every entry, so a declaration whose initializer does something does it again each time —
   measured, four entries and four executions of one `appendText`. 4.3.1 made each entry's
@@ -2415,8 +2432,8 @@ answer yet, and it belongs asked before E4 starts.
 
 ## Last relevant commit
 
-`dap: an exception-breakpoint request is answered, not refused`
-(released as v2.7.1 — found by wiring a second editor to the adapter)
+`integration: the four evolution branches, merged and measured`
+(PR #162, on main as 4d35c10e — tagged as nothing yet; see §Current milestone)
 
 ---
 
