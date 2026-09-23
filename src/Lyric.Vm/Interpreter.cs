@@ -180,6 +180,21 @@ public static class Interpreter
     [ThreadStatic]
     private static int _nesting;
 
+    /// <summary>
+    /// The panic both engines raise when the nesting bound is reached.
+    ///
+    /// <para>Counted rather than probed. <c>RuntimeHelpers.TryEnsureSufficientExecutionStack</c>
+    /// stood in its place first and did not save the process: it leaves only its own small probe
+    /// as headroom, and an exception FILTER runs BEFORE the stack unwinds — the filter below
+    /// builds a backtrace, at every nesting level, on an almost-full stack. A bound that keeps
+    /// hundreds of kilobytes free has room for its own unwinding.</para>
+    /// </summary>
+    private static LyricPanic TooDeep() =>
+        new(VmDiagnostics.CallDepthExceeded,
+            $"re-entry nested {MaxReentryDepth} runs deep — a host function that calls back into "
+            + "the script starts a run INSIDE the one that called it, and each nesting costs "
+            + "thread stack that no frame count can see");
+
     /// <summary>Runs the start function and returns its value.</summary>
     public static LyrValue Run(BytecodeModule module, NativeRegistry? natives = null) =>
         Run(module, [], natives);
@@ -220,11 +235,21 @@ public static class Interpreter
         BytecodeSourceMap? sourceMap = null, DebugController? debug = null,
         ExecutionBudget? budget = null, Jit.JitContext? jit = null)
     {
+        // THE NESTING GUARD STANDS ABOVE BOTH ENGINES, and it has to. It sat below the compiled
+        // fast path at first, which left the compiled engine with no guard at all: that path
+        // returns from here without ever reaching the interpreter's bookkeeping, so a host
+        // callback into compiled code nested for free and took the process down exactly as
+        // before. The CI job that runs the whole suite with the compiler on caught it. The
+        // reasoning that had put it below — "the default engine is the interpreter" — is true and
+        // beside the point.
+        if (_nesting >= MaxReentryDepth) throw TooDeep();
+
         // Compiled code IS the whole call and needs no frame. Only an unwatched run reaches it:
         // a debugger or a budget means the interpreter, per IExecutionPolicy.
         if (jit is not null && debug is null && budget is null
             && jit.CodeFor(prepared[startIndex]) is { } entryCode)
         {
+            _nesting++;
             try
             {
                 return entryCode(jit, entryArguments ?? []);
@@ -240,23 +265,11 @@ public static class Interpreter
                 // interpreter, where a panic points at a line, and ship compiled.
                 throw panic.WithCallStack([prepared[startIndex].Source.Name]);
             }
+            finally
+            {
+                _nesting--;
+            }
         }
-
-        // THE OTHER RESOURCE, and it is counted rather than probed. The tally below counts
-        // interpreter frames: they live on the heap, cost no CLR stack, and 1024 of them are free.
-        // A RE-ENTRY is not free — script to host to script puts a whole Execute, its loop and the
-        // host's own frames on the CLR stack — so the two are bounded separately.
-        //
-        // RuntimeHelpers.TryEnsureSufficientExecutionStack stood here first and did not save the
-        // process. It leaves only its own small probe as headroom, and that is not enough for what
-        // happens next: an exception FILTER runs before the stack unwinds, the filter below builds
-        // a backtrace, and running it at every nesting level on an almost-full stack overflowed
-        // anyway. A limit that keeps hundreds of kilobytes free has room for its own unwinding.
-        if (_nesting >= MaxReentryDepth)
-            throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
-                $"re-entry nested {MaxReentryDepth} runs deep — a host function that calls back "
-                + "into the script starts a run INSIDE the one that called it, and each nesting "
-                + "costs thread stack that no frame count can see");
 
         var frames = new Stack<Frame>();
         var frame = prepared[startIndex].Rent();
