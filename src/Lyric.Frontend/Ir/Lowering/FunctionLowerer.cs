@@ -4973,7 +4973,7 @@ internal sealed class FunctionLowerer
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null) return false;
         if (decl.Generics.Length > 0) return false;
 
-        id = table.Request(symbol, decl, owner.Module, owner.TargetName,
+        id = table.Request(symbol, decl, owner.Module, owner.Target,
             decl.IsStatic ? null : owner.Target,
             decl.IsStatic ? null : owner.TargetNode);
         return true;

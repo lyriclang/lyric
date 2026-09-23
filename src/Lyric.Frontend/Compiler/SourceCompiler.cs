@@ -138,24 +138,25 @@ public static class SourceCompiler
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
         //
-        // verify:false plus the separate VerifyOrThrow call is not a behaviour change:
-        // ModuleLowerer.VerifyByDefault still decides whether verification runs. The split exists
-        // so the two durations can be measured separately.
+        // The verifier runs INSIDE the lowering now, and twice — once on what the lowering produced,
+        // once on what the optimizations left of it. Neither point is reachable from out here, so
+        // the lowering times itself and this caller subtracts, the same arrangement as the module
+        // loader inside 'Resolve' above.
         report?.BeginPhase(Phase.Lower);
-        var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
+        var timings = new LoweringTimings();
+        var lowering = Stopwatch.StartNew();
+        var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes,
-            comptime: comptime);
+            comptime: comptime, timings: timings);
+        var lowered = lowering.Elapsed;
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));
-        report?.EndPhase();
+        report?.EndPhase(lowered - timings.Verification);
+        if (timings.Verified && ir is not null)
+            report?.ReportPhase(Phase.Verify,
+                timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
+                timings.Verification);
         if (ir is null || stage == Stage.Lower)
             return new CompileResult(sources, diagnostics, ir, null, model);
-
-        if (ModuleLowerer.VerifyByDefault)
-        {
-            report?.BeginPhase(Phase.Verify, FunctionCount(ir));
-            IrVerifier.VerifyOrThrow(ir);
-            report?.EndPhase();
-        }
 
         // Everything a build does except turning the IR into bytes. That step is mechanical, but
         // "mechanical" is not "cannot go wrong": a module whose loader refused it type-checked in
@@ -196,10 +197,9 @@ public static class SourceCompiler
             return null;
         }
 
-        var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
+        var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, comptime: new ComptimeTable { Hoist = true });
         if (hoisted is null) return null;
-        if (ModuleLowerer.VerifyByDefault) IrVerifier.VerifyOrThrow(hoisted);
 
         // With a source map, so a panic inside a site names the line it happened on.
         var bytes = BytecodeWriter.Write(hoisted,
@@ -375,11 +375,9 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, null, model);
 
-        var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics, verify: false,
+        var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
         if (ir is null) return new CompileResult(sources, diagnostics, null, null, model);
-
-        if (ModuleLowerer.VerifyByDefault) IrVerifier.VerifyOrThrow(ir);
 
         return new CompileResult(sources, diagnostics, ir, null, model);
     }

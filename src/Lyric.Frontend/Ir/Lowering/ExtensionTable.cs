@@ -45,7 +45,16 @@ internal sealed class ExtensionTable
 
     private readonly FunctionIds _ids;
 
-    public ExtensionTable(FunctionIds ids) => _ids = ids;
+    /// <summary>Every registered <c>extend</c> block, for the overload suffix. <c>null</c> only where a
+    /// caller builds a table without a compilation; the names are then unsuffixed, which is what they
+    /// were before overloaded extensions were told apart at all.</summary>
+    private readonly ExtensionRegistry? _registry;
+
+    public ExtensionTable(FunctionIds ids, ExtensionRegistry? registry = null)
+    {
+        _ids = ids;
+        _registry = registry;
+    }
 
     /// <summary>Has this method already been requested? Returns the id under which it is
     /// callable.</summary>
@@ -58,17 +67,58 @@ internal sealed class ExtensionTable
     /// </summary>
     /// <param name="declaringModule">The module the <c>extend</c> block stands in, not the one of the
     /// target type. <c>extend string</c> may stand in any module.</param>
+    /// <param name="target">The extended type. Needed as the SYMBOL rather than as its name, because
+    /// the overload suffix is computed over every block that extends it.</param>
     public FunctionId Request(FunctionSymbol symbol, FunctionDecl decl, ModuleSymbol declaringModule,
-        string targetName, TypeSymbol? receiver, TypeNode? receiverTypeNode)
+        TypeSymbol target, TypeSymbol? receiver, TypeNode? receiverTypeNode)
     {
         if (_requested.TryGetValue(symbol, out var existing)) return existing;
 
         var id = _ids.Next();
         _requested[symbol] = id;
         _pending.Add(new Pending(decl,
-            NameMangling.ForExtension(declaringModule, targetName, decl.Name),
+            NameMangling.ForExtension(declaringModule, target.Name, decl.Name)
+                + OverloadSuffixFor(declaringModule, target, decl),
             id, receiver, receiverTypeNode));
         return id;
+    }
+
+    /// <summary>
+    /// The suffix that separates an extension method from its overloads, empty when the name is
+    /// declared once — which keeps the bytes of every program without overloaded extensions where
+    /// they were.
+    ///
+    /// <para>THE SET SPANS BLOCKS. §4.3a says several visible extensions offering one member are one
+    /// overload set, so <c>extend Box { fn tell(n: int) }</c> and a second <c>extend Box</c> with
+    /// <c>fn tell(s: string)</c> are two overloads of one name, not two names. Asking the declaring
+    /// block's own scope would see one method per block and find nothing to separate — which is how
+    /// both landed on <c>main.&lt;extend&gt;.Box.tell</c> and the verifier called it a duplicate.</para>
+    ///
+    /// <para>Filtered by the DECLARING module, because that module already stands in the name: two
+    /// modules extending the same type never collided in the first place.</para>
+    /// </summary>
+    private string OverloadSuffixFor(ModuleSymbol declaringModule, TypeSymbol target, FunctionDecl decl)
+    {
+        if (_registry is null) return "";
+
+        var siblings = _registry.MethodsFor(target)
+            .Where(m => ReferenceEquals(m.Module, declaringModule) && m.Symbol.Name == decl.Name)
+            .ToList();
+        if (siblings.Count < 2) return "";
+
+        // The ordinal counts the EARLIER declarations whose written signatures print alike; it is the
+        // tie-breaker for the case the written form cannot separate. Same rule as for free functions
+        // and methods, and the order is the registration order, which is block then declaration order.
+        var mine = NameMangling.OverloadSuffix(decl.Parameters, 0);
+        var ordinal = 0;
+        foreach (var sibling in siblings)
+        {
+            if (sibling.Symbol.Declaration is not FunctionDecl other) continue;
+            if (ReferenceEquals(other, decl)) break;
+            if (NameMangling.OverloadSuffix(other.Parameters, 0) == mine) ordinal++;
+        }
+
+        return NameMangling.OverloadSuffix(decl.Parameters, ordinal);
     }
 
     /// <summary>

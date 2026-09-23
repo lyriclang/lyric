@@ -103,22 +103,54 @@ public sealed class OutputTests
     }
 
     /// <summary>
-    /// The verifier is the only phase a build may skip, and a release build does.
+    /// The verifier is the only phase a build may skip, and what decides is the build configuration
+    /// unless <c>LYRIC_VERIFY_IR</c> says otherwise.
     ///
     /// <para>Without this test the one above would stay green even if <see cref="Pipeline.OfThisBuild"/>
     /// returned the same in BOTH configurations: it compares the output against the same list it arises
     /// from. Here the statement itself stands, against the <c>#if</c> the compiler really saw.</para>
+    ///
+    /// <para>It used to assert that ONLY a debug build verifies. That rule fell with the variable, and
+    /// it had to: every CI job builds <c>--configuration Release</c>, so the old rule said in a test
+    /// what the CI proved in practice — the verifier never ran there at all.</para>
     /// </summary>
     [Fact]
-    public void Only_a_debug_build_runs_the_verifier()
+    public void The_build_configuration_decides_unless_the_variable_does()
     {
         var verifies = Pipeline.OfThisBuild.Contains(Phase.Verify);
+        Assert.Equal(Pipeline.VerifiesIr, verifies);
+
+        if (Environment.GetEnvironmentVariable(Pipeline.VerifyEnvironmentVariable) is { Length: > 0 })
+            return;
 
 #if DEBUG
         Assert.True(verifies);
 #else
         Assert.False(verifies);
 #endif
+    }
+
+    /// <summary>
+    /// The variable overrides the configuration in BOTH directions, and a process that inherits it
+    /// shows the phase.
+    ///
+    /// <para>Driven as a process rather than read off <see cref="Pipeline"/>: the value is read once at
+    /// static initialization, so a test that set it in-process would measure whatever ran first. The
+    /// point of the variable is that a release-configuration CI can verify, and that is a subprocess
+    /// question.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("0", false)]
+    public void The_variable_decides_whether_a_compile_verifies(string value, bool expected)
+    {
+        var result = Toolchain.RunWithEnvironment(Toolchain.LyrcPath,
+            new Dictionary<string, string?> { [Pipeline.VerifyEnvironmentVariable] = value },
+            "check", Toolchain.Example("hello.lyr"), "--verbose");
+
+        var listed = result.Err.Split('\n')
+            .Any(line => line.TrimStart().StartsWith(PhaseNames.Short(Phase.Verify), StringComparison.Ordinal));
+        Assert.Equal(expected, listed);
     }
 
     [Fact]

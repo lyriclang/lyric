@@ -798,4 +798,51 @@ public class VerifierTests
         var ex = Assert.Throws<InternalCompilationException>(() => IrVerifier.Verify(module));
         Assert.Contains("unhandled terminator UnknownTerminator", ex.Message, StringComparison.Ordinal);
     }
+
+    // ------------------------------------------------------------- 2k) what the optimizer would hide
+
+    /// <summary>
+    /// A function nothing calls is checked like any other.
+    ///
+    /// <para>This is the invariant the verifier's POSITION rests on. <c>Reachability.Prune</c> deletes
+    /// what nothing calls, and it runs inside the lowering; while the verifier ran only behind it, a
+    /// malformed body in a function the optimizer had just made unreachable was deleted before anyone
+    /// looked. Measured on a real case: two extension overloads collided in the symbol table, the
+    /// inliner spliced both into their only caller, the pruning removed the originals, and the release
+    /// profile reported a clean module. If this test ever goes red because the verifier learned to skip
+    /// unreachable functions, the first verification point loses its reason to exist.</para>
+    /// </summary>
+    [Fact]
+    public void A_function_nothing_calls_is_verified_too()
+    {
+        var module = Module(
+            Fn("main.main", VoidT, 0, new List<IrLocal>(), new List<IrTemp>(),
+                new List<IrBlock> { Block(0, new List<IrOp>(), new Return(null, Sp)) }),
+            Fn("main.orphan", I64, 0, new List<IrLocal>(), new List<IrTemp>(),
+                new List<IrBlock> { Block(0, new List<IrOp>(), new Return(null, Sp)) }));
+
+        AssertFinding(module, "main.orphan");
+    }
+
+    /// <summary>
+    /// The thrown message names WHICH run found it.
+    ///
+    /// <para>The verifier runs twice per lowering now, and the two accuse different culprits: the first
+    /// this lowering, the second one of the passes. A finding without that word is a stack trace and a
+    /// guess.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("after the lowering")]
+    [InlineData("after the optimizations")]
+    public void The_message_names_the_run_that_found_it(string stage)
+    {
+        var body = () => Block(0, new List<IrOp>(), new Return(null, Sp));
+        var module = Module(
+            Fn("main.f", VoidT, 0, new List<IrLocal>(), new List<IrTemp>(), new List<IrBlock> { body() }),
+            Fn("main.f", VoidT, 0, new List<IrLocal>(), new List<IrTemp>(), new List<IrBlock> { body() }));
+
+        var ex = Assert.Throws<InternalCompilationException>(
+            () => IrVerifier.VerifyOrThrow(module, stage));
+        Assert.Contains(stage, ex.Message, StringComparison.Ordinal);
+    }
 }

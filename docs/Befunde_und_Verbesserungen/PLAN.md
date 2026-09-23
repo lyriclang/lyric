@@ -37,19 +37,38 @@ sonst kann die Suite den Stand nicht beurteilen.
 
 ## 4.5 — was noch reingehört
 
-### A. Der Verifier läuft an der falschen Stelle (zuerst)
+### ~~A. Der Verifier läuft an der falschen Stelle (zuerst)~~ — **erledigt, 2026-09-23**
 
-`ModuleLowerer.cs:468–487`: Inliner, ScalarReplacement, Devirtualizer und Reachability laufen
-**vor** `IrVerifier.VerifyOrThrow`, und `Phase.cs:52` schaltet ihn nur im Debug-Build ein. Beides
-zusammen heißt: ein Lowering-Defekt ist im Release doppelt unsichtbar, und eine Optimierung kann
-fehlerhaftes IR zudecken — belegt am selben Fall mit und ohne Schleife im Körper.
+Der Befund war richtig und **größer als beschrieben**. Zwei Hälften, beide gemessen:
 
-**Der Umbau ist durchgerechnet**, nicht geschätzt: mit `Optimize = false` verifiziert bestehen die
-gesamte stdlib, ihre Tests und alle 47 Beispiele ohne einen Befund. Wer die Reihenfolge ändert,
-fasst fünf Tests an und sonst nichts. Dazu: im Release verifizieren oder den Bytecode-Reader
-typisieren lassen (Bug-Hunt P1-19).
+*Die Reihenfolge.* Inliner, ScalarReplacement, Devirtualizer und `Reachability.Prune` liefen vor
+`IrVerifier.VerifyOrThrow`. Belegt an einem echten Fall (`two_extensions_overload_by_parameters`):
+mit abgeschaltetem Optimierer fand die alte Position den Defekt, mit eingeschaltetem **nicht** —
+der Inliner spleißte beide Rümpfe in ihren einzigen Aufrufer, das Pruning löschte die Originale,
+das Modul verifizierte sauber. Jetzt läuft der Verifier hinter dem Lowering **und** hinter den
+Pässen (letzteres nur, wenn wirklich einer lief), und die Meldung nennt den Lauf.
 
-*Das gehört an den Anfang, weil jede folgende Messung sonst weniger wert ist.*
+*Der Schalter.* Das eigentliche Loch: **jeder** CI-Job baut `--configuration Release`, und
+`VerifiesIr` war `#if DEBUG`. Die CI hat auf keinem Pfad durch `SourceCompiler` verifiziert — nicht
+die Tooling-Tests, nicht die Konformanz-Suite, nicht die Beispiele. Gerettet hat das nur, dass
+**alle 92** direkten `ModuleLowerer.Lower`-Aufrufe in Tests `verify:` explizit setzen; davon
+verifizierten 78 ausschließlich hinter dem Optimierer. `LYRIC_VERIFY_IR` überschreibt jetzt beide
+Richtungen, in allen drei Workflows an.
+
+*Korrekturen an der Vorlage oben.* Die Beispiele sind **80** Dateien, nicht 47. Angefasst wurde
+**ein** Test, nicht fünf — der, dessen Regel fiel (`Only_a_debug_build_runs_the_verifier`).
+
+**Ertrag: ein echter Defekt.** Zwei `extend`-Überladungen auf einem Typ im selben Modul bekamen
+denselben gemangelten Namen (`main.<extend>.Box.tell`) — freie Funktionen und Methoden holen sich
+seit 3.0 einen Überladungssuffix, `ExtensionTable` nicht. Auch ohne Verifier sichtbar: zwei
+ununterscheidbare `call`s im IR-Dump. Gefixt; die Überladungsmenge spannt laut §4.3a über die
+Blöcke, wird also über `ExtensionRegistry.MethodsFor` gerechnet, nicht über den Block-Scope.
+
+Messung im Zielzustand: 5497 Tests grün mit Verifier an *und* aus · 159/159 Konformanz ·
+80 Beispiele × 2 Profile ohne Befund.
+
+*Offen geblieben*: der Bytecode-Reader typisieren (Bug-Hunt P1-19) — der Verifier deckt das jetzt
+in der CI ab, im ausgelieferten Compiler weiterhin nicht.
 
 ### B. Prozessabbrüche — Exit 134/141 statt Diagnose oder Panik
 
@@ -162,7 +181,8 @@ Ordnung auf Optionals, Block-Ausdruck für jeden Block, `break value`, `derive`-
 
 1. ~~`lyric-spec#38` mergen~~ — gelandet (2026-09-23): die zwei retirierten Pattern-Limits **und**
    die Grammatik, die 4.5 wirklich beschreibt. Dann PR #162.
-2. **A** (Verifier-Reihenfolge) — weil jede spätere Messung sonst weniger wert ist.
+2. ~~**A** (Verifier-Reihenfolge)~~ — gelandet (2026-09-23), samt dem Defekt, den sie zutage
+   gefördert hat. Ab hier misst jede Runde gegen eine CI, die das IR wirklich prüft.
 3. **B** (Prozessabbrüche) als eigene Sweep-Runde.
 4. **C** und **D**, dann 4.5 ausliefern.
 5. Erst danach die 4.6-Liste, Position für Position.

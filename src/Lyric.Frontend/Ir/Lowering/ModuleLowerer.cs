@@ -6,6 +6,28 @@ using Lyric.Sema;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
+/// What a lowering run measured about itself, for callers that show a timing table.
+///
+/// <para>Only verification, and only because the verifier is the expensive part and runs at two
+/// points inside the lowering — a caller can no longer bracket it from outside. Everything else a
+/// caller can time around the call.</para>
+/// </summary>
+public sealed class LoweringTimings
+{
+    /// <summary>The sum of both verification runs. Zero when none ran.</summary>
+    public TimeSpan Verification { get; internal set; }
+
+    /// <summary>Whether verification ran at all — distinct from a duration of zero, which a fast
+    /// enough check on a small module really can be.</summary>
+    public bool Verified { get; internal set; }
+
+    /// <summary>How many times the verifier ran: one when nothing optimized the module, two when
+    /// something did. A reader of the timing table is owed the difference — the second run is why
+    /// the release profile pays roughly twice what the debug profile pays for the same line.</summary>
+    public int Runs { get; internal set; }
+}
+
+/// <summary>
 /// The entry point of the lowering: a type-checked compilation to an <see cref="IrModule"/>.
 ///
 /// <para>TWO PASSES. Pass 1 assigns every function to be lowered its <see cref="FunctionId"/>, pass 2
@@ -13,10 +35,14 @@ namespace Lyric.Ir.Lowering;
 /// the target would have no id while the call is lowered. The same solution as the two-pass
 /// declaration in the resolver.</para>
 ///
-/// <para>THE VERIFIER RUNS AS ACCEPTANCE. A finding is a bug in this lowering rather than a user
-/// diagnostic, which is why <see cref="IrVerifier.VerifyOrThrow"/> throws. Always on in tests and
-/// debug builds; for release builds the caller can switch it off, as LLVM's verifier is on in assert
-/// builds.</para>
+/// <para>THE VERIFIER RUNS AS ACCEPTANCE, AND IT RUNS TWICE. A finding is a bug in this lowering or
+/// in an optimization rather than a user diagnostic, which is why <see cref="IrVerifier.VerifyOrThrow"/>
+/// throws — and which of the two it is, only the position tells: once on what the lowering produced,
+/// once on what the passes left of it. It used to run once, at the very end, and that hid a whole
+/// class of finding: an extension overload that collided with its sibling in the symbol table was
+/// inlined into its only caller, pruned as unreachable, and verified clean. Always on in tests;
+/// otherwise <see cref="Pipeline.VerifiesIr"/> decides, as LLVM's verifier is on in assert builds
+/// and runs BETWEEN passes when it is.</para>
 ///
 /// <para>WHAT IS SKIPPED: bodyless declarations, which have nothing to lower, and generic functions.
 /// The latter need the worklist monomorphization — one instance per concrete type argument tuple,
@@ -34,8 +60,15 @@ public static class ModuleLowerer
         new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// Does the verifier run when the caller says nothing else? Yes in debug builds, no in release, as
-    /// LLVM's verifier is on in assert builds.
+    /// Does the verifier run when the caller says nothing else? Yes in debug builds, no in release,
+    /// and <c>LYRIC_VERIFY_IR</c> overrides both — as LLVM's verifier is on in assert builds and
+    /// reachable by flag otherwise.
+    ///
+    /// <para>The variable is not a convenience. Every CI job of this repository builds
+    /// <c>--configuration Release</c>, so until it existed the verifier ran on no path that went
+    /// through <c>SourceCompiler</c>: not the tooling tests, not the conformance suite, not the
+    /// examples. The unit tests escaped that only because all 92 of them pass <c>verify:</c>
+    /// explicitly.</para>
     ///
     /// <para>Measured over 400 functions and 18,400 instructions: lowering with verification takes
     /// 30 ms, without it 2.8 ms. The check is therefore 90% of the total time, most of it in the
@@ -72,9 +105,13 @@ public static class ModuleLowerer
     /// <param name="comptime">How <c>comptime</c> sites lower: <c>null</c> as their inner
     /// expression (a check), hoisted into evaluator functions, or replaced by evaluated values.
     /// See <see cref="ComptimeTable"/>.</param>
+    /// <param name="timings">Filled with what the run spent on verification, for <c>--verbose</c>.
+    /// The caller used to lower with <c>verify:false</c> and verify itself just to time the step;
+    /// that stopped working the moment one of the two runs had to happen mid-pipeline. The same
+    /// shape as the module loader, which also times itself and lets its caller subtract.</param>
     public static IrModule? Lower(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine de, bool? verify = null, bool optimize = true, bool libraryRoots = false,
-        IrPasses passes = IrPasses.All, ComptimeTable? comptime = null)
+        IrPasses passes = IrPasses.All, ComptimeTable? comptime = null, LoweringTimings? timings = null)
     {
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
@@ -306,7 +343,7 @@ public static class ModuleLowerer
         var coroutines = new CoroutineTable(nextId);
         var instances = new InstanceTable(nextId, compilation);
         var lambdas = new LambdaTable(nextId);
-        var extensions = new ExtensionTable(nextId);
+        var extensions = new ExtensionTable(nextId, compilation.Extensions);
         typeTable.Extensions = extensions;
 
         // Pass 2: the bodies. Scope boundaries are reported rather than thrown, so the user sees all the
@@ -511,6 +548,17 @@ public static class ModuleLowerer
         };
         if (failed) return null;
 
+        var verifies = verify ?? VerifyByDefault;
+        if (timings is not null) timings.Verified = verifies;
+
+        // THE FIRST VERIFICATION, and the one that names a culprit: what stands here is what this
+        // lowering produced, untouched. It used to run at the very end, behind the optimizations and
+        // behind the pruning, which made two findings impossible to tell apart and one impossible to
+        // see at all — a malformed body in a function nobody calls was deleted before anyone looked.
+        // LLVM is the precedent quoted for the verifier's existence; it also runs it BETWEEN passes,
+        // for this reason.
+        if (verifies) Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the lowering"));
+
         // Inlining BEFORE the pruning: a body spliced into its last caller leaves a function
         // nobody calls, and the pruning that follows deletes it in the same run. Scalar
         // replacement BEHIND the inliner, because a returned value escapes its own function but
@@ -531,8 +579,10 @@ public static class ModuleLowerer
             }
         }
 
-        // BEFORE the verifier: what gets deleted does not need checking, and the verifier runs again at
-        // load time anyway, so this is the one place where the saving counts twice.
+        // The pruning still runs before the second verification, and this saving is the one that may
+        // stay: deleting a whole function cannot make another one malformed, and a dangling function
+        // id is among the few things the bytecode reader really does check. What the saving used to
+        // cover up — a malformed body nobody calls — the first verification has already seen.
         Reachability.Prune(result);
 
         // The evaluation module requires what its retained imports require — nothing more. The
@@ -545,8 +595,31 @@ public static class ModuleLowerer
             result.Capabilities = needed;
         }
 
-        if (verify ?? VerifyByDefault) IrVerifier.VerifyOrThrow(result);
+        // THE SECOND VERIFICATION, and it names the other culprit. Only when a pass really ran: with
+        // none of them enabled the module is what the first run already accepted, and a second pass
+        // over it would buy nothing for 90% of the lowering time. That is why the debug profile —
+        // which optimizes nothing — still verifies exactly once.
+        if (verifies && enabled != IrPasses.None)
+            Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the optimizations"));
+
         return result;
+    }
+
+    /// <summary>Runs the action and adds its duration to the tally. The verifier is 90% of the
+    /// lowering time, so <c>--verbose</c> showing it as part of 'lower' would misname the bill; ONE
+    /// tally for both runs, because the table reports a pipeline stage, not a number of calls.</summary>
+    private static void Timed(LoweringTimings? timings, Action action)
+    {
+        if (timings is null)
+        {
+            action();
+            return;
+        }
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        action();
+        timings.Verification += clock.Elapsed;
+        timings.Runs++;
     }
 
     /// <summary>Recognises a host type in the signature of a native declaration; the rule itself lives
@@ -1159,7 +1232,7 @@ public static class ModuleLowerer
             if (block.Target is not { } target) continue;
 
             // requests it if that has not happened yet: a vtable row is a use
-            return extensions.Request(symbol, decl, block.Module, target.Name,
+            return extensions.Request(symbol, decl, block.Module, target,
                 decl.IsStatic ? null : target, decl.IsStatic ? null : block.Decl.Target);
         }
         return null;
