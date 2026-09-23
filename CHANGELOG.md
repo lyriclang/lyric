@@ -10,6 +10,111 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
+## v4.6.0 — 2026-09-23
+
+**Patterns test and bind at every depth, expressions reach further, and the standard library
+answers with values.** A minor: the bytecode format stays 4.0, and every 4.5 project still
+builds — except where it relied on something that was silently wrong, which is the one list to
+read before upgrading.
+
+### Refused now, accepted before
+
+Each of these compiled in 4.5 and gave an answer nobody asked for. They are listed first because
+they are the only way this release can break a build.
+
+- **`if (c) 1 else 2.5` is `LYR-SEM0016`.** The arms unified to `float` while the integer arm
+  stayed an integer, so a release build printed `5e-324` — the bit pattern of `1` read as a
+  double — and a debug build died in the verifier. §3.1 lists the contexts an unsuffixed literal
+  adapts in and an arm is not one. `let q: float = if (c) 1 else 2.5;` is unchanged: with a
+  context the arms check against it.
+- **`x++` and `--x` on a `let` are `LYR-SEM0019`.** They write as much as they read, and the rule
+  had only ever looked at assignments.
+- **An assignment to a captured `let` inside a lambda, and inside the block arm of a `match`
+  expression, is `LYR-SEM0019`.** Neither body was walked at all: the first reached the lowering,
+  which threw an internal error; the second overwrote the binding at runtime.
+- **A narrowing that an assignment ended stays ended.** `if (o != null) { if (c) { o = null; } o + 1 }`
+  was accepted and panicked with `LYR-VM0007`; it is a type error now.
+- **A destructuring initializer is a call site.** `let (a, b) = mayThrow();` in a function that
+  declares nothing is `LYR-SEM0034` instead of reaching `LYR-VM0010` at runtime.
+- **A visible extension beats an interface default** (§5.4). Where both offered a name, the
+  default used to win; the resolution order the specification states now holds at run time too.
+
+### Added — the language
+
+- **Patterns test and bind at every depth.** Nested variant patterns, tuple patterns containing
+  variants and literals, field patterns whose sub-pattern can fail (`Point { x = 3, y }`), and
+  or-patterns that bind (`A(x) | B(x)`) all lower. The last two were documented implementation
+  limits and are retired from §7.6.
+- **Array patterns**: `[]`, `[a, b]`, `[first, ..]`, `[.., last]`, `[a, .., z]`, and a NAMED rest
+  (`[first, ..rest]`) that binds the elements it covers as an array of their own — a copy, since
+  the language has no slices.
+- **`if let`, `while let` and `let … else`.** A pattern in a condition binds for the branch or the
+  body; a refutable binding takes an `else` block that leaves the scope.
+- **Patterns in a `for` head** (`for ((k, v) in pairs)`) and as lambda parameters.
+- **Closure shorthand and trailing lambdas**: `x => x * 2`, and `xs.map { it * 2 }`, where a block
+  after a call is its last argument and its one parameter is `it`.
+- **A block arm of a `match` expression delivers a value through its TAIL** — an expression
+  standing last without `;`.
+- **`throw` is an expression** of type `never`, so it stands in the absent side of `??`, a branch
+  of an `if` and an arm of a `match` without constraining the others.
+- **Labels on loops**, with `break L` and `continue L`.
+- **f-strings render a `Display` conformance.** `f"{p}"` on a conforming type calls `show()`
+  instead of being `LYR-IR0001`.
+- **`try` contributes to definite assignment**: a variable assigned in the body and in every
+  catch that falls through counts as assigned after it.
+- **`comptime e`** evaluates an expression while compiling — through the VM, with no capability
+  and an instruction budget — and splices the result in as a constant.
+- **`extern "dotnet" fn … = "Type::Method"`** binds a public static .NET method by reflection,
+  with width-exact marshalling and a capability check.
+- **Exhaustiveness names a WITNESS**: a missing case is reported as the pattern that reaches no
+  arm rather than as a list.
+
+### Added — the standard library
+
+- **`std.result`** with `Result<T, E>` and the bridges `parseIntOrErr`, `textOrErr`, `parseOrErr`.
+  A value, not a second error mechanism: `throws` stays the one way an error propagates.
+- **Fourteen terminators as default methods on `Iterator`** — `count`, `any`, `all`, `none`,
+  `find`, `position`, `fold`, `reduce`, `first`, `last`, `nth`, `toArray`, `forEach`, `countWhere`
+  — and five adapters (`skipWhile`, `stepBy`, `dedupBy`, `inspect`, `zipWith`), so a chain no
+  longer breaks at its end.
+- **Containers**: `List.of`/`slice`/`map`/`filter`, `Map.keys`/`entries`/`getOrInsert`/`update`,
+  `Set` helpers, `arrayOf`, `arrayFilled`, `groupBy`, `sortArray`, `sortListByKey`, `listRemove`.
+- **`std.hash`** with SHA, MD and CRC digests plus `hashCombine` and `hashAll`.
+- **Checked and saturating arithmetic**: `checkedAdd`/`Sub`/`Mul`/`Abs`, `saturatingAdd`/`Sub`/`Mul`.
+- **Seven test assertions**: `assertNotEq`, `assertNull`, `assertNotNull`, `assertClose`,
+  `assertLess`, `assertContains`, `fail`.
+- **`std.io.file.modifiedMillis`**, `parseIntRadix`, `hexDecodeOrErr`, `option.orElse`.
+
+### Fixed
+
+- **A `do-while`'s jump target landed inside a handler's block range.** A `break` inside a `try`
+  put the code after the loop under a handler that belongs inside it: a `throw` behind the loop
+  was caught by the `catch` in its body and the loop ran forever. A `continue` had the same shape,
+  and a `defer` body ran twice.
+- **A monomorphized instance carried no module path**, so two modules declaring `fn twice<T>`
+  shared one instance and one of them ran the other's body.
+- **Variant construction lowered its payload raw**, so a struct payload shared its slot array with
+  the value it was built from, and a `match` arm binding the whole subject aliased it.
+- **A `defer` in an `if` body registered on the enclosing scope** and ran at the end of the
+  function instead of the end of its own block.
+- **A throwing `defer` body ran the scope's defers twice** on the fall-through path.
+- **The methods of a generic enum were never lowered**, so calling one was `LYR-IR0001`.
+- **`parseInt` and `powInt` answered a wrapped number** where their `?int` return type promised
+  `null`: `parseInt("99999999999999999999")` was `7766279631452241919`, `powInt(2, 64)` was `0`.
+- **`trim` and `trimStart`/`trimEnd`/`isBlank` used two different notions of whitespace.**
+- **A `Map` grew without bound under set/remove churn**: tombstones triggered a doubling and never
+  a compaction.
+- **`std.os.args()` answered the VM's arguments**, not the program's.
+- **`Random.nextIntRange` and `nextFloat` could fall below their lower bound**, because
+  `absInt(int.min)` stays negative.
+
+### Changed
+
+- The grammar (§2) describes the forms above. Seven of them were shipping without being in it.
+- `LYR-IR0001` covers two constructs fewer; the appendix says which.
+
+---
+
 ## v4.5.0 — 2026-09-22
 
 **The project system.** A compile is one of two named profiles and the default is `debug`; a

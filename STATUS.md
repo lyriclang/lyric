@@ -11,12 +11,21 @@
 
 ## Current milestone
 
-**4.5 IS TAGGED AND MAIN IS 75 COMMITS PAST IT.** `v4.5.0` sits at `6f138636` and carries M37
-alone. Everything below landed after it, and the tree still claims `4.5.0` — so a build from main
-calls itself a version that does not contain it. **The next release is a MINOR**: the language
-grew forms, the standard library grew modules, and two documented limits were retired. Whoever
-bumps it also moves the `since:` gates of the two conformance cases added with the spec round,
-which say `4.5.0` today and describe something `v4.5.0` cannot do.
+**THE TREE CLAIMS 4.6.0 AND NOTHING IS TAGGED YET.** `v4.5.0` sits at `6f138636` and carries M37
+alone; everything below landed after it, and for a while the tree still called itself `4.5.0` — a
+build from main naming a version that did not contain it. A MINOR, because the bytecode format
+stays 4.0 and the language only grew: `Directory.Build.props`, `ToolchainVersion`, the README and
+the changelog say 4.6.0 together, and the specification's pin moved with them.
+
+**What a 4.5 project has to read before upgrading** is the changelog's first section, and it is
+short: six shapes that compiled in 4.5 and answered something nobody asked for are refused now —
+`if (c) 1 else 2.5`, `x++` on a `let`, an assignment to a captured `let` in a lambda or in a block
+arm, a narrowing an assignment had ended, a destructuring initializer that throws, and an
+interface default that outranked a visible extension.
+
+**The `since:` gates were measured in both directions**, which is the only way to know a gate
+gates: as 4.6.0 the two new conformance cases run and the suite is 159/159; as 4.5.0 they skip and
+it is 157/157. A gate that passes at both numbers pins nothing.
 
 **The four evolution branches are merged** (2026-09-23, `integration/v4.5`, PR #162): a recursive
 pattern compiler, five expression forms, `std.result` with the iterator terminators, `comptime`
