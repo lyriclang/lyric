@@ -245,4 +245,60 @@ public class OverloadTests
         Assert.Contains("main.show(string)", names);
         Assert.Contains("main.show(int, string)", names);
     }
+
+    /// <summary>
+    /// Extension overloads keep their own names too — whether they stand in one <c>extend</c> block or
+    /// in several.
+    ///
+    /// <para>They did not. Free functions and methods took an overload suffix, extensions did not, so
+    /// two <c>tell</c> overloads on one type in one module both became
+    /// <c>main.&lt;extend&gt;.Box.tell</c>: two functions under one name in the symbol table, and two
+    /// calls in the IR dump that no reader could tell apart. It stayed invisible because the verifier
+    /// ran only at the very end — the inliner spliced both bodies into their caller and the pruning
+    /// deleted the originals, so the finding was gone before anything looked for it.</para>
+    ///
+    /// <para>The cross-block case is the one that decides the shape of the fix: §4.3a makes several
+    /// visible extensions ONE overload set, so the set cannot be read off the declaring block.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("one block", """
+        struct Box { v: int, }
+        extend Box {
+            fn tell(n: int): int { return this.v + n; }
+            fn tell(s: string): int { return this.v; }
+        }
+        pub fn use(): int { let b = Box { v = 1 }; return b.tell(2) + b.tell("x"); }
+        """)]
+    [InlineData("two blocks", """
+        struct Box { v: int, }
+        extend Box { fn tell(n: int): int { return this.v + n; } }
+        extend Box { fn tell(s: string): int { return this.v; } }
+        pub fn use(): int { let b = Box { v = 1 }; return b.tell(2) + b.tell("x"); }
+        """)]
+    public void Extension_overloads_keep_their_own_names_in_the_module(string shape, string source)
+    {
+        Assert.NotEmpty(shape);
+
+        var sm = new SourceManager();
+        var id = sm.AddVirtual("lib.lyr", source);
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de)
+        {
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+        };
+        comp.AddModule(new Parser(sm, id, de).ParseModule());
+        var binding = comp.Resolve();
+        var types = Semantics.Analyze(comp, binding, de);
+        Assert.False(de.HasErrors);
+
+        // optimize:false deliberately: with the passes on, the inliner and the pruning remove exactly
+        // the two functions this test is about — which is how the defect hid for as long as it did.
+        var ir = ModuleLowerer.Lower(comp, binding, types, de, verify: true, optimize: false,
+            libraryRoots: true);
+        Assert.NotNull(ir);
+
+        var names = ir!.Functions.Select(f => f.Name).ToArray();
+        Assert.Contains("main.<extend>.Box.tell(int)", names);
+        Assert.Contains("main.<extend>.Box.tell(string)", names);
+    }
 }

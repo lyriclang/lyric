@@ -343,7 +343,7 @@ public static class ModuleLowerer
         var coroutines = new CoroutineTable(nextId);
         var instances = new InstanceTable(nextId, compilation);
         var lambdas = new LambdaTable(nextId);
-        var extensions = new ExtensionTable(nextId);
+        var extensions = new ExtensionTable(nextId, compilation.Extensions);
         typeTable.Extensions = extensions;
 
         // Pass 2: the bodies. Scope boundaries are reported rather than thrown, so the user sees all the
@@ -1232,7 +1232,7 @@ public static class ModuleLowerer
             if (block.Target is not { } target) continue;
 
             // requests it if that has not happened yet: a vtable row is a use
-            return extensions.Request(symbol, decl, block.Module, target.Name,
+            return extensions.Request(symbol, decl, block.Module, target,
                 decl.IsStatic ? null : target, decl.IsStatic ? null : block.Decl.Target);
         }
         return null;
