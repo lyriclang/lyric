@@ -113,28 +113,64 @@ body is an error, not an import declaration.</li>
 <p>The rules above need no configuration, and for a program in one directory that is the whole story.
 A project with a <code>src/</code> directory says so in a <code>lyric.json</code> beside it:</p>
 <pre><code class="language-json">{
+  // what the project is called
+  &quot;name&quot;: &quot;game&quot;,
+
   // where our own modules live
   &quot;sourceRoot&quot;: &quot;src&quot;,
 
   /* an SDK whose modules may declare functions without a body */
   &quot;nativeRoots&quot;: { &quot;engine&quot;: &quot;sdk&quot; },
+
+  // other projects this one imports from, by the segment each owns
+  &quot;dependencies&quot;: { &quot;geometry&quot;: &quot;../geometry&quot; },
+
+  // the oldest toolchain that may build it
+  &quot;toolchain&quot;: &quot;4.5&quot;,
 }
 </code></pre>
 <pre><code>lyric.json
-src/main.lyr          &lt;- import shapes.area
+src/main.lyr                  &lt;- import shapes.area
 src/shapes/area.lyr
-sdk/engine/input.lyr  &lt;- import engine.input
+sdk/engine/input.lyr          &lt;- import engine.input
+../geometry/src/geometry.lyr  &lt;- import geometry
 </code></pre>
 <p>The file is searched for upwards from the file being compiled, so it is found from anywhere in the
 project. Comments and trailing commas are allowed; it is meant to be edited by hand.</p>
 <ul>
+<li><strong><code>name</code></strong> is the project's name — a module name, so letters, digits and <code>_</code>. Without it the
+directory's name serves.</li>
 <li><strong><code>sourceRoot</code></strong> replaces &quot;the directory of the entry file&quot; as the module root.</li>
 <li><strong><code>nativeRoots</code></strong> maps a module path segment to a directory whose modules may declare functions
 without a body. That segment then belongs to the root, and is no longer looked for under
 <code>sourceRoot</code>.</li>
+<li><strong><code>dependencies</code></strong> maps a module path segment to the directory of another project. That
+project's own <code>sourceRoot</code> (or its directory, when it has no <code>lyric.json</code>) is where the segment's
+modules come from: <code>import geometry</code> reads <code>geometry.lyr</code> there and <code>import geometry.shapes</code>
+reads <code>geometry/shapes.lyr</code>, the same derivation <code>std</code> uses. The segment belongs to the
+dependency and is no longer looked for under your own root.</li>
+<li><strong><code>toolchain</code></strong> names the oldest toolchain version that may build the project. An older one
+refuses with both numbers (<code>LYR-CLI0018</code>) instead of compiling against a language the project
+was not written for. A minimum, nothing more: a newer toolchain builds it.</li>
 </ul>
-<p>Both are optional, and <strong>without the file nothing changes</strong>: the entry file's directory is the root
-and no module of your own may declare a native.</p>
+<p>Every key is optional, and <strong>without the file nothing changes</strong>: the entry file's directory is the
+root and no module of your own may declare a native.</p>
+<h3 id="depending-on-another-project">Depending on another project</h3>
+<p>A dependency is a directory: a library <code>lyric new mylib --lib</code> wrote, a checkout beside yours, a
+subdirectory. Its modules are ordinary Lyric — a function without a body is an error there as it
+is here — and its own <code>lyric.json</code> counts: its <code>nativeRoots</code> come along, and its <code>dependencies</code>
+do too, so a library that stands on another library needs no help from the program using it.</p>
+<p>Three rules follow from the namespace being one namespace:</p>
+<ul>
+<li><strong>A segment belongs to one root.</strong> Two of your dependencies that want <code>mathx</code> to mean two
+different directories are a conflict, refused with both named. Your own <code>lyric.json</code> decides
+it: name <code>mathx</code> yourself, and your word stands for everybody under you.</li>
+<li><strong><code>std</code> is nobody's dependency</strong>, and neither is a segment a native root already owns.</li>
+<li><strong>A dependency's <code>toolchain</code> is a requirement of your build too.</strong> A library written for a
+newer toolchain refuses under an older one, naming its own file.</li>
+</ul>
+<p>Nothing is fetched and nothing is versioned: a dependency is where you say it is. What is fetched
+from where, pinned and verified, is a later chapter.</p>
 <p>A key nobody knows is a warning rather than an error, so a file written for a later version still
 loads — but the warning is there, because a typo that does nothing is worse than one that complains.</p>
 <p><code>lyric.json</code> is read and never executed. That is what lets an editor learn the layout of a project

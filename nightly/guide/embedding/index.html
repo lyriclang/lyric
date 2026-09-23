@@ -266,6 +266,22 @@ path.</p>
 needs a runtime that can emit IL, and a NativeAOT build has none. There <code>Compile = true</code> is
 ignored — every function is declined with <code>no runtime code generation</code>, every script is
 interpreted, and nothing else about the host changes.</p>
+<h3 id="the-other-half-of-fast">The other half of fast</h3>
+<p><code>Compile</code> decides how a script RUNS; <code>Profile</code> decides how it is COMPILED, and the two defaults
+agree. A VM compiles the debug profile unless told otherwise (<a href="/nightly/guide/building/#two-profiles">chapter
+16</a>): no inlining, no scalar replacement, every frame and every
+name kept, the shape a backtrace and a debugger can read. A host that ships sets both:</p>
+<pre><code class="language-csharp">var vm = new LangVm(new HostOptions
+{
+    Capabilities = Capability.None,
+    Profile = Profile.Release,   // optimized bytecode, slot names dropped, source map kept
+    Compile = true,              // and machine code for what the emitter accepts
+});
+</code></pre>
+<p><code>Profile</code> left unset takes the process default, which is <code>debug</code> unless <code>LYRIC_PROFILE</code> names
+<code>release</code>. Struct-heavy loops run about two and a half times slower in the debug profile on the
+interpreter; a host whose scripts are mostly glue will not notice, a host whose scripts do
+vector mathematics per frame will, and that host is the one shipping with <code>Compile</code> anyway.</p>
 <h2 id="registering-types">Registering types</h2>
 <p><code>RegisterType</code> exposes a C# class to scripts. Scripts receive such an object and pass it on; they
 cannot construct one and cannot read its fields.</p>

@@ -57,15 +57,21 @@ that runs on a machine that has never heard of Lyric.</p>
 <pre><code class="language-bash">lyric pack app.lyr
 ./app arg1 arg2
 </code></pre>
-<p>That is the whole workflow. <code>lyric pack</code> compiles the file and hands the module to <code>lyrpack</code>,
-which copies a prebuilt runtime — the <em>stub</em> — and appends the module to it. No compiler ships
-inside the result, nothing is installed on the target machine, and packing takes about as long
-as copying the file, because that is what it is.</p>
-<p>An already compiled module packs directly, which is how a <code>build.lyr</code> project packs its
-artifact:</p>
+<p>That is the whole workflow. <code>lyric pack</code> compiles the file in the release profile (<a href="/nightly/guide/building/#two-profiles">chapter
+16</a>; <code>--debug</code> if you want the other one) and hands the module to
+<code>lyrpack</code>, which copies a prebuilt runtime — the <em>stub</em> — and appends the module to it. No
+compiler ships inside the result, nothing is installed on the target machine, and packing takes
+about as long as copying the file, because that is what it is.</p>
+<p>In a project you name nothing at all: <code>lyric pack</code> builds the default artifact in the release
+profile and packs it beside the module, as <code>out/release/app</code> (with the platform's suffix).
+<code>lyric pack mktex</code> packs the artifact of that name.</p>
+<p>An already compiled module packs directly too:</p>
 <pre><code class="language-bash">lyric build
-lyric pack out/app.lyrbc -o dist/app
+lyric pack out/debug/app.lyrbc -o dist/app
 </code></pre>
+<p>A <code>build.lyr</code> can also declare the packed form outright, with <code>packed(app)</code>, which is how a
+project that always ships one gets it from a plain <code>lyric build</code>. See <a href="/nightly/guide/building/#packing-from-the-script">chapter
+16</a>.</p>
 <h2 id="what-a-packed-program-is">What a packed program is</h2>
 <p>It is your program, owning the whole command line. Every argument goes to <code>main</code> unchanged —
 there is no <code>--</code> protocol and no wrapper option, not even <code>--help</code>. If your program wants a

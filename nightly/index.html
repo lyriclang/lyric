@@ -30,24 +30,162 @@
 </a>
 </nav>
 <section class="changes">
-<h2>What changed in v4.4.1 — 2026-09-04</h2>
-<p><strong>Round 1 of the sweep after M36.</strong> Two findings, both older than the feature that surfaced them.</p>
+<h2>What changed in v4.5.0 — 2026-09-22</h2>
+<p><strong>The project system.</strong> A compile is one of two named profiles and the default is <code>debug</code>; a
+build script names what it builds; a project builds, runs, packs, checks and tests without
+anybody naming a file; and <code>lyric.json</code> says what the project is called, what it depends on and
+which toolchain it needs.</p>
+<h3 id="added">Added</h3>
+<ul>
+<li><p><strong>Profiles.</strong> A compile is one of two named shapes. <code>debug</code> runs no IR optimizations and keeps
+the source map and the debug info; <code>release</code> runs them and drops the debug info, keeping the
+source map. <code>lyrc</code>, <code>lyrbuild</code> and <code>lyrtest</code> take <code>--profile &lt;name&gt;</code>, <code>--release</code> and
+<code>--debug</code>, and <code>lyric run</code>, <code>lyric build</code> and <code>lyric pack</code> hand them through. Every field of a
+profile stays overridable, and a field flag wins: <code>--optimize</code>/<code>--no-optimize</code>,
+<code>--source-map</code>/<code>--no-source-map</code>, <code>--debug-info</code>/<code>--no-debug-info</code>. <code>LYRIC_PROFILE</code> names the
+default for a whole process, the <code>LYRIC_JIT</code> shape; a flag beats it.</p>
+</li>
+<li><p><strong><code>HostOptions.Profile</code></strong> in the embedding API. A host that ships sets <code>Profile.Release</code> beside
+<code>Compile = true</code>; left unset, a VM compiles the process default.</p>
+</li>
+<li><p><strong>Four diagnostic switches on <code>lyrc</code></strong>, part of no profile: <code>--no-inline</code>,
+<code>--no-scalar-replacement</code>, <code>--no-devirtualize</code> and <code>--no-fusion</code>. Each takes one pass or the
+fused instruction forms out of an optimized build, for bisecting a finding down to the pass.</p>
+</li>
+<li><p><strong><code>lyrvm run --jit</code></strong>, the engine <code>HostOptions.Compile</code> opts into, from the command line.
+<code>lyric run app.lyr --jit</code> hands it through to the runtime.</p>
+</li>
+<li><p><strong><code>lyric.json</code> learns three keys.</strong> <code>dependencies</code> maps a module path segment to the directory
+of another project; that project's own source root is where the segment's modules come from,
+its <code>nativeRoots</code> and <code>dependencies</code> come along, and the table is flat: one segment, one
+directory, for the whole program — two dependencies disagreeing are refused with both named,
+and your own entry pins the segment for everybody under you. <code>name</code> is the project's name, a
+module name. <code>toolchain</code> is the oldest toolchain that may build the project; an older one
+refuses with both numbers (<code>LYR-CLI0018</code>) instead of compiling against a language the project
+was not written for. All three are optional; a file without them means what it meant.</p>
+</li>
+<li><p><strong><code>HostOptions.DependencyRoots</code></strong>, the same table for a host compiling a project's scripts.</p>
+</li>
+<li><p><strong><code>std.build</code> names what it builds.</strong> <code>executable(name, entry)</code> declares a program that lands
+as <code>out/&lt;profile&gt;/&lt;name&gt;.lyrbc</code>; <code>library(name, root)</code> checks every module under a root and
+writes nothing; <code>packed(app)</code> declares the packed form of an executable, landing as
+<code>out/&lt;profile&gt;/&lt;name&gt;</code> with the platform's suffix. An artifact is an ordinary object: its
+fields are the profile's four (<code>optimize</code>, <code>sourceMap</code>, <code>debugInfo</code>, <code>denyWarnings</code>), set one
+by one or all at once with <code>use(Profile.release())</code>, and <code>output</code> names where it lands
+outright. <code>Profile.selected()</code>, <code>Profile.debug()</code> and <code>Profile.release()</code> are the toolchain's
+table, asked rather than copied.</p>
+</li>
+<li><p><strong>A build script takes options.</strong> <code>option(name, help)</code> answers <code>-D name=value</code> (<code>null</code> when
+not given), <code>flag(name, help)</code> answers <code>-D name</code>; <code>lyric build --help</code> in a project lists
+them. A <code>-D</code> the script never asked about is refused with the ones it did (<code>LYR-CLI0003</code>).
+<code>--only &lt;name&gt;</code> builds one artifact; a name nobody declared is refused with the ones that
+were (<code>LYR-CLI0019</code>). A <code>pub fn after()</code> in the script runs once every artifact was written,
+and not otherwise.</p>
+</li>
+<li><p><strong>The verbs take no file in a project.</strong> <code>lyric run</code> builds the default artifact — the first
+executable the script declares — and runs it; <code>lyric run mktex</code> runs that one; <code>lyric pack</code>
+builds it in the release profile and packs it. An argument that is on disk or carries
+<code>.lyr</code>/<code>.lyrbc</code> is a file and goes to the compiler as before, and anything else is an
+artifact's name.</p>
+</li>
+<li><p><strong><code>lyric check</code> checks a whole project.</strong> Without a file, or with a directory, the source
+root is read as one compilation and the test root as a second one that imports it — a test
+calling a function that was renamed is a question no per-file check can answer. <code>lyrc check</code>
+takes the same directory.</p>
+</li>
+<li><p><strong><code>lyric test --filter &lt;text&gt;</code></strong> runs the tests whose <code>module.function</code> contains the text.
+A filter that matches nothing is an error, because a green run of nothing is worse.</p>
+</li>
+<li><p><strong>A project builds without a script.</strong> <code>lyric build</code> in a directory without a <code>build.lyr</code>
+compiles <code>main.lyr</code> under the source root into <code>out/&lt;profile&gt;/&lt;name&gt;.lyrbc</code>, named after the
+project (<code>lyric.json</code>'s <code>name</code>, or the directory); a source root without a <code>main.lyr</code> is a
+library and is checked as a whole. Neither is <code>LYR-CLI0011</code>, naming both ways.</p>
+</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li><p><strong><code>lyric new</code> writes a <code>tests/</code> directory</strong> with one test in it, and the app template gains a
+module beside <code>main.lyr</code> for that test to import: a scaffold whose shape is the shape a
+project keeps. <code>lyric test</code> runs it straight away.</p>
+</li>
+<li><p><strong>Build artifacts land under <code>out/&lt;profile&gt;/</code>.</strong> <code>lyric new</code>'s app builds to
+<code>out/debug/&lt;name&gt;.lyrbc</code>, and <code>lyric build --release</code> to <code>out/release/</code>, so the two shapes
+never overwrite each other. A script that wants the old layout sets <code>output</code> on the artifact.</p>
+</li>
+<li><p><strong><code>addExecutable(entry, output)</code> is deprecated</strong> (<code>LYR-SEM0076</code>, kept until 5.0). It still
+builds, named after the output's stem; the new spelling is <code>executable(name, entry)</code> with
+<code>output</code> set when the derivation is not wanted. The old arguments in the new call are refused
+at the call with a message saying which way round they go. Its one setter,
+<code>app.sourceMap(false)</code>, is the field now — <code>app.sourceMap = false</code> — and a script calling the
+method gets a compile error at the call: a field and a method cannot share the name, and the
+field is the one the other three options have.</p>
+</li>
+<li><p><strong><code>lyric build</code>, <code>lyric run</code>, <code>lyric check</code>, <code>lyric test</code>, the REPL and the embedding API
+compile the debug profile by default.</strong> Before, every compile ran the optimizations and kept
+the names, the shape <code>--release --debug-info</code> produces now. <code>lyric pack</code> compiles the release
+profile by default. The measurement behind the change, on this interpreter (<code>tools/Bench</code>,
+Release configuration, both shapes in one session):</p>
+<table>
+<thead>
+<tr>
+<th>shape</th>
+<th style="text-align: right;">release</th>
+<th style="text-align: right;">debug</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>struct built and added per iteration (<code>construct_call</code>)</td>
+<td style="text-align: right;">55 ns</td>
+<td style="text-align: right;">141 ns</td>
+</tr>
+<tr>
+<td><code>for-in</code> over a range</td>
+<td style="text-align: right;">73 ns</td>
+<td style="text-align: right;">117 ns</td>
+</tr>
+<tr>
+<td><code>for-in</code> over an array</td>
+<td style="text-align: right;">154 ns</td>
+<td style="text-align: right;">140 ns</td>
+</tr>
+<tr>
+<td><code>Set.iter()</code> loop</td>
+<td style="text-align: right;">409 ns</td>
+<td style="text-align: right;">351 ns</td>
+</tr>
+<tr>
+<td>one call per iteration</td>
+<td style="text-align: right;">64 ns</td>
+<td style="text-align: right;">65 ns</td>
+</tr>
+<tr>
+<td>the standard library's test suite</td>
+<td style="text-align: right;">3.96 s</td>
+<td style="text-align: right;">3.45 s</td>
+</tr>
+</tbody>
+</table>
+<p>A backtrace from a default build names every frame, small callees included; the release
+profile still splices them away.</p>
+</li>
+<li><p><strong>Every tool refuses an option it does not know</strong> (<code>LYR-CLI0003</code>, exit code 2). <code>lyrc</code> and
+<code>lyrvm</code> used to overlook one in silence, so <code>lyric run app.lyr --grant none</code> sent <code>--grant</code> to
+the compiler, which ignored it, and the program ran with every capability.</p>
+</li>
+</ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
-<li><p><strong>A pattern may no longer bind the same name twice</strong> (<code>LYR-SEM0097</code>). <code>P { n, n }</code>,
-<code>P { n = x, m = x }</code> and <code>E.B(x, x)</code> each name one binding twice, and the second was <strong>dropped
-in silence</strong>: <code>P { n = 7, m = 9 }</code> matched against <code>P { n = x, m = x }</code> answered <code>7</code>. The mirror
-image had always been refused — <code>LYR-SEM0070</code> for a duplicate field in an initializer — so one
-brace list answered the same question two ways depending on whether you were constructing or
-destructuring.</p>
-<p>Shadowing a name from an enclosing scope is untouched, and so is an or-pattern, whose
-alternatives are required to repeat the same names.</p>
+<li><p><strong>The standard library's own tests are checked for warnings again.</strong> The repository holds
+every Lyric file it tracks to complete diagnostic silence, and the sixteen files under
+<code>stdlib-tests/</code> were exempt by accident for as long as the rule has existed — the check that
+routes a standard library module through an importing probe matched them on their path's
+prefix. Three findings fell out of it at once, all cleaned: two unused imports and an unused
+loop variable.</p>
 </li>
-<li><p><strong>An or-pattern that binds is refused by name.</strong> <code>E.A(x) | E.B(x)</code> never lowered: each
-alternative is a branch of its own and would have to bind on its own path, while the binding
-step runs once for the whole pattern. It said nothing about that, so the first <em>use</em> of a bound
-name failed as <code>reference to 'x'</code> — a message about a name that only looks undeclared. An
-or-pattern that binds nothing, which is what the form is usually for, is unaffected.</p>
+<li><p><strong><code>lyric test</code> could not find <code>lyrtest</code></strong> in a source build: the test runner was the one tool
+the driver's output directory did not get a copy of. The release archive always carried it,
+so the failure was a developer's, which is why nothing caught it.</p>
 </li>
 </ul>
 <p><a href="changelog/">The full changelog →</a></p>

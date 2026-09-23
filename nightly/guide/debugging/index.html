@@ -68,10 +68,10 @@ variables panel with your locals and globals under their names.</p>
 }
 </code></pre>
 <p><code>program</code> may be a <code>.lyr</code> source or an already-built <code>.lyrbc</code>. A source file is compiled by the
-debugger itself, in the <strong>debug shape</strong>: with the source map, with debug info, and with the
-optimizations off — an inlined function has no frame to show, and a debugger that shows you the
-optimizer's world instead of your program's is lying politely. The compile costs tens of
-milliseconds; what runs is always the file in the editor.</p>
+debugger itself, in the <strong>debug profile</strong> (<a href="/nightly/guide/building/#two-profiles">chapter 16</a>): with the
+source map, with debug info, and with the optimizations off — an inlined function has no frame
+to show, and a debugger that shows you the optimizer's world instead of your program's is lying
+politely. The compile costs tens of milliseconds; what runs is always the file in the editor.</p>
 <h2 id="what-the-panels-show">What the panels show</h2>
 <p>The <strong>call stack</strong> is the real frame stack, innermost first, each frame with its function and
 source line. The <strong>variables panel</strong> shows the locals of the selected frame — parameters first,
@@ -104,11 +104,13 @@ Inside a loop, a breakpoint on the body hits every pass.</p>
 labeled. A panic ends the session the way it ends a run: the message and backtrace land on
 stderr, the exit code is 101.</p>
 <h2 id="the-machinery-briefly">The machinery, briefly</h2>
-<p>Debugging works because the compiler writes two strippable sections into every module by
-default: the source map (byte offsets to lines, since 1.0.1) and, since 2.3, <strong>debug info</strong> —
-the names of local and global slots, plus field names for every named type. <code>lyrc build --no-debug-info</code> strips the names, exactly like <code>--no-source-map</code> strips the lines; the program
-is byte-for-byte the same otherwise, and a debugger attached to a stripped module falls back to
-slot indices. <code>lyrvm info</code> tells you which sections a module carries.</p>
+<p>Debugging works because the compiler writes two strippable sections into a module: the source
+map (byte offsets to lines, since 1.0.1) and, since 2.3, <strong>debug info</strong> — the names of local and
+global slots, plus field names for every named type. The debug profile writes both; the release
+profile drops the names and keeps the lines. <code>--no-debug-info</code> strips the names from any build,
+exactly like <code>--no-source-map</code> strips the lines; the program is byte-for-byte the same otherwise,
+and a debugger attached to a stripped module falls back to slot indices. <code>lyrvm info</code> tells you
+which sections a module carries.</p>
 <h2 id="debugging-a-script-inside-a-host">Debugging a script inside a host</h2>
 <p>A game has no <code>main</code>. Its entry points are the functions a host calls once per frame, so the shape
 above — launch a program, watch it run — never applies to it. Since 2.7 the controller attaches to
@@ -167,10 +169,10 @@ instruction boundary into a resumable suspension is a different debugger, not a 
 scope, when the first line of <code>main</code> does.</li>
 <li><strong>Standard-library lines are not steppable.</strong> Their files are recorded by bare name, not by
 path, so a step into <code>List.push</code> runs through it and stops on your next line.</li>
-<li><strong>Debugging optimized bytecode shows the optimizer's world.</strong> A prebuilt <code>.lyrbc</code> from
-<code>lyrc build</code> has functions inlined away and structs scattered into scalars; frames and
-variables show what actually exists. Debug the source instead — the adapter's own compile is
-the honest shape.</li>
+<li><strong>Debugging release bytecode shows the optimizer's world.</strong> A <code>.lyrbc</code> built with <code>--release</code>
+has functions inlined away and structs scattered into scalars; frames and variables show what
+actually exists. A plain <code>lyric build</code> is the debug profile and debugs honestly; for a release
+build, debug the source instead — the adapter's own compile is the honest shape.</li>
 </ul>
 <nav class="neighbours">
 <a class="prev" href="../../guide/testing/">Testing</a>
