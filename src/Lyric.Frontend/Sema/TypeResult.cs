@@ -10,6 +10,17 @@ namespace Lyric.Sema;
 /// </summary>
 public sealed class TypeResult
 {
+    /// <summary>
+    /// Whether the check gave up because a construct nested deeper than it walks (§12.4).
+    ///
+    /// <para>Read by <c>Semantics.Analyze</c>, which then runs none of the walkers behind the
+    /// checker: they recurse over the same tree, so the diagnostic would be reported correctly and
+    /// the process would die in the next pass anyway. A flag rather than a search of the
+    /// diagnostics for the code, because "did this analysis finish" is a fact about the analysis.
+    /// </para>
+    /// </summary>
+    public bool NestingExceeded { get; internal set; }
+
     private readonly Dictionary<Expr, LyrType> _types = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Node, Symbol> _refs = new(ReferenceEqualityComparer.Instance);
 

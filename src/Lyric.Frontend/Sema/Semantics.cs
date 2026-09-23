@@ -16,6 +16,13 @@ public static class Semantics
         DiagnosticEngine de, bool singleProgram = true)
     {
         var types = new TypeChecker(compilation, binding, de).Check();
+
+        // A NESTING BOUND STOPS THE WHOLE PIPELINE, not just the checker. Both walkers below
+        // recurse over the same tree the checker gave up on, and 'SemaRules.WalkExpr' proved it:
+        // the checker reported LYR-SEM0098 as it should and the process died three lines later,
+        // in the walk that followed. Whatever cannot be checked cannot be walked either.
+        if (types.NestingExceeded) return types;
+
         new SemaRules(compilation, binding, types, de, singleProgram).Run();
         new ExceptionAnalyzer(compilation, binding, types, de).Run(); // throws propagation
 

@@ -53,6 +53,13 @@ public static class Program
             return CliDiagnostics.Fail(Console.Error, broken.Code,
                 $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
         }
+        catch (InternalCompilationException bug)
+        {
+            // §12.4: the compiler failing is not the program failing. Escaping, this was a stack
+            // trace with no code, no position and no file -- and under --json it landed in the
+            // middle of the document and destroyed it for whatever was reading.
+            return CliDiagnostics.FailInternal(Console.Error, bug);
+        }
     }
 
     /// <summary>

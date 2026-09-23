@@ -49,7 +49,7 @@ public class LoopLabelTests
             }
             """);
         Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
-        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0100");
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0103");
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class LoopLabelTests
                 return 0;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0098");
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0101");
         Assert.Contains("nowhere", error.Message);
     }
 
@@ -90,7 +90,7 @@ public class LoopLabelTests
                 return 0;
             }
             """);
-        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0098");
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0101");
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class LoopLabelTests
                 return 0;
             }
             """);
-        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0099");
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0102");
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public class LoopLabelTests
             }
             """);
         Assert.False(de.HasErrors);
-        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0100");
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0103");
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class LoopLabelTests
                 return x;
             }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0044");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0046");
     }
 
     // ------------------------------------------------------------------ flow

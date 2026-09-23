@@ -196,7 +196,7 @@ public sealed class SemaRules
         if (label is null) { WalkStmt(body); return; }
 
         if (_labels.Any(l => l.Name == label))
-            _de.Report("LYR-SEM0099", Severity.Error, labelSpan,
+            _de.Report("LYR-SEM0102", Severity.Error, labelSpan,
                 $"label '{label}' already names an enclosing loop — a jump to it would be ambiguous");
 
         var entry = new LoopLabel(label, labelSpan);
@@ -205,7 +205,7 @@ public sealed class SemaRules
         _labels.RemoveAt(_labels.Count - 1);
 
         if (!entry.Used)
-            _de.Report("LYR-SEM0100", Severity.Warning, labelSpan,
+            _de.Report("LYR-SEM0103", Severity.Warning, labelSpan,
                 $"label '{label}' is never used — no 'break {label}' or 'continue {label}' names it");
     }
 
@@ -213,7 +213,7 @@ public sealed class SemaRules
     {
         for (var i = _labels.Count - 1; i >= 0; i--)
             if (_labels[i].Name == label) { _labels[i].Used = true; return; }
-        _de.Report("LYR-SEM0098", Severity.Error, span,
+        _de.Report("LYR-SEM0101", Severity.Error, span,
             $"no enclosing loop is labeled '{label}' — '{keyword} {label}' names a loop this statement stands in");
     }
 

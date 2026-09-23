@@ -180,6 +180,20 @@ jobs:
       - name: Build the toolchain
         run: dotnet build --configuration Release
 
+      # The catalogue guard needs the specification beside the tree, and this is the one job that
+      # has it. Without this step the test SKIPS everywhere and guards nothing -- which is how the
+      # seven undocumented codes it was written for got in.
+      - name: Check the diagnostic catalogue against the appendix
+        run: |
+          set -o pipefail
+          dotnet test tests/Lyric.Tests.Cli/Lyric.Tests.Cli.csproj \
+            --configuration Release --no-build \
+            --filter "FullyQualifiedName~DiagnosticCatalogueTests" | tee catalogue.log
+          # A --filter that matches NOTHING reports success. Two tests are expected here, and a
+          # step that passes because it ran none of them is worse than no step.
+          grep -qE 'Passed: +[1-9]' catalogue.log \
+            || { echo "the catalogue filter matched no tests"; exit 1; }
+
       - name: Run the suite against the working tree
         run: |
           VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)

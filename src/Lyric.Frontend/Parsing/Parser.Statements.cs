@@ -71,7 +71,7 @@ public sealed partial class Parser
                 return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
             }
             default:
-                _de.Report("LYR-PAR0044", Severity.Error, nameTok.Span,
+                _de.Report("LYR-PAR0046", Severity.Error, nameTok.Span,
                     $"a label names a loop: expected 'while', 'do' or 'for' after '{label}:'");
                 return ParseStmt();
         }

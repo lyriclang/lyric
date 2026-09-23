@@ -191,6 +191,26 @@ public sealed class TypeChecker
 
     public TypeResult Check()
     {
+        try
+        {
+            return CheckInner();
+        }
+        catch (NestingTooDeep deep)
+        {
+            // §12.4, reported once. The walk that hit the bound has unwound past everything that
+            // could have said it, and the partial result is still handed back: the caller stops on
+            // HasErrors, and a null here would only move the crash.
+            _de.Report("LYR-SEM0105", Severity.Error, deep.At,
+                $"this nests deeper than the checker walks ({MaxNesting} levels) — the language "
+                + "sets no limit, this implementation does, and the alternative was taking the "
+                + "process down");
+            _result.NestingExceeded = true;
+            return _result;
+        }
+    }
+
+    private TypeResult CheckInner()
+    {
         _result.IteratorInterface = _iterator;
         _result.ArrayIterator = _arrayIterator;
         _result.RangeIterator = _rangeIterator;
@@ -424,7 +444,7 @@ public sealed class TypeChecker
     {
         if (spec.Abi != "dotnet")
         {
-            _de.Report("LYR-SEM0098", Severity.Error, spec.Span,
+            _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
                 $"unknown ABI \"{spec.Abi}\" — this compiler binds \"dotnet\"");
             return;
         }
@@ -1473,7 +1493,7 @@ public sealed class TypeChecker
         var inner = new SymbolTable(scope);
         BindPattern(letCond.Pattern, type, inner);
         if (!type.IsError && IsIrrefutable(letCond.Pattern, type))
-            _de.Report("LYR-SEM0099", Severity.Warning, letCond.Pattern.Span,
+            _de.Report("LYR-SEM0104", Severity.Warning, letCond.Pattern.Span,
                 $"this pattern matches every '{TypeFacts.Display(type)}' — the {form} never fails");
         return inner;
     }
@@ -1506,7 +1526,7 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0098", Severity.Error, stmt.Pattern.Span,
                 $"this pattern can fail on a '{TypeFacts.Display(source)}' — add 'else {{ … }}' that leaves, or use 'match'");
         else if (!refutable && stmt.Else is not null)
-            _de.Report("LYR-SEM0099", Severity.Warning, stmt.Else.Span,
+            _de.Report("LYR-SEM0104", Severity.Warning, stmt.Else.Span,
                 $"this pattern matches every '{TypeFacts.Display(source)}' — the 'else' never runs");
 
         BindPattern(stmt.Pattern, source, scope, stmt.IsMutable);
@@ -1576,7 +1596,44 @@ public sealed class TypeChecker
     /// — exactly once, at the place where the value is needed. From there on <see cref="ErrorType"/>
     /// applies, and with it the ordinary "already reported" rule.
     /// </summary>
+    /// <summary>
+    /// How deeply a type or an expression may nest before the CHECK refuses (§12.4).
+    ///
+    /// <para>A separate bound from the parser's, and it has to be: the parse can accept what this
+    /// walk cannot carry. A chain of a hundred thousand <c>+</c> is read by a LOOP and builds a
+    /// left-leaning tree a hundred thousand deep — shallow to read, deep to walk — and it took the
+    /// process down in <c>Compute</c>. A wall of <c>[]</c> did the same in <c>ResolveType</c> while
+    /// the parser shrugged. That is also why §12.1 gives the two stages their own codes.</para>
+    ///
+    /// <para>The same number as the parser's, so a program is either accepted by both or refused
+    /// by the earlier one, which reports at the better position.</para>
+    /// </summary>
+    private const int MaxNesting = Parsing.Parser.MaxNesting;
+
+    private int _depth;
+
+    /// <summary>Thrown when the bound is reached, caught once by <c>Check</c>. The same shape as
+    /// the parser's, for the same reason: the recursion has to stop, and no frame between here and
+    /// the top has anything sensible to return.</summary>
+    private sealed class NestingTooDeep(Span at) : Exception
+    {
+        public Span At { get; } = at;
+    }
+
+    private LyrType Deeper(Span at)
+    {
+        _depth--;
+        throw new NestingTooDeep(at);
+    }
+
     private LyrType CheckExpr(Expr expr, SymbolTable scope, LyrType? expected = null)
+    {
+        if (++_depth > MaxNesting) return Deeper(expr.Span);
+        try { return CheckExprInner(expr, scope, expected); }
+        finally { _depth--; }
+    }
+
+    private LyrType CheckExprInner(Expr expr, SymbolTable scope, LyrType? expected)
     {
         var type = CheckTarget(expr, scope, expected);
         if (type is not NonValueType nv) return type;
@@ -5779,6 +5836,13 @@ public sealed class TypeChecker
     // --- type resolution: TypeNode to LyrType ---
 
     private LyrType ResolveType(TypeNode node, SymbolTable scope)
+    {
+        if (++_depth > MaxNesting) return Deeper(node.Span);
+        try { return ResolveTypeInner(node, scope); }
+        finally { _depth--; }
+    }
+
+    private LyrType ResolveTypeInner(TypeNode node, SymbolTable scope)
     {
         switch (node)
         {

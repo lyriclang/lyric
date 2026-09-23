@@ -117,8 +117,17 @@ public sealed class LoadedProgram
 
         // The initializer runs before everything else and exactly once. It is void; what counts
         // are the slots it leaves behind.
+        //
+        // IT IS THE ONLY RUN THAT CARRIES THE READY MAP (§4.3). While it runs, a slot may still be
+        // unwritten, and reading one then is LYR-VM0017 rather than a zero nobody asked for. Once
+        // it has finished every slot holds its value, so every later call passes no map and pays
+        // no check. Interpreted deliberately: compiled code reads globals without consulting the
+        // map, and a guard the faster engine skips is not a guard -- the same mistake the re-entry
+        // bound made one release earlier.
         if (module.GlobalInit is { } init && init >= module.Imports.Count)
-            program.Execute(init - module.Imports.Count, budget: budget);
+            program.Execute(init - module.Imports.Count, budget: budget,
+                globalsReady: globals.Length > 0 ? new bool[globals.Length] : null,
+                interpretOnly: true);
 
         return program;
     }
@@ -310,9 +319,15 @@ public sealed class LoadedProgram
     public LyrValue Invoke(int index, DebugController debug, params LyrValue[] arguments) =>
         Execute(index, arguments, debug);
 
+    /// <param name="globalsReady">Which globals already hold a value; see the call in
+    /// <see cref="Load"/>. <c>null</c> for every run but the initializer, which is the only one
+    /// that can observe an unwritten slot.</param>
+    /// <param name="interpretOnly">Runs without the compiler even when one is attached. For the
+    /// initializer, whose guard lives in the interpreter's <c>ldglob</c>.</param>
     private LyrValue Execute(int index, LyrValue[]? arguments = null,
-        DebugController? debug = null, ExecutionBudget? budget = null) =>
+        DebugController? debug = null, ExecutionBudget? budget = null,
+        bool[]? globalsReady = null, bool interpretOnly = false) =>
         Interpreter.Execute(_prepared, index, _module.Strings, _module.Types, _dispatch,
             _natives, _globals, _module.Globals, _arguments, arguments, _module.SourceMap,
-            debug, budget, _jit);
+            debug, budget, interpretOnly ? null : _jit, globalsReady);
 }

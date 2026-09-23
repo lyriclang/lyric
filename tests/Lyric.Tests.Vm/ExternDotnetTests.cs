@@ -89,7 +89,7 @@ public class ExternDotnetTests
             extern "c" fn strlen(s: string): int;
             fn main(): int { return 0; }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0098");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0099");
     }
 
     [Fact]
