@@ -29,6 +29,12 @@ pub fn panic(message: string): void;
 /// Called from a dispatcher nobody wrote, which is why nobody could have written the import either.
 pub fn coroutineEnded(): void;
 
+// An array of `n` elements, none of them written. NOT `pub`: every slot holds whatever the
+// runtime leaves there, so it is only safe where the caller fills the whole array before anything
+// reads it — the rest of an array pattern, a container's backing store. A generic native, meaning
+// one row per element type and one host function serving them all.
+fn rawArrayAlloc<T>(n: int): T[];
+
 // ------------------------------------------------------------------------ aborting with a reason
 //
 // All three are `panic` with a statement about who got it wrong. They are written in Lyric and

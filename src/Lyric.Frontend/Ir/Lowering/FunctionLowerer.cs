@@ -2695,11 +2695,7 @@ internal sealed class FunctionLowerer
                 }
 
                 if (restIndex >= 0 && array.Elements[restIndex] is RestPattern { Name: not null } named)
-                    throw NotSupported(
-                        "a NAMED rest in an array pattern — the elements it covers would have to be "
-                        + "copied into an array of their own, and this compiler version has no way to "
-                        + "build one of a length it learns at runtime; bind the positions you need and "
-                        + "take the tail with 'slice'", named.Span);
+                    BindNamedRest(named, value, elementType, length, before.Length, after.Length);
                 return;
             }
 
@@ -4204,6 +4200,12 @@ internal sealed class FunctionLowerer
             throw NotSupported($"call to '{calleeName}' (no declaration to read parameters from)",
                 expr.Span);
 
+        // A GENERIC NATIVE has no instance to build — it has a row per signature. The type
+        // arguments go into the declared signature and the result is interned; see
+        // ImportTable.DeclareTemplate.
+        if (symbol.Generics.Length > 0 && _imports.IsGenericNative(symbol))
+            return LowerGenericImportCall(symbol, expr, calleeName);
+
         // Generic: not the declaration is called but an INSTANCE of it. Which one is said by the type
         // arguments the sema inferred at the call site; deriving them a second time would be a second
         // truth about the same question.
@@ -4454,6 +4456,134 @@ internal sealed class FunctionLowerer
     /// than from a function: an import has no body.</summary>
     /// <param name="receiver">For a method on a host type the receiver, which becomes parameter 0.
     /// <c>null</c> for every free function.</param>
+    /// <summary>
+    /// <c>[first, ..rest]</c> — the elements the rest covers, copied into an array of their own.
+    ///
+    /// <para>A copy, not a view: the language has no slice, and a view would alias the array the
+    /// pattern matched. Python's <c>case [x, *rest]</c> copies for the same reason; Rust's
+    /// <c>rest @ ..</c> does not, because it has slices.</para>
+    ///
+    /// <para>The length is known only at runtime, so the array comes from
+    /// <c>std.core.rawArrayAlloc</c>, whose slots are unwritten until the loop below fills every
+    /// one of them. That the native is generic is what makes this work at any element type.</para>
+    /// </summary>
+    private void BindNamedRest(RestPattern rest, TempId value, IrType elementType, TempId length,
+        int beforeCount, int afterCount)
+    {
+        if (_types.RefOf(rest) is not LocalSymbol local)
+            throw Bug($"the rest binding '{rest.Name}' was not bound by the type checker");
+
+        var i64 = new IrScalarType(IrScalar.I64);
+        var arrayType = new IrArrayType(elementType);
+        var span = rest.Span;
+
+        // length - (elements before it + elements after it)
+        var fixedCount = EmitConst(new IntConst((ulong)(beforeCount + afterCount)), i64, span);
+        var count = _slots.NewTemp(i64);
+        _b.Emit(new BinOp(count, IrBinKind.Sub, i64, length, fixedCount, span));
+
+        var target = _imports.Intern(new IrImport("std.core.rawArrayAlloc", [i64], arrayType));
+        var rested = _slots.NewTemp(arrayType);
+        _b.Emit(new CallImport(rested, target, [count], span));
+
+        var slot = _slots.DeclareFor(local, arrayType);
+        _b.Emit(new StoreLocal(slot, rested, span));
+
+        // for (i = 0; i < count; i++) rest[i] = value[i + beforeCount];
+        var cursor = _slots.DeclareSynthetic($"<rest:{rest.Name}>", i64);
+        _b.Emit(new StoreLocal(cursor, EmitConst(new IntConst(0), i64, span), span));
+
+        var head = _b.NewBlock();
+        _b.Seal(new Branch(head, span));
+        _b.SwitchTo(head);
+
+        var current = _slots.NewTemp(i64);
+        _b.Emit(new LoadLocal(current, cursor, i64, span));
+        var more = _slots.NewTemp(BoolType);
+        _b.Emit(new BinOp(more, IrBinKind.Lt, BoolType, current, count, span));
+
+        var body = _b.NewBlock();
+        var done = _b.NewBlock();
+        _b.Seal(new CondBranch(more, body, done, span));
+
+        _b.SwitchTo(body);
+        var offset = EmitConst(new IntConst((ulong)beforeCount), i64, span);
+        var source = _slots.NewTemp(i64);
+        _b.Emit(new BinOp(source, IrBinKind.Add, i64, current, offset, span));
+        var element = _slots.NewTemp(elementType);
+        _b.Emit(new LoadElem(element, value, source, elementType, span));
+
+        var into = _slots.NewTemp(arrayType);
+        _b.Emit(new LoadLocal(into, slot, arrayType, span));
+        _b.Emit(new StoreElem(into, current, element, span));
+
+        var next = _slots.NewTemp(i64);
+        _b.Emit(new BinOp(next, IrBinKind.Add, i64, current,
+            EmitConst(new IntConst(1), i64, span), span));
+        _b.Emit(new StoreLocal(cursor, next, span));
+        _b.Seal(new Branch(head, span));
+
+        _b.SwitchTo(done);
+    }
+
+    /// <summary>
+    /// A call to a GENERIC native: the type arguments are substituted into the declared signature
+    /// and the resulting row is interned under the same name.
+    ///
+    /// <para>No instance is built. A native has no body to monomorphize — what varies is only what
+    /// the runtime is told the signature is, and the import table has keyed by name AND signature
+    /// since coroutines. The binder compares TAGS, so one host implementation answers every
+    /// instantiation whose shape it can serve.</para>
+    /// </summary>
+    private TempId? LowerGenericImportCall(FunctionSymbol symbol, CallExpr expr, string calleeName)
+    {
+        var (name, decl, _) = _imports.TemplateOf(symbol);
+
+        // Through the sema's inference, with a type argument that is itself a parameter of the
+        // CALLING instance resolved through the own substitution — the step every generic call
+        // takes.
+        var typeArguments = _types.TypeArgumentsOf(expr)
+            .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
+                ? bound : t)
+            .ToArray();
+
+        if (typeArguments.Length != symbol.Generics.Length)
+            throw NotSupported(
+                $"call to the native '{calleeName}': {typeArguments.Length} type argument(s) for "
+                + $"{symbol.Generics.Length} parameter(s)", expr.Span);
+
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < symbol.Generics.Length; i++)
+            mapping[symbol.Generics[i].Name] = typeArguments[i];
+
+        var parameters = decl.Parameters
+            .Select(p => LowerDeclaredUnder(p.Type, mapping, p.Span))
+            .ToArray();
+        var returnType = decl.ReturnType is null
+            ? new IrScalarType(IrScalar.Void)
+            : LowerDeclaredUnder(decl.ReturnType, mapping, expr.Span);
+
+        var target = _imports.Intern(new IrImport(name, parameters, returnType));
+        return LowerImportCall(target, expr.Arguments, expr.Span);
+    }
+
+    /// <summary>A written type of a native's signature, lowered with the call's type arguments put
+    /// in for the declaration's own parameter names.</summary>
+    private IrType LowerDeclaredUnder(TypeNode node, Dictionary<string, LyrType> mapping, Span span)
+    {
+        if (node is NamedType { Path: [var only], TypeArguments.Length: 0 }
+            && mapping.TryGetValue(only, out var bound))
+            return LowerType(bound, span);
+
+        if (node is ArrayType array)
+            return new IrArrayType(LowerDeclaredUnder(array.Element, mapping, span));
+
+        if (node is NullableType option)
+            return new IrOptionalType(LowerDeclaredUnder(option.Inner, mapping, span));
+
+        return DeclaredTypes.Lower(node);
+    }
+
     private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span,
         TempId? receiver = null)
     {

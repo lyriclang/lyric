@@ -94,7 +94,20 @@ public static class ModuleLowerer
             foreach (var decl in compilation.AstOf(module).Declarations)
             {
                 if (decl is not FunctionDecl function) continue;
-                if (function.Generics.Length > 0) continue;
+
+                // A GENERIC native is a template rather than a row: one import per type argument
+                // tuple a call site asks for, built there and interned by name AND signature —
+                // which the import table has distinguished since coroutines, whose 'isDone' is
+                // emitted once per coroutine signature and bound by one host function.
+                if (function.Generics.Length > 0)
+                {
+                    if (function.Body is null && compilation.IsNative(module)
+                        && module.Members.FunctionFor(function.Name, function) is { } nativeTemplate)
+                        imports.DeclareTemplate(nativeTemplate,
+                            NameMangling.ForFunction(module, function.Name), function, module);
+                    continue;
+                }
+
                 if (module.Members.FunctionFor(function.Name, function) is not { } symbol) continue;
 
                 // Bodyless in a stdlib module means a native declaration. The signature is in Lyric, the

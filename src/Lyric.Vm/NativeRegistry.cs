@@ -352,6 +352,24 @@ public sealed class NativeRegistry : IDisposable
         Register("std.core.panic", str, TypeTag.Void,
             args => throw new LyricPanic(VmDiagnostics.Panicked, args[0].AsString));
 
+        // An array of n unwritten elements. Registered WITHOUT a return element, so the tag check
+        // in Bind accepts every instantiation the module asks for — the generic-native shape,
+        // the same one 'coroutineIsDone' has had for every coroutine signature.
+        //
+        // The slots hold the default LyrValue until the caller writes them, which is why the
+        // declaration is private: the compiler emits the fill, and nothing else may see it.
+        Register("std.core.rawArrayAlloc", new[] { TypeTag.I64 }, TypeTag.Array, args =>
+        {
+            var count = args[0].AsI64;
+            if (count < 0)
+                throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                    $"array length {count} is negative");
+            if (count > int.MaxValue)
+                throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                    $"array length {count} exceeds what an array can hold");
+            return LyrValue.FromObject(new LyrValue[(int)count]);
+        });
+
         // A 'resume' on an exhausted coroutine. It is a panic, not a catchable error.
         Register("std.core.coroutineEnded", Array.Empty<TypeTag>(), TypeTag.Void,
             _ => throw new LyricPanic(VmDiagnostics.Panicked,

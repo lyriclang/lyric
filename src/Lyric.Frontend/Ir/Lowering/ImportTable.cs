@@ -1,3 +1,4 @@
+using Lyric.AST;
 using Lyric.Resolver;
 
 namespace Lyric.Ir.Lowering;
@@ -81,6 +82,34 @@ internal sealed class ImportTable
     }
 
     public bool IsNative(FunctionSymbol symbol) => _declared.ContainsKey(symbol);
+
+    /// <summary>
+    /// A GENERIC native: the declaration, kept as a template rather than as a row.
+    ///
+    /// <para>A native binds by name, and <see cref="Intern(IrImport)"/> keys by name AND
+    /// signature, so one name may stand over several rows — the runtime binds each of them
+    /// independently against the one host function. That is how <c>coroutineIsDone</c> already
+    /// serves every coroutine signature. A generic native is the same shape written down: the
+    /// call site substitutes its type arguments into the declared signature and interns the
+    /// result, and two call sites at one type argument tuple share a row.</para>
+    /// </summary>
+    private readonly record struct Template(string Name, FunctionDecl Decl, ModuleSymbol Module);
+
+    private readonly Dictionary<FunctionSymbol, Template> _templates =
+        new(ReferenceEqualityComparer.Instance);
+
+    public void DeclareTemplate(FunctionSymbol symbol, string name, FunctionDecl decl,
+        ModuleSymbol module) => _templates[symbol] = new Template(name, decl, module);
+
+    public bool IsGenericNative(FunctionSymbol symbol) => _templates.ContainsKey(symbol);
+
+    /// <summary>The template's name and declaration, for a call site that has the substitution.
+    /// </summary>
+    public (string Name, FunctionDecl Decl, ModuleSymbol Module) TemplateOf(FunctionSymbol symbol)
+    {
+        var template = _templates[symbol];
+        return (template.Name, template.Decl, template.Module);
+    }
 
     public ImportId Intern(FunctionSymbol symbol) => Intern(_declared[symbol]);
 
