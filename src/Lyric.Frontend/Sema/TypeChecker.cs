@@ -3553,11 +3553,13 @@ public sealed class TypeChecker
     /// would satisfy a <c>Src&lt;string&gt;</c> too.</param>
     private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted) => arg switch
     {
-        NamedRef nr => ImplementsWithExtensions(nr.Symbol, iface, wanted, EmptySubst),
+        NamedRef nr => IsTheConstraint(nr, nr.Symbol, iface, wanted)
+                       || ImplementsWithExtensions(nr.Symbol, iface, wanted, EmptySubst),
 
         // For an instance its own arguments count: 'class Box<T> :: [Src<T>]' satisfies exactly
         // 'Src<int>' for 'Box<int>'.
-        GenericInstance gi => ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
+        GenericInstance gi => IsTheConstraint(gi, gi.Definition, iface, wanted)
+                              || ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
 
         TypeParamType tp => tp.Param.Constraints.Any(c =>
             NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst)),
@@ -3571,6 +3573,26 @@ public sealed class TypeChecker
         OpaqueRef => false,
         _ => true // external or error: pass through opaquely
     };
+
+    /// <summary>
+    /// The argument IS the interface the constraint names.
+    ///
+    /// <para>Asked first because the walk below cannot answer it: it reads the interfaces a type
+    /// DECLARES, which for an interface are its parents — so <c>Named</c> found everything above
+    /// <c>Named</c> and never <c>Named</c> itself. A value of an interface type could therefore not
+    /// be passed to <c>fn show&lt;T :: [Named]&gt;</c>, and said so in the one sentence that cannot
+    /// be true: "type 'Named' does not satisfy constraint 'Named' on 'T'".</para>
+    ///
+    /// <para>It is sound for the same reason the constraint exists: the constraint promises the
+    /// members, and an interface value carries a table of exactly those. The call inside the
+    /// generic becomes a virtual dispatch rather than a direct one, which is what an interface
+    /// value is for.</para>
+    ///
+    /// <para>The type arguments still have to line up — <c>Src&lt;int&gt;</c> is not
+    /// <c>Src&lt;string&gt;</c> — so the same <c>Matches</c> decides it as everywhere else.</para>
+    /// </summary>
+    private static bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
+        ReferenceEquals(ts, iface) && Matches(arg, EmptySubst, wanted);
 
     // Conformance through the declared interfaces OR a visible `extend T :: [I]` block — each
     // reaching through its parents: declaring the child implies the whole chain.

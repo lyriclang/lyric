@@ -1954,6 +1954,68 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+
+    /// <summary>
+    /// <c>&amp;&amp;=</c>, <c>||=</c> and <c>??=</c> on anything that can be loaded and stored:
+    /// a local, a field, an element.
+    ///
+    /// <para>ALL THREE ARE SHORT-CIRCUIT, which is the whole reason they are not
+    /// <c>x = x op e</c>: <c>b &amp;&amp;= f()</c> must not call <c>f</c> when <c>b</c> is already
+    /// false, and <c>o ??= f()</c> must not call it when <c>o</c> already holds a value. An
+    /// assignment that evaluates its right side regardless is a different program.</para>
+    ///
+    /// <para>One helper for the three targets because they differ in exactly one place — which way
+    /// the test branches — and §2 lists the operators in one production. Three copies of a
+    /// four-block diamond is how the versions that existed came to disagree: <c>??=</c> worked on a
+    /// local and was an internal error on a field and on an element, and the short-circuit pair was
+    /// an internal error on all three.</para>
+    ///
+    /// <para>The caller has already evaluated the receiver and the index, so <paramref name="load"/>
+    /// and <paramref name="store"/> touch them once each however often they are invoked — which is
+    /// what keeps <c>xs[next()] ??= v</c> from calling <c>next</c> twice.</para>
+    /// </summary>
+    private TempId LowerShortCircuitAssign(AssignExpr expr, IrType type,
+        Func<TempId> load, Action<TempId> store)
+    {
+        var current = load();
+
+        TempId test;
+        if (expr.Operator is BinaryOp.Coalesce)
+        {
+            if (type is not IrOptionalType)
+                throw NotSupported("'??=' on a non-optional target", expr.Span,
+                    LoweringDiagnostics.NeverNull);
+
+            test = _slots.NewTemp(BoolType);
+            _b.Emit(new OptIsSome(test, current, expr.Span));
+        }
+        else
+        {
+            if (type is not IrScalarType { Kind: IrScalar.Bool })
+                throw NotSupported(
+                    $"'{(expr.Operator is BinaryOp.LogicalAnd ? "&&=" : "||=")}' on a non-bool target",
+                    expr.Span);
+
+            test = current;
+        }
+
+        var assign = _b.NewBlock();
+        var merge = _b.NewBlock();
+
+        // '&&=' assigns when the target is TRUE; '||=' and '??=' assign when it is not. That one
+        // line is the whole difference between the three.
+        _b.Seal(expr.Operator is BinaryOp.LogicalAnd
+            ? new CondBranch(test, assign, merge, expr.Span)
+            : new CondBranch(test, merge, assign, expr.Span));
+
+        _b.SwitchTo(assign);
+        store(LowerExprAs(expr.Value, type));
+        _b.Seal(new Branch(merge, expr.Span));
+
+        _b.SwitchTo(merge);
+        return load();
+    }
+
     private TempId LowerAssign(AssignExpr expr)
     {
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
@@ -1973,10 +2035,13 @@ internal sealed class FunctionLowerer
             return value;
         }
 
-        if (expr.Operator is BinaryOp.Coalesce) return LowerCoalesceAssign(slot, expr);
-
-        if (expr.Operator is BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
-            throw NotSupported("short-circuit assignment ('&&=' / '||=')", expr.Span);
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+        {
+            var slotType = ValueTypeOf(slot);
+            return LowerShortCircuitAssign(expr, slotType,
+                () => LoadValue(slot, expr.Target.Span),
+                value => StoreValue(slot, value, expr.Span));
+        }
 
         // Through the operator interface when the sema desugared one: the stored call lowers the
         // real operand nodes — the identifier receiver loads once, exactly like the read below.
@@ -2142,8 +2207,15 @@ internal sealed class FunctionLowerer
             return assigned;
         }
 
-        if (expr.Operator is BinaryOp.LogicalAnd or BinaryOp.LogicalOr or BinaryOp.Coalesce)
-            throw NotSupported("short-circuit or coalescing assignment", expr.Span);
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+            return LowerShortCircuitAssign(expr, fieldType,
+                () =>
+                {
+                    var loaded = _slots.NewTemp(fieldType);
+                    _b.Emit(new LoadField(loaded, obj, type, field, fieldType, member.Span));
+                    return loaded;
+                },
+                value => _b.Emit(new StoreField(obj, type, field, value, expr.Span)));
 
         var current = _slots.NewTemp(fieldType);
         _b.Emit(new LoadField(current, obj, type, field, fieldType, member.Span));
@@ -2204,8 +2276,15 @@ internal sealed class FunctionLowerer
             return assigned;
         }
 
-        if (expr.Operator is BinaryOp.LogicalAnd or BinaryOp.LogicalOr or BinaryOp.Coalesce)
-            throw NotSupported("short-circuit or coalescing assignment", expr.Span);
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+            return LowerShortCircuitAssign(expr, element,
+                () =>
+                {
+                    var loaded = _slots.NewTemp(element);
+                    _b.Emit(new LoadElem(loaded, array, index, element, indexed.Span));
+                    return loaded;
+                },
+                value => _b.Emit(new StoreElem(array, index, value, expr.Span)));
 
         var current = _slots.NewTemp(element);
         _b.Emit(new LoadElem(current, array, index, element, indexed.Span));
@@ -4048,8 +4127,15 @@ internal sealed class FunctionLowerer
 
             // The receiver is an interface value: which implementation runs is settled only at runtime.
             // That is the language's only dynamic dispatch.
+            //
+            // SUBSTITUTED rather than written, which is what the generic twin below already did.
+            // A type argument may BE an interface — 'show<T :: [Named]>' called with a 'Named'
+            // value — and then the written type is the parameter while the real receiver is an
+            // interface. Without the substitution this case missed, the constraint case took it,
+            // and it ended at "'Named.name' was not lowered": an interface method has no body to
+            // call directly, which is the whole reason this case exists.
             case MemberExpr member
-                when ReceiverType(member.Target) is NamedRef
+                when SubstituteType(ReceiverType(member.Target)) is NamedRef
                      { Symbol.Kind: TypeSymbolKind.Interface } iface:
                 return LowerVirtualCall(member, iface.Symbol, expr);
 
