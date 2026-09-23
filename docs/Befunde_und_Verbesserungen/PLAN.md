@@ -1,19 +1,28 @@
 # Der Plan — eine Liste
 
-Zusammenführung von vier Quellen: dem Bug-Hunt (146 Einträge), dem Usability-Review (117), dem
-Evolution-Team (94 plus `deliverables/new-features/roadmap.md`) und den Regelfragen, die der
-Sweep aufgeworfen hat (`SPEC-RUNDE.md`).
+Zusammenführung von fünf Quellen: dem Bug-Hunt (146 Einträge), dem Usability-Review (117), dem
+Evolution-Team (94 plus `deliverables/new-features/roadmap.md`), den Regelfragen, die der Sweep
+aufgeworfen hat (`SPEC-RUNDE.md`), und seit dem 2026-09-23 `lyric-v5-features.md`.
 
 **Lesart.** „gemessen" heißt: ein Repro lief gegen den Integrationsstand und hat geantwortet.
 „behauptet" heißt: es steht in einem Bericht und ist nicht nachgefahren. Alles ohne Marke ist
-Fund, nicht Arbeit.
+Fund, nicht Arbeit. **NEU** heißt: steht in `lyric-v5-features.md` und stand vorher in keiner
+Liste hier.
+
+**4.6 ist eine Stabilisierung, kein Feature-Release** (Maintainer, 2026-09-23). Der Tag fällt
+erst, wenn die Fehler unten weg sind — B, C, D und E. Features beginnen bei 4.7. Der Baum trägt
+die Versionsnummer seit dem 2026-09-23, der Tag ist bewusst noch nicht gesetzt.
 
 **5.0 wird gesammelt, nicht geplant** (Maintainer, 2026-09-22). Der Abschnitt unten ist eine
 Ablage mit Uhren, kein Meilenstein.
 
 ---
 
-## 4.5 — was schon drin ist
+## 4.6 — was schon drin ist
+
+> Die Abschnitte hießen bis zum 2026-09-23 „4.5". Der Versionsbump lief mitten durch diese Liste:
+> was hier steht, ist der Inhalt der `v4.6.0`-Sektion im `CHANGELOG`, ausgeliefert ist davon
+> nichts, weil nicht getaggt ist.
 
 Gemessen gegen `integration/v4.5`, Repro-Korpora unter `scratchpad/repro/`.
 
@@ -35,7 +44,12 @@ sonst kann die Suite den Stand nicht beurteilen.
 
 ---
 
-## 4.5 — was noch reingehört
+## 4.6 — was noch reingehört, bevor getaggt wird
+
+**Das hier ist die vollständige Bedingung für den Tag.** Jeder Posten von B bis E ist ein Fehler,
+kein Feature; ein stabiles 4.6 heißt, dass keiner davon mehr offen ist. Zwei Einträge in **C**
+stehen in `lyric-v5-features.md` als P1-*Fundament* (generische Methoden auf generischen Typen,
+die restlichen `IR0001`-Grenzen) — sie sind beides, und sie landen hier, nicht in 4.7.
 
 ### ~~A. Der Verifier läuft an der falschen Stelle (zuerst)~~ — **erledigt, 2026-09-23**
 
@@ -96,6 +110,8 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
   Unterschied, die Regel ist so nicht lehrbar.
 - **Feld und Methode teilen einen Namensraum** (`RES0001`).
 - **`p.field ??= x`** ist `IR0001`, auf einer Variablen geht es.
+- **`&&=` und `||=` fehlen** (**NEU**) — dieselbe Familie wie der Posten darüber.
+- **`catch` auf einem Interface** (**NEU**) — die Spec führt die Lücke als Implementierungsgrenze.
 - **Interface-Wert erfüllt seine eigene Constraint nicht.**
 - ~~**`rawArrayAlloc<T>(n)`** (~15 VM-Zeilen), billigster Posten der Liste~~ — **erledigt, und die
   Schätzung war falsch.** Generische Natives gab es nicht: `ModuleLowerer` übersprang jede Funktion
@@ -123,30 +139,112 @@ läuft auf Parser-Recovery-Knoten, `--json` unvollständig, `--verbose`-Zeiten �
 
 ---
 
-## 4.6 — die nächste Feature-Runde
+## 4.7 — die nächste Feature-Runde
 
-Aus der Roadmap des Evolution-Teams, unverändert in der Reihenfolge, plus was aus den Reviews
-dazugehört.
+Zwei Quellen, abgeglichen am 2026-09-23: die elf Positionen des Evolution-Teams und
+`lyric-v5-features.md`. Das Ergebnis des Abgleichs in einem Satz: **die alte Liste war nicht
+falsch, aber sie war eine Auswahl** — sie kannte die Ergonomie-Hälfte kaum, die FFI-Hälfte gar
+nicht und die Standardbibliothek überhaupt nicht.
+
+Die **Reihenfolge** kommt aus der neuen Liste, und ihre Begründung trägt: A1 ist das Fundament,
+an dem die halbe Standardbibliothek hängt. Ohne statische Interface-Member gibt es kein
+`FromJson`, kein generisches `sum`, kein `parse<T>`; ohne bedingte Konformanz kein `Display` auf
+einem Container.
+
+### Das Fundament (P1) — hier zuerst
 
 | # | Feature | Stand | Hängt an |
 |---|---|---|---|
 | 1 | `?T == ?T` | designt | — |
 | 2 | Konformanz-Synthese (Equatable/Hashable/Ordered/Display), Swift-Modell ohne `derive` | designt | 1 |
-| 3 | typed throws St. 1 (Substitution an der Aufrufstelle — Bugfix) | designt | — |
-| 4 | typed throws St. 2 (Inferenz von `E`, `throws never`) | designt | 3 |
-| 5 | `try`-Ausdruck (`try e catch (x: E) …`, `try? e`) | designt | Value-Block ✅ |
-| 6 | Bedingte Konformanz (`extend<T :: [Display]> List<T> :: [Display]`) | designt | 2 |
-| 7 | typed throws St. 3 (werfende Funktionstypen und Lambdas) | designt | 4 |
-| 8 | Raw-/Mehrzeilen-Strings | Prototyp 19 | — |
-| 9 | Named arguments | Prototyp 12 | — |
-| 10 | `@NonExhaustive` | designt, Andockstelle benannt | Zeugen-Routine ✅ |
-| 11 | **Inkrement abgeleitet statt eingebaut** (`SPEC-RUNDE` 1) | entschieden, nicht gebaut | — |
+| 3 | Bedingte Konformanz (`extend<T :: [Display]> List<T> :: [Display]`) | designt | 2 |
+| 4 | **Statische Interface-Member und ein `Self`-Typ** (`static fn parse(s: string): ?Self`, `Default`, `Zero`/`One`) | **NEU** | — |
+| 5 | typed throws St. 1 (Substitution an der Aufrufstelle — Bugfix) | designt | — |
+| 6 | typed throws St. 2 (Inferenz von `E`, `throws never`) | designt | 5 |
+| 7 | typed throws St. 3 (werfende Funktionstypen und Lambdas) | designt | 6 |
+| 8 | `try`-Ausdruck (`try e catch (x: E) …`, `try? e`) | designt | Value-Block ✅ |
 
-Zu **11**: der Maintainer hat die Richtung gesetzt — `++`/`--` folgen entweder aus `Add<T, R>`
+**4 ist der einzige P1-Posten, den die alte Liste gar nicht kannte**, und der teuerste Fund des
+Abgleichs. Durch die Monomorphisierung kostet er zur Laufzeit nichts: aufrufbar nur über eine
+Constraint (`T.parse(s)`), nie über einen Interface-Wert — der hat kein `Self`. Ohne ihn bleibt
+die halbe `std.serial`/`std.json`-Liste unten unbaubar.
+
+Die zwei P1-Posten **generische Methoden auf generischen Typen** und **restliche `IR0001`-Grenzen**
+stehen in der neuen Liste ebenfalls als Fundament — hier bleiben sie unter **C**, weil sie Fehler
+sind und 4.6 stabil wird.
+
+### Ergonomie (P2/P3)
+
+| # | Feature | Stand |
+|---|---|---|
+| 9 | Raw-/Mehrzeilen-Strings | Prototyp 19 |
+| 10 | Named arguments | Prototyp 12 |
+| 11 | `@NonExhaustive` | designt, Andockstelle benannt |
+| 12 | **Inkrement abgeleitet statt eingebaut** (`SPEC-RUNDE` 1) | entschieden, nicht gebaut |
+| 13 | **Indexierung verallgemeinern**: `Index<K,V>`/`IndexSet<K,V>`, damit `m["k"] = v` geht | **NEU** |
+| 14 | **Collection-Literale für eigene Typen** über `FromLiteral` (`let m: Map<…> = {"a": 1}`) | **NEU** |
+| 15 | **Struct-Update**: `p with { x = 3 }` | **NEU** |
+| 16 | **Typ-Patterns auf Interface-Werten**: `match (shape) { c: Circle => … }` | **NEU** |
+| 17 | **Enum-Reflexion per Synthese**: `E.variants()`, `E.fromName("…")` | **NEU** |
+| 18 | **`comptime` ausbauen**: `embed("file")`/`embedBytes`, comptime-Tabellen | **NEU** |
+| 19 | **Doc-Tests**: Code in `///` läuft unter `lyric test` | **NEU** |
+| 20 | **`checked { … }`** für überlaufgeprüfte Arithmetik | **NEU** |
+
+Zu **12**: der Maintainer hat die Richtung gesetzt — `++`/`--` folgen entweder aus `Add<T, R>`
 (`x.add(1)`, verlangt eine Konformanz mit `int` als `other`) oder bekommen eigene `Inc`/`Dec`-
 Interfaces. Empfehlung steht auf A (Rule 2: kein zweiter Mechanismus für „plus eins"). Im selben
 Satz zu klären: die Statement-Form beider Schreibweisen (§6.8 lässt heute keine zu, akzeptiert aber
 `x++;`) und worauf ein Inkrement stehen darf (heute nur auf einem Local, `p.x++` ist `IR0001`).
+Die neue Liste hängt daran die **übrigen Operator-Interfaces** (`Neg`, `Rem`, Bit-Operatoren, `in`
+über `Contains<T>`) — eine Runde, nicht zwei.
+
+Zu **16**: geht ohne Typ-Tags auf Werten, weil der Fat Pointer seine Tabelle kennt. Das ist der
+Grund, warum es hier stehen darf und nicht in der Ablage.
+
+Zu **20**: §3.2 kündigt das Konstrukt bereits an („future checked mode … new construct"). Es ist
+damit kein Vorschlag, sondern eine Einlösung.
+
+### Braucht eine Entscheidung, bevor es überhaupt geplant wird
+
+| # | Position | Warum nicht einfach einreihen |
+|---|---|---|
+| 21 | **Slices und Views** (`xs[a..b]` als `Span<T>`, Ranges als Werte) | 💥 Revidiert die Regel „Ranges sind kein Wert". Daran hängt, dass `[first, ..rest]` heute **kopiert** — genau die Einschränkung, die beim `rawArrayAlloc`-Posten oben schon aufgeschlagen ist. |
+| 22 | **`extern "dotnet"` Stufe 2** (Arrays, Optionals, Structs, Instanzmethoden, Handles, Exceptions als `HostError`, Callbacks) | P1, und der größte Teil der Bibliotheksliste unten baut darauf auf. Ohne diese Entscheidung ist B nicht planbar. |
+| 23 | **`extern "C"`** mit `std.ffi` und Capability-Bit `ffiAccess` | P3, `abi.md` Stufe 2. |
+| 24 | **Worker-Isolates** (eine VM pro Worker, Austausch nur über Nachrichten) | 📜 bricht „single-threaded" und verlangt nach Rule 2 ein ADR mit 30 Tagen. |
+
+---
+
+## Die Standardbibliothek — neu in dieser Liste, und sie braucht zuerst eine Entscheidung
+
+`lyric-v5-features.md` legt erstmals eine Bibliotheksplanung vor (Abschnitt B, sechs Gruppen von
+`std.core` bis `std.test`). Sie steht hier absichtlich **nicht** als Tabelle: sie ist zu groß für
+diese Liste und hängt an einer einzigen Frage.
+
+**Die Frage.** `stdlib-2.md` hat Regex, HTTP-Client, Zeitzonen, Kompression und AES/RSA
+**ausdrücklich aus der std ausgeschlossen** — „nimm `extern "dotnet"`". Die neue Liste
+**revidiert das** mit dem Argument, .NET bringe alles davon mit, die Module würden dünne
+Lyric-Hüllen über Natives und liefen unter den vorhandenen Capability-Bits.
+
+Das ist eine Umkehr einer getroffenen Entscheidung, keine Ergänzung. Sie ist **nirgends
+entschieden** und gehört vor jede Bibliotheksarbeit. An ihr hängt unter anderem `std.net.tls`,
+womit sie den offenen TLS-Faden aus `STATUS.md` mitentscheidet.
+
+Was unabhängig davon gilt: die P1-Gruppen `std.core`, `std.collections`, `std.iter`,
+`std.option`/`std.result` hängen fast vollständig an den Fundament-Positionen 1–4 oben. **Vor
+denen ist Bibliotheksarbeit nicht möglich**, egal wie die Frage ausgeht.
+
+---
+
+## Werkzeuge — ebenfalls neu
+
+Aus `lyric-v5-features.md` Abschnitt D, hier vollständig, weil keins davon irgendwo sonst steht:
+
+- **ein Paketmanager** mit Versionen, Lockfile und Registry (heute nur lokale Pfade)
+- **`lyrfix`** als Migrationswerkzeug für die 5.0-Brüche — die Ablage unten setzt es voraus
+- Ausdrücke im Debugger-`evaluate`
+- ein Profiler
+- Coverage
 
 ---
 
@@ -155,15 +253,28 @@ Satz zu klären: die Statement-Form beider Schreibweisen (§6.8 lässt heute kei
 Jede Position braucht eine 4.x-Warnstufe, bevor sie greifen kann. Die Uhren sind der eigentliche
 Inhalt dieser Liste.
 
+**Alle Uhren sind um eine Minor verschoben**: sie standen auf 4.6, und 4.6 nimmt keine Features
+mehr auf. `lyric-v5-features.md` nennt für den größten Bruch von sich aus 4.7 — die beiden Listen
+sind sich also einig.
+
 | Position | Bruch | Uhr muss starten |
 |---|---|---|
-| Member-Sichtbarkeit (Default privat) | groß | 4.6 als Warnung |
-| stdlib: Überladung statt Typ-Suffixe (`abs`/`absInt`) | groß | 4.6 als `@Deprecated` |
+| Member-Sichtbarkeit (Default privat) | groß | **4.7** als Warnung |
+| stdlib: Überladung statt Typ-Suffixe (`abs`/`absInt`) | groß | **4.7** als `@Deprecated` |
 | `try e` → `Result<T, E>` | additiv, aber Anker | nach dem `try`-Ausdruck |
-| f-String-Formatsprache spec-fixiert (Python/Rust statt .NET) | mittel | 4.6 |
+| f-String-Formatsprache spec-fixiert (Python/Rust statt .NET) | mittel | **4.7** |
 | **`?Struct` als Wert** (`SPEC-RUNDE` 2) | mittel | — |
 | **`let`-Struct-Felder** (`SPEC-RUNDE` 3) | klein | — |
 | **Parameter vs. `let`** (`SPEC-RUNDE` 6) | klein | — |
+| **Deprecations wirklich entfernen** (**NEU**): freie Iterator-Terminatoren, `listContains`, `keys(m)`, die Zeitfunktionen in `std.os`, `addExecutable` | groß | Uhren laufen bereits — braucht `lyrfix` |
+| **`spawn` liefert ein Handle** (**NEU**) | mittel | — |
+
+Zur f-String-Zeile kommt aus der neuen Liste ein Detail dazu, das die Position erst vollständig
+macht: ein **`Format`-Interface**, damit eigene Typen Specifier verstehen. Ohne das ist die
+festgeschriebene Formatsprache nur für eingebaute Typen eine.
+
+Die Zeile **Deprecations entfernen** ist die einzige der Ablage, deren Uhren schon laufen — die
+Warnungen stehen seit 4.5 im Code. Was fehlt, ist das Werkzeug: `lyrfix` (siehe Werkzeuge oben).
 
 Die drei aus `SPEC-RUNDE` hängen zusammen und sind bisher **nirgends entschieden**: `?Struct` teilt
 heute statt zu kopieren (§13 zählt `?Struct` in keiner seiner beiden Listen auf), ein `let`-Struct
@@ -175,6 +286,16 @@ An `?Struct` hängt außerdem, ob `struct Node { next: ?Node }` weiter läuft.
 als Enum, `?`-Operator auf `Result`, Vererbung, `finally`, Threads, `never` als allgemeiner Typ,
 Ordnung auf Optionals, Block-Ausdruck für jeden Block, `break value`, `derive`-Schlüsselwort.
 
+`lyric-v5-features.md` führt dieselbe Liste kürzer und **legt zwei Posten dazu**: ein allgemeines
+**Makrosystem** und **Laufzeit-Reflexion** (Werte tragen keinen Typ-Tag; Synthese und `comptime`
+decken den Bedarf). Der erste ist bemerkenswert — ein Makro-System war eins der vier Dinge, die die
+Feature-Branches im September *vorgeführt* haben. Es bleibt bei der Vorführung.
+
+Umgekehrt **fehlen** in der neuen Liste fünf Ausschlüsse, die hier stehen: `never` als allgemeiner
+Typ, Ordnung auf Optionals, Block-Ausdruck für jeden Block, `break value`, `derive`. Das ist
+vermutlich Auslassung und keine Revision — aber es steht nirgends, also gilt hier weiter die
+ältere, ausdrückliche Begründung.
+
 ---
 
 ## Was als Nächstes ansteht
@@ -184,5 +305,21 @@ Ordnung auf Optionals, Block-Ausdruck für jeden Block, `break value`, `derive`-
 2. ~~**A** (Verifier-Reihenfolge)~~ — gelandet (2026-09-23), samt dem Defekt, den sie zutage
    gefördert hat. Ab hier misst jede Runde gegen eine CI, die das IR wirklich prüft.
 3. **B** (Prozessabbrüche) als eigene Sweep-Runde.
-4. **C** und **D**, dann 4.5 ausliefern.
-5. Erst danach die 4.6-Liste, Position für Position.
+4. **C**, **D**, **E** — und erst dann `v4.6.0` taggen. Kein Feature vorher.
+5. Danach 4.7, in der Reihenfolge der neuen Liste: erst das Fundament (1–8), dann Ergonomie.
+6. Parallel zu 5: die vier Entscheidungen aus der Tabelle „braucht eine Entscheidung" und die
+   Bibliotheksfrage. Sie blockieren nichts an 4.6, aber alles, was danach kommt.
+
+### Offen und nirgends entschieden
+
+Der Abgleich hat vier Dinge hinterlassen, die niemand beantwortet hat:
+
+1. **Die Bibliotheks-Umkehr** — Regex, HTTP, TLS, Zeitzonen, Kompression, Krypto in die std oder
+   weiter draußen? `stdlib-2.md` sagt draußen, `lyric-v5-features.md` sagt rein.
+2. **Slices** — die Regel „Ranges sind kein Wert" halten oder fallen lassen?
+3. **Worker-Isolates** — ein ADR aufsetzen oder den Posten streichen?
+4. **Wohin mit dieser Datei.** `lyric-v5-features.md` sagt über sich selbst, sie liege „außerhalb
+   der Repositories", weil CONTRIBUTING Rule 1 für Ideen nach v1 GitHub-Issues vorsieht und kein
+   Roadmap-Dokument im Repo. Sie liegt aber im Repo. Entweder wandert sie in Issues mit dem Label
+   `idea`, oder Rule 1 bekommt eine ausdrückliche Ausnahme für den `Befunde_und_Verbesserungen`-
+   Ordner. Beides ist vertretbar; der heutige Zustand ist keins von beidem.
