@@ -129,7 +129,7 @@ public class LoopLabelTests
                 return x;
             }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0044");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0046");
     }
 
     // ------------------------------------------------------------------ flow
