@@ -342,10 +342,29 @@ public sealed class NativeRegistry : IDisposable
             TypeTag.String, args => LyrValue.FromString(args[0].AsString + args[1].AsString));
 
         // 'ab' * 3. A negative factor yields the empty string; there is no error case for it.
+        //
+        // THE FACTOR IS AN i64 AND A .NET STRING IS INDEXED BY AN int. The cast used to be
+        // unchecked, so a count past 2^31 wrapped and the call SUCCEEDED with a wrong answer:
+        // "ab" * 9000000000 returned a string of 820130816 code points — 18 billion modulo 2^32 —
+        // and reported that length without a word. A silent wrong answer, where the array form
+        // right below had been answering LYR-VM0006 since 3.4.1. Both bounds are checked against
+        // the RESULT, because a short source with a large factor overflows just as well as a long
+        // one with a small factor.
         Register("std.string.repeat", new[] { TypeTag.String, TypeTag.I64 },
-            TypeTag.String, args => LyrValue.FromString(
-                args[1].AsI64 <= 0 ? string.Empty
-                    : string.Concat(Enumerable.Repeat(args[0].AsString, (int)args[1].AsI64))));
+            TypeTag.String, args =>
+            {
+                var count = args[1].AsI64;
+                var source = args[0].AsString;
+                if (count <= 0 || source.Length == 0) return LyrValue.FromString(string.Empty);
+
+                var total = (long)source.Length * count;
+                if (total > int.MaxValue)
+                    throw new LyricPanic(VmDiagnostics.IndexOutOfRange,
+                        $"string repetition of {source.Length} code point(s) x {count} exceeds "
+                        + "the length a string can hold");
+
+                return LyrValue.FromString(string.Concat(Enumerable.Repeat(source, (int)count)));
+            });
 
         // A panic is not catchable and never returns, so it throws. The loop that holds the frame
         // stack attaches the backtrace.

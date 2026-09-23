@@ -138,6 +138,48 @@ public static class Interpreter
     /// optimization, so a missing base case surfaces here.</summary>
     private const int MaxCallDepth = 1024;
 
+    /// <summary>
+    /// The frames held by OUTER runs on this thread, so the limit above counts a whole thread
+    /// rather than one <see cref="Execute"/>.
+    ///
+    /// <para>The limit used to count <c>frames.Count</c>, and every run starts that stack at zero.
+    /// A host function that calls back into the script therefore began counting again while the
+    /// CLR stack kept growing: script to host to script never reached 1024 and took the process
+    /// down with a stack overflow instead — no panic, no backtrace, in a host that had done
+    /// nothing wrong. Pure Lyric recursion was caught the whole time, which is why it went
+    /// unnoticed.</para>
+    ///
+    /// <para>Thread-static because what it protects is the CLR stack, and that is per thread; two
+    /// VMs on two threads have nothing to do with each other. Written before a native is called —
+    /// the one place a run can re-enter — and restored by the run that raised it.</para>
+    /// </summary>
+    [ThreadStatic]
+    private static int _outerFrames;
+
+    /// <summary>
+    /// How many runs may be nested inside one another on one thread.
+    ///
+    /// <para>Small on purpose, and it is a different quantity from <see cref="MaxCallDepth"/>: an
+    /// interpreter frame is a heap object, a NESTED RUN is real CLR stack — Execute, its loop, the
+    /// host's delegate and whatever the host does in between. A few hundred kilobytes of a 1 MB
+    /// thread at this bound, which leaves the rest for unwinding; 1024 nested runs would not fit
+    /// and never did.</para>
+    ///
+    /// <para>MEASURED, then halved. On a default test thread the probe in
+    /// <c>ReentrancyTests</c> survives 64 nestings and dies at 96, so the ceiling is somewhere
+    /// between — with a host callback that does NOTHING but call back. A real host has locals, and
+    /// whatever it does between the call and the callback is on the same stack, so the number that
+    /// ships is half of the smallest measurement rather than just under the largest.</para>
+    ///
+    /// <para>A host that legitimately needs deeper than this is describing a recursion it should
+    /// be writing inside the script, where the frames are free.</para>
+    /// </summary>
+    private const int MaxReentryDepth = 32;
+
+    /// <summary>How many runs are nested on this thread right now.</summary>
+    [ThreadStatic]
+    private static int _nesting;
+
     /// <summary>Runs the start function and returns its value.</summary>
     public static LyrValue Run(BytecodeModule module, NativeRegistry? natives = null) =>
         Run(module, [], natives);
@@ -200,8 +242,26 @@ public static class Interpreter
             }
         }
 
+        // THE OTHER RESOURCE, and it is counted rather than probed. The tally below counts
+        // interpreter frames: they live on the heap, cost no CLR stack, and 1024 of them are free.
+        // A RE-ENTRY is not free — script to host to script puts a whole Execute, its loop and the
+        // host's own frames on the CLR stack — so the two are bounded separately.
+        //
+        // RuntimeHelpers.TryEnsureSufficientExecutionStack stood here first and did not save the
+        // process. It leaves only its own small probe as headroom, and that is not enough for what
+        // happens next: an exception FILTER runs before the stack unwinds, the filter below builds
+        // a backtrace, and running it at every nesting level on an almost-full stack overflowed
+        // anyway. A limit that keeps hundreds of kilobytes free has room for its own unwinding.
+        if (_nesting >= MaxReentryDepth)
+            throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
+                $"re-entry nested {MaxReentryDepth} runs deep — a host function that calls back "
+                + "into the script starts a run INSIDE the one that called it, and each nesting "
+                + "costs thread stack that no frame count can see");
+
         var frames = new Stack<Frame>();
         var frame = prepared[startIndex].Rent();
+        var outer = _outerFrames;
+        _nesting++;
 
         // The entry point receives its arguments in the parameter slots, the same convention as
         // any other call.
@@ -216,17 +276,17 @@ public static class Interpreter
             // toolchain combines them — the debugger runs a program, a budget runs foreign code.
             if (debug is not null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, new DebugPolicy(debug), jit);
+                    ref frame, outer, new DebugPolicy(debug), jit);
 
             if (Profiling && budget is null)
                 return Loop(prepared, strings, types, dispatch, natives, globals, globalTypes,
-                    arguments, frames, ref frame, default(ProfilePolicy), jit);
+                    arguments, frames, ref frame, outer, default(ProfilePolicy), jit);
 
             return budget is null
                 ? Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, default(ReleasePolicy), jit)
+                    ref frame, outer, default(ReleasePolicy), jit)
                 : Loop(prepared, strings, types, dispatch, natives, globals, globalTypes, arguments, frames,
-                    ref frame, new BudgetPolicy(budget), jit);
+                    ref frame, outer, new BudgetPolicy(budget), jit);
         }
         catch (LyricPanic panic) when (panic.CallStack.Count == 0)
         {
@@ -235,6 +295,13 @@ public static class Interpreter
             var stack = new List<string> { Describe(frame, sourceMap) };
             stack.AddRange(frames.Select(f => Describe(f, sourceMap)));
             throw panic.WithCallStack(stack);
+        }
+        finally
+        {
+            // Put back what this run found. A native that threw left the tally raised; unwinding
+            // through here is what makes that temporary rather than permanent.
+            _outerFrames = outer;
+            _nesting--;
         }
     }
 
@@ -277,7 +344,7 @@ public static class Interpreter
         IReadOnlyList<BytecodeTypeDef> types, DispatchTable dispatch,
         NativeRegistry.BoundNative[] natives, LyrValue[] globals,
         IReadOnlyList<BytecodeType> globalTypes, ArgumentPool arguments,
-        Stack<Frame> frames, ref Frame frame, TPolicy policy, Jit.JitContext? jit)
+        Stack<Frame> frames, ref Frame frame, int outer, TPolicy policy, Jit.JitContext? jit)
         where TPolicy : struct, IExecutionPolicy
     {
         // The resumes in flight. Grows only when a program nests chains, so an ordinary run
@@ -421,13 +488,16 @@ public static class Interpreter
                         var args = arguments.Rent(native.Arity);
                         for (var i = native.Arity - 1; i >= 0; i--) args[i] = stack[--sp];
 
+                        // The one place this run can re-enter: a host function may call back
+                        // into the script, and the run it starts reads this.
+                        _outerFrames = outer + frames.Count + 1;
                         var produced = native.Implementation(args);
                         arguments.Recycle(args);
                         if (native.ReturnsValue) stack[sp++] = produced;
                         break;
                     }
 
-                    if (frames.Count >= MaxCallDepth)
+                    if (outer + frames.Count >= MaxCallDepth)
                         throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 
@@ -560,13 +630,16 @@ public static class Interpreter
                         for (var i = native.Arity - 1; i >= 0; i--) nativeArgs[i] = stack[--sp];
                         sp--; // the closure value itself
 
+                        // As at the two direct native calls: a host function reached through a
+                        // closure can call back just as well.
+                        _outerFrames = outer + frames.Count + 1;
                         var produced = native.Implementation(nativeArgs);
                         arguments.Recycle(nativeArgs);
                         if (native.ReturnsValue) stack[sp++] = produced;
                         break;
                     }
 
-                    if (frames.Count >= MaxCallDepth)
+                    if (outer + frames.Count >= MaxCallDepth)
                         throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 
@@ -607,13 +680,16 @@ public static class Interpreter
                         var args = arguments.Rent(native.Arity);
                         for (var i = native.Arity - 1; i >= 0; i--) args[i] = stack[--sp];
 
+                        // The one place this run can re-enter: a host function may call back
+                        // into the script, and the run it starts reads this.
+                        _outerFrames = outer + frames.Count + 1;
                         var produced = native.Implementation(args);
                         arguments.Recycle(args);
                         if (native.ReturnsValue) stack[sp++] = produced;
                         break;
                     }
 
-                    if (frames.Count >= MaxCallDepth)
+                    if (outer + frames.Count >= MaxCallDepth)
                         throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 
@@ -699,7 +775,7 @@ public static class Interpreter
                     var incoming = chain.State == CoroutineChain.ChainState.NotStarted
                         ? 1
                         : chain.SavedCount;
-                    if (frames.Count + incoming >= MaxCallDepth)
+                    if (outer + frames.Count + incoming >= MaxCallDepth)
                         throw new LyricPanic(VmDiagnostics.CallDepthExceeded,
                             $"call depth exceeded {MaxCallDepth} frames in '{frame.Fn.Source.Name}'");
 

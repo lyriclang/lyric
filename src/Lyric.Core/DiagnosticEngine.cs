@@ -75,15 +75,52 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         return copy;
     }
 
+    /// <summary>
+    /// A string as it may be written to a terminal: every control character replaced by ONE visible
+    /// stand-in.
+    ///
+    /// <para>A diagnostic quotes what the program wrote — the offending source line, a string
+    /// literal inside a message, a file path. All three are attacker-controlled when the source is,
+    /// and all three went to stderr raw: a literal holding <c>ESC ] 0 ; … BEL</c> retitled the
+    /// reader's terminal, and <c>ESC [ 31 m</c> recoloured everything after it. Compiling a file is
+    /// not consenting to let it drive the terminal.</para>
+    ///
+    /// <para>ONE character out for one character in, deliberately. The caret line below counts
+    /// columns in the original text, so an escape expanded to <c>\x1b</c> would slide the caret off
+    /// its target — the diagnostic would stop lying about the terminal and start lying about the
+    /// position. The Control Pictures block (U+2400…) names the character it replaces without
+    /// costing a column; C1 and anything else unprintable become U+FFFD, which claims nothing.</para>
+    ///
+    /// <para>Tab is left alone: it drives no terminal and the alignment it produces is the one the
+    /// file asked for.</para>
+    /// </summary>
+    public static string Printable(string text)
+    {
+        var needs = false;
+        foreach (var c in text)
+            if (IsControl(c)) { needs = true; break; }
+        if (!needs) return text;
+
+        var sb = new StringBuilder(text.Length);
+        foreach (var c in text)
+            sb.Append(!IsControl(c) ? c
+                : c < 0x20 ? (char)(0x2400 + c)   // the Control Pictures glyph for that very code
+                : c == 0x7F ? '␡'            // the one for DEL, which has no arithmetic form
+                : '�');                      // C1 and the rest: something was here
+        return sb.ToString();
+
+        static bool IsControl(char c) => c != '\t' && (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F));
+    }
+
     public void RenderText(TextWriter output)
     {
         if (output == null) throw new ArgumentNullException(nameof(output));
-        
+
         foreach (var diagnostic in SortedSnapshot())
         {
             if (!diagnostic.Span.File.IsValid)
             {
-                output.Write($"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {diagnostic.Message}");
+                output.Write($"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {Printable(diagnostic.Message)}");
                 output.Write("\n");
                 RenderNotes(output, diagnostic);
                 output.Write("\n");
@@ -93,11 +130,11 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             LinePosition diagPos = _sourceManager.LocateStart(diagnostic.Span);
             output.WriteLine
             (
-                $"{_sourceManager.GetPath(diagnostic.Span.File)}:" +
+                $"{Printable(_sourceManager.GetPath(diagnostic.Span.File))}:" +
                 $"{diagPos.Line}:{diagPos.Column}: " +
-                $"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {diagnostic.Message}"
+                $"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {Printable(diagnostic.Message)}"
             );
-            output.WriteLine(_sourceManager.GetLineText(diagnostic.Span.File, diagPos.Line));
+            output.WriteLine(Printable(_sourceManager.GetLineText(diagnostic.Span.File, diagPos.Line)));
             for (int i = 0; i < diagPos.Column - 1; i++)
             {
                 output.Write(" ");
@@ -128,12 +165,12 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             if (note.Location.File.IsValid)
             {
                 var position = _sourceManager.LocateStart(note.Location);
-                output.WriteLine($"  note: {note.Message} — " +
-                    $"{_sourceManager.GetPath(note.Location.File)}:{position.Line}:{position.Column}");
+                output.WriteLine($"  note: {Printable(note.Message)} — " +
+                    $"{Printable(_sourceManager.GetPath(note.Location.File))}:{position.Line}:{position.Column}");
             }
             else
             {
-                output.WriteLine($"  note: {note.Message}");
+                output.WriteLine($"  note: {Printable(note.Message)}");
             }
         }
     }
@@ -203,7 +240,11 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
                 sb.Append("\\b");
             else if (c == '\f') 
                 sb.Append("\\f");
-            else if (c < 0x20)
+            // DEL and C1 alongside C0: JSON permits them raw, and a consumer that prints this line
+            // to a terminal would then be driven by it — 0x9B is CSI in the 8-bit encoding. Escaped
+            // here rather than replaced as in the text renderer, because the JSON is read by a
+            // program and has to carry the byte the file really held.
+            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
                 sb.Append($"\\u{(int)c:x4}");
             else sb.Append(c);
         }
