@@ -11,11 +11,18 @@
 
 ## Current milestone
 
-**THE TREE CLAIMS 4.6.0 AND NOTHING IS TAGGED YET.** `v4.5.0` sits at `6f138636` and carries M37
-alone; everything below landed after it, and for a while the tree still called itself `4.5.0` — a
-build from main naming a version that did not contain it. A MINOR, because the bytecode format
+**THE TREE CLAIMS 4.6.0 AND THE TAG WAITS ON PURPOSE.** `v4.5.0` sits at `6f138636` and carries
+M37 alone; everything below landed after it, and for a while the tree still called itself `4.5.0`
+— a build from main naming a version that did not contain it. A MINOR, because the bytecode format
 stays 4.0 and the language only grew: `Directory.Build.props`, `ToolchainVersion`, the README and
 the changelog say 4.6.0 together, and the specification's pin moved with them.
+
+**4.6 IS A STABILIZATION RELEASE** (maintainer, 2026-09-23). The rule is no longer "tag after
+green CI on main" — green CI is necessary and no longer sufficient. The tag falls when items **B
+through E** of `docs/Befunde_und_Verbesserungen/PLAN.md` are empty: the process aborts, the sema
+holes, the diagnostics, and the two rule questions that pass for bug fixes. **No feature enters
+4.6.** The next feature round is 4.7, and every deprecation clock that was aimed at 4.6 moved
+with it.
 
 **What a 4.5 project has to read before upgrading** is the changelog's first section, and it is
 short: six shapes that compiled in 4.5 and answered something nobody asked for are refused now —
@@ -1325,6 +1332,18 @@ the moves. Any future optimization argument on this VM starts from those three n
 
 ## What we are working on
 
+**Stabilizing 4.6 — `PLAN.md` items B through E, in that order** (2026-09-23). A is done (§Recently
+finished). **B** is next: process aborts, where the toolchain dies with exit 134/141 instead of a
+diagnostic or a panic — a missing depth limit in the recursive descent, `lyrc build -o ""` as an
+unhandled `ArgumentException`, `string * n` at a large `n`, a global forward reference, script →
+host → script re-entry past `MaxCallDepth`, terminal escapes raw on stderr, and the remaining ICEs
+from valid source. `Lyrc/Program.cs` does not catch `InternalCompilationException` at all, so an
+ICE today is a stack trace without a code or a position, and in `--json` mode it destroys the
+output. Its own sweep round. The tag comes after E, not before.
+
+> Everything below this line is older than the current milestone and is kept for the reasoning,
+> not as a statement about where the work stands.
+
 **v3.0.0 IS RELEASED, with v3.0.1 and v3.0.2 behind it** (2026-08-23). v3.0.2 closes #101, the
 Linux CI flake: the driver learned its tools' output directories by BUILDING them a second time
 under its own properties — a second project instance writing one output directory — and listed
@@ -1607,6 +1626,44 @@ out of them and hands its own functions, types and value structs in.
 
 ## Recently finished
 
+- [x] **The IR verifier runs where a finding still has a culprit** (2026-09-23, PR #165,
+  `fix/verifier-order`). Item A of `PLAN.md`, and the entry understated it twice.
+
+  **The order.** Inliner, scalar replacement, devirtualization and `Reachability.Prune` all ran
+  before `IrVerifier.VerifyOrThrow`. Proven on a real case rather than argued: with the passes off
+  the old position found the defect, with the passes on it did not — the inliner spliced both
+  bodies into their only caller, the pruning deleted the originals, and the module verified clean.
+  The verifier now runs after the lowering AND after the passes, the second only when a pass
+  really ran, and the message names which run found it.
+
+  **The hole underneath it.** Every CI job builds `--configuration Release`, and `VerifiesIr` was
+  `#if DEBUG`, so nothing that went through `SourceCompiler` was ever verified here — not the
+  tooling tests, not the conformance suite, not the examples. What saved that was a discipline and
+  not a guarantee: **all 92** direct `ModuleLowerer.Lower` calls in tests pass `verify:`
+  explicitly, and **78** of them verified only behind the optimizer. `LYRIC_VERIFY_IR` now
+  overrides the configuration in both directions and is on in all three workflows.
+
+  **What it found on being switched on.** Two `extend` overloads on one type in one module took
+  one mangled name — free functions and methods have carried an overload suffix since 3.0,
+  `ExtensionTable` did not. Visible without the verifier too: two indistinguishable `call`s in
+  `lyrc lower`. The set spans blocks (§4.3a), so it is computed over `ExtensionRegistry.MethodsFor`
+  and not over the declaring block's scope.
+
+  **Two numbers in the PLAN entry were wrong**, which is what measuring is for: the examples are
+  80 files and not 47, and ONE test was touched and not five — the one whose rule fell.
+  `Only_a_debug_build_runs_the_verifier` asserted in a test what the CI disproved in practice.
+
+  5497 tests green with the verifier on AND off, conformance 159/159, 80 examples in both profiles
+  clean.
+
+- [x] **The plan absorbs `lyric-v5-features.md`** (2026-09-23, PR #166). The old eleven-item
+  feature list was a selection: 7 foundation positions became 8, 4 ergonomics became 12, and a
+  standard-library section and five tools appeared that stood in no list here. The expensive find
+  is **static interface members with a `Self` type** — P1, in no list before, and nothing in
+  `std.serial`, `std.json` or a generic `sum` is buildable without it; monomorphization makes it
+  free, callable through a constraint and never through an interface value, which has no `Self`.
+  Two of the new list's P1 "foundation" entries are bugs here and stay in 4.6.
+
 - [x] **Sweep round 2, the four merges and the grammar round** (2026-09-23, PRs #161/#162,
   `lyric-spec#38`). Eight defects that answered WRONG rather than failing: a `do-while` whose
   jump target landed inside a handler's block range, a monomorphized instance without its module
@@ -1648,46 +1705,6 @@ out of them and hands its own functions, types and value structs in.
   spec-first mode pays for itself in corrections, not only in new rules. (3) `catch (_: T)`
   crashed the compiler while the SEM0071 note RECOMMENDED that form; found by probing catch
   shapes for the appendix, the class of find sweeps exist for.
-
-- [x] **M34 — the data formats** (2026-08-24, `feature/m34-data-formats`, released as v3.5.0).
-  `std.json` and `std.encoding`, both written in Lyric — the first structured-data story the
-  library has. What the milestone turned up outside its scope: `std.string.parseFloat` could not
-  carry a JSON number — no exponent notation (its own doc said so), and the digit-by-digit
-  fraction sum drifted an ulp on long fractions, so `parseFloat(fromFloat(x))` was not reliably
-  `x`. It is NATIVE now, correctly rounded; new-native binding rule as with `co.next()` in 2.2.0.
-
-  **Two decisions worth keeping.** The json parser decides int-fits on the DIGITS before calling
-  `parseInt`, because `parseInt` wraps on overflow by documented design — a wrapped id would be a
-  silently wrong value, the exact shape the sweeps hunt. And the parser carries its own depth cap
-  (128): input is data, and the VM's 1024-frame panic is not an answer a `?JsonValue` contract
-  may give. **One harness lesson**: `dotnet test | tail` reports tail's exit code, not dotnet's —
-  two slice verdicts leaned on that pipe before it was caught; suite gates read the real exit
-  now, redirected to a file instead of piped.
-
-  **The sweep ran the same day and found NOTHING** (`fix/m34-sweep`): 41 adversarial probes —
-  object/mixed nesting at the bound, number and string corners, eleven refusal shapes, the
-  interactions (a `JsonValue` through a coroutine, the REPL, `LYRIC_JIT=1`, capability gating,
-  `lyric pack` of a json program) — no crash, no wrong answer, no guide claim off. The probes
-  with pin value landed as tests; no patch release, per the pipeline the loop exits here.
-
-- [x] **The pipeline bug sweep** (2026-08-24, `fix/pipeline-sweep`, PR #111). Thirteen fixes,
-  bottom up through every stage, each with a failing test first. The three worth keeping were
-  reachable from plain source or from foreign bytes and ended in a crash rather than a
-  diagnostic: `"\u{80000000}"` wrapped past `Int32` and took the compiler down with an unhandled
-  exception; `[0] * n` reached the allocator as an overflowed length and took the PROCESS
-  down — the escape `Capability.None` is sold on; and a module that under-declares its
-  capabilities was handed `std.io.file` and ran it, so the "a host loading foreign bytes is
-  protected too" promise the code makes did not hold.
-
-  **The lesson is the reader's.** Its "must reject" catalogue had four holes between §5/§8.5 and
-  the validator — `IsTerminator` knew five of nine terminators, so the stack walk crossed block
-  boundaries; `ret`/`retval`/`throw` and the entry-point signature were checked nowhere. The
-  round-trip tests could never have found them: they only ever show the reader ACCEPTING what the
-  writer produced. What was missing was a negative catalogue of hand-built modules and a
-  totality layer under the front end — both added, seeded, so a crash reproduces. The capability
-  fix is the other half: the load check refused declaring MORE than granted, this refuses USING
-  more than declared, and together the declared bitset is a verified bound rather than a trusted
-  one.
 
 ## Measurements
 
@@ -2081,7 +2098,27 @@ answer yet, and it belongs asked before E4 starts.
 
 ## Still open
 
+**Four decisions the v5 comparison left standing** (2026-09-23, none of them answered anywhere):
+
+- **The library reversal.** `design/stdlib-2.md` excludes regex, an HTTP client, timezones,
+  compression and AES/RSA from the standard library — "use `extern \"dotnet\"`".
+  `lyric-v5-features.md` puts them in, arguing .NET brings all of it and the modules would be thin
+  Lyric shells under the existing capability bits. That is the UNDOING of a decision, not an
+  addition, and `std.net.tls` settles the open TLS thread below along with it.
+- **Slices.** `xs[a..b]` as a view revises "ranges are not values". It is also why `[first, ..rest]`
+  copies today.
+- **Worker isolates.** One VM per worker, messages only. Real CPU parallelism without threads, but
+  it breaks "single-threaded", so Rule 2 wants an ADR — or the position goes.
+- **Where `lyric-v5-features.md` is allowed to live.** It states of itself that Rule 1 keeps it out
+  of the repositories. It is in one. Either it becomes issues labelled `idea`, or Rule 1 gets an
+  explicit exception for `docs/Befunde_und_Verbesserungen/`.
+
 **Tooling and format:**
+
+- **The bytecode reader still does not type what the verifier types.** Bug-hunt P1-19, and the
+  other half of item A: the CI verifies now, a shipped `lyric` does not, and what the reader does
+  not check a release build does not catch. The reader learned the arithmetic tags after one
+  escaped as `add string`; the general gap stands.
 
 - **Exhaustiveness does not see an enum INSIDE a tuple.** `match ((E.A(n), m))` over `(E, int)` is
   `LYR-SEM0050` although the arms cover every variant. The pattern compiler learned the form; the
@@ -2441,8 +2478,8 @@ answer yet, and it belongs asked before E4 starts.
 
 ## Last relevant commit
 
-`integration: the four evolution branches, merged and measured`
-(PR #162, on main as 4d35c10e — tagged as nothing yet; see §Current milestone)
+`ir: the verifier runs where a finding still has a culprit`
+(PR #165, on main as 05f91883 — tagged as nothing yet, and on purpose; see §Current milestone)
 
 ---
 
