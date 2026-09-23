@@ -78,8 +78,14 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
 - **Feld und Methode teilen einen Namensraum** (`RES0001`).
 - **`p.field ??= x`** ist `IR0001`, auf einer Variablen geht es.
 - **Interface-Wert erfüllt seine eigene Constraint nicht.**
-- **`rawArrayAlloc<T>(n)`** (~15 VM-Zeilen): hängt doppelt — `List<?T>`/`Map<K,?V>` brauchen es,
-  und der benannte Rest `[first, ..rest]` auch. Billigster Posten der Liste.
+- ~~**`rawArrayAlloc<T>(n)`** (~15 VM-Zeilen), billigster Posten der Liste~~ — **erledigt, und die
+  Schätzung war falsch.** Generische Natives gab es nicht: `ModuleLowerer` übersprang jede Funktion
+  mit Typparametern, *bevor* der Native-Zweig kam. Der Mechanismus lag aber eine Ebene tiefer
+  bereit — `ImportTable.Intern` schlüsselt nach Name UND Signatur, weil `coroutineIsDone` seit je
+  eine Zeile pro Coroutine-Signatur bekommt. Eine bodiless generische `fn` ist jetzt ein Template,
+  die Aufrufstelle substituiert und interniert. **`[first, ..rest]` lowert damit** (Kopie, kein
+  View — die Sprache hat keine Slices). Was daran hängen bleibt: `List<?T>`/`Map<K,?V>` können das
+  Native jetzt benutzen, gebaut ist ihr Backing-Array damit noch nicht.
 
 ### D. Diagnostik
 
@@ -154,7 +160,8 @@ Ordnung auf Optionals, Block-Ausdruck für jeden Block, `break value`, `derive`-
 
 ## Was als Nächstes ansteht
 
-1. `lyric-spec#38` mergen, dann PR #162.
+1. ~~`lyric-spec#38` mergen~~ — gelandet (2026-09-23): die zwei retirierten Pattern-Limits **und**
+   die Grammatik, die 4.5 wirklich beschreibt. Dann PR #162.
 2. **A** (Verifier-Reihenfolge) — weil jede spätere Messung sonst weniger wert ist.
 3. **B** (Prozessabbrüche) als eigene Sweep-Runde.
 4. **C** und **D**, dann 4.5 ausliefern.
