@@ -1,4 +1,4 @@
-﻿using Lyric.AST;
+using Lyric.AST;
 using Lyric.Core;
 using Lyric.Resolver;
 using Lyric.Sema;

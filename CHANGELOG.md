@@ -38,6 +38,9 @@ they are the only way this release can break a build.
   declares nothing is `LYR-SEM0034` instead of reaching `LYR-VM0010` at runtime.
 - **A visible extension beats an interface default** (§5.4). Where both offered a name, the
   default used to win; the resolution order the specification states now holds at run time too.
+- **A parameter name binds once** (`LYR-RES0001`). `fn f(x: int, x: int)` compiled, the first
+  parameter won every lookup, and the argument written for the second went nowhere — `f(1, 2)`
+  returning `x` answered `1`. `_` is the deliberate non-name and may still repeat.
 
 ### Added — the language
 
@@ -111,6 +114,16 @@ they are the only way this release can break a build.
 - **A `Map` grew without bound under set/remove churn**: tombstones triggered a doubling and never
   a compaction.
 - **`std.os.args()` answered the VM's arguments**, not the program's.
+- **A name imported twice made a call ambiguous with itself.** Two `import m { f };` lines put one
+  function into the overload set twice, and two copies of one function separate nothing: the call
+  was `LYR-SEM0086`, with two identical notes pointing at one declaration.
+- **A failed destructuring left its names undeclared**, so `let (a, b) = 5;` answered the real
+  error and then "unknown identifier 'a'" and "unknown identifier 'b'" about its own consequence.
+- **`--verbose` phase times were a hundred times too large on Linux.** Stopwatch ticks were read
+  as `TimeSpan` ticks, which coincide on Windows and do not elsewhere; the total row underneath
+  them was right all along, so the table contradicted itself.
+- **`--json` did not cover argument errors.** A compile error came out as a document and an
+  unknown option as a bare line, in a stream a caller is parsing.
 - **`Random.nextIntRange` and `nextFloat` could fall below their lower bound**, because
   `absInt(int.min)` stays negative.
 - **Two extension overloads on one type shared one name in the bytecode.** `extend Box { fn
@@ -124,6 +137,17 @@ they are the only way this release can break a build.
 
 - The grammar (§2) describes the forms above. Seven of them were shipping without being in it.
 - `LYR-IR0001` covers two constructs fewer; the appendix says which.
+- **Three semantic errors moved out of `LYR-IR0001` into the checker**, where they reach
+  `lyrc check`, which never lowers and therefore used to answer *ok* to programs `lyrc build`
+  refuses. An initializer that omits a field with no default is `LYR-SEM0106` and names every
+  missing field at once; `x == null` on a non-optional is `LYR-SEM0059`, beside the `null` pattern
+  rule it mirrors; `x ?? y` and `x ??= y` on one are `LYR-SEM0005`, beside the force-unwrap they
+  belong with. §12.1 keeps `IR0001` for valid Lyric, and none of the three is that — the note
+  "this compiler version cannot lower it yet" promised a release that will never help. Inside a
+  generic body all three stay legal, because only the instantiation can answer the question.
+- **`LYR-SEM0052` no longer suggests what cannot be written.** It offered `'X { … }'` for every
+  type there is — including `int { … }` for `let i = int;`. A struct or class gets the brace form,
+  an enum gets one of its variants, and everything else gets no suggestion.
 - **A lowering that gives up on a written type now names the type.** The message was "a
   non-primitive field type" wherever one failed — including at a method's RETURN type, where it
   described a field that was not in the program and sent the reader to the wrong line.

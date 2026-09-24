@@ -994,6 +994,34 @@ public sealed class TypeChecker
 
     private static Span NodeSpan(TypeNode n) => n.Span;
 
+    /// <summary>
+    /// A second parameter of one name (<c>LYR-RES0001</c>, §7.1a).
+    ///
+    /// <para>It compiled. <c>fn f(x: int, x: int)</c> declared both, the first won every lookup,
+    /// and the argument written for the second went nowhere — measured: <c>f(1, 2)</c> returning
+    /// <c>x</c> answered 1. A second binding of a name can only replace the first or be
+    /// unreachable, and both readings silently discard an argument the caller wrote out.</para>
+    ///
+    /// <para>The same rule as <c>LYR-RES0001</c> for a module or type body and
+    /// <c>LYR-SEM0097</c> for a pattern; the parameter list was the one scope nobody had asked
+    /// about. The CODE names the rule rather than the phase — the resolver never declares
+    /// parameter symbols, so there is no RES-phase place to put it.</para>
+    /// </summary>
+    private void ReportDuplicateParameter(string name, Span at, Span? previous)
+    {
+        // '_' IS THE DELIBERATE NON-NAME (§7.1) and may repeat, here as in a pattern: 'fn g(_: int,
+        // _: int)' says twice that it ignores an argument, which is not a collision but the way to
+        // write one. A first version of this check refused it, and its own control test caught
+        // that -- which is what a control is for.
+        if (name == "_") return;
+
+        _de.Report("LYR-RES0001", Severity.Error, at,
+            $"'{name}' is already declared in this parameter list",
+            previous is { } where
+                ? new DiagnosticNote(where, "previous declaration")
+                : new DiagnosticNote("previous declaration"));
+    }
+
     private void CheckFunction(FunctionDecl fn, SymbolTable outerScope, LyrType? thisType)
     {
         var savedReturn = _currentReturn;
@@ -1012,7 +1040,9 @@ public sealed class TypeChecker
         {
             var pt = ResolveType(p.Type, scope);
             var ps = new ParameterSymbol(p.Name, pt, p);
-            scope.TryDeclare(ps);
+            if (!scope.TryDeclare(ps))
+                ReportDuplicateParameter(p.Name, p.Span,
+                    Array.Find(fn.Parameters, q => q.Name == p.Name && !ReferenceEquals(q, p))?.Span);
             _result.BindRef(p, ps); // for definite-assignment analysis
             if (p.Default is not null)
                 CheckAssignable(p.Default, CheckExpr(p.Default, scope, pt), pt, p.Span);
@@ -1638,13 +1668,35 @@ public sealed class TypeChecker
         var type = CheckTarget(expr, scope, expected);
         if (type is not NonValueType nv) return type;
 
-        var hint = nv.Symbol is TypeSymbol ? $" — did you mean '{nv.Symbol.Name} {{ … }}'?" : "";
         _de.Report("LYR-SEM0052", Severity.Error, expr.Span,
-            $"'{nv.Symbol.Name}' is a {nv.Kind}, not a value{hint}");
+            $"'{nv.Symbol.Name}' is a {nv.Kind}, not a value{ValueHintFor(nv.Symbol)}");
 
         _result.SetType(expr, LyrType.Error);
         return LyrType.Error;
     }
+
+    /// <summary>
+    /// What to suggest for a TYPE standing where a value belongs.
+    ///
+    /// <para>The suggestion used to be <c>'X { … }'</c> for every type symbol there is, and only a
+    /// struct or a class can take that advice. An enum is built through a variant, an interface is
+    /// not built at all, and <c>let i = int;</c> was answered with "did you mean 'int { … }'?" —
+    /// a form of the language that does not exist. A suggestion costs the reader the time it takes
+    /// to try it, so a wrong one is worse than none.</para>
+    ///
+    /// <para>An ALIAS gets none either, deliberately: <c>type A = MyStruct</c> could take the
+    /// brace form and <c>type A = int</c> could not, and telling them apart here means resolving
+    /// the alias in a scope this method does not have. Silence is the answer that is never
+    /// wrong.</para>
+    /// </summary>
+    private static string ValueHintFor(Symbol symbol) => symbol switch
+    {
+        TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class } t
+            => $" — did you mean '{t.Name} {{ … }}'?",
+        TypeSymbol { Kind: TypeSymbolKind.Enum, Declaration: EnumDecl { Variants: [var first, ..] } } e
+            => $" — did you mean a variant, such as '{e.Name}.{first.Name}'?",
+        _ => "",
+    };
 
     /// <summary>
     /// Like <see cref="CheckExpr"/>, but leaves a <see cref="NonValueType"/> standing. Only for the
@@ -1983,6 +2035,18 @@ public sealed class TypeChecker
     private FunctionSymbol? SelectOverload(CallExpr call, IReadOnlyList<OverloadCandidate> candidates,
         SymbolTable scope)
     {
+        // ONE SYMBOL IS ONE CANDIDATE, however many times it reached this list. Importing a name
+        // twice -- 'import std.io.console { println };' written on two lines -- put the same
+        // FunctionSymbol into the set twice, and two copies of one function fit each other
+        // exactly by construction: the call was then reported AMBIGUOUS between a function and
+        // itself, with two identical notes pointing at one declaration.
+        //
+        // Deduplicated here rather than at the import, because a name may arrive by more than one
+        // route -- a namespace import beside a selective one, a re-export -- and none of those
+        // routes is the wrong one. What is wrong is counting a function twice because it was
+        // named twice.
+        if (candidates.Count > 1) candidates = candidates.Distinct().ToArray();
+
         // Trial types, quietly: typing an argument against the WRONG candidate reports mismatches
         // the program does not have. The winner is checked again for real by the caller.
         var argumentTypes = new LyrType?[call.Arguments.Length];
@@ -2271,7 +2335,7 @@ public sealed class TypeChecker
     /// </remarks>
     private void CheckEquatable(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
-        if (l is NullType || r is NullType) return;
+        if (l is NullType || r is NullType) { CheckNullTest(b, l, r); return; }
         if (l is PrimitiveType or ErrorType) return;
 
         // Two values of the SAME opaque alias compare like their underlying — a handle must be
@@ -2314,6 +2378,36 @@ public sealed class TypeChecker
 
         _de.Report("LYR-SEM0059", Severity.Error, b.Span,
             $"'{op}' is not defined for '{TypeFacts.Display(l)}'");
+    }
+
+    /// <summary>
+    /// <c>x == null</c> where <c>x</c> can never be null (<c>LYR-SEM0059</c>, §6.2).
+    ///
+    /// <para>The lowering refused it as <c>LYR-IR0001</c>, which says "this compiler version
+    /// cannot lower it yet" about a program no version will ever run — §12.1 keeps that code for
+    /// VALID Lyric. The pattern twin has been a sema error all along (<c>LYR-SEM0029</c>, a
+    /// <c>null</c> pattern against a non-optional scrutinee); this is the expression side of the
+    /// same sentence, and it now reaches <c>lyrc check</c> too.</para>
+    ///
+    /// <para>A TYPE PARAMETER is exempt, deliberately: in <c>fn f&lt;T&gt;(x: T)</c> the
+    /// instantiation answers the question and the declaration cannot, and a <c>T</c> bound to
+    /// <c>?int</c> makes this an ordinary optional test — measured, and it behaves correctly.
+    /// That the force-unwrap and the <c>null</c> pattern refuse a <c>T</c> up front is a
+    /// DISAGREEMENT among the four ways of asking, recorded in STATUS.md; refusing here as well
+    /// would settle it in passing, in the direction that breaks generic bodies which compile
+    /// today.</para>
+    /// </summary>
+    private void CheckNullTest(BinaryExpr b, LyrType l, LyrType r)
+    {
+        // Which side is the value: 'null == x' is the same test written round the other way.
+        var value = l is NullType ? r : l;
+
+        if (value is NullType or ErrorType or Optional or TypeParamType) return;
+
+        var op = b.Operator is BinaryOp.Eq ? "==" : "!=";
+        _de.Report("LYR-SEM0059", Severity.Error, b.Span,
+            $"'{op} null' on '{TypeFacts.Display(value)}' — a value of this type is never null",
+            new DiagnosticNote($"declare it '?{TypeFacts.Display(value)}' if it may be absent"));
     }
 
     /// <summary>Can this type conform to an interface at all? Only what can carry a conformance
@@ -2655,7 +2749,23 @@ public sealed class TypeChecker
             return o.Inner;
         }
         if (l is NullType) return r; // null ?? b yields the type of b
-        return l; // the left side is not nullable, so ?? has no effect, but it is no type error
+
+        // AN OPTIONAL-ONLY OPERATOR ON SOMETHING THAT IS NEVER NULL. This used to read "no effect,
+        // but no type error" and leave the refusal to the lowering, as LYR-IR0001 — a code §12.1
+        // keeps for VALID Lyric, carrying the note "this compiler version cannot lower it yet"
+        // about a program no version will ever run. The force-unwrap beside it has been
+        // LYR-SEM0005 all along; this is the same rule and now the same code, in the phase that
+        // knows the types. 'lyrc check' sees it too, which it did not before.
+        //
+        // The type parameter stays exempt for the reason CheckNullTest gives: only the
+        // instantiation answers the question, and the lowering still refuses what a substitution
+        // leaves non-optional.
+        if (l is not (ErrorType or TypeParamType))
+            _de.Report("LYR-SEM0005", Severity.Error, b.Span,
+                $"'??' on '{TypeFacts.Display(l)}' — a value of this type is never null, so the "
+                + "right side can never be reached");
+
+        return l;
     }
 
     private LyrType CheckAssign(AssignExpr a, SymbolTable scope)
@@ -2705,6 +2815,14 @@ public sealed class TypeChecker
         else
         {
             value = CheckExpr(a.Value, scope, targetType);
+
+            // '??=' carries the rule of the '??' it is named after: a target that can never be
+            // null can never take the right side. Same code, same reason — see CheckCoalesce.
+            if (a.Operator is BinaryOp.Coalesce
+                && targetType is not (ErrorType or TypeParamType or Optional or NullType))
+                _de.Report("LYR-SEM0005", Severity.Error, a.Span,
+                    $"'??=' on '{TypeFacts.Display(targetType)}' — a value of this type is never "
+                    + "null, so the assignment can never happen");
         }
 
         // The lvalue and mutability check happens in SemaRules; only type compatibility here.
@@ -4273,7 +4391,43 @@ public sealed class TypeChecker
                 CheckExpr(field.Value, scope);
             }
         }
+
+        ReportOmittedFields(si.Span, ts.Name, DeclaredFields(ts.Declaration), seen);
         return result;
+    }
+
+    /// <summary>The fields a type declares, in declaration order; empty for anything else.</summary>
+    private static IReadOnlyList<FieldDecl> DeclaredFields(Node? declaration) => declaration switch
+    {
+        ClassDecl c => c.Members.OfType<FieldDecl>().ToArray(),
+        StructDecl v => v.Members.OfType<FieldDecl>().ToArray(),
+        _ => [],
+    };
+
+    /// <summary>
+    /// An initializer that leaves a field without a default unset (<c>LYR-SEM0106</c>).
+    ///
+    /// <para>IT WAS THE LOWERING'S JOB, and the lowering has no business refusing a program: the
+    /// same omission answered <c>LYR-IR0001</c> with the note "this compiler version cannot lower
+    /// it yet", which is a promise about a future release for a program that will never be valid.
+    /// §12.1 reserves that code for VALID Lyric, so the check belongs here — where it also reaches
+    /// <c>lyrc check</c>, which never lowers and therefore used to answer "ok".</para>
+    ///
+    /// <para>EVERY missing field at once, not the first. The lowering threw on the first one it
+    /// met, so a three-field omission took three compiles to find; a checker that can see all of
+    /// them has no reason to hand them out one at a time.</para>
+    /// </summary>
+    private void ReportOmittedFields(Span span, string owner, IReadOnlyList<FieldDecl> declared,
+        HashSet<string> given)
+    {
+        var missing = declared.Where(f => f.Default is null && !given.Contains(f.Name))
+            .Select(f => f.Name).ToArray();
+        if (missing.Length == 0) return;
+
+        _de.Report("LYR-SEM0106", Severity.Error, span, missing.Length == 1
+            ? $"initializer for '{owner}' omits field '{missing[0]}', which has no default"
+            : $"initializer for '{owner}' omits {missing.Length} fields with no default: "
+              + string.Join(", ", missing.Select(m => $"'{m}'")));
     }
 
     // Path resolution for a struct initializer: runs through modules AND type members, meaning enum
@@ -4423,6 +4577,8 @@ public sealed class TypeChecker
                 CheckExpr(field.Value, scope);
             }
         }
+
+        ReportOmittedFields(si.Span, ev.Name, decls, seen);
         return result;
     }
 
@@ -4917,10 +5073,16 @@ public sealed class TypeChecker
 
         if (source.IsError) return; // already reported
 
+        // A FAILED DESTRUCTURING STILL BINDS ITS NAMES, at the error type. Without it the names
+        // do not exist at all, and every use of them downstream is a second diagnostic about the
+        // first one's consequence: 'let (a, b) = 5;' answered SEM0058 and then "unknown
+        // identifier 'a'" and "unknown identifier 'b'", of which only the first was the mistake.
+        // BindPattern poisons a whole pattern from an error scrutinee, nesting included.
         if (source is not TupleOf tuple)
         {
             Report(stmt.Initializer.Span, "LYR-SEM0058",
                 $"cannot destructure '{TypeFacts.Display(source)}' — only tuples can be taken apart");
+            BindPattern(stmt.Pattern, LyrType.Error, scope, stmt.IsMutable);
             return;
         }
 
@@ -4929,6 +5091,7 @@ public sealed class TypeChecker
             Report(stmt.Pattern.Span, "LYR-SEM0058",
                 $"the pattern binds {stmt.Pattern.Elements.Length} name(s), but "
                 + $"'{TypeFacts.Display(tuple)}' has {tuple.Elements.Length} element(s)");
+            BindPattern(stmt.Pattern, LyrType.Error, scope, stmt.IsMutable);
             return;
         }
 
@@ -5482,7 +5645,11 @@ public sealed class TypeChecker
             else pt = Report(p.Span, "LYR-SEM0045",
                 $"lambda parameter '{p.Name}' needs a type annotation (no context type available)");
             var ps = new ParameterSymbol(p.Name, pt, p);
-            if (p.Pattern is null) lambdaScope.TryDeclare(ps); // a pattern parameter's '_' is not a name in scope
+            // A pattern parameter's '_' is not a name in scope, so there is nothing to declare
+            // and nothing to collide.
+            if (p.Pattern is null && !lambdaScope.TryDeclare(ps))
+                ReportDuplicateParameter(p.Name, p.Span,
+                    Array.Find(parameters, q => q.Name == p.Name && !ReferenceEquals(q, p))?.Span);
             _result.BindRef(p, ps); // for definite-assignment analysis: lambda parameters are assigned
             pTypes[i] = pt;
 

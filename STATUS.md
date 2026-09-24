@@ -2199,6 +2199,11 @@ answer yet, and it belongs asked before E4 starts.
   wait — or it may not, and then the coalesce and the null test belong in the sema. **A spec-round
   candidate, and it is NOT additive either way**: making `??` strict would break any generic body
   that uses it today. Found by the 4.2 sweep, round 2; pre-existing.
+  - *Unchanged by the 4.6 diagnostics round, deliberately.* `x == null` and `x ?? y` on a
+    CONCRETE non-optional are checker errors now (`LYR-SEM0059`, `LYR-SEM0005`) instead of
+    `LYR-IR0001`, and §6.2 writes the type-parameter exemption down with its reason. What it does
+    NOT do is decide the disagreement: refusing a `T` here would have settled it in passing, in
+    the direction that breaks generic bodies which compile today.
 - **`lyrtest` isolates module state per test, but not resources — and closing that needs a
   decision.** A file, socket or child belongs to the VM (4.3.0's rule), and the runner uses one VM
   per test FILE since 4.3.5, so two tests in ONE file still share what either of them opens:
@@ -2253,6 +2258,10 @@ answer yet, and it belongs asked before E4 starts.
   Retrofitting them would mean extending the model with provenance data — a decision of its own.
 - **Measure the verifier share in a Release profile** — the Debug numbers are riddled with JIT
   warm-up and serve only as an order of magnitude.
+- **"Sema runs on parser recovery nodes" is unreproduced.** The one entry of `PLAN.md` **D** that
+  did not survive being measured: four attempts each gave a sema message that fitted the program
+  in front of it. It stays on the list as *claimed* rather than being struck — an unreproduced
+  finding is not a refuted one — but nothing can be changed without a case.
 - **§3.1's context does not propagate into TUPLE elements.** `(null, 0, "")` against
   `(?uint8[], int, string)` is "cannot assign" — the null element gets no context, while an
   array element or a match arm would adapt (2.1). Hit by M35's decode cores, worked around

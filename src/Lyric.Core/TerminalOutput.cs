@@ -99,8 +99,13 @@ public sealed class TerminalOutput : IDisposable
     {
         if (_current is not { } phase) return;
 
+        // STOPWATCH TICKS ARE NOT TIMESPAN TICKS. 'TimeSpan.FromTicks' counts 100 ns; a
+        // Stopwatch counts whatever 'Stopwatch.Frequency' says, which on Windows happens to be the
+        // same 10 MHz and on Linux is 1 GHz. Every per-phase row was therefore a HUNDRED TIMES too
+        // large there — and visibly so, because the total below is built from '.Elapsed' and
+        // converts properly, so a table's rows summed to a hundred times its own total.
         _timings.Add((phase, _currentDetail,
-            elapsedOverride ?? TimeSpan.FromTicks(_total.ElapsedTicks - _currentStartTicks)));
+            elapsedOverride ?? Stopwatch.GetElapsedTime(_currentStartTicks, _total.ElapsedTicks)));
         _current = null;
         _currentDetail = "";
     }

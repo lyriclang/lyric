@@ -100,13 +100,25 @@ public static class CliDiagnostics
     /// written nothing; the message lists the names that exist.</summary>
     public const string UnknownArtifact = "LYR-CLI0019";
 
-    /// <summary>Reports a CLI diagnostic and renders it immediately. It has no source span, so
-    /// there is nothing to collect or order.</summary>
-    public static int Fail(TextWriter error, string code, string message, int exitCode)
+    /// <summary>
+    /// Reports a CLI diagnostic and renders it immediately. It has no source span, so there is
+    /// nothing to collect or order.
+    /// </summary>
+    /// <param name="json">
+    /// Render as JSON, as <c>--json</c> asks. It used to be text unconditionally, so a caller
+    /// reading the diagnostic stream as JSON got a document for a compile error and a bare line
+    /// for a USAGE error — the one case a wrapper is most likely to hit while it is being written.
+    /// Measured: <c>lyrc check --json --bogus f.lyr</c> printed
+    /// <c>error[LYR-CLI0003]: unknown option</c> where <c>lyrc check --json missing.lyr</c>
+    /// printed a document. Passed rather than read from a static, because the drivers parse the
+    /// shared flags first and have the answer in hand at every one of these sites.
+    /// </param>
+    public static int Fail(TextWriter error, string code, string message, int exitCode,
+        bool json = false)
     {
         var engine = new DiagnosticEngine(new SourceManager());
         engine.Report(code, Severity.Error, default, message);
-        engine.RenderText(error);
+        if (json) engine.RenderJson(error); else engine.RenderText(error);
         return exitCode;
     }
 
@@ -131,10 +143,10 @@ public static class CliDiagnostics
 
     /// <summary>As <see cref="Fail"/>, at warning severity: rendered immediately, no exit
     /// code — a warning by itself ends nothing.</summary>
-    public static void Warn(TextWriter error, string code, string message)
+    public static void Warn(TextWriter error, string code, string message, bool json = false)
     {
         var engine = new DiagnosticEngine(new SourceManager());
         engine.Report(code, Severity.Warning, default, message);
-        engine.RenderText(error);
+        if (json) engine.RenderJson(error); else engine.RenderText(error);
     }
 }
