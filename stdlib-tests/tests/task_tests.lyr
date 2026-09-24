@@ -87,10 +87,19 @@ pub fn sleeps_wake_in_deadline_order(): void {
 // loaded machine (CI under JIT warm-up) both were already overdue, and the scheduler woke them
 // in SPAWN order. Negative waits make that exact situation deterministic: both deadlines are
 // in the past at the first poll, and the later-spawned task holds the earlier one.
+//
+// THE MARGIN IS AN HOUR, and it was 20 ms until 4.6. A deadline is computed when its task first
+// RESUMES, not when it is spawned, so the two are read from a clock that has moved in between:
+// with a gap of more than 20 ms the second task's "20 ms ago" lands AFTER the first task's
+// "now", the premise inverts, and the test asserts the opposite of what it set up. It went red
+// on CI on 2026-09-24 and green on the rerun. Reproduced on purpose by putting a task that
+// burns 40 million iterations between the two spawns: 1 before 2, with the same message the CI
+// printed. An hour cannot be closed by any scheduling gap, which is the whole requirement — the
+// numbers only have to be ordered, never realistic.
 @Test
 pub fn overdue_sleepers_still_wake_in_deadline_order(): void {
     spawn(sleeper(1, 0));
-    spawn(sleeper(2, 0 - 20));
+    spawn(sleeper(2, 0 - 3600000));
     run();
 
     let seen = drainLog();
@@ -99,6 +108,10 @@ pub fn overdue_sleepers_still_wake_in_deadline_order(): void {
     assertEq(seen[1], 1);
 }
 
+// A REAL tie needs the clock to stand still between the two resumes, which nothing can
+// promise; when it has moved, the first task simply holds the earlier deadline and wins on
+// that instead. Either way the answer is 1 then 2, so the test is never wrong -- it is only
+// sometimes weaker than its name. The sibling above is what the ordering itself is pinned on.
 @Test
 pub fn overdue_ties_wake_in_spawn_order(): void {
     spawn(sleeper(1, 0 - 20));
