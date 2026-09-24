@@ -314,6 +314,10 @@ internal sealed class WarningAnalyzer
             // the shorthand is exempt. An explicitly chosen name ('w = width') still warns.
             if (node is FieldPattern) continue;
 
+            // A rebound binding already has LYR-SEM0107, which says why nothing reads it. Saying
+            // "never used" beside it is the same fact told backwards.
+            if (_types.WasRebound(node)) continue;
+
             var (span, message) = node switch
             {
                 BindingStmt b => (b.NameSpan, $"'{local.Name}' is never used"),

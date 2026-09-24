@@ -72,6 +72,31 @@ they are the only way this release can break a build.
 - **Exhaustiveness names a WITNESS**: a missing case is reported as the pattern that reaches no
   arm rather than as a list.
 
+### Added — four migration warnings
+
+**Four questions about the language are open, and all four are settled together with 5.0** rather
+than one release at a time. Until then each carries a warning and *nothing else changes*: the
+behaviour a program has today is the behaviour it keeps until the major. §12.5 of the
+specification defines the family; the short version is that a migration warning marks a place
+whose meaning changes **whichever way** its question is settled, so none of them presumes an
+answer.
+
+- **`LYR-SEM0107` — a second binding of one name in one scope.** `let x = 1; let x = 2; return x;`
+  answers `1`: the second binding gets a slot nobody reads, and it does so even when it changes
+  the type. Neither refusal nor Rust-style shadowing. Shadowing an *enclosing* scope is a
+  different thing and stays legal. The `'x' is never used` warning that used to stand beside it is
+  gone — it was true and described the situation backwards.
+- **`LYR-SEM0108` — a non-`mut` method writing `this` on a class.** On a struct the same line is
+  `LYR-SEM0019`; on a class nothing checks it, although §5.1 takes `mut` into the signature an
+  interface conformance must match exactly. `examples/objects.lyr` was the one place in this
+  repository that triggered it, and it now says `mut fn advance()`.
+- **`LYR-SEM0109` — a field written through an immutable struct binding.** `let` pins the name and
+  not the value, so `let p = P { … }; p.x = 5;` compiles. A parameter is an immutable binding by
+  the same rule. A `var` binding, and a class through a `let`, do not warn.
+- **`LYR-SEM0110` — a `defer` body that can throw.** What that does to the rest of the chain is
+  unspecified; measured on this implementation, the stages scheduled before the thrower do not run
+  and the chain runs twice on the `return` path.
+
 ### Added — the standard library
 
 - **`std.result`** with `Result<T, E>` and the bridges `parseIntOrErr`, `textOrErr`, `parseOrErr`.

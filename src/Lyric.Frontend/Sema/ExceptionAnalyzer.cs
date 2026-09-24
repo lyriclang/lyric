@@ -121,7 +121,13 @@ internal sealed class ExceptionAnalyzer
             case ForInStmt fo: AnalyzeExpr(fo.Iterable); AnalyzeStmt(fo.Body); break;
             case ReturnStmt r: if (r.Value is not null) AnalyzeExpr(r.Value); break;
             case YieldStmt y: if (y.Value is not null) AnalyzeExpr(y.Value); break;
-            case DeferStmt de: AnalyzeStmt(de.Body); break; // treated like code at the declaration site
+            // Treated like code at the declaration site for the THROWS rules -- what may escape
+            // a defer body is what may escape the function. The counter is for the migration
+            // warning below: what a throwing defer does to the rest of the chain is unspecified.
+            case DeferStmt de:
+                _inDefer++;
+                try { AnalyzeStmt(de.Body); } finally { _inDefer--; }
+                break;
             case ThrowStmt t:
                 AnalyzeExpr(t.Value);
                 var thrownType = _types.TypeOf(t.Value);
@@ -261,9 +267,46 @@ internal sealed class ExceptionAnalyzer
         return (false, sym);
     }
 
+    /// <summary>
+    /// How many <c>defer</c> bodies enclose the statement being analyzed.
+    ///
+    /// <para>A counter rather than a flag because a <c>defer</c> body may hold a <c>defer</c>.
+    /// </para>
+    /// </summary>
+    private int _inDefer;
+
+    /// <summary>
+    /// A <c>defer</c> body that can throw (<c>LYR-SEM0110</c>, §7.5, §12.5).
+    ///
+    /// <para>§7.5 orders the chain and says nothing about a body that throws in the middle of it.
+    /// MEASURED on this implementation, and both halves show in one program: a counter in a
+    /// throwing <c>defer</c> before a <c>return</c> reads <b>2</b> instead of 1, because the
+    /// drain happens at the return site and that site lies inside the finally region the defer
+    /// bodies are — and a <c>defer</c> scheduled BEFORE the thrower does not run at all. Go, whose
+    /// <c>defer</c> this construct is shaped after, runs the rest of the chain.</para>
+    ///
+    /// <para>The fix is one piece of work — routing every <c>return</c> of a defer scope through
+    /// one epilogue behind the region, with the value in a synthetic local — and it is worth
+    /// building once the rule is settled rather than twice. 5.0 settles it; this marks the
+    /// places.</para>
+    ///
+    /// <para>REPORTED AT THE THROWING SITE, which is where the reader can see what throws. The
+    /// <c>defer</c> keyword above it may be several statements away.</para>
+    /// </summary>
+    private void NoteThrowingDefer(Span span)
+    {
+        if (_inDefer == 0) return;
+        _de.Report("LYR-SEM0110", Severity.Warning, span,
+            "this runs inside a 'defer' and can throw — what that does to the rest of the chain "
+            + "is unspecified, and 5.0 settles it",
+            new DiagnosticNote("a migration warning: the program is legal today, "
+                + "and 5.0 makes it a different program"));
+    }
+
     private void CheckSite((bool any, TypeSymbol? sym)? thrown, Span span, string what)
     {
         if (thrown is not { } th) return;
+        NoteThrowingDefer(span);
         if (HandledByTry(th)) return;
         if (PermittedByDeclaration(th)) return;
         var name = th.sym?.Name ?? "Throwable";

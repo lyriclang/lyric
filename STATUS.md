@@ -24,8 +24,8 @@ holes, the diagnostics, and the two rule questions that pass for bug fixes. **No
 4.6.** The next feature round is 4.7, and every deprecation clock that was aimed at 4.6 moved
 with it.
 
-**B AND C ARE EMPTY** (2026-09-24, PRs #167, #168, #169, #170). What is left before the tag is
-**D**, the diagnostics section, and the warning stages below.
+**B, C, D AND E ARE EMPTY** (2026-09-24, PRs #167–#172). **The tag's condition is met.** What
+stands between the tree and `v4.6.0` is the release checklist itself, not a finding.
 
 **THE OPEN RULE QUESTIONS ARE ANSWERED, AND THE ANSWER IS "WITH v5"** (maintainer, 2026-09-24).
 Everything this file and the plan call "decided nowhere" — a second binding of one name, a
@@ -36,6 +36,15 @@ stating: item **E** is no longer a pair of bug fixes but a pair of clocks, and e
 plan's shelf starts NOW rather than in 4.7 — a warning changes no program, so it sits inside a
 stabilization release without contradiction. What a warning needs in order to be written is a
 finding that can be made WITHOUT the rule's answer; where there is none, the position waits.
+
+**FOUR CLOCKS RUN** (PR #172, `lyric-spec#44`): `LYR-SEM0107` a second binding of one name in one
+scope, `LYR-SEM0108` a non-`mut` method writing `this` on a class, `LYR-SEM0109` a field written
+through an immutable struct binding, `LYR-SEM0110` a `defer` body that can throw. §12.5 defines
+the family and states the property that matters — none of them presumes an answer; each reports a
+program whose meaning changes whichever way its question is settled. Measured over `examples/`,
+`stdlib/` and `stdlib-tests/` BEFORE the codes were written, the four together fire **once**, on
+`examples/objects.lyr`, whose `advance()` writes its receiver without `mut`. A warning nobody can
+switch off has to be right about programs that are NOT going to change.
 
 **What a 4.5 project has to read before upgrading** is the changelog's first section, and it is
 short: six shapes that compiled in 4.5 and answered something nobody asked for are refused now —

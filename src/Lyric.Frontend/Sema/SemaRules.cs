@@ -244,6 +244,7 @@ public sealed class SemaRules
             case AssignExpr a:
                 if (!_types.TypeOf(a.Target).IsError && !IsMutableLvalue(a.Target))
                     _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, "cannot assign to this target (not a mutable lvalue)");
+                NoteWhereFiveSettlesIt(a.Target);
                 WalkExpr(a.Value);
                 WalkExpr(a.Target);
                 return;
@@ -287,10 +288,70 @@ public sealed class SemaRules
     /// <summary>The target of <c>++</c> or <c>--</c>, which is written as much as read.</summary>
     private void CheckIncrementTarget(Expr operand)
     {
+        NoteWhereFiveSettlesIt(operand);
         if (_types.TypeOf(operand).IsError || IsMutableLvalue(operand)) return;
         _de.Report("LYR-SEM0019", Severity.Error, operand.Span,
             "cannot increment or decrement this target (not a mutable lvalue)");
     }
+
+    /// <summary>
+    /// The two field writes §3.4a leaves unspecified, marked as migration warnings (§12.5).
+    ///
+    /// <para><c>LYR-SEM0108</c> — a non-<c>mut</c> method writing <c>this</c> on a CLASS. On a
+    /// struct the same line is <c>LYR-SEM0019</c>; on a class nothing checks it, although §5.1's
+    /// conformance test takes <c>mut</c> into the signature and an interface method declared
+    /// <c>mut</c> is therefore satisfied only by a <c>mut</c> implementation. The keyword is part
+    /// of the contract and means nothing at the site that would have to keep it.</para>
+    ///
+    /// <para><c>LYR-SEM0109</c> — a field written through an immutable binding of a STRUCT value.
+    /// <c>let</c> is immutability of the binding and not of the value (§7.1), which for a
+    /// reference is the intended reading and for a value is a consequence with no obvious one:
+    /// <c>let p = P { … }; p.x = 5;</c> compiles although <c>p</c> can never be reassigned. A
+    /// parameter is an immutable binding by the same rule.</para>
+    ///
+    /// <para>SEPARATE FROM <see cref="IsMutableLvalue"/> ON PURPOSE. That predicate is asked twice
+    /// per program point — once for an assignment and once for an increment — and a warning raised
+    /// from inside it would be reported twice for one increment. A query that diagnoses is a
+    /// query that gets called the wrong number of times.</para>
+    ///
+    /// <para>NEITHER FIRES ON WHAT 5.0 WILL ACCEPT: a <c>mut fn</c> on a class writes its receiver
+    /// under every candidate answer, and a <c>var</c> struct binding stays writable under all of
+    /// them. What both mark is a place where the answer moves the program.</para>
+    /// </summary>
+    private void NoteWhereFiveSettlesIt(Expr target)
+    {
+        if (target is not MemberExpr m) return;
+
+        var baseType = _types.TypeOf(m.Target);
+        if (baseType.IsError) return;
+
+        switch (TypeFacts.KindOf(baseType))
+        {
+            case TypeSymbolKind.Class when m.Target is ThisExpr && !_thisMut:
+                Migration("LYR-SEM0108", m.Span,
+                    $"this method writes '{m.Member}' on its receiver without 'mut' — a struct "
+                    + "refuses that today (LYR-SEM0019), a class does not, and 5.0 settles which "
+                    + "of the two a class follows");
+                return;
+
+            case TypeSymbolKind.Struct when m.Target is IdentifierExpr id
+                && _types.RefOf(id) is LocalSymbol { IsMutable: false } or ParameterSymbol:
+                Migration("LYR-SEM0109", m.Span,
+                    $"'{NameOf(m.Target)}' is an immutable binding and this writes its field "
+                    + $"'{m.Member}' — legal today, because 'let' pins the name and not the value, "
+                    + "and 5.0 settles what a struct is");
+                return;
+        }
+    }
+
+    private static string NameOf(Expr e) => e is IdentifierExpr id ? id.Name : "the binding";
+
+    /// <summary>A migration warning: legal today, different in 5.0. §12.5 carries the family, and
+    /// every one of them says so, because the code alone does not.</summary>
+    private void Migration(string code, Span span, string message) =>
+        _de.Report(code, Severity.Warning, span, message,
+            new DiagnosticNote("a migration warning: the program is legal today, "
+                + "and 5.0 makes it a different program"));
 
     private bool IsMutableLvalue(Expr expr) => expr switch
     {

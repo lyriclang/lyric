@@ -50,6 +50,34 @@ lyric check src/main.lyr --deny-warnings
 The warnings keep their severity in the output; one closing error carries the policy into the
 exit code, and a denied `build` writes no file.
 
+## Migration warnings
+
+Four warnings are not about the program being odd. They mark a place where **the language has
+not decided yet**, and where the answer — which comes with 5.0, all four at once — changes what
+your program means. The program compiles today and keeps the behaviour it has until the major.
+
+| Code | What it marks |
+|---|---|
+| `LYR-SEM0107` | a second `let` or `var` binding the same name **in one scope**. Today the first one wins and the second is unreachable, even when it changes the type. Shadowing an *enclosing* scope is a different thing and stays legal. |
+| `LYR-SEM0108` | a method that writes `this` on a **class** without saying `mut`. On a struct that is already an error. |
+| `LYR-SEM0109` | a field written through an immutable binding of a **struct** — a `let` or a parameter. `let` pins the name, not the value. |
+| `LYR-SEM0110` | a `defer` body that can **throw**. What that does to the rest of the chain is not decided. |
+
+Each of them fires on a program whose meaning changes **whichever way** its question is settled,
+so none of them is a decision announced early. Each carries a note saying so:
+
+```
+main.lyr:3:5: warning[LYR-SEM0107]: 'x' is already bound in this scope — this binding is
+  unreachable today, and 5.0 settles which of the two a later use names
+    let x = 2;
+    ^^^^^^^^^^
+  note: previous binding — main.lyr:2:5
+  note: a migration warning: the program is legal today, and 5.0 makes it a different program
+```
+
+When 5.0 settles a question, its code is retired rather than turned into the new rule's error:
+the code meant "this will change", and that stops being true.
+
 ## Hints
 
 `LYR-SEM0075` is a hint: a `var` through which nothing is ever changed — no reassignment, no
