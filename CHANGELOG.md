@@ -99,6 +99,12 @@ they are the only way this release can break a build.
   function instead of the end of its own block.
 - **A throwing `defer` body ran the scope's defers twice** on the fall-through path.
 - **The methods of a generic enum were never lowered**, so calling one was `LYR-IR0001`.
+- **A method could not be generic on top of its type.** `Box<int>.map<string>` takes its `T` from
+  the receiver and its `U` from the call, and the lowering bound only the first, so every
+  combinator with that shape — `Result<T, E>.map<U>`, `List<T>.map<U>`, `Iterator.toList` — was
+  `LYR-IR0001`. It is why the standard library writes several of its combinators as free
+  functions; those keep working, and the method form is now available to write. §8.4 states the
+  rule, including which parameter wins when the two collide by name.
 - **`parseInt` and `powInt` answered a wrapped number** where their `?int` return type promised
   `null`: `parseInt("99999999999999999999")` was `7766279631452241919`, `powInt(2, 64)` was `0`.
 - **`trim` and `trimStart`/`trimEnd`/`isBlank` used two different notions of whitespace.**
@@ -118,6 +124,9 @@ they are the only way this release can break a build.
 
 - The grammar (§2) describes the forms above. Seven of them were shipping without being in it.
 - `LYR-IR0001` covers two constructs fewer; the appendix says which.
+- **A lowering that gives up on a written type now names the type.** The message was "a
+  non-primitive field type" wherever one failed — including at a method's RETURN type, where it
+  described a field that was not in the program and sent the reader to the wrong line.
 - **`LYRIC_VERIFY_IR=1` turns the IR verifier on in any build**, and `=0` off. It checks the
   compiler's own intermediate form twice per compile — once on what the lowering produced, once
   on what the optimizations left of it — and a finding is a compiler bug, so it aborts naming

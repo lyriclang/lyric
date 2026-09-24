@@ -24,6 +24,19 @@ holes, the diagnostics, and the two rule questions that pass for bug fixes. **No
 4.6.** The next feature round is 4.7, and every deprecation clock that was aimed at 4.6 moved
 with it.
 
+**B AND C ARE EMPTY** (2026-09-24, PRs #167, #168, #169, #170). What is left before the tag is
+**D**, the diagnostics section, and the warning stages below.
+
+**THE OPEN RULE QUESTIONS ARE ANSWERED, AND THE ANSWER IS "WITH v5"** (maintainer, 2026-09-24).
+Everything this file and the plan call "decided nowhere" — a second binding of one name, a
+`let` struct's fields, `?Struct` as a value, a parameter versus a `let`, `mut` on class methods,
+`mut struct`, what a throwing `defer` owes the rest of the chain — is settled together with the
+major. **Until then only a WARNING is produced, pointing at the change.** Two consequences worth
+stating: item **E** is no longer a pair of bug fixes but a pair of clocks, and every clock in the
+plan's shelf starts NOW rather than in 4.7 — a warning changes no program, so it sits inside a
+stabilization release without contradiction. What a warning needs in order to be written is a
+finding that can be made WITHOUT the rule's answer; where there is none, the position waits.
+
 **What a 4.5 project has to read before upgrading** is the changelog's first section, and it is
 short: six shapes that compiled in 4.5 and answered something nobody asked for are refused now —
 `if (c) 1 else 2.5`, `x++` on a `let`, an assignment to a captured `let` in a lambda or in a block
@@ -1656,6 +1669,39 @@ out of them and hands its own functions, types and value structs in.
   5497 tests green with the verifier on AND off, conformance 159/159, 80 examples in both profiles
   clean.
 
+- [x] **B and C: the process aborts and the sema holes** (2026-09-23/24, PRs #167, #168, #169,
+  #170, `lyric-spec#39`, `#40`, `#41`, `#42`). Two sections of the plan, empty now.
+
+  **B was mostly about not dying.** A depth limit in the recursive descent (measured, not guessed:
+  350 nests compile, 450 kill the process — the limit is 192), `lyrc build -o ""`, `string * n`
+  with a big `n`, a forward reference to a global, script→host→script reentrancy, ESC/BEL raw on
+  stderr, and an `InternalCompilationException` that used to leave a stack trace with no code and
+  no position. `LYR-CLI0020` is what catches the last one — and it immediately earned its keep:
+  it is what surfaced the receiver bug in C below, which `lyrc check` had never been able to see.
+
+  **Three lessons.** `RuntimeHelpers.TryEnsureSufficientExecutionStack` does NOT save the process
+  here, because an exception FILTER runs before the stack unwinds and builds a backtrace at every
+  level; a counted depth does. A guard placed after the JIT fast path guards only the interpreter,
+  which the compiled CI job found and my reasoning had not. And `dotnet test --no-build` reported
+  green against stale binaries after a diagnostic code was split — the CI found the red test.
+
+  **C was seven entries, two of which were not holes.** Exhaustiveness through a tuple (decided
+  where ONE column tests; two testing columns still want a `_`, because half of Maranget would
+  ACCEPT holes and the lowering drops the last arm's test on an exhaustive match). `catch` on an
+  interface — and without a format change: the refusal rested on the handler table, but the
+  dispatch table already answers conformance. An interface value that did not satisfy its own
+  constraint. `&&=`, `||=` and `??=`, of which one combination out of nine worked. Generic
+  natives, which did not exist at all. A generic method monomorphized without its receiver, whose
+  module its own READER refused. And finally a method generic on top of its type
+  (`Box<int>.map<string>`) — the shape of every mapping combinator, and the reason the standard
+  library writes several of them as free functions.
+
+  Two entries were **wrongly listed**: a lambda cannot carry a `throws` clause because §2 has no
+  such form (that is typed throws stage 3, a 4.7 feature), and field-versus-method sharing a
+  namespace is already refused and stays refused — what is missing there is a spec line.
+
+  5609 tests green, conformance 163/163, both engines, verifier on.
+
 - [x] **The plan absorbs `lyric-v5-features.md`** (2026-09-23, PR #166). The old eleven-item
   feature list was a selection: 7 foundation positions became 8, 4 ergonomics became 12, and a
   standard-library section and five tools appeared that stood in no list here. The expensive find
@@ -2120,17 +2166,22 @@ answer yet, and it belongs asked before E4 starts.
   not check a release build does not catch. The reader learned the arithmetic tags after one
   escaped as `add string`; the general gap stands.
 
-- **Exhaustiveness does not see an enum INSIDE a tuple.** `match ((E.A(n), m))` over `(E, int)` is
-  `LYR-SEM0050` although the arms cover every variant. The pattern compiler learned the form; the
-  coverage computation did not. The one defect of its ten that pattern-compiler did not close, and
-  the measurement says so rather than the report.
+- **A throwing `defer` still runs the chain twice on the RETURN path** — and it is a CLOCK now,
+  not a fix (maintainer, 2026-09-24). Measured 2026-09-24, and both halves show in one program: a
+  counter in a throwing `defer` before a `return` reads **2** instead of 1, and a `defer`
+  scheduled before it runs **not at all** — Go would run it. The fall-through path is fixed; the
+  return drains at the return site, which lies inside the region, so moving the region's end does
+  not reach it. Getting it out means routing every `return` of a defer scope through one epilogue
+  behind the region, with the value in a synthetic local — built once, after §7.5 says whether the
+  defers scheduled BEFORE a throwing one still run, and that answer comes with v5.
 
-- **A throwing `defer` still runs the chain twice on the RETURN path.** The fall-through path is
-  fixed; the return drains at the return site, which lies inside the region, so moving the
-  region's end does not reach it. Getting it out means routing every `return` of a defer scope
-  through one epilogue behind the region, with the value in a synthetic local — and that is only
-  worth building once §7.5 says whether the defers scheduled BEFORE a throwing one still run. Go,
-  whose `defer` this is, says yes.
+- **A second binding of one name is discarded in silence** — the other clock. Measured
+  2026-09-24: `let x = 1; let x = 2; return x;` answers **1**, and it answers 1 even when the
+  second binding changes the type (`let x = "two";` leaves `return x` checking against `int`).
+  The second binding gets a slot nobody reads. The only signal today is `LYR-SEM0071` *"'x' is
+  never used"* on the SECOND declaration, which describes the situation exactly backwards.
+  Rejecting it and Rust-style shadowing are both better than this; which of the two is a v5
+  question, and neither answer is needed to warn.
 
 - **Seven rule questions stand collected rather than answered**, in
   `docs/Befunde_und_Verbesserungen/SPEC-RUNDE.md`: where `+1` comes from (the maintainer set the

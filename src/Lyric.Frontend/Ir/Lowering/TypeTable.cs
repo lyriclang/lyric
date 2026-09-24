@@ -1,4 +1,4 @@
-using Lyric.AST;
+﻿using Lyric.AST;
 using Lyric.Resolver;
 using Lyric.Sema;
 
@@ -932,8 +932,19 @@ internal sealed class TypeTable
             if (bound is TypeSymbol type) return RefTo(type);
         }
 
+        // WHAT IT IS, rather than where it most often stood. This is the one place in the table
+        // that gives up on a written type, and it is reached from every position a type can be
+        // written in -- a field, a parameter, a return type. Saying "field" there sent the reader
+        // of a generic method's LYR-IR0001 to look for a field that was not in the program.
+        //
+        // A bare name arriving here is all but certainly a type parameter no substitution bound:
+        // everything else was answered further up, and the sema would have refused an unknown name
+        // long before the lowering ran.
         throw new UnsupportedConstructException(
-            "a non-primitive field type", node.Span);
+            node is NamedType { TypeArguments.Length: 0 } bare
+                ? $"'{string.Join(".", bare.Path)}' names no type with a layout here — for a bare "
+                  + "name that means a type parameter no substitution bound"
+                : "a type this lowering cannot resolve", node.Span);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using Lyric.AST;
+﻿using Lyric.AST;
 using Lyric.Core;
 using Lyric.Resolver;
 using Lyric.Sema;
@@ -3690,12 +3690,7 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
-        // The type arguments the sema inferred, with any that are still parameters of the CALLING
-        // instance resolved through its substitution — the same step an ordinary generic call takes.
-        var typeArguments = _types.TypeArgumentsOf(expr)
-            .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
-                ? bound : t)
-            .ToArray();
+        var typeArguments = SubstitutedTypeArguments(expr);
 
         var owning = _typeTable.InstanceOf(interfaceId);
         var target = _instances.Request(method, declaration, $"{iface.Name}.{method.Name}",
@@ -3751,13 +3746,38 @@ internal sealed class FunctionLowerer
     /// malformed store into the optional slot surfaces one step later, in the caller, with no
     /// line to point at. Every path that calls a method OF an instance needs it.</para>
     /// </summary>
-    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance owner)
+    private static Dictionary<string, LyrType> InstanceSubstitution(GenericInstance owner,
+        FunctionSymbol? method = null, IReadOnlyList<LyrType>? methodArguments = null)
     {
         var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
         for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
             mapping[owner.Definition.Generics[i].Name] = owner.Arguments[i];
+
+        // The METHOD's own parameters afterwards, so its 'U' wins a collision with the type's 'U'.
+        // That is the scoping the source has, and the one InstanceTable.Request builds for the body
+        // -- the two have to agree, or a parameter type would be materialized under one binding and
+        // read under the other.
+        if (method is not null && methodArguments is not null)
+            for (var i = 0; i < Math.Min(method.Generics.Length, methodArguments.Count); i++)
+                mapping[method.Generics[i].Name] = methodArguments[i];
+
         return mapping;
     }
+
+    /// <summary>
+    /// The type arguments the sema settled for this call, with any that are still a parameter OF
+    /// THE CALLING INSTANCE resolved through its substitution.
+    ///
+    /// <para>In <c>fn wrap&lt;T&gt;(b: Box&lt;T&gt;)</c> the call <c>b.map&lt;T&gt;(x)</c> names the
+    /// caller's <c>T</c>, and which type that is only the enclosing instantiation knows. Left
+    /// unresolved it reaches <see cref="InstanceTable.Request"/> as a bare parameter, which refuses
+    /// it -- correctly, since there is no instance to build for a name.</para>
+    /// </summary>
+    private LyrType[] SubstitutedTypeArguments(CallExpr expr) =>
+        _types.TypeArgumentsOf(expr)
+            .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
+                ? bound : t)
+            .ToArray();
 
     private TempId? LowerGenericMethodCall(MemberExpr member, GenericInstance owner, CallExpr expr)
     {
@@ -3768,7 +3788,18 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
-        var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
+        // A GENERIC METHOD ON A GENERIC TYPE takes its T from the instance and its U from the
+        // call, and needs BOTH bound. RequestMethod knows only the first, so 'Result<T,E>.map<U>'
+        // ended at "a non-primitive field type" — a sentence about a field, reported at a method's
+        // return type. The two-sided request has existed all along; this path never asked for it.
+        var methodArguments = method.Generics.Length > 0
+            ? SubstitutedTypeArguments(expr) : [];
+
+        var target = method.Generics.Length > 0
+            ? _instances.Request(method, declaration, $"{owner.Definition.Name}.{method.Name}",
+                method.IsStatic ? null : owner.Definition, methodArguments, _typeTable,
+                expr.Span, owner)
+            : _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         var receiver = LowerExpr(member.Target);
 
@@ -3778,7 +3809,7 @@ internal sealed class FunctionLowerer
         // as "store of t3 (i64) into l9 (?i64)" — malformed IR with no line to point at. The
         // interface path below has carried this mapping all along; this one had not.
         var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
-            InstanceSubstitution(owner));
+            InstanceSubstitution(owner, method, methodArguments));
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
         // receiver comes before them, as in every method call.
@@ -3786,7 +3817,12 @@ internal sealed class FunctionLowerer
         args[0] = receiver;
         Array.Copy(supplied, 0, args, 1, supplied.Length);
 
-        var returns = ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
+        // The written return type is in the DECLARATION's terms and is lowered in the instance's;
+        // for a generic method the sema's type of the call already carries both bindings, which is
+        // the route the interface twin above takes for exactly this reason.
+        var returns = method.Generics.Length > 0
+            ? TypeOfExpr(expr)
+            : ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
         if (IsVoid(returns))
         {
             _b.Emit(new Call(null, target, args, expr.Span));
@@ -3815,16 +3851,27 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
-        var target = _instances.RequestMethod(method, declaration, owner, expr.Span);
+        // Generic on both sides here too: 'Box<int>.make<string>()'. A static method carries no
+        // receiver, which is the only difference -- the request says so by passing none.
+        var methodArguments = method.Generics.Length > 0
+            ? SubstitutedTypeArguments(expr) : [];
+
+        var target = method.Generics.Length > 0
+            ? _instances.Request(method, declaration, $"{owner.Definition.Name}.{method.Name}",
+                method.IsStatic ? null : owner.Definition, methodArguments, _typeTable,
+                expr.Span, owner)
+            : _instances.RequestMethod(method, declaration, owner, expr.Span);
 
         // Under the instance's substitution, for the same reason as the instance-method path:
         // 'Box<?int>.of(3)' writes its parameter 'T', which is a '?int' here, and the 3 has to
         // be wrapped. A STATIC call needs it just as much — the receiver is absent, the type
         // arguments are not.
         var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
-            InstanceSubstitution(owner));
+            InstanceSubstitution(owner, method, methodArguments));
 
-        var returns = ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
+        var returns = method.Generics.Length > 0
+            ? TypeOfExpr(expr)
+            : ReturnTypeOfInstanceMethod(declaration, owner, expr.Span);
         if (IsVoid(returns))
         {
             _b.Emit(new Call(null, target, args, expr.Span));
@@ -4310,10 +4357,7 @@ internal sealed class FunctionLowerer
             // A type argument may itself BE a type parameter when the calling function is already an
             // instance: in 'wrap<T>' the call 'id(x)' calls the instance 'id<T>', and which T that is is
             // known only to the own substitution.
-            var typeArguments = _types.TypeArgumentsOf(expr)
-                .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var b)
-                    ? b : t)
-                .ToArray();
+            var typeArguments = SubstitutedTypeArguments(expr);
 
             // THE RECEIVER'S TYPE GOES WITH IT. It used to be 'null' here unconditionally, so a
             // generic METHOD on a plain class was monomorphized without a 'this' slot: the call
