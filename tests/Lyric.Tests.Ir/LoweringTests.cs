@@ -664,28 +664,35 @@ public class LoweringTests
     /// An optional-shaped operation on a value that is not optional carries a note saying so —
     /// NOT the default "cannot lower it yet" category.
     ///
-    /// <para>The check has to sit in the lowering, because a generic body may write
-    /// <c>x == null</c> or <c>x ?? y</c> over a <c>T</c> that IS instantiated with an optional,
-    /// and only monomorphization knows. But once the substituted type has no optional in it, no
-    /// future compiler version will lower it either — there is nothing to lower. The old note
-    /// sent a reader looking for a release that will never help.</para>
+    /// <para>The check sits in the lowering because a generic body may write <c>x == null</c> or
+    /// <c>x ?? y</c> over a <c>T</c> that IS instantiated with an optional, and only
+    /// monomorphization knows. But once the substituted type has no optional in it, no future
+    /// compiler version will lower it either — there is nothing to lower. The old note sent a
+    /// reader looking for a release that will never help.</para>
+    ///
+    /// <para>SINCE 4.6 THIS IS THE BACKSTOP AND NOT THE RULE. The written forms
+    /// (<c>let x: int = 5; x ?? 0</c>) are refused by the CHECKER now — <c>LYR-SEM0059</c> for the
+    /// null test, <c>LYR-SEM0005</c> for the two coalescing forms beside the force-unwrap they
+    /// belong with — because §12.1 keeps <c>LYR-IR0001</c> for valid Lyric and a program that can
+    /// never run is not that. What is left here is exactly the part the checker cannot decide: the
+    /// body is generic, the sema lets a <c>T</c> through, and the instantiation is what makes the
+    /// question answerable. Hence <c>probe&lt;int&gt;</c> rather than <c>let x: int</c>.</para>
     ///
     /// <para>The CODE stays <c>LYR-IR0001</c>: codes are stable identifiers and
     /// <c>LYR-IR0002..0010</c> stay free by decision. Only the aside changes.</para>
     /// </summary>
     [Theory]
-    [InlineData("if (x == null) { return 1; }", "null test on a non-optional")]
-    [InlineData("let y: int = x ?? 0;", "'??' on a non-optional")]
-    [InlineData("var z = x; z ??= 0;", "'??=' on a non-optional target")]
+    [InlineData("if (x == null) { return 1; } return 0;", "null test on a non-optional")]
+    [InlineData("let y: T = x ?? x; return 0;", "'??' on a non-optional")]
+    [InlineData("var z = x; z ??= x; return 0;", "'??=' on a non-optional target")]
     public void An_optional_operation_on_a_plain_value_says_it_is_never_null(
         string statement, string expected)
     {
         var (ir, de) = TryLower($$"""
-            fn main(): int {
-                let x: int = 5;
+            fn probe<T>(x: T): int {
                 {{statement}}
-                return 0;
             }
+            fn main(): int { return probe<int>(5); }
             """);
 
         Assert.Null(ir);
@@ -811,22 +818,26 @@ public class LoweringTests
     /// the two grew together: "initializer omits field 'wood', which has no default is not
     /// supported by this compiler version yet" is one sentence made of two, and a reader takes it
     /// apart before answering it.</para>
+    ///
+    /// <para>THE EXAMPLE IN THAT PARAGRAPH IS HISTORY as of 4.6: an initializer that omits a field
+    /// is <c>LYR-SEM0106</c> now and never reaches the lowering. The FORMATTING rule it found is
+    /// what this test is about, so it moved to a construct that is still a genuine limit — a
+    /// generic method value, which the language will one day lower and today does not.</para>
     /// </summary>
     [Fact]
     public void The_lowering_limit_says_the_construct_and_notes_the_category()
     {
         var (ir, de) = TryLower("""
-            struct Store { wood: int, stone: int }
-            fn main(): int { let s = Store { stone = 1 }; return s.stone; }
+            fn probe<T>(x: T): int { if (x == null) { return 1; } return 0; }
+            fn main(): int { return probe<int>(5); }
             """);
 
         Assert.Null(ir);
-        var diagnostic = Assert.Single(de.Diagnostics);
-        Assert.Equal("LYR-IR0001", diagnostic.Code);
-        Assert.Equal("initializer omits field 'wood', which has no default", diagnostic.Message);
+        var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Code == "LYR-IR0001"));
+        Assert.Equal("null test on a non-optional", diagnostic.Message);
 
         Assert.NotNull(diagnostic.Notes);
-        Assert.Contains(diagnostic.Notes!, n => n.Message.Contains("cannot lower it yet"));
+        Assert.Contains(diagnostic.Notes!, n => n.Message.Contains("never null"));
     }
 
     [Fact]

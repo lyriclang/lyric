@@ -164,10 +164,28 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
 
 ### D. Diagnostik
 
-`IR0001` trägt Semantikfehler, die keine Implementierungsgrenze sind (fehlendes Pflichtfeld,
-`p.x++`, `x == null` auf Nicht-Optional) — §12.1 reserviert den Code für gültiges Lyric. Dazu:
-keine Deduplizierung, `SEM0058` vergiftet nicht, `SEM0052` schlägt das Geschriebene vor, Sema
-läuft auf Parser-Recovery-Knoten, `--json` unvollständig, `--verbose`-Zeiten ×100 auf Linux.
+**Sieben Posten, gemessen am 2026-09-24, sechs davon erledigt** (PR #171, `lyric-spec#43`):
+
+| Fund | Stand |
+|---|---|
+| `IR0001` trägt Semantikfehler: fehlendes Pflichtfeld, `x == null` auf Nicht-Optional, dazu `??`/`??=` auf Nicht-Optional | ✅ → `SEM0106` (nennt ALLE fehlenden Felder), `SEM0059`, `SEM0005` |
+| `SEM0052` schlägt das Geschriebene vor | ✅ — schlug `'X { … }'` für **jeden** Typ vor, `int { … }` eingeschlossen |
+| `SEM0058` vergiftet nicht | ✅ — `let (a, b) = 5;` antwortete danach zweimal „unknown identifier" über die eigene Folge |
+| keine Deduplizierung | ✅ — ein doppelt importierter Name war **mit sich selbst** mehrdeutig, mit zwei identischen Notes auf eine Deklaration |
+| `--verbose`-Zeiten ×100 auf Linux | ✅ — Stopwatch-Ticks als TimeSpan-Ticks gelesen; die Summenzeile darunter war immer richtig, die Tabelle widersprach sich also selbst |
+| `--json` unvollständig | ✅ — Argumentfehler kamen als Textzeile in einen Strom, den jemand parst |
+| Sema läuft auf Parser-Recovery-Knoten | **offen, nicht reproduziert.** Vier Versuche ergaben je eine Sema-Meldung, die zum Programm passte. Der Fund steht als „behauptet"; ohne Repro ist nicht zu sagen, was zu ändern wäre. |
+
+**Nebenbefund, selbst gefunden**: `fn f(x: int, x: int)` kompilierte. Der erste Parameter gewann
+jede Auflösung, das Argument für den zweiten ging nirgendwohin — `f(1, 2)` mit `return x` ergab
+**1**. Eine Parameterliste ist ein Scope wie ein Modul- oder Typ-Rumpf, und sie war der einzige,
+nach dem nie jemand gefragt hat. Jetzt `RES0001`; `_` darf sich weiter wiederholen, was der
+eigene Kontrolltest gefangen hat, nachdem die erste Fassung es verbot.
+
+**`p.x++` gehört nicht hierher.** Der Posten stand in dieser Liste als „Semantikfehler unter
+`IR0001`", und das stimmt nicht: §6.1 sagt „auf ganzzahligen **Variablen**", also ist die Frage,
+worauf ein Inkrement stehen darf, offen und keine Grenze, die falsch benannt wäre. Sie gehört in
+die Inkrement-Runde von 4.7 (Position 12), wo sie ohnehin schon steht.
 
 **Eine Warnung, die einen Fehler erklärt, wird genau dann unterdrückt, wenn sie gebraucht wird**
 (**NEU**, gemessen 2026-09-24). `WarningAnalyzer` läuft nur über ein Programm ohne Fehler, und

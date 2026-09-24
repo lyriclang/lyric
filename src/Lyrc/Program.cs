@@ -24,7 +24,7 @@ public static class Program
         var (options, args, optionError) = ToolOptions.Parse(rawArgs);
         if (optionError is not null)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                optionError, ExitCodes.Usage);
+                optionError, ExitCodes.Usage, options.Json);
 
         using var terminal = new TerminalOutput(Console.Out, Console.Error, options);
 
@@ -42,7 +42,7 @@ public static class Program
                 "parse" => WithFile(args, "parse", terminal, Parse),
                 "tokenize" => WithFile(args, "tokenize", terminal, Tokenize),
                 _ => CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                    $"unknown command: {args[0]} — try 'lyrc --help'", ExitCodes.Usage),
+                    $"unknown command: {args[0]} — try 'lyrc --help'", ExitCodes.Usage, options.Json),
             };
         }
         catch (ProjectFileException broken)
@@ -51,7 +51,7 @@ public static class Program
             // put a diagnostic, and threading a result type through five commands would put the
             // handling in five places for a failure that ends all of them the same way.
             return CliDiagnostics.Fail(Console.Error, broken.Code,
-                $"{broken.Path}: {broken.Message}", ExitCodes.Failure);
+                $"{broken.Path}: {broken.Message}", ExitCodes.Failure, options.Json);
         }
         catch (InternalCompilationException bug)
         {
@@ -216,14 +216,15 @@ public static class Program
     {
         var (flags, refused) = ParseFlags("build", args);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         var output = flags.Output ?? Path.ChangeExtension(path, ".lyrbc");
 
         var result = SourceCompiler.Compile(path, Options(path, flags, terminal, out var suspect));
         terminal.Render(result.Diagnostics);
         if (!result.Ok || result.Bytes is null) return ExitCodes.Failure;
-        if (DeniedWarnings(flags, result, suspect) is { } denied) return denied;
+        if (DeniedWarnings(flags, result, suspect, terminal.Options.Json) is { } denied) return denied;
 
         try
         {
@@ -232,7 +233,7 @@ public static class Program
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.OutputUnwritable,
-                $"cannot write {output}: {ex.Message}", ExitCodes.Failure);
+                $"cannot write {output}: {ex.Message}", ExitCodes.Failure, terminal.Options.Json);
         }
 
         terminal.Info($"{output}: {new FileInfo(output).Length} bytes");
@@ -269,11 +270,12 @@ public static class Program
 
         var (flags, refused) = ParseFlags("check", args, target is null ? 1 : 2);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         if (flags.Emit)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.UnknownCommand,
-                "--emit: a project has no one module to emit — name a file", ExitCodes.Usage);
+                "--emit: a project has no one module to emit — name a file", ExitCodes.Usage, terminal.Options.Json);
 
         // Without an argument there has to BE a project: a directory that merely holds .lyr
         // files is not one, and reading every file under the working directory because
@@ -282,7 +284,7 @@ public static class Program
         if (target is null && ProjectFile.Discover(Directory.GetCurrentDirectory()) is null)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
                 "check: missing file argument — 'check <dir>' checks a directory, and a "
-                + $"{ProjectFile.FileName} makes this one a project", ExitCodes.Usage);
+                + $"{ProjectFile.FileName} makes this one a project", ExitCodes.Usage, terminal.Options.Json);
 
         return CheckProject(Path.GetFullPath(target ?? "."), flags, terminal);
     }
@@ -321,7 +323,7 @@ public static class Program
         if (sources.Count == 0)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.FileUnreadable,
                 $"no .lyr file under {sourceRoot} — 'check' takes a file, a directory or "
-                + "nothing at all", ExitCodes.Usage);
+                + "nothing at all", ExitCodes.Usage, terminal.Options.Json);
 
         var warnings = project?.Warnings.Count ?? 0;
         var checkedModules = sources.Count;
@@ -353,7 +355,7 @@ public static class Program
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.WarningsDenied,
                 warnings == 1 ? "1 warning denied by --deny-warnings"
                     : $"{warnings} warnings denied by --deny-warnings",
-                ExitCodes.Failure);
+                ExitCodes.Failure, terminal.Options.Json);
 
         terminal.Info($"{directory}: {checkedModules} "
             + $"{(checkedModules == 1 ? "module" : "modules")} ok");
@@ -379,7 +381,8 @@ public static class Program
     {
         var (flags, refused) = ParseFlags("check", args);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         var options = Options(path, flags, terminal, out var suspect);
         var result = flags.Emit
@@ -388,7 +391,7 @@ public static class Program
 
         terminal.Render(result.Diagnostics);
         if (!result.Ok) return ExitCodes.Failure;
-        if (DeniedWarnings(flags, result, suspect) is { } denied) return denied;
+        if (DeniedWarnings(flags, result, suspect, terminal.Options.Json) is { } denied) return denied;
 
         terminal.Info($"{path}: ok");
         return ExitCodes.Success;
@@ -400,7 +403,7 @@ public static class Program
     /// rustc's way (<c>-D</c> relabels them as errors) — what a diagnostic IS must not depend on a
     /// flag. A profile may carry the policy too, which is how a build script asks for it.
     /// </summary>
-    private static int? DeniedWarnings(Flags flags, CompileResult result, int suspect)
+    private static int? DeniedWarnings(Flags flags, CompileResult result, int suspect, bool json)
     {
         var warnings = result.Diagnostics.WarningCount + suspect;
         if (warnings == 0 || !(flags.DenyWarnings || flags.Profile.DenyWarnings)) return null;
@@ -408,7 +411,7 @@ public static class Program
         return CliDiagnostics.Fail(Console.Error, CliDiagnostics.WarningsDenied,
             warnings == 1 ? "1 warning denied by --deny-warnings"
                 : $"{warnings} warnings denied by --deny-warnings",
-            ExitCodes.Failure);
+            ExitCodes.Failure, json);
     }
 
     /// <summary>Debug output of the mid-level IR. Lowers only when sema reported no errors; the
@@ -418,7 +421,8 @@ public static class Program
     {
         var (flags, refused) = ParseFlags("lower", args);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         var result = SourceCompiler.Lower(path, Options(path, flags, terminal, out _));
         terminal.Render(result.Diagnostics);
@@ -432,7 +436,8 @@ public static class Program
     {
         var (flags, refused) = ParseFlags("parse", args);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         var (sources, diagnostics, id) = SourceCompiler.Read(path);
         if (!id.IsValid) { terminal.Render(diagnostics); return ExitCodes.Failure; }
@@ -447,7 +452,8 @@ public static class Program
     {
         var (flags, refused) = ParseFlags("tokenize", args);
         if (flags is null)
-            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message, ExitCodes.Usage);
+            return CliDiagnostics.Fail(Console.Error, refused!.Code, refused.Message,
+                ExitCodes.Usage, terminal.Options.Json);
 
         var (sources, diagnostics, id) = SourceCompiler.Read(path);
         if (!id.IsValid) { terminal.Render(diagnostics); return ExitCodes.Failure; }
@@ -513,7 +519,7 @@ public static class Program
     {
         if (args.Length < 2)
             return CliDiagnostics.Fail(Console.Error, CliDiagnostics.MissingArgument,
-                $"{command}: missing file argument", ExitCodes.Usage);
+                $"{command}: missing file argument", ExitCodes.Usage, terminal.Options.Json);
         return run(args[1], args, terminal);
     }
 
