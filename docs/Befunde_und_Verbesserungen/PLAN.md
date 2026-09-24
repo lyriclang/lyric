@@ -16,6 +16,13 @@ die Versionsnummer seit dem 2026-09-23, der Tag ist bewusst noch nicht gesetzt.
 **5.0 wird gesammelt, nicht geplant** (Maintainer, 2026-09-22). Der Abschnitt unten ist eine
 Ablage mit Uhren, kein Meilenstein.
 
+**Offene Regelfragen werden mit v5 zusammen entschieden; bis dahin entsteht ausschliesslich eine
+WARNUNG, die auf den Wechsel hinweist** (Maintainer, 2026-09-24). Das beantwortet jede Frage, die
+in dieser Liste „nirgends entschieden" heisst, auf dieselbe Weise: nicht jetzt, und bis dahin
+kein stilles Verhalten. Es raeumt damit **E** ab — die zwei Posten dort sind keine Bugfixes mehr,
+sondern zwei Uhren — und es setzt alle Uhren der Ablage unten in Gang, statt sie auf 4.7 zu
+vertagen. Eine Warnung aendert kein Programm, also vertraegt sie sich mit einer Stabilisierung.
+
 ---
 
 ## 4.6 — was schon drin ist
@@ -50,6 +57,9 @@ sonst kann die Suite den Stand nicht beurteilen.
 kein Feature; ein stabiles 4.6 heißt, dass keiner davon mehr offen ist. Zwei Einträge in **C**
 stehen in `lyric-v5-features.md` als P1-*Fundament* (generische Methoden auf generischen Typen,
 die restlichen `IR0001`-Grenzen) — sie sind beides, und sie landen hier, nicht in 4.7.
+
+**Stand 2026-09-24**: **B** und **C** sind leer. Offen sind **D** und die Warnstufen, die aus
+**E** und der Ablage geworden sind.
 
 ### ~~A. Der Verifier läuft an der falschen Stelle (zuerst)~~ — **erledigt, 2026-09-23**
 
@@ -107,11 +117,14 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
   für sich deckt und `(A, false)` offen lässt — und ein *akzeptiertes* Loch wäre schlimmer als ein
   abgelehnter Match, da das Lowering bei „erschöpfend" den Test des letzten Arms weglässt. Der
   vollständige Fall ist Maranget; halb davon ist schlechter als nichts.
-- **Generische Methode auf generischem Typ** (`Result<T,E>.map<U>`) → `IR0001`. Blockiert
-  `Result.map`, `List.map`, `Iterator.toList`. Von drei Seiten gemeldet. **Weiterhin offen** — die
-  zweiseitige Substitution existiert (`InstanceTable.Request` nimmt einen Owner), aber der direkte
-  Pfad braucht auch Rückgabetyp und Argument-Materialisierung auf beiden Seiten gebunden; ein
-  erster Versuch war unvollständig und wurde zurückgenommen statt halb ausgeliefert.
+- ~~**Generische Methode auf generischem Typ** (`Result<T,E>.map<U>`)~~ — **erledigt** (PR #170,
+  `lyric-spec#42`). Die zweiseitige Substitution existierte, und der Interface-Zwilling
+  (`Iterator<int>.map<string>`) benutzte sie seit je; nur der konkrete Pfad hat nie danach
+  gefragt. Der zurückgenommene erste Versuch war richtig zurückgenommen: Aufrufstelle, Argumente
+  und Rückgabetyp müssen alle drei beide Seiten gebunden haben, zwei davon ergeben ein Modul, das
+  übersetzt und falsch rechnet. §8.4 nennt jetzt die Regel samt Kollisionsordnung (die Methode
+  gewinnt). Die freien Umwege in der std (`mapList`, `result.map`) bleiben gültig — sie
+  abzulösen ist eine API-Änderung und gehört nach 4.7.
 - ~~**Lambda kann keine `throws`-Klausel tragen**~~ — **falsch einsortiert, kein Loch.** Die
   Grammatik kennt für Lambdas keine `throws`-Klausel (§2 `Lambda`), also existiert die Form nicht.
   Der Aufruf eines Werfers im Lambda ist `SEM0034`, und `SEM0084` gehört zum Funktions*typ*. Das
@@ -165,17 +178,30 @@ während derselbe Import `RES0002` auslöste. Hier war die Auflösung der Fehler
 FORM des Problems bleibt und lohnt einen Blick, welche Warnungen sonst noch ihren eigenen Fehler
 erklären würden.
 
-**Die Meldung eines Lowering-Abbruchs kann am falschen Ort stehen** (**NEU**). Eine generische
-Methode auf einem generischen Typ meldet „a non-primitive field type" — ein Satz über ein Feld,
-für eine Methode. Gehört zum offenen C-Posten oben.
+~~**Die Meldung eines Lowering-Abbruchs kann am falschen Ort stehen**~~ — **erledigt** (PR #170).
+Die Stelle ist die einzige in der Typtabelle, die einen geschriebenen Typ aufgibt, und sie wird
+aus jeder Position erreicht, in der ein Typ stehen kann; sie nannte den häufigsten Aufrufer statt
+den, den sie hatte. Wer das `IR0001` einer generischen Methode las, suchte nach einem Feld, das
+nicht im Programm stand. Sie nennt jetzt den Typ.
 
-### E. Zwei Regelfragen, die als Bugfix durchgehen
+### E. Zwei Regelfragen — beantwortet mit „v5, und bis dahin eine Warnung"
 
-- **Shadowing** (`SPEC-RUNDE` 4): `let x = 1; let x = 2;` verwirft die zweite Bindung still. Ablehnen
-  oder Rust-Shadowing — **beides ist besser als heute**, der heutige Zustand ist keine der beiden
-  Antworten. Prototyp 10 liegt vor.
-- **Werfender `defer`** (`SPEC-RUNDE` 5): der `return`-Pfad führt die Kette weiterhin doppelt aus.
-  Braucht vorher die Antwort, ob die vor dem Werfer geplanten Stufen noch laufen (Go: ja).
+Der Maintainer-Entscheid vom 2026-09-24 nimmt beiden Posten den Bugfix-Charakter: die Regel faellt
+mit v5, 4.6 bekommt die Uhr. **Gemessen am 2026-09-24**, beide Male am Integrationsstand:
+
+- **Shadowing** (`SPEC-RUNDE` 4): `let x = 1; let x = 2; return x;` liefert **1**. Die zweite
+  Bindung bekommt einen eigenen Slot, den niemand liest — auch wenn sie den Typ wechselt
+  (`let x = "two";` und `return x` prüft weiter gegen `int`). Das einzige Signal heute ist ein
+  `LYR-SEM0071` „'x' is never used" auf der **zweiten** Deklaration, was die Lage genau verkehrt
+  herum beschreibt. Ablehnen oder Rust-Shadowing — beides ist besser als das; die Uhr sagt das,
+  ohne die Antwort vorwegzunehmen. Prototyp 10 liegt vor.
+- **Werfender `defer`** (`SPEC-RUNDE` 5): **gemessen, und beide Hälften sind in EINEM Programm
+  sichtbar.** Ein Zähler in einem werfenden `defer` vor einem `return` steht danach auf **2**
+  statt 1 (die Region deckt die Abwicklung an der Return-Stelle mit ab), und ein vorher
+  registrierter `defer` daneben läuft **gar nicht** — Go liefe ihn. Die zweite Hälfte ist die
+  offene Frage, die erste haengt an ihrer Antwort: der Ausweg ist eine Epilog-Route hinter der
+  Region, mit dem Rückgabewert in einem synthetischen Local, und die baut man einmal, nicht
+  zweimal. Also auch hier: Uhr jetzt, Regel mit v5.
 
 ---
 
@@ -297,6 +323,12 @@ Inhalt dieser Liste.
 mehr auf. `lyric-v5-features.md` nennt für den größten Bruch von sich aus 4.7 — die beiden Listen
 sind sich also einig.
 
+**Und sie starten jetzt** (Maintainer, 2026-09-24): eine Warnung ist kein Feature, sie ändert kein
+Programm, und je früher eine Uhr läuft, desto weniger Code muss `lyrfix` später anfassen. Was eine
+Warnung heute tragen kann, ist die Frage, die dabei zu beantworten ist — sie muss einen Befund
+haben, der sich ohne die Antwort auf die Regel stellen lässt, sonst warnt sie über Programme, die
+nachher richtig sind.
+
 | Position | Bruch | Uhr muss starten |
 |---|---|---|
 | Member-Sichtbarkeit (Default privat) | groß | **4.7** als Warnung |
@@ -358,15 +390,22 @@ vermutlich Auslassung und keine Revision — aber es steht nirgends, also gilt h
    die Grammatik, die 4.5 wirklich beschreibt. Dann PR #162.
 2. ~~**A** (Verifier-Reihenfolge)~~ — gelandet (2026-09-23), samt dem Defekt, den sie zutage
    gefördert hat. Ab hier misst jede Runde gegen eine CI, die das IR wirklich prüft.
-3. **B** (Prozessabbrüche) als eigene Sweep-Runde.
-4. **C**, **D**, **E** — und erst dann `v4.6.0` taggen. Kein Feature vorher.
-5. Danach 4.7, in der Reihenfolge der neuen Liste: erst das Fundament (1–8), dann Ergonomie.
-6. Parallel zu 5: die vier Entscheidungen aus der Tabelle „braucht eine Entscheidung" und die
+3. ~~**B** (Prozessabbrüche) als eigene Sweep-Runde~~ — gelandet (PR #167, #168).
+4. ~~**C**~~ — gelandet (PR #162, #169, #170). Sieben Posten, davon zwei, die keine Löcher waren.
+5. **D** (Diagnostik) — der letzte Fehler-Abschnitt vor dem Tag.
+6. **Die Warnstufen**: aus **E** und der Ablage, in einer Runde, mit einem Spec-PR für die neuen
+   Codes. Sie sind kein Tag-Blocker im selben Sinn wie D — eine fehlende Warnung macht kein
+   Programm falsch —, aber sie sind das, was der Entscheid vom 2026-09-24 verlangt.
+7. Dann `v4.6.0` taggen. Kein Feature vorher.
+8. Danach 4.7, in der Reihenfolge der neuen Liste: erst das Fundament (1–8), dann Ergonomie.
+9. Parallel zu 8: die vier Entscheidungen aus der Tabelle „braucht eine Entscheidung" und die
    Bibliotheksfrage. Sie blockieren nichts an 4.6, aber alles, was danach kommt.
 
 ### Offen und nirgends entschieden
 
-Der Abgleich hat vier Dinge hinterlassen, die niemand beantwortet hat:
+Der Abgleich hat vier Dinge hinterlassen, die niemand beantwortet hat. **Die Regelfragen der
+Sprache sind seit dem 2026-09-24 beantwortet** — v5, bis dahin eine Warnung —; diese vier sind es
+nicht, weil sie keine Sprachregeln sind, sondern Zuschnitt:
 
 1. **Die Bibliotheks-Umkehr** — Regex, HTTP, TLS, Zeitzonen, Kompression, Krypto in die std oder
    weiter draußen? `stdlib-2.md` sagt draußen, `lyric-v5-features.md` sagt rein.
