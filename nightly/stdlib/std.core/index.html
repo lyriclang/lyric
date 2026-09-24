@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/" class="here">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
@@ -79,6 +81,9 @@
 <li><a href="#interface-onfunction">OnFunction</a></li>
 <li><a href="#interface-witharg">WithArg</a></li>
 <li><a href="#struct-deprecated">Deprecated</a></li>
+<li><a href="#function-combinehash">combineHash</a></li>
+<li><a href="#interface-onmethod">OnMethod</a></li>
+<li><a href="#struct-nonexhaustive">NonExhaustive</a></li>
 </ul>
 </nav>
 <p>What the language itself needs: aborting with a reason, the ready-made <code>Throwable</code>, and the
@@ -106,14 +111,14 @@ unreachable — which is why <code>expect</code> can return a non-optional after
 <p>Panics with <code>message</code> when <code>condition</code> is false, for invariants the compiler does not check.</p>
 <p><code>void</code> rather than <code>never</code>: it does not replace a <code>return</code>, and a function ending in <code>assert</code> is
 still <code>LYR-SEM0017</code>.</p>
-<p class="source">stdlib/std/core.lyr:44</p>
+<p class="source">stdlib/std/core.lyr:50</p>
 </section>
 <section class="item" id="function-todo">
 <h2><a href="#function-todo">todo</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn todo(message: string): void</code></pre>
 <p>Marks a place that is still missing. Unlike a comment it reports itself when reached, with
 <code>not implemented:</code> before the message.</p>
-<p class="source">stdlib/std/core.lyr:52</p>
+<p class="source">stdlib/std/core.lyr:58</p>
 </section>
 <section class="item" id="function-unreachable">
 <h2><a href="#function-unreachable">unreachable</a> <span class="kind">function</span></h2>
@@ -121,7 +126,7 @@ still <code>LYR-SEM0017</code>.</p>
 <p>Marks a branch that must never be taken, with <code>unreachable:</code> before the message.</p>
 <p><code>todo</code> means <em>still to come</em>; this means <em>must never happen</em>. Reaching it says that an assumption
 stated somewhere else is wrong.</p>
-<p class="source">stdlib/std/core.lyr:60</p>
+<p class="source">stdlib/std/core.lyr:66</p>
 </section>
 <section class="item" id="class-exception">
 <h2><a href="#class-exception">Exception</a> <span class="kind">class</span></h2>
@@ -137,7 +142,7 @@ stated somewhere else is wrong.</p>
 <p>The text this exception was built with.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:72</p>
+<p class="source">stdlib/std/core.lyr:78</p>
 </section>
 <section class="item" id="interface-display">
 <h2><a href="#interface-display">Display</a> <span class="kind">interface</span></h2>
@@ -152,7 +157,7 @@ pointer and needs a reference, which a scalar has none of.</p>
 <p>This value as text.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:95</p>
+<p class="source">stdlib/std/core.lyr:101</p>
 </section>
 <section class="item" id="interface-equatable">
 <h2><a href="#interface-equatable">Equatable</a> <span class="kind">interface</span></h2>
@@ -167,7 +172,7 @@ would be no <code>Map&lt;int, V&gt;</code>.</p>
 <p>Whether the two are equal.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:149</p>
+<p class="source">stdlib/std/core.lyr:155</p>
 </section>
 <section class="item" id="interface-hashable">
 <h2><a href="#interface-hashable">Hashable</a> <span class="kind">interface</span></h2>
@@ -183,7 +188,7 @@ without equality. A key constraint is <code>K :: [Hashable&lt;K&gt;]</code> alon
 <p>The hash of this value.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:161</p>
+<p class="source">stdlib/std/core.lyr:167</p>
 </section>
 <section class="item" id="interface-ordered">
 <h2><a href="#interface-ordered">Ordered</a> <span class="kind">interface</span></h2>
@@ -197,7 +202,7 @@ without equality. A key constraint is <code>K :: [Hashable&lt;K&gt;]</code> alon
 first — as <code>strcmp</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:169</p>
+<p class="source">stdlib/std/core.lyr:175</p>
 </section>
 <section class="item" id="interface-add">
 <h2><a href="#interface-add">Add</a> <span class="kind">interface</span></h2>
@@ -209,7 +214,7 @@ first — as <code>strcmp</code>.</p>
 <p>The sum of this value and <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:352</p>
+<p class="source">stdlib/std/core.lyr:358</p>
 </section>
 <section class="item" id="interface-sub">
 <h2><a href="#interface-sub">Sub</a> <span class="kind">interface</span></h2>
@@ -221,7 +226,7 @@ first — as <code>strcmp</code>.</p>
 <p>This value minus <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:358</p>
+<p class="source">stdlib/std/core.lyr:364</p>
 </section>
 <section class="item" id="interface-mul">
 <h2><a href="#interface-mul">Mul</a> <span class="kind">interface</span></h2>
@@ -233,7 +238,7 @@ first — as <code>strcmp</code>.</p>
 <p>The product of this value and <code>other</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:364</p>
+<p class="source">stdlib/std/core.lyr:370</p>
 </section>
 <section class="item" id="interface-div">
 <h2><a href="#interface-div">Div</a> <span class="kind">interface</span></h2>
@@ -246,7 +251,7 @@ first — as <code>strcmp</code>.</p>
 the built-in numerics panic.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:370</p>
+<p class="source">stdlib/std/core.lyr:376</p>
 </section>
 <section class="item" id="interface-into">
 <h2><a href="#interface-into">Into</a> <span class="kind">interface</span></h2>
@@ -262,25 +267,25 @@ belongs in a named function returning an optional.</p>
 <p>This value as a <code>T</code>.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:467</p>
+<p class="source">stdlib/std/core.lyr:473</p>
 </section>
 <section class="item" id="interface-onmodule">
 <h2><a href="#interface-onmodule">OnModule</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnModule</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before the module header.</p>
-<p class="source">stdlib/std/core.lyr:477</p>
+<p class="source">stdlib/std/core.lyr:483</p>
 </section>
 <section class="item" id="interface-ontype">
 <h2><a href="#interface-ontype">OnType</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnType</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before a struct, class or enum declaration.</p>
-<p class="source">stdlib/std/core.lyr:480</p>
+<p class="source">stdlib/std/core.lyr:486</p>
 </section>
 <section class="item" id="interface-onfunction">
 <h2><a href="#interface-onfunction">OnFunction</a> <span class="kind">interface</span></h2>
 <pre class="signature"><code class="language-lyr">pub interface OnFunction</code></pre>
 <p>A struct declaring this may stand as <code>@Name</code> before a top-level function.</p>
-<p class="source">stdlib/std/core.lyr:483</p>
+<p class="source">stdlib/std/core.lyr:489</p>
 </section>
 <section class="item" id="interface-witharg">
 <h2><a href="#interface-witharg">WithArg</a> <span class="kind">interface</span></h2>
@@ -289,7 +294,7 @@ belongs in a named function returning an optional.</p>
 the value fills the attribute's FIRST field, whose type must be <code>T</code>. The braces form stays
 open to every attribute; this one is opted into, so a struct's field order never becomes an
 argument order by accident.</p>
-<p class="source">stdlib/std/core.lyr:489</p>
+<p class="source">stdlib/std/core.lyr:495</p>
 </section>
 <section class="item" id="struct-deprecated">
 <h2><a href="#struct-deprecated">Deprecated</a> <span class="kind">struct</span></h2>
@@ -310,7 +315,35 @@ the removal happens because the build stops, not because somebody remembered.</p
 <p>Empty means the ordinary policy: warn now, remove at the next major.</p>
 </div>
 </div>
-<p class="source">stdlib/std/core.lyr:494</p>
+<p class="source">stdlib/std/core.lyr:500</p>
+</section>
+<section class="item" id="function-combinehash">
+<h2><a href="#function-combinehash">combineHash</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn combineHash(seed: int, value: int): int</code></pre>
+<p>Folds <code>value</code> into <code>seed</code> — what a <code>hash()</code> over several fields is built from:
+<code>combineHash(combineHash(0, this.x.hash()), this.y.hash())</code>. Order matters, so <code>(1, 2)</code> and
+<code>(2, 1)</code> differ. The anchor a synthesized <code>Hashable</code> conformance (4.5) combines the fields
+with, so a hand-written <code>hash()</code> and a synthesized one agree.</p>
+<p>The formula is Boost's <code>hash_combine</code> at 64 bits: the golden-ratio constant keeps a run of
+small values from cancelling, and the two shifts spread each field over the whole word.</p>
+<p class="source">stdlib/std/core.lyr:521</p>
+</section>
+<section class="item" id="interface-onmethod">
+<h2><a href="#interface-onmethod">OnMethod</a> <span class="kind">interface</span></h2>
+<pre class="signature"><code class="language-lyr">pub interface OnMethod</code></pre>
+<p>A struct declaring this may stand as <code>@Name</code> before a METHOD or a field — the seat a
+<code>@Deprecated</code> on <code>List.oldName</code> needs. An anchor for the compiler (4.5): declared here so a
+library can name it today, honoured once the attribute rows carry members.</p>
+<p class="source">stdlib/std/core.lyr:530</p>
+</section>
+<section class="item" id="struct-nonexhaustive">
+<h2><a href="#struct-nonexhaustive">NonExhaustive</a> <span class="kind">struct</span></h2>
+<pre class="signature"><code class="language-lyr">pub struct NonExhaustive :: [OnType]</code></pre>
+<p>Marks an enum as one that may GAIN variants without breaking its callers: a <code>match</code> over it
+outside the declaring module must carry a <code>_</code> arm, so <code>Wait</code> or <code>IoErrorKind</code> can grow. The
+same contract Rust's <code>#[non_exhaustive]</code> states. An anchor for the compiler (4.5): the
+attribute is data today, the rule follows in the exhaustiveness check.</p>
+<p class="source">stdlib/std/core.lyr:536</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.collections/">std.collections</a>

@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/" class="here">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
@@ -63,6 +65,7 @@
 <li><a href="#function-hexencode">hexEncode</a></li>
 <li><a href="#function-hexdecode">hexDecode</a></li>
 <li><a href="#function-hexdecodeorthrow">hexDecodeOrThrow</a></li>
+<li><a href="#function-hexdecodeorerr">hexDecodeOrErr</a></li>
 <li><a href="#function-base64encode">base64Encode</a></li>
 <li><a href="#function-base64decode">base64Decode</a></li>
 <li><a href="#function-base64decodeorthrow">base64DecodeOrThrow</a></li>
@@ -84,35 +87,42 @@ decoder expected there.</p>
 <pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
 </div>
 </div>
-<p class="source">stdlib/std/encoding.lyr:22</p>
+<p class="source">stdlib/std/encoding.lyr:23</p>
 </section>
 <section class="item" id="function-hexencode">
 <h2><a href="#function-hexencode">hexEncode</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn hexEncode(bytes: uint8[]): string</code></pre>
 <p>Bytes as lowercase hexadecimal, two characters per byte, no separators. Empty bytes are the
 empty string.</p>
-<p class="source">stdlib/std/encoding.lyr:69</p>
+<p class="source">stdlib/std/encoding.lyr:70</p>
 </section>
 <section class="item" id="function-hexdecode">
 <h2><a href="#function-hexdecode">hexDecode</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn hexDecode(text: string): ?uint8[]</code></pre>
 <p>The bytes a hexadecimal string spells, or <code>null</code> when it spells none: an odd length or a
 character outside <code>0-9</code>, <code>a-f</code>, <code>A-F</code>. The empty string is an empty array.</p>
-<p class="source">stdlib/std/encoding.lyr:83</p>
+<p class="source">stdlib/std/encoding.lyr:84</p>
 </section>
 <section class="item" id="function-hexdecodeorthrow">
 <h2><a href="#function-hexdecodeorthrow">hexDecodeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn hexDecodeOrThrow(text: string): uint8[] throws EncodingError</code></pre>
 <p><code>hexDecode</code>, with the reason when the text spells no bytes: where it broke, and what a
 hexadecimal string would have had there.</p>
-<p class="source">stdlib/std/encoding.lyr:89</p>
+<p class="source">stdlib/std/encoding.lyr:90</p>
+</section>
+<section class="item" id="function-hexdecodeorerr">
+<h2><a href="#function-hexdecodeorerr">hexDecodeOrErr</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn hexDecodeOrErr(text: string): Result&lt;uint8[], EncodingError&gt;</code></pre>
+<p><code>hexDecode</code>, with the reason as a VALUE: the bytes, or the <code>EncodingError</code> that
+<code>hexDecodeOrThrow</code> would throw.</p>
+<p class="source">stdlib/std/encoding.lyr:101</p>
 </section>
 <section class="item" id="function-base64encode">
 <h2><a href="#function-base64encode">base64Encode</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn base64Encode(bytes: uint8[]): string</code></pre>
 <p>Bytes as base64 (RFC 4648 §4: <code>A-Za-z0-9+/</code>), padded with <code>=</code> to a multiple of four
 characters. Empty bytes are the empty string.</p>
-<p class="source">stdlib/std/encoding.lyr:124</p>
+<p class="source">stdlib/std/encoding.lyr:138</p>
 </section>
 <section class="item" id="function-base64decode">
 <h2><a href="#function-base64decode">base64Decode</a> <span class="kind">function</span></h2>
@@ -121,14 +131,14 @@ characters. Empty bytes are the empty string.</p>
 multiple of four, <code>=</code> may appear only as the final one or two characters, characters outside
 the alphabet are refused, and so is padding whose unused bits are not zero — accepted input is
 exactly what <code>base64Encode</code> produces. The empty string is an empty array.</p>
-<p class="source">stdlib/std/encoding.lyr:172</p>
+<p class="source">stdlib/std/encoding.lyr:186</p>
 </section>
 <section class="item" id="function-base64decodeorthrow">
 <h2><a href="#function-base64decodeorthrow">base64DecodeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn base64DecodeOrThrow(text: string): uint8[] throws EncodingError</code></pre>
 <p><code>base64Decode</code>, with the reason when the text spells no bytes: where it broke, and what a
 base64 string would have had there.</p>
-<p class="source">stdlib/std/encoding.lyr:178</p>
+<p class="source">stdlib/std/encoding.lyr:192</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.core/">std.core</a>

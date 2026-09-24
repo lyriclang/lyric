@@ -121,6 +121,25 @@ fn main(): int {
 }
 </code></pre>
 <p><code>break</code> leaves the innermost loop, <code>continue</code> starts its next iteration.</p>
+<p>A loop may carry a <strong>label</strong>, and <code>break</code> or <code>continue</code> may name it to reach past the innermost
+loop:</p>
+<pre><code class="language-lyr">fn find(grid: int[][], target: int): (int, int) {
+    var found = (-1, -1);
+    outer: for (i in 0..grid.length) {
+        for (j in 0..grid[i].length) {
+            if (grid[i][j] == target) {
+                found = (i, j);
+                break outer;
+            }
+        }
+    }
+    return found;
+}
+</code></pre>
+<p><code>continue outer</code> abandons the rest of the inner loop and starts the outer loop's next
+iteration. A label is visible only inside the loop it marks and shares nothing with variables;
+one nothing jumps to is a warning, and a label repeating an enclosing one is refused. Every
+<code>defer</code> between the jump and the loop it names runs on the way out, innermost first.</p>
 <h2 id="deferred-work">Deferred work</h2>
 <p><code>defer</code> schedules a statement to run when the surrounding scope ends, whichever way it ends.</p>
 <pre><code class="language-lyr">import std.io.console { println };

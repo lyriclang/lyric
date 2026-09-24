@@ -48,6 +48,7 @@
 <nav class="contents">
 <ul>
 <li><a href="#whether-or-why-the-orthrow-twins">Whether, or why: the OrThrow twins</a></li>
+<li><a href="#whether-why-or-the-reason-as-a-value">Whether, why — or the reason as a value</a></li>
 <li><a href="#collections">Collections</a></li>
 <li><a href="#tasks">Tasks</a></li>
 <li><a href="#iteration">Iteration</a></li>
@@ -92,15 +93,23 @@
 </tr>
 <tr>
 <td><code>std.collections</code></td>
-<td><code>List&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code>, <code>Set&lt;T&gt;</code>, <code>Indexable&lt;T&gt;</code>, sorting</td>
+<td><code>List&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code>, <code>Set&lt;T&gt;</code>, <code>Deque&lt;T&gt;</code>, <code>Indexable&lt;T&gt;</code>, sorting, <code>groupBy</code></td>
 </tr>
 <tr>
 <td><code>std.iter</code></td>
-<td><code>Iterator&lt;T&gt;</code>, <code>Iterable&lt;T&gt;</code>, adapters, the entrances (<code>over</code>, <code>range</code>, <code>compact</code>), <code>sum</code></td>
+<td><code>Iterator&lt;T&gt;</code>, <code>Iterable&lt;T&gt;</code>, adapters and terminators as methods, the entrances (<code>over</code>, <code>range</code>, <code>compact</code>), <code>sum</code></td>
 </tr>
 <tr>
 <td><code>std.option</code></td>
 <td><code>map</code>, <code>andThen</code>, <code>filter</code>, <code>zip</code>, <code>contains</code>, <code>toArray</code>, <code>iter</code>, <code>expect</code></td>
+</tr>
+<tr>
+<td><code>std.result</code></td>
+<td><code>Result&lt;T, E&gt;</code> — a failure as a value; <code>map</code>, <code>andThen</code>, <code>orThrow</code>, <code>fromOptional</code> (since 4.5)</td>
+</tr>
+<tr>
+<td><code>std.hash</code></td>
+<td><code>sha256</code>, <code>sha1</code>, <code>md5</code>, <code>crc32</code>, <code>hashCombine</code> — digests over bytes; no capability (since 4.5)</td>
 </tr>
 <tr>
 <td><code>std.io.console</code></td>
@@ -158,8 +167,59 @@ shows both shapes side by side. Where <code>null</code> is the whole truth — <
 the silent form stands alone. <code>listDir</code> went with 4.0, as its clock promised: it answered an
 empty array to both &quot;empty&quot; and &quot;unreadable&quot;, which <code>entries</code> (<code>?string[]</code>) and
 <code>entriesOrThrow</code> tell apart.</p>
+<h2 id="whether-why-or-the-reason-as-a-value">Whether, why — or the reason as a value</h2>
+<p>Since 4.5 a third form stands beside the silent one and the throwing twin: a <code>Result&lt;T, E&gt;</code>
+from <code>std.result</code>, under the suffix <code>OrErr</code> — <code>parseIntOrErr</code>, <code>textOrErr</code>, <code>parseOrErr</code>,
+<code>hexDecodeOrErr</code>. Like <code>OrThrow</code>, the suffix names the answer form. The result is an ordinary
+enum, <code>Ok(value)</code> or <code>Err(reason)</code>, for the failure that is not handled where it happens but
+stored, collected or mapped:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+import std.string { parseIntOrErr, ParseError };
+import std.result { Result };
+import std.collections { List };
+
+fn main(): int {
+    let results = List&lt;Result&lt;int, ParseError&gt;&gt;.empty();
+    for (text in [&quot;80&quot;, &quot;x&quot;, &quot;99999999999999999999&quot;]) {
+        results.push(parseIntOrErr(text));
+    }
+    var ok = 0;
+    for (r in results) {
+        match (r) {
+            Ok(_) =&gt; { ok = ok + 1; }
+            Err(e) =&gt; { println(e.message()); }
+        }
+    }
+    return ok;
+}
+</code></pre>
+<pre><code>parse: not a digit at offset 0
+parse: outside the int range at offset 20
+</code></pre>
+<p><code>isOk</code>, <code>ok()</code>, <code>err()</code>, <code>unwrapOr</code>, <code>unwrapOrElse</code> and <code>expect</code> are methods; <code>map</code>,
+<code>mapErr</code>, <code>andThen</code> and <code>orElse</code> are free functions, because a method of a generic type cannot
+introduce a type parameter of its own yet. <code>orThrow</code> throws the reason — the way back to
+<code>throws</code> — and <code>fromOptional</code> attaches a reason to a <code>?T</code>. <code>parseIntOrErr</code> says WHY a text is
+not a number: a <code>ParseError</code> with a kind (<code>Empty</code>, <code>InvalidDigit</code>, <code>Overflow</code>) and the offset
+where the reading stopped. <code>throws</code> remains the language's mechanism; <code>Result</code> is a holder,
+not a second one.</p>
 <h2 id="collections">Collections</h2>
-<p><code>List&lt;T&gt;</code> grows; <code>T[]</code> does not.</p>
+<p><code>List&lt;T&gt;</code> grows; <code>T[]</code> does not. Since 4.5 it comes from an array (<code>List&lt;int&gt;.of([3, 1, 2])</code>),
+takes bulk (<code>pushAll</code>), slices, filters, and a <code>Map</code> walks through its own methods (<code>keys()</code>,
+<code>values()</code>, <code>entries()</code>) and answers <code>getOrInsert</code> — the whole of a group-by:</p>
+<pre><code class="language-lyr">import std.collections { List, Map };
+import std.string as strings;
+
+fn main(): int {
+    let groups = Map&lt;int, List&lt;string&gt;&gt;.empty();
+    for (word in [&quot;a&quot;, &quot;bb&quot;, &quot;cc&quot;, &quot;d&quot;]) {
+        groups.getOrInsert(word.length(), () =&gt; List&lt;string&gt;.empty()).push(word);
+    }
+    return groups.get(2)!.length();
+}
+</code></pre>
+<p><code>groupBy(xs, key)</code>, <code>sortListByKey</code>, <code>sortArray</code>, <code>maxBy</code>/<code>minBy</code> and <code>slice</code> over arrays
+stand beside as free functions, each with the constraint it needs on the element type.</p>
 <pre><code class="language-lyr">import std.io.console { println };
 import std.collections { List };
 
@@ -369,9 +429,22 @@ fn main(): int {
     return out.length;
 }
 </code></pre>
-<p><code>map</code>, <code>filter</code>, <code>take</code>, <code>skip</code>, <code>takeWhile</code>, <code>zip</code>, <code>chain</code> and <code>flatMap</code> are methods on
-<code>Iterator&lt;T&gt;</code>; the free forms still work, warn, and go with 3.0.</p>
-<p>Two families stay free, each for a reason worth knowing:</p>
+<p><code>map</code>, <code>filter</code>, <code>take</code>, <code>skip</code>, <code>takeWhile</code>, <code>skipWhile</code>, <code>stepBy</code>, <code>inspect</code>, <code>dedupBy</code>,
+<code>zip</code>, <code>zipWith</code>, <code>chain</code> and <code>flatMap</code> are methods on <code>Iterator&lt;T&gt;</code> — and since 4.5 so are
+the terminators that ask nothing of the element type: <code>count</code>, <code>fold</code>, <code>reduce</code>, <code>first</code>,
+<code>last</code>, <code>nth</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>find</code>, <code>position</code>, <code>countWhere</code>, <code>forEach</code> and
+<code>toArray</code>. A chain reads to its end:</p>
+<pre><code class="language-lyr">import std.collections { List };
+
+fn main(): int {
+    let xs = List&lt;int&gt;.of([1, 2, 3, 4]);
+    let evens = xs.iter().filter((n) =&gt; n % 2 == 0).count();
+    let total = xs.iter().fold(0, (acc, n) =&gt; acc + n);
+    return evens + total;
+}
+</code></pre>
+<p>The free forms of the terminators still work and go with 5.0. Two families stay free, each for
+a reason worth knowing:</p>
 <ul>
 <li><strong><code>sum</code>, <code>sumFloat</code>, <code>minValue</code>, <code>maxValue</code></strong> ask something of the ELEMENT type — that it is a
 number, that it is ordered — and an interface cannot require that of its own parameter.</li>
@@ -431,9 +504,9 @@ an <strong>empty array</strong> both for an empty file and for a file that is no
 those apart, and the advice was to ask <code>exists</code> first — which is a race, not an answer. The three
 old names (<code>readText</code>, <code>readBytes</code>, <code>readLines</code>) warned through the 2.x line and went with 3.0;
 <code>text</code>, <code>bytes</code> and <code>lines</code> are what is left.</p>
-<p>What none of the shapes carries is a REASON: a missing file and a permission denied look the
-same. That gap is known and left open on purpose — carrying reasons means an error type and a
-decision about <code>throws</code> that this module should not make on its own.</p>
+<p>The REASON — a missing file against a permission denied — is what the <code>OrThrow</code> twin carries
+since 3.7 (<code>textOrThrow</code> throws an <code>IoError</code>), and what the <code>OrErr</code> form answers as a value
+since 4.5 (<code>textOrErr</code> is a <code>Result&lt;string, IoError&gt;</code>).</p>
 <h2 id="a-file-too-large-to-hold-and-a-file-read-beside-other-work">A file too large to hold, and a file read beside other work</h2>
 <p><code>std.io.file</code> reads a file in ONE call, and it blocks the thread while it does. That is right for
 a config file and wrong for two things: a file too large to hold in memory, and a program with
@@ -490,8 +563,9 @@ fn firstErrors(f: stream.File): Coroutine&lt;Wait&gt; {
 </code></pre>
 <p>That protocol spends <code>null</code> on &quot;the end&quot;, so a read failure and the end of the file look the same
 from <code>next()</code> alone. <code>failed()</code> is how you tell them apart after the walk — Rust yields a
-<code>Result</code> per line for this; Lyric has no <code>Result</code>, so the question is asked once at the end
-instead of answered once per line.</p>
+<code>Result</code> per line for this; a Lyric <code>Iterator&lt;Result&lt;string, IoError&gt;&gt;</code> could too, but the
+iterator protocol is <code>?T</code>, so the question is asked once at the end instead of answered once
+per line.</p>
 <h3 id="two-things-to-know-before-you-reach-for-it">Two things to know before you reach for it</h3>
 <p><strong>These forms need a running <code>run()</code>.</strong> <code>readSome</code>, <code>write</code> and a <code>LineReader</code> walk yield, and a
 yield outside a running coroutine panics (<a href="/nightly/guide/coroutines/">chapter 11</a>). <code>open</code> and <code>close</code>

@@ -119,8 +119,29 @@ guard:</p>
 
 fn main(): int { return classify(7); }
 </code></pre>
-<p>An arm whose body is an expression ends with <code>,</code>. An arm whose body is a block may omit it, but a
-block arm must <code>return</code> or <code>throw</code> — it contributes no value.</p>
+<p>An arm whose body is an expression ends with <code>,</code>. An arm whose body is a block may omit it. A
+block arm delivers a value through its <strong>tail</strong>: an expression standing last, without <code>;</code>. A
+block arm without a tail must <code>return</code> or <code>throw</code> — it contributes no value.</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+enum State { Idle, Busy(int), Closed }
+enum Event { Start, Tick, Stop }
+
+fn step(s: State, e: Event): State {
+    return match (e) {
+        Event.Start =&gt; State.Busy(0),
+        Event.Tick =&gt; {
+            let n = match (s) { State.Busy(k) =&gt; k + 1, _ =&gt; 0 };
+            println(f&quot;tick {n}&quot;);
+            State.Busy(n)
+        },
+        Event.Stop =&gt; { return State.Closed; },
+    };
+}
+</code></pre>
+<p>The tail is taken before the block's <code>defer</code>s run. In a <code>match</code> statement the value goes
+nowhere, so a tail there is held to the ordinary rule for an expression statement: a call, an
+assignment, <code>resume</code> or <code>throw</code>.</p>
 <h2 id="taking-a-struct-apart">Taking a struct apart</h2>
 <p>A <code>match</code> also destructures a struct or a class. It tests nothing — the value is already of that
 type — so one arm covers the whole <code>match</code>, and the pattern is simply a list of the fields you

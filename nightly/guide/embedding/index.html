@@ -51,6 +51,7 @@
 <li><a href="#reloading">Reloading</a></li>
 <li><a href="#registering-functions">Registering functions</a></li>
 <li><a href="#an-sdk-of-your-own">An SDK of your own</a></li>
+<li><a href="#reaching-into.net-from-the-script">Reaching into .NET from the script</a></li>
 <li><a href="#value-types-across-the-boundary">Value types across the boundary</a></li>
 <li><a href="#bounding-what-a-script-may-spend">Bounding what a script may spend</a></li>
 <li><a href="#running-scripts-compiled">Running scripts compiled</a></li>
@@ -142,6 +143,47 @@ instantiated, not at the call site.</li>
 </ul>
 <p>A module in a native root may hold ordinary Lyric code beside its declarations; <code>anyKey</code> above is
 compiled like any other function.</p>
+<h2 id="reaching-into.net-from-the-script">Reaching into .NET from the script</h2>
+<p>Everything above is the host offering something to a script. Since 4.5 a script can also ask
+for a public static .NET method itself, by symbol:</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+extern &quot;dotnet&quot; fn cbrt(x: float): float = &quot;System.Math::Cbrt&quot;;
+extern &quot;dotnet&quot; fn tempPath(): string = &quot;System.IO.Path::GetTempPath&quot;;
+
+fn main(): int {
+    println(f&quot;{cbrt(27.0)} {tempPath()}&quot;);
+    return 0;
+}
+</code></pre>
+<p>An <code>extern</code> declaration is a function without a body, like a native root's, with two strings
+instead: the <strong>ABI</strong> — <code>&quot;dotnet&quot;</code> is the one this runtime binds — and the <strong>symbol</strong>, the type
+and the method as .NET spells them. A type that lives in an assembly the process has not loaded
+is written assembly-qualified, <code>&quot;System.Net.Dns, System.Net.NameResolution::GetHostName&quot;</code>, and
+the assembly is loaded for it.</p>
+<p>The Lyric signature is what picks the overload: each parameter type names exactly one .NET
+type — <code>int</code> is <code>Int64</code>, <code>int32</code> is <code>Int32</code>, <code>float</code> is <code>Double</code>, <code>char</code> is <code>Char</code>, <code>string</code>
+is <code>String</code> — and the one public static method with that parameter list and that return type
+is the binding. A symbol nobody can bind, or one with two candidates, refuses the module at
+load with the candidates in the message; the same place a missing native root implementation
+is reported.</p>
+<p>Three rules make this fit the rest of the sandbox rather than punch through it:</p>
+<ul>
+<li><strong>It is gated.</strong> An extern declaration records <code>hostAccess</code> in the compiled module — the bit
+reserved for this since 1.0 — so a VM that does not grant <code>Capability.HostAccess</code> refuses
+the module before any instruction runs, exactly as it refuses <code>std.io.file</code> without
+<code>FileAccess</code>. <code>lyrvm run app.lyrbc --grant none</code> says so too.</li>
+<li><strong>What crosses is what a native root can cross today:</strong> the scalars, <code>bool</code>, <code>char</code>,
+<code>string</code>, and <code>void</code> as a return. An optional, an array or a struct in the signature is
+refused where it is declared (<code>LYR-SEM0099</code>); how those cross is the next stage of the
+design, not something the binder guesses.</li>
+<li><strong>A .NET exception is a panic.</strong> <code>System.Int32::Parse</code> given <code>&quot;zz&quot;</code> ends the program with
+<code>LYR-VM0016</code> and the exception's own message. Mapping it onto a Lyric <code>throws</code> is the open
+item of this stage, and until it is settled the failure is loud rather than turned into a
+value.</li>
+</ul>
+<p>A host that has registered a native under the same <code>dotnet:</code> name wins over reflection: a
+registration is a decision, reflection is the default.</p>
 <h2 id="value-types-across-the-boundary">Value types across the boundary</h2>
 <p>A native signature may use a <code>struct</code> an SDK module declares, with scalar and string fields only.
 Since v2.5 it may be a struct of <strong>another</strong> module of the SDK — a vector is declared once and

@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/" class="here">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
@@ -94,6 +96,12 @@ sequence would stay 0 forever — so it is replaced silently rather than panicki
 plausible input.</p>
 </div>
 <div class="member">
+<pre class="signature"><code class="language-lyr">pub static fn fresh(): Random</code></pre>
+<p>A generator seeded from the operating system's entropy — for a game or a shuffle that
+should differ per run, and that nobody needs to replay. <code>seeded</code> is the reproducible
+form; this one says in its name that the run cannot be repeated.</p>
+</div>
+<div class="member">
 <pre class="signature"><code class="language-lyr">pub mut fn nextInt(): int</code></pre>
 <p>The next raw value. It may have either sign.</p>
 </div>
@@ -120,17 +128,17 @@ plausible input.</p>
 <h2><a href="#function-shuffle">shuffle</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn shuffle&lt;T&gt;(random: Random, xs: List&lt;T&gt;): void</code></pre>
 <p>Shuffles in place, Fisher–Yates: every permutation equally likely, one draw per element.</p>
-<p class="source">stdlib/std/random.lyr:93</p>
+<p class="source">stdlib/std/random.lyr:128</p>
 </section>
 <section class="item" id="function-choice">
 <h2><a href="#function-choice">choice</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn choice&lt;T&gt;(random: Random, xs: List&lt;T&gt;): ?T</code></pre>
 <p>One element drawn uniformly, or <code>null</code> from an empty list.</p>
-<p class="source">stdlib/std/random.lyr:103</p>
+<p class="source">stdlib/std/random.lyr:138</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.process/">std.process</a>
-<a class="next" href="../../stdlib/std.string/">std.string</a>
+<a class="next" href="../../stdlib/std.result/">std.result</a>
 </nav>
 </main>
 </div>

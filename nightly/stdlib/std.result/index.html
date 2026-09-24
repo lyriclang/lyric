@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.result — Lyric nightly</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">nightly</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/" class="here">std.result</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.result</h1>
+<nav class="contents">
+<ul>
+<li><a href="#enum-result">Result</a></li>
+<li><a href="#function-map">map</a></li>
+<li><a href="#function-maperr">mapErr</a></li>
+<li><a href="#function-andthen">andThen</a></li>
+<li><a href="#function-orelse">orElse</a></li>
+<li><a href="#function-orthrow">orThrow</a></li>
+<li><a href="#function-fromoptional">fromOptional</a></li>
+</ul>
+</nav>
+<p>A failure as a value: <code>Ok(value)</code> or <code>Err(reason)</code>, and the combinators that compute with
+either without testing first.</p>
+<p><code>throws</code> remains the language's mechanism; this is the holder for a failure that is stored,
+collected or handled later. <code>orThrow</code> and <code>fromOptional</code> are the bridges to <code>throws</code> and <code>?T</code>.</p>
+<section class="item" id="enum-result">
+<h2><a href="#enum-result">Result</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum Result&lt;T, E&gt;</code></pre>
+<p>The outcome of something that can fail: the value, or the reason it did not happen.</p>
+<p>Two variants and nothing else, so a <code>match</code> covers it with two arms. The reason type <code>E</code> is
+unconstrained — a <code>string</code> is a fine reason for a config line, and <code>orThrow</code> alone asks for
+a <code>Throwable</code>.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">Ok(T)</code></pre>
+<p>It happened, and this is the value.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Err(E)</code></pre>
+<p>It did not, and this says why.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn isOk(): bool</code></pre>
+<p>Whether this is an <code>Ok</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn isErr(): bool</code></pre>
+<p>Whether this is an <code>Err</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn ok(): ?T</code></pre>
+<p>The value as an optional: <code>null</code> for an <code>Err</code>, which drops the reason — the bridge to
+<code>??</code> and to every function that takes a <code>?T</code>.</p>
+<p>Not available when <code>T</code> is itself optional: the answer would be <code>??T</code>. A <code>match</code> tells
+<code>Ok(null)</code> from <code>Ok(v)</code> there, which is the distinction this would have collapsed anyway.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn err(): ?E</code></pre>
+<p>The reason as an optional: <code>null</code> for an <code>Ok</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn unwrapOr(fallback: T): T</code></pre>
+<p>The value, or <code>fallback</code> for an <code>Err</code>. The fallback is evaluated either way; for one that
+costs something, <code>unwrapOrElse</code> takes a function.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn unwrapOrElse(fallback: fn(E) -&gt; T): T</code></pre>
+<p>The value, or what <code>fallback</code> makes of the reason — the reason is not lost, it is handed
+to the function that decides what stands in for the value.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn expect(message: string): T</code></pre>
+<p>The value, or a panic carrying <code>message</code> — for a result that CANNOT be an <code>Err</code> here,
+where being wrong about that is a programming error. As <code>std.option.expect</code> for <code>?T</code>.</p>
+</div>
+</div>
+<p class="source">stdlib/std/result.lyr:39</p>
+</section>
+<section class="item" id="function-map">
+<h2><a href="#function-map">map</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn map&lt;T, E, U&gt;(r: Result&lt;T, E&gt;, f: fn(T) -&gt; U): Result&lt;U, E&gt;</code></pre>
+<p>Applies <code>f</code> to the value when there is one; an <code>Err</code> passes through unchanged.</p>
+<p class="source">stdlib/std/result.lyr:113</p>
+</section>
+<section class="item" id="function-maperr">
+<h2><a href="#function-maperr">mapErr</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn mapErr&lt;T, E, F&gt;(r: Result&lt;T, E&gt;, f: fn(E) -&gt; F): Result&lt;T, F&gt;</code></pre>
+<p>Applies <code>f</code> to the REASON when there is one; an <code>Ok</code> passes through unchanged. What a
+layer uses to translate a lower layer's reason into its own.</p>
+<p class="source">stdlib/std/result.lyr:122</p>
+</section>
+<section class="item" id="function-andthen">
+<h2><a href="#function-andthen">andThen</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn andThen&lt;T, E, U&gt;(r: Result&lt;T, E&gt;, f: fn(T) -&gt; Result&lt;U, E&gt;): Result&lt;U, E&gt;</code></pre>
+<p>As <code>map</code>, but <code>f</code> may itself fail: the first <code>Err</code> in a chain wins, and everything after it
+is skipped. <code>andThen(andThen(parse(a), lookup), validate)</code> reads as the three steps it is.</p>
+<p class="source">stdlib/std/result.lyr:131</p>
+</section>
+<section class="item" id="function-orelse">
+<h2><a href="#function-orelse">orElse</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn orElse&lt;T, E, F&gt;(r: Result&lt;T, E&gt;, f: fn(E) -&gt; Result&lt;T, F&gt;): Result&lt;T, F&gt;</code></pre>
+<p>A second attempt when the first failed: <code>f</code> gets the reason and answers a result of its own.
+The mirror image of <code>andThen</code>.</p>
+<p class="source">stdlib/std/result.lyr:140</p>
+</section>
+<section class="item" id="function-orthrow">
+<h2><a href="#function-orthrow">orThrow</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn orThrow&lt;T, E :: [Throwable]&gt;(r: Result&lt;T, E&gt;): T throws E</code></pre>
+<p>The value, or the reason THROWN — the bridge from the value form back to the language's
+mechanism, for the moment a stored failure is finally handled.</p>
+<p>The catch that goes with it is <code>catch (e: Throwable)</code> today: the compiler substitutes a
+throws clause's type parameter at no call site yet, so a <code>catch (e: IoError)</code> beside it is
+reported as not covering. That is a compiler limitation, not a property of this function.</p>
+<p class="source">stdlib/std/result.lyr:155</p>
+</section>
+<section class="item" id="function-fromoptional">
+<h2><a href="#function-fromoptional">fromOptional</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn fromOptional&lt;T, E&gt;(o: ?T, error: E): Result&lt;T, E&gt;</code></pre>
+<p>An optional with a reason attached: the value when there is one, <code>error</code> when there is not.
+What turns a <code>Map.get</code> or a <code>parseInt</code> into a result without a <code>match</code> at every site.</p>
+<p>Not instantiable for an optional <code>T</code>, for the reason <code>ok</code> is not: the parameter would read
+<code>??T</code>. <code>Result&lt;?U, E&gt;.Ok(value)</code> is the direct construction there.</p>
+<p class="source">stdlib/std/result.lyr:169</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.random/">std.random</a>
+<a class="next" href="../../stdlib/std.string/">std.string</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>

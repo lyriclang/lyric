@@ -160,19 +160,24 @@ fn main(): int {
 }
 </code></pre>
 <p>Write <code>{{</code> and <code>}}</code> for a literal brace.</p>
-<p><strong>An interpolation holds a SCALAR</strong> — a number, a <code>bool</code>, a <code>char</code> or a <code>string</code>. A struct, a
-class or an enum is refused there even when it conforms to <code>Display</code>, so a type that prints
-through <code>println</code> still needs <code>.show()</code> inside an f-string:</p>
+<p><strong>An interpolation holds a scalar or a <code>Display</code> value.</strong> A number, a <code>bool</code>, a <code>char</code> or a
+<code>string</code> renders through its converter. Anything else renders the way <code>println</code> renders it: the
+hole calls <code>show()</code> when the type conforms to <code>Display</code> — a struct, a class, an enum, a type
+parameter with the constraint, or a value held through the interface — and is refused when it
+does not. A format specifier belongs to the scalars; <code>{at:N2}</code> on a <code>Display</code> value is an error,
+because <code>Display</code> renders one way.</p>
 <pre><code class="language-lyr">import std.io.console { println };
 import std.time { Instant };
 
 fn main(): int {
     let at = Instant.ofEpochMillis(1000);
     println(at);                        // Display, through the constraint
-    println(f&quot;at {at.show()}&quot;);         // f&quot;{at}&quot; is refused
+    println(f&quot;at {at}&quot;);                // the same call, through the hole
     return 0;
 }
 </code></pre>
+<p>An optional, an array or a tuple is not <code>Display</code> and does not render: narrow the optional,
+or convert the value with a function that returns a <code>string</code>.</p>
 <h2 id="arrays">Arrays</h2>
 <p><code>T[]</code> is a fixed-length array. Its length is part of the value, not of the type.</p>
 <pre><code class="language-lyr">import std.io.console { println };

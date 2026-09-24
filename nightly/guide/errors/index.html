@@ -52,6 +52,7 @@
 <li><a href="#exceptions">Exceptions</a></li>
 <li><a href="#cleanup">Cleanup</a></li>
 <li><a href="#custom-exception-types">Custom exception types</a></li>
+<li><a href="#throw-as-an-expression">throw as an expression</a></li>
 </ul>
 </nav>
 <p>Lyric separates two kinds of failure.</p>
@@ -151,6 +152,36 @@ fn main(): int {
 }
 </code></pre>
 <p><code>main</code> cannot declare <code>throws</code>; an exception that reaches it aborts the process.</p>
+<p>A <code>try</code> whose every <code>catch</code> leaves — returns, throws, breaks or continues — counts what its
+body assigned: a throw mid-way lands in a clause that leaves, so the only way past the <code>try</code> is
+the body's own end.</p>
+<pre><code class="language-lyr">import std.io.console { println };
+
+class UsageError :: [Throwable] {
+    text: string,
+    fn message(): string { return this.text; }
+}
+
+struct Options { verbose: bool }
+
+fn parse(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { text = &quot;nothing to do&quot; }; }
+    return Options { verbose = true };
+}
+
+fn run(opts: Options): int { return if (opts.verbose) 0 else 1; }
+
+fn main(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parse(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    return run(opts);      // opts is definitely assigned here
+}
+</code></pre>
 <h2 id="cleanup">Cleanup</h2>
 <p><code>defer</code> runs when the scope ends, on the normal path and while unwinding:</p>
 <pre><code class="language-lyr">import std.core { Exception };
@@ -190,6 +221,44 @@ fn main(): int {
     } catch (e: NotFound) {
         return 0;
     }
+}
+</code></pre>
+<h2 id="throw-as-an-expression"><code>throw</code> as an expression</h2>
+<p><code>throw</code> may stand where a value is expected. It has the type <code>never</code> — the type of an
+expression that does not deliver a value — and so it fits anywhere and takes part in no
+unification: the absent path of <code>??</code>, the other branch of an <code>if</code>, an arm of a <code>match</code>.</p>
+<pre><code class="language-lyr">class NotFound :: [Throwable] {
+    what: string,
+    fn message(): string { return &quot;not found: &quot; + this.what; }
+}
+
+enum Cmd { Go, Dial(int) }
+
+fn need(o: ?int, key: string): int throws NotFound {
+    return o ?? throw NotFound { what = key };
+}
+
+fn code(c: Cmd): int throws NotFound {
+    return match (c) {
+        Cmd.Go =&gt; 1,
+        Cmd.Dial(n) if n &gt; 0 =&gt; n,
+        _ =&gt; throw NotFound { what = &quot;dial&quot; },
+    };
+}
+</code></pre>
+<p><code>throw</code> binds like a prefix operator: <code>x ?? throw e</code> reads as intended, and <code>throw e ?? f</code> is a
+throw of <code>e</code>, not of <code>e ?? f</code>. The throw site is checked exactly as the statement form is — the
+enclosing function declares <code>throws</code> or a <code>try</code> around it catches.</p>
+<p>A function of your own may declare <code>never</code> as its return type. Its body must throw or panic on
+every path, and a call to it ends the path the way <code>panic</code> does — the flow analysis counts it as
+a return and narrows what follows:</p>
+<pre><code class="language-lyr">fn fail(message: string): never {
+    panic(&quot;fatal: &quot; + message);
+}
+
+fn guard(o: ?int): int {
+    if (o == null) { fail(&quot;no value&quot;); }
+    return o;
 }
 </code></pre>
 <nav class="neighbours">

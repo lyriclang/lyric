@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/" class="here">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
@@ -81,6 +83,10 @@
 <li><a href="#function-join">join</a></li>
 <li><a href="#function-parseint">parseInt</a></li>
 <li><a href="#function-parseintradix">parseIntRadix</a></li>
+<li><a href="#enum-parseerrorkind">ParseErrorKind</a></li>
+<li><a href="#class-parseerror">ParseError</a></li>
+<li><a href="#function-parseintorerr">parseIntOrErr</a></li>
+<li><a href="#function-parseintradixorerr">parseIntRadixOrErr</a></li>
 <li><a href="#function-parsebool">parseBool</a></li>
 <li><a href="#function-parsefloat">parseFloat</a></li>
 <li><a href="#class-stringbuilder">StringBuilder</a></li>
@@ -90,50 +96,50 @@
 <h2><a href="#function-concat">concat</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn concat(a: string, b: string): string</code></pre>
 <p>The two joined — what <code>+</code> on strings compiles to.</p>
-<p class="source">stdlib/std/string.lyr:15</p>
+<p class="source">stdlib/std/string.lyr:19</p>
 </section>
 <section class="item" id="function-fromint">
 <h2><a href="#function-fromint">fromInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromInt(value: int): string</code></pre>
 <p>The decimal text of the value.</p>
-<p class="source">stdlib/std/string.lyr:18</p>
+<p class="source">stdlib/std/string.lyr:22</p>
 </section>
 <section class="item" id="function-fromuint">
 <h2><a href="#function-fromuint">fromUint</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromUint(value: uint): string</code></pre>
 <p>The decimal text of an unsigned value.</p>
-<p class="source">stdlib/std/string.lyr:23</p>
+<p class="source">stdlib/std/string.lyr:27</p>
 </section>
 <section class="item" id="function-fromfloat">
 <h2><a href="#function-fromfloat">fromFloat</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromFloat(value: float): string</code></pre>
 <p>The decimal text of the value.</p>
-<p class="source">stdlib/std/string.lyr:25</p>
+<p class="source">stdlib/std/string.lyr:29</p>
 </section>
 <section class="item" id="function-frombool">
 <h2><a href="#function-frombool">fromBool</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromBool(value: bool): string</code></pre>
 <p><code>&quot;true&quot;</code> or <code>&quot;false&quot;</code>.</p>
-<p class="source">stdlib/std/string.lyr:27</p>
+<p class="source">stdlib/std/string.lyr:31</p>
 </section>
 <section class="item" id="function-fromchar">
 <h2><a href="#function-fromchar">fromChar</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromChar(value: char): string</code></pre>
 <p>The character as a one-character string.</p>
-<p class="source">stdlib/std/string.lyr:29</p>
+<p class="source">stdlib/std/string.lyr:33</p>
 </section>
 <section class="item" id="function-repeat">
 <h2><a href="#function-repeat">repeat</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn repeat(value: string, count: int): string</code></pre>
 <p>The string repeated <code>count</code> times — what <code>s * n</code> compiles to.</p>
-<p class="source">stdlib/std/string.lyr:34</p>
+<p class="source">stdlib/std/string.lyr:38</p>
 </section>
 <section class="item" id="function-fromchars">
 <h2><a href="#function-fromchars">fromChars</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn fromChars(chars: char[]): string</code></pre>
 <p>The characters joined back into one string — the inverse of <code>toChars</code>. Native since v1.14:
 one call instead of one string per character.</p>
-<p class="source">stdlib/std/string.lyr:46</p>
+<p class="source">stdlib/std/string.lyr:50</p>
 </section>
 <section class="item" id="function-utf8decode">
 <h2><a href="#function-utf8decode">utf8Decode</a> <span class="kind">function</span></h2>
@@ -141,7 +147,7 @@ one call instead of one string per character.</p>
 <p>The bytes as a string, STRICTLY: invalid UTF-8 answers <code>null</code> rather than a U+FFFD quietly
 standing in for the data — the difference to <code>std.io.file.text</code>, whose replacement decoding is
 documented there.</p>
-<p class="source">stdlib/std/string.lyr:56</p>
+<p class="source">stdlib/std/string.lyr:60</p>
 </section>
 <section class="item" id="class-utf8error">
 <h2><a href="#class-utf8error">Utf8Error</a> <span class="kind">class</span></h2>
@@ -155,89 +161,149 @@ documented there.</p>
 <pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
 </div>
 </div>
-<p class="source">stdlib/std/string.lyr:59</p>
+<p class="source">stdlib/std/string.lyr:63</p>
 </section>
 <section class="item" id="function-utf8decodeorthrow">
 <h2><a href="#function-utf8decodeorthrow">utf8DecodeOrThrow</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn utf8DecodeOrThrow(bytes: uint8[]): string throws Utf8Error</code></pre>
 <p><code>utf8Decode</code>, with the reason when the bytes are not UTF-8: which byte broke the sequence.</p>
-<p class="source">stdlib/std/string.lyr:72</p>
+<p class="source">stdlib/std/string.lyr:76</p>
 </section>
 <section class="item" id="function-isdigit">
 <h2><a href="#function-isdigit">isDigit</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isDigit(c: char): bool</code></pre>
 <p><code>'0'</code> through <code>'9'</code>.</p>
-<p class="source">stdlib/std/string.lyr:387</p>
+<p class="source">stdlib/std/string.lyr:391</p>
 </section>
 <section class="item" id="function-isalpha">
 <h2><a href="#function-isalpha">isAlpha</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isAlpha(c: char): bool</code></pre>
 <p>An ASCII letter.</p>
-<p class="source">stdlib/std/string.lyr:393</p>
+<p class="source">stdlib/std/string.lyr:397</p>
 </section>
 <section class="item" id="function-isalphanumeric">
 <h2><a href="#function-isalphanumeric">isAlphanumeric</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isAlphanumeric(c: char): bool</code></pre>
 <p>An ASCII letter or a digit.</p>
-<p class="source">stdlib/std/string.lyr:398</p>
+<p class="source">stdlib/std/string.lyr:402</p>
 </section>
 <section class="item" id="function-iswhitespace">
 <h2><a href="#function-iswhitespace">isWhitespace</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isWhitespace(c: char): bool</code></pre>
-<p>Space, tab, <code>\n</code> or <code>\r</code>.</p>
-<p class="source">stdlib/std/string.lyr:403</p>
+<p>Whether the character is white space in the Unicode sense — the same set <code>trim</code> removes,
+so <code>s.trim() == s.trimStart().trimEnd()</code> and <code>isBlank</code> agree with it: the ASCII controls
+<code>\t</code>..<code>\r</code> and the space, U+0085, U+00A0 and the other space separators (U+1680,
+U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000). Before 4.5 only four ASCII
+characters counted here while <code>trim</code> already used this set.</p>
+<p class="source">stdlib/std/string.lyr:411</p>
 </section>
 <section class="item" id="function-isupper">
 <h2><a href="#function-isupper">isUpper</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isUpper(c: char): bool</code></pre>
 <p><code>'A'</code> through <code>'Z'</code>.</p>
-<p class="source">stdlib/std/string.lyr:408</p>
+<p class="source">stdlib/std/string.lyr:431</p>
 </section>
 <section class="item" id="function-islower">
 <h2><a href="#function-islower">isLower</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isLower(c: char): bool</code></pre>
 <p><code>'a'</code> through <code>'z'</code>.</p>
-<p class="source">stdlib/std/string.lyr:413</p>
+<p class="source">stdlib/std/string.lyr:436</p>
 </section>
 <section class="item" id="function-chartodigit">
 <h2><a href="#function-chartodigit">charToDigit</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn charToDigit(c: char): ?int</code></pre>
 <p>The numeric value of a digit, or <code>null</code> when it is not one.</p>
 <p><code>?int</code> rather than <code>-1</code>: a failure the caller has to handle belongs in the type.</p>
-<p class="source">stdlib/std/string.lyr:420</p>
+<p class="source">stdlib/std/string.lyr:443</p>
 </section>
 <section class="item" id="function-digittochar">
 <h2><a href="#function-digittochar">digitToChar</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn digitToChar(value: int): ?char</code></pre>
 <p>The digit as a character, or <code>null</code> outside <code>0..9</code>.</p>
-<p class="source">stdlib/std/string.lyr:428</p>
+<p class="source">stdlib/std/string.lyr:451</p>
 </section>
 <section class="item" id="function-join">
 <h2><a href="#function-join">join</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn join(parts: string[], separator: string): string</code></pre>
 <p>Joins the parts with a separator: the inverse of <code>split</code>. One native call — a left fold
 would copy the whole result once per part.</p>
-<p class="source">stdlib/std/string.lyr:455</p>
+<p class="source">stdlib/std/string.lyr:478</p>
 </section>
 <section class="item" id="function-parseint">
 <h2><a href="#function-parseint">parseInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseInt(value: string): ?int</code></pre>
-<p><code>&quot;-42&quot;</code> becomes <code>-42</code>, anything else <code>null</code>.</p>
-<p>No overflow protection: a number beyond <code>int64</code> wraps rather than yielding <code>null</code>. Detecting
-it would need a division per digit.</p>
-<p class="source">stdlib/std/string.lyr:470</p>
+<p><code>&quot;-42&quot;</code> becomes <code>-42</code>, anything else <code>null</code> — an empty text, a sign on its own, a character
+that is no digit, and since 4.5 a magnitude beyond <code>int</code>, which used to wrap silently. The
+reason is what <code>parseIntOrErr</code> says.</p>
+<p class="source">stdlib/std/string.lyr:492</p>
 </section>
 <section class="item" id="function-parseintradix">
 <h2><a href="#function-parseintradix">parseIntRadix</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseIntRadix(value: string, radix: int): ?int</code></pre>
-<p>From a base of 2 to 36. Letters continue from <code>a</code>/<code>A</code>.</p>
-<p class="source">stdlib/std/string.lyr:504</p>
+<p>From a base of 2 to 36. Letters continue from <code>a</code>/<code>A</code>. <code>null</code> on anything <code>parseInt</code>
+refuses, and on a base outside <code>2..=36</code>.</p>
+<p class="source">stdlib/std/string.lyr:498</p>
+</section>
+<section class="item" id="enum-parseerrorkind">
+<h2><a href="#enum-parseerrorkind">ParseErrorKind</a> <span class="kind">enum</span></h2>
+<pre class="signature"><code class="language-lyr">pub enum ParseErrorKind</code></pre>
+<p>What kept a text from being a number.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">Empty</code></pre>
+<p>Nothing to read: the text is empty, or a sign with nothing after it.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">InvalidDigit</code></pre>
+<p>A character that is no digit of the base — <code>offset</code> says which.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">Overflow</code></pre>
+<p>The digits are fine and the number is not: it lies outside <code>int</code>.</p>
+</div>
+</div>
+<p class="source">stdlib/std/string.lyr:505</p>
+</section>
+<section class="item" id="class-parseerror">
+<h2><a href="#class-parseerror">ParseError</a> <span class="kind">class</span></h2>
+<pre class="signature"><code class="language-lyr">pub class ParseError :: [Throwable]</code></pre>
+<p>Why a text is not a number: which kind, and at which code-point offset the reading stopped.</p>
+<p>The carrier-plus-kind shape of <code>std.io.error.IoError</code>: a class that throws, holding an enum
+that matches, so a kind can be added without breaking a <code>match</code> over the ones known.</p>
+<div class="members">
+<div class="member">
+<pre class="signature"><code class="language-lyr">kind: ParseErrorKind</code></pre>
+<p>What went wrong.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">offset: int</code></pre>
+<p>Where the reading stopped, in code points; the text's length for <code>Overflow</code> and <code>Empty</code>.</p>
+</div>
+<div class="member">
+<pre class="signature"><code class="language-lyr">pub fn message(): string</code></pre>
+</div>
+</div>
+<p class="source">stdlib/std/string.lyr:518</p>
+</section>
+<section class="item" id="function-parseintorerr">
+<h2><a href="#function-parseintorerr">parseIntOrErr</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parseIntOrErr(value: string): Result&lt;int, ParseError&gt;</code></pre>
+<p><code>parseInt</code>, with the reason when the text is not a number: the value, or a <code>ParseError</code>
+saying what stopped the reading and where.</p>
+<p class="source">stdlib/std/string.lyr:536</p>
+</section>
+<section class="item" id="function-parseintradixorerr">
+<h2><a href="#function-parseintradixorerr">parseIntRadixOrErr</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn parseIntRadixOrErr(value: string, radix: int): Result&lt;int, ParseError&gt;</code></pre>
+<p><code>parseIntRadix</code>, with the reason. A base outside <code>2..=36</code> is reported as <code>InvalidDigit</code> at
+offset 0: no character of any text is a digit of a base that does not exist.</p>
+<p class="source">stdlib/std/string.lyr:542</p>
 </section>
 <section class="item" id="function-parsebool">
 <h2><a href="#function-parsebool">parseBool</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn parseBool(value: string): ?bool</code></pre>
 <p>Exactly <code>&quot;true&quot;</code> or <code>&quot;false&quot;</code>; anything else is <code>null</code>.</p>
-<p class="source">stdlib/std/string.lyr:549</p>
+<p class="source">stdlib/std/string.lyr:610</p>
 </section>
 <section class="item" id="function-parsefloat">
 <h2><a href="#function-parsefloat">parseFloat</a> <span class="kind">function</span></h2>
@@ -249,7 +315,7 @@ numbers. A magnitude beyond the type rounds to the infinities, as IEEE 754 presc
 <p>Native because the conversion is CORRECTLY ROUNDED, which needs arbitrary-precision
 arithmetic in the worst cases; an approximate parser hands back a float the text did not
 say. <code>parseFloat(fromFloat(x))</code> is <code>x</code> again, for every finite <code>x</code>.</p>
-<p class="source">stdlib/std/string.lyr:567</p>
+<p class="source">stdlib/std/string.lyr:628</p>
 </section>
 <section class="item" id="class-stringbuilder">
 <h2><a href="#class-stringbuilder">StringBuilder</a> <span class="kind">class</span></h2>
@@ -292,10 +358,10 @@ builder exists to avoid. Reads and never consumes: building twice yields the sam
 string.</p>
 </div>
 </div>
-<p class="source">stdlib/std/string.lyr:578</p>
+<p class="source">stdlib/std/string.lyr:639</p>
 </section>
 <nav class="neighbours">
-<a class="prev" href="../../stdlib/std.random/">std.random</a>
+<a class="prev" href="../../stdlib/std.result/">std.result</a>
 <a class="next" href="../../stdlib/std.task/">std.task</a>
 </nav>
 </main>

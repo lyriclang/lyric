@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/">std.test</a></li>
@@ -78,7 +80,16 @@
 <li><a href="#function-atan">atan</a></li>
 <li><a href="#function-atan2">atan2</a></li>
 <li><a href="#binding-tau">tau</a></li>
+<li><a href="#binding-intmax">intMax</a></li>
+<li><a href="#binding-intmin">intMin</a></li>
 <li><a href="#function-absint">absInt</a></li>
+<li><a href="#function-checkedadd">checkedAdd</a></li>
+<li><a href="#function-checkedsub">checkedSub</a></li>
+<li><a href="#function-checkedmul">checkedMul</a></li>
+<li><a href="#function-checkedabs">checkedAbs</a></li>
+<li><a href="#function-saturatingadd">saturatingAdd</a></li>
+<li><a href="#function-saturatingsub">saturatingSub</a></li>
+<li><a href="#function-saturatingmul">saturatingMul</a></li>
 <li><a href="#function-minint">minInt</a></li>
 <li><a href="#function-maxint">maxInt</a></li>
 <li><a href="#function-clampint">clampInt</a></li>
@@ -222,55 +233,111 @@ avoids the bias of always rounding up.</p>
 <p>The full turn: 2π.</p>
 <p class="source">stdlib/std/math.lyr:70</p>
 </section>
+<section class="item" id="binding-intmax">
+<h2><a href="#binding-intmax">intMax</a> <span class="kind">binding</span></h2>
+<pre class="signature"><code class="language-lyr">pub let intMax: int = 9223372036854775807</code></pre>
+<p>The largest <code>int</code>, 2^63 - 1.</p>
+<p class="source">stdlib/std/math.lyr:77</p>
+</section>
+<section class="item" id="binding-intmin">
+<h2><a href="#binding-intmin">intMin</a> <span class="kind">binding</span></h2>
+<pre class="signature"><code class="language-lyr">pub let intMin: int</code></pre>
+<p>The smallest <code>int</code>, -2^63. It has no positive twin: <code>absInt(intMin)</code> is <code>intMin</code> again, and
+<code>0 - intMin</code> too — arithmetic wraps.</p>
+<p class="source">stdlib/std/math.lyr:81</p>
+</section>
 <section class="item" id="function-absint">
 <h2><a href="#function-absint">absInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn absInt(value: int): int</code></pre>
 <p>The absolute value. The most negative <code>int</code> has no positive twin and comes back
-unchanged — arithmetic wraps.</p>
-<p class="source">stdlib/std/math.lyr:79</p>
+unchanged — arithmetic wraps; <code>checkedAbs</code> answers <code>null</code> there instead.</p>
+<p class="source">stdlib/std/math.lyr:85</p>
+</section>
+<section class="item" id="function-checkedadd">
+<h2><a href="#function-checkedadd">checkedAdd</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn checkedAdd(a: int, b: int): ?int</code></pre>
+<p><code>a + b</code>, or <code>null</code> when the sum does not fit <code>int</code>.</p>
+<p class="source">stdlib/std/math.lyr:97</p>
+</section>
+<section class="item" id="function-checkedsub">
+<h2><a href="#function-checkedsub">checkedSub</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn checkedSub(a: int, b: int): ?int</code></pre>
+<p><code>a - b</code>, or <code>null</code> when the difference does not fit <code>int</code>.</p>
+<p class="source">stdlib/std/math.lyr:107</p>
+</section>
+<section class="item" id="function-checkedmul">
+<h2><a href="#function-checkedmul">checkedMul</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn checkedMul(a: int, b: int): ?int</code></pre>
+<p><code>a * b</code>, or <code>null</code> when the product does not fit <code>int</code>.</p>
+<p class="source">stdlib/std/math.lyr:117</p>
+</section>
+<section class="item" id="function-checkedabs">
+<h2><a href="#function-checkedabs">checkedAbs</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn checkedAbs(value: int): ?int</code></pre>
+<p>The absolute value, or <code>null</code> for <code>intMin</code>, the one value without one.</p>
+<p class="source">stdlib/std/math.lyr:131</p>
+</section>
+<section class="item" id="function-saturatingadd">
+<h2><a href="#function-saturatingadd">saturatingAdd</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn saturatingAdd(a: int, b: int): int</code></pre>
+<p><code>a + b</code>, held at <code>intMax</code> or <code>intMin</code> instead of wrapping.</p>
+<p class="source">stdlib/std/math.lyr:139</p>
+</section>
+<section class="item" id="function-saturatingsub">
+<h2><a href="#function-saturatingsub">saturatingSub</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn saturatingSub(a: int, b: int): int</code></pre>
+<p><code>a - b</code>, held at the bounds instead of wrapping.</p>
+<p class="source">stdlib/std/math.lyr:148</p>
+</section>
+<section class="item" id="function-saturatingmul">
+<h2><a href="#function-saturatingmul">saturatingMul</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn saturatingMul(a: int, b: int): int</code></pre>
+<p><code>a * b</code>, held at the bounds instead of wrapping.</p>
+<p class="source">stdlib/std/math.lyr:157</p>
 </section>
 <section class="item" id="function-minint">
 <h2><a href="#function-minint">minInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn minInt(a: int, b: int): int</code></pre>
 <p>The smaller of the two.</p>
-<p class="source">stdlib/std/math.lyr:84</p>
+<p class="source">stdlib/std/math.lyr:166</p>
 </section>
 <section class="item" id="function-maxint">
 <h2><a href="#function-maxint">maxInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn maxInt(a: int, b: int): int</code></pre>
 <p>The larger of the two.</p>
-<p class="source">stdlib/std/math.lyr:89</p>
+<p class="source">stdlib/std/math.lyr:171</p>
 </section>
 <section class="item" id="function-clampint">
 <h2><a href="#function-clampint">clampInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn clampInt(value: int, lo: int, hi: int): int</code></pre>
 <p>Clamps to <code>[lo, hi]</code>. A <code>lo &gt; hi</code> yields <code>lo</code>; the bounds are the caller's business.</p>
-<p class="source">stdlib/std/math.lyr:94</p>
+<p class="source">stdlib/std/math.lyr:176</p>
 </section>
 <section class="item" id="function-signint">
 <h2><a href="#function-signint">signInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn signInt(value: int): int</code></pre>
 <p><code>-1</code>, <code>0</code> or <code>1</code>, matching the sign.</p>
-<p class="source">stdlib/std/math.lyr:102</p>
+<p class="source">stdlib/std/math.lyr:184</p>
 </section>
 <section class="item" id="function-gcd">
 <h2><a href="#function-gcd">gcd</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn gcd(a: int, b: int): int</code></pre>
 <p>Greatest common divisor, Euclidean. Always non-negative.</p>
-<p class="source">stdlib/std/math.lyr:110</p>
+<p class="source">stdlib/std/math.lyr:192</p>
 </section>
 <section class="item" id="function-lcm">
 <h2><a href="#function-lcm">lcm</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn lcm(a: int, b: int): int</code></pre>
 <p>Least common multiple. <code>lcm(0, n)</code> is 0.</p>
-<p class="source">stdlib/std/math.lyr:122</p>
+<p class="source">stdlib/std/math.lyr:204</p>
 </section>
 <section class="item" id="function-powint">
 <h2><a href="#function-powint">powInt</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn powInt(base: int, exponent: int): ?int</code></pre>
 <p>Integer power by repeated squaring.</p>
-<p>A negative exponent yields <code>null</code>: the result would be a fraction.</p>
-<p class="source">stdlib/std/math.lyr:134</p>
+<p><code>null</code> for a negative exponent — the result would be a fraction — and since 4.5 for a result
+beyond <code>int</code>, which used to wrap silently: <code>powInt(2, 64)</code> answered 0.</p>
+<p class="source">stdlib/std/math.lyr:217</p>
 </section>
 <section class="item" id="function-divfloor">
 <h2><a href="#function-divfloor">divFloor</a> <span class="kind">function</span></h2>
@@ -279,74 +346,74 @@ unchanged — arithmetic wraps.</p>
 <p><code>/</code> and <code>%</code> follow the sign of the dividend, so <code>-7 / 2</code> is -3.
 Computing on a grid (tiles, time windows) needs -4. Both forms stand side by side so the
 choice is visible.</p>
-<p class="source">stdlib/std/math.lyr:157</p>
+<p class="source">stdlib/std/math.lyr:252</p>
 </section>
 <section class="item" id="function-modfloor">
 <h2><a href="#function-modfloor">modFloor</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn modFloor(a: int, b: int): int</code></pre>
 <p>The remainder matching <code>divFloor</code>, always carrying the sign of <code>b</code>.</p>
-<p class="source">stdlib/std/math.lyr:167</p>
+<p class="source">stdlib/std/math.lyr:262</p>
 </section>
 <section class="item" id="function-clamp">
 <h2><a href="#function-clamp">clamp</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn clamp(value: float, lo: float, hi: float): float</code></pre>
 <p>Clamps to <code>[lo, hi]</code>. A <code>lo &gt; hi</code> yields <code>lo</code>; the bounds are the caller's business.</p>
-<p class="source">stdlib/std/math.lyr:178</p>
+<p class="source">stdlib/std/math.lyr:273</p>
 </section>
 <section class="item" id="function-sign">
 <h2><a href="#function-sign">sign</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn sign(value: float): float</code></pre>
 <p><code>-1.0</code>, <code>0.0</code> or <code>1.0</code>, matching the sign. NaN yields <code>0.0</code>.</p>
-<p class="source">stdlib/std/math.lyr:186</p>
+<p class="source">stdlib/std/math.lyr:281</p>
 </section>
 <section class="item" id="function-trunc">
 <h2><a href="#function-trunc">trunc</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn trunc(value: float): float</code></pre>
 <p>Truncates towards zero: <code>trunc(-2.7)</code> is <code>-2.0</code>, while <code>floor(-2.7)</code> would be <code>-3.0</code>.</p>
-<p class="source">stdlib/std/math.lyr:194</p>
+<p class="source">stdlib/std/math.lyr:289</p>
 </section>
 <section class="item" id="function-isnan">
 <h2><a href="#function-isnan">isNaN</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isNaN(value: float): bool</code></pre>
 <p><code>NaN</code> is the only value unequal to itself (IEEE 754), so this needs no native edge and no bit
 access.</p>
-<p class="source">stdlib/std/math.lyr:200</p>
+<p class="source">stdlib/std/math.lyr:295</p>
 </section>
 <section class="item" id="function-isinfinite">
 <h2><a href="#function-isinfinite">isInfinite</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isInfinite(value: float): bool</code></pre>
 <p>Whether the value is positive or negative infinity. NaN is neither.</p>
-<p class="source">stdlib/std/math.lyr:205</p>
+<p class="source">stdlib/std/math.lyr:300</p>
 </section>
 <section class="item" id="function-isfinite">
 <h2><a href="#function-isfinite">isFinite</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn isFinite(value: float): bool</code></pre>
 <p>Whether the value is neither NaN nor infinite.</p>
-<p class="source">stdlib/std/math.lyr:214</p>
+<p class="source">stdlib/std/math.lyr:309</p>
 </section>
 <section class="item" id="function-exp">
 <h2><a href="#function-exp">exp</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn exp(value: float): float</code></pre>
 <p><code>e</code> raised to <code>value</code>.</p>
-<p class="source">stdlib/std/math.lyr:219</p>
+<p class="source">stdlib/std/math.lyr:314</p>
 </section>
 <section class="item" id="function-log2">
 <h2><a href="#function-log2">log2</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn log2(value: float): float</code></pre>
 <p>The base-2 logarithm.</p>
-<p class="source">stdlib/std/math.lyr:226</p>
+<p class="source">stdlib/std/math.lyr:321</p>
 </section>
 <section class="item" id="function-log10">
 <h2><a href="#function-log10">log10</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn log10(value: float): float</code></pre>
 <p>The base-10 logarithm.</p>
-<p class="source">stdlib/std/math.lyr:228</p>
+<p class="source">stdlib/std/math.lyr:323</p>
 </section>
 <section class="item" id="function-logbase">
 <h2><a href="#function-logbase">logBase</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn logBase(value: float, base: float): float</code></pre>
 <p>The logarithm to an arbitrary base.</p>
-<p class="source">stdlib/std/math.lyr:231</p>
+<p class="source">stdlib/std/math.lyr:326</p>
 </section>
 <section class="item" id="function-cbrt">
 <h2><a href="#function-cbrt">cbrt</a> <span class="kind">function</span></h2>
@@ -354,43 +421,43 @@ access.</p>
 <p>The cube root, negative values included.</p>
 <p><code>pow(x, 1/3)</code> alone yields NaN for negative <code>x</code>: a fractional power is undefined there. The
 cube root is not, and the sign simply moves out.</p>
-<p class="source">stdlib/std/math.lyr:239</p>
+<p class="source">stdlib/std/math.lyr:334</p>
 </section>
 <section class="item" id="function-hypot">
 <h2><a href="#function-hypot">hypot</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn hypot(a: float, b: float): float</code></pre>
 <p>The length of the hypotenuse.</p>
-<p class="source">stdlib/std/math.lyr:247</p>
+<p class="source">stdlib/std/math.lyr:342</p>
 </section>
 <section class="item" id="function-sinh">
 <h2><a href="#function-sinh">sinh</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn sinh(value: float): float</code></pre>
 <p>The hyperbolic sine.</p>
-<p class="source">stdlib/std/math.lyr:252</p>
+<p class="source">stdlib/std/math.lyr:347</p>
 </section>
 <section class="item" id="function-cosh">
 <h2><a href="#function-cosh">cosh</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn cosh(value: float): float</code></pre>
 <p>The hyperbolic cosine.</p>
-<p class="source">stdlib/std/math.lyr:257</p>
+<p class="source">stdlib/std/math.lyr:352</p>
 </section>
 <section class="item" id="function-tanh">
 <h2><a href="#function-tanh">tanh</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn tanh(value: float): float</code></pre>
 <p>The hyperbolic tangent.</p>
-<p class="source">stdlib/std/math.lyr:262</p>
+<p class="source">stdlib/std/math.lyr:357</p>
 </section>
 <section class="item" id="function-toradians">
 <h2><a href="#function-toradians">toRadians</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn toRadians(degrees: float): float</code></pre>
 <p>Degrees to radians.</p>
-<p class="source">stdlib/std/math.lyr:267</p>
+<p class="source">stdlib/std/math.lyr:362</p>
 </section>
 <section class="item" id="function-todegrees">
 <h2><a href="#function-todegrees">toDegrees</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn toDegrees(radians: float): float</code></pre>
 <p>Radians to degrees.</p>
-<p class="source">stdlib/std/math.lyr:272</p>
+<p class="source">stdlib/std/math.lyr:367</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.json/">std.json</a>

@@ -36,6 +36,7 @@
 <li><a href="../../stdlib/std.core/">std.core</a></li>
 <li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../../stdlib/std.os/">std.os</a></li>
 <li><a href="../../stdlib/std.process/">std.process</a></li>
 <li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
 <li><a href="../../stdlib/std.string/">std.string</a></li>
 <li><a href="../../stdlib/std.task/">std.task</a></li>
 <li><a href="../../stdlib/std.test/" class="here">std.test</a></li>
@@ -62,6 +64,13 @@
 <li><a href="#struct-test">Test</a></li>
 <li><a href="#function-asserttrue">assertTrue</a></li>
 <li><a href="#function-asserteq">assertEq</a></li>
+<li><a href="#function-assertnoteq">assertNotEq</a></li>
+<li><a href="#function-assertnull">assertNull</a></li>
+<li><a href="#function-assertnotnull">assertNotNull</a></li>
+<li><a href="#function-assertclose">assertClose</a></li>
+<li><a href="#function-assertless">assertLess</a></li>
+<li><a href="#function-assertcontains">assertContains</a></li>
+<li><a href="#function-fail">fail</a></li>
 </ul>
 </nav>
 <p>Marking tests, and the assertions that fail them. <code>lyric test</code> runs every function marked
@@ -72,7 +81,7 @@ here do.</p>
 <pre class="signature"><code class="language-lyr">pub struct Test :: [OnFunction]</code></pre>
 <p>Marks a top-level function as a test. <code>lyric test</code> finds it through the attribute row and
 runs it in a fresh instance; the function takes no parameters and returns nothing.</p>
-<p class="source">stdlib/std/test.lyr:16</p>
+<p class="source">stdlib/std/test.lyr:17</p>
 </section>
 <section class="item" id="function-asserttrue">
 <h2><a href="#function-asserttrue">assertTrue</a> <span class="kind">function</span></h2>
@@ -80,13 +89,60 @@ runs it in a fresh instance; the function takes no parameters and returns nothin
 <p>Fails the test with <code>message</code> when <code>condition</code> is false.</p>
 <p>The same behavior as <code>std.core.assert</code> — it exists so a test file needs one import, and it
 delegates so there is one implementation.</p>
-<p class="source">stdlib/std/test.lyr:22</p>
+<p class="source">stdlib/std/test.lyr:23</p>
 </section>
 <section class="item" id="function-asserteq">
 <h2><a href="#function-asserteq">assertEq</a> <span class="kind">function</span></h2>
 <pre class="signature"><code class="language-lyr">pub fn assertEq&lt;T :: [Equatable&lt;T&gt;, Display]&gt;(actual: T, expected: T): void</code></pre>
 <p>Fails the test when the two values differ, naming both.</p>
-<p class="source">stdlib/std/test.lyr:27</p>
+<p class="source">stdlib/std/test.lyr:28</p>
+</section>
+<section class="item" id="function-assertnoteq">
+<h2><a href="#function-assertnoteq">assertNotEq</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertNotEq&lt;T :: [Equatable&lt;T&gt;, Display]&gt;(actual: T, unexpected: T): void</code></pre>
+<p>Fails the test when the two values are EQUAL, naming the value — the assertion for &quot;it
+changed&quot;, where <code>assertEq</code> says &quot;it is&quot;.</p>
+<p class="source">stdlib/std/test.lyr:36</p>
+</section>
+<section class="item" id="function-assertnull">
+<h2><a href="#function-assertnull">assertNull</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertNull&lt;T :: [Display]&gt;(value: ?T): void</code></pre>
+<p>Fails the test when the value is present, naming it.</p>
+<p class="source">stdlib/std/test.lyr:43</p>
+</section>
+<section class="item" id="function-assertnotnull">
+<h2><a href="#function-assertnotnull">assertNotNull</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertNotNull&lt;T&gt;(value: ?T, message: string): void</code></pre>
+<p>Fails the test when the value is absent.</p>
+<p class="source">stdlib/std/test.lyr:50</p>
+</section>
+<section class="item" id="function-assertclose">
+<h2><a href="#function-assertclose">assertClose</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertClose(actual: float, expected: float, tolerance: float): void</code></pre>
+<p>Fails the test when the two floats lie further apart than <code>tolerance</code> — the comparison
+<code>assertEq</code> cannot make for floating point, where <code>0.1 + 0.2</code> is not <code>0.3</code>. NaN on either
+side fails: it is close to nothing.</p>
+<p class="source">stdlib/std/test.lyr:59</p>
+</section>
+<section class="item" id="function-assertless">
+<h2><a href="#function-assertless">assertLess</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertLess&lt;T :: [Ordered&lt;T&gt;, Display]&gt;(actual: T, bound: T): void</code></pre>
+<p>Fails the test when <code>actual</code> is not strictly less than <code>bound</code>, naming both.</p>
+<p class="source">stdlib/std/test.lyr:74</p>
+</section>
+<section class="item" id="function-assertcontains">
+<h2><a href="#function-assertcontains">assertContains</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn assertContains(haystack: string, needle: string): void</code></pre>
+<p>Fails the test when the text does not contain <code>needle</code>, quoting both.</p>
+<p class="source">stdlib/std/test.lyr:81</p>
+</section>
+<section class="item" id="function-fail">
+<h2><a href="#function-fail">fail</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn fail(message: string): void</code></pre>
+<p>Fails the test outright, with <code>message</code> — for a branch a test must never reach.</p>
+<p><code>void</code> rather than <code>never</code> like <code>panic</code>: it does not count as a <code>return</code> for the flow
+analysis until the language lets a library function say <code>never</code>.</p>
+<p class="source">stdlib/std/test.lyr:91</p>
 </section>
 <nav class="neighbours">
 <a class="prev" href="../../stdlib/std.task/">std.task</a>

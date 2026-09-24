@@ -36,6 +36,7 @@
 <li><a href="../stdlib/std.core/">std.core</a></li>
 <li><a href="../stdlib/std.encoding/">std.encoding</a></li>
 <li><a href="../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../stdlib/std.hash/">std.hash</a></li>
 <li><a href="../stdlib/std.io.console/">std.io.console</a></li>
 <li><a href="../stdlib/std.io.error/">std.io.error</a></li>
 <li><a href="../stdlib/std.io.file/">std.io.file</a></li>
@@ -49,6 +50,7 @@
 <li><a href="../stdlib/std.os/">std.os</a></li>
 <li><a href="../stdlib/std.process/">std.process</a></li>
 <li><a href="../stdlib/std.random/">std.random</a></li>
+<li><a href="../stdlib/std.result/">std.result</a></li>
 <li><a href="../stdlib/std.string/">std.string</a></li>
 <li><a href="../stdlib/std.task/">std.task</a></li>
 <li><a href="../stdlib/std.test/">std.test</a></li>
@@ -248,13 +250,18 @@ TopLevelDecl    = ImportDecl
                 | [ 'pub' ] ( InterfaceDecl
                             | ExtendDecl
                             | GlobalBinding
-                            | TypeAlias ) .
+                            | TypeAlias
+                            | ExternDecl ) .
 
 GlobalBinding   = BindingStmt .                   (* 'let' only *)
 TypeAlias       = [ 'opaque' ] 'type' IDENTIFIER '=' TypeExpr ';' .
+ExternDecl      = 'extern' STRING 'fn' IDENTIFIER '(' [ ParamList ] ')' [ ':' TypeExpr ]
+                  [ '=' STRING ] ';' .
 </code></pre>
-<p>Neither <code>type</code> nor <code>opaque</code> is a keyword; both are contextual, so both remain usable as
-identifiers.</p>
+<p>Neither <code>type</code>, <code>opaque</code> nor <code>extern</code> is a keyword; all three are contextual, so they remain
+usable as identifiers. <code>extern</code> opens a declaration only when a string literal follows it.
+The first string names the ABI (<code>&quot;dotnet&quot;</code>), the second the symbol the ABI binds
+(<code>&quot;System.Math::Cbrt&quot;</code>); an extern declaration has no body and no <code>throws</code> clause.</p>
 <p>A plain alias is a name for a type, not a new type. An <strong>opaque</strong> alias (since v1.15) is a new
 IDENTITY over the same layout: nothing converts implicitly in either direction, an explicit <code>as</code>
 to exactly the underlying type and back is the one crossing, <code>==</code>/<code>!=</code> compare within one alias,
@@ -380,6 +387,8 @@ optionals is written <code>(?T)[]</code>.</p>
 Statement       = Block
                 | BindingStmt
                 | DestructuringStmt
+                | LetPatternStmt
+                | LabeledStmt
                 | IfStmt
                 | WhileStmt
                 | DoWhileStmt
@@ -392,23 +401,29 @@ Statement       = Block
                 | DeferStmt
                 | ThrowStmt
                 | TryStmt
-                | ExprStmt .
+                | ExprStmt
+                | TailExprStmt .
 
 BindingStmt     = ( 'let' | 'var' ) IDENTIFIER [ ':' TypeExpr ] [ '=' Expr ] ';' .
 DestructuringStmt = ( 'let' | 'var' ) TuplePattern [ ':' TypeExpr ] '=' Expr ';' .
+LetPatternStmt  = ( 'let' | 'var' ) Pattern [ ':' TypeExpr ] '=' Expr [ 'else' Block ] ';' .
 
-IfStmt          = 'if' '(' Expr ')' Block [ 'else' ( Block | IfStmt ) ] .
+LabeledStmt     = IDENTIFIER ':' ( WhileStmt | DoWhileStmt | ForInStmt ) .
 
-WhileStmt       = 'while' '(' Expr ')' Block .
+IfStmt          = 'if' '(' Condition ')' Block [ 'else' ( Block | IfStmt ) ] .
+Condition       = Expr | LetCondition .
+LetCondition    = 'let' Pattern '=' Expr .
+
+WhileStmt       = 'while' '(' Condition ')' Block .
 DoWhileStmt     = 'do' Block 'while' '(' Expr ')' ';' .
-ForInStmt       = 'for' '(' IDENTIFIER 'in' ( RangeExpr | Expr ) ')' Block .
+ForInStmt       = 'for' '(' ( IDENTIFIER | TuplePattern ) 'in' ( RangeExpr | Expr ) ')' Block .
 RangeExpr       = Expr ( '..' | '..=' ) Expr .
 
 MatchStmt       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 MatchArm        = Pattern [ 'if' Expr ] '=&gt;' ( Expr | Block ) .
 
-BreakStmt       = 'break' ';' .
-ContinueStmt    = 'continue' ';' .
+BreakStmt       = 'break' [ IDENTIFIER ] ';' .
+ContinueStmt    = 'continue' [ IDENTIFIER ] ';' .
 ReturnStmt      = 'return' [ Expr ] ';' .
 YieldStmt       = 'yield' [ Expr ] ';' .
 DeferStmt       = 'defer' ( Block | Expr ';' ) .
@@ -421,9 +436,22 @@ CatchBinding    = '_'
                 | IDENTIFIER .
 
 ExprStmt        = Expr ';' .
+TailExprStmt    = Expr .                          (* only as the last statement of a value block *)
 </code></pre>
 <p>A destructuring binding requires an initializer. Its pattern admits names, <code>_</code> and nested tuple
-patterns; no form that can fail.</p>
+patterns; no form that can fail. <code>LetPatternStmt</code> is the form that admits one: a pattern that CAN
+fail needs an <code>else</code> block, which the flow rules require to leave the scope. Without <code>else</code> the
+pattern must be irrefutable, and the two productions then describe the same statement — the
+tuple form is the older spelling of it.</p>
+<p>A <strong>label</strong> names the loop that follows it and only a loop; <code>break L</code> and <code>continue L</code> name a
+label that is in scope, meaning a loop this statement stands inside. Without a name they take the
+innermost loop, as they always have.</p>
+<p>A <code>let</code> <strong>condition</strong> stands in an <code>if</code> or a <code>while</code> head and nowhere else. It is true when the
+pattern matches, and the names it binds are in scope in the branch or the body — for a <code>while</code>,
+on every iteration.</p>
+<p>A <code>TailExprStmt</code> is an expression without <code>;</code> standing last in a block that delivers a VALUE
+(§6.9) — the block of a <code>match</code> arm — and it is that block's value. Everywhere else, an ordinary
+block and a lambda's block included, a missing <code>;</code> stays the error it always was.</p>
 <p><code>RangeExpr</code> appears in <code>ForInStmt</code> and nowhere else — it is a loop head, not a value. There is no
 range type: <code>0..9</code> says which numbers the loop walks, and a program that binds one, stores one or
 passes one to a function is refused there rather than at a later stage. <code>RangePattern</code> (§Patterns)
@@ -547,18 +575,24 @@ Primary         = IntLit | FloatLit | StringLit | InterpolatedStr
                 | TupleLit
                 | Lambda .
 
-Lambda          = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
+Lambda          = ParenLambda | BareLambda .
+ParenLambda     = '(' [ LambdaParam { ',' LambdaParam } ] ')' [ ':' TypeExpr ]
                   '=&gt;' ( Expr | Block ) .
-LambdaParam     = IDENTIFIER [ ':' TypeExpr ] .
+BareLambda      = IDENTIFIER '=&gt;' ( Expr | Block ) .
+LambdaParam     = IDENTIFIER [ ':' TypeExpr ]
+                | TuplePattern .
 
 ResumeExpr      = 'resume' UnaryExpr .
+ComptimeExpr    = 'comptime' UnaryExpr .          (* contextual: only before an expression *)
+ThrowExpr       = 'throw' UnaryExpr .
 
 StructInit      = TypePath '{' [ StructInitField { ',' StructInitField } [ ',' ] ] '}' .
 StructInitField = IDENTIFIER '=' Expr .
 
 TypePath        = ModulePath [ '&lt;' TypeExpr { ',' TypeExpr } '&gt;' ] [ '.' IDENTIFIER ] .
 
-CallArgs        = [ '&lt;' TypeExpr { ',' TypeExpr } '&gt;' ] '(' [ Expr { ',' Expr } ] ')' .
+CallArgs        = [ '&lt;' TypeExpr { ',' TypeExpr } '&gt;' ] '(' [ Expr { ',' Expr } ] ')' [ Block ]
+                | [ '&lt;' TypeExpr { ',' TypeExpr } '&gt;' ] Block .   (* a trailing lambda *)
 
 ArrayLit        = '[' [ Expr { ',' Expr } [ ',' ] ] ']' .
 TupleLit        = '(' Expr ',' Expr { ',' Expr } ')' .
@@ -567,6 +601,16 @@ IfExpr          = 'if' '(' Expr ')' Expr 'else' Expr .
 MatchExpr       = 'match' '(' Expr ')' '{' { MatchArm } '}' .
 </code></pre>
 <p><code>else</code> is mandatory in <code>IfExpr</code>; <code>else if</code> is a nested <code>IfExpr</code>.</p>
+<p>A <strong>bare lambda</strong> takes one parameter and names it: <code>x =&gt; x * 2</code>. A <strong>trailing lambda</strong> is a block
+standing after a call, or in place of its argument list — <code>xs.map { it * 2 }</code>, <code>fold(0) { acc + it }</code>
+— and is that call's last argument, a lambda whose one parameter is the implicit <code>it</code>. A <code>{</code> after
+an expression opened nothing before, so no earlier program changes meaning; the one look-alike, a
+struct initializer at the start of a statement, is what §6.8 keeps out of that position anyway.</p>
+<p><code>throw</code> as an <strong>expression</strong> has the type <code>never</code> and therefore stands wherever a value is expected
+without constraining the others: the absent side of <code>??</code>, a branch of an <code>if</code>, an arm of a <code>match</code>.
+<code>throw e;</code> at the start of a statement stays a <code>ThrowStmt</code> — one form per position.</p>
+<p><code>comptime e</code> is the value of <code>e</code>, computed while compiling. The prefix says WHEN the expression is
+evaluated, not what it means.</p>
 <p>In a <code>TypePath</code>, the trailing <code>'.' IDENTIFIER</code> names an enum variant: <code>Opt&lt;int&gt;.Some</code>. The type
 arguments belong to the type and precede that segment.</p>
 <h3 id="resolving">6.3 Resolving <code>&lt;</code></h3>
@@ -603,15 +647,22 @@ occur in a type expression stand between the two, and the token that follows is 
                 | TypePath [ '(' Pattern { ',' Pattern } ')' ]
                 | TypePath '{' [ FieldPattern { ',' FieldPattern } [ ',' ] ] '}'
                 | TuplePattern
+                | ArrayPattern
                 | Pattern '|' Pattern
                 | RangePattern .
 
 FieldPattern    = IDENTIFIER [ '=' Pattern ] .
 TuplePattern    = '(' Pattern ',' Pattern { ',' Pattern } ')' .
+ArrayPattern    = '[' [ ArrayElement { ',' ArrayElement } [ ',' ] ] ']' .
+ArrayElement    = Pattern | RestPattern .
+RestPattern     = '..' [ IDENTIFIER ] .
 RangePattern    = Literal ( '..' | '..=' ) Literal .
 </code></pre>
 <p><code>Literal</code> is an integer, float, string, char, bool or null literal. A <code>FieldPattern</code> without <code>=</code>
 binds the field to its own name.</p>
+<p>An <strong>array pattern</strong> matches by length: without a <code>RestPattern</code> it matches an array of exactly its
+element count, with one it matches any array long enough for the elements beside it. At most one
+rest may appear, and a named one binds the elements it covers as an array.</p>
 <nav class="neighbours">
 <a class="next" href="../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a>
 </nav>

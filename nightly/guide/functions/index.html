@@ -178,9 +178,11 @@ fn main(): int {
     return apply(triple, 3) + apply(describe, 5);
 }
 </code></pre>
-<p>A lambda captures the variables it uses. A block-bodied lambda infers its return type from its
-<code>return</code> statements when neither an annotation nor a context provides one — the returns must
-agree, the same rule match arms follow.</p>
+<p>A lambda captures the variables it uses. A block-bodied lambda may end in a <strong>tail</strong>, an
+expression without <code>;</code>, which is its result — <code>(n: int) =&gt; { let d = n * 2; d + 1 }</code> — exactly
+as if it had written <code>return d + 1;</code>. It infers its return type from its <code>return</code> statements
+and its tail when neither an annotation nor a context provides one — they must agree, the same
+rule match arms follow.</p>
 <h2 id="static-methods">Static methods</h2>
 <p>A type can carry functions that need no instance. They are called through the type.</p>
 <pre><code class="language-lyr">struct Point {

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.hash — Lyric nightly</title>
+<link rel="stylesheet" href="../../site.css" />
+</head>
+<body>
+<header class="top">
+<a class="brand" href="../../">Lyric</a>
+<nav class="areas">
+<a href="../../guide/getting-started/">Guide</a>
+<a class="current" href="../../grammar/">Documentation</a>
+</nav>
+<span class="version">nightly</span>
+<nav class="switcher" data-versions="../../../versions.json"></nav>
+</header>
+<div class="layout">
+<nav class="sidebar">
+<h2>Reference</h2>
+<ul>
+<li><a href="../../grammar/">Lyric Grammar</a></li>
+<li><a href="../../bytecode/">Lyric .lyrbc Bytecode Format 4.0</a></li>
+<li><a href="../../pack/">The Pack Format</a></li>
+</ul>
+<h2>Project</h2>
+<ul>
+<li><a href="../../changelog/">Changelog</a></li>
+</ul>
+<h2>Standard library</h2>
+<ul>
+<li><a href="../../stdlib/std.build/">std.build</a></li>
+<li><a href="../../stdlib/std.bytes/">std.bytes</a></li>
+<li><a href="../../stdlib/std.collections/">std.collections</a></li>
+<li><a href="../../stdlib/std.core/">std.core</a></li>
+<li><a href="../../stdlib/std.encoding/">std.encoding</a></li>
+<li><a href="../../stdlib/std.fmt/">std.fmt</a></li>
+<li><a href="../../stdlib/std.hash/" class="here">std.hash</a></li>
+<li><a href="../../stdlib/std.io.console/">std.io.console</a></li>
+<li><a href="../../stdlib/std.io.error/">std.io.error</a></li>
+<li><a href="../../stdlib/std.io.file/">std.io.file</a></li>
+<li><a href="../../stdlib/std.io.net/">std.io.net</a></li>
+<li><a href="../../stdlib/std.io.path/">std.io.path</a></li>
+<li><a href="../../stdlib/std.io.stream/">std.io.stream</a></li>
+<li><a href="../../stdlib/std.iter/">std.iter</a></li>
+<li><a href="../../stdlib/std.json/">std.json</a></li>
+<li><a href="../../stdlib/std.math/">std.math</a></li>
+<li><a href="../../stdlib/std.option/">std.option</a></li>
+<li><a href="../../stdlib/std.os/">std.os</a></li>
+<li><a href="../../stdlib/std.process/">std.process</a></li>
+<li><a href="../../stdlib/std.random/">std.random</a></li>
+<li><a href="../../stdlib/std.result/">std.result</a></li>
+<li><a href="../../stdlib/std.string/">std.string</a></li>
+<li><a href="../../stdlib/std.task/">std.task</a></li>
+<li><a href="../../stdlib/std.test/">std.test</a></li>
+<li><a href="../../stdlib/std.time/">std.time</a></li>
+</ul>
+</nav>
+<main>
+<h1>std.hash</h1>
+<nav class="contents">
+<ul>
+<li><a href="#function-sha256">sha256</a></li>
+<li><a href="#function-sha1">sha1</a></li>
+<li><a href="#function-md5">md5</a></li>
+<li><a href="#function-crc32">crc32</a></li>
+<li><a href="#function-sha256hex">sha256Hex</a></li>
+<li><a href="#function-sha1hex">sha1Hex</a></li>
+<li><a href="#function-md5hex">md5Hex</a></li>
+<li><a href="#function-hashcombine">hashCombine</a></li>
+<li><a href="#function-hashall">hashAll</a></li>
+</ul>
+</nav>
+<p>Digests and checksums over bytes: <code>sha256</code>, <code>sha1</code>, <code>md5</code> and <code>crc32</code>, plus the hex
+conveniences over text and <code>hashCombine</code> for a <code>Hashable</code> built from several fields.</p>
+<section class="item" id="function-sha256">
+<h2><a href="#function-sha256">sha256</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sha256(bytes: uint8[]): uint8[]</code></pre>
+<p>The SHA-256 digest: 32 bytes. The one to reach for when the digest must resist an
+attacker — content addressing, integrity checks, tokens derived from secrets.</p>
+<p class="source">stdlib/std/hash.lyr:26</p>
+</section>
+<section class="item" id="function-sha1">
+<h2><a href="#function-sha1">sha1</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sha1(bytes: uint8[]): uint8[]</code></pre>
+<p>The SHA-1 digest: 20 bytes. Broken for collision resistance since 2017; here because git
+and older protocols still speak it, not for anything new.</p>
+<p class="source">stdlib/std/hash.lyr:30</p>
+</section>
+<section class="item" id="function-md5">
+<h2><a href="#function-md5">md5</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn md5(bytes: uint8[]): uint8[]</code></pre>
+<p>The MD5 digest: 16 bytes. Broken; here for legacy checksums and for nothing else.</p>
+<p class="source">stdlib/std/hash.lyr:33</p>
+</section>
+<section class="item" id="function-crc32">
+<h2><a href="#function-crc32">crc32</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn crc32(bytes: uint8[]): int</code></pre>
+<p>The CRC-32 checksum (IEEE 802.3, the polynomial zip, PNG and Ethernet use), as a
+non-negative <code>int</code> below 2^32. Detects accidental corruption; a deliberate change is
+trivially hidden from it.</p>
+<p class="source">stdlib/std/hash.lyr:38</p>
+</section>
+<section class="item" id="function-sha256hex">
+<h2><a href="#function-sha256hex">sha256Hex</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sha256Hex(text: string): string</code></pre>
+<p><code>sha256</code> over the UTF-8 bytes of <code>text</code>, as lower-case hex — the form a checksum file or a
+content id is written in.</p>
+<p class="source">stdlib/std/hash.lyr:44</p>
+</section>
+<section class="item" id="function-sha1hex">
+<h2><a href="#function-sha1hex">sha1Hex</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn sha1Hex(text: string): string</code></pre>
+<p><code>sha1</code> over the UTF-8 bytes of <code>text</code>, as lower-case hex.</p>
+<p class="source">stdlib/std/hash.lyr:49</p>
+</section>
+<section class="item" id="function-md5hex">
+<h2><a href="#function-md5hex">md5Hex</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn md5Hex(text: string): string</code></pre>
+<p><code>md5</code> over the UTF-8 bytes of <code>text</code>, as lower-case hex.</p>
+<p class="source">stdlib/std/hash.lyr:54</p>
+</section>
+<section class="item" id="function-hashcombine">
+<h2><a href="#function-hashcombine">hashCombine</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn hashCombine(seed: int, value: int): int</code></pre>
+<p>Folds <code>value</code> into <code>seed</code>, for a <code>hash()</code> over several fields:
+<code>hashCombine(hashCombine(0, this.x.hash()), this.y.hash())</code>. Order matters, so <code>(1, 2)</code>
+and <code>(2, 1)</code> hash differently. The same function as <code>std.core.combineHash</code>, named here
+beside the digests.</p>
+<p class="source">stdlib/std/hash.lyr:62</p>
+</section>
+<section class="item" id="function-hashall">
+<h2><a href="#function-hashall">hashAll</a> <span class="kind">function</span></h2>
+<pre class="signature"><code class="language-lyr">pub fn hashAll(hashes: int[]): int</code></pre>
+<p>The hash of a whole array of hashes, folded in order from a seed of zero.</p>
+<p class="source">stdlib/std/hash.lyr:67</p>
+</section>
+<nav class="neighbours">
+<a class="prev" href="../../stdlib/std.fmt/">std.fmt</a>
+<a class="next" href="../../stdlib/std.io.console/">std.io.console</a>
+</nav>
+</main>
+</div>
+<script src="../../site.js"></script>
+</body>
+</html>
