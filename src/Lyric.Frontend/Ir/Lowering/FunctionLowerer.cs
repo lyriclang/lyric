@@ -4088,6 +4088,11 @@ internal sealed class FunctionLowerer
         // `P.new(…)` there is none and the call is an ordinary one. Both forms then run through the same
         // path — the difference lies solely in the argument list.
         TempId? receiver = null;
+
+        // The receiver's TYPE, for a generic method: the instance needs it to give the body a
+        // 'this' slot. Without it the call passed a receiver the callee had not declared, and the
+        // module went out one argument heavier than its own signature -- see the request below.
+        TypeSymbol? receiverOwner = null;
         string calleeName;
         Symbol? bound;
 
@@ -4187,10 +4192,11 @@ internal sealed class FunctionLowerer
             case MemberExpr member
                 when ReceiverType(member.Target) is NamedRef
                      { Symbol.Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct
-                         or TypeSymbolKind.Enum }:
+                         or TypeSymbolKind.Enum } named:
                 calleeName = member.Member;
                 bound = _types.RefOf(member);
                 receiver = LowerExpr(member.Target);
+                receiverOwner = named.Symbol;
                 break;
 
             // A GENERIC interface member on an instance of a generic type:
@@ -4309,7 +4315,13 @@ internal sealed class FunctionLowerer
                     ? b : t)
                 .ToArray();
 
-            target = _instances.Request(symbol, generic, calleeName, null,
+            // THE RECEIVER'S TYPE GOES WITH IT. It used to be 'null' here unconditionally, so a
+            // generic METHOD on a plain class was monomorphized without a 'this' slot: the call
+            // pushed a receiver and the callee declared one parameter fewer than it was given.
+            // The frontend was happy -- 'check' passes -- and the module the writer produced was
+            // then refused by its own reader with "block at 0 ends with 1 value(s) on the stack".
+            // Only 'check --emit' or a real build ever asked.
+            target = _instances.Request(symbol, generic, calleeName, receiverOwner,
                 typeArguments, _typeTable, expr.Span);
         }
         else if (!TryResolveFunction(symbol, out target))
