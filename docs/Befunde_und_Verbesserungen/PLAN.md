@@ -58,8 +58,9 @@ kein Feature; ein stabiles 4.6 heißt, dass keiner davon mehr offen ist. Zwei Ei
 stehen in `lyric-v5-features.md` als P1-*Fundament* (generische Methoden auf generischen Typen,
 die restlichen `IR0001`-Grenzen) — sie sind beides, und sie landen hier, nicht in 4.7.
 
-**Stand 2026-09-24**: **B** und **C** sind leer. Offen sind **D** und die Warnstufen, die aus
-**E** und der Ablage geworden sind.
+**Stand 2026-09-24, abends**: **B**, **C**, **D** und **E** sind leer. Die vier Uhren laufen
+(`SEM0107`–`SEM0110`, §12.5). **Damit ist die Tag-Bedingung erfüllt** — was noch fehlt, ist die
+Release-Checkliste selbst, kein Fund mehr.
 
 ### ~~A. Der Verifier läuft an der falschen Stelle (zuerst)~~ — **erledigt, 2026-09-23**
 
@@ -202,7 +203,7 @@ aus jeder Position erreicht, in der ein Typ stehen kann; sie nannte den häufigs
 den, den sie hatte. Wer das `IR0001` einer generischen Methode las, suchte nach einem Feld, das
 nicht im Programm stand. Sie nennt jetzt den Typ.
 
-### E. Zwei Regelfragen — beantwortet mit „v5, und bis dahin eine Warnung"
+### ~~E. Zwei Regelfragen~~ — **erledigt als Uhren** (PR #172, `lyric-spec#44`)
 
 Der Maintainer-Entscheid vom 2026-09-24 nimmt beiden Posten den Bugfix-Charakter: die Regel faellt
 mit v5, 4.6 bekommt die Uhr. **Gemessen am 2026-09-24**, beide Male am Integrationsstand:
@@ -220,6 +221,20 @@ mit v5, 4.6 bekommt die Uhr. **Gemessen am 2026-09-24**, beide Male am Integrati
   offene Frage, die erste haengt an ihrer Antwort: der Ausweg ist eine Epilog-Route hinter der
   Region, mit dem Rückgabewert in einem synthetischen Local, und die baut man einmal, nicht
   zweimal. Also auch hier: Uhr jetzt, Regel mit v5.
+
+**Gebaut als vier Uhren, nicht zwei** (PR #172): die zwei aus **E** und die zwei aus der Ablage,
+weil sie dieselbe Form haben und dasselbe Release beantwortet. `SEM0107` (zweite Bindung),
+`SEM0108` (`mut` auf Klassen), `SEM0109` (Feldschreibung durch eine unveränderliche
+Struct-Bindung — deckt `SPEC-RUNDE` 3 und 6 und ist die Andockstelle von `mut struct`), `SEM0110`
+(werfender `defer`). §12.5 der Spec definiert die Familie; die Eigenschaft, auf die es ankommt:
+**keine von ihnen setzt eine Antwort voraus** — jede meldet ein Programm, dessen Bedeutung sich
+bei *jeder* der möglichen Antworten ändert.
+
+**Vorher gemessen, nicht nachher**: über `examples/`, `stdlib/` und `stdlib-tests/` zusammen feuern
+die vier **einmal** — auf `examples/objects.lyr`, dessen `advance()` seinen Empfänger ohne `mut`
+schreibt. Genau das Loch, um das es bei `SEM0108` geht, im eigenen Lehrbeispiel. Eine Warnung, die
+nicht abschaltbar ist, muss über Programme recht behalten, die sich *nicht* ändern werden; sonst
+bringt sie ihren Lesern bei, sie zu überlesen.
 
 ---
 
@@ -353,11 +368,11 @@ nachher richtig sind.
 | stdlib: Überladung statt Typ-Suffixe (`abs`/`absInt`) | groß | **4.7** als `@Deprecated` |
 | `try e` → `Result<T, E>` | additiv, aber Anker | nach dem `try`-Ausdruck |
 | f-String-Formatsprache spec-fixiert (Python/Rust statt .NET) | mittel | **4.7** |
-| **`?Struct` als Wert** (`SPEC-RUNDE` 2) | mittel | — |
-| **`let`-Struct-Felder** (`SPEC-RUNDE` 3) | klein | — |
-| **Parameter vs. `let`** (`SPEC-RUNDE` 6) | klein | — |
-| **`mut` auf Klassenmethoden erzwingen** | mittel | 4.7 als Warnung |
-| **`mut struct`** — ein Struct ist unveränderlich, sofern nicht anders erklärt | groß | in Prüfung |
+| **`?Struct` als Wert** (`SPEC-RUNDE` 2) | mittel | — (entfällt, wenn `mut struct` kommt) |
+| **`let`-Struct-Felder** (`SPEC-RUNDE` 3) | klein | ✅ `SEM0109` |
+| **Parameter vs. `let`** (`SPEC-RUNDE` 6) | klein | ✅ `SEM0109` |
+| **`mut` auf Klassenmethoden erzwingen** | mittel | ✅ **läuft seit 4.6** (`SEM0108`) |
+| **`mut struct`** — ein Struct ist unveränderlich, sofern nicht anders erklärt | groß | ✅ **läuft seit 4.6** (`SEM0109`, zusammen mit den drei `SPEC-RUNDE`-Posten) |
 | **Deprecations wirklich entfernen** (**NEU**): freie Iterator-Terminatoren, `listContains`, `keys(m)`, die Zeitfunktionen in `std.os`, `addExecutable` | groß | Uhren laufen bereits — braucht `lyrfix` |
 | **`spawn` liefert ein Handle** (**NEU**) | mittel | — |
 

@@ -13,8 +13,10 @@ class Counter {
         return Counter { value = 0, step = step };
     }
 
-    // An instance method: `this` is the receiver and is passed as parameter 0.
-    fn advance() {
+    // An instance method: `this` is the receiver and is passed as parameter 0. It writes the
+    // receiver, so it says `mut` -- enforced on a struct today, and on a class from 5.0
+    // (LYR-SEM0108). This example is what the warning found when it was first switched on.
+    mut fn advance() {
         this.value += this.step;
     }
 

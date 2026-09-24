@@ -1184,8 +1184,38 @@ public sealed class TypeChecker
         else { _de.Report("LYR-SEM0010", Severity.Error, bnd.Span, $"binding '{bnd.Name}' needs a type or an initializer"); type = LyrType.Error; }
 
         var local = new LocalSymbol(bnd.Name, type, bnd.IsMutable, bnd);
-        scope.TryDeclare(local);
+        if (!scope.TryDeclare(local)) ReportRebinding(scope, bnd);
         _result.BindRef(bnd, local); // for definite-assignment analysis
+    }
+
+    /// <summary>
+    /// A second binding of one name in ONE scope (<c>LYR-SEM0107</c>, §7.1, §12.5).
+    ///
+    /// <para>MEASURED, and it is neither of the two answers a language can give here:
+    /// <c>let x = 1; let x = 2; return x;</c> answers <b>1</b>. The second binding gets a slot
+    /// nobody reads — and it does so even when it changes the TYPE, so <c>let x = "two";</c>
+    /// leaves a following <c>x</c> checking as an <c>int</c>. Refusing it and Rust-style shadowing
+    /// are both better than that, and which of the two is a 5.0 question.</para>
+    ///
+    /// <para>The only signal before this was <c>LYR-SEM0071</c>, "'x' is never used", on the
+    /// SECOND declaration — which describes the situation exactly backwards.</para>
+    ///
+    /// <para>Shadowing an ENCLOSING scope is a different thing and untouched: <c>TryDeclare</c>
+    /// looks at this scope alone, so an inner block binding an outer name never reaches here.
+    /// </para>
+    /// </summary>
+    private void ReportRebinding(SymbolTable scope, BindingStmt bnd)
+    {
+        _result.NoteRebound(bnd);
+        var previous = scope.LookupLocal(bnd.Name)?.Declaration?.Span;
+        _de.Report("LYR-SEM0107", Severity.Warning, bnd.Span,
+            $"'{bnd.Name}' is already bound in this scope — this binding is unreachable today, "
+            + "and 5.0 settles which of the two a later use names",
+            previous is { } where
+                ? new DiagnosticNote(where, "previous binding")
+                : new DiagnosticNote("previous binding"),
+            new DiagnosticNote("a migration warning: the program is legal today, "
+                + "and 5.0 makes it a different program"));
     }
 
     /// <summary>

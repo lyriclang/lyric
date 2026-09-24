@@ -192,6 +192,21 @@ public sealed class TypeResult
     public void SetTypeArguments(Node call, LyrType[] arguments) =>
         _typeArguments[call] = arguments;
 
+    /// <summary>
+    /// Bindings that were REBOUND in their own scope — the ones <c>LYR-SEM0107</c> reports.
+    ///
+    /// <para>Read by the <see cref="WarningAnalyzer"/>, which would otherwise add "'x' is never
+    /// used" on the same line. That sentence is true and describes the situation backwards: the
+    /// binding is not unused because its author forgot it, it is unreachable because an earlier
+    /// one of the same name wins. Two warnings for one fact, and the less informative one is the
+    /// one that reads like an accusation.</para>
+    /// </summary>
+    private readonly HashSet<Node> _rebound = new(ReferenceEqualityComparer.Instance);
+
+    public void NoteRebound(Node binding) => _rebound.Add(binding);
+
+    public bool WasRebound(Node binding) => _rebound.Contains(binding);
+
     /// <summary>The type arguments of a call; empty when the callee is not generic.</summary>
     public LyrType[] TypeArgumentsOf(Node call) =>
         _typeArguments.TryGetValue(call, out var args) ? args : [];

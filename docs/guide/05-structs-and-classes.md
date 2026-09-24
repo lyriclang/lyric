@@ -60,6 +60,11 @@ fn main(): int {
 
 `mut` on a method of a struct means the receiver is written back to the caller's value.
 
+On a **struct** the keyword is enforced: a method without it that writes `this` is an error. On a
+**class** it is not, yet — such a method compiles and warns (`LYR-SEM0108`), and 5.0 enforces it
+there too. Write the `mut`: it is part of the signature an interface conformance has to match
+either way.
+
 ## Constants on a type
 
 `static let` attaches a constant to a type. `static fn` attaches a function that needs no
