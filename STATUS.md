@@ -11,6 +11,12 @@
 
 ## Current milestone
 
+**THE CONDITION FOR THE TAG IS MET (2026-09-24).** Items **B through E** of
+`docs/Befunde_und_Verbesserungen/PLAN.md` are empty: the process aborts, the sema holes, the
+diagnostics, and the two rule questions — the last of which became four clocks rather than two
+answers. Cutting the tag is the maintainer's call and nothing else is outstanding; this file says
+"released" once it is cut, not before.
+
 **THE TREE CLAIMS 4.6.0 AND THE TAG WAITS ON PURPOSE.** `v4.5.0` sits at `6f138636` and carries
 M37 alone; everything below landed after it, and for a while the tree still called itself `4.5.0`
 — a build from main naming a version that did not contain it. A MINOR, because the bytecode format
@@ -24,8 +30,12 @@ holes, the diagnostics, and the two rule questions that pass for bug fixes. **No
 4.6.** The next feature round is 4.7, and every deprecation clock that was aimed at 4.6 moved
 with it.
 
-**B, C, D AND E ARE EMPTY** (2026-09-24, PRs #167–#172). **The tag's condition is met.** What
-stands between the tree and `v4.6.0` is the release checklist itself, not a finding.
+**B, C, D AND E ARE EMPTY** (2026-09-24, PRs #167–#172). Twelve findings under B, seven under C,
+six under D, and E's two, which the maintainer's decision turned from bug fixes into clocks. Two
+of C's entries and one of D's were **not what the list said they were**, and saying so is part of
+the result: a lambda cannot carry a `throws` clause because §2 has no such form, field-and-method
+sharing a namespace is already refused, and `p.x++` is an open question about what an increment
+may stand on rather than a mislabelled limit.
 
 **THE OPEN RULE QUESTIONS ARE ANSWERED, AND THE ANSWER IS "WITH v5"** (maintainer, 2026-09-24).
 Everything this file and the plan call "decided nowhere" — a second binding of one name, a
