@@ -101,18 +101,45 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
 
 ### C. Sema-Löcher, die die Branches offen gelassen haben
 
-- **Erschöpfung über ein Tupel, das ein Enum enthält** (`match ((E.A(n), m))` über `(E, int)` →
-  `SEM0050`). **Gemessen.** Das Lowering kennt die Form, die Abdeckungsrechnung nicht.
+- ~~**Erschöpfung über ein Tupel**~~ — **erledigt** (PR #169). Es gab für Tupel gar keinen Fall in
+  der Abdeckungsrechnung. Entschieden wird jetzt, wo die Unterscheidungen in EINER Spalte liegen;
+  zwei testende Spalten verlangen weiter ein `_`, weil `(A, true)` neben `(B, false)` jede Spalte
+  für sich deckt und `(A, false)` offen lässt — und ein *akzeptiertes* Loch wäre schlimmer als ein
+  abgelehnter Match, da das Lowering bei „erschöpfend" den Test des letzten Arms weglässt. Der
+  vollständige Fall ist Maranget; halb davon ist schlechter als nichts.
 - **Generische Methode auf generischem Typ** (`Result<T,E>.map<U>`) → `IR0001`. Blockiert
-  `Result.map`, `List.map`, `Iterator.toList`. Von drei Seiten gemeldet.
-- **Lambda kann keine `throws`-Klausel tragen** (`SEM0084`) — verhindert `assertThrows`.
-- **`mut fn` wird auf Klassen nicht erzwungen, auf Structs schon.** Der Guide macht keinen
-  Unterschied, die Regel ist so nicht lehrbar.
-- **Feld und Methode teilen einen Namensraum** (`RES0001`).
-- **`p.field ??= x`** ist `IR0001`, auf einer Variablen geht es.
-- **`&&=` und `||=` fehlen** (**NEU**) — dieselbe Familie wie der Posten darüber.
-- **`catch` auf einem Interface** (**NEU**) — die Spec führt die Lücke als Implementierungsgrenze.
-- **Interface-Wert erfüllt seine eigene Constraint nicht.**
+  `Result.map`, `List.map`, `Iterator.toList`. Von drei Seiten gemeldet. **Weiterhin offen** — die
+  zweiseitige Substitution existiert (`InstanceTable.Request` nimmt einen Owner), aber der direkte
+  Pfad braucht auch Rückgabetyp und Argument-Materialisierung auf beiden Seiten gebunden; ein
+  erster Versuch war unvollständig und wurde zurückgenommen statt halb ausgeliefert.
+- ~~**Lambda kann keine `throws`-Klausel tragen**~~ — **falsch einsortiert, kein Loch.** Die
+  Grammatik kennt für Lambdas keine `throws`-Klausel (§2 `Lambda`), also existiert die Form nicht.
+  Der Aufruf eines Werfers im Lambda ist `SEM0034`, und `SEM0084` gehört zum Funktions*typ*. Das
+  ist **typed throws Stufe 3** und gehört nach 4.7, Position 7.
+- **`mut fn` wird auf Klassen nicht erzwungen, auf Structs schon.** **Gemessen, und die Aussage
+  stimmt**: eine nicht-`mut`-Methode darf auf einer Klasse `this` schreiben, auf einem Struct ist
+  es `SEM0019`. Unangenehm daran ist nicht der Guide, sondern §5: der exakte Signaturvergleich für
+  Interface-Konformanz nimmt `mut` auf, also ist es Teil des Vertrags **und bedeutet auf Klassen
+  nichts**. Erzwingen lehnt Programme ab, die seit je kompilieren → **Warnstufe in 4.7, Wirkung in
+  5.0** (Maintainer, 2026-09-24). Der `let`-Struct-Posten unten hängt nicht daran.
+- ~~**Feld und Methode teilen einen Namensraum** (`RES0001`)~~ — **kein Loch, eine fehlende
+  Spec-Zeile.** Der Compiler verbietet es bereits, und das bleibt so (Maintainer, 2026-09-24).
+  Begründung, gemessen: `c.get` ohne Klammern löst in Lyric **als Feld** auf („'C' has no field
+  'get'"). Java und Rust dürfen es erlauben, weil dort eine Methode nicht `obj.method` heißt —
+  Java braucht `obj::method`, Rust einen Pfad. Lyric hat Funktionswerte und baut sie in 4.7 aus;
+  sobald `c.size` auch die Methode bezeichnen kann, ist es mehrdeutig. Go verbietet es mit
+  derselben Begründung. **Offen: die Regel steht in keiner Spec.**
+- ~~**`p.field ??= x`**, **`&&=`/`||=`**~~ — **erledigt** (PR #169, `lyric-spec#41`). Alle drei
+  stehen in §2, also existieren sie; von neun Kombinationen aus Operator und Ziel funktionierte
+  EINE. Der Kurzschluss ist jetzt Spec-Text und gemessen: die rechte Seite läuft genau dann, wenn
+  sie muss. §6.5 führte `&&=`/`||=` ausdrücklich als Implementierungsgrenze — die Konformanz-Suite
+  hat den Fix abgefangen, bevor er ohne Spec-Zwilling landen konnte.
+- ~~**`catch` auf einem Interface**~~ — **erledigt** (PR #169), und **ohne Formatänderung**. Die
+  Ablehnung stand auf der Lesart, die Handler-Tabelle könne keinen Konformanztest ausdrücken; sie
+  muss es nicht, die Dispatch-Tabelle beantwortet es.
+- ~~**Interface-Wert erfüllt seine eigene Constraint nicht**~~ — **erledigt** (PR #169), zwei
+  Hälften: die Sema las nur die *deklarierten* Interfaces (bei einem Interface dessen Eltern), und
+  das Lowering prüfte den geschriebenen statt des substituierten Empfängertyps.
 - ~~**`rawArrayAlloc<T>(n)`** (~15 VM-Zeilen), billigster Posten der Liste~~ — **erledigt, und die
   Schätzung war falsch.** Generische Natives gab es nicht: `ModuleLowerer` übersprang jede Funktion
   mit Typparametern, *bevor* der Native-Zweig kam. Der Mechanismus lag aber eine Ebene tiefer
@@ -128,6 +155,19 @@ ohne Code und ohne Position, und im JSON-Modus zerstört sie die Ausgabe.
 `p.x++`, `x == null` auf Nicht-Optional) — §12.1 reserviert den Code für gültiges Lyric. Dazu:
 keine Deduplizierung, `SEM0058` vergiftet nicht, `SEM0052` schlägt das Geschriebene vor, Sema
 läuft auf Parser-Recovery-Knoten, `--json` unvollständig, `--verbose`-Zeiten ×100 auf Linux.
+
+**Eine Warnung, die einen Fehler erklärt, wird genau dann unterdrückt, wenn sie gebraucht wird**
+(**NEU**, gemessen 2026-09-24). `WarningAnalyzer` läuft nur über ein Programm ohne Fehler, und
+das ist **richtig so** — eine Warnung aus einer halben Tabelle ist eine Vermutung im Tonfall der
+Gewissheit. Die Folge trifft aber genau die Fälle, für die manche Warnung gedacht ist:
+`LYR-SEM0077` warnt vor einem Import, der einen eingebauten Typnamen verschattet, und schwieg,
+während derselbe Import `RES0002` auslöste. Hier war die Auflösung der Fehler und ist gefixt; die
+FORM des Problems bleibt und lohnt einen Blick, welche Warnungen sonst noch ihren eigenen Fehler
+erklären würden.
+
+**Die Meldung eines Lowering-Abbruchs kann am falschen Ort stehen** (**NEU**). Eine generische
+Methode auf einem generischen Typ meldet „a non-primitive field type" — ein Satz über ein Feld,
+für eine Methode. Gehört zum offenen C-Posten oben.
 
 ### E. Zwei Regelfragen, die als Bugfix durchgehen
 
@@ -266,6 +306,8 @@ sind sich also einig.
 | **`?Struct` als Wert** (`SPEC-RUNDE` 2) | mittel | — |
 | **`let`-Struct-Felder** (`SPEC-RUNDE` 3) | klein | — |
 | **Parameter vs. `let`** (`SPEC-RUNDE` 6) | klein | — |
+| **`mut` auf Klassenmethoden erzwingen** | mittel | 4.7 als Warnung |
+| **`mut struct`** — ein Struct ist unveränderlich, sofern nicht anders erklärt | groß | in Prüfung |
 | **Deprecations wirklich entfernen** (**NEU**): freie Iterator-Terminatoren, `listContains`, `keys(m)`, die Zeitfunktionen in `std.os`, `addExecutable` | groß | Uhren laufen bereits — braucht `lyrfix` |
 | **`spawn` liefert ein Handle** (**NEU**) | mittel | — |
 
@@ -275,6 +317,18 @@ festgeschriebene Formatsprache nur für eingebaute Typen eine.
 
 Die Zeile **Deprecations entfernen** ist die einzige der Ablage, deren Uhren schon laufen — die
 Warnungen stehen seit 4.5 im Code. Was fehlt, ist das Werkzeug: `lyrfix` (siehe Werkzeuge oben).
+
+**Die drei `SPEC-RUNDE`-Posten sind EINE Frage**, und `mut struct` beantwortet sie zusammen
+(Maintainer-Idee, 2026-09-24; in Prüfung). Ist ein Struct unveränderlich, sofern es nicht
+`mut struct` heißt, dann ist „geteilt" von „kopiert" nicht mehr unterscheidbar (Posten 2 entfällt,
+und `struct Node { next: ?Node }` bleibt legal — der andere Weg hätte ihn unendlich groß gemacht),
+ein `let`-Struct hat keine schreibbaren Felder (3), und die Parameterfrage stellt sich nicht mehr
+(6). Es hängt an `p with { x = 3 }` (4.7 Position 15): ohne Update-Ausdruck ist ein
+unveränderliches Struct nicht benutzbar, nur ertragbar. Es könnte Geschwindigkeit BRINGEN —
+`structcopy` existiert gegen Aliasing, und was nicht mutieren kann, darf geteilt werden. Preis:
+jedes Struct mit `mut fn` braucht das Schlüsselwort, also ein 5.0-Bruch mit mechanischer
+Migration. Vorbild sind F#-Records, Scala-`case class` und Kotlin-Data-Classes; C# hat den
+umgekehrten Default genommen und mit `readonly struct` nachgebessert.
 
 Die drei aus `SPEC-RUNDE` hängen zusammen und sind bisher **nirgends entschieden**: `?Struct` teilt
 heute statt zu kopieren (§13 zählt `?Struct` in keiner seiner beiden Listen auf), ein `let`-Struct

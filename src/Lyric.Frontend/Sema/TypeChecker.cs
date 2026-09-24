@@ -3553,11 +3553,13 @@ public sealed class TypeChecker
     /// would satisfy a <c>Src&lt;string&gt;</c> too.</param>
     private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted) => arg switch
     {
-        NamedRef nr => ImplementsWithExtensions(nr.Symbol, iface, wanted, EmptySubst),
+        NamedRef nr => IsTheConstraint(nr, nr.Symbol, iface, wanted)
+                       || ImplementsWithExtensions(nr.Symbol, iface, wanted, EmptySubst),
 
         // For an instance its own arguments count: 'class Box<T> :: [Src<T>]' satisfies exactly
         // 'Src<int>' for 'Box<int>'.
-        GenericInstance gi => ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
+        GenericInstance gi => IsTheConstraint(gi, gi.Definition, iface, wanted)
+                              || ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
 
         TypeParamType tp => tp.Param.Constraints.Any(c =>
             NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst)),
@@ -3571,6 +3573,26 @@ public sealed class TypeChecker
         OpaqueRef => false,
         _ => true // external or error: pass through opaquely
     };
+
+    /// <summary>
+    /// The argument IS the interface the constraint names.
+    ///
+    /// <para>Asked first because the walk below cannot answer it: it reads the interfaces a type
+    /// DECLARES, which for an interface are its parents — so <c>Named</c> found everything above
+    /// <c>Named</c> and never <c>Named</c> itself. A value of an interface type could therefore not
+    /// be passed to <c>fn show&lt;T :: [Named]&gt;</c>, and said so in the one sentence that cannot
+    /// be true: "type 'Named' does not satisfy constraint 'Named' on 'T'".</para>
+    ///
+    /// <para>It is sound for the same reason the constraint exists: the constraint promises the
+    /// members, and an interface value carries a table of exactly those. The call inside the
+    /// generic becomes a virtual dispatch rather than a direct one, which is what an interface
+    /// value is for.</para>
+    ///
+    /// <para>The type arguments still have to line up — <c>Src&lt;int&gt;</c> is not
+    /// <c>Src&lt;string&gt;</c> — so the same <c>Matches</c> decides it as everywhere else.</para>
+    /// </summary>
+    private static bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
+        ReferenceEquals(ts, iface) && Matches(arg, EmptySubst, wanted);
 
     // Conformance through the declared interfaces OR a visible `extend T :: [I]` block — each
     // reaching through its parents: declaring the child implies the whole chain.
@@ -4626,11 +4648,68 @@ public sealed class TypeChecker
             }
             case ArrayOf array:
                 return MissingArrayCases(array, pats);
+            case TupleOf tuple:
+                return MissingTupleCases(tuple, pats);
             default:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
                     return MissingVariants(type, ed, enumTs, pats);
                 return ["_"]; // an open type is coverable only by a default
         }
+    }
+
+    /// <summary>
+    /// A TUPLE scrutinee: <c>match ((e, m))</c> over <c>(E, int)</c>.
+    ///
+    /// <para>There was no case for this at all, so a tuple fell to the default and demanded a
+    /// <c>_</c> arm however completely the arms covered it. The lowering has known the form since
+    /// 4.4; only the coverage did not.</para>
+    ///
+    /// <para>DECIDED ONLY WHERE THE DISTINCTIONS LIVE IN ONE COLUMN, and that restriction is the
+    /// point rather than an oversight. With one refutable column the other columns are wildcards
+    /// in every row, so coverage of the tuple IS coverage of that column — the reduction is exact.
+    /// With two, it is not: <c>(A, true)</c> beside <c>(B, false)</c> covers each column and
+    /// leaves <c>(A, false)</c> open, so checking columns independently would ACCEPT a match with
+    /// a hole. Deciding that properly is the pattern matrix of Maranget's algorithm, and half of
+    /// one would be worse than none — a wrong "exhaustive" removes the last arm's test in the
+    /// lowering, which turns a missing case into whatever the previous arm did.</para>
+    ///
+    /// <para>So two or more testing columns keep today's answer: a <c>_</c> or binding arm. That
+    /// refuses a match a person may see as complete, which is a cost — but it is the cost that was
+    /// already being paid for every tuple, and nothing that compiles today stops compiling.</para>
+    /// </summary>
+    private List<string> MissingTupleCases(TupleOf tuple, List<Pattern> pats)
+    {
+        var rows = pats.OfType<TuplePattern>()
+            .Where(t => t.Elements.Length == tuple.Elements.Length)
+            .ToList();
+        if (rows.Count == 0) return ["_"];
+
+        var testing = new List<int>();
+        for (var i = 0; i < tuple.Elements.Length; i++)
+        {
+            var element = tuple.Elements[i];
+            if (rows.Any(r => !IsIrrefutable(r.Elements[i], element, nested: true)))
+                testing.Add(i);
+        }
+
+        // Every row is wildcards throughout: the first one already matches everything.
+        if (testing.Count == 0) return [];
+        if (testing.Count > 1) return ["_"];
+
+        var column = testing[0];
+        var missing = MissingCases(tuple.Elements[column],
+            rows.Select(r => r.Elements[column]).ToList(), nested: true);
+
+        return missing.Select(m => TupleWitness(m, column, tuple.Elements.Length)).ToList();
+    }
+
+    /// <summary>A hole in one column, written as the tuple it stands for: <c>(_, E.B, _)</c>. The
+    /// witness is what makes the diagnostic worth reading, so it keeps its shape here too.</summary>
+    private static string TupleWitness(string missing, int column, int arity)
+    {
+        var parts = new string[arity];
+        for (var i = 0; i < arity; i++) parts[i] = i == column ? missing : "_";
+        return "(" + string.Join(", ", parts) + ")";
     }
 
     /// <summary>The variants no arm covers, each as a witness. A variant with one payload field

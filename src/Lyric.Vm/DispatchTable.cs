@@ -28,6 +28,20 @@ internal sealed class DispatchTable
     /// </summary>
     private readonly int[]?[] _arity;
 
+    /// <summary>
+    /// Does this concrete type implement this interface?
+    ///
+    /// <para>The same table the virtual calls read, asked as a yes/no. It exists for the typed
+    /// catch: a handler naming an INTERFACE cannot compare type ids, because the thrown value is a
+    /// class and the handler is not — and this is the only place that knows the answer. The
+    /// alternative was a second conformance table in the handler section, which is a format change
+    /// for a question already answered here.</para>
+    /// </summary>
+    public bool Implements(int type, int iface) =>
+        type >= 0 && iface >= 0
+        && type < _rows.GetLength(0) && iface < _rows.GetLength(1)
+        && _rows[type, iface] is not null;
+
     private DispatchTable(int[]?[,] rows, int[]?[] arity)
     {
         _rows = rows;

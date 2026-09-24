@@ -418,8 +418,8 @@ public sealed class Resolver
     private Symbol? ResolveTypePath(string[] path, SymbolTable scope, FileId file)
     {
         var head = scope.Lookup(path[0]);
-        if (head is null) return null;
-        if (path.Length == 1) return IsTypeLike(head) ? head : null;
+        if (head is null) return BuiltinType(path[0]);
+        if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0]);
 
         // Multi-segment paths navigate through imported modules only.
         for (var i = 1; i < path.Length; i++)
@@ -441,6 +441,28 @@ public sealed class Resolver
         }
         return IsTypeLike(head) ? head : null;
     }
+
+    /// <summary>
+    /// The builtin type of this name, when a TYPE position found something that is not one.
+    ///
+    /// <para>A MODULE IS NOT A TYPE. <c>import std.string;</c> binds <c>string</c> as a namespace
+    /// — legal by the scoping rules, module members shadow the builtin root scope like any parent
+    /// — and until now that made the builtin type <c>string</c> unnameable for the rest of the
+    /// file: <c>fn f(): string</c> reported <c>LYR-RES0002: unresolved type 'string'</c>. Importing
+    /// the module named after a type removed the type.</para>
+    ///
+    /// <para>The shadowing itself is not the error, and it still warns (<c>LYR-SEM0077</c>) — what
+    /// was wrong is giving up in a position where the namespace cannot have been meant. A type
+    /// annotation admits types; a module has never been one, so it does not stand in the way of
+    /// one. The value position is untouched: <c>string.length(s)</c> still reaches the module.</para>
+    ///
+    /// <para>The warning was silent as well, and for a reason worth keeping: warnings run only over
+    /// a program without errors, because a warning computed from half a table is a guess with a
+    /// confident tone. So the one diagnostic that explained the situation was withheld exactly
+    /// when the situation bit. Fixing the resolution is what lets it be heard.</para>
+    /// </summary>
+    private Symbol? BuiltinType(string name) =>
+        _comp.Builtins.LookupLocal(name) as TypeSymbol;
 
     // --- Helpers ---
 

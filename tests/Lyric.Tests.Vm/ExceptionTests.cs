@@ -128,11 +128,14 @@ public class ExceptionTests
     }
 
     [Fact]
-    public void An_underscore_catch_on_an_interface_is_the_documented_refusal()
+    public void An_underscore_catch_on_an_interface_catches_a_conforming_class()
     {
-        // Same boundary as the named form: an interface other than Throwable needs a conformance
-        // test during unwinding, which the handler table cannot express — IR0001, not a crash.
-        var (ir, de) = TryLower("""
+        // RETIRED WITH ITS RULE. This asserted the refusal: an interface other than Throwable was
+        // said to need a conformance test during unwinding "which the handler table cannot
+        // express". It does not have to express one — the dispatch table that answers every
+        // callvirt answers this too, so the handler carries the interface's own type id and the
+        // unwinding asks. Nothing about the format changed.
+        Assert.Equal(3, Run("""
             interface AppError :: [Throwable] { }
 
             class Boom :: [AppError] {
@@ -149,10 +152,7 @@ public class ExceptionTests
                     return 3;
                 }
             }
-            """);
-
-        Assert.Null(ir);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-IR0001");
+            """));
     }
 
     [Fact]
@@ -538,12 +538,13 @@ public class ExceptionTests
     }
 
     [Fact]
-    public void A_specific_interface_catch_is_refused_not_silently_missed()
+    public void A_specific_interface_catch_binds_a_usable_value()
     {
-        // Until the handler table can express a conformance test, a specific interface in a
-        // catch is a diagnosed boundary — the alternative was an id comparison that caught
-        // NOTHING and let the exception fly past a handler the sema had accepted.
-        var (ir, de) = TryLower("""
+        // RETIRED WITH ITS RULE, and replaced by what the rule was protecting: the old test feared
+        // "an id comparison that caught NOTHING". The comparison is no longer an id comparison —
+        // the unwinding asks the dispatch table whether the thrown class conforms — and the bound
+        // name is a fat pointer, so the interface's OWN member dispatches on it.
+        Assert.Equal(502, Run("""
             interface AppError :: [Throwable] {
                 fn code(): int;
             }
@@ -557,12 +558,34 @@ public class ExceptionTests
 
             fn main(): int {
                 try { let v = risky(); return 99; }
-                catch (e: AppError) { return 42; }
+                catch (e: AppError) { return e.code(); }
             }
-            """);
-        Assert.Null(ir);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-IR0001"
-            && d.Message.Contains("specific interface"));
+            """));
+    }
+
+    /// <summary>
+    /// The other direction, and the one a refuse-everything handler would pass: an interface catch
+    /// must NOT take something that does not conform.
+    /// </summary>
+    [Fact]
+    public void An_interface_catch_lets_a_non_conforming_throw_past()
+    {
+        Assert.Equal(2, Run("""
+            interface AppError :: [Throwable] { }
+
+            class NetError :: [AppError] { fn message(): string { return "down"; } }
+            class Plain :: [Throwable] { fn message(): string { return "plain"; } }
+
+            fn risky(): int throws Plain { throw Plain { }; }
+
+            fn main(): int {
+                try {
+                    try { let v = risky(); return 99; }
+                    catch (e: AppError) { return 1; }
+                } catch (_) { return 2; }
+                return 0;
+            }
+            """));
     }
 
     [Fact]
