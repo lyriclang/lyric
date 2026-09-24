@@ -812,11 +812,14 @@ internal sealed class FunctionLowerer
                             _typeTable.Compilation.Builtins.LookupLocal("Throwable")):
                         caught = null;
                         break;
-                    case IrInterfaceType:
-                        throw NotSupported(
-                            "catching a specific interface is not supported by this compiler "
-                            + "version yet — catch the concrete classes, or 'catch (e)' for "
-                            + "everything", clause.Span);
+                    // ANY OTHER INTERFACE is the interface's own type id, and the unwinding asks
+                    // the dispatch table whether the thrown class conforms. This used to be a
+                    // refusal, on the reading that the handler table could not express a
+                    // conformance test -- it does not have to: the table that answers every
+                    // 'callvirt' answers this too, so nothing about the FORMAT had to change.
+                    case IrInterfaceType i:
+                        caught = i.Type;
+                        break;
 
                     default:
                         throw NotSupported(

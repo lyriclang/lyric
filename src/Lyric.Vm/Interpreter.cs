@@ -580,7 +580,7 @@ public static class Interpreter
                     var pending = frame.Unwinding;
                     var pendingType = frame.UnwindType;
                     frame.Sp = sp;
-                    if (!Resume(frames, ref frame, pending, pendingType))
+                    if (!Resume(frames, ref frame, pending, pendingType, dispatch))
                         throw new LyricPanic(VmDiagnostics.UncaughtException,
                             $"uncaught exception of type '{TypeName(types, pendingType)}'");
 
@@ -610,7 +610,7 @@ public static class Interpreter
                     frame.UnwindBlock = BlockAt(frame, frame.Ip - 1);
 
                     frame.Sp = sp;
-                    if (!Resume(frames, ref frame, thrown, type))
+                    if (!Resume(frames, ref frame, thrown, type, dispatch))
                         throw new LyricPanic(VmDiagnostics.UncaughtException,
                             $"uncaught exception of type '{TypeName(types, type)}'");
 
@@ -1178,7 +1178,8 @@ public static class Interpreter
     /// <para>Returns <c>false</c> when no frame has a handler; the exception then leaves the entry
     /// point.</para>
     /// </summary>
-    private static bool Resume(Stack<Frame> frames, ref Frame frame, LyrValue thrown, int type)
+    private static bool Resume(Stack<Frame> frames, ref Frame frame, LyrValue thrown, int type,
+        DispatchTable dispatch)
     {
         while (true)
         {
@@ -1202,13 +1203,22 @@ public static class Interpreter
                     return true;
                 }
 
-                if (handler.CatchType >= 0 && handler.CatchType != type) continue;
+                // THREE SHAPES, and the match tells them apart without a new table. A handler
+                // naming a CLASS compares ids, because Lyric has no class inheritance and the
+                // thrown type is exactly it or is not. A handler naming an INTERFACE cannot
+                // compare ids at all — the thrown value is a class — so it asks the dispatch
+                // table, which already holds the answer for every virtual call. A catch-all has
+                // no type and takes everything.
+                var exact = handler.CatchType == type;
+                if (handler.CatchType >= 0 && !exact
+                    && !dispatch.Implements(type, handler.CatchType)) continue;
 
-                // A typed catch knows the type statically and takes the bare reference. A
-                // catch-all binds 'Throwable', an interface type, which needs a fat pointer; only
-                // this place knows the concrete type to build it from.
+                // A catch on the exact class takes the bare reference. Everything else binds a
+                // name of interface type — 'Throwable' for a catch-all, the named interface for a
+                // typed one — and that needs a fat pointer. Only this place knows the concrete
+                // type to build it from.
                 if (handler.Slot >= 0)
-                    frame.Slots[handler.Slot] = handler.CatchType >= 0
+                    frame.Slots[handler.Slot] = exact
                         ? thrown
                         : LyrValue.FromInterface(thrown, type);
                 frame.UnwindType = -1;
