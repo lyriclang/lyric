@@ -101,6 +101,10 @@ fn main(): int {
 }
 </code></pre>
 <p><code>mut</code> on a method of a struct means the receiver is written back to the caller's value.</p>
+<p>On a <strong>struct</strong> the keyword is enforced: a method without it that writes <code>this</code> is an error. On a
+<strong>class</strong> it is not, yet — such a method compiles and warns (<code>LYR-SEM0108</code>), and 5.0 enforces it
+there too. Write the <code>mut</code>: it is part of the signature an interface conformance has to match
+either way.</p>
 <h2 id="constants-on-a-type">Constants on a type</h2>
 <p><code>static let</code> attaches a constant to a type. <code>static fn</code> attaches a function that needs no
 receiver.</p>

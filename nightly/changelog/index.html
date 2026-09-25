@@ -173,6 +173,9 @@ was accepted and panicked with <code>LYR-VM0007</code>; it is a type error now.<
 declares nothing is <code>LYR-SEM0034</code> instead of reaching <code>LYR-VM0010</code> at runtime.</li>
 <li><strong>A visible extension beats an interface default</strong> (§5.4). Where both offered a name, the
 default used to win; the resolution order the specification states now holds at run time too.</li>
+<li><strong>A parameter name binds once</strong> (<code>LYR-RES0001</code>). <code>fn f(x: int, x: int)</code> compiled, the first
+parameter won every lookup, and the argument written for the second went nowhere — <code>f(1, 2)</code>
+returning <code>x</code> answered <code>1</code>. <code>_</code> is the deliberate non-name and may still repeat.</li>
 </ul>
 <h3 id="added-the-language">Added — the language</h3>
 <ul>
@@ -204,6 +207,30 @@ with width-exact marshalling and a capability check.</li>
 <li><strong>Exhaustiveness names a WITNESS</strong>: a missing case is reported as the pattern that reaches no
 arm rather than as a list.</li>
 </ul>
+<h3 id="added-four-migration-warnings">Added — four migration warnings</h3>
+<p><strong>Four questions about the language are open, and all four are settled together with 5.0</strong> rather
+than one release at a time. Until then each carries a warning and <em>nothing else changes</em>: the
+behaviour a program has today is the behaviour it keeps until the major. §12.5 of the
+specification defines the family; the short version is that a migration warning marks a place
+whose meaning changes <strong>whichever way</strong> its question is settled, so none of them presumes an
+answer.</p>
+<ul>
+<li><strong><code>LYR-SEM0107</code> — a second binding of one name in one scope.</strong> <code>let x = 1; let x = 2; return x;</code>
+answers <code>1</code>: the second binding gets a slot nobody reads, and it does so even when it changes
+the type. Neither refusal nor Rust-style shadowing. Shadowing an <em>enclosing</em> scope is a
+different thing and stays legal. The <code>'x' is never used</code> warning that used to stand beside it is
+gone — it was true and described the situation backwards.</li>
+<li><strong><code>LYR-SEM0108</code> — a non-<code>mut</code> method writing <code>this</code> on a class.</strong> On a struct the same line is
+<code>LYR-SEM0019</code>; on a class nothing checks it, although §5.1 takes <code>mut</code> into the signature an
+interface conformance must match exactly. <code>examples/objects.lyr</code> was the one place in this
+repository that triggered it, and it now says <code>mut fn advance()</code>.</li>
+<li><strong><code>LYR-SEM0109</code> — a field written through an immutable struct binding.</strong> <code>let</code> pins the name and
+not the value, so <code>let p = P { … }; p.x = 5;</code> compiles. A parameter is an immutable binding by
+the same rule. A <code>var</code> binding, and a class through a <code>let</code>, do not warn.</li>
+<li><strong><code>LYR-SEM0110</code> — a <code>defer</code> body that can throw.</strong> What that does to the rest of the chain is
+unspecified; measured on this implementation, the stages scheduled before the thrower do not run
+and the chain runs twice on the <code>return</code> path.</li>
+</ul>
 <h3 id="added-the-standard-library">Added — the standard library</h3>
 <ul>
 <li><strong><code>std.result</code></strong> with <code>Result&lt;T, E&gt;</code> and the bridges <code>parseIntOrErr</code>, <code>textOrErr</code>, <code>parseOrErr</code>.
@@ -234,12 +261,28 @@ the value it was built from, and a <code>match</code> arm binding the whole subj
 function instead of the end of its own block.</li>
 <li><strong>A throwing <code>defer</code> body ran the scope's defers twice</strong> on the fall-through path.</li>
 <li><strong>The methods of a generic enum were never lowered</strong>, so calling one was <code>LYR-IR0001</code>.</li>
+<li><strong>A method could not be generic on top of its type.</strong> <code>Box&lt;int&gt;.map&lt;string&gt;</code> takes its <code>T</code> from
+the receiver and its <code>U</code> from the call, and the lowering bound only the first, so every
+combinator with that shape — <code>Result&lt;T, E&gt;.map&lt;U&gt;</code>, <code>List&lt;T&gt;.map&lt;U&gt;</code>, <code>Iterator.toList</code> — was
+<code>LYR-IR0001</code>. It is why the standard library writes several of its combinators as free
+functions; those keep working, and the method form is now available to write. §8.4 states the
+rule, including which parameter wins when the two collide by name.</li>
 <li><strong><code>parseInt</code> and <code>powInt</code> answered a wrapped number</strong> where their <code>?int</code> return type promised
 <code>null</code>: <code>parseInt(&quot;99999999999999999999&quot;)</code> was <code>7766279631452241919</code>, <code>powInt(2, 64)</code> was <code>0</code>.</li>
 <li><strong><code>trim</code> and <code>trimStart</code>/<code>trimEnd</code>/<code>isBlank</code> used two different notions of whitespace.</strong></li>
 <li><strong>A <code>Map</code> grew without bound under set/remove churn</strong>: tombstones triggered a doubling and never
 a compaction.</li>
 <li><strong><code>std.os.args()</code> answered the VM's arguments</strong>, not the program's.</li>
+<li><strong>A name imported twice made a call ambiguous with itself.</strong> Two <code>import m { f };</code> lines put one
+function into the overload set twice, and two copies of one function separate nothing: the call
+was <code>LYR-SEM0086</code>, with two identical notes pointing at one declaration.</li>
+<li><strong>A failed destructuring left its names undeclared</strong>, so <code>let (a, b) = 5;</code> answered the real
+error and then &quot;unknown identifier 'a'&quot; and &quot;unknown identifier 'b'&quot; about its own consequence.</li>
+<li><strong><code>--verbose</code> phase times were a hundred times too large on Linux.</strong> Stopwatch ticks were read
+as <code>TimeSpan</code> ticks, which coincide on Windows and do not elsewhere; the total row underneath
+them was right all along, so the table contradicted itself.</li>
+<li><strong><code>--json</code> did not cover argument errors.</strong> A compile error came out as a document and an
+unknown option as a bare line, in a stream a caller is parsing.</li>
 <li><strong><code>Random.nextIntRange</code> and <code>nextFloat</code> could fall below their lower bound</strong>, because
 <code>absInt(int.min)</code> stays negative.</li>
 <li><strong>Two extension overloads on one type shared one name in the bytecode.</strong> <code>extend Box { fn tell(n: int) … }</code> beside <code>fn tell(s: string)</code> — in one block or in two — both became
@@ -252,6 +295,20 @@ the bytes they had.</li>
 <ul>
 <li>The grammar (§2) describes the forms above. Seven of them were shipping without being in it.</li>
 <li><code>LYR-IR0001</code> covers two constructs fewer; the appendix says which.</li>
+<li><strong>Three semantic errors moved out of <code>LYR-IR0001</code> into the checker</strong>, where they reach
+<code>lyrc check</code>, which never lowers and therefore used to answer <em>ok</em> to programs <code>lyrc build</code>
+refuses. An initializer that omits a field with no default is <code>LYR-SEM0106</code> and names every
+missing field at once; <code>x == null</code> on a non-optional is <code>LYR-SEM0059</code>, beside the <code>null</code> pattern
+rule it mirrors; <code>x ?? y</code> and <code>x ??= y</code> on one are <code>LYR-SEM0005</code>, beside the force-unwrap they
+belong with. §12.1 keeps <code>IR0001</code> for valid Lyric, and none of the three is that — the note
+&quot;this compiler version cannot lower it yet&quot; promised a release that will never help. Inside a
+generic body all three stay legal, because only the instantiation can answer the question.</li>
+<li><strong><code>LYR-SEM0052</code> no longer suggests what cannot be written.</strong> It offered <code>'X { … }'</code> for every
+type there is — including <code>int { … }</code> for <code>let i = int;</code>. A struct or class gets the brace form,
+an enum gets one of its variants, and everything else gets no suggestion.</li>
+<li><strong>A lowering that gives up on a written type now names the type.</strong> The message was &quot;a
+non-primitive field type&quot; wherever one failed — including at a method's RETURN type, where it
+described a field that was not in the program and sent the reader to the wrong line.</li>
 <li><strong><code>LYRIC_VERIFY_IR=1</code> turns the IR verifier on in any build</strong>, and <code>=0</code> off. It checks the
 compiler's own intermediate form twice per compile — once on what the lowering produced, once
 on what the optimizations left of it — and a finding is a compiler bug, so it aborts naming

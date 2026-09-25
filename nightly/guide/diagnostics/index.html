@@ -48,6 +48,7 @@
 <nav class="contents">
 <ul>
 <li><a href="#warnings">Warnings</a></li>
+<li><a href="#migration-warnings">Migration warnings</a></li>
 <li><a href="#hints">Hints</a></li>
 <li><a href="#notes">Notes</a></li>
 </ul>
@@ -88,6 +89,47 @@ pattern <code>Rect { w, h }</code>, whose names belong to the fields rather than
 </code></pre>
 <p>The warnings keep their severity in the output; one closing error carries the policy into the
 exit code, and a denied <code>build</code> writes no file.</p>
+<h2 id="migration-warnings">Migration warnings</h2>
+<p>Four warnings are not about the program being odd. They mark a place where <strong>the language has
+not decided yet</strong>, and where the answer — which comes with 5.0, all four at once — changes what
+your program means. The program compiles today and keeps the behaviour it has until the major.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>What it marks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LYR-SEM0107</code></td>
+<td>a second <code>let</code> or <code>var</code> binding the same name <strong>in one scope</strong>. Today the first one wins and the second is unreachable, even when it changes the type. Shadowing an <em>enclosing</em> scope is a different thing and stays legal.</td>
+</tr>
+<tr>
+<td><code>LYR-SEM0108</code></td>
+<td>a method that writes <code>this</code> on a <strong>class</strong> without saying <code>mut</code>. On a struct that is already an error.</td>
+</tr>
+<tr>
+<td><code>LYR-SEM0109</code></td>
+<td>a field written through an immutable binding of a <strong>struct</strong> — a <code>let</code> or a parameter. <code>let</code> pins the name, not the value.</td>
+</tr>
+<tr>
+<td><code>LYR-SEM0110</code></td>
+<td>a <code>defer</code> body that can <strong>throw</strong>. What that does to the rest of the chain is not decided.</td>
+</tr>
+</tbody>
+</table>
+<p>Each of them fires on a program whose meaning changes <strong>whichever way</strong> its question is settled,
+so none of them is a decision announced early. Each carries a note saying so:</p>
+<pre><code>main.lyr:3:5: warning[LYR-SEM0107]: 'x' is already bound in this scope — this binding is
+  unreachable today, and 5.0 settles which of the two a later use names
+    let x = 2;
+    ^^^^^^^^^^
+  note: previous binding — main.lyr:2:5
+  note: a migration warning: the program is legal today, and 5.0 makes it a different program
+</code></pre>
+<p>When 5.0 settles a question, its code is retired rather than turned into the new rule's error:
+the code meant &quot;this will change&quot;, and that stops being true.</p>
 <h2 id="hints">Hints</h2>
 <p><code>LYR-SEM0075</code> is a hint: a <code>var</code> through which nothing is ever changed — no reassignment, no
 field or element write, no <code>mut</code> method call — could be a <code>let</code>. A <code>var</code> that documents
