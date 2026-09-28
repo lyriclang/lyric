@@ -108,7 +108,30 @@ definiert, nie auf `Indexable` portiert). **Für Bereich 4 (Operatoren)**: die a
 Operator-Interfaces (`Add<T, R>` mit zwei Typargumenten, fehlende `Neg`/`Rem`/Bit-Operatoren,
 `++`/`--` außerhalb der Interfaces) gesamt überarbeiten.
 
-## M6 — `with`: **offen**
+## M6 — `with`: **entschieden** (2026-09-28)
+
+**`p with { x = 3, y = 4 }`** — Postfix, kontextuelles Schlüsselwort; unter M2 die einzige
+Form, ein unveränderliches Feld zu ändern.
+
+| Form | Warum nicht |
+|---|---|
+| Rust `Point { x = 3, ..p }` | Typname wiederholen; `..p` liest sich in Ketten schlecht; Rust braucht es wegen Moves |
+| F#/OCaml `{ p with x = 3 }` | kollidiert mit Value-Block-Syntax |
+| Kotlin/Scala `p.copy(x = 3)` | Methode, die keine ist; umgeht Invarianten |
+
+| # | Regel |
+|---|---|
+| W1 | Kopie von `p`, genannte Felder ersetzt; `p` unverändert; Typ von `p` |
+| W2 | **nur auf Structs**; Klassen nicht (flacher Klon mit neuer Identität → `Clone`-Frage, Bereich 4); Tupel nicht (keine Feldnamen) |
+| W3 | **Sichtbarkeit wie der Initializer an derselben Stelle** — folgt automatisch der Member-Sichtbarkeit (Bereich 7); private Felder bleiben geschützt, Kotlins `copy`-Loch entsteht nicht |
+| W4 | links nach rechts; Ausdrücke sehen die **alten** Werte (`p with { x = p.y, y = p.x }` vertauscht); Feld doppelt = Fehler; unbekannt = Fehler; kein `var`-Feld nötig |
+| W5 | Präzedenz Postfix-Stufe: `p with { x = 1 }.x` = `(p with { x = 1 }).x`; `q + p with {…}` = `q + (p with …)` |
+| W6 | **verschachtelte Pfade** `p with { pos.x = 1 }` = entfalteter innerer `with`; Sichtbarkeit je Segment (kein Mainstream-Vorbild, aber eindeutig; tiefe unveränderliche Structs brauchen es) |
+| W7 | `p with {…};` als Statement ist ein Fehler (Ergebnis ungenutzt) |
+| W8 | auf Enum-Feldvarianten nicht in 5.0 (Variante statisch selten bekannt) — Tür |
+
+Nebeneffekt für M13: `with` baut neu und kann nie einen Zyklus schließen.
+
 ## M7 — Kopieren durch `?T`, Tupel, Enum, Closure-Umgebung, `[x] * n`: **offen**
 ## M8 — Closure-Capture: **offen**
 ## M9 — Unveränderliche Klassenfelder: **offen**
