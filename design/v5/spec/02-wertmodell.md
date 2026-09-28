@@ -132,9 +132,41 @@ Form, ein unveränderliches Feld zu ändern.
 
 Nebeneffekt für M13: `with` baut neu und kann nie einen Zyklus schließen.
 
-## M7 — Kopieren durch `?T`, Tupel, Enum, Closure-Umgebung, `[x] * n`: **offen**
-## M8 — Closure-Capture: **offen**
-## M9 — Unveränderliche Klassenfelder: **offen**
+## M7 — Kopieren: **entschieden durch Darstellung** (2026-09-28)
+
+**Aus dem Typ allein ist ablesbar, ob eine Bindung kopiert oder teilt** — unter Bereich 1 ist
+das die Darstellung selbst: `struct`, Tupel, Enum mit Nutzlast, `?Wert` kopieren (inline);
+`class`, Array, Interface-Wert, Closure, Koroutine, `?Referenz` teilen (Zeiger). `[x] * n` und
+`[x, x]` sind n Kopien (V10).
+
+**Tiefe, ein Satz für die Spec**: *Eine Kopie kopiert die Wertfelder und teilt die
+Referenzfelder.* „Unveränderlich" (M2) ist immer flach: ein `let`-Feld vom Typ `int[]` ist eine
+feste Referenz auf ein veränderliches Array — F#s, Kotlins, Scalas Bedeutung.
+
+## M8 — Closure-Capture: **entschieden** (2026-09-28) — nach Bindungsart
+
+Ein gefangenes **`let` liegt als Kopie** in der Umgebung (semantisch unbeobachtbar, es kann
+sich nicht ändern); ein gefangenes **`var` liegt in einer Box** auf dem Heap, die Umgebung und
+umschließender Scope teilen, **ab seiner Deklaration** (kein Stack-Ort, der die Closure
+überleben müsste; Go, Swift). Kosten sichtbar: eine gefangene `var` allokiert einmal, sonst
+nichts. Löst den Spec-Widerspruch §3/§7 („by reference" / „as its value"): beides.
+
+| | Warum nicht |
+|---|---|
+| immer per Referenz (Go, C#, JS, Kotlin) | boxt auch nie geänderte Variablen |
+| immer per Wert (C++ `[=]`, Rust `move`) | `var n = 0; xs.each { n += 1 }` stirbt |
+
+| # | Folgeregel |
+|---|---|
+| C1 | **Schleifenbindungen je Durchlauf frisch**: `for (i in 0..3) { fs.add(() => i) }` → 0, 1, 2 — folgt aus M3 (`let`), was Go 1.22 reparieren und C# bis heute erklären muss |
+| C2 | **`this` einer Struct-Methode wird per Wert gefangen** (Referenz auf einen ggf. Stack-Ort, M5; Swift verbietet `self`-Capture in `mutating` bei escaping Closures — wir kopieren); Klassen-`this` wird geteilt |
+| C3 | **`inout`/`ref`-Parameter** (Bereich-3-Kandidat) sind von entkommenden Closures nicht fangbar |
+
+## M9 — Unveränderliche Klassenfelder: **entschieden durch M2** (2026-09-28)
+
+Ein Feld ohne `var` ist fest, durch jede Referenz; mit `var` schreibbar durch jede Referenz
+(Kotlin `val`/`var`).
+
 ## M10 — Identität und Gleichheit: **offen**
 ## M11 — Große Werte: **offen**
 ## M12 — Besitzende Werttypen / RAII: **offen**
