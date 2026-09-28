@@ -167,7 +167,25 @@ nichts. Löst den Spec-Widerspruch §3/§7 („by reference" / „as its value")
 Ein Feld ohne `var` ist fest, durch jede Referenz; mit `var` schreibbar durch jede Referenz
 (Kotlin `val`/`var`).
 
-## M10 — Identität und Gleichheit: **offen**
+## M10 — Identität und Gleichheit: **entschieden** (2026-09-28)
+
+- **Werte haben keine Identität** (`struct`, Tupel, Enum — unter V2 nicht einmal eine stabile
+  Adresse); **Referenzen haben sie** (`class`, Array, Koroutine; V3: die Adresse ist die
+  Identität). Swift's Linie.
+- **`==`/`!=` bedeuten genau eines: Wertgleichheit nach `Equatable`.** Kein `===`. Identität ist
+  eine **Funktion** in `std.core` (`same(a, b)`, Name offen), nur für Referenztypen — auf einem
+  Wert ein Übersetzungsfehler, nicht `false`. (Rust `ptr::eq`, Dart `identical`.)
+- Verworfen: **A** `==` = Identität für Referenzen bis `equals` überschrieben wird (Java, C#,
+  Kotlin) — ein Operator, zwei Bedeutungen, stiller Wechsel beim Hinzufügen von `Equatable`;
+  **C** fest verdrahtetes `==` ohne Überladung (Go) — keine eigene Gleichheit, NaN eingebaut.
+- **Woher die Gleichheit kommt** (Details Bereich 4): Structs/Enums/Tupel **feldweise
+  synthetisiert auf Anfrage** (`:: [Equatable]` ohne Körper; alle Felder `Equatable`, ein
+  Klassenfeld verlangt also eine `Equatable`-Klasse, nie stille Identität — Swift; Go's
+  „automatisch, wenn vergleichbar" verworfen). Klassen: `equals` geschrieben oder synthetisiert
+  (strukturell), **oder** ein Marker-Interface (`Identity`, Name offen), dessen Konformanz
+  **Identitäts-`Equatable` und Adress-`Hashable` synthetisiert** — `Map<Node, X>` nach
+  Objektidentität ohne Handarbeit. Eine Klasse ohne beides hat kein `==`.
+
 ## M11 — Große Werte: **offen**
 ## M12 — Besitzende Werttypen / RAII: **offen**
 ## M13 — Rekursive Werttypen: **offen**
