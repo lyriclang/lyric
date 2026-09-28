@@ -65,7 +65,31 @@ die man nicht nachrüsten kann und in der Ein-Thread-Version nichts kosten:
    Nebeneffekt: dieselben Polls tragen kooperative Koroutinen-Präemption oder ein Zeitbudget,
    falls L10 es will.
 
-## L2 — Wertdarstellung: **offen**
+## L2 — Wertdarstellung: **entschieden** (2026-09-28)
+
+**Ein Wert kostet, was er ist.** Unter L1 (nicht bewegend, präziser Heap, konservativer Stack):
+
+| # | Wert | Darstellung | Verworfen |
+|---|---|---|---|
+| V1 | Skalare | C-Typen direkt: `int64_t`, `double`, `uint8_t` (bool), `uint32_t` (char = Code-Punkt); natürliche Ausrichtung | — |
+| V2 | Struct | **C-Struct by value**, Felder inline, verschachtelt inline; Übergabe by value (clang reicht große Structs selbst per Zeiger) | Heap-Objekt mit Kopie (Lyric 4) |
+| V3 | Klassenobjekt | **ein Wort Header**: Zeiger auf den Typdeskriptor; Mark-Bits in Immix-Seitenmetadaten; **Identitäts-Hash = Adresse** (nichts bewegt sich; nicht reproduzierbar zwischen Läufen — akzeptiert) | Java/C#-Header 12–16 B |
+| V4 | Typdeskriptor | statisch je Typ: Größe, Referenz-Bitmap, Name/Modul, Anker für Interface-Tabellen; **Typidentität = Deskriptor-Zeiger** — Downcast/Typ-Pattern auf Interface-Werten ist ein Zeigervergleich | — |
+| V5 | `?T` | Referenz-`T`: Null-Zeiger (Niche, 0 B); Enum: Niche im Tag; sonst `{T; bool}`. **`??T` ist darstellbar**; ob erlaubt, entscheidet Bereich 3 | — |
+| V6 | Enum mit Nutzlast | **Tag + Union inline** (Rust); rekursive Nutzlast braucht `?` oder eine Klasse als Indirektion | Heap-Objekt je Variante |
+| V7 | Interface-Wert | **Fat Pointer** {Daten, VTable}, 16 B; VTable statisch je (Typ, Interface); ein Struct wird beim Übergang **geboxt** (passt es in ein Wort, liegt es im Datenslot); bei Constraints wird monomorphisiert, dann gibt es keinen Interface-Wert | VTable im Header (nur Klassen); Swift-Inline-Puffer (Kopien je Übergabe, drei Wörter) |
+| V8 | Closure | {Funktionszeiger, Umgebung}, 16 B; Umgebung Heap-Objekt, erstes Argument; freie Funktion = Closure mit Null-Umgebung. Capture-Semantik (Bereich 2) trägt beides: by-ref = Box, by-value = Kopie | — |
+| V9 | String | **ein Wort**: Zeiger auf {Header, Länge, UTF-8-Bytes inline}; unveränderlich. Substrings als eigener **View-Typ** {Innenzeiger, Länge} — gratis und sicher, weil unbeweglich und Innenzeiger verstanden werden; ob die Sprache ihn hat: Bereich 3/10 | Go-{ptr,len} (16 B je Feld, String = View); SSO (verwirrt den Scan, Branches überall) |
+| V10 | Array | {Header, Länge, Elemente inline}; **Struct-Elemente zusammenhängend** (`Vec3[]` ist ein Block); Referenz-Elemente sind Zeiger. Views {Innenzeiger, Länge} gratis — die 4.x-Absage an Slices beruhte auf einer VM ohne Innenzeiger | — |
+| V11 | Tupel | anonymes C-Struct inline | — |
+| V12 | Generics | **Monomorphisierung**, konkrete Layouts, kein Boxing; Sharing über Referenztypen (C#) als spätere Optimierung ohne Layoutänderung | Erasure (Java), Witness Tables (Swift) |
+
+Größen: `bool` 1, `int` 8, `Vec3` 24, Referenz 8, Interface 16, `?int` 16, `?Vec3` 32,
+`?Klasse` 8. Lyric 4: 16 für alles plus Heap je Struct.
+
+**Folgen für andere Bereiche**: Innenzeiger und Typidentität öffnen Views und Typ-Patterns
+(Bereich 3); Struct-Kopien sind Speicherkopien — ob große Structs eine Kostenregel bekommen,
+ist Bereich 2.
 ## L3 — Aufrufkonvention und Stack: **offen**
 ## L4 — Koroutinen im Runtime: **offen**
 ## L5 — Fehler-ABI: **offen**
