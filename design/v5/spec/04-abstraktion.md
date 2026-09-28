@@ -63,7 +63,29 @@ Weiterleitungsmethoden und sonst nichts:
 
 ## D2 — Dispatch und Auflösungsreihenfolge: **offen**
 ## D3 — Default-Methoden, Konflikte, expliziter Aufruf: **offen**
-## D4 — Überladung: **offen**
+## D4 — Überladung: **entschieden** (2026-09-28) — nur Arität
+
+**Ein Name darf mehrere Signaturen haben, wenn sie sich in der Anzahl der Parameter
+unterscheiden — nie nur im Typ.** Auswahl = Anzahl zählen, ein Kandidat. Keine Rangordnung,
+kein Weitungsrang, keine Ambiguität am Aufruf, keine Wechselwirkung mit Inferenz (T8),
+Generics, `inout`, `throws`, Operatoren. Mangling: Name + Anzahl, stabil.
+
+- Default-Argumente (D5) und Arität sind derselbe Mechanismus: `f(a, b = 0)` ist `f(a)` und
+  `f(a, b)`. Passen für irgendeine Argumentzahl zwei Signaturen, ist das ein **Fehler an der
+  Deklaration**, nie am Aufruf.
+- Typsuffixe (`absInt`, `maxInt`, …) gehen über **Generics + Interfaces** (T5: `Self`,
+  statische Member; D6), nicht über Überladung — der Weg von Rust und Go.
+- Operatoren (D6): eine Auflösung, die Konformanz zum rechten Operandentyp.
+
+Gemessen als Grundlage: echte Überladungsmengen (gleicher Scope, gleicher Receiver, anderer
+Typ) gibt es in der stdlib praktisch nicht, und die Typsuffix-Familien stehen nach anderthalb
+Majors mit freier Überladung unverändert da — das Feature wurde eingeführt und nicht benutzt.
+
+| Verworfen | Warum |
+|---|---|
+| freie Überladung, repariert (C#, Java, Swift, Kotlin) | der 41-Fragen-Katalog ist keine Implementierungsschwäche, sondern die Form, die freie Überladung in jeder Sprache annimmt (sechs Auflösungsalgorithmen, Rangordnung, exponentielle Auswahl, Signatur-Mangling); ihr einziger genannter Nutzen (Typsuffixe) ist generisch lösbar. Nimmt 3.0 zurück, mit 3.0's eigener Begründung („the shape Oil died of") |
+| keine Überladung (Rust, Go, Zig) | verliert Fabriken (`of(hex)`, `of(r, g, b)`) und Bequemlichkeits-APIs, die Arität ohne jede Regelkomplexität deckt |
+
 ## D5 — Default-Argumente und benannte Argumente: **offen**
 ## D6 — Operator-Interfaces: **offen**
 ## D7 — Konformanz-Synthese: **offen**
