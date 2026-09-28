@@ -137,8 +137,53 @@ automatisch für jede `let`-Bindung (implizit; ein abgelegtes Handle würde gesc
 `use { }`-Lambda (Kotlin; `return` im Lambda). Zwei Mechanismen — `defer` für beliebigen Code,
 `using` für das, was der Typ verlangt und der Compiler prüfen kann (Java, C# ebenso).
 
-## E8 — Panik: Katalog, `recover`, Hooks: **offen**
-## E9 — `catch`-Klauseln: Reihenfolge, tote Klauseln: **offen**
-## E10 — Fehler über Grenzen: Tasks, Koroutinen, FFI, Host: **offen**
-## E11 — Kontrollfluss: Ausdrucksformen, `loop`, `break` mit Wert: **offen**
-## E12 — `never`: **offen**
+## E8 — Panik: **entschieden** (2026-09-28)
+
+Katalog (Index, Division durch 0, Überlauf, Stacküberlauf, `!` auf `null`, `try!`,
+`panic(msg)`, `assert`, `unreachable()`): Meldung, Backtrace, **Exit 101**, keine `defer`/`using`
+(L5 E5). **Kein `recover`-Wort.** Isolation **an der Koroutinengrenze, ohne Abwicklung**: eine
+Panik in einer Koroutine verlässt deren Stack (K1) — kein Frame besucht, keine `defer` —, der
+Resumer erhält den Status „gescheitert durch Panik" mit `PanicInfo`; Stack freigegeben, offene
+Ressourcen fängt das GC-Netz (L1). Bereich 6 macht daraus Task-Zustände. Hauptstack: Prozessende.
+Fremde Frames auf dem Stack (K4-Zähler > 0): Prozessende (Go: Panik durch cgo ist fatal).
+**Host-Hook** `Runtime.onPanic(fn(PanicInfo))` zum Loggen/Flushen, kann das Ende nicht
+verhindern. Verworfen: nie (Swift, Zig — ein Request-Bug tötet den Server), überall (Go
+`recover`, Rust `catch_unwind` — braucht Abwicklung, die L5 nicht hat). (Erlang)
+
+## E9 — `catch`-Klauseln: **entschieden** (2026-09-28)
+
+| # | Regel |
+|---|---|
+| C1 | derselbe Typ zweimal → Fehler |
+| C2 | eine Klausel, die eine frühere vollständig abdeckt (Interface, `sealed`-Elternteil, `Error`) → **Fehler „unerreichbare Klausel"** (heute still tot; Java) |
+| C3 | Catch-all `catch (e)` zuletzt, sonst Fehler; aus dem Anhang nach §9 |
+| C4 | Klauseln müssen die Menge nicht decken; Rest propagiert, wenn deklariert (K8) |
+| C5 | **Mehrfach-Klausel `catch (e: A, B)`**, `e` trägt die Menge (K7) — Java Multi-Catch ohne Unionstyp |
+| C6 | Wurf aus einer Klausel wird von Schwesterklauseln nicht gefangen (normiert) |
+
+## E10 — Fehler über Grenzen: **entschieden** (2026-09-28)
+
+Task-Ergebnis **trägt den Fehler** (warten liefert `T throws E`; Form Bereich 6);
+`Coroutine<T> throws E` bleibt (Ziehen wirft); C-Grenze nach L5 E6/E7 (Wrapper-Form Bereich 11);
+Host sieht eine Lyric-Ausnahme als **strukturiertes Fehlerobjekt**, nie als Panik; eine Panik
+über den Hook (Bereich 11).
+
+## E11 — Kontrollfluss: **entschieden** (2026-09-28)
+
+**`loop { … }`** als Endlosschleife (Rust, Zig; Definite Assignment weiß, dass sie nur über
+`break` endet); **`break value` nur aus `loop`** (`let found = loop { …; break x; };` — bei
+`while`/`for` gäbe es den „nicht gebrochen"-Fall; Rust ebenso). `while`, `do-while`,
+`for (x in …)`, Labels, `let`-Bedingungen bleiben; `for` über `Iterable`/Ranges (Bereich 10);
+`if`/`match`/`try` als Ausdruck und Value-Block bleiben; `match`-Erschöpfung durch Tupel
+hindurch (4.x-Fund, gebaut). Kein `goto`, kein Fallthrough, kein `switch`.
+
+## E12 — `never`: **entschieden** (2026-09-28)
+
+Builtin-Typname; **gültig nur als Rückgabetyp** von Funktionen und Lambdas; `throw`, `panic`,
+`unreachable()`, `loop` ohne `break`, `return` haben Typ `never`; **`never` koerziert zu jedem
+Typ** an Ausdruckspositionen (T3-Liste); jede andere Position ist ein Sema-Fehler — die drei
+4.x-ICEs werden Diagnosen. (Rust `!`, Swift `Never`)
+
+---
+
+**Bereich 5 ist damit vollständig entschieden** (E1–E12, 2026-09-28).
