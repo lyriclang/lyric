@@ -1,0 +1,32 @@
+// R8 — Ist ein Struct hinter einem Interface-Wert noch ein Wert?
+// Ein Interface-Wert ist ein Fat Pointer auf DIESELBEN Slots (Op.MakeInterface kopiert nicht).
+// Erwartung VOR dem Lauf:
+//   nachIface = 1   wenn das Einpacken NICHT kopiert (Alias)
+//   nachIface = 0   wenn das Einpacken kopiert
+//   aliasZwei = 1   wenn zwei Interface-Werte aus derselben Variablen denselben Speicher sehen
+import std.io.console { println };
+
+interface Zaehlbar { mut fn hoch(): void; fn wert(): int; }
+
+struct Z {
+    n: int,
+    mut fn hoch(): void { this.n += 1; }
+    fn wert(): int { return this.n; }
+}
+
+extend Z :: [Zaehlbar] {}
+
+fn main(): int {
+    var a = Z { n = 0 };
+    let i: Zaehlbar = a;
+    i.hoch();
+    println(f"nachIface = {a.n}");
+    println(f"imIface   = {i.wert()}");
+
+    var b = Z { n = 0 };
+    let p: Zaehlbar = b;
+    let q: Zaehlbar = p;
+    p.hoch();
+    println(f"aliasZwei = {q.wert()}");
+    return 0;
+}

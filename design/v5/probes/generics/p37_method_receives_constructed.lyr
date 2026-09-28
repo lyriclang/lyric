@@ -1,0 +1,10 @@
+class Sink { n: int,
+    fn take<U>(u: U): int { return 2; }
+}
+
+fn outer<T>(x: T): int {
+    let s = Sink { n = 0 };
+    return s.take<T[]>([x]);
+}
+
+fn main(): int { return outer<int>(1); }

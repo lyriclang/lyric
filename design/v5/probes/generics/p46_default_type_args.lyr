@@ -1,0 +1,6 @@
+class Box<T = int> { value: T, }
+
+fn main(): int {
+    let b = Box { value = 4 };
+    return b.value;
+}

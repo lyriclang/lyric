@@ -1,0 +1,17 @@
+// ERWARTUNG: unklar — ein yield innerhalb einer geschuetzten Region (try-Body).
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn gen(): Coroutine<int> {
+    try {
+        yield 1;
+        yield 2;
+    } catch (_: Boom) {
+        yield 99;
+    }
+}
+fn main(): int {
+    let co = gen();
+    println(f"{resume co}");
+    println(f"{resume co}");
+    return 0;
+}

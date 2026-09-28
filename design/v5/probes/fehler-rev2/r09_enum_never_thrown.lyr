@@ -1,0 +1,15 @@
+// KONTROLLE zu r08: dasselbe Enum, deklariert und BENUTZT, aber nie geworfen.
+// ERWARTUNG: kompiliert und laeuft, druckt "broken".
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Missing(string),
+    Broken(int);
+    pub fn message(): string {
+        return match (this) { Missing(s) => s, Broken(n) => "broken", };
+    }
+}
+fn main(): int {
+    let e = Fault.Broken(3);
+    println(e.message());
+    return 0;
+}

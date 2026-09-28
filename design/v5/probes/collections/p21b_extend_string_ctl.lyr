@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+extend string {
+    pub fn shout(): string { return this + "!"; }
+}
+
+fn main(): int {
+    println("hi".shout());
+    return 0;
+}

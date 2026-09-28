@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let big: float32 = 1e300;
+    let small: float32 = 1e-60;
+    println(f"big={big} small={small}");
+    return 0;
+}

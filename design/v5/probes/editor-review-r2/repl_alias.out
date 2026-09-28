@@ -1,0 +1,42 @@
+Lyric 4.6.0 — :help for commands, :quit to leave
+lyr> repl[1].lyr:3:5: error[LYR-SEM0002]: unknown identifier 'type'
+    type Meters = int;
+    ^^^^
+
+repl[1].lyr:3:5: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    type Meters = int;
+    ^^^^^^^^^^^
+
+repl[1].lyr:3:10: error[LYR-PAR0016]: expected ';'
+    type Meters = int;
+         ^^^^^^
+
+repl[1].lyr:3:10: error[LYR-SEM0002]: unknown identifier 'Meters'
+    type Meters = int;
+         ^^^^^^
+
+repl[1].lyr:3:19: error[LYR-SEM0052]: 'int' is a type, not a value
+    type Meters = int;
+                  ^^^
+
+lyr> repl[2].lyr:2:8: error[LYR-RES0002]: unresolved type 'Meters'
+let d: Meters = 3;
+       ^^^^^^
+
+lyr> repl[4].lyr:3:5: error[LYR-SEM0002]: unknown identifier 'd'
+    d;
+    ^
+
+repl[4].lyr:3:5: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    d;
+    ^^
+
+lyr> lyr> repl[7].lyr:3:5: error[LYR-SEM0002]: unknown identifier 'v'
+    v;
+    ^
+
+repl[7].lyr:3:5: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    v;
+    ^^
+
+lyr> 

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.iter { over };
+
+fn main(): int {
+    println(over([1, 2, 3]).map((n: int) => n * 2).count());
+    return 0;
+}

@@ -1,0 +1,8 @@
+struct S { v: int, mut fn bump(): void { this.v = this.v + 1; } fn peek(): int { return this.v; } }
+fn main(): int {
+    var a = S { v = 1 };
+    a.bump();            // expectation: NO SEM0075 (a mut fn call is a by-reference touch)
+    var b = S { v = 1 };
+    let n = b.peek();    // expectation: SEM0075 fires (a non-mut call is not a mutation)
+    return a.v + n;
+}

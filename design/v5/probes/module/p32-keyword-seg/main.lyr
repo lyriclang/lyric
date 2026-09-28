@@ -1,0 +1,3 @@
+module type.match;
+
+fn main(): int { return 0; }

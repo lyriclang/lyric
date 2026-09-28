@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.task { Wait };
+
+fn describe(w: Wait): string {
+    match (w) {
+        Now => { return "now"; }
+        Sleep(ms) => { return "sleep"; }
+    }
+}
+
+fn main(): int {
+    println(describe(Wait.Now));
+    return 0;
+}

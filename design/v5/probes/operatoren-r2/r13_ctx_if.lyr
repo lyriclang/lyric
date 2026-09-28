@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    let c = true;
+    let x: float = if (c) 1 else 2;
+    println(fromFloat(x));
+    let n = 1;
+    let y: float = match (n) { 1 => 1, _ => 2 };
+    println(fromFloat(y));
+    return 0;
+}

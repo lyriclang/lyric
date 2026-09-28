@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int, fn area(): int { return this.r; } }
+class Square :: [Shape] { s: int, fn area(): int { return this.s; } }
+
+fn main(): int {
+    let sh: Shape = Circle { r = 3 };
+    match (sh) {
+        c: Circle => println("circle"),
+        _ => println("other")
+    }
+    return 0;
+}

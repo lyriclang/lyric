@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let n = 1;
+    {
+        let n = 2;
+        println(fromInt(n));
+    }
+    return 0;
+}

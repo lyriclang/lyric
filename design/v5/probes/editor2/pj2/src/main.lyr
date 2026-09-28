@@ -1,0 +1,8 @@
+import std.io.console { println };
+import autil;
+import butil;
+
+fn main(): int {
+    println(f"{autil.f(1) + butil.f(1)}");
+    return 0;
+}

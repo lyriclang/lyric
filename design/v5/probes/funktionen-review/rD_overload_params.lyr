@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f(a: int): void { println("one"); }
+fn f(params xs: int[]): void { println("variadic"); }
+fn main(): int { f(1); f(1, 2); return 0; }

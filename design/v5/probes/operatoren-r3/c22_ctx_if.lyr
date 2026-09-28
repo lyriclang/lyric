@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    let c = true;
+    let x: float = if (c) 1 else 2;
+    println(fromFloat(x));
+    return 0;
+}

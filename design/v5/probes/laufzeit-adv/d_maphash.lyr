@@ -1,0 +1,15 @@
+// D — Map.slotOf rechnet 'positive = 0 - h' fuer negatives h. Bei h == int.MinValue wickelt
+// das auf MinValue, 'positive % len' wird negativ -> Indexpanik statt Einfuegen.
+// ERWARTUNG VOR DEM LAUF (falls int.hash() die Identitaet ist): Kontrolle key=-1 laeuft (ok=1),
+// key=MinValue panikt mit LYR-VM (Index) statt 'min=1'.
+import std.io.console { println };
+import std.collections { Map };
+fn main(): int {
+    var m = Map<int, int>.empty();
+    m.set(-1, 1);
+    println(f"ok = {m.get(-1) ?? 0}");
+    let mn: int = -9223372036854775807 - 1;
+    m.set(mn, 1);
+    println(f"min = {m.get(mn) ?? 0}");
+    return 0;
+}

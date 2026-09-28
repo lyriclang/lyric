@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct V { x: int, mut fn shift(d: int): void { this.x = this.x + d; } }
+fn main(): int {
+    var a: ?V = V { x = 1 };
+    var b = a;
+    b?.shift(9);
+    println(f"q10 a={a!.x} b={b!.x}");
+    return 0;
+}

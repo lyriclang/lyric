@@ -1,0 +1,5 @@
+init caps: {'supportsConfigurationDoneRequest': True, 'supportsEvaluateForHovers': True}
+launch: True None
+event output {'category': 'stdout', 'output': 'wrote=true\n'}
+event exited {'exitCode': 0}
+event terminated None

@@ -1,0 +1,2 @@
+fn f(): ?void { return null; }
+fn main(): int { return 0; }

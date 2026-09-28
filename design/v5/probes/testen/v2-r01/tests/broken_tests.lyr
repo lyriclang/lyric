@@ -1,0 +1,6 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn calls_nothing(): void {
+    nosuchfunction();
+}

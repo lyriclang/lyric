@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn s(): string { return "ab" + "cd"; }
+fn b(): bool { return 1 < 2; }
+fn c(): char { return 'x'; }
+fn f(): float { return 1.5 * 2.0; }
+fn main(): int {
+    println(f"{comptime s()} {comptime b()} {comptime c()} {comptime f()}");
+    return 0;
+}

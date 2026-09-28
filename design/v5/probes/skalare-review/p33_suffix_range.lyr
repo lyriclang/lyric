@@ -1,0 +1,15 @@
+// ERWARTUNG (Hypothese nach p05b): kompiliert still, druckt -56 44 0 0 (suffigierte Literale werden nicht bereichsgeprueft)
+import std.io.console { println };
+fn main(): int {
+  let x = 200i8;
+  println(f"{x}");
+  let y = 300i8;
+  println(f"{y}");
+  let z = 256u8;
+  println(f"{z}");
+  let w = 65536u16;
+  println(f"{w}");
+  let v = 99999999999i32;
+  println(f"{v}");
+  return 0;
+}

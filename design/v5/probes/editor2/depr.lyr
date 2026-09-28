@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.iter { fold, range };
+
+fn main(): int {
+    let s = fold<int, int>(range(0, 4), 0, (a, n) => a + n);
+    println(f"{s}");
+    return 0;
+}

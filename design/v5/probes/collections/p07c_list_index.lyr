@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    let l = List<int>.empty();
+    l.push(5);
+    l.push(6);
+    println(f"read {l[1]}");
+    l[1] = 9;
+    println(f"after {l[1]}");
+    for (v in l) { println(f"walk {v}"); }
+    return 0;
+}

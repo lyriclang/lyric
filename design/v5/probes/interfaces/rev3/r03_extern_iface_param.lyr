@@ -1,0 +1,3 @@
+interface Shape { fn area(): int; }
+extern "dotnet" fn take(x: Shape): int = "System.Math::Abs";
+fn main(): int { return 0; }

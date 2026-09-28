@@ -1,0 +1,1 @@
+fn main(): int { let g: float32 = 16777217; return 0; }

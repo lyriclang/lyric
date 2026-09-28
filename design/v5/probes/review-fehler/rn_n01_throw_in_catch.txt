@@ -1,0 +1,2 @@
+in catch A, throwing B
+outer caught B

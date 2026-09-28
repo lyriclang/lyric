@@ -1,0 +1,10 @@
+enum Opt2 { Some(bool), None }
+
+fn f(o: Opt2): int {
+    return match (o) {
+        Some(true) => 1,
+        None => 0,
+    };
+}
+
+fn main(): int { return f(Opt2.None); }

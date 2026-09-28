@@ -1,0 +1,7 @@
+module lib;
+
+fn hidden(): int { return 7; }
+let secretGlobal = 11;
+struct Secret { v: int, }
+pub fn make(): Secret { return Secret { v = 5 }; }
+pub fn shown(): int { return hidden(); }

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let s = "abc\
+def";
+    println(s);
+    return 0;
+}

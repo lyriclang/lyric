@@ -1,0 +1,5 @@
+import std.core { OnType };
+pub struct Tag :: [OnType] { }
+@Tag
+pub let X = 1;
+fn main(): int { return 0; }

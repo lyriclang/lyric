@@ -1,0 +1,4 @@
+./n20_global_init_throws.lyr:5:14: error[LYR-SEM0034]: call to 'risky' may throw 'Boom', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch
+let g: int = risky();
+             ^^^^^^^
+

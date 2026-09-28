@@ -1,0 +1,7 @@
+import std.io.console { println };
+import mvis3 { P };
+fn main(): int {
+    let p = P.make();
+    println(p.m(3));
+    return 0;
+}

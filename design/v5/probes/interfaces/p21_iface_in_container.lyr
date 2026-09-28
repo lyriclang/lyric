@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.collections { List };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int, fn area(): int { return this.r; } }
+
+fn main(): int {
+    let xs = List<Shape>.empty();
+    xs.push(Circle { r = 3 });
+    xs.push(Circle { r = 4 });
+    var total = 0;
+    for (i in 0..xs.length()) { total = total + xs.get(i).area(); }
+    println(f"{total}");
+    return 0;
+}

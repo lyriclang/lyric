@@ -1,0 +1,12 @@
+// ERWARTUNG (p10 nachgefahren): catch auf einem INTERFACE faengt die Klasse. Exit 0.
+import std.io.console { println };
+interface AppError :: [Throwable] { fn code(): int; }
+class NotFound :: [AppError] {
+    what: string,
+    fn message(): string { return this.what; }
+    fn code(): int { return 404; }
+}
+fn f(): int throws NotFound { throw NotFound { what = "gone" }; }
+fn main(): int {
+    try { return f(); } catch (e: AppError) { println(f"caught {e.code()} {e.message()}"); return 0; }
+}

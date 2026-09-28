@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.core { Exception, panic };
+
+fn main(): int {
+    try {
+        panic("blown");
+    } catch (e: Exception) {
+        println("caught");
+    }
+    println("after");
+    return 0;
+}

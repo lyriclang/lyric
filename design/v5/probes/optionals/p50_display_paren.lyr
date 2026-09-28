@@ -1,0 +1,7 @@
+fn f(a: (?int)[]): void { }
+fn g(b: ?int[]): void { }
+fn main(): int {
+    let opt: ?int[] = null;
+    f(opt);
+    return 0;
+}

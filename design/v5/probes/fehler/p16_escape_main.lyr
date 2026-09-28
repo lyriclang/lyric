@@ -1,0 +1,4 @@
+// ERWARTUNG: SEM0034 — eine Ausnahme kann main nicht verlassen, main darf kein throws.
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Boom { what = "x" }; }
+fn main(): int { return f(); }

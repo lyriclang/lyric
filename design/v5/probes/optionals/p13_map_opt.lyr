@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.collections { Map };
+fn main(): int {
+    var m = Map<string, ?int>.new();
+    m.set("a", null);
+    let v = m.get("a");
+    println("built");
+    return 0;
+}

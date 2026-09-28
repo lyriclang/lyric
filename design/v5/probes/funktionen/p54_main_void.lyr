@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): void { println("void main"); }

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn f(): int { println("f"); return 1; }
+fn g(): int { println("g"); return 2; }
+fn main(): int {
+    let s = f() + g();
+    return s - 3;
+}

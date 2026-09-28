@@ -1,0 +1,18 @@
+import std.io.console { println };
+import lib;
+struct Box :: [lib.HiddenI] { n: int, fn size(): int { return this.n; } }
+extend lib.Secret { fn grafted(): int { return this.v * 10; } }
+fn bounded<T :: [lib.HiddenI]>(x: T): int { return x.size(); }
+fn main(): int {
+    println(lib.hidden());
+    println(lib.secretGlobal);
+    let s: lib.Secret = lib.Secret { v = 3 };
+    println(s.v);
+    println(lib.Counter.HIDDEN);
+    let m = lib.Mode.Fast;
+    match (m) { lib.Mode.Fast => println("fast"), _ => println("other") }
+    println(lib.make().grafted());
+    println(bounded(Box { n = 4 }));
+    println(lib.make().v);
+    return 0;
+}

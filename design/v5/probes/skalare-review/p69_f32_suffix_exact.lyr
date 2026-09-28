@@ -1,0 +1,7 @@
+// ERWARTUNG (Hypothese: suffigiert = ungeprueft): kompiliert, druckt 16777216 (still gerundet)
+import std.io.console { println };
+fn main(): int {
+  let g = 16777217f32;
+  println(f"{g}");
+  return 0;
+}

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var x: ?int = 1; while (true) { if (x == null) { break; } println(f"{x + 1}"); break; } return 0; }

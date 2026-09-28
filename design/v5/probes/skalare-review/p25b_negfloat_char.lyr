@@ -1,0 +1,9 @@
+// ERWARTUNG: unklar - Panik VM0012 oder stilles Saettigen auf U+0000
+import std.io.console { println };
+fn main(): int {
+  let c = (-1.0) as char;
+  println(f"{c as int}");
+  let d = 1e300 as char;
+  println(f"{d as int}");
+  return 0;
+}

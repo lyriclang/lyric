@@ -1,0 +1,2 @@
+enum Signal { Red, Green }
+fn main(): int { let s: Signal = Red; return 0; }

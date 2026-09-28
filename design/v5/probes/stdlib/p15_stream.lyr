@@ -1,0 +1,9 @@
+import std.io.stream { open, close };
+
+fn main(): int {
+    let f = open("nope.txt");
+    if (f != null) {
+        close(f);
+    }
+    return 0;
+}

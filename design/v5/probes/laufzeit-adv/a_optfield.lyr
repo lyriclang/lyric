@@ -1,0 +1,25 @@
+// A — Struct-Kopie: ist ein ?Struct-FELD und ein Interface-FELD in der Kopie geteilt?
+// ERWARTUNG VOR DEM LAUF (CopyStruct rekursiert nur bei FieldTypes[i].Tag == Struct):
+//   plainField = 1   (Struct-Feld wird rekursiv kopiert)
+//   optField   = 99  (?Struct-Feld hat Tag Optional -> NICHT kopiert, geteilt)
+//   ifaceField = 1   (Interface-Feld geteilt; Kontrolle plainField zeigt den Normalfall)
+import std.io.console { println };
+struct B { n: int, }
+struct A { plain: B, opt: ?B, }
+interface Zaehlbar { mut fn hoch(): void; fn wert(): int; }
+struct C { n: int, mut fn hoch(): void { this.n += 1; } fn wert(): int { return this.n; } }
+extend C :: [Zaehlbar] {}
+struct D { iface: Zaehlbar, }
+fn main(): int {
+    var a = A { plain = B { n = 1 }, opt = B { n = 1 } };
+    var b = a;
+    b.plain.n = 99;
+    b.opt!.n = 99;
+    println(f"plainField = {a.plain.n}");
+    println(f"optField   = {a.opt!.n}");
+    var d1 = D { iface = C { n = 0 } };
+    var d2 = d1;
+    d2.iface.hoch();
+    println(f"ifaceField = {d1.iface.wert()}");
+    return 0;
+}

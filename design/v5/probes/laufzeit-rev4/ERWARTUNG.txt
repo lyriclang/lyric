@@ -1,0 +1,8 @@
+Kontrolllauf rev4 (2026-09-28), Erwartungen VOR dem Lauf, aus den rev3-Koepfen uebernommen:
+r3a: plainField=1, optField=99, ifaceField=1
+r3c: Compile-Fehler LYR-SEM0019
+r3e: letCapture=1, frischeKopie=0, varCapture=1
+r3f: enumWrap=0, enumBind=0, klassePayload=1, tupleBind=0
+r3g (mit Argument): panic LYR-VM0004, Exit 101, Interpreter UND --jit
+r3h: unter --jit Backtrace mit 'in main.tief (r3h_jitrec.lyr:7)'-Zeilen; fib(27) --jit nicht schneller als Interpreter
+r3i: f64 = 0, f32 = 0 in beiden Engines

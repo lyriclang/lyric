@@ -1,0 +1,3 @@
+import oldlib;
+
+fn main(): int { return oldlib.f(); }

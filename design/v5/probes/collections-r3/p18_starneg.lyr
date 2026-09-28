@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    var k = -1;
+    k = k + 0;
+    let xs = [1] * k;
+    println(f"{xs.length}");
+    return 0;
+}

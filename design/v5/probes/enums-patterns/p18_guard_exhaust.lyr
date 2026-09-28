@@ -1,0 +1,8 @@
+enum E { A, B }
+fn f(e: E): int {
+    return match (e) {
+        A => 1,
+        B if true => 2,
+    };
+}
+fn main(): int { return f(E.A); }

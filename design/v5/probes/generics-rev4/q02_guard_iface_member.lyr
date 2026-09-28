@@ -1,0 +1,11 @@
+interface Nest<T> { fn nest(): It<T[]>; }
+class It<T> :: [Nest<T>] {
+  v: T,
+  fn nest(): It<T[]> { return It<T[]> { v = [this.v] }; }
+}
+fn main(): int {
+  let a = It<int> { v = 1 };
+  let n: Nest<int> = a;
+  let _ = n.nest();
+  return 0;
+}

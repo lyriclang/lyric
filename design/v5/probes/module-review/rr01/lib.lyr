@@ -1,0 +1,10 @@
+fn hidden(): int { return 7; }
+let secretGlobal = 11;
+struct Secret { v: int, }
+pub class Counter {
+    static let HIDDEN: int = 5;
+    pub static let SHOWN: int = 9;
+}
+enum Mode { Fast, Slow }
+interface HiddenI { fn size(): int; }
+pub fn make(): Secret { return Secret { v = 3 }; }

@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int, fn area(): int { return this.r; } }
+class Square :: [Shape] { s: int, fn area(): int { return this.s; } }
+
+fn main(): int {
+    let xs: Shape[] = [Circle { r = 1 }, Square { s = 2 }];
+    var t = 0;
+    for (x in xs) { t = t + x.area(); }
+    println(f"{t}");
+    return 0;
+}

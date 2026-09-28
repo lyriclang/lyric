@@ -1,0 +1,3 @@
+module m7;
+pub fn v7(): int { return 7; }
+pub fn w7(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 7; } return s; }

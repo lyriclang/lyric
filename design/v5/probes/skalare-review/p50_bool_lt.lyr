@@ -1,0 +1,6 @@
+// ERWARTUNG: SEM0003 (bool hat kein Ordered, keine Maschinenvergleiche)
+import std.io.console { println };
+fn main(): int {
+  println(f"{true < false}");
+  return 0;
+}

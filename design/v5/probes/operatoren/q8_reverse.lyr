@@ -1,0 +1,20 @@
+import std.core { Add, Mul };
+import std.io.console { println };
+import std.string { fromInt };
+
+struct V :: [Mul<int, V>] {
+    x: int,
+    fn mul(other: int): V { return V { x = this.x * other }; }
+}
+
+// Can a user module give a BUILT-IN type a conformance whose argument is a user type?
+extend int :: [Mul<V, V>] {
+    fn mul(other: V): V { return V { x = this * other.x }; }
+}
+
+fn main(): int {
+    let v = V { x = 5 };
+    println(fromInt((v * 3).x));   // 15 — V's own conformance
+    println(fromInt((3 * v).x));   // 15 — int extended by this module
+    return 0;
+}

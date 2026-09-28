@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.collections { List };
+extend List<int> { pub fn foo(): int { return 1; } }
+fn main(): int { println("x"); return 0; }

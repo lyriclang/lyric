@@ -1,0 +1,4 @@
+import other;
+import std.io.console;
+
+fn main(): int { console.println(f"{other.use()}"); return 0; }

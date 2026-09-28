@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn f(v: uint8): int {
+    return match (v) {
+        0..=255 => 1,
+    };
+}
+fn main(): int { println(f"{f(7)}"); return 0; }

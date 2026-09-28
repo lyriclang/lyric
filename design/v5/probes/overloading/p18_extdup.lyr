@@ -1,0 +1,4 @@
+struct S { v: int, }
+extend S { fn m(x: int): string { return "a"; } }
+extend S { fn m(x: int): string { return "b"; } }
+fn main(): int { let s = S { v = 1 }; return 0; }

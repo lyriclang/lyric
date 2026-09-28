@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    let n = 1;
+    let y: float = match (n) { 1 => { 1 }, _ => { 2 } };
+    println(fromFloat(y));
+    return 0;
+}

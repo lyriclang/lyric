@@ -1,0 +1,6 @@
+// ERWARTUNG: ein Modul-let, das eine werfende Funktion ruft, bekommt eine Diagnose,
+// die etwas verlangt, das auf Modulebene unmoeglich ist.
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn risky(): int throws Boom { throw Boom { }; }
+let g: int = risky();
+fn main(): int { return g; }

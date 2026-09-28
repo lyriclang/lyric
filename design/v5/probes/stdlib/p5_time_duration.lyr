@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.time { Duration };
+
+fn main(): int {
+    let d = Duration.ofSeconds(5);
+    println(d.totalMillis());
+    return 0;
+}

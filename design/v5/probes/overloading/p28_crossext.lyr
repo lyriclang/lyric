@@ -1,0 +1,9 @@
+import std.io.console { println };
+import mext { S };
+extend S { fn m(x: string): string { return "local-string"; } }
+fn main(): int {
+    let s = S { v = 1 };
+    println(s.m(1));
+    println(s.m("a"));
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface Log { fn log(params xs: string[]): int; }
+class L :: [Log] { fn log(params xs: string[]): int { return xs.length; } }
+fn main(): int {
+    let l: Log = L { };
+    println(l.log("a", "b", "c").show());
+    return 0;
+}

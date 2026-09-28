@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let m = - 9223372036854775808;
+    println(fromInt(m));
+    return 0;
+}

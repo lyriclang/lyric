@@ -1,0 +1,2 @@
+pub fn value15(n: int): int { return n * 15; }
+pub fn other15(n: int): int { return value15(n) + 15; }

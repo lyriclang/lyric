@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Show { fn show(): string; }
+class Pair<T> :: [Show] { a: T, b: T, fn show(): string { return "pair"; } }
+fn main(): int {
+    let s1: Show = Pair<int> { a = 1, b = 2 };
+    let s2: Show = Pair<string> { a = "x", b = "y" };
+    println(f"{s1.show()} {s2.show()}");
+    return 0;
+}

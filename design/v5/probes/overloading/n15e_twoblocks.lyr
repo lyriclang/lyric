@@ -1,0 +1,4 @@
+import std.io.console { println };
+extend int { fn display(): string { return "mine"; } }
+extend int { fn display(): string { return "mine2"; } }
+fn main(): int { let n = 3; println(n.display()); return 0; }

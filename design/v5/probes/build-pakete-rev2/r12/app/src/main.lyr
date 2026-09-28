@@ -1,0 +1,2 @@
+import dep { d };
+fn main(): int { return d(); }

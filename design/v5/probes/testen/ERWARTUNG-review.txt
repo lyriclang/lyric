@@ -1,0 +1,13 @@
+rv01 probe: panic inside try/catch(Exception) is NOT caught -> exit 101, stderr has "panic [LYR-VM00xx]", no "caught"/"after" printed.
+rv01 ctl:   thrown Exception is caught -> prints "caught", "after", exit 0.
+rv02: a @Test declared `throws Exception` — expectation: lyrc check accepts it (2 modules ok);
+      lyrtest either refuses to call it or reports FAIL with an [LYR-EMB...] code (ScriptException branch, line 192); bb PASS; exit 1.
+rv03 (v2-r08-0 rerun): exit(0) in first test -> no output at all, exit 0. ctl -> 3 PASS, exit 0.
+rv04 (v2-r16 rerun): aa_returns_int PASS, bb PASS, cc FAIL [LYR-EMB0007].
+rv05 (v2-r09 rerun): own Test struct -> both PASS.
+rv06 (v2-r07 rerun, lyrc check): int[] and ?int -> LYR-IR0001 at stdlib test.lyr:29; List<int> -> SEM0028 x2.
+rv07 (p04 rerun): "module init ran" twice for two tests.
+rv08 (v2-r13 rerun): both PASS, fast.
+rv09 (v2-r14b 500 files): lyrtest ~18 s, lyrc check ~1 s.
+rv11 (v2-r02): check -> 3 modules ok; lyrtest -> RES0003.
+rv12 (v2-r10): SEM0067.

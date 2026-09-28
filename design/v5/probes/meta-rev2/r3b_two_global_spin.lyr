@@ -1,0 +1,9 @@
+fn spin(n: int): int {
+    var i = 0;
+    var s = 0;
+    while (i < n) { s = s + i; i = i + 1; }
+    return s;
+}
+let A: int = comptime spin(15000000);
+let B: int = comptime spin(15000001);
+fn main(): int { return 0; }

@@ -1,0 +1,6 @@
+// ERWARTUNG: unklar — darf ein Modul-let eine werfende Funktion aufrufen? Wer faengt das?
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn risky(): int throws Boom { throw Boom { }; }
+let g: int = risky();
+fn main(): int { println(f"{g}"); return 0; }

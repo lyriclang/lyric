@@ -1,0 +1,22 @@
+Erwartungen VOR dem Lauf (2026-09-24):
+
+w01 ?uint ?? 7          -> ERWARTE CLI0020 store of i64 into u64  (Kritiker hat recht)
+w02 ?uint64 ?? 7        -> ERWARTE CLI0020
+w03 ?float64 ?? 1.5     -> ERWARTE laeuft (Kontrolle)
+w04 ?int ?? 7           -> ERWARTE laeuft (Kontrolle)
+w05 println(uint)       -> ERWARTE SEM0028 Display
+w06 f"{uint}"           -> ERWARTE druckt 5 (Kontrolle)
+w07 xs[int8]            -> ERWARTE CLI0020 loadelem index i8
+w08 xs[uint]            -> ERWARTE CLI0020 loadelem index u64
+w09 xs[int]             -> ERWARTE 2 (Kontrolle)
+w10 -u auf uint         -> ERWARTE 18446744073709551613 still
+w11 f"{float32 0.1}"    -> ERWARTE 0.10000000149011612
+w12 compare(nan,1.0)    -> ERWARTE 0 ; equals(nan,nan) false
+w13 Map<float,int>      -> ERWARTE SEM0028 Hashable
+w14 j5 Map<int32,string> Meldungszahl -> ERWARTE 1x SEM0028 + Folgemeldung
+w15 j2 Ordered<int8>    -> ERWARTE 2x SEM0028
+w16 LYRIC_VERIFY_IR=0 auf w01 -> ERWARTE kompiliert und druckt 7
+w17 takes<int8>(5) vs let a: int8 = takes(5) -> ERWARTE erstes laeuft, zweites SEM0001
+w18 u - 1 bei u == 0    -> ERWARTE uintMax still
+w19 int8 Schleifenzaehler / Range-Grenze -> ERWARTE Fehler oder CLI0020
+w20 parseFloat float32 Rundreise -> ERWARTE kein float32-Gegenstueck

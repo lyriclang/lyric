@@ -1,0 +1,25 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    println(f"w1  [{42:8}]");
+    println(f"w2  [{42:-8}]");
+    println(f"w3  [{42:08}]");
+    println(f"w4  [{42:D8}]");
+    println(f"w5  [{3.5:8}]");
+    println(f"w6  [{"x":8}]");
+    println(f"s1  [{1234.5:#,##0.00}]");
+    println(f"s2  [{42:'abc'}]");
+    println(f"s3  [{0.5:P1}]");
+    println(f"s4  [{3.7:C}]");
+    println(f"s5  [{-255:X}]");
+    println(f"s6  [{255:x}]");
+    let w = 8;
+    println(f"dyn [{42:{w}}]");
+    println(f"rep [{"ab" * -2}]");
+    println(f"cas1 {"é".toUpper()}");
+    println(f"cas2 {"ß".toUpper()}");
+    println(f"cas3 {"İ".toLower()} len={"İ".toLower().length()}");
+    println(f"cas4 {"Σ".toLower()}");
+    return 0;
+}

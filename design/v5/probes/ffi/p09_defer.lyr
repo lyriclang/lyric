@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+extern "dotnet" fn parseI32(s: string): int32 = "System.Int32::Parse";
+
+fn inner(): int {
+    defer println("defer ran");
+    let n = parseI32("zz");
+    return n as int;
+}
+
+fn main(): int {
+    println("before");
+    let r = inner();
+    println(f"after={r}");
+    return 0;
+}

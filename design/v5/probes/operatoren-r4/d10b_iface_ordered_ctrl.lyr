@@ -1,0 +1,11 @@
+import std.core { Ordered };
+import std.io.console { println };
+struct V :: [Ordered<V>] {
+    x: int,
+    fn compare(other: V): int { return this.x - other.x; }
+}
+fn viaCall(a: Ordered<V>, b: V): bool { return a.compare(b) < 0; }
+fn main(): int {
+    if (viaCall(V { x = 1 }, V { x = 2 })) { println("lt"); }
+    return 0;
+}

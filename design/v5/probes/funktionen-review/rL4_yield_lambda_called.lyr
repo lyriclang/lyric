@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let g = () => { println("entered"); yield 1; println("after yield"); };
+    g();
+    println("done");
+    return 0;
+}

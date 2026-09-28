@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct S { v: int, }
+enum E { A(S), B }
+fn read(e: E): int { match (e) { E.A(inner) => { return inner.v; }, E.B => { return -1; } } }
+fn main(): int {
+    let e = E.A(S { v = 1 });
+    match (e) { E.A(inner) => { inner.v = 9; }, E.B => { } }
+    println(f"r04 payload={read(e)}");
+    return 0;
+}

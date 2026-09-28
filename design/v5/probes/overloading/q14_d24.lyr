@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn g(x: int): int { return x; }
+fn g(x: string): string { return x; }
+fn main(): int {
+    let r = g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(g(1))))))))))))))))))))))));
+    println("done");
+    return 0;
+}

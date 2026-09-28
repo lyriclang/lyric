@@ -1,0 +1,2 @@
+fn make(): int { return 1; }
+fn main(): int { let n: int = make(); return n; }

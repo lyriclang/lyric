@@ -1,0 +1,8 @@
+// C — Ist die for-in-Variable eine unveraenderliche Bindung (let)? ERWARTUNG: Compile-Fehler
+// bei 'j = 5' (dann ist Q1's '0 1 2' die Spec-Regel 'let wird als Wert gefangen', keine
+// for-Sonderregel).
+import std.io.console { println };
+fn main(): int {
+    for (j in 0..3) { j = 5; println(f"{j}"); }
+    return 0;
+}

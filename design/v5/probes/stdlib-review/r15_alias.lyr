@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn fill(buf: uint8[]): void {
+    buf[0] = 7;
+}
+
+fn main(): int {
+    let b: uint8[] = [0, 0, 0];
+    fill(b);
+    println(b[0] as int);
+    return 0;
+}

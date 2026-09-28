@@ -1,0 +1,16 @@
+struct Cfg { host: string, port: int }
+
+fn make(): Cfg {
+    return Cfg {
+        host = "localhost",
+        port = 80,
+    };
+}
+
+fn calc(): int {
+    let n = 1 + /* inner */ 2;
+    let m = 3 /* a */ + /* b */ 4;
+    return n + m;
+}
+
+fn main(): int { return 0; }

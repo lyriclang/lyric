@@ -1,0 +1,5 @@
+// ERWARTUNG: kompiliert, wenn 'never' ein echter Rueckgabetyp ist (p09 behauptet das).
+import std.core { panic };
+fn fail(m: string): never { panic(m); }
+fn f(): int { fail("x"); }
+fn main(): int { return f(); }

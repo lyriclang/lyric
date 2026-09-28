@@ -1,0 +1,7 @@
+// ERWARTUNG: CLI0020 (negative i8-Konstante als 64-bit-Muster), analog w32
+import std.io.console { println };
+fn main(): int {
+  let c: int8 = comptime (200 as int8);
+  println(f"{c}");
+  return 0;
+}

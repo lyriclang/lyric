@@ -1,0 +1,1 @@
+fn main(): int { let b = true; let r = match (b) { true => 1, false => "a" }; return 0; }

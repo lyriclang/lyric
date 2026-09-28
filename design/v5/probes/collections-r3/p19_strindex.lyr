@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let s = "abc";
+    println(f"{s[0]}");
+    return 0;
+}

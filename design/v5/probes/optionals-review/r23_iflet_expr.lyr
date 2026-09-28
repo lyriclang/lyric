@@ -1,0 +1,9 @@
+import std.io.console { println };
+class P { v: ?int }
+fn main(): int {
+    let p = P { v = 4 };
+    if (let n = p.v) { println(f"{n}"); }
+    let m = p.v else { return 1; }
+    println(f"{m}");
+    return 0;
+}

@@ -1,0 +1,5 @@
+import std.build { executable };
+
+fn main(): int {
+    return 0;
+}

@@ -1,0 +1,5 @@
+fn gen(): Coroutine<int> { yield 1; yield 2; }
+fn main(): int {
+    let g = gen;
+    return 0;
+}

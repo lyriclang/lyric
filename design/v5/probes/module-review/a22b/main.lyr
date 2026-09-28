@@ -1,0 +1,8 @@
+module main;
+import std.io.console { println };
+import std.io.file;
+
+fn main(): int {
+    println(file.text("nope.txt") ?? "none");
+    return 0;
+}

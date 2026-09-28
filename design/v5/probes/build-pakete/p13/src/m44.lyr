@@ -1,0 +1,3 @@
+module m44;
+pub fn v44(): int { return 44; }
+pub fn w44(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 44; } return s; }

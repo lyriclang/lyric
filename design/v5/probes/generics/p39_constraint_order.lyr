@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+interface Conv<U> { fn to(): U; }
+
+class Meters :: [Conv<int>] { fn to(): int { return 5; } }
+
+fn convert<T :: [Conv<U>], U>(x: T): U { return x.to(); }
+
+fn main(): int {
+    return convert<Meters, int>(Meters { });
+}

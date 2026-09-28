@@ -1,0 +1,5 @@
+class Holder { f: fn() -> int }
+fn main(): int {
+    let h: ?Holder = Holder { f = () => 1 };
+    return h?.f() ?? 0;
+}

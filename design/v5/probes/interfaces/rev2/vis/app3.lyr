@@ -1,0 +1,6 @@
+import std.io.console { println };
+import c { Tag, describe };
+fn main(): int {
+    println(describe(Tag { }));
+    return 0;
+}

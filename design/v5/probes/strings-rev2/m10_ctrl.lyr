@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn main(): int {
+    let f = 3.14159;
+    println(f"F2={f:F2}");
+    println(f"N2={f:N2}");
+    println(f"dot2={f:.2}");
+    println(f"dot={f:.}");
+    println(f"dot3={f:.3}");
+    return 0;
+}

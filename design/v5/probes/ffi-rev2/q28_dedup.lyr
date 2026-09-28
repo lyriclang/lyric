@@ -1,0 +1,10 @@
+import std.io.console { println };
+extern "dotnet" fn ticks(): int = "System.Diagnostics.Stopwatch::GetTimestamp";
+fn spin(): int { var i = 0; var s = 0; while (i < 3000000) { s = s + i; i = i + 1; } return s; }
+fn main(): int {
+    let a = ticks();
+    let junk = spin();
+    let b = ticks();
+    println(f"gleich={a == b} junk={junk > 0}");
+    return 0;
+}

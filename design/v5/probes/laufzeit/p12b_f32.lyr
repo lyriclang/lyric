@@ -1,0 +1,10 @@
+// P12b — KONTROLLE: hat float32 eine eigene Darstellung, oder wird es als double gerendert?
+// Erwartung VOR dem Lauf: als double -> "0.10000000149011612" statt "0.1".
+import std.io.console { println };
+fn main(): int {
+    let a: float32 = 0.1;
+    let b: float = 0.1;
+    println(f"f32 = {a}");
+    println(f"f64 = {b}");
+    return 0;
+}

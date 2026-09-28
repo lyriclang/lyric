@@ -1,0 +1,11 @@
+// Q5b — KONTROLLE zu q5: ueber der Elementschranke von arrrep.
+// ERWARTUNG: saubere Panik LYR-VM0006, Exit 101 (Interpreter.cs:978-984 prueft
+// count > int.MaxValue / source.Length).
+import std.io.console { println };
+
+fn main(): int {
+    let n = 3000000000; // > int.MaxValue -> die VM-Schranke greift VOR der .NET-Allokation
+    let xs = [1] * n;
+    println(f"unerreichbar {xs.length}");
+    return 0;
+}

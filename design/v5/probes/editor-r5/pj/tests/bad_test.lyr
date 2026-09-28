@@ -1,0 +1,4 @@
+import nothere;
+import std.test { Test };
+@Test
+fn broken(): void { let s: string = 1; }

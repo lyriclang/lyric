@@ -1,0 +1,2 @@
+import util;
+fn main(): int { return util.twice(4) - 8; }

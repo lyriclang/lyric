@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.os;
+fn main(): int {
+    println("BEFORE");
+    os.exit(7);
+    return 0;
+}

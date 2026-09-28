@@ -1,0 +1,5 @@
+module mathy;
+
+fn hidden(n: int): int { return n * 2; }
+
+pub fn visible(n: int): int { return hidden(n); }

@@ -1,0 +1,17 @@
+import std.io.console { println };
+
+interface Counter {
+    mut fn bump(): void;
+}
+
+struct S :: [Counter] {
+    n: int,
+    fn bump(): void { this.n = this.n + 1; }
+}
+
+class C :: [Counter] {
+    n: int,
+    fn bump(): void { this.n = this.n + 1; }
+}
+
+fn main(): int { return 0; }

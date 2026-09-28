@@ -1,0 +1,6 @@
+import std.io.console { println };
+
+fn main(): int {
+    println([1, 2, 3]);
+    return 0;
+}

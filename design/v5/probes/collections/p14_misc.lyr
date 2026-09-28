@@ -1,0 +1,33 @@
+import std.io.console { println };
+import std.string;
+
+struct Box { cells: int[], n: int }
+
+fn mutate(xs: int[]): void { xs[0] = 42; }
+
+fn variadic(params xs: int[]): int { return xs.length; }
+
+fn main(): int {
+    // 1. array field in a struct: copy shares the array?
+    let a = Box { cells = [1, 2], n = 0 };
+    var b = a;
+    b.cells[0] = 9;
+    b.n = 7;
+    println(f"struct copy: a.cells0={a.cells[0]} a.n={a.n}");
+
+    // 2. arrays are references across a call
+    let xs = [1, 2, 3];
+    mutate(xs);
+    println(f"after call xs0={xs[0]}");
+
+    // 3. length spelling
+    let s = "abc";
+    println(f"array length={xs.length} string length={s.length()}");
+
+    // 4. variadic
+    println(f"variadic={variadic(1, 2, 3)} spread={variadic(xs)}");
+
+    // 5. string for-in
+    for (c in s) { println(f"char {c}"); }
+    return 0;
+}

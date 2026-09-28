@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let a: uint8 = 200u8;
+    let b: uint8 = 100u8;
+    println(f"{a + b}");
+    let big: int32 = 2147483647i32;
+    println(f"{big + 1i32}");
+    return 0;
+}

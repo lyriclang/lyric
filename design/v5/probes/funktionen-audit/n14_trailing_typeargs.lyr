@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn apply<T>(x: T, f: fn(T) -> T): T { return f(x); }
+fn main(): int {
+    println(fromInt(apply<int>(3) { it * 2 }));
+    return 0;
+}

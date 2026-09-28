@@ -1,0 +1,17 @@
+import std.io.console { println };
+interface A { fn a(): string; }
+interface B { fn b(): string; }
+interface C :: [A, B] { fn c(): string; }
+class K :: [C] {
+    fn a(): string { return "a"; }
+    fn b(): string { return "b"; }
+    fn c(): string { return "c"; }
+}
+fn main(): int {
+    let k = K { };
+    let ca: C = k;
+    let aa: A = k;
+    let bb: B = k;
+    println(ca.a() + ca.b() + ca.c() + aa.a() + bb.b());
+    return 0;
+}

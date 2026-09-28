@@ -1,0 +1,4 @@
+import std.io.console { println };
+interface I { mut fn a(): void; }
+class K :: [I] { v: int, fn a(): void { this.v = 1; } }
+fn main(): int { println("class impl of a mut member, without mut"); return 0; }

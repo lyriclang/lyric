@@ -1,0 +1,15 @@
+import std.io.console { println };
+interface Mapper {
+    fn tag(): string;
+    fn wrap<U>(u: U): U { return u; }
+}
+class M :: [Mapper] { fn tag(): string { return "m"; } }
+extend M {
+    fn wrap<U>(u: U): U { println("shadow"); return u; }
+}
+fn main(): int {
+    println(M { }.wrap<string>("direct"));
+    let v: Mapper = M { };
+    println(v.wrap<string>("value"));
+    return 0;
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.core { Ordered };
+fn biggest<T :: [Ordered<T>]>(a: T, b: T): T { if (a.compare(b) > 0) { return a; } return b; }
+fn main(): int { let r = biggest<int8>(3i8, 7i8); println(f"{r}"); return 0; }

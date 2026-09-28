@@ -1,0 +1,2 @@
+module totally.different.name;
+fn main(): int { return 0; }

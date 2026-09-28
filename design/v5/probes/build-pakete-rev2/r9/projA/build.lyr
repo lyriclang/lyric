@@ -1,0 +1,5 @@
+import std.build { executable };
+
+pub fn build(): void {
+    executable("neighbour", "../projB/src/main.lyr");
+}

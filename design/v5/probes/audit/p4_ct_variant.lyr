@@ -1,0 +1,7 @@
+pub enum Layout { Packed, Separate }
+
+fn pick(): Layout { return Layout.Separate; }
+
+let L = comptime pick();
+
+fn main(): int { return 0; }

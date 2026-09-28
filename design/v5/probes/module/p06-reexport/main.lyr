@@ -1,0 +1,4 @@
+import mid;
+import std.io.console;
+
+fn main(): int { console.println(f"{mid.f()}"); return 0; }

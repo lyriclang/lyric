@@ -1,0 +1,28 @@
+fn work<T>(a: T, b: T, c: T): int {
+    let xs: T[] = [a, b, c, a, b, c, a, b, c, a, b, c];
+    var total = 0;
+    for (i in 0..xs.length) { total = total + i * 3 - 1; }
+    for (i in 0..xs.length) { total = total + i * 7 - 2; }
+    return total;
+}
+
+struct S1 { v: int, }
+struct S2 { v: int, }
+struct S3 { v: int, }
+struct S4 { v: int, }
+struct S5 { v: int, }
+struct S6 { v: int, }
+struct S7 { v: int, }
+
+fn main(): int {
+    var t = 0;
+    t = t + work<int>(1, 2, 3);
+    t = t + work<string>("a", "b", "c");
+    t = t + work<float>(1.0, 2.0, 3.0);
+    t = t + work<bool>(true, false, true);
+    t = t + work<S1>(S1 { v = 1 }, S1 { v = 2 }, S1 { v = 3 });
+    t = t + work<S2>(S2 { v = 1 }, S2 { v = 2 }, S2 { v = 3 });
+    t = t + work<S3>(S3 { v = 1 }, S3 { v = 2 }, S3 { v = 3 });
+    t = t + work<S4>(S4 { v = 1 }, S4 { v = 2 }, S4 { v = 3 });
+    return t % 7;
+}

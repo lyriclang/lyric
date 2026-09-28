@@ -1,0 +1,31 @@
+import std.io.console { println };
+import std.collections { Indexable };
+import std.iter { Iterator, Iterable };
+
+class Grid :: [Indexable<int>, Iterable<int>] {
+    cells: int[],
+
+    pub fn get(index: int): int { return this.cells[index]; }
+    pub mut fn set(index: int, value: int): void { this.cells[index] = value; }
+    pub fn iter(): Iterator<int> { return GridCursor { g = this, i = 0 }; }
+}
+
+class GridCursor :: [Iterator<int>] {
+    g: Grid,
+    i: int,
+    pub mut fn next(): ?int {
+        if (this.i >= this.g.cells.length) { return null; }
+        let v = this.g.cells[this.i];
+        this.i = this.i + 1;
+        return v;
+    }
+}
+
+fn main(): int {
+    let g = Grid { cells = [1, 2, 3] };
+    println(f"read {g[1]}");
+    g[1] = 8;
+    println(f"after {g[1]}");
+    for (v in g) { println(f"walk {v}"); }
+    return 0;
+}

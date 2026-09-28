@@ -1,0 +1,2 @@
+import std.collections { Map };
+fn main(): int { var m: Map<float, int> = Map<float, int>.new(); return 0; }

@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+fn describe(xs: int[]): int {
+    return match (xs) {
+        [] => 0,
+        [x] => x,
+        [a, b] => a + b,
+        [first, .., last] => first * 100 + last,
+    };
+}
+
+fn main(): int {
+    println(f"{describe([])} {describe([5])} {describe([1,2])} {describe([1,2,3])}");
+    return 0;
+}

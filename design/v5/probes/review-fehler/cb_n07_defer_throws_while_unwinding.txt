@@ -1,0 +1,6 @@
+./n07_defer_throws_while_unwinding.lyr:9:11: warning[LYR-SEM0110]: this runs inside a 'defer' and can throw — what that does to the rest of the chain is unspecified, and 5.0 settles it
+    defer second();
+          ^^^^^^^^
+  note: a migration warning (§12.5): the program is legal today and means something else in 5.0
+
+./n07_defer_throws_while_unwinding.lyrbc: 3074 bytes

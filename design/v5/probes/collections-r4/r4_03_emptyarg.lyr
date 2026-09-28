@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn count<T>(xs: T[]): int { return xs.length; }
+fn main(): int {
+    println(f"{count([])}");
+    return 0;
+}

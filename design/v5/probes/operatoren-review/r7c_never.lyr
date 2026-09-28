@@ -1,0 +1,5 @@
+fn main(): int {
+    let x: ?never = null;
+    var ys: never[] = [];
+    return 0;
+}

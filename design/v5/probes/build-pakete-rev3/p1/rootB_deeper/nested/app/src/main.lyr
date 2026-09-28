@@ -1,0 +1,7 @@
+import std.io.console { println };
+import geo { area };
+fn main(): int {
+    println(f"area {area(3)}");
+    panic("boom");
+    return 0;
+}

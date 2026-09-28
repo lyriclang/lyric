@@ -1,0 +1,6 @@
+// R3c — Ist die for-in-Variable eine let-Bindung? ERWARTUNG: LYR-SEM0019 bei 'j = 5'.
+import std.io.console { println };
+fn main(): int {
+    for (j in 0..3) { j = 5; println(f"{j}"); }
+    return 0;
+}

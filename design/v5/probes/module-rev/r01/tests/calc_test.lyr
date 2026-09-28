@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+import calc;
+
+@Test
+pub fn whitebox_reaches_a_non_pub_function(): void {
+    assertEq(calc.internalDouble(3), 6);
+}

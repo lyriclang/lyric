@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+import std.iter { over, sum };
+fn main(): int {
+    let xs: int[] = [1, 2, 3, 4];
+    let a = over(xs).map { it * 2 };
+    println(fromInt(sum(a)));
+    return 0;
+}

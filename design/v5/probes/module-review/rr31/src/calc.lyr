@@ -1,0 +1,2 @@
+fn internalDouble(x: int): int { return x * 2; }
+pub fn quad(x: int): int { return internalDouble(internalDouble(x)); }

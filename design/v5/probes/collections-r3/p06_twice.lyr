@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.iter { over };
+fn main(): int {
+    let xs = [1, 2, 3];
+    let it = over(xs);
+    var a = 0;
+    for (v in it) { a += 1; }
+    var b = 0;
+    for (v in it) { b += 1; }
+    println(f"{a} {b}");
+    return 0;
+}

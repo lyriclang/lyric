@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum S { Rect { w: int, h: int }, Dot }
+fn f(s: S): int {
+    return match (s) {
+        Rect { w = 0, h } => 1,
+        Rect { w, h } => 2,
+        Dot => 3,
+    };
+}
+fn main(): int { println(f"{f(S.Rect { w = 0, h = 4 })} {f(S.Rect { w = 1, h = 4 })}"); return 0; }

@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+import calc { internalDouble };
+
+@Test
+pub fn selective_is_refused(): void {
+    assertEq(internalDouble(3), 6);
+}

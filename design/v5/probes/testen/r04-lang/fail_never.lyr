@@ -1,0 +1,12 @@
+import std.test { fail };
+import std.io.console { println };
+
+fn pick(n: int): int {
+    if (n > 0) { return n; }
+    fail("never");
+}
+
+pub fn main(): int {
+    println("x");
+    return 0;
+}

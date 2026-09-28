@@ -1,0 +1,11 @@
+// ERWARTUNG: beide kompilieren, drucken 3 und 3 ("v as T" und "v.into()" sind zwei Schreibweisen)
+import std.io.console { println };
+import std.core { Into };
+struct A { v: int }
+extend A :: [Into<int>] { fn into(): int { return this.v; } }
+fn main(): int {
+  let a = A { v = 3 };
+  println(f"{a as int}");
+  println(f"{a.into()}");
+  return 0;
+}

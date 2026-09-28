@@ -1,0 +1,7 @@
+import std.io.console { println };
+class C {
+    n: int,
+    fn m(x: int): string { return "plain"; }
+    mut fn m(x: int): string { this.n = x; return "mut"; }
+}
+fn main(): int { return 0; }

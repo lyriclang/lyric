@@ -1,0 +1,3 @@
+// ERWARTUNG: SEM0021 — main darf keine throws-Klausel tragen.
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn main(): int throws Boom { throw Boom { what = "x" }; }

@@ -1,0 +1,9 @@
+import std.io.console { println };
+class Boom { }
+fn mk(): int throws { throw Boom { }; }
+struct D { a: int = mk(), }
+fn main(): int {
+    let d = D { };
+    println(f"g01 {d.a}");
+    return 0;
+}

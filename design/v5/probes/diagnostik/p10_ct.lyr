@@ -1,0 +1,6 @@
+fn compute(): int { return 6 * 7; }
+
+fn main(): int {
+    let n = comptime compute();
+    return n;
+}

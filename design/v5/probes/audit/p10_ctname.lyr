@@ -1,0 +1,6 @@
+fn comptime(n: int): int { return n + 1; }
+
+fn main(): int {
+    let k = 3;
+    return comptime(k);
+}

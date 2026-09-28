@@ -1,0 +1,3 @@
+module m50;
+pub fn v50(): int { return 50; }
+pub fn w50(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 50; } return s; }

@@ -1,0 +1,3 @@
+module mpv;
+pub fn m(x: ?int): string { return "pub-opt"; }
+fn m(x: int): string { return "priv-exact"; }

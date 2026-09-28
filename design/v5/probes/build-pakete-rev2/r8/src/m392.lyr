@@ -1,0 +1,16 @@
+module m392;
+
+pub fn v392(n: int): int {
+    var s = 0;
+    s = s + 1 * n;
+    s = s + 2 * n;
+    s = s + 3 * n;
+    s = s + 4 * n;
+    s = s + 5 * n;
+    s = s + 6 * n;
+    s = s + 7 * n;
+    s = s + 8 * n;
+    s = s + 9 * n;
+    s = s + 10 * n;
+    return s + 392;
+}

@@ -1,0 +1,11 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use b" }
+pub fn oldA(): int { return oldB(); }
+
+@Deprecated { message = "use c" }
+pub fn oldB(): int { return 1; }
+
+pub fn fresh(): int { return oldB(); }
+
+fn main(): int { return fresh() + oldA(); }

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import a { touch };
+import b;
+fn main(): int {
+    println(5.tag());
+    return 0;
+}

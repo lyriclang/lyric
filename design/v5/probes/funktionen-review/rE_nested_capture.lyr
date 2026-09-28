@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn apply(f: fn(int) -> int, v: int): int { return f(v); }
+fn outer(k: int): fn(int) -> int {
+    let g = (n: int) => { let h = (m: int) => m + k + n; return apply(h, 0); };
+    return g;
+}
+fn main(): int { println(fromInt(outer(10)(5))); return 0; }

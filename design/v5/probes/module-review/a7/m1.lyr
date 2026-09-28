@@ -1,0 +1,3 @@
+module m1;
+import lib { f as g };
+fn main(): int { return g(); }

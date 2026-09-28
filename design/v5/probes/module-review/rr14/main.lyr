@@ -1,0 +1,2 @@
+import mid;
+fn main(): int { return mid.f(); }

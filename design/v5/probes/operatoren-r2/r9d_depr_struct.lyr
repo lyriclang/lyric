@@ -1,0 +1,4 @@
+import std.core { Deprecated };
+@Deprecated { message = "use Bar", until = "99.0" }
+struct Foo { n: int, }
+fn main(): int { let f = Foo { n = 1 }; return f.n; }

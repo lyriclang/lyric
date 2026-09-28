@@ -1,0 +1,1 @@
+import geo { g }; pub fn m(): int { return g(); }

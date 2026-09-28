@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Greet { fn hello(): string { return "iface"; } }
+struct S :: [Greet] { v: int, fn hello(n: int): string { return "own"; } }
+fn main(): int {
+    let s = S { v = 1 };
+    println(s.hello());
+    println(s.hello(1));
+    return 0;
+}

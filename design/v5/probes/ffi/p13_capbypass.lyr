@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+extern "dotnet" fn readAll(path: string): string = "System.IO.File::ReadAllText";
+extern "dotnet" fn writeAll(path: string, text: string): void = "System.IO.File::WriteAllText";
+extern "dotnet" fn envOf(name: string): string = "System.Environment::GetEnvironmentVariable";
+
+fn main(): int {
+    println(f"file=[{readAll("secret.txt")}]");
+    writeAll("written-by-ffi.txt", "hello from ffi");
+    println(f"env USERNAME=[{envOf("USERNAME")}]");
+    return 0;
+}

@@ -1,0 +1,18 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn an_assertion_fails(): void {
+    assertEq(1, 2);
+}
+
+@Test
+pub fn a_bug_panics(): void {
+    let xs = [1, 2, 3];
+    assertEq(xs[99], 0);
+}
+
+@Test
+pub fn a_division_by_zero(): void {
+    let z = 0;
+    assertEq(1 / z, 0);
+}

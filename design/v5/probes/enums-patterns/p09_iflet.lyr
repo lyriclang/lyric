@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+enum Shape { Circle(int), Dot }
+
+fn main(): int {
+    let s = Shape.Circle(5);
+    if (let Circle(r) = s) { println(f"r={r}"); } else { println("not a circle"); }
+
+    let o: ?int = 7;
+    if (let n = o) { println(f"n={n}"); }
+
+    let Circle(r2) = s else { return 1; };
+    println(f"r2={r2}");
+
+    var xs: ?int = 3;
+    while (let v = xs) {
+        println(f"v={v}");
+        xs = null;
+    }
+    return 0;
+}

@@ -1,0 +1,6 @@
+import std.io.console;
+fn main(): int {
+    let unused = 5;
+    console.println("hi");
+    return 0;
+}

@@ -1,0 +1,10 @@
+// KONTROLLE zu n07: Klasse VOR Interface — beide Klauseln erreichbar, Ausgabe "class", Exit 0.
+import std.io.console { println };
+interface AppError :: [Throwable] { }
+class NotFound :: [AppError] { fn message(): string { return "nf"; } }
+fn f(): int throws NotFound { throw NotFound { }; }
+fn main(): int {
+    try { return f(); }
+    catch (_: NotFound) { println("class"); return 0; }
+    catch (_: AppError) { println("iface"); return 1; }
+}

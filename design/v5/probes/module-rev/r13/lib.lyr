@@ -1,0 +1,3 @@
+module lib;
+extend int { fn thrice(): int { return this * 3; } }
+pub fn anchor(): int { return 1; }

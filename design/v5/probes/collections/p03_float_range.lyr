@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    var i = 0;
+    for (x in 0.5..3.0) { println(f"a {x}"); i = i + 1; }
+    for (x in 0.0..0.5) { println(f"b {x}"); i = i + 1; }
+    for (x in 0.0..=2.5) { println(f"c {x}"); i = i + 1; }
+    return i;
+}

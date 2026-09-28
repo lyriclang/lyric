@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn pick(n: int): string { return "concrete"; }
+fn pick<T>(v: T): string { return "generic"; }
+fn main(): int {
+    println(pick(1));
+    println(pick("s"));
+    return 0;
+}

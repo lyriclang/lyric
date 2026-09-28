@@ -1,0 +1,4 @@
+import std.io.console { println };
+let BASE: int = 41;
+struct D { a: int = BASE + 1, }
+fn main(): int { let d = D { }; println(f"{d.a}"); return 0; }

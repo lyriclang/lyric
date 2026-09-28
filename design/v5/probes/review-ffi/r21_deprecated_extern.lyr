@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.core { Deprecated };
+@Deprecated { message = "use cbrt2" }
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+fn main(): int { println(f"{cbrt(27.0)}"); return 0; }

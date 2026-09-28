@@ -1,0 +1,8 @@
+import lib;
+import std.io.console;
+
+fn main(): int {
+    let lib = 5;
+    console.println(f"{lib}");
+    return 0;
+}

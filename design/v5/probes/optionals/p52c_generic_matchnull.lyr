@@ -1,0 +1,2 @@
+fn m<T>(x: T): int { match (x) { null => { return 0; }, _ => { return 1; } } }
+fn main(): int { return 0; }

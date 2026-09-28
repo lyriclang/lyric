@@ -1,0 +1,2 @@
+import app;
+pub fn fb(): int { return app.fa() + 10; }

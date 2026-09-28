@@ -1,0 +1,17 @@
+import std.io.console { println };
+
+fn lt(a: string, b: string): bool {
+    return a < b;
+}
+
+fn gt(a: string, b: string): bool {
+    return a > b;
+}
+
+fn main(): int {
+    println(f"apple<banana {lt("apple", "banana")}");
+    println(f"apple>banana {gt("apple", "banana")}");
+    println(f"banana<apple {lt("banana", "apple")}");
+    println(f"same<same     {lt("same", "same")}");
+    return 0;
+}

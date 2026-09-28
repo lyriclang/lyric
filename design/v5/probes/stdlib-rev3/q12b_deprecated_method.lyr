@@ -1,0 +1,8 @@
+import std.core { Deprecated };
+class Counter {
+    n: int,
+    @Deprecated { message = "use tick()" }
+    pub mut fn bump(): void { this.n = this.n + 1; }
+    pub mut fn tick(): void { this.n = this.n + 1; }
+}
+fn main(): int { var c = Counter { n = 0 }; c.bump(); return c.n; }

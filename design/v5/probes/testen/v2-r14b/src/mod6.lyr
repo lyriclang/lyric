@@ -1,0 +1,2 @@
+pub fn value6(n: int): int { return n * 6; }
+pub fn other6(n: int): int { return value6(n) + 6; }

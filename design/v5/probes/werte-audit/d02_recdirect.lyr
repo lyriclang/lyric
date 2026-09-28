@@ -1,0 +1,2 @@
+struct N { n: N, }
+fn main(): int { return 0; }

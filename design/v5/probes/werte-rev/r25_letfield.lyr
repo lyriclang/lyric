@@ -1,0 +1,2 @@
+class C { let id: int, }
+fn main(): int { return 0; }

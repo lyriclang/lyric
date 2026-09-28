@@ -1,0 +1,10 @@
+import lib { Wait };
+
+fn describe(w: Wait): int {
+    return match (w) {
+        Wait.Ready => 1,
+        Wait.Timeout => 2,
+    };
+}
+
+fn main(): int { return describe(Wait.Ready); }

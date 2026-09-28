@@ -1,0 +1,8 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn two_optionals(): void {
+    let a: ?int = 1;
+    let b: ?int = 1;
+    assertEq(a, b);
+}

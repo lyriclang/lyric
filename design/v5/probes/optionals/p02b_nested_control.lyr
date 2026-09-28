@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn wrap<T>(x: T): ?T {
+    return x;
+}
+
+fn main(): int {
+    // CONTROL: T = int, no nesting possible
+    let plain = wrap(5);
+    println(f"{plain ?? 0}");
+    return 0;
+}

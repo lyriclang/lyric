@@ -1,0 +1,27 @@
+// P6 — Closures fangen laut Spec Kapitel 3.3 "by reference". Was heisst das konkret?
+// Erwartung VOR dem Lauf:
+//   proDurchlauf: 0 1 2 wenn jede Iteration ihre eigene Umgebung bekommt, sonst 3 3 3
+//   nachher = 2 wenn die Closure in die AEUSSERE Variable schreibt (by reference)
+import std.io.console { println };
+
+fn main(): int {
+    var a: fn() -> int = () => 0;
+    var b: fn() -> int = () => 0;
+    var c: fn() -> int = () => 0;
+    var i = 0;
+    while (i < 3) {
+        let k = i;
+        if (i == 0) { a = () => k; }
+        if (i == 1) { b = () => k; }
+        if (i == 2) { c = () => k; }
+        i += 1;
+    }
+    println(f"proDurchlauf = {a()} {b()} {c()}");
+
+    var zaehler = 0;
+    let erhoehe: fn() -> int = () => { zaehler += 1; return zaehler; };
+    let _x = erhoehe();
+    let _y = erhoehe();
+    println(f"nachher = {zaehler}");
+    return 0;
+}

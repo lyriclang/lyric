@@ -1,0 +1,9 @@
+import std.core { Deprecated, OnFunction };
+
+@Deprecated { message = "use Tag2" }
+pub struct Tag :: [OnFunction] { n: int = 0 }
+
+@Tag { n = 1 }
+pub fn f(): void { }
+
+fn main(): int { return 0; }

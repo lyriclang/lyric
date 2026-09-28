@@ -1,0 +1,8 @@
+import std.io.console { println };
+extern "dotnet" fn boom(m: string) = "System.Environment::FailFast";
+fn main(): int {
+    println("BEFORE");
+    boom("lyric said so");
+    println("AFTER");
+    return 0;
+}

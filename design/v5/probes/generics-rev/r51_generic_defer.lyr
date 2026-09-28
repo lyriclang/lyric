@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn wrap<T>(x: T): int {
+  defer println("out");
+  println("in");
+  return 1;
+}
+fn main(): int { return wrap<int>(5) + wrap<string>("a"); }

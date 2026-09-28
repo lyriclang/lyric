@@ -1,0 +1,46 @@
+Erwartungen VOR dem Lauf (Runde 2, Kritik-Nachpruefung):
+
+r01 lyrc check kompiliert die Testwurzel
+  ERWARTUNG: `lyrc check .` mit kaputtem tests/-File -> Exit 1, SEM-Fehler.
+             Kontrolle `lyrc build src/main.lyr` -> Exit 0.
+  (Kritik behauptet das; Guide 20:76-78 sagt es auch. Ich erwarte, dass die Kritik recht hat.)
+
+r02 Helferimport
+  ERWARTUNG: `lyrc check .` -> gruen ("3 modules ok"); `lyrtest .` -> LYR-RES0003.
+  (Divergenz zwischen zwei Werkzeugen.)
+
+r03 Modulnamen
+  ERWARTUNG: check nimmt Pfadnamen (alpha.shared_tests), lyrtest den Basisnamen.
+             check gruen, lyrtest RES0003 UND trotzdem zwei PASS shared_tests.one.
+
+r05 Panikcode und Backtrace
+  ERWARTUNG: FAIL-Zeile ohne Code; Backtrace-Spitze bei assertEq in std.test,
+             beim echten Bug im Benutzermodul. lyrvm run druckt LYR-VM0006.
+
+r06 module-Header in einer Testdatei
+  ERWARTUNG: Header wird verworfen, PASS bb_header.named (Basisname gewinnt).
+
+r07 assertEq auf int[], ?int, List<int>
+  ERWARTUNG: int[] -> LYR-IR0001 in stdlib/std/test.lyr; List<int> -> 2x SEM0028;
+             Kontrolle int/string -> PASS.
+
+r08 std.os.exit im Test
+  ERWARTUNG: exit(3) -> Runner-Exit 3, keine Ergebniszeile; exit(0) -> Exit 0, leer.
+             Kontrolle ohne exit -> 3 PASS.
+
+r09 eigenes @Test-Attribut
+  ERWARTUNG: eine selbst deklarierte `pub struct Test :: [OnFunction]` wird ausgefuehrt.
+
+r10 generischer Test
+  ERWARTUNG: LYR-SEM0067.
+
+r11 Capabilities im Test
+  ERWARTUNG: Capability.All unabhaengig von lyric.json; ein Test darf ins Dateisystem
+             schreiben, auch wenn das Projekt weniger deklariert (falls lyric.json
+             ueberhaupt ein Capability-Feld hat).
+
+r12 --list / Position eines Tests
+  ERWARTUNG: keine Option, die Datei/Zeile eines Tests nennt.
+
+r13 offener Task am Testende
+  ERWARTUNG: ein Test, der einen Task startet und nicht joint, wird gruen gemeldet.

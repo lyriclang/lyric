@@ -1,0 +1,3 @@
+module proto;
+
+pub interface Show2 { fn s(): string; }

@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { x: int, }
+fn main(): int {
+    let o: ?S = S { x = 1 };
+    o!.x = 9;
+    println(f"r11 o!.x={o!.x}");
+    return 0;
+}

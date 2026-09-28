@@ -1,0 +1,14 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1] * 1000;
+    var total = 0;
+    var round = 0;
+    while (round < 20000) {
+        for (x in xs) {
+            total = total + x;
+        }
+        round = round + 1;
+    }
+    println(f"{total}");
+    return 0;
+}

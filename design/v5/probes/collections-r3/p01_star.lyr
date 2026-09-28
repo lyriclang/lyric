@@ -1,0 +1,17 @@
+import std.io.console { println };
+struct Vec2 { x: float, y: float }
+fn main(): int {
+    let seed = Vec2{x=1.0, y=2.0};
+    var c = [seed] * 2;
+    c[0].x = 7.0;
+    println(f"star {c[0].x} {c[1].x}");
+    var d = [seed, seed];
+    d[0].x = 8.0;
+    println(f"lit {d[0].x} {d[1].x}");
+    var m = [[0] * 2] * 2;
+    m[0][0] = 9;
+    println(f"nested {m[0][0]} {m[1][0]}");
+    let z = [seed] * 0;
+    println(f"zero {z.length}");
+    return 0;
+}

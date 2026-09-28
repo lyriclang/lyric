@@ -1,0 +1,6 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use Index", until = "5.0" }
+pub type OldName = int;
+
+fn main(): int { return 0; }

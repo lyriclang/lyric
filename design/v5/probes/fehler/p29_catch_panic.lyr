@@ -1,0 +1,12 @@
+// ERWARTUNG: eine Panik ist nicht fangbar; catch (_) faengt sie NICHT. Exit 101.
+import std.io.console { println };
+import std.core { panic };
+fn boom(): int { panic("nope"); return 0; }
+fn main(): int {
+    try {
+        return boom();
+    } catch (_) {
+        println("caught a panic?!");
+        return 0;
+    }
+}

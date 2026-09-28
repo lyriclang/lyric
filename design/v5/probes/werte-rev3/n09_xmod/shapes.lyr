@@ -1,0 +1,2 @@
+pub struct S { v: int, }
+pub fn make(): S { return S { v = 1 }; }

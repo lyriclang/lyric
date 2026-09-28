@@ -1,0 +1,54 @@
+import std.io.console { println };
+import std.io.net as net;
+import std.collections { List };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+let t0 = os.nowMillis();
+let N = 300;
+let listeners = List<net.Listener>.empty();
+
+fn acceptor(id: int, l: net.Listener): Coroutine<Wait> {
+    let s = net.accept(l);
+    if (s == null) {
+        if (id == N - 1) { println(f"acceptor {id}: null at +{os.nowMillis() - t0}ms"); }
+        return;
+    }
+    println(f"acceptor {id} got connection at +{os.nowMillis() - t0}ms");
+    net.close(s);
+}
+
+fn client(port: int): Coroutine<Wait> {
+    yield Wait.Sleep(100);
+    let s = net.connect("127.0.0.1", port);
+    if (s == null) { println("client failed"); return; }
+    println(f"client connected at +{os.nowMillis() - t0}ms");
+    yield Wait.Sleep(200);
+    net.close(s);
+}
+
+fn watchdog(): Coroutine<Wait> {
+    yield Wait.Sleep(3000);
+    println(f"WATCHDOG at +{os.nowMillis() - t0}ms: closing all listeners");
+    var i = 0;
+    while (i < listeners.length()) {
+        net.closeListener(listeners.get(i));
+        i += 1;
+    }
+}
+
+fn main(): int {
+    var i = 0;
+    while (i < N) {
+        let l = net.listen("127.0.0.1", 0);
+        if (l == null) { println(f"listen {i} failed"); return 1; }
+        listeners.push(l);
+        spawn(acceptor(i, l));
+        i += 1;
+    }
+    spawn(client(net.localPort(listeners.get(N - 1))));
+    spawn(watchdog());
+    run();
+    println(f"run returned at +{os.nowMillis() - t0}ms");
+    return 0;
+}

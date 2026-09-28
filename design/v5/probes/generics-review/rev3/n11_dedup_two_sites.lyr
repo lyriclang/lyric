@@ -1,0 +1,4 @@
+fn id<T>(x: T): T { return x; }
+fn a(): int { return id<int>(1); }
+fn b(): int { return id<int>(2); }
+fn main(): int { return a() + b(); }

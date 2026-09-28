@@ -1,0 +1,12 @@
+// ERWARTUNG (§3.1): alles kompiliert; druckt 5 6 7 8 9
+import std.io.console { println };
+struct S { x: int8 }
+fn withDefault(v: int8 = 7): int8 { return v; }
+fn gives(): int8 { return 8; }
+fn main(): int {
+  let s = S { x = 5 };
+  let o: ?int8 = 6;
+  let xs: int8[] = [9];
+  println(f"{s.x} {o!} {withDefault()} {gives()} {xs[0]}");
+  return 0;
+}

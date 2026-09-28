@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn zero<T>(): T[] {
+    return [];
+}
+
+fn main(): int {
+    let xs: int[] = zero();
+    println(f"{xs.length}");
+    return 0;
+}

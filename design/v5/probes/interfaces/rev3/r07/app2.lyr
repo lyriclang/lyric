@@ -1,0 +1,2 @@
+import lib { T, Hidden };
+fn main(): int { let x: Hidden = T { }; return x.h(); }

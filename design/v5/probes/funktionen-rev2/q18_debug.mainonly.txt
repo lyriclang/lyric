@@ -1,0 +1,36 @@
+fn main.main -> i64 {
+  params: 0
+  locals:
+    l0 xs: i64[]
+    l1 a: dyn ty0
+    l2 b: dyn ty0
+  bb0:
+    t0: i64 = const 1
+    t1: i64 = const 2
+    t2: i64 = const 3
+    t3: i64 = const 4
+    t4: i64[] = newarr i64 [t0, t1, t2, t3]
+    store l0, t4
+    t5: i64[] = load l0
+    t6: dyn ty0 = call std.iter.over<int>(t5)
+    t7: fn(i64) -> i64 = mkclosure f4 (no captures)
+    t8: dyn ty0 = call std.iter.Iterator<int>.map<int>(t6, t7)
+    t9: fn(i64) -> bool = mkclosure f5 (no captures)
+    t10: dyn ty0 = callvirt ty0#1(t8, t9)
+    store l1, t10
+    t11: dyn ty0 = load l1
+    t12: i64 = call std.iter.sum(t11)
+    t13: string = callimport std.string.fromInt(t12)
+    call std.io.console.println<string>(t13)
+    t14: i64[] = load l0
+    t15: dyn ty0 = call std.iter.over<int>(t14)
+    t16: fn(i64) -> i64 = mkclosure f7 (no captures)
+    t17: dyn ty0 = call std.iter.Iterator<int>.map<int>(t15, t16)
+    store l2, t17
+    t18: dyn ty0 = load l2
+    t19: i64 = call std.iter.sum(t18)
+    t20: string = callimport std.string.fromInt(t19)
+    call std.io.console.println<string>(t20)
+    t21: i64 = const 0
+    ret t21
+}

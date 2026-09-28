@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.core { Display };
+interface Shape :: [Display] { fn area(): int; }
+class Circle :: [Shape] {
+    fn area(): int { return 1; }
+    fn show(): string { return "circle"; }
+}
+fn main(): int {
+    let s: Shape = Circle { };
+    println(s.show());
+    println(s);
+    return 0;
+}

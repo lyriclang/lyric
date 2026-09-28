@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let a: char = 'a'; println(f"{(a & 1) as int}"); return 0; }

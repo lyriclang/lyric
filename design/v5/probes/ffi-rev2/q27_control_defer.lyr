@@ -1,0 +1,12 @@
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn inner(): int throws Boom {
+    defer println("defer ran");
+    throw Boom { };
+}
+fn main(): int {
+    println("before");
+    try { let r = inner(); println(f"after={r}"); }
+    catch (e: Boom) { println("caught"); }
+    return 0;
+}

@@ -1,0 +1,17 @@
+import std.core { Deprecated };
+
+pub interface Shape {
+    @Deprecated { message = "use area2" }
+    fn area(): int;
+}
+
+struct Sq :: [Shape] {
+    s: int,
+    fn area(): int { return this.s * this.s; }
+}
+
+fn main(): int {
+    let q = Sq { s = 3 };
+    let sh: Shape = q;
+    return q.area() + sh.area();
+}

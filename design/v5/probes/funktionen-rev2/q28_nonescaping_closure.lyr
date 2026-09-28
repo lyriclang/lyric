@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var acc = 0;
+    let add = (n: int) => { acc = acc + n; return acc; };
+    println(fromInt(add(3)));
+    println(fromInt(add(4)));
+    return 0;
+}

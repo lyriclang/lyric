@@ -1,0 +1,3 @@
+module geometry;
+pub fn area(w: int, h: int): int { return w * h; }
+fn secret(): int { return 99; }

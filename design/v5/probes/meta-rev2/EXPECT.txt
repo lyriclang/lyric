@@ -1,0 +1,23 @@
+Erwartungen VOR dem Lauf (meta-rev2):
+r1_two_global_sites: build -> CT0002 an Zeile 6 UND Zeile 7, Text "the module's constant initializer panicked [LYR-VM0011]: boom"
+r2_body_site: build -> CT0002 nur an Zeile 5, Text "panicked [LYR-VM0011]: boom" ohne Praefix
+r3a_single_global_spin: build -> ok
+r3b_two_global_spin: build -> CT0002 an beiden Zeilen "did not finish within the compile-time budget"
+r3c_two_body_spin: build -> ok
+r4b_iface_dep_use: build -> ok + SEM0076 an sh.area() (Zeile 16), NICHT an q.area()
+r4c_iface_other: build -> SEM0065
+r4d_iface_until: build -> SEM0081
+r5_generic_dep: build -> ok + SEM0076 an id<int>(1) und an Box<int>{...}
+r6_extern_dep: build -> PAR0042
+r7_dep_attrstruct: build -> ok + SEM0076 an @Tag
+r8_fielddefault: run -> exit 42
+dep2/consumer: build -> SEM0076 in expired2.lyr (fresh ruft stale); mit --deny-warnings -> CLI0016
+n1a_throws_direct: comptime f() wobei f throws, Site nicht in try -> Sema-Fehler (unhandled throw) ODER CT0002 — unbekannt
+n1b_throws_caught: comptime g() wo g faengt -> ok, Wert 7
+n1c_throws_wrapper: comptime h() wo h: int throws und wirft -> unbekannt
+n2_ctfstring: comptime f"{1.0/3.0}|{sin(1.0)}" -> ok, const string im Disasm
+n3_generic: Site im generischen Rumpf + comptime id<int>(1) -> unbekannt (SEM0100 oder ok)
+n4_paramdefault: fn f(n: int = comptime g()) -> unbekannt
+n5_qualified: @core.Deprecated ueber Alias-Import -> ok (Grammar erlaubt Pfad)
+coll2: @a.Tag und @b.Tag aus zwei Modulen im selben Modul -> ok, zwei Zeilen "attribute @Tag" im Disasm
+repl: "comptime (6 * 7)" -> 42; "comptime exists(...)" -> Wert statt CT0002 (Runtime-Auswertung, No-Table-Modus)

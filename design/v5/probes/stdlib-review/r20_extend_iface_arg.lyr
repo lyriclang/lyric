@@ -1,0 +1,19 @@
+import std.io.console { println };
+import std.iter { Iterator, over };
+
+extend Iterator<int> {
+    fn total(): int {
+        var t = 0;
+        var v = this.next();
+        while (v != null) {
+            t = t + v;
+            v = this.next();
+        }
+        return t;
+    }
+}
+
+fn main(): int {
+    println(over([1, 2, 3]).total());
+    return 0;
+}

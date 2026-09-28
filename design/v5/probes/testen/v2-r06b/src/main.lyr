@@ -1,0 +1,3 @@
+import deep.nested.name { value };
+
+fn main(): int { return value(); }

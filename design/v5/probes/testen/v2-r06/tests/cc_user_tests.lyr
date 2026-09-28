@@ -1,0 +1,5 @@
+import std.test { Test, assertEq };
+import deep.nested.name { shared };
+
+@Test
+pub fn uses(): void { assertEq(shared(), 5); }

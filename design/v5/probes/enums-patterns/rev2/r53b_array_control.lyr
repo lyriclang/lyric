@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1];
+    match (xs) {
+        [a] => { println(f"one {a}"); },
+        _ => { println("other"); },
+    }
+    return 0;
+}

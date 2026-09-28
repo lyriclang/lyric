@@ -1,0 +1,1 @@
+import banana { label }; import mathx { b }; fn main(): int { return label() + b(); }

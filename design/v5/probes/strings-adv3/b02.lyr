@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "a\0b";
+    println(f"{s.length()} {s.utf8Encode().length} [{s}]");
+    return 0;
+}

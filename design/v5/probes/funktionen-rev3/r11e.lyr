@@ -1,0 +1,6 @@
+import std.io.console { println };
+struct C { v: int, fn m(): int { defer { println("d"); } return this.v; } }
+fn main(): int {
+    let c = C { v = 4 };
+    return c.m();
+}

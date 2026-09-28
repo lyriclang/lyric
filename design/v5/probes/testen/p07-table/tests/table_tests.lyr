@@ -1,0 +1,15 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn squares(): void {
+    let inputs = [1, 2, 3, 4];
+    let expected = [1, 4, 8, 16];
+    for (i in 0..inputs.length) {
+        assertEq(inputs[i] * inputs[i], expected[i]);
+    }
+}
+
+@Test
+pub fn after_the_table(): void {
+    assertEq(1, 1);
+}

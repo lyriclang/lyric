@@ -1,0 +1,10 @@
+fn calc(): int {
+    let n = 1 + 2;
+    // trailing line comment
+
+    return n;
+}
+
+fn main(): int {
+    return calc();
+}

@@ -1,0 +1,20 @@
+// ERWARTUNG: kompiliert; der Pull ist die Throw-Site.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn gen(): Coroutine<int> throws Boom {
+    yield 1;
+    throw Boom { what = "mid-stream" };
+}
+
+fn main(): int {
+    let co = gen();
+    try {
+        println(f"{resume co}");
+        println(f"{resume co}");
+    } catch (e: Boom) {
+        println(f"caught {e.message()}");
+        return 0;
+    }
+    return 1;
+}

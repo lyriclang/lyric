@@ -1,0 +1,2 @@
+class Box<T = int> { value: T, }
+fn main(): int { return 0; }

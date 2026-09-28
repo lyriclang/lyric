@@ -1,0 +1,19 @@
+import std.io.console { println };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    let co = three();
+    var sum = 0;
+    var live = true;
+    while (live) {
+        let v = co.next();
+        if (v == null) { live = false; } else { sum += v; }
+    }
+    println(f"sum: {sum}");
+    return 0;
+}

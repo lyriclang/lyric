@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn run(f: fn(int) -> int): int { return f(2); }
+fn main(): int {
+    for (i in 0..3) {
+        let _ = run((n: int) => { break; });
+    }
+    println("done");
+    return 0;
+}

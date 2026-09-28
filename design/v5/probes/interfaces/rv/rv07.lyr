@@ -1,0 +1,15 @@
+import std.io.console { println };
+interface Sink<T> { fn put(x: T): string; }
+interface Both :: [Sink<int>, Sink<string>] { }
+class B :: [Both] {
+    fn put(x: int): string { return "int"; }
+    fn put(x: string): string { return "string"; }
+}
+fn viaInt(s: Sink<int>): string { return s.put(1); }
+fn viaString(s: Sink<string>): string { return s.put("a"); }
+fn main(): int {
+    let b = B { };
+    println(viaInt(b));
+    println(viaString(b));
+    return 0;
+}

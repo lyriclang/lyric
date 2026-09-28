@@ -1,0 +1,23 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn gen(): Coroutine<int> {
+    yield 1;
+    yield 2;
+}
+
+fn worker(): Coroutine<Wait> {
+    let g = gen();
+    var live = true;
+    while (live) {
+        let v = g.next();
+        if (v == null) { live = false; } else { println(f"got {v}"); }
+    }
+}
+
+fn main(): int {
+    spawn(worker());
+    run();
+    println("done");
+    return 0;
+}

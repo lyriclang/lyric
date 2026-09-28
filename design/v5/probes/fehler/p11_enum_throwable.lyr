@@ -1,0 +1,26 @@
+// ERWARTUNG (STATUS.md "An enum's throwability has three answers"): Sema nimmt throw/throws an,
+// das Lowering lehnt das catch mit LYR-IR0001 ab.
+import std.io.console { println };
+
+enum Fault :: [Throwable] {
+    Missing(string),
+    Broken(int);
+
+    pub fn message(): string {
+        return match (this) {
+            Missing(s) => s,
+            Broken(n) => "broken",
+        };
+    }
+}
+
+fn f(): int throws Fault { throw Fault.Missing("k"); }
+
+fn main(): int {
+    try {
+        return f();
+    } catch (e: Fault) {
+        println(f"caught {e.message()}");
+        return 0;
+    }
+}

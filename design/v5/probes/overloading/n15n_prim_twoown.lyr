@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.string { fromInt };
+extend int { fn twice(): int { return this * 2; } }
+extend int { fn twice(k: int): int { return this * 2 * k; } }
+fn main(): int { let n = 3; println(fromInt(n.twice())); println(fromInt(n.twice(5))); return 0; }

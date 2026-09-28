@@ -1,0 +1,1 @@
+pub struct bb { n: int, pub fn c(): int { return 1; } }

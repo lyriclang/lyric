@@ -1,0 +1,2 @@
+module string;
+pub fn f(): int { return 42; }

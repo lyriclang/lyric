@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn work(): void {
+    defer { return; }
+    println("w");
+}
+fn main(): int { work(); return 0; }

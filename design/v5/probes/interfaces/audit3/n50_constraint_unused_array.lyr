@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.core { Display };
+fn id<T :: [Display]>(x: T): T { return x; }
+fn main(): int {
+    let ys = id([1, 2, 3]);
+    println(ys.length.show());
+    return 0;
+}

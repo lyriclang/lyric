@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    let xs = List<int>.of([1]);
+    match (xs) {
+        [a] => { println(f"one {a}"); },
+        _ => { println("other"); },
+    }
+    return 0;
+}

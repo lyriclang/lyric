@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let s = "hello";
+    println(s.length());
+    return 0;
+}

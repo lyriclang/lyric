@@ -1,0 +1,11 @@
+Lyric 4.6.0 — :help for commands, :quit to leave
+lyr> lyr> 7
+lyr> repl[4].lyr:4:5: error[LYR-SEM0002]: unknown identifier 'zzz'
+    zzz;
+    ^^^
+
+repl[4].lyr:4:5: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    zzz;
+    ^^^^
+
+lyr> 

@@ -1,0 +1,2 @@
+struct S { x: int, pub fn f(): int { return this.x; } }
+fn main(): int { return S { x = 4 }.f(); }

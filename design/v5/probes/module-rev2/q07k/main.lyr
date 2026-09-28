@@ -1,0 +1,4 @@
+import std.io.console { println };
+import a;
+import a.b;
+fn main(): int { let x = a.bb { n = 0 }; println(x.c()); println(b.c()); return 0; }

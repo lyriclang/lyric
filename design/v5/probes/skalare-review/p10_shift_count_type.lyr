@@ -1,0 +1,9 @@
+// ERWARTUNG: unklar - SEM0003 (gemischte Typen) oder 4. Designfrage: Typ des Shift-Counts
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = 1i8;
+  let n: int32 = 2i32;
+  let r = a << n;
+  println(f"{r}");
+  return 0;
+}

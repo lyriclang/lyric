@@ -1,0 +1,24 @@
+import std.core { Exception };
+import std.io.console { println };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    throw Exception { text = "boom" };
+}
+
+fn main(): int {
+    let co = steps();
+    try {
+        println(f"first {resume co}");
+        println(f"second {resume co}");
+    } catch (e: Exception) {
+        println(f"caught {e.message()}");
+    }
+    try {
+        let v = co.next();
+        if (v == null) { println("after throw: next is null"); } else { println(f"after throw: {v}"); }
+    } catch (e: Exception) {
+        println(f"caught again {e.message()}");
+    }
+    return 0;
+}

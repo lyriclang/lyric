@@ -1,0 +1,29 @@
+// P3b — KONTROLLE: der Normalfall neben dem verweigerten Interface-Wert ueber int.
+// Erwartung VOR dem Lauf:
+//   constraint = 7   (monomorphisiert, kein Fat Pointer noetig)
+//   structIface: wenn mkiface KEINE Kopie macht, zeigt die Mutation durch -> 99, sonst 1
+import std.io.console { println };
+
+interface Sized { fn size(): int; }
+
+extend int :: [Sized] {
+    pub fn size(): int { return this; }
+}
+
+struct Box :: [Sized] {
+    n: int,
+    pub fn size(): int { return this.n; }
+}
+
+fn viaConstraint<T :: [Sized]>(x: T): int { return x.size(); }
+fn viaValue(s: Sized): int { return s.size(); }
+
+fn main(): int {
+    println(f"constraint  = {viaConstraint(7)}");
+
+    var b = Box { n = 1 };
+    let iface: Sized = b;
+    b.n = 99;
+    println(f"structIface = {viaValue(iface)}");
+    return 0;
+}

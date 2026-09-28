@@ -1,0 +1,43 @@
+import std.io.console { println };
+import std.io.stream as stream;
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+let t0 = os.nowMillis();
+
+fn reader(): Coroutine<Wait> {
+    yield Wait.Sleep(20);
+    println(f"reader enters stream at +{os.nowMillis() - t0}ms");
+    var total = 0;
+    var i = 0;
+    while (i < 10) {
+        let f = stream.open(os.args()[0]);
+        if (f == null) { println("open failed"); return; }
+        var live = true;
+        while (live) {
+            let chunk = stream.readSome(f, 65536);
+            if (chunk == null) { live = false; }
+            else if (chunk.length == 0) { live = false; }
+            else { total += chunk.length; }
+        }
+        stream.close(f);
+        i += 1;
+    }
+    println(f"reader leaves stream at +{os.nowMillis() - t0}ms, bytes {total}");
+}
+
+fn ticker(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 8) {
+        println(f"tick {i} at +{os.nowMillis() - t0}ms");
+        yield Wait.Sleep(20);
+        i += 1;
+    }
+}
+
+fn main(): int {
+    spawn(reader());
+    spawn(ticker());
+    run();
+    return 0;
+}

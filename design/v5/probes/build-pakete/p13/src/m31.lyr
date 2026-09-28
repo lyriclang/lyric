@@ -1,0 +1,3 @@
+module m31;
+pub fn v31(): int { return 31; }
+pub fn w31(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 31; } return s; }

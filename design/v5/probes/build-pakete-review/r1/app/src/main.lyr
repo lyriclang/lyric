@@ -1,0 +1,6 @@
+module main;
+import std.io.console { println };
+import geo;
+import mid;
+import nat.thing;
+fn main(): int { println(geo.tag() + "/" + mid.sees()); return 0; }

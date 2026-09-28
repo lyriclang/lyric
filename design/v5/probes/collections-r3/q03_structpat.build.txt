@@ -1,0 +1,84 @@
+q03_structpat.lyr:5:12: error[LYR-PAR0002]: expected an expression, got LBrace
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+           ^
+
+q03_structpat.lyr:5:12: error[LYR-PAR0021]: expected 'in' in for-loop
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+           ^
+
+q03_structpat.lyr:5:14: error[LYR-PAR0008]: expected ')' after for-loop header
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+             ^
+
+q03_structpat.lyr:5:14: error[LYR-PAR0017]: expected '{' to open block
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+             ^
+
+q03_structpat.lyr:5:14: error[LYR-SEM0002]: unknown identifier 'x'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+             ^
+  note: did you mean 'P'?
+
+q03_structpat.lyr:5:14: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+             ^^
+
+q03_structpat.lyr:5:15: error[LYR-PAR0002]: expected an expression, got Comma
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+              ^
+
+q03_structpat.lyr:5:15: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+              ^
+
+q03_structpat.lyr:5:15: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+              ^
+
+q03_structpat.lyr:5:17: error[LYR-SEM0002]: unknown identifier 'y'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                ^
+  note: did you mean 'P'?
+
+q03_structpat.lyr:5:17: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                ^^^
+
+q03_structpat.lyr:5:19: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                  ^
+
+q03_structpat.lyr:5:21: error[LYR-PAR0002]: expected an expression, got In
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                    ^^
+
+q03_structpat.lyr:5:24: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                       ^^
+
+q03_structpat.lyr:5:24: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                       ^^^
+
+q03_structpat.lyr:5:26: error[LYR-PAR0002]: expected an expression, got RParen
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                         ^
+
+q03_structpat.lyr:5:26: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                         ^
+
+q03_structpat.lyr:5:26: error[LYR-PAR0016]: expected ';'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                         ^
+
+q03_structpat.lyr:5:41: error[LYR-SEM0002]: unknown identifier 'x'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                                        ^
+  note: did you mean 'P'?
+
+q03_structpat.lyr:5:45: error[LYR-SEM0002]: unknown identifier 'y'
+    for (P { x, y } in ps) { println(f"{x},{y}"); }
+                                            ^
+  note: did you mean 'P'?
+

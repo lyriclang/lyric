@@ -1,0 +1,12 @@
+import lib;
+import std.io.console;
+
+fn main(): int {
+    let p = lib.Point { x = 1, y = 2 };
+    console.println(f"{p.x}");
+    let c = lib.newCounter();
+    c.count = 99;
+    console.println(f"{c.count}");
+    console.println(f"{c.secret()}");
+    return 0;
+}

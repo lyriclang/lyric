@@ -1,0 +1,8 @@
+module deep.nested.name;
+
+import std.test { Test, assertEq };
+
+pub fn shared(): int { return 5; }
+
+@Test
+pub fn named(): void { assertEq(1, 1); }

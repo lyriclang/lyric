@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let s = "x"; let n = 5; let f = 2.5; println(f"[{s:}] [{n:}] [{f:}]"); return 0; }

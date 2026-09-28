@@ -1,0 +1,29 @@
+import std.io.console { println };
+import std.iter { Iterator };
+pub class Counter :: [Iterator<int>] {
+    n: int = 0,
+    pub mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n += 1;
+        return this.n;
+    }
+}
+pub class Words :: [Iterator<string>] {
+    n: int = 0,
+    pub mut fn next(): ?string {
+        if (this.n >= 2) { return null; }
+        this.n += 1;
+        return "w";
+    }
+}
+fn main(): int {
+    let c: Iterator<int> = Counter{};
+    let w: Iterator<string> = Words{};
+    var total = 0;
+    var v = c.next();
+    while (v != null) { total += v; v = c.next(); }
+    var s = w.next();
+    while (s != null) { total += 1; s = w.next(); }
+    println(f"{total}");
+    return 0;
+}

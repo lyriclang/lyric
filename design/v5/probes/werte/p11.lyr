@@ -1,0 +1,18 @@
+import std.io.console { println };
+struct V {
+    x: int,
+    mut fn shift(d: int): void { this.x = this.x + d; }
+}
+class Holder { s: V, }
+fn main(): int {
+    let v = V { x = 1 };
+    v.shift(9);
+    println(f"let + mut fn: v.x = {v.x}");
+    var xs = [V { x = 1 }];
+    xs[0].shift(9);
+    println(f"array element: xs[0].x = {xs[0].x}");
+    let h = Holder { s = V { x = 1 } };
+    h.s.shift(9);
+    println(f"class field: h.s.x = {h.s.x}");
+    return 0;
+}

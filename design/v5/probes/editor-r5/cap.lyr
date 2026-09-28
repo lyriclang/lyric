@@ -1,0 +1,7 @@
+import std.io.file;
+import std.io.console;
+fn main(): int {
+    let ok = file.writeText("cap_written.txt", "hello");
+    console.println(f"wrote={ok}");
+    return 0;
+}

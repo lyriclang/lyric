@@ -1,0 +1,4 @@
+s08_display_err.lyr:9:9: error[LYR-SEM0028]: type 'Throwable' does not satisfy constraint 'Display' on 'T'
+        println(e);
+        ^^^^^^^^^^
+

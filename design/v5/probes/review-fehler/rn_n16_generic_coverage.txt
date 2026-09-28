@@ -1,0 +1,2 @@
+panic [LYR-VM0010]: uncaught exception of type 'Box<int>'
+    in main.main (n16_generic_coverage.lyr:8)

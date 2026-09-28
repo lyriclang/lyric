@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn b(v: bool): int {
+    return match (v) {
+        true => 1,
+        false => 0,
+    };
+}
+
+fn u(v: uint8): int {
+    return match (v) {
+        0..=255 => 1,
+    };
+}
+
+fn main(): int { println(f"{b(true)} {u(3)}"); return 0; }

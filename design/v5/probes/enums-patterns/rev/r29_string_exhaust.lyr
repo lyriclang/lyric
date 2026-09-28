@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(s: string): int {
+    return match (s) {
+        "a" => 1,
+        "b" => 2,
+    };
+}
+fn main(): int { println(f"{f(\"a\")}"); return 0; }

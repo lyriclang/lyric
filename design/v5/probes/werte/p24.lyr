@@ -1,0 +1,14 @@
+import std.io.console { println };
+interface Bump { mut fn bump(): void, fn read(): int }
+struct S :: [Bump] {
+    v: int,
+    mut fn bump(): void { this.v = this.v + 1; }
+    fn read(): int { return this.v; }
+}
+fn main(): int {
+    var s = S { v = 1 };
+    let b: Bump = s;
+    b.bump();
+    println(f"through interface: s.v = {s.v}, b.read() = {b.read()}");
+    return 0;
+}

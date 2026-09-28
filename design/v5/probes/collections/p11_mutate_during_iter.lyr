@@ -1,0 +1,42 @@
+import std.io.console { println };
+import std.collections { List, Map };
+import std.iter { over, enumerate };
+
+fn main(): int {
+    let l = List<int>.empty();
+    l.push(1);
+    l.push(2);
+    var seen = 0;
+    var pushed = false;
+    for (v in l) {
+        seen = seen + 1;
+        if (!pushed) { l.push(3); pushed = true; }
+    }
+    println(f"list grown during walk: iterations={seen} finalLength={l.length()}");
+
+    let r = List<int>.empty();
+    r.push(1); r.push(2); r.push(3);
+    var visited = 0;
+    for (v in r) {
+        visited = visited + 1;
+        if (v == 1) { r.removeAt(0); }
+    }
+    println(f"list shrunk during walk: visited={visited} left={r.length()}");
+
+    let xs = [10, 20, 30];
+    for (v in over(xs).map((n: int) => n + 1)) {
+        println(f"chain {v}");
+    }
+
+    for ((i, v) in enumerate(over(xs))) {
+        println(f"enum {i} {v}");
+    }
+
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+    for ((k, v) in m.entries()) {
+        println(f"map {k}={v}");
+    }
+    return 0;
+}

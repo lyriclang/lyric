@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+enum E { A(int), B(int), C }
+
+fn v(e: E): int {
+    return match (e) {
+        A(x) | B(x) => x,
+        C => -1,
+    };
+}
+
+fn main(): int {
+    println(f"{v(E.A(3))} {v(E.B(4))} {v(E.C)}");
+    return 0;
+}

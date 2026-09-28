@@ -1,0 +1,4 @@
+import std.core as core;
+@core.Deprecated { message = "x" }
+pub fn old(): int { return 1; }
+fn main(): int { return old(); }

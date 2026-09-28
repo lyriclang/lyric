@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    var n = 2000000000;
+    n = n + 0;
+    let xs = [0] * n;
+    println(f"{xs.length}");
+    return 0;
+}

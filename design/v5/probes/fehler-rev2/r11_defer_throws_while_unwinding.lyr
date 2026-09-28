@@ -1,0 +1,15 @@
+// ERWARTUNG: eine Ausnahme First fliegt, ein defer wirft Second.
+// Der catch sieht SECOND, First ist weg, und der VORHER registrierte defer laeuft NICHT.
+import std.io.console { println };
+class First :: [Throwable] { fn message(): string { return "FIRST"; } }
+class Second :: [Throwable] { fn message(): string { return "SECOND"; } }
+fn second(): void throws Second { println("second-defer runs"); throw Second { }; }
+fn work(): int throws {
+    defer println("EARLIER");
+    defer second();
+    throw First { };
+}
+fn main(): int {
+    try { return work(); }
+    catch (e) { println(f"caught: {e.message()}"); return 0; }
+}

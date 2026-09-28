@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+fn counter(a: int, b: int): Coroutine<int> {
+    yield a;
+    yield b;
+}
+
+fn main(): int {
+    let c = counter(3, 4);
+    let x = resume c;
+    let y = resume c;
+    println(f"{x + y}");
+    return x + y;
+}

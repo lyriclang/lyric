@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let a = 1; let b = 2; let c = 3; let r = a<b>(c); println(f"{r}"); return 0; }

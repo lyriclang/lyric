@@ -1,0 +1,5 @@
+module e1;
+
+pub extend int { pub fn twice(): int { return this * 2; } }
+
+pub fn ping(): int { return 1; }

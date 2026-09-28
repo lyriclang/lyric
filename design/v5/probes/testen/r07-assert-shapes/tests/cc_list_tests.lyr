@@ -1,0 +1,11 @@
+import std.test { Test, assertEq };
+import std.collections { List };
+
+@Test
+pub fn lists_compare(): void {
+    let a = List<int>.empty();
+    let b = List<int>.empty();
+    a.add(1);
+    b.add(1);
+    assertEq(a, b);
+}

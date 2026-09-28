@@ -1,0 +1,7 @@
+module t_vis;
+
+import std.test { Test, assertEq };
+import mathy { visible };
+
+@Test
+pub fn sees_public(): void { assertEq(visible(2), 4); }

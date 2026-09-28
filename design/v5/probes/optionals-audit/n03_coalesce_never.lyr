@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let a: ?int = 5;
+    let y = a ?? panic("no value");
+    println(f"{y}");
+    return 0;
+}

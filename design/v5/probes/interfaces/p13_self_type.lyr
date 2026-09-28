@@ -1,0 +1,10 @@
+interface Cloneable {
+    fn copy(): Self;
+}
+
+struct P :: [Cloneable] {
+    x: int,
+    fn copy(): P { return P { x = this.x }; }
+}
+
+fn main(): int { return 0; }

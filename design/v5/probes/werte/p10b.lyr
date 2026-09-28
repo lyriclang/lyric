@@ -1,0 +1,6 @@
+import std.io.console { println };
+struct S {
+    v: int,
+    fn setNoMut(): void { this.v = 9; }
+}
+fn main(): int { println("KONTROLLE struct ohne mut"); return 0; }

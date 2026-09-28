@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    var sum: int8 = 0i8;
+    for (i in 0i8..10i8) { sum += i; }
+    println(f"{sum as int}");
+    return 0;
+}

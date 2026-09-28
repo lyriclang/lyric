@@ -1,0 +1,5 @@
+fn ident<T>(v: T): T { return v; }
+fn main(): int {
+    let g: fn(int) -> int = ident;
+    return g(3);
+}

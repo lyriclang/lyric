@@ -1,0 +1,8 @@
+// ERWARTUNG: unklar - '5 as Id': int-Literal ist nicht uint8; SEM0006 oder erlaubt?
+import std.io.console { println };
+opaque type Id = uint8;
+fn main(): int {
+  let i: Id = 5 as Id;
+  println(f"{i as uint8}");
+  return 0;
+}

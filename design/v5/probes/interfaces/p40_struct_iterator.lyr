@@ -1,0 +1,33 @@
+import std.io.console { println };
+import std.iter { Iterator };
+
+struct Counter :: [Iterator<int>] {
+    n: int,
+    mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n = this.n + 1;
+        return this.n;
+    }
+}
+
+class CounterC :: [Iterator<int>] {
+    n: int,
+    mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n = this.n + 1;
+        return this.n;
+    }
+}
+
+fn threeOf(it: Iterator<int>): string {
+    let a = it.next();
+    let b = it.next();
+    let c = it.next();
+    return f"{a ?? -1} {b ?? -1} {c ?? -1}";
+}
+
+fn main(): int {
+    println(threeOf(Counter { n = 0 }));
+    println(threeOf(CounterC { n = 0 }));
+    return 0;
+}

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x: int = 1; if (x != null) { println("yes"); } return 0; }

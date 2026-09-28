@@ -1,0 +1,10 @@
+// ERWARTUNG: WENN die Deckungsrechnung nur die DEFINITION vergleicht (ExceptionAnalyzer.cs:245,
+// 'GenericInstance gi => (false, gi.Definition)'), kompiliert das hier, obwohl catch (Box<string>)
+// einen Box<int> zur Laufzeit nie faengt -> VM0010 statt Diagnose.
+import std.io.console { println };
+class Box<T> :: [Throwable] { v: T, fn message(): string { return "box"; } }
+fn thrower(): int throws Box<int> { throw Box<int> { v = 1 }; }
+fn main(): int {
+    try { return thrower(); }
+    catch (e: Box<string>) { println(f"caught {e.v}"); return 1; }
+}

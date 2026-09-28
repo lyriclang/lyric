@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    println(f"{'a' < 'b'} {'b' > 'a'}");
+    return 0;
+}

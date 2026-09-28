@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.core { Equatable };
+struct Pair<T :: [Equatable<T>]> :: [Equatable<Pair<T>>] {
+  a: T, b: T,
+  fn equals(other: Pair<T>): bool { return this.a.equals(other.a) && this.b.equals(other.b); }
+}
+fn main(): int {
+  let p = Pair<int> { a = 1, b = 2 };
+  let q = Pair<int> { a = 1, b = 2 };
+  println(f"{p.equals(q)}");
+  return 0;
+}

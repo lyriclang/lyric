@@ -1,0 +1,12 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use ident" }
+pub fn id<T>(x: T): T { return x; }
+
+@Deprecated { message = "use Box2" }
+pub struct Box<T> { v: T }
+
+fn main(): int {
+    let b = Box<int> { v = 2 };
+    return id<int>(1) + b.v;
+}

@@ -1,0 +1,2 @@
+extern "dotnet" fn identity<T>(x: T): T;
+fn main(): int { return 0; }

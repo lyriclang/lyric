@@ -1,0 +1,85 @@
+fn main.main -> i64 {
+  params: 0
+  maxstack: 2
+  slots:
+    l0: struct
+    l1: i64
+    l2: struct
+    l3: struct
+    l4: struct
+    l5: struct
+    l6: f64
+    l7: f64
+    l8: string
+    l9: f64
+    l10: f64
+    l11: f64
+    l12: f64
+    l13: f64
+    l14: f64
+    l15: f64
+    l16: f64
+    l17: f64
+    l18: f64
+    l19: f64
+    l20: f64
+    l21: f64
+    l22: f64
+    l23: f64
+    l24: string
+  bb0:
+    const f64 0
+    stloc 17
+    const f64 0
+    ldloc 17
+    stloc 9
+    stloc 10
+    const i64 0
+    stloc 1
+    br bb1
+  bb1:
+    brcmpk lt i64 l1, 3000000 -> bb2, bb3
+  bb2:
+    const f64 1
+    stloc 18
+    const f64 2
+    stloc 19
+    ldloc 9
+    stloc 20
+    ldloc 10
+    stloc 21
+    br bb4
+  bb3:
+    ldloc 9
+    stloc 22
+    br bb6
+  bb4:
+    ldloc 20
+    ldloc 18
+    add f64
+    stloc 23
+    ldloc 21
+    ldloc 19
+    add f64
+    ldloc 23
+    stloc 9
+    stloc 10
+    br bb5
+  bb5:
+    binlk add i64 l1 = l1, 1
+    br bb1
+  bb6:
+    br bb8
+  bb7:
+    const i64 0
+    retval
+  bb8:
+    ldloc 22
+    call std.core.fromFloat
+    stloc 24
+    br bb9
+  bb9:
+    ldloc 24
+    call std.io.console.rawPrintln
+    br bb7
+}

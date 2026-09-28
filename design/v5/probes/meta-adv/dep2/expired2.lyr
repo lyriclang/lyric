@@ -1,0 +1,8 @@
+module expired2;
+
+import std.core { Deprecated };
+
+@Deprecated { message = "use renew" }
+pub fn stale(): int { return 1; }
+
+pub fn fresh(): int { return stale(); }

@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct S { v: int, }
+class C { s: S, }
+fn main(): int {
+    let c = C { s = S { v = 1 } };
+    var t = c.s;
+    t.v = 9;
+    println(f"copy out of class field: c.s.v = {c.s.v}");
+    let c2 = c;
+    c2.s.v = 7;
+    println(f"class is shared: c.s.v = {c.s.v}");
+    return 0;
+}

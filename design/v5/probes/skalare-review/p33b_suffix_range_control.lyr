@@ -1,0 +1,7 @@
+// KONTROLLE ERWARTUNG: SEM0001 fuer unsuffigiertes 200 an int8
+import std.io.console { println };
+fn main(): int {
+  let q: int8 = 200;
+  println(f"{q}");
+  return 0;
+}

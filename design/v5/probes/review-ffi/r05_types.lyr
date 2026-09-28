@@ -1,0 +1,4 @@
+extern "dotnet" fn a(x: ?int): int = "X::Y";
+extern "dotnet" fn b(x: int[]): int = "X::Y";
+extern "dotnet" fn c(x: uint8[]): int = "X::Y";
+fn main(): int { return 0; }

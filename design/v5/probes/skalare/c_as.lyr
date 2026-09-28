@@ -1,0 +1,23 @@
+import std.io.console { println };
+
+fn main(): int {
+    let big: float = 1e300;
+    println(f"1e300 as int  = {big as int}");
+    println(f"-1e300 as int = {(-big) as int}");
+    let z: float = 0.0;
+    let nan = z / z;
+    println(f"0.0/0.0 = {nan}");
+    println(f"nan as int = {nan as int}");
+    println(f"1.0/0.0 = {1.0 / z}");
+
+    let n: int = 300;
+    println(f"300 as int8 = {n as int8}");
+    println(f"-1 as uint = {-1 as uint}");
+    println(f"3.9 as int = {3.9 as int}");
+    println(f"-3.9 as int = {-3.9 as int}");
+    println(f"'A' as int = {'A' as int}");
+    println(f"65 as char = {65 as char}");
+    println(f"1e300 as float32 = {big as float32}");
+    println(f"int max as float = {9223372036854775807 as float}");
+    return 0;
+}

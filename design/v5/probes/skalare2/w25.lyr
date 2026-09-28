@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.core { Display };
+import std.string { fromInt };
+extend int8 :: [Display] {
+    fn toString(): string { return fromInt(this as int); }
+}
+fn main(): int { println(5i8); return 0; }

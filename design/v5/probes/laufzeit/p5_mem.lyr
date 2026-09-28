@@ -1,0 +1,17 @@
+// P5 — Was kostet ein int[] pro Element? (mit langer Schleife, damit der Prozess messbar lebt)
+import std.io.console { println };
+
+fn main(args: string[]): int {
+    var n = 1;
+    if (args.length > 0) { n = 20000000; }
+    let xs = [1] * n;
+    var runden = 0;
+    var sum = 0;
+    while (runden < 3) {
+        var i = 0;
+        while (i < xs.length) { sum += xs[i]; i += 1; }
+        runden += 1;
+    }
+    println(f"n={xs.length} sum={sum}");
+    return 0;
+}

@@ -1,0 +1,23 @@
+import std.io.console { println };
+
+fn f(n: int): int {
+    return match (n) {
+        0..5 => 1,
+        5..=9 => 2,
+        _ => 3,
+    };
+}
+
+fn g(c: char): int {
+    return match (c) {
+        'a'..='z' => 1,
+        'A'..='Z' => 2,
+        _ => 0,
+    };
+}
+
+fn main(): int {
+    println(f"{f(4)} {f(5)} {f(9)} {f(10)}");
+    println(f"{g('q')} {g('Q')} {g('1')}");
+    return 0;
+}

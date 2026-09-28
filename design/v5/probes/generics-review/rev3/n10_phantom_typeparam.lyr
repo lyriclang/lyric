@@ -1,0 +1,3 @@
+class Tagged<T> { n: int }
+fn f<T>(n: int): int { return n; }
+fn main(): int { let t = Tagged<string> { n = 1 }; return f<bool>(t.n); }

@@ -1,0 +1,7 @@
+// ERWARTUNG: CLI0020 (f64-Konstante in f32-Slot), analog (c3)
+import std.io.console { println };
+fn main(): int {
+  let c: float32 = comptime (0.1f32 + 0.2f32);
+  println(f"{c}");
+  return 0;
+}

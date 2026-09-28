@@ -1,0 +1,18 @@
+// ERWARTUNG (design/try-expression.md Stufe a, implementiert): kompiliert, opts ist danach zugewiesen.
+import std.io.console { println };
+class UsageError :: [Throwable] { text: string, fn message(): string { return this.text; } }
+struct Options { verbose: bool }
+fn parse(args: string[]): Options throws UsageError {
+    if (args.length == 0) { throw UsageError { text = "nothing to do" }; }
+    return Options { verbose = true };
+}
+fn main(args: string[]): int {
+    var opts: Options;
+    try {
+        opts = parse(args);
+    } catch (e: UsageError) {
+        println(e.message());
+        return 2;
+    }
+    return if (opts.verbose) 0 else 1;
+}

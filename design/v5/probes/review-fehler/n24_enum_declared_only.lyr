@@ -1,0 +1,14 @@
+// KONTROLLE: nur DEKLARIERT, nie geworfen -> erwartet: kompiliert.
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Missing(string),
+    Broken(int);
+
+    pub fn message(): string {
+        return match (this) {
+            Missing(s) => s,
+            Broken(_) => "broken",
+        };
+    }
+}
+fn main(): int { let f = Fault.Broken(1); println(f.message()); return 0; }

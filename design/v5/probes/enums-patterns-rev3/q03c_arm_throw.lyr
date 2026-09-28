@@ -1,0 +1,4 @@
+import std.io.console { println };
+class Oops :: [Throwable] { fn message(): string { return "oops"; } }
+fn f(b: bool): int throws { return match (b) { true => 1, false => throw Oops {} }; }
+fn main(): int { try { println(f"{f(true)}"); } catch (_) { println("caught"); } return 0; }

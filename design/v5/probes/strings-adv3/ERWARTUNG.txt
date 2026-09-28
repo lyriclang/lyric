@@ -1,0 +1,39 @@
+Erwartungen VOR dem Lauf (adversarische Nachpruefung strings.md):
+a01 astral char literal '😀'      -> LEX0008 "got 2"; '\u{1F600}' ok
+a02 f"{3.14159:.2}"               -> 32 ; .3 -> 33 ; F2 -> 3.14 (Kontrolle)
+a03 f"[{42:8}]"                   -> [42      ] ; -8 -> [      42] ; 08 -> [42      ] ; D8 -> [00000042]
+a04 f"[{42:{w}}]"                 -> [{w}] plus SEM0071 'w' never used
+a05 f"{-255:X}" -> FFFFFFFFFFFFFF01 ; {-255:b} -> 64 bit ; {3.14159:e} -> 3.141590e+000 ; {255:o} -> panic VM0006
+a06 println(int32)                -> SEM0028 ; println(uint) -> SEM0028 ; f"{a}" ok
+a07 "ß".toUpper() -> ß ; "é".toUpper() -> É ; isUpper('É') false
+a08 "{{ x }}" -> {{ x }} ; f"{{ x }}" -> { x } ; f"a } b" -> a } b
+a09 let d: Display = 5            -> SEM0001
+a10 f"[{emoji:6}]"                -> 4 Leerzeichen bei length()==1
+a11 match string/char literals    -> 1 2 3 / 10 20 30
+a12 "\u{1F600}" * 2000000000     -> panic "2 code point(s)"
+a13 "\e"                          -> LEX0007
+a14 "ab" * -2                     -> "" (leer)
+a15 "\xE2\x82\xAC"                -> length 3, utf8 6
+a16 "b" > "a" -> true ; "a" < "b" -> true (Ordered ueber core)
+a17 import std.string { fromInt } + s.length() -> SEM0072 warning trotz Nutzung
+a18 r"abc"                        -> SEM0002 unknown identifier 'r'
+a19 """ dreizeilig                -> 18 Diagnosen, erste LEX0009
+a20 comptime f"n={1+1}"           -> n=2
+a21 f"{42:'abc'}" -> abc ; f"{3.7:C}" -> ¤3.70 ; f"{0.5:P1}" -> 50.0 % ; f"{1234.5:#,##0.00}" -> 1,234.50
+a22 55296 as char                 -> panic VM0012
+Neue Fragen (nicht im Dossier):
+b01 'a' < 'b' (char ordering)     -> unbekannt; Bytecode sagt lt numerisch -> vermutlich SEM-Fehler oder geht
+b02 "\0" embedded NUL: length 3 fuer "a\0b", println schreibt es
+b03 charAt(3) / charAt(-1) auf "abc" -> panic VM0006?
+b04 f"{s:}" leerer Spec           -> vermutlich unveraendert
+b05 f"{x:>8}"                      -> FormatException -> panic VM0006
+b07 "é" == "e\u{301}" -> false ; b.toUpper() Laenge 2
+b08 hash("") und hash("a"), compare mit ""
+b09 f"{a:8}" mit int32, {u:X} mit uint8, {a:X} mit int32 -7 -> 64-bit Bits? (Weitung auf i64)
+b10 Backslash-Zeilenfortsetzung in String -> LEX0007 oder LEX0009
+b11 Spec auf char/bool: {c:5} {c:X} {true:5} -> ?
+b12 == nach concat true; substring(1,10) ueber Ende -> panic oder clamp?
+c01 import std.string; -> SEM0077 shadowing warning
+c02 struct P :: Display mit {p:N2} -> Sema-Fehler "does not apply"; f"{[1,2]}" -> Sema-Diagnose
+c03 {n:<8} auf int -> "<8" (Literal-only custom format schluckt den Wert); {s:>8} auf string -> panic not a width; {true:5} -> "true "
+c04 compare 20000 gemeinsames Praefix: erwartet ~1.5 s gesamt (Dossier: 1589 ms); == Kontrolle ~0.15 s

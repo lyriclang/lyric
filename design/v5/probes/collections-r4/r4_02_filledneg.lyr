@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.collections { arrayFilled };
+fn main(): int {
+    let a = arrayFilled(-1, 7);
+    println(f"filled {a.length}");
+    let b = [] * 3;
+    println(f"emptyrep {b.length}");
+    return 0;
+}

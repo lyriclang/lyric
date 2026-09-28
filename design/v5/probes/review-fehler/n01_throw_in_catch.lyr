@@ -1,0 +1,19 @@
+// ERWARTUNG: ein throw IM catch wird NICHT von einer spaeteren Klausel desselben try gefangen.
+import std.io.console { println };
+class A :: [Throwable] { fn message(): string { return "A"; } }
+class B :: [Throwable] { fn message(): string { return "B"; } }
+fn thrower(): int throws A { throw A { }; }
+fn work(): int throws B {
+    try {
+        return thrower();
+    } catch (_: A) {
+        println("in catch A, throwing B");
+        throw B { };
+    } catch (_: B) {
+        println("SIBLING CAUGHT B");
+        return 9;
+    }
+}
+fn main(): int {
+    try { return work(); } catch (e: B) { println(f"outer caught {e.message()}"); return 0; }
+}

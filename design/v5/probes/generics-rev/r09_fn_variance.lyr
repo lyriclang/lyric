@@ -1,0 +1,7 @@
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { fn area(): int { return 1; } }
+fn apply(f: fn(Shape) -> int, s: Shape): int { return f(s); }
+fn main(): int {
+  let g = (c: Circle) => c.area();
+  return apply(g, Circle {});
+}

@@ -1,0 +1,7 @@
+// ERWARTUNG: Fehler (0x80i8 = 128 passt nicht) - welcher Code?
+import std.io.console { println };
+fn main(): int {
+  let x = 0x80i8;
+  println(f"{x}");
+  return 0;
+}

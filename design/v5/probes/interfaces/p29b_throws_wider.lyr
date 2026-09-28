@@ -1,0 +1,11 @@
+class E :: [Throwable] { fn message(): string { return "e"; } }
+
+interface Plain {
+    fn run(): int;
+}
+
+struct Risky :: [Plain] {
+    fn run(): int throws E { throw E { }; }
+}
+
+fn main(): int { return 0; }

@@ -1,0 +1,11 @@
+// ERWARTUNG: catch auf dem Interface VOR catch auf der Klasse: die zweite Klausel ist tot,
+// vermutlich KEINE Diagnose (SEM0035 prueft nur den Catch-all). Ausgabe: "iface".
+import std.io.console { println };
+interface AppError :: [Throwable] { }
+class NotFound :: [AppError] { fn message(): string { return "nf"; } }
+fn f(): int throws NotFound { throw NotFound { }; }
+fn main(): int {
+    try { return f(); }
+    catch (_: AppError) { println("iface"); return 0; }
+    catch (_: NotFound) { println("class"); return 1; }
+}

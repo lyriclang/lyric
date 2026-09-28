@@ -1,0 +1,10 @@
+import std.io.console { println };
+interface Greeter { fn greet(name: string, greeting: string = "Hi"): string; }
+struct S :: [Greeter] { v: int, fn greet(name: string, greeting: string = "Yo"): string { return greeting + name; } }
+fn main(): int {
+    let s = S { v = 1 };
+    println(s.greet("B"));
+    let g: Greeter = s;
+    println(g.greet("B", "Hey"));
+    return 0;
+}

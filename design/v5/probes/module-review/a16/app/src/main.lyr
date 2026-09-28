@@ -1,0 +1,7 @@
+import geometry;
+import std.io.console;
+
+fn main(): int {
+    console.println(f"{geometry.secret()}");
+    return 0;
+}

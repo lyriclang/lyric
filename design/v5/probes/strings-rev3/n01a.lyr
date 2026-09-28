@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let c = 'a'; println(f"[{c:X}]"); return 0; }

@@ -1,0 +1,6 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    println(fromInt(comptime (3 * 4)));
+    return 0;
+}

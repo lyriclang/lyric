@@ -1,0 +1,14 @@
+import std.test { Test, assertTrue };
+import std.io.stream { create };
+import std.io.file { writeText };
+
+@Test
+pub fn aa_leaks_a_handle(): void {
+    let f = create("probe_leak.txt");
+    assertTrue(f != null, "the file must open");
+}
+
+@Test
+pub fn bb_writes_the_same_file(): void {
+    assertTrue(writeText("probe_leak.txt", "hello"), "the write must succeed");
+}

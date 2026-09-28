@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [10, 20, 30];
+    let n: int32 = 3;
+    var total = 0;
+    for (i in 0..n) { total += xs[i]; }
+    println(f"{total}");
+    return 0;
+}

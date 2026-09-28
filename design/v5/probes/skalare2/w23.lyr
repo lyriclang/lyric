@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn main(): int {
+    let c: char = 'a';
+    let n: int = c as int;
+    println(f"{n}");
+    let back: char = 300 as char;
+    println(f"{back}");
+    let bits = 1.5 as int;
+    println(f"{bits}");
+    return 0;
+}

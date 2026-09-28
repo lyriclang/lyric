@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let a: ?int = null;
+    let b: ?int = 7;
+    let c = a ?? b;
+    println(f"{c ?? -1}");
+    return 0;
+}

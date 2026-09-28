@@ -1,0 +1,7 @@
+interface Left { fn go(): int; }
+interface Right { fn go(): int; }
+interface Both :: [Left, Right] { }
+
+struct B :: [Both] { fn go(): int { return 1; } }
+
+fn main(): int { return 0; }

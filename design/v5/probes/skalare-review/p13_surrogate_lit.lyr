@@ -1,0 +1,7 @@
+// ERWARTUNG: Compile-Fehler (LEX oder SEM) - Surrogat als char-Literal
+import std.io.console { println };
+fn main(): int {
+  let c = '\u{D800}';
+  println(f"{c as int}");
+  return 0;
+}

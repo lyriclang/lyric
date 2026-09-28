@@ -1,0 +1,2 @@
+import a;
+fn main(): int { return a.fa(); }

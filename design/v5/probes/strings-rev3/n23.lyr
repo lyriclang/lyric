@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.core { Display };
+fn p<T :: [Display]>(x: T): string { return f"[{x:6}]"; }
+fn main(): int { println(p(42)); println(f"[{42:6}]"); return 0; }

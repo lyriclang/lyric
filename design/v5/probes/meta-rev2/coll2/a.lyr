@@ -1,0 +1,3 @@
+module a;
+import std.core { OnFunction };
+pub struct Tag :: [OnFunction] { kind: string = "a" }

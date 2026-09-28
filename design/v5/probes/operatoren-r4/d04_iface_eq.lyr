@@ -1,0 +1,11 @@
+import std.core { Equatable };
+import std.io.console { println };
+struct V :: [Equatable<V>] {
+    x: int,
+    fn equals(other: V): bool { return this.x == other.x; }
+}
+fn viaOp(a: Equatable<V>, b: V): bool { return a == b; }
+fn main(): int {
+    if (viaOp(V { x = 1 }, V { x = 1 })) { println("eq"); }
+    return 0;
+}

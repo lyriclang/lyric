@@ -1,0 +1,6 @@
+@Deprecated { message = "use fresh" }
+module old;
+
+import std.core { Deprecated };
+
+pub fn f(): int { return 1; }

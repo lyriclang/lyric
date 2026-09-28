@@ -1,0 +1,3 @@
+interface I { pub fn f(): int; }
+struct S :: [I] { n: int, fn f(): int { return this.n; } }
+fn main(): int { return S { n = 4 }.f(); }

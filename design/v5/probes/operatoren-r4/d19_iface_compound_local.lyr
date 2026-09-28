@@ -1,0 +1,13 @@
+import std.core { Add };
+import std.io.console { println };
+import std.string { fromInt };
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V { println("add"); return V { x = this.x + other.x }; }
+}
+fn main(): int {
+    var v = V { x = 1 };
+    v += V { x = 2 };
+    println(fromInt(v.x));
+    return 0;
+}

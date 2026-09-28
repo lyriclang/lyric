@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.core { Deprecated };
+@Deprecated { message = "use the string one" }
+fn q(n: int): string { return "int"; }
+fn q(s: string): string { return "string"; }
+fn main(): int {
+    println(q(1));
+    println(q("a"));
+    return 0;
+}

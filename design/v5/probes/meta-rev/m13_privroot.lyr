@@ -1,0 +1,7 @@
+import std.core { OnFunction };
+pub struct Keep :: [OnFunction] { }
+
+@Keep
+fn neverCalled(): int { return 42; }
+
+fn main(): int { return 0; }

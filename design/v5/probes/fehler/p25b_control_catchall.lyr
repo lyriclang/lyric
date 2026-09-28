@@ -1,0 +1,12 @@
+// KONTROLLE zu p25: dieselbe Funktion, aber mit catch-all am Ende. ERWARTUNG: kompiliert,
+// der typisierte catch greift zuerst.
+import std.io.console { println };
+class A :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class B :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(which: int): int throws {
+    if (which == 0) { throw A { what = "a" }; }
+    throw B { what = "b" };
+}
+fn main(): int {
+    try { return f(0); } catch (e: A) { println("A"); return 0; } catch (_) { println("rest"); return 1; }
+}

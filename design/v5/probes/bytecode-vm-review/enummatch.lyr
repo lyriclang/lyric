@@ -1,0 +1,28 @@
+import std.io.console { println };
+
+enum Color { Red, Green, Blue }
+
+fn pick(n: int): Color {
+    if (n % 3 == 0) { return Color.Red; }
+    if (n % 3 == 1) { return Color.Green; }
+    return Color.Blue;
+}
+
+fn score(c: Color): int {
+    match (c) {
+        Color.Red => { return 1; }
+        Color.Green => { return 2; }
+        Color.Blue => { return 3; }
+    }
+}
+
+fn main(): int {
+    var acc = 0;
+    var i = 0;
+    while (i < 5000000) {
+        acc = (acc + score(pick(i))) & 1023;
+        i = i + 1;
+    }
+    println(acc);
+    return 0;
+}

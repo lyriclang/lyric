@@ -1,0 +1,3 @@
+module m15;
+pub fn v15(): int { return 15; }
+pub fn w15(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 15; } return s; }

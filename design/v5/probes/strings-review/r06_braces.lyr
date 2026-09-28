@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+fn main(): int {
+    println("{{ plain }}");
+    println(f"{{ fstring }}");
+    println(f"single close } here");
+    println(f"{1 + 1}");
+    return 0;
+}

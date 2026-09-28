@@ -1,0 +1,8 @@
+import std.io.console { println };
+class Counter { n: int, fn get(): int { return this.n; } }
+fn main(): int {
+    let c = Counter { n = 1 };
+    let g = c.get;
+    println("x");
+    return 0;
+}

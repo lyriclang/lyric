@@ -1,0 +1,5 @@
+fn main(): int {
+    let n = 2;
+    let x = comptime (3 * n);
+    return x;
+}

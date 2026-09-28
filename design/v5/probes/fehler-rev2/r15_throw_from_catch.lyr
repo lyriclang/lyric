@@ -1,0 +1,12 @@
+// ERWARTUNG: ein Wurf AUS einem catch wird von der Schwesterklausel desselben try NICHT gefangen.
+import std.io.console { println };
+class A :: [Throwable] { fn message(): string { return "A"; } }
+class B :: [Throwable] { fn message(): string { return "B"; } }
+fn fa(): int throws A { throw A { }; }
+fn main(): int {
+    try {
+        try { return fa(); }
+        catch (_: A) { println("in A-clause, throwing B"); throw B { }; }
+        catch (_: B) { println("SISTER CAUGHT B"); return 9; }
+    } catch (_: B) { println("outer caught B"); return 0; }
+}

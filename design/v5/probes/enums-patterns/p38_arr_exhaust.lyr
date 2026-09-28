@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn f(xs: int[]): int {
+    return match (xs) {
+        [] => 0,
+        [x] => x,
+        [a, ..] => a,
+    };
+}
+fn main(): int { println(f"{f([1,2,3])}"); return 0; }

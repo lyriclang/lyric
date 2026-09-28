@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn outer(): fn() -> int {
+    var n = 0;
+    let f = () => {
+        let g = () => { n = n + 1; return n; };
+        return g();
+    };
+    return f;
+}
+fn main(): int {
+    let f = outer();
+    println(fromInt(f()));
+    println(fromInt(f()));
+    return 0;
+}

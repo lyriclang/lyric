@@ -1,0 +1,8 @@
+// ERWARTUNG: 97 / a / 97
+import std.io.console { println };
+fn main(): int {
+  println(f"{'a' as float}");
+  println(f"{97.5 as char}");
+  println(f"{'a' as uint8}");
+  return 0;
+}

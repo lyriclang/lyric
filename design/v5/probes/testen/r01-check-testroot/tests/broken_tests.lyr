@@ -1,0 +1,6 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn broken(): void {
+    assertEq(nosuchfunction(), 1);
+}

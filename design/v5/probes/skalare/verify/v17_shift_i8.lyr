@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    var one: int8 = 1i8;
+    var eight: int8 = 8i8;
+    println(f"{(one << eight) as int}");
+    return 0;
+}

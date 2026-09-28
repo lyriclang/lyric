@@ -1,0 +1,17 @@
+interface Describable {
+    fn describe(): string;
+}
+
+class Coin :: [Describable] {
+    fn describe(): string { return "coin"; }
+}
+
+class Bag<T :: [Describable]> {
+    item: T,
+    fn tell(): string { return this.item.describe(); }
+}
+
+fn main(): int {
+    let bad = Bag<int> { item = 1 };
+    return 0;
+}

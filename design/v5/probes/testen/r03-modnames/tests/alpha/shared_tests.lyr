@@ -1,0 +1,8 @@
+import std.test { Test, assertEq };
+
+pub fn alphaValue(): int { return 1; }
+
+@Test
+pub fn one(): void {
+    assertEq(alphaValue(), 1);
+}

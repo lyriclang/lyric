@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.collections { List, sortListByKey, collect };
+import std.iter { over };
+struct Rec { k: int, tag: string, }
+fn main(): int {
+    let l = List<Rec>.empty();
+    l.push(Rec{k=1, tag="A"});
+    l.push(Rec{k=0, tag="B"});
+    l.push(Rec{k=1, tag="C"});
+    l.push(Rec{k=0, tag="D"});
+    l.push(Rec{k=1, tag="E"});
+    sortListByKey(l, (r: Rec) => r.k);
+    var line = "sortListByKey:";
+    var i = 0;
+    while (i < l.length()) { line = line + " " + l.get(i).tag; i += 1; }
+    println(line);
+    return 0;
+}

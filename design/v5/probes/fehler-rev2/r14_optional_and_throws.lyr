@@ -1,0 +1,16 @@
+// ERWARTUNG: eine Funktion darf ?T zurueckgeben UND werfen. Kompiliert, Exit 0.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn maybe(i: int): ?int throws Boom {
+    if (i < 0) { throw Boom { }; }
+    if (i == 0) { return null; }
+    return i;
+}
+fn main(): int {
+    try {
+        let a = maybe(5);
+        let b = maybe(0);
+        println(f"a={a!} b-is-null={b == null}");
+        return 0;
+    } catch (e: Boom) { println("threw"); return 1; }
+}

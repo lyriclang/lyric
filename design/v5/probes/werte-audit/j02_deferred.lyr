@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var s: S;
+    s.v = 5;
+    println(f"j02 s.v={s.v}");
+    return 0;
+}

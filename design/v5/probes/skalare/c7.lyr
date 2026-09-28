@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var s: string = "x"; println(f"{s as int}"); return 0; }

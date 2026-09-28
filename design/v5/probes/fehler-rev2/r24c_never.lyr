@@ -1,0 +1,3 @@
+// ERWARTUNG (offen): never als Elementtyp in einem let
+let xs: never[] = [];
+fn main(): int { return 0; }

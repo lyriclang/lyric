@@ -1,0 +1,10 @@
+import std.core { Deprecated };
+
+pub struct Box { v: int }
+
+extend Box {
+    @Deprecated { message = "use v2" }
+    pub fn get(): int { return this.v; }
+}
+
+fn main(): int { return 0; }

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    let n = 2;
+    println(fromFloat(1 + n as float));
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.json { parse, JsonValue };
+fn main(): int {
+    let v = parse("{\"a\":1}");
+    println("x");
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface I { mut fn a(): void; fn b(): void; }
+struct S :: [I] {
+    v: int,
+    fn a(): void { }
+    mut fn b(): void { this.v = 1; }
+}
+fn main(): int { println("mut-ness mismatch both ways compiled"); return 0; }

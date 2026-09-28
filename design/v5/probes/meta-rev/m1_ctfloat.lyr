@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.math { sin, pow, log };
+
+let S: float = comptime sin(1.0);
+let P: float = comptime pow(1.0000001, 100000.0);
+let L: float = comptime log(2.0);
+
+fn main(): int {
+    println(f"{S}");
+    println(f"{P}");
+    println(f"{L}");
+    return 0;
+}

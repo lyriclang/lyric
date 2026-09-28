@@ -1,0 +1,25 @@
+// R1b — KONTROLLE zu R1: dieselbe Panik, aber 'hot' enthaelt ein try, das der JIT ablehnt.
+// Erwartung: mit --jit derselbe vollstaendige Backtrace wie ohne.
+import std.io.console { println };
+import std.core { Exception };
+
+fn hot(xs: int[], i: int): int {
+    try {
+        let z = 0;
+    } catch (_) {
+        println("nie");
+    }
+    return xs[i] + 1;
+}
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    var acc = 0;
+    var k = 0;
+    while (k < 200000) {
+        acc = acc + hot(xs, k % 3);
+        k = k + 1;
+    }
+    println(f"warm={acc}");
+    return hot(xs, 99);
+}

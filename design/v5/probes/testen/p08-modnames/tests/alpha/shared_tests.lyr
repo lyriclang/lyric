@@ -1,0 +1,6 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn one(): void {
+    assertEq(1, 1);
+}

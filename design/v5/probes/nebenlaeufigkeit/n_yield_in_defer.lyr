@@ -1,0 +1,17 @@
+import std.io.console { println };
+
+fn gen(): Coroutine<int> {
+    defer yieldTwo();
+    yield 1;
+}
+
+fn yieldTwo(): void {
+    yield 2;
+}
+
+fn main(): int {
+    let co = gen();
+    println(f"a={resume co}");
+    println(f"b={resume co}");
+    return 0;
+}

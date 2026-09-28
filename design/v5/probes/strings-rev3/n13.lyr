@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.string as strings;
+import std.time { Instant };
+fn main(): int {
+    let s = "ab" * 20000;
+    let t0 = Instant.now();
+    var i = 0;
+    var acc = 0;
+    while (i < s.length()) { acc = acc + 1; i = i + 1; }
+    let t1 = Instant.now();
+    var j = 0;
+    let n = s.length();
+    while (j < n) { acc = acc + 1; j = j + 1; }
+    let t2 = Instant.now();
+    println(f"{acc} length-in-loop={t1.since(t0).totalMillis()}ms cached={t2.since(t1).totalMillis()}ms");
+    return 0;
+}

@@ -1,0 +1,5 @@
+bt_coro: debug -> panic VM0006 in main.inner, Rahmen: inner(3), gen(8), drive(14), main(18) = 4 Rahmen, exit 101
+release -> inner gespleisst: weniger Rahmen, vermutlich gen(3?) drive main
+--jit -> JIT lehnt Chains ab (STATUS:848), also wie interpretiert ODER ein Rahmen ohne Zeile
+handlers: nested -> verify ok (Kontrolle). cross -> verify ok (Reader prueft keine Verschachtelung). catchstruct -> verify ok (Reader prueft nur Index). catchslot (Slot i64, catch &C) -> verify ok (kein Typvektor)
+intsem: max+1 -> -9223372036854775808 (wrap); min/-1 -> -9223372036854775808 (wrap); min%-1 -> 0; 1<<65 -> 2 (mod 64); min>>63 -> -1 (arithmetisch); 1/0 -> panic LYR-VM0002, exit 101

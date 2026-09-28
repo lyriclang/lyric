@@ -1,0 +1,22 @@
+import sys, os, time
+sys.path.insert(0, r"C:/Users/Olivier/AppData/Local/Temp/claude/C--Users-Olivier-CLionProjects-lyric/6d1f3425-b9ac-45c5-b685-291491b2d632/scratchpad/v5-design/probes/editor")
+from lspclient import Client
+HERE = os.path.dirname(os.path.abspath(__file__))
+def uri(p): return "file:///" + p.replace("\\","/").lstrip("/")
+path = os.path.join(HERE, "good.lyr")
+text = open(path, encoding="utf-8").read()
+c = Client()
+i = c.request("initialize", {"processId":None,"rootUri":None,"capabilities":{}})
+c.wait(lambda m: m.get("id")==i); c.notify("initialized",{})
+c.notify("textDocument/didOpen", {"textDocument":{"uri":uri(path),"languageId":"lyric","version":1,"text":text}})
+c.wait(lambda m: m.get("method")=="textDocument/publishDiagnostics", timeout=60)
+time.sleep(0.5)
+for meth in ("textDocument/documentSymbol", "textDocument/foldingRange"):
+    rid = c.request(meth, {"textDocument":{"uri":uri(path)}})
+    _, m = c.wait(lambda m, rid=rid: m.get("id")==rid, timeout=30)
+    r = m.get("result")
+    print(f"CONTROL {meth}: {'null' if r is None else (str(len(r)) + ' items')}")
+rid = c.request("textDocument/hover", {"textDocument":{"uri":uri(path)},"position":{"line":0,"character":4}})
+_, m = c.wait(lambda m, rid=rid: m.get("id")==rid, timeout=30)
+print("CONTROL hover on 'main':", "null" if m.get("result") is None else "data")
+c.p.kill()

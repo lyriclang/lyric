@@ -1,0 +1,3 @@
+module m60;
+pub fn v60(): int { return 60; }
+pub fn w60(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 60; } return s; }

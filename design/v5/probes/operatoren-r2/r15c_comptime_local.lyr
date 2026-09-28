@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let n = 3;
+    println(fromInt(comptime n));
+    return 0;
+}

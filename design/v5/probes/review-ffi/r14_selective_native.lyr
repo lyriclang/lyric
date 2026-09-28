@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.math { sqrt };
+fn apply(f: fn(float) -> float, x: float): float { return f(x); }
+fn main(): int { println(f"{apply(sqrt, 4.0)}"); return 0; }

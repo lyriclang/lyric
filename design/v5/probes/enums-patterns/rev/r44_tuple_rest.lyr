@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let t = (1, 2, 3);
+    match (t) {
+        (a, ..) => { println(f"{a}"); },
+    }
+    return 0;
+}

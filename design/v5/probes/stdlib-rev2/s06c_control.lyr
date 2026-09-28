@@ -1,0 +1,26 @@
+import std.io.console { println };
+import std.collections { Map };
+import std.string { fromInt };
+
+fn main(): int {
+    var m = Map<int, int>.empty();
+    m.set(1, 1);
+    m.set(2, 2);
+    m.set(3, 3);
+    let it = m.entries();
+    var seen = 0;
+    var e = it.next();
+    while (e != null) {
+        seen = seen + 1;
+        if (seen == 1) {
+
+
+
+
+
+        }
+        e = it.next();
+    }
+    println("seen=" + fromInt(seen) + " size=" + fromInt(m.length()));
+    return 0;
+}

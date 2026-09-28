@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"[{42:8}]");
+    println(f"[{42:-8}]");
+    println(f"[{42:08}]");
+    println(f"[{"x":8}]");
+    println(f"[{3.5:8}]");
+    println(f"[{42:D8}]");
+    println(f"[{true:6}]");
+    return 0;
+}

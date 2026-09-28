@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn main(): int {
+    let name: ?string = "Ada";
+    if (name != null) {
+        println(name);
+    }
+    let n: ?int = 5;
+    println(f"{n ?? 0}");
+    return 0;
+}

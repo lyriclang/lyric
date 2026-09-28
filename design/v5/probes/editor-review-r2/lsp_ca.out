@@ -1,0 +1,7 @@
+diagnostics: []
+codeAction -> {"code": -32601, "message": "'textDocument/codeAction' is not implemented"}
+hover-on-decl 'twice' -> null
+hover-on-use 'twice' -> {"contents": {"kind": "markdown", "value": "```lyric\nfn twice(int) -> int\n```"}, "range": {"start": {"line": 4, "character": 12}, "end": {"line": 4, "character": 17}}}
+hover-on-decl 'x' -> {"contents": {"kind": "markdown", "value": "```lyric\nlet x: int\n```"}, "range": {"start": {"line": 4, "character": 4}, "end": {"line": 4, "character": 21}}}
+hover-on-use 'x' -> {"contents": {"kind": "markdown", "value": "```lyric\nlet x: int\n```"}, "range": {"start": {"line": 5, "character": 11}, "end": {"line": 5, "character": 12}}}
+formatting -> [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 7, "character": 0}}, "newText": "fn twice(n: int): int {\n    return n * 2;\n}\n\nfn main(): int {\n    let x = twice(4);\n    return x - 8;\n}\n"}]

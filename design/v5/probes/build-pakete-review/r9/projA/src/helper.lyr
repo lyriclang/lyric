@@ -1,0 +1,2 @@
+module helper;
+pub fn who(): string { return "A's helper"; }

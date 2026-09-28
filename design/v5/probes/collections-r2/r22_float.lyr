@@ -1,0 +1,13 @@
+import std.io.console { println };
+fn main(): int {
+    var line = "1.5..4.5 ->";
+    for (x in 1.5..4.5) { line = line + f" {x}"; }
+    println(line);
+    var l2 = "0.0..0.5 ->";
+    var n = 0;
+    for (x in 0.0..0.5) { n += 1; l2 = l2 + f" {x}"; }
+    println(f"{l2} (Durchlaeufe {n})");
+    let probe: float = 0.5;
+    println(f"Kontrolle float-Druck: {probe} und {probe + 0.75}");
+    return 0;
+}

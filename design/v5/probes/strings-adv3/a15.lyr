@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "\xE2\x82\xAC";
+    println(f"{s.length()} {s.utf8Encode().length} {'\xFF' as int}");
+    return 0;
+}

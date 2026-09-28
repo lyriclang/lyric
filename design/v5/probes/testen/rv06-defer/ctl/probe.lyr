@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.core { panic };
+
+fn main(): int {
+    defer println("cleanup");
+    panic("boom");
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.random { secureRandom };
+
+fn main(): int {
+    let b = secureRandom(8);
+    println(b.length);
+    return 0;
+}

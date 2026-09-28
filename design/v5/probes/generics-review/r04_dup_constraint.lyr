@@ -1,0 +1,9 @@
+interface A1 { fn a(): int; }
+
+fn f<T :: [A1, A1]>(x: T): int { return x.a(); }
+
+class C1 :: [A1] { fn a(): int { return 7; } }
+
+fn main(): int {
+    return f(C1 { });
+}

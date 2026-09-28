@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"a [{3.14159:.2f}]");
+    println(f"b [{42:<8}]");
+    println(f"c [{42:>8}]");
+    println(f"d [{42:^8}]");
+    println(f"e [{42:*>8}]");
+    println(f"f [{255:x}]");
+    println(f"g [{255:X}]");
+    println(f"h [{255:b}]");
+    println(f"i [{3.14159:.2}]");
+    println(f"j [{42:+}]");
+    println(f"k [{42:#x}]");
+    return 0;
+}

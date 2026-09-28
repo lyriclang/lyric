@@ -1,0 +1,2 @@
+module shared;
+pub fn label(): string { return "from src/shared.lyr"; }

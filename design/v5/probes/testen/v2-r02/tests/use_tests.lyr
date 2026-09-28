@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+import helpers { helperValue };
+
+@Test
+pub fn uses_the_helper(): void {
+    assertEq(helperValue(), 42);
+}

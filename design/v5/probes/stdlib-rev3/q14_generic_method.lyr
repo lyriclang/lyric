@@ -1,0 +1,6 @@
+import std.io.console { println };
+class Box<T> {
+    value: T,
+    pub fn map<U>(f: fn(T) -> U): Box<U> { return Box<U> { value = f(this.value) }; }
+}
+fn main(): int { let b = Box<int> { value = 2 }; let c = b.map((n: int) => n * 10); println(c.value); return 0; }

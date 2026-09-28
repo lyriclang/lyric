@@ -1,0 +1,8 @@
+import std.core { Equatable, Hashable, Display };
+
+pub struct Coord :: [Equatable<Coord>, Hashable<Coord>, Display] {
+    x: int,
+    y: int,
+}
+
+fn main(): int { return 0; }

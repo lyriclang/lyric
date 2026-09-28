@@ -1,0 +1,5 @@
+module calc;
+
+fn internalDouble(x: int): int { return x * 2; }
+
+pub fn publicTriple(x: int): int { return x * 3; }

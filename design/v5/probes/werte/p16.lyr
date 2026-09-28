@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { v: int, }
+let g = S { v = 1 };
+fn main(): int {
+    g.v = 9;
+    println(f"global let struct field: g.v = {g.v}");
+    return 0;
+}

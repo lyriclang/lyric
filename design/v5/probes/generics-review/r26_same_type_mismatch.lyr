@@ -1,0 +1,5 @@
+fn same<T>(a: T, b: T): int { return 1; }
+fn main(): int {
+    let s = "x";
+    return same(1, s);
+}

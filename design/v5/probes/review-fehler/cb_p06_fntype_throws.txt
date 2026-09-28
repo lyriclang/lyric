@@ -1,0 +1,4 @@
+./p06_fntype_throws.lyr:7:23: error[LYR-SEM0084]: 'throws' belongs to a coroutine type, and 'void' is not one — a call declares what it throws in its own signature
+fn each(f: fn(int) -> void throws Boom): void {
+                      ^^^^^^^^^^^^^^^^
+

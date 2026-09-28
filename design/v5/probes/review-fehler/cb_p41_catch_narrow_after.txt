@@ -1,0 +1,12 @@
+./p41_catch_narrow_after.lyr:9:14: error[LYR-PAR0002]: expected an expression, got Colon
+            c: Boom => println("boom"),
+             ^
+
+./p41_catch_narrow_after.lyr:9:14: error[LYR-PAR0034]: expected '=>' in match arm, got Colon
+            c: Boom => println("boom"),
+             ^
+
+./p41_catch_narrow_after.lyr:9:16: error[LYR-PAR0035]: expected ',' after match arm
+            c: Boom => println("boom"),
+               ^^^^
+

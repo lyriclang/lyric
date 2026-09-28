@@ -1,0 +1,6 @@
+module lib;
+
+struct Secret { v: int, }
+
+pub fn make(): Secret { return Secret { v = 5 }; }
+pub fn read(s: Secret): int { return s.v; }

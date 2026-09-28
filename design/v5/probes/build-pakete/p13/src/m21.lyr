@@ -1,0 +1,3 @@
+module m21;
+pub fn v21(): int { return 21; }
+pub fn w21(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 21; } return s; }

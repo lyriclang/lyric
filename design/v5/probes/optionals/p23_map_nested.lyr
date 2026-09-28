@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.option { map };
+fn half(n: int): ?int { return if (n % 2 == 0) n / 2 else null; }
+fn main(): int {
+    let a: ?int = 4;
+    let r = map(a, (n: int) => half(n));
+    println("built");
+    return 0;
+}

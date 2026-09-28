@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let comptime = 2;
+    println(f"{comptime + 3}");
+    return 0;
+}

@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    // runtime: max int + 1
+    var a = 9223372036854775807;
+    a = a + 1;
+    println(fromInt(a));
+    // comptime: the same sum
+    println(fromInt(comptime (9223372036854775807 + 1)));
+    // truncation, both ways
+    println(fromInt(comptime (0 - 7 / 2)));
+    var b = 0 - 7;
+    println(fromInt(b / 2));
+    println(fromInt(b % 2));
+    println(fromInt(comptime (0 - 7 % 2)));
+    return 0;
+}

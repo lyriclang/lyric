@@ -1,0 +1,7 @@
+import m0 { h0_0 };
+import std.io.console { println };
+
+fn main(): int {
+    println(f"{h0_0(3)}");
+    return 0;
+}

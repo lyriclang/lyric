@@ -1,0 +1,4 @@
+import std.core { Deprecated };
+@Deprecated { message = "use Index", until = "5.0" }
+pub interface Oldish<T> { fn get(index: int): T; }
+fn main(): int { return 0; }

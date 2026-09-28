@@ -1,0 +1,17 @@
+import std.io.console { println };
+
+class Counter {
+    n: int,
+    pub mut fn bump(): int {
+        this.n = this.n + 1;
+        return 0;
+    }
+}
+
+fn main(): int {
+    let c = Counter { n = 0 };
+    let xs = [1, 2, 3];
+    xs[c.bump()] += 10;
+    println(f"array: calls={c.n} value={xs[0]}");
+    return 0;
+}

@@ -1,0 +1,3 @@
+module a;
+pub fn touch(): int { return 1; }
+extend int { fn tag(): string { return "from-a"; } }

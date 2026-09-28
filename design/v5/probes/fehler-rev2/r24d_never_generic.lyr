@@ -1,0 +1,4 @@
+// ERWARTUNG (offen): 'never' als Typargument einer Klasse.
+class Box<T> { tag: T }
+fn g(b: ?Box<never>): int { return 0; }
+fn main(): int { return g(null); }

@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn run(f: fn(int) -> int): int { return f(2); }
+fn main(): int {
+    println(fromInt(run { return 5; }));
+    println("after");
+    return 0;
+}

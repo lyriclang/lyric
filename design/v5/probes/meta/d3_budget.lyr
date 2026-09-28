@@ -1,0 +1,7 @@
+fn spin(): int {
+    var i = 0;
+    while (true) { i = i + 1; }
+    return i;
+}
+let S = comptime spin();
+fn main(): int { return S; }

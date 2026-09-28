@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+struct P { x: int, }
+
+fn main(): int {
+    let o: ?P = P { x = 5 };
+    let n: ?P = null;
+    println(fromInt(o?.x ?? 0));    // 5
+    println(fromInt(n?.x ?? 0));    // 0
+    println(fromInt(o!.x));         // 5
+    return 0;
+}

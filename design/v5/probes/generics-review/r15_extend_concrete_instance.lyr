@@ -1,0 +1,5 @@
+import std.collections { List };
+extend List<int> {
+    fn total(): int { return 0; }
+}
+fn main(): int { return 0; }

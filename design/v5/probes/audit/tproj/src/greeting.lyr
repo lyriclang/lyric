@@ -1,0 +1,7 @@
+module greeting;
+
+/// What the program says. A module of its own so a test can import it: `main.lyr` is the entry
+/// point and nobody imports an entry point.
+pub fn text(name: string): string {
+    return "Hello, " + name + "!";
+}

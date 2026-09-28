@@ -1,0 +1,6 @@
+// head comment
+fn main(  ):int{
+  // inside
+  let x=1; // trailing
+  /* block */ return x-1;
+}

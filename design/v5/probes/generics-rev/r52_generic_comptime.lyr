@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn twice<T>(x: T, n: int): int { return n * 2; }
+let K = comptime twice<int>(1, 21);
+fn main(): int { println(f"{K}"); return 0; }

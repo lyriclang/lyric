@@ -1,0 +1,5 @@
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\diagnostik2\proj\src\main.lyr:5:9: warning[LYR-SEM0071]: 'unused' is never used
+    let unused = 42;
+        ^^^^^^
+  note: name it '_' when the value is deliberately unused
+

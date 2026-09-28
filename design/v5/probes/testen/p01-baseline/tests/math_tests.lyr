@@ -1,0 +1,11 @@
+import std.test { Test, assertEq, assertTrue };
+
+@Test
+pub fn doubling_doubles(): void {
+    assertEq(2 * 2, 4);
+}
+
+@Test
+pub fn sign_survives(): void {
+    assertTrue(-3 * 2 < 0, "the sign must survive");
+}

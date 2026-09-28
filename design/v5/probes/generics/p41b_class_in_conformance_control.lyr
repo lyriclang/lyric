@@ -1,0 +1,5 @@
+class Plain { n: int, }
+
+class Other :: [Plain] { m: int, }
+
+fn main(): int { return 0; }

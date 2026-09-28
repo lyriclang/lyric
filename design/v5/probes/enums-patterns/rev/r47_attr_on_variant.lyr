@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.core { Deprecated };
+
+enum Signal {
+    Red,
+    @Deprecated { message = "use Green" }
+    Yellow,
+    Green,
+}
+fn main(): int { println("ok"); return 0; }

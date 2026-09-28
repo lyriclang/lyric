@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "aou";
+    var n = 0;
+    for (c in s) { n += 1; println(strings.fromInt(c as int)); }
+    println(f"count {n} length {s.length()}");
+    return 0;
+}

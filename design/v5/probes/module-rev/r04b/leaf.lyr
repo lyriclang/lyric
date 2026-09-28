@@ -1,0 +1,5 @@
+module leaf;
+
+pub struct Inner { v: int }
+
+pub fn make(): Inner { return Inner { v = 3 }; }

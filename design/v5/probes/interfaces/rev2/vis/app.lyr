@@ -1,0 +1,7 @@
+import std.io.console { println };
+import b { Named, Tag };
+fn main(): int {
+    let n: Named = Tag { };
+    println(n.name());
+    return 0;
+}

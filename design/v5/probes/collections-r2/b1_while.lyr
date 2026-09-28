@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.collections { arrayOf };
+fn main(): int {
+    let xs = arrayOf(1000, (i: int) => i);
+    var total = 0;
+    var r = 0;
+    while (r < 3000) {
+        var i = 0;
+        while (i < xs.length) { total = total + xs[i]; i = i + 1; }
+        r = r + 1;
+    }
+    println(f"{total}");
+    return 0;
+}

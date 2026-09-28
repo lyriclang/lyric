@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+fn pair(): Coroutine<void> {
+    yield;
+    yield;
+}
+
+fn main(): int {
+    let p = pair();
+    var n = 0;
+    while (p.next()) { n += 1; }
+    println(f"advanced {n} times");
+    return 0;
+}

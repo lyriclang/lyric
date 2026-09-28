@@ -1,0 +1,5 @@
+fn main(): int {
+    let c = true;
+    let a = if (c) 1;
+    return a;
+}

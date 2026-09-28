@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+fn apply<T, U>(x: T, f: fn(T) -> U): U { return f(x); }
+
+fn main(): int {
+    let n = apply(3, x => x + 1);
+    println(f"{n}");
+    return 0;
+}

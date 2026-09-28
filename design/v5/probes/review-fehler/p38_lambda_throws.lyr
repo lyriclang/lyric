@@ -1,0 +1,7 @@
+// ERWARTUNG (PLAN.md C): ein Lambda-Body, der wirft, ist SEM0034 — Lambdas duerfen nicht werfen.
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn risky(x: int): int throws Boom { throw Boom { what = "x" }; }
+fn apply(f: fn(int) -> int): int { return f(1); }
+fn main(): int {
+    return apply((x: int): int => risky(x));
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+import c { Tag, describe };
+fn use<T :: [c.Named]>(x: T): string { return x.name(); }
+fn main(): int { println(use(Tag { })); return 0; }

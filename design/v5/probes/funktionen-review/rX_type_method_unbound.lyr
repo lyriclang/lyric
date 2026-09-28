@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int, fn tell(): int { return this.v; } }
+fn call(f: fn(S) -> int): int { return f(S { v = 1 }); }
+fn main(): int { println(fromInt(call(S.tell))); return 0; }

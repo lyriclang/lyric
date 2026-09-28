@@ -1,0 +1,8 @@
+./p12_try_without_catch.lyr:5:5: error[LYR-PAR0023]: try needs at least one catch clause
+    try {
+    ^
+
+./p12_try_without_catch.lyr:5:5: error[LYR-SEM0036]: 'try' needs at least one 'catch' ('finally' does not exist — use 'defer')
+    try {
+    ^
+

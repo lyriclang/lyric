@@ -1,0 +1,32 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+class Clock { t0: int }
+let clock = Clock { t0 = 0 };
+
+fn stamp(): int { return os.nowMillis() - clock.t0; }
+
+fn sleeper(): Coroutine<Wait> {
+    println(f"sleeper enters os.sleep(300) at +{stamp()}ms");
+    os.sleep(300);
+    println(f"sleeper leaves os.sleep at +{stamp()}ms");
+}
+
+fn ticker(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 3) {
+        println(f"tick {i} at +{stamp()}ms");
+        yield Wait.Now;
+        i += 1;
+    }
+}
+
+fn main(): int {
+    clock.t0 = os.nowMillis();
+    spawn(sleeper());
+    spawn(ticker());
+    run();
+    println(f"run returned at +{stamp()}ms");
+    return 0;
+}

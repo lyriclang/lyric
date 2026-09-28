@@ -1,0 +1,12 @@
+import std.io.console { println };
+enum E { A(int), B(int), C }
+fn main(): int {
+    let e = E.A(3);
+    let r = match (e) {
+        A(x) | B(x) if x > 2 => x * 10,
+        A(x) | B(x) => x,
+        C => 0,
+    };
+    println(f"{r}");
+    return 0;
+}

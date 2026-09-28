@@ -1,0 +1,3 @@
+import lib;
+struct Other { w: int, }
+pub fn go(): int { return lib.ident(Other { w = 7 }).w; }

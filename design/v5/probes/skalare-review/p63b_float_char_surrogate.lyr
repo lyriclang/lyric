@@ -1,0 +1,8 @@
+// ERWARTUNG (§3.6): Panik VM0012 - float 55296.0 (=0xD800) -> char ist Surrogat
+import std.io.console { println };
+fn main(): int {
+  let f = 55296.0;
+  let c = f as char;
+  println(f"{c as int}");
+  return 0;
+}

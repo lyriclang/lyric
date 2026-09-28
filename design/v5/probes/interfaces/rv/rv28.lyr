@@ -1,0 +1,4 @@
+interface A { fn f(): int; }
+interface B { fn f(): int; }
+interface C :: [A, B] { }
+fn main(): int { return 0; }

@@ -1,0 +1,6 @@
+import std.io.console { println };
+class NoShow { }
+fn main(): int {
+    println(NoShow { });
+    return 0;
+}

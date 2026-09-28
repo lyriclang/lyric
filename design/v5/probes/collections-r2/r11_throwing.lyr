@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.iter { over };
+fn parse(s: string): int throws Exception {
+    if (s == "") { throw Exception { text = "leer" }; }
+    return 1;
+}
+fn main(): int {
+    let xs = ["a", "b"];
+    // Die Frage: darf eine werfende Funktion in eine Kette?
+    let it = over(xs).map(parse);
+    println(f"{it.count()}");
+    return 0;
+}

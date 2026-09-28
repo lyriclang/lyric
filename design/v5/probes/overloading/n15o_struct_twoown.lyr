@@ -1,0 +1,6 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int, }
+extend S { fn twice(): int { return this.v * 2; } }
+extend S { fn twice(k: int): int { return this.v * 2 * k; } }
+fn main(): int { let s = S { v = 3 }; println(fromInt(s.twice())); println(fromInt(s.twice(5))); return 0; }

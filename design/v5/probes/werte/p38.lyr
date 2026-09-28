@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct E { }
+class K { }
+fn main(): int { let e = E { }; let k = K { }; println("empty struct and class"); return 0; }

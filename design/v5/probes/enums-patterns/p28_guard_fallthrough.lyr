@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum E { A(int), B }
+fn f(e: E): int {
+    return match (e) {
+        A(x) if x > 10 => 1,
+        A(x) => 2,
+        B => 3,
+    };
+}
+fn main(): int { println(f"{f(E.A(1))} {f(E.A(20))}"); return 0; }

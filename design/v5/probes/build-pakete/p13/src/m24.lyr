@@ -1,0 +1,3 @@
+module m24;
+pub fn v24(): int { return 24; }
+pub fn w24(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 24; } return s; }

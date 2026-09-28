@@ -1,0 +1,2 @@
+import main;
+pub fn fb(): int { return main.fa() + 10; }

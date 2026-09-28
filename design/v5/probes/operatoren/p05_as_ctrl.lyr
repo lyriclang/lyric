@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromFloat };
+
+fn main(): int {
+    let a = 7;
+    let b = 2;
+    // as tighter than / (spec level 3 vs 4)  -> a / (b as float) -> int/float -> should be SEM0003
+    // as looser                              -> (a / b) as float -> 3.0
+    println(fromFloat(a / b as float));
+    return 0;
+}

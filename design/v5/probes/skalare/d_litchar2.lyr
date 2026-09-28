@@ -1,0 +1,1 @@
+fn main(): int { let c: char = 1114112; return 0; }

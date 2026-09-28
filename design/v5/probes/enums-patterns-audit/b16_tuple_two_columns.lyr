@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn f(a: bool, b: bool): int {
+    return match ((a, b)) { (true, true) => 1, (true, false) => 2, (false, true) => 3, (false, false) => 4 };
+}
+fn main(): int { println(f"{f(true, false)}"); return 0; }

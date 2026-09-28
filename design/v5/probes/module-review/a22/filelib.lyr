@@ -1,0 +1,5 @@
+module filelib;
+
+import std.io.file;
+
+pub fn readIt(p: string): ?string { return file.text(p); }

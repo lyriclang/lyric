@@ -1,0 +1,24 @@
+import std.io.console { println };
+import std.collections { Deque };
+import std.os as os;
+
+fn descend(n: int): void {
+    if (n > 0) { descend(n - 1); return; }
+    yield 1;
+}
+
+fn gen(d: int): Coroutine<int> { descend(d); descend(d); }
+
+fn main(): int {
+    let held = Deque<Coroutine<int>>.empty();
+    var i = 0;
+    while (i < 20000) {
+        let co = gen(40);
+        let _ = resume co;          // now suspended at depth 40
+        held.pushBack(co);
+        i += 1;
+    }
+    println(f"suspended chains: {held.length()}");
+    os.sleep(4000);
+    return 0;
+}

@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.task as task;
+import std.task { Wait };
+
+fn outer(): Coroutine<Wait> {
+    println("outer step 1");
+    yield Wait.Now;
+    println("outer calls nested run()");
+    task.run();
+    println("outer after nested run");
+}
+
+fn main(): int {
+    let co = outer();
+    task.spawn(co);
+    task.spawn(co);
+    task.run();
+    println("done");
+    return 0;
+}

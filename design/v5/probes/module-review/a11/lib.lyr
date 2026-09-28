@@ -1,0 +1,4 @@
+module lib;
+
+pub fn h(x: int): int { return 1; }
+pub fn h(s: string): int { return 2; }

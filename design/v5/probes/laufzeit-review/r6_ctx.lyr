@@ -1,0 +1,7 @@
+// R6 — Erreicht die Kontextausbreitung [x] * n?
+// Erwartung: 'let xs: uint8[] = [1] * n;' ist LYR-SEM0001
+fn main(): int {
+    let n = 4;
+    let xs: uint8[] = [1] * n;
+    return xs.length;
+}

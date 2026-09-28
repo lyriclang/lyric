@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.io.stream { open };
+
+fn main(): int {
+    println("x");
+    return 0;
+}

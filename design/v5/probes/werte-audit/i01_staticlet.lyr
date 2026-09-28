@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct P {
+    x: int,
+    static let ORIGIN: P = P { x = 0 };
+}
+fn main(): int {
+    P.ORIGIN.x = 9;
+    println(f"i01 P.ORIGIN.x={P.ORIGIN.x}");
+    return 0;
+}

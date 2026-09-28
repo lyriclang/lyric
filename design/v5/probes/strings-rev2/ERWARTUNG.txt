@@ -1,0 +1,21 @@
+ERWARTUNG VOR DEM LAUF (rev2, Strings)
+
+Grundlast (Prozessstart + String-Aufbau + '=='): ~200 ms, KONSTANT ueber n.
+  Begruendung: '==' ist ein VM-Opcode (Interpreter.cs:1381), also O(n) memcmp; der Rest ist
+  dotnet-Start.
+
+compare-Delta (a < b, gemeinsames Praefix der Laenge n):
+  Schleife laeuft n mal, jede Runde 2x charAt, charAt ist O(n) -> ~n^2 Schritte.
+  Erwartung: 10k ~400 ms, 20k ~1600 ms, 40k ~6400 ms. Faktor ~4 pro Verdopplung.
+
+hash-Delta (FNV ueber n Code-Punkte):
+  Schleife laeuft n mal, jede Runde 1x charAt -> ~n^2/2 Schritte, also ~HALB so teuer wie compare.
+  Erwartung: 10k ~200 ms, 20k ~800 ms, 40k ~3200 ms. Faktor ~4 pro Verdopplung.
+
+Wenn hash NICHT ~halb so teuer wie compare ist, habe ich einen Tippfehler gemessen.
+
+f-String-Absenkung (Linksfaltung aus concat, FunctionLowerer.cs:4874-4877):
+  k Loecher mit je L Zeichen -> Kopieraufwand ~ L*k^2/2, nicht L*k.
+  Erwartung bei L=20000, 100 Durchlaeufe: k=4 ~20M, k=8 ~72M, k=16 ~272M kopierte Zeichen,
+  also ueberproportional: Verdopplung von k soll die Zeit etwa VERVIERFACHEN, nicht verdoppeln.
+  Kontrolle: k=1 (nur ein Loch) muss praktisch Grundlast sein.

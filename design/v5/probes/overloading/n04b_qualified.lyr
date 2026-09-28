@@ -1,0 +1,3 @@
+import std.io.console { println };
+import mpv;
+fn main(): int { println(mpv.m(3)); return 0; }

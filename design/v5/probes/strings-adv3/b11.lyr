@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let c = 'a';
+    let s = "x";
+    println(f"{c:5}|{c:X}|{true:5}|{s:3}");
+    return 0;
+}

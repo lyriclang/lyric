@@ -1,0 +1,18 @@
+// ERWARTUNG: 9223372036854775807 / 5 / false / true / 1 / 9223372036854775807 / 1.8446744073709552E+19 / -1
+import std.io.console { println };
+fn main(): int {
+  let z: uint = 0 as uint;
+  let one: uint = 1 as uint;
+  let two: uint = 2 as uint;
+  let ten: uint = 10 as uint;
+  let big: uint = z - one;
+  println(f"{big / two}");
+  println(f"{big % ten}");
+  println(f"{big < one}");
+  println(f"{big > one}");
+  println(f"{big >> 63}");
+  println(f"{big >> 1}");
+  println(f"{big as float}");
+  println(f"{big as int}");
+  return 0;
+}

@@ -1,0 +1,5 @@
+class Boom { n: int }
+fn risky<T, E>(x: T, e: E, fail: bool): T throws E { if (fail) { throw e; } return x; }
+fn main(): int {
+  try { return risky<int, Boom>(1, Boom { n = 2 }, true); } catch (b: Boom) { return b.n; }
+}

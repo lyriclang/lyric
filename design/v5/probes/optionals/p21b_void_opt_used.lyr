@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn f(): ?void { return null; }
+fn main(): int {
+    let v = f();
+    if (v == null) { println("void-optional is null"); } else { println("void-optional is present"); }
+    return 0;
+}

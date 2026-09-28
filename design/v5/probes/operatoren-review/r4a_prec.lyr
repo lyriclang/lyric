@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt, fromFloat };
+fn main(): int {
+    let n = 7;
+    println(fromFloat(n as float * 2.0));
+    println(fromInt(1 << 2 + 3));
+    if (1 & 3 == 1) { println("and-tight"); }
+    if (1 | 2 == 3) { println("or-tight"); }
+    return 0;
+}

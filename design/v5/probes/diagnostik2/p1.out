@@ -1,0 +1,48 @@
+p1_missing_field.lyr:7:1: error[LYR-SEM0017]: not all code paths of 'main' return a value
+fn main(): int {
+^
+
+p1_missing_field.lyr:8:13: error[LYR-SEM0052]: 'Point' is a type, not a value — did you mean 'Point { … }'?
+    let p = Point { x: 1 };
+            ^^^^^
+
+p1_missing_field.lyr:8:19: error[LYR-SEM0045]: lambda parameter 'it' needs a type annotation (no context type available)
+    let p = Point { x: 1 };
+                  ^
+
+p1_missing_field.lyr:8:19: error[LYR-SEM0045]: a trailing lambda takes one parameter, 'it' — the context has to expect a function of one parameter
+    let p = Point { x: 1 };
+                  ^^^^
+
+p1_missing_field.lyr:8:21: error[LYR-SEM0002]: unknown identifier 'x'
+    let p = Point { x: 1 };
+                    ^
+
+p1_missing_field.lyr:8:22: error[LYR-PAR0002]: expected an expression, got Colon
+    let p = Point { x: 1 };
+                     ^
+
+p1_missing_field.lyr:8:22: error[LYR-PAR0016]: expected ';'
+    let p = Point { x: 1 };
+                     ^
+
+p1_missing_field.lyr:8:22: error[LYR-PAR0018]: expected '}' to close the lambda body
+    let p = Point { x: 1 };
+                     ^
+
+p1_missing_field.lyr:8:24: error[LYR-PAR0016]: expected ';'
+    let p = Point { x: 1 };
+                       ^
+
+p1_missing_field.lyr:8:24: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+    let p = Point { x: 1 };
+                       ^^^
+
+p1_missing_field.lyr:8:26: error[LYR-PAR0016]: expected ';'
+    let p = Point { x: 1 };
+                         ^
+
+p1_missing_field.lyr:8:27: error[LYR-PAR0025]: expected a declaration, got Semicolon
+    let p = Point { x: 1 };
+                          ^
+

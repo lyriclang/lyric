@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.json { Json };
+import std.collections { List, Map };
+fn main(): int {
+    var xs = List<int>.new();
+    xs.push(1);
+    var m = Map<string, int>.new();
+    m.set("a", 1);
+    println(xs.length.show());
+    return 0;
+}

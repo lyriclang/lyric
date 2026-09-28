@@ -1,0 +1,2 @@
+struct N { v: int, xs: N[], }
+fn main(): int { let n = N { v = 1, xs = [] }; return n.v; }

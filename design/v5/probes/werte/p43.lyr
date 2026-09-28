@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct S { v: int, }
+class C { o: ?S, }
+fn main(): int {
+    let a = C { o = S { v = 1 } };
+    var b = a.o;
+    b!.v = 9;
+    println(f"?S read out of a class field: a.o!.v = {a.o!.v}");
+    return 0;
+}

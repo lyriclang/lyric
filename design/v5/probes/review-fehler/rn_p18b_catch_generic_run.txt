@@ -1,0 +1,2 @@
+panic [LYR-VM0010]: uncaught exception of type 'Other'
+    in main.main (p18b_catch_generic_run.lyr:17)

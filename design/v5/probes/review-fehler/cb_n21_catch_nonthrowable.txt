@@ -1,0 +1,4 @@
+./n21_catch_nonthrowable.lyr:2:46: error[LYR-SEM0030]: cannot catch 'int' — only types implementing 'Throwable' can be caught
+fn main(): int { try { return 0; } catch (e: int) { return 1; } }
+                                             ^^^
+

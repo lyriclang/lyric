@@ -1,0 +1,14 @@
+// KONTROLLE: derselbe Aufbau ohne Wurf, stille Form.
+import std.io.console { println };
+fn quiet(i: int): ?int { if (i % 2 == 0) { return null; } return i; }
+fn main(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 200000) {
+        let r = quiet(i);
+        sum = sum + (r ?? 1);
+        i = i + 1;
+    }
+    println(f"{sum}");
+    return 0;
+}

@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.collections { slice };
+struct V { x: int, }
+fn main(): int {
+    var xs = [V{x=1}, V{x=2}, V{x=3}];
+    var s = slice(xs, 0, 3);
+    s[0].x = 77;   // Element 0 -- aliased die Quelle?
+    s[1].x = 88;   // Kontrolle: Element 1
+    println(f"quelle: {xs[0].x} {xs[1].x} {xs[2].x}");
+    println(f"slice:  {s[0].x} {s[1].x} {s[2].x}");
+    return 0;
+}

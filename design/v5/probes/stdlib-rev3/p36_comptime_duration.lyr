@@ -1,0 +1,3 @@
+import std.time { Duration };
+fn millis(): int { return Duration.ofSeconds(5).totalMillis(); }
+fn main(): int { let m = comptime millis(); return m as int; }

@@ -1,0 +1,4 @@
+fn main(): int {
+    let xs = [];
+    return 0;
+}

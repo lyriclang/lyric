@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct S { v: int, }
+enum E { A(S), B }
+fn main(): int {
+    var s = S { v = 1 };
+    let e = E.A(s);
+    match (e) {
+        E.A(inner) => { inner.v = 9; },
+        E.B => { },
+    }
+    println(f"g04 s.v={s.v}");
+    return 0;
+}

@@ -1,0 +1,2 @@
+module geo;
+pub fn tag(): string { return "A"; }

@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct V { x: int, mut fn shift(d: int): void { this.x = this.x + d; } }
+fn make(): V { return V { x = 1 }; }
+fn main(): int {
+    make().shift(9);
+    println("mut fn on a temporary compiled");
+    return 0;
+}

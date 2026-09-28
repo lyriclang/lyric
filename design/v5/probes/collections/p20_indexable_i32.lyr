@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    let l = List<int>.of([1, 2, 3]);
+    let i: int32 = 1i32;
+    println(f"{l[i]}");
+    return 0;
+}

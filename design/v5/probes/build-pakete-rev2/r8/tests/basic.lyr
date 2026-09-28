@@ -1,0 +1,7 @@
+import m1 { v1 };
+import std.test { Test, assertEq };
+
+@Test
+pub fn one_holds(): void {
+    assertEq(v1(2), v1(2));
+}

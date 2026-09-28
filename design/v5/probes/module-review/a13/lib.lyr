@@ -1,0 +1,10 @@
+module lib;
+
+extend int {
+    fn twice(): int { return this * 2; }
+}
+
+pub interface Named {
+    pub fn name(): string;
+    fn other(): int;
+}

@@ -1,0 +1,1 @@
+fn main(): int { var x: int8 = 1i8; x += 200; return 0; }

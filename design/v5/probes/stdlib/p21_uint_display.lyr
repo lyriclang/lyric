@@ -1,0 +1,7 @@
+import std.io.console { println };
+
+fn main(): int {
+    let u: uint = 5;
+    println(u);
+    return 0;
+}

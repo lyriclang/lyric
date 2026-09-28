@@ -1,0 +1,12 @@
+import std.io.console { println };
+pub enum Opt<T> {
+    Some(T),
+    Nothing;
+    pub fn map<U>(f: fn(T) -> U): Opt<U> {
+        return match (this) {
+            Some(v) => Opt<U>.Some(f(v)),
+            Nothing => Opt<U>.Nothing,
+        };
+    }
+}
+fn main(): int { let o = Opt<int>.Some(2); let p = o.map((n: int) => n * 10); match (p) { Some(v) => { println(v); } Nothing => { println("none"); } } return 0; }

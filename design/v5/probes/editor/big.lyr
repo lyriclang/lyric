@@ -1,0 +1,41 @@
+import std.io.console { println };
+
+struct P { x: int, y: int }
+
+fn f0(a: int, b: int): int { return a * 1 + b; }
+fn f1(a: int, b: int): int { return a * 2 + b; }
+fn f2(a: int, b: int): int { return a * 3 + b; }
+fn f3(a: int, b: int): int { return a * 4 + b; }
+fn f4(a: int, b: int): int { return a * 5 + b; }
+fn f5(a: int, b: int): int { return a * 6 + b; }
+fn f6(a: int, b: int): int { return a * 7 + b; }
+fn f7(a: int, b: int): int { return a * 8 + b; }
+fn f8(a: int, b: int): int { return a * 9 + b; }
+fn f9(a: int, b: int): int { return a * 10 + b; }
+fn f10(a: int, b: int): int { return a * 11 + b; }
+fn f11(a: int, b: int): int { return a * 12 + b; }
+fn f12(a: int, b: int): int { return a * 13 + b; }
+fn f13(a: int, b: int): int { return a * 14 + b; }
+fn f14(a: int, b: int): int { return a * 15 + b; }
+fn f15(a: int, b: int): int { return a * 16 + b; }
+fn f16(a: int, b: int): int { return a * 17 + b; }
+fn f17(a: int, b: int): int { return a * 18 + b; }
+fn f18(a: int, b: int): int { return a * 19 + b; }
+fn f19(a: int, b: int): int { return a * 20 + b; }
+fn f20(a: int, b: int): int { return a * 21 + b; }
+fn f21(a: int, b: int): int { return a * 22 + b; }
+fn f22(a: int, b: int): int { return a * 23 + b; }
+fn f23(a: int, b: int): int { return a * 24 + b; }
+fn f24(a: int, b: int): int { return a * 25 + b; }
+fn f25(a: int, b: int): int { return a * 26 + b; }
+fn f26(a: int, b: int): int { return a * 27 + b; }
+fn f27(a: int, b: int): int { return a * 28 + b; }
+fn f28(a: int, b: int): int { return a * 29 + b; }
+fn f29(a: int, b: int): int { return a * 30 + b; }
+
+fn main(): int {
+    let p = P { x = 1, y = 2 };
+    let s = f0(p.x, p.y) + f1(1, 2);
+    println(f"{s}");
+    return 0;
+}

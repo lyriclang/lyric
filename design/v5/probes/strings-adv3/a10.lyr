@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let emoji = "\u{1F600}";
+    let plain = "ab";
+    let cjk = "世界";
+    println(f"[{emoji:6}] {emoji.length()}");
+    println(f"[{plain:6}] {plain.length()}");
+    println(f"[{cjk:6}] {cjk.length()}");
+    return 0;
+}

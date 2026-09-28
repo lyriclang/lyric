@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f(c: char): int { return match (c) { 'z'..='a' => 1, _ => 2 }; }
+fn g(n: int): int { return match (n) { -1..=-5 => 1, _ => 2 }; }
+fn main(): int { println(f"{f('m')} {g(-3)}"); return 0; }

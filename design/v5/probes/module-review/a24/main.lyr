@@ -1,0 +1,12 @@
+module main;
+import std.io.console { println };
+import shapes.circle;
+import shapes.circle as C;
+
+fn main(): int {
+    println(circle.area(2));
+    println(C.area(2));
+    let lib = 5;
+    println(lib);
+    return 0;
+}

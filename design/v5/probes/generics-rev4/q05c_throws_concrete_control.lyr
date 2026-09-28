@@ -1,0 +1,5 @@
+class Boom :: [Throwable] { n: int, fn message(): string { return "boom"; } }
+fn risky<T>(x: T, fail: bool): T throws Boom { if (fail) { throw Boom { n = 2 }; } return x; }
+fn main(): int {
+  try { return risky<int>(1, true); } catch (b: Boom) { return b.n; }
+}

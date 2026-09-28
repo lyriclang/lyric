@@ -1,0 +1,3 @@
+module m36;
+pub fn v36(): int { return 36; }
+pub fn w36(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 36; } return s; }

@@ -1,0 +1,26 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+fn sleeper(): Coroutine<Wait> {
+    println("sleeper: yielding Wait.Sleep(300)");
+    yield Wait.Sleep(300);
+    println("sleeper: out");
+}
+
+fn ticker(): Coroutine<Wait> {
+    let start = os.nowMillis();
+    var i = 0;
+    while (i < 5) {
+        println(f"tick {i} at +{os.nowMillis() - start}ms");
+        yield Wait.Now;
+        i += 1;
+    }
+}
+
+fn main(): int {
+    spawn(sleeper());
+    spawn(ticker());
+    run();
+    return 0;
+}

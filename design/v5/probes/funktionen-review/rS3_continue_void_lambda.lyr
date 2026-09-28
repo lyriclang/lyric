@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn run(f: fn(int) -> void): void { f(2); }
+fn main(): int {
+    for (i in 0..3) {
+        run((n: int) => { continue; });
+        println(fromInt(i));
+    }
+    println("done");
+    return 0;
+}

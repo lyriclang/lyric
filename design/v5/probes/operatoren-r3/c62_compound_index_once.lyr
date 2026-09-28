@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+class C { n: int = 0, fn next(): int { println("next"); this.n = this.n + 1; return 1; } }
+class Box { v: ?int = null, }
+fn main(): int {
+    let c = C { };
+    var ys = [0, 0];
+    ys[c.next()] += 5;
+    println(fromInt(ys[1]));
+    let boxes = [Box { }, Box { }];
+    boxes[c.next()].v ??= 9;
+    println(fromInt(boxes[1].v ?? 0));
+    return 0;
+}

@@ -1,0 +1,2 @@
+module std.core;
+fn main(): int { return 0; }

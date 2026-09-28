@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct P { x: int, y: int }
+fn main(): int {
+    var P { x, y } = P { x = 1, y = 2 };
+    x = x + 10;
+    println(f"{x} {y}");
+    return 0;
+}

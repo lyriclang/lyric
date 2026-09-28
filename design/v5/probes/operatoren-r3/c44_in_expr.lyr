@@ -1,0 +1,5 @@
+fn main(): int {
+    let xs = [1, 2, 3];
+    let b = 3 in xs;
+    return 0;
+}

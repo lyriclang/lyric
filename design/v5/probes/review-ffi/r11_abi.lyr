@@ -1,0 +1,4 @@
+extern "C" fn a(x: int): int = "X::Y";
+extern "c" fn b(x: int): int = "X::Y";
+extern "DOTNET" fn c(x: int): int = "X::Y";
+fn main(): int { return 0; }

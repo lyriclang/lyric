@@ -1,0 +1,5 @@
+s02_file_only.lyr:2:22: warning[LYR-SEM0072]: import 'exists' is never used
+import std.io.file { exists };
+                     ^^^^^^
+
+s02_file_only.lyrbc: 3123 bytes

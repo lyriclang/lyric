@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int, fn area(): int { return this.r; } }
+
+fn main(): int {
+    let a: Shape = Circle { r = 5 };
+    let b: Shape = Circle { r = 5 };
+    if (a == b) { println("eq"); } else { println("ne"); }
+    return 0;
+}

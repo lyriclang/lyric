@@ -1,0 +1,9 @@
+fn gen(): Coroutine<int> {
+    yield 1;
+    return 42;
+}
+
+fn main(): int {
+    let co = gen();
+    return 0;
+}

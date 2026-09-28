@@ -1,0 +1,8 @@
+import std.test { Test };
+
+fn outer(): void {
+    @Test
+    fn inner(): void { }
+}
+
+fn main(): int { return 0; }

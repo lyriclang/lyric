@@ -1,0 +1,8 @@
+// ERWARTUNG: unklar - f(1i8, 2): T=int8 und 2 adaptiert? oder Konflikt int8/int
+import std.io.console { println };
+fn f<T>(a: T, b: T): T { return b; }
+fn main(): int {
+  let r = f(1i8, 2);
+  println(f"{r}");
+  return 0;
+}

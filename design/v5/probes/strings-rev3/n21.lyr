@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.io.file as file;
+fn main(): int {
+    let r = file.text("nul\0name.txt");
+    println(if (r == null) "null (not found or refused)" else "read something");
+    return 0;
+}

@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct S { v: int, }
+fn takesOpt(o: ?S): void { o!.v = 9; }
+fn takesPlain(s: S): void { s.v = 9; }
+fn main(): int {
+    var a: ?S = S { v = 1 };
+    takesOpt(a);
+    println(f"?S parameter: a!.v = {a!.v}");
+    var b = S { v = 1 };
+    takesPlain(b);
+    println(f"KONTROLLE S parameter: b.v = {b.v}");
+    return 0;
+}

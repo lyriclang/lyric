@@ -1,0 +1,12 @@
+import std.core { OnFunction };
+
+pub struct Hot :: [OnFunction] { }
+
+pub struct Box { v: int }
+
+extend Box {
+    @Hot
+    pub fn get(): int { return this.v; }
+}
+
+fn main(): int { return 0; }

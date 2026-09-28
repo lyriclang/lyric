@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var f: ?fn(int) -> int = null;
+    if (f == null) { println("null"); }
+    f = (n: int) => n + 1;
+    println(fromInt(f!(1)));
+    return 0;
+}

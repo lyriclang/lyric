@@ -1,0 +1,7 @@
+// B-Kontrolle — [1] * 3e9: ueber der VM-Schranke. ERWARTUNG: LYR-VM0006, Exit 101.
+import std.io.console { println };
+fn main(): int {
+    let xs = [1] * 3000000000;
+    println(f"{xs.length}");
+    return 0;
+}

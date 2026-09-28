@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.core { Hashable };
+fn takesHashable<K :: [Hashable<K>]>(k: K): int { return k.hash(); }
+fn main(): int {
+    // Kontrolle: int erfuellt sie
+    println(f"{takesHashable(7)}");
+    return 0;
+}

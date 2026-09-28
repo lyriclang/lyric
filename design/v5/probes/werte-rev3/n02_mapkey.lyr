@@ -1,0 +1,23 @@
+import std.io.console { println };
+import std.collections { Map };
+import std.core { Hashable };
+struct K :: [Hashable<K>] {
+    v: int,
+    fn equals(other: K): bool { return this.v == other.v; }
+    fn hash(): int { return this.v; }
+}
+fn main(): int {
+    var k: ?K = K { v = 1 };
+    var alias = k;
+    var m = Map<K, int>.empty();
+    m.set(k!, 100);
+    alias!.v = 2;
+    let viaOld = m.get(K { v = 1 });
+    let viaNew = m.get(K { v = 2 });
+    println(f"n02 mapkey old={viaOld ?? -1} new={viaNew ?? -1} (old=100 -> key was copied on insert)");
+    var ys = [K { v = 5 }] * 2;
+    m.set(ys[0], 500);
+    ys[1].v = 6;
+    println(f"n02 mapkey via [x]*n old={m.get(K { v = 5 }) ?? -1} new={m.get(K { v = 6 }) ?? -1}");
+    return 0;
+}

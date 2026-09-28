@@ -1,0 +1,8 @@
+import std.io.console { println };
+class Counter { i: int = 0, fn next(): ?int { this.i = this.i + 1; if (this.i > 3) { return null; } return this.i; } }
+fn main(): int {
+    let c = Counter { };
+    var l: ?int = null;
+    while ((l = c.next()) != null) { println("tick"); }
+    return 0;
+}

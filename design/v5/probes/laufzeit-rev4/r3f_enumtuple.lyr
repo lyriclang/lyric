@@ -1,0 +1,34 @@
+// R3f — Darstellung/Kopie von Enum-Payload und Tupel-Element, wenn ein Struct drinsteckt.
+// ERWARTUNG VOR DEM LAUF (BindLocal kopiert 'type is IrStructType'; ein Enum-Wert und ein Tupel
+// sind Referenzen auf ein LyrValue[], ihre Bindung kopiert nichts):
+//   enumBind  = 0   (match-Bindung des Payloads kopiert -> spaeteres hoch() im Original unsichtbar)
+//   enumShare = 1   (let e2 = e1; dann via match aus e2 mutieren... nicht moeglich ohne Bindung)
+//   -> stattdessen: tupleShare = 1 (t2 = t1; t2.0 mutieren via Destrukturierung? auch Bindung)
+// Wir messen, was messbar ist: Bindung aus Enum kopiert (0), Bindung aus Tupel kopiert (0),
+// KONTROLLE Klassenpayload geteilt (1).
+import std.io.console { println };
+struct Zaehler { n: int, mut fn hoch(): void { this.n += 1; } fn wert(): int { return this.n; } }
+class KZ { n: int, mut fn hoch(): void { this.n += 1; } }
+enum Box { Voll(Zaehler), Leer }
+enum KBox { Voll(KZ), Leer }
+fn lese(b: Box): int { match (b) { Box.Voll(z) => { return z.wert(); } Box.Leer => { return -1; } } }
+fn main(): int {
+    let z = Zaehler { n = 0 };
+    let b = Box.Voll(z);
+    z.hoch();
+    println(f"enumWrap  = {lese(b)}");   // Erwartung 0: das Einpacken in den Variant kopiert (frisch? nein, z ist gebunden)
+    match (b) { Box.Voll(q) => { q.hoch(); } Box.Leer => {} }
+    println(f"enumBind  = {lese(b)}");   // Erwartung: 0 wenn die match-Bindung kopiert, 1 wenn Alias
+    let kz = KZ { n = 0 };
+    let kb = KBox.Voll(kz);
+    kz.hoch();
+    var kk = 0;
+    match (kb) { KBox.Voll(o) => { kk = o.n; } KBox.Leer => {} }
+    println(f"klassePayload = {kk}");    // KONTROLLE Erwartung 1 (Referenz)
+    let t = (Zaehler { n = 0 }, 5);
+    let (tz, _) = t;
+    tz.hoch();
+    let (tz2, _) = t;
+    println(f"tupleBind = {tz2.wert()}"); // Erwartung 0 wenn die Destrukturierung kopiert, 1 wenn Alias
+    return 0;
+}

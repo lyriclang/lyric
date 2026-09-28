@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.fmt { formatFloat };
+import std.string { fromInt };
+fn main(): int {
+    let spec = "F" + fromInt(2);
+    println(formatFloat(3.14159, spec));
+    let bad = "Q" + fromInt(9);
+    println(formatFloat(3.14159, bad));
+    return 0;
+}

@@ -1,0 +1,2 @@
+fn sq(x: int): int { return x * x; }
+fn main(): int { return sq(3) - 9; }

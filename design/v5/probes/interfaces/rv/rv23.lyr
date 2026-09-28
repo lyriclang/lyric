@@ -1,0 +1,4 @@
+import std.io.console { println };
+class Plain { }
+extend Plain { static fn make(): Plain { return Plain { }; } }
+fn main(): int { let p = Plain.make(); println("ok"); return 0; }

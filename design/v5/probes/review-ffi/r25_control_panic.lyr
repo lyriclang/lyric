@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    println("BEFORE");
+    panic("ordinary lyric panic");
+    return 0;
+}

@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn main(): int {
+    let c = '\xFF';
+    println(f"xFF as int = {c as int}");
+    let euroBytes = "\xE2\x82\xAC";
+    println(f"len={euroBytes.length()} bytes={euroBytes.utf8Encode().length}");
+    let nul = "a\0b";
+    println(f"nul len={nul.length()} bytes={nul.utf8Encode().length}");
+    let hi = "\u{10FFFF}";
+    println(f"max len={hi.length()} bytes={hi.utf8Encode().length}");
+    return 0;
+}

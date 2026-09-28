@@ -1,0 +1,9 @@
+import std.io.console { println };
+enum E { A(int), B }
+fn f(e: E, m: int): int {
+    return match ((e, m)) {
+        (A(n), _) => n,
+        (B, _) => -1,
+    };
+}
+fn main(): int { println(f"{f(E.A(3), 7)}"); return 0; }

@@ -1,0 +1,7 @@
+import std.core { OnFunction, panic };
+
+pub struct Test :: [OnFunction] { }
+
+pub fn notReallyATest(): void {
+    panic("but the runner ran me");
+}

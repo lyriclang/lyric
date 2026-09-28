@@ -1,0 +1,5 @@
+fn main(): int {
+    let n = 1 + 2;
+    // c
+    return n - 3;
+}

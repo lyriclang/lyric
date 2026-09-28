@@ -1,0 +1,343 @@
+type ty0 Utf8Error {
+  #0 offset: i64
+}
+type ty1 <tuple> {
+  #0 0: i64
+  #1 1: i64
+  #2 2: i64
+}
+type ty2 Result<int, ParseError> {
+}
+type ty3 Result<int, ParseError>.Ok {
+  #0 $tag: i64
+  #1 0: i64
+}
+type ty4 ParseError {
+  #0 kind: enum ty5
+  #1 offset: i64
+}
+type ty5 ParseErrorKind {
+}
+type ty6 ParseErrorKind.Empty {
+  #0 $tag: i64
+}
+type ty7 ParseErrorKind.InvalidDigit {
+  #0 $tag: i64
+}
+type ty8 ParseErrorKind.Overflow {
+  #0 $tag: i64
+}
+type ty9 Result<int, ParseError>.Err {
+  #0 $tag: i64
+  #1 0: &ty4
+}
+type ty10 StringBuilder {
+  #0 parts: string[]
+  #1 count: i64
+}
+type ty11 Exception {
+  #0 text: string
+}
+interface ty12 Iterator<int> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty13 RangeIterator {
+  #0 current: i64
+  #1 end: i64
+}
+type ty14 InclusiveRangeIterator {
+  #0 current: i64
+  #1 last: i64
+  #2 done: bool
+}
+interface ty15 Iterator<float> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty16 UnsignedRangeIterator {
+  #0 current: u64
+  #1 end: u64
+}
+type ty17 InclusiveUnsignedRangeIterator {
+  #0 current: u64
+  #1 last: u64
+  #2 done: bool
+}
+type ty18 StringIterator {
+  #0 chars: char[]
+  #1 index: i64
+}
+interface ty19 Iterator<string> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty20 LineIterator {
+  #0 done: bool
+}
+type ty21 FilterIterator<int> {
+  #0 source: dyn ty12
+  #1 keep: fn(i64) -> bool
+}
+type ty22 TakeIterator<int> {
+  #0 source: dyn ty12
+  #1 remaining: i64
+}
+type ty23 SkipIterator<int> {
+  #0 source: dyn ty12
+  #1 pending: i64
+}
+type ty24 TakeWhileIterator<int> {
+  #0 source: dyn ty12
+  #1 keep: fn(i64) -> bool
+  #2 done: bool
+}
+type ty25 ChainIterator<int> {
+  #0 first: dyn ty12
+  #1 second: dyn ty12
+  #2 onFirst: bool
+}
+type ty26 SkipWhileIterator<int> {
+  #0 source: dyn ty12
+  #1 drop: fn(i64) -> bool
+  #2 passing: bool
+}
+type ty27 StepByIterator<int> {
+  #0 source: dyn ty12
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty28 InspectIterator<int> {
+  #0 source: dyn ty12
+  #1 look: fn(i64) -> void
+}
+type ty29 DedupIterator<int> {
+  #0 source: dyn ty12
+  #1 key: fn(i64) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+type ty30 FilterIterator<float> {
+  #0 source: dyn ty15
+  #1 keep: fn(f64) -> bool
+}
+type ty31 TakeIterator<float> {
+  #0 source: dyn ty15
+  #1 remaining: i64
+}
+type ty32 SkipIterator<float> {
+  #0 source: dyn ty15
+  #1 pending: i64
+}
+type ty33 TakeWhileIterator<float> {
+  #0 source: dyn ty15
+  #1 keep: fn(f64) -> bool
+  #2 done: bool
+}
+type ty34 ChainIterator<float> {
+  #0 first: dyn ty15
+  #1 second: dyn ty15
+  #2 onFirst: bool
+}
+type ty35 SkipWhileIterator<float> {
+  #0 source: dyn ty15
+  #1 drop: fn(f64) -> bool
+  #2 passing: bool
+}
+type ty36 StepByIterator<float> {
+  #0 source: dyn ty15
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty37 InspectIterator<float> {
+  #0 source: dyn ty15
+  #1 look: fn(f64) -> void
+}
+type ty38 DedupIterator<float> {
+  #0 source: dyn ty15
+  #1 key: fn(f64) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+type ty39 FilterIterator<string> {
+  #0 source: dyn ty19
+  #1 keep: fn(string) -> bool
+}
+type ty40 TakeIterator<string> {
+  #0 source: dyn ty19
+  #1 remaining: i64
+}
+type ty41 SkipIterator<string> {
+  #0 source: dyn ty19
+  #1 pending: i64
+}
+type ty42 TakeWhileIterator<string> {
+  #0 source: dyn ty19
+  #1 keep: fn(string) -> bool
+  #2 done: bool
+}
+type ty43 ChainIterator<string> {
+  #0 first: dyn ty19
+  #1 second: dyn ty19
+  #2 onFirst: bool
+}
+type ty44 SkipWhileIterator<string> {
+  #0 source: dyn ty19
+  #1 drop: fn(string) -> bool
+  #2 passing: bool
+}
+type ty45 StepByIterator<string> {
+  #0 source: dyn ty19
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty46 InspectIterator<string> {
+  #0 source: dyn ty19
+  #1 look: fn(string) -> void
+}
+type ty47 DedupIterator<string> {
+  #0 source: dyn ty19
+  #1 key: fn(string) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+
+fn main.f -> i64 {
+  params: 1
+  locals:
+    l0 s: string
+    l1 $match0: i64
+  bb0:
+    t0: string = load l0
+    t1: string = const "get"
+    t2: bool = eq t0, t1
+    condbr t2 -> bb1, bb2
+  bb1:
+    t3: i64 = const 1
+    store l1, t3
+    br bb3
+  bb2:
+    t4: string = const "put"
+    t5: bool = eq t0, t4
+    condbr t5 -> bb4, bb5
+  bb3:
+    t11: i64 = load l1
+    ret t11
+  bb4:
+    t6: i64 = const 2
+    store l1, t6
+    br bb3
+  bb5:
+    t7: string = const "post"
+    t8: bool = eq t0, t7
+    condbr t8 -> bb6, bb7
+  bb6:
+    t9: i64 = const 3
+    store l1, t9
+    br bb3
+  bb7:
+    t10: i64 = const 0
+    store l1, t10
+    br bb3
+}
+
+fn main.main -> i64 {
+  params: 0
+  locals:
+  bb0:
+    t0: string = const "post"
+    t1: i64 = call main.f(t0)
+    t2: string = callimport std.string.fromInt(t1)
+    t3: string = const " "
+    t4: string = const "x"
+    t5: i64 = call main.f(t4)
+    t6: string = callimport std.string.fromInt(t5)
+    t7: string = callimport std.string.concat(t2, t3)
+    t8: string = callimport std.string.concat(t7, t6)
+    call std.io.console.println<string>(t8)
+    t9: i64 = const 0
+    ret t9
+}
+
+fn std.io.console.println<string> -> void {
+  params: 1
+  locals:
+    l0 value: string
+  bb0:
+    t0: string = load l0
+    t1: string = call std.core.<extend>.string.show(t0)
+    callimport std.io.console.rawPrintln(t1)
+    ret
+}
+
+fn std.core.<extend>.string.show -> string {
+  params: 1
+  locals:
+    l0 this: string
+  bb0:
+    t0: string = load l0
+    ret t0
+}

@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    if (2 in xs) { println("ja"); }
+    return 0;
+}

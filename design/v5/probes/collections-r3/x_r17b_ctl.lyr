@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.iter { Iterator };
+pub opaque type Handle = int;
+extend Handle { pub fn describe(): string { return "handle"; } }
+fn main(): int {
+    let h: Handle = 1 as Handle;
+    println(h.describe());
+    return 0;
+}

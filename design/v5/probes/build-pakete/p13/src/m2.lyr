@@ -1,0 +1,3 @@
+module m2;
+pub fn v2(): int { return 2; }
+pub fn w2(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 2; } return s; }

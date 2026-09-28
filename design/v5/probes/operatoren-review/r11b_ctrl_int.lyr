@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let n = 7;
+    println(f"value {n}");
+    return 0;
+}

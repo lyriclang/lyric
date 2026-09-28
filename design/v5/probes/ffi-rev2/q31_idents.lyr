@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let unsafe = 1;
+    let extern = 2;
+    println(f"{unsafe + extern}");
+    return 0;
+}

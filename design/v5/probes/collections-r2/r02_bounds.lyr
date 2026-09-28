@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    var i = 5;
+    println("vor dem Zugriff");
+    println(f"{xs[i]}");
+    println("nach dem Zugriff");
+    return 0;
+}

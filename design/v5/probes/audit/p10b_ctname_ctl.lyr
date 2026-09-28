@@ -1,0 +1,6 @@
+fn plusOne(n: int): int { return n + 1; }
+
+fn main(): int {
+    let k = 3;
+    return plusOne(k);
+}

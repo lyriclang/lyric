@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct P { x: int, y: int }
+fn main(): int {
+    let ps = [P { x = 1, y = 2 }];
+    for (P { x, y } in ps) { println(f"{x}"); }
+    return 0;
+}

@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.iter { Iterator, over };
+
+fn total(source: Iterator<int>): int {
+    return 0;
+}
+
+fn total(source: Iterator<float>): int {
+    return 1;
+}
+
+fn main(): int {
+    println(total(over([1, 2, 3])));
+    return 0;
+}

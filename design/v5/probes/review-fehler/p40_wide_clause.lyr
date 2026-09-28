@@ -1,0 +1,7 @@
+// ERWARTUNG: keine Diagnose fuer eine zu weite Klausel (deklariert Throwable, wirft nur Boom).
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn wide(): int throws { throw Boom { what = "x" }; }
+fn main(): int {
+    try { return wide(); } catch (_) { println("caught"); return 0; }
+}

@@ -1,0 +1,4 @@
+class E1 :: [Throwable] { fn message(): string { return "e1"; } }
+interface Risky { fn go(): int; }
+class Wide :: [Risky] { fn go(): int throws E1 { return 1; } }
+fn main(): int { return 0; }

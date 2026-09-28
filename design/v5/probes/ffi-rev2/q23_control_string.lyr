@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string;
+extern "dotnet" fn toChar(v: int32): char = "System.Convert::ToChar";
+extern "dotnet" fn charToString(c: char): string = "System.Char::ToString";
+fn main(): int {
+    let ok = charToString(toChar(65));
+    println(f"len={ok.length()} c0={ok.charAt(0) as int}");
+    return 0;
+}

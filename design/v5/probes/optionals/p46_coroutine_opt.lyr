@@ -1,0 +1,2 @@
+fn gen(): Coroutine<?int> { yield 1; }
+fn main(): int { return 0; }

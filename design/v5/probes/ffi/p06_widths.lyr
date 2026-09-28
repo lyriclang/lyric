@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+extern "dotnet" fn maxI32(a: int32, b: int32): int32 = "System.Math::Max";
+extern "dotnet" fn maxU8(a: uint8, b: uint8): uint8 = "System.Math::Max";
+extern "dotnet" fn upper(c: char): char = "System.Char::ToUpper";
+extern "dotnet" fn isDigit(c: char): bool = "System.Char::IsDigit";
+extern "dotnet" fn envOf(name: string): string = "System.Environment::GetEnvironmentVariable";
+
+fn main(): int {
+    println(f"maxI32={maxI32(3i32, 9i32)}");
+    println(f"maxU8={maxU8(200u8, 7u8)}");
+    println(f"upper={upper('a')}");
+    println(f"isDigit={isDigit('7')}");
+    println(f"missing=[{envOf("LYRIC_NO_SUCH_VAR_XYZ")}]");
+    return 0;
+}

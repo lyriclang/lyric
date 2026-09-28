@@ -1,0 +1,14 @@
+// ERWARTUNG: die Koroutine wird EINMAL gezogen und dann fallengelassen;
+// "coroutine cleanup" erscheint NIE.
+import std.io.console { println };
+fn gen(): Coroutine<int> {
+    defer println("coroutine cleanup");
+    yield 1;
+    yield 2;
+}
+fn main(): int {
+    let co = gen();
+    println(f"{resume co}");
+    println("dropped");
+    return 0;
+}

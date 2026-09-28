@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn once<T>(a: T): Coroutine<T> { yield a; }
+fn main(): int {
+  let c = once<int>(7);
+  println(f"{resume c}");
+  return 0;
+}

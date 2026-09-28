@@ -1,0 +1,5 @@
+struct S {
+    v: int,
+    fn setNoMut(): void { this.v = 9; }
+}
+fn main(): int { return 0; }

@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    println(f"[{42:'abc'}] [{3.7:C}] [{0.5:P1}] [{1234.5:#,##0.00}]");
+    return 0;
+}

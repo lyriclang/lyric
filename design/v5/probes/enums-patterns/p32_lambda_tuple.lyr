@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn apply(f: fn((int, int)) -> int, p: (int, int)): int { return f(p); }
+fn main(): int {
+    println(f"{apply(((a, b)) => a + b, (3, 4))}");
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn isEven(n: int): bool { if (n == 0) { return true; } return isOdd(n - 1); }
+fn isOdd(n: int): bool { if (n == 0) { return false; } return isEven(n - 1); }
+fn main(): int {
+    if (isEven(10)) { println("even"); }
+    return 0;
+}

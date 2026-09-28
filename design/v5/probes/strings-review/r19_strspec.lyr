@@ -1,0 +1,6 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"{"x":N2}");
+    return 0;
+}

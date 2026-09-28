@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.collections { List };
+struct Vec2 { x: float, y: float }
+fn main(): int {
+    let xs = [Vec2{x=1.0,y=0.0}, Vec2{x=2.0,y=0.0}, Vec2{x=3.0,y=0.0}];
+    match (xs) {
+        [first, ..rest] => {
+            rest[0].x = 9.0;
+            println(f"rest xs[1].x={xs[1].x} rest[0].x={rest[0].x} first.x={first.x}");
+        }
+        _ => { println("no"); }
+    }
+    let l = List<Vec2>.of(xs);
+    let back = l.toArray();
+    back[0].x = 7.0;
+    println(f"list xs[0].x={xs[0].x} back[0].x={back[0].x}");
+    return 0;
+}

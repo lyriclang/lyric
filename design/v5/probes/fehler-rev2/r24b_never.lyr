@@ -1,0 +1,3 @@
+// ERWARTUNG (offen): never[] als Rueckgabetyp
+fn f(): never[] { panic("x"); }
+fn main(): int { return 0; }

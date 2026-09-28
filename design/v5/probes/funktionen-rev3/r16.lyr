@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn side(s: string): int { println(s); return 1; }
+fn f(a: int = side("a"), b: int = side("b")): int { return a + b; }
+fn main(): int {
+    println(fromInt(f()));
+    println(fromInt(f(1)));
+    println(fromInt(f(side("x"))));
+    return 0;
+}

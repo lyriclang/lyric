@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    let l: List<int> = [1, 2, 3];
+    println("x");
+    return 0;
+}

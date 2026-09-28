@@ -1,0 +1,7 @@
+import std.core { panic };
+fn checked(n: int): int {
+    if (n > 10) { panic("too big"); }
+    return n;
+}
+let K = comptime checked(99);
+fn main(): int { return K; }

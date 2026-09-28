@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn g<T>(x: T): int { return 1; }
+fn g(x: int): int { return 2; }
+fn main(): int {
+  let a = g(5);
+  let b = g("s");
+  println(f"{a} {b}");
+  return 0;
+}

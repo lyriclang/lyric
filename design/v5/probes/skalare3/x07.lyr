@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let a: int8 = -1i8; println(f"{a as uint64}"); println(f"{a as uint8}"); println(f"{a as int64}"); let b: uint8 = 200u8; println(f"{b as int64}"); println(f"{b as int8}"); return 0; }

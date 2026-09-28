@@ -1,0 +1,4 @@
+import lib;
+import std.io.console;
+
+fn main(): int { console.println(f"{lib.secretGlobal}"); return 0; }

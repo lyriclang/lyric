@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"[{1234.5:#,##0.00}]");
+    println(f"[{42:'abc'}]");
+    println(f"[{0.5:P1}]");
+    println(f"[{255:X}]");
+    println(f"[{-255:X}]");
+    println(f"[{1234:0,0}]");
+    println(f"[{3.7:C}]");
+    return 0;
+}

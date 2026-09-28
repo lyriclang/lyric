@@ -1,0 +1,33 @@
+fn main(): int {
+    let a0 = nosuch0;
+    let a1 = nosuch1;
+    let a2 = nosuch2;
+    let a3 = nosuch3;
+    let a4 = nosuch4;
+    let a5 = nosuch5;
+    let a6 = nosuch6;
+    let a7 = nosuch7;
+    let a8 = nosuch8;
+    let a9 = nosuch9;
+    let a10 = nosuch10;
+    let a11 = nosuch11;
+    let a12 = nosuch12;
+    let a13 = nosuch13;
+    let a14 = nosuch14;
+    let a15 = nosuch15;
+    let a16 = nosuch16;
+    let a17 = nosuch17;
+    let a18 = nosuch18;
+    let a19 = nosuch19;
+    let a20 = nosuch20;
+    let a21 = nosuch21;
+    let a22 = nosuch22;
+    let a23 = nosuch23;
+    let a24 = nosuch24;
+    let a25 = nosuch25;
+    let a26 = nosuch26;
+    let a27 = nosuch27;
+    let a28 = nosuch28;
+    let a29 = nosuch29;
+    return 0;
+}

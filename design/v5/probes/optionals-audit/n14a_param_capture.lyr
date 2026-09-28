@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn f(x: ?int): int {
+    if (x != null) {
+        let g = () => x + 1;
+        return g();
+    }
+    return 0;
+}
+fn main(): int {
+    println(f"{f(1)}");
+    return 0;
+}

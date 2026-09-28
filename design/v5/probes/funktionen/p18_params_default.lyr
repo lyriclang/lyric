@@ -1,0 +1,2 @@
+fn f(a: int = 1, params rest: int[]): int { return a + rest.length; }
+fn main(): int { return f(); }

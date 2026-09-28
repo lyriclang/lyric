@@ -1,0 +1,6 @@
+import std.core { OnFunction };
+pub struct Tag :: [OnFunction] { }
+@Tag
+@Tag
+pub fn f(): void { }
+fn main(): int { return 0; }

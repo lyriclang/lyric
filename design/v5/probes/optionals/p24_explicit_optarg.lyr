@@ -1,0 +1,5 @@
+fn take<T>(x: ?T): int { return if (x == null) 0 else 1; }
+fn main(): int {
+    let a: ?int = null;
+    return take<?int>(a);
+}

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let n = 3; println(n.show()); return 0; }

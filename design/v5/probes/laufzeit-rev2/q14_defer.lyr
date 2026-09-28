@@ -1,0 +1,16 @@
+// Q14 — Laeuft 'defer' auf dem Panik-Pfad?
+// ERWARTUNG VOR DEM LAUF: NEIN. ExecutionBudget.cs:56-61 begruendet ausdruecklich, dass eine
+// Panik den Interpreter als host-seitiger Wurf verlaesst und "kein defer danach laeuft".
+// KONTROLLE: derselbe Block ohne Panik gibt "aufgeraeumt" aus.
+import std.io.console { println };
+
+fn arbeit(panisch: bool): int {
+    defer { println("aufgeraeumt"); }
+    println("drin");
+    if (panisch) { let xs = [1]; return xs[5]; }
+    return 0;
+}
+
+fn main(args: string[]): int {
+    return arbeit(args.length > 0);
+}

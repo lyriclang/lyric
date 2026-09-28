@@ -1,0 +1,2 @@
+import std.random { secureRandom };
+fn main(): int { let b = secureRandom(8); return b.length; }

@@ -1,0 +1,8 @@
+import std.core { OnFunction };
+pub struct Route :: [OnFunction] { path: string = "" }
+
+@Route { path = "/a" }
+@Route { path = "/b" }
+pub fn handle(): void { }
+
+fn main(): int { return 0; }

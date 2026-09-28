@@ -1,0 +1,11 @@
+module lib;
+
+pub class Counter {
+    count: int,
+
+    static fn create(): Counter { return Counter { count = 0 }; },
+
+    fn secret(): int { return 42; },
+
+    static let HIDDEN: int = 5;
+}

@@ -1,0 +1,5 @@
+fn pair<A, B>(a: A, b: B): int { return 1; }
+fn main(): int {
+    let s = "x";
+    return pair<int>(1, s);
+}

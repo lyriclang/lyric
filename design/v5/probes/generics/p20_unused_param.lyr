@@ -1,0 +1,5 @@
+fn tag<T>(): int { return 1; }
+
+fn main(): int {
+    return tag<int>();
+}

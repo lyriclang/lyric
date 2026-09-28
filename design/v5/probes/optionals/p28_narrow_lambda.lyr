@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let x: ?int = 1;
+    if (x != null) {
+        let f = () => x + 1;
+        println(f"{f()}");
+    }
+    return 0;
+}

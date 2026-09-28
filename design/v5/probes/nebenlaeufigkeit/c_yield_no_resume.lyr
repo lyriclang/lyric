@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn main(): int {
+    println("before");
+    yield 1;
+    println("after");
+    return 0;
+}

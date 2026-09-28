@@ -1,0 +1,14 @@
+// ERWARTUNG: unbekannt. Eine Ausnahme fliegt bereits, und ein defer wirft eine ZWEITE.
+// Wer kommt beim catch an? Und laeuft der frueher registrierte defer?
+import std.io.console { println };
+class First :: [Throwable] { fn message(): string { return "FIRST"; } }
+class Second :: [Throwable] { fn message(): string { return "SECOND"; } }
+fn second(): void throws Second { println("defer runs"); throw Second { }; }
+fn work(): int throws Throwable {
+    defer println("early defer");
+    defer second();
+    throw First { };
+}
+fn main(): int {
+    try { return work(); } catch (e) { println(f"caught {e.message()}"); return 0; }
+}

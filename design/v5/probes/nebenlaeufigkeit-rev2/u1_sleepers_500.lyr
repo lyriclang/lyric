@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+fn sleeper(): Coroutine<Wait> { yield Wait.Sleep(300); }
+
+fn main(): int {
+    let n = 500;
+    var i = 0;
+    while (i < n) { spawn(sleeper()); i += 1; }
+    let t0 = os.nowMillis();
+    run();
+    println(f"{n} sleepers: run took {os.nowMillis() - t0}ms (300ms of it is the sleep)");
+    return 0;
+}

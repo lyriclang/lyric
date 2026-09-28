@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string as strings;
+import std.core { Hashable };
+
+fn main(): int {
+    let base = "a" * 20000;
+    let x = base + "b";
+    let h = x.hash();
+    println(f"h={h} len={x.length()}");
+    return 0;
+}

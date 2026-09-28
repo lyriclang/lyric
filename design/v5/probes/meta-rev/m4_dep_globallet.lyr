@@ -1,0 +1,6 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use PI", until = "5.0" }
+pub let OldPi: float = 3.0;
+
+fn main(): int { return 0; }

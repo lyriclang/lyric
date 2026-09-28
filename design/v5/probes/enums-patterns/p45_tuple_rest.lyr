@@ -1,0 +1,6 @@
+fn f(t: (int, int, int)): int {
+    return match (t) {
+        (a, ..) => a,
+    };
+}
+fn main(): int { return f((1,2,3)); }

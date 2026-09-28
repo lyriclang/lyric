@@ -1,0 +1,4 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn generic_test<T>(): void { assertEq(1, 1); }

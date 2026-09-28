@@ -1,0 +1,9 @@
+import std.io.console { println };
+extern "dotnet" fn hardExit(code: int32) = "System.Environment::Exit";
+fn main(): int {
+    defer { println("DEFER RAN"); }
+    println("BEFORE");
+    hardExit(7);
+    println("AFTER");
+    return 0;
+}

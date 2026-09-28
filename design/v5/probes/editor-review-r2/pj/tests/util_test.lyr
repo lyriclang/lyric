@@ -1,0 +1,4 @@
+import util;
+import std.test { Test, assertEq };
+@Test
+fn twiceDoubles(): void { assertEq(util.twice(2), 4); }

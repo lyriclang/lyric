@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let x: int = 5;
+    let y = x as int;
+    let z = x as int64;
+    let w: int = z as int;
+    println(f"{y} {w}");
+    return 0;
+}

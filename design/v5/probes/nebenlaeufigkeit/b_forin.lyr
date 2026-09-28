@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+}
+
+fn main(): int {
+    let co = three();
+    for (x in co) {
+        println(f"{x}");
+    }
+    return 0;
+}

@@ -1,0 +1,2 @@
+fn unused<T>(x: T): int { return x.foo(); }
+fn main(): int { return 0; }

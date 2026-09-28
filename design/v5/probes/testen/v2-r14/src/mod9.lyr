@@ -1,0 +1,2 @@
+pub fn value9(n: int): int { return n * 9; }
+pub fn other9(n: int): int { return value9(n) + 9; }

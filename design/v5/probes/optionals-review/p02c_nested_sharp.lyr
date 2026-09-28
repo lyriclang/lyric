@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+fn wrap<T>(x: T): ?T {
+    return x;
+}
+
+fn main(): int {
+    let inner: ?int = null;          // an ABSENT ?int
+    let outer = wrap(inner);          // ??int, if nesting happened
+    if (outer == null) {
+        println("outer == null  (flattened)");
+    } else {
+        println("outer != null  (NESTED: some(none))");
+    }
+    let x = outer ?? -1;              // if nested: ?int; if flat: int
+    if (x == null) {
+        println("inner layer is null -> two layers exist");
+    } else {
+        println("no second layer");
+    }
+    return 0;
+}

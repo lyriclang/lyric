@@ -1,0 +1,11 @@
+// P11 — Was macht eine Allokation, die nicht passt? (PLAN B nannte das einmal als Prozessabbruch)
+// Erwartung VOR dem Lauf: entweder eine saubere Panik oder ein Prozessabbruch mit .NET-Trace.
+import std.io.console { println };
+
+fn main(args: string[]): int {
+    var n = 1;
+    if (args.length > 0) { n = 100000000000; }
+    let xs = [1] * n;
+    println(f"len={xs.length}");
+    return 0;
+}

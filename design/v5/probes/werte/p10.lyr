@@ -1,0 +1,11 @@
+import std.io.console { println };
+class C {
+    v: int,
+    fn setNoMut(): void { this.v = 9; }
+}
+fn main(): int {
+    let c = C { v = 1 };
+    c.setNoMut();
+    println(f"{c.v}");
+    return 0;
+}

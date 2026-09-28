@@ -1,0 +1,19 @@
+import std.io.console { println };
+struct I { x: int, mut fn bump2(): void { this.x = this.x + 1; } }
+struct S {
+    v: int,
+    inner: I,
+    mut fn bump(): void { this.v = this.v + 1; }
+    fn viaThis(): void { this.bump(); }
+    fn viaInner(): void { this.inner.bump2(); }
+}
+fn main(): int {
+    var s = S { v = 1, inner = I { x = 1 } };
+    s.viaThis();
+    s.viaInner();
+    println(f"q02a v={s.v} inner.x={s.inner.x}");
+    let t = S { v = 1, inner = I { x = 1 } };
+    t.viaThis();
+    println(f"q02a let t.v={t.v}");
+    return 0;
+}

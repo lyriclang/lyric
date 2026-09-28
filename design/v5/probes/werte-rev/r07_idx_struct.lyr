@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.collections { Indexable };
+struct G :: [Indexable<int>] {
+    xs: int[],
+    fn get(index: int): int { return this.xs[index]; }
+    mut fn set(index: int, value: int): void { this.xs[index] = value; }
+}
+fn main(): int {
+    let g = G { xs = [1, 2] };
+    g[0] = 9;
+    println(f"r07 g[0]={g[0]}");
+    return 0;
+}

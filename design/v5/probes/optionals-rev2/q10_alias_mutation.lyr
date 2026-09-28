@@ -1,0 +1,9 @@
+import std.io.console { println };
+class P { v: ?int }
+fn clear(q: P): void { q.v = null; }
+fn main(): int {
+    let p = P { v = 1 };
+    clear(p);
+    println(f"{p.v ?? -1}");
+    return 0;
+}

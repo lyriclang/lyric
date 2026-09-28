@@ -1,0 +1,2 @@
+panic [LYR-VM0010]: uncaught exception of type 'Detailed'
+    in main.main (p27_uncaught_message.lyr:17)

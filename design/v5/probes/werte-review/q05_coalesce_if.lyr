@@ -1,0 +1,14 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var s = S { v = 1 };
+    var o: ?S = null;
+    var r = o ?? s;
+    r.v = 9;
+    println(f"q05 coalesce s.v={s.v}");
+    var t = S { v = 1 };
+    var r2 = if (t.v == 1) t else s;
+    r2.v = 9;
+    println(f"q05 if-expr t.v={t.v}");
+    return 0;
+}

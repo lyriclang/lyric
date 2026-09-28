@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let emoji = "\u{1F600}";
+    let plain = "ab";
+    println(f"[{emoji:6}]");
+    println(f"[{plain:6}]");
+    let combining = "e\u{301}";
+    println(f"[{combining:6}]");
+    let cjk = "\u{4E16}\u{754C}";
+    println(f"[{cjk:6}]");
+    println(f"cp emoji={emoji.length()} comb={combining.length()} cjk={cjk.length()}");
+    return 0;
+}

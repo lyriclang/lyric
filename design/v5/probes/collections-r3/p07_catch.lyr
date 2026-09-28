@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    var i = 5;
+    i = i + 0;
+    try {
+        println(f"{xs[i]}");
+    } catch (e: Throwable) {
+        println("gefangen");
+    }
+    return 0;
+}

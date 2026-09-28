@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let hexff = '\xFF';
+    println(f"xFF={hexff as int}");
+    let euro = "\xE2\x82\xAC";
+    println(f"euro len={euro.length()} bytes={euro.utf8Encode().length}");
+    let real = "\u{20AC}";
+    println(f"real len={real.length()} bytes={real.utf8Encode().length} txt={real}");
+    return 0;
+}

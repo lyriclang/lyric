@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let a = 5;
+    println(fromInt(a ?? 3));
+    return 0;
+}

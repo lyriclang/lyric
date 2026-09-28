@@ -1,0 +1,15 @@
+import std.io.console { println };
+struct S { v: int, }
+enum E { A(S), B }
+fn main(): int {
+    var s = S { v = 1 };
+    let t = (s, 2);
+    s.v = 9;
+    let (a, _) = t;
+    println(f"q04 tuple a.v={a.v} (1 = copied at tuple build, 9 = shared)");
+    var u = S { v = 1 };
+    let e = E.A(u);
+    u.v = 9;
+    match (e) { E.A(i) => { println(f"q04 enum i.v={i.v} (1 = copied at payload build, 9 = shared)"); }, E.B => { } }
+    return 0;
+}

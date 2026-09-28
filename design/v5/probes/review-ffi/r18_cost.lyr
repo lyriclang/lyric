@@ -1,0 +1,35 @@
+import std.io.console { println };
+import std.math { sqrt };
+extern "dotnet" fn xsqrt(x: float): float = "System.Math::Sqrt";
+extern "dotnet" fn qpc(): int = "System.Diagnostics.Stopwatch::GetTimestamp";
+extern "dotnet" fn ms(): int = "System.Environment::get_TickCount64";
+
+fn main(): int {
+    let n = 5000000;
+    var acc = 0.0;
+    acc = acc + xsqrt(2.0) + sqrt(2.0);
+
+    // calibrate qpc against the millisecond clock
+    let c0 = qpc(); let m0 = ms();
+    var w = 0; var junk = 0.0;
+    while (w < 20000000) { junk = junk + 1.0; w = w + 1; }
+    let c1 = qpc(); let m1 = ms();
+    println(f"calib qpcTicks={c1 - c0} ms={m1 - m0}");
+
+    let t0 = qpc();
+    var i = 0;
+    while (i < n) { acc = acc + 1.4142; i = i + 1; }
+    let t1 = qpc();
+    i = 0;
+    while (i < n) { acc = acc + sqrt(2.0); i = i + 1; }
+    let t2 = qpc();
+    i = 0;
+    while (i < n) { acc = acc + xsqrt(2.0); i = i + 1; }
+    let t3 = qpc();
+
+    println(f"empty  ticks={t1 - t0}");
+    println(f"native ticks={t2 - t1}");
+    println(f"extern ticks={t3 - t2}");
+    println(f"acc={acc} junk={junk}");
+    return 0;
+}

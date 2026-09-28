@@ -1,0 +1,6 @@
+class C { }
+extend C {
+    fn a(): int { return 1; },
+    fn b(): int { return 2; }
+}
+fn main(): int { return C { }.a(); }

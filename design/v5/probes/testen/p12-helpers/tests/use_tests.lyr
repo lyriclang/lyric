@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+import lib { double };
+
+@Test
+pub fn uses_the_source_root(): void {
+    assertEq(double(21), 42);
+}

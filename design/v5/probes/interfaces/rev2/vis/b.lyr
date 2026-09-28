@@ -1,0 +1,4 @@
+module b;
+pub interface Named { fn name(): string; }
+pub class Tag { }
+pub extend Tag :: [Named] { fn name(): string { return "tag"; } }

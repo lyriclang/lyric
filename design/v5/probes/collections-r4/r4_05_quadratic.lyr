@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.collections { List };
+import std.time { Instant };
+fn main(): int {
+    let n = 20000;
+    let t0 = Instant.now();
+    var result: int[] = [];
+    for (i in 0..n) { result = result + [i]; }
+    let t1 = Instant.now();
+    let l = List<int>.empty();
+    for (i in 0..n) { l.push(i); }
+    let arr = l.toArray();
+    let t2 = Instant.now();
+    println(f"concat-loop {result.length} list-push {arr.length}");
+    println(f"ms concat={t1.since(t0).totalMillis()} list={t2.since(t1).totalMillis()}");
+    return 0;
+}

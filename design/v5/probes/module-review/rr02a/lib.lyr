@@ -1,0 +1,2 @@
+fn h(a: int): int { return 1; }
+fn h(a: string): int { return 2; }

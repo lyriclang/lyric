@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let o: ?int[] = null;
+    let p: ?int[] = [1, 2];
+    for (x in p) { println(f"{x}"); }
+    return 0;
+}

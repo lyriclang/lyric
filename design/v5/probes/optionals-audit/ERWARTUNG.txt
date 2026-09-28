@@ -1,0 +1,34 @@
+Erwartungen VOR dem Lauf (Audit optionals):
+n01 x:int, if (x != null): erwarte SEM0059 (PLAN D sagt "x == null auf Nicht-Optional -> SEM0059")
+n02 x:int, x ?? 2: erwarte SEM0005 laut PLAN D (oder SEM0003)
+n03 a ?? panic("no"): erwarte kompiliert (Never passt ueberall, TC:6026) -> druckt 5
+n04 a ?? b ?? 0 (rechtsassoziativ), b optional: erwarte kompiliert, druckt 3
+n05 p.v auf ?P: erwarte SEM0012 "'?P' has no member 'v'" ohne ?.-Hinweis
+n06a match ?bool mit true/false/null: erwarte exhaustiv, kompiliert
+n06b match ?bool mit true/false ohne null: erwarte SEM0050
+n06c match ?Color (enum) mit allen Varianten + null: erwarte kompiliert
+n07 ?fn: g != null dann g(): erwarte kompiliert, druckt 1
+n08 fn f(x: ?int = null): erwarte kompiliert, druckt -1 und 5
+n08b fn f(x: ?int = 7): erwarte kompiliert, druckt 7
+n09a let g: fn() -> ?int = () => 1: erwarte kompiliert (Kontexttyp)
+n09b let g2: fn() -> ?int = h (h: fn(): int): erwarte SEM0001 (keine Kovarianz)
+n10 int[] -> (?int)[]: erwarte SEM0001
+n11a let x: ?float = 1: unklar; n11b let y: float = 1: Kontrolle
+n12 if (x == null) { x = 5; } x + 1: erwarte SEM0003 (kein Join-Narrowing)
+n13 continue als Frueh-Exit: erwarte narrowt, druckt 1,3,5; throw als Frueh-Exit: erwarte narrowt
+n14 Parameter narrowed + Lambda-Capture: erwarte kompiliert, druckt 2; n14b Param-Zuweisung: erwarte Fehler (Param unveraenderlich?)
+n15 match (5) { null => }: erwarte SEM0029
+n16 xs[0] ??= 4 auf (?int)[]: erwarte kompiliert, druckt 4
+n17 enum Opt<T> { Some(T), None } mit Opt<?int>: erwarte kompiliert (Nutzer-Option nestet)
+n18 interface fn get(): ?int, class liefert int: erwarte Fehler (Signatur)
+n19 import std.core { rawArrayAlloc }: erwarte Sichtbarkeitsfehler (nicht pub)
+n20 let x: ??int: erwarte Parserfehler
+n21 a ?? "s" auf ?int: erwarte SEM0003
+n22 if (!(x == null)) { x + 1 }: erwarte SEM0003 (keine Negations-Narrowing) -- unsicher
+n23 if-Ausdruck narrowt: erwarte kompiliert, druckt 2
+n24 zwei fn f mit int / ?int: erwarte Duplikat-Fehler -- unsicher, Overloading-Gebiet existiert
+n27 null == null: erwarte Fehler (SEM0059?)
+n33 x! = 5 als Zuweisungsziel: erwarte SEM0019
+n34 xs: ?int[] ; xs[0]: erwarte SEM-Fehler mit brauchbarem Text
+Erwartung n13c: narrowt nach throw-Fruehexit, druckt 2. n17b: kompiliert, druckt 'some -1'. n24b: f(5) -> 1, f(o) -> 2. n35: kompiliert, druckt n=2 (PLAN:121 sagt erledigt)
+Erwartung n37: Satisfies schweigt fuer ?int, IR0001 landet in stdlib/std/test.lyr (Befund B, weiterer Eintrittspunkt)

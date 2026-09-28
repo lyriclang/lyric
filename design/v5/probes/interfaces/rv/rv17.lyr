@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { n: int = 0 }
+fn main(): int {
+    let d = S { };
+    d.n = 5;
+    println(d.n.show());
+    return 0;
+}

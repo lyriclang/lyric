@@ -1,0 +1,10 @@
+import std.io.console { println };
+interface Shape { fn area(): int; }
+interface Named { fn name(): string; }
+class Circle :: [Shape, Named] { fn area(): int { return 1; } fn name(): string { return "c"; } }
+fn f(x: Shape): string { return "shape"; }
+fn f(x: Named): string { return "named"; }
+fn main(): int {
+    println(f(Circle { }));
+    return 0;
+}

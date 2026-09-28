@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn inc(n: int): int { return n + 1; }
+fn pick(k: int): fn(int) -> int { return inc; }
+fn main(): int {
+    let f = pick(1);
+    var acc = 0;
+    var i = 0;
+    while (i < 3000000) { acc = f(acc); i = i + 1; }
+    println(fromInt(acc));
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.collections { List };
+fn main(): int {
+    let xs = [1, 2, 3];
+    let ys = [1, 2, 3];
+    let eq = xs == ys;                 // array equality?
+    let l: List<int> = [1, 2, 3];      // collection literal for List?
+    let m = xs.map((v: int) => v);     // methods on arrays?
+    let e = [];                        // empty literal without context
+    return 0;
+}

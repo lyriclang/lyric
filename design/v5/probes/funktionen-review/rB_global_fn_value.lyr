@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn inc(n: int): int { return n + 1; }
+let handler: fn(int) -> int = inc;
+fn main(): int { println(fromInt(handler(41))); return 0; }

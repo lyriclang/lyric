@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { if (let y = 5) { println(f"{y}"); } else { println("no"); } return 0; }

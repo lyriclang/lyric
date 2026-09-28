@@ -1,0 +1,10 @@
+import std.io.console { println };
+import wrap2 { cbrt };
+
+fn apply(f: fn(float) -> float, x: float): float { return f(x); }
+
+fn main(): int {
+    println(f"direct={cbrt(27.0)}");
+    println(f"asvalue={apply(cbrt, 8.0)}");
+    return 0;
+}

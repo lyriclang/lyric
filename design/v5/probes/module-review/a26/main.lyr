@@ -1,0 +1,21 @@
+module main;
+import std.io.console { println };
+import lib;
+
+extend lib.Secret {
+    fn grafted(): int { return this.v * 10; }
+}
+
+fn main(): int {
+    let s = lib.Secret { v = 7 };
+    println(s.grafted());
+    let m = lib.Mode.Fast;
+    let name = match (m) {
+        lib.Mode.Fast => "fast",
+        lib.Mode.Slow => "slow",
+    };
+    println(name);
+    let lib = 5;
+    println(lib);
+    return 0;
+}

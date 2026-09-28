@@ -1,0 +1,22 @@
+Erwartungen VOR dem Lauf (Nachpruefung der Kritik-Proben, 2026-09-28):
+q12b: Compile-Warnung LYR-SEM0076 'bump' is deprecated; Exit 1
+q13: druckt int, float
+q14: druckt 20 ; q14b: druckt 20
+q22c: druckt 9, 1 ; q22d: SEM0001 cannot assign 'H' to 'Reader' ; q22e: SEM0012 no member 'twice'
+q23: kompiliert ohne Fehler
+q03c: druckt 1 ; q03e: SEM0028 float Hashable
+q20b: druckt 2, 2
+q04c: capabilities 0x4
+
+Neue Proben (rev3):
+p31 orphan: Nutzermodul `extend float :: [Hashable<float>]` -> erwartet LYR-SEM0041 (Orphan)
+p32 unicode: "ß".toUpper() -> "ß" (Laenge 1, .NET invariant); isDigit(U+0661) -> false; "İ".toLower().length() -> 1 oder 2 (unsicher)
+p33 coroutine-throws als Parametertyp: kompiliert, druckt "threw"
+p34 Grenzkosten: bytes() auf 4 MB -> 20..100 ms; Lyric-Schleife 4M Elementkopien -> 0,5..3 s
+p35 for (kv in m) auf Map -> Compilerfehler (Map nicht Iterable)
+p34 Kontrolllauf: gleiche Groessenordnung wie Lauf 1 (bytes ~50-60 ms, Schleife ~0,8 s)
+p36 comptime: `comptime Duration.ofSeconds(5).totalMillis()` -> Compilerfehler LYR-CT* (std.time braucht osAccess, Runner laedt mit None)
+p36 UEBERRASCHUNG: kompilierte. Kontrollen:
+p36 run -> Exit 5000 mod 256 = 136 ; lyrc info p36 -> capabilities enthaelt osAccess (0x4) trotz comptime
+p36b comptime secureRandom -> erwartet LYR-CT0002 (Kontrolle, dass der Runner ueberhaupt ablehnt)
+p36c comptime Instant.now().epochMillis -> unklar; wenn p36 lief, laeuft das auch (dann prueft comptime KEINE Capability)

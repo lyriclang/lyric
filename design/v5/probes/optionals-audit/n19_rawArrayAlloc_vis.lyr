@@ -1,0 +1,5 @@
+import std.core { rawArrayAlloc };
+fn main(): int {
+    let xs = rawArrayAlloc<int>(3);
+    return xs.length;
+}

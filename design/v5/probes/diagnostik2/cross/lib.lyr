@@ -1,0 +1,4 @@
+pub fn helper(): int {
+    let unusedInLib = 99;
+    return 1;
+}

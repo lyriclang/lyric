@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum Opt { Some(bool), None }
+fn f(o: Opt): int {
+    return match (o) {
+        Some(true) => 1,
+        Some(false) => 2,
+        None => 3,
+    };
+}
+fn main(): int { println(f"{f(Opt.Some(false))}"); return 0; }

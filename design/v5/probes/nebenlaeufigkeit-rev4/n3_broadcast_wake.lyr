@@ -1,0 +1,38 @@
+import std.io.console { println };
+import std.io.net as net;
+import std.collections { List };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+let t0 = os.nowMillis();
+let wakes = List<int>.empty();
+
+fn waiter(id: int, l: net.Listener): Coroutine<Wait> {
+    yield Wait.Readable(l as int);
+    wakes.push(id);
+    println(f"waiter {id} woke at +{os.nowMillis() - t0}ms");
+}
+
+fn client(port: int): Coroutine<Wait> {
+    yield Wait.Sleep(30);
+    let s = net.connect("127.0.0.1", port);
+    if (s != null) {
+        println(f"client connected at +{os.nowMillis() - t0}ms");
+        yield Wait.Sleep(30);
+        net.close(s);
+    } else {
+        println("client failed");
+    }
+}
+
+fn main(): int {
+    let l = net.listen("127.0.0.1", 0);
+    if (l == null) { println("listen failed"); return 1; }
+    spawn(waiter(1, l));
+    spawn(waiter(2, l));
+    spawn(client(net.localPort(l)));
+    run();
+    println(f"wakes = {wakes.length()}");
+    net.closeListener(l);
+    return 0;
+}

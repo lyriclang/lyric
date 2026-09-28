@@ -1,0 +1,10 @@
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn take(a: ?int): int throws Boom { return a ?? throw Boom {}; }
+fn main(): int {
+    try {
+        println(f"{take(3)}");
+        println(f"{take(null)}");
+    } catch (e: Boom) { println("caught"); }
+    return 0;
+}

@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.core { Add };
+struct V :: [Add<V, V>] {
+    x: int,
+    pub fn add(other: V): V { return V{x = this.x + other.x}; }
+}
+fn main(): int {
+    var xs = [V{x=1}, V{x=2}];
+    xs[0] += V{x=10};
+    println(f"{xs[0].x}");
+    return 0;
+}

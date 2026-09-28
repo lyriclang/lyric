@@ -1,0 +1,6 @@
+import std.build { executable, packed };
+
+pub fn build(): void {
+    let app = executable("app", "src/main.lyr");
+    packed(app);
+}

@@ -1,0 +1,9 @@
+import std.collections { List };
+import std.test { assertEq };
+
+fn main(): int {
+    let a = List<int>.new();
+    let b = List<int>.new();
+    assertEq(a, b);
+    return 0;
+}

@@ -1,0 +1,13 @@
+// R3i — Kontrahiert der JIT a*b+c zu einem FMA? 0.1*10.0 - 1.0 ist ohne FMA exakt 0,
+// mit FMA 5.551115123125783e-17. ERWARTUNG: 0 in beiden Engines (RyuJIT kontrahiert nicht implizit).
+// float32: 0.1f*10f - 1f: ohne FMA 0, mit FMA -1.4901161e-08 (Produkt exakt 1.0000000149...).
+import std.io.console { println };
+fn f64probe(a: float, b: float, c: float): float { return a * b - c; }
+fn f32probe(a: float32, b: float32, c: float32): float32 { return a * b - c; }
+fn main(): int {
+    var i = 0; var s = 0.0; var t: float32 = 0.0;
+    while (i < 1000) { s = f64probe(0.1, 10.0, 1.0); t = f32probe(0.1, 10.0, 1.0); i += 1; }
+    println(f"f64 = {s}");
+    println(f"f32 = {t}");
+    return 0;
+}

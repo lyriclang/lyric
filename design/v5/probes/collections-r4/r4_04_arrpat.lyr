@@ -1,0 +1,14 @@
+import std.io.console { println };
+fn describe(xs: int[]): string {
+    return match (xs) {
+        [] => "empty",
+        [a] => f"one {a}",
+        [a, ..] => f"many from {a}",
+    };
+}
+fn main(): int {
+    println(describe([]));
+    println(describe([1]));
+    println(describe([1, 2, 3]));
+    return 0;
+}

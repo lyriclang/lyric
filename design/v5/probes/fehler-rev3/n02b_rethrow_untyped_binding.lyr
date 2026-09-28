@@ -1,0 +1,11 @@
+// ERWARTUNG: catch (e) { throw e; } — e ist Throwable; in fn throws Boom ist das SEM0034
+// (kein "precise rethrow" wie Java 7). Kontrolle: mit 'throws' bar kompiliert es.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { throw Boom { }; }
+fn work(): int throws Boom {
+    try { return f(); } catch (e) { println("rethrow"); throw e; }
+}
+fn main(): int {
+    try { return work(); } catch (e: Boom) { println("main caught"); return 0; }
+}

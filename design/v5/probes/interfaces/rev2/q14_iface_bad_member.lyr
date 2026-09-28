@@ -1,0 +1,6 @@
+interface I {
+    fn a() int;
+    fn b(): int;
+    fn c(): int;
+}
+fn main(): int { return 0; }

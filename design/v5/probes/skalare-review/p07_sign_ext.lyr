@@ -1,0 +1,16 @@
+// ERWARTUNG (C/Rust-Semantik, Spec sagt nichts): 18446744073709551615 65535 18446744073709551615 -1 255 255 -1 -1
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = -1i8;
+  println(f"{a as uint64}");
+  println(f"{a as uint16}");
+  println(f"{a as uint}");
+  let b: uint8 = 255u8;
+  println(f"{b as int8}");
+  println(f"{b as int64}");
+  println(f"{b as int16}");
+  let c: int8 = -1i8;
+  println(f"{c as int16}");
+  println(f"{c as float32}");
+  return 0;
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f(xs: int[]): string { return "ints"; }
+fn f(xs: string[]): string { return "strs"; }
+fn main(): int { println(f([])); return 0; }

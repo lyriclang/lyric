@@ -1,0 +1,10 @@
+import std.core { OnFunction };
+import std.io.console { println };
+
+/// Nothing to do with std.test — a marker of this file's own.
+pub struct Test :: [OnFunction] { }
+
+@Test
+pub fn my_own_marker(): void {
+    println("this ran");
+}

@@ -1,0 +1,16 @@
+import std.core { panic, Exception };
+import std.io.console { println };
+
+fn boom(): void {
+    panic("blown");
+}
+
+fn main(): int {
+    try {
+        boom();
+        println("no panic");
+    } catch (e: Exception) {
+        println("caught: " + e.message());
+    }
+    return 0;
+}

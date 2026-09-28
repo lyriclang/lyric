@@ -1,0 +1,3 @@
+fn g(x: int): int { panic("boom"); }
+fn g(x: string): int { return 0; }
+fn main(): int { return g(1); }

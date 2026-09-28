@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn main(): int {
+    let max = 9223372036854775807;
+    let min = -9223372036854775807 - 1;
+    let one = 1;
+    let m1 = -1;
+    println(max + one);
+    println(min / m1);
+    println(min % m1);
+    println(one << 65);
+    println(min >> 63);
+    let z = 0;
+    println(one / z);
+    return 0;
+}

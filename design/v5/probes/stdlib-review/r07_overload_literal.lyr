@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+fn kind(x: int): string {
+    return "int";
+}
+
+fn kind(x: float): string {
+    return "float";
+}
+
+fn main(): int {
+    println(kind(-3));
+    return 0;
+}

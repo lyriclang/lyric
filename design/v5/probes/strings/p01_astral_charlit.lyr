@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn main(): int {
+    let escaped = '\u{1F600}';
+    let direct = '😀';
+    println(f"{escaped} {direct}");
+    return 0;
+}

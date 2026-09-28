@@ -1,0 +1,4 @@
+import a;
+import std.io.console;
+
+fn main(): int { console.println(f"{a.fa()}"); return 0; }

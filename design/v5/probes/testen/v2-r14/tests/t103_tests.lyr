@@ -1,0 +1,8 @@
+import std.test { Test, assertEq };
+import mod4 { value4 };
+
+@Test
+pub fn a(): void { assertEq(value4(2), 8); }
+
+@Test
+pub fn b(): void { assertEq(1, 1); }

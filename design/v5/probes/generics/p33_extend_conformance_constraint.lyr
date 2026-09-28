@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+interface Describable { fn describe(): string; }
+
+class Plain { n: int, }
+
+extend Plain :: [Describable] {
+    fn describe(): string { return "plain"; }
+}
+
+fn report<T :: [Describable]>(item: T): void { println(item.describe()); }
+
+fn main(): int {
+    report(Plain { n = 1 });
+    return 0;
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f(x: int): string { return "int"; }
+fn f(g: fn(int) -> int): string { return "fn"; }
+fn main(): int { println(f(x => x)); return 0; }

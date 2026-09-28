@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.iter { Iterator };
+
+pub opaque type Handle = int;
+
+extend Handle :: [Iterator<int>] {
+    pub mut fn next(): ?int { return null; }
+}
+
+fn main(): int {
+    let h: Handle = 1 as Handle;
+    for (v in h) { println(f"{v}"); }
+    return 0;
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+pub opaque type H = int;
+extend H { pub fn twice(): int { return (this as int) * 2; } }
+fn main(): int { let h = 5 as H; println(h.twice()); return 0; }

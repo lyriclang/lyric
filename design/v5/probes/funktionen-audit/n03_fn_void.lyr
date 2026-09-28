@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let f: fn() -> void = () => { println("x"); };
+    f();
+    let g = () => { println("y"); };
+    g();
+    return 0;
+}

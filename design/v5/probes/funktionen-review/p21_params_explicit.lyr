@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn count<T>(params xs: T[]): int { return xs.length; }
+fn main(): int {
+    println(fromInt(count<int>(1, 2, 3)));
+    let arr: string[] = ["a", "b"];
+    println(fromInt(count(arr)));
+    return 0;
+}

@@ -1,0 +1,6 @@
+struct P { x: int, }
+fn main(): int {
+    var p = P { x = 1 };
+    p.x++;
+    return p.x;
+}

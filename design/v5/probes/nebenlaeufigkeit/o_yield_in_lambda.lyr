@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+fn apply(f: fn() -> void): void { f(); }
+
+fn gen(): Coroutine<int> {
+    apply(() => { yield 7; });
+    yield 8;
+}
+
+fn main(): int {
+    let co = gen();
+    println(f"a={resume co}");
+    println(f"b={resume co}");
+    return 0;
+}

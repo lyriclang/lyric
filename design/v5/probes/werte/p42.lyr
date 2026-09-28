@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct V { x: int, }
+fn f(v: V): int { var w = v; w.x = 9; return w.x + v.x; }
+fn main(): int { println(f"{f(V { x = 1 })}"); return 0; }

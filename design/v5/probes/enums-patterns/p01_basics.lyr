@@ -1,0 +1,26 @@
+import std.io.console { println };
+
+enum Shape {
+    Circle(float),
+    Rect { w: int, h: int },
+    Empty;
+
+    fn corners(): int {
+        return match (this) {
+            Circle(r) => 0,
+            Rect { w, h } => 4,
+            Empty => 0,
+        };
+    }
+}
+
+fn main(): int {
+    let s = Shape.Rect { w = 3, h = 4 };
+    println(f"corners={s.corners()}");
+    match (s) {
+        Circle(r) => println("circle"),
+        Rect { w, h } => println(f"rect {w}x{h}"),
+        Empty => println("empty"),
+    }
+    return 0;
+}

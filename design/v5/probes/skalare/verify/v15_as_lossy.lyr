@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let a = 300 as int8;
+    let b = 9007199254740993 as float;
+    println(f"a={a as int} b={b}");
+    return 0;
+}

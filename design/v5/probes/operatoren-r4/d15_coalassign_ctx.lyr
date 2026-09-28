@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var o: ?int = null;
+    let r: int = (o ??= 3);
+    println(fromInt(r));
+    return 0;
+}

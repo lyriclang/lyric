@@ -1,0 +1,4 @@
+module c;
+import a;
+pub fn fc(): int { return 1; }
+pub fn other(): int { return a.fa(); }

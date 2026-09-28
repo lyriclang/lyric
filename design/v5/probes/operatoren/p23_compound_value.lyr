@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var n = 1;
+    println(fromInt(1 + (n += 5)));   // 7 if compound assignment yields a value
+    var o: ?int = null;
+    println(fromInt((o ??= 3)! + 1));  // ??= yields ?int, not int
+    var b = false;
+    let r = (b ||= true);
+    if (r) { println("logical compound yields a value"); }
+    return 0;
+}

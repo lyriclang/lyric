@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let o: ?int = 5;
+    match (o) { 5 | null => println("five-or-null"), n => println(f"{n}"), }
+    return 0;
+}

@@ -1,0 +1,7 @@
+module lib;
+
+struct Secret { v: int, }
+
+enum Mode { Fast, Slow }
+
+pub fn make(): Secret { return Secret { v = 4 }; }

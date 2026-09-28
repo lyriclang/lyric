@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn pair<A, B>(a: A, b: B): A {
+    return a;
+}
+
+fn main(): int {
+    let s = "x";
+    let n = pair<int>(1, s);
+    println(f"{n}");
+    return 0;
+}

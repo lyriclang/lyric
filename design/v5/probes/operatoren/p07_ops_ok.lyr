@@ -1,0 +1,31 @@
+import std.core { Add, Sub, Mul };
+import std.io.console { println };
+import std.string { fromInt };
+
+struct V :: [Add<V, V>, Sub<V, V>, Mul<int, V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; },
+    fn sub(other: V): V { return V { x = this.x - other.x }; },
+    fn mul(other: int): V { return V { x = this.x * other }; }
+}
+
+struct Box { n: int, }
+
+fn main(): int {
+    let a = V { x = 10 };
+    let b = V { x = 3 };
+    println(fromInt((a + b).x));      // 13
+    println(fromInt((a - b).x));      // 7
+    println(fromInt((a * 2).x));      // 20
+    var c = a;
+    c += b;
+    println(fromInt(c.x));            // 13
+    // CONTROL: built-in int on a field and on an element
+    var bx = Box { n = 10 };
+    bx.n += 3;
+    println(fromInt(bx.n));           // 13
+    var ns = [10, 10];
+    ns[0] += 3;
+    println(fromInt(ns[0]));          // 13
+    return 0;
+}

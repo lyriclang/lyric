@@ -1,0 +1,13 @@
+// P11b — KONTROLLE: eine Groesse UNTER dem Element-Limit (int.MaxValue), aber ueber dem,
+// was .NET fuer EIN Array zulaesst (2 GB ohne gcAllowVeryLargeObjects).
+// 150 Mio Elemente x 16 Byte = 2.4 GB.
+// Erwartung VOR dem Lauf: kein LYR-Code, sondern eine .NET-OutOfMemoryException.
+import std.io.console { println };
+
+fn main(args: string[]): int {
+    var n = 1;
+    if (args.length > 0) { n = 150000000; }
+    let xs = [1] * n;
+    println(f"len={xs.length}");
+    return 0;
+}

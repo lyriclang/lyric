@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn describe(n: int): string { return "number " + fromInt(n); }
+fn describe(s: string): string { return "word " + s; }
+fn twice(g: fn(int) -> string, n: int): string { return g(n) + g(n); }
+fn main(): int {
+    println(twice(describe, 7));
+    return 0;
+}

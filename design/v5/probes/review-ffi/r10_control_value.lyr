@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn dbl(x: float): float { return x * 2.0; }
+fn apply(f: fn(float) -> float, x: float): float { return f(x); }
+fn main(): int { println(f"{apply(dbl, 4.0)}"); return 0; }

@@ -1,0 +1,1 @@
+{"diagnostics":[{"code":"LYR-SEM0002","severity":"error","file":"bad.lyr","start":{"line":2,"column":12,"offset":28},"end":{"line":2,"column":21,"offset":37},"message":"unknown identifier 'notAThing'"}]}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn noise(): void { println("noise"); }
+fn main(): int {
+    var x: ?int = 1;
+    if (x != null) {
+        noise();
+        println(f"{x + 1}");
+    }
+    return 0;
+}

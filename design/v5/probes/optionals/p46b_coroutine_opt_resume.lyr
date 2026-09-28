@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn gen(): Coroutine<?int> { yield 1; yield null; }
+fn main(): int {
+    let c = gen();
+    let a = resume c;
+    println("resumed");
+    return 0;
+}

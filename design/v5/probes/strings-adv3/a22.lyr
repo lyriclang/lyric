@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let n = 55296;
+    let c = n as char;
+    println(c);
+    return 0;
+}

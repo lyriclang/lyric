@@ -1,0 +1,8 @@
+class Box<T> { value: T, }
+
+fn take<U>(u: U): int { return 3; }
+
+fn main(): int {
+    let inner = Box<int> { value = 7 };
+    return take<Box<int>>(inner);
+}

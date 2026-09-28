@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    var x: ?int = 1;
+    if (x != null) {
+        x = 5;
+        println(f"{x + 1}");
+    }
+    return 0;
+}

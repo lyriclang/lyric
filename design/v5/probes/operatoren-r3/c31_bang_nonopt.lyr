@@ -1,0 +1,4 @@
+fn main(): int {
+    let n = 5;
+    return n!;
+}

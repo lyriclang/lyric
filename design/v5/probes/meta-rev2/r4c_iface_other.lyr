@@ -1,0 +1,10 @@
+import std.core { OnFunction };
+
+pub struct Other :: [OnFunction] { }
+
+pub interface Shape {
+    @Other
+    fn area(): int;
+}
+
+fn main(): int { return 0; }

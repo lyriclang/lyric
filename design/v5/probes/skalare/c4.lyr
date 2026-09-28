@@ -1,0 +1,1 @@
+fn main(): int { let b = 1 as bool; return 0; }

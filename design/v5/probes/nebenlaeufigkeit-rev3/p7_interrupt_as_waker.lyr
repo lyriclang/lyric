@@ -1,0 +1,42 @@
+import std.io.console { println };
+import std.collections { List };
+import std.os as os;
+import std.task { Wait, spawn, run, interrupt };
+
+let t0 = os.nowMillis();
+let queue = List<int>.empty();
+
+fn producer(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 3) {
+        yield Wait.Sleep(30);
+        queue.push(i * 10);
+        interrupt();
+        i += 1;
+    }
+}
+
+fn consumer(): Coroutine<Wait> {
+    var got = 0;
+    var parks = 0;
+    while (got < 3) {
+        if (queue.length() == 0) {
+            parks += 1;
+            yield Wait.Interrupt;
+        } else {
+            let v = queue.get(0);
+            queue.removeAt(0);
+            got += 1;
+            println(f"consumer got {v} at +{os.nowMillis() - t0}ms");
+        }
+    }
+    println(f"parks = {parks}, idle rounds = 0 by construction");
+}
+
+fn main(): int {
+    spawn(consumer());
+    spawn(producer());
+    run();
+    println(f"run returned at +{os.nowMillis() - t0}ms");
+    return 0;
+}

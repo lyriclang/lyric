@@ -1,0 +1,201 @@
+fn main.main -> i64 {
+  params: 0
+  locals:
+    l0 xs: i64[]
+    l1 a: dyn ty0
+    l2 b: dyn ty0
+    l3 __inl_xs: i64[]
+    l4 __inl_ret: dyn ty0
+    l5 __inl_this: dyn ty0
+    l6 __inl_f: fn(i64) -> i64
+    l7 __inl_ret: dyn ty0
+    l8 __inl_source: dyn ty0
+    l9 __inl_total: i64
+    l10 __inl_value: ?i64
+    l11 __inl_ret: i64
+    l12 __inl_value: string
+    l13 __inl_this: string
+    l14 __inl_ret: string
+    l15 __inl_xs: i64[]
+    l16 __inl_ret: dyn ty0
+    l17 __inl_this: dyn ty0
+    l18 __inl_f: fn(i64) -> i64
+    l19 __inl_ret: dyn ty0
+    l20 __inl_source: dyn ty0
+    l21 __inl_total: i64
+    l22 __inl_value: ?i64
+    l23 __inl_ret: i64
+    l24 __inl_value: string
+    l25 __inl_this: string
+    l26 __inl_ret: string
+    l27 __inl_this: dyn ty0
+    l28 __inl_keep: fn(i64) -> bool
+    l29 __inl_ret: dyn ty0
+    l30 __inl_this: &ty22
+    l31 __inl_value: ?i64
+    l32 __inl_g: fn(i64) -> i64
+    l33 __inl_ret: ?i64
+    l34 __inl_this: &ty22
+    l35 __inl_value: ?i64
+    l36 __inl_g: fn(i64) -> i64
+    l37 __inl_ret: ?i64
+  bb0:
+    t0: i64 = const 1
+    t1: i64 = const 2
+    t2: i64 = const 3
+    t3: i64 = const 4
+    t4: i64[] = newarr i64 [t0, t1, t2, t3]
+    br bb1
+  bb1:
+    t5: i64 = const 0
+    t6: &ty21 = newobj ty21
+    storefield t6, ty21#0, t4
+    storefield t6, ty21#1, t5
+    t7: dyn ty0 = mkiface t6, ty21
+    br bb2
+  bb2:
+    t8: fn(i64) -> i64 = mkclosure f1 (no captures)
+    br bb3
+  bb3:
+    t9: &ty22 = newobj ty22
+    storefield t9, ty22#0, t7
+    storefield t9, ty22#1, t8
+    t10: dyn ty0 = mkiface t9, ty22
+    br bb4
+  bb4:
+    t11: fn(i64) -> bool = mkclosure f2 (no captures)
+    br bb27
+  bb5:
+    t12: i64 = const 0
+    store l9, t12
+    t13: ?i64 = callvirt ty0#0(t40)
+    store l10, t13
+    br bb6
+  bb6:
+    t14: ?i64 = load l10
+    t15: bool = optissome t14
+    condbr t15 -> bb7, bb8
+  bb7:
+    t16: i64 = load l9
+    t17: ?i64 = load l10
+    t18: i64 = optget t17
+    t19: i64 = add t16, t18
+    store l9, t19
+    t20: ?i64 = callvirt ty0#0(t40)
+    store l10, t20
+    br bb6
+  bb8:
+    t21: i64 = load l9
+    br bb9
+  bb9:
+    t22: string = callimport std.string.fromInt(t21)
+    br bb10
+  bb10:
+    br bb12
+  bb11:
+    br bb14
+  bb12:
+    br bb13
+  bb13:
+    callimport std.io.console.rawPrintln(t22)
+    br bb11
+  bb14:
+    t23: i64 = const 0
+    t24: &ty21 = newobj ty21
+    storefield t24, ty21#0, t4
+    storefield t24, ty21#1, t23
+    t25: dyn ty0 = mkiface t24, ty21
+    br bb15
+  bb15:
+    t26: fn(i64) -> i64 = mkclosure f3 (no captures)
+    br bb16
+  bb16:
+    t27: &ty22 = newobj ty22
+    storefield t27, ty22#0, t25
+    storefield t27, ty22#1, t26
+    t28: dyn ty0 = mkiface t27, ty22
+    br bb17
+  bb17:
+    br bb18
+  bb18:
+    t29: i64 = const 0
+    store l21, t29
+    br bb29
+  bb19:
+    t30: ?i64 = load l22
+    t31: bool = optissome t30
+    condbr t31 -> bb20, bb21
+  bb20:
+    t32: i64 = load l21
+    t33: ?i64 = load l22
+    t34: i64 = optget t33
+    t35: i64 = add t32, t34
+    store l21, t35
+    br bb33
+  bb21:
+    t36: i64 = load l21
+    br bb22
+  bb22:
+    t37: string = callimport std.string.fromInt(t36)
+    br bb23
+  bb23:
+    br bb25
+  bb24:
+    t38: i64 = const 0
+    ret t38
+  bb25:
+    br bb26
+  bb26:
+    callimport std.io.console.rawPrintln(t37)
+    br bb24
+  bb27:
+    t39: &ty23 = newobj ty23
+    storefield t39, ty23#0, t10
+    storefield t39, ty23#1, t11
+    t40: dyn ty0 = mkiface t39, ty23
+    br bb28
+  bb28:
+    br bb5
+  bb29:
+    t41: dyn ty0 = loadfield t27, ty22#0
+    t42: ?i64 = callvirt ty0#0(t41)
+    t43: bool = optissome t42
+    t44: bool = not t43
+    condbr t44 -> bb30, bb31
+  bb30:
+    t45: ?i64 = optnone
+    store l33, t45
+    br bb32
+  bb31:
+    t46: fn(i64) -> i64 = loadfield t27, ty22#1
+    t47: i64 = optget t42
+    t48: i64 = callind t46(t47)
+    t49: ?i64 = optsome t48
+    store l33, t49
+    br bb32
+  bb32:
+    t50: ?i64 = load l33
+    store l22, t50
+    br bb19
+  bb33:
+    t51: dyn ty0 = loadfield t27, ty22#0
+    t52: ?i64 = callvirt ty0#0(t51)
+    t53: bool = optissome t52
+    t54: bool = not t53
+    condbr t54 -> bb34, bb35
+  bb34:
+    t55: ?i64 = optnone
+    store l37, t55
+    br bb36
+  bb35:
+    t56: fn(i64) -> i64 = loadfield t27, ty22#1
+    t57: i64 = optget t52
+    t58: i64 = callind t56(t57)
+    t59: ?i64 = optsome t58
+    store l37, t59
+    br bb36
+  bb36:
+    t60: ?i64 = load l37
+    store l22, t60
+    br bb19
+}

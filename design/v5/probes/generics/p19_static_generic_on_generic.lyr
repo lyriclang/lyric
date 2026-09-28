@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+class Box<T> {
+    value: T,
+    static fn make<U>(u: U): Box<U> { return Box<U> { value = u }; }
+    fn keep(): T { return this.value; }
+}
+
+fn main(): int {
+    let b = Box<int>.make<string>("hi");
+    println(b.value);
+    let c = Box<int> { value = 4 };
+    println(f"{c.keep()}");
+    return 0;
+}

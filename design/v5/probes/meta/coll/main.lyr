@@ -1,0 +1,10 @@
+import a;
+import b;
+
+@a.Tag { kind = "x" }
+pub fn one(): void { }
+
+@b.Tag { level = 7 }
+pub fn two(): void { }
+
+fn main(): int { return 0; }

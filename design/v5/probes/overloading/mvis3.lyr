@@ -1,0 +1,5 @@
+pub struct P {
+    v: int,
+    pub static fn make(): P { return P { v = 1 }; }
+    fn m(x: int): string { return "PRIVATE-only"; }
+}

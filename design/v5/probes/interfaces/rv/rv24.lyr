@@ -1,0 +1,5 @@
+import std.io.console { println };
+class E1 :: [Throwable] { fn message(): string { return "e1"; } }
+interface Risky { fn go(): int throws E1; }
+class Safe :: [Risky] { fn go(): int { return 1; } }
+fn main(): int { let r: Risky = Safe { }; return 0; }

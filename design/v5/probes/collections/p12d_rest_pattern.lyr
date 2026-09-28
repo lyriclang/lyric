@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3, 4];
+    match (xs) {
+        [first, ..rest] => {
+            rest[0] = 99;
+            println(f"first={first} rest0={rest[0]} xs1={xs[1]} restLen={rest.length}");
+        },
+        _ => println("no"),
+    }
+    return 0;
+}

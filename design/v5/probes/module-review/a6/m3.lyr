@@ -1,0 +1,3 @@
+module m3;
+import lib as L;
+fn main(): int { return 0; }

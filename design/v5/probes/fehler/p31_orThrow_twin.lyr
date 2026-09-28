@@ -1,0 +1,16 @@
+// ERWARTUNG (Guide 10): textOrThrow wirft IoError mit kind; text() antwortet null.
+import std.io.file { text, textOrThrow };
+import std.io.error { IoError, IoErrorKind };
+import std.io.console { println };
+fn main(): int {
+    println(text("does-not-exist.txt") ?? "fallback");
+    try {
+        println(textOrThrow("does-not-exist.txt"));
+    } catch (e: IoError) {
+        println(match (e.kind) {
+            IoErrorKind.NotFound => "NotFound",
+            _ => "other: " + e.message(),
+        });
+    }
+    return 0;
+}

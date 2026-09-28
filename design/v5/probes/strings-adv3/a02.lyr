@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let x = 3.14159;
+    println(f"[{x:.2}] [{x:.3}] [{x:F2}] [{x:.}]");
+    return 0;
+}

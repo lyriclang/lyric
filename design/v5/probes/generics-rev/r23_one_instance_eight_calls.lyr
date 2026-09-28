@@ -1,0 +1,43 @@
+fn work<T>(x: T, k: int): int {
+  var s = 0;
+  var i = 0;
+  while (i < k) { s = s + i; i = i + 1; }
+  return s;
+}
+struct S1 { v: int }
+struct S2 { v: int }
+struct S3 { v: int }
+struct S4 { v: int }
+struct S5 { v: int }
+struct S6 { v: int }
+struct S7 { v: int }
+struct S8 { v: int }
+fn main(): int {
+  let a1 = S1 { v = 1 };
+  let a2 = S2 { v = 2 };
+  let a3 = S3 { v = 3 };
+  let a4 = S4 { v = 4 };
+  let a5 = S5 { v = 5 };
+  let a6 = S6 { v = 6 };
+  let a7 = S7 { v = 7 };
+  let a8 = S8 { v = 8 };
+  var base = 0;
+  base = base + a1.v;
+  base = base + a2.v;
+  base = base + a3.v;
+  base = base + a4.v;
+  base = base + a5.v;
+  base = base + a6.v;
+  base = base + a7.v;
+  base = base + a8.v;
+  var t = 0;
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  return (base + t) % 7;
+}

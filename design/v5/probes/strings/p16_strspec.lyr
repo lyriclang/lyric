@@ -1,0 +1,7 @@
+import std.io.console { println };
+
+fn main(): int {
+    println("before");
+    println(f"{"x":N2}");
+    return 0;
+}

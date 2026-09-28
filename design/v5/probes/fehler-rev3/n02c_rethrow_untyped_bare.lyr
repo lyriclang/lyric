@@ -1,0 +1,10 @@
+// KONTROLLE zu n02b: 'throws' bar nimmt den Throwable-Rethrow. Kompiliert; main braucht catch-all.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { throw Boom { }; }
+fn work(): int throws {
+    try { return f(); } catch (e) { println("rethrow"); throw e; }
+}
+fn main(): int {
+    try { return work(); } catch (e) { println(f"main caught {e.message()}"); return 0; }
+}

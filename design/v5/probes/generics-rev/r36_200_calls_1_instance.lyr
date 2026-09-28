@@ -1,0 +1,811 @@
+fn work<T>(x: T, k: int): int {
+  var s = 0;
+  var i = 0;
+  while (i < k) { s = s + i; i = i + 1; }
+  return s;
+}
+struct S1 { v: int }
+struct S2 { v: int }
+struct S3 { v: int }
+struct S4 { v: int }
+struct S5 { v: int }
+struct S6 { v: int }
+struct S7 { v: int }
+struct S8 { v: int }
+struct S9 { v: int }
+struct S10 { v: int }
+struct S11 { v: int }
+struct S12 { v: int }
+struct S13 { v: int }
+struct S14 { v: int }
+struct S15 { v: int }
+struct S16 { v: int }
+struct S17 { v: int }
+struct S18 { v: int }
+struct S19 { v: int }
+struct S20 { v: int }
+struct S21 { v: int }
+struct S22 { v: int }
+struct S23 { v: int }
+struct S24 { v: int }
+struct S25 { v: int }
+struct S26 { v: int }
+struct S27 { v: int }
+struct S28 { v: int }
+struct S29 { v: int }
+struct S30 { v: int }
+struct S31 { v: int }
+struct S32 { v: int }
+struct S33 { v: int }
+struct S34 { v: int }
+struct S35 { v: int }
+struct S36 { v: int }
+struct S37 { v: int }
+struct S38 { v: int }
+struct S39 { v: int }
+struct S40 { v: int }
+struct S41 { v: int }
+struct S42 { v: int }
+struct S43 { v: int }
+struct S44 { v: int }
+struct S45 { v: int }
+struct S46 { v: int }
+struct S47 { v: int }
+struct S48 { v: int }
+struct S49 { v: int }
+struct S50 { v: int }
+struct S51 { v: int }
+struct S52 { v: int }
+struct S53 { v: int }
+struct S54 { v: int }
+struct S55 { v: int }
+struct S56 { v: int }
+struct S57 { v: int }
+struct S58 { v: int }
+struct S59 { v: int }
+struct S60 { v: int }
+struct S61 { v: int }
+struct S62 { v: int }
+struct S63 { v: int }
+struct S64 { v: int }
+struct S65 { v: int }
+struct S66 { v: int }
+struct S67 { v: int }
+struct S68 { v: int }
+struct S69 { v: int }
+struct S70 { v: int }
+struct S71 { v: int }
+struct S72 { v: int }
+struct S73 { v: int }
+struct S74 { v: int }
+struct S75 { v: int }
+struct S76 { v: int }
+struct S77 { v: int }
+struct S78 { v: int }
+struct S79 { v: int }
+struct S80 { v: int }
+struct S81 { v: int }
+struct S82 { v: int }
+struct S83 { v: int }
+struct S84 { v: int }
+struct S85 { v: int }
+struct S86 { v: int }
+struct S87 { v: int }
+struct S88 { v: int }
+struct S89 { v: int }
+struct S90 { v: int }
+struct S91 { v: int }
+struct S92 { v: int }
+struct S93 { v: int }
+struct S94 { v: int }
+struct S95 { v: int }
+struct S96 { v: int }
+struct S97 { v: int }
+struct S98 { v: int }
+struct S99 { v: int }
+struct S100 { v: int }
+struct S101 { v: int }
+struct S102 { v: int }
+struct S103 { v: int }
+struct S104 { v: int }
+struct S105 { v: int }
+struct S106 { v: int }
+struct S107 { v: int }
+struct S108 { v: int }
+struct S109 { v: int }
+struct S110 { v: int }
+struct S111 { v: int }
+struct S112 { v: int }
+struct S113 { v: int }
+struct S114 { v: int }
+struct S115 { v: int }
+struct S116 { v: int }
+struct S117 { v: int }
+struct S118 { v: int }
+struct S119 { v: int }
+struct S120 { v: int }
+struct S121 { v: int }
+struct S122 { v: int }
+struct S123 { v: int }
+struct S124 { v: int }
+struct S125 { v: int }
+struct S126 { v: int }
+struct S127 { v: int }
+struct S128 { v: int }
+struct S129 { v: int }
+struct S130 { v: int }
+struct S131 { v: int }
+struct S132 { v: int }
+struct S133 { v: int }
+struct S134 { v: int }
+struct S135 { v: int }
+struct S136 { v: int }
+struct S137 { v: int }
+struct S138 { v: int }
+struct S139 { v: int }
+struct S140 { v: int }
+struct S141 { v: int }
+struct S142 { v: int }
+struct S143 { v: int }
+struct S144 { v: int }
+struct S145 { v: int }
+struct S146 { v: int }
+struct S147 { v: int }
+struct S148 { v: int }
+struct S149 { v: int }
+struct S150 { v: int }
+struct S151 { v: int }
+struct S152 { v: int }
+struct S153 { v: int }
+struct S154 { v: int }
+struct S155 { v: int }
+struct S156 { v: int }
+struct S157 { v: int }
+struct S158 { v: int }
+struct S159 { v: int }
+struct S160 { v: int }
+struct S161 { v: int }
+struct S162 { v: int }
+struct S163 { v: int }
+struct S164 { v: int }
+struct S165 { v: int }
+struct S166 { v: int }
+struct S167 { v: int }
+struct S168 { v: int }
+struct S169 { v: int }
+struct S170 { v: int }
+struct S171 { v: int }
+struct S172 { v: int }
+struct S173 { v: int }
+struct S174 { v: int }
+struct S175 { v: int }
+struct S176 { v: int }
+struct S177 { v: int }
+struct S178 { v: int }
+struct S179 { v: int }
+struct S180 { v: int }
+struct S181 { v: int }
+struct S182 { v: int }
+struct S183 { v: int }
+struct S184 { v: int }
+struct S185 { v: int }
+struct S186 { v: int }
+struct S187 { v: int }
+struct S188 { v: int }
+struct S189 { v: int }
+struct S190 { v: int }
+struct S191 { v: int }
+struct S192 { v: int }
+struct S193 { v: int }
+struct S194 { v: int }
+struct S195 { v: int }
+struct S196 { v: int }
+struct S197 { v: int }
+struct S198 { v: int }
+struct S199 { v: int }
+struct S200 { v: int }
+fn main(): int {
+  let a1 = S1 { v = 1 };
+  let a2 = S2 { v = 2 };
+  let a3 = S3 { v = 3 };
+  let a4 = S4 { v = 4 };
+  let a5 = S5 { v = 5 };
+  let a6 = S6 { v = 6 };
+  let a7 = S7 { v = 7 };
+  let a8 = S8 { v = 8 };
+  let a9 = S9 { v = 9 };
+  let a10 = S10 { v = 10 };
+  let a11 = S11 { v = 11 };
+  let a12 = S12 { v = 12 };
+  let a13 = S13 { v = 13 };
+  let a14 = S14 { v = 14 };
+  let a15 = S15 { v = 15 };
+  let a16 = S16 { v = 16 };
+  let a17 = S17 { v = 17 };
+  let a18 = S18 { v = 18 };
+  let a19 = S19 { v = 19 };
+  let a20 = S20 { v = 20 };
+  let a21 = S21 { v = 21 };
+  let a22 = S22 { v = 22 };
+  let a23 = S23 { v = 23 };
+  let a24 = S24 { v = 24 };
+  let a25 = S25 { v = 25 };
+  let a26 = S26 { v = 26 };
+  let a27 = S27 { v = 27 };
+  let a28 = S28 { v = 28 };
+  let a29 = S29 { v = 29 };
+  let a30 = S30 { v = 30 };
+  let a31 = S31 { v = 31 };
+  let a32 = S32 { v = 32 };
+  let a33 = S33 { v = 33 };
+  let a34 = S34 { v = 34 };
+  let a35 = S35 { v = 35 };
+  let a36 = S36 { v = 36 };
+  let a37 = S37 { v = 37 };
+  let a38 = S38 { v = 38 };
+  let a39 = S39 { v = 39 };
+  let a40 = S40 { v = 40 };
+  let a41 = S41 { v = 41 };
+  let a42 = S42 { v = 42 };
+  let a43 = S43 { v = 43 };
+  let a44 = S44 { v = 44 };
+  let a45 = S45 { v = 45 };
+  let a46 = S46 { v = 46 };
+  let a47 = S47 { v = 47 };
+  let a48 = S48 { v = 48 };
+  let a49 = S49 { v = 49 };
+  let a50 = S50 { v = 50 };
+  let a51 = S51 { v = 51 };
+  let a52 = S52 { v = 52 };
+  let a53 = S53 { v = 53 };
+  let a54 = S54 { v = 54 };
+  let a55 = S55 { v = 55 };
+  let a56 = S56 { v = 56 };
+  let a57 = S57 { v = 57 };
+  let a58 = S58 { v = 58 };
+  let a59 = S59 { v = 59 };
+  let a60 = S60 { v = 60 };
+  let a61 = S61 { v = 61 };
+  let a62 = S62 { v = 62 };
+  let a63 = S63 { v = 63 };
+  let a64 = S64 { v = 64 };
+  let a65 = S65 { v = 65 };
+  let a66 = S66 { v = 66 };
+  let a67 = S67 { v = 67 };
+  let a68 = S68 { v = 68 };
+  let a69 = S69 { v = 69 };
+  let a70 = S70 { v = 70 };
+  let a71 = S71 { v = 71 };
+  let a72 = S72 { v = 72 };
+  let a73 = S73 { v = 73 };
+  let a74 = S74 { v = 74 };
+  let a75 = S75 { v = 75 };
+  let a76 = S76 { v = 76 };
+  let a77 = S77 { v = 77 };
+  let a78 = S78 { v = 78 };
+  let a79 = S79 { v = 79 };
+  let a80 = S80 { v = 80 };
+  let a81 = S81 { v = 81 };
+  let a82 = S82 { v = 82 };
+  let a83 = S83 { v = 83 };
+  let a84 = S84 { v = 84 };
+  let a85 = S85 { v = 85 };
+  let a86 = S86 { v = 86 };
+  let a87 = S87 { v = 87 };
+  let a88 = S88 { v = 88 };
+  let a89 = S89 { v = 89 };
+  let a90 = S90 { v = 90 };
+  let a91 = S91 { v = 91 };
+  let a92 = S92 { v = 92 };
+  let a93 = S93 { v = 93 };
+  let a94 = S94 { v = 94 };
+  let a95 = S95 { v = 95 };
+  let a96 = S96 { v = 96 };
+  let a97 = S97 { v = 97 };
+  let a98 = S98 { v = 98 };
+  let a99 = S99 { v = 99 };
+  let a100 = S100 { v = 100 };
+  let a101 = S101 { v = 101 };
+  let a102 = S102 { v = 102 };
+  let a103 = S103 { v = 103 };
+  let a104 = S104 { v = 104 };
+  let a105 = S105 { v = 105 };
+  let a106 = S106 { v = 106 };
+  let a107 = S107 { v = 107 };
+  let a108 = S108 { v = 108 };
+  let a109 = S109 { v = 109 };
+  let a110 = S110 { v = 110 };
+  let a111 = S111 { v = 111 };
+  let a112 = S112 { v = 112 };
+  let a113 = S113 { v = 113 };
+  let a114 = S114 { v = 114 };
+  let a115 = S115 { v = 115 };
+  let a116 = S116 { v = 116 };
+  let a117 = S117 { v = 117 };
+  let a118 = S118 { v = 118 };
+  let a119 = S119 { v = 119 };
+  let a120 = S120 { v = 120 };
+  let a121 = S121 { v = 121 };
+  let a122 = S122 { v = 122 };
+  let a123 = S123 { v = 123 };
+  let a124 = S124 { v = 124 };
+  let a125 = S125 { v = 125 };
+  let a126 = S126 { v = 126 };
+  let a127 = S127 { v = 127 };
+  let a128 = S128 { v = 128 };
+  let a129 = S129 { v = 129 };
+  let a130 = S130 { v = 130 };
+  let a131 = S131 { v = 131 };
+  let a132 = S132 { v = 132 };
+  let a133 = S133 { v = 133 };
+  let a134 = S134 { v = 134 };
+  let a135 = S135 { v = 135 };
+  let a136 = S136 { v = 136 };
+  let a137 = S137 { v = 137 };
+  let a138 = S138 { v = 138 };
+  let a139 = S139 { v = 139 };
+  let a140 = S140 { v = 140 };
+  let a141 = S141 { v = 141 };
+  let a142 = S142 { v = 142 };
+  let a143 = S143 { v = 143 };
+  let a144 = S144 { v = 144 };
+  let a145 = S145 { v = 145 };
+  let a146 = S146 { v = 146 };
+  let a147 = S147 { v = 147 };
+  let a148 = S148 { v = 148 };
+  let a149 = S149 { v = 149 };
+  let a150 = S150 { v = 150 };
+  let a151 = S151 { v = 151 };
+  let a152 = S152 { v = 152 };
+  let a153 = S153 { v = 153 };
+  let a154 = S154 { v = 154 };
+  let a155 = S155 { v = 155 };
+  let a156 = S156 { v = 156 };
+  let a157 = S157 { v = 157 };
+  let a158 = S158 { v = 158 };
+  let a159 = S159 { v = 159 };
+  let a160 = S160 { v = 160 };
+  let a161 = S161 { v = 161 };
+  let a162 = S162 { v = 162 };
+  let a163 = S163 { v = 163 };
+  let a164 = S164 { v = 164 };
+  let a165 = S165 { v = 165 };
+  let a166 = S166 { v = 166 };
+  let a167 = S167 { v = 167 };
+  let a168 = S168 { v = 168 };
+  let a169 = S169 { v = 169 };
+  let a170 = S170 { v = 170 };
+  let a171 = S171 { v = 171 };
+  let a172 = S172 { v = 172 };
+  let a173 = S173 { v = 173 };
+  let a174 = S174 { v = 174 };
+  let a175 = S175 { v = 175 };
+  let a176 = S176 { v = 176 };
+  let a177 = S177 { v = 177 };
+  let a178 = S178 { v = 178 };
+  let a179 = S179 { v = 179 };
+  let a180 = S180 { v = 180 };
+  let a181 = S181 { v = 181 };
+  let a182 = S182 { v = 182 };
+  let a183 = S183 { v = 183 };
+  let a184 = S184 { v = 184 };
+  let a185 = S185 { v = 185 };
+  let a186 = S186 { v = 186 };
+  let a187 = S187 { v = 187 };
+  let a188 = S188 { v = 188 };
+  let a189 = S189 { v = 189 };
+  let a190 = S190 { v = 190 };
+  let a191 = S191 { v = 191 };
+  let a192 = S192 { v = 192 };
+  let a193 = S193 { v = 193 };
+  let a194 = S194 { v = 194 };
+  let a195 = S195 { v = 195 };
+  let a196 = S196 { v = 196 };
+  let a197 = S197 { v = 197 };
+  let a198 = S198 { v = 198 };
+  let a199 = S199 { v = 199 };
+  let a200 = S200 { v = 200 };
+  var base = 0;
+  base = base + a1.v;
+  base = base + a2.v;
+  base = base + a3.v;
+  base = base + a4.v;
+  base = base + a5.v;
+  base = base + a6.v;
+  base = base + a7.v;
+  base = base + a8.v;
+  base = base + a9.v;
+  base = base + a10.v;
+  base = base + a11.v;
+  base = base + a12.v;
+  base = base + a13.v;
+  base = base + a14.v;
+  base = base + a15.v;
+  base = base + a16.v;
+  base = base + a17.v;
+  base = base + a18.v;
+  base = base + a19.v;
+  base = base + a20.v;
+  base = base + a21.v;
+  base = base + a22.v;
+  base = base + a23.v;
+  base = base + a24.v;
+  base = base + a25.v;
+  base = base + a26.v;
+  base = base + a27.v;
+  base = base + a28.v;
+  base = base + a29.v;
+  base = base + a30.v;
+  base = base + a31.v;
+  base = base + a32.v;
+  base = base + a33.v;
+  base = base + a34.v;
+  base = base + a35.v;
+  base = base + a36.v;
+  base = base + a37.v;
+  base = base + a38.v;
+  base = base + a39.v;
+  base = base + a40.v;
+  base = base + a41.v;
+  base = base + a42.v;
+  base = base + a43.v;
+  base = base + a44.v;
+  base = base + a45.v;
+  base = base + a46.v;
+  base = base + a47.v;
+  base = base + a48.v;
+  base = base + a49.v;
+  base = base + a50.v;
+  base = base + a51.v;
+  base = base + a52.v;
+  base = base + a53.v;
+  base = base + a54.v;
+  base = base + a55.v;
+  base = base + a56.v;
+  base = base + a57.v;
+  base = base + a58.v;
+  base = base + a59.v;
+  base = base + a60.v;
+  base = base + a61.v;
+  base = base + a62.v;
+  base = base + a63.v;
+  base = base + a64.v;
+  base = base + a65.v;
+  base = base + a66.v;
+  base = base + a67.v;
+  base = base + a68.v;
+  base = base + a69.v;
+  base = base + a70.v;
+  base = base + a71.v;
+  base = base + a72.v;
+  base = base + a73.v;
+  base = base + a74.v;
+  base = base + a75.v;
+  base = base + a76.v;
+  base = base + a77.v;
+  base = base + a78.v;
+  base = base + a79.v;
+  base = base + a80.v;
+  base = base + a81.v;
+  base = base + a82.v;
+  base = base + a83.v;
+  base = base + a84.v;
+  base = base + a85.v;
+  base = base + a86.v;
+  base = base + a87.v;
+  base = base + a88.v;
+  base = base + a89.v;
+  base = base + a90.v;
+  base = base + a91.v;
+  base = base + a92.v;
+  base = base + a93.v;
+  base = base + a94.v;
+  base = base + a95.v;
+  base = base + a96.v;
+  base = base + a97.v;
+  base = base + a98.v;
+  base = base + a99.v;
+  base = base + a100.v;
+  base = base + a101.v;
+  base = base + a102.v;
+  base = base + a103.v;
+  base = base + a104.v;
+  base = base + a105.v;
+  base = base + a106.v;
+  base = base + a107.v;
+  base = base + a108.v;
+  base = base + a109.v;
+  base = base + a110.v;
+  base = base + a111.v;
+  base = base + a112.v;
+  base = base + a113.v;
+  base = base + a114.v;
+  base = base + a115.v;
+  base = base + a116.v;
+  base = base + a117.v;
+  base = base + a118.v;
+  base = base + a119.v;
+  base = base + a120.v;
+  base = base + a121.v;
+  base = base + a122.v;
+  base = base + a123.v;
+  base = base + a124.v;
+  base = base + a125.v;
+  base = base + a126.v;
+  base = base + a127.v;
+  base = base + a128.v;
+  base = base + a129.v;
+  base = base + a130.v;
+  base = base + a131.v;
+  base = base + a132.v;
+  base = base + a133.v;
+  base = base + a134.v;
+  base = base + a135.v;
+  base = base + a136.v;
+  base = base + a137.v;
+  base = base + a138.v;
+  base = base + a139.v;
+  base = base + a140.v;
+  base = base + a141.v;
+  base = base + a142.v;
+  base = base + a143.v;
+  base = base + a144.v;
+  base = base + a145.v;
+  base = base + a146.v;
+  base = base + a147.v;
+  base = base + a148.v;
+  base = base + a149.v;
+  base = base + a150.v;
+  base = base + a151.v;
+  base = base + a152.v;
+  base = base + a153.v;
+  base = base + a154.v;
+  base = base + a155.v;
+  base = base + a156.v;
+  base = base + a157.v;
+  base = base + a158.v;
+  base = base + a159.v;
+  base = base + a160.v;
+  base = base + a161.v;
+  base = base + a162.v;
+  base = base + a163.v;
+  base = base + a164.v;
+  base = base + a165.v;
+  base = base + a166.v;
+  base = base + a167.v;
+  base = base + a168.v;
+  base = base + a169.v;
+  base = base + a170.v;
+  base = base + a171.v;
+  base = base + a172.v;
+  base = base + a173.v;
+  base = base + a174.v;
+  base = base + a175.v;
+  base = base + a176.v;
+  base = base + a177.v;
+  base = base + a178.v;
+  base = base + a179.v;
+  base = base + a180.v;
+  base = base + a181.v;
+  base = base + a182.v;
+  base = base + a183.v;
+  base = base + a184.v;
+  base = base + a185.v;
+  base = base + a186.v;
+  base = base + a187.v;
+  base = base + a188.v;
+  base = base + a189.v;
+  base = base + a190.v;
+  base = base + a191.v;
+  base = base + a192.v;
+  base = base + a193.v;
+  base = base + a194.v;
+  base = base + a195.v;
+  base = base + a196.v;
+  base = base + a197.v;
+  base = base + a198.v;
+  base = base + a199.v;
+  base = base + a200.v;
+  var t = 0;
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  return (base + t) % 7;
+}

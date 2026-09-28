@@ -1,0 +1,13 @@
+// ERWARTUNG: unklar. catch mit Typparameter.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn attempt<E :: [Throwable]>(f: fn() -> int): int {
+    try {
+        return f();
+    } catch (e: E) {
+        println("caught E");
+        return 0;
+    }
+}
+fn main(): int { return 0; }

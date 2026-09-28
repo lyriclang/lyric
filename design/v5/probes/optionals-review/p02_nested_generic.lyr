@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+fn wrap<T>(x: T): ?T {
+    return x;
+}
+
+fn main(): int {
+    let a: ?int = 5;
+    let b = wrap(a);
+    println(f"{b ?? 0}");
+    let c: ?int = null;
+    let d = wrap(c);
+    if (d == null) { println("d is null"); } else { println("d is not null"); }
+    return 0;
+}

@@ -1,0 +1,9 @@
+enum S { Pair(bool, bool), Dot }
+fn f(s: S): int {
+    return match (s) {
+        Pair(true, true) => 1,
+        Pair(false, false) => 2,
+        Dot => 3,
+    };
+}
+fn main(): int { return f(S.Dot); }

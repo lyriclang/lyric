@@ -1,0 +1,10 @@
+enum Res<T, E> { Ok(T), Err(E) }
+
+fn unwrapOr<T, E>(r: Res<T, E>, d: T): T {
+    match (r) {
+        Res<T, E>.Ok(v) => { return v; }
+        _ => { return d; }
+    }
+}
+
+fn main(): int { return unwrapOr<int, string>(Res<int, string>.Ok(5), 0); }

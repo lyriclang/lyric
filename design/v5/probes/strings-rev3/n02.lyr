@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let n = 5; println(f"[{n:>8}] [{n:<8}] [{n:*>8}] [{n:+}] [{n:^8}]"); println(f"[{n:8}] [{n:-8}]"); return 0; }

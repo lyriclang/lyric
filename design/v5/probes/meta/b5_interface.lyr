@@ -1,0 +1,5 @@
+import std.core { OnType };
+pub struct Tag :: [OnType] { }
+@Tag
+pub interface Sink { fn put(x: int): void; }
+fn main(): int { return 0; }

@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn waiter(): Coroutine<Wait> {
+    println("parking on a descriptor nobody owns");
+    yield Wait.Readable(999);
+    println("woke up");
+}
+
+fn main(): int {
+    spawn(waiter());
+    run();
+    println("run returned");
+    return 0;
+}

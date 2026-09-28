@@ -1,0 +1,3 @@
+// ERWARTUNG: unklar — darf 'never' in anderen Typpositionen stehen?
+fn g(x: never): int { return 0; }
+fn main(): int { return 0; }

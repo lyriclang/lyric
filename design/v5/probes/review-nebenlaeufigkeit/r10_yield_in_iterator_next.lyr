@@ -1,0 +1,26 @@
+import std.io.console { println };
+import std.iter { Iterator };
+
+class Counter :: [Iterator<int>] {
+    i: int,
+
+    pub mut fn next(): ?int {
+        yield 99;
+        this.i = this.i + 1;
+        if (this.i > 3) { return null; }
+        return this.i;
+    }
+}
+
+fn gen(): Coroutine<int> {
+    let c = Counter { i = 0 };
+    var v = c.next();
+    while (v != null) { v = c.next(); }
+}
+
+fn main(): int {
+    let co = gen();
+    var x = co.next();
+    while (x != null) { println(f"yielded {x}"); x = co.next(); }
+    return 0;
+}

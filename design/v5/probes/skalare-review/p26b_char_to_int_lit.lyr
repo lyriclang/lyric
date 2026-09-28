@@ -1,0 +1,7 @@
+// ERWARTUNG: SEM0001 (char-Literal adaptiert nicht an int)
+import std.io.console { println };
+fn main(): int {
+  let n: int = 'a';
+  println(f"{n}");
+  return 0;
+}

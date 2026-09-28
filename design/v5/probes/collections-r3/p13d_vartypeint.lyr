@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let n: int32 = 3;
+    for (i in 0..n) { let j: int = i; println(f"{j}"); }
+    return 0;
+}

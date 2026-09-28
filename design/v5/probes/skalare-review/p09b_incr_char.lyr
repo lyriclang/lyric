@@ -1,0 +1,8 @@
+// ERWARTUNG (Dossier): LYR-IR0001 increment on non-numeric type
+import std.io.console { println };
+fn main(): int {
+  var c: char = 'a';
+  c++;
+  println(f"{c}");
+  return 0;
+}

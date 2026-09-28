@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let z = -0.0; println(f"{z}"); println(f"{0.0 == z}"); println(f"{1.0 / z}"); println(f"{z < 0.0}"); return 0; }

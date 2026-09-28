@@ -1,0 +1,33 @@
+import std.io.console { println };
+pub interface Fat<T> {
+    mut fn next(): ?T;
+    fn d1(): int { return 1; }
+    fn d2(): int { return 2; }
+    fn d3(): int { return 3; }
+    fn d4(): int { return 4; }
+    fn d5(): int { return 5; }
+    fn d6(): int { return 6; }
+    fn d7(): int { return 7; }
+    fn d8(): int { return 8; }
+    fn d9(): int { return 9; }
+    fn d10(): int { return 10; }
+    fn d11(): int { return 11; }
+    fn d12(): int { return 12; }
+    fn d13(): int { return 13; }
+}
+pub class Counter :: [Fat<int>] {
+    n: int = 0,
+    pub mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n += 1;
+        return this.n;
+    }
+}
+fn main(): int {
+    let c: Fat<int> = Counter{};
+    var total = 0;
+    var v = c.next();
+    while (v != null) { total += v; v = c.next(); }
+    println(f"{total}");
+    return 0;
+}

@@ -1,0 +1,13 @@
+// KONTROLLE ERWARTUNG (§3.6 char konvertiert als Codepunkt): 97 97 65 ; int->char Kontrolle 65
+import std.io.console { println };
+fn main(): int {
+  let a = 97.0;
+  println(f"{(a as char) as int}");
+  let b = 97.5;
+  println(f"{(b as char) as int}");
+  let c: float32 = 65f32;
+  println(f"{(c as char) as int}");
+  let n = 65;
+  println(f"{(n as char) as int}");
+  return 0;
+}

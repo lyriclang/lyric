@@ -1,0 +1,7 @@
+// ERWARTUNG: catch (e) bindet Throwable; e.message() geht.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Boom { what = "x" }; }
+fn main(): int {
+    try { return f(); } catch (e) { println(f"caught {e.message()}"); return 0; }
+}

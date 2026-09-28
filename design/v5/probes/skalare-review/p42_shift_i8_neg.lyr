@@ -1,0 +1,9 @@
+// ERWARTUNG: -128 (Count -1 maskiert auf 7) und 2 (1u8 << 9 -> << 1)
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = 1i8;
+  println(f"{a << -1}");
+  let b: uint8 = 1u8;
+  println(f"{b << 9}");
+  return 0;
+}

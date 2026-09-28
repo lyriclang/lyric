@@ -1,0 +1,6 @@
+interface Base { fn go(): int; }
+interface Child :: [Base] { fn go(): int { return 2; } }
+
+struct B :: [Child] { fn go(): int { return 1; } }
+
+fn main(): int { return 0; }

@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.string as strings;
+import std.string { isAlpha, isUpper, isLower, isAlphanumeric, isDigit };
+
+fn main(): int {
+    println(f"upper(é)  = {"é".toUpper()}");
+    println(f"upper(ß)  = {"ß".toUpper()}");
+    println(f"lower(İ)  = {"İ".toLower()}");
+    println(f"isAlpha(é)     = {isAlpha('é')}");
+    println(f"isUpper(É)     = {isUpper('É')}");
+    println(f"isLower(é)     = {isLower('é')}");
+    println(f"isDigit(٣)     = {isDigit('٣')}");
+    println(f"alnum(é)       = {isAlphanumeric('é')}");
+    println(f"len(İ.toLower)= {"İ".toLower().length()}");
+    return 0;
+}

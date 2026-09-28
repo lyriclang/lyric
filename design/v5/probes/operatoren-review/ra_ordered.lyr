@@ -1,0 +1,12 @@
+import std.core { Ordered };
+struct V :: [Ordered<V>] {
+    n: int,
+    fn compare(other: V): int { return this.n - other.n; }
+}
+fn main(): int {
+    let a = V { n = 1 };
+    let b = V { n = 2 };
+    if (a < b) { }
+    if (a == b) { return 1; }
+    return 0;
+}

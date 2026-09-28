@@ -1,0 +1,5 @@
+class Plain { n: int, }
+
+fn f<T :: [Plain]>(x: T): int { return x.n; }
+
+fn main(): int { return 0; }

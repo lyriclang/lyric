@@ -1,0 +1,13 @@
+enum A { A1, A2 }
+enum B { B1, B2 }
+
+fn f(a: A, b: B): int {
+    return match ((a, b)) {
+        (A1, B1) => 1,
+        (A1, B2) => 2,
+        (A2, B1) => 3,
+        (A2, B2) => 4,
+    };
+}
+
+fn main(): int { return f(A.A1, B.B1); }

@@ -1,0 +1,4 @@
+./p05_typeparam_throws.lyr:16:16: error[LYR-SEM0034]: call to 'rethrowIt' may throw 'Throwable', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch
+        return rethrowIt(Boom { what = "x" });
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+

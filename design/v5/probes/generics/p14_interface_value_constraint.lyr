@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+interface Describable { fn describe(): string; }
+class Coin :: [Describable] { fn describe(): string { return "coin"; } }
+
+fn report<T :: [Describable]>(item: T): void { println(item.describe()); }
+
+fn main(): int {
+    let d: Describable = Coin { };
+    report(d);
+    return 0;
+}

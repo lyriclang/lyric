@@ -1,0 +1,7 @@
+import std.io.console { println };
+enum Col { Red, Blue }
+enum Box { Wrap(Col), Empty }
+fn f(b: Box): int {
+    return match (b) { Wrap(Red) => 1, Wrap(Blue) => 2, Empty => 3 };
+}
+fn main(): int { println(f"{f(Box.Wrap(Col.Blue))}"); return 0; }

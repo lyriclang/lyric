@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.core { Exception };
+fn f(x: int): int { return x; }
+fn f(x: int): int throws Exception { return x; }
+fn main(): int { return 0; }

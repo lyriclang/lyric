@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+fn body(): Coroutine<int> {
+    defer println("cleanup ran");
+    yield 1;
+    yield 2;
+}
+
+fn main(): int {
+    let dropped = body();
+    let x = resume dropped;          // suspended after first yield, then abandoned
+    println(f"dropped got {x}");
+    println("-- control --");
+    let full = body();
+    var live = true;
+    while (live) {
+        if (full.next() == null) { live = false; }
+    }
+    println("control done");
+    return 0;
+}

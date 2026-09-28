@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    var xs = [1, 2, 3, 4];
+    match (xs) {
+        [first, ..rest] => { rest[0] = 99; println(f"xs[1]={xs[1]} rest0={rest[0]} first={first}"); }
+        _ => { println("no match"); }
+    }
+    return 0;
+}

@@ -1,0 +1,3 @@
+import b;
+pub fn fa(): int { return 1; }
+fn main(): int { return b.fb(); }

@@ -1,0 +1,9 @@
+// ERWARTUNG: ein defer liest einen mutablen Local zum AUSFUEHRUNGSZEITPUNKT (nicht zur Planung).
+import std.io.console { println };
+fn main(): int {
+    var n = 1;
+    defer println(f"defer sees {n}");
+    n = 2;
+    println("body");
+    return 0;
+}

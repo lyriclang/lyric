@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let sz = "ß";
+    let e = "é";
+    let up = e.toUpper();
+    println(f"{sz.toUpper()} {sz.toUpper().length()} {up} {strings.isUpper(up.charAt(0))} {strings.isAlpha('é')}");
+    let fi = "\u{FB01}";
+    let dot = "\u{130}";
+    println(f"{fi.toUpper().length()} {dot.toLower().length()}");
+    return 0;
+}

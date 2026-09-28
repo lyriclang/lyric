@@ -1,0 +1,14 @@
+// ERWARTUNG: 2147483647 4294967295 2147483647 true
+import std.io.console { println };
+fn main(): int {
+  let m: uint32 = 4294967295u32;
+  let two: uint32 = 2u32;
+  println(f"{m / two}");
+  let z: uint32 = 0u32;
+  let one: uint32 = 1u32;
+  let w = z - one;
+  println(f"{w}");
+  println(f"{w >> 1}");
+  println(f"{w > one}");
+  return 0;
+}

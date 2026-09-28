@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.hash { sha256Hex };
+
+fn main(): int {
+    println(sha256Hex([104, 105]));
+    return 0;
+}

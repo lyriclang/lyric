@@ -1,0 +1,15 @@
+// Q5c — OOM, praezise. int.MaxValue Elemente passieren die VM-Schranke
+// (Interpreter.cs:978-981 prueft 'count > int.MaxValue / 1'), liegen aber UEBER
+// .NETs Array.MaxLength (2 147 483 591).
+// ERWARTUNG VOR DEM LAUF: rohe .NET-OutOfMemoryException, kein LYR-VM0006, Exit != 101.
+// (q5 mit 2e9 lief durch: 32 GB wurden auf einer 31,5-GB-Maschine mit 46 GB Commit-Limit
+//  tatsaechlich vergeben — die "34-GB-Schranke" des Dossiers ist also nicht einmal eine
+//  praktische Grenze.)
+import std.io.console { println };
+
+fn main(): int {
+    let n = 2147483647;
+    let xs = [1] * n;
+    println(f"unerreichbar {xs.length}");
+    return 0;
+}

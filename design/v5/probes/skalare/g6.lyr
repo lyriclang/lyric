@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let f: float = 1.5; println(f"{f + 1}"); return 0; }

@@ -1,0 +1,35 @@
+// ERWARTUNG (PLAN.md E): "A" laeuft NIE; der werfende defer laeuft ZWEIMAL vor einem return.
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    what: string,
+    fn message(): string { return this.what; }
+}
+
+class Counter { n: int = 0 }
+
+fn boom(c: Counter): void throws Boom {
+    c.n = c.n + 1;
+    println(f"boom {c.n}");
+    throw Boom { what = "from defer" };
+}
+
+fn work(c: Counter): int throws Boom {
+    defer println("A");
+    defer boom(c);
+    println("body");
+    return 1;
+}
+
+fn main(): int {
+    let c = Counter { };
+    try {
+        let n = work(c);
+        println(f"returned {n}");
+        return n;
+    } catch (e: Boom) {
+        println(f"caught: {e.message()}");
+        println(f"count = {c.n}");
+        return 0;
+    }
+}

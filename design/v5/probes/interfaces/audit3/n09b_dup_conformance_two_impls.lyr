@@ -1,0 +1,10 @@
+import std.io.console { println };
+interface I { fn f(): int; }
+struct T :: [I] { fn f(): int { return 1; } }
+extend T :: [I] { fn f(): int { return 2; } }
+fn main(): int {
+    let v: I = T { };
+    println(v.f().show());
+    println(T { }.f().show());
+    return 0;
+}

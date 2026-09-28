@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let unsafe = 1;
+    let extern = 2;
+    let type = 3;
+    let opaque = 4;
+    println(f"{unsafe + extern + type + opaque}");
+    return 0;
+}

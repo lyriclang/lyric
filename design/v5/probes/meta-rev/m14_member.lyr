@@ -1,0 +1,15 @@
+import std.core { Deprecated, OnFunction, OnMethod };
+
+pub struct Other :: [OnMethod] { }
+
+pub class Box {
+    v: int = 0,
+
+    @Deprecated { message = "use get2", until = "9.9" }
+    pub fn get(): int { return this.v; }
+
+    @Other
+    pub fn tagged(): int { return this.v; }
+}
+
+fn main(): int { return 0; }

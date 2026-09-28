@@ -1,0 +1,23 @@
+Erwartungen VOR dem Lauf (ffi-adv3, adversarische Pruefung des Dossiers ffi.md):
+a01 extern GetEnvironmentVariable unter --grant host -> Username gedruckt, exit 0
+a02 std.os.env unter --grant host -> LYR-CAP0001 exit 1; unter --grant os -> exit 0 (Kontrolle)
+a03 Convert::ToChar(55296) als char -> "code=55296" exit 0 (Dossier B14)
+a04 Char::ToString(surrogat).charAt(0) -> CLR-Absturz, Dossier sagt Exit 127
+a05 apply(cbrt aus std.math, 27.0) -> LYR-IR0001 (Dossier B7)
+a06 apply(x => cbrt(x), 27.0) -> laeuft, 3 (Lambda als Umweg; Dossier erwaehnt ihn nicht)
+a07 let unsafe=1; let extern=2 -> 3
+a08 @Deprecated auf extern -> LYR-PAR0042
+a09 unerreichbares Bogus-extern: build ok, info capabilities 0x8 + imports 1, verify ok; mit --no-optimize: import bleibt?
+a10 Environment::Exit(7) -> exit 7, kein DEFER RAN
+a11 opaque alias in extern -> SEM0099 nur fuer h
+a12 extern ohne Symbol -> SEM0099
+a13 comptime xsqrt(4.0) mit extern -> UNBEKANNT (entweder Compiler fuehrt Reflection aus, oder Diagnose)
+a14 get_NewLine ok (len=2); NewLine -> VM0005; Stopwatch::Frequency -> VM0005
+a15 zwei extern auf System.Math::Abs -> info zeigt zwei Import-Zeilen
+a16 Int32::Parse("x") -> panic VM0016, kein defer, exit 101
+a17 Kosten q12 interp und --jit -> Groessenordnung wie Dossier (extern ~100-115 ns JIT)
+a18 --grant all deckt extern -> laeuft
+a19 std.io.file unter --grant host -> CAP0001 (Kontrolle zu a01)
+a20 extern mit ?string Rueckgabe -> SEM0099
+a21 lyrc check auf Bogus-Symbol -> ok
+a22 char-Argument > 0xFFFF -> panic VM0016

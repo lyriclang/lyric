@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.io.file { bytes };
+import std.os { nowNanos };
+import std.string { fromInt };
+fn main(): int {
+    let t0 = nowNanos();
+    let b = bytes("big.bin");
+    let t1 = nowNanos();
+    if (b == null) { return 1; }
+    println("bytes(4MB) us: " + fromInt((t1 - t0) / 1000));
+    let zero: uint8 = 0;
+    let dst = [zero] * b.length;
+    let t2 = nowNanos();
+    var i = 0;
+    while (i < b.length) { dst[i] = b[i]; i = i + 1; }
+    let t3 = nowNanos();
+    println("copy loop us: " + fromInt((t3 - t2) / 1000));
+    println("len: " + fromInt(dst.length));
+    return 0;
+}

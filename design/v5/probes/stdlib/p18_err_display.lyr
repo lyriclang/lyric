@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.io.file { textOrThrow };
+import std.io.error { IoError };
+
+fn main(): int {
+    try {
+        let t = textOrThrow("nope.txt");
+        println(t);
+    } catch (e: IoError) {
+        println(e);
+    }
+    return 0;
+}

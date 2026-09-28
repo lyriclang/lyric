@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+interface Named { fn name(): string; }
+interface Labeled :: [Named] { fn label(): string { return "[" + this.name() + "]"; } }
+
+struct Tag :: [Labeled] { fn name(): string { return "tag"; } }
+
+fn main(): int {
+    let l: Labeled = Tag { };
+    println(l.name());
+    let n: Named = l;
+    println(n.name());
+    return 0;
+}

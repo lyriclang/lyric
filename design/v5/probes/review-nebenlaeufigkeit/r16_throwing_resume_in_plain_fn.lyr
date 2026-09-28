@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    pub fn message(): string { return "boom"; }
+}
+
+fn gen(): Coroutine<int> throws Boom {
+    yield 1;
+    throw Boom { };
+}
+
+// no throws clause here
+fn drive(co: Coroutine<int> throws Boom): void {
+    let v = resume co;
+    println("drove");
+}
+
+fn main(): int {
+    drive(gen());
+    return 0;
+}

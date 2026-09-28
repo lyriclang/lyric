@@ -1,0 +1,21 @@
+import std.io.console { println };
+extern "dotnet" fn ms(): int = "System.Environment::get_TickCount64";
+extern "dotnet" fn qpc(): int = "System.Diagnostics.Stopwatch::GetTimestamp";
+
+fn main(): int {
+    var k = 0;
+    while (k < 5) {
+        let a = ms();
+        var b = a;
+        var spins = 0;
+        while (b == a) { b = ms(); spins = spins + 1; }
+        println(f"TickCount64 jump={b - a} ms after {spins} reads");
+        k = k + 1;
+    }
+    let q0 = qpc();
+    var j = 0;
+    while (j < 1000) { j = j + 1; }
+    let q1 = qpc();
+    println(f"qpc delta ticks={q1 - q0}");
+    return 0;
+}

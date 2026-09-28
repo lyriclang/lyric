@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn total(params values: int[]): int {
+    var sum = 0;
+    for (v in values) { sum = sum + v; }
+    return sum;
+}
+fn tagged(tag: string, params values: int[]): int { return values.length; }
+
+fn main(): int {
+    println(fromInt(total()));
+    println(fromInt(total(1, 2, 3)));
+    let arr: int[] = [4, 5, 6];
+    println(fromInt(total(arr)));
+    println(fromInt(tagged("x")));
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let a: char = 'a';
+    let z: char = 'z';
+    let d: char = z - a;
+    println(f"{d as int}");
+    return 0;
+}

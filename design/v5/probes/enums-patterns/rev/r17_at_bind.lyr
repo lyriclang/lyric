@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(n: int): int {
+    return match (n) {
+        d @ 1..=9 => d,
+        _ => 0,
+    };
+}
+fn main(): int { println(f"{f(5)}"); return 0; }

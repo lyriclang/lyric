@@ -1,0 +1,3 @@
+module filelib;
+import std.io.file { exists };
+pub fn readIt(p: string): bool { return exists(p); }

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn comptime(n: int): int { return n + 1; }
+fn main(): int {
+    let k = 5;
+    println(f"{comptime(k)}");
+    return 0;
+}

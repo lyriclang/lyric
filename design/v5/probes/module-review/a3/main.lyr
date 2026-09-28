@@ -1,0 +1,13 @@
+module main;
+
+import std.io.console { println };
+import lib;
+
+fn main(): int {
+    let c = lib.Counter.create();
+    c.count = 99;
+    println(c.count);
+    println(c.secret());
+    println(lib.Counter.HIDDEN);
+    return 0;
+}

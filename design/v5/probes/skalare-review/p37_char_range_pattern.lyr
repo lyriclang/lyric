@@ -1,0 +1,11 @@
+// ERWARTUNG: kompiliert, druckt 1
+import std.io.console { println };
+fn main(): int {
+  let c = 'q';
+  let r = match (c) {
+    'a'..='z' => 1,
+    _ => 2,
+  };
+  println(f"{r}");
+  return 0;
+}

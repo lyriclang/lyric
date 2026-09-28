@@ -1,0 +1,4 @@
+import std.test { Test, assertEq };
+import calc { internalDouble };
+@Test
+fn doubles() { assertEq(internalDouble(3), 6); }

@@ -1,0 +1,48 @@
+// P2 — Wertsemantik an den Raendern: ?Struct, Array-Element, Parameter, Feld.
+// Erwartung VOR dem Lauf:
+//   optional   -> 99  (kein structcopy hinter ?T; bekannte offene Frage SPEC-RUNDE)
+//   element    -> 1   (Lesen aus einem Array kopiert)
+//   store      -> 1   (Schreiben in ein Array kopiert)
+//   param      -> 1   (Argumentuebergabe kopiert)
+//   returnval  -> 1   (Rueckgabe kopiert)
+import std.io.console { println };
+
+struct S { n: int, }
+
+fn mutate(s: S): int {
+    var local = s;
+    local.n = 99;
+    return 0;
+}
+
+fn giveBack(s: S): S { return s; }
+
+fn main(): int {
+    var a = S { n = 1 };
+    var opt: ?S = a;
+    var got = opt!;
+    got.n = 99;
+    println(f"optional  = {opt!.n}");
+
+    var xs = [S { n = 1 }];
+    var e = xs[0];
+    e.n = 99;
+    println(f"element   = {xs[0].n}");
+
+    var src = S { n = 1 };
+    var ys = [S { n = 0 }];
+    ys[0] = src;
+    src.n = 99;
+    println(f"store     = {ys[0].n}");
+
+    var p = S { n = 1 };
+    let ignored = mutate(p);
+    println(f"param     = {p.n}");
+
+    var r = S { n = 1 };
+    var back = giveBack(r);
+    back.n = 99;
+    println(f"returnval = {r.n}");
+
+    return 0;
+}

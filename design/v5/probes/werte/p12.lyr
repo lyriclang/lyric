@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn seed(): int { println("default evaluated"); return 7; }
+struct D {
+    a: int = seed(),
+    b: int = 3,
+}
+fn main(): int {
+    let d1 = D { };
+    let d2 = D { };
+    println(f"{d1.a} {d2.b}");
+    return 0;
+}

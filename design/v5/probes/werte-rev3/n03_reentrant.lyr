@@ -1,0 +1,17 @@
+import std.io.console { println };
+class H { s: S, }
+struct S {
+    v: int,
+    mut fn other(): void { this.v = 7; }
+    mut fn bump(): void {
+        this.v = 5;
+        G.s.other();
+        println(f"n03 inside bump after G.s.other(): this.v={this.v} (7 = reference, 5 = copy)");
+    }
+}
+let G = H { s = S { v = 1 } };
+fn main(): int {
+    G.s.bump();
+    println(f"n03 after: G.s.v={G.s.v}");
+    return 0;
+}

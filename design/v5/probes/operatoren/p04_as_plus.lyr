@@ -1,0 +1,5 @@
+fn main(): int {
+    let n = 7;
+    let x = 1 + n as float;
+    return 0;
+}

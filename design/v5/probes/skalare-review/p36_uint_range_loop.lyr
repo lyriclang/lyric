@@ -1,0 +1,9 @@
+// ERWARTUNG: unklar - 3 (Range-Operand ist binaerer Kontext?) oder SEM0003
+import std.io.console { println };
+fn main(): int {
+  let n: uint = 3 as uint;
+  var c = 0;
+  for (_ in 0..n) { c += 1; }
+  println(f"{c}");
+  return 0;
+}

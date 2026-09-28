@@ -1,0 +1,3515 @@
+interface ty0 Iterator<int> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty1 Utf8Error {
+  #0 offset: i64
+}
+type ty2 <tuple> {
+  #0 0: i64
+  #1 1: i64
+  #2 2: i64
+}
+type ty3 Result<int, ParseError> {
+}
+type ty4 Result<int, ParseError>.Ok {
+  #0 $tag: i64
+  #1 0: i64
+}
+type ty5 ParseError {
+  #0 kind: enum ty6
+  #1 offset: i64
+}
+type ty6 ParseErrorKind {
+}
+type ty7 ParseErrorKind.Empty {
+  #0 $tag: i64
+}
+type ty8 ParseErrorKind.InvalidDigit {
+  #0 $tag: i64
+}
+type ty9 ParseErrorKind.Overflow {
+  #0 $tag: i64
+}
+type ty10 Result<int, ParseError>.Err {
+  #0 $tag: i64
+  #1 0: &ty5
+}
+type ty11 StringBuilder {
+  #0 parts: string[]
+  #1 count: i64
+}
+type ty12 Exception {
+  #0 text: string
+}
+type ty13 RangeIterator {
+  #0 current: i64
+  #1 end: i64
+}
+type ty14 InclusiveRangeIterator {
+  #0 current: i64
+  #1 last: i64
+  #2 done: bool
+}
+interface ty15 Iterator<float> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty16 UnsignedRangeIterator {
+  #0 current: u64
+  #1 end: u64
+}
+type ty17 InclusiveUnsignedRangeIterator {
+  #0 current: u64
+  #1 last: u64
+  #2 done: bool
+}
+type ty18 StringIterator {
+  #0 chars: char[]
+  #1 index: i64
+}
+interface ty19 Iterator<string> {
+  #0 next
+  #1 filter
+  #2 take
+  #3 skip
+  #4 takeWhile
+  #5 chain
+  #6 skipWhile
+  #7 stepBy
+  #8 inspect
+  #9 dedupBy
+  #10 reduce
+  #11 count
+  #12 first
+  #13 last
+  #14 nth
+  #15 any
+  #16 all
+  #17 none
+  #18 find
+  #19 position
+  #20 countWhere
+  #21 forEach
+  #22 toArray
+}
+type ty20 LineIterator {
+  #0 done: bool
+}
+type ty21 ArrayIterator<int> {
+  #0 source: i64[]
+  #1 index: i64
+}
+type ty22 MapIterator<int, int> {
+  #0 source: dyn ty0
+  #1 f: fn(i64) -> i64
+}
+type ty23 FilterIterator<int> {
+  #0 source: dyn ty0
+  #1 keep: fn(i64) -> bool
+}
+type ty24 TakeIterator<int> {
+  #0 source: dyn ty0
+  #1 remaining: i64
+}
+type ty25 SkipIterator<int> {
+  #0 source: dyn ty0
+  #1 pending: i64
+}
+type ty26 TakeWhileIterator<int> {
+  #0 source: dyn ty0
+  #1 keep: fn(i64) -> bool
+  #2 done: bool
+}
+type ty27 ChainIterator<int> {
+  #0 first: dyn ty0
+  #1 second: dyn ty0
+  #2 onFirst: bool
+}
+type ty28 SkipWhileIterator<int> {
+  #0 source: dyn ty0
+  #1 drop: fn(i64) -> bool
+  #2 passing: bool
+}
+type ty29 StepByIterator<int> {
+  #0 source: dyn ty0
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty30 InspectIterator<int> {
+  #0 source: dyn ty0
+  #1 look: fn(i64) -> void
+}
+type ty31 DedupIterator<int> {
+  #0 source: dyn ty0
+  #1 key: fn(i64) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+type ty32 FilterIterator<float> {
+  #0 source: dyn ty15
+  #1 keep: fn(f64) -> bool
+}
+type ty33 TakeIterator<float> {
+  #0 source: dyn ty15
+  #1 remaining: i64
+}
+type ty34 SkipIterator<float> {
+  #0 source: dyn ty15
+  #1 pending: i64
+}
+type ty35 TakeWhileIterator<float> {
+  #0 source: dyn ty15
+  #1 keep: fn(f64) -> bool
+  #2 done: bool
+}
+type ty36 ChainIterator<float> {
+  #0 first: dyn ty15
+  #1 second: dyn ty15
+  #2 onFirst: bool
+}
+type ty37 SkipWhileIterator<float> {
+  #0 source: dyn ty15
+  #1 drop: fn(f64) -> bool
+  #2 passing: bool
+}
+type ty38 StepByIterator<float> {
+  #0 source: dyn ty15
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty39 InspectIterator<float> {
+  #0 source: dyn ty15
+  #1 look: fn(f64) -> void
+}
+type ty40 DedupIterator<float> {
+  #0 source: dyn ty15
+  #1 key: fn(f64) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+type ty41 FilterIterator<string> {
+  #0 source: dyn ty19
+  #1 keep: fn(string) -> bool
+}
+type ty42 TakeIterator<string> {
+  #0 source: dyn ty19
+  #1 remaining: i64
+}
+type ty43 SkipIterator<string> {
+  #0 source: dyn ty19
+  #1 pending: i64
+}
+type ty44 TakeWhileIterator<string> {
+  #0 source: dyn ty19
+  #1 keep: fn(string) -> bool
+  #2 done: bool
+}
+type ty45 ChainIterator<string> {
+  #0 first: dyn ty19
+  #1 second: dyn ty19
+  #2 onFirst: bool
+}
+type ty46 SkipWhileIterator<string> {
+  #0 source: dyn ty19
+  #1 drop: fn(string) -> bool
+  #2 passing: bool
+}
+type ty47 StepByIterator<string> {
+  #0 source: dyn ty19
+  #1 step: i64
+  #2 atStart: bool
+}
+type ty48 InspectIterator<string> {
+  #0 source: dyn ty19
+  #1 look: fn(string) -> void
+}
+type ty49 DedupIterator<string> {
+  #0 source: dyn ty19
+  #1 key: fn(string) -> i64
+  #2 lastKey: i64
+  #3 started: bool
+}
+impl ty21 :: ty0 [f70, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty21 :: ty15 [f70, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty21 :: ty19 [f70, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty22 :: ty0 [f71, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty22 :: ty15 [f71, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty22 :: ty19 [f71, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty23 :: ty0 [f72, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty23 :: ty15 [f72, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty23 :: ty19 [f72, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty24 :: ty0 [f73, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty24 :: ty15 [f73, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty24 :: ty19 [f73, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty25 :: ty0 [f74, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty25 :: ty15 [f74, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty25 :: ty19 [f74, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty26 :: ty0 [f75, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty26 :: ty15 [f75, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty26 :: ty19 [f75, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty27 :: ty0 [f76, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty27 :: ty15 [f76, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty27 :: ty19 [f76, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty28 :: ty0 [f77, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty28 :: ty15 [f77, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty28 :: ty19 [f77, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty29 :: ty0 [f78, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty29 :: ty15 [f78, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty29 :: ty19 [f78, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty30 :: ty0 [f79, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty30 :: ty15 [f79, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty30 :: ty19 [f79, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty31 :: ty0 [f80, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty31 :: ty15 [f80, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty31 :: ty19 [f80, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty32 :: ty0 [f81, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty32 :: ty15 [f81, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty32 :: ty19 [f81, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty33 :: ty0 [f82, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty33 :: ty15 [f82, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty33 :: ty19 [f82, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty34 :: ty0 [f83, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty34 :: ty15 [f83, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty34 :: ty19 [f83, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty35 :: ty0 [f84, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty35 :: ty15 [f84, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty35 :: ty19 [f84, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty36 :: ty0 [f85, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty36 :: ty15 [f85, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty36 :: ty19 [f85, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty37 :: ty0 [f86, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty37 :: ty15 [f86, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty37 :: ty19 [f86, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty38 :: ty0 [f87, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty38 :: ty15 [f87, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty38 :: ty19 [f87, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty39 :: ty0 [f88, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty39 :: ty15 [f88, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty39 :: ty19 [f88, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty40 :: ty0 [f89, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty40 :: ty15 [f89, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty40 :: ty19 [f89, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty41 :: ty0 [f90, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty41 :: ty15 [f90, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty41 :: ty19 [f90, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty42 :: ty0 [f91, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty42 :: ty15 [f91, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty42 :: ty19 [f91, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty43 :: ty0 [f92, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty43 :: ty15 [f92, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty43 :: ty19 [f92, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty44 :: ty0 [f93, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty44 :: ty15 [f93, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty44 :: ty19 [f93, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty45 :: ty0 [f94, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty45 :: ty15 [f94, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty45 :: ty19 [f94, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty46 :: ty0 [f95, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty46 :: ty15 [f95, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty46 :: ty19 [f95, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty47 :: ty0 [f96, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty47 :: ty15 [f96, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty47 :: ty19 [f96, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty48 :: ty0 [f97, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty48 :: ty15 [f97, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty48 :: ty19 [f97, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+impl ty49 :: ty0 [f98, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25]
+impl ty49 :: ty15 [f98, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47]
+impl ty49 :: ty19 [f98, f48, f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64, f65, f66, f67, f68, f69]
+
+fn main.main -> i64 {
+  params: 0
+  locals:
+    l0 xs: i64[]
+    l1 a: dyn ty0
+    l2 b: dyn ty0
+    l3 __inl_xs: i64[]
+    l4 __inl_ret: dyn ty0
+    l5 __inl_this: dyn ty0
+    l6 __inl_f: fn(i64) -> i64
+    l7 __inl_ret: dyn ty0
+    l8 __inl_source: dyn ty0
+    l9 __inl_total: i64
+    l10 __inl_value: ?i64
+    l11 __inl_ret: i64
+    l12 __inl_value: string
+    l13 __inl_this: string
+    l14 __inl_ret: string
+    l15 __inl_xs: i64[]
+    l16 __inl_ret: dyn ty0
+    l17 __inl_this: dyn ty0
+    l18 __inl_f: fn(i64) -> i64
+    l19 __inl_ret: dyn ty0
+    l20 __inl_source: dyn ty0
+    l21 __inl_total: i64
+    l22 __inl_value: ?i64
+    l23 __inl_ret: i64
+    l24 __inl_value: string
+    l25 __inl_this: string
+    l26 __inl_ret: string
+    l27 __inl_this: dyn ty0
+    l28 __inl_keep: fn(i64) -> bool
+    l29 __inl_ret: dyn ty0
+    l30 __inl_this: &ty22
+    l31 __inl_value: ?i64
+    l32 __inl_g: fn(i64) -> i64
+    l33 __inl_ret: ?i64
+    l34 __inl_this: &ty22
+    l35 __inl_value: ?i64
+    l36 __inl_g: fn(i64) -> i64
+    l37 __inl_ret: ?i64
+  bb0:
+    t0: i64 = const 1
+    t1: i64 = const 2
+    t2: i64 = const 3
+    t3: i64 = const 4
+    t4: i64[] = newarr i64 [t0, t1, t2, t3]
+    br bb1
+  bb1:
+    t5: i64 = const 0
+    t6: &ty21 = newobj ty21
+    storefield t6, ty21#0, t4
+    storefield t6, ty21#1, t5
+    t7: dyn ty0 = mkiface t6, ty21
+    br bb2
+  bb2:
+    t8: fn(i64) -> i64 = mkclosure f1 (no captures)
+    br bb3
+  bb3:
+    t9: &ty22 = newobj ty22
+    storefield t9, ty22#0, t7
+    storefield t9, ty22#1, t8
+    t10: dyn ty0 = mkiface t9, ty22
+    br bb4
+  bb4:
+    t11: fn(i64) -> bool = mkclosure f2 (no captures)
+    br bb27
+  bb5:
+    t12: i64 = const 0
+    store l9, t12
+    t13: ?i64 = callvirt ty0#0(t40)
+    store l10, t13
+    br bb6
+  bb6:
+    t14: ?i64 = load l10
+    t15: bool = optissome t14
+    condbr t15 -> bb7, bb8
+  bb7:
+    t16: i64 = load l9
+    t17: ?i64 = load l10
+    t18: i64 = optget t17
+    t19: i64 = add t16, t18
+    store l9, t19
+    t20: ?i64 = callvirt ty0#0(t40)
+    store l10, t20
+    br bb6
+  bb8:
+    t21: i64 = load l9
+    br bb9
+  bb9:
+    t22: string = callimport std.string.fromInt(t21)
+    br bb10
+  bb10:
+    br bb12
+  bb11:
+    br bb14
+  bb12:
+    br bb13
+  bb13:
+    callimport std.io.console.rawPrintln(t22)
+    br bb11
+  bb14:
+    t23: i64 = const 0
+    t24: &ty21 = newobj ty21
+    storefield t24, ty21#0, t4
+    storefield t24, ty21#1, t23
+    t25: dyn ty0 = mkiface t24, ty21
+    br bb15
+  bb15:
+    t26: fn(i64) -> i64 = mkclosure f3 (no captures)
+    br bb16
+  bb16:
+    t27: &ty22 = newobj ty22
+    storefield t27, ty22#0, t25
+    storefield t27, ty22#1, t26
+    t28: dyn ty0 = mkiface t27, ty22
+    br bb17
+  bb17:
+    br bb18
+  bb18:
+    t29: i64 = const 0
+    store l21, t29
+    br bb29
+  bb19:
+    t30: ?i64 = load l22
+    t31: bool = optissome t30
+    condbr t31 -> bb20, bb21
+  bb20:
+    t32: i64 = load l21
+    t33: ?i64 = load l22
+    t34: i64 = optget t33
+    t35: i64 = add t32, t34
+    store l21, t35
+    br bb33
+  bb21:
+    t36: i64 = load l21
+    br bb22
+  bb22:
+    t37: string = callimport std.string.fromInt(t36)
+    br bb23
+  bb23:
+    br bb25
+  bb24:
+    t38: i64 = const 0
+    ret t38
+  bb25:
+    br bb26
+  bb26:
+    callimport std.io.console.rawPrintln(t37)
+    br bb24
+  bb27:
+    t39: &ty23 = newobj ty23
+    storefield t39, ty23#0, t10
+    storefield t39, ty23#1, t11
+    t40: dyn ty0 = mkiface t39, ty23
+    br bb28
+  bb28:
+    br bb5
+  bb29:
+    t41: dyn ty0 = loadfield t27, ty22#0
+    t42: ?i64 = callvirt ty0#0(t41)
+    t43: bool = optissome t42
+    t44: bool = not t43
+    condbr t44 -> bb30, bb31
+  bb30:
+    t45: ?i64 = optnone
+    store l33, t45
+    br bb32
+  bb31:
+    t46: fn(i64) -> i64 = loadfield t27, ty22#1
+    t47: i64 = optget t42
+    t48: i64 = callind t46(t47)
+    t49: ?i64 = optsome t48
+    store l33, t49
+    br bb32
+  bb32:
+    t50: ?i64 = load l33
+    store l22, t50
+    br bb19
+  bb33:
+    t51: dyn ty0 = loadfield t27, ty22#0
+    t52: ?i64 = callvirt ty0#0(t51)
+    t53: bool = optissome t52
+    t54: bool = not t53
+    condbr t54 -> bb34, bb35
+  bb34:
+    t55: ?i64 = optnone
+    store l37, t55
+    br bb36
+  bb35:
+    t56: fn(i64) -> i64 = loadfield t27, ty22#1
+    t57: i64 = optget t52
+    t58: i64 = callind t56(t57)
+    t59: ?i64 = optsome t58
+    store l37, t59
+    br bb36
+  bb36:
+    t60: ?i64 = load l37
+    store l22, t60
+    br bb19
+}
+
+fn main.main.<lambda0> -> i64 {
+  params: 1
+  locals:
+    l0 it: i64
+  bb0:
+    t0: i64 = load l0
+    t1: i64 = const 2
+    t2: i64 = mul t0, t1
+    ret t2
+}
+
+fn main.main.<lambda1> -> bool {
+  params: 1
+  locals:
+    l0 it: i64
+  bb0:
+    t0: i64 = load l0
+    t1: i64 = const 4
+    t2: bool = gt t0, t1
+    ret t2
+}
+
+fn main.main.<lambda2> -> i64 {
+  params: 1
+  locals:
+    l0 n: i64
+  bb0:
+    t0: i64 = load l0
+    t1: i64 = const 2
+    t2: i64 = mul t0, t1
+    ret t2
+}
+
+fn std.iter.Iterator<int>.filter -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 keep: fn(i64) -> bool
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> bool = load l1
+    t2: &ty23 = newobj ty23
+    storefield t2, ty23#0, t0
+    storefield t2, ty23#1, t1
+    t3: dyn ty0 = mkiface t2, ty23
+    ret t3
+}
+
+fn std.iter.Iterator<int>.take -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 count: i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: i64 = load l1
+    t2: &ty24 = newobj ty24
+    storefield t2, ty24#0, t0
+    storefield t2, ty24#1, t1
+    t3: dyn ty0 = mkiface t2, ty24
+    ret t3
+}
+
+fn std.iter.Iterator<int>.skip -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 count: i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: i64 = load l1
+    t2: &ty25 = newobj ty25
+    storefield t2, ty25#0, t0
+    storefield t2, ty25#1, t1
+    t3: dyn ty0 = mkiface t2, ty25
+    ret t3
+}
+
+fn std.iter.Iterator<int>.takeWhile -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 keep: fn(i64) -> bool
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> bool = load l1
+    t2: bool = const false
+    t3: &ty26 = newobj ty26
+    storefield t3, ty26#0, t0
+    storefield t3, ty26#1, t1
+    storefield t3, ty26#2, t2
+    t4: dyn ty0 = mkiface t3, ty26
+    ret t4
+}
+
+fn std.iter.Iterator<int>.chain -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 second: dyn ty0
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: dyn ty0 = load l1
+    t2: bool = const true
+    t3: &ty27 = newobj ty27
+    storefield t3, ty27#0, t0
+    storefield t3, ty27#1, t1
+    storefield t3, ty27#2, t2
+    t4: dyn ty0 = mkiface t3, ty27
+    ret t4
+}
+
+fn std.iter.Iterator<int>.skipWhile -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 drop: fn(i64) -> bool
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> bool = load l1
+    t2: bool = const false
+    t3: &ty28 = newobj ty28
+    storefield t3, ty28#0, t0
+    storefield t3, ty28#1, t1
+    storefield t3, ty28#2, t2
+    t4: dyn ty0 = mkiface t3, ty28
+    ret t4
+}
+
+fn std.iter.Iterator<int>.stepBy -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 step: i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: i64 = load l1
+    t2: bool = const true
+    t3: &ty29 = newobj ty29
+    storefield t3, ty29#0, t0
+    storefield t3, ty29#1, t1
+    storefield t3, ty29#2, t2
+    t4: dyn ty0 = mkiface t3, ty29
+    ret t4
+}
+
+fn std.iter.Iterator<int>.inspect -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 look: fn(i64) -> void
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> void = load l1
+    t2: &ty30 = newobj ty30
+    storefield t2, ty30#0, t0
+    storefield t2, ty30#1, t1
+    t3: dyn ty0 = mkiface t2, ty30
+    ret t3
+}
+
+fn std.iter.Iterator<int>.dedupBy -> dyn ty0 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 key: fn(i64) -> i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> i64 = load l1
+    t2: i64 = const 0
+    t3: bool = const false
+    t4: &ty31 = newobj ty31
+    storefield t4, ty31#0, t0
+    storefield t4, ty31#1, t1
+    storefield t4, ty31#2, t2
+    storefield t4, ty31#3, t3
+    t5: dyn ty0 = mkiface t4, ty31
+    ret t5
+}
+
+fn std.iter.Iterator<int>.reduce -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 step: fn(i64, i64) -> i64
+    l2 acc: ?i64
+    l3 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l2, t1
+    t2: ?i64 = load l2
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?i64 = optnone
+    ret t5
+  bb2:
+    t6: dyn ty0 = load l0
+    t7: ?i64 = callvirt ty0#0(t6)
+    store l3, t7
+    br bb3
+  bb3:
+    t8: ?i64 = load l3
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: fn(i64, i64) -> i64 = load l1
+    t11: ?i64 = load l2
+    t12: i64 = optget t11
+    t13: ?i64 = load l3
+    t14: i64 = optget t13
+    t15: i64 = callind t10(t12, t14)
+    t16: ?i64 = optsome t15
+    store l2, t16
+    t17: dyn ty0 = load l0
+    t18: ?i64 = callvirt ty0#0(t17)
+    store l3, t18
+    br bb3
+  bb5:
+    t19: ?i64 = load l2
+    ret t19
+}
+
+fn std.iter.Iterator<int>.count -> i64 {
+  params: 1
+  locals:
+    l0 this: dyn ty0
+    l1 n: i64
+    l2 value: ?i64
+  bb0:
+    t0: i64 = const 0
+    store l1, t0
+    t1: dyn ty0 = load l0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?i64 = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: i64 = load l1
+    t6: i64 = const 1
+    t7: i64 = add t5, t6
+    store l1, t7
+    t8: dyn ty0 = load l0
+    t9: ?i64 = callvirt ty0#0(t8)
+    store l2, t9
+    br bb1
+  bb3:
+    t10: i64 = load l1
+    ret t10
+}
+
+fn std.iter.Iterator<int>.first -> ?i64 {
+  params: 1
+  locals:
+    l0 this: dyn ty0
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    ret t1
+}
+
+fn std.iter.Iterator<int>.last -> ?i64 {
+  params: 1
+  locals:
+    l0 this: dyn ty0
+    l1 held: ?i64
+    l2 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l1, t1
+    t2: ?i64 = load l1
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?i64 = optnone
+    ret t5
+  bb2:
+    t6: dyn ty0 = load l0
+    t7: ?i64 = callvirt ty0#0(t6)
+    store l2, t7
+    br bb3
+  bb3:
+    t8: ?i64 = load l2
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: ?i64 = load l2
+    t11: i64 = optget t10
+    t12: ?i64 = optsome t11
+    store l1, t12
+    t13: dyn ty0 = load l0
+    t14: ?i64 = callvirt ty0#0(t13)
+    store l2, t14
+    br bb3
+  bb5:
+    t15: ?i64 = load l1
+    ret t15
+}
+
+fn std.iter.Iterator<int>.nth -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 n: i64
+    l2 remaining: i64
+    l3 value: ?i64
+    l4 $and0: bool
+  bb0:
+    t0: i64 = load l1
+    t1: i64 = const 0
+    t2: bool = lt t0, t1
+    condbr t2 -> bb1, bb2
+  bb1:
+    t3: ?i64 = optnone
+    ret t3
+  bb2:
+    t4: i64 = load l1
+    store l2, t4
+    t5: dyn ty0 = load l0
+    t6: ?i64 = callvirt ty0#0(t5)
+    store l3, t6
+    br bb3
+  bb3:
+    t7: ?i64 = load l3
+    t8: bool = optissome t7
+    store l4, t8
+    condbr t8 -> bb4, bb5
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 0
+    t11: bool = gt t9, t10
+    store l4, t11
+    br bb5
+  bb5:
+    t12: bool = load l4
+    condbr t12 -> bb6, bb7
+  bb6:
+    t13: i64 = load l2
+    t14: i64 = const 1
+    t15: i64 = sub t13, t14
+    store l2, t15
+    t16: dyn ty0 = load l0
+    t17: ?i64 = callvirt ty0#0(t16)
+    store l3, t17
+    br bb3
+  bb7:
+    t18: ?i64 = load l3
+    ret t18
+}
+
+fn std.iter.Iterator<int>.any -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+    l2 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?i64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(i64) -> bool = load l1
+    t5: ?i64 = load l2
+    t6: i64 = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t11: bool = const false
+    ret t11
+  bb4:
+    t8: bool = const true
+    ret t8
+  bb5:
+    t9: dyn ty0 = load l0
+    t10: ?i64 = callvirt ty0#0(t9)
+    store l2, t10
+    br bb1
+}
+
+fn std.iter.Iterator<int>.all -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+    l2 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?i64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(i64) -> bool = load l1
+    t5: ?i64 = load l2
+    t6: i64 = optget t5
+    t7: bool = callind t4(t6)
+    t8: bool = not t7
+    condbr t8 -> bb4, bb5
+  bb3:
+    t12: bool = const true
+    ret t12
+  bb4:
+    t9: bool = const false
+    ret t9
+  bb5:
+    t10: dyn ty0 = load l0
+    t11: ?i64 = callvirt ty0#0(t10)
+    store l2, t11
+    br bb1
+}
+
+fn std.iter.Iterator<int>.none -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: fn(i64) -> bool = load l1
+    t2: bool = callvirt ty0#15(t0, t1)
+    t3: bool = not t2
+    ret t3
+}
+
+fn std.iter.Iterator<int>.find -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+    l2 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?i64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(i64) -> bool = load l1
+    t5: ?i64 = load l2
+    t6: i64 = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t13: ?i64 = optnone
+    ret t13
+  bb4:
+    t8: ?i64 = load l2
+    t9: i64 = optget t8
+    t10: ?i64 = optsome t9
+    ret t10
+  bb5:
+    t11: dyn ty0 = load l0
+    t12: ?i64 = callvirt ty0#0(t11)
+    store l2, t12
+    br bb1
+}
+
+fn std.iter.Iterator<int>.position -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+    l2 index: i64
+    l3 value: ?i64
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty0 = load l0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?i64 = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(i64) -> bool = load l1
+    t6: ?i64 = load l3
+    t7: i64 = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t16: ?i64 = optnone
+    ret t16
+  bb4:
+    t9: i64 = load l2
+    t10: ?i64 = optsome t9
+    ret t10
+  bb5:
+    t11: i64 = load l2
+    t12: i64 = const 1
+    t13: i64 = add t11, t12
+    store l2, t13
+    t14: dyn ty0 = load l0
+    t15: ?i64 = callvirt ty0#0(t14)
+    store l3, t15
+    br bb1
+}
+
+fn std.iter.Iterator<int>.countWhere -> i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 test: fn(i64) -> bool
+    l2 n: i64
+    l3 value: ?i64
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty0 = load l0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?i64 = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(i64) -> bool = load l1
+    t6: ?i64 = load l3
+    t7: i64 = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t14: i64 = load l2
+    ret t14
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 1
+    t11: i64 = add t9, t10
+    store l2, t11
+    br bb5
+  bb5:
+    t12: dyn ty0 = load l0
+    t13: ?i64 = callvirt ty0#0(t12)
+    store l3, t13
+    br bb1
+}
+
+fn std.iter.Iterator<int>.forEach -> void {
+  params: 2
+  locals:
+    l0 this: dyn ty0
+    l1 f: fn(i64) -> void
+    l2 value: ?i64
+  bb0:
+    t0: dyn ty0 = load l0
+    t1: ?i64 = callvirt ty0#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?i64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(i64) -> void = load l1
+    t5: ?i64 = load l2
+    t6: i64 = optget t5
+    callind t4(t6)
+    t7: dyn ty0 = load l0
+    t8: ?i64 = callvirt ty0#0(t7)
+    store l2, t8
+    br bb1
+  bb3:
+    ret
+}
+
+fn std.iter.Iterator<int>.toArray -> i64[] {
+  params: 1
+  locals:
+    l0 this: dyn ty0
+    l1 result: i64[]
+    l2 value: ?i64
+  bb0:
+    t0: i64[] = newarr i64 []
+    store l1, t0
+    t1: dyn ty0 = load l0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?i64 = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: i64[] = load l1
+    t6: ?i64 = load l2
+    t7: i64 = optget t6
+    t8: i64[] = newarr i64 [t7]
+    t9: i64[] = arrcat t5, t8
+    store l1, t9
+    t10: dyn ty0 = load l0
+    t11: ?i64 = callvirt ty0#0(t10)
+    store l2, t11
+    br bb1
+  bb3:
+    t12: i64[] = load l1
+    ret t12
+}
+
+fn std.iter.Iterator<float>.filter -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 keep: fn(f64) -> bool
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> bool = load l1
+    t2: &ty32 = newobj ty32
+    storefield t2, ty32#0, t0
+    storefield t2, ty32#1, t1
+    t3: dyn ty15 = mkiface t2, ty32
+    ret t3
+}
+
+fn std.iter.Iterator<float>.take -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 count: i64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: i64 = load l1
+    t2: &ty33 = newobj ty33
+    storefield t2, ty33#0, t0
+    storefield t2, ty33#1, t1
+    t3: dyn ty15 = mkiface t2, ty33
+    ret t3
+}
+
+fn std.iter.Iterator<float>.skip -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 count: i64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: i64 = load l1
+    t2: &ty34 = newobj ty34
+    storefield t2, ty34#0, t0
+    storefield t2, ty34#1, t1
+    t3: dyn ty15 = mkiface t2, ty34
+    ret t3
+}
+
+fn std.iter.Iterator<float>.takeWhile -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 keep: fn(f64) -> bool
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> bool = load l1
+    t2: bool = const false
+    t3: &ty35 = newobj ty35
+    storefield t3, ty35#0, t0
+    storefield t3, ty35#1, t1
+    storefield t3, ty35#2, t2
+    t4: dyn ty15 = mkiface t3, ty35
+    ret t4
+}
+
+fn std.iter.Iterator<float>.chain -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 second: dyn ty15
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: dyn ty15 = load l1
+    t2: bool = const true
+    t3: &ty36 = newobj ty36
+    storefield t3, ty36#0, t0
+    storefield t3, ty36#1, t1
+    storefield t3, ty36#2, t2
+    t4: dyn ty15 = mkiface t3, ty36
+    ret t4
+}
+
+fn std.iter.Iterator<float>.skipWhile -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 drop: fn(f64) -> bool
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> bool = load l1
+    t2: bool = const false
+    t3: &ty37 = newobj ty37
+    storefield t3, ty37#0, t0
+    storefield t3, ty37#1, t1
+    storefield t3, ty37#2, t2
+    t4: dyn ty15 = mkiface t3, ty37
+    ret t4
+}
+
+fn std.iter.Iterator<float>.stepBy -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 step: i64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: i64 = load l1
+    t2: bool = const true
+    t3: &ty38 = newobj ty38
+    storefield t3, ty38#0, t0
+    storefield t3, ty38#1, t1
+    storefield t3, ty38#2, t2
+    t4: dyn ty15 = mkiface t3, ty38
+    ret t4
+}
+
+fn std.iter.Iterator<float>.inspect -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 look: fn(f64) -> void
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> void = load l1
+    t2: &ty39 = newobj ty39
+    storefield t2, ty39#0, t0
+    storefield t2, ty39#1, t1
+    t3: dyn ty15 = mkiface t2, ty39
+    ret t3
+}
+
+fn std.iter.Iterator<float>.dedupBy -> dyn ty15 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 key: fn(f64) -> i64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> i64 = load l1
+    t2: i64 = const 0
+    t3: bool = const false
+    t4: &ty40 = newobj ty40
+    storefield t4, ty40#0, t0
+    storefield t4, ty40#1, t1
+    storefield t4, ty40#2, t2
+    storefield t4, ty40#3, t3
+    t5: dyn ty15 = mkiface t4, ty40
+    ret t5
+}
+
+fn std.iter.Iterator<float>.reduce -> ?f64 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 step: fn(f64, f64) -> f64
+    l2 acc: ?f64
+    l3 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l2, t1
+    t2: ?f64 = load l2
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?f64 = optnone
+    ret t5
+  bb2:
+    t6: dyn ty15 = load l0
+    t7: ?f64 = callvirt ty15#0(t6)
+    store l3, t7
+    br bb3
+  bb3:
+    t8: ?f64 = load l3
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: fn(f64, f64) -> f64 = load l1
+    t11: ?f64 = load l2
+    t12: f64 = optget t11
+    t13: ?f64 = load l3
+    t14: f64 = optget t13
+    t15: f64 = callind t10(t12, t14)
+    t16: ?f64 = optsome t15
+    store l2, t16
+    t17: dyn ty15 = load l0
+    t18: ?f64 = callvirt ty15#0(t17)
+    store l3, t18
+    br bb3
+  bb5:
+    t19: ?f64 = load l2
+    ret t19
+}
+
+fn std.iter.Iterator<float>.count -> i64 {
+  params: 1
+  locals:
+    l0 this: dyn ty15
+    l1 n: i64
+    l2 value: ?f64
+  bb0:
+    t0: i64 = const 0
+    store l1, t0
+    t1: dyn ty15 = load l0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?f64 = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: i64 = load l1
+    t6: i64 = const 1
+    t7: i64 = add t5, t6
+    store l1, t7
+    t8: dyn ty15 = load l0
+    t9: ?f64 = callvirt ty15#0(t8)
+    store l2, t9
+    br bb1
+  bb3:
+    t10: i64 = load l1
+    ret t10
+}
+
+fn std.iter.Iterator<float>.first -> ?f64 {
+  params: 1
+  locals:
+    l0 this: dyn ty15
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    ret t1
+}
+
+fn std.iter.Iterator<float>.last -> ?f64 {
+  params: 1
+  locals:
+    l0 this: dyn ty15
+    l1 held: ?f64
+    l2 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l1, t1
+    t2: ?f64 = load l1
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?f64 = optnone
+    ret t5
+  bb2:
+    t6: dyn ty15 = load l0
+    t7: ?f64 = callvirt ty15#0(t6)
+    store l2, t7
+    br bb3
+  bb3:
+    t8: ?f64 = load l2
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: ?f64 = load l2
+    t11: f64 = optget t10
+    t12: ?f64 = optsome t11
+    store l1, t12
+    t13: dyn ty15 = load l0
+    t14: ?f64 = callvirt ty15#0(t13)
+    store l2, t14
+    br bb3
+  bb5:
+    t15: ?f64 = load l1
+    ret t15
+}
+
+fn std.iter.Iterator<float>.nth -> ?f64 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 n: i64
+    l2 remaining: i64
+    l3 value: ?f64
+    l4 $and0: bool
+  bb0:
+    t0: i64 = load l1
+    t1: i64 = const 0
+    t2: bool = lt t0, t1
+    condbr t2 -> bb1, bb2
+  bb1:
+    t3: ?f64 = optnone
+    ret t3
+  bb2:
+    t4: i64 = load l1
+    store l2, t4
+    t5: dyn ty15 = load l0
+    t6: ?f64 = callvirt ty15#0(t5)
+    store l3, t6
+    br bb3
+  bb3:
+    t7: ?f64 = load l3
+    t8: bool = optissome t7
+    store l4, t8
+    condbr t8 -> bb4, bb5
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 0
+    t11: bool = gt t9, t10
+    store l4, t11
+    br bb5
+  bb5:
+    t12: bool = load l4
+    condbr t12 -> bb6, bb7
+  bb6:
+    t13: i64 = load l2
+    t14: i64 = const 1
+    t15: i64 = sub t13, t14
+    store l2, t15
+    t16: dyn ty15 = load l0
+    t17: ?f64 = callvirt ty15#0(t16)
+    store l3, t17
+    br bb3
+  bb7:
+    t18: ?f64 = load l3
+    ret t18
+}
+
+fn std.iter.Iterator<float>.any -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+    l2 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?f64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(f64) -> bool = load l1
+    t5: ?f64 = load l2
+    t6: f64 = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t11: bool = const false
+    ret t11
+  bb4:
+    t8: bool = const true
+    ret t8
+  bb5:
+    t9: dyn ty15 = load l0
+    t10: ?f64 = callvirt ty15#0(t9)
+    store l2, t10
+    br bb1
+}
+
+fn std.iter.Iterator<float>.all -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+    l2 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?f64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(f64) -> bool = load l1
+    t5: ?f64 = load l2
+    t6: f64 = optget t5
+    t7: bool = callind t4(t6)
+    t8: bool = not t7
+    condbr t8 -> bb4, bb5
+  bb3:
+    t12: bool = const true
+    ret t12
+  bb4:
+    t9: bool = const false
+    ret t9
+  bb5:
+    t10: dyn ty15 = load l0
+    t11: ?f64 = callvirt ty15#0(t10)
+    store l2, t11
+    br bb1
+}
+
+fn std.iter.Iterator<float>.none -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: fn(f64) -> bool = load l1
+    t2: bool = callvirt ty15#15(t0, t1)
+    t3: bool = not t2
+    ret t3
+}
+
+fn std.iter.Iterator<float>.find -> ?f64 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+    l2 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?f64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(f64) -> bool = load l1
+    t5: ?f64 = load l2
+    t6: f64 = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t13: ?f64 = optnone
+    ret t13
+  bb4:
+    t8: ?f64 = load l2
+    t9: f64 = optget t8
+    t10: ?f64 = optsome t9
+    ret t10
+  bb5:
+    t11: dyn ty15 = load l0
+    t12: ?f64 = callvirt ty15#0(t11)
+    store l2, t12
+    br bb1
+}
+
+fn std.iter.Iterator<float>.position -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+    l2 index: i64
+    l3 value: ?f64
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty15 = load l0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?f64 = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(f64) -> bool = load l1
+    t6: ?f64 = load l3
+    t7: f64 = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t16: ?i64 = optnone
+    ret t16
+  bb4:
+    t9: i64 = load l2
+    t10: ?i64 = optsome t9
+    ret t10
+  bb5:
+    t11: i64 = load l2
+    t12: i64 = const 1
+    t13: i64 = add t11, t12
+    store l2, t13
+    t14: dyn ty15 = load l0
+    t15: ?f64 = callvirt ty15#0(t14)
+    store l3, t15
+    br bb1
+}
+
+fn std.iter.Iterator<float>.countWhere -> i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 test: fn(f64) -> bool
+    l2 n: i64
+    l3 value: ?f64
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty15 = load l0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?f64 = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(f64) -> bool = load l1
+    t6: ?f64 = load l3
+    t7: f64 = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t14: i64 = load l2
+    ret t14
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 1
+    t11: i64 = add t9, t10
+    store l2, t11
+    br bb5
+  bb5:
+    t12: dyn ty15 = load l0
+    t13: ?f64 = callvirt ty15#0(t12)
+    store l3, t13
+    br bb1
+}
+
+fn std.iter.Iterator<float>.forEach -> void {
+  params: 2
+  locals:
+    l0 this: dyn ty15
+    l1 f: fn(f64) -> void
+    l2 value: ?f64
+  bb0:
+    t0: dyn ty15 = load l0
+    t1: ?f64 = callvirt ty15#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?f64 = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(f64) -> void = load l1
+    t5: ?f64 = load l2
+    t6: f64 = optget t5
+    callind t4(t6)
+    t7: dyn ty15 = load l0
+    t8: ?f64 = callvirt ty15#0(t7)
+    store l2, t8
+    br bb1
+  bb3:
+    ret
+}
+
+fn std.iter.Iterator<float>.toArray -> f64[] {
+  params: 1
+  locals:
+    l0 this: dyn ty15
+    l1 result: f64[]
+    l2 value: ?f64
+  bb0:
+    t0: f64[] = newarr f64 []
+    store l1, t0
+    t1: dyn ty15 = load l0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?f64 = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: f64[] = load l1
+    t6: ?f64 = load l2
+    t7: f64 = optget t6
+    t8: f64[] = newarr f64 [t7]
+    t9: f64[] = arrcat t5, t8
+    store l1, t9
+    t10: dyn ty15 = load l0
+    t11: ?f64 = callvirt ty15#0(t10)
+    store l2, t11
+    br bb1
+  bb3:
+    t12: f64[] = load l1
+    ret t12
+}
+
+fn std.iter.Iterator<string>.filter -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 keep: fn(string) -> bool
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> bool = load l1
+    t2: &ty41 = newobj ty41
+    storefield t2, ty41#0, t0
+    storefield t2, ty41#1, t1
+    t3: dyn ty19 = mkiface t2, ty41
+    ret t3
+}
+
+fn std.iter.Iterator<string>.take -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 count: i64
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: i64 = load l1
+    t2: &ty42 = newobj ty42
+    storefield t2, ty42#0, t0
+    storefield t2, ty42#1, t1
+    t3: dyn ty19 = mkiface t2, ty42
+    ret t3
+}
+
+fn std.iter.Iterator<string>.skip -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 count: i64
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: i64 = load l1
+    t2: &ty43 = newobj ty43
+    storefield t2, ty43#0, t0
+    storefield t2, ty43#1, t1
+    t3: dyn ty19 = mkiface t2, ty43
+    ret t3
+}
+
+fn std.iter.Iterator<string>.takeWhile -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 keep: fn(string) -> bool
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> bool = load l1
+    t2: bool = const false
+    t3: &ty44 = newobj ty44
+    storefield t3, ty44#0, t0
+    storefield t3, ty44#1, t1
+    storefield t3, ty44#2, t2
+    t4: dyn ty19 = mkiface t3, ty44
+    ret t4
+}
+
+fn std.iter.Iterator<string>.chain -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 second: dyn ty19
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: dyn ty19 = load l1
+    t2: bool = const true
+    t3: &ty45 = newobj ty45
+    storefield t3, ty45#0, t0
+    storefield t3, ty45#1, t1
+    storefield t3, ty45#2, t2
+    t4: dyn ty19 = mkiface t3, ty45
+    ret t4
+}
+
+fn std.iter.Iterator<string>.skipWhile -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 drop: fn(string) -> bool
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> bool = load l1
+    t2: bool = const false
+    t3: &ty46 = newobj ty46
+    storefield t3, ty46#0, t0
+    storefield t3, ty46#1, t1
+    storefield t3, ty46#2, t2
+    t4: dyn ty19 = mkiface t3, ty46
+    ret t4
+}
+
+fn std.iter.Iterator<string>.stepBy -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 step: i64
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: i64 = load l1
+    t2: bool = const true
+    t3: &ty47 = newobj ty47
+    storefield t3, ty47#0, t0
+    storefield t3, ty47#1, t1
+    storefield t3, ty47#2, t2
+    t4: dyn ty19 = mkiface t3, ty47
+    ret t4
+}
+
+fn std.iter.Iterator<string>.inspect -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 look: fn(string) -> void
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> void = load l1
+    t2: &ty48 = newobj ty48
+    storefield t2, ty48#0, t0
+    storefield t2, ty48#1, t1
+    t3: dyn ty19 = mkiface t2, ty48
+    ret t3
+}
+
+fn std.iter.Iterator<string>.dedupBy -> dyn ty19 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 key: fn(string) -> i64
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> i64 = load l1
+    t2: i64 = const 0
+    t3: bool = const false
+    t4: &ty49 = newobj ty49
+    storefield t4, ty49#0, t0
+    storefield t4, ty49#1, t1
+    storefield t4, ty49#2, t2
+    storefield t4, ty49#3, t3
+    t5: dyn ty19 = mkiface t4, ty49
+    ret t5
+}
+
+fn std.iter.Iterator<string>.reduce -> ?string {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 step: fn(string, string) -> string
+    l2 acc: ?string
+    l3 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l2, t1
+    t2: ?string = load l2
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?string = optnone
+    ret t5
+  bb2:
+    t6: dyn ty19 = load l0
+    t7: ?string = callvirt ty19#0(t6)
+    store l3, t7
+    br bb3
+  bb3:
+    t8: ?string = load l3
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: fn(string, string) -> string = load l1
+    t11: ?string = load l2
+    t12: string = optget t11
+    t13: ?string = load l3
+    t14: string = optget t13
+    t15: string = callind t10(t12, t14)
+    t16: ?string = optsome t15
+    store l2, t16
+    t17: dyn ty19 = load l0
+    t18: ?string = callvirt ty19#0(t17)
+    store l3, t18
+    br bb3
+  bb5:
+    t19: ?string = load l2
+    ret t19
+}
+
+fn std.iter.Iterator<string>.count -> i64 {
+  params: 1
+  locals:
+    l0 this: dyn ty19
+    l1 n: i64
+    l2 value: ?string
+  bb0:
+    t0: i64 = const 0
+    store l1, t0
+    t1: dyn ty19 = load l0
+    t2: ?string = callvirt ty19#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?string = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: i64 = load l1
+    t6: i64 = const 1
+    t7: i64 = add t5, t6
+    store l1, t7
+    t8: dyn ty19 = load l0
+    t9: ?string = callvirt ty19#0(t8)
+    store l2, t9
+    br bb1
+  bb3:
+    t10: i64 = load l1
+    ret t10
+}
+
+fn std.iter.Iterator<string>.first -> ?string {
+  params: 1
+  locals:
+    l0 this: dyn ty19
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    ret t1
+}
+
+fn std.iter.Iterator<string>.last -> ?string {
+  params: 1
+  locals:
+    l0 this: dyn ty19
+    l1 held: ?string
+    l2 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l1, t1
+    t2: ?string = load l1
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?string = optnone
+    ret t5
+  bb2:
+    t6: dyn ty19 = load l0
+    t7: ?string = callvirt ty19#0(t6)
+    store l2, t7
+    br bb3
+  bb3:
+    t8: ?string = load l2
+    t9: bool = optissome t8
+    condbr t9 -> bb4, bb5
+  bb4:
+    t10: ?string = load l2
+    t11: string = optget t10
+    t12: ?string = optsome t11
+    store l1, t12
+    t13: dyn ty19 = load l0
+    t14: ?string = callvirt ty19#0(t13)
+    store l2, t14
+    br bb3
+  bb5:
+    t15: ?string = load l1
+    ret t15
+}
+
+fn std.iter.Iterator<string>.nth -> ?string {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 n: i64
+    l2 remaining: i64
+    l3 value: ?string
+    l4 $and0: bool
+  bb0:
+    t0: i64 = load l1
+    t1: i64 = const 0
+    t2: bool = lt t0, t1
+    condbr t2 -> bb1, bb2
+  bb1:
+    t3: ?string = optnone
+    ret t3
+  bb2:
+    t4: i64 = load l1
+    store l2, t4
+    t5: dyn ty19 = load l0
+    t6: ?string = callvirt ty19#0(t5)
+    store l3, t6
+    br bb3
+  bb3:
+    t7: ?string = load l3
+    t8: bool = optissome t7
+    store l4, t8
+    condbr t8 -> bb4, bb5
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 0
+    t11: bool = gt t9, t10
+    store l4, t11
+    br bb5
+  bb5:
+    t12: bool = load l4
+    condbr t12 -> bb6, bb7
+  bb6:
+    t13: i64 = load l2
+    t14: i64 = const 1
+    t15: i64 = sub t13, t14
+    store l2, t15
+    t16: dyn ty19 = load l0
+    t17: ?string = callvirt ty19#0(t16)
+    store l3, t17
+    br bb3
+  bb7:
+    t18: ?string = load l3
+    ret t18
+}
+
+fn std.iter.Iterator<string>.any -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+    l2 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?string = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(string) -> bool = load l1
+    t5: ?string = load l2
+    t6: string = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t11: bool = const false
+    ret t11
+  bb4:
+    t8: bool = const true
+    ret t8
+  bb5:
+    t9: dyn ty19 = load l0
+    t10: ?string = callvirt ty19#0(t9)
+    store l2, t10
+    br bb1
+}
+
+fn std.iter.Iterator<string>.all -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+    l2 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?string = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(string) -> bool = load l1
+    t5: ?string = load l2
+    t6: string = optget t5
+    t7: bool = callind t4(t6)
+    t8: bool = not t7
+    condbr t8 -> bb4, bb5
+  bb3:
+    t12: bool = const true
+    ret t12
+  bb4:
+    t9: bool = const false
+    ret t9
+  bb5:
+    t10: dyn ty19 = load l0
+    t11: ?string = callvirt ty19#0(t10)
+    store l2, t11
+    br bb1
+}
+
+fn std.iter.Iterator<string>.none -> bool {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: fn(string) -> bool = load l1
+    t2: bool = callvirt ty19#15(t0, t1)
+    t3: bool = not t2
+    ret t3
+}
+
+fn std.iter.Iterator<string>.find -> ?string {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+    l2 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?string = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(string) -> bool = load l1
+    t5: ?string = load l2
+    t6: string = optget t5
+    t7: bool = callind t4(t6)
+    condbr t7 -> bb4, bb5
+  bb3:
+    t13: ?string = optnone
+    ret t13
+  bb4:
+    t8: ?string = load l2
+    t9: string = optget t8
+    t10: ?string = optsome t9
+    ret t10
+  bb5:
+    t11: dyn ty19 = load l0
+    t12: ?string = callvirt ty19#0(t11)
+    store l2, t12
+    br bb1
+}
+
+fn std.iter.Iterator<string>.position -> ?i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+    l2 index: i64
+    l3 value: ?string
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty19 = load l0
+    t2: ?string = callvirt ty19#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?string = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(string) -> bool = load l1
+    t6: ?string = load l3
+    t7: string = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t16: ?i64 = optnone
+    ret t16
+  bb4:
+    t9: i64 = load l2
+    t10: ?i64 = optsome t9
+    ret t10
+  bb5:
+    t11: i64 = load l2
+    t12: i64 = const 1
+    t13: i64 = add t11, t12
+    store l2, t13
+    t14: dyn ty19 = load l0
+    t15: ?string = callvirt ty19#0(t14)
+    store l3, t15
+    br bb1
+}
+
+fn std.iter.Iterator<string>.countWhere -> i64 {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 test: fn(string) -> bool
+    l2 n: i64
+    l3 value: ?string
+  bb0:
+    t0: i64 = const 0
+    store l2, t0
+    t1: dyn ty19 = load l0
+    t2: ?string = callvirt ty19#0(t1)
+    store l3, t2
+    br bb1
+  bb1:
+    t3: ?string = load l3
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: fn(string) -> bool = load l1
+    t6: ?string = load l3
+    t7: string = optget t6
+    t8: bool = callind t5(t7)
+    condbr t8 -> bb4, bb5
+  bb3:
+    t14: i64 = load l2
+    ret t14
+  bb4:
+    t9: i64 = load l2
+    t10: i64 = const 1
+    t11: i64 = add t9, t10
+    store l2, t11
+    br bb5
+  bb5:
+    t12: dyn ty19 = load l0
+    t13: ?string = callvirt ty19#0(t12)
+    store l3, t13
+    br bb1
+}
+
+fn std.iter.Iterator<string>.forEach -> void {
+  params: 2
+  locals:
+    l0 this: dyn ty19
+    l1 f: fn(string) -> void
+    l2 value: ?string
+  bb0:
+    t0: dyn ty19 = load l0
+    t1: ?string = callvirt ty19#0(t0)
+    store l2, t1
+    br bb1
+  bb1:
+    t2: ?string = load l2
+    t3: bool = optissome t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: fn(string) -> void = load l1
+    t5: ?string = load l2
+    t6: string = optget t5
+    callind t4(t6)
+    t7: dyn ty19 = load l0
+    t8: ?string = callvirt ty19#0(t7)
+    store l2, t8
+    br bb1
+  bb3:
+    ret
+}
+
+fn std.iter.Iterator<string>.toArray -> string[] {
+  params: 1
+  locals:
+    l0 this: dyn ty19
+    l1 result: string[]
+    l2 value: ?string
+  bb0:
+    t0: string[] = newarr string []
+    store l1, t0
+    t1: dyn ty19 = load l0
+    t2: ?string = callvirt ty19#0(t1)
+    store l2, t2
+    br bb1
+  bb1:
+    t3: ?string = load l2
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: string[] = load l1
+    t6: ?string = load l2
+    t7: string = optget t6
+    t8: string[] = newarr string [t7]
+    t9: string[] = arrcat t5, t8
+    store l1, t9
+    t10: dyn ty19 = load l0
+    t11: ?string = callvirt ty19#0(t10)
+    store l2, t11
+    br bb1
+  bb3:
+    t12: string[] = load l1
+    ret t12
+}
+
+fn std.iter.ArrayIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty21
+    l1 value: i64
+  bb0:
+    t0: &ty21 = load l0
+    t1: i64 = loadfield t0, ty21#1
+    t2: &ty21 = load l0
+    t3: i64[] = loadfield t2, ty21#0
+    t4: i64 = arraylen t3
+    t5: bool = ge t1, t4
+    condbr t5 -> bb1, bb2
+  bb1:
+    t6: ?i64 = optnone
+    ret t6
+  bb2:
+    t7: &ty21 = load l0
+    t8: i64[] = loadfield t7, ty21#0
+    t9: &ty21 = load l0
+    t10: i64 = loadfield t9, ty21#1
+    t11: i64 = loadelem t8, t10
+    t12: &ty21 = load l0
+    t13: &ty21 = load l0
+    t14: i64 = loadfield t13, ty21#1
+    t15: i64 = const 1
+    t16: i64 = add t14, t15
+    storefield t12, ty21#1, t16
+    t17: ?i64 = optsome t11
+    ret t17
+}
+
+fn std.iter.MapIterator<int, int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty22
+    l1 value: ?i64
+    l2 g: fn(i64) -> i64
+  bb0:
+    t0: &ty22 = load l0
+    t1: dyn ty0 = loadfield t0, ty22#0
+    t2: ?i64 = callvirt ty0#0(t1)
+    t3: bool = optissome t2
+    t4: bool = not t3
+    condbr t4 -> bb1, bb2
+  bb1:
+    t5: ?i64 = optnone
+    ret t5
+  bb2:
+    t6: &ty22 = load l0
+    t7: fn(i64) -> i64 = loadfield t6, ty22#1
+    t8: i64 = optget t2
+    t9: i64 = callind t7(t8)
+    t10: ?i64 = optsome t9
+    ret t10
+}
+
+fn std.iter.FilterIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty23
+    l1 value: ?i64
+    l2 p: fn(i64) -> bool
+  bb0:
+    t0: &ty23 = load l0
+    t1: dyn ty0 = loadfield t0, ty23#0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l1, t2
+    br bb1
+  bb1:
+    t3: ?i64 = load l1
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: &ty23 = load l0
+    t6: fn(i64) -> bool = loadfield t5, ty23#1
+    t7: ?i64 = load l1
+    t8: i64 = optget t7
+    t9: bool = callind t6(t8)
+    condbr t9 -> bb4, bb5
+  bb3:
+    t10: ?i64 = optnone
+    ret t10
+  bb4:
+    t11: ?i64 = load l1
+    t12: i64 = optget t11
+    t13: ?i64 = optsome t12
+    ret t13
+  bb5:
+    t14: &ty23 = load l0
+    t15: dyn ty0 = loadfield t14, ty23#0
+    t16: ?i64 = callvirt ty0#0(t15)
+    store l1, t16
+    br bb1
+}
+
+fn std.iter.TakeIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty24
+  bb0:
+    t0: &ty24 = load l0
+    t1: i64 = loadfield t0, ty24#1
+    t2: i64 = const 0
+    t3: bool = le t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?i64 = optnone
+    ret t4
+  bb2:
+    t5: &ty24 = load l0
+    t6: &ty24 = load l0
+    t7: i64 = loadfield t6, ty24#1
+    t8: i64 = const 1
+    t9: i64 = sub t7, t8
+    storefield t5, ty24#1, t9
+    t10: &ty24 = load l0
+    t11: dyn ty0 = loadfield t10, ty24#0
+    t12: ?i64 = callvirt ty0#0(t11)
+    ret t12
+}
+
+fn std.iter.SkipIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty25
+  bb0:
+    br bb1
+  bb1:
+    t0: &ty25 = load l0
+    t1: i64 = loadfield t0, ty25#1
+    t2: i64 = const 0
+    t3: bool = gt t1, t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: &ty25 = load l0
+    t5: &ty25 = load l0
+    t6: i64 = loadfield t5, ty25#1
+    t7: i64 = const 1
+    t8: i64 = sub t6, t7
+    storefield t4, ty25#1, t8
+    t9: &ty25 = load l0
+    t10: dyn ty0 = loadfield t9, ty25#0
+    t11: ?i64 = callvirt ty0#0(t10)
+    t12: bool = optissome t11
+    t13: bool = not t12
+    condbr t13 -> bb4, bb5
+  bb3:
+    t15: &ty25 = load l0
+    t16: dyn ty0 = loadfield t15, ty25#0
+    t17: ?i64 = callvirt ty0#0(t16)
+    ret t17
+  bb4:
+    t14: ?i64 = optnone
+    ret t14
+  bb5:
+    br bb1
+}
+
+fn std.iter.TakeWhileIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty26
+    l1 value: ?i64
+    l2 p: fn(i64) -> bool
+  bb0:
+    t0: &ty26 = load l0
+    t1: bool = loadfield t0, ty26#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: ?i64 = optnone
+    ret t2
+  bb2:
+    t3: &ty26 = load l0
+    t4: dyn ty0 = loadfield t3, ty26#0
+    t5: ?i64 = callvirt ty0#0(t4)
+    t6: bool = optissome t5
+    t7: bool = not t6
+    condbr t7 -> bb3, bb4
+  bb3:
+    t8: &ty26 = load l0
+    t9: bool = const true
+    storefield t8, ty26#2, t9
+    t10: ?i64 = optnone
+    ret t10
+  bb4:
+    t11: &ty26 = load l0
+    t12: fn(i64) -> bool = loadfield t11, ty26#1
+    t13: i64 = optget t5
+    t14: bool = callind t12(t13)
+    condbr t14 -> bb5, bb6
+  bb5:
+    t15: i64 = optget t5
+    t16: ?i64 = optsome t15
+    ret t16
+  bb6:
+    t17: &ty26 = load l0
+    t18: bool = const true
+    storefield t17, ty26#2, t18
+    t19: ?i64 = optnone
+    ret t19
+}
+
+fn std.iter.ChainIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty27
+    l1 value: ?i64
+  bb0:
+    t0: &ty27 = load l0
+    t1: bool = loadfield t0, ty27#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty27 = load l0
+    t3: dyn ty0 = loadfield t2, ty27#0
+    t4: ?i64 = callvirt ty0#0(t3)
+    t5: bool = optissome t4
+    condbr t5 -> bb3, bb4
+  bb2:
+    t6: &ty27 = load l0
+    t7: dyn ty0 = loadfield t6, ty27#1
+    t8: ?i64 = callvirt ty0#0(t7)
+    ret t8
+  bb3:
+    t9: i64 = optget t4
+    t10: ?i64 = optsome t9
+    ret t10
+  bb4:
+    t11: &ty27 = load l0
+    t12: bool = const false
+    storefield t11, ty27#2, t12
+    br bb2
+}
+
+fn std.iter.SkipWhileIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty28
+    l1 value: ?i64
+    l2 p: fn(i64) -> bool
+    l3 $and0: bool
+  bb0:
+    t0: &ty28 = load l0
+    t1: bool = loadfield t0, ty28#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty28 = load l0
+    t3: dyn ty0 = loadfield t2, ty28#0
+    t4: ?i64 = callvirt ty0#0(t3)
+    ret t4
+  bb2:
+    t5: &ty28 = load l0
+    t6: dyn ty0 = loadfield t5, ty28#0
+    t7: ?i64 = callvirt ty0#0(t6)
+    store l1, t7
+    t8: &ty28 = load l0
+    t9: fn(i64) -> bool = loadfield t8, ty28#1
+    br bb3
+  bb3:
+    t10: ?i64 = load l1
+    t11: bool = optissome t10
+    store l3, t11
+    condbr t11 -> bb4, bb5
+  bb4:
+    t12: ?i64 = load l1
+    t13: i64 = optget t12
+    t14: bool = callind t9(t13)
+    store l3, t14
+    br bb5
+  bb5:
+    t15: bool = load l3
+    condbr t15 -> bb6, bb7
+  bb6:
+    t16: &ty28 = load l0
+    t17: dyn ty0 = loadfield t16, ty28#0
+    t18: ?i64 = callvirt ty0#0(t17)
+    store l1, t18
+    br bb3
+  bb7:
+    t19: &ty28 = load l0
+    t20: bool = const true
+    storefield t19, ty28#2, t20
+    t21: ?i64 = load l1
+    ret t21
+}
+
+fn std.iter.StepByIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty29
+    l1 skipped: i64
+  bb0:
+    t0: &ty29 = load l0
+    t1: i64 = loadfield t0, ty29#1
+    t2: i64 = const 1
+    t3: bool = lt t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?i64 = optnone
+    ret t4
+  bb2:
+    t5: &ty29 = load l0
+    t6: bool = loadfield t5, ty29#2
+    condbr t6 -> bb3, bb4
+  bb3:
+    t7: &ty29 = load l0
+    t8: bool = const false
+    storefield t7, ty29#2, t8
+    t9: &ty29 = load l0
+    t10: dyn ty0 = loadfield t9, ty29#0
+    t11: ?i64 = callvirt ty0#0(t10)
+    ret t11
+  bb4:
+    t12: i64 = const 1
+    store l1, t12
+    br bb5
+  bb5:
+    t13: i64 = load l1
+    t14: &ty29 = load l0
+    t15: i64 = loadfield t14, ty29#1
+    t16: bool = lt t13, t15
+    condbr t16 -> bb6, bb7
+  bb6:
+    t17: &ty29 = load l0
+    t18: dyn ty0 = loadfield t17, ty29#0
+    t19: ?i64 = callvirt ty0#0(t18)
+    t20: bool = optissome t19
+    t21: bool = not t20
+    condbr t21 -> bb8, bb9
+  bb7:
+    t26: &ty29 = load l0
+    t27: dyn ty0 = loadfield t26, ty29#0
+    t28: ?i64 = callvirt ty0#0(t27)
+    ret t28
+  bb8:
+    t22: ?i64 = optnone
+    ret t22
+  bb9:
+    t23: i64 = load l1
+    t24: i64 = const 1
+    t25: i64 = add t23, t24
+    store l1, t25
+    br bb5
+}
+
+fn std.iter.InspectIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty30
+    l1 value: ?i64
+    l2 f: fn(i64) -> void
+  bb0:
+    t0: &ty30 = load l0
+    t1: dyn ty0 = loadfield t0, ty30#0
+    t2: ?i64 = callvirt ty0#0(t1)
+    t3: bool = optissome t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: &ty30 = load l0
+    t5: fn(i64) -> void = loadfield t4, ty30#1
+    t6: i64 = optget t2
+    callind t5(t6)
+    br bb2
+  bb2:
+    ret t2
+}
+
+fn std.iter.DedupIterator<int>.next -> ?i64 {
+  params: 1
+  locals:
+    l0 this: &ty31
+    l1 value: ?i64
+    l2 k: fn(i64) -> i64
+    l3 current: i64
+    l4 $or0: bool
+  bb0:
+    t0: &ty31 = load l0
+    t1: dyn ty0 = loadfield t0, ty31#0
+    t2: ?i64 = callvirt ty0#0(t1)
+    store l1, t2
+    t3: &ty31 = load l0
+    t4: fn(i64) -> i64 = loadfield t3, ty31#1
+    br bb1
+  bb1:
+    t5: ?i64 = load l1
+    t6: bool = optissome t5
+    condbr t6 -> bb2, bb3
+  bb2:
+    t7: ?i64 = load l1
+    t8: i64 = optget t7
+    t9: i64 = callind t4(t8)
+    t10: &ty31 = load l0
+    t11: bool = loadfield t10, ty31#3
+    t12: bool = not t11
+    store l4, t12
+    condbr t12 -> bb5, bb4
+  bb3:
+    t13: ?i64 = optnone
+    ret t13
+  bb4:
+    t14: &ty31 = load l0
+    t15: i64 = loadfield t14, ty31#2
+    t16: bool = ne t9, t15
+    store l4, t16
+    br bb5
+  bb5:
+    t17: bool = load l4
+    condbr t17 -> bb6, bb7
+  bb6:
+    t18: &ty31 = load l0
+    t19: bool = const true
+    storefield t18, ty31#3, t19
+    t20: &ty31 = load l0
+    storefield t20, ty31#2, t9
+    t21: ?i64 = load l1
+    t22: i64 = optget t21
+    t23: ?i64 = optsome t22
+    ret t23
+  bb7:
+    t24: &ty31 = load l0
+    t25: dyn ty0 = loadfield t24, ty31#0
+    t26: ?i64 = callvirt ty0#0(t25)
+    store l1, t26
+    br bb1
+}
+
+fn std.iter.FilterIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty32
+    l1 value: ?f64
+    l2 p: fn(f64) -> bool
+  bb0:
+    t0: &ty32 = load l0
+    t1: dyn ty15 = loadfield t0, ty32#0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l1, t2
+    br bb1
+  bb1:
+    t3: ?f64 = load l1
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: &ty32 = load l0
+    t6: fn(f64) -> bool = loadfield t5, ty32#1
+    t7: ?f64 = load l1
+    t8: f64 = optget t7
+    t9: bool = callind t6(t8)
+    condbr t9 -> bb4, bb5
+  bb3:
+    t10: ?f64 = optnone
+    ret t10
+  bb4:
+    t11: ?f64 = load l1
+    t12: f64 = optget t11
+    t13: ?f64 = optsome t12
+    ret t13
+  bb5:
+    t14: &ty32 = load l0
+    t15: dyn ty15 = loadfield t14, ty32#0
+    t16: ?f64 = callvirt ty15#0(t15)
+    store l1, t16
+    br bb1
+}
+
+fn std.iter.TakeIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty33
+  bb0:
+    t0: &ty33 = load l0
+    t1: i64 = loadfield t0, ty33#1
+    t2: i64 = const 0
+    t3: bool = le t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?f64 = optnone
+    ret t4
+  bb2:
+    t5: &ty33 = load l0
+    t6: &ty33 = load l0
+    t7: i64 = loadfield t6, ty33#1
+    t8: i64 = const 1
+    t9: i64 = sub t7, t8
+    storefield t5, ty33#1, t9
+    t10: &ty33 = load l0
+    t11: dyn ty15 = loadfield t10, ty33#0
+    t12: ?f64 = callvirt ty15#0(t11)
+    ret t12
+}
+
+fn std.iter.SkipIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty34
+  bb0:
+    br bb1
+  bb1:
+    t0: &ty34 = load l0
+    t1: i64 = loadfield t0, ty34#1
+    t2: i64 = const 0
+    t3: bool = gt t1, t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: &ty34 = load l0
+    t5: &ty34 = load l0
+    t6: i64 = loadfield t5, ty34#1
+    t7: i64 = const 1
+    t8: i64 = sub t6, t7
+    storefield t4, ty34#1, t8
+    t9: &ty34 = load l0
+    t10: dyn ty15 = loadfield t9, ty34#0
+    t11: ?f64 = callvirt ty15#0(t10)
+    t12: bool = optissome t11
+    t13: bool = not t12
+    condbr t13 -> bb4, bb5
+  bb3:
+    t15: &ty34 = load l0
+    t16: dyn ty15 = loadfield t15, ty34#0
+    t17: ?f64 = callvirt ty15#0(t16)
+    ret t17
+  bb4:
+    t14: ?f64 = optnone
+    ret t14
+  bb5:
+    br bb1
+}
+
+fn std.iter.TakeWhileIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty35
+    l1 value: ?f64
+    l2 p: fn(f64) -> bool
+  bb0:
+    t0: &ty35 = load l0
+    t1: bool = loadfield t0, ty35#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: ?f64 = optnone
+    ret t2
+  bb2:
+    t3: &ty35 = load l0
+    t4: dyn ty15 = loadfield t3, ty35#0
+    t5: ?f64 = callvirt ty15#0(t4)
+    t6: bool = optissome t5
+    t7: bool = not t6
+    condbr t7 -> bb3, bb4
+  bb3:
+    t8: &ty35 = load l0
+    t9: bool = const true
+    storefield t8, ty35#2, t9
+    t10: ?f64 = optnone
+    ret t10
+  bb4:
+    t11: &ty35 = load l0
+    t12: fn(f64) -> bool = loadfield t11, ty35#1
+    t13: f64 = optget t5
+    t14: bool = callind t12(t13)
+    condbr t14 -> bb5, bb6
+  bb5:
+    t15: f64 = optget t5
+    t16: ?f64 = optsome t15
+    ret t16
+  bb6:
+    t17: &ty35 = load l0
+    t18: bool = const true
+    storefield t17, ty35#2, t18
+    t19: ?f64 = optnone
+    ret t19
+}
+
+fn std.iter.ChainIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty36
+    l1 value: ?f64
+  bb0:
+    t0: &ty36 = load l0
+    t1: bool = loadfield t0, ty36#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty36 = load l0
+    t3: dyn ty15 = loadfield t2, ty36#0
+    t4: ?f64 = callvirt ty15#0(t3)
+    t5: bool = optissome t4
+    condbr t5 -> bb3, bb4
+  bb2:
+    t6: &ty36 = load l0
+    t7: dyn ty15 = loadfield t6, ty36#1
+    t8: ?f64 = callvirt ty15#0(t7)
+    ret t8
+  bb3:
+    t9: f64 = optget t4
+    t10: ?f64 = optsome t9
+    ret t10
+  bb4:
+    t11: &ty36 = load l0
+    t12: bool = const false
+    storefield t11, ty36#2, t12
+    br bb2
+}
+
+fn std.iter.SkipWhileIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty37
+    l1 value: ?f64
+    l2 p: fn(f64) -> bool
+    l3 $and0: bool
+  bb0:
+    t0: &ty37 = load l0
+    t1: bool = loadfield t0, ty37#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty37 = load l0
+    t3: dyn ty15 = loadfield t2, ty37#0
+    t4: ?f64 = callvirt ty15#0(t3)
+    ret t4
+  bb2:
+    t5: &ty37 = load l0
+    t6: dyn ty15 = loadfield t5, ty37#0
+    t7: ?f64 = callvirt ty15#0(t6)
+    store l1, t7
+    t8: &ty37 = load l0
+    t9: fn(f64) -> bool = loadfield t8, ty37#1
+    br bb3
+  bb3:
+    t10: ?f64 = load l1
+    t11: bool = optissome t10
+    store l3, t11
+    condbr t11 -> bb4, bb5
+  bb4:
+    t12: ?f64 = load l1
+    t13: f64 = optget t12
+    t14: bool = callind t9(t13)
+    store l3, t14
+    br bb5
+  bb5:
+    t15: bool = load l3
+    condbr t15 -> bb6, bb7
+  bb6:
+    t16: &ty37 = load l0
+    t17: dyn ty15 = loadfield t16, ty37#0
+    t18: ?f64 = callvirt ty15#0(t17)
+    store l1, t18
+    br bb3
+  bb7:
+    t19: &ty37 = load l0
+    t20: bool = const true
+    storefield t19, ty37#2, t20
+    t21: ?f64 = load l1
+    ret t21
+}
+
+fn std.iter.StepByIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty38
+    l1 skipped: i64
+  bb0:
+    t0: &ty38 = load l0
+    t1: i64 = loadfield t0, ty38#1
+    t2: i64 = const 1
+    t3: bool = lt t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?f64 = optnone
+    ret t4
+  bb2:
+    t5: &ty38 = load l0
+    t6: bool = loadfield t5, ty38#2
+    condbr t6 -> bb3, bb4
+  bb3:
+    t7: &ty38 = load l0
+    t8: bool = const false
+    storefield t7, ty38#2, t8
+    t9: &ty38 = load l0
+    t10: dyn ty15 = loadfield t9, ty38#0
+    t11: ?f64 = callvirt ty15#0(t10)
+    ret t11
+  bb4:
+    t12: i64 = const 1
+    store l1, t12
+    br bb5
+  bb5:
+    t13: i64 = load l1
+    t14: &ty38 = load l0
+    t15: i64 = loadfield t14, ty38#1
+    t16: bool = lt t13, t15
+    condbr t16 -> bb6, bb7
+  bb6:
+    t17: &ty38 = load l0
+    t18: dyn ty15 = loadfield t17, ty38#0
+    t19: ?f64 = callvirt ty15#0(t18)
+    t20: bool = optissome t19
+    t21: bool = not t20
+    condbr t21 -> bb8, bb9
+  bb7:
+    t26: &ty38 = load l0
+    t27: dyn ty15 = loadfield t26, ty38#0
+    t28: ?f64 = callvirt ty15#0(t27)
+    ret t28
+  bb8:
+    t22: ?f64 = optnone
+    ret t22
+  bb9:
+    t23: i64 = load l1
+    t24: i64 = const 1
+    t25: i64 = add t23, t24
+    store l1, t25
+    br bb5
+}
+
+fn std.iter.InspectIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty39
+    l1 value: ?f64
+    l2 f: fn(f64) -> void
+  bb0:
+    t0: &ty39 = load l0
+    t1: dyn ty15 = loadfield t0, ty39#0
+    t2: ?f64 = callvirt ty15#0(t1)
+    t3: bool = optissome t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: &ty39 = load l0
+    t5: fn(f64) -> void = loadfield t4, ty39#1
+    t6: f64 = optget t2
+    callind t5(t6)
+    br bb2
+  bb2:
+    ret t2
+}
+
+fn std.iter.DedupIterator<float>.next -> ?f64 {
+  params: 1
+  locals:
+    l0 this: &ty40
+    l1 value: ?f64
+    l2 k: fn(f64) -> i64
+    l3 current: i64
+    l4 $or0: bool
+  bb0:
+    t0: &ty40 = load l0
+    t1: dyn ty15 = loadfield t0, ty40#0
+    t2: ?f64 = callvirt ty15#0(t1)
+    store l1, t2
+    t3: &ty40 = load l0
+    t4: fn(f64) -> i64 = loadfield t3, ty40#1
+    br bb1
+  bb1:
+    t5: ?f64 = load l1
+    t6: bool = optissome t5
+    condbr t6 -> bb2, bb3
+  bb2:
+    t7: ?f64 = load l1
+    t8: f64 = optget t7
+    t9: i64 = callind t4(t8)
+    t10: &ty40 = load l0
+    t11: bool = loadfield t10, ty40#3
+    t12: bool = not t11
+    store l4, t12
+    condbr t12 -> bb5, bb4
+  bb3:
+    t13: ?f64 = optnone
+    ret t13
+  bb4:
+    t14: &ty40 = load l0
+    t15: i64 = loadfield t14, ty40#2
+    t16: bool = ne t9, t15
+    store l4, t16
+    br bb5
+  bb5:
+    t17: bool = load l4
+    condbr t17 -> bb6, bb7
+  bb6:
+    t18: &ty40 = load l0
+    t19: bool = const true
+    storefield t18, ty40#3, t19
+    t20: &ty40 = load l0
+    storefield t20, ty40#2, t9
+    t21: ?f64 = load l1
+    t22: f64 = optget t21
+    t23: ?f64 = optsome t22
+    ret t23
+  bb7:
+    t24: &ty40 = load l0
+    t25: dyn ty15 = loadfield t24, ty40#0
+    t26: ?f64 = callvirt ty15#0(t25)
+    store l1, t26
+    br bb1
+}
+
+fn std.iter.FilterIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty41
+    l1 value: ?string
+    l2 p: fn(string) -> bool
+  bb0:
+    t0: &ty41 = load l0
+    t1: dyn ty19 = loadfield t0, ty41#0
+    t2: ?string = callvirt ty19#0(t1)
+    store l1, t2
+    br bb1
+  bb1:
+    t3: ?string = load l1
+    t4: bool = optissome t3
+    condbr t4 -> bb2, bb3
+  bb2:
+    t5: &ty41 = load l0
+    t6: fn(string) -> bool = loadfield t5, ty41#1
+    t7: ?string = load l1
+    t8: string = optget t7
+    t9: bool = callind t6(t8)
+    condbr t9 -> bb4, bb5
+  bb3:
+    t10: ?string = optnone
+    ret t10
+  bb4:
+    t11: ?string = load l1
+    t12: string = optget t11
+    t13: ?string = optsome t12
+    ret t13
+  bb5:
+    t14: &ty41 = load l0
+    t15: dyn ty19 = loadfield t14, ty41#0
+    t16: ?string = callvirt ty19#0(t15)
+    store l1, t16
+    br bb1
+}
+
+fn std.iter.TakeIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty42
+  bb0:
+    t0: &ty42 = load l0
+    t1: i64 = loadfield t0, ty42#1
+    t2: i64 = const 0
+    t3: bool = le t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?string = optnone
+    ret t4
+  bb2:
+    t5: &ty42 = load l0
+    t6: &ty42 = load l0
+    t7: i64 = loadfield t6, ty42#1
+    t8: i64 = const 1
+    t9: i64 = sub t7, t8
+    storefield t5, ty42#1, t9
+    t10: &ty42 = load l0
+    t11: dyn ty19 = loadfield t10, ty42#0
+    t12: ?string = callvirt ty19#0(t11)
+    ret t12
+}
+
+fn std.iter.SkipIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty43
+  bb0:
+    br bb1
+  bb1:
+    t0: &ty43 = load l0
+    t1: i64 = loadfield t0, ty43#1
+    t2: i64 = const 0
+    t3: bool = gt t1, t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: &ty43 = load l0
+    t5: &ty43 = load l0
+    t6: i64 = loadfield t5, ty43#1
+    t7: i64 = const 1
+    t8: i64 = sub t6, t7
+    storefield t4, ty43#1, t8
+    t9: &ty43 = load l0
+    t10: dyn ty19 = loadfield t9, ty43#0
+    t11: ?string = callvirt ty19#0(t10)
+    t12: bool = optissome t11
+    t13: bool = not t12
+    condbr t13 -> bb4, bb5
+  bb3:
+    t15: &ty43 = load l0
+    t16: dyn ty19 = loadfield t15, ty43#0
+    t17: ?string = callvirt ty19#0(t16)
+    ret t17
+  bb4:
+    t14: ?string = optnone
+    ret t14
+  bb5:
+    br bb1
+}
+
+fn std.iter.TakeWhileIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty44
+    l1 value: ?string
+    l2 p: fn(string) -> bool
+  bb0:
+    t0: &ty44 = load l0
+    t1: bool = loadfield t0, ty44#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: ?string = optnone
+    ret t2
+  bb2:
+    t3: &ty44 = load l0
+    t4: dyn ty19 = loadfield t3, ty44#0
+    t5: ?string = callvirt ty19#0(t4)
+    t6: bool = optissome t5
+    t7: bool = not t6
+    condbr t7 -> bb3, bb4
+  bb3:
+    t8: &ty44 = load l0
+    t9: bool = const true
+    storefield t8, ty44#2, t9
+    t10: ?string = optnone
+    ret t10
+  bb4:
+    t11: &ty44 = load l0
+    t12: fn(string) -> bool = loadfield t11, ty44#1
+    t13: string = optget t5
+    t14: bool = callind t12(t13)
+    condbr t14 -> bb5, bb6
+  bb5:
+    t15: string = optget t5
+    t16: ?string = optsome t15
+    ret t16
+  bb6:
+    t17: &ty44 = load l0
+    t18: bool = const true
+    storefield t17, ty44#2, t18
+    t19: ?string = optnone
+    ret t19
+}
+
+fn std.iter.ChainIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty45
+    l1 value: ?string
+  bb0:
+    t0: &ty45 = load l0
+    t1: bool = loadfield t0, ty45#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty45 = load l0
+    t3: dyn ty19 = loadfield t2, ty45#0
+    t4: ?string = callvirt ty19#0(t3)
+    t5: bool = optissome t4
+    condbr t5 -> bb3, bb4
+  bb2:
+    t6: &ty45 = load l0
+    t7: dyn ty19 = loadfield t6, ty45#1
+    t8: ?string = callvirt ty19#0(t7)
+    ret t8
+  bb3:
+    t9: string = optget t4
+    t10: ?string = optsome t9
+    ret t10
+  bb4:
+    t11: &ty45 = load l0
+    t12: bool = const false
+    storefield t11, ty45#2, t12
+    br bb2
+}
+
+fn std.iter.SkipWhileIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty46
+    l1 value: ?string
+    l2 p: fn(string) -> bool
+    l3 $and0: bool
+  bb0:
+    t0: &ty46 = load l0
+    t1: bool = loadfield t0, ty46#2
+    condbr t1 -> bb1, bb2
+  bb1:
+    t2: &ty46 = load l0
+    t3: dyn ty19 = loadfield t2, ty46#0
+    t4: ?string = callvirt ty19#0(t3)
+    ret t4
+  bb2:
+    t5: &ty46 = load l0
+    t6: dyn ty19 = loadfield t5, ty46#0
+    t7: ?string = callvirt ty19#0(t6)
+    store l1, t7
+    t8: &ty46 = load l0
+    t9: fn(string) -> bool = loadfield t8, ty46#1
+    br bb3
+  bb3:
+    t10: ?string = load l1
+    t11: bool = optissome t10
+    store l3, t11
+    condbr t11 -> bb4, bb5
+  bb4:
+    t12: ?string = load l1
+    t13: string = optget t12
+    t14: bool = callind t9(t13)
+    store l3, t14
+    br bb5
+  bb5:
+    t15: bool = load l3
+    condbr t15 -> bb6, bb7
+  bb6:
+    t16: &ty46 = load l0
+    t17: dyn ty19 = loadfield t16, ty46#0
+    t18: ?string = callvirt ty19#0(t17)
+    store l1, t18
+    br bb3
+  bb7:
+    t19: &ty46 = load l0
+    t20: bool = const true
+    storefield t19, ty46#2, t20
+    t21: ?string = load l1
+    ret t21
+}
+
+fn std.iter.StepByIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty47
+    l1 skipped: i64
+  bb0:
+    t0: &ty47 = load l0
+    t1: i64 = loadfield t0, ty47#1
+    t2: i64 = const 1
+    t3: bool = lt t1, t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: ?string = optnone
+    ret t4
+  bb2:
+    t5: &ty47 = load l0
+    t6: bool = loadfield t5, ty47#2
+    condbr t6 -> bb3, bb4
+  bb3:
+    t7: &ty47 = load l0
+    t8: bool = const false
+    storefield t7, ty47#2, t8
+    t9: &ty47 = load l0
+    t10: dyn ty19 = loadfield t9, ty47#0
+    t11: ?string = callvirt ty19#0(t10)
+    ret t11
+  bb4:
+    t12: i64 = const 1
+    store l1, t12
+    br bb5
+  bb5:
+    t13: i64 = load l1
+    t14: &ty47 = load l0
+    t15: i64 = loadfield t14, ty47#1
+    t16: bool = lt t13, t15
+    condbr t16 -> bb6, bb7
+  bb6:
+    t17: &ty47 = load l0
+    t18: dyn ty19 = loadfield t17, ty47#0
+    t19: ?string = callvirt ty19#0(t18)
+    t20: bool = optissome t19
+    t21: bool = not t20
+    condbr t21 -> bb8, bb9
+  bb7:
+    t26: &ty47 = load l0
+    t27: dyn ty19 = loadfield t26, ty47#0
+    t28: ?string = callvirt ty19#0(t27)
+    ret t28
+  bb8:
+    t22: ?string = optnone
+    ret t22
+  bb9:
+    t23: i64 = load l1
+    t24: i64 = const 1
+    t25: i64 = add t23, t24
+    store l1, t25
+    br bb5
+}
+
+fn std.iter.InspectIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty48
+    l1 value: ?string
+    l2 f: fn(string) -> void
+  bb0:
+    t0: &ty48 = load l0
+    t1: dyn ty19 = loadfield t0, ty48#0
+    t2: ?string = callvirt ty19#0(t1)
+    t3: bool = optissome t2
+    condbr t3 -> bb1, bb2
+  bb1:
+    t4: &ty48 = load l0
+    t5: fn(string) -> void = loadfield t4, ty48#1
+    t6: string = optget t2
+    callind t5(t6)
+    br bb2
+  bb2:
+    ret t2
+}
+
+fn std.iter.DedupIterator<string>.next -> ?string {
+  params: 1
+  locals:
+    l0 this: &ty49
+    l1 value: ?string
+    l2 k: fn(string) -> i64
+    l3 current: i64
+    l4 $or0: bool
+  bb0:
+    t0: &ty49 = load l0
+    t1: dyn ty19 = loadfield t0, ty49#0
+    t2: ?string = callvirt ty19#0(t1)
+    store l1, t2
+    t3: &ty49 = load l0
+    t4: fn(string) -> i64 = loadfield t3, ty49#1
+    br bb1
+  bb1:
+    t5: ?string = load l1
+    t6: bool = optissome t5
+    condbr t6 -> bb2, bb3
+  bb2:
+    t7: ?string = load l1
+    t8: string = optget t7
+    t9: i64 = callind t4(t8)
+    t10: &ty49 = load l0
+    t11: bool = loadfield t10, ty49#3
+    t12: bool = not t11
+    store l4, t12
+    condbr t12 -> bb5, bb4
+  bb3:
+    t13: ?string = optnone
+    ret t13
+  bb4:
+    t14: &ty49 = load l0
+    t15: i64 = loadfield t14, ty49#2
+    t16: bool = ne t9, t15
+    store l4, t16
+    br bb5
+  bb5:
+    t17: bool = load l4
+    condbr t17 -> bb6, bb7
+  bb6:
+    t18: &ty49 = load l0
+    t19: bool = const true
+    storefield t18, ty49#3, t19
+    t20: &ty49 = load l0
+    storefield t20, ty49#2, t9
+    t21: ?string = load l1
+    t22: string = optget t21
+    t23: ?string = optsome t22
+    ret t23
+  bb7:
+    t24: &ty49 = load l0
+    t25: dyn ty19 = loadfield t24, ty49#0
+    t26: ?string = callvirt ty19#0(t25)
+    store l1, t26
+    br bb1
+}

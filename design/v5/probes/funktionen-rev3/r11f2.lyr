@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn gen(): Coroutine<int> {
+    defer { yield 9; }
+    yield 1;
+}
+fn main(): int {
+    let c = gen();
+    println(fromInt(resume c));
+    println(fromInt(resume c));
+    println("end");
+    return 0;
+}

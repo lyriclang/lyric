@@ -1,0 +1,4 @@
+module m1;
+import std.io.console { println };
+import lib;
+fn main(): int { println(lib.h(1)); println(lib.h("a")); return 0; }

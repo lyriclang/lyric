@@ -1,0 +1,18 @@
+// KONTROLLE zu r23: IDENTISCHER Bau, aber die Bedingung ist nie wahr -> NULL Wuerfe bei 2 Mio
+// Aufrufen, try/catch steht trotzdem da. r23 minus r23d = der Preis von 1 Mio Wuerfen.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "b"; } }
+fn maybeThrow(i: int): int throws Boom {
+    if (i < 0) { throw Boom { }; }
+    return i;
+}
+fn main(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 2000000) {
+        try { sum = sum + maybeThrow(i); } catch (_: Boom) { sum = sum + 1; }
+        i = i + 1;
+    }
+    println(f"{sum}");
+    return 0;
+}

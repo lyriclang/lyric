@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+class Plain { n: int, }
+
+fn f<T :: [Plain]>(x: T): int { return 1; }
+
+fn main(): int {
+    let total = f(5) + f("x");
+    println(f"{total}");
+    return total;
+}

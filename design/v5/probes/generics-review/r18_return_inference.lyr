@@ -1,0 +1,5 @@
+fn zero<T>(): T[] { return []; }
+fn main(): int {
+    let xs: int[] = zero();
+    return xs.length;
+}

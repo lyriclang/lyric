@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let n = 5;
+    let s = "x";
+    println(f"[{n:<8}] [{n:*>8}] [{n:+}] [{true:5}]");
+    println(f"[{s:>8}]");
+    return 0;
+}

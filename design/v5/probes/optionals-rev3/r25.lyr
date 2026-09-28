@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f(x: ?int = null): int { return 1; }
+fn f(): int { return 2; }
+fn main(): int { println(f"{f()}"); return 0; }

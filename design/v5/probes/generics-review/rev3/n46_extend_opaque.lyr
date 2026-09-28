@@ -1,0 +1,4 @@
+opaque type Meters = int;
+interface Show { fn show(): string; }
+extend Meters :: [Show] { pub fn show(): string { return "m"; } }
+fn main(): int { let m = 3 as Meters; return 0; }

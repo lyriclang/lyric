@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn drive(f: fn() -> Coroutine<int>): int {
+    let c = f();
+    return resume c;
+}
+fn main(): int {
+    println(fromInt(drive(() => { yield 41; })));
+    return 0;
+}

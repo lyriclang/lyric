@@ -1,0 +1,7 @@
+// ERWARTUNG: SEM0001
+import std.io.console { println };
+fn main(): int {
+  let u: uint8 = -1;
+  println(f"{u}");
+  return 0;
+}

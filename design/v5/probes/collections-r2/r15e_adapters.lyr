@@ -1,0 +1,50 @@
+import std.io.console { println };
+pub interface Ad<T> {
+    mut fn next(): ?T;
+    fn map<U>(f: fn(T) -> U): Ad<U> { return MapAd<T, U> { source = this, f = f }; }
+    fn filter(keep: fn(T) -> bool): Ad<T> { return FilterAd<T> { source = this, keep = keep }; }
+    fn take(n: int): Ad<T> { return TakeAd<T> { source = this, left = n }; }
+}
+pub class MapAd<T, U> :: [Ad<U>] {
+    source: Ad<T>, f: fn(T) -> U,
+    pub mut fn next(): ?U {
+        let v = this.source.next();
+        if (v == null) { return null; }
+        return this.f(v);
+    }
+}
+pub class FilterAd<T> :: [Ad<T>] {
+    source: Ad<T>, keep: fn(T) -> bool,
+    pub mut fn next(): ?T {
+        var v = this.source.next();
+        while (v != null) {
+            if (this.keep(v)) { return v; }
+            v = this.source.next();
+        }
+        return null;
+    }
+}
+pub class TakeAd<T> :: [Ad<T>] {
+    source: Ad<T>, left: int,
+    pub mut fn next(): ?T {
+        if (this.left <= 0) { return null; }
+        this.left -= 1;
+        return this.source.next();
+    }
+}
+pub class Counter :: [Ad<int>] {
+    n: int = 0,
+    pub mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n += 1;
+        return this.n;
+    }
+}
+fn main(): int {
+    let c: Ad<int> = Counter{};
+    var total = 0;
+    var v = c.next();
+    while (v != null) { total += v; v = c.next(); }
+    println(f"{total}");
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var fact: fn(int) -> int = (n: int) => 1;
+    fact = (n: int): int => { if (n <= 1) { return 1; } return n * fact(n - 1); };
+    println(fromInt(fact(5)));
+    return 0;
+}

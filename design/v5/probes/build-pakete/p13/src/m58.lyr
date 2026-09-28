@@ -1,0 +1,3 @@
+module m58;
+pub fn v58(): int { return 58; }
+pub fn w58(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 58; } return s; }

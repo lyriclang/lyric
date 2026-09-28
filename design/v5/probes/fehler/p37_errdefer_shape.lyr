@@ -1,0 +1,17 @@
+// ERWARTUNG: es gibt kein errdefer; der Nur-im-Fehlerfall-Cleanup muss von Hand gebaut werden.
+// Hier: ein defer, der nur aufraeumen soll, wenn geworfen wurde. Geht heute nur mit einem Flag.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class Flag { ok: bool = false }
+fn build(fail: bool): int throws Boom {
+    let f = Flag { };
+    defer { if (!f.ok) { println("rollback"); } }
+    if (fail) { throw Boom { what = "x" }; }
+    f.ok = true;
+    return 1;
+}
+fn main(): int {
+    try { println(f"{build(false)}"); } catch (_) { println("caught"); }
+    try { println(f"{build(true)}"); } catch (_) { println("caught"); }
+    return 0;
+}

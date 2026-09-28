@@ -1,0 +1,21 @@
+p1_opteq: Dossier says ?T == ?T is LYR-SEM0059. Expectation if dossier right: error SEM0059. If 4.6 added optional equality: compiles, exit 0.
+p2_check: check -> ok exit 0 ; check --emit -> LYR-CT0002 ; build -> LYR-CT0002.
+p4_ifacemember: some error (guide: interface members carry no attributes). Code unknown: PAR0042 or SEM0065.
+dep/consumer: SEM0081 error pointing into expired.lyr, even though only fresh imported.
+p4b: if the interface-member attribute is honoured: warning SEM0076 at sh.area() and/or q.area(); if silently dropped: ok, no warning.
+p4c: @Other on interface member -> expect error (SEM0065 or PAR0042); if ok -> silently dropped, guide wrong.
+p4d: until="1.0" on interface member -> if honoured: SEM0081 error; else ok.
+p5: class D : B -> parse error.
+p6: build ok; disasm shows attribute row with enum value and names section entries.
+p7a: if global-let sites are evaluated in Load: BOTH A and B report CT0002 "the module's constant initializer panicked" (B is innocent). Else only A.
+p7b: body site panic -> CT0002 message WITHOUT "the module's constant initializer" prefix: "panicked [LYR-VM0011]: boom".
+p7c1: single global spin(15M): calibration. Expect pass if 15M iterations < 100M instructions.
+p7c2: two global spins: if Load budget is shared/cumulative -> budget CT0002 at both sites although each alone passes; if per site -> pass.
+p7c3: two body spins: per-site Invoke budgets -> pass.
+p8: dossier table says generic declaration -> SEM0067 for any attribute. Expect SEM0067 twice; if @Deprecated is exempt: ok/warning.
+p9: extern in comptime: if extern is capability-gated -> CT0002 capability; else evaluates to 3 (determinism hole beyond std.math).
+p10: @Deprecated on attribute struct, then @Tag use: expect NO warning (attribute use is not a "use") - unknown.
+p11: comptime in field default: unknown; either ok (42) or SEM error.
+p13: @Deprecated on extern fn: unknown; PAR0042 or ok.
+dep2: consumer imports fresh; expired2.fresh calls stale -> SEM0076 warning inside dependency; with --deny-warnings consumer build exit != 0.
+EXPECT: if lyrtest has a runner -> 2 tests pass; if not -> LYR-CT0001 on both compilations.

@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+class Holder {
+    value: int,
+
+    fn pick<U>(other: U): U {
+        return other;
+    }
+}
+
+fn main(): int {
+    let h = Holder { value = 1 };
+    println(h.pick<string>("ok"));
+    return 0;
+}

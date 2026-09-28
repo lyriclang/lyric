@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let xs: int8[] = [1, 2, 300]; println(f"{xs[0]}"); return 0; }

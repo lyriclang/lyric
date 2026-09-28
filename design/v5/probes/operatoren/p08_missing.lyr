@@ -1,0 +1,25 @@
+import std.core { Add, Sub, Mul, Equatable, Ordered };
+
+struct V :: [Add<V, V>, Sub<V, V>, Mul<int, V>, Equatable<V>, Ordered<V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; },
+    fn sub(other: V): V { return V { x = this.x - other.x }; },
+    fn mul(other: int): V { return V { x = this.x * other }; },
+    fn equals(other: V): bool { return this.x == other.x; },
+    fn compare(other: V): int { return this.x - other.x; },
+    fn rem(other: V): V { return V { x = this.x % other.x }; },
+    fn neg(): V { return V { x = -this.x }; }
+}
+
+fn main(): int {
+    let a = V { x = 10 };
+    let b = V { x = 3 };
+    let n1 = -a;            // Neg?
+    let n2 = a % b;         // Rem?
+    let n3 = a & b;         // BitAnd?
+    let n4 = ~a;            // BitNot?
+    let n5 = a << 1;        // Shl?
+    let n6 = !a;            // Not?
+    let n7 = a / b;         // Div not declared
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.core { Exception };
+fn work(): int32 throws Exception {
+    defer { println("DEFER RAN"); }
+    throw Exception { text = "boom" };
+}
+fn main(): int {
+    try { println(f"{work()}"); } catch (e: Exception) { println("CAUGHT"); }
+    return 0;
+}

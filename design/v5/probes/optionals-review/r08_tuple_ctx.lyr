@@ -1,0 +1,4 @@
+fn main(): int {
+    let t: (?int, int, string) = (null, 0, "");
+    return 0;
+}

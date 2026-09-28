@@ -1,0 +1,2 @@
+module mylib2;
+pub fn dbl(x: float): float { return x * 2.0; }

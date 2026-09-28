@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let o: ?int = 7;
+    match (o) {
+        null => println("none"),
+        n => println(f"{n + 1}"),
+    }
+    return 0;
+}

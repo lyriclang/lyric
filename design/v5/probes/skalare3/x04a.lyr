@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x = 9223372036854775808; println(f"{x}"); return 0; }

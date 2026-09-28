@@ -1,0 +1,6 @@
+class Boom :: [Throwable] { msg: string, fn message(): string { return this.msg; } }
+fn risky(n: int): int throws Boom { return n; }
+fn main(): int {
+    let f = risky;
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let n = 1099511627776;
+    let xs = [0] * n;
+    println(f"len {xs.length}");
+    return 0;
+}

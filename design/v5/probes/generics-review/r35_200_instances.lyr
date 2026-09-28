@@ -1,0 +1,413 @@
+fn work<T>(a: T, b: T, c: T): int {
+    let xs: T[] = [a, b, c, a, b, c, a, b, c, a, b, c];
+    var total = 0;
+    for (i in 0..xs.length) { total = total + i * 3 - 1; }
+    for (i in 0..xs.length) { total = total + i * 7 - 2; }
+    return total;
+}
+
+struct S1 { v: int, }
+struct S2 { v: int, }
+struct S3 { v: int, }
+struct S4 { v: int, }
+struct S5 { v: int, }
+struct S6 { v: int, }
+struct S7 { v: int, }
+struct S8 { v: int, }
+struct S9 { v: int, }
+struct S10 { v: int, }
+struct S11 { v: int, }
+struct S12 { v: int, }
+struct S13 { v: int, }
+struct S14 { v: int, }
+struct S15 { v: int, }
+struct S16 { v: int, }
+struct S17 { v: int, }
+struct S18 { v: int, }
+struct S19 { v: int, }
+struct S20 { v: int, }
+struct S21 { v: int, }
+struct S22 { v: int, }
+struct S23 { v: int, }
+struct S24 { v: int, }
+struct S25 { v: int, }
+struct S26 { v: int, }
+struct S27 { v: int, }
+struct S28 { v: int, }
+struct S29 { v: int, }
+struct S30 { v: int, }
+struct S31 { v: int, }
+struct S32 { v: int, }
+struct S33 { v: int, }
+struct S34 { v: int, }
+struct S35 { v: int, }
+struct S36 { v: int, }
+struct S37 { v: int, }
+struct S38 { v: int, }
+struct S39 { v: int, }
+struct S40 { v: int, }
+struct S41 { v: int, }
+struct S42 { v: int, }
+struct S43 { v: int, }
+struct S44 { v: int, }
+struct S45 { v: int, }
+struct S46 { v: int, }
+struct S47 { v: int, }
+struct S48 { v: int, }
+struct S49 { v: int, }
+struct S50 { v: int, }
+struct S51 { v: int, }
+struct S52 { v: int, }
+struct S53 { v: int, }
+struct S54 { v: int, }
+struct S55 { v: int, }
+struct S56 { v: int, }
+struct S57 { v: int, }
+struct S58 { v: int, }
+struct S59 { v: int, }
+struct S60 { v: int, }
+struct S61 { v: int, }
+struct S62 { v: int, }
+struct S63 { v: int, }
+struct S64 { v: int, }
+struct S65 { v: int, }
+struct S66 { v: int, }
+struct S67 { v: int, }
+struct S68 { v: int, }
+struct S69 { v: int, }
+struct S70 { v: int, }
+struct S71 { v: int, }
+struct S72 { v: int, }
+struct S73 { v: int, }
+struct S74 { v: int, }
+struct S75 { v: int, }
+struct S76 { v: int, }
+struct S77 { v: int, }
+struct S78 { v: int, }
+struct S79 { v: int, }
+struct S80 { v: int, }
+struct S81 { v: int, }
+struct S82 { v: int, }
+struct S83 { v: int, }
+struct S84 { v: int, }
+struct S85 { v: int, }
+struct S86 { v: int, }
+struct S87 { v: int, }
+struct S88 { v: int, }
+struct S89 { v: int, }
+struct S90 { v: int, }
+struct S91 { v: int, }
+struct S92 { v: int, }
+struct S93 { v: int, }
+struct S94 { v: int, }
+struct S95 { v: int, }
+struct S96 { v: int, }
+struct S97 { v: int, }
+struct S98 { v: int, }
+struct S99 { v: int, }
+struct S100 { v: int, }
+struct S101 { v: int, }
+struct S102 { v: int, }
+struct S103 { v: int, }
+struct S104 { v: int, }
+struct S105 { v: int, }
+struct S106 { v: int, }
+struct S107 { v: int, }
+struct S108 { v: int, }
+struct S109 { v: int, }
+struct S110 { v: int, }
+struct S111 { v: int, }
+struct S112 { v: int, }
+struct S113 { v: int, }
+struct S114 { v: int, }
+struct S115 { v: int, }
+struct S116 { v: int, }
+struct S117 { v: int, }
+struct S118 { v: int, }
+struct S119 { v: int, }
+struct S120 { v: int, }
+struct S121 { v: int, }
+struct S122 { v: int, }
+struct S123 { v: int, }
+struct S124 { v: int, }
+struct S125 { v: int, }
+struct S126 { v: int, }
+struct S127 { v: int, }
+struct S128 { v: int, }
+struct S129 { v: int, }
+struct S130 { v: int, }
+struct S131 { v: int, }
+struct S132 { v: int, }
+struct S133 { v: int, }
+struct S134 { v: int, }
+struct S135 { v: int, }
+struct S136 { v: int, }
+struct S137 { v: int, }
+struct S138 { v: int, }
+struct S139 { v: int, }
+struct S140 { v: int, }
+struct S141 { v: int, }
+struct S142 { v: int, }
+struct S143 { v: int, }
+struct S144 { v: int, }
+struct S145 { v: int, }
+struct S146 { v: int, }
+struct S147 { v: int, }
+struct S148 { v: int, }
+struct S149 { v: int, }
+struct S150 { v: int, }
+struct S151 { v: int, }
+struct S152 { v: int, }
+struct S153 { v: int, }
+struct S154 { v: int, }
+struct S155 { v: int, }
+struct S156 { v: int, }
+struct S157 { v: int, }
+struct S158 { v: int, }
+struct S159 { v: int, }
+struct S160 { v: int, }
+struct S161 { v: int, }
+struct S162 { v: int, }
+struct S163 { v: int, }
+struct S164 { v: int, }
+struct S165 { v: int, }
+struct S166 { v: int, }
+struct S167 { v: int, }
+struct S168 { v: int, }
+struct S169 { v: int, }
+struct S170 { v: int, }
+struct S171 { v: int, }
+struct S172 { v: int, }
+struct S173 { v: int, }
+struct S174 { v: int, }
+struct S175 { v: int, }
+struct S176 { v: int, }
+struct S177 { v: int, }
+struct S178 { v: int, }
+struct S179 { v: int, }
+struct S180 { v: int, }
+struct S181 { v: int, }
+struct S182 { v: int, }
+struct S183 { v: int, }
+struct S184 { v: int, }
+struct S185 { v: int, }
+struct S186 { v: int, }
+struct S187 { v: int, }
+struct S188 { v: int, }
+struct S189 { v: int, }
+struct S190 { v: int, }
+struct S191 { v: int, }
+struct S192 { v: int, }
+struct S193 { v: int, }
+struct S194 { v: int, }
+struct S195 { v: int, }
+struct S196 { v: int, }
+struct S197 { v: int, }
+struct S198 { v: int, }
+struct S199 { v: int, }
+struct S200 { v: int, }
+
+fn main(): int {
+    var t = 0;
+    t = t + work<S1>(S1 { v = 1 }, S1 { v = 2 }, S1 { v = 3 });
+    t = t + work<S2>(S2 { v = 1 }, S2 { v = 2 }, S2 { v = 3 });
+    t = t + work<S3>(S3 { v = 1 }, S3 { v = 2 }, S3 { v = 3 });
+    t = t + work<S4>(S4 { v = 1 }, S4 { v = 2 }, S4 { v = 3 });
+    t = t + work<S5>(S5 { v = 1 }, S5 { v = 2 }, S5 { v = 3 });
+    t = t + work<S6>(S6 { v = 1 }, S6 { v = 2 }, S6 { v = 3 });
+    t = t + work<S7>(S7 { v = 1 }, S7 { v = 2 }, S7 { v = 3 });
+    t = t + work<S8>(S8 { v = 1 }, S8 { v = 2 }, S8 { v = 3 });
+    t = t + work<S9>(S9 { v = 1 }, S9 { v = 2 }, S9 { v = 3 });
+    t = t + work<S10>(S10 { v = 1 }, S10 { v = 2 }, S10 { v = 3 });
+    t = t + work<S11>(S11 { v = 1 }, S11 { v = 2 }, S11 { v = 3 });
+    t = t + work<S12>(S12 { v = 1 }, S12 { v = 2 }, S12 { v = 3 });
+    t = t + work<S13>(S13 { v = 1 }, S13 { v = 2 }, S13 { v = 3 });
+    t = t + work<S14>(S14 { v = 1 }, S14 { v = 2 }, S14 { v = 3 });
+    t = t + work<S15>(S15 { v = 1 }, S15 { v = 2 }, S15 { v = 3 });
+    t = t + work<S16>(S16 { v = 1 }, S16 { v = 2 }, S16 { v = 3 });
+    t = t + work<S17>(S17 { v = 1 }, S17 { v = 2 }, S17 { v = 3 });
+    t = t + work<S18>(S18 { v = 1 }, S18 { v = 2 }, S18 { v = 3 });
+    t = t + work<S19>(S19 { v = 1 }, S19 { v = 2 }, S19 { v = 3 });
+    t = t + work<S20>(S20 { v = 1 }, S20 { v = 2 }, S20 { v = 3 });
+    t = t + work<S21>(S21 { v = 1 }, S21 { v = 2 }, S21 { v = 3 });
+    t = t + work<S22>(S22 { v = 1 }, S22 { v = 2 }, S22 { v = 3 });
+    t = t + work<S23>(S23 { v = 1 }, S23 { v = 2 }, S23 { v = 3 });
+    t = t + work<S24>(S24 { v = 1 }, S24 { v = 2 }, S24 { v = 3 });
+    t = t + work<S25>(S25 { v = 1 }, S25 { v = 2 }, S25 { v = 3 });
+    t = t + work<S26>(S26 { v = 1 }, S26 { v = 2 }, S26 { v = 3 });
+    t = t + work<S27>(S27 { v = 1 }, S27 { v = 2 }, S27 { v = 3 });
+    t = t + work<S28>(S28 { v = 1 }, S28 { v = 2 }, S28 { v = 3 });
+    t = t + work<S29>(S29 { v = 1 }, S29 { v = 2 }, S29 { v = 3 });
+    t = t + work<S30>(S30 { v = 1 }, S30 { v = 2 }, S30 { v = 3 });
+    t = t + work<S31>(S31 { v = 1 }, S31 { v = 2 }, S31 { v = 3 });
+    t = t + work<S32>(S32 { v = 1 }, S32 { v = 2 }, S32 { v = 3 });
+    t = t + work<S33>(S33 { v = 1 }, S33 { v = 2 }, S33 { v = 3 });
+    t = t + work<S34>(S34 { v = 1 }, S34 { v = 2 }, S34 { v = 3 });
+    t = t + work<S35>(S35 { v = 1 }, S35 { v = 2 }, S35 { v = 3 });
+    t = t + work<S36>(S36 { v = 1 }, S36 { v = 2 }, S36 { v = 3 });
+    t = t + work<S37>(S37 { v = 1 }, S37 { v = 2 }, S37 { v = 3 });
+    t = t + work<S38>(S38 { v = 1 }, S38 { v = 2 }, S38 { v = 3 });
+    t = t + work<S39>(S39 { v = 1 }, S39 { v = 2 }, S39 { v = 3 });
+    t = t + work<S40>(S40 { v = 1 }, S40 { v = 2 }, S40 { v = 3 });
+    t = t + work<S41>(S41 { v = 1 }, S41 { v = 2 }, S41 { v = 3 });
+    t = t + work<S42>(S42 { v = 1 }, S42 { v = 2 }, S42 { v = 3 });
+    t = t + work<S43>(S43 { v = 1 }, S43 { v = 2 }, S43 { v = 3 });
+    t = t + work<S44>(S44 { v = 1 }, S44 { v = 2 }, S44 { v = 3 });
+    t = t + work<S45>(S45 { v = 1 }, S45 { v = 2 }, S45 { v = 3 });
+    t = t + work<S46>(S46 { v = 1 }, S46 { v = 2 }, S46 { v = 3 });
+    t = t + work<S47>(S47 { v = 1 }, S47 { v = 2 }, S47 { v = 3 });
+    t = t + work<S48>(S48 { v = 1 }, S48 { v = 2 }, S48 { v = 3 });
+    t = t + work<S49>(S49 { v = 1 }, S49 { v = 2 }, S49 { v = 3 });
+    t = t + work<S50>(S50 { v = 1 }, S50 { v = 2 }, S50 { v = 3 });
+    t = t + work<S51>(S51 { v = 1 }, S51 { v = 2 }, S51 { v = 3 });
+    t = t + work<S52>(S52 { v = 1 }, S52 { v = 2 }, S52 { v = 3 });
+    t = t + work<S53>(S53 { v = 1 }, S53 { v = 2 }, S53 { v = 3 });
+    t = t + work<S54>(S54 { v = 1 }, S54 { v = 2 }, S54 { v = 3 });
+    t = t + work<S55>(S55 { v = 1 }, S55 { v = 2 }, S55 { v = 3 });
+    t = t + work<S56>(S56 { v = 1 }, S56 { v = 2 }, S56 { v = 3 });
+    t = t + work<S57>(S57 { v = 1 }, S57 { v = 2 }, S57 { v = 3 });
+    t = t + work<S58>(S58 { v = 1 }, S58 { v = 2 }, S58 { v = 3 });
+    t = t + work<S59>(S59 { v = 1 }, S59 { v = 2 }, S59 { v = 3 });
+    t = t + work<S60>(S60 { v = 1 }, S60 { v = 2 }, S60 { v = 3 });
+    t = t + work<S61>(S61 { v = 1 }, S61 { v = 2 }, S61 { v = 3 });
+    t = t + work<S62>(S62 { v = 1 }, S62 { v = 2 }, S62 { v = 3 });
+    t = t + work<S63>(S63 { v = 1 }, S63 { v = 2 }, S63 { v = 3 });
+    t = t + work<S64>(S64 { v = 1 }, S64 { v = 2 }, S64 { v = 3 });
+    t = t + work<S65>(S65 { v = 1 }, S65 { v = 2 }, S65 { v = 3 });
+    t = t + work<S66>(S66 { v = 1 }, S66 { v = 2 }, S66 { v = 3 });
+    t = t + work<S67>(S67 { v = 1 }, S67 { v = 2 }, S67 { v = 3 });
+    t = t + work<S68>(S68 { v = 1 }, S68 { v = 2 }, S68 { v = 3 });
+    t = t + work<S69>(S69 { v = 1 }, S69 { v = 2 }, S69 { v = 3 });
+    t = t + work<S70>(S70 { v = 1 }, S70 { v = 2 }, S70 { v = 3 });
+    t = t + work<S71>(S71 { v = 1 }, S71 { v = 2 }, S71 { v = 3 });
+    t = t + work<S72>(S72 { v = 1 }, S72 { v = 2 }, S72 { v = 3 });
+    t = t + work<S73>(S73 { v = 1 }, S73 { v = 2 }, S73 { v = 3 });
+    t = t + work<S74>(S74 { v = 1 }, S74 { v = 2 }, S74 { v = 3 });
+    t = t + work<S75>(S75 { v = 1 }, S75 { v = 2 }, S75 { v = 3 });
+    t = t + work<S76>(S76 { v = 1 }, S76 { v = 2 }, S76 { v = 3 });
+    t = t + work<S77>(S77 { v = 1 }, S77 { v = 2 }, S77 { v = 3 });
+    t = t + work<S78>(S78 { v = 1 }, S78 { v = 2 }, S78 { v = 3 });
+    t = t + work<S79>(S79 { v = 1 }, S79 { v = 2 }, S79 { v = 3 });
+    t = t + work<S80>(S80 { v = 1 }, S80 { v = 2 }, S80 { v = 3 });
+    t = t + work<S81>(S81 { v = 1 }, S81 { v = 2 }, S81 { v = 3 });
+    t = t + work<S82>(S82 { v = 1 }, S82 { v = 2 }, S82 { v = 3 });
+    t = t + work<S83>(S83 { v = 1 }, S83 { v = 2 }, S83 { v = 3 });
+    t = t + work<S84>(S84 { v = 1 }, S84 { v = 2 }, S84 { v = 3 });
+    t = t + work<S85>(S85 { v = 1 }, S85 { v = 2 }, S85 { v = 3 });
+    t = t + work<S86>(S86 { v = 1 }, S86 { v = 2 }, S86 { v = 3 });
+    t = t + work<S87>(S87 { v = 1 }, S87 { v = 2 }, S87 { v = 3 });
+    t = t + work<S88>(S88 { v = 1 }, S88 { v = 2 }, S88 { v = 3 });
+    t = t + work<S89>(S89 { v = 1 }, S89 { v = 2 }, S89 { v = 3 });
+    t = t + work<S90>(S90 { v = 1 }, S90 { v = 2 }, S90 { v = 3 });
+    t = t + work<S91>(S91 { v = 1 }, S91 { v = 2 }, S91 { v = 3 });
+    t = t + work<S92>(S92 { v = 1 }, S92 { v = 2 }, S92 { v = 3 });
+    t = t + work<S93>(S93 { v = 1 }, S93 { v = 2 }, S93 { v = 3 });
+    t = t + work<S94>(S94 { v = 1 }, S94 { v = 2 }, S94 { v = 3 });
+    t = t + work<S95>(S95 { v = 1 }, S95 { v = 2 }, S95 { v = 3 });
+    t = t + work<S96>(S96 { v = 1 }, S96 { v = 2 }, S96 { v = 3 });
+    t = t + work<S97>(S97 { v = 1 }, S97 { v = 2 }, S97 { v = 3 });
+    t = t + work<S98>(S98 { v = 1 }, S98 { v = 2 }, S98 { v = 3 });
+    t = t + work<S99>(S99 { v = 1 }, S99 { v = 2 }, S99 { v = 3 });
+    t = t + work<S100>(S100 { v = 1 }, S100 { v = 2 }, S100 { v = 3 });
+    t = t + work<S101>(S101 { v = 1 }, S101 { v = 2 }, S101 { v = 3 });
+    t = t + work<S102>(S102 { v = 1 }, S102 { v = 2 }, S102 { v = 3 });
+    t = t + work<S103>(S103 { v = 1 }, S103 { v = 2 }, S103 { v = 3 });
+    t = t + work<S104>(S104 { v = 1 }, S104 { v = 2 }, S104 { v = 3 });
+    t = t + work<S105>(S105 { v = 1 }, S105 { v = 2 }, S105 { v = 3 });
+    t = t + work<S106>(S106 { v = 1 }, S106 { v = 2 }, S106 { v = 3 });
+    t = t + work<S107>(S107 { v = 1 }, S107 { v = 2 }, S107 { v = 3 });
+    t = t + work<S108>(S108 { v = 1 }, S108 { v = 2 }, S108 { v = 3 });
+    t = t + work<S109>(S109 { v = 1 }, S109 { v = 2 }, S109 { v = 3 });
+    t = t + work<S110>(S110 { v = 1 }, S110 { v = 2 }, S110 { v = 3 });
+    t = t + work<S111>(S111 { v = 1 }, S111 { v = 2 }, S111 { v = 3 });
+    t = t + work<S112>(S112 { v = 1 }, S112 { v = 2 }, S112 { v = 3 });
+    t = t + work<S113>(S113 { v = 1 }, S113 { v = 2 }, S113 { v = 3 });
+    t = t + work<S114>(S114 { v = 1 }, S114 { v = 2 }, S114 { v = 3 });
+    t = t + work<S115>(S115 { v = 1 }, S115 { v = 2 }, S115 { v = 3 });
+    t = t + work<S116>(S116 { v = 1 }, S116 { v = 2 }, S116 { v = 3 });
+    t = t + work<S117>(S117 { v = 1 }, S117 { v = 2 }, S117 { v = 3 });
+    t = t + work<S118>(S118 { v = 1 }, S118 { v = 2 }, S118 { v = 3 });
+    t = t + work<S119>(S119 { v = 1 }, S119 { v = 2 }, S119 { v = 3 });
+    t = t + work<S120>(S120 { v = 1 }, S120 { v = 2 }, S120 { v = 3 });
+    t = t + work<S121>(S121 { v = 1 }, S121 { v = 2 }, S121 { v = 3 });
+    t = t + work<S122>(S122 { v = 1 }, S122 { v = 2 }, S122 { v = 3 });
+    t = t + work<S123>(S123 { v = 1 }, S123 { v = 2 }, S123 { v = 3 });
+    t = t + work<S124>(S124 { v = 1 }, S124 { v = 2 }, S124 { v = 3 });
+    t = t + work<S125>(S125 { v = 1 }, S125 { v = 2 }, S125 { v = 3 });
+    t = t + work<S126>(S126 { v = 1 }, S126 { v = 2 }, S126 { v = 3 });
+    t = t + work<S127>(S127 { v = 1 }, S127 { v = 2 }, S127 { v = 3 });
+    t = t + work<S128>(S128 { v = 1 }, S128 { v = 2 }, S128 { v = 3 });
+    t = t + work<S129>(S129 { v = 1 }, S129 { v = 2 }, S129 { v = 3 });
+    t = t + work<S130>(S130 { v = 1 }, S130 { v = 2 }, S130 { v = 3 });
+    t = t + work<S131>(S131 { v = 1 }, S131 { v = 2 }, S131 { v = 3 });
+    t = t + work<S132>(S132 { v = 1 }, S132 { v = 2 }, S132 { v = 3 });
+    t = t + work<S133>(S133 { v = 1 }, S133 { v = 2 }, S133 { v = 3 });
+    t = t + work<S134>(S134 { v = 1 }, S134 { v = 2 }, S134 { v = 3 });
+    t = t + work<S135>(S135 { v = 1 }, S135 { v = 2 }, S135 { v = 3 });
+    t = t + work<S136>(S136 { v = 1 }, S136 { v = 2 }, S136 { v = 3 });
+    t = t + work<S137>(S137 { v = 1 }, S137 { v = 2 }, S137 { v = 3 });
+    t = t + work<S138>(S138 { v = 1 }, S138 { v = 2 }, S138 { v = 3 });
+    t = t + work<S139>(S139 { v = 1 }, S139 { v = 2 }, S139 { v = 3 });
+    t = t + work<S140>(S140 { v = 1 }, S140 { v = 2 }, S140 { v = 3 });
+    t = t + work<S141>(S141 { v = 1 }, S141 { v = 2 }, S141 { v = 3 });
+    t = t + work<S142>(S142 { v = 1 }, S142 { v = 2 }, S142 { v = 3 });
+    t = t + work<S143>(S143 { v = 1 }, S143 { v = 2 }, S143 { v = 3 });
+    t = t + work<S144>(S144 { v = 1 }, S144 { v = 2 }, S144 { v = 3 });
+    t = t + work<S145>(S145 { v = 1 }, S145 { v = 2 }, S145 { v = 3 });
+    t = t + work<S146>(S146 { v = 1 }, S146 { v = 2 }, S146 { v = 3 });
+    t = t + work<S147>(S147 { v = 1 }, S147 { v = 2 }, S147 { v = 3 });
+    t = t + work<S148>(S148 { v = 1 }, S148 { v = 2 }, S148 { v = 3 });
+    t = t + work<S149>(S149 { v = 1 }, S149 { v = 2 }, S149 { v = 3 });
+    t = t + work<S150>(S150 { v = 1 }, S150 { v = 2 }, S150 { v = 3 });
+    t = t + work<S151>(S151 { v = 1 }, S151 { v = 2 }, S151 { v = 3 });
+    t = t + work<S152>(S152 { v = 1 }, S152 { v = 2 }, S152 { v = 3 });
+    t = t + work<S153>(S153 { v = 1 }, S153 { v = 2 }, S153 { v = 3 });
+    t = t + work<S154>(S154 { v = 1 }, S154 { v = 2 }, S154 { v = 3 });
+    t = t + work<S155>(S155 { v = 1 }, S155 { v = 2 }, S155 { v = 3 });
+    t = t + work<S156>(S156 { v = 1 }, S156 { v = 2 }, S156 { v = 3 });
+    t = t + work<S157>(S157 { v = 1 }, S157 { v = 2 }, S157 { v = 3 });
+    t = t + work<S158>(S158 { v = 1 }, S158 { v = 2 }, S158 { v = 3 });
+    t = t + work<S159>(S159 { v = 1 }, S159 { v = 2 }, S159 { v = 3 });
+    t = t + work<S160>(S160 { v = 1 }, S160 { v = 2 }, S160 { v = 3 });
+    t = t + work<S161>(S161 { v = 1 }, S161 { v = 2 }, S161 { v = 3 });
+    t = t + work<S162>(S162 { v = 1 }, S162 { v = 2 }, S162 { v = 3 });
+    t = t + work<S163>(S163 { v = 1 }, S163 { v = 2 }, S163 { v = 3 });
+    t = t + work<S164>(S164 { v = 1 }, S164 { v = 2 }, S164 { v = 3 });
+    t = t + work<S165>(S165 { v = 1 }, S165 { v = 2 }, S165 { v = 3 });
+    t = t + work<S166>(S166 { v = 1 }, S166 { v = 2 }, S166 { v = 3 });
+    t = t + work<S167>(S167 { v = 1 }, S167 { v = 2 }, S167 { v = 3 });
+    t = t + work<S168>(S168 { v = 1 }, S168 { v = 2 }, S168 { v = 3 });
+    t = t + work<S169>(S169 { v = 1 }, S169 { v = 2 }, S169 { v = 3 });
+    t = t + work<S170>(S170 { v = 1 }, S170 { v = 2 }, S170 { v = 3 });
+    t = t + work<S171>(S171 { v = 1 }, S171 { v = 2 }, S171 { v = 3 });
+    t = t + work<S172>(S172 { v = 1 }, S172 { v = 2 }, S172 { v = 3 });
+    t = t + work<S173>(S173 { v = 1 }, S173 { v = 2 }, S173 { v = 3 });
+    t = t + work<S174>(S174 { v = 1 }, S174 { v = 2 }, S174 { v = 3 });
+    t = t + work<S175>(S175 { v = 1 }, S175 { v = 2 }, S175 { v = 3 });
+    t = t + work<S176>(S176 { v = 1 }, S176 { v = 2 }, S176 { v = 3 });
+    t = t + work<S177>(S177 { v = 1 }, S177 { v = 2 }, S177 { v = 3 });
+    t = t + work<S178>(S178 { v = 1 }, S178 { v = 2 }, S178 { v = 3 });
+    t = t + work<S179>(S179 { v = 1 }, S179 { v = 2 }, S179 { v = 3 });
+    t = t + work<S180>(S180 { v = 1 }, S180 { v = 2 }, S180 { v = 3 });
+    t = t + work<S181>(S181 { v = 1 }, S181 { v = 2 }, S181 { v = 3 });
+    t = t + work<S182>(S182 { v = 1 }, S182 { v = 2 }, S182 { v = 3 });
+    t = t + work<S183>(S183 { v = 1 }, S183 { v = 2 }, S183 { v = 3 });
+    t = t + work<S184>(S184 { v = 1 }, S184 { v = 2 }, S184 { v = 3 });
+    t = t + work<S185>(S185 { v = 1 }, S185 { v = 2 }, S185 { v = 3 });
+    t = t + work<S186>(S186 { v = 1 }, S186 { v = 2 }, S186 { v = 3 });
+    t = t + work<S187>(S187 { v = 1 }, S187 { v = 2 }, S187 { v = 3 });
+    t = t + work<S188>(S188 { v = 1 }, S188 { v = 2 }, S188 { v = 3 });
+    t = t + work<S189>(S189 { v = 1 }, S189 { v = 2 }, S189 { v = 3 });
+    t = t + work<S190>(S190 { v = 1 }, S190 { v = 2 }, S190 { v = 3 });
+    t = t + work<S191>(S191 { v = 1 }, S191 { v = 2 }, S191 { v = 3 });
+    t = t + work<S192>(S192 { v = 1 }, S192 { v = 2 }, S192 { v = 3 });
+    t = t + work<S193>(S193 { v = 1 }, S193 { v = 2 }, S193 { v = 3 });
+    t = t + work<S194>(S194 { v = 1 }, S194 { v = 2 }, S194 { v = 3 });
+    t = t + work<S195>(S195 { v = 1 }, S195 { v = 2 }, S195 { v = 3 });
+    t = t + work<S196>(S196 { v = 1 }, S196 { v = 2 }, S196 { v = 3 });
+    t = t + work<S197>(S197 { v = 1 }, S197 { v = 2 }, S197 { v = 3 });
+    t = t + work<S198>(S198 { v = 1 }, S198 { v = 2 }, S198 { v = 3 });
+    t = t + work<S199>(S199 { v = 1 }, S199 { v = 2 }, S199 { v = 3 });
+    t = t + work<S200>(S200 { v = 1 }, S200 { v = 2 }, S200 { v = 3 });
+    return t % 7;
+}

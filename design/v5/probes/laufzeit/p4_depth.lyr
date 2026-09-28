@@ -1,0 +1,15 @@
+// P4 — Wo genau liegt MaxCallDepth?
+// Erwartung VOR dem Lauf: 1020 laeuft, 1024 panikt mit LYR-VM0004 (Exit 101).
+import std.io.console { println };
+
+fn down(n: int): int {
+    if (n <= 0) { return 0; }
+    return 1 + down(n - 1);
+}
+
+fn main(args: string[]): int {
+    var limit = 1020;
+    if (args.length > 0) { limit = 1500; }
+    println(f"tief = {down(limit)}");
+    return 0;
+}

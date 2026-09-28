@@ -1,0 +1,20 @@
+fn inner(xs: int[], i: int): int {
+    return xs[i];
+}
+
+fn gen(): Coroutine<int> {
+    let xs = [1, 2, 3];
+    yield inner(xs, 1);
+    yield inner(xs, 7);
+}
+
+fn drive(): int {
+    let c = gen();
+    let a = resume c;
+    let b = resume c;
+    return a + b;
+}
+
+fn main(): int {
+    return drive();
+}

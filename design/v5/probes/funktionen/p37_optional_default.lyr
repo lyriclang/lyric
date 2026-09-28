@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn f(x: ?int = null): string { if (x == null) { return "none"; } return "some"; }
+fn main(): int {
+    println(f());
+    println(f(3));
+    return 0;
+}

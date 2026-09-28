@@ -1,0 +1,14 @@
+// KONTROLLE zu p05: dieselbe Funktion OHNE Typparameter. ERWARTUNG: kompiliert, druckt caught.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn rethrowIt(e: Boom): int throws Boom { throw e; }
+
+fn main(): int {
+    try {
+        return rethrowIt(Boom { what = "x" });
+    } catch (e: Boom) {
+        println("caught");
+        return 0;
+    }
+}

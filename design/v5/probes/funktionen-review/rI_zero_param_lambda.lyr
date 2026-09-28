@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn call(f: fn() -> int): int { return f(); }
+fn main(): int { println(fromInt(call(() => 7))); return 0; }

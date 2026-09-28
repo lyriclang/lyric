@@ -1,0 +1,2 @@
+class K { a: int = 1, b: int, }
+fn main(): int { let k = K { a = 1 }; return k.b; }

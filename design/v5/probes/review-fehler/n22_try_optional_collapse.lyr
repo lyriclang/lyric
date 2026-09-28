@@ -1,0 +1,8 @@
+// ERWARTUNG (F5-A): heute PAR — aber die Frage ist, was 'try? f()' bei ?T-Rueckgabe hiesse.
+// Messbar ist nur der Ist-Zustand: eine werfende Funktion mit ?int Rueckgabe.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn maybe(i: int): ?int throws Boom { if (i == 0) { throw Boom { }; } if (i == 1) { return null; } return i; }
+fn main(): int {
+    try { println(f"{maybe(1) ?? -1}"); return 0; } catch (_: Boom) { return 1; }
+}

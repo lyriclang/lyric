@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.collections { slice };
+import std.bytes { slice };
+fn main(): int { let b: uint8[] = [1, 2, 3, 4]; let s = slice(b, 1, 2); println(s.length); let a: int[] = [1, 2, 3]; let t = slice(a, 0, 2); println(t.length); return 0; }

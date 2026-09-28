@@ -1,0 +1,5 @@
+// KONTROLLE: derselbe Task ohne throws kompiliert und laeuft, Exit 0.
+import std.io.console { println };
+import std.task { spawn, run, Wait };
+fn job(): Coroutine<Wait> { yield Wait.Now; println("job done"); }
+fn main(): int { spawn(job()); run(); return 0; }

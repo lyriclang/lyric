@@ -1,0 +1,3 @@
+import std.core { Exception };
+fn attempt(f: fn() -> void throws Exception): bool { return true; }
+fn main(): int { return 0; }

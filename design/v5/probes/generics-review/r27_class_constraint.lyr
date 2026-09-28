@@ -1,0 +1,7 @@
+interface A1 { fn a(): int; }
+class Holder<T :: [A1]> { v: T, }
+class Bad { n: int, }
+fn main(): int {
+    let h = Holder<Bad> { v = Bad { n = 1 } };
+    return 0;
+}

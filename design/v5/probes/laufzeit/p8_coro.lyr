@@ -1,0 +1,19 @@
+// P8 — Zaehlt eine SUSPENDIERTE Koroutine gegen MaxCallDepth?
+// Die Frames einer suspendierten Kette liegen im Heap (CoroutineChain.Saved), nicht auf dem
+// Frame-Stack. Erwartung VOR dem Lauf:
+//   tiefeKette: 900 verschachtelte Helfer im Koroutinenkoerper -> laeuft, weil sie beim
+//   Suspendieren vom Stack verschwinden; 2000 haengende Ketten -> ebenfalls, weil jede fuer
+//   sich unter 1024 bleibt.
+import std.io.console { println };
+
+fn tief(n: int): Coroutine<int> {
+    if (n <= 0) { yield 0; } else { yield resume tief(n - 1) + 1; }
+}
+
+fn main(args: string[]): int {
+    var d = 900;
+    if (args.length > 0) { d = 1200; }
+    let c = tief(d);
+    println(f"tiefeKette = {resume c}");
+    return 0;
+}

@@ -1,0 +1,5 @@
+fn main(): int {
+    let x: ?int = null;
+    var ys: int[] = [];
+    return 0;
+}

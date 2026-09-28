@@ -1,0 +1,4 @@
+fn take(r: int): int { return r; }
+fn main(): int {
+    return take(0..3);
+}

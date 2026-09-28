@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn once(a: int): Coroutine<int> { yield a; }
+fn main(): int {
+  let c = once(7);
+  let v = c.next();
+  if (v == null) { println("done"); return 1; }
+  println(f"{v!}");
+  return 0;
+}

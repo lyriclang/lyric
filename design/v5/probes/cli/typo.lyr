@@ -1,0 +1,4 @@
+fn main(): int {
+    let count = 1;
+    return cout;
+}

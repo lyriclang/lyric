@@ -1,0 +1,10 @@
+c03_used.lyr:2:26: warning[LYR-SEM0072]: import 'JsonValue' is never used
+import std.json { parse, JsonValue };
+                         ^^^^^^^^^
+
+c03_used.lyr:4:9: warning[LYR-SEM0071]: 'v' is never used
+    let v = parse("{\"a\":1}");
+        ^
+  note: name it '_' when the value is deliberately unused
+
+c03_used.lyrbc: 13899 bytes

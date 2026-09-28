@@ -1,0 +1,10 @@
+module t_ct;
+
+import std.test { Test, assertEq };
+import mathy { visible };
+
+@Test
+pub fn sees_comptime(): void { assertEq(visible(), 42); }
+
+@Test
+pub fn site_in_test(): void { assertEq(comptime (6 * 7), 42); }

@@ -1,0 +1,2 @@
+panic [LYR-VM0006]: string repetition of 2 code point(s) x 4000000000 exceeds the length a string can hold
+    in main.main (bigstr.lyr:5)

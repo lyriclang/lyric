@@ -1,0 +1,1 @@
+{ "name": "mid", "sourceRoot": "src", "dependencies": { "geo": "../geoB" } }

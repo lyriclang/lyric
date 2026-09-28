@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn apply(v: int, f: fn(int) -> int = (n: int) => n + 1): int { return f(v); }
+fn main(): int { println(fromInt(apply(41))); return 0; }

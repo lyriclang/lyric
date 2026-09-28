@@ -1,0 +1,6 @@
+import std.core { Mul };
+struct V { x: int, }
+extend int :: [Mul<V, V>] {
+    fn mul(other: V): V { return V { x = this * other.x }; }
+}
+fn main(): int { return 0; }

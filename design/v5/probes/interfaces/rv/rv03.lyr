@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Greeter {
+    fn greet(who: string = "world"): string;
+}
+
+class C :: [Greeter] {
+    fn greet(who: string = "world"): string { return "hi " + who; }
+}
+
+fn main(): int {
+    let g: Greeter = C { };
+    println(g.greet());
+    return 0;
+}

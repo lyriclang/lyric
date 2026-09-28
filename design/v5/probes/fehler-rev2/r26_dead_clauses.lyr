@@ -1,0 +1,9 @@
+// ERWARTUNG: KEINE Diagnose. (1) ein try, dessen Koerper nichts werfen kann;
+// (2) eine throws-Klausel, die nie greift.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn neverThrows(): int throws Boom { return 1; }
+fn main(): int {
+    try { println("nothing throws here"); } catch (_: Boom) { return 1; }
+    try { return neverThrows() - 1; } catch (_: Boom) { return 2; }
+}

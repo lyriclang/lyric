@@ -1,0 +1,17 @@
+import std.test { Test, assertEq };
+import std.task { Wait, spawn, pending };
+
+fn worker(): Coroutine<Wait> {
+    yield Wait.Now;
+}
+
+@Test
+pub fn a_spawns_and_never_runs(): void {
+    spawn(worker());
+    assertEq(pending(), 1);
+}
+
+@Test
+pub fn b_sees_a_clean_scheduler(): void {
+    assertEq(pending(), 0);
+}

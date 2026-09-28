@@ -1,0 +1,13 @@
+import std.core { Exception };
+import std.task { Wait, spawn, run };
+
+fn risky(): Coroutine<Wait> throws Exception {
+    yield Wait.Now;
+    throw Exception { text = "boom" };
+}
+
+fn main(): int {
+    spawn(risky());
+    run();
+    return 0;
+}

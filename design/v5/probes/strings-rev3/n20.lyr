@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { println(f"[{255:#x}] [{1234567:,}] [{5:.2}] [{255:X8}] [{255:x2}]"); return 0; }

@@ -1,0 +1,4 @@
+// ERWARTUNG: kompiliert — 'never' als Rueckgabetyp befriedigt die Rueckgabepflicht des Aufrufers.
+fn fail(m: string): never { panic(m); }
+fn f(): int { fail("x"); }
+fn main(): int { return 0; }

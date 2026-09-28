@@ -1,0 +1,6 @@
+class P { x: int = 0, }
+fn main(): int {
+    let p = P { };
+    p.x++;
+    return p.x;
+}

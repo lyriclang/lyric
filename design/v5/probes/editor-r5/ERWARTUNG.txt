@@ -1,0 +1,10 @@
+Runde 5 (Nachpruefung der Kritik), Erwartungen VOR dem Lauf:
+1. lsp_test.py pj/tests/util_test.lyr  -> Diagnosen leer (import util loest auf), bad_test.lyr -> RES0003 + SEM0001. (Kritik: so gemessen; ich erwarte Bestaetigung, weil OptionsForAsync SourceRoot auch fuer Dokumente ausserhalb der Wurzel setzt.)
+2. lsp_refs.py -> references von util.twice: nur main.lyr + util.lyr; rename aus Testdatei: Fehler -32803 'not part of a project'.
+3. lyrc check topvar.lyr -> LYR-PAR0027 (globale var illegal).
+4. lyrrepl mit 'type Meters = int;' -> 5 Fehler (als Statement geparst); 'let d: Meters = 3;' -> RES0002.
+5. dap_cap.py (launch mit file.writeText, ohne/mit grant-Feld) -> laeuft, wrote=true; lyrvm run --grant none -> LYR-CAP0001.
+6. Latenz Release vs Debug (lsp_lat_rel.py auf sample.lyr, je 10 Samples): Release Median 80-100 ms, Debug 100-120 ms; kein Faktor 5.
+7. Hover auf 'struct P' Deklarationsname -> null (Vermutung der Kritik), auf 'fn twice' -> null, auf 'let x' -> Antwort.
+8. lyrtest: laeuft mit Capability.All (gelesen Program.cs:134) - keine Messung noetig.
+ERWARTUNG 7: struct/enum/type/fn-Deklarationsnamen -> null; let p -> Antwort; Verwendungen -> Antwort

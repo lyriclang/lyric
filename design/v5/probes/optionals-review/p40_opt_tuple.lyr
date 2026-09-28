@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.option { zip };
+fn main(): int {
+    let a: ?int = 1;
+    let b: ?string = "x";
+    let z = zip(a, b);
+    if (z != null) { let (p, q) = z!; println(f"{p}{q}"); }
+    return 0;
+}

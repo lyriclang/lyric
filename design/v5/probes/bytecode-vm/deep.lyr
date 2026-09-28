@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn down(n: int): int {
+    if (n <= 0) { return 0; }
+    return 1 + down(n - 1);
+}
+
+fn main(): int {
+    println(down(10000000));
+    return 0;
+}

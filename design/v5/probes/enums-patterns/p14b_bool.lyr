@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn b(v: bool): int {
+    return match (v) {
+        true => 1,
+        false => 0,
+    };
+}
+fn main(): int { println(f"{b(true)}"); return 0; }

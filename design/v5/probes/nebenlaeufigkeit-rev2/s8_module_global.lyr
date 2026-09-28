@@ -1,0 +1,23 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+class Cell { n: int }
+let shared = Cell { n = 0 };
+
+fn worker(name: string): Coroutine<Wait> {
+    var i = 0;
+    while (i < 3) {
+        shared.n += 1;
+        println(f"{name} sees shared.n = {shared.n}");
+        yield Wait.Now;
+        i += 1;
+    }
+}
+
+fn main(): int {
+    spawn(worker("A"));
+    spawn(worker("B"));
+    run();
+    println(f"final shared.n = {shared.n}");
+    return 0;
+}

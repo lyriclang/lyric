@@ -1,0 +1,5 @@
+// ERWARTUNG: SEM0034 o.ae. — deklariert Boom, wirft Other.
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class Other :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Other { what = "x" }; }
+fn main(): int { return 0; }

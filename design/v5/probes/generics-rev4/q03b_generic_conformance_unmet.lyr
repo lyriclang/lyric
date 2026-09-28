@@ -1,0 +1,10 @@
+import std.core { Equatable };
+struct Plain { n: int }
+struct Pair<T :: [Equatable<T>]> :: [Equatable<Pair<T>>] {
+  a: T, b: T,
+  fn equals(other: Pair<T>): bool { return this.a.equals(other.a) && this.b.equals(other.b); }
+}
+fn main(): int {
+  let _ = Pair<Plain> { a = Plain { n = 1 }, b = Plain { n = 2 } };
+  return 0;
+}

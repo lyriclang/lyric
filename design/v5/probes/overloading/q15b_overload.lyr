@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn f(a: int, b: int = 7, params xs: int[]): string { return "A"; }
+fn f(a: int, b: int, c: int): string { return "B"; }
+fn main(): int {
+    println(f(1, 2, 3));
+    return 0;
+}

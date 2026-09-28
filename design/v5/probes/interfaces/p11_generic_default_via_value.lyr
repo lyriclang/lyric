@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Mapper {
+    fn tag(): string;
+    fn wrap<U>(u: U): U { return u; }
+}
+
+struct M :: [Mapper] { fn tag(): string { return "m"; } }
+
+fn main(): int {
+    let v: Mapper = M { };
+    println(v.tag());
+    println(v.wrap<string>("hi"));
+    return 0;
+}

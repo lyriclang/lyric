@@ -1,0 +1,1 @@
+extend int { fn thrice(): int { return this * 3; } }

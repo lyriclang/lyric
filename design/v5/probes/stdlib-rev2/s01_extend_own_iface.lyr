@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+pub interface Byteish {
+    fn describe(): string;
+}
+
+extend uint8 :: [Byteish] {
+    fn describe(): string {
+        return fromInt(this as int);
+    }
+}
+
+fn main(): int {
+    let b: uint8 = 65;
+    println(b.describe());
+    return 0;
+}

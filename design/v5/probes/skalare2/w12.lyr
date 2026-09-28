@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.core { Ordered, Equatable };
+fn main(): int {
+    let nan: float = 0.0 / 0.0;
+    println(f"cmp(nan,1.0)={nan.compare(1.0)}");
+    println(f"cmp(nan,2.0)={nan.compare(2.0)}");
+    println(f"cmp(nan,nan)={nan.compare(nan)}");
+    println(f"eq(nan,nan)={nan.equals(nan)}");
+    println(f"nan<1.0={nan < 1.0} nan>1.0={nan > 1.0}");
+    return 0;
+}

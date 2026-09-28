@@ -1,0 +1,10 @@
+// ERWARTUNG: Grammatik erlaubt { CatchClause } = null Klauseln. Was tut der Compiler?
+// Meine Erwartung: akzeptiert still, schuetzt nichts.
+import std.io.console { println };
+fn main(): int {
+    try {
+        println("in try");
+    }
+    println("after");
+    return 0;
+}

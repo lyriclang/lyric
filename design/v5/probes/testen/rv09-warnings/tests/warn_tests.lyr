@@ -1,0 +1,9 @@
+import std.test { Test, assertEq };
+import std.core { Exception };
+
+fn boom(): void throws Exception { throw Exception { text = "x" }; }
+
+@Test
+pub fn one(): void {
+    try { boom(); } catch (e: Exception) { assertEq(1, 1); }
+}

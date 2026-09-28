@@ -1,0 +1,2 @@
+import std.io.console { readLine };
+fn main(): int { let l = readLine(); return 0; }

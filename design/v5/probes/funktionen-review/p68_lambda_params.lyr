@@ -1,0 +1,4 @@
+fn main(): int {
+    let f = (params xs: int[]) => xs.length;
+    return f(1, 2);
+}

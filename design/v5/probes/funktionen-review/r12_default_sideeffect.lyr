@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt };
+var counter: int = 0;
+fn bump(): int { counter = counter + 1; return counter; }
+fn withDefault(a: int, b: int = bump()): int { return a + b; }
+fn main(): int {
+    println(fromInt(withDefault(10)));
+    println(fromInt(withDefault(10)));
+    println(fromInt(counter));
+    return 0;
+}

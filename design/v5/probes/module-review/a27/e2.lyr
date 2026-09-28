@@ -1,0 +1,2 @@
+module e2;
+extend int { pub fn twice(): int { return this * 200; } }

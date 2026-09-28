@@ -1,0 +1,8 @@
+import std.core { OnType };
+pub struct Tag :: [OnType] { }
+pub enum E {
+    @Tag
+    A,
+    B,
+}
+fn main(): int { return 0; }

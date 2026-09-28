@@ -1,0 +1,2 @@
+// ERWARTUNG: LYR-SEM0030 oder aehnlich — 'int' ist nicht werfbar.
+fn main(): int { try { return 0; } catch (e: int) { return 1; } }

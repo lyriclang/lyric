@@ -1,0 +1,39 @@
+import std.collections { Deque };
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+class Chan { q: Deque<int>, closed: bool, turns: int }
+let ch = Chan { q = Deque<int>.empty(), closed = false, turns = 0 };
+
+fn producer(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 3) {
+        yield Wait.Sleep(30);          // simulates work / IO latency
+        ch.q.pushBack(i);
+        i += 1;
+    }
+    ch.closed = true;
+}
+
+fn consumer(): Coroutine<Wait> {
+    var live = true;
+    while (live) {
+        let v = ch.q.popFront();
+        if (v != null) {
+            println(f"got {v}");
+        } else if (ch.closed) {
+            live = false;
+        } else {
+            ch.turns += 1;
+            yield Wait.Now;            // the ONLY way to wait for a condition
+        }
+    }
+    println(f"consumer spun {ch.turns} idle turns");
+}
+
+fn main(): int {
+    spawn(producer());
+    spawn(consumer());
+    run();
+    return 0;
+}

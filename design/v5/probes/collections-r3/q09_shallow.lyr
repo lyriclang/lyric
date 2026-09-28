@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let inner = [1, 2];
+    let a = [inner];
+    let b = a + [[3]];
+    b[0][0] = 9;
+    println(f"{inner[0]} {a[0][0]}");
+    return 0;
+}

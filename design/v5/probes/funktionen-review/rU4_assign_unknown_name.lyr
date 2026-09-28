@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn take(a: int, port: int): int { return a + port; }
+fn main(): int {
+    println(fromInt(take(1, port = 5)));
+    return 0;
+}

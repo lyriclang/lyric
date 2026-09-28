@@ -1,0 +1,2 @@
+module mathx;
+pub fn b(): int { return 3; }

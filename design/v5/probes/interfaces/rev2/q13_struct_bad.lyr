@@ -1,0 +1,5 @@
+struct S {
+    name string = "",
+    fn greet(): string { return this.name; }
+}
+fn main(): int { return 0; }

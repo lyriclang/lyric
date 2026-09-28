@@ -1,0 +1,12 @@
+import std.io.console { println };
+interface Named { fn name(): string; }
+interface Labeled :: [Named] { fn label(): string { return "L" + this.name(); } }
+class Tag :: [Labeled] { fn name(): string { return "tag"; } }
+fn main(): int {
+    let t = Tag { };
+    let l: Labeled = t;
+    println(l.name());
+    let n: Named = t;
+    println(n.name());
+    return 0;
+}

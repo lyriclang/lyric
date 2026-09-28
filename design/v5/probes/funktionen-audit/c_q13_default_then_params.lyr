@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn f(a: int = 1, params xs: int[]): int { return a * 100 + xs.length; }
+fn main(): int {
+    println(fromInt(f()));
+    println(fromInt(f(5)));
+    println(fromInt(f(5, 6)));
+    println(fromInt(f(5, 6, 7)));
+    return 0;
+}

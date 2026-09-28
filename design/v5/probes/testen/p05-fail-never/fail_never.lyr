@@ -1,0 +1,12 @@
+import std.test { fail };
+
+fn pick(n: int): int {
+    if (n > 0) {
+        return n;
+    }
+    fail("unreachable");
+}
+
+fn main(): int {
+    return pick(1);
+}

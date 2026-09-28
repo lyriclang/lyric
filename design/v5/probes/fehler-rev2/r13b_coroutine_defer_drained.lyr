@@ -1,0 +1,13 @@
+// KONTROLLE zu r13: dieselbe Koroutine ERSCHOEPFT gezogen. ERWARTUNG: cleanup laeuft.
+import std.io.console { println };
+fn gen(): Coroutine<int> {
+    defer println("coroutine cleanup");
+    yield 1;
+}
+fn main(): int {
+    let co = gen();
+    println(f"{resume co}");
+    let more = resume co;
+    println("drained");
+    return 0;
+}

@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import helper;
+fn main(): int { println(helper.who()); return 0; }

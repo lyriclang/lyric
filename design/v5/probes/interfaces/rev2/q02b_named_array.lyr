@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Named { fn name(): string; }
+struct M :: [Named] { n: int = 0, fn name(): string { return "m"; } }
+fn main(): int {
+    let xs: Named[] = [M { }];
+    println(xs.length.show());
+    println(xs[0].name());
+    return 0;
+}

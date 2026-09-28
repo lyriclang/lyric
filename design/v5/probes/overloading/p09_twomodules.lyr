@@ -1,0 +1,8 @@
+import std.io.console { println };
+import mlibx { area };
+import mliby { area };
+fn main(): int {
+    println(area(3));
+    println(area("s"));
+    return 0;
+}

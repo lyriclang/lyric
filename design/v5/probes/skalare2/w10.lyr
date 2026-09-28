@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let u: uint = 3 as uint; let n = -u; println(f"{n}"); let z: uint = 0 as uint; println(f"{z - 1}"); return 0; }

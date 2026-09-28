@@ -1,0 +1,8 @@
+import std.io.console { println };
+import geo { label };
+import midl { via };
+
+fn main(): int {
+    println(label() + "/" + via());
+    return 0;
+}

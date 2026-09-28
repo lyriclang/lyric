@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+struct Vec2 { x: int, y: int }
+
+fn main(): int {
+    let v = Vec2 { x = 7, y = 9 };
+    let xs = [10, 20, 30];
+    var total = 0;
+    for (n in xs) {
+        total = total + n;
+        println(f"{n}");
+    }
+    println(f"{v.x} {total}");
+    return 0;
+}

@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"[{"ab" * 0}]");
+    println(f"[{"ab" * -2}]");
+    let s = comptime f"n={1 + 1}";
+    println(s);
+    let n = 3;
+    println(f"[{"ab" * n}]");
+    return 0;
+}

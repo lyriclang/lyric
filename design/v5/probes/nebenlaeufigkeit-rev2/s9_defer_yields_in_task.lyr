@@ -1,0 +1,33 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+let t0 = os.nowMillis();
+
+fn cleaner(): Coroutine<Wait> {
+    defer {
+        println(f"cleanup starts at +{os.nowMillis() - t0}ms");
+        yield Wait.Sleep(200);
+        println(f"cleanup ends at +{os.nowMillis() - t0}ms");
+    }
+    println(f"body at +{os.nowMillis() - t0}ms");
+    yield Wait.Sleep(50);
+    println(f"body done at +{os.nowMillis() - t0}ms");
+}
+
+fn ticker(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 5) {
+        println(f"tick {i} at +{os.nowMillis() - t0}ms");
+        yield Wait.Sleep(60);
+        i += 1;
+    }
+}
+
+fn main(): int {
+    spawn(cleaner());
+    spawn(ticker());
+    run();
+    println(f"run returned at +{os.nowMillis() - t0}ms");
+    return 0;
+}

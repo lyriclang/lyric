@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+interface Sink<T> {
+    fn put(v: T): void;
+}
+
+interface Both :: [Sink<int>, Sink<string>] { }
+
+struct B :: [Both] {
+    fn put(v: int): void { println("int"); },
+    fn put(v: string): void { println("string"); }
+}
+
+fn viaInt(s: Sink<int>): void { s.put(1); }
+fn viaString(s: Sink<string>): void { s.put("x"); }
+
+fn main(): int {
+    let b = B { };
+    viaInt(b);
+    viaString(b);
+    return 0;
+}

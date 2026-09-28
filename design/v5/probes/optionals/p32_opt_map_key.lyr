@@ -1,0 +1,5 @@
+import std.collections { Map };
+fn main(): int {
+    let m = Map<?string, int>.empty();
+    return 0;
+}

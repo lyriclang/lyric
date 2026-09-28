@@ -1,0 +1,3 @@
+panic [LYR-VM0002]: division by zero
+    in main.divide (p15_panic.lyr:1)
+    in main.main (p15_panic.lyr:4)

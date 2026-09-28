@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(a: int[]): int {
+    return match (a) {
+        [x, .., y, ..] => x + y,
+        _ => 0,
+    };
+}
+fn main(): int { println(f"{f([1,2,3])}"); return 0; }

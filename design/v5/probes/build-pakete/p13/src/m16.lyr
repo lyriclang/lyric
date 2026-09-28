@@ -1,0 +1,3 @@
+module m16;
+pub fn v16(): int { return 16; }
+pub fn w16(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 16; } return s; }

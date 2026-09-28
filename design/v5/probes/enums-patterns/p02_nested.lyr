@@ -1,0 +1,24 @@
+import std.io.console { println };
+
+enum Expr {
+    Lit(int),
+    Neg(Expr),
+    Add(Expr, Expr),
+}
+
+fn simplify(e: Expr): int {
+    return match (e) {
+        Neg(Neg(x)) => simplify(x),
+        Neg(Lit(n)) => 0 - n,
+        Lit(n) => n,
+        Add(Lit(0), r) => simplify(r),
+        Add(l, r) => simplify(l) + simplify(r),
+        Neg(x) => 0 - simplify(x),
+    };
+}
+
+fn main(): int {
+    println(f"{simplify(Expr.Neg(Expr.Neg(Expr.Lit(7))))}");
+    println(f"{simplify(Expr.Add(Expr.Lit(0), Expr.Lit(5)))}");
+    return 0;
+}

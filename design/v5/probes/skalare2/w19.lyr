@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var s: int8 = 0i8; for (i in 0i8..3i8) { s = s + i; } println(f"{s}"); return 0; }

@@ -1,0 +1,4 @@
+import lib { f };
+import lib as L;
+
+fn main(): int { return 0; }

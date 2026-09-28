@@ -1,0 +1,3 @@
+module m8;
+pub fn v8(): int { return 8; }
+pub fn w8(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 8; } return s; }

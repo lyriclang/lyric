@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn h(x: float): float { return x; }
+fn h(x: int): int { return x; }
+fn main(): int { let r = h(2); println(fromFloat(r)); return 0; }

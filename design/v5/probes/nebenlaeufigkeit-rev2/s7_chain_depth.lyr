@@ -1,0 +1,19 @@
+import std.io.console { println };
+
+fn descend(n: int): void {
+    if (n > 0) { descend(n - 1); return; }
+    yield 1;
+}
+
+fn gen(depth: int): Coroutine<int> { descend(depth); }
+
+fn main(): int {
+    var d = 1000;
+    while (d <= 2000000) {
+        let co = gen(d);
+        let v = co.next();
+        println(f"depth {d}: yielded, ok");
+        d = d * 2;
+    }
+    return 0;
+}

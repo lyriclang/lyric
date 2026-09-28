@@ -1,0 +1,7 @@
+import std.io.console { println, readLine };
+
+fn main(): int {
+    let s = readLine();
+    println("read");
+    return 0;
+}

@@ -1,0 +1,6 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "no seat for it", until = "5.0" }
+pub interface OnMethod { }
+
+fn main(): int { return 0; }

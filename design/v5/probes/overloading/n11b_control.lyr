@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn k(x: int): string { return "int"; }
+fn k(x: string): string { return "str"; }
+fn h(x: int): string { return k(x); }
+fn main(): int { println(h(1)); return 0; }

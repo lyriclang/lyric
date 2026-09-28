@@ -1,0 +1,11 @@
+import std.io.console { println };
+class Src {
+  v: int,
+  fn stream(): Coroutine<int> { yield this.v; }
+}
+fn main(): int {
+  let s = Src { v = 9 };
+  let c = s.stream();
+  println(f"{resume c}");
+  return 0;
+}

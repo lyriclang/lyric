@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn main(): int {
+    let a: int32 = 7;
+    let u: uint = 3;
+    let i: int = 1;
+    println(f"{a} {u}");
+    println(i);
+    println(a);
+    println(u);
+    return 0;
+}

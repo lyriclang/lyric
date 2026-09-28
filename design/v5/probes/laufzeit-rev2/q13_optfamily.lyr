@@ -1,0 +1,41 @@
+// Q13 — Die ?T-Haelfte derselben Familie, mit Kontrollen.
+// ERWARTUNG VOR DEM LAUF (aus FunctionLowerer.cs:3036-3039 gelesen: die Kopie unterbleibt,
+// sobald der QUELLtyp schon '?T' ist):
+//   wrapKopie  = 1   das Einpacken kopiert (a bleibt 1)
+//   bindAlias  = 99  '?S' an '?S' binden kopiert nicht
+//   elemAlias  = 99  ein '?S' aus einem Array gelesen kopiert nicht
+//   argAlias   = 99  ein '?S' als Argument kopiert nicht
+//   nacktKontr = 1   KONTROLLE: dasselbe mit nacktem S kopiert ueberall
+import std.io.console { println };
+
+struct S { n: int, }
+
+fn schreibe(o: ?S): void { o!.n = 99; }
+fn schreibeNackt(s: S): void { s.n = 99; }
+
+fn main(): int {
+    var a = S { n = 1 };
+    var w: ?S = a;
+    w!.n = 99;
+    println(f"wrapKopie  = {a.n}");
+
+    var o1: ?S = S { n = 1 };
+    var o2 = o1;
+    o2!.n = 99;
+    println(f"bindAlias  = {o1!.n}");
+
+    let hole: ?S = S { n = 1 };
+    let xs: (?S)[] = [hole];
+    let e = xs[0];
+    e!.n = 99;
+    println(f"elemAlias  = {xs[0]!.n}");
+
+    var o3: ?S = S { n = 1 };
+    schreibe(o3);
+    println(f"argAlias   = {o3!.n}");
+
+    var b = S { n = 1 };
+    schreibeNackt(b);
+    println(f"nacktKontr = {b.n}");
+    return 0;
+}

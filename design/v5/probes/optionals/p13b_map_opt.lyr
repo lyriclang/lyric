@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.collections { Map };
+fn main(): int {
+    var m = Map<string, ?int>.empty();
+    m.set("a", null);
+    println(f"{m.length()}");
+    return 0;
+}

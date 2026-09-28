@@ -1,0 +1,7 @@
+import std.io.console { println };
+class P { fn act(): void { println("act"); } }
+fn main(): int {
+    let p: ?P = P {};
+    let r = p?.act();
+    return 0;
+}

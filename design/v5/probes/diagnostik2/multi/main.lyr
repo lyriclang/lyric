@@ -1,0 +1,7 @@
+import lib { Shape };
+
+struct Sq :: [Shape] { s: int }
+
+fn main(): int {
+    return 0;
+}

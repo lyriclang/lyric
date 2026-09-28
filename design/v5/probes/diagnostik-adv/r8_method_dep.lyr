@@ -1,0 +1,11 @@
+import std.core { Deprecated };
+
+class C {
+    @Deprecated { message = "use b" }
+    pub fn a(): int { return 1; }
+}
+
+fn main(): int {
+    let c = C { };
+    return c.a();
+}

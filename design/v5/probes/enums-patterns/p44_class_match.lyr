@@ -1,0 +1,8 @@
+import std.io.console { println };
+class C { a: int, b: int }
+fn f(c: C): int {
+    return match (c) {
+        C { a, b } => a + b,
+    };
+}
+fn main(): int { println(f"{f(C { a = 1, b = 2 })}"); return 0; }

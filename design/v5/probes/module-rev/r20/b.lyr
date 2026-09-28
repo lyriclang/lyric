@@ -1,0 +1,6 @@
+module main;
+import std.io.console { println };
+pub interface Named { pub fn name(): string; }
+pub struct S :: [Named] { pub fn name(): string { return "s"; } }
+pub extend S { pub fn extra(): int { return 1; } }
+fn main(): int { println(S{}.name()); println(S{}.extra()); return 0; }

@@ -1,0 +1,11 @@
+import std.io.console { println };
+enum Color { Red, Green }
+fn main(): int {
+    let c: ?Color = Color.Green;
+    match (c) {
+        Red => println("r"),
+        Green => println("g"),
+        null => println("n"),
+    }
+    return 0;
+}

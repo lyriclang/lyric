@@ -1,0 +1,2 @@
+pub fn value19(n: int): int { return n * 19; }
+pub fn other19(n: int): int { return value19(n) + 19; }

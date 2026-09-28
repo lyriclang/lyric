@@ -1,0 +1,23 @@
+import std.test { Test, assertEq, assertTrue, fail };
+
+@Test
+pub fn assertion_fails(): void {
+    assertEq(1 + 1, 3);
+}
+
+@Test
+pub fn real_bug(): void {
+    let xs: int[] = [1, 2, 3];
+    let i = 7;
+    assertEq(xs[i], 0);
+}
+
+@Test
+pub fn plain_fail(): void {
+    fail("said so");
+}
+
+@Test
+pub fn assert_true_fails(): void {
+    assertTrue(false, "must hold");
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+extern "dotnet" fn abs(x: float): float = "System.Math::Abs";
+extern "dotnet" fn abs(x: int): int = "System.Math::Abs";
+
+fn main(): int {
+    println(f"abs(-2.5)={abs(-2.5)}");
+    println(f"abs(-7)={abs(-7)}");
+    return 0;
+}

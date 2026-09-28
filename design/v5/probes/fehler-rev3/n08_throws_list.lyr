@@ -1,0 +1,5 @@
+// ERWARTUNG (Dossier r11-Vorlauf): 'throws First, Second' -> SEM0051 + PAR0016 + PAR0025.
+class First :: [Throwable] { fn message(): string { return "F"; } }
+class Second :: [Throwable] { fn message(): string { return "S"; } }
+fn work(): int throws First, Second { throw First { }; }
+fn main(): int { try { return work(); } catch (_) { return 0; } }

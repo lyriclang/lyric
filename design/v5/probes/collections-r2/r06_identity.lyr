@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn main(): int {
+    let a = [1, 2, 3];
+    let b = a;          // teilt, laut Referenzsemantik
+    let c = [1, 2, 3];  // strukturell gleich, anderes Array
+    println(f"{a.length} {b.length} {c.length}");
+    // Die Frage: kann ein Programm a und b von a und c unterscheiden?
+    if (a == b) { println("gleich"); }
+    return 0;
+}

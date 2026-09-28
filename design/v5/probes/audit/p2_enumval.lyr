@@ -1,0 +1,9 @@
+import std.core { OnFunction };
+
+pub enum Layout { Packed, Separate }
+pub struct Saved :: [OnFunction] { layout: Layout = Layout.Packed }
+
+@Saved { layout = Layout.Separate }
+pub fn store(): void { }
+
+fn main(): int { return 0; }

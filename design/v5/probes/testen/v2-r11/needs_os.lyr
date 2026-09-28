@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.os { platform };
+
+fn main(): int {
+    println(platform());
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.math { isNaN, isInfinite };
+fn main(): int {
+    let n = 0.0 / 0.0;
+    println(f"{isNaN(n)}");
+    return 0;
+}

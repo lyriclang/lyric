@@ -1,0 +1,2 @@
+import a;
+pub fn fc(): int { return 3; }

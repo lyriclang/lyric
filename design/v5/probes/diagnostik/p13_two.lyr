@@ -1,0 +1,6 @@
+fn main(): int {
+    let count = 1;
+    let mount = 2;
+    let a = xount;
+    return a + count + mount;
+}

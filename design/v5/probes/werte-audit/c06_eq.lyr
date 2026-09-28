@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    let a = S { v = 1 };
+    let b = S { v = 1 };
+    if (a == b) { return 1; }
+    return 0;
+}

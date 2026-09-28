@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int }
+fn main(): int {
+    var s = S { v = 1 };
+    let f = () => s.v;
+    s.v = 2;
+    println(fromInt(f()));
+    let t = s;
+    s.v = 3;
+    println(fromInt(t.v));
+    return 0;
+}

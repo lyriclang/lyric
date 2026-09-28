@@ -1,0 +1,23 @@
+// P9 — Randfaelle der tagfreien Darstellung.
+// Erwartung VOR dem Lauf:
+//   optFn      = 7   (eine Closure OHNE Captures hat Ref == null; Some() haengt den SomeMarker
+//                     an, optget muss ihn wieder abziehen, sonst faende CallIndirect eine
+//                     Umgebung, die es nicht gibt)
+//   optFnCap   = 12  (dieselbe Frage MIT Capture)
+//   nullDeref  -> Panik LYR-VM0007, danach laeuft nichts mehr
+import std.io.console { println };
+
+fn main(args: string[]): int {
+    let ohne: ?fn() -> int = () => 7;
+    println(f"optFn    = {ohne!()}");
+
+    let k = 5;
+    let mit: ?fn() -> int = () => k + 7;
+    println(f"optFnCap = {mit!()}");
+
+    var leer: ?int = null;
+    if (args.length > 0) {
+        println(f"nullDeref = {leer!}");
+    }
+    return 0;
+}

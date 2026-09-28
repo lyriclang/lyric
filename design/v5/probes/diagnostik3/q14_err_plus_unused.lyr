@@ -1,0 +1,4 @@
+fn main(): int {
+    let unusedOne = 1;
+    return nosuch;
+}

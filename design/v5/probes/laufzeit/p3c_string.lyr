@@ -1,0 +1,26 @@
+// P3c — Welche Skalare duerfen ein Interface-WERT werden?
+// Erwartung VOR dem Lauf: string ja (Ref != null), float nein, enum ja.
+import std.io.console { println };
+
+interface Tagged { fn tag(): int; }
+
+extend string :: [Tagged] { pub fn tag(): int { return 1; } }
+extend float  :: [Tagged] { pub fn tag(): int { return 2; } }
+
+enum Color :: [Tagged] {
+    Red,
+    Blue;
+    pub fn tag(): int { return 3; }
+}
+
+fn viaValue(t: Tagged): int { return t.tag(); }
+
+fn main(): int {
+    let s: Tagged = "hi";
+    println(f"string = {viaValue(s)}");
+    let f: Tagged = 1.5;
+    println(f"float  = {viaValue(f)}");
+    let e: Tagged = Color.Red;
+    println(f"enum   = {viaValue(e)}");
+    return 0;
+}

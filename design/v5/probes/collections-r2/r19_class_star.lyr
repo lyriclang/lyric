@@ -1,0 +1,13 @@
+import std.io.console { println };
+class Box { v: int, }
+fn main(): int {
+    let seed = Box{v=1};
+    var c = [seed] * 2;
+    c[0].v = 7;
+    println(f"class star: {c[0].v} {c[1].v}");
+    // Kontrolle: Klassen teilen auch ohne '*'
+    let a = seed;
+    a.v = 9;
+    println(f"class assign ctl: {seed.v}");
+    return 0;
+}

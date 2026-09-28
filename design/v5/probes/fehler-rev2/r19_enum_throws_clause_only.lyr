@@ -1,0 +1,11 @@
+// KONTROLLE zu r08/r18: das Enum steht NUR in einer throws-Klausel, nichts wirft, nichts faengt.
+// ERWARTUNG: kompiliert.
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Missing(string);
+    pub fn message(): string { return match (this) { Missing(s) => s, }; }
+}
+fn f(): int throws Fault { return 1; }
+fn main(): int {
+    try { return f(); } catch (_) { println("caught"); return 0; }
+}

@@ -1,0 +1,3 @@
+// ERWARTUNG (Dossier w01): CLI0020 store of i64 into u64
+import std.io.console { println };
+fn main(): int { let o: ?uint = null; let v: uint = o ?? 7; println(f"{v}"); return 0; }

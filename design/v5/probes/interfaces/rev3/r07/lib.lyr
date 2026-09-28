@@ -1,0 +1,4 @@
+module lib;
+interface Hidden { pub fn h(): int; }
+pub class T :: [Hidden] { fn h(): int { return 5; } }
+pub fn viaHidden<X :: [Hidden]>(x: X): int { return x.h(); }

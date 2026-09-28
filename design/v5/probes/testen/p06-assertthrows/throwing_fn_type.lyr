@@ -1,0 +1,7 @@
+class Boom :: [Throwable] {
+    pub fn message(): string { return "boom"; }
+}
+
+fn assertThrows(f: fn() -> void throws Boom): void { }
+
+fn main(): int { return 0; }

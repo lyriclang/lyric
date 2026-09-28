@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    defer { println("DEFER RAN"); }
+    println("BEFORE");
+    panic("ordinary panic");
+    return 0;
+}

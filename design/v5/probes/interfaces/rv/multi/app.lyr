@@ -1,0 +1,11 @@
+import std.io.console { println };
+import shapes { Named, Labeled, Tag };
+
+fn main(): int {
+    let t = Tag { };
+    let l: Labeled = t;
+    println(l.name());
+    let n: Named = t;
+    println(n.name());
+    return 0;
+}

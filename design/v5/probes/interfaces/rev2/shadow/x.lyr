@@ -1,0 +1,4 @@
+module x;
+import g { C };
+pub fn touch(): int { return 1; }
+extend C { fn greet(): string { return "extension"; } }

@@ -1,0 +1,3 @@
+class Bag<T> { item: T }
+extend Bag<int> { pub fn tell(): int { return this.item; } }
+fn main(): int { let b = Bag<int> { item = 4 }; return b.tell(); }

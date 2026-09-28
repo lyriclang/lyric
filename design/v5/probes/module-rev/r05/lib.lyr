@@ -1,0 +1,7 @@
+module lib;
+
+pub class Counter {
+    static let HIDDEN: int = 5;
+    pub static let SHOWN: int = 9;
+    count: int = 0
+}

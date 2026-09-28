@@ -1,0 +1,13 @@
+class It<T> {
+    v: T,
+    fn deep(n: int): int {
+        if (n == 0) { return 0; }
+        let next = It<T[]> { v = [this.v] };
+        return next.deep(n - 1);
+    }
+}
+
+fn main(): int {
+    let a = It<int> { v = 1 };
+    return a.deep(3);
+}

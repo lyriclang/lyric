@@ -1,0 +1,15 @@
+module main;
+
+import kinds { Wait };
+import std.io.console { println };
+
+fn describe(w: Wait): string {
+    return match (w) {
+        Wait.Ready => "ready",
+    };
+}
+
+fn main(): int {
+    println(describe(Wait.Ready));
+    return 0;
+}

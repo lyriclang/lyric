@@ -1,0 +1,10 @@
+import std.test { Test, assertEq };
+import std.core { Exception };
+
+@Test
+pub fn aa_throws_uncaught(): void throws Exception {
+    throw Exception { text = "boom" };
+}
+
+@Test
+pub fn bb_control(): void { assertEq(1, 1); }

@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run, pending };
+
+fn parker(n: int): void {
+    if (n > 0) { parker(n - 1); return; }
+    yield Wait.Sleep(700);
+}
+
+fn task0(): Coroutine<Wait> { parker(0); }
+
+fn main(): int {
+    var i = 0;
+    while (i < 20000) { spawn(task0()); i += 1; }
+    println(f"parked tasks: {pending()}");
+    run();
+    return 0;
+}

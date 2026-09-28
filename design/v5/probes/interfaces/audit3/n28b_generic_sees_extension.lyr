@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Greeter { fn name(): string; }
+class C :: [Greeter] { fn name(): string { return "c"; } }
+extend C { fn extra(): string { return "extra"; } }
+fn viaT<T :: [Greeter]>(x: T): string { return x.extra(); }
+fn main(): int {
+    println(viaT(C { }));
+    return 0;
+}

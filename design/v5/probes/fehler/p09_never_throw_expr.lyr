@@ -1,0 +1,26 @@
+// ERWARTUNG: kompiliert (Guide 10). throw als Ausdruck, never als Rueckgabetyp.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn need(o: ?int, key: string): int throws Boom {
+    return o ?? throw Boom { what = key };
+}
+
+fn fail(message: string): never {
+    panic("fatal: " + message);
+}
+
+fn guard(o: ?int): int {
+    if (o == null) { fail("no value"); }
+    return o;
+}
+
+fn main(): int {
+    println(f"{guard(5)}");
+    try {
+        return need(null, "k");
+    } catch (e: Boom) {
+        println(f"caught {e.message()}");
+        return 0;
+    }
+}

@@ -1,0 +1,14 @@
+import std.io.console { println };
+class Oops :: [Throwable] { fn message(): string { return "oops"; } }
+fn f(x: ?int): int throws Oops {
+    if (x == null) { throw Oops {}; }
+    return x + 1;
+}
+fn main(): int {
+    try {
+        println(f"{f(1)}");
+    } catch (e: Oops) {
+        println("caught");
+    }
+    return 0;
+}

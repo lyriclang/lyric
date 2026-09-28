@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var x = 1;
+    defer { println(fromInt(x)); }
+    x = 2;
+    return 0;
+}

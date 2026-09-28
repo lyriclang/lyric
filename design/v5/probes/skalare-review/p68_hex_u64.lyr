@@ -1,0 +1,9 @@
+// ERWARTUNG: unannotiert Fehler (int-Kontext, > intMax); annotiert uint ok
+import std.io.console { println };
+fn main(): int {
+  let y: uint = 0xFFFFFFFFFFFFFFFF;
+  println(f"{y}");
+  let x = 0xFFFFFFFFFFFFFFFF;
+  println(f"{x}");
+  return 0;
+}

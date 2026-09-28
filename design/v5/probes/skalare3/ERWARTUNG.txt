@@ -1,0 +1,39 @@
+Erwartungen VOR dem Lauf (2026-09-27, Runde 3, Nachpruefung der Kritik):
+
+x01 let u: uint = 5; let big: uint = 18446744073709551615  -> ERWARTE laeuft, druckt 5 / 18446744073709551615 (Kritik hat recht; SK-27-Praemisse faellt)
+x02a (97.0 as char) as int, (65f32 as char) as int, (1e300 as char) as int -> ERWARTE 0 / 0 / 0 (Kritik: FloatToInt _ => (0,0))
+x02b Kontrolle 65 as char -> ERWARTE A / 65
+x02c Kontrolle 1114112 as char -> ERWARTE Panik LYR-VM0012
+x03a let x = 200i8 -> ERWARTE kompiliert MIT Verifier, druckt -56
+x03b let x = 300i8 -> ERWARTE CLI0020 (Verifier)
+x03c let x = 0x80i8 -> ERWARTE -128
+x03d let x = 16777217f32 -> ERWARTE 16777216 still
+x03e Kontrolle let g: float32 = 16777217 -> ERWARTE SEM0001
+x03f Kontrolle let x = 100i8 -> ERWARTE 100
+x04a let x = 9223372036854775808 -> ERWARTE SEM0001 mit "does not fit" und uint-Hinweis
+x04b let x = 0xFFFFFFFFFFFFFFFF -> ERWARTE dasselbe
+x05  big: uint = uintMax; big >> 63 -> ERWARTE 1 (logisch); big >> 1 -> 9223372036854775807; Kontrolle -1 >> 63 -> -1 (arithmetisch)
+x06  interface Mine im eigenen Modul; extend int8 :: [Mine] -> ERWARTE kompiliert und laeuft (Kritik: Orphan-Regel erlaubt es)
+x07  -1i8 as uint64 -> ERWARTE 18446744073709551615 (sign-extend); -1i8 as uint8 -> 255; 200u8 as int64 -> 200; -1i8 as int64 -> -1
+x08a a: int8, m: int; a << m -> ERWARTE SEM0003
+x08b Kontrolle a << 3 (Literal) -> ERWARTE 8
+x09a f(1i8, 2) -> ERWARTE laeuft, T=int8
+x09b f(2, 1i8) -> ERWARTE SEM0001 cannot assign 'int8' to 'int'
+x10  f"{-1i8:X}" -> ERWARTE FFFFFFFFFFFFFFFF; f"{255u8:X}" -> FF; f"{-1i32:X}" -> FFFFFFFFFFFFFFFF; f"{-1i8:B}" -> 64 Einsen
+x11  f"{1.0}" -> 1; f"{1e21}" -> 1e+21; f"{1e-7}" -> 1e-07
+x12a let x = 1 / 0 -> ERWARTE kompiliert, Panik VM0002 zur Laufzeit
+x12b comptime (1 / 0) -> ERWARTE LYR-CT0002
+x12c let x = intMin / -1 (import std.math) -> ERWARTE kompiliert, druckt intMin (wrappt)
+x13a opaque type Id = uint8; let i: Id = 5 -> ERWARTE SEM0001
+x13b let i: Id = 5 as Id -> ERWARTE SEM0006 mit Into-Hinweis
+x13c let i: Id = (5 as uint8) as Id -> ERWARTE laeuft, 5
+x14  -0.0 drucken -> -0; 0.0 == -0.0 -> true; 1.0 / -0.0 -> -Infinity
+x15  for i in 0u8..=255u8 zaehlen -> ERWARTE 256, terminiert
+x16a match auf float-Literal 1.0 -> ERWARTE 1; mit NaN-Scrutinee -> ERWARTE 2 (Default-Arm)
+x17  nan as int8 -> 0; 1e300 as int8 -> 127; -1e300 as uint8 -> 0
+x18  var x: int8 = 127i8; x++ -> ERWARTE -128 (wrappt); x += 1 -> -127
+x19  Kontrolle: extend int8 :: [Display] (std.core-Interface) -> ERWARTE SEM0041 (wie w25)
+x20  Reihenfolge-Kontrolle: f(1i8, 2i8) -> laeuft; f(2, 3) -> laeuft T=int
+y01 zehn plain a+b in einer Funktion (Basis)      -> Bytecodegroesse B1
+y02 zehn a+b je mit manueller Ueberlaufpruefung   -> ERWARTE B2 - B1 deutlich > 3x (10 Adds -> 10 Add + je 2 Vergleiche + Branch + Panik-Aufruf); Proxy fuer SK-26 Option C
+y00 leere Funktion mit nur println                -> Basis-Overhead B0, damit (B2-B0)/(B1-B0) das Verhaeltnis pro Operation ist

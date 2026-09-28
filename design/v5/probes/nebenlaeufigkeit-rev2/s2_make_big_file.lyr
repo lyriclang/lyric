@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.io.file as file;
+import std.os as os;
+import std.string;
+
+fn main(): int {
+    var chunk = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    var i = 0;
+    while (i < 15) { chunk = chunk + chunk; i += 1; }
+    let ok = file.writeText(os.args()[0], chunk);
+    println(f"written: {ok}");
+    return 0;
+}

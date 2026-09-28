@@ -1,0 +1,4 @@
+import std.io.console { println };
+interface Mine { fn twice(): int; }
+extend int8 :: [Mine] { fn twice(): int { return (this as int) * 2; } }
+fn main(): int { let v: int8 = 21i8; println(f"{v.twice()}"); return 0; }

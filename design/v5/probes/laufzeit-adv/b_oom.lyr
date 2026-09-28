@@ -1,0 +1,8 @@
+// B — [1] * int.MaxValue: ueber Array.MaxLength. ERWARTUNG: keine Panik, rohe .NET-OOM,
+// Exit-Code 0xE0434352 (in bash: & 0xFF = 82), Ausgabe "Out of memory."
+import std.io.console { println };
+fn main(): int {
+    let xs = [1] * 2147483647;
+    println(f"{xs.length}");
+    return 0;
+}

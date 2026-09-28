@@ -1,0 +1,4 @@
+// ERWARTUNG: SEM0017 — todo() ist void und ersetzt kein return.
+import std.core { todo };
+fn f(): int { todo("later"); }
+fn main(): int { return 0; }

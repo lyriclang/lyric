@@ -1,0 +1,6 @@
+@Deprecated { message = "use newlib" }
+module oldlib;
+
+import std.core { Deprecated };
+
+pub fn f(): int { return 1; }

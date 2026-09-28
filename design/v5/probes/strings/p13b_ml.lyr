@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+fn main(): int {
+    let a = """
+        abc
+        """;
+    println(a);
+    return 0;
+}

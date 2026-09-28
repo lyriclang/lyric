@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+enum Shape { Rect { w: int, h: int }, Dot }
+
+fn kind(s: Shape): int {
+    return match (s) {
+        Rect { w = 0, h } => 1,
+        Rect { w, h } => 2,
+        Dot => 3,
+    };
+}
+
+fn main(): int {
+    println(f"{kind(Shape.Rect { w = 0, h = 5 })} {kind(Shape.Rect { w = 1, h = 5 })}");
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn each(f: fn(int) -> void): string { return "int-cb"; }
+fn each(f: fn(string) -> void): string { return "str-cb"; }
+fn main(): int {
+    println(each { println("hi"); });
+    return 0;
+}

@@ -1,0 +1,20 @@
+import std.io.console { println };
+
+struct Cfg {
+    host: string,
+    port: int,
+}
+
+fn build(): Cfg {
+    return Cfg {
+        host = "localhost",
+        port = 80,
+    };
+}
+
+fn main(): int {
+    let c = build();
+    let n = 1 + /* inner */ 2;
+    println(f"{c.host}:{c.port} {n}");
+    return 0;
+}

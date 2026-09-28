@@ -1,0 +1,10 @@
+import std.io.console { println };
+class Cell { n: int }
+enum E { Has(Cell), No }
+fn main(): int {
+    let a = E.Has(Cell { n = 1 });
+    let b = a;
+    match (b) { Has(c) => { c.n = 42; }, No => { } }
+    match (a) { Has(c) => { println(f"{c.n}"); }, No => { println("no"); } }
+    return 0;
+}

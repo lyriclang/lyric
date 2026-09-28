@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    var xs: (?int)[] = [null];
+    xs[0] ??= 4;
+    println(f"{xs[0] ?? -1}");
+    return 0;
+}

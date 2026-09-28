@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+fn headTail(xs: int[]): int {
+    return match (xs) {
+        [first, ..rest] => first + rest.length,
+        [] => 0,
+    };
+}
+
+fn main(): int {
+    println(f"{headTail([1,2,3])}");
+    return 0;
+}

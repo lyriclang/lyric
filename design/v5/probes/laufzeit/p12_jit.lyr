@@ -1,0 +1,43 @@
+// P12 — Rechnen Interpreter und JIT bitgleich?
+// Erwartung VOR dem Lauf: identische Ausgabe. f32 geht im Interpreter durch double
+// (Interpreter.cs:1302) und im JIT vermutlich nativ; fuer + - * / ist doppelte Rundung
+// beweisbar harmlos (53 > 2*24+2), also darf nichts abweichen.
+import std.io.console { println };
+import std.math { sqrt, sin };
+
+fn f32Kette(n: int): float32 {
+    var acc: float32 = 1.0;
+    var i = 0;
+    while (i < n) {
+        acc = acc * 1.0000001 + 0.3333333;
+        acc = acc / 1.7;
+        i += 1;
+    }
+    return acc;
+}
+
+fn f64Kette(n: int): float {
+    var acc = 1.0;
+    var i = 0;
+    while (i < n) {
+        acc = acc * 1.0000001 + 0.3333333333333;
+        acc = acc / 1.7;
+        acc = sqrt(acc) + sin(acc);
+        i += 1;
+    }
+    return acc;
+}
+
+fn wrap(n: int): int {
+    var acc = 9223372036854775807;
+    var i = 0;
+    while (i < n) { acc = acc * 31 + 17; i += 1; }
+    return acc;
+}
+
+fn main(): int {
+    println(f"f32  = {f32Kette(1000)}");
+    println(f"f64  = {f64Kette(1000)}");
+    println(f"wrap = {wrap(1000)}");
+    return 0;
+}

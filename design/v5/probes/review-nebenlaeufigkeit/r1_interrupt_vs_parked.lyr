@@ -1,0 +1,31 @@
+import std.io.console { println };
+import std.task as task;
+import std.task { Wait };
+import std.os as os;
+
+fn sleeper(): Coroutine<Wait> {
+    println("sleeper parks on Sleep(2000)");
+    yield Wait.Sleep(2000);
+    println("sleeper woke");
+}
+
+fn shutdownWatcher(): Coroutine<Wait> {
+    yield Wait.Interrupt;
+    println("watcher woke on interrupt");
+}
+
+fn tripper(): Coroutine<Wait> {
+    yield Wait.Sleep(50);
+    println("tripper calls interrupt()");
+    task.interrupt();
+}
+
+fn main(): int {
+    let t0 = os.nowMillis();
+    task.spawn(sleeper());
+    task.spawn(shutdownWatcher());
+    task.spawn(tripper());
+    task.run();
+    println(f"run returned at +{os.nowMillis() - t0}ms");
+    return 0;
+}

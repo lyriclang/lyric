@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x = 1.0; let r = match (x) { 1.0 => 1, _ => 2, }; println(f"{r}"); let nan = 0.0 / 0.0; let q = match (nan) { 1.0 => 1, _ => 2, }; println(f"{q}"); return 0; }

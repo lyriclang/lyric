@@ -1,0 +1,3 @@
+import std.math { sin };
+let S: string = comptime f"{1.0 / 3.0}|{sin(1.0)}|{12345.678}";
+fn main(): int { println(S); return 0; }

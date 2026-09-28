@@ -1,0 +1,7 @@
+import std.collections { Map };
+fn main(): int {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    for (kv in m) { return 1; }
+    return 0;
+}

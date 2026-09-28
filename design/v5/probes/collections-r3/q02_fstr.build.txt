@@ -1,0 +1,4 @@
+q02_fstr.lyr:4:16: error[LYR-SEM0006]: 'int[]' does not render in an f-string — a value renders through 'Display': give the type the conformance ':: [Display]' with a 'fn show(): string', or narrow and convert it explicitly
+    println(f"{xs}");
+               ^^
+

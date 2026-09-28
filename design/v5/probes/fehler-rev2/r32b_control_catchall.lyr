@@ -1,0 +1,14 @@
+// KONTROLLE zu r32: derselbe Bau mit zusaetzlichem catch-all. ERWARTUNG: kompiliert, laeuft.
+import std.io.console { println };
+class A :: [Throwable] { fn message(): string { return "A"; } }
+class B :: [Throwable] { fn message(): string { return "B"; } }
+fn f(n: int): int throws {
+    if (n == 0) { throw A { }; }
+    throw B { };
+}
+fn main(): int {
+    try { return f(1); }
+    catch (_: A) { println("A"); return 0; }
+    catch (_: B) { println("B"); return 0; }
+    catch (_) { println("all"); return 0; }
+}

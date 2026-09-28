@@ -1,0 +1,5 @@
+fn table(): int[] { return [1, 2, 3]; }
+
+let T: int[] = comptime table();
+
+fn main(): int { return T.length; }

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let s = "x"; println(f"[{s:>8}]"); return 0; }

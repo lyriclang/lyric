@@ -1,0 +1,17 @@
+import std.io.console { println };
+
+class Counter {
+    i: int,
+    pub mut fn next(): ?int {
+        if (this.i >= 3) { return null; }
+        this.i = this.i + 1;
+        return this.i;
+    }
+}
+
+fn main(): int {
+    let c = Counter { i = 0 };
+    var v = c.next();
+    while (v != null) { println(f"{v}"); v = c.next(); }
+    return 0;
+}

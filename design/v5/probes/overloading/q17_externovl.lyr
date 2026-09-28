@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt, fromFloat };
+extern "dotnet" fn hostAbs(x: int): int = "System.Math::Abs";
+extern "dotnet" fn hostAbs(x: float): float = "System.Math::Abs";
+fn main(): int {
+    println(fromInt(hostAbs(-3)));
+    println(fromFloat(hostAbs(-2.5)));
+    return 0;
+}

@@ -1,0 +1,5 @@
+module main;
+import std.io.console { println };
+fn main(): int { println(helper()); return 0; }
+import lib;
+fn helper(): int { return lib.f(); }

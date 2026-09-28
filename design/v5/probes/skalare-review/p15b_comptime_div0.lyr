@@ -1,0 +1,7 @@
+// ERWARTUNG: Compile-Fehler (comptime muss die Panik melden)
+import std.io.console { println };
+fn main(): int {
+  let y = comptime (1 / 0);
+  println(f"{y}");
+  return 0;
+}

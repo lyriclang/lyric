@@ -1,0 +1,4 @@
+import std.io.console { println };
+import lib;
+struct Secret { v: int, }
+fn main(): int { println(lib.ident(Secret { v = 3 }).v); return 0; }

@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn main(): int {
+    var acc = 0;
+    var i = 0;
+    while (i < 20000000) {
+        acc = (acc + i) & 1023;
+        i = i + 1;
+    }
+    println(acc);
+    return 0;
+}

@@ -1,0 +1,11 @@
+struct S { v: int, }
+class C { v: int, }
+fn main(): int {
+    var s = S { v = 1 };
+    s.v++;
+    var c = C { v = 1 };
+    c.v++;
+    var n = 1;
+    n++;
+    return s.v + c.v + n;
+}

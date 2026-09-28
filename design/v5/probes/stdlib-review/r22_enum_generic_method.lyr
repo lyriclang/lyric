@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+pub enum Maybe<T> {
+    Nothing,
+    Just { value: T },
+
+    pub fn map<U>(f: fn(T) -> U): Maybe<U> {
+        return match (this) {
+            Maybe.Nothing => Maybe<U>.Nothing,
+            Maybe.Just { value } => Maybe<U>.Just { value = f(value) },
+        };
+    }
+}
+
+fn main(): int {
+    let m = Maybe<int>.Just { value = 3 };
+    let n = m.map((x: int) => x * 2);
+    return match (n) {
+        Maybe.Nothing => 0,
+        Maybe.Just { value } => value,
+    };
+}

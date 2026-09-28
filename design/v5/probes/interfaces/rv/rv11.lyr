@@ -1,0 +1,4 @@
+import std.io.console { println };
+interface I { pub fn f(): int; }
+class C :: [I] { fn f(): int { return 7; } }
+fn main(): int { let i: I = C { }; println(i.f()); return 0; }

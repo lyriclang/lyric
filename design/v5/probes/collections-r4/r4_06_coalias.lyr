@@ -1,0 +1,14 @@
+import std.io.console { println };
+fn walk(xs: int[]): Coroutine<int> {
+    for (x in xs) { yield x; }
+}
+fn main(): int {
+    var xs = [1, 2, 3];
+    let co = walk(xs);
+    let a = co.next()!;
+    xs[1] = 99;
+    let b = co.next()!;
+    let c = co.next()!;
+    println(f"{a} {b} {c}");
+    return 0;
+}

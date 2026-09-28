@@ -1,0 +1,10 @@
+// ERWARTUNG (p19 nachgefahren): ICE, LYR-CLI0020 "block bb4 is already sealed".
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn main(): int {
+    try {
+        defer { throw Boom { }; }
+        println("body");
+    } catch (e: Boom) { println(f"caught {e.message()}"); return 0; }
+    return 1;
+}

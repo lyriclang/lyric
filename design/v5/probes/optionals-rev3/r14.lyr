@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let xs: int[] = [1, 2]; let ys: (?int)[] = xs; println(f"{ys.length}"); return 0; }

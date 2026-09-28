@@ -1,0 +1,2 @@
+error[LYR-CLI0003]: unknown argument: --deny-warnings — try 'lyrbuild --help'
+

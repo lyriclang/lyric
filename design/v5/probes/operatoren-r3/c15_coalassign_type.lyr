@@ -1,0 +1,4 @@
+fn main(): int {
+    var o: ?int = null;
+    return (o ??= 3) + 1;
+}

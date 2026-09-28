@@ -1,0 +1,8 @@
+module main;
+import std.core { Deprecated };
+import std.io.console { println };
+
+@Deprecated { message = "use fresh()", until = "5.0" }
+fn old(): string { return "packed-probe"; }
+
+fn main(): int { println(old()); return 0; }

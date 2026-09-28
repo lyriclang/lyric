@@ -1,0 +1,7 @@
+import std.io.console { println };
+import wrap { root };
+
+fn main(): int {
+    println(f"root={root(27.0)}");
+    return 0;
+}

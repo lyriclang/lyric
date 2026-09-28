@@ -1,0 +1,35 @@
+Erwartungen VOR dem Lauf (Revision 2 des Modul-Dossiers, 2026-09-27)
+q01   struct S { pub x: int, }                      -> Parse-Fehler (PAR0011/0026/0031), Kritik recht
+q01k  struct S { x: int, pub fn f() }               -> kompiliert, 4 (Kontrolle: pub an Methode parst)
+q02   interface I { pub fn f(): int; }              -> kompiliert, 4
+q03   panic("x") ohne Import (nicht erreicht)       -> kompiliert, Exit 3 (implizite Bindung)
+q03b  Benutzer-fn panic(msg): int im Entry, Aufruf -> UNBEKANNT; vermutlich gewinnt die Benutzerdeklaration still (Builtins sind PARENT-Tabelle), druckt 9
+q03c  import mylib { panic } (pub fn panic in lib)  -> UNBEKANNT; vermutlich Import gewinnt still, druckt 9
+q03d  Benutzer-fn concat(a,b) im Entry, "a"+"b"     -> "ab" (Lowering bindet std.string.concat per festem Namen, kein Hijack), Benutzer-concat nur bei direktem Aufruf
+q04   lyrc build api.lyr OHNE Header, lyrvm info    -> main.newBox, main.helper (Kritik recht)
+q04k  dasselbe MIT module api;                      -> api.newBox, api.helper
+q05a  let lib = 5 LOKAL neben import lib            -> kompiliert wortlos, Exit 5
+q05b  let lib = 5 TOP-LEVEL neben import lib        -> LYR-RES0001
+q06   nicht-pub extern in lib, lib.cbrt(8.0) aussen -> kompiliert, druckt 2
+q06k  import lib { cbrt } selektiv                  -> LYR-RES0004
+q07   Modul a: pub struct b { pub fn c }; Modul a.b: pub fn c  -> LYR-CLI0020 duplicate function name a.b.c
+q07k  Struct heisst bb                              -> 1 2
+q08   app.lyr importiert b, b importiert app        -> RES0005 'b' + SEM0021 duplicate main (Doppelladung app.lyr als main UND app)
+q08k  main.lyr importiert b, b importiert main      -> nur RES0005
+q08c  app.lyr: import app;                          -> RES0005 'app' + SEM0021
+q09   lib.lyr mit fn main, importiert von main.lyr  -> SEM0021 duplicate main an lib.lyr, OHNE Note
+q10   import std.io.consol { println }              -> RES0003 ohne did-you-mean
+q10k  unbekannter Bezeichner g neben fn f           -> SEM0002 mit note did you mean 'f'
+q11   hello world mit --verbose                     -> Phasen mit ms, load ~5 std-Module bei jedem Bau
+q12   import lib; import lib { f };  f()+lib.g()    -> kompiliert, 13
+q12b  import lib; import lib { f }; nur f benutzt   -> keine Warnung (bare warnt nie)
+q12c  import lib as L; import lib { f }; nur f      -> SEM0072 auf dem as-Import
+q13   pub fn ident<T> in lib, Entry ruft mit privatem struct Secret -> kompiliert, 3; lyrvm info zeigt Instanznamen mit 'Secret' unter lib
+q14   lyric.json sourceRoot/testRoot, Test ruft calc.internalDouble qualifiziert -> lyric test PASS; lyric check sagt N modules ok
+q14k  dasselbe selektiv                             -> RES0004, Test rot
+q15   NICHT gemessen: import con; (Windows-Geraetename, Haengegefahr)
+--- Runde 2 (nach q13)
+q13b  zwei Module mit je eigenem privatem struct Secret, beide instanziieren lib.ident -> LYR-CLI0020 duplicate function name lib.ident<Secret> (Instanzname traegt den Typnamen ohne Modul)
+q13c  Kontrolle: zweiter Typ heisst Other          -> 3 7
+q16   import lib { f }; import lib { g };           -> UNBEKANNT; vermutlich kompiliert (13), kein RES0001
+q16b  bare + as + selektiv, alle drei benutzt       -> kompiliert, 20

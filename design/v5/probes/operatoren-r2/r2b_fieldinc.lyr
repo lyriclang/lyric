@@ -1,0 +1,6 @@
+struct Box { n: int, }
+fn main(): int {
+    var b = Box { n = 10 };
+    b.n++;
+    return b.n;
+}

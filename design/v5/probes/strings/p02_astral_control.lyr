@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn main(): int {
+    let escaped = '\u{1F600}';
+    let s = "a😀b";
+    println(f"{escaped}");
+    println(f"len={s.length()} bytes={s.utf8Encode().length}");
+    var n = 0;
+    for (c in s) {
+        n = n + 1;
+    }
+    println(f"iterated={n}");
+    println(f"charAt1={s.charAt(1)}");
+    println(f"upper={s.toUpper()}");
+    return 0;
+}

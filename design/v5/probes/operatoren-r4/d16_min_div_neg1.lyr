@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var m = 0 - 9223372036854775807;
+    m = m - 1;
+    var two = 2;
+    println(fromInt(m / two));
+    var neg = 0 - 1;
+    println("before div");
+    println(fromInt(m / neg));
+    println("before rem");
+    println(fromInt(m % neg));
+    return 0;
+}

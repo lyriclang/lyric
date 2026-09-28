@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn build(s: string): string {
+    return f"{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}{s}";
+}
+
+fn main(): int {
+    let s = "a" * 20000;
+    var total = 0;
+    var i = 0;
+    while (i < 100) {
+        total = total + build(s).length();
+        i = i + 1;
+    }
+    println(f"total={total}");
+    return 0;
+}

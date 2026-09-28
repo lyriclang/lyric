@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var t = (S { v = 1 }, 2);
+    var u = t;
+    let (a, b) = u;
+    println(f"g03 a.v={a.v} b={b}");
+    return 0;
+}

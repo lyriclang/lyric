@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn double(n: int): int { return n * 2; }
+fn main(): int {
+    let a = double;
+    let b = double;
+    if (a == b) { println("equal"); } else { println("not equal"); }
+    return 0;
+}

@@ -1,0 +1,3 @@
+// ERWARTUNG (Kontrolle zu r02): LYR-SEM0017, weil todo() bewusst void ist.
+fn f(): int { todo("x"); }
+fn main(): int { return 0; }

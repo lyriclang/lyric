@@ -1,0 +1,26 @@
+Erwartungen VOR dem Lauf (Runde 3, Nachpruefung der Kritik):
+r01 import std.core { rawArrayAlloc }: erwarte LYR-RES0004 (nicht pub, core.lyr:32-36)
+r02 class Box<T> { fn map<U> }: erwarte kompiliert, druckt n=2 (PLAN.md:121)
+r03 if (null == null): erwarte IR0001 (Kritik); r03b Kontrolle a == null auf ?int: kompiliert, druckt eq
+r04 enum Opt<T> { Some(T), None } mit Opt<?int>: erwarte kompiliert, druckt some -1
+r05 assertEq(a, null) mit a: ?int: erwarte IR0001 in stdlib/std/test.lyr; r05b Kontrolle assertEq(1, 1): gruen
+r06 if (x == null) { x = 5; } x + 1: erwarte SEM0003; r06b Kontrolle if (x == null) { return 1; } x + 1: gruen, druckt 6
+r07 if (!(x == null)) { x + 1 }: erwarte SEM0003
+r08 x! = 5: erwarte SEM0019
+r09 f(int)/f(?int), f(null): erwarte 2; r09b f(5): erwarte 1; r09c f(?int)/f(?string), f(null): erwarte SEM0086 (Mehrdeutigkeit)
+r10 fn f(x: ?int = null), f(): erwarte -1; r10b fn f<T>(x: ?T = null), f<int>(): erwarte gruen; r10c f() ohne Typargument: erwarte SEM-Fehler (T nicht ableitbar); r10d fn f(x: ?int) ohne Default, f(): erwarte Aritaetsfehler (kein implizites null)
+r11 a ?? panic("no"): erwarte gruen, druckt 5
+r12 fn() -> int nach fn() -> ?int: erwarte SEM0001
+r13 interface get(): ?int, impl get(): int: erwarte SEM0042
+r14 int[] nach (?int)[]: erwarte SEM0001
+r15 let x: ??int: erwarte Lexer-/Parser-Kaskade ohne Nestungshinweis
+r16 p.v auf ?P: erwarte SEM0012 ohne ?.-Hinweis
+r17 xs[0] auf ?int[]: erwarte SEM0007 mit Indexable-Text
+r18a x != null auf int: erwarte SEM0059; r18b x ?? 2 auf int: erwarte SEM0005
+r19 extend ?int { fn isPos(): bool }: unklar - erwarte Ablehnung (Parser oder Sema); r19b Kontrolle extend int { fn dbl(): int }: gruen, druckt 4
+r20 let y = a ?? return 0;: erwarte Parserfehler (return ist Anweisung)
+r21 while (true) { if (x == null) { break; } println(x + 1); break; }: erwarte gruen (Spec 7.4 nennt break), druckt 2
+r22 lyrc lower: drei Lesungen einer genarrowten Variable im selben Block: erwarte DREI optget (Spec 7.4: a read compiles to a checked unwrap)
+r23 Koerzierungsstellen: Argument g(5), Struct-Init S { v = 5 }, return 5 aus ?int, let y: int = a ?? 5, Array-Literal [1, null]: erwarte alle gruen
+r24 match (o) { 5 | null => ..., n => ... } auf ?int: unklar; erwarte gruen oder SEM-Fehler mit Or-Pattern-Text
+r25 fn f(x: ?int = null) und fn f(): int als Ueberladung: erwarte SEM0085 oder SEM0086 (Default ist Aufrufstellen-Transformation, 04-modules.md:84-86)

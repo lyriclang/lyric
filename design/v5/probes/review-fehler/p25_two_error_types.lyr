@@ -1,0 +1,22 @@
+// ERWARTUNG: eine Funktion, die zwei Typen wirft, kann nur 'throws' bar deklarieren.
+// Der Aufrufer, der beide einzeln faengt, deckt damit alles ab? Oder SEM0034?
+import std.io.console { println };
+class A :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class B :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn f(which: int): int throws {
+    if (which == 0) { throw A { what = "a" }; }
+    throw B { what = "b" };
+}
+
+fn main(): int {
+    try {
+        return f(0);
+    } catch (e: A) {
+        println("A");
+        return 0;
+    } catch (e: B) {
+        println("B");
+        return 1;
+    }
+}

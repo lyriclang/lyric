@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn f(v: int): int { return v; }
+fn main(): int {
+    var x = 1;
+    let y = x++;
+    let z = f(x++);
+    println(fromInt(y));
+    println(fromInt(z));
+    println(fromInt(x));
+    return 0;
+}

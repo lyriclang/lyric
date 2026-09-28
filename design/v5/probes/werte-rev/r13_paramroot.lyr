@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct S { x: int, }
+fn f(s: S): int { s.x = 9; return s.x; }
+fn main(): int { let a = S { x = 1 }; println(f"r13 {f(a)} {a.x}"); return 0; }

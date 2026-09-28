@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn id<T>(x: T): T { return x; }
+fn wrap<T>(x: T): fn() -> T { return () => id<T>(x); }
+fn main(): int { let w = wrap<int>(9); println(f"{w()}"); return 0; }

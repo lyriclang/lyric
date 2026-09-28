@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn nat(x: int): int;
+fn nat(x: float): float;
+fn main(): int { println("x"); return 0; }

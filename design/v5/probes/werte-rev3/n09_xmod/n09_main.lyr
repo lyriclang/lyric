@@ -1,0 +1,9 @@
+import std.io.console { println };
+import shapes { S, make };
+extend S { mut fn bump(): void { this.v = this.v + 1; } }
+fn main(): int {
+    let s = make();
+    s.bump();
+    println(f"n09 cross-module extend mut fn on let s: s.v={s.v} (2 = landed, no diagnostic expected)");
+    return 0;
+}

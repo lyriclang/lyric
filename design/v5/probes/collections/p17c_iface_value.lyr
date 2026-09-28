@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.iter { Iterator };
+
+class Counter :: [Iterator<int>] {
+    i: int,
+    pub mut fn next(): ?int {
+        if (this.i >= 3) { return null; }
+        this.i = this.i + 1;
+        return this.i;
+    }
+}
+
+fn main(): int {
+    let c: Iterator<int> = Counter { i = 0 };
+    for (v in c) { println(f"{v}"); }
+    return 0;
+}

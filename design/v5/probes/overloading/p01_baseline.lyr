@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn describe(n: int): string { return "the number " + fromInt(n); }
+fn describe(s: string): string { return "the word " + s; }
+fn describe(a: int, b: int): string { return "a pair"; }
+
+fn main(): int {
+    println(describe(7));
+    println(describe("seven"));
+    println(describe(1, 2));
+    return 0;
+}

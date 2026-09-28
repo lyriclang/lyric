@@ -1,0 +1,21 @@
+import std.io.console { println };
+struct S { v: int, }
+fn takesPlain(s: S) { s.v = 9; }
+fn takesOpt(o: ?S) { o!.v = 9; }
+fn main(): int {
+    var x = S { v = 1 };
+    takesPlain(x);
+    println(f"a04 after takesPlain x.v={x.v}");
+    var y: ?S = S { v = 1 };
+    takesOpt(y);
+    println(f"a04 after takesOpt y!.v={y!.v}");
+    var z = S { v = 1 };
+    var w: ?S = z;
+    w!.v = 7;
+    println(f"a04 wrap z.v={z.v} w!.v={w!.v}");
+    var p: ?S = S { v = 1 };
+    var q = p;
+    q!.v = 9;
+    println(f"a04 opt2opt p!.v={p!.v} q!.v={q!.v}");
+    return 0;
+}

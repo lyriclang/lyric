@@ -1,0 +1,1 @@
+{ "name": "app", "sourceRoot": "src", "nativeRoots": { "nat": "sdkA" }, "dependencies": { "dep": "../dep" } }
