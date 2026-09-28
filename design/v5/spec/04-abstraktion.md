@@ -127,8 +127,52 @@ Majors mit freier Überladung unverändert da — das Feature wurde eingeführt 
 
 Guide: benannte Argumente für Konfiguration, positionelle für Daten.
 
-## D6 — Operator-Interfaces: **offen**
-## D7 — Konformanz-Synthese: **offen**
+## D6 — Operator-Interfaces: **entschieden** (2026-09-28)
+
+Mit `Self`, assoziierten Typen und Default-Typargumenten: `interface Add<Rhs = Self> { type Out
+= Self; fn add(rhs: Rhs): Out; }` — der homogene Fall ist `struct Vec2 :: [Add]` ohne
+Zeremonie; heterogen `Mul<float>`, `Mul<Vec2>` mit `type Out = float`. **Defaults für
+assoziierte Typen** (`type Out = Self;`) sind erlaubt.
+
+| Operator | Interface / Regel |
+|---|---|
+| `+ - * / %` | `Add`, `Sub`, `Mul`, `Div`, `Rem` je `<Rhs = Self>`, `type Out = Self`. **Eine Auflösung**: `a * b` ist exakt `a.mul(b)`, Konformanz nach dem statischen Typ von `b`, Literale adaptieren (T8); zwei Konformanzen, die ein Literal beide nehmen → Mehrdeutigkeit, annotieren. §5.1's Versprechen gilt per Konstruktion |
+| `-x` | `Neg { type Out = Self }` |
+| `& \| ^ ~ << >>` | `BitAnd`, `BitOr`, `BitXor`, `BitNot`, `Shl<Rhs = int>`, `Shr` |
+| `!x` | nur `bool`, kein Interface |
+| `+=` u. a. | abgeleitet: `a = a.add(b)`, wenn `Out == Self` und `a` ein `var`-Ort; kein `AddAssign` (Tür) |
+| **`++`/`--`** | **Ausdrücke** (Maintainer: C#-Form): Postfix liefert den alten, Präfix den neuen Wert, Schreibung sofort; Ziel jeder `var`-Ganzzahl-Ort (Local, Feld, Array-Element, `inout`) — schließt SPEC-RUNDE 1; Auswertung links nach rechts überall, Ziel vor Wert (C# §12.4.1); beide Formen auch als Statement; `x = x++;`/`x = ++x;` → Warnung; **nur Ganzzahlen**, eigene Typen schreiben `+= 1`; Überlauf Panik (T2). Verworfen: Go-Statement-Form, Swift's Streichung |
+| `== !=` | `Equatable { fn equals(o: Self): bool }` (M10) |
+| `< <= > >=` | `Ordered :: [Equatable] { fn compare(o: Self): ?Ordering }` — `?`, weil `float` partiell ist (Rust `PartialOrd`) |
+| Sortieren, Schlüssel | `TotalOrder :: [Ordered] { fn totalCompare(o: Self): Ordering }` (Rust `Ord`). **`float`: `Equatable`, `Ordered`, aber weder `TotalOrder` noch `Hashable`** — `Map<float, X>` Übersetzungsfehler, `sort` auf `float[]` per `sortBy(float.totalCompare)` (IEEE-totalOrder). Beantwortet Korpus ★W5: `NaN != NaN` bräche jede Map-Suche |
+| `x in xs` | `Contains<T> { fn contains(x: T): bool }` — Ranges, Arrays, `Slice`, `Set`, `Map` (Schlüssel), `string`/`str`; `!in` Bereich 8 |
+| `x[k]` | `Index<K>`, `IndexSet<K>` (T14) |
+| `as` | **nur numerisch** (T1d); Typkonversion als Methode `T.from(v)`/`v.into()` über `From<T>`/`Into<T>`, Auswahl über den erwarteten Typ (T8) — der `as`/`Into`-Mehrdeutigkeitsbefund verschwindet |
+| `{x}` im f-String | `Display { fn show(): string }`; Debug-Form D7 |
+
+## D7 — Konformanz-Synthese: **entschieden** (2026-09-28)
+
+**Form: die Konformanz ohne Körper** — `struct P :: [Equatable, Hashable] { … }` synthetisiert
+(Swift). Kein `derive`-Wort (ein Attribut, das *tut*, gibt es bei uns nicht).
+
+| Interface | Synthese | Bedingung |
+|---|---|---|
+| `Equatable`, `Hashable` | feldweise, Deklarationsreihenfolge, konsistent | alle Felder konform |
+| `Ordered`, `TotalOrder` | lexikographisch nach Deklarationsreihenfolge — nur auf Anfrage | alle Felder konform |
+| **`Debug`** | **für jeden Typ automatisch, bei Bedarf** (`P { x = 1, y = 2 }`, Variantenname, Klassen mit Feldern); kein Opt-out | — |
+| `Display` | **nie automatisch**; auf Anfrage = Debug-Form (löst Korpus W9: zwei Interfaces) | — |
+| `Default` | feldweise aus `Default` der Felder oder aus Feld-Defaults (M14) | — |
+| `Clone` | **flach**: Wertfelder kopiert, Referenzfelder geteilt (Kotlin `copy`); auf Klassen die Antwort zu M6 W2 | — |
+| `Identity` (M10) | Identitäts-`Equatable` + Adress-`Hashable`, nur Klassen | — |
+| Enums | wie Structs; statische `variants()`/`fromName()` Bereich 9 | — |
+| Tupel | automatisch bedingt (T16) | — |
+
+Regeln: generische Typen **bedingt** synthetisiert (`struct Pair<T> :: [Equatable]` ⇒
+`extend<T :: [Equatable]> Pair<T> :: [Equatable]`, Rusts `derive`-Bound); ein selbst
+geschriebener Member ersetzt die Synthese für diesen Member (Swift); fehlende Feldkonformanz
+nennt das Feld. **Liste in 5.0 fest im Compiler**; nutzererweiterbare Synthese (`ToJson`) ist
+die Bereich-9-Frage (`comptime`-Kandidat, kein Makrosystem).
+
 ## D8 — `sealed`: **offen**
 ## D9 — Objektsicherheit vollständig: **offen**
 ## D10 — Interface-Eltern als Wert: **offen**
