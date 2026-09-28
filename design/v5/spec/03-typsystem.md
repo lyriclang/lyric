@@ -48,7 +48,20 @@ Aus `docs/Grammar.md`, Spec §3/§8, Korpus (`../generics.md`, `../skalare.md`,
 | T1e | `char` ist Unicode-Skalarwert, **keine Zahl** (keine Arithmetik, kein Vergleich mit Ganzzahlen); `bool` keine Zahl | Go `rune`, C |
 | T1f | `int128`/`uint128`: Tür (clang/`zig cc` liefern `__int128`); `float16`/`bfloat16`: Tür; **kein `usize`** (C `size_t` ↔ `uint` an der FFI); `decimal` Bibliothek | — |
 
-## T2 — Überlauf: **offen**
+## T2 — Überlauf: **entschieden** (2026-09-28) — Swift's Modell
+
+**Überlauf ist eine Panik, in jedem Profil** (`+ - * / << >>`, unsigned Unterlauf; Division
+durch 0 und `MIN / -1`; Shift um ≥ Breite — kein stilles Maskieren). Wrap, Sättigung und
+Prüfung sind **explizit**: `a.wrappingAdd(b)`, `a.saturatingAdd(b)`, `a.checkedAdd(b): ?int`,
+dazu Wrap-Operatoren (`&+` Swift / `+%` Zig — Schreibweise Bereich 8). Ein Profil-Schalter, der
+die Prüfung entfernt, nur **ausdrücklich, nie stillschweigend** (wie Fast-Math, L10). `as`
+bleibt wrappend (T1d); Float kennt keinen Überlauf (IEEE ∞). Emission über
+`__builtin_add_overflow` + `unlikely`-Branch (signed overflow ist in C undefiniert — ohnehin
+eine Wahl). **Kein `checked {}`-Block** (zweiter Mechanismus).
+
+Verworfen: immer wrap (Go, Java, C# — stille falsche Zahl); Debug-Panik/Release-wrap (Rust —
+dasselbe Programm rechnet je Profil anders, gegen L10); Block/Profil als Hauptform.
+
 ## T3 — Subtyping und Varianz: **entschieden** (2026-09-28) — Koerzion statt Subtyping
 
 **Lyric 5 hat keine Subtyp-Beziehung zwischen deklarierten Typen; es hat eine feste Liste von
@@ -252,8 +265,50 @@ aus (Rust `mut x` = veränderliche lokale *Kopie*, das Gegenteil).
 | N5 | **Bereichsprüfung immer**, Panik, in 5.0 nicht abschaltbar (Go); `unchecked`-Profil als Tür | — |
 | N6 | **Vom-Ende-Index als Klammer-Zucker**: `^n` **nur innerhalb von `[…]`**, statisch ersetzt durch `<Ausdruck>.length - n` — `xs[^1]`, `line[..^1]`, `buf[^4..]`; verlangt `length: int` am indizierten Ausdruck; `^0` als Bereichsende gültig, als Einzelindex Panik; **kein `Index`-Typ**, keine Konformanz, keine Laufzeitdarstellung. Bereich 8 bestätigt das Präfix-`^` neben XOR | C# (`Index`-Struct, verworfen als zu schwer); Python negative Indizes (verstecken Bugs, verworfen) |
 
-## T15 — Aliase, `opaque type`, Newtype: **offen**
-## T16 — Tupel: **offen**
-## T17 — Funktionstypen: **offen**
-## T18 — Typparameter-Hygiene: **offen**
-## T19 — Grenzen der Monomorphisierung: **offen**
+## T15 — Aliase, `opaque type`, Newtype: **entschieden** (2026-09-28)
+
+- `type Name = …` bleibt transparent, **parametrisiert erlaubt** (`type Pair<T> = (T, T)`,
+  `type Handler = fn(Event) -> void throws IoError`) — Rust, Swift.
+- **`opaque type` entfällt.** Ein Ein-Feld-Struct `struct Meters { v: float }` hat unter V2
+  exakt das Layout von `float` (C garantiert es, auch an der FFI); Synthese gibt
+  `Equatable`/`Ordered`/`Display` per `:: […]`; `with` und Feldzugriff ersetzen das
+  Doppel-`as`. Rusts Newtype-Muster; Handles an der Host-Grenze werden Ein-Feld-Structs.
+
+## T16 — Tupel: **entschieden** (2026-09-28)
+
+Benannte Elemente `(x: int, y: int)` mit Zugriff `.x` **und** `.0`; **Namen sind
+Übersetzungszeit-Etiketten**, `(x: int, y: int)` und `(int, int)` sind derselbe Typ (C#; Swift
+macht Labels zum Typ und zahlt mit Konversionsregeln). Keine Arität 1, kein leeres Tupel (`void`
+bleibt). Patterns/Destructuring bleiben. Gleichheit/Hash/Display bedingt synthetisiert.
+
+## T17 — Funktionstypen: **entschieden** (2026-09-28)
+
+`fn(A, B) -> R` bleibt, Closures und freie Funktionen einheitlich (V8). **`throws` im
+Funktionstyp** (`fn(int) -> int throws ParseError`; ohne `throws` wirft er nichts) — Fehlerform
+Bereich 5. Instanziierte generische Funktion als Wert **ja** (`map(ident<int>)`, ein
+Funktionszeiger nach Monomorphisierung); die uninstanziierte bleibt verboten (Rust). Methode als
+Wert (`obj.method`) ergibt eine Closure, die `obj` fängt (C2). Keine Varianz (T3), keine
+benannten Parameter im Typ.
+
+## T18 — Typparameter-Hygiene: **entschieden** (2026-09-28)
+
+| | Entscheidung |
+|---|---|
+| Phantom-Parameter | **erlaubt, ohne Warnung** — typisierte Handles (`Id<User>`); Rust verbietet es nur wegen Varianzinferenz |
+| `<T :: [int]>`, `<T :: [Plain]>` | **Fehler**: ein Constraint nennt ein Interface |
+| doppelter Constraint | Fehler |
+| **Default-Typargumente** | ja — `interface Add<Rhs = Self>`, `class Map<K, V, H = DefaultHasher>` (Rust, C++) |
+| partielle Listen | über `_` (T8) |
+| Wertparameter | 5.0 nur Literale in `T[N]` (T13); `const N` als Generik: Tür |
+| höhere Kinds | nein; `FromIterator`-artige Interfaces decken den Fall |
+
+## T19 — Grenzen der Monomorphisierung: **entschieden** (2026-09-28)
+
+Divergenz: **immer Diagnose, nie Absturz** — Tiefenlimit je Instanziierungskette (Rust 128),
+Meldung nennt die Kette; Instanzlimit mit klarer Meldung; Instanzen whole-program einmal (C3),
+Sharing über Referenztypen als Optimierer-Tür (Bereich 11); der Cache (L7) hält Instanzen über
+Builds; der 4.x-Verifier-Anteil (Hälfte der ~0.5 ms je Instanz) entfällt unter C-Emission.
+
+---
+
+**Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).
