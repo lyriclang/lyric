@@ -206,7 +206,44 @@ Ein Feld ohne `var` ist fest, durch jede Referenz; mit `var` schreibbar durch je
   Swift, Rust, Go verzichten bewusst. In Bereich 3 gegen **Enum ohne Zeremonie** (anonyme /
   inline deklarierte Enums, Swift-Ergonomie) abwägen, nicht gegen nichts.
 
-## M11 — Große Werte: **offen**
-## M12 — Besitzende Werttypen / RAII: **offen**
-## M13 — Rekursive Werttypen: **offen**
-## M14 — Felddefaults und Initialisierung: **offen**
+## M11 — Große Werte: **entschieden** (2026-09-28)
+
+**Keine Sprachregel** (Rust, Go, Swift). clang übergibt große Structs ohnehin per verstecktem
+Zeiger; der Preis fällt nur bei echter Kopie in eine Bindung an. Ausweg für den seltenen Fall:
+`inout`/`ref` (Bereich 3). Ein Lint („Struct > 256 B in einer Schleife kopiert") ist Werkzeug,
+Bereich 11. C#'s 16-Byte-Richtlinie bleibt Doku.
+
+## M12 — Besitzende Werttypen / RAII: **entschieden** (2026-09-28)
+
+**Kein RAII in 5.0.** Deterministische Freigabe ohne Vergessen liefert die typgebundene
+Scope-Freigabe (L1; C# `using var`, Python `with`, Kotlin `use`): die Bindung schließt am
+Scope-Ende, Kopien der Referenz sind Aliasse. Eine Ressource, die in einem zurückgegebenen oder
+gespeicherten Wert weiterlebt, ist eine Klasse mit `close()` plus Weak-Ref-Netz. Verworfen:
+Rust `Drop` (Ownership + Moves), Swift `~Copyable` (eigene Regelwelt — zeigt aber, dass es
+nachrüstbar ist: Tür), C++ RAII.
+
+## M13 — Rekursive Werttypen: **entschieden** (2026-09-28)
+
+Unter V2 ist `struct Node { next: ?Node }` unendlich groß. Indirektion über **`Box<T>` aus
+`std.core`, ohne Sprachfeature**: `class Box<T> { let value: T }` — eine Referenz, also geteilt,
+und für ein unveränderliches Struct ist Teilen unbeobachtbar (die Block-1-Einsicht gilt für die
+Box, nicht für das Struct). `struct Node { v: int, next: ?Box<Node> }`,
+`enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` — Rusts Form ohne Ownership. SEM0056 sagt
+ehrlich: „ein Werttyp kann sich nicht enthalten; leg den rekursiven Teil hinter `Box` oder eine
+Klasse". Verworfen: implizites Boxen (Magie), `indirect`-Marker (Swift nur für Enums), nur
+Klasse verlangen (Swift).
+
+## M14 — Felddefaults und Initialisierung: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| I1 | **`?T`-Felder haben implizit den Default `null`** | Swift |
+| I2 | explizite Felder in **Schreibreihenfolge**, dann Defaults in **Deklarationsreihenfolge**; Defaults ohne `this` | Rust, C# |
+| I3 | Feldkurzform `S { v, w }` = `S { v = v, w = w }` (Syntax: Bereich 8) | Rust, JS |
+| I4 | **keine feldweise Erstinitialisierung**: ein Struct entsteht ganz (Initializer oder `with`) | Rust |
+| I5 | fehlendes Feld ohne Default: Fehler, der **alle** fehlenden nennt | 4.6 `SEM0106` |
+| I6 | Structs haben nur den Initializer; `init`-Form für Klassen: Bereich 4 | — |
+
+---
+
+**Bereich 2 ist damit vollständig entschieden** (M1–M14, 2026-09-28).
