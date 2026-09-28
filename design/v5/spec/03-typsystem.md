@@ -49,7 +49,32 @@ Aus `docs/Grammar.md`, Spec §3/§8, Korpus (`../generics.md`, `../skalare.md`,
 | T1f | `int128`/`uint128`: Tür (clang/`zig cc` liefern `__int128`); `float16`/`bfloat16`: Tür; **kein `usize`** (C `size_t` ↔ `uint` an der FFI); `decimal` Bibliothek | — |
 
 ## T2 — Überlauf: **offen**
-## T3 — Subtyping und Varianz: **offen**
+## T3 — Subtyping und Varianz: **entschieden** (2026-09-28) — Koerzion statt Subtyping
+
+**Lyric 5 hat keine Subtyp-Beziehung zwischen deklarierten Typen; es hat eine feste Liste von
+Koerzionen, die an Stellen mit Zieltyp gelten (Zuweisung, Argument, Rückgabe, Initializer-Feld)
+und durch `?` hindurchreichen.** Keine deklarationsseitige Varianz (`out T`), keine Wildcards.
+
+Warum die Darstellung es vorgibt: Varianz heißt Reinterpretieren ohne Umbau. `Circle[]` ist
+ein Block aus Inline-Structs oder 8-Byte-Zeigern, `Shape[]` ein Block aus 16-Byte-Fat-Pointern
+(V7, V10) — nie dasselbe. Rust und Go leben damit; Java/C# können Container-Varianz nur, weil
+die VTable im Objekt-Header liegt, und C# nennt seine kovarianten Arrays einen Fehler.
+
+| Koerzion | Status |
+|---|---|
+| `T → ?T` | behalten (§3.1) |
+| `Typ → Interface` (Fat Pointer bauen, Struct boxen) | behalten |
+| verlustfreie Ganzzahl-Weitung, `float32 → float64` | T1c |
+| **`?Circle → ?Shape`, `Circle → ?Shape`** — Koerzion durch das Optional hindurch, neues Optional aus dem umgewandelten Wert (Optionals sind Werte, V5) | **neu**; der gemessene 4.x-Ablehnungsfall; Swift |
+| Union-Einlegen (`int → int \| string`) | falls T9 — als Koerzion, nie als Subtyp-Gitter |
+| Funktionstyp-Varianz | **nein** (bräuchte Thunks je Konversion — Swift zahlt sie, Rust hat sie nicht); eine Lambda ist der Weg |
+| Vererbung `Sub → Super` | Bereich 4; ohne Vererbung keine |
+
+Folgen: die **Inferenz bleibt Unifikation ohne Gitter** — kein LUB (`if (c) circle else
+square` braucht die Annotation `Shape`), keine Varianzannotationen; T8 (bidirektional) bleibt
+bezahlbar (Swift's Checker ist wegen Subtyping × Überladung × Literale berüchtigt). Die
+Monomorphisierung bleibt eindeutig. **T9 muss diesem Grundsatz gehorchen.**
+
 ## T4 — Optionals, Nesting, Null im generischen Rumpf: **offen**
 ## T5 — `Self` und statische Interface-Member: **offen**
 ## T6 — Assoziierte Typen: **offen**
