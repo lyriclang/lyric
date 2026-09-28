@@ -173,11 +173,62 @@ geschriebener Member ersetzt die Synthese für diesen Member (Swift); fehlende F
 nennt das Feld. **Liste in 5.0 fest im Compiler**; nutzererweiterbare Synthese (`ToJson`) ist
 die Bereich-9-Frage (`comptime`-Kandidat, kein Makrosystem).
 
-## D8 — `sealed`: **offen**
-## D9 — Objektsicherheit vollständig: **offen**
-## D10 — Interface-Eltern als Wert: **offen**
-## D11 — Klassen: Konstruktion und Validierung: **offen**
-## D12 — Struct als Interface-Wert: **offen**
-## D13 — `Clone`: **offen**
-## D14 — Interface-Member-Sichtbarkeit, private Konformanz: **offen**
-## D15 — Extensions: **offen**
+## D8 — `sealed`: **entschieden** (2026-09-28)
+
+`sealed interface Shape { … }`: alle Konformer **im selben Modul** (Paketgrenze, sobald Bereich
+7 sie definiert); `match` über Typ-Patterns dann **erschöpfend ohne `_`**; Konformer sind Structs
+oder Klassen. Kein Doppel mit `enum`: Enum = geschlossene Varianten mit Nutzlast, versiegeltes
+Interface = geschlossene Typen mit eigenen Methoden. (Kotlin, Java 17)
+
+## D9 — Objektsicherheit: **entschieden** (2026-09-28)
+
+**Wertfähig** (Fat Pointer) ist ein Interface, wenn: kein `Self` außerhalb der
+Receiver-Position; keine statischen Member; **keine generischen Member** (als Constraint
+erlaubt, als Wert unbenutzbar); assoziierte Typen im Werttyp **fixiert** (`Iterator<Item =
+int>`). Sonst nur als Constraint; Diagnose an der Verwendungsstelle mit Grund. Die 4.x-Regel
+„slotloses Interface darf kein Wert sein" **fällt** (`Any`). Default-Rümpfe mit `Self` sind
+harmlos (je Konformer monomorphisiert). (Rust dyn-compatibility, Swift)
+
+## D10 — Kind-Interface-Wert → Eltern-Wert: **entschieden** (2026-09-28)
+
+**Ja, als Koerzion** (T3). Zero-Cost über **VTable-Präfix** (die Zeile des Kindes beginnt mit
+den Slots des ersten Elternteils — 4.x-Layout); weitere Elternteile über die Konformanzliste im
+Deskriptor. Nie implizit in Containern. (Go implizit, Rust seit 1.86)
+
+## D11 — Klassenkonstruktion: **entschieden** (2026-09-28)
+
+**Keine Konstruktoren.** Initializer `C { f = v }` bleibt die Primitive und der einzige Ort
+für `let`-Felder; **Fabriken** `static fn new(…): C` tragen Validierung; mit
+Member-Sichtbarkeit (Bereich 7) sind private Felder von außen nicht initialisierbar →
+Fabrikpflicht, Invarianten sicher. Struct und Klasse symmetrisch. **Vorgemerkt Bereich 8**:
+Aufrufsyntax `Point(1, 2)` als Zucker für `Point.new(1, 2)`. (Rust, Go; Kotlin/Swift-`init`
+verworfen: zweite Deklarationsform, Verkettung, ohne D1 nicht nötig)
+
+## D12 — Struct als Interface-Wert: **entschieden** (2026-09-28)
+
+Der Übergang **kopiert** (V7 boxt), danach geteilt; unabhängige Kopie per Downcast (T11) oder
+`Clone`. Die 4.x-Lowering-Regel wird Spec-Satz.
+
+## D13 — `Clone`: **entschieden** (2026-09-28)
+
+`interface Clone { fn clone(): Self }`, synthetisiert flach (D7); **`Self`-liefernd, also nur
+Constraint** — durch einen Interface-Wert klont man per Downcast. `with` auf Klassen bleibt
+nein (M6); `c.clone() with …` ist der Weg. (Rust)
+
+## D14 — Interface-Member-Sichtbarkeit: **entschieden** (2026-09-28)
+
+Interface-Member sind **immer öffentlich** (`pub` am Member ist ein Fehler); eine Konformanz
+ist sichtbar, wo Typ und Interface sichtbar sind; **keine private Konformanz**; Sichtbarkeit des
+Interfaces: Bereich 7. (Rust, Swift, Kotlin)
+
+## D15 — Extensions: **entschieden** (2026-09-28)
+
+Drei Formen: inhärent `extend T { … }`, Konformanz `extend T :: [I] { … }`, **generisch/
+Blanket** `extend<T :: [I]> T :: [J] { … }` (X1/R4); ein Blanket-Extend schließt spezifische
+`extend Foo :: [J]` aus (X4, Rusts Grenze). **`extend Walker { … }` auf ein Interface ist ein
+Fehler mit Hinweis auf die generische Form** (Swift's Protocol Extension als zweite Schreibweise
+verworfen). Statische Member ja, Felder nein (X5); Sichtbarkeit X6.
+
+---
+
+**Bereich 4 ist damit vollständig entschieden** (D1–D15, 2026-09-28).
