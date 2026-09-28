@@ -50,8 +50,28 @@ Fehler (L5 E5). Die Zwillingsdoktrin fällt (E5). Familie um ein Wort: `try f()`
 `try? f()` → `?T`, `try! f()` → Panik, `try f() catch (e: E) { … }` als Ausdruck (E4).
 **Schreibweisen sind Arbeitsnotation — Bereich 8 bestimmt die Syntax.** (Swift 6 typed throws)
 
-## E2 — Typisierte `throws`: Liste, Inferenz, Generik, `throws` bar: **offen**
-## E3 — Was ist werfbar: **offen**
+## E2 — Typisierte `throws`: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| K1 | **`throws A, B, C` ist eine Menge** (Reihenfolge egal, Duplikat Fehler) | Zig Error-Sets, Java |
+| K2 | **`throws` bar = `throws Error`** (Wurzeltyp, E6): erlaubt, untypisiert; der Aufrufer fängt `Error` und schaut per Typ-Pattern (T11) hinein. Die Liste ist die empfohlene Form; die stdlib schreibt Listen | Swift |
+| K3 | **Deklariert, nie inferiert** für benannte Funktionen; **inferiert für Lambdas**, wenn der erwartete Funktionstyp es nicht vorgibt | Swift |
+| K4 | **Generisch**: `fn map<T, U, E>(xs: T[], f: fn(T) -> U throws E): U[] throws E`; `E` aus dem Argument inferiert, **an der Aufrufstelle substituiert**; `E = never` ≡ keine Klausel; ein Aufruf mit leerer Menge nach Substitution braucht kein `try` (überflüssiges `try` = Warnung) | Swift `throws(Never)` |
+| K5 | **Deckung auf der Instanz** (`throws Box<int>` ≠ `catch Box<string>`) | — |
+| K6 | **Teilmengenregel**: Implementierung wirft ⊆ Interface-Member; Funktionswert mit kleinerer Menge koerziert zu größerer (T3-Liste), nie umgekehrt | Swift, Java |
+| K7 | **Präzises Rethrow**: `catch (e)` ohne Typ trägt statisch **die Menge** der gefangenen Typen; `throw e` wirft genau sie; `match (e)` über die Menge ist erschöpfend ohne `_`; beim Speichern weitet `e` auf `Error`. Beschränkt auf Catch-Bindungen — kein zweiter Typmechanismus | **Zig Error-Sets** |
+| K8 | `try` in einer Funktion ohne Klausel und ohne `catch`: „behandle oder deklariere" | Swift, Java |
+
+## E3 — Was ist werfbar: **entschieden** (2026-09-28)
+
+**Jeder Typ, der `Error` konformiert** — Klassen, Structs, Enums. Enums sind der natürliche
+Fehlertyp (`enum ParseError :: [Error] { Empty, BadDigit(char, int) }`, erschöpfendes `match`
+im `catch`), Structs für Fehler mit Daten, Klassen für Identität oder Ursachenkette (E6);
+`sealed`-Interfaces (D8) als Fehlerfamilie mit erschöpfendem `match`. Laufzeit: **Boxing beim
+Wurf** (V7-Form), Kosten nur auf dem Fehlerpfad; Typtest = Deskriptorvergleich. Verworfen: nur
+Klassen (Lyric 4, Java, C#). (Rust, Zig, Swift)
+
 ## E4 — `try` als Ausdruck, `try?`, `catch`-Ausdruck: **offen**
 ## E5 — Die Zwillingsdoktrin: **offen**
 ## E6 — Fehlerobjekt: Rethrow, Ursache, Unterdrückte, Backtrace: **offen**
