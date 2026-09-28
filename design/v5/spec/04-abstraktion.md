@@ -34,7 +34,33 @@ Aus `../interfaces.md` (48 Fragen), `../overloading.md` (41), Guide, Spec §4.3a
   fehlend `Neg`, `Rem`, Bit-Ops, `Contains`.
 - **Synthese**: Entwurf, nichts gebaut.
 
-## D1 — Vererbung: **offen**
+## D1 — Vererbung: **entschieden** (2026-09-28) — keine; Delegation `by`
+
+**Keine Klassenvererbung.** Interface-Verfeinerung mit Defaults bleibt (Eltern als
+Implikation; ob ein Kind-Wert zum Eltern-Wert koerziert: D10), dazu **`sealed`** (D8) und
+**Delegation als Sprachfeature** (Kotlin `by`).
+
+| Modell | Warum nicht |
+|---|---|
+| Einfache Klassenvererbung (C#, Kotlin, Swift, Java) | unter V3 billig (VTable im Deskriptor, Upcast = Reinterpretation), aber Sprachkosten: `open`/`final`, `override`, `abstract`, `protected`, `super`, Konstruktorverkettung (D11 dreimal schwerer), ein vierter Auflösungspfad (D2), ein zweiter Dispatch-Mechanismus neben Interface-Tabellen, Struct/Klasse asymmetrisch, fragile Basisklasse — Kotlin und Swift bremsen das Feature mit `final` per Default. Die drei Nutzen (Hooks, Zustand mitnehmen, offene Hierarchie) decken Defaults, Delegation und Interface-Werte. **Nachrüstbar** unter V3, falls je nötig |
+| Go-Embedding (befördert alle Member) | Schatten- und Mehrdeutigkeitsregeln; `by` ist Konformanz, nicht Einbettung |
+
+**Delegation `by`**: `class Dog :: [Walker by legs, Named by tag] { legs: Legs, … }` —
+jedes `Walker`-Member, das `Dog` nicht selbst schreibt, wird an das Feld `legs` weitergeleitet
+(synthetisiert: `fn walk(d) { this.legs.walk(d); }`). `by` spart genau diese
+Weiterleitungsmethoden und sonst nichts:
+
+| Regel | |
+|---|---|
+| das Feld muss zum Interface konformieren (Fehler an der `by`-Stelle) | |
+| eigene Member gewinnen; Interface-Defaults laufen auf dem **äußeren** Typ (`Dog` ist der Konformer; `let w: Walker = dog` zeigt auf den Dog) | |
+| **kein `this`-Durchgriff**: `Legs.walk` läuft mit `this = legs`; ruft es `this.speed()`, ist das `Legs.speed()`, nie die Dog-Fassung — der Unterschied zur Vererbung und der Grund, warum es keine Fragilität gibt | |
+| nur Interface-Member werden weitergeleitet, keine anderen Methoden oder Felder von `Legs` | |
+| `let`- oder `var`-Feld; bei `var` austauschbar zur Laufzeit (Strategiemuster) | |
+| mehrere Delegationen erlaubt; zwei Interfaces mit demselben Member an verschiedene Felder: Fehler an der Deklaration | |
+| `mut fn`-Member auf einem Struct-Feld brauchen `var legs` (M4) | |
+| für Structs erlaubt; `by` auf ein Interface-Feld (`legs: Walker`) erlaubt (dynamische Wahl) | |
+
 ## D2 — Dispatch und Auflösungsreihenfolge: **offen**
 ## D3 — Default-Methoden, Konflikte, expliziter Aufruf: **offen**
 ## D4 — Überladung: **offen**
