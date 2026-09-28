@@ -86,9 +86,37 @@ Monomorphisierung bleibt eindeutig. **T9 muss diesem Grundsatz gehorchen.**
 | O5 | **Optional-Member über `extend<T> ?T { map, flatMap, orElse, filter, … }`** in der stdlib — `?T` ist ein Typkonstruktor, den generische Extends (T7) erreichen, wie `T[]` | Rust `impl<T> Option<T>` |
 | O6 | `?T == ?T` über **bedingte Konformanz** (`Equatable` wenn `T` es ist; `null == null` true; `x == 5` mit `x: ?int` über Koerzion, T3); `Hashable` ebenso; **keine Ordnung auf `?T`** (Swift; Rust's `None < Some` überrascht mehr als es nützt) | — |
 
-## T5 — `Self` und statische Interface-Member: **offen**
-## T6 — Assoziierte Typen: **offen**
-## T7 — Generische Extends, bedingte Konformanz in `extend`-Form: **offen**
+## T5 — `Self` und statische Interface-Member: **entschieden** (2026-09-28)
+
+- **`Self`** ist der konformierende Typ innerhalb eines Interfaces (Rust, Swift). Unter
+  Monomorphisierung ist ein Constraint-Aufruf ein direkter Aufruf; `Self` kostet nichts.
+- **Objektsicherheitsregel**: ein Interface mit `Self` außerhalb der Receiver-Position oder mit
+  statischen Membern ist **nur als Constraint** nutzbar, nicht als Wert; der Compiler sagt es an
+  der Verwendungsstelle („benutze es als Constraint"). Rust „dyn-compatible", Swift.
+- **Statische Member: ja** — `static fn parse(s: string): ?Self`, `static fn default(): Self`,
+  `static let ZERO: Self` (assoziierte Konstante); nur durch einen Constraint aufrufbar
+  (`T.parse(s)`). C# 11 „static abstract members" für generische Mathematik.
+- **Bibliotheksaufteilung**: `Equatable`, `Hashable`, `Ordered`, `Display`, `Default`, `Parse`,
+  `Clone` über `Self` (homogen); `Add<Rhs>`, `Mul<…>`, `Index<K>`, `Into<T>` mit Typparametern
+  (heterogen by design), mit Default-Typargumenten (T18) als `Add<Rhs = Self>`. Die
+  Mehrfachkonformanz `Equatable<Tag>, Equatable<int>` entfällt; heterogene Gleichheit wäre ein
+  eigenes `EquatableWith<T>`.
+- Verworfen: Parameter-Form `Equatable<T>` (C#, Java, Kotlin, Lyric 4 — jeder Typ nennt sich
+  zweimal, und die Objektsicherheit war der einzige Grund dagegen).
+
+## T6 — Assoziierte Typen: **offen** — in Klärung (Iterator-Beispiel)
+
+## T7 — Generische Extends, bedingte Konformanz, Kohärenz: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| X1 | **`extend<T> List<T> { … }`**, mit Constraints: `extend<T :: [Display]> List<T> :: [Display] { … }` — die `extend`-Form bedingter Konformanz (die deklarationsseitige existiert seit 4.x) | Rust `impl<T: Display> Display for Vec<T>`, Swift `extension … where` |
+| X2 | **Extends auf eingebauten Konstruktoren**: `extend<T> T[]`, `extend<T> ?T`, `extend<T> Range<T>`, Tupel fester Arität — der Mechanismus, der Arrays, Optionals, Ranges ihre Member gibt (T13, O5) | Rust `impl<T> [T]`, `impl<T> Option<T>` |
+| X3 | **Kohärenz whole-program**: je (Typinstanz, Interface) genau eine Konformanz; Duplikat = Fehler an beiden Stellen. **Keine Orphan-Regel** — Rust braucht sie wegen getrennter Kompilierung, wir kompilieren whole-program (L7); ein Extend darf in jedem Modul stehen | — |
+| X4 | **Keine Spezialisierung**: überlappende generische Extends sind ein Fehler | Rust (Spezialisierung seit Jahren instabil) |
+| X5 | Extends fügen Methoden und Konformanzen hinzu, **keine Felder** (Layout fix) | alle |
+| X6 | Sichtbarkeit von Extend-Membern wie Modulmember (Bereich 7); sichtbar, wo das Modul importiert ist | Rust, Swift, Kotlin |
+
 ## T8 — Inferenz: **offen**
 ## T9 — Vereinigungstypen gegen Enum ohne Zeremonie: **entschieden** (2026-09-28)
 
