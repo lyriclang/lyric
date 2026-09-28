@@ -104,7 +104,26 @@ Monomorphisierung bleibt eindeutig. **T9 muss diesem Grundsatz gehorchen.**
 - Verworfen: Parameter-Form `Equatable<T>` (C#, Java, Kotlin, Lyric 4 — jeder Typ nennt sich
   zweimal, und die Objektsicherheit war der einzige Grund dagegen).
 
-## T6 — Assoziierte Typen: **offen** — in Klärung (Iterator-Beispiel)
+## T6 — Assoziierte Typen: **entschieden** (2026-09-28)
+
+**Assoziierte Typen kommen als neue Interface-Member-Art hinzu (`type Item;`), neben
+Typparametern — nichts wird ersetzt, der Entwickler wählt je Interface, auch gemischt.**
+
+| | Typparameter `Interface<T>` | Assoziierter Typ `type Item` |
+|---|---|---|
+| Wer wählt | Aufrufer / Konformanz-Deklaration (**Eingabe**) | der konformierende Typ, einmal (**Ausgabe**) |
+| Mehrfachkonformanz | ja, sinnvoll (`Vec2 :: [Add<Vec2>, Add<float>]`) | nein — genau eine je Typ, Aufrufe eindeutig |
+| Generischer Code | `T` muss von außen kommen oder aus Konformanzen gesucht werden | **`I.Item` wird vom Typ abgelesen** — `collect<I :: [Iterator]>(it: I): I.Item[]`; Iterator-Ketten inferieren ohne Annotation (Rust), was M33 in Lyric 4 per Konvention nachbauen musste |
+| Fixierung | — | `Iterator<Item = int>` als Interface-Wert (Fat Pointer muss `next()` typisieren; Rust `dyn Iterator<Item = i32>`) und als Constraint mit Bedingung |
+| Beide zusammen | `interface Index<K> { type Output; fn get(k: K): Output }` — Schlüssel Eingabe, Ergebnis je Schlüsseltyp Ausgabe | |
+
+**Richtlinie für die Standardbibliothek** (kein Compilerzwang): Eingaben als Parameter (`Add<Rhs>`,
+`Index<K>`, `Into<T>`, `From<T>`), Ausgaben assoziiert (`Iterator.Item`, `Iterable.Iter`,
+`Index<K>.Output`, `Add<Rhs>.Out`). Wer `Iterator<T>` als Parameter schreibt, darf das und
+verliert die Ketteninferenz — der Compiler sagt es an der Aufrufstelle. Preis: `type Item;`,
+Typpfade `I.Item`, die `Item =`-Schreibweise. C#/Java haben nur Parameter und leben mit
+`IEnumerable<T>`-Mehrdeutigkeit.
+
 
 ## T7 — Generische Extends, bedingte Konformanz, Kohärenz: **entschieden** (2026-09-28)
 
