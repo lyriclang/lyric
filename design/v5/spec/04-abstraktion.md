@@ -61,8 +61,33 @@ Weiterleitungsmethoden und sonst nichts:
 | `mut fn`-Member auf einem Struct-Feld brauchen `var legs` (M4) | |
 | für Structs erlaubt; `by` auf ein Interface-Feld (`legs: Walker`) erlaubt (dynamische Wahl) | |
 
-## D2 — Dispatch und Auflösungsreihenfolge: **offen**
-## D3 — Default-Methoden, Konflikte, expliziter Aufruf: **offen**
+## D2 — Dispatch: **entschieden** (2026-09-28) — eine Methodenmenge je Typ
+
+„Drei Pfade, drei Antworten" entstand, weil ein Name aus zwei Mengen kommen konnte
+(Typ-Methoden vs. Konformanzen). Keine Reihenfolge repariert das — nur eine Menge.
+
+| # | Regel | Vorbild |
+|---|---|---|
+| R1 | Methodenmenge = eigene Member + inhärente Extension-Member + Konformanz-Implementierungen (eigene oder Default); **ein Name genau einmal**. Ein eigener Member `m` *ist* die Implementierung von `I.m` für jedes konformierte `I` (Signaturen müssen passen) | Lyric 4 |
+| R2 | **Kollision = Fehler an der Deklaration**: inhärente Extension `extend T { fn m() }` neben einer Konformanz, die `m` per Default nimmt → „mach sie zur Konformanz-Implementierung oder benenne um". Whole-program prüfbar (X3) | Rust (inhärent gewinnt still) und Kotlin (Member gewinnt still) verworfen — dokumentierte Fallen |
+| R3 | **Jeder Pfad liest dieselbe Menge**: statischer Aufruf, VTable-Zeile, Constraint-Aufruf; die VTable hält, was R1 ergibt | — |
+| R4 | Im generischen Rumpf sieht `x: T` die Constraint-Member (O2) **plus generische Extends, deren Constraint `T` erfüllt** (`extend<T :: [Walker]> T { … }`, D15) | Rust blanket impl |
+| R5 | Interface-Member **qualifiziert aufrufbar**: `Walker.describe(x)` (UFCS) | Rust, Kotlin `super<I>` |
+
+## D3 — Default-Konflikte: **entschieden** (2026-09-28)
+
+| Fall | Regel | Vorbild |
+|---|---|---|
+| `C :: [I1, I2]`, beide `greet` mit Default, `C` schreibt keins | **Fehler an der Konformanz**: `C` muss `greet` implementieren — eine Funktion für beide | Java, Kotlin; 4.x's stille Annahme mit je statischem Typ anderer Antwort fällt |
+| `C` implementiert `greet` | implementiert beide; Signaturen müssen übereinstimmen | Java |
+| zwei **verschiedene** `greet` je Interface | nur über getrennte Konformanzblöcke `extend C :: [I1] { fn greet() }` / `extend C :: [I2] { … }`; der Name ist **auf den Block beschränkt**: `c.greet()` ist ein Fehler („qualifiziere `I1.greet(c)`"), `let a: I1 = c; a.greet()` eindeutig | Rust (trait-scoped) |
+| eigene Implementierung ruft den Default | `I1.greet(this)` (R5) — Swift's Protocol-Extension-Lücke geschlossen | Java `I1.super.greet()` |
+| Diamant (ein Member über zwei Elternpfade) | ein Member, kein Konflikt | — |
+| zwei Elternteile mit gleichem Namen aus verschiedenen Deklarationen | Fehler am Interface (bleibt) | — |
+
+**Ein Name, eine Funktion je Typ — außer der Programmierer trennt ausdrücklich nach
+Konformanzblock, und dann ist der unqualifizierte Aufruf verboten.**
+
 ## D4 — Überladung: **entschieden** (2026-09-28) — nur Arität
 
 **Ein Name darf mehrere Signaturen haben, wenn sie sich in der Anzahl der Parameter
