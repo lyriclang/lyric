@@ -58,12 +58,47 @@ Parallelität ist ein expliziter Schritt, die Race-Hypothek trifft nur, wer ihn 
 | B · M:N migrierend (Go, Java 21) | Race-Hypothek auf jedem Programm; jede Laufzeitstruktur feinkörnig thread-sicher; Migration gegen TLS und C-Affinität; Go's Scheduler ist zehn Jahre Arbeit |
 | D · Isolates (Dart, JS Workers) | Kopie je Nachricht, große geteilte Daten unmöglich, für Spiele unbrauchbar; zweiter Heap-Begriff — als Muster unter C enthalten |
 
-## N2 — Koroutinen-API: Status, Schließen, Senden, Ergebnis, Identität: **offen**
-## N3 — Generatoren gegen Tasks: die Sync/Async-Spaltung: **offen**
+## N2 — Koroutinen-API: **entschieden** (2026-09-29)
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| A1 | **`Coroutine<Y, R = void>`** — yieldet `Y`, gibt `R` zurück; `throws E` am Typ bleibt (E10) | Python, Kotlin |
+| A2 | **`next(): ?Y`** bleibt (mit O1 auch für `Coroutine<?T>`); **`result(): ?R`** null bis zur Erschöpfung. Nicht `Step<Y, R>` (Korpus ★W2): die `?Y`-Form gibt **`Coroutine<Y, R> :: [Iterator]` mit `Item = Y` gratis** (T6); `for (x in gen)` wird legal | — |
+| A3 | `Coroutine<void>`: `next(): bool` bleibt (Schrittprozess, `yield;` je Frame) | Lyric 4 |
+| A4 | **`isDone(): bool`** (wissbar ohne Ziehen); **kein `hasNext`** (entscheidet der Körper — Spec-Satz bleibt) | — |
+| A5 | **`close()`**: die suspendierte `yield`-Stelle wirft `Cancelled` (ein `Error`), `defer` laufen über die normale Abwicklung; erneutes Yield nach gefangenem `Cancelled` paniert; auf fertiger No-op. „Aufgegeben ohne `close` läuft nichts" bleibt normiert; Debug-Profil warnt über das GC-Netz (L1) | Python `close()`, Lua 5.4 |
+| A6 | Senden hinein (`resume co, v`): **nein** in 5.0 — Channels; Tür | Kotlin, C# |
+| A7 | `Coroutine` konformiert **`Identity`** (M10): `same()`, Adress-Hash; Doppel-`spawn` erkennbar | — |
+| A8 | Zweiter Treiber / Selbst-Resume / `yield` ohne Resumer bleiben dynamische Paniken (Färbung verworfen; N3 nimmt den schlimmsten Fall) | Lyric 4 |
+| A9 | Erzeugungssyntax, Zucker: Bereich 8 | — |
+
+## N3 — Generatoren gegen Tasks: **entschieden** (2026-09-29) — Warten ist kein `yield`
+
+| | `yield v` (Generator) | `wait` (Task) |
+|---|---|---|
+| tut | übergibt einen Wert **an den Resumer** (Transfer entlang der Kette) | **parkt den laufenden Kontext, wo immer er steht**, beim Scheduler seines Threads — symmetrischer Wechsel, Resumer-Kette bleibt intakt |
+| fortgesetzt von | dem Resumer (`next()`) | dem Scheduler, der zum gesicherten Kontext zurückwechselt — auch mitten in einem Generator in einem Task |
+
+Ein Generator kann warten (`for (line in readLines(file))`), beliebig geschachtelt, **ohne
+Färbung, ohne zwei Typen** — Go's implizites Verhalten als zwei benannte Primitive: die Laufzeit
+bekommt **`park`/`unpark`** neben `resume`/`yield` (L4 K7 wächst um ein Paar). „yield suspends
+the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein Task ist **kein
+`Coroutine<Wait>` mehr**, sondern ein Kontext des Schedulers (N4); `Wait` ist das Argument von
+`wait`. Verworfen: Typ-Split (Kotlin `sequence`/`Flow`, C# `IEnumerable`/`IAsyncEnumerable`).
+
 ## N4 — Task-Modell: Handle, Ergebnis, Abbruch, strukturierte Nebenläufigkeit: **offen**
 ## N5 — Kommunikation: Channels, `select`, Timer, typisierter Waker: **offen**
 ## N6 — Scheduler und I/O: nicht-blockierend, blockierende Natives, Host-Pump: **offen**
-## N7 — Parallelität: Speichermodell oder Nachrichten: **offen**
+## N7 — Speichermodell: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| P1 | **Happens-before** nur durch `Channel`-Senden/Empfangen, `Mutex` lock/unlock, `Thread.join`, `Atomic`-Operationen, Thread-Start | Java JMM, Go |
+| P2 | `Atomic<T>` sequenziell konsistent (C11 `seq_cst`); schwächere Ordnungen als Methoden: Tür | C11, Rust |
+| P3 | Zugriff ohne Happens-before auf einen `var`-Ort, den ein anderer Thread schreibt: **Data Race, keine Zusage** (G3) | Go |
+| P4 | keine Umordnung über Atomics und Locks (clang mit C11-Atomics) | — |
+| P5 | Datenparallelität (`parallelMap`, Chunk-Schleifen) ist **Bibliothek** über einen Thread-Pool; kein `parallel for` in der Sprache | Rust rayon, Java streams |
+
 ## N8 — Präemption: **offen**
 ## N9 — Abbruch und Timeouts: **offen**
 ## N10 — Thread-Sicherheit von Laufzeit und Bibliothek: **offen**
