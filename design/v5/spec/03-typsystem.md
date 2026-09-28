@@ -232,8 +232,26 @@ Rückgabe, Felder), von der wir nur den Parameter haben, hält aber die `ref`-R�
 einem Namen; `inout` (Swift) sagt „Modus, nie ein Typ". `mut`/`var` als Parameterwort scheiden
 aus (Rust `mut x` = veränderliche lokale *Kopie*, das Gegenteil).
 
-## T13 — Arrays und Ranges als Typen mit Membern, Views, Länge im Typ: **offen**
-## T14 — Index-Familie: **offen**
+## T13 — Arrays, Views, Ranges, `T[N]`: **entschieden** (2026-09-28)
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| A1 | **`T[]`** bleibt Heap-Objekt, feste Länge, Referenz (V10); Member aus der stdlib über `extend<T> T[]` (X2) — nur `length` und Index sind Primitive | Compiler-Sonderfälle je Methode |
+| A2 | **View-Typ `Slice<T>`** (Arbeitsname) in `std.core`: Struct {Innenzeiger, Länge}, 16 B, kopierbar, **teilt die Elemente** (schreibt durch); `arr[a..b]`, `arr[..b]`, `arr[a..]`, `arr[..]` erzeugen ihn ohne Kopie; die stdlib schreibt Member einmal auf `Slice<T>`, `T[]` gibt einen View von sich. Kein Lebensdauermodell: der GC hält den Block (L1). **`str`** (Arbeitsname) als unveränderlicher View auf UTF-8; `s[a..b]` mit **Byte-Indizes und Panik an Nicht-Zeichengrenzen** (Rust); kein `s[i]` für Zeichen, `s.chars()` ist der Iterator. Das Array-Pattern `[first, ..rest]` bindet `rest` als View (Bereich 8) | Go-Slices als Primitiv (Aliasing ohne Marker, `append`), Swift `ArraySlice` (CoW, Original-Indizes), C# `Span` (Escape-Regeln), Kopien (Java) |
+| A3 | **Ranges als Typ je Form**: `Range` (`a..b`), `RangeInclusive` (`a..=b`), `RangeFrom` (`a..`), `RangeTo` (`..b`), `RangeFull` (`..`) — Structs in `std.core`; `Range`/`RangeInclusive` sind `Iterator`; `for (i in ..5)` ist ein Übersetzungsfehler; `for (i in a..b)` mit Range-Literal wird zur **Zählschleife** ohne Objekt (Rust). Die 4.x-Regel „Ranges sind keine Werte" fällt | ein Typ mit `inclusive`-Flag (Überlauf bei `0..=MAX` als halboffen, Laufzeitprüfung statt Typfehler) |
+| A4 | **`T[N]` inline**: Werttyp mit `N` Elementen inline — `struct Mat4 { m: float[16] }` ohne Heap-Objekt, direkt ein C-Array an der FFI; `N` in 5.0 **nur Literal**, Generizität über `N` (`const N`) ist Tür (T18); mehrdimensional inline `float[4][4]`, `T[][]` bleibt gezackt. **View auf `T[N]` nur heap-resident** (Feld eines Objekts, Element eines `T[]`) — ein View auf ein Stack-Local dürfte den Frame nicht überleben; Stack-`T[N]` wird `inout` weitergereicht oder kopiert | Rust `[T; N]`, Go, Zig, Swift `InlineArray` |
+
+## T14 — Index-Familie: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| N1 | `interface Index<K> { type Output; fn get(k: K): Output }`, `interface IndexSet<K> { fn set(k: K, v: …) }`; `x[k]` = `get`, `x[k] = v` = `set`; `x[k].f = v`/`x[k].bump()` über Get/Set-Rückschreibung (M4), ohne `IndexSet` ein Fehler | Rust, Swift, C# |
+| N2 | `T[]`, `Slice<T>`: `Index<int>` → `T`, `Index<Range…>` → `Slice<T>`, `IndexSet<int>`; `string`/`str`: `Index<Range…>` → `str` | — |
+| N3 | `Map<K, V>`: `Index<K>` mit `Output = ?V` (`m[k]` liefert `?V`, wirft nicht); `IndexSet<K>` | Kotlin |
+| N4 | **Index-Typ `int`**; kleinere Ganzzahltypen weiten (T1c), `uint64` braucht `as`; negativ = Panik | Swift, C#, Kotlin |
+| N5 | **Bereichsprüfung immer**, Panik, in 5.0 nicht abschaltbar (Go); `unchecked`-Profil als Tür | — |
+| N6 | **Vom-Ende-Index als Klammer-Zucker**: `^n` **nur innerhalb von `[…]`**, statisch ersetzt durch `<Ausdruck>.length - n` — `xs[^1]`, `line[..^1]`, `buf[^4..]`; verlangt `length: int` am indizierten Ausdruck; `^0` als Bereichsende gültig, als Einzelindex Panik; **kein `Index`-Typ**, keine Konformanz, keine Laufzeitdarstellung. Bereich 8 bestätigt das Präfix-`^` neben XOR | C# (`Index`-Struct, verworfen als zu schwer); Python negative Indizes (verstecken Bugs, verworfen) |
+
 ## T15 — Aliase, `opaque type`, Newtype: **offen**
 ## T16 — Tupel: **offen**
 ## T17 — Funktionstypen: **offen**
