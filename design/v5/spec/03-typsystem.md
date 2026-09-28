@@ -187,9 +187,51 @@ Typmengen; einzeilige Deklaration bleibt. Der `Json`-Fall ist ein rekursives Enu
 der `Result`-Fall gehört zu Bereich 5. `?T` bleibt ein eigener Typkonstruktor — T4 entscheidet
 `??T` frei.
 
-## T10 — `any`: **offen**
-## T11 — Downcast und Typ-Patterns auf Interface-Werten: **offen**
-## T12 — `inout`/`ref`-Parameter, `ref`-Rückgabe: **offen**
+## T10 — `Any`: **entschieden** (2026-09-28)
+
+**`Any` ist das leere Interface in `std.core`** — kein Feature, ein Name. `let a: Any = 5` ist
+dieselbe Koerzion wie zu jedem Interface (Wert geboxt, V7); heraus über `is`/Typ-Pattern (T11);
+`Any[]` ist das heterogene Array. Nichts konvertiert unaufgefordert dorthin — die Koerzion
+greift nur, wo der Zieltyp `Any` ist. Guide: „meist willst du ein Enum oder ein Interface".
+
+## T11 — Downcast und Typ-Patterns: **entschieden** (2026-09-28)
+
+Billig durch V4/V7 (Typtest = Deskriptorvergleich; Downcast liefert bei Klassen die Referenz,
+bei geboxten Structs eine Kopie).
+
+| Form | Regel | Vorbild |
+|---|---|---|
+| Typ-Pattern im `match` | `match (shape) { c: Circle => …, r: Rect => …, _ => … }` | C#, Swift, Kotlin |
+| `is` mit Narrowing | `if (shape is Circle) { shape.r }` — Bindung wird im Zweig zum konkreten Typ (Smart Cast), Regel wie O3 | Kotlin, C#, TypeScript |
+| `as?` | **nein** — `as` ist die bit-nahe Konversion (T1d); `is` + Narrowing deckt den Fall | — |
+| Interface → Interface | `x is Display` über die Konformanzliste im Deskriptor, lineare Suche | Go |
+| Erschöpfung | Typ-Pattern-`match` braucht `_` (offene Menge) — außer bei **versiegelten** Interfaces (`sealed`, alle Konformer im Modul): **Bereich-4-Posten**, vorgemerkt | Kotlin, Java 17 |
+| Bloßes `T` | **kein Typtest** (O2); dynamische Typisierung nimmt `Any` als Parametertyp | Rust |
+
+## T12 — `inout`-Parameter: **entschieden** (2026-09-28); Keyword in Bereich 8
+
+**Ein Parameter-Übergabemodus, kein Referenztyp** (Swift `inout`, Pascal `var`-Parameter):
+der Parameter kommt per Ort (ein Zeiger, S1) und darf geschrieben werden. `mut fn` ist der
+Sonderfall für den Receiver (`fn f(inout this: Self)`); `inout` ist dasselbe für jeden
+Parameter — freie Funktionen (`swap`), Skalare (`increment(inout n: int)`), ein Nicht-`mut`-
+Methode, die einen *anderen* Ort schreibt (`multiplyInto(other, inout target)`).
+
+| Regel | |
+|---|---|
+| Argument | ein **`var`-Ort** nach M3 (Local, `var`-Feld unter `var`-Wurzel, Array-Element); kein Temporary, kein `let` |
+| Aufrufstelle | **markiert** (Arbeitsnotation `&x`), damit die Mutation sichtbar ist (Swift, C#) |
+| Entkommen | keine Closure fängt es (C3); nicht speicherbar (kein Referenztyp als Wert); Yield währenddessen harmlos (Aufrufer wartet auf demselben Stack) |
+| Aliasing (`swap(&a, &a)`) | erlaubt, Wirkung undefiniert, dokumentiert — keine Exklusivitätsprüfung (Linie von M5) |
+| Klassen-Parameter | `inout` biegt die *Variable* des Aufrufers um; erlaubt, selten |
+| `mut fn` | darf `this` als `inout` weiterreichen (`normalize(&this)`); ein gewöhnliches `fn` nicht |
+| C# `out`, `in` | **nein** (Rückgabe/Tupel; große Structs gehen ohnehin per Zeiger) |
+| `ref`-Rückgabe (Ort im Backing-Speicher, statement-gebunden) | **Tür**, nicht 5.0; Get/Set-Rückschreibung (M4) deckt `list[0].x = 1` |
+
+**Keyword — Bereich 8, mit dieser Abwägung**: `ref` (C#) deutet auf eine Familie (Locals,
+Rückgabe, Felder), von der wir nur den Parameter haben, hält aber die `ref`-Rückgabe-Tür unter
+einem Namen; `inout` (Swift) sagt „Modus, nie ein Typ". `mut`/`var` als Parameterwort scheiden
+aus (Rust `mut x` = veränderliche lokale *Kopie*, das Gegenteil).
+
 ## T13 — Arrays und Ranges als Typen mit Membern, Views, Länge im Typ: **offen**
 ## T14 — Index-Familie: **offen**
 ## T15 — Aliase, `opaque type`, Newtype: **offen**
