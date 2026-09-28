@@ -1,0 +1,49 @@
+# 05 — Fehler und Kontrollfluss
+
+Lebendes Dokument des Bereichs 5. Fragen E1–E12, je **entschieden** oder **offen**. Basis:
+`01-laufzeit.md` L5 (Fehlerrückgabe-ABI: ein Wurf kostet einen Return; Paniken unfangbar auf
+Prozessebene; erster Fehler gewinnt, zweiter wird angehängt; Wurf darf C nicht durchqueren),
+`03-typsystem.md` T17 (`throws` im Funktionstyp), T11 (Typ-Patterns), `04-abstraktion.md`.
+
+## Bestandsaufnahme Lyric 4
+
+Aus `../fehler.md` (41 Fragen, Fassung 3), Spec §7.5/§9/§10, Guide 10:
+
+- **Drei Fehlerformen**: Wert (`?T`/`bool`), Ausnahme (`throw`), Panik. Doktrin „whether vs.
+  why": stille Form + `OrThrow`-Zwilling aus einer Implementierung (`text`/`textOrThrow`).
+- **Nur Klassen sind werfbar** (`Throwable`, `fn message(): string`); ein Enum hat vier
+  Antworten (Deklaration/Klausel kompilieren, `catch` `IR0001`, Wurf ICE, `extend` `SEM0030`).
+- Klausel `throws [Typ]` — **ein** Typ oder keiner; `throws A, B` existiert nicht; wer zwei Typen
+  wirft, schreibt `throws` bar, und `catch (_: A) … catch (_: B)` deckt das nicht — **der
+  typisierte Wurf kollabiert auf `Throwable`, ohne Weg zurück** (schwerster Befund).
+- Typparameter in der Klausel wird an der Aufrufstelle nicht substituiert; Deckung rechnet auf
+  der Definition, nicht der Instanz (`throws Box<int>` gegen `catch Box<string>` kompiliert).
+- **Lambdas dürfen nicht werfen** (kein `throws` am Funktionstyp) — der Grund für das fehlende
+  `assertThrows`.
+- `try`/`catch` nur als Statement; `throw` als Ausdruck (`never`) seit 4.5; `never` fehlt in
+  der Grammatik, drei Positionen sind ICEs.
+- **`defer`** einziger Cleanup, block-scoped, einmal je Iteration, läuft beim Abwickeln (LIFO);
+  Panik und `std.os.exit` laufen keine `defer`; fallengelassene Koroutine läuft keine (normiert).
+  Werfender `defer`: unspezifiziert (Uhr `SEM0110`); gemessen: Rückgabepfad läuft ihn zweimal,
+  Abwicklungspfad ersetzt die erste Ausnahme; `defer { throw }` im `try` ist ein ICE.
+- Kein präzises Rethrow (`catch (e) { throw e; }` verliert den Typ); keine Ursache, keine
+  Unterdrückten (`Exception` hat ein Feld); entkommene Ausnahme meldet nur den Typ.
+- Tote/verdeckte `catch`-Klauseln still; Catch-all zuletzt nur im Anhang normiert.
+- Ein Task kann sein Scheitern nicht melden (`spawn` mit werfender Koroutine per Typ
+  ausgeschlossen); eine Lyric-Ausnahme sieht für den Host aus wie eine Panik; .NET-Ausnahme =
+  Panik.
+- Kontrollfluss: `if`/`match` als Ausdruck, Value-Block, Labels, `let`-Bedingungen, `while`/
+  `do-while`/`for-in`, `break`/`continue` ohne Wert.
+
+## E1 — Grundmodell: Ausnahmen, Result, beides: **offen**
+## E2 — Typisierte `throws`: Liste, Inferenz, Generik, `throws` bar: **offen**
+## E3 — Was ist werfbar: **offen**
+## E4 — `try` als Ausdruck, `try?`, `catch`-Ausdruck: **offen**
+## E5 — Die Zwillingsdoktrin: **offen**
+## E6 — Fehlerobjekt: Rethrow, Ursache, Unterdrückte, Backtrace: **offen**
+## E7 — `defer`, werfender `defer`, Ressourcen-Scope: **offen**
+## E8 — Panik: Katalog, `recover`, Hooks: **offen**
+## E9 — `catch`-Klauseln: Reihenfolge, tote Klauseln: **offen**
+## E10 — Fehler über Grenzen: Tasks, Koroutinen, FFI, Host: **offen**
+## E11 — Kontrollfluss: Ausdrucksformen, `loop`, `break` mit Wert: **offen**
+## E12 — `never`: **offen**
