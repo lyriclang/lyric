@@ -136,9 +136,84 @@ die Zwillingsdoktrin (`OrThrow`-Paare, `TryParse`) verliert ihren Grund.
 | E7 | C hinaus: ein Wurf **darf C nicht durchqueren**. Standard: Callback-Typ ist nicht-werfend (Compiler erzwingt). Explizit: Wrapper fängt, legt den Fehler in der Koroutine ab, gibt C einen Status; nach Rückkehr aus C wird er weitergeworfen (Form: Bereich 11) | — |
 | E8 | **Backtrace auf Fehlerobjekten nur im Debug-Profil** (libbacktrace / `RtlCaptureStackBackTrace`); Release nur, wenn der Typ es verlangt; Paniken immer mit Trace | Go/Rust-Linie |
 
-## L7 — Was `.lyrbc` ersetzt: **offen**
-## L8 — C-Emission: **offen**
-## L9 — Laufzeitbibliothek: **offen**
-## L10 — Determinismus und Budget: **offen**
-## L11 — Start und Binärgröße: **offen**
-## L12 — Debugging und Profiling: **offen**
+## L7 — Was `.lyrbc` ersetzt: **entschieden** (2026-09-28)
+
+**Die Quelle ist das Format.** Kein stabiles Binärmodul in 5.0; die Stabilitätszusage liegt auf
+Sprache und Quelle, nicht auf Bytes (Go, Zig, Nim, Rust/crates.io). Dazu ein **Build-Cache je
+Modul** — typisierte Schnittstelle, serialisiertes IR, erzeugtes C, Objektdatei, adressiert über
+Inhalts-Hash — der **kein Format verspricht** und mit jeder Toolchain-Version verfallen darf.
+
+| Fall | Antwort |
+|---|---|
+| Closed Source | **nicht bedient** (Maintainer: nicht wichtig). Ausweg: C-ABI, `lib.a` + `.lyr` mit `extern "C"`. Toolchain-gebundene Artefakte aus dem Cache (Rust-`.rlib`-Stufe): Tür |
+| Schnelle Builds | der Cache |
+| Plugins zur Laufzeit | native `.so`/`.dll` über die C-ABI, oder Lyric-Script (Z3) |
+| Vorgebaute Pakete, Toolchain-übergreifend, Werkzeuge ohne Quelle | Quelle |
+| **Ein Programm, zwei Ausführungsarten** (IR interpretieren: Sandbox, Hot-Reload) | **Tür**: das IR wird **interpretierbar gebaut** — serialisierbar, typisiert, selbstbeschreibend, ohne Backend-Annahmen im IR. Kostet Disziplin im Entwurf, **keine Laufzeit im kompilierten Code** (das C entsteht aus demselben IR). **Z4 bleibt**: Lyric-Script ist weiterentwickeltes Lyric 4, nicht interpretiertes Lyric 5 |
+
+**Stabilität**: nie „ewig" — mit „5.0 ist der letzte Major" wäre das ein Versprechen ohne
+Ausstieg, das genau einfriert, was sich in Minors entwickeln soll. **Stirbt**: das
+`.lyrbc`-Kapitel für Lyric 5, der Verifier als Ladeprüfung, `lyrvm`, `lyrpack`. `.lyrbc` bleibt
+das Format von Lyric-Script.
+
+## L8 — C-Emission: **entschieden** (2026-09-28)
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| C1 | **C11** plus `__builtin_expect`, `__attribute__`, `restrict`, `_Thread_local`. **Kein MSVC** als Backend-Compiler; unter Windows `zig cc` oder clang | MSVC |
+| C2 | **eine `.c` je Lyric-Modul**; Release mit **ThinLTO**, Debug ohne LTO | Unity-Build als Release-Option: Tür |
+| C3 | generische Instanziierungen **whole-program gesammelt**, je Instanz eine Hash-benannte Cache-Einheit, einmal kompiliert (C hat kein COMDAT) | `static` je Einheit |
+| C4 | Mangling `lyr_<modul>_<name>` + kurzer Typ-Hash bei Überladung/Instanz; lesbar in gdb und perf | — |
+| C5 | Form: aus dem IR, Blöcke + `goto`, Werte in Locals; `if`/`while` wo der Block es hergibt; `__builtin_expect` auf Fehlerprüfungen | — |
+| C6 | `#line` überall → gdb/lldb/perf/Sanitizer zeigen `.lyr`-Quelle | — |
+| C7 | Runtime `liblyr.a`, **statisch gelinkt** → eine Binary; Debug-Variante mit ASan/UBSan als Profil | dynamische Runtime |
+| C8 | **C-Compiler installiert voraussetzen**, Erkennung `zig cc` > clang > gcc, `zig cc` empfohlen; Bündelung: Tür | Bündelung in 5.0 |
+| C9 | Cross-Build über das Ziel-Tripel von `zig cc` | — |
+| C10 | Der Nutzer sieht das C nie, außer `lyric build --emit-c`; Cache unter `out/` | — |
+
+## L9 — Laufzeitbibliothek: **entschieden** (2026-09-28)
+
+**Die C-Schicht ist so dünn, wie es die Sicherheit erlaubt** — Schätzung 5–10 k Zeilen, die
+Hälfte GC. Lyric-Code ist unter D so schnell wie das C daneben und hat Typen, Tests und den
+GC-Vertrag umsonst (Go: kleine Runtime, Bibliothek in Go; Rust: `core` in Rust).
+
+| In C | In Lyric |
+|---|---|
+| GC, Allokation, Weak-Refs, Deskriptoren (L1) | — |
+| Stack-Reservierung, Kontextwechsel (L3/L4) | Scheduler, Tasks, Channels (Bereich 6) |
+| Panik-Pfad, Backtrace-Erfassung (L5) | Fehlertypen, Formatierung |
+| String-Layout, UTF-8-Validierung, Vergleich/Hash (SIMD-fähig), Zahl↔Text | Suche, Split, Case-Mapping |
+| **keine Container** (Array-Layout ist Compiler-Sache) | `List`, `Map`, `Set` monomorphisiert |
+| dünne Syscall-Hüllen: Datei, Socket, Prozess, Zeit, Zufall, Umgebung — kein Puffern | Reader/Writer, Pfade, JSON |
+| Thread-Primitive, TLS, Atomics, Signal-Handler | — |
+
+## L10 — Determinismus und Budget: **entschieden** (2026-09-28)
+
+| | Entscheidung |
+|---|---|
+| Instruktions-/Zeitbudget | **nein** — Rolle von Lyric-Script. Die Safepoint-Polls bleiben; ein Budget darauf ist eine Tür für Hosts |
+| Numerik | **deterministisch als Standard**: IEEE binary64/32 ohne Fast-Math (`-ffp-model=strict`, SSE2/NEON), definierte Integer-Semantik (Bereich 3). **Fast-Math, FMA-Kontraktion u. ä. per Flag/Profil zuschaltbar**, nie stillschweigend |
+| „Never a process abort" | **aufgegeben**: Paniken beenden den Prozess (E5), mit Hook für Hosts; Isolation über Lyric-Script oder Kindprozess |
+
+## L11 — Start und Binärgröße: **entschieden** (2026-09-28)
+
+| | Ziel | Wie |
+|---|---|---|
+| Start | **< 5 ms** Hallo-Welt (Go ~1 ms, .NET-JIT 50–100 ms) | statisch gelinkt, kein JIT, GC-Heap träge, keine leere Modulinitialisierung |
+| Größe | **< 2 MB** Hallo-Welt (Go ~2 MB, Rust ~300 KB) | Reachability whole-program auf Funktionsebene (nicht Erreichbares wird nicht emittiert), `-Os`/`-O2` je Profil, Debug-Info getrennt |
+| Abhängigkeiten | **null** außer libc; optional statisch gegen musl (`zig cc`-Flag) | — |
+
+## L12 — Debugging und Profiling: **entschieden** (2026-09-28)
+
+| | Entscheidung |
+|---|---|
+| Debug-Info | DWARF/PDB über den C-Compiler, `#line` macht Lyric-Zeilen daraus; **gdb/lldb ab Tag eins**, kein eigener Debugger; der DAP wird ein Adapter über lldb-dap/gdb (Bereich 11) |
+| Typen im Debugger | C-Structs sichtbar; **Pretty-Printer** (lldb/gdb-Python) für Strings, Optionals, Interfaces, wie Rust |
+| Backtraces | libbacktrace / `RtlCaptureStackBackTrace`, symbolisiert; Koroutinen-Stacks als eigene Segmente („resumed from …") |
+| Profiling | `perf`, Instruments, VTune, Tracy nativ — **kein eigener Profiler**; lesbare Namen (C4) |
+| Sanitizer-Profil | `lyric build --profile asan` (ASan + UBSan, Koroutinen annotiert, GC-Fast-Path aus) |
+| Panik-Ausgabe | Meldung + Backtrace mit `.lyr`-Positionen; Debug immer, Release bei Panik (E8) |
+
+---
+
+**Bereich 1 ist damit vollständig entschieden** (L1–L12, 2026-09-28).
