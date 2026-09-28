@@ -35,7 +35,21 @@ Aus `../fehler.md` (41 Fragen, Fassung 3), Spec §7.5/§9/§10, Guide 10:
 - Kontrollfluss: `if`/`match` als Ausdruck, Value-Block, Labels, `let`-Bedingungen, `while`/
   `do-while`/`for-in`, `break`/`continue` ohne Wert.
 
-## E1 — Grundmodell: Ausnahmen, Result, beides: **offen**
+## E1 — Grundmodell: **entschieden** (2026-09-28) — Klausel, markierte Propagation, `Result` als Wert
+
+Unter L5 ist ein Wurf ein Return; die Frage ist reine Sprachform, auf drei Achsen:
+
+| Achse | Entscheidung | Verworfen |
+|---|---|---|
+| Wo steht der Fehlertyp | **Klausel**: `fn f(): int throws IoError, ParseError` — der Vertrag neben der Signatur; ehrlich zur ABI (zwei Kanäle), lesbar | Rückgabetyp `Result<int, E>` (Rust), `E!int` (Zig), `(int, error)` (Go) — jeder Fehler durch `match` |
+| Propagation | **markiert**: `try f()` ist Pflicht an jedem werfenden Aufruf, ohne `try` ein Übersetzungsfehler; die umschließende Funktion deklariert oder fängt. Sichtbarkeit gegen Kürze — Rusts `?` und Swifts `try` sind das meistgelobte Stück beider Sprachen; ein Refactoring zu „werfend" meldet sich an jedem Aufrufer statt still mitzulaufen | implizit (Java, C#, Kotlin, Lyric 4) |
+| Fehler als Wert | **`Result<T, E>` bleibt Bibliothek** für „Fehler aufheben", Brücken in beide Richtungen (`Result.of { try f() }`, `try r.get()`); **kein eigener Propagationsoperator** auf `Result` | Rust/Go (Fehler immer Wert) |
+
+Die drei Fehlerformen werden **zwei**: `?T` für Abwesenheit, Wurf für Scheitern; Panik ist kein
+Fehler (L5 E5). Die Zwillingsdoktrin fällt (E5). Familie um ein Wort: `try f()` propagiert,
+`try? f()` → `?T`, `try! f()` → Panik, `try f() catch (e: E) { … }` als Ausdruck (E4).
+**Schreibweisen sind Arbeitsnotation — Bereich 8 bestimmt die Syntax.** (Swift 6 typed throws)
+
 ## E2 — Typisierte `throws`: Liste, Inferenz, Generik, `throws` bar: **offen**
 ## E3 — Was ist werfbar: **offen**
 ## E4 — `try` als Ausdruck, `try?`, `catch`-Ausdruck: **offen**
