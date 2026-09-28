@@ -86,8 +86,30 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 `Coroutine<Wait>` mehr**, sondern ein Kontext des Schedulers (N4); `Wait` ist das Argument von
 `wait`. Verworfen: Typ-Split (Kotlin `sequence`/`Flow`, C# `IEnumerable`/`IAsyncEnumerable`).
 
-## N4 — Task-Modell: Handle, Ergebnis, Abbruch, strukturierte Nebenläufigkeit: **offen**
-## N5 — Kommunikation: Channels, `select`, Timer, typisierter Waker: **offen**
+## N4 — Task-Modell: **entschieden** (2026-09-29)
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| T1 | **`spawn(fn(): T throws E): Task<T> throws E`** — Handle mit Ergebnis und Fehlermenge (E10); läuft auf dem Scheduler des aktuellen Threads, `thread.spawn`/`pool.spawn` wählt einen anderen | Kotlin, Swift |
+| T2 | **`try task.await(): T`** parkt bis zum Ende; **Methode, kein Schlüsselwort** — keine Färbung | Kotlin |
+| T3 | Zustände `Running`, `Done(T)`, `Failed(E)`, `Panicked(PanicInfo)`, `Cancelled`; `status()`, `isDone` | — |
+| T4 | **Panik im Task** (E8): Zustand `Panicked`; `await()` darauf **paniert erneut** — eine Panik bleibt ein Bug, außer ein Aufseher schaut per `status()` ohne zu warten. Ein Server überlebt einen Request-Bug nur, wenn er es ausdrücklich so baut | Erlang Monitor |
+| T5 | **Strukturierte Nebenläufigkeit als Hauptform**: `TaskScope` — Kinder enden vor dem Scope; erster Fehler bricht Geschwister ab (N9) und wird am Scope-Ende geworfen. `spawnDetached` für Fire-and-forget, beim Namen genannt | Trio, Kotlin `coroutineScope`, Swift `TaskGroup`, Java 21 |
+| T6 | `main` ist ein Task auf dem Hauptscheduler; endet `main`, endet das Programm, detachte Tasks werden nicht abgewartet | Go |
+| T7 | Kein impliziter „aktueller Task"-Kontext; Kontextwerte wandern als Parameter oder im Scope | Go `context` als Gegenbeispiel |
+
+## N5 — Kommunikation: **entschieden** (2026-09-29) — alles Bibliothek über `park`/`unpark`
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| K1 | **`Channel<T>`** ungepuffert/gepuffert; `send` parkt bei voll, `recv(): ?T` bei leer; `close()`: `recv` nach dem Leeren `null`, `send` wirft `ChannelClosed`; innerhalb eines Threads und darüber hinweg (P1) | Go, Kotlin |
+| K2 | **`select` als Bibliothek** mit Builder (`Select.on(c1) { … }.on(c2) { … }.timeout(d) { … }.run()`); kein Schlüsselwort; Bereich 8 darf Syntax darüberlegen | Kotlin DSL; Go-Statement verworfen |
+| K3 | `sleep(Duration)` parkt; `Timer.after(d)` ist ein einmal feuernder Channel; `timeout` ein `select`-Fall | Go |
+| K4 | **Typisierte Waker statt `interrupt()`**: `Signal` (einmalig), `Event`, `Semaphore`; das globale sticky `interrupt()` und die Zwei-Rollen-Falle sind weg | Java, Kotlin |
+| K5 | **Shutdown/Ctrl+C eigene Sache**: `os.signals(SIGINT): Channel<Signal>`; der Scheduler schluckt nie ein Signal | Go `signal.Notify` |
+| K6 | `Mutex<T>`, `RwLock<T>`, `Once`, `Atomic<T>` (G4); auch auf einem Thread nötig, sobald ein Abschnitt einen `wait` enthält; `Mutex` parkt statt zu spinnen | Rust |
+| K7 | alles in Lyric (L9) über `park`/`unpark` und Thread-Primitive; die Laufzeit kennt keinen Channel | — |
+
 ## N6 — Scheduler und I/O: nicht-blockierend, blockierende Natives, Host-Pump: **offen**
 ## N7 — Speichermodell: **entschieden** (2026-09-29)
 
