@@ -52,10 +52,62 @@ ist (M5) und Reentranz zugelassen statt verhindert wird. Reife: das Modell von C
 und Schreibzugriff ohne Klasse — dieselbe Laufzeit, kein neues Modell, nur eine Parameterform.
 Unter den 4.x-Regeln verboten, jetzt Kandidat.
 
-## M2 — Unveränderlichkeit per Default, `mut struct`: **offen**
-## M3 — Reicht `let` bis in die Felder; Parameter als `let`; Wurzel einer Zugriffskette: **offen**
-## M4 — Wer darf `mut fn` rufen; Temporaries: **offen**
-## M5 — `this` als Referenz: **offen**
+## M2 — Unveränderlichkeit: **entschieden** (2026-09-28) — Feld + Bindung, kein `mut struct`
+
+**Felder sind unveränderlich, sofern sie nicht `var` heißen; ein `var`-Feld ist schreibbar,
+wenn die Wurzelbindung `var` ist.** Ein Wort (`var`) an zwei Orten (Bindung, Feld), eine Regel
+für Structs und Klassen.
+
+| Form | Vorbild | Warum nicht |
+|---|---|---|
+| Bindung allein entscheidet | Swift, Rust | keine Autorenabsicht ausdrückbar; Swift-Asymmetrie bei Klassen (`let` schützt nichts) |
+| **Feld + Bindung** | **F#, OCaml, Scala, Kotlin** | **gewählt** |
+| Typ entscheidet (`struct` / `mut struct`) | — (C# `readonly struct` ist die Umkehrung) | zweite Struct-Art mit Folgen für Generics, Interfaces, Konvertierung; seine zwei Block-1-Argumente sind unter Bereich 1 weg: Structs sind inline (V2), also wird nichts geteilt und Rekursion braucht ohnehin Indirektion (M13); Hash-Sicherheit folgt aus Wertsemantik (ein Map-Schlüssel ist eine Kopie). Was bleibt, Autorenabsicht, drückt die Feldform feiner aus. `mut struct` als Zucker für „alle Felder `var`": weggelassen, bis es jemand vermisst |
+| veränderlich per Default | C#, Go, Lyric 4 | C#'s Fallen: defensive Kopien, `list[0].X = 9` verboten, `readonly` nachgerüstet |
+
+`struct Vec3 { x: float, y: float, z: float }` ist ein Wert, den niemand in place ändert;
+`struct Counter { var n: int }` sagt, was veränderlich ist. Ein Klassen-`let`-Feld ist wirklich
+fest (M9 damit erledigt). Migration von 4: jedes geschriebene Feld bekommt `var`.
+
+## M3 — `let` bis in die Felder, Parameter, Wurzel: **entschieden** (2026-09-28)
+
+- `let` friert einen **Wert tief** ein (Swift); ein **Parameter ist `let`**; eine
+  Schleifen-/Pattern-Bindung ist `let`.
+- Die **Wurzel** einer Zugriffskette `a.b[i].c` ist die erste Bindung — **eine Referenz wurzelt
+  die Kette neu**: hinter `let arr: Point[]` ist `arr[0].x = 1` erlaubt (das Array-Objekt ist
+  veränderlich, das Element ein Ort im Block, V10); hinter `let c: Cls` ist `c.varField = 1`
+  erlaubt, `c.letField = 1` nicht. Ein Array ist eine Referenz (wie Kotlin, C#, Go, Lyric 4) —
+  Swift's Werttyp-Arrays mit Copy-on-Write sind ein zweites, verstecktes Kopiermodell und
+  werden nicht übernommen.
+- `[Point{…}] * 5` erzeugt unter V10 fünf Kopien im Block; das 4.x-Loch „n Aliasse" ist durch
+  die Darstellung weg.
+
+## M4 — `mut fn` und Temporaries: **entschieden** (2026-09-28)
+
+- `mut fn` (Swift `mutating`) bleibt der Methodenmarker; erlaubt nur auf Typen mit mindestens
+  einem `var`-Feld oder mit Ganzzuweisung an `this`; **aufrufbar nur auf einer `var`-Wurzel**.
+- **Temporaries werden abgelehnt**, nie still kopiert: `list[0].x = 1` und `list[0].bump()` sind
+  Fehler, wenn `list[0]` das Ergebnis eines `get` ist — mit der Meldung, dass ein `set` fehlt
+  (C# CS1612 als Vorbild, ohne C#'s defensive Kopie CS8656). Das Problem betrifft nur Werttypen:
+  für eine Klasse liefert `get` die Referenz, und die wurzelt neu.
+- Wie ein Nutzercontainer einen **Ort** liefert, ist Bereich 3/10: Get/Set-Paar mit
+  Rückschreibung durch den Compiler (Swift: `list[0].x = 1` → get, ändern, set) als allgemeine
+  Form; `ref`-Rückgabe über Innenzeiger (L1) als Optimierung mit der Regel „lebt nur bis zum
+  Ende des Statements" (Umallokation).
+
+## M5 — `this` als Referenz: **entschieden** (2026-09-28)
+
+`this` einer Struct-Methode ist eine **Referenz auf den Ort des Aufrufers** (C# `ref this`),
+kein Copy-in/Copy-out: eine Teilschreibung vor einem Wurf bleibt stehen, Reentranz ist sichtbar
+— festgeschrieben, nicht verhindert (keine Swift-Exklusivitätsregel). Bereich 1 macht es so
+(V2, S1); die Sprache sagt es.
+
+**Vorgemerkt für Bereich 3/10 (Indexierung)**: die `Indexable`-Familie neu — `get`/`set`/`ref`,
+Schlüsseltypen jenseits `int`, **Index-Ranges für Nutzertypen** (heute nur auf Arrays
+definiert, nie auf `Indexable` portiert). **Für Bereich 4 (Operatoren)**: die arithmetischen
+Operator-Interfaces (`Add<T, R>` mit zwei Typargumenten, fehlende `Neg`/`Rem`/Bit-Operatoren,
+`++`/`--` außerhalb der Interfaces) gesamt überarbeiten.
+
 ## M6 — `with`: **offen**
 ## M7 — Kopieren durch `?T`, Tupel, Enum, Closure-Umgebung, `[x] * n`: **offen**
 ## M8 — Closure-Capture: **offen**
