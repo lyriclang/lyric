@@ -86,7 +86,22 @@ Majors mit freier Überladung unverändert da — das Feature wurde eingeführt 
 | freie Überladung, repariert (C#, Java, Swift, Kotlin) | der 41-Fragen-Katalog ist keine Implementierungsschwäche, sondern die Form, die freie Überladung in jeder Sprache annimmt (sechs Auflösungsalgorithmen, Rangordnung, exponentielle Auswahl, Signatur-Mangling); ihr einziger genannter Nutzen (Typsuffixe) ist generisch lösbar. Nimmt 3.0 zurück, mit 3.0's eigener Begründung („the shape Oil died of") |
 | keine Überladung (Rust, Go, Zig) | verliert Fabriken (`of(hex)`, `of(r, g, b)`) und Bequemlichkeits-APIs, die Arität ohne jede Regelkomplexität deckt |
 
-## D5 — Default-Argumente und benannte Argumente: **offen**
+## D5 — Default-Argumente und benannte Argumente: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| F1 | **Der Default gehört zur Deklaration, einmal**: ein Interface-Member deklariert ihn, eine Implementierung darf keinen eigenen angeben (auch nicht denselben) — sie erbt ihn; jeder Aufrufpfad (statisch, virtuell, Constraint) liest denselben Ort. Schließt den gemessenen Drei-Leser-Befund | Kotlin |
+| F2 | **Je Aufruf ausgewertet, im Scope der Funktion**, nach den Pflichtargumenten; darf frühere Parameter referenzieren (`fn sub(s: str, from: int = 0, to: int = s.length)`), kein `this` | Kotlin; Python (einmal bei Definition) und C# (nur Konstanten) verworfen |
+| F3 | Defaults an jeder Position; ein mittlerer Default ist nur benannt überspringbar | Kotlin |
+| F4 | zwei Signaturen, die für eine Argumentzahl beide passen: Fehler an der Deklaration (D4) | — |
+| F5 | **Jeder Parameter ist benennbar** (`connect(host: "h", port: 80)`); **Parameternamen sind öffentliche API** (Umbenennung = Bruch für benannte Aufrufer) | Kotlin, C#, Python; Swift's externe Labels (zweite Namensmenge) verworfen |
+| F6 | positionell vor benannt; benannte in beliebiger Reihenfolge; kein Name doppelt, keiner für einen positionell gesetzten Parameter | Python, Kotlin |
+| F7 | Namen stimmen bei der Auswahl nicht mit (Arität wählt, D4); unbekannter Name → Fehler mit Kandidatenliste | — |
+| F8 | `params` bleibt letzter Parameter, nicht benennbar; Trailing-Lambda bleibt (Bereich 8) | — |
+| F9 | **Schreibweise `name: value`** — Zuweisung ist ein Ausdruck, `f(a = 3)` wäre eine Zuweisung als Argument; in Aufrufklammern kommen keine Typen vor. Struct-Initializer und Attribute behalten `=` (andere Klammern, W16 gelöst). Bereich 8 bestätigt | C#, Swift |
+
+Guide: benannte Argumente für Konfiguration, positionelle für Daten.
+
 ## D6 — Operator-Interfaces: **offen**
 ## D7 — Konformanz-Synthese: **offen**
 ## D8 — `sealed`: **offen**
