@@ -75,7 +75,17 @@ square` braucht die Annotation `Shape`), keine Varianzannotationen; T8 (bidirekt
 bezahlbar (Swift's Checker ist wegen Subtyping × Überladung × Literale berüchtigt). Die
 Monomorphisierung bleibt eindeutig. **T9 muss diesem Grundsatz gehorchen.**
 
-## T4 — Optionals, Nesting, Null im generischen Rumpf: **offen**
+## T4 — Optionals: **entschieden** (2026-09-28)
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| O1 | **`??T` ist erlaubt** (Rust `Option<Option<T>>`, Swift). Darstellung V5 hat den Platz; die konsistente Antwort auf Monomorphisierung: ein generisches `?T` ist ein Optional um das, was `T` ist — `first<T>(xs: T[]): ?T` mit `T = ?int` ist `??int`, `Map<K, ?V>.get(k): ??V` unterscheidet „fehlt" von „null", `Iterator<?T>` wird möglich. Ebenen werden über **Narrowing** erreicht, keine neue Syntax (kein `Some`) | Abflachung (Kotlin `String??` = `String?`), Verbot (C#, Lyric 4 — die vier gemessenen Löcher im generischen Rumpf sind die Kosten des Verbots) |
+| O2 | **Ein bloßes `T` ist opak**: keine Null-Operation (`== null`, `??`, `!`, `match null`) auf einem Ausdruck vom Typ `T`; nur auf `?…`. Folgt aus „Constraints an der Deklaration geprüft"; schließt die vier Löcher mit einem Satz | Rust, Swift |
+| O3 | Narrowing narrowt die **Bindung** um eine Ebene (`!= null` in `if`/`while`/`&&`/frühem `return`); ein danach zugewiesenes `var` verliert die Verengung; `if let`/`while let` bleiben | Kotlin, TypeScript, Lyric 4 |
+| O4 | `?.`-Ketten **flachen ab** (`a?.b?.c` ist `?R`, Swift — das Ergebnis kann nur einmal fehlen); `??` rechtsassoziativ, lazy, schält eine Ebene; `!` Panik mit Position, schält eine Ebene; **keine Zuweisung durch `?.`** (Tür) | — |
+| O5 | **Optional-Member über `extend<T> ?T { map, flatMap, orElse, filter, … }`** in der stdlib — `?T` ist ein Typkonstruktor, den generische Extends (T7) erreichen, wie `T[]` | Rust `impl<T> Option<T>` |
+| O6 | `?T == ?T` über **bedingte Konformanz** (`Equatable` wenn `T` es ist; `null == null` true; `x == 5` mit `x: ?int` über Koerzion, T3); `Hashable` ebenso; **keine Ordnung auf `?T`** (Swift; Rust's `None < Some` überrascht mehr als es nützt) | — |
+
 ## T5 — `Self` und statische Interface-Member: **offen**
 ## T6 — Assoziierte Typen: **offen**
 ## T7 — Generische Extends, bedingte Konformanz in `extend`-Form: **offen**
