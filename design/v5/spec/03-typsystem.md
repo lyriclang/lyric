@@ -80,7 +80,33 @@ Monomorphisierung bleibt eindeutig. **T9 muss diesem Grundsatz gehorchen.**
 ## T6 — Assoziierte Typen: **offen**
 ## T7 — Generische Extends, bedingte Konformanz in `extend`-Form: **offen**
 ## T8 — Inferenz: **offen**
-## T9 — Vereinigungstypen gegen Enum ohne Zeremonie: **offen**
+## T9 — Vereinigungstypen gegen Enum ohne Zeremonie: **entschieden** (2026-09-28)
+
+**Keine Vereinigungstypen `A | B` in 5.0.** Enum-Ergonomie stattdessen; die Union bleibt eine
+**Tür, die rein additiv ist**: sie käme nach T3 nur als Koerzion (kein Subtyp-Gitter, kein LUB),
+also verbaut nichts, was 5.0 entscheidet.
+
+Was sie wäre: ein anonymes Enum (Tag + Union inline, V6), Eintritt nur an Stellen mit Zieltyp,
+Austritt per Typtest — kommutativ, assoziativ, abflachend. Was sie kauft: Summen ohne
+Deklaration an Signaturen, Rückgabe-Alternativen ohne Wrapper (`int | ParseError`), `?T` als
+`T | null`.
+
+| Warum nicht | |
+|---|---|
+| zweiter Summenmechanismus neben `enum` | jede Folgefrage (Synthese, Formatierung, Exhaustiveness, Serialisierung) zweimal |
+| Abflachung in Generics | `f<T>(x: T \| string)` mit `T = string` — die Union verschwindet an der Instanz, in monomorphisiertem Code |
+| `?T` als `T \| null` macht `??T` prinzipiell unmöglich | das Iterator-Ende könnte nicht `null` sein; TypeScript's `find`-Problem, Rust kann `Option<Option<T>>` |
+| Überladung wächst um eine Dimension | `f(int)`, `f(string)`, Aufruf mit `int \| string` |
+| rekursive Unionen brauchen parametrisierte rekursive Aliase (T15) | sonst ist `Json` nicht schreibbar |
+| keine Sprache hat Unionen ohne Subtyping darunter | TypeScript, Scala 3, Crystal, Python alle mit Gitter; C#, Go, Rust, Swift, Kotlin, Java bewusst ohne Unionen |
+
+**Enum-Ergonomie, zugesagt an Bereich 4/8**: Swift's **implizites Member bei bekanntem
+Zieltyp** (`find(.Name("x"))`, `return .Missing;`, `match (id) { .Int(n) => … }`); Synthese von
+`Equatable`/`Hashable`/`Display` (M10); Typ-Patterns auf Interface-Werten (T11) für offene
+Typmengen; einzeilige Deklaration bleibt. Der `Json`-Fall ist ein rekursives Enum (Rust, Swift);
+der `Result`-Fall gehört zu Bereich 5. `?T` bleibt ein eigener Typkonstruktor — T4 entscheidet
+`??T` frei.
+
 ## T10 — `any`: **offen**
 ## T11 — Downcast und Typ-Patterns auf Interface-Werten: **offen**
 ## T12 — `inout`/`ref`-Parameter, `ref`-Rückgabe: **offen**
