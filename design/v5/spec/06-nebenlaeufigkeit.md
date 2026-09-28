@@ -37,7 +37,27 @@ Aus `../nebenlaeufigkeit.md` (44 Fragen, Fassung 4), Spec §10, `stdlib/std/task
   Abbruch-Token, keine strukturierte Nebenläufigkeit; Koroutinen-Schachtelung über
   `MaxReentryDepth = 32`.
 
-## N1 — Grundmodell: Koroutinen, Threads, Isolates: **offen**
+## N1 — Grundmodell: **entschieden** (2026-09-29) — Threads explizit, Koroutinen je Thread, ein Heap
+
+**Modell C** (C#, Kotlin): der Normalfall ist single-threaded und yieldend — Lyric 4 —,
+Parallelität ist ein expliziter Schritt, die Race-Hypothek trifft nur, wer ihn geht.
+
+| # | Regel |
+|---|---|
+| G1 | **Ein Scheduler je Thread**; Koroutinen gehören dem erzeugenden Thread und **migrieren nicht** (TLS über Yields, thread-gebundene C-Bibliotheken; Kotlin-Dispatcher-Form). Work-Stealing: Tür |
+| G2 | `Thread.spawn(fn)` startet einen Thread mit eigenem Scheduler; Hauptthread hat den ersten; Thread-Pool als Bibliothek |
+| G3 | **Ein Heap** (L1/L6), Referenzen überschreiten Threads. **Data Races sind Programmfehler ohne Zusage** — auch nicht Speichersicherheit (Fat Pointer und Inline-Structs werden zerrissen geschrieben; Go's Vertrag, ausgesprochen). Guide-Satz; **`--profile tsan`** (ThreadSanitizer über den C-Backend) findet sie. Java's Zusage (Speicher heil) wäre nur mit Kosten an jeder Referenzschreibung zu haben — verworfen |
+| G4 | Bibliothek gibt die sicheren Wege: `Channel<T>` (empfohlen), `Mutex<T>` (gibt `T` nur innerhalb `lock { }` her — Rusts Disziplin ohne Compiler), `Atomic<int>`, `Once`. Kein `Send`/`Sync` (ohne Ownership nicht prüfbar) |
+| G5 | Unveränderliche Daten (Structs ohne `var`, Strings, `let`-Felder) sind **frei teilbar** — Dividende von M2 |
+| G6 | I/O yieldet je Thread-Scheduler (N6); ein blockierender Aufruf blockiert seinen Thread, nicht das Programm |
+| G7 | Isolate als **Muster**: `Isolate.spawn(fn)` = Thread mit Scheduler, nur über Channels erreichbar — keine zweite Laufzeit |
+
+| Verworfen | Warum |
+|---|---|
+| A · ein Thread + Koroutinen (Lyric 4, Lua, Node) | ein Kern — verfehlt Z2/Z3 |
+| B · M:N migrierend (Go, Java 21) | Race-Hypothek auf jedem Programm; jede Laufzeitstruktur feinkörnig thread-sicher; Migration gegen TLS und C-Affinität; Go's Scheduler ist zehn Jahre Arbeit |
+| D · Isolates (Dart, JS Workers) | Kopie je Nachricht, große geteilte Daten unmöglich, für Spiele unbrauchbar; zweiter Heap-Begriff — als Muster unter C enthalten |
+
 ## N2 — Koroutinen-API: Status, Schließen, Senden, Ergebnis, Identität: **offen**
 ## N3 — Generatoren gegen Tasks: die Sync/Async-Spaltung: **offen**
 ## N4 — Task-Modell: Handle, Ergebnis, Abbruch, strukturierte Nebenläufigkeit: **offen**
