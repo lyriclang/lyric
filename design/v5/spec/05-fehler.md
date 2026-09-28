@@ -72,8 +72,31 @@ im `catch`), Structs für Fehler mit Daten, Klassen für Identität oder Ursache
 Wurf** (V7-Form), Kosten nur auf dem Fehlerpfad; Typtest = Deskriptorvergleich. Verworfen: nur
 Klassen (Lyric 4, Java, C#). (Rust, Zig, Swift)
 
-## E4 — `try` als Ausdruck, `try?`, `catch`-Ausdruck: **offen**
-## E5 — Die Zwillingsdoktrin: **offen**
+## E4 — Die `try`-Familie: **entschieden** (2026-09-28) — Arbeitsnotation, Syntax Bereich 8
+
+| Form | Ergebnis | Regel |
+|---|---|---|
+| `try f()` | `T`, propagiert | Pflicht (E1); **deckt den ganzen Ausdruck rechts** (Swift); `try` ohne werfenden Aufruf darunter = Warnung |
+| `try? f()` | `?T` | `null` bei jedem Fehler; **keine Abflachung** (`f(): ?int` → `??int`, „geworfen" ≠ „null geliefert", O1; Swift 5 flacht ab) |
+| `try! f()` | `T` | Panik mit Meldung und Position |
+| `try f() catch (e: A) expr` | `T` | **als Ausdruck**, mehrere Klauseln; Klauseln decken die Menge oder die Funktion deklariert den Rest; Klauselkörper Ausdruck oder Value-Block; `throw` als Körper für Rethrow-mit-Kontext (E6) |
+| `try { … } catch (e: A) { … }` | Statement | bleibt, Blockform derselben Sache |
+| `catch (e)` ohne Typ | Menge nach K7 | — |
+
+`try` steht überall, wo ein Ausdruck steht; die Deckungsregel gilt für den umschließenden Rumpf.
+
+## E5 — Die Zwillingsdoktrin: **entschieden** (2026-09-28) — fällt
+
+Ihr Grund (Wurf teuer in der VM, Wurfpfad ohne JIT) ist unter L5 weg. **Eine Funktion je
+Operation**; der Aufrufer wählt die Form mit einem Zeichen: `try? read(p)` (werfend →
+optional), `map[k] ?? throw NotFound { key }` (optional → werfend; `throw` ist ein
+`never`-Ausdruck seit 4.5). Kein `OrThrow`-, kein `OrNull`-Suffix, kein `tryParse` mit `bool`.
+
+**Die Grenze (Guide-Satz)**: `?T`, wenn Abwesenheit ein normales Ergebnis ohne Grund ist
+(`map[k]`, `first`, `find`, `parent`); **Wurf, wenn das Scheitern einen Grund trägt, den der
+Aufrufer brauchen könnte** (I/O, Parsen mit Position, Netz, Prozesse). Nie beides. Je API
+einmal entschieden nach „trägt der Fehler Information?". Beantwortet Korpus-Widerspruch W7.
+
 ## E6 — Fehlerobjekt: Rethrow, Ursache, Unterdrückte, Backtrace: **offen**
 ## E7 — `defer`, werfender `defer`, Ressourcen-Scope: **offen**
 ## E8 — Panik: Katalog, `recover`, Hooks: **offen**
