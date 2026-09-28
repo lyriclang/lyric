@@ -186,6 +186,26 @@ Ein Feld ohne `var` ist fest, durch jede Referenz; mit `var` schreibbar durch je
   **Identitäts-`Equatable` und Adress-`Hashable` synthetisiert** — `Map<Node, X>` nach
   Objektidentität ohne Handarbeit. Eine Klasse ohne beides hat kein `==`.
 
+**Vorgemerkt für Bereich 3 (Maintainer, 2026-09-28)**, mit erster Einordnung:
+
+- **`any`**: fällt unter V4/V7 strukturell ab als leeres Interface (Fat Pointer, Downcast per
+  Typ-Pattern, Werte geboxt). Neigung: existieren lassen als `std.core.Any`, nicht bewerben,
+  **keine implizite Konvertierung** dorthin; Enums, Interfaces, Generics bleiben die Antwort.
+- **Arrays und Ranges als echte Typen mit Membern** (C#-/Rust-Form): `T[]` bekommt seine Member
+  in der stdlib über generisches `extend<T> T[]` (setzt generische Extends voraus, Bereich 4);
+  `Range<T>` wird ein Struct (`start`, `end`, `inclusive`), `..`/`..=` bauen es, `Iterator`-
+  Konformanz, `for (i in a..b)` vom Compiler zur Zählschleife optimiert (Rust). Damit
+  `arr[1..3]` als View (V10) und `Index<Range<int>>` auf Nutzertypen — schließt die
+  `Indexable`-Range-Lücke. Die 4.x-Regel „Ranges sind keine Werte" war eine VM-Regel.
+- **Vereinigungstypen** `A | B` (Maintainer: gemeint ist die Union-Lesart von
+  `[uint8, char, int8]`): zur Laufzeit ein anonymes Enum (Tag + Union inline, V6). Kauft Summen
+  ohne Deklaration, Narrowing per Typ-Pattern, und `?T` als `T | null`. Kostet: zweiter
+  Summenmechanismus neben `enum`, Subtyping (`int <: int | string`) in Inferenz und Generics
+  (Scala 3), und **Abflachung** (`T | null | null` = `T | null` — kein `??T`, kein „kein Wert" vs.
+  „Wert ist null"; TypeScript's Lage, Lyrics Iterator-Ende-Problem in Prinzipform). Kotlin,
+  Swift, Rust, Go verzichten bewusst. In Bereich 3 gegen **Enum ohne Zeremonie** (anonyme /
+  inline deklarierte Enums, Swift-Ergonomie) abwägen, nicht gegen nichts.
+
 ## M11 — Große Werte: **offen**
 ## M12 — Besitzende Werttypen / RAII: **offen**
 ## M13 — Rekursive Werttypen: **offen**
