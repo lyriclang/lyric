@@ -136,7 +136,30 @@ Typpfade `I.Item`, die `Item =`-Schreibweise. C#/Java haben nur Parameter und le
 | X5 | Extends fügen Methoden und Konformanzen hinzu, **keine Felder** (Layout fix) | alle |
 | X6 | Sichtbarkeit von Extend-Membern wie Modulmember (Bereich 7); sichtbar, wo das Modul importiert ist | Rust, Swift, Kotlin |
 
-## T8 — Inferenz: **offen**
+## T8 — Inferenz: **entschieden** (2026-09-28) — bidirektional je Statement
+
+Die Klasse von C#, Kotlin, Swift: der **erwartete Typ fließt von außen nach innen**, Typen von
+innen nach außen, Unifikation innerhalb eines Statements. **Keine Whole-Function-Inferenz**
+(Rust, OCaml): sie kauft nur `let v = List.new(); v.add(1)` und zahlt mit nichtlokalen Fehlern
+und einer Interaktion mit Überladung, die keine Sprache mit beidem gut gelöst hat. Schnell,
+weil ohne Subtyping (T3) — Swift's Langsamkeit kommt aus Subtyping × Überladung × Literale.
+
+| Position | Regel |
+|---|---|
+| Zuweisung, Argument, Rückgabe, Initializer-/`with`-Feld | Typparameter aus dem erwarteten Typ: `let xs: int[] = zero();` |
+| Literale | adaptieren (T1b); ohne Kontext `int`/`float` |
+| `null`, `[]`, `.Member` | Typ aus dem Kontext; ohne Kontext Fehler mit Vorschlag |
+| Lambda | Parameter aus dem erwarteten Funktionstyp, Rückgabe aus dem Rumpf; ohne erwarteten Typ Parameter annotieren |
+| `if`/`match`-Arme | jeder Arm koerziert zum erwarteten Typ; ohne erwarteten Typ bestimmt der erste Arm, kein LUB |
+| Generische Argumente | **Unifikation innerhalb des Aufrufs** statt „erste Bindung gewinnt": `same(1, s)` → `T = string`, Fehler am Literal |
+| Koerzion | nach der Unifikation, nie darin (T1c, T3) |
+| nicht inferiert | ein Typparameter ohne Vorkommen in Argumenten oder erwartetem Typ; eine Variable aus späterer Verwendung |
+
+Kleinigkeiten: `_` als Platzhalter in Typargumenten (`collect<_, List<int>>(it)`, Rust);
+partielle Listen nur über `_`; explizite Typargumente bleiben; **Rückgabetypen immer
+annotiert** (Signatur ist der Vertrag, auch für Fehlermeldungen und den Cache); `var x: int;`
+mit Definite Assignment bleibt, **`var x;` ohne Typ nein**.
+
 ## T9 — Vereinigungstypen gegen Enum ohne Zeremonie: **entschieden** (2026-09-28)
 
 **Keine Vereinigungstypen `A | B` in 5.0.** Enum-Ergonomie stattdessen; die Union bleibt eine
