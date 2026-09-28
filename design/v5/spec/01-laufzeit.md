@@ -90,9 +90,52 @@ Größen: `bool` 1, `int` 8, `Vec3` 24, Referenz 8, Interface 16, `?int` 16, `?V
 **Folgen für andere Bereiche**: Innenzeiger und Typidentität öffnen Views und Typ-Patterns
 (Bereich 3); Struct-Kopien sind Speicherkopien — ob große Structs eine Kostenregel bekommen,
 ist Bereich 2.
-## L3 — Aufrufkonvention und Stack: **offen**
-## L4 — Koroutinen im Runtime: **offen**
-## L5 — Fehler-ABI: **offen**
+## L3 — Aufrufkonvention und Stack: **entschieden** (2026-09-28)
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| S1 | Lyric-Funktionen sind **C-Funktionen der Plattform-ABI** (SysV, Win64, AAPCS64); Structs by value, Tupel als Struct-Rückgabe; versteckte Parameter nur wo ein Feature sie braucht (Closure-Umgebung als erstes Argument, Fehlerslot nach L5). Jede exportierte Funktion ist ohne Adapter aus C aufrufbar. | eigene Konvention |
+| S2 | Locals sind C-Locals; kein Frame-Objekt, kein Pool, kein Operandenstapel | — |
+| S3 | **Überlauf = Stack-Pointer-Prüfung im Prolog** gegen eine thread-lokale Grenze (ein Vergleich, mit dem Safepoint-Poll verschmelzbar), **Guard-Page + Signal-Handler als Netz**; Überlauf ist eine **Panik mit Backtrace**, kein Segfault | Tiefenzähler (zählt Frames statt Bytes) |
+| S4 | **`main` auf dem OS-Stack**, Größe per Linker-Flag auf **8 MB** auf allen Plattformen, Grenzen beim Start ermittelt (`pthread_getattr_np`/`VirtualQuery`). Begründung: ein laufzeiteigener Hauptstack kauft Uniformität und zahlt mit TEB-Umschreibung unter Windows (SEH, `__chkstk`) und Reibung in gdb/ASan/valgrind — ausgerechnet dort, wo man am meisten debuggt | laufzeiteigener Hauptstack (zuerst empfohlen, revidiert) |
+| S5 | Tail Calls (`musttail`): Tür, kein Plan | — |
+
+## L4 — Koroutinen im Runtime: **entschieden** (2026-09-28)
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| K1 | **Feste Reservierung, träges Commit**: `mmap`/`VirtualAlloc` reserviert, Seiten werden beim Zugriff physisch; **256 KB Standard**, je Erzeugung konfigurierbar; Stacks nach dem Tod gepoolt. Unter Windows mit `PAGE_GUARD` und TEB-Update (`StackBase`/`StackLimit`/`DeallocationStack`), ASan-Annotation beim Wechsel | wachsende Stacks (Kopieren — unmöglich mit konservativem Scan und C-Zeigern in den Stack); segmentierte Stacks (Hot-Split, von Go und Rust verworfen) |
+| K2 | **Eigene Assembler-Routine je ABI** (callee-saved Register + SP, ~20 Instruktionen): x86-64 SysV, x86-64 Win64, AArch64; ~10–20 ns je Wechsel | `ucontext` (Syscall, deprecated), Windows Fibers (nur dort) |
+| K3 | Jede Koroutine registriert ihre Stackgrenzen (L6); suspendiert wird vom gesicherten SP bis zur Basis gescannt, die Register liegen dort | — |
+| K4 | **Yield durch C-Frames ist erlaubt** (ein Callback läuft auf dem Stack der Koroutine; mechanisch harmlos). Die Laufzeit führt je Koroutine einen **Fremd-Frame-Zähler** (FFI-Eintritt/-Austritt); daran hängen zwei Regeln: **kein Abbruch und keine GC-Aufgabe** einer Koroutine mit Zähler > 0 ohne Fehler/Warnung (C-Frames lassen sich nicht abwickeln), **keine Thread-Migration** bei Zähler > 0 (TLS, GL-Kontexte, thread-gebundene Mutexe; Go pinnt während cgo). Nicht-reentrante Bibliotheken und gehaltene Locks während eines Yields sind dokumentierte Verantwortung, nicht prüfbar | Lua-Verbot „yield across C-call boundary" — würde jeden Callback-Event-Loop unbenutzbar machen |
+| K5 | **asymmetrisch** als Primitiv (`yield` kehrt zum Resumer zurück); symmetrisch darüber baubar | — |
+| K6 | **kooperativ**; Präemption über die Safepoint-Polls bleibt Tür | — |
+| K7 | Die Laufzeit liefert nur Primitive: `create(fn, stackSize)`, `resume`, `yield`, `status`, TLS „aktuelle Koroutine"; Scheduler, Tasks, Channels, M:N sind **Bereich 6** | — |
+
+Gegenüber Lyric 4: dasselbe Modell (stackful, Helfer dürfen anhalten), billiger (kein
+Frame-Einsammeln beim Yield), und neu: Yield aus einem Callback, der durch C läuft. Die eine
+Tür, die zugeht: wachsende Stacks — wer viele tief rekursive Koroutinen will, konfiguriert die
+Reservierung.
+
+## L5 — Fehler-ABI: **entschieden** (2026-09-28)
+
+**Fehlerrückgabe** (Status + Slot), wie Swift, Zig, Go. Erzwungen durch zwei frühere
+Entscheidungen: `setjmp`/`longjmp` überspringt Frames (zerstört `defer`, undefiniert über
+Koroutinen-Wechsel), tabellenbasiertes Unwinding kann keine C-Frames abwickeln — und K4 erlaubt
+C-Frames mitten im Stack. Nebeneffekt, der Bereich 5 prägt: **ein Wurf kostet wie ein Return**;
+die Zwillingsdoktrin (`OrThrow`-Paare, `TryParse`) verliert ihren Grund.
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| E1 | **Swift-Form in C**: der normale Rückgabewert bleibt der C-Rückgabewert; jede werfende Funktion bekommt einen **versteckten Zeigerparameter auf den Fehlerslot des Aufrufers**; Status = Slot nicht null. Nicht TLS (Zugriffskosten, Koroutinen teilen Threads). | Zig-Form (Status als Rückgabe, Wert per Out-Parameter — verunstaltet Signaturen, verliert Registerrückgabe); `Result`-Struct als Rückgabe |
+| E2 | Fehlerwert = **Zeiger auf Heap-Objekt mit Typdeskriptor**; Typtest = Deskriptorvergleich (V4); Allokation nur beim Wurf | Inline-Fehlerwerte (machen `catch (e: T)` zum Layoutproblem) |
+| E3 | Prüfstelle nach jedem werfenden Aufruf: `if (unlikely(err)) goto L_cleanup_N;` — Cleanup-Labels in umgekehrter `defer`-Reihenfolge, am Ende Weitergabe in den eigenen Slot (Zig-Emission) | — |
+| E4 | `defer` beim Wurf läuft über die Cleanup-Kette; **wirft ein `defer` während der Weitergabe, gewinnt der erste Fehler, der zweite wird angehängt** (Java `addSuppressed`) — beantwortet SPEC-RUNDE 5 als ABI-Frage | Go (Panik im `defer` ersetzt) |
+| E5 | **Paniken sind keine Fehler**: Index, Division durch null, Überlauf, Stacküberlauf → Meldung, Backtrace, Prozessende; Prozess-weiter Hook für Hosts. Ob es ein `recover` an Koroutinengrenzen gibt, entscheidet Bereich 5 — die ABI erlaubt es (Panik als Wurf einer nicht fangbaren Klasse an der Grenze) | Panik als gewöhnliche Exception |
+| E6 | C hinein: `extern "C"` wirft nie; ein C-Status wird vom Aufrufer übersetzt (Bibliothekssache) | — |
+| E7 | C hinaus: ein Wurf **darf C nicht durchqueren**. Standard: Callback-Typ ist nicht-werfend (Compiler erzwingt). Explizit: Wrapper fängt, legt den Fehler in der Koroutine ab, gibt C einen Status; nach Rückkehr aus C wird er weitergeworfen (Form: Bereich 11) | — |
+| E8 | **Backtrace auf Fehlerobjekten nur im Debug-Profil** (libbacktrace / `RtlCaptureStackBackTrace`); Release nur, wenn der Typ es verlangt; Paniken immer mit Trace | Go/Rust-Linie |
+
 ## L7 — Was `.lyrbc` ersetzt: **offen**
 ## L8 — C-Emission: **offen**
 ## L9 — Laufzeitbibliothek: **offen**
