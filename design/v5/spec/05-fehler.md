@@ -97,8 +97,46 @@ optional), `map[k] ?? throw NotFound { key }` (optional → werfend; `throw` ist
 Aufrufer brauchen könnte** (I/O, Parsen mit Position, Netz, Prozesse). Nie beides. Je API
 einmal entschieden nach „trägt der Fehler Information?". Beantwortet Korpus-Widerspruch W7.
 
-## E6 — Fehlerobjekt: Rethrow, Ursache, Unterdrückte, Backtrace: **offen**
-## E7 — `defer`, werfender `defer`, Ressourcen-Scope: **offen**
+## E6 — Fehlerobjekt: **entschieden** (2026-09-28)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| O1 | **`interface Error { fn message(): string; fn cause(): ?Error { return null; } }`** — Wurzel aller werfbaren Typen; ohne Vererbung (D1) kann die Wurzel nur ein Interface sein. `Debug` automatisch (D7) | Swift, Rust |
+| O2 | Ursache ist Sache des Typs (`class ConfigError :: [Error] { message, cause: ?Error }`); Rethrow-mit-Kontext `catch (e: IoError) throw ConfigError { …, cause = e }` | Java, Rust |
+| O3 | **Unterdrückte Fehler und Backtrace leben in der Box**, nicht im Typ (ein geworfener Wert wird geboxt, E3): `e.suppressed(): Error[]`, `e.backtrace(): ?Backtrace` von der Laufzeit für jeden Fehlerwert — löst „ein Interface ohne Speicher kann nichts anhängen" | — |
+| O4 | **`main` darf `throws`**; entkommener Fehler: `error: <message>`, Ursachenkette, Backtrace im Debug, **Exit 1** (Panik: 101). Die 4.x-Regel fällt | Rust, Go |
+| O5 | Host-/C-Grenze: Wrapper nach L5 E7, Form Bereich 11 | — |
+
+## E7 — `defer` und Ressourcen: **entschieden** (2026-09-28)
+
+**`defer`** unverändert: block-scoped, einmal je Iteration, LIFO, bei jedem Verlassen außer
+Panik; fallengelassene Koroutine läuft keine (bleibt; das Verb dafür ist Bereich 6).
+
+**Werfender `defer`** (SPEC-RUNDE 5, beide Hälften, nach L5 E4):
+
+| Lage | Regel |
+|---|---|
+| wirft beim normalen Verlassen | der Fehler verlässt den Block wie jeder andere (Menge zählt zur Funktion); **früher registrierte `defer` laufen trotzdem** (Go) |
+| wirft, während ein Fehler unterwegs ist | **erster gewinnt, zweiter wird angehängt** (`suppressed`), Kette läuft zu Ende (Java) — das Gegenteil des gemessenen 4.x-Verhaltens |
+| zwei werfen beim normalen Verlassen | der zuerst gelaufene gewinnt, der zweite hängt an |
+| `errdefer` | **nein** (Idiom `var ok = false; defer { if (!ok) … }`); Tür (Zig) |
+
+**Ressourcen-Scope** — **Schlüsselwort an der Bindung** (Arbeitsnotation `using let f = open(p);`, C# `using var`; Syntax Bereich 8):
+
+| # | Regel |
+|---|---|
+| R1 | `interface Resource { fn close(): void throws Error; }` (Name Bereich 10); `close` darf werfen |
+| R2 | die Bindung ist `let`; `close()` läuft bei jedem Ausgang außer Panik; **`using` und `defer` sind eine gemeinsame LIFO-Liste** in Registrierungsreihenfolge |
+| R3 | ein `Resource`-Wert, der weder `using`-gebunden noch gespeichert, zurückgegeben oder weitergereicht wird: **Warnung** „wird nie geschlossen"; das GC-Netz (L1) fängt den Rest |
+| R4 | Fehler aus `close()` propagieren beim normalen Verlassen; während eines Fehlers werden sie angehängt |
+| R5 | Kopien der Referenz sind Aliasse; Nutzung nach `close` → Laufzeitfehler „closed" (M12) |
+| R6 | `using` auf einem Nicht-`Resource`-Typ: Übersetzungsfehler |
+
+Verworfen: Blockform `with … as` (Python; zweiter Block für das, was die Bindung sagt),
+automatisch für jede `let`-Bindung (implizit; ein abgelegtes Handle würde geschlossen),
+`use { }`-Lambda (Kotlin; `return` im Lambda). Zwei Mechanismen — `defer` für beliebigen Code,
+`using` für das, was der Typ verlangt und der Compiler prüfen kann (Java, C# ebenso).
+
 ## E8 — Panik: Katalog, `recover`, Hooks: **offen**
 ## E9 — `catch`-Klauseln: Reihenfolge, tote Klauseln: **offen**
 ## E10 — Fehler über Grenzen: Tasks, Koroutinen, FFI, Host: **offen**
