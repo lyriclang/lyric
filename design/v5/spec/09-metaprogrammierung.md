@@ -67,7 +67,20 @@ Makros" verworfen: die `ToJson`-Schleife als `quote`-Konstruktion wäre die Unle
 
 ## A2 — Deklarationsform, Ziele, Argumente: **offen**
 ## A3 — Attribut-Identität (qualifizierte Namen): **offen**
-## A4 — `comptime`: Umfang, Werte, Budget, `embed`: **offen**
+## A4 — `comptime`: Umfang: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| Q1 | **Ergebnistypen**: jeder Werttyp (Skalare, Strings, Arrays, Structs, Enums, Tupel, `?T`); **keine Referenzen** (Klassen, Closures, Koroutinen) — ein Heap-Objekt des Interpreters wird keine Konstante (4.x: nur Skalar/String) | Zig |
+| Q2 | **Formen**: `comptime expr`, `comptime { … }` (Block, letzter Ausdruck ist der Wert), `comptime if` (**beide Zweige typgeprüft**, einer emittiert — nicht Zigs Überraschung), `comptime for (x in werte)` (Entfaltung über einen `comptime`-Wert) | Zig `inline for` |
+| Q3 | **Reiner Code**: Funktionen rufen (laufen dann zur Compile-Zeit), Werte bauen, `std.meta`; **kein I/O, Netz, Zeit, Zufall** — Übersetzungsfehler an der Stelle | Zig |
+| Q4 | **`embed("pfad")`**: Datei relativ zum Modul, innerhalb des Pakets, als `uint8[]`/`string` — die einzige Compile-Zeit-I/O; Build hängt von der Datei ab (Cache) | Zig `@embedFile`, Rust `include_bytes!` |
+| Q5 | **Budget mit Zahl** je Auswertung, im Manifest konfigurierbar; Meldung nennt Limit und Stelle | Zig |
+| Q6 | Panik im `comptime`-Code = Übersetzungsfehler **mit innerem Backtrace** (4.x: ohne) | Rust const eval |
+| Q7 | **Determinismus**: dieselbe Eingabe, dasselbe Ergebnis auf jeder Plattform (Q3, L10); `target.os`/`target.arch` sind `comptime`-Konstanten (A6) | Zig |
+| Q8 | **`lyric check` wertet aus** — der Interpreter ist Teil des Compilers, nicht der VM (4.x: `check` grün, `build` rot); im Editor gilt Q5 strenger | rust-analyzer |
+| Q9 | Makro-Rümpfe laufen unter denselben Regeln | — |
+
 ## A5 — Synthese: **entschieden** (2026-09-29) — die Synthese gehört dem Interface
 
 **Die Konformanzliste ist das `derive`.** Ein Interface schreibt seine Member als
@@ -87,7 +100,18 @@ Rusts Makro-Namensraum wird nicht übernommen). D7 ist damit begründet, nicht g
   eigenem Namen (`@JsonVia`), das `extend P :: [ToJson] { … }` erzeugt — erlaubt, Nebenweg.
 
 ## A6 — Bedingungskompilierung: **offen**
-## A7 — Typinformation zur Compile-Zeit, Enum-Reflexion: **offen**
+## A7 — Typinformation zur Compile-Zeit: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| R1 | **`std.meta`** liefert Typinformation als `comptime`-Werte: `fields(T)` (Name, Typ, Sichtbarkeit, Attribute, Index), `variants(E)`, `members(T)`, `conformances(T)`, `typeName(T)`, `isStruct/isClass/isEnum(T)` | Zig `@typeInfo`, Nim |
+| R2 | **Feldzugriff über Info** `this.[f]` (Arbeitsnotation) — statisch je Entfaltung gelöst | Zig `@field` |
+| R3 | **Nur über bekannte Typen** (`fields(Self)`, `fields(T)` monomorphisiert); keine Reflexion über Objekte — Compile-Zeit, nicht Laufzeit | Zig |
+| R4 | **Attribute sind Teil der Info** (`f.attributes` → Art-1-Daten): Nutzer steuern Synthese je Feld ohne Makro (`@Serialize { name = "id" }`) | serde, Swift `CodingKeys` |
+| R5 | **Enum-Reflexion zur Laufzeit ist Synthese**: `E.variants()`, `E.fromName(s): ?E`, `e.name()` als `comptime`-generierte Member eines `std.core`-Interfaces, das ein Enum auf Anfrage konformiert | Rust `strum`, Swift `CaseIterable` |
+| R6 | `typeName<T>()` als gefaltete Konstante; `Debug` (D7); **keine allgemeine Laufzeitreflexion** — Deskriptoren (V4) tragen Identität, keine Feldnamen; Feldnamen zur Laufzeit sind eine zur Compile-Zeit synthetisierte Tabelle | — |
+| R7 | **Sichtbarkeit gilt auch für Typinformation**: private Member nur im deklarierenden Paket sichtbar (V2) — ein fremdes `ToJson` sieht nur `pub`, das Interface im selben Paket alles | strenger als Rust |
+
 ## A8 — Der Mechanismus: **entschieden** (2026-09-29) — die ganze Leiter, Sprosse 5
 
 „`comptime` *oder* Makros" war falsch gestellt: ein Makrosystem nach Nims Modell ist
