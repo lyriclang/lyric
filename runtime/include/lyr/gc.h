@@ -27,7 +27,40 @@ LyrStr *lyr_alloc_string(int64_t len);
 /* A point where a stop-the-world collection may stop this thread. Empty until stage 2. */
 #define LYR_SAFEPOINT() ((void)0)
 
-/* Collects now. For tests and hosts; programs never need it. */
+/* Strong roots for pointers the collector cannot see — held by C code or a host (11 X6 GcHandle).
+ * A root keeps its object alive until it is freed. Drop the handle with it: while the collector is
+ * conservative (stage 1), a stale handle in scanned memory keeps alive whatever reuses its cell. */
+typedef struct LyrRoot LyrRoot;
+LyrRoot *lyr_root_new(void *object);
+void *lyr_root_get(const LyrRoot *root);
+void lyr_root_set(LyrRoot *root, void *object);
+void lyr_root_free(LyrRoot *root);
+
+/* Memory ranges scanned conservatively besides the thread stacks the collector knows: coroutine
+ * stacks (M6) and any C memory that holds object pointers. */
+void lyr_register_stack(void *low, void *high);
+void lyr_unregister_stack(void *low, void *high);
+
+/* Nothing moves (01 L1), so pinning does nothing. Foreign-code paths call it anyway: the rule
+ * "an object passed to C must stay where it is" stays written at the place it applies. */
+#define lyr_pin(object) ((void)(object))
+#define lyr_unpin(object) ((void)(object))
+
+/* Weak references with a callback after death, in the Cleaner form (01 L1): the callback never
+ * sees the object, only its context, so it cannot bring the object back. Callbacks run on the
+ * allocating thread at the next allocation or explicit collection after the object died. */
+typedef struct LyrWeak LyrWeak;
+typedef void (*LyrWeakCallback)(void *context);
+LyrWeak *lyr_weak_new(void *object, LyrWeakCallback on_death, void *context);
+void *lyr_weak_get(const LyrWeak *weak);   /* NULL once the object is dead */
+void lyr_weak_free(LyrWeak *weak);         /* before death: the callback will not run */
+
+/* Threads (01 L6): a thread touches the heap only while attached. lyr_init attaches the main
+ * thread; every other thread calls lyr_thread_attach first and lyr_thread_detach last. */
+int lyr_thread_attach(void);   /* 0 on success */
+void lyr_thread_detach(void);
+
+/* Collects now, then runs the callbacks of what died. For tests and hosts; programs never need it. */
 void lyr_gc_collect(void);
 
 /* Bytes the collector currently holds from the operating system. */

@@ -19,6 +19,9 @@ public class RuntimeProgramTests
             data.Add("arrays", profile, 0, "arrays ok\n", []);
             data.Add("config", profile, 0, "config ok\n", []);
             data.Add("hello", profile, 7, "Hello, Lyric!\nargs: 2\n", ["one", "two"]);
+            data.Add("roots", profile, 0, "roots ok\n", []);
+            data.Add("weak", profile, 0, "weak ok\n", []);
+            data.Add("threads", profile, 0, "threads ok\n", []);
         }
         return data;
     }
