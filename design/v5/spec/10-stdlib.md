@@ -81,7 +81,7 @@ SL-01, SL-16, SL-18. **Regel D mit Trägerklausel, ein Ring in 5.0, der zweite a
 | Gruppe | Module |
 |---|---|
 | Kern | `prelude`, `core` (Kern-Interfaces, `Num`-Familie, `Error`, `Result`, `Box`, `Slice`, `StringView`, Ranges, Member von `T[]`/`Slice`/`?T`, Art-2-Attribute — `result`/`option` gehen auf), `iter`, `collections`, `string`, `fmt`, `math` |
-| Daten/Kodierung | `encode` (Encode/Decode-Paar, Name B10), `json` (RFC 8259), **`toml`** (Manifest), `encoding` (Base64/Hex/UTF-16/LE-BE; `bytes` geht auf), **`compress`** (RFC 1950–1952), **`regex`** (RE2-Syntax, lineare Zeit), `hash` (`Hasher`, SipHash, FNV, CRC32), `crypto` (SHA-2/SHA-1/MD5, HMAC, `secureRandom`; Ed25519/ChaCha20-Poly1305 Tür), `random` (PCG), `time` (RFC 3339, TZif-Parser RFC 8536 über die System-Zonendatenbank) |
+| Daten/Kodierung | `codec` (Encode/Decode-Paar, B10), `json` (RFC 8259), **`toml`** (Manifest), `encoding` (Base64/Hex/UTF-16/LE-BE; `bytes` geht auf), **`compress`** (RFC 1950–1952), **`regex`** (RE2-Syntax, lineare Zeit), `hash` (`Hasher`, SipHash, FNV, CRC32), `crypto` (SHA-2/SHA-1/MD5, HMAC, `secureRandom`; Ed25519/ChaCha20-Poly1305 Tür), `random` (PCG), `time` (RFC 3339, TZif-Parser RFC 8536 über die System-Zonendatenbank) |
 | I/O und System | `io` (`Reader`/`Writer`/`Seek`, Puffer-/Text-Hüllen, `IoError`, `copy`, Speicherströme, `stdin/stdout/stderr`, `print`-Familie, `readLine`, `isInteractive` — `io.stream`/`io.error`/`io.console` gehen auf), `fs`, `path`, `net`, **`uri`** (RFC 3986), **`http`** (HTTP/1.1 Client **und** Server über `Reader`+`Writer`; kein TLS, HTTP/2 Tür), `os` (ohne Zeit), `process`, **`term`** (ECMA-48, TTY-Erkennung; Raw-Mode Tür) |
 | Nebenläufigkeit (06) | `task`, `sync`, `thread` |
 | Werkzeug-Seite | `test`, `meta`, `syntax`, `build` (Bereich 11), `ffi` (Bereich 11) |
@@ -329,11 +329,29 @@ interface Seek   { fn seek(pos: SeekFrom): int throws IoError; }            // e
 | S7 | **Formatsprache** (Y7): `std.fmt.format(template, args...)` zur Laufzeit mit der f-String-Grammatik; `Format { fn format(spec: StringView, out: &StringBuilder) }` für Typen mit eigenen Specs; Breite/Ausrichtung/Füllung generisch für jeden `Display`-Typ, gezählt in Zeichen | Python |
 | S8 | **`std.regex`**: `Regex.new(pattern): Regex throws RegexError` (`r"…"`; `comptime Regex.new(…)` prüft zur Übersetzungszeit), `isMatch`, `find(s): ?Match { start, end, group(i), named(n) }`, `findAll`, `captures`, `replace`, `split`; RE2-Syntax (Klassen, Gruppen, benannte Gruppen, Unicode-Klassen; **keine** Backreferences, kein Lookaround), **lineare Zeit** (Pike-VM + lazy DFA); `Regex :: [Pattern]` | Go `regexp`, Rust `regex`; verworfen: Backtracking (PCRE, .NET — ReDoS) |
 
-## B10 — Serialisierung: **offen**
+## B10 — Serialisierung: **entschieden** (2026-09-29)
 
-SL-14: `Encode`/`Decode`-Paar mit Formaten als Backends, Ableitung per Makro-Attribut (09
-`@Derive`-Familie) statt Handschrift; `std.json` als erstes Backend; TOML (Manifest) als
-zweites; kein Format ohne das Paar.
+```
+interface Encode { fn encode(e: &Encoder): void throws EncodeError; }
+interface Decode { static fn decode(d: &Decoder): Self throws DecodeError; }
+interface Codable :: [Encode, Decode] {}
+```
+
+`Encoder`/`Decoder` sind Interfaces, die ein Format implementiert; Datenmodell mit zehn Formen:
+`null`, `bool`, `int`, `uint`, `float`, `string`, `bytes`, `seq`, `map`, `struct(name, fields)`,
+`variant(enum, name, payload)`.
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| E1 | **Modul `std.codec`** (Paar, `Encoder`/`Decoder`, Fehler, Attribut; B1-Arbeitsname `encode` ersetzt); Formate sind eigene Module (`std.json`, `std.toml`) mit je einem `Encoder`/`Decoder`. **Kein Format ohne das Paar** (SL-14) | Swift `Codable`, Rust `serde`; verworfen: `ToJson`/`FromJson` je Format (4.x), Go-Reflexion |
+| E2 | **Container-Modell**, kein Visitor: `Encoder` bietet `encodeInt(v)`, …, `encodeSeq(len): SeqEncoder`, `encodeMap(len): MapEncoder`, `encodeStruct(name, n): StructEncoder { field(name, v: Encode) }`, `encodeVariant(enum, name, index, payload)`; `Decoder` spiegelt pull-basiert (`decodeStruct(name, fields: string[]): StructDecoder { field<T :: [Decode]>(name): T }`, `SeqDecoder.next<T>(): ?T`); nicht selbstbeschreibende Formate dekodieren Structs in Feldreihenfolge | Swift `KeyedDecodingContainer`; verworfen: serdes Visitor-Doppeldispatch |
+| E3 | **Synthese über die Konformanzliste** (A5): `struct User :: [Codable] { id: int, name: string, mail: ?string }` feldweise per `comptime for (f in fields(Self))`, Deklarationsreihenfolge; Enums: Unit-Varianten als String, Nutzlast-Varianten **extern getaggt** (`{ "Circle": { "r": 1 } }`); eigene `encode`/`decode` ersetzt die Synthese | serde |
+| E4 | **Steuerung per Art-1-Attribut `@Codec`** (R4): am Feld `@Codec { name = "user_id", skip = true, default = true }`, am Enum `@Codec { tag = "kind" }` (intern getaggt), am Typ `@Codec { rename = .camelCase \| .snakeCase, denyUnknown = true }` | serde-Attribute; Swift `CodingKeys` verworfen |
+| E5 | **Fehler**: `DecodeError { kind: Missing \| TypeMismatch \| Invalid \| UnknownField \| UnknownVariant, path: string ("users[0].mail"), detail }`, `EncodeError { path, detail }`; Formatfehler eigene Typen (`JsonError { line, column }`, `TomlError`) — `json.decode<T>(text): T throws [JsonError, DecodeError]` | Swift `DecodingError.codingPath` |
+| E6 | **Regeln**: `?T` ↔ `null` **oder fehlend**; fehlendes Pflichtfeld → `Missing` (außer `default`); unbekanntes Feld ignoriert (`denyUnknown` dreht es); `uint8[]` formatabhängig (JSON Base64, TOML Array); `Instant` ↔ RFC 3339; `Map<K, V>` bedingt für `K` = `string` oder `Integer` (Zahlen als Schlüsselstrings), sonst Übersetzungsfehler; Ganzzahl-Überlauf beim Dekodieren → `Invalid`; `Map`-Schlüsselreihenfolge unspezifiziert, `sortKeys`-Option | serde; verworfen: Swifts Map-als-Paarliste |
+| E7 | **`std.json`**: `json.encode<T :: [Encode]>(v, opts = JsonOptions { pretty = false, indent = 2, sortKeys = false }): string`, `json.encodeTo(v, w: Writer)`, `json.decode<T :: [Decode]>(text): T`, `json.decodeFrom<T>(r: Reader)`; **`JsonValue`** als dynamischer Baum (`enum { Null, Bool, Int, Float, String, Array(List), Object(Map) }`), selbst `Codable` (`json.decode<JsonValue>` = altes `parse`); `[]` über `Index<string>`/`Index<int>` → `?JsonValue`, `path("a.b[0]")`, `Display` kompakt, `Debug`, `Equatable`. Strikt RFC 8259 (JSON5 Tür) | Rust `serde_json::Value`, Go |
+| E8 | **`std.toml`**: `toml.decode<T>`, `toml.encode`, `TomlValue` (mit `Datetime`); TOML 1.0; Manifest-Leser (Bereich 11) nutzt es | Rust `toml` |
+| E9 | **Türen**: CBOR (RFC 8949, per D zulässig), MessagePack, CSV, JSON5/JSONC, streamender `SeqDecoder` | — |
 
 ## B11 — Zeit, Zufall, Hash, Bytes, Encoding: **offen**
 
