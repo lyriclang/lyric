@@ -153,7 +153,10 @@ assoziierte Typen** (`type Out = Self;`) sind erlaubt.
 ## D7 — Konformanz-Synthese: **entschieden** (2026-09-28)
 
 **Form: die Konformanz ohne Körper** — `struct P :: [Equatable, Hashable] { … }` synthetisiert
-(Swift). Kein `derive`-Wort (ein Attribut, das *tut*, gibt es bei uns nicht).
+(Swift). Kein `derive`-Wort. *Vorläufig bis Bereich 9* (Maintainer, 2026-09-29): die Begründung
+„ein Attribut, das *tut*, gibt es bei uns nicht" ist die 4.x-Prämisse und für 5 **nicht**
+übernommen; Bereich 9 entscheidet, was Attribute dürfen. Die Form über die Konformanzliste
+kann auch dann die bessere sein — sie ist dann begründet, nicht geerbt.
 
 | Interface | Synthese | Bedingung |
 |---|---|---|

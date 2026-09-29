@@ -37,7 +37,27 @@ Aus `../module.md` (45 Fragen), `../build-pakete.md` (33), Spec §4, Guide 12/16
   werden bei jedem Bau geparst (~90 ms); ein weggepinntes Projekt wird trotzdem gelesen.
 - Bibliothek wurzelt in ihren `pub` **Funktionen** — Member nicht erfasst, Privates bleibt drin.
 
-## V1 — Modulbegriff und Modulname: **offen**
+## V1 — Modulbegriff, Modulname, Einstiegspunkt: **entschieden** (2026-09-29)
+
+**Datei = Modul bleibt; der Name kommt aus genau einer Quelle — dem Pfad.**
+
+| # | Regel | Vorbild |
+|---|---|---|
+| M1 | **Modulpfad = Dateipfad relativ zum Source-Root, mit dem Paketnamen als erstem Segment** — `src/net/http.lyr` in `mypkg` ist `mypkg.net.http`, **überall so geschrieben**, auch im Paket selbst (eine Schreibweise, kein `crate::`-Zwilling) | Go |
+| M2 | **Der `module`-Header entfällt** (redundant oder falsch: `RES0006`, `std.core`-Hijack) | Go, Python, Zig |
+| M3 | Paketname im Manifest (V7) ist ein Root; `std` reserviert; kein Paket beansprucht einen fremden Root | Lyric 4 |
+| M4 | **Loader dedupliziert nach Datei**, nicht nach Name (die Doppelladung von `app.lyr`) | — |
+| M5 | Verzeichnis = Namensraum, kein Modul; `net.lyr` neben `net/` ist Modul `net` | Rust |
+| M6 | Modulpfade **case-sensitiv, müssen dem echten Dateinamen entsprechen, auf jeder Plattform** | Go |
+| M7 | **Einstiegspunkt** (aufgerollt): |  |
+| M7a | **Ein Modul darf Bibliothek und Programm sein.** `main` in einem importierten Modul ist eine normale `internal`-Funktion; nur das Entry-Modul des Artefakts macht sie zur Wurzel (L11), jedes andere `main` ist toter Code. `lyric run src/tools/gen.lyr` führt dessen `main` aus. Das 4.x-Verbot (`SEM0021`) war eine VM-Regel (ein `.lyrbc`, ein Entry) und fällt ersatzlos | Python-Kultur, Rust `lib.rs`+`main.rs` |
+| M7b | **Signaturfamilie**: `fn main(): void` (Exit 0), `fn main(): int` (Exit-Code), beide optional `throws` (O4); **kein `args`-Parameter** — `std.env.args()` | Rust, Go |
+| M7c | Name bleibt `main`; **kein `@Entry`-Attribut in dieser Fassung** — *vorläufig bis Bereich 9*, der entscheidet, was Attribute dürfen (die 4.x-Prämisse „Attribute tun nichts" ist für 5 **nicht** übernommen) | — |
+| M7d | **Auswahl gehört dem Artefakt**: Manifest/`build.lyr` nennt das Entry-Modul (`executable("name", entry: …)`), Konvention `main.lyr`; mehrere Executables je Paket. Ob und wie `build.lyr` bleibt: **Bereich 11**; hier nur *ein Artefakt = ein Entry-Modul* | Rust, Zig |
+| M7e | **Keine Top-Level-Statements** (C# 9) — Skript-Ergonomie ist Lyric-Script (Z3) | — |
+| M7f | Exit-Codes: `int` = Code, `void` = 0, entkommener Fehler = 1, Panik = 101; `os.exit(n)` jederzeit ohne `defer`/`using` | Rust, Go |
+| M8 | Reservierte Gerätenamen als Modulname: Lint (Bereich 11) | — |
+
 ## V2 — Sichtbarkeit: **entschieden** (2026-09-29)
 
 **Drei Stufen** (Arbeitsnamen): **`private`** — dieses Modul; **`internal`** — dieses Paket,
@@ -58,7 +78,20 @@ verworfen (`pub`/`pub(crate)`-Rauschen in jeder App).
 | S6 | Die Bibliotheks-Wurzelregel (Reachability, L11) folgt der Sichtbarkeit: exportiert = erreichbar, inklusive Member | — |
 
 ## V3 — Importformen, Re-Export, Prelude: **offen**
-## V4 — Kapselungseinheit und Whitebox-Tests: **offen**
+## V4 — Kapselungseinheit und Tests: **entschieden** (2026-09-29)
+
+**Das Paket ist die Einheit** (`internal` paketweit, `private` modulweit, V2). Tests:
+
+| Wo | Sieht | Vorbild |
+|---|---|---|
+| **`@Test` im selben Modul** neben dem Code | alles, auch `private` | Rust `#[cfg(test)] mod tests`, Zig |
+| **`tests/`-Root als Teil des Pakets** — dieselbe Kompilation, keine Fremdkompilation, die den Source-Root importiert (halbiert den gemessenen Doppel-Compile in CI) | `internal` und `pub` | Go (`_test.go` im Paket) |
+| Blackbox | ein eigenes Paket im Workspace, das das geprüfte importiert — ein Muster, kein Mechanismus | Rust `tests/`, Go `foo_test` |
+
+Testcode wird nicht ausgeliefert: Wurzeln der Reachability (L11) sind `main`/`pub`; `@Test`-
+Funktionen sind nur unter `lyric test` Wurzeln — sonst toter Code. **Keine Bedingungs-
+kompilierung** dafür (Rust `#[cfg(test)]` überflüssig); Plattformbedingungen: Bereich 9.
+
 ## V5 — Initialisierung und Globale: **offen**
 ## V6 — Namensräume und Kollisionen: **offen**
 ## V7 — Pakete: Manifest, Versionen, Auflösung, Lockfile, Registry: **offen**
