@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The C side of the Lyric 5 toolchain: which C compiler, which target, which profile, and how a
+    set of C files becomes objects, an archive and an executable, with a content-hashed cache
+    (design/v5/spec/01 C1–C9, 11 T3). The runtime is built through it; from M2 on, so is every
+    program the compiler emits.
+  -->
+  <PropertyGroup>
+    <Version>5.0.0</Version>
+    <AssemblyName>Lyric5.Toolchain</AssemblyName>
+    <RootNamespace>Lyric5.Toolchain</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+</Project>
