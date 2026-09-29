@@ -77,7 +77,19 @@ verworfen (`pub`/`pub(crate)`-Rauschen in jeder App).
 | S5 | **`extend`-Blöcke**: inhärent `extend Foo { … }` — jede Methode mit eigener Stufe; ein Modifikator am Block ist der **Default für die Methoden darin** (`private extend Foo { … }`). Konformanz `extend Foo :: [Bar]` — die Konformanz ist **global**, sichtbar wo `Foo` und `Bar` sichtbar sind, nicht einschränkbar; Modifikator am Block ist ein Fehler. Grund: Kohärenz (X3) — zwei paketprivate `Hashable`-Konformanzen wären zwei Hash-Funktionen für einen `Set<Foo>` | Swift `private extension`; Rust/Swift (Konformanzen global) |
 | S6 | Die Bibliotheks-Wurzelregel (Reachability, L11) folgt der Sichtbarkeit: exportiert = erreichbar, inklusive Member | — |
 
-## V3 — Importformen, Re-Export, Prelude: **offen**
+## V3 — Importformen, Re-Export, Prelude: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| I1 | drei Formen bleiben: selektiv `import a.b { f, g }`, qualifiziert `import a.b;`, Alias `import a.b as x` | Rust, Python |
+| I2 | **Rename** im selektiven Import: `{ f as g }` | Rust, Python |
+| I3 | **kein Glob**; Rusts Hauptfall (`use Color::*`) deckt das implizite Member `.Red` (T9) | Go, Rust (entmutigt) |
+| I4 | **Re-Export `pub import a.b { Client }`** — ein Paket kuratiert seine Fläche im Wurzelmodul; ein Import ohne `pub` ist nie außerhalb sichtbar | Rust `pub use` |
+| I5 | Nichtnutzungswarnung **einheitlich** für alle Formen | — |
+| I6 | mehrere Formen für ein Modul koexistieren ohne Namenskollision; identischer Doppelimport Fehler | Lyric 4 |
+| I7 | Importe sind Top-Level-Deklarationen an jeder Stelle; der Formatter zieht sie nach oben und sortiert | Go |
+| I8 | **Prelude = Modul `std.prelude`**, in jedem Modul gebunden (Liste Bereich 10: mind. `panic`, `assert`, `unreachable`, `println`/`print`, `Error`, `Result`, `Box`, `Slice`, `str`, Range-Typen, Kern-Interfaces). Lokaler Name verdeckt Prelude-Namen → **Warnung** (heute still). Fest verdrahtete Helfer (`std.string.concat` für `+`) verschwinden — Operatoren über Interfaces (D6) | Rust, Swift/Kotlin |
+
 ## V4 — Kapselungseinheit und Tests: **entschieden** (2026-09-29)
 
 **Das Paket ist die Einheit** (`internal` paketweit, `private` modulweit, V2). Tests:
@@ -92,8 +104,29 @@ Testcode wird nicht ausgeliefert: Wurzeln der Reachability (L11) sind `main`/`pu
 Funktionen sind nur unter `lyric test` Wurzeln — sonst toter Code. **Keine Bedingungs-
 kompilierung** dafür (Rust `#[cfg(test)]` überflüssig); Plattformbedingungen: Bereich 9.
 
-## V5 — Initialisierung und Globale: **offen**
-## V6 — Namensräume und Kollisionen: **offen**
+## V5 — Initialisierung und Globale: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| G1 | Ein Modul hat **keinen Rumpf** — nur Deklarationen; ein Import führt nichts aus | Go, Rust |
+| G2 | Modul-`let`/`var` **eager beim Programmstart**, in Abhängigkeitsreihenfolge (Importe zuerst), innerhalb eines Moduls in Deklarationsreihenfolge; Zyklen Fehler; nur erreichbare Module (L11) | Go |
+| G3 | Ein Initializer darf nicht werfen: `try!` oder Panik | Rust `static`, Go |
+| G4 | **`Lazy<T>` als Bibliothek** (über `Once`, N10) — kein Sprachfeature | Rust `LazyLock`, Kotlin |
+| G5 | **Top-Level-`var` erlaubt** (`internal` per Default); unter Threads ohne `Atomic`/`Mutex` → Warnung (N10) | Go, Kotlin, Swift |
+| G6 | Kein `init()`-Hook (versteckter Kontrollfluss) | Go's `init` verworfen |
+
+## V6 — Namensräume und Kollisionen: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| K1 | **Modul- und Typnamensraum überlappen nicht**: kein Top-Level-Name, der ein Untermodul benennt — Fehler am Modul; `a.b.c` eindeutig | Rust |
+| K2 | **Mangling aus dem vollen Pfad** mit unterscheidbaren Trennern (C4); generische Instanzen tragen den **vollen Typpfad** (`lib.ident<app.Secret>`) | — |
+| K3 | Top-Level-Name, Import und Untermodul teilen **einen** Namensraum je Modul — Kollision = Fehler mit Note | Rust |
+| K4 | Ein Local darf einen Modulnamen verdecken — **legal und still**; aber wo es beißt (Memberzugriff auf das Local, dessen Name kein Member des Locals, wohl aber ein exportierter Name des verdeckten Moduls ist), trägt der Fehler eine **Note** „`path` ist hier das Local vom Typ `string` (Zeile 12) und verdeckt das Modul `std.path`"; dazu ein **Lint, standardmäßig aus**, für jede Verdeckung. „Immer warnen" verworfen: `path`, `time`, `json`, `log` sind als Local- wie Modulnamen häufig — Rauschen erzieht zum Ignorieren | Go `vet -shadow` |
+| K5 | **Builtin-Typnamen** nicht deklarierbar — Fehler | — |
+| K6 | Prelude-Funktionen verdecken → Warnung (I8) | — |
+| K7 | Modulpfad-Tippfehler bekommt einen Vorschlag | Bereich 11 |
+
 ## V7 — Pakete: Manifest, Versionen, Auflösung, Lockfile, Registry: **offen**
 ## V8 — Bibliotheksform und öffentliche Fläche: **offen**
 ## V9 — Toolchain- und Sprachversion im Paket: **offen**
