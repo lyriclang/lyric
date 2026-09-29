@@ -368,15 +368,29 @@ interface Codable :: [Encode, Decode] {}
 | Q9 | **`std.os`** — `args()`, `env(name): ?string`, `envs(): Map`, `setEnv`, `cwd()`, `setCwd`, `exit(code): never`, `platform`/`arch`, `homeDir`, `tempDir`, `hostname`, `cpuCount`, `pid`. **Signale**: `enum Signal { Interrupt, Terminate, Hangup, Quit, User1, User2, WindowChange, Other(n) }` — abstrakte Namen; Windows kennt nur `Interrupt` (Ctrl+C/Break) und `Terminate` (Konsole schließt); `os.signals(Signal.Interrupt, Signal.Terminate): Channel<Signal>` (mehrere je Aufruf, Kanal schließen = abbestellen; **ohne Abonnement OS-Default**); Zustellung Self-Pipe → Poller (S2) → Kanal, nie Lyric-Code im Handler; **intern**: `SIGCHLD` (Prozess-Modul), `SIGPIPE` ignoriert → `BrokenPipe`, `SIGALRM` (Timer); **nicht**: `KILL`/`STOP` (der Kernel liefert sie nicht), Fehler-Signale (`SEGV`/`BUS`/`FPE`/`ILL`/`ABRT` = Absturz mit Backtrace, kein Kanal; Guard-Pages der Koroutinen-Stacks intern); `child.signal(Signal.Terminate)` (O8); `os.kill(pid, s)` Tür. **Vormerk Bereich 11**: ein eingebettetes Runtime installiert **keine** Handler (`Runtime.init(installSignalHandlers = false)`, `os.signals` → `Unsupported`) — sie gehören dem Host. **Bare-Metal/Kernel/Firmware**: kein Ring, sondern ein „freestanding"-Laufzeitprofil ohne GC/libc — **Tür**, nicht 5.0 (Rust `no_std`, Zig `freestanding`; Go kann es nicht) | Go `signal.Notify`, Rust `signal-hook` |
 | Q10 | **Nebenläufigkeit, Modulschnitt** (Inhalt 06): **`std.task`** — `spawn`, `Task<T>`, `TaskScope`, `spawnDetached`, `sleep`, `Timer`, `Channel<T>`, `Select`, `timeout`, `Cancelled`, `ChannelClosed`; **`std.sync`** — `Mutex<T>`, `RwLock<T>`, `Once`, `Atomic<T>`, `Semaphore`; **`std.thread`** — `Thread.spawn`/`join`, `Pool`, `parallelMap`, `Isolate` (Muster G7) | Kotlin, Rust `std::sync` |
 
-## B12 — Test und Bench: **offen**
+## B12 — Test und Bench: **entschieden** (2026-09-29)
 
-SL-15/32: Assertionsliste, `assertThrows` (Lambda-Form), tabellengetriebene Tests, `@Bench`,
-`assertEq(actual, expected)`-Reihenfolge, Diff-Ausgabe; Property-Tests/Snapshots im Ring;
-Setup/Teardown nein (Test = Funktion).
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| X1 | **Assertions in `std.test`** (`assert(cond)` ist Prelude und panikt): `assertEq(actual, expected, msg = "")`, `assertNotEq`, `assertTrue/False`, `assertNull/NotNull`, `assertClose(a, e, tolerance)`, `assertLess/Greater`, `assertContains(c: Contains<T>, x)`, `assertEmpty`, `fail(msg): never`; **`assertThrows<E :: [Error]>(f: fn() -> void throws E): E`** (Lambda-Form, `E` inferiert, **gibt den Fehler zurück**), `assertPanics(f)` (eigener Task, prüft `Panicked`, T4). Reihenfolge `(actual, expected)` (N13). **Meldungen über `Debug`** (D7) und **`@callerExpr`** (09 Q10): `assertEq(xs.length(), 3)` meldet `xs.length() = 2, expected 3`; Strings: erste abweichende Position, mehrzeilig als Zeilen-Diff | JUnit/Kotlin, Rust `assert_eq!`, power-assert |
+| X2 | **Test = Funktion** `@Test fn` ohne Parameter, im Paket (V4); **Subtests** `subtest("name") { … }` für tabellengetriebene Tests (einzeln berichtet, Lauf geht nach Fehlschlag weiter); `@Test { skip = "grund" }`; Filter über CLI (`lyric test -f name`). **Kein Setup/Teardown** — Fixtures sind Aufrufe plus `using` (SL-15) | Go `t.Run`; verworfen: JUnit `@Before`, Klassen-Fixtures |
+| X3 | **Isolation**: jeder Test in einem eigenen Task (Panik → Test rot, Lauf geht weiter), Timeout je Test (Default 60 s, `@Test { timeout = … }`); **sequenziell je Paket, `@Test { parallel = true }` opt-in** (ohne `Send`/`Sync` ist Parallel-Default eine Falle: cwd, env, globale `var`); Pakete parallel zueinander | Go; verworfen: Rusts Parallel-Default |
+| X4 | **`@Bench fn name(b: &Bench)`** mit `b.iter { … }` (Warmup, Iterationen bis stabil), `b.bytes(n)`, `blackBox(x)` gegen DCE; Bericht ns/op, Allokationen/op (GC-Zähler), MB/s; `lyric bench --save/--compare` (Bereich 11) | Go `testing.B`, Rust `criterion` (Teilmenge) |
+| X5 | **`///`-Codeblöcke laufen als Tests** (09) | Rust doctests |
+| X6 | **Ring**: Property-Tests, Snapshots, Mocking; Coverage-Werkzeug Bereich 11 | — |
 
-## B13 — `std.meta` und `std.syntax`: **offen**
+## B13 — `std.meta` und `std.syntax`: **entschieden** (2026-09-29)
 
-Was Bereich 9 braucht, nichts mehr: `std.meta` (Typ-Introspektion zur Compile-Zeit: Felder,
-Varianten, Konformanzen, Attribute), `std.syntax` (`Expr`, `Stmt`, `Block`, `Decl`,
-`StructDecl`, `FnDecl`, `Ident`, `Type`, `Literal`, `Pattern`; `quote`-Ergebnistypen;
-`error(node, …)`).
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| M1 | **`std.meta`** (nur `comptime`, R1–R6): `fields<T>(): FieldInfo[]` (`name`, `type: Type`, `index`, `visibility`, `isVar`, `attributes`), `variants<E>(): VariantInfo[]` (`name`, `index`, `payload`), `members<T>()`, `conformances<T>()`, `hasConformance<T, I>()`, `typeName<T>()`, `isStruct/isClass/isEnum/isInterface<T>()`, `attributes<T>()`, `sizeOf<T>()`, `alignOf<T>()`; Feldzugriff `this.[f]` (R2); `target { os, arch, pointerWidth, endian }`, `profile { name, debug }` (A6); `Type` ist ein `comptime`-Wert, einsetzbar in Typposition eines `quote` | Zig `@typeInfo`, Nim |
+| M2 | **`std.syntax`**: AST als **Enums/Structs mit `Box`-Nutzlast** (`Box` zählt als Wert — 09 Q1 präzisiert): `Expr`, `Stmt`, `Block { stmts }`, `Decl` (`FnDecl`, `StructDecl`, `ClassDecl`, `EnumDecl`, `InterfaceDecl`, `ExtendDecl`, `LetDecl`, …), `Type`, `Pattern`, `Ident { name, span }`, `Literal`, `Param`, `Attribute`, `Span { file, line, column }`; jeder Knoten `span`, `Debug`, `toSource(): string`; Bauen über `quote`/`#{}`, `Ident.fresh("hint")` (Hygiene), `parseExpr(s: string): Expr` für DSL-Strings (Q5); Gehen über `children()`/`walk(f)`/`map(f)`; Diagnosen `error(node, msg): never`, `warn(node, msg)`, `note` | Nim `macros`, Rust `syn` (ohne Token-Strom) |
+| M3 | **Stabilität**: AST-Enums `@NonExhaustive` (neue Knotenarten je Minor; Makro-`match` braucht `_`); `std.syntax` mit dem Compiler versioniert, kein Ring | — |
+| M4 | **Nicht**: Laufzeitreflexion, `typeof` zur Laufzeit, dynamischer Aufruf (R6) — Feldnamen zur Laufzeit nur als `comptime`-synthetisierte Tabelle (`Debug`, `Codec`) | Zig |
+
+---
+
+**Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen
+Bereichen aus diesem: 03 A2 (`StringView`), 04 D6 (`showTo`), 04 D7 (`Clone` folgt der
+Konformanz), 05 K7/R7, 08 S3a, 01 K7a, 09 Q1 (`Box` als `comptime`-Wert).
+Es bleiben 11 (Werkzeuge und Interop) und 12 (Migration).

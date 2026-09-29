@@ -86,7 +86,7 @@ Daten, kein Test.
 
 | # | Regel | Vorbild |
 |---|---|---|
-| Q1 | **Ergebnistypen**: jeder Werttyp (Skalare, Strings, Arrays, Structs, Enums, Tupel, `?T`); **keine Referenzen** (Klassen, Closures, Koroutinen) — ein Heap-Objekt des Interpreters wird keine Konstante (4.x: nur Skalar/String) | Zig |
+| Q1 | **Ergebnistypen**: jeder Werttyp (Skalare, Strings, Arrays, Structs, Enums, Tupel, `?T`, **`Box<T>` — Nachtrag Bereich 10 M2**, damit rekursive AST-Enums `comptime`-Werte sind); **keine Referenzen** (Klassen, Closures, Koroutinen) — ein Heap-Objekt des Interpreters wird keine Konstante (4.x: nur Skalar/String) | Zig |
 | Q2 | **Formen**: `comptime expr`, `comptime { … }` (Block, letzter Ausdruck ist der Wert), `comptime if` (**beide Zweige typgeprüft**, einer emittiert — nicht Zigs Überraschung), `comptime for (x in werte)` (Entfaltung über einen `comptime`-Wert) | Zig `inline for` |
 | Q3 | **Reiner Code**: Funktionen rufen (laufen dann zur Compile-Zeit), Werte bauen, `std.meta`; **kein I/O, Netz, Zeit, Zufall** — Übersetzungsfehler an der Stelle | Zig |
 | Q4 | **`embed("pfad")`**: Datei relativ zum Modul, innerhalb des Pakets, als `uint8[]`/`string` — die einzige Compile-Zeit-I/O; Build hängt von der Datei ab (Cache) | Zig `@embedFile`, Rust `include_bytes!` |
