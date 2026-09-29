@@ -145,11 +145,41 @@ bedingte Extends (`extend<T :: [Num]> Iterator<Item = T> { fn sum(): T }`, X1) �
 4.x-Grund für freie Zwillinge ist weg; keine `listX`/`mapList`-Namen. Kotlin/Swift; gegen Go
 (`slices.Sort(xs)`).
 
-## B3 — Antwortformen und Panik-Regel: **offen**
+## B3 — Antwortformen und Panik-Regel: **entschieden** (2026-09-29)
 
-Nach 05 E1: eine werfende Funktion je Operation; wo bleibt die stille `?T`-Form (`parseInt`,
-`Map.get`, `env`)? `bool` als Antwort? Panik-Regel („Argument aus Daten panikt nie; Argument
-aus dem Programmtext darf") und ihre Fälle (`split("")`, `substring`, Index).
+Nach 05 E1 gibt es je Operation **eine** werfende Funktion (N6). Die Formen:
+
+| Form | Frage | bleibt für | Vorbild |
+|---|---|---|---|
+| `throws E` | „Warum nicht?" | **jede Operation mit einem Grund**: Datei, Netz, Prozess, JSON, Encoding, **Parse** | Swift |
+| `?T` | „Gibt es einen Wert?" | **nur Nachschlagen und Absenz ohne Grund**: `m.get(k)`, `xs.first()`, `xs.find(p)`, `indexOf`, `os.env(name)`, Iterator-Ende, `Deque.pop()` | Kotlin, Swift |
+| `bool` | „Ist es so?" | Zustandsprädikate (`exists`, `isEmpty`, `contains`) und Informationsantworten (`Set.add` = „war neu") — **nie** „hat es geklappt" | Go-`ok` nur beim Lookup |
+| `Result<T, E>` | „Grund als Wert" | **nie Rückgabetyp der std**; der Aufrufer baut ihn (`Result.of { … }`); Ausnahme: Sammlungen von Ergebnissen aus Batch-Operationen | Swift `Result(catching:)` |
+| Panik | „Wer hat sich geirrt?" | Vorbedingung aus dem **Programmtext** | Rust |
+
+**`parse` wirft** — `int.parse(s)`, `float.parse`, `bool.parse`, `Instant.parse`, `Url.parse`
+werfen `ParseError { kind: Invalid | Overflow | Empty }`: eine Parse-Antwort hat einen Grund,
+den die Fehlermeldung braucht; die stille Form kostet ein Zeichen (`try? int.parse(s) ?? 0`).
+Rust (`Result`); gegen Swift (`Int("42")` → Optional) und 4.x (`parseInt` → `?int`).
+
+**Panik-Regel (normativ):** *Ein Argument, das aus Daten stammen kann, panikt nie — es
+antwortet `?T`, `bool` oder wirft. Ein Argument, das der Programmierer schreibt (Index,
+Trenner, Format-Spec, Bereichsgrenze), darf paniken.* Da Paniken unfangbar sind außer an der
+Task-Grenze (E-Reihe): **kein Parser, Decoder oder I/O-Pfad der std panikt auf Eingabe.**
+
+| Fall | Antwort |
+|---|---|
+| `xs[i]` außerhalb | Panik; `xs.get(i)` → `?T` (COL-23) |
+| `s[a..b]` außerhalb oder nicht an Zeichengrenze | Panik (A2, Rust) |
+| `s.split("")` | Panik (Python `ValueError`) |
+| Ganzzahl-Überlauf, Division durch null | Panik (T-Reihe); `checkedDiv` für Daten |
+| `x!` auf `null` | Panik |
+| `List.remove(i)` außerhalb | Panik; `Map.remove(k)` fehlend → `?V` |
+| `Duration.ofSeconds(-5)` | erlaubt (negativ ist ein Wert) |
+| `fmt.format("{:zz}", x)` mit kaputtem Spec zur Laufzeit | Panik (im f-String prüft es der Compiler) |
+| ungültiges UTF-8, kaputtes JSON, fehlende Datei | wirft |
+
+Werfende Iteratoren (`lines()`, `fs.walk`): Protokollfrage → B6.
 
 ## B4 — Kern-Interfaces und Verträge in `std.core`: **offen**
 
