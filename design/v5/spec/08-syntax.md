@@ -76,7 +76,64 @@ Kotlin) ist **nicht** der Optimierungshinweis — der heißt **`@AlwaysInline`/`
 `mutating` verworfen: länger, nichts gewonnen); **`&T`-Parameter** mit **`&x`** an der
 Aufrufstelle (Y1); keine `ref`-Locals, keine `ref`-Rückgabe (T12 Tür).
 
-## Y2 — Deklarationssyntax: **offen**
+## Y2 — Deklarationssyntax: **entschieden** (2026-09-29)
+
+| # | Regel |
+|---|---|
+| D1 | **Feldtrenner `,`** bleibt (Felder und Member in einer Liste; ein selbstschließender Member darf es weglassen) |
+| D2 | **Enum-Methoden nach `;`** bleiben (`enum E { A, B; fn f() { } }`); `extend E` ebenso möglich |
+| D3 | Sichtbarkeitswort vor der Deklaration: `pub fn`, `internal struct`, `private let`; Reihenfolge `pub static fn`, `pub mut fn` |
+| D4 | `var`-Feld: `pub var count: int,`; ohne `var` unveränderlich (M2) |
+| D5/D6 | `struct S :: [I, J]`, `<T :: [I, Iterator<Item = int>]>` bleiben (Y1) |
+| D7 | `class Dog :: [Walker by legs]` — `by` im Listeneintrag |
+| D8 | **`sealed interface Shape { }`** — geschlossene Konformermenge im Paket: `match` über Typ-Patterns erschöpfend ohne `_`, ein neuer Konformer macht jedes `match` ohne ihn zum Fehler, fremde Pakete konformieren nicht, der Compiler darf `switch` über Deskriptoren emittieren. Gegen Enum: eigenständige Typen mit eigenen Membern (Kotlin, Java 17) |
+| D9 | `fn f(): int throws [IoError, ParseError]`; ein Typ auch ohne Klammern; bar = `Error` |
+| D10 | Interface: `type Item;` / `type Out = Self;`, `static fn parse(s: string): ?Self;`, `static let ZERO: Self;`, Default-Rümpfe, `private fn` Helfer |
+| D11 | **Koroutine nur über den Rückgabetyp** `Coroutine<int>` + `yield` — keine Signaturmarkierung (keine Färbung) |
+| D12 | `extend T { }`, `extend T :: [I] { }`, `extend<T :: [I]> T[] { }`, `private extend T { }` |
+| D13 | `macro Name(target: StructDecl, n: Expr): Decl { … }` (Y12) |
+| D14 | `type Pair<T> = (T, T);`; kein `opaque` |
+| D15 | `extern "C" fn strlen(s: CStr): uint = "strlen";`; kein `"dotnet"`; `@Export("name")` (Bereich 11) |
+| D16 | `@[…]` vor der Deklaration; gestapelte `@A` → Gruppe (Formatter) |
+| D17 | `struct Pair<T :: [Equatable]> :: [Equatable] { … }`, `<Rhs = Self>`, `_` |
+| D18 | `fn main(): void \| int [throws …]` |
+
+Gesamtform an einem Beispiel (Guide-Kapitel 1 übernimmt es):
+
+```
+@[Route { path = "/x" }]
+pub sealed interface Shape :: [Display] {
+    type Unit = float;
+    static fn origin(): Self;
+    fn area(): Unit;
+    fn describe(): string { return f"area {this.area()}"; }
+    private fn fmt(v: float): string { … }
+}
+
+pub struct Circle :: [Shape, Equatable, Hashable] {
+    r: float,
+    pub var tag: string,
+    static let UNIT: Circle = Circle { r = 1.0, tag = "u" };
+    static fn origin(): Circle { return Circle.UNIT; }
+    fn area(): float { return 3.14159 * this.r * this.r; }
+    mut fn scale(f: float): void { this.tag = f"{this.tag}*{f}"; }
+}
+
+class Dog :: [Walker by legs] { legs: Legs, name: string, }
+
+enum Json { Null, Bool(bool), Num(float), Arr(Json[]), Obj(Map<string, Json>);
+    fn isNull(): bool { return match (this) { .Null => true, _ => false }; }
+}
+
+pub fn parse<T :: [Parse]>(s: str): T throws [ParseError] { return try T.parse(s); }
+fn swap<T>(a: &T, b: &T): void { let t = a; a = b; b = t; }
+fn sum(nums: int...): int { … }
+inline fn each<T>(xs: T[], f: fn(T) -> void): void { for (x in xs) { f(x); } }
+macro Builder(target: StructDecl): Decl { return quote { … }; }
+type Handler = fn(Event) -> void throws [IoError];
+extend<T :: [Display]> T[] :: [Display] { fn show(): string { … } }
+```
+
 ## Y3 — Bindungs- und Mutabilitätswörter (`mut`, `inout`/`ref`, `&`): **offen**
 ## Y4 — Ausdrucksformen und Präzedenz: **entschieden** (2026-09-29)
 
