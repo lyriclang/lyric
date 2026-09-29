@@ -38,7 +38,25 @@ Aus `../module.md` (45 Fragen), `../build-pakete.md` (33), Spec §4, Guide 12/16
 - Bibliothek wurzelt in ihren `pub` **Funktionen** — Member nicht erfasst, Privates bleibt drin.
 
 ## V1 — Modulbegriff und Modulname: **offen**
-## V2 — Sichtbarkeit: Stufen, Member, Felder, der qualifizierte Weg: **offen**
+## V2 — Sichtbarkeit: **entschieden** (2026-09-29)
+
+**Drei Stufen** (Arbeitsnamen): **`private`** — dieses Modul; **`internal`** — dieses Paket,
+**der Default**; **`pub`** — exportiert. Der Default ist die häufigste Bedeutung: in einer App
+teilen Dateien ohne Wort, eine Bibliothek schreibt Wörter nur, wo sie eine Absicht hat
+(exportieren, verstecken). Swift (`internal` Default), Go (paketweit); Rust's `private`-Default
+verworfen (`pub`/`pub(crate)`-Rauschen in jeder App).
+
+| # | Regel | Vorbild |
+|---|---|---|
+| S0 | **Member folgen der Typregel**: ohne Wort `internal`, `pub` exportiert, `private` modulintern. `struct Point { x: int, y: int }` ist in einer App vollständig; an der Exportgrenze `pub x`. Enum-Varianten wie das Enum; Extension-Methoden wie Member | Swift |
+| S0a | **Felder: Lese-/Schreibtrennung** — ein `var`-Feld darf lesend weiter sichtbar sein als schreibend (Arbeitsnotation `pub(read) var n`; Syntax Bereich 8); unveränderliche Felder sind mit `pub` lesbar und nie schreibbar (M2) | Swift `private(set)`, Kotlin, C# |
+| S1 | Sichtbarkeit wird **bei jeder Namensauflösung** geprüft — qualifiziert, selektiv, Pattern, Konformanzliste, Constraint, `extend`-Ziel, `extern`; **eine** Implementierung im Symbolmodell (schließt den zentralen 4.x-Befund) | — |
+| S2 | **Privater Typ in exportierter Fläche ist ein Fehler** (`pub fn make(): Secret`) | Rust E0446 |
+| S3 | `pub` auf einem Member eines nicht exportierten Typs ist erlaubt (exportiert, sobald der Typ es wird) — **mit Warnung** „Member `x` ist sichtbarer als sein Typ `Y`" | Rust (ohne Warnung) |
+| S4 | **Interface-Anforderungen** (Methoden, statische Member, assoziierte Typen) sind so sichtbar wie das Interface — ein Modifikator dort ist ein Fehler (ein Interface *ist* seine Memberliste; eine Pflicht ohne Aufrufer wäre sinnlos). **Private Helfer mit Rumpf** im Interface sind erlaubt, aufrufbar nur aus Default-Methoden desselben Interfaces; kein Konformer implementiert sie | Rust, Swift; Java 9 (private interface methods) |
+| S5 | **`extend`-Blöcke**: inhärent `extend Foo { … }` — jede Methode mit eigener Stufe; ein Modifikator am Block ist der **Default für die Methoden darin** (`private extend Foo { … }`). Konformanz `extend Foo :: [Bar]` — die Konformanz ist **global**, sichtbar wo `Foo` und `Bar` sichtbar sind, nicht einschränkbar; Modifikator am Block ist ein Fehler. Grund: Kohärenz (X3) — zwei paketprivate `Hashable`-Konformanzen wären zwei Hash-Funktionen für einen `Set<Foo>` | Swift `private extension`; Rust/Swift (Konformanzen global) |
+| S6 | Die Bibliotheks-Wurzelregel (Reachability, L11) folgt der Sichtbarkeit: exportiert = erreichbar, inklusive Member | — |
+
 ## V3 — Importformen, Re-Export, Prelude: **offen**
 ## V4 — Kapselungseinheit und Whitebox-Tests: **offen**
 ## V5 — Initialisierung und Globale: **offen**
