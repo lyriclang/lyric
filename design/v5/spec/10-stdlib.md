@@ -181,14 +181,25 @@ Task-Grenze (E-Reihe): **kein Parser, Decoder oder I/O-Pfad der std panikt auf E
 
 Werfende Iteratoren (`lines()`, `fs.walk`): Protokollfrage → B6.
 
-## B4 — Kern-Interfaces und Verträge in `std.core`: **offen**
+## B4 — Kern-Interfaces und Verträge in `std.core`: **entschieden** (2026-09-29)
 
-Vollständige Liste und Namen: `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Display`,
-`Debug`, `Default`, `Clone`, `Parse`, `Into`/`From`, `Add`…`Neg`, `Index`/`IndexSet`,
-`Iterator`/`Iterable`/`FromIterator`, `Resource` (05 R1 — Name), `Error`, `Format`
-(Formatsprache), `FromLiteral` (COL-13). Hash-Vertrag (SL-26: `equals ⇒ hash`; nicht stabil
-über Versionen; **Hasher-Modell**: `hash(): int` oder `hash(h: &Hasher)` streaming). Ordnungs-
-vertrag (Sortierstabilität COL-39).
+| Gruppe | Interfaces |
+|---|---|
+| Gleichheit/Ordnung | `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Identity` (Marker), Enum `Ordering { Less, Equal, Greater }` |
+| Text | `Display`, `Debug`, `Format`, `Parse { static fn parse(s: StringView): Self throws [ParseError] }` |
+| Erzeugung/Konversion | `Default { static fn default(): Self }`, `Clone { fn clone(): Self }`, `From<T> { static fn from(v: T): Self }`, `Into<T>` als Blanket über generischen Extend (`extend<T, U :: [From<T>]> T :: [Into<U>]`, X1) |
+| Operatoren | `Add`…`Rem`, `Neg`, `BitAnd/Or/Xor/Not`, `Shl/Shr`, `Contains<T>`, `Index<K>`, `IndexSet<K>` (D6) |
+| Iteration | `Iterator`, `Iterable`, `FromIterator` (B6) |
+| Zahlen | `Num`, `Integer`, `Float` (B5) |
+| Sonstige | `Error`, `Any`, `Closeable`, `FromArrayLiteral<T>` |
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| K1 | **`Closeable { fn close(): void throws Error }`** ist der Name des Ressourcen-Interfaces (05 R1) — nennt die geforderte Methode; `Resource` (Kategorie-Substantiv), `Disposable` (C#), `Drop` (Rust, RAII) verworfen | Java, Kotlin, Go `io.Closer` |
+| K2 | **`Hashable { fn hash(h: &Hasher) }`** — streaming: der Typ füttert seine Felder, der Hasher mischt; `Hasher` ist ein Struct in `std.hash`; Synthese schreibt `h.write(feld)` je Feld; `Map<K, V, H = DefaultHasher>`. **Default-Hasher SipHash-1-3 mit zufälligem Prozess-Schlüssel** (Z3 „Server": HashDoS); Reproduzierbarkeit über `Map.withHasher(FixedHasher)`. `fn hash(): int` (C#, Java, 4.x: `combineHash` von Hand, schwache Mischung) verworfen | Rust `Hash`/`Hasher`, Swift `hash(into:)` |
+| K3 | **Verträge (normativ)**: *Hash* — `a == b ⇒` derselbe Strom; Hashwerte **nicht stabil** über Prozesse/Versionen, nie persistieren; `float` ohne Hash (D6). *Ordnung* — `compare` konsistent mit `equals`; `TotalOrder` total und antisymmetrisch; **`sort()` stabil**, `sortUnstable()` daneben; `sortBy(cmp)`, `sortByKey(f)` (COL-39). *Clone* — siehe K5 | Rust, Go, Python (Hash-Instabilität ausgesprochen) |
+| K4 | **`FromArrayLiteral<T> { static fn fromLiteral(items: T[]): Self }`**: ein Array-Literal koerziert an den erwarteten Typ (T3) — `let s: Set<int> = [1, 2, 3];`, `let m: Map<string, int> = [("a", 1)];` (kein Map-Literal); eine Kopie, die `Set.of` auch hätte | Swift `ExpressibleByArrayLiteral`; Rust nur `vec!` |
+| K5 | **`Clone` folgt der Konformanz** (D7 revidiert): Zuweisung und `with` kopieren einen Struct ohnehin eine Ebene (Wertmodell) — `clone()` ist die ausdrückliche Kopie „so tief, wie der Typ besitzt", und Besitz steht in der Konformanzliste: Wertfelder kopiert, Referenzfelder `clone()`d, wenn ihr Typ `Clone` ist, sonst Fehler an der Synthese; **`@Shared`** am Feld kopiert die Referenz (Parent-Zeiger, Dienste, Zyklen); Container bedingt `Clone`. Kein `DeepClone` (zwei Mechanismen; C#s `ICloneable`-Unklarheit) | Rust; gegen Kotlin `copy`/Java `clone` (flach) |
 
 ## B5 — Zahlen: **offen**
 

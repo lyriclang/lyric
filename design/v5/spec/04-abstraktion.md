@@ -165,7 +165,7 @@ kann auch dann die bessere sein — sie ist dann begründet, nicht geerbt.
 | **`Debug`** | **für jeden Typ automatisch, bei Bedarf** (`P { x = 1, y = 2 }`, Variantenname, Klassen mit Feldern); kein Opt-out | — |
 | `Display` | **nie automatisch**; auf Anfrage = Debug-Form (löst Korpus W9: zwei Interfaces) | — |
 | `Default` | feldweise aus `Default` der Felder oder aus Feld-Defaults (M14) | — |
-| `Clone` | **flach**: Wertfelder kopiert, Referenzfelder geteilt (Kotlin `copy`); auf Klassen die Antwort zu M6 W2 | — |
+| `Clone` | **folgt der Konformanz** (revidiert 2026-09-29, Bereich 10 B4): Wertfelder kopiert; ein Referenzfeld wird `clone()`d, wenn sein Typ `Clone` konformiert, sonst **Fehler an der Synthese** — es sei denn, das Feld trägt `@Shared` (Referenz kopiert: Parent-Zeiger, Dienste, Zyklen). Container bedingt (`extend<T :: [Clone]> List<T> :: [Clone]`). Rust; die flache Kotlin-`copy`-Form verworfen (Java/C#-Überraschung); kein zweites `DeepClone` | alle Referenzfelder `Clone` oder `@Shared` |
 | `Identity` (M10) | Identitäts-`Equatable` + Adress-`Hashable`, nur Klassen | — |
 | Enums | wie Structs; statische `variants()`/`fromName()` Bereich 9 | — |
 | Tupel | automatisch bedingt (T16) | — |
