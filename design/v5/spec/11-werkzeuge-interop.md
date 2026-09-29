@@ -66,13 +66,23 @@ Reihenfolge: W1 (CLI) → W2 (Projekt, Profile, Ziele) → W3 (`build.lyr`) → 
 W5 (Einbettung, Script-Nesting) → W6 (Diagnostik) → W7 (Lints) → W8 (Editor, Formatter, REPL,
 Doku) → W9 (Distribution).
 
-## W1 — CLI: ein Treiber, Verben, Optionen, Ausgabe: **offen**
+## W1 — CLI: ein Binary, Verben, Optionen, Ausgabe: **entschieden** (2026-09-29)
 
-CLI-1…15, 19–25, 28–34, 39. Ein Binary mit Verben (Cargo/Go) oder Werkzeugkasten (4.x)?
-Verbenliste (`new build run test bench check fmt fix doc api expand clean add update
-toolchain …`); Optionsgrammatik, Präzedenzleiter (Flag > Env > Manifest > Default), `--`,
-Exit-Code-Leiter, JSON-Ausgabe (`--json`), Farbe/`NO_COLOR`, Completions, Datei vs
-Artefaktname, was `lyric run` kosten darf, CLI als versionierter Vertrag.
+Grundlage verschoben: keine VM (L7) — der Grund für den 4.x-Werkzeugkasten („`lyrvm` ohne
+Compiler") entfällt; der C#-Compiler wird als NativeAOT-Binary ausgeliefert (W9).
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| C1 | **Ein Binary `lyric` mit Verben** (CLI-1 B); `lyric lsp`/`lyric dap` sind Verben (stdio). Kein Treiber, keine doppelte Optionsarität, keine drei Prozessstarts | Cargo, Go, Zig, Deno; verworfen: Werkzeugkasten (4.x), PATH-Erweiterungen (Tür) |
+| C2 | **Verben 5.0**: `new`, `init`, `build`, `run`, `test`, `bench`, `check`, `fmt`, `fix`, `doc`, `api`, `expand`, `explain`, `clean`, `add`/`remove`, `update`, `metadata`, `env`, `lsp`, `dap`, `toolchain`, `version`, `help`, `completions`. **Weg**: `pack` (das native Binary ist das Artefakt), `disasm`/`verify` (`lyric build --emit c\|ir`), `repl` (W8). Türen: `publish`, `vendor`, `watch` | CLI-2 C |
+| C3 | **Optionsgrammatik**: `--flag value`/`--flag=value`, Kurzflags, `--no-X`, globale Optionen vor oder nach dem Verb (`-q`, `-v`, `--color`, `--json`, `-C dir`), **streng** (unbekannt = Exit 2), `--` trennt Programmargumente; **eine Optionstabelle je Verb** erzeugt `--help`, Completions (`bash zsh fish pwsh`) und die Spec-Tabelle | Cargo, Go `flag` |
+| C4 | **Präzedenzleiter** (CLI-21 A): Kommandozeile > `LYRIC_*` > `lyric.toml` > benutzerweite `config.toml` > Vorgabe; Feldflag > Profilflag; `lyric env` zeigt Werte mit Herkunft | Cargo, `go env` |
+| C5 | **Exit-Codes** (CLI-32 A): 0 ok · 1 Eingabe abgelehnt (Compilefehler, rote Tests, `deny`-Lint) · 2 Kommandozeile/Umgebung falsch · 101 Panik der Toolchain; `lyric run`/`test` **reichen den Programm-Exit durch** (Panik 101, entkommener Fehler 1, 05 O4); `fn main(): int` wird `& 0xFF` (dokumentiert), Warnung bei konstantem `return` außerhalb `0..255`; **kein `ExitCode`-Typ** | Cargo; verworfen: Rust `ExitCode` (CLI-12 E), Sättigung, sysexits-Stufen |
+| C6 | **`--json`** = NDJSON-Ereignisstrom (Diagnosen, Artefakte, Testergebnisse, Fortschritt) mit Schema in der Spec (Diagnoseform W6); `--quiet` unterdrückt nur Fortschritt | Cargo `--message-format=json` |
+| C7 | **Terminal**: `--color auto\|always\|never`, `NO_COLOR`, `TERM=dumb`, Fortschritt nur am TTY; Diagnoseausgabe rustc-artig (W6) | rustc |
+| C8 | **Datei oder Projekt**: `lyric run` = Standard-Binary des Pakets (sucht `lyric.toml` aufwärts); `lyric run pfad.lyr` = **Einzeldatei als implizites Paket** (Skript-Modus, nur `std`); `--bin name` bei mehreren | Go, Cargo |
+| C9 | **Kosten** (CLI-25): Whole-Program-Compile je Lauf über den Cache (L7) — unverändert = kein Compile; Ratchets in Verhältnisform: Hello-World kalt ≤ 400 ms, **warm ≤ 50 ms über dem nackten Programmstart**; NativeAOT-Compiler + `zig cc` im selben Prozessbaum | Zig, Go |
+| C10 | **CLI = versionierter Vertrag** (CLI-30): Verben, Optionen, Exit-Codes, JSON-Schema in der Spec; ein Verb/Flag fällt nur in einem Major, vorher `deprecated` in `--help` und beim Aufruf; `lyric --version` nennt Compiler, Edition, `std`, C-Compiler | Go 1 |
 
 ## W2 — Projektmodell: Manifest-Schema, Profile, Ziele, `out/`: **offen**
 
