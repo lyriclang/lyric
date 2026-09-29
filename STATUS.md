@@ -23,8 +23,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 
 | M | Name | Size | State |
 |---|---|---|---|
-| M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **open** |
-| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | — |
+| M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
+| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **next** |
 | M2 | First native program (IR → C → `zig cc`) | L | — |
 | M3 | Value model and type system | XL | — |
 | M4 | Interfaces and abstraction | L | — |
@@ -49,16 +49,27 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 Sizes are sessions, not dates: S days, M 1–2 weeks, L 3–4 weeks, XL more. A milestone more than
 100 % over its size is re-cut here (CONTRIBUTING, scope check).
 
-### M0 — exit criteria
+### M0 — done (2026-09-29)
 
-1. `lyriclang/lyric-script` exists and its CI is green. — **done** (`33339164`)
-2. `lyric-spec`: branch `script` = the 4.x text; `main` carries the 5.0 skeleton.
+1. `lyriclang/lyric-script` exists and its CI is green — `33339164`.
+2. `lyric-spec`: branch `script` = the 4.x text (`e314d72`); `main` carries the 5.0 skeleton
+   (lyric-spec#45).
 3. `main`: `lyric5` (5.0.0) beside the 4.x tree (4.6.0), the Lyric 5 migration warnings reverted,
-   4.x planning archived, README/CONTRIBUTING/CHANGELOG on the 5 line.
-4. CI: the C toolchain job (native, cross to every Tier 1 triple, clang sanitizers) and the
-   `lyric5` NativeAOT job are green on Linux x64/arm64, Windows and macOS.
-5. The rolling `dev` prerelease exists with `lyric5 --version` → `lyric 5.0.0-dev.<date>+<sha>`;
-   the `nightly` prerelease is gone.
+   4.x planning archived, README/CONTRIBUTING/CHANGELOG on the 5 line — #175.
+4. CI: `c-toolchain` (native, cross to every Tier 1 triple, clang sanitizers) and `lyric5-aot`
+   green on Linux x64/arm64, Windows and macOS — #175.
+5. The rolling `dev` prerelease exists (first build `0634784`, four Tier 1 archives and
+   `SHA256SUMS`), every package job checked `lyric5 --version` → `lyric 5.0.0-dev.<date>+<sha>`;
+   the `nightly` prerelease and tag are gone. The linux-arm64 package needed the stub to know
+   the RID — #176.
+
+Measured on the way and kept: the tree stays 4.6.0 because a 5.0.0 claim fires the 4.x
+deprecation clocks aimed at 5.0 (29 CLI tests red); `zig cc` ships no ASan/TSan runtime, so the
+sanitizer profile compiles with clang (01 C7).
+
+### M1 — Runtime core in C
+
+Next. Plan first (13, M1), then slices.
 
 ## Design decisions
 
