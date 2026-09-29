@@ -64,11 +64,38 @@ Aus `../stdlib.md` §1 (gelesen und gemessen auf 4.6):
 Reihenfolge: **B1 zuerst** (sie entscheidet, was es überhaupt gibt), dann Schnitt/Namen (B2–B3),
 dann die Kernverträge (B4–B6), dann die Fachmodule (B7–B12), zuletzt `std.meta`/`std.syntax` (B13).
 
-## B1 — Umfang und Ringe (Bibliotheks-Umkehr): **offen**
+## B1 — Umfang und Ringe (Bibliotheks-Umkehr): **entschieden** (2026-09-29)
 
-SL-01, SL-16, SL-18. Kommen Regex, HTTP, TLS, Zeitzonen, Kompression, Krypto, CLI-Parser,
-Logging, Terminal in `std`? Nach welcher **Regel**? Ein Ring oder zwei? Wird `std` mit dem
-Compiler versioniert?
+SL-01, SL-16, SL-18. **Regel D mit Trägerklausel, ein Ring in 5.0, der zweite als Tür.**
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| U1 | **Inhaltsregel D**: in `std` kommt, was eine **externe Norm** vorgibt (RFC, IANA, Unicode, ECMA-48, TOML-Spec); draußen bleibt, was **API-Geschmack** ist (Arg-Parser-Form, Logging-API, ORM, Template) | Go implizit; gegen Python (drei Arg-Parser, PEP 594) |
+| U2 | **Trägerklausel**: rein kommt nur, was `std` selbst in Lyric plus dünner C-Schicht (L9) trägt — **keine Systembibliothek als Abhängigkeit** von `std`. Folge: TLS, Zonendaten, Ciphers sind Pakete | Rust `hyper`/`rustls`-Trennung; gegen Zig (eigenes TLS, nur Client) |
+| U3 | **Ein Ring** in 5.0: `std` liegt bei der Toolchain, ist mit ihr versioniert (Quelle ist das Format, L7); Reachability (L11) macht Größe laufzeitkostenfrei — der Preis von D ist Pflege, nicht Binary | Rust, Go |
+| U4 | **Zweiter Ring = Tür**: Pakete im Org mit eigener Version über Pfad/Git (07 P2) — kein Mechanismus, bis er existiert | Swift `swift-*`, Kotlin `kotlinx-*`, Deno `@std` |
+| U5 | **Prelude ohne I/O**: `print`/`println`/`eprint`/`eprintln` liegen in `std.io` (`import std.io { println }`); das Prelude trägt, was Signaturen brauchen, nicht Wirkungen | Go `fmt`, C# `Console`, Zig; gegen Rust/Python/Swift |
+
+**`std` in 5.0 — 35 Module** (Namen vorläufig, Schnitt B2):
+
+| Gruppe | Module |
+|---|---|
+| Kern | `prelude`, `core` (Kern-Interfaces, `Num`-Familie, `Error`, `Result`, `Box`, `Slice`, `str`, Ranges, `?T`-Member, Art-2-Attribute — `result`/`option` gehen auf), `iter`, `collections`, `string`, `fmt`, `math` |
+| Daten/Kodierung | `encode` (Encode/Decode-Paar, Name B10), `json` (RFC 8259), **`toml`** (Manifest), `encoding` (Base64/Hex/UTF-16/LE-BE; `bytes` geht auf), **`compress`** (RFC 1950–1952), **`regex`** (RE2-Syntax, lineare Zeit), `hash` (`Hasher`, SipHash, FNV, CRC32), `crypto` (SHA-2/SHA-1/MD5, HMAC, `secureRandom`; Ed25519/ChaCha20-Poly1305 Tür), `random` (PCG), `time` (RFC 3339, TZif-Parser RFC 8536 über die System-Zonendatenbank) |
+| I/O und System | `io` (`Reader`/`Writer`/`Seek`, Puffer-/Text-Hüllen, `IoError`, `copy`, Speicherströme, `stdin/stdout/stderr`, `print`-Familie, `readLine`, `isInteractive` — `io.stream`/`io.error`/`io.console` gehen auf), `fs`, `path`, `net`, **`url`** (RFC 3986), **`http`** (HTTP/1.1 Client **und** Server über `Reader`+`Writer`; kein TLS, HTTP/2 Tür), `os` (ohne Zeit), `process`, **`term`** (ECMA-48, TTY-Erkennung; Raw-Mode Tür) |
+| Nebenläufigkeit (06) | `task`, `sync`, `thread` |
+| Werkzeug-Seite | `test`, `meta`, `syntax`, `build` (Bereich 11), `ffi` (Bereich 11) |
+
+**Ring** (Pakete im Org): `cli`, `log`, `tls` (Systembibliothek per FFI), `tzdata`, `unicode`
+(Normalisierung, Grapheme, Konsolenbreite), `crypto.cipher` (AES, RSA), `proptest`/`snapshot`,
+HTTP/2. **Bewusst nein**: BigInt (Tür), GUI, ORM/Template, XML/CSV (per D zulässig, ohne
+Bedarf — Tür). **Fällt gegenüber 4.x**: `result`/`option`/`bytes`/`io.*`-Untermodule als
+eigene Module, Zeit in `os`, `OrThrow`/`OrErr`-Zwillinge, `lastError*`, Typsuffixe, freie
+Terminatoren, `LineReader`, `std.build` als Programmimport.
+
+Verworfen: A (Rust-klein — ohne Registry zu karg), B ohne Regel (Go/Python — Halde), zweiter
+Ring jetzt (doppelte Release-Mechanik für einen Maintainer), `extern`-Hüllen als Batterien
+(Sandbox-Frage entfällt, Trägerklausel bleibt).
 
 ## B2 — Modulschnitt, Prelude, Namenskonventionen: **offen**
 
