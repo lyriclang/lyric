@@ -43,7 +43,29 @@ Aus `../metaprogrammierung.md` (37 Fragen), Guide 15, `design/macros.md`,
 ## A5 — Synthese: fest im Compiler oder nutzererweiterbar: **offen**
 ## A6 — Bedingungskompilierung: **offen**
 ## A7 — Typinformation zur Compile-Zeit, Enum-Reflexion: **offen**
-## A8 — Makros: **offen**
+## A8 — Der Mechanismus: **entschieden** (2026-09-29) — die ganze Leiter, Sprosse 5
+
+„`comptime` *oder* Makros" war falsch gestellt: ein Makrosystem nach Nims Modell ist
+**`comptime` plus drei Dinge** (AST-Typen als Werte, `quote`/Einfügung, Aufrufformen) auf
+demselben Compile-Zeit-Interpreter (L7). Entschieden: **alle fünf Sprossen für 5.0.**
+
+| Sprosse | Was | Kostet |
+|---|---|---|
+| 1 | `comptime`-Werte und -Blöcke mit allen Werttypen, `comptime if`/`for` in Rümpfen (A4) | den Interpreter (vorhanden) |
+| 2 | **Typinformation zur Compile-Zeit**, `comptime for` über Felder/Varianten (A7) — der Hybrid: Nutzer sieht Konformanz/Attribut, `comptime` steht in der Bibliothek | Typinfo-API |
+| 3 | **`@callerExpr`** u. Verwandte (Quelltext des Arguments, Zeile, Datei als Parameterwert) — deckt `assert`/`expect`/Logging ohne Makro | compilergelesenes Attribut (C# `CallerArgumentExpression`, Zig `@src()`) |
+| 4 | **`inline`-Funktionen mit nicht-lokalem `return`** — Blöcke, die wie Keywords wirken (`forEach { if (…) return }`) | eine Funktionseigenschaft (Kotlin) |
+| **5** | **Makros**: Compile-Zeit-Funktionen über typisierten Syntaxbäumen (`std.syntax`: `Expr`, `Block`, `Ident`, `StructDecl` …), Ausgabe über **`quote { … }` mit `#{…}`-Einfügung, hygienisch**; **drei feste Aufrufformen** — Deklaration (`@derive(ToJson) struct …`, das Attribut *ist* die Anwendung), Ausdruck/Statement (`sql!("…")`, `retry!(3) { … }`), Block (Trailing-Lambda als `Block`-Argument); das Makro sieht Syntax **und auf Anfrage Typen** (`typeOf(expr)`, `fields(T)` — was Rust-proc-macros fehlt); Fehler zeigen auf `quote`-Stelle und Aufrufstelle; `lyric expand` zeigt erzeugten Code | AST als **stabile öffentliche API** (eigenes Spec-Kapitel), Hygiene, Expansionswerkzeug im Editor |
+
+**Grenze: T1, nicht T3.** Ein Makro gibt existierenden Formen neue Bedeutung (Elixir, Julia,
+Rust, Nim); es erzeugt Deklarationen, Ausdrücke, Statements — **keine neuen Grammatikformen**
+(keine Keywords, keine Statement-Shapes, keine Operatoren). Erweiterbare Grammatik (Racket —
+funktioniert nur durch Syntaxlosigkeit; Seed7, Fortress †, Perl-Source-Filter) verlangt, dass
+jedes Werkzeug die Erweiterungen ausführt, um eine Datei zu lesen, und Grammatiken komponieren
+nicht. C-Makros (Textersetzung: keine Typen, kein Scope, keine Hygiene) verworfen.
+
+**Syntax** (Makrodeklaration, `quote`, Einfügung, `!`/`@`, `inline`) — **Bereich 8**.
+
 ## A9 — Doc-Tests: **offen**
 ## A10 — Warnungsunterdrückung: **offen**
 ## A11 — Die compilergelesenen Attribute: **offen**
