@@ -122,34 +122,45 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | B16 | `extern "dotnet" fn … = "System.Math::Cbrt"` (guide 14) | entfällt — FFI über C (W4) | H | — |
 | B17 | `OnType`/`OnFunction`/`OnModule`/`WithArg` (guide 15) | bleiben (F1-Marker) | — | — |
 
-## R3 — Reihenfolge der Korpora: **offen**
+## R3 — Reihenfolge der Korpora: **entschieden** (2026-09-29)
 
-Vorschlag: `std` wird **neu geschrieben** (nicht migriert — Regel D, neue Module, neue Grenze);
-Guide wird neu geschrieben (Spec 5.0 als Quelle); `examples/` migriert (Testfall für `fix`);
-Konformanzsuite neu (R4); Erato bleibt auf Lyricpp/4.x, bis es will. Was `fix --from-4` am
-Ende wirklich abdeckt, misst der `examples/`-Lauf.
+| # | Korpus | Weg | Warum |
+|---|---|---|---|
+| Q1 | **`std`** | **neu schreiben**, nicht migrieren — 35 Module nach B1, neue Grenze, neue Verträge; die 4.x-Quelle ist Steinbruch für getestete Algorithmen (Map, Merge-Sort, JSON, Base64, RFC 3339) | Regel D und die neuen Interfaces machen jede Datei zu 70 % anders |
+| Q2 | **Guide** | neu aus den Spec-Dokumenten; Kapitel folgen den Bereichen; jedes Snippet in der Suite | der 4.x-Guide erklärt eine andere Bibliothek |
+| Q3 | **`examples/`** | **mit `fix --from-4` migrieren** — der Abnahmetest: was danach nicht kompiliert, ist eine fehlende Regel (R2 ergänzen) oder ein `needsReview`-Fall im Bericht | misst das Werkzeug ehrlich |
+| Q4 | **Konformanzsuite** | neu (R4); 4.x-Fälle wandern mit Lyric-Script | — |
+| Q5 | **Golden-Tests** des Compilers | fallen; Ersatz: Konformanzfälle + C-Emission-Goldens | Compiler-Umbau |
+| Q6 | **Erato** | unberührt (Lyricpp) | Z-Reihe |
+| Q7 | `design/`, `docs/Befunde_und_Verbesserungen/`, `PLAN.md`, `STATUS.md` (4.x) | archivieren (`docs/archive/4.x/`); `design/v5/spec` ist die Quelle | — |
 
-## R4 — Spec 5.0 und Konformanzsuite: **offen**
+## R4 — Spec 5.0 und Konformanzsuite: **entschieden** (2026-09-29)
 
-Die Dokumente `spec/00–12` sind die Grundlage der Spec 5.0 (normativ: Grammatik, Typsystem,
-Fehler, Nebenläufigkeit, Module, Metaprogrammierung, Syntax, stdlib-Verträge §11, CLI-Kapitel
-C10, Diagnostik G-Reihe, FFI-Typtabelle X2). Suite: `since:`-Gates werden auf `5.0` gesetzt,
-4.x-Fälle retirieren mit ihren Regeln; Reihenfolge spec-first bleibt (Regel-PR → Zwilling →
-Release + Pin). Wer schreibt die Spec — aus den Bereichsdokumenten generiert oder von Hand?
+| # | Entscheidung |
+|---|---|
+| P1 | **Die Spec wird von Hand geschrieben**, nicht generiert (Bereichsdokumente tragen Begründung und Verworfenes, die Spec nur die Regel). Kapitel: `01-lexical`, `02-grammar`, `03-types`, `04-modules`, `05-interfaces`, `06-errors`, `07-statements`, `08-expressions`, `09-patterns`, `10-concurrency`, `11-metaprogramming`, `12-stdlib` (Verträge), `13-abi` (X2, `@Layout`, Einbettung H1–H3 — ersetzt `13-bytecode`), `14-cli` (C10), `15-project` (W2), `16-diagnostics` (G-Reihe), Appendix A **generiert** aus `diagnostics.toml` (G9) |
+| P2 | **Suite neu**, jeder Fall `since: 5.0.0`; **spec-first bleibt**: Regel-PR mit Konformanzfall (Zwilling) → Compiler; der Compiler pinnt einen Spec-Commit; jede Warnung rot/grün (G10) |
+| P3 | Die 4.x-Spec bleibt als Spec von Lyric-Script (R6) |
 
-## R5 — Repository und Org: **offen**
+## R5 — Repository und Org: **entschieden** (2026-09-29)
 
-Lyric 5 im bestehenden `lyric`-Repo (Branch, dann `main`) oder neues Repo `lyric5`? Was mit dem
-4.x-Code (Compiler C#: wird Basis des 5er-Frontends; VM: wird Lyric-Script); Spec-Repo-Zweig;
-Clients (Tree-sitter-Repo neu); Erato unberührt. Versionsnummer der ersten Release: `5.0.0`.
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| O1 | **`lyric` bleibt das Repo von Lyric 5**: `main` wird 5-Entwicklung (`dev`-Kanal, T5), `release/4.x` Wartungszweig bis zum Schnitt | Go, Rust |
+| O2 | **Neues Repo `lyric-script`** aus dem 4.6-Tag (Compiler, VM, stdlib, Werkzeuge) — die 4.x-Linie lebt dort weiter (R6) | — |
+| O3 | **`lyric-spec`**: `main` = 5.0; Zweig `script` = 4.x-Spec, eigenes Repo sobald Lyric-Script sich bewegt | — |
+| O4 | Clients `vscode-lyric`/`jetbrains-lyric` sprechen `lyric lsp` (5); Fork `…-script` für den Script-Server; **neu `tree-sitter-lyric`** (E8) | — |
+| O5 | Erste Release **`5.0.0`**, davor `5.0.0-dev.<datum>+<sha>` | SemVer |
 
-## R6 — Die 4.x-Linie und Lyric-Script: **offen**
+## R6 — Die 4.x-Linie wird Lyric-Script: **entschieden** (2026-09-29)
 
-4.x endet nicht — es **wird** Lyric-Script (Z4): letzte Release der 4er-Linie unter dem Namen
-`lyric`, erste unter `lyric-script`; eigene Roadmap, eigene Versionierung (1.0 oder 4.7?);
-was aus 5 zurückfließt (Formatsprache, Lints, Diagnostik) ist Sache dieser Roadmap.
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| L1 | **4.x endet nicht, es zieht um**: letzte Release unter `lyric` ist die beim Schnitt (4.6/4.7); die erste unter **`lyric-script 1.0.0`** ist dieselbe Codebasis umbenannt — Binary `lyric-script`, Endung **`.lyrs`**, eigener Versionszähler ab 1.0, Spec „Lyric-Script 1.0" = Lyric-Spec 4.x | verworfen: Weiterzählen als 4.7 (zwei Produkte, eine Nummernlinie) |
+| L2 | Bugfixes der 4.x-Linie geschehen in Lyric-Script; **kein 4.x-Release mehr unter `lyric`** nach dem Schnitt | — |
+| L3 | Rückfluss aus 5 (Formatsprache, Lints, Diagnostikform, `lyric.toml`) entscheidet die Script-Roadmap — nichts ist Pflicht | Z4 |
 
-## R7 — Der Umsetzungsplan: **offen**
+## R7 — Der Umsetzungsplan: **offen** → eigenes Dokument `13-umsetzungsplan.md`
 
 Das eigentliche Ergebnis der Runde (Maintainer: „einen detailreichen Plan, nach dem Lyric 4
 stückweise auf 5 gebracht wird"). Meilensteine mit konkretem Artefakt je Schritt (CONTRIBUTING
