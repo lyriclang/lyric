@@ -127,7 +127,26 @@ kompilierung** dafür (Rust `#[cfg(test)]` überflüssig); Plattformbedingungen:
 | K6 | Prelude-Funktionen verdecken → Warnung (I8) | — |
 | K7 | Modulpfad-Tippfehler bekommt einen Vorschlag | Bereich 11 |
 
-## V7 — Pakete: Manifest, Versionen, Auflösung, Lockfile, Registry: **offen**
+## V7 — Pakete: **entschieden** (2026-09-29)
+
+**`lyric.toml`** als deklaratives Manifest (von Werkzeugen ohne Ausführung lesbar), `build.lyr`
+für Logik (ob und wie: Bereich 11) — die Cargo-Trennung, von Zig (`build.zig.zon`) nachvollzogen.
+Verworfen: JSON/JSONC (Korpus W18: kein Standard), Manifest in der Sprache (nicht ohne
+Ausführung lesbar).
+
+| # | Regel | Vorbild |
+|---|---|---|
+| P1 | `name` (Root-Segment, M3), `version` (Semver), `lyric` (Sprachversion, V9) | Cargo, Go |
+| P2 | `[dependencies]` mit Versionsanforderung (`"1.2"` = `^1.2`), Pfad, Git; Registry-Quelle später als dieselbe Eintragsform | Cargo |
+| P3 | **Genau eine Version je Paket im Programm** — whole-program, Monomorphisierung, Kohärenz (X3) vertragen keine zwei `foo`; ein nebeneinander lebender Major ist ein anderer Paketname (`foo2`) | Go (semantische Import-Versionierung); Rust (Duplikate) verworfen |
+| P4 | **Minimal Version Selection**: das kleinste, das alle Anforderungen erfüllt; deterministisch ohne Solver; Upgrade nur per `lyric update` | Go MVS; Cargos Solver verworfen |
+| P5 | **`lyric.lock`** mit aufgelöster Menge und **Inhalts-Hashes**, eingecheckt (MVS macht die Auswahl, das Lock den Inhalt reproduzierbar) | Go `go.sum` |
+| P6 | **Nur deklarierte Abhängigkeiten importierbar** (heute: flacher Abschluss gibt jedem alles) | Cargo, Go |
+| P7 | **`[override]`** ersetzt ein Paket durch einen Pfad; das ersetzte wird **nicht gelesen** | Cargo `[patch]`, Go `replace` |
+| P8 | **Keine Registry in 5.0** (Pfad + Git; LUECKEN C-06); Manifest registry-fähig, statischer HTTP-Index als Tür | Cargo sparse index, Go proxy — Bereich 11 |
+| P9 | Features, Workspaces, Vendoring: Türen in Bereich 11 | Cargo |
+| P10 | Ein Paket ist ein Quellbaum (L7); der Cache liegt beim Nutzer | Go |
+
 ## V8 — Bibliotheksform und öffentliche Fläche: **offen**
 ## V9 — Toolchain- und Sprachversion im Paket: **offen**
 ## V10 — `std` als Paket: **offen**
