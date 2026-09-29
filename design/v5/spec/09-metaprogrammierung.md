@@ -65,8 +65,23 @@ weil man normalen Code liest, der entfaltet wird; **Makros** für **Deklaratione
 Makros" verworfen: die `ToJson`-Schleife als `quote`-Konstruktion wäre die Unlesbarkeit, die an
 `comptime` stört, an jeder Stelle statt an manchen. (Nim: `static:`/`when` + `macro`)
 
-## A2 — Deklarationsform, Ziele, Argumente: **offen**
-## A3 — Attribut-Identität (qualifizierte Namen): **offen**
+## A2 — Deklarationsform, Ziele, Argumente: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| F1 | **Daten-Attribut** = Struct mit Zielmarker (4.x). Marker vollständig: `OnModule`, `OnType`, `OnFunction`, `OnMethod`, `OnField`, `OnParameter`, `OnVariant`, `OnInterface`, `OnAlias`, `OnExtend` — und eine **Hierarchie** über die Elternkette (Maintainer): **`OnAny`** (alles), `OnDecl` (jede benannte Deklaration), `OnTopLevel`, `OnTypeLike` (Struct, Klasse, Enum, Interface, Alias), `OnMember` (Methode, Feld, `static let`, Variante), `OnCallable` (Funktion, Methode). Ein Attribut nennt den kleinsten passenden Marker; kein `OnAll`-Synonym | Lyric 4 |
+| F2 | **Makro-Attribut** = `macro` mit typisiertem Deklarationsparameter (A8); der Parametertyp ist der Zielmarker | Nim, Swift |
+| F3 | **Compiler-Anweisung** in `std.core` deklariert wie Art 1, vom Compiler an der Identität erkannt; Nutzer legen keine an | — |
+| F4 | **Argumente**: benannte Felder `@Route { path = "/x" }`, Positionsform `@Retry(3)`; Werte sind **`comptime`-Ausdrücke** (Literale, `let`s, Unit-Varianten, berechnete) — ein Begriff von „Wert zur Compile-Zeit" (schließt L5) | — |
+| F5 | Gruppe `@[A, B(…), C { … }]` bleibt Normalform des Formatters | Lyric 4 |
+
+## A3 — Identität: **entschieden** (2026-09-29)
+
+Ein Attribut ist über seinen **vollen Pfad** identifiziert (`std.test.Test`) — im Format, in der
+Host-API, im Runner; zwei `Tag` aus zwei Modulen sind zwei Attribute (schließt L1/L2). Art-2-
+Attribute erkennt der Compiler an der Identität, nicht am Namen: ein eigenes `struct Test` ist
+Daten, kein Test.
+
 ## A4 — `comptime`: Umfang: **entschieden** (2026-09-29)
 
 | # | Regel | Vorbild |
@@ -99,7 +114,15 @@ Rusts Makro-Namensraum wird nicht übernommen). D7 ist damit begründet, nicht g
 - Synthese für ein **fremdes** Interface (Rusts `serde_derive`-Fall): ein Attribut-Makro mit
   eigenem Namen (`@JsonVia`), das `extend P :: [ToJson] { … }` erzeugt — erlaubt, Nebenweg.
 
-## A6 — Bedingungskompilierung: **offen**
+## A6 — Bedingungskompilierung: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| B1 | **Im Rumpf**: `comptime if (target.os == .Windows) { … }` — beide Zweige typgeprüft (Q2) | Zig |
+| B2 | **Auf Deklarationen**: Art-2-Attribut **`@When(cond)`** — emittiert nur unter der Bedingung; der inaktive Zweig wird typgeprüft, soweit die Plattform es erlaubt (ein `extern "C"` auf eine Windows-API: bis zur Signatur) | Rust `#[cfg]` (prüft inaktiven Code nicht) — die Überraschung „der Linux-Zweig hatte einen Tippfehler" gibt es bei uns nicht |
+| B3 | **Kein Dateisuffix-Mechanismus**; ein Modul je Plattform ist `@When` am Modulkopf | Go's `_windows.go` verworfen: unsichtbar im Text |
+| B4 | Bedingungen sind `comptime`-Ausdrücke über `target` (`os`, `arch`, `pointerWidth`), Manifest-Features (Tür, V7 P9) und Profil (`profile.debug`) | — |
+
 ## A7 — Typinformation zur Compile-Zeit: **entschieden** (2026-09-29)
 
 | # | Regel | Vorbild |
@@ -135,7 +158,41 @@ nicht. C-Makros (Textersetzung: keine Typen, kein Scope, keine Hygiene) verworfe
 
 **Syntax** (Makrodeklaration, `quote`, Einfügung, `!`/`@`, `inline`) — **Bereich 8**.
 
-## A9 — Doc-Tests: **offen**
-## A10 — Warnungsunterdrückung: **offen**
-## A11 — Die compilergelesenen Attribute: **offen**
-## A12 — Generierter Code und Werkzeuge: **offen**
+## A9 — Doc-Tests: **entschieden** (2026-09-29)
+
+**`///`-Codeblöcke werden von `lyric test` ausgeführt**, als `@Test`s mit generiertem Namen;
+Zaunmarken ` ```lyr no_run ` (nur kompilieren) und ` ```lyr ignore `. Ein Beispiel, das nicht
+läuft, ist eine Lüge. Korpus ★W4: kein zweiter Mechanismus — es *ist* ein `@Test`, den der
+Runner aus dem Kommentar baut. (Rust)
+
+## A10 — Warnungsunterdrückung: **entschieden** (2026-09-29)
+
+**Art-2-Attribut `@Allow(code)`** an Deklaration oder Modul, plus **Paketliste im Manifest**
+(`[lints] allow = […]`) — zwei Orte, ein Mechanismus (das Manifest ist „das Attribut am
+Paket"). Keine Quelltext-Direktive (Kommentare tun nichts). Ein `@Allow`, das nichts
+unterdrückt, warnt selbst (Clippy). Korpus W10 beantwortet.
+
+## A11 — Die compilergelesenen Attribute (Art 2): **entschieden** (2026-09-29)
+
+| Attribut | Vertrag |
+|---|---|
+| `@Deprecated { message, until, replacement }` | Warnung am Aufruf; `until` als Ratchet (4.x); **`replacement`** speist `lyric fix` (Bereich 11) |
+| `@Test`, `@Bench` | Wurzeln unter `lyric test`/`lyric bench` (V4); identitätsgebunden (A3) |
+| `@Inline`, `@NoInline`, `@Cold` | **Hinweise** an den C-Compiler (`always_inline`, `noinline`, `cold`), kein Versprechen; das 4.x-„documented No" fällt — es ist eine Zeile C, kein Interpreter-Budget |
+| `@MustUse` | Warnung bei verworfenem Rückgabewert (Funktionen; Typen wie `Result`, `Task`) |
+| `@NonExhaustive` | Enum/`sealed`-Interface: `match` außerhalb des Pakets braucht `_` — die Regel, die 4.x versprach und nie prüfte |
+| `@callerExpr(param)`, `@callerLine`, `@callerFile` | Quelltext/Position des Arguments als Parameterdefault (A8 Sprosse 3) |
+| `@When(cond)` | Bedingungskompilierung (A6) |
+| `@Allow(code)` | Unterdrückung (A10) |
+| `@Export("c_name")` | C-ABI-Export (B6, Bereich 11) |
+| `@Entry` | **nein** — M7c bestätigt: `main` ist der Name, das Artefakt wählt das Modul |
+
+## A12 — Generierter Code und Werkzeuge: **entschieden** (2026-09-29)
+
+Quellgeneratoren (`lyrbind`, Schema→`.lyr`) bleiben **Werkzeuge im Bau**, schreiben nach
+`gen/` — sichtbar, versionierbar, debuggbar; `build.lyr` (Bereich 11) ruft sie. Makros (A8) für
+das, was *im* Programm entsteht; Generatoren für das, was aus *fremden* Beschreibungen kommt.
+
+---
+
+**Bereich 9 ist damit vollständig entschieden** (A1–A12, 2026-09-29).
