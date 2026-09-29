@@ -148,7 +148,7 @@ assoziierte Typen** (`type Out = Self;`) sind erlaubt.
 | `x in xs` | `Contains<T> { fn contains(x: T): bool }` — Ranges, Arrays, `Slice`, `Set`, `Map` (Schlüssel), `string`/`str`; `!in` Bereich 8 |
 | `x[k]` | `Index<K>`, `IndexSet<K>` (T14) |
 | `as` | **nur numerisch** (T1d); Typkonversion als Methode `T.from(v)`/`v.into()` über `From<T>`/`Into<T>`, Auswahl über den erwarteten Typ (T8) — der `as`/`Into`-Mehrdeutigkeitsbefund verschwindet |
-| `{x}` im f-String | `Display { fn show(): string }`; Debug-Form D7 |
+| `{x}` im f-String | `Display { fn show(): string }`; Debug-Form D7; **Nachtrag (Bereich 10 S6)**: zweites Mitglied `fn showTo(out: &StringBuilder): void` mit Default über `show()`, von f-Strings und Containern gerufen; `Debug` analog `debugTo` |
 
 ## D7 — Konformanz-Synthese: **entschieden** (2026-09-28)
 
