@@ -110,7 +110,17 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 | K6 | `Mutex<T>`, `RwLock<T>`, `Once`, `Atomic<T>` (G4); auch auf einem Thread nötig, sobald ein Abschnitt einen `wait` enthält; `Mutex` parkt statt zu spinnen | Rust |
 | K7 | alles in Lyric (L9) über `park`/`unpark` und Thread-Primitive; die Laufzeit kennt keinen Channel | — |
 
-## N6 — Scheduler und I/O: nicht-blockierend, blockierende Natives, Host-Pump: **offen**
+## N6 — Scheduler und I/O: **entschieden** (2026-09-29)
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| S1 | **Scheduler bleibt Lyric** über `park`/`unpark`, `poll(events, timeout)`, Timer (L9) | Lyric 4 |
+| S2 | **Poller in C je Plattform**: epoll, kqueue, **AFD/wepoll** unter Windows (Bereitschaftssemantik; IOCP's Completion-Modell würde die stdlib zweigleisig machen) | mio, libuv |
+| S3 | **Reguläre Dateien** über Pool-Thread + notify (4.2-Modell von `std.io.stream`, jetzt für alle Datei-I/O); `io_uring` Tür | libuv, tokio |
+| S4 | **Keine blockierenden Natives in der stdlib**: `sleep` parkt, DNS auf dem Pool-Thread, `file.bytes` über S3; ein blockierfähiges Native heißt so und existiert nur als Pool-Variante | — |
+| S5 | **Host-Pump**: `Scheduler.step(): bool` und `Scheduler.run()` — die 4.x-Form | Lyric 4, Erato |
+| S6 | ein Scheduler je Thread, kein Nesting; Host-Callback ist ein C-Aufruf, wartet er, läuft er als Task; `MaxReentryDepth` verschwindet | — |
+| S7 | `std.task` steht in der Spec; kein Capability-Gating in Lyric 5 (Z3) | — |
 ## N7 — Speichermodell: **entschieden** (2026-09-29)
 
 | # | Regel | Vorbild |
@@ -121,6 +131,35 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 | P4 | keine Umordnung über Atomics und Locks (clang mit C11-Atomics) | — |
 | P5 | Datenparallelität (`parallelMap`, Chunk-Schleifen) ist **Bibliothek** über einen Thread-Pool; kein `parallel for` in der Sprache | Rust rayon, Java streams |
 
-## N8 — Präemption: **offen**
-## N9 — Abbruch und Timeouts: **offen**
-## N10 — Thread-Sicherheit von Laufzeit und Bibliothek: **offen**
+## N8 — Präemption: **entschieden** (2026-09-29) — kooperativ
+
+Die Invariante **„Code zwischen zwei Warteoperationen läuft ohne Zwischenschaltung von
+Geschwister-Tasks desselben Threads"** bleibt (Kotlin, C#, Node, Lyric 4); ein `var`-Zähler
+braucht keinen Lock ohne `wait` dazwischen. Aushungern durch einen rechnenden Task ist
+dokumentiert; `yieldNow()` als expliziter Rescheduling-Punkt; Rat: CPU-Arbeit auf einen anderen
+Thread. **Opt-in Zeitscheibe je Scheduler** über die Safepoint-Polls (L6): Tür. Verworfen: Go's
+Präemption (Mutexe auch auf einem Thread nötig).
+
+## N9 — Abbruch und Timeouts: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| X1 | **Kooperativ**: `task.cancel()` setzt eine Marke; am nächsten `wait`/`park` wird **`Cancelled`** geworfen (Mechanismus von `close()`, A5) — `defer`/`using` laufen, Zustand `Cancelled`; `await()` darauf wirft `Cancelled` | Kotlin, Trio |
+| X2 | ein Task, der nie wartet, ist nicht abbrechbar (dokumentiert); `yieldNow()` ist Abbruchpunkt | Kotlin |
+| X3 | `scope.cancel()` bricht alle Kinder ab; erster Fehler eines Kindes bricht Geschwister ab (T5) | Trio |
+| X4 | **`withTimeout(d) { … }`** = Scope + Timer + Abbruch; Ergebnis `T throws TimedOut` | Kotlin |
+| X5 | `Cancelled` ist ein fangbarer `Error` (Aufräumen); erneutes Warten danach wirft sofort wieder `Cancelled`, die Marke bleibt | Kotlin |
+| X6 | unabbrechbare Abschnitte (`shield`): Tür | Trio |
+
+## N10 — Thread-Sicherheit: **entschieden** (2026-09-29)
+
+Laufzeit thread-sicher (L6); `string`, unveränderliche Structs, `let`-Felder, Enums frei
+teilbar (G5); **Container und I/O-Handles nicht thread-sicher** — Teilen über `Mutex<T>` oder
+Channels („ein Objekt gehört einem Thread, bis es übergeben wird"); globale `var` ohne
+`Atomic`/`Mutex` in einem Programm mit Threads: **Warnung** (Lint, Bereich 11);
+Modulinitialisierung einmal, thread-sicher (`Once`); Sync-Typen: `Mutex<T>`, `RwLock<T>`,
+`Atomic<T>`, `Once`, `Channel<T>`.
+
+---
+
+**Bereich 6 ist damit vollständig entschieden** (N1–N10, 2026-09-29).
