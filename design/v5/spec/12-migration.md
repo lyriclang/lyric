@@ -30,13 +30,13 @@ Reihenfolge: R1 (Werkzeugform) → R2 (Regelkatalog) → R3 (Reihenfolge der Kor
 und Suite) → R5 (Repo/Org) → R6 (4.x-Linie und Lyric-Script) → R7 (Umsetzungsplan — das
 Ergebnis der ganzen Runde).
 
-## R1 — Das Werkzeug: `lyric fix --from-4`: **offen**
+## R1 — Das Werkzeug: `lyric fix --from-4`: **entschieden** (2026-09-29)
 
-Ein 4.x-Programm wird vom 5er-Compiler nicht gelesen. Wer parst es? Optionen: der 4.x-Frontend
-(C#, dieselbe Linie — als Bibliothek im 5er-`lyric` mitgeliefert, nur für `fix --from-4`), ein
-eigener Tolerant-Parser, oder rein textuelle Regeln. Mechanisch vs. semantisch (SL-28):
-mechanische Regeln schreiben, semantische melden mit Hinweis (`needsReview`). Ausgabe:
-umgeschriebene Quelle + Bericht (`--json`).
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| F1 | **Das 4.x-Frontend (Parser + Sema, C#) eingefroren als Bibliothek im 5er-`lyric`**, nur für `fix --from-4`: liest 4.x mit vollem Typwissen (Empfängertyp für `abs`, Schreibstellen für `var`), wendet die Regeln aus R2 an, druckt 5er-Syntax | `go fix`, `cargo fix`; verworfen: toleranter 5er-Parser mit 4-Modus (zwei Grammatiken, kein 4-Sema), Textregeln (`abs(` ohne Typ nicht entscheidbar), Migrator bei Lyric-Script (driftet mit Z4 weg) |
+| F2 | **Form**: `lyric fix --from-4 [pfad]` schreibt um (`--dry-run`, `--json` nach G8), konvertiert `lyric.json` → `lyric.toml`, entfernt Modulköpfe, schlägt das Layout vor; **mechanische** Regeln schreiben, **semantische** werden `needsReview`-Notizen mit Erklärung und Vorschlag (SL-28) | — |
+| F3 | **Kein Versprechen, dass das Ergebnis kompiliert** — danach `lyric check`; Maßstab ist der `examples/`-Lauf (R3). Verfallsdatum: eine Major-Linie, danach eingefroren | — |
 
 ## R2 — Der Regelkatalog: **offen**
 
