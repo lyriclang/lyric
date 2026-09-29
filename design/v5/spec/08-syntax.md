@@ -78,7 +78,34 @@ Aufrufstelle (Y1); keine `ref`-Locals, keine `ref`-Rückgabe (T12 Tür).
 
 ## Y2 — Deklarationssyntax: **offen**
 ## Y3 — Bindungs- und Mutabilitätswörter (`mut`, `inout`/`ref`, `&`): **offen**
-## Y4 — Ausdrucksformen, Präzedenz, Zuweisung: **offen**
+## Y4 — Ausdrucksformen und Präzedenz: **entschieden** (2026-09-29)
+
+| # | Operatoren | Assoz. | Bemerkung |
+|---|---|---|---|
+| 1 | Postfix `.` `?.` `[ ]` `( )` `!` `++` `--` `with { }` | links | `with` auf Postfix-Stufe (M6); Makro-`!` gehört zum Namen |
+| 2 | Präfix `!` `-` `~` `++` `--` `&` `comptime` `try` `try?` `try!` `throw` | rechts | `&x` nur in Argumentposition; `try` deckt den ganzen Ausdruck rechts (`try a + b` = `try (a + b)`) |
+| 3 | `as` | links | über `*` |
+| 4 | `*` `/` `%` `*%` | links | **Wrap-Operatoren in Zig-Schreibweise `+%` `-%` `*%`** (Swift-`&+` kollidiert mit Präfix-`&`); **nur auf Ganzzahltypen**, kein Interface, kein Default (ein Default `addWrap = add` wäre eine Lüge — Wickeln folgt nicht aus Addieren; `WrappingAdd :: [Add]` als additive Tür, Rust-`num-traits`-Form) |
+| 5 | `+` `-` `+%` `-%` | links | |
+| 6 | `<<` `>>` | links | |
+| 7 | `..` `..=` | nicht-assoz. | Werte (T13); `0..n+1` = `0..(n+1)` |
+| 8–10 | `&` `^` `\|` | links | |
+| 11 | `<` `<=` `>` `>=` **`is`** **`in`** **`!in`** | **nicht-assoz.** | `a < b < c` ist ein **Parsefehler mit Hinweis** („meinst du `a < b && b < c`?") statt des heutigen Typfehlers; `is`/`in` auf Vergleichsstufe (Kotlin) |
+| 12 | `==` `!=` | **nicht-assoz.** | dito |
+| 13–14 | `&&` `\|\|` | links | |
+| 15 | `??` | rechts | |
+| 16 | `=` und Compound | rechts | Ausdruck (S8) |
+
+| Form | Regel |
+|---|---|
+| `if (c) a else b` / `if (c) { … } else { … }` | beide als Wert (S1); `else` Pflicht; `else if` kettet |
+| `match (e) { p => v, p => { … v } }` | bleibt; Kontexttyp in die Arme (T8) |
+| `loop { … break v; }` | Wert = `break`-Wert; ohne `break value` Typ `never` |
+| `try f()`, `try? f()`, `try! f()` | Präfix (E4) |
+| **`try expr catch (e: E) expr \| { … }`** | als Ausdruck, Klauseln kettbar; ein `catch` bindet an das nächste `try` links — eigene Form |
+| Value-Block `{ …; v }` | nur als Arm-, Lambda-, `if`-Ausdrucks- und `??`-Rechtsseite; **kein allgemeiner Block-Ausdruck** (`{` hätte eine dritte Bedeutung neben Initializer und Trailing-Lambda) |
+| `throw e`, `comptime e`/`{ }`, `p with { }`, `f(host: "h")`, Trailing-Lambda, `P { x = 1 }` (nie an Statement-Anfang), `(a, b)`, `[a, b]`, `[x] * n`, `a..b`, `x!` (`x!!` = zwei Postfixe) | wie entschieden |
+
 ## Y5 — Statement-Formen, Klammern, Semikolons: **entschieden** (2026-09-29)
 
 **Klammern um Kontrollköpfe bleiben** (`if (c) { … }`; C#, Kotlin, Zig, Lyric 4): sie
