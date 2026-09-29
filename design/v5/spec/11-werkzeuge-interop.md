@@ -134,11 +134,20 @@ inherits = "release"  debugInfo = true
 | P11 | **Build-Optionen ins Programm** (BP-17): nur `target.*` und `profile.*` als `comptime`-Konstanten (09 B4); `-D key=value`/Features **Tür** | Zig `-D…` verworfen für 5.0 |
 | P12 | **Toolchain-Pin**: `[package] toolchain = ">=5.1"` (Fehler mit Hinweis auf `lyric toolchain install`); Edition wählt die Sprachfassung (07) | Rust `rust-version` |
 
-## W3 — `build.lyr`: Programm, Daten oder Graph: **offen**
+## W3 — `build.lyr`: Programm, Daten oder Graph: **entschieden** (2026-09-29)
 
-BP-10/11, CLI-17, SL-29. Reicht das Manifest (Cargo ohne `build.rs` für 95 %)? `build.lyr`
-als Programm über `std.build` (4.x), als Zig-Graph (`std.Build`), oder nur als Hook für
-Codegen (`gen/`, 09) und native Teile; Modulraum, Abhängigkeiten, Rechte, wann es läuft.
+Verschoben gegenüber dem Dossier: das Manifest ist die Wahrheit (P1), und ohne Capabilities
+(Z3) gibt es keine Skript-Sandbox — es bleiben Vollzugriff mit Vertrauensregel oder kein Skript.
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| BS1 | **`build.lyr` bleibt — als gewöhnliches Lyric-Programm mit Vollzugriff, das *vor* dem Compile läuft und nichts definiert** (P1): nur **tun** — Quelltext nach `gen/` erzeugen (09), native Teile bauen, Link-Einstellungen beisteuern. `lyric new` erzeugt keins (BP-32 D) | Cargo `build.rs`; verworfen: Zig (`build.zig` definiert das Projekt), Sandbox (BP-10 B), Go `go generate` |
+| BS2 | **`std.build`**: `build.target`, `build.profile`, `build.outDir`, `build.genDir` (= `gen/`), `build.rerunIfChanged(paths)`, `build.linkLib(name)`, `build.cFlags(…)`, `build.compileC(sources, …)`, `build.warn(msg)`; sonst die normale std | Cargo `cargo:rerun-if-changed`, `cargo:rustc-link-lib` |
+| BS3 | **Eigener Modulraum** (BP-11 C): `build.lyr` + `build/`, `[build-dependencies]`; sieht `src/` lesend (D), kompiliert sich nie hinein | Cargo |
+| BS4 | **Wann**: vor dem Compile, wenn Skript, `[build-dependencies]` oder eine `rerunIfChanged`-Eingabe sich geändert hat, sonst Cache; `lyric check`/`lsp` lassen es einmal laufen, damit `gen/` existiert; `--help`/Completions führen nie etwas aus | rust-analyzer |
+| BS5 | **Vertrauensregel** (CLI-17): Wurzelpaket-Skript läuft immer; **Skripte von Abhängigkeiten nur mit `[trust] build-scripts = ["…"]`** im Wurzel-Manifest, sonst Fehler mit Paket und Zeile | **pnpm 10**, Deno; gegen Cargo/npm |
+| BS6 | **`gen/` ist sichtbarer Modulraum** (`app.gen.schema`), nicht eingecheckt, in Diagnosen und Debugger eine Datei | 09 |
+| BS7 | **Türen**: `[tasks]` (`lyric task name`), Schritt-Graph mit deklarierten Ein-/Ausgaben | Deno `task`, Bazel |
 
 ## W4 — FFI: `extern "C"`, Typen an der Grenze, Export, Bindungen: **offen**
 
