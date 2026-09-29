@@ -116,7 +116,7 @@ Majors mit freier Überladung unverändert da — das Feature wurde eingeführt 
 | # | Regel | Vorbild |
 |---|---|---|
 | F1 | **Der Default gehört zur Deklaration, einmal**: ein Interface-Member deklariert ihn, eine Implementierung darf keinen eigenen angeben (auch nicht denselben) — sie erbt ihn; jeder Aufrufpfad (statisch, virtuell, Constraint) liest denselben Ort. Schließt den gemessenen Drei-Leser-Befund | Kotlin |
-| F2 | **Je Aufruf ausgewertet, im Scope der Funktion**, nach den Pflichtargumenten; darf frühere Parameter referenzieren (`fn sub(s: str, from: int = 0, to: int = s.length)`), kein `this` | Kotlin; Python (einmal bei Definition) und C# (nur Konstanten) verworfen |
+| F2 | **Je Aufruf ausgewertet, im Scope der Funktion**, nach den Pflichtargumenten; darf frühere Parameter referenzieren (`fn sub(s: StringView, from: int = 0, to: int = s.length)`), kein `this` | Kotlin; Python (einmal bei Definition) und C# (nur Konstanten) verworfen |
 | F3 | Defaults an jeder Position; ein mittlerer Default ist nur benannt überspringbar | Kotlin |
 | F4 | zwei Signaturen, die für eine Argumentzahl beide passen: Fehler an der Deklaration (D4) | — |
 | F5 | **Jeder Parameter ist benennbar** (`connect(host: "h", port: 80)`); **Parameternamen sind öffentliche API** (Umbenennung = Bruch für benannte Aufrufer) | Kotlin, C#, Python; Swift's externe Labels (zweite Namensmenge) verworfen |

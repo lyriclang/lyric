@@ -125,7 +125,7 @@ enum Json { Null, Bool(bool), Num(float), Arr(Json[]), Obj(Map<string, Json>);
     fn isNull(): bool { return match (this) { .Null => true, _ => false }; }
 }
 
-pub fn parse<T :: [Parse]>(s: str): T throws [ParseError] { return try T.parse(s); }
+pub fn parse<T :: [Parse]>(s: StringView): T throws [ParseError] { return try T.parse(s); }
 fn swap<T>(a: &T, b: &T): void { let t = a; a = b; b = t; }
 fn sum(nums: int...): int { … }
 inline fn each<T>(xs: T[], f: fn(T) -> void): void { for (x in xs) { f(x); } }
@@ -234,7 +234,7 @@ Ausrichtung `< > ^` mit Füllzeichen; Vorzeichen `+`/`-`; `#` alternative Form (
 `0xff`); `0`-Auffüllung; Breite, Präzision; Gruppierung `,`/`_` (`{1234567:,}` → `1,234,567`);
 Typ `b o x X e E f %` auf Zahlen, **`?` = Debug** auf allem (D7). Zahlen und `char`/`string`
 verstehen alles Passende; ein **`Display`-Typ** bekommt nur Breite/Ausrichtung/Füllung auf sein
-`show()`; ein Typ mit eigenen Specs konformiert **`Format { fn format(spec: str): string }`**.
+`show()`; ein Typ mit eigenen Specs konformiert **`Format { fn format(spec: StringView): string }`**.
 Kein `C`/`N2`/`P1`, keine Kultur. `std.fmt.format("{} {0:>4}", …)` zur Laufzeit mit derselben
 Sprache. (Python-Grammatik, Rust `{:?}`)
 

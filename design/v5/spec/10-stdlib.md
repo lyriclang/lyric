@@ -54,7 +54,7 @@ Aus `../stdlib.md` §1 (gelesen und gemessen auf 4.6):
 | SL-31 Nesting-Regel | `Debug` automatisch für jeden Typ, `Display` nie; `{x:?}` | 04 D7, 08 Y7 |
 | SL-32 `assertThrows` | Lambdas tragen inferiertes `throws` → Lambda-Form ist baubar | 05 K3 |
 | SL-06 Typsuffixe → Überladung | **Überladung nur nach Arität** (04 D4) — `abs(int)`/`abs(float)` gibt es nicht; die Antwort muss generisch sein (B5) | 04 D4 |
-| COL-* Slices, Ranges, Index, Iterator-Ende | `Slice<T>`/`str` als Views, Range-Typen als Structs, `Index<K>{type Output}`, `next(): ?Item`, `??T` erlaubt | 02 M-, 03 A/N/O |
+| COL-* Slices, Ranges, Index, Iterator-Ende | `Slice<T>`/`StringView` als Views, Range-Typen als Structs, `Index<K>{type Output}`, `next(): ?Item`, `??T` erlaubt | 02 M-, 03 A/N/O |
 | Operator-Interfaces, Synthese | `Add<Rhs=Self>{type Out}`, `Equatable`/`Hashable`/`Ordered`/`TotalOrder`/`Display`/`Debug`, Konformanz ohne Körper | 04 D6/D7 |
 | Prelude | Modul `std.prelude`, Liste hier (B2) | 07 I8 |
 | Tests | im Paket (`@Test` neben dem Code oder `tests/`-Root) | 07 V4 |
@@ -97,13 +97,53 @@ Verworfen: A (Rust-klein — ohne Registry zu karg), B ohne Regel (Go/Python —
 Ring jetzt (doppelte Release-Mechanik für einen Maintainer), `extern`-Hüllen als Batterien
 (Sandbox-Frage entfällt, Trägerklausel bleibt).
 
-## B2 — Modulschnitt, Prelude, Namenskonventionen: **offen**
+## B2 — Modulschnitt, Prelude, Namenskonventionen: **entschieden** (2026-09-29)
 
-Modulliste 5.0 (Umzüge: Zeit, `iter`/`collections`, `bytes`/`encoding`, `io.*`, `task`,
-`sync`); Prelude-Liste (07 I8); Namensgesetz (`stdlib-2.md` §2 als Vorlage; SL-10, SL-35:
-Felder Substantive, Methoden Verben; Suffix beschreibt die Ausgabe, nie die Eingabe;
-`of`/`from`/`ofX`; `toX`/`asX`); **ein Aufrufstil** (SL-09: Methode, wo generische Extends es
-tragen; frei nur `copy(r, w)`-artige Zweistelligkeit).
+**Modulschnitt: flach.** `std.fs`, `std.path`, `std.net`, `std.io` statt `std.io.*` — die
+4.x-Verschachtelung bildete die Capability-Tabelle ab, die es nicht mehr gibt. Höchstens zwei
+Ebenen, nur für echte Unterräume (`std.crypto.cipher` als Ring-Tür). Rust/Go; gegen Python
+(`os.path` → `pathlib`).
+
+**Der String-View heißt `StringView`** (A2-Arbeitsname `str` verworfen: verstößt gegen N1 und
+ist Pythons Name für den String selbst; `Substring` liest sich als Parametertyp falsch, `Str`
+bleibt ein Ratespiel neben `string`). `string` koerziert zu `StringView` an Koerzionsstellen
+(T3), wie `T[]` zu `Slice<T>`; gewöhnliche Funktionen nehmen `string` (ein Wort), der View
+erscheint, wo geschnitten wird (Tokenizer, Parser, `split`/`lines`) — C++ `string_view`.
+
+**Prelude** (`std.prelude`, alles `pub import` aus `std.core`; Verdecken = Warnung, I8):
+
+| Gruppe | Namen |
+|---|---|
+| Funktionen | `panic`, `assert`, `unreachable`, `todo`, `same` |
+| Typen | `Error`, `Result`, `Box`, `Slice`, `StringView`, `Range`/`RangeInclusive`/`RangeFrom`/`RangeTo`/`RangeFull`, `Ordering`, `List`, `Map`, `Set` (Sammlungsvokabular der Sprache; Rust hat `Vec`, nicht `HashMap` — wir alle drei) |
+| Interfaces | `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Display`, `Debug`, `Default`, `Clone`, `Iterator`, `Iterable`, `FromIterator`, `Into`, `From`, `Index`, `IndexSet`, `Resource`, `Num`, `Integer`, `Float` |
+| Attribute | die geschlossene Art-2-Liste (09 A11): `@Test`, `@Deprecated`, `@Allow`, `@Inline`-Familie, `@MustUse`, … |
+| **nicht** | `print`-Familie (U5), Operator-Interfaces `Add`…`Not` (Rust `std::ops`), `spawn`/`Task`, `min`/`max` |
+
+**Namensgesetz** (normativ in Spec §11; Grundlage `stdlib-2.md` §2):
+
+| # | Regel | Beispiel |
+|---|---|---|
+| N1 | Typen PascalCase (Builtins `int`, `string`, … ausgenommen); Funktionen, Methoden, Felder camelCase; Module klein und kurz; Konstanten sind statische Member — kein `intMax` | `int.max`, `float.epsilon` |
+| N2 | Funktionen Verben oder Verb-Objekt; Prädikate `is`/`has`/`contains`/`can`; **Felder Substantive, Methoden Verben** (löst SL-35 bei einem Namensraum) | `int.parse`, `isBlank`, `containsKey` |
+| N3 | Konstruktoren auf dem Typ: `new` (Zucker `Point(1, 2)`), `empty()`, `withCapacity(n)`, `of(Elemente)`, `from(andere Darstellung)`, `ofEinheit(x)` | `List.of([1, 2])`, `Map.from(pairs)`, `Duration.ofSeconds(5)` |
+| N4 | `toX()` materialisiert/kopiert, `asX()` reinterpretiert in O(1), `into` nur Operator-Anker | `toList()`, `asBytes()` |
+| N5 | Plural für Sammlungen, Singular für Elemente | `keys()`, `first()` |
+| N6 | **Keine Antwortform im Namen**: kein `OrThrow`/`OrNull`/`tryX`/`OrErr`; die einzige benannte Form ist die werfende, die Form wählt der Aufrufer (`try?`, `try!`, `Result.of`); stille Reste regelt B3 | `try? fs.text(p)` |
+| N7 | **Keine Typsuffixe**: generisch über `Num` (B5) | `abs(x)`, `sum()` |
+| N8 | Kein `get`-Präfix fürs Lesen; `get(k)` nur fürs Nachschlagen; **`length()` überall mit Klammern**, auch auf `T[]`/`Slice`/`StringView` (Intrinsic, Rust `len()`) | `xs.length()`, `m.get(k)` |
+| N9 | Mutation heißt, was sie tut (`mut fn`), gibt `void` oder das Entfernte; Kopie trägt Partizip/`to` | `sort()`/`sorted()`, `reverse()`/`toReversed()` |
+| N10 | Boolesche Parameter: Enum oder zwei Funktionen bevorzugt; mit benanntem Argument (F5) toleriert, nie positional | `trimStart()`, nicht `trim(true)` |
+| N11 | Ein Suffix beschreibt die **Ausgabe**, nie die Eingabe | `sha256Hex(bytes)`; Text über `s.asBytes()` |
+| N12 | Fehlertypen enden auf `Error`, Gründe als `XErrorKind` im selben Modul; Options-Structs mit Defaults statt Builder | `IoError { kind, path, detail }`, `Command { program, args, cwd = "" }` |
+| N13 | Assertions `(actual, expected)` | `assertEq(got, 4)` |
+
+**Ein Aufrufstil**: **Methode, wenn es einen Empfänger gibt** — die Operation gehört dem Typ
+ihres ersten Arguments; frei nur bei gleichrangigen Operanden (`copy(r, w)`, `min(a, b)`) oder
+ohne Empfänger (`repeat(x)`, `once(x)`). Terminatoren mit Constraint sind Methoden über
+bedingte Extends (`extend<T :: [Num]> Iterator<Item = T> { fn sum(): T }`, X1) — der
+4.x-Grund für freie Zwillinge ist weg; keine `listX`/`mapList`-Namen. Kotlin/Swift; gegen Go
+(`slices.Sort(xs)`).
 
 ## B3 — Antwortformen und Panik-Regel: **offen**
 

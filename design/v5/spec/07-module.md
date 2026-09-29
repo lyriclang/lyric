@@ -88,7 +88,7 @@ verworfen (`pub`/`pub(crate)`-Rauschen in jeder App).
 | I5 | Nichtnutzungswarnung **einheitlich** für alle Formen | — |
 | I6 | mehrere Formen für ein Modul koexistieren ohne Namenskollision; identischer Doppelimport Fehler | Lyric 4 |
 | I7 | Importe sind Top-Level-Deklarationen an jeder Stelle; der Formatter zieht sie nach oben und sortiert | Go |
-| I8 | **Prelude = Modul `std.prelude`**, in jedem Modul gebunden (Liste Bereich 10: mind. `panic`, `assert`, `unreachable`, `println`/`print`, `Error`, `Result`, `Box`, `Slice`, `str`, Range-Typen, Kern-Interfaces). Lokaler Name verdeckt Prelude-Namen → **Warnung** (heute still). Fest verdrahtete Helfer (`std.string.concat` für `+`) verschwinden — Operatoren über Interfaces (D6) | Rust, Swift/Kotlin |
+| I8 | **Prelude = Modul `std.prelude`**, in jedem Modul gebunden (Liste Bereich 10: mind. `panic`, `assert`, `unreachable`, `Error`, `Result`, `Box`, `Slice`, `StringView`, Range-Typen, Kern-Interfaces). Lokaler Name verdeckt Prelude-Namen → **Warnung** (heute still). Fest verdrahtete Helfer (`std.string.concat` für `+`) verschwinden — Operatoren über Interfaces (D6) | Rust, Swift/Kotlin |
 
 ## V4 — Kapselungseinheit und Tests: **entschieden** (2026-09-29)
 
