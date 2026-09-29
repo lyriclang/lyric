@@ -29,4 +29,25 @@ static int64_t program(void) {
     return fault_here(42) + 1;
 }
 
-int main(int argc, char **argv) { return lyr_run_main(argc, argv, program); }
+/* With "plain": a runtime started without signal handlers, as a host starts it (10 Q9). The same
+ * fault is the operating system's alone — no "crash:" report, the process ends by the fault. */
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#endif
+
+int main(int argc, char **argv) {
+    if (argc > 1 && strcmp(argv[1], "plain") == 0) {
+#ifdef _WIN32
+        SetErrorMode(SEM_NOGPFAULTERRORBOX);  /* no error-reporting dialog on a developer's desktop */
+#endif
+        LyrConfig config;
+        memset(&config, 0, sizeof config);
+        config.argc = argc;
+        config.argv = argv;
+        config.install_signal_handlers = 0;
+        lyr_init(&config);
+        return fault_here(42) + 1;
+    }
+    return lyr_run_main(argc, argv, program);
+}

@@ -12,6 +12,47 @@
 
 static int initialized;
 
+/* Under ASan (the asan profile, 01 C7) two of its defaults fight a conservative collector: fake
+ * stacks move locals into memory the collector's stack scan never sees, so live objects would be
+ * collected; and LeakSanitizer does not scan the collector's heap, so malloc blocks referenced
+ * only from there (weak records, via the finalizer table) would be reported as leaks. */
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+const char *__asan_default_options(void);
+const char *__asan_default_options(void) {
+    return "detect_stack_use_after_return=0:detect_leaks=0";
+}
+#  endif
+/* Under TSan (the tsan profile) the collector is uninstrumented, so TSan sees neither its lock nor
+ * the stopped world — only memory that one thread wrote and, after a collection recycled it,
+ * another thread received. A collection does order those: it stops every thread (signals and
+ * semaphores) before it decides what is garbage, and restarts them after. The runtime tells TSan
+ * so, instead of silencing the reports: each allocation publishes what its thread wrote before
+ * it, the stopped collector takes all of that over, and it publishes its own view before the
+ * restart, which each allocation takes over after. A race that no collection separates is still
+ * reported. What is left is memory the collector maps or sweeps itself (its frames: GC_*). */
+#  if __has_feature(thread_sanitizer)
+#    include <sanitizer/tsan_interface.h>
+#    define LYR_TSAN 1
+const char *__tsan_default_suppressions(void);
+const char *__tsan_default_suppressions(void) {
+    return "race:GC_*\n";
+}
+static char tsan_program_side, tsan_collector_side;  /* only their addresses matter */
+static void tsan_on_collection(GC_EventType event) {
+    if (event == GC_EVENT_POST_STOP_WORLD) __tsan_acquire(&tsan_program_side);
+    else if (event == GC_EVENT_PRE_START_WORLD) __tsan_release(&tsan_collector_side);
+}
+#  endif
+#endif
+#ifdef LYR_TSAN
+#  define TSAN_PUBLISH() __tsan_release(&tsan_program_side)
+#  define TSAN_RECEIVE() __tsan_acquire(&tsan_collector_side)
+#else
+#  define TSAN_PUBLISH() ((void)0)
+#  define TSAN_RECEIVE() ((void)0)
+#endif
+
 /* Set by the collector when finalizers are ready; drained on the allocating thread. */
 static atomic_int callbacks_pending;
 static _Thread_local int draining;
@@ -32,16 +73,25 @@ void lyr_gc_init(void) {
     if (initialized) return;
     GC_INIT();
     GC_allow_register_threads();
+    /* The collector's warnings ("Out of Memory! Returning NULL!", "Repeated allocation of very
+     * large block") are not a Lyric program's output: what matters reaches the program as a
+     * panic (RT0005) with a message of the runtime's own. */
+    GC_set_warn_proc(GC_ignore_warn_proc);
     /* Death callbacks run at known points (an allocation or an explicit collection on the thread
      * that notices them), never inside the collector. */
     GC_set_finalize_on_demand(1);
     GC_set_finalizer_notifier(notify_callbacks);
+#ifdef LYR_TSAN
+    GC_set_on_collection_event(tsan_on_collection);
+#endif
     initialized = 1;
 }
 
 static void *allocate(size_t bytes, int has_refs, int zero) {
     if (LYR_UNLIKELY(atomic_load_explicit(&callbacks_pending, memory_order_relaxed))) run_callbacks();
+    TSAN_PUBLISH();
     void *memory = has_refs ? GC_MALLOC(bytes) : GC_MALLOC_ATOMIC(bytes);
+    TSAN_RECEIVE();
     if (LYR_UNLIKELY(memory == NULL)) {
         lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory allocating %zu bytes (heap %zu bytes)",
                   bytes, (size_t)GC_get_heap_size());
@@ -183,6 +233,7 @@ int lyr_thread_attach(void) {
 }
 
 void lyr_thread_detach(void) {
+    TSAN_PUBLISH();  /* the thread's last writes, for the collection that recycles them */
     lyr_crash_thread_end();
     GC_unregister_my_thread();
 }
@@ -190,7 +241,9 @@ void lyr_thread_detach(void) {
 /* --- collection -------------------------------------------------------------------------------- */
 
 void lyr_gc_collect(void) {
+    TSAN_PUBLISH();
     GC_gcollect();
+    TSAN_RECEIVE();
     run_callbacks();
 }
 

@@ -24,7 +24,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M | Name | Size | State |
 |---|---|---|---|
 | M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
-| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **next** |
+| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **in review** (#178) |
 | M2 | First native program (IR → C → `zig cc`) | L | — |
 | M3 | Value model and type system | XL | — |
 | M4 | Interfaces and abstraction | L | — |
@@ -67,9 +67,41 @@ Measured on the way and kept: the tree stays 4.6.0 because a 5.0.0 claim fires t
 deprecation clocks aimed at 5.0 (29 CLI tests red); `zig cc` ships no ASan/TSan runtime, so the
 sanitizer profile compiles with clang (01 C7).
 
-### M1 — Runtime core in C
+### M1 — Runtime core in C (in review, #178)
 
-Next. Plan first (13, M1), then slices.
+1. S1 `6ce9d46e`: bdwgc 8.2.12 and libbacktrace vendored (`runtime/THIRD_PARTY.md`);
+   `Lyric5.Toolchain` builds `liblyr.a` for all five Tier 1 triples, with a content-hash cache.
+2. S2 `f64b09ab`: object model (header → descriptor), allocation, strings, arrays, console,
+   `lyr_run_main`; Hello in C runs on every Tier 1 runner.
+3. S3 `36ea5b2d`: roots, registered ranges, weak references with a death callback, thread attach.
+4. S4 `233a6f00`: panics with backtraces, the check macros, the RT codes, the crash handler,
+   stack overflow as a panic, the panic hook. The panic golden passes on Linux, Windows and macOS.
+5. S5: ASan+UBSan and TSan over the runtime programs in CI (Linux x64), each with a control that
+   shows a real fault is still reported; valgrind locally (`tooling/valgrind/run.sh`,
+   `runtime/valgrind.supp`); the measurement below; spec chapter 13 §1, the runtime contract of
+   stage 0 (lyric-spec#46).
+
+Measured (WSL2 x86-64, release profile, zig cc 0.16; no ratchet before M2):
+
+| | Hello in C against `liblyr.a` | plain C hello |
+|---|---|---|
+| Size, stripped | 202 KB | 3.5 KB |
+| Size with debug information | 1.2 MB | 5 KB |
+| Start, fork + exec | ≈ 0.8 ms | ≈ 0.6 ms |
+
+Learned on the way and kept:
+- `zig cc` writes PDB on Windows, not DWARF. Frames are named through DbgHelp there; libbacktrace
+  serves Linux and macOS. The plan had assumed DWARF everywhere.
+- `zig cc` links no unwinder into a C program (its libunwind comes in with `-lunwind` on Linux)
+  and turns UBSan on by itself at `-O0` (switched off: UBSan belongs to the asan profile).
+- macOS keeps line tables out of the executable: the link runs `dsymutil` on a macOS host, which
+  the plan had left for M2.
+- TSan cannot see Boehm's synchronization. The runtime tells it that a collection orders the
+  threads, which it does, instead of suppressing the reports.
+- Under the conservative stage, a stale root handle in scanned memory keeps alive whatever
+  reuses its cell (documented in `lyr/gc.h`).
+- Temporary object files were unique per process only, and parallel builds in one process
+  collided on them.
 
 ## Design decisions
 

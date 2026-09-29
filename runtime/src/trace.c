@@ -240,10 +240,13 @@ size_t lyr_trace_format(char *out, size_t capacity, uintptr_t fault_pc) {
     capture_at(fault_pc);
 #endif
 
+    /* The faulting frame's pc is the fault address itself when the unwinder knows it came from a
+     * signal frame (Linux), and one byte less when it treats it as a return address like any
+     * other (macOS: libbacktrace steps back into "the call"). */
     int start = -1;
     if (fault_pc != 0) {
         for (int i = 0; i < trace.count && start < 0; i++) {
-            if (trace.frames[i].pc == fault_pc) start = i;
+            if (trace.frames[i].pc == fault_pc || trace.frames[i].pc == fault_pc - 1) start = i;
         }
     }
     if (start < 0) {

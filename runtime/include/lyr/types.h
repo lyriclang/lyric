@@ -21,8 +21,9 @@ typedef struct LyrDesc {
     uint32_t flags;
     uint32_t elem_size;          /* arrays: bytes per element */
     uint32_t refmap_words;       /* 64-bit words in refmap */
-    const uint64_t *refmap;      /* bit i set: pointer-sized slot i is a reference (fixed objects: of the object,
-                                    header slot excluded as slot 0; arrays: of one element) */
+    const uint64_t *refmap;      /* bit i set: pointer-sized word i is a reference — for a fixed object,
+                                    word i of the object (word 0 is the header; its bit stays clear);
+                                    for an array, word i of one element */
     const char *name;            /* "module.Type", for backtraces, debuggers and Debug */
     const void *itables;         /* interface tables (M4) */
 } LyrDesc;

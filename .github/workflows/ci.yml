@@ -270,7 +270,14 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner.
+      # TSan's shadow memory needs the kernel's older mmap randomization; Ubuntu 24.04 raised it
+      # past what the runner's clang supports ("unexpected memory mapping").
+      - name: Make room for TSan
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner — on
+      # Linux x86-64 also under ASan+UBSan and TSan (clang), and there without clang they fail.
       - name: Runtime tests
         run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
 

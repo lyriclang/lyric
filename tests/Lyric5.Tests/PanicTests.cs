@@ -136,6 +136,26 @@ public partial class PanicTests
 
     [Theory]
     [MemberData(nameof(Profiles))]
+    public void Without_handlers_a_fault_belongs_to_the_operating_system(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("crash", profile, args: ["plain"]);
+        Assert.DoesNotContain("crash:", result.Stderr);
+        Assert.Equal(OperatingSystem.IsWindows() ? unchecked((int)0xC0000005) : 128 + 11, result.ExitCode);
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Allocation_beyond_the_heap_limit_panics(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("heap_limit", profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = Lines(result.Stderr);
+        Assert.StartsWith("panic [LYR-RT0005]: out of memory allocating 1016 bytes (heap ", lines[0]);
+        Assert.All(lines.Skip(1), line => Assert.StartsWith("    ", line));
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
     public void An_abort_is_a_crash_with_a_trace(Profile profile)
     {
         var result = RuntimeBuildTests.RunTest("crash", profile, args: ["abort"]);
