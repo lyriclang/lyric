@@ -1,6 +1,7 @@
 /* Runtime start and stop, the configured writers, and the main of an emitted program. */
 #include "lyr/init.h"
 #include "lyr/gc.h"
+#include "internal.h"
 
 #include <errno.h>
 #include <string.h>
@@ -22,6 +23,7 @@ int lyr_init(const LyrConfig *given) {
     if (given) config = *given;
     lyr_gc_init();
     if (config.heap_limit) lyr_gc_set_heap_limit(config.heap_limit);
+    if (config.install_signal_handlers) lyr_crash_install();
 #ifdef _WIN32
     /* Strings are UTF-8; the console shows them as such only in this code page. */
     SetConsoleOutputCP(CP_UTF8);

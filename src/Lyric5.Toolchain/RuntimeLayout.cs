@@ -20,6 +20,26 @@ public static class RuntimeLayout
 
     private static string BdwgcDir(string root) => Path.Combine(root, "runtime", "third_party", "bdwgc");
 
+    private static string LibbacktraceDir(string root) => Path.Combine(root, "runtime", "third_party", "libbacktrace");
+
+    private static string BacktraceConfigDir(string root) => Path.Combine(root, "runtime", "src", "backtrace_config");
+
+    /// <summary>
+    /// The libbacktrace files a target needs (panic backtraces, 01 E8): the DWARF reader, the
+    /// reader for the target's executable format, and mapped file access. Windows has none: the
+    /// runtime names its frames through DbgHelp there, because zig cc writes PDB, not DWARF.
+    /// </summary>
+    public static IReadOnlyList<string> LibbacktraceSources(Target target)
+    {
+        string[] common = ["backtrace.c", "simple.c", "dwarf.c", "fileline.c", "posix.c", "print.c", "sort.c", "state.c", "mmap.c", "mmapio.c"];
+        return target.Os switch
+        {
+            TargetOs.Linux => [.. common, "elf.c"],
+            TargetOs.MacOs => [.. common, "macho.c"],
+            _ => [],
+        };
+    }
+
     /// <summary>
     /// The collector's configuration. Threads from contract 0 (L6); C11 atomics instead of
     /// libatomic_ops; every interior pointer keeps its object alive, because views point into
@@ -53,11 +73,20 @@ public static class RuntimeLayout
                 Instrument: false, ExtraFlags: ["-w", "-std=gnu11"]),
         };
 
+        // Third-party as well, and uninstrumented for the same reason as the collector: its readers
+        // walk the executable's own bytes in ways a sanitizer has no business judging.
+        var libbacktrace = LibbacktraceDir(root);
+        foreach (var file in LibbacktraceSources(target))
+        {
+            units.Add(new CUnit(Path.Combine(libbacktrace, file), [], [BacktraceConfigDir(root), libbacktrace],
+                Instrument: false, ExtraFlags: ["-w", "-std=gnu11"]));
+        }
+
         var own = Path.Combine(root, "runtime", "src");
         var runtimeDefines = CollectorDefines(target).Where(d => d is "GC_THREADS" or "GC_NOT_DLL" or "GC_NO_THREAD_REDIRECTS").ToList();
         foreach (var source in Directory.EnumerateFiles(own, "*.c").Order(StringComparer.Ordinal))
         {
-            units.Add(new CUnit(source, runtimeDefines, [IncludeDir(root), bdwgcInclude],
+            units.Add(new CUnit(source, runtimeDefines, [IncludeDir(root), bdwgcInclude, libbacktrace],
                 ExtraFlags: ["-Wall", "-Wextra"]));
         }
         return units;

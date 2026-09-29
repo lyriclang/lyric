@@ -3,6 +3,7 @@
  * zeroes them, so they are zeroed here where the contract promises it. */
 #include "lyr/gc.h"
 #include "lyr/panic.h"
+#include "internal.h"
 
 #include <gc.h>
 #include <stdatomic.h>
@@ -174,10 +175,15 @@ int lyr_thread_attach(void) {
     struct GC_stack_base base;
     if (GC_get_stack_base(&base) != GC_SUCCESS) return -1;
     int result = GC_register_my_thread(&base);
-    return result == GC_SUCCESS || result == GC_DUPLICATE ? 0 : -1;
+    if (result != GC_SUCCESS && result != GC_DUPLICATE) return -1;
+    /* The thread's net for faults and stack overflow (crash.c), when the handlers are installed;
+     * a thread the collector knew already (the main thread) has it from lyr_init. */
+    if (result == GC_SUCCESS) lyr_crash_thread_start();
+    return 0;
 }
 
 void lyr_thread_detach(void) {
+    lyr_crash_thread_end();
     GC_unregister_my_thread();
 }
 

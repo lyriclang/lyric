@@ -62,6 +62,9 @@ public sealed class CBuild
     public IReadOnlyList<string> FlagsFor(CUnit unit)
     {
         var flags = new List<string> { "-std=c11", "-ffunction-sections", "-fdata-sections" };
+        // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
+        // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
+        if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");
         flags.AddRange(Profile.Codegen());
         if (unit.Instrument) flags.AddRange(Profile.Instrumentation());
         foreach (var define in unit.Defines) flags.Add("-D" + define);
@@ -114,7 +117,9 @@ public sealed class CBuild
         if (File.Exists(target)) return target;
 
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        var partial = target + $".{Environment.ProcessId}.tmp";
+        // Unique per compilation, not per process: builds in one process (parallel tests, a
+        // compiler building two targets) compile the same unit at the same time.
+        var partial = $"{target}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         var arguments = Driver();
         arguments.AddRange(FlagsFor(unit));
         arguments.AddRange(["-c", unit.Source, "-o", partial]);
@@ -124,7 +129,16 @@ public sealed class CBuild
             File.Delete(partial);
             throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name()}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
-        File.Move(partial, target, overwrite: true);
+        try
+        {
+            File.Move(partial, target, overwrite: true);
+        }
+        catch (IOException) when (File.Exists(target))
+        {
+            // Windows refuses to replace a file another process has open; the object in place has
+            // the same content — the name is its key.
+            File.Delete(partial);
+        }
         return target;
     }
 
@@ -181,7 +195,11 @@ public sealed class CBuild
 
     /// <summary>
     /// Links objects and archives into an executable. Sections nobody references are dropped
-    /// (design/v5/spec/01 L11); the sanitizer runtime comes along in the sanitizer profiles.
+    /// (design/v5/spec/01 L11); the sanitizer runtime comes along in the sanitizer profiles. The
+    /// runtime's backtraces need an unwinder — zig cc links a C program without one, so its own
+    /// libunwind comes along on Linux; clang and gcc bring libgcc's; macOS has one in libSystem —
+    /// and DbgHelp on Windows. On a macOS host the debug information is gathered into a .dSYM
+    /// beside the executable when dsymutil is there: libbacktrace reads line tables only from one.
     /// </summary>
     public string LinkExecutable(IReadOnlyList<string> inputs, string output)
     {
@@ -194,15 +212,26 @@ public sealed class CBuild
         arguments.AddRange(Target.Os switch
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
-            TargetOs.Windows => ["-Wl,--gc-sections"],
+            TargetOs.Windows => ["-Wl,--gc-sections", "-ldbghelp"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
+        if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");
+        if (Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig) arguments.Add("-lunwind");
         var result = ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
         if (result.ExitCode != 0)
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name()}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
+        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(output);
         return output;
+    }
+
+    /// <summary>Best effort: without dsymutil a backtrace still names functions, without lines.</summary>
+    private static void GatherDebugInfo(string executable)
+    {
+        var dsymutil = CCompiler.FindOnPath("dsymutil");
+        if (dsymutil is null) return;
+        ProcessRunner.Run(dsymutil, [executable], TimeSpan.FromMinutes(2));
     }
 
     private string Command(IEnumerable<string> arguments) =>
