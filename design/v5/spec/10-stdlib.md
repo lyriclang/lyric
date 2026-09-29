@@ -244,14 +244,34 @@ interface Float :: [Signed] {
 | Z7 | **Kein BigInt, kein `decimal` in 5.0** — Türen (`int128` T1f, `decimal` als Paket; IEEE 754 decimal128 wäre per D zulässig, ohne Bedarf) | Python `int` verworfen |
 | Z8 | `char` und `bool` außerhalb des Turms (T1e); `char.toUint32()` / `char.fromUint32(n): ?char` statt `as` | — |
 
-## B6 — Iterator-Protokoll, Adapter, Generatoren: **offen**
+## B6 — Iterator-Protokoll, Adapter, Generatoren: **entschieden** (2026-09-29)
 
-`Iterator { type Item; fn next(): ?Item }`, `Iterable { type Iter; fn iter(): Iter }`; Adapter
-als generische Extends auf `Iterator` (COL-12); Terminatoren mit Constraint (`sum`, `min`,
-`sorted`, `joinToString`); `collect` über `FromIterator`; `Peekable`; `enumerate`/`chunks`/
-`windows` als Methoden (assoziierte Typen machen es möglich); `sequence { yield }` ist ein
-`Iterator` (COL-26); Iteration über `Map` (SL-19) und `Deque`; Reihenfolge-Vertrag (COL-28);
-Mutation während Iteration (COL-16); Generator-Freigabe bei `break` (COL-25).
+```
+interface Iterator {
+    type Item;
+    type Error :: [Error] = never;              // I5
+    fn next(): ?Item throws [Error];
+    fn sizeHint(): (int, ?int) { return (0, null); }
+}
+interface Iterable { type Iter :: [Iterator]; fn iter(): Iter; }
+interface DoubleEnded :: [Iterator] { fn nextBack(): ?Item; }   // Arrays, Slices, List, Ranges → rev()
+```
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| I1 | **`next(): ?Item`, `null` = Ende** (COL-10 A; `??T` erlaubt, also `Iterator<Item = ?T>` möglich). `sizeHint` als Default für Vorallokation in `collect` | Swift; verworfen: `hasNext/next` (Kotlin), Push-Iteration (Go 1.23) |
+| I2 | **`for` nimmt nur `Iterable`**; `Iterator :: [Iterable]` mit `iter(): this` (COL-11 B); Warnung bei zweifachem Iterator-Local im Schleifenkopf (COL-11 C) | Rust `IntoIterator` |
+| I3 | **Adapter sind generische Extends auf `Iterator`** (COL-12 B, X1) und liefern **konkrete Adapter-Structs** (`Map<I, U>`, `Filter<I>`, …) — monomorphisiert, allokationsfrei; `Iterator<Item = T>` als Interface-Wert nur bei gewollter Typlöschung (Box) | Rust, Swift `LazyMapSequence`; verworfen: Default-Methoden mit Slots (4.x, 15 KB je Modul) |
+| I4 | **Adapter**: `map`, `filter`, `mapNotNull`, `take`, `skip`, `takeWhile`, `skipWhile`, `stepBy`, `zip`, `chain`, `flatMap`, `flatten`, `enumerate` (→ `(int, Item)`), `chunks(n)`/`windows(n)` (→ `List<Item>`), `inspect`, `dedup`/`dedupBy`, `scan`, `peekable()` → `Peekable<I>` mit `peek(): ?Item`, `rev()` (nur `DoubleEnded`), `cycle()` (Iterator `Clone`). **Terminatoren**: `count`, `fold`, `reduce`, `first`, `last`, `nth`, `any`, `all`, `none`, `find`, `position`, `forEach`, `collect<C :: [FromIterator<Item>]>()` (Zieltyp inferiert), Kurzformen `toList`/`toArray`/`toSet`/`toMap`; bedingt: `sum`, `product`, `average`, `min`/`max` (`?Item`), `minBy`/`maxBy`, `sorted()`/`sortedBy()` → `List` (materialisiert, im Namen), `join(sep)` für `Item :: [Display]`, `partition(p)` → `(List, List)`, `groupBy(f)` → `Map` (eager) | Rust, Kotlin, Python |
+| I5 | **Werfende Iteratoren über `type Error`**: Default `never` (E12) — gewöhnliches `for`. Ist `Error ≠ never` (`reader.lines()`, `fs.walk`), ist der Schleifenkopf markiert: **`for (line in try reader.lines())`** — das `try` deckt Quellausdruck *und* jedes `next()`; fangen/propagieren wie jeder Wurf. **Join-Regel** für Adapter: gleicher Typ → dieser; einer `never` → der andere; verschieden → Wurzel `Error` (K2, T11). Lambdas in Adaptern dürfen werfen (K3): `map { try parse(it) }` hat `Error = ParseError`. `Item = Result<…>` nur, wo B3 es erlaubt (Batch) | **Swift 6 `AsyncIteratorProtocol<Failure>`** + `for try await`; verworfen: `Item = Result` (Rust — gegen B3), lazy Adapter ohne Wurf (Swift-`lazy`, Kotlin-Falle beim Terminator) |
+| I6 | **Freigabe bei `break`/`return`/Wurf**: `for` ruft `close()`, wenn der Iterator `Closeable` ist — statisch bei bekanntem Typ, sonst `is Closeable` (T11). Kein `close` am `Iterator` selbst (zweiter Mechanismus neben `Closeable`) | C# `IEnumerator : IDisposable`; Python `gen.close()` |
+| I7 | **Generatoren sind Iteratoren**: `Coroutine<T> :: [Iterator<Item = T>]` eingebaut (COL-26 B); `sequence { yield … }` (Y11) ist die kürzeste Iterator-Definition; `enumerate`/`chunks` dürfen intern Generatoren sein. **`Coroutine<T> :: [Closeable]`**: `close()` auf einer schwebenden Koroutine wickelt ihren Stack ab, `defer`/`using` laufen (01 K7a) | C# `yield return`, Python, Kotlin `sequence` |
+| I8 | **`Map<K, V> :: [Iterable<Item = (K, V)>]`** (SL-19), dazu `keys()`, `values()`, `entries()`; **Reihenfolge unspezifiziert** (COL-28 A) — mit SipHash-Prozessschlüssel (K2) je Lauf anders, wie Rust/Go; `LinkedMap`/`LinkedSet` als Tür | Go, Rust; verworfen: Einfügereihenfolge (Python 3.7 — Verkettung pro Container) |
+| I9 | **Mutation während Iteration = Panik** („modified during iteration") über Modifikationszähler in `List`/`Map`/`Set`/`Deque` (COL-16 C; ein Vergleich je `next`) | C#, Java (fail-fast); verworfen: „undefiniert" (4.x), Gos Teilzusagen |
+| I10 | `Range`/`RangeInclusive` sind `Iterator` **und** `DoubleEnded`; `T[]`/`Slice`/`List` liefern über `iter()` einen `SliceIter<T>` (Struct, bounds-check-frei); `for (x in arr)` lowert auf die Indexschleife (COL-09 B) | Rust |
+
+Sprachnachträge eingetragen: 05 K7 (Join-Regel), 05 R7 (`for` schließt `Closeable`), 08 S3a
+(`try` im Schleifenkopf), 01 K7a (`close` auf schwebender Koroutine).
 
 ## B7 — Container: **offen**
 

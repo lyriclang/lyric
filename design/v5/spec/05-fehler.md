@@ -60,6 +60,7 @@ Fehler (L5 E5). Die Zwillingsdoktrin fällt (E5). Familie um ein Wort: `try f()`
 | K4 | **Generisch**: `fn map<T, U, E>(xs: T[], f: fn(T) -> U throws E): U[] throws E`; `E` aus dem Argument inferiert, **an der Aufrufstelle substituiert**; `E = never` ≡ keine Klausel; ein Aufruf mit leerer Menge nach Substitution braucht kein `try` (überflüssiges `try` = Warnung) | Swift `throws(Never)` |
 | K5 | **Deckung auf der Instanz** (`throws Box<int>` ≠ `catch Box<string>`) | — |
 | K6 | **Teilmengenregel**: Implementierung wirft ⊆ Interface-Member; Funktionswert mit kleinerer Menge koerziert zu größerer (T3-Liste), nie umgekehrt | Swift, Java |
+| K7 | **Nachtrag (Bereich 10 I5)** — assoziierte Fehlertypen: `interface Iterator { type Error :: [Error] = never; fn next(): ?Item throws [Error]; }`; **Join-Regel** beim Zusammensetzen (Adapter über werfendem Lambda): gleicher Typ → dieser, einer `never` → der andere, verschieden → Wurzel `Error` (K2, Typ-Pattern zum Unterscheiden) | Swift 6 `AsyncIteratorProtocol<Failure>` |
 | K7 | **Präzises Rethrow**: `catch (e)` ohne Typ trägt statisch **die Menge** der gefangenen Typen; `throw e` wirft genau sie; `match (e)` über die Menge ist erschöpfend ohne `_`; beim Speichern weitet `e` auf `Error`. Beschränkt auf Catch-Bindungen — kein zweiter Typmechanismus | **Zig Error-Sets** |
 | K8 | `try` in einer Funktion ohne Klausel und ohne `catch`: „behandle oder deklariere" | Swift, Java |
 
@@ -131,6 +132,7 @@ Panik; fallengelassene Koroutine läuft keine (bleibt; das Verb dafür ist Berei
 | R4 | Fehler aus `close()` propagieren beim normalen Verlassen; während eines Fehlers werden sie angehängt |
 | R5 | Kopien der Referenz sind Aliasse; Nutzung nach `close` → Laufzeitfehler „closed" (M12) |
 | R6 | `using` auf einem Nicht-`Resource`-Typ: Übersetzungsfehler |
+| R7 | **Nachtrag (Bereich 10 I6)**: `for` ruft `close()` auf einem Iterator, der `Closeable` ist, bei jedem Verlassen (`break`, `return`, Wurf) — statisch bei bekanntem Typ, sonst `is Closeable` auf dem Interface-Wert (T11); `Coroutine<T> :: [Closeable]` (I7) |
 
 Verworfen: Blockform `with … as` (Python; zweiter Block für das, was die Bindung sagt),
 automatisch für jede `let`-Bindung (implizit; ein abgelegtes Handle würde geschlossen),

@@ -111,6 +111,7 @@ ist Bereich 2.
 | K5 | **asymmetrisch** als Primitiv (`yield` kehrt zum Resumer zurück); symmetrisch darüber baubar | — |
 | K6 | **kooperativ**; Präemption über die Safepoint-Polls bleibt Tür | — |
 | K7 | Die Laufzeit liefert nur Primitive: `create(fn, stackSize)`, `resume`, `yield`, `status`, TLS „aktuelle Koroutine"; Scheduler, Tasks, Channels, M:N sind **Bereich 6** | — |
+| K7a | **Nachtrag (Bereich 10 I7)**: `close(co)` auf einer schwebenden Koroutine wickelt ihren Stack ab (Resume mit Abbruchsignal, `defer`/`using` laufen, kein weiteres `yield` erlaubt → Panik); Grundlage für `Coroutine<T> :: [Closeable]` | Python `GeneratorExit`, Kotlin Cancellation |
 
 Gegenüber Lyric 4: dasselbe Modell (stackful, Helfer dürfen anhalten), billiger (kein
 Frame-Einsammeln beim Yield), und neu: Yield aus einem Callback, der durch C läuft. Die eine
