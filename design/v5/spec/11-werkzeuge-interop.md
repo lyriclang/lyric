@@ -167,12 +167,26 @@ bewegt nicht (L1), Yields dürfen C-Frames durchqueren (L4), `extern "C"` wirft 
 | X9 | **Bindungen**: 5.0 von Hand, C-Bibliotheken als Pakete (07 B5, `-sys`-Muster); **`lyric bindgen` Tür** (libclang) | Rust `bindgen`; Zig `@cImport` verworfen |
 | X10 | **Optimierer/Vertrag**: `extern`-Aufruf ist opak (Speicher-Clobber); **`@Pure` auf `extern` Tür** (Reinheit ohne Körper ist eine Behauptung, die still miskompiliert — Gewinn klein); Typtabelle, `@Layout`-Regeln je Zieltripel und Callback-Regeln als Normtext (F2/F10/F18) | GCC `__attribute__((const))` |
 
-## W5 — Einbettung und Script-Nesting: **offen**
+## W5 — Einbettung und Script-Nesting: **entschieden** (2026-09-29)
 
-00 Z4/Z5, F22–F24, E21. Lyric 5 als C-Bibliothek in einem Host (Erato): Runtime-Objekt,
-Init/Shutdown, Scheduler-Pumpe (S5), Exporte, Objektlebensdauer über die Grenze, Reentranz;
-**Lyric-Script in Lyric 5**: CoreCLR-Hosting (opt-in, zieht .NET in den Prozess) oder eine
-native Script-VM — oder gar nicht in 5.0.
+### A. Lyric 5 im C-Host
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| H1 | **Ein Runtime je Prozess**: `lyr_init(const LyrConfig*)` / `lyr_shutdown()`; `LyrConfig { argc, argv, install_signal_handlers (10 Q9), heap_limit, stdout_write/stderr_write (nullbare Callbacks), log }`; zweites `lyr_init` = Fehler; generiert in `<name>.h` (X8) | Python `Py_Initialize`; Lua-Mehrfach-States verworfen (ein Heap, L1/G3) |
+| H2 | **Exporte sind die API** (X8): ein Export läuft als Task auf dem Scheduler des rufenden Threads (S6) und **pumpt bis zum Ende** — synchron aus Host-Sicht, parken erlaubt; asynchron über `spawnDetached` + **`lyr_step(): bool`/`lyr_run()`** (S5) | Lyric 4, Erato |
+| H3 | **Fehler/Panik über die Grenze** (E7-Form, 05 O5): werfende Exporte bekommen **`LyrStatus name(args…, R* out)`**; `LYR_OK`/`LYR_ERROR`/`LYR_PANIC`; `lyr_take_error(LyrError*)` (Typname, Meldung, Ursachenkette); **Panik im Export = `LYR_PANIC`, Runtime bleibt nutzbar** (Task-Grenze, T4) | Swift `@_cdecl`-Muster; gegen Rust (Panik über FFI = abort) |
+| H4 | **Host-Threads**: erster Aufruf attacht lazy einen Scheduler (G1); `lyr_detach_thread()` optional; Objekte dürfen Threads wechseln, Container/Handles nicht gleichzeitig (G3) | Go cgo; JNI `AttachCurrentThread` verworfen |
+| H5 | **Host-Objekte in Lyric**: `Ptr<void>` in Ein-Feld-Struct (T15) oder `Closeable`-Klasse — der Host besitzt; keine Handle-Tabelle, keine Lebendprüfung (F22 D verworfen); Lyric-Objekte im Host über `GcHandle` (X6); `lyr_gc_collect()`, `lyr_gc_stats()` | Go cgo, Lua `lightuserdata` |
+| H6 | **Reentranz** Host → Lyric → Host → Lyric gewöhnlich; kein Tiefenzähler (S6); Stack-Overflow = Guard-Page-Panik | Lua `LUAI_MAXCCALLS` verworfen |
+| H7 | **Dynamisches Laden**: `ffi.Library.open(path): Library throws IoError`, `lib.symbol<extern "C" fn(int) -> int>("name"): ?…`, `Closeable`; **Lyric-Plugins** (Lyric-`.so` in Lyric-Programm) **Tür** — zwei statisch gelinkte Runtimes = zwei GCs; bräuchte `--shared-runtime` | Rust `libloading`, C# `NativeLibrary` |
+| H8 | **Kein Compiler im Host** (JIT-Skripting von Lyric 5) in 5.0; Tür = interpretierbares IR (L7) | — |
+
+### B. Lyric-Script in Lyric 5
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| H9 | **Kein Script-Nesting in 5.0** (Z4). **Wird neu geplant, sobald die native Script-VM steht** (Maintainer, 2026-09-29 — „nur angestoßen"). Bis dahin: Prozessgrenze (`lyric-script` als Kindprozess, Pipes) als Ring-Paket; **CoreCLR-Hosting verworfen** (zieht das Laufzeitgewicht zurück, das Z1 ablegt). Vorgedacht für die spätere Planung: **(a) Modul-Mix im Paket** — `[script] root/toolchain/embed` im Manifest, Grenze **einmal** in Lyric 5 als `@ScriptApi`-Funktionen (→ Natives der VM) und `extern "script"`-Stubs, API-Beschreibung aus dieser Quelle, Bytecode per `embed` ins Binary oder daneben (Hot-Reload/Modding), VM als Bibliothek gelinkt, Marshalling = Native-Tabelle (Bibliotheks-, keine Sprachgrenze), zwei LSPs nach Dateiendung; **(b) Datei-Mix** (HTML-Idee des Maintainers) nur als Makro `script! { … }` (Q5) — braucht einen comptime-aufrufbaren Script-Compiler (Q3), kein Sprachfeature; die echte HTML-Analogie (Objektmodell + Verhalten in einer Datei) wäre ein Erato-Format, nicht Lyrics; **(c) die andere Tür**: Lyric-5-Module im IR-Interpreter (L7) — dasselbe Typsystem, keine Grenze, Hot-Reload/Budget/Sandbox durch den Interpreter, aber ohne Z4s Script-Freiheit | VS Code Extension-Host (Prozess), Rust `inline-python` (Makro) |
 
 ## W6 — Diagnostik: Katalog, Form, JSON, Fixes: **offen**
 
