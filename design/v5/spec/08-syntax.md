@@ -47,7 +47,27 @@ Aus `docs/Grammar.md`, `../operatoren.md` (46 Fragen), `../funktionen.md` (49),
 ## Y2 — Deklarationssyntax: **offen**
 ## Y3 — Bindungs- und Mutabilitätswörter (`mut`, `inout`/`ref`, `&`): **offen**
 ## Y4 — Ausdrucksformen, Präzedenz, Zuweisung: **offen**
-## Y5 — Statement-Formen, Klammern, Semikolons: **offen**
+## Y5 — Statement-Formen, Klammern, Semikolons: **entschieden** (2026-09-29)
+
+**Klammern um Kontrollköpfe bleiben** (`if (c) { … }`; C#, Kotlin, Zig, Lyric 4): sie
+begrenzen den Kopf, ohne die Rust-Sonderregel „kein Struct-Literal im Kopf"; Lyric-Script
+bleibt ebenso. **`;` bleibt Pflicht**: es trägt Semantik (`x` Tail gegen `x;` Statement — Rusts
+Grund), und Zeilenumbruch-Regeln wären Grammatikkomplexität für jedes Werkzeug inkl.
+Makro-`quote`; JS-ASI verworfen.
+
+| # | Regel | Vorbild |
+|---|---|---|
+| S1 | **Statement-Rümpfe immer geklammert** — kein `if (c) x;`. Der **`if`-Ausdruck** dagegen erlaubt beide Seitenformen: `if (c) a else b` (ohne Klammern, `else` Pflicht) und `if (c) { … a } else { … b }` mit Value-Blöcken (heute fünf Diagnosen) — kein `?:` | Go, Rust; Y4 |
+| S2 | `if (…) { } else if … else { }`; `if (let p = e) { }`; **`let p = e else { … };`** — widerlegbare Bindung: `else` läuft, wenn das Pattern nicht passt, und muss den Scope verlassen (Compiler prüft). **Für Optionals ist `??` das Idiom** (`let n = parse(s) ?? throw …;`, `?? { return 0; }` über `never`); `let … else` bleibt für Gestalt (`let Circle(r) = shape else { … };`) | Swift `guard`, Rust `let-else` |
+| S3 | `while (c) { }`, `do { } while (c);`, **`loop { }`**, `for (x in xs)`, `for (i in a..b)`, `for ((k, v) in map)`; kein `for (;;)`, kein `switch` | — |
+| S4 | Labels `outer: loop { … break outer; }` (4.x-Form, kein `'outer`); `break value` nur aus `loop`; `break outer value` erlaubt | Rust (Wert) |
+| S5 | **`using let f = open(p);`** — Wort vor `let`; `using var` ist ein Fehler | C# `using var` |
+| S6 | `defer expr;` / `defer { … }`; `return`/`break` im `defer`-Rumpf ist ein Übersetzungsfehler (heute Compiler-Stack-Overflow) | Go |
+| S7 | `try { } catch (e: T) { }` bleibt; `catch (e: A, B)` (E9) | — |
+| S8 | **Zuweisung bleibt Ausdruck** (Maintainer): Wert = neuer Wert des Ziels, Typ = Typ des Ziels, rechtsassoziativ, für `=` und Compound (`o ??= 3` liefert `?T`) — die gemessene Wirklichkeit als Spec-Zeile; **Zuweisung direkt als Bedingung → Warnung** „`==` gemeint?", Doppelklammer schaltet sie ab; Präzedenz niedrigste, unter `??` | C#; Clang `-Wparentheses` |
+| S9 | `match (e) { … }`; Ausdrucksarm endet mit `,`, Blockarm darf es weglassen (beide erlaubt; Formatter schreibt bei Blöcken keins) | Rust |
+| S10 | Leeres `;` erlaubt, Formatter entfernt es | — |
+
 ## Y6 — Patterns: **offen**
 ## Y7 — Literale und Formatsprache: **offen**
 ## Y8 — Kommentare und Dokumentation: **offen**
