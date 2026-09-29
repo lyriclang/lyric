@@ -244,7 +244,15 @@ Lambdas (`xs.filter { it > 0 }.map { it * 2 }.toList()`, lazy bis zum Terminator
 mit Statements. C#'s LINQ-Query-Syntax als Gegenbeispiel einer zweiten Schreibweise, die
 niemand nutzt.
 
-## Y8 — Kommentare und Dokumentation: **offen**
+## Y8 — Kommentare und Dokumentation: **entschieden** (2026-09-29)
+
+`//`, `/* … */` (geschachtelt) bleiben; `///` dokumentiert die folgende Deklaration (Markdown,
+Code-Zäune als Doc-Tests, A9), auch an Feldern, Varianten, Parametern; **`//!` am Dateianfang
+ist die Moduldoku** — **optional** wie `///`: der LSP zeigt sie beim Hover über den Modulpfad
+(Import, qualifizierter Name), `lyric doc` macht die Modulseite, `lyric api` den Kopf; ein Lint
+„exportiertes Modul ohne Doku" ist einschaltbar (A10), zwingend nichts. Nötig, weil der
+`module`-Header weg ist (M2). (Rust)
+
 ## Y9 — Zucker: **entschieden** (2026-09-29)
 
 | Form | Regel | Aus |
@@ -260,7 +268,14 @@ niemand nutzt.
 | **nachlaufende Kommata** | überall erlaubt | Rust, Go |
 | Property-Zucker | Tür | Y1 |
 
-## Y10 — Formatierung und Stil: **offen**
+## Y10 — Formatierung und Stil: **entschieden** (2026-09-29)
+
+**Eine Form**, `lyric fmt` ohne Optionen (Go, Zig); 4 Spaces; K&R-Klammern (`fn f() {`,
+`} else {`); weiche Zeilenlänge 100; Importe oben, sortiert (I7); `@[…]`-Gruppe (F5);
+nachlaufende Kommata in mehrzeiligen Listen (Y9). **Der Formatter ist Teil des
+Toolchain-Vertrags**: idempotent, eine Formatänderung ist ein Minor mit Changelog-Eintrag
+(Korpus E29/E30). Kein `// fmt: off` — Kommentare tun nichts.
+
 ## Y11 — Lambdas: **entschieden** (2026-09-29)
 
 | # | Regel | Vorbild |
@@ -277,4 +292,34 @@ niemand nutzt.
 | F10 | `obj.method` gebundene Closure, `Type.staticFn` Funktionswert (T17) | Kotlin |
 | F11 | Parametertypen aus dem Kontext (T8), sonst annotieren | — |
 
-## Y12 — Makro- und `comptime`-Syntax: **offen**
+## Y12 — Makro- und `comptime`-Syntax: **entschieden** (2026-09-29)
+
+| # | Form | Regel |
+|---|---|---|
+| Q1 | `macro Builder(target: StructDecl): Decl { … }`, `macro retry(n: Expr, body: Block): Expr { … }` | wie `fn`, kontextuelles `macro`; Parametertypen aus `std.syntax` (`Expr`, `Stmt`, `Block`, `Decl`, `StructDecl`, `FnDecl`, `Ident`, `Type`, `Literal`, `Pattern` — Bereich 10); Rückgabe AST-Typ oder `Decl[]`/`Stmt[]` |
+| Q2 | **`quote { … }`** | Ausdruck vom AST-Typ seines Inhalts (erwarteter Typ entscheidet bei Mehrdeutigkeit); **hygienisch**: im `quote` entstandene Namen sind eigene, Namen aus `#{…}` gehören dem Aufrufer |
+| Q3 | **`#{expr}`** | AST-Wert, `Ident`, Literal eingesetzt; ein Array von Knoten wird **gespleißt**; in Bezeichnerposition baut es Namen (`fn #{name}()`) |
+| Q4 | `@Builder struct P { … }`, `@Retry(3) fn f() { … }` | Art 3, keine Sonderschreibweise (T4) |
+| Q5 | **`name!(args)`**, **`name!(args) { … }`**, `name! { … }` | `!` = Expansion; Argumente sind gewöhnliche Lyric-Syntax, kein Token-Strom (T1); DSL-Strings sind String-Literale, die das Makro deutet |
+| Q6 | Makros rufen `comptime`-Funktionen und `std.meta`; Fehler per `error(node, "…")` mit Span | Rust `compile_error!` |
+| Q7 | **`lyric expand datei.lyr`**; Editor „expandieren" | `cargo expand` |
+| Q8 | `comptime expr`, `comptime { …; v }`, `comptime if (c) { } else { }`, `comptime for (x in xs) { }`; `let TABLE = comptime { … };` | Zig |
+| Q9 | `embed("pfad")` eingebaute `comptime`-Funktion, kein Makro | Zig |
+| Q10 | `@callerExpr(cond) text: string = ""` am Parameter, Default Pflicht | C# |
+
+```
+macro retry(n: Expr, body: Block): Expr {
+    return quote {
+        loop {
+            var left = #{n};
+            try { break #{body}; } catch (e) { left -= 1; if (left == 0) { throw e; } }
+        }
+    };
+}
+let data = retry!(3) { try fetch(url) };
+```
+
+---
+
+**Bereich 8 ist damit vollständig entschieden** (Y1–Y12, 2026-09-29) — und mit ihm die Sprache.
+Es bleiben 10 (Standardbibliothek), 11 (Werkzeuge und Interop), 12 (Migration).
