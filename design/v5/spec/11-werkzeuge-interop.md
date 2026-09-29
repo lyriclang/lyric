@@ -207,12 +207,31 @@ bewegt nicht (L1), Yields dürfen C-Frames durchqueren (L4), `extern "C"` wirft 
 | G12 | **`comptime`/Makro-Spans** (D31 C+D): Hauptspan an der Aufrufstelle, Notizkette mit Frames; `lyric expand` | rustc |
 | G13 | **Laufzeit**: Paniken mit Code (`LYR-RT…`) und Backtrace, Exit 101; entkommener Fehler `error: message` + Ursachenkette, Exit 1 (05 O4/E8) — dieselbe Textform, `explain` kennt beides | Rust |
 
-## W7 — Lints: **offen**
+## W7 — Lints: **entschieden** (2026-09-29)
 
-D17, 06/07/08/10-Vormerkungen. Welche Warnungen es gibt (toter Code, ungenutzt, globale `var`
-ohne Sync, reservierte Gerätenamen, Prelude-Verdeckung, nie geschlossene `Closeable`,
-Zuweisung in Bedingung, `x = x++`, `+=` auf Strings in Schleifen?), Stufen (`allow`/`warn`/
-`deny`) über `[lints]` und `@Allow`, Standardstufen, ob Lints Teil von `check` sind.
+Maintainer: viele sinnvolle Warnungen (in 4.x erst vergessen, dann dünn) und ein schaltbares
+„Warnungen als Fehler".
+
+| # | Entscheidung | Vorbild |
+|---|---|---|
+| L1 | **Stufen** `allow`/`warn`/`deny` je Lint; gesetzt über `[lints]` (paketweit), `@Allow(name)`/`@Warn`/`@Deny` an Deklaration oder Modul (09 A10), CLI `-A`/`-W`/`-D name`; ein Mechanismus, drei Orte, Präzedenz C4 | Rust |
+| L2 | **Warnungen als Fehler**: Gruppe `warnings` — `[lints] warnings = "deny"`, CLI **`--deny-warnings`** (= `-D warnings`), Profilfeld `denyWarnings` (P3); wirkt auf jede Warnung inkl. Deprecations; **neue Lints in einem Minor starten als `warn`** (Toolchain-Pin P12 schützt `deny`-Projekte) | Rust `-D warnings`, C `-Werror` |
+| L3 | **Gruppen**: `unused`, `correctness`, `resources`, `concurrency`, `deprecation`, `style`, `perf`, `docs`; `[lints] style = "allow"` schaltet eine Gruppe | Clippy-Gruppen |
+| L4 | **Lints laufen in `check` und `build`**, kein `lyric lint`; Teil des Katalogs (G2), jeder mit rotem und grünem Konformanzfall (G10) | Go `vet` (getrennt) verworfen |
+| L5 | **Editor**: `unused` als `Hint` mit `Unnecessary`-Tag, sonst `Warning`; Fixes nach G7 | rust-analyzer |
+
+**Die Liste** (Standardstufe):
+
+| Gruppe | Lints |
+|---|---|
+| **unused** (warn) | `unused-variable`, `unused-parameter` (`_x` schweigt), `unused-import`, `unused-result` (Rückgabe einer werfenden oder `@MustUse`-Funktion verworfen), `unused-assignment`, `unused-var` (`var` nie neu zugewiesen → „`let` genügt"), `unused-label`, `unused-generic`, `dead-code` (nicht-`pub` ohne Nutzung; Attributträger ausgenommen), `unreachable-code`, `unreachable-pattern` (4.x „kein Fehler" → Warnung) |
+| **correctness** (warn) | `assignment-in-condition` (Y), `self-assignment` (`x = x`, `x = x++`, D), `comparison-always` (`uint >= 0`), `float-equality` (allow), `prelude-shadowing` (I8), `shadowed-local` (allow), `module-shadowing` (07 K4), `int-literal-adapts` (allow). Fehler bleiben Fehler (Konstantenüberlauf, `!` auf Nicht-Optional, fehlendes `try`) — kein zweiter Fehlerkanal |
+| **resources** (warn) | `closeable-never-closed` (R3), `unused-task` (`Task<T>` verworfen — `spawnDetached` sagt es) |
+| **concurrency** (warn) | `global-var-without-sync` (Modul-`var` in einem Programm mit Threads, 06) |
+| **deprecation** (warn) | `deprecated` (A11; abgelaufenes `until` = Fehler), `deprecated-edition` (Bereich 12) |
+| **style** (warn) | `naming` (N1), `reserved-device-name` (07 M8 — deny), `redundant-clone`, `needless-return` (allow), `loop-instead-of-while-true` (allow) |
+| **perf** (allow, außer *) | `string-concat-in-loop`* (warn → `StringBuilder`), `large-value-copy` (Struct > 64 B als Wert; 02: 16-B-Richtlinie bleibt Doku), `boxed-interface-in-hot-loop` |
+| **docs** (allow) | `missing-docs` (`pub` ohne `///`; Bibliotheken setzen `deny`), `broken-doc-link` (warn) |
 
 ## W8 — Editor, Formatter, REPL, Doku: **offen**
 
