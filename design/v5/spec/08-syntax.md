@@ -245,7 +245,36 @@ mit Statements. C#'s LINQ-Query-Syntax als Gegenbeispiel einer zweiten Schreibwe
 niemand nutzt.
 
 ## Y8 — Kommentare und Dokumentation: **offen**
-## Y9 — Zucker: implizites Member, Feldkurzform, Aufrufsyntax, `^n`, `!in`: **offen**
+## Y9 — Zucker: **entschieden** (2026-09-29)
+
+| Form | Regel | Aus |
+|---|---|---|
+| `.Red`, `.Num(v)` | implizites Member überall mit erwartetem Typ (Argument, Rückgabe, Zuweisung, `x == .Red`, Default, Pattern) | T9 |
+| `S { v, w }` | Feldkurzform | M14 |
+| **`Point(1, 2)`** | Typname in Aufrufposition ≡ `Point.new(1, 2)` — **`new` ist eine gewöhnliche statische Funktion** (Namenskonvention wie Rust `new`/Go `NewX`), Arität wählt (D4); ohne `new` Fehler mit Hinweis auf den Initializer; **keine Konstruktoren** (kein halbfertiges `this`, keine Verkettung; eine Fabrik darf `?T` liefern, werfen, ein bestehendes Objekt zurückgeben); anders benannte Fabriken ruft man beim Namen | D11 |
+| `xs[^1]`, `xs[1..^1]` | nur in Klammern, über `length` | T14 |
+| `x !in xs` | `!(x in xs)` | D6 |
+| `?.` `??` `!` `??=` `&&=` `\|\|=` | bleiben | — |
+| Ranges `a..b`, `a..=b`, `a..`, `..b`, `..` | Werte | T13 |
+| `f(host: "h")` | benannte Argumente | D5 |
+| **nachlaufende Kommata** | überall erlaubt | Rust, Go |
+| Property-Zucker | Tür | Y1 |
+
 ## Y10 — Formatierung und Stil: **offen**
-## Y11 — Lambdas: Formen, Rumpfregeln, `inline`: **offen**
+## Y11 — Lambdas: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| F1 | **Drei Formen**: Paren `(n: int): int throws [E] => …`, bare `x => x * 3`, Trailing `xs.map { it * 2 }` / `f(a) { … }` — alle drei in Guide-Kapitel 3 | Kotlin |
+| F2 | **Mehrere Parameter im Trailing-Block**: `xs.fold(0) { acc, x => acc + x }`, Destructuring `{ (k, v) => v }`; ohne Parameterliste ist `it` der Parameter (heute: zwölf Diagnosen) | Kotlin |
+| F3 | **Rumpf = Ausdruck oder Value-Block** (Statements + Tail) in jeder Form — die 4.x-Unterscheidung „Trailing-Block ohne Tail" fällt | — |
+| F4 | `it` implizit; inneres `it` verdeckt äußeres **mit Warnung** | Kotlin (still) |
+| F5 | **Rahmengebundene Konstrukte** (die vier ICEs): `return` verlässt das Lambda; `break`/`continue` nur für Schleifen *im* Lambda, sonst Fehler; `this` und impliziter Feldzugriff **erlaubt** (gefangen nach M8 C2); **`yield` im Lambda macht es zum Generator-Lambda** vom Typ `fn(…) -> Coroutine<Y>` — D11 auf Lambdas; `sequence { … yield … }` ist eine gewöhnliche Funktion darüber | Kotlin `sequence`, C# Iterator-Blöcke |
+| F6 | **`inline fn`**: Funktionsparameter eingesetzt, Lambda keine Closure; `return` darin **nicht-lokal**, `break`/`continue` treffen umschließende Schleifen; das Lambda darf im Callee nicht gespeichert/zurückgegeben werden (Fehler); `noinline`-Marker: Tür | Kotlin |
+| F7 | `throws` inferiert (K3), in der Paren-Form annotierbar | Swift |
+| F8 | **Lokale `fn`** in Rümpfen, mit Capture — benannte Closures, Rekursion | Kotlin |
+| F9 | keine Defaults, kein `...` in Lambdas (lokale `fn`) | — |
+| F10 | `obj.method` gebundene Closure, `Type.staticFn` Funktionswert (T17) | Kotlin |
+| F11 | Parametertypen aus dem Kontext (T8), sonst annotieren | — |
+
 ## Y12 — Makro- und `comptime`-Syntax: **offen**
