@@ -149,13 +149,23 @@ Verschoben gegenüber dem Dossier: das Manifest ist die Wahrheit (P1), und ohne 
 | BS6 | **`gen/` ist sichtbarer Modulraum** (`app.gen.schema`), nicht eingecheckt, in Diagnosen und Debugger eine Datei | 09 |
 | BS7 | **Türen**: `[tasks]` (`lyric task name`), Schritt-Graph mit deklarierten Ein-/Ausgaben | Deno `task`, Bazel |
 
-## W4 — FFI: `extern "C"`, Typen an der Grenze, Export, Bindungen: **offen**
+## W4 — FFI: `extern "C"`, Typen an der Grenze, Export, Bindungen: **entschieden** (2026-09-29)
 
-F3/F4/F7–F13, F15, F17–F21, F25, F28–F31, F34. Form (`extern "C" fn`, Symbolname, Bibliothek),
-Typen die kreuzen (`CStr`, `Ptr<T>`, `@Repr(C)`-Structs, Callbacks, Arrays/Slices, `string`
-auf dem Draht), `unsafe`?, `@Export("name")` und `lib.a`-Bau, wer Bindungen schreibt
-(`lyric bindgen` über libclang?), Linking über `[native]`, Variadics, Versionierung, Tests
-hinter `extern`, Optimierer an der Grenze, `std.ffi`-Oberfläche.
+Grundlage aus 00/01: C-ABI ist die Muttersprache (Z5), Structs sind inline C-Structs, der GC
+bewegt nicht (L1), Yields dürfen C-Frames durchqueren (L4), `extern "C"` wirft nie (E6/E7).
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| X1 | **Form** (D15): `extern "C" fn strlen(s: CStr): uint = "strlen";` einzeln oder gebündelt `extern "C" { fn …; }`; Symbolname = Funktionsname, `= "sym"` weicht ab; **Linken über `[native] libs`** (P1), kein `@Link`; Variadik: `extern "C" fn printf(fmt: CStr, ...): int` (C-Promotion) | Rust, Zig; verworfen: `@Link` |
+| X2 | **Typtabelle (normativ)**: `int8…uint64` ↔ `int8_t…uint64_t`, `int` = `int64_t`, `uint` = `uint64_t`/`size_t`, `float32/float64` ↔ `float/double`, `bool` ↔ `bool`, `char` ↔ `uint32_t`; **`Ptr<T>`** (nicht-null) ↔ `T*`, **`?Ptr<T>`** ↔ nullbarer Zeiger (V5-Niche); `CStr` ↔ `const char*`; **`@Layout(C) struct`** ↔ C-Struct nach Plattform-ABI (auch als Wert; Felder müssen C-fähig sein, sonst Fehler), `@Layout(C)`/`@Layout(uint8)` Enum ↔ C-Enum/Integer; `T[N]` in `@Layout(C)`-Structs inline; `extern "C" fn(int) -> int` ↔ Funktionszeiger. **Nicht**: Klassen, `string` als Rückgabe, `Slice`, `?T` außer Zeiger, Closures, Tupel, Interface-Werte. **`@Layout`** statt Rusts `@Repr` — der Name sagt, was es tut (Maintainer): ohne Attribut darf der Compiler Felder umordnen und Nischen nutzen | Rust `#[repr(C)]`, Zig `extern struct`, C# `StructLayout`; verworfen: alle Structs C-Layout, Union/Bitfelder (Tür) |
+| X3 | **Strings**: `string` ist im Layout **NUL-terminiert** (ein Byte je String) → koerziert als Argument zu `CStr` **ohne Kopie** (GC unbeweglich); `CStr` aus C ist geliehen: `toString()` kopiert und prüft UTF-8 (`throws Utf8Error`), `length()`; Halten über den Aufruf hinaus nur mit `GcHandle` (X6) | Zig `[*:0]const u8`; F21 A |
+| X4 | **Speicher und `unsafe`**: `Ptr<T>.read()/write(v)/offset(n)/cast<U>()`, `ffi.alloc(n)`/`free(p)` nur in **`unsafe { … }`** (kontextuelles Schlüsselwort); der *Aufruf* eines `extern` ist nicht `unsafe` (Zig-Haltung); `Slice<T>.asPtr()`/`T[].asPtr()` sicher, Nutzung unsafe; **keine Arena** (F11 B war die Sandbox-Antwort) | Rust, Zig; verworfen: Java-FFM-Arena, Handle-Tabelle |
+| X5 | **Callbacks**: nur nicht-fangende Funktionen/Lambdas koerzieren zu `extern "C" fn(…)`; Closures über **`ffi.Callback.new(closure)`** → `(fnptr, userdata: Ptr<void>)` mit GC-Pin, `release()`; Callback-Typ **nicht-werfend** (E7); Fehlerbrücke `ffi.stash(e)` im Callback + `ffi.takeStashed()` nach dem Aufruf (Task-lokal, E7-Form); **Panik im Callback = Abbruch**; Callbacks dürfen parken/yielden (L4) | Rust, Go cgo |
+| X6 | **Lebensdauer**: während eines Aufrufs sind Lyric-Zeiger stabil; darüber hinaus **`GcHandle.pin(obj)`** + `release()`, `asPtr()` für `void* userdata`, `GcHandle.from(ptr)`; C-Speicher gehört dem Programm | .NET `GCHandle`, Go `cgo.Handle` |
+| X7 | **Fremde Threads**: Callback auf einem Thread ohne Lyric-Scheduler → **Queue des besitzenden Threads** (06), nur `void`-Callbacks; mit Rückgabewert von fremdem Thread = Abbruch mit Meldung; `Callback.new(closure, thread: …)` wählt den Besitzer | Kotlin-Dispatcher-Form |
+| X8 | **Export**: `@Export("c_name") pub fn f(a: int): int` → C-Symbol (nur X2-Typen; Reachability-Wurzel, 07 B6); `lyric build --lib` erzeugt `lib<name>.a`/`.so`/`.dll` **und `<name>.h`** mit Exporten plus `lyr_init`/`lyr_shutdown` (W5) | Rust `cbindgen`, Go `//export`, Swift `@_cdecl` |
+| X9 | **Bindungen**: 5.0 von Hand, C-Bibliotheken als Pakete (07 B5, `-sys`-Muster); **`lyric bindgen` Tür** (libclang) | Rust `bindgen`; Zig `@cImport` verworfen |
+| X10 | **Optimierer/Vertrag**: `extern`-Aufruf ist opak (Speicher-Clobber); **`@Pure` auf `extern` Tür** (Reinheit ohne Körper ist eine Behauptung, die still miskompiliert — Gewinn klein); Typtabelle, `@Layout`-Regeln je Zieltripel und Callback-Regeln als Normtext (F2/F10/F18) | GCC `__attribute__((const))` |
 
 ## W5 — Einbettung und Script-Nesting: **offen**
 
