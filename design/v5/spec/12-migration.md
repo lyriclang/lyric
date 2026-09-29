@@ -160,7 +160,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | L2 | Bugfixes der 4.x-Linie geschehen in Lyric-Script; **kein 4.x-Release mehr unter `lyric`** nach dem Schnitt | — |
 | L3 | Rückfluss aus 5 (Formatsprache, Lints, Diagnostikform, `lyric.toml`) entscheidet die Script-Roadmap — nichts ist Pflicht | Z4 |
 
-## R7 — Der Umsetzungsplan: **offen** → eigenes Dokument `13-umsetzungsplan.md`
+## R7 — Der Umsetzungsplan: **entschieden** (2026-09-29) → `13-umsetzungsplan.md` (M0–M18, Abhängigkeiten, Messpunkte)
 
 Das eigentliche Ergebnis der Runde (Maintainer: „einen detailreichen Plan, nach dem Lyric 4
 stückweise auf 5 gebracht wird"). Meilensteine mit konkretem Artefakt je Schritt (CONTRIBUTING
