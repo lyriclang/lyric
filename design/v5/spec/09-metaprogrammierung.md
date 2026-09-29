@@ -36,11 +36,56 @@ Aus `../metaprogrammierung.md` (37 Fragen), Guide 15, `design/macros.md`,
   Warnungsunterdrückung, `lyrfix`, Attribut-Vervollständigung im LSP, Laufzeitreflexion
   (bewusst), Makrosystem (bewusst), Bedingungskompilierung.
 
-## A1 — Was ein Attribut ist und darf: **offen**
+## A1 — Was ein Attribut ist und darf: **entschieden** (2026-09-29) — drei Arten, ein Wort
+
+| Art | Was `@Name` tut | Wer liest es | Beispiele | Vorbild |
+|---|---|---|---|---|
+| **1 · Daten** | nichts — annotiert mit Werten für Host, Werkzeuge, Makros | Host, `lyric api`, Runner, Makros | `@Route { path = "/x" }`, SDK-Marker | Lyric 4, C#, Java |
+| **2 · Compiler-Anweisung** | ändert, was der Compiler tut — **geschlossene Liste** in `std.core`, je mit Vertrag in der Spec (A11) | der Compiler | `@Deprecated{until, replacement}`, `@Test`, `@Inline`, `@MustUse`, `@NonExhaustive`, `@callerExpr` | Rust `#[inline]`, Swift |
+| **3 · Makroanwendung** | erweitert die Deklaration um erzeugten Code (A8) | Compile-Zeit-Interpreter | `@Builder`, `@Retry(3)` | Rust Attribut-Makros, Swift attached macros |
+
+| # | Regel |
+|---|---|
+| T1 | **Ein Name, eine Art** — die Spec nennt bei jedem Attribut seine Art |
+| T2 | Art 2 ist geschlossen; Nutzer definieren Art 1 und 3; was eine Compiler-Anweisung bräuchte, ist ein Makro |
+| T3 | Deklarationsform unterscheidet 1 und 3 (A2): Daten-Attribut = Struct mit Zielmarker; Makro-Attribut = `macro` mit Deklarationsparameter |
+| T4 | **Kein `!` an Attributen**; Sichtbarkeit der Expansion über Editor-Anzeige und `lyric expand` (Rust: `#[derive]` und `#[serde]` sehen gleich aus, die Doku sagt es) |
+| T5 | **Ein Attribut ändert nie Code, der es nicht trägt** — Hygiene auf Deklarationsebene (Swift) |
+| T6 | Art-2-Attribute sind **identitätsgebunden** (A3): `std.test.Test`, nicht „irgendein `Test`" (der Runner-Befund) |
+| T7 | Attribute an **allen** Deklarationen (Top-Level, Member, Parameter, Variante, Interface, Alias, `extend`, Modul); der Zielmarker sagt je Attribut, wo es sitzen darf |
+
+Die 4.x-Sätze „Attribute tun nichts" und „nur `@Deprecated` ist compilergelesen" fallen —
+ersetzt durch „jedes Attribut hat eine deklarierte Art".
+
+**`comptime` und Makros — die Trennregel** (Maintainer-Nachfrage): beides existiert, auf
+demselben Interpreter. `comptime` für **Werte** (Tabellen, geprüfte Konstanten) und **Rumpfcode,
+der von Typinformation abhängt** (`comptime for (f in fields(Self))`, `comptime if`) — lesbar,
+weil man normalen Code liest, der entfaltet wird; **Makros** für **Deklarationen** (Builder-Typ,
+`extend`-Block), **Umwickeln** (`@Retry`) und **Syntax lesen** (`sql!("…")`). „Alles über
+Makros" verworfen: die `ToJson`-Schleife als `quote`-Konstruktion wäre die Unlesbarkeit, die an
+`comptime` stört, an jeder Stelle statt an manchen. (Nim: `static:`/`when` + `macro`)
+
 ## A2 — Deklarationsform, Ziele, Argumente: **offen**
 ## A3 — Attribut-Identität (qualifizierte Namen): **offen**
 ## A4 — `comptime`: Umfang, Werte, Budget, `embed`: **offen**
-## A5 — Synthese: fest im Compiler oder nutzererweiterbar: **offen**
+## A5 — Synthese: **entschieden** (2026-09-29) — die Synthese gehört dem Interface
+
+**Die Konformanzliste ist das `derive`.** Ein Interface schreibt seine Member als
+`comptime`-Default-Rümpfe generisch über `Self` (`comptime for (f, i) in fields(Self) { … }`);
+`struct Point :: [ToJson] { … }` bekommt sie, eine eigene Implementierung ersetzt sie (D7).
+**Kein `@derive(X)`** (Rust braucht es, weil Trait und Synthese dort getrennte Dinge sind) und
+**kein `@ToJson`** (ein Makro mit dem Namen des Interfaces kollidierte in K3's einem Namensraum;
+Rusts Makro-Namensraum wird nicht übernommen). D7 ist damit begründet, nicht geerbt.
+
+- `Equatable`, `Hashable`, `Ordered`, `Clone`, `Default` wandern als Interfaces mit
+  `comptime`-Defaults nach `std.core`; **fest im Compiler** bleibt nur, was keine Bibliothek
+  schreiben kann: `Debug` für alles automatisch, `Identity` (Adresse).
+- **Attribut-Makros** (Art 3) sind für Codeerzeugung, die **keine Konformanz** ist — `@Builder`,
+  `@Retry(3)`, `@Route { … }` (Art 1) — in der normalen `@[…]`-Liste; die Art steht in der
+  Deklaration, nicht in der Schreibweise.
+- Synthese für ein **fremdes** Interface (Rusts `serde_derive`-Fall): ein Attribut-Makro mit
+  eigenem Namen (`@JsonVia`), das `extend P :: [ToJson] { … }` erzeugt — erlaubt, Nebenweg.
+
 ## A6 — Bedingungskompilierung: **offen**
 ## A7 — Typinformation zur Compile-Zeit, Enum-Reflexion: **offen**
 ## A8 — Der Mechanismus: **entschieden** (2026-09-29) — die ganze Leiter, Sprosse 5
