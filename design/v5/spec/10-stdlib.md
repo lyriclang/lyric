@@ -80,7 +80,7 @@ SL-01, SL-16, SL-18. **Regel D mit Trägerklausel, ein Ring in 5.0, der zweite a
 
 | Gruppe | Module |
 |---|---|
-| Kern | `prelude`, `core` (Kern-Interfaces, `Num`-Familie, `Error`, `Result`, `Box`, `Slice`, `str`, Ranges, `?T`-Member, Art-2-Attribute — `result`/`option` gehen auf), `iter`, `collections`, `string`, `fmt`, `math` |
+| Kern | `prelude`, `core` (Kern-Interfaces, `Num`-Familie, `Error`, `Result`, `Box`, `Slice`, `StringView`, Ranges, Member von `T[]`/`Slice`/`?T`, Art-2-Attribute — `result`/`option` gehen auf), `iter`, `collections`, `string`, `fmt`, `math` |
 | Daten/Kodierung | `encode` (Encode/Decode-Paar, Name B10), `json` (RFC 8259), **`toml`** (Manifest), `encoding` (Base64/Hex/UTF-16/LE-BE; `bytes` geht auf), **`compress`** (RFC 1950–1952), **`regex`** (RE2-Syntax, lineare Zeit), `hash` (`Hasher`, SipHash, FNV, CRC32), `crypto` (SHA-2/SHA-1/MD5, HMAC, `secureRandom`; Ed25519/ChaCha20-Poly1305 Tür), `random` (PCG), `time` (RFC 3339, TZif-Parser RFC 8536 über die System-Zonendatenbank) |
 | I/O und System | `io` (`Reader`/`Writer`/`Seek`, Puffer-/Text-Hüllen, `IoError`, `copy`, Speicherströme, `stdin/stdout/stderr`, `print`-Familie, `readLine`, `isInteractive` — `io.stream`/`io.error`/`io.console` gehen auf), `fs`, `path`, `net`, **`url`** (RFC 3986), **`http`** (HTTP/1.1 Client **und** Server über `Reader`+`Writer`; kein TLS, HTTP/2 Tür), `os` (ohne Zeit), `process`, **`term`** (ECMA-48, TTY-Erkennung; Raw-Mode Tür) |
 | Nebenläufigkeit (06) | `task`, `sync`, `thread` |
@@ -273,12 +273,22 @@ interface DoubleEnded :: [Iterator] { fn nextBack(): ?Item; }   // Arrays, Slice
 Sprachnachträge eingetragen: 05 K7 (Join-Regel), 05 R7 (`for` schließt `Closeable`), 08 S3a
 (`try` im Schleifenkopf), 01 K7a (`close` auf schwebender Koroutine).
 
-## B7 — Container: **offen**
+## B7 — Container: **entschieden** (2026-09-29)
 
-`List`/`Map`/`Set`/`Deque` Oberfläche (COL-14, `stdlib-2.md` §5), `SortedMap`/`SortedSet`
-(B-Tree) ja/nein, `entry`-API vs `getOrInsert`/`update`, Kapazität, Hash-Tabellen-Strategie
-(Robin-Hood/Swiss, Verdichtung), `T[]`/`Slice<T>`-Member, Collection-Literale für eigene Typen
-(COL-13 `FromLiteral`), Arrays als Map-Schlüssel (COL-30), `x in xs` (COL-31).
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| C1 | **`std.collections`: `List<T>`, `Map<K, V, H = DefaultHasher>`, `Set<T, H>`, `Deque<T>`, `Heap<T :: [TotalOrder]>`** (Binärheap: `push`/`pop`/`peek`). **Türen**: `SortedMap`/`SortedSet` (B-Tree), `LinkedMap` (I8), `BitSet` | Rust `BinaryHeap`, C# `PriorityQueue`; Go/Python/Swift ohne SortedMap |
+| C2 | **Member von `T[]`, `Slice<T>`, `T[N]` liegen in `std.core`** (Sprachprimitive, ohne Import sichtbar): `length()`, `isEmpty()`, `get(i): ?T`, `first`/`last`, `iter()`, `contains`, `indexOf`, `fill`, `copyInto(dst)`, `reversed()`, `reverse()`, `sort`-Familie, `binarySearch(v): ?int`, `partitionPoint(p)`, `join(sep)`; `arr[a..b]` → `Slice<T>` (A2). *Korrigiert B1: nicht `collections`* | Rust `core::slice` |
+| C3 | **`List<T>`** (Klasse, Verdopplung, `shrinkToFit()`): `new()`/`withCapacity(n)`/`of(arr)`/`from(iterable)`; `[i]` (Panik), `get(i): ?T`, `[a..b]` → `Slice<T>` (View auf den Puffer; Wachstum löst den View — zeigt auf den alten Puffer, speichersicher, dokumentiert wie Go); `push`, `pop(): ?T`, `insert(i, v)`, **`removeAt(i): T`, `remove(v): bool`** (Arität trennt `remove(int)`/`remove(T)` nicht — Kotlins Paar), `removeWhere(p)`, `pushAll(iterable)`, `clear`, `truncate(n)`, `swap`, `dedup`, `toArray()`, `asSlice()`; C2 per `asSlice()` | Kotlin `MutableList`, Rust `Vec` |
+| C4 | **`Map`**: `[k]` → `?V`, `[k] = v` (N3), `get`, `getOr(k, d)`, `getOrInsert(k, make)`, `insert(k, v): ?V` (alter Wert), `remove(k): ?V`, `containsKey`, `update(k, f)`, `retain(p)`, `keys/values/entries`, `from(pairs)`; **kein `entry`-Typ**. **Implementierung: Swiss-Table** (offene Adressierung, Gruppen-Metadaten, Last 7/8, Tombstone-Rehash), SipHash-1-3 (K2); `Set` über dieselbe Tabelle | Rust hashbrown, Abseil; verworfen: `entry`-API, Robin-Hood |
+| C5 | **`Set`**: Mengenoperationen als **Methoden** `union`, `intersect`, `difference`, `symmetricDifference`, `isSubset/isSuperset/isDisjoint` (B2; 4.x frei); keine Mengen-Operatoren (Tür) | Kotlin, Swift |
+| C6 | **`Deque`** (Ringpuffer): `pushFront/pushBack/popFront/popBack/peekFront/peekBack`, `[i]`, **`Iterable`** vorn→hinten — „a queue is drained, not walked" (4.x) fällt | Rust `VecDeque`, C# `Queue` |
+| C7 | **Concat und Wiederholung als Operatoren** (Maintainer): `+` auf `string`, `T[]` (`Add<Out = T[]>`), `Slice<T>` (`Out = T[]`) → neuer Wert; **`xs * n`** auf `string` und **`extend<T :: [Clone]> T[] :: [Mul<Rhs = int, Out = T[]>]`** — **jeder Slot ein `clone()`** (K5): `[List.new()] * 3` sind drei Listen, ein nicht-`Clone`-Element ist ein Übersetzungsfehler mit Hinweis auf `arrayOf`. Kein `n * xs`. **`arrayOf<T>(n, f: fn(int) -> T): T[]`** bleibt (frische, indexabhängige Elemente); `arrayFilled` fällt (= `[v] * n`). **Inline**: `let buf: uint8[64] = [0] * 64;` — konstantes `n` mit erwartetem `T[N]` baut zur Übersetzungszeit (T13); `T[N] :: [Default]` bedingt (D7-Synthese für Structs mit Array-Feld); `T[]` hat kein `Default` (`[T.default()] * n`) | Rust `vec![x; n]` (verlangt `Clone`), Python `+`/`*`; verworfen: Verbot der Wiederholung (Vorfassung C7, Pythons Alias-Falle — gelöst durch Clone je Slot) |
+| C8 | **Hash-Fähigkeit**: `string`, Tupel, `T[N]` (Inline-Wert), Structs strukturell; **`T[]`, `Slice`, `List`, `Map`, `Set` nicht `Hashable`** (Referenz mit schreibbaren Slots; COL-30 A); `Map<int[], V>` ist ein Übersetzungsfehler an der Aufrufstelle | C#, Java; Rust nur für `[T; N]` — gilt für unser `T[N]` |
+| C9 | **Gleichheit/Anzeige**: `List`, `T[]`, `Slice`, `Set`, `Map`, `Deque` bedingt `Equatable` (elementweise; `Set`/`Map` ordnungsunabhängig); `Debug` automatisch (`[1, 2, 3]`, `{a: 1}`, Strings zitiert); **`Display` explizit konformiert = Debug-Form** (D7 „auf Anfrage"), damit `println("{xs}")` druckt — mit Anführungszeichen um Strings, weil `[a, b]` die Grenzen verlöre | Python/Kotlin (drucken Container); Rust (kein `Display` für `Vec`) verworfen |
+| C10 | **Ordnung**: `sort()` stabil (K3), `sortUnstable()`, `sortBy(cmp: fn(T, T) -> Ordering)`, `sortByKey(f)`; `binarySearch` verlangt `TotalOrder` (`NaN` bräche sie, COL-39 D) | Rust |
+| C11 | **Nicht thread-sicher**; Data Races sind Programmfehler (G3); `Mutex<List<T>>` aus `std.sync`; `ConcurrentMap` Tür | Rust, Go |
+| C12 | `x in xs` über `Contains<T>` (D6) auf `List`, `Set`, `Map` (Schlüssel), `T[]`, `Slice`, Ranges, `string` | Kotlin, Python |
 
 ## B8 — I/O: Ströme, Dateien, Netz, Prozesse, Konsole: **offen**
 
