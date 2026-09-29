@@ -125,12 +125,12 @@ enum Json { Null, Bool(bool), Num(float), Arr(Json[]), Obj(Map<string, Json>);
     fn isNull(): bool { return match (this) { .Null => true, _ => false }; }
 }
 
-pub fn parse<T :: [Parse]>(s: StringView): T throws [ParseError] { return try T.parse(s); }
+pub fn parse<T :: [Parse]>(s: StringView): T throws ParseError { return try T.parse(s); }
 fn swap<T>(a: &T, b: &T): void { let t = a; a = b; b = t; }
 fn sum(nums: int...): int { … }
 inline fn each<T>(xs: T[], f: fn(T) -> void): void { for (x in xs) { f(x); } }
 macro Builder(target: StructDecl): Decl { return quote { … }; }
-type Handler = fn(Event) -> void throws [IoError];
+type Handler = fn(Event) -> void throws IoError;
 extend<T :: [Display]> T[] :: [Display] { fn show(): string { … } }
 ```
 
@@ -281,7 +281,7 @@ Toolchain-Vertrags**: idempotent, eine Formatänderung ist ein Minor mit Changel
 
 | # | Regel | Vorbild |
 |---|---|---|
-| F1 | **Drei Formen**: Paren `(n: int): int throws [E] => …`, bare `x => x * 3`, Trailing `xs.map { it * 2 }` / `f(a) { … }` — alle drei in Guide-Kapitel 3 | Kotlin |
+| F1 | **Drei Formen**: Paren `(n: int): int throws E => …`, bare `x => x * 3`, Trailing `xs.map { it * 2 }` / `f(a) { … }` — alle drei in Guide-Kapitel 3 | Kotlin |
 | F2 | **Mehrere Parameter im Trailing-Block**: `xs.fold(0) { acc, x => acc + x }`, Destructuring `{ (k, v) => v }`; ohne Parameterliste ist `it` der Parameter (heute: zwölf Diagnosen) | Kotlin |
 | F3 | **Rumpf = Ausdruck oder Value-Block** (Statements + Tail) in jeder Form — die 4.x-Unterscheidung „Trailing-Block ohne Tail" fällt | — |
 | F4 | `it` implizit; inneres `it` verdeckt äußeres **mit Warnung** | Kotlin (still) |

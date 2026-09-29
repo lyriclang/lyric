@@ -13,7 +13,7 @@ Aus `../fehler.md` (41 Fragen, Fassung 3), Spec §7.5/§9/§10, Guide 10:
   why": stille Form + `OrThrow`-Zwilling aus einer Implementierung (`text`/`textOrThrow`).
 - **Nur Klassen sind werfbar** (`Throwable`, `fn message(): string`); ein Enum hat vier
   Antworten (Deklaration/Klausel kompilieren, `catch` `IR0001`, Wurf ICE, `extend` `SEM0030`).
-- Klausel `throws [Typ]` — **ein** Typ oder keiner; `throws A, B` existiert nicht; wer zwei Typen
+- Klausel `throws Typ` — **ein** Typ oder keiner; `throws A, B` existiert nicht; wer zwei Typen
   wirft, schreibt `throws` bar, und `catch (_: A) … catch (_: B)` deckt das nicht — **der
   typisierte Wurf kollabiert auf `Throwable`, ohne Weg zurück** (schwerster Befund).
 - Typparameter in der Klausel wird an der Aufrufstelle nicht substituiert; Deckung rechnet auf
@@ -60,7 +60,7 @@ Fehler (L5 E5). Die Zwillingsdoktrin fällt (E5). Familie um ein Wort: `try f()`
 | K4 | **Generisch**: `fn map<T, U, E>(xs: T[], f: fn(T) -> U throws E): U[] throws E`; `E` aus dem Argument inferiert, **an der Aufrufstelle substituiert**; `E = never` ≡ keine Klausel; ein Aufruf mit leerer Menge nach Substitution braucht kein `try` (überflüssiges `try` = Warnung) | Swift `throws(Never)` |
 | K5 | **Deckung auf der Instanz** (`throws Box<int>` ≠ `catch Box<string>`) | — |
 | K6 | **Teilmengenregel**: Implementierung wirft ⊆ Interface-Member; Funktionswert mit kleinerer Menge koerziert zu größerer (T3-Liste), nie umgekehrt | Swift, Java |
-| K7 | **Nachtrag (Bereich 10 I5)** — assoziierte Fehlertypen: `interface Iterator { type Error :: [Error] = never; fn next(): ?Item throws [Error]; }`; **Join-Regel** beim Zusammensetzen (Adapter über werfendem Lambda): gleicher Typ → dieser, einer `never` → der andere, verschieden → Wurzel `Error` (K2, Typ-Pattern zum Unterscheiden) | Swift 6 `AsyncIteratorProtocol<Failure>` |
+| K7 | **Nachtrag (Bereich 10 I5)** — assoziierte Fehlertypen: `interface Iterator { type Error :: [Error] = never; fn next(): ?Item throws Error; }`; **Join-Regel** beim Zusammensetzen (Adapter über werfendem Lambda): gleicher Typ → dieser, einer `never` → der andere, verschieden → Wurzel `Error` (K2, Typ-Pattern zum Unterscheiden) | Swift 6 `AsyncIteratorProtocol<Failure>` |
 | K7 | **Präzises Rethrow**: `catch (e)` ohne Typ trägt statisch **die Menge** der gefangenen Typen; `throw e` wirft genau sie; `match (e)` über die Menge ist erschöpfend ohne `_`; beim Speichern weitet `e` auf `Error`. Beschränkt auf Catch-Bindungen — kein zweiter Typmechanismus | **Zig Error-Sets** |
 | K8 | `try` in einer Funktion ohne Klausel und ohne `catch`: „behandle oder deklariere" | Swift, Java |
 

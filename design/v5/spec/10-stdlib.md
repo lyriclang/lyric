@@ -82,7 +82,7 @@ SL-01, SL-16, SL-18. **Regel D mit Trägerklausel, ein Ring in 5.0, der zweite a
 |---|---|
 | Kern | `prelude`, `core` (Kern-Interfaces, `Num`-Familie, `Error`, `Result`, `Box`, `Slice`, `StringView`, Ranges, Member von `T[]`/`Slice`/`?T`, Art-2-Attribute — `result`/`option` gehen auf), `iter`, `collections`, `string`, `fmt`, `math` |
 | Daten/Kodierung | `encode` (Encode/Decode-Paar, Name B10), `json` (RFC 8259), **`toml`** (Manifest), `encoding` (Base64/Hex/UTF-16/LE-BE; `bytes` geht auf), **`compress`** (RFC 1950–1952), **`regex`** (RE2-Syntax, lineare Zeit), `hash` (`Hasher`, SipHash, FNV, CRC32), `crypto` (SHA-2/SHA-1/MD5, HMAC, `secureRandom`; Ed25519/ChaCha20-Poly1305 Tür), `random` (PCG), `time` (RFC 3339, TZif-Parser RFC 8536 über die System-Zonendatenbank) |
-| I/O und System | `io` (`Reader`/`Writer`/`Seek`, Puffer-/Text-Hüllen, `IoError`, `copy`, Speicherströme, `stdin/stdout/stderr`, `print`-Familie, `readLine`, `isInteractive` — `io.stream`/`io.error`/`io.console` gehen auf), `fs`, `path`, `net`, **`url`** (RFC 3986), **`http`** (HTTP/1.1 Client **und** Server über `Reader`+`Writer`; kein TLS, HTTP/2 Tür), `os` (ohne Zeit), `process`, **`term`** (ECMA-48, TTY-Erkennung; Raw-Mode Tür) |
+| I/O und System | `io` (`Reader`/`Writer`/`Seek`, Puffer-/Text-Hüllen, `IoError`, `copy`, Speicherströme, `stdin/stdout/stderr`, `print`-Familie, `readLine`, `isInteractive` — `io.stream`/`io.error`/`io.console` gehen auf), `fs`, `path`, `net`, **`uri`** (RFC 3986), **`http`** (HTTP/1.1 Client **und** Server über `Reader`+`Writer`; kein TLS, HTTP/2 Tür), `os` (ohne Zeit), `process`, **`term`** (ECMA-48, TTY-Erkennung; Raw-Mode Tür) |
 | Nebenläufigkeit (06) | `task`, `sync`, `thread` |
 | Werkzeug-Seite | `test`, `meta`, `syntax`, `build` (Bereich 11), `ffi` (Bereich 11) |
 
@@ -186,7 +186,7 @@ Werfende Iteratoren (`lines()`, `fs.walk`): Protokollfrage → B6.
 | Gruppe | Interfaces |
 |---|---|
 | Gleichheit/Ordnung | `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Identity` (Marker), Enum `Ordering { Less, Equal, Greater }` |
-| Text | `Display`, `Debug`, `Format`, `Parse { static fn parse(s: StringView): Self throws [ParseError] }` |
+| Text | `Display`, `Debug`, `Format`, `Parse { static fn parse(s: StringView): Self throws ParseError }` |
 | Erzeugung/Konversion | `Default { static fn default(): Self }`, `Clone { fn clone(): Self }`, `From<T> { static fn from(v: T): Self }`, `Into<T>` als Blanket über generischen Extend (`extend<T, U :: [From<T>]> T :: [Into<U>]`, X1) |
 | Operatoren | `Add`…`Rem`, `Neg`, `BitAnd/Or/Xor/Not`, `Shl/Shr`, `Contains<T>`, `Index<K>`, `IndexSet<K>` (D6) |
 | Iteration | `Iterator`, `Iterable`, `FromIterator` (B6) |
@@ -219,7 +219,7 @@ interface Integer :: [Num, TotalOrder, Hashable, BitAnd, BitOr, BitXor, BitNot, 
     fn checkedAdd(o: Self): ?Self; …   fn saturatingAdd(o: Self): Self; …   fn wrappingAdd(o: Self): Self; …
     fn pow(n: uint): Self;  fn leadingZeros(): int;  fn trailingZeros(): int;  fn popCount(): int;
     fn rotateLeft(n: int): Self;  fn toBytesLE(): uint8[N]; …
-    static fn parse(s: StringView, radix: int = 10): Self throws [ParseError];
+    static fn parse(s: StringView, radix: int = 10): Self throws ParseError;
     static fn exact<T :: [Integer]>(v: T): ?Self;   static fn clamping<T :: [Integer]>(v: T): Self;
 }
 interface Float :: [Signed] {
@@ -229,7 +229,7 @@ interface Float :: [Signed] {
     fn floor/ceil/round/trunc/sqrt/cbrt/exp/ln/log2/log10/sin/cos/tan/…/atan2(y)/hypot(o): Self;
     fn pow(e: Self): Self;  fn totalCompare(o: Self): Ordering;   // IEEE totalOrder, für sortBy
     fn toBits(): uint64;  static fn fromBits(b: uint64): Self;
-    static fn parse(s: StringView): Self throws [ParseError];
+    static fn parse(s: StringView): Self throws ParseError;
 }
 ```
 
@@ -250,7 +250,7 @@ interface Float :: [Signed] {
 interface Iterator {
     type Item;
     type Error :: [Error] = never;              // I5
-    fn next(): ?Item throws [Error];
+    fn next(): ?Item throws Error;
     fn sizeHint(): (int, ?int) { return (0, null); }
 }
 interface Iterable { type Iter :: [Iterator]; fn iter(): Iter; }
@@ -290,13 +290,31 @@ Sprachnachträge eingetragen: 05 K7 (Join-Regel), 05 R7 (`for` schließt `Closea
 | C11 | **Nicht thread-sicher**; Data Races sind Programmfehler (G3); `Mutex<List<T>>` aus `std.sync`; `ConcurrentMap` Tür | Rust, Go |
 | C12 | `x in xs` über `Contains<T>` (D6) auf `List`, `Set`, `Map` (Schlüssel), `T[]`, `Slice`, Ranges, `string` | Kotlin, Python |
 
-## B8 — I/O: Ströme, Dateien, Netz, Prozesse, Konsole: **offen**
+## B8 — I/O: Ströme, Dateien, Netz, Prozesse, Konsole: **entschieden** (2026-09-29)
 
-`Reader`/`Writer`/`Seek` mit `Slice<uint8>` (SL-03), `BufReader`/`BufWriter`/`TextReader`
-(SL-23: Codepoint-Split, `Utf8Error` mit Offset, BOM nur auf Wunsch), `IoError` als **ein**
-Fehlertyp mit `kind` (SL-22), Handles als Structs/Klassen mit `Resource`, `file`/`net`/
-`process`/`console`/`path`-API (Options-Structs statt Builder), `HostOptions.Input`-Frage
-entfällt (kein Embedding).
+```
+interface Reader { fn read(into: Slice<uint8>): int throws IoError; }        // 0 = EOF
+interface Writer { fn write(from: Slice<uint8>): int throws IoError; fn flush(): void throws IoError {} }
+interface Seek   { fn seek(pos: SeekFrom): int throws IoError; }            // enum SeekFrom { Start(int), Current(int), End(int) }
+```
+
+(Ein einzelner Fehlertyp steht ohne Klammern — D9; die Liste `[A, B]` nur bei mehreren.)
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| O1 | **Go-Form** mit `Slice<uint8>` (Aufrufer stellt den Puffer); `read` liefert 0 **nur** am Ende, leerer Slice → 0 sofort; `write` darf partiell sein. Defaults per generischem Extend: `readExact(into)` (wirft `UnexpectedEof`), `readToEnd(): uint8[]`, `readToString(): string`, `writeAll(from)`, `writeString(s)`; frei `io.copy(r, w): int` (B2). `EINTR` verschwindet in der C-Schicht | Go `io.Reader/Writer`, Rust `Read/Write`; verworfen: `BufRead` als drittes Lese-Interface, `Stream`-Basisklasse (C#) |
+| O2 | **Puffer-Hüllen als Structs mit eigenem Puffer** (8 KiB, Inline-Bytes): `BufReader<R>`, `BufWriter<W>` (flush bei `close()`; ungeschlossen → R3-Warnung), **`TextReader<R>`** = `BufReader` + UTF-8-Decoder: `readLine(): ?string`, `lines(): Iterator<Item = string, Error = IoError>`, `readToEnd(): string`, `chars()`; gesplitteter Codepoint bleibt im Decoder, ungültiges UTF-8 → `IoError { kind: InvalidData, cause: Utf8Error }` (nie `""` wie 4.x), BOM nur mit `skipBom: true`. **`TextWriter<W>`**: `write(s: StringView)`, `writeLine(s)`. Speicherströme **`ByteReader`** (über `Slice<uint8>`, `Seek`) und **`ByteBuffer`** (wachsend, `Reader`+`Writer`, `toArray()`) — deklarieren `throws IoError`, werfen nie | Zig 0.15, C# `StreamReader`, Go `bytes.Buffer`; verworfen: `lines()` als Default auf `Reader` (heimliches Puffern) |
+| O3 | **Ein Fehlertyp**: `struct IoError :: [Error] { kind: IoErrorKind, path: ?string, detail: string, cause: ?Error }`; `@NonExhaustive enum IoErrorKind { NotFound, PermissionDenied, AlreadyExists, IsDirectory, NotDirectory, InvalidInput, InvalidData, UnexpectedEof, TimedOut, ConnectionRefused, ConnectionReset, AddrInUse, BrokenPipe, Closed, Unsupported, Other(code: int) }` — Datei, Netz, Prozess, Speicher, Ring (SL-22 A); Fat-Pointer-Interfaces tragen keinen typabhängigen Fehler | Rust `io::Error`/`ErrorKind`, Go `errors.Is` |
+| O4 | **Handles sind Klassen**: `class File :: [Reader, Writer, Seek, Closeable]`, `TcpStream :: [Reader, Writer, Closeable]`, `TcpListener`, `UdpSocket`, `Child` — Identität, `closed`-Zustand (M12), `using let f = File.open(p)`. Kein `opaque` (T15) | Go `*os.File`, Swift `FileHandle`; verworfen: Struct-Adapter um nackte fds |
+| O5 | **`std.fs`**: `File.open(path)`, `File.create(path)`, `File.openWith(path, OpenOptions { read, write, append, create, truncate })`; Komfort `fs.readText`, `fs.readBytes`, `fs.lines(path)` (Iterator, `Error = IoError`), `fs.writeText`, `fs.writeBytes`, `fs.appendText`, `fs.exists`, `fs.metadata(path): Metadata { size, modified: Instant, isFile, isDir, isSymlink, readonly }`, `fs.remove`, `fs.removeDir`, `fs.removeAll`, `fs.createDir`, `fs.createDirAll`, `fs.copy`, **`fs.rename`** (4.x `move`), `fs.readDir(path): Iterator<Item = DirEntry>`, `fs.walk(path)`, `fs.canonicalize`, `fs.tempDir()`, `fs.tempFile()`; Türen: Symlinks, `watch`, Rechte-Bits | Rust `std::fs`, Kotlin `File.readText` |
+| O6 | **Pfade sind Strings, kein `Path`-Typ**: `path.join(a, b, …)`, `fileName`, `parent`, `extension`, `stem`, `withExtension`, `isAbsolute`, `normalize` (lexikalisch), `relative(base, target)`, `components(p)`, `separator`; `fs.absolute(p)` (braucht cwd). `Path`-Typ Tür | Go `filepath`; verworfen: Rust `Path`/`PathBuf`, Python `pathlib` |
+| O7 | **`std.net`**: `IpAddr` (Enum V4/V6, `Parse`), `SocketAddr { ip, port }` (`Parse`), `net.resolve(host): List<IpAddr>` (DNS auf dem Pool, S4); `TcpListener.bind(addr)`, `accept(): TcpStream`, `TcpStream.connect(addr)`, `shutdown(how)`, `setNoDelay`, `peerAddr`/`localAddr`; `UdpSocket.bind(addr)`, `sendTo(from, addr)`, `recvFrom(into): (int, SocketAddr)`. **Keine Socket-Timeouts** — `timeout(d) { … }` aus `std.task` ist der eine Mechanismus. Unix-Sockets Tür | Rust `std::net`, Go `net` |
+| O8 | **`std.process`**: Options-Struct **`Command { program, args = [], cwd = null, env = [], stdin/stdout/stderr = Stdio.Inherit \| Piped \| Null }`** (N12); `cmd.spawn(): Child` mit `stdin: ?Writer`, `stdout: ?Reader`, `stderr: ?Reader`, `wait(): ExitStatus`, `kill()`; Komfort `cmd.output(): Output { status, stdout: uint8[], stderr: uint8[] }`, `cmd.status()` | Rust `Command`, Python `subprocess.run` |
+| O9 | **Konsole in `std.io`**: `stdin()` (Reader; `lines()`, `readLine(): ?string` = null bei EOF), `stdout()`/`stderr()` (Writer; zeilengepuffert am Terminal, blockgepuffert sonst, Flush bei Programmende), `print<T :: [Display]>(v)`, `println`, `eprint`, `eprintln` (ein Argument, der f-String formatiert), `flush()`. Terminal-Erkennung und Escapes in `std.term` | Rust, C |
+| O10 | **Alles yieldet**: `read`/`write`/`accept`/`connect`/`wait` auf Handles parken den laufenden Task (S3/S4); Speicherströme parken nie; `main` ist ein Task (T6) — kein „nur in `run()`"-Vorbehalt | Go |
+| O11 | **`std.uri`, Typ `Uri`, streng RFC 3986** (`Parse`; `scheme`, `authority`, `host`, `port`, `path`, `query`, `fragment`, `resolve(relative)`, Percent-Encoding; RFC 3987 IRI Tür). Name `Uri`, weil es der Name der Norm ist, die HTTP (RFC 9110) referenziert; WHATWG-URL-Lenienz ist Browser-Verhalten, kein Bibliotheksvertrag | C# `System.Uri`, Java `URI`, Go `net/url`; verworfen: WHATWG-Parser (Rust `url`) |
+
+`std.http`/`std.term`/`std.compress` als Formen in B11 (Bibliotheksarbeit, keine Designfragen).
 
 ## B9 — Strings und Unicode: **offen**
 
