@@ -1,5 +1,12 @@
 # Lyric
 
+> **`main` is Lyric 5 in development** (`5.0.0-dev`, no promise of any kind): a native successor
+> compiled through C, designed in [`design/v5/spec/`](design/v5/spec/) and built along the plan in
+> [`13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md). Until the milestones replace it,
+> the tree below still builds the Lyric 4 toolchain this README describes. The **last Lyric 4
+> release is [v4.5.0](https://github.com/lyriclang/lyric/releases/tag/v4.5.0)**; the 4.x line
+> continues as [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script).
+
 A statically typed, GC-managed application language with an embeddable bytecode VM.
 
 ![CI](https://github.com/lyriclang/lyric/actions/workflows/ci.yml/badge.svg)
@@ -12,7 +19,9 @@ The compiler, the bytecode VM and the standard library work end to end; every co
 [`docs/Grammar.md`](docs/Grammar.md) compiles and runs. From v1.0 the language and the `.lyrbc`
 format carry the promise the versioning describes: a minor may add, a major may break.
 
-Current version: **4.6.0**, bytecode format **4.0**.
+Current version of the 4.x toolchain this tree builds: **4.6.0** (never released — the last
+release is v4.5.0), bytecode format **4.0**. Beside it grows `lyric5`, the Lyric 5 command line,
+at `5.0.0-dev`.
 
 ## Targets
 
@@ -170,14 +179,17 @@ lyric/
 │   ├── Lyrstub/          → lyrstub.exe   the runtime half of a packed program
 │   ├── Lyrfmt/           → lyrfmt.exe    formatter
 │   ├── Lyrtest/          → lyrtest.exe   runs a project's @Test functions
-│   └── Lyric.Cli/        → lyric.exe
+│   ├── Lyric.Cli/        → lyric.exe
+│   └── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT (in development)
 ├── stdlib/               standard library, written in Lyric
 ├── tests/                xUnit test projects
 ├── examples/             22 example programs, plus embedded-host/
 ├── build/                publish.proj
-├── tooling/              textmate/ — the editor grammar, pinned against the lexer by the tests
+├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–13)
+├── tooling/              textmate/ — the editor grammar, pinned against the lexer by the tests;
+│                         zig-version and c-smoke/ — the C toolchain Lyric 5 compiles through
 ├── tools/                DocGen, the documentation site generator
-└── docs/                 specifications and documentation sources
+└── docs/                 specifications and documentation sources; archive/4.x/ — 4.x planning
 ```
 
 ## Documentation

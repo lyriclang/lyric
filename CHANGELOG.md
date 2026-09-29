@@ -10,7 +10,22 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v4.6.0 — 2026-09-23
+## v5.0.0 — in development
+
+Lyric 5 is built on `main` along [`design/v5/spec/13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md).
+Nothing here is released; the rolling `dev` prerelease carries the current state without any
+promise. This entry fills with the milestones.
+
+- **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
+  design decided a hard cut with no 4.x warning stages toward 5.
+
+---
+
+## v4.6.0 — never released
+
+> **This version was never published.** The Lyric 4 line ended with **v4.5.0**. The state
+> described below continues in [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script),
+> without the Lyric 5 migration warnings, which were reverted there and here.
 
 **Patterns test and bind at every depth, expressions reach further, and the standard library
 answers with values.** A minor: the bytecode format stays 4.0, and every 4.5 project still
@@ -71,31 +86,6 @@ they are the only way this release can break a build.
   with width-exact marshalling and a capability check.
 - **Exhaustiveness names a WITNESS**: a missing case is reported as the pattern that reaches no
   arm rather than as a list.
-
-### Added — four migration warnings
-
-**Four questions about the language are open, and all four are settled together with 5.0** rather
-than one release at a time. Until then each carries a warning and *nothing else changes*: the
-behaviour a program has today is the behaviour it keeps until the major. §12.5 of the
-specification defines the family; the short version is that a migration warning marks a place
-whose meaning changes **whichever way** its question is settled, so none of them presumes an
-answer.
-
-- **`LYR-SEM0107` — a second binding of one name in one scope.** `let x = 1; let x = 2; return x;`
-  answers `1`: the second binding gets a slot nobody reads, and it does so even when it changes
-  the type. Neither refusal nor Rust-style shadowing. Shadowing an *enclosing* scope is a
-  different thing and stays legal. The `'x' is never used` warning that used to stand beside it is
-  gone — it was true and described the situation backwards.
-- **`LYR-SEM0108` — a non-`mut` method writing `this` on a class.** On a struct the same line is
-  `LYR-SEM0019`; on a class nothing checks it, although §5.1 takes `mut` into the signature an
-  interface conformance must match exactly. `examples/objects.lyr` was the one place in this
-  repository that triggered it, and it now says `mut fn advance()`.
-- **`LYR-SEM0109` — a field written through an immutable struct binding.** `let` pins the name and
-  not the value, so `let p = P { … }; p.x = 5;` compiles. A parameter is an immutable binding by
-  the same rule. A `var` binding, and a class through a `let`, do not warn.
-- **`LYR-SEM0110` — a `defer` body that can throw.** What that does to the rest of the chain is
-  unspecified; measured on this implementation, the stages scheduled before the thrower do not run
-  and the chain runs twice on the `return` path.
 
 ### Added — the standard library
 

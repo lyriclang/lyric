@@ -10,9 +10,6 @@ name: Docs
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
-  workflow_run:
-    workflows: [Nightly]
-    types: [completed]
   workflow_dispatch:
 
 permissions:

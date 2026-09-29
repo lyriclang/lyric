@@ -1,7 +1,8 @@
 > **Mirror.** The canonical home of this document is
-> [`lyriclang/lyric-spec` → `spec/13-bytecode.md`](https://github.com/lyriclang/lyric-spec/blob/main/spec/13-bytecode.md).
+> [`lyriclang/lyric-spec` → `spec/13-bytecode.md`](https://github.com/lyriclang/lyric-spec/blob/script/spec/13-bytecode.md).
 > This copy exists for the toolchain's tests and doc site; CI diffs everything below the
-> marker against the canonical body. Edit it there, mirror it here.
+> marker against the canonical body. Edit it there, mirror it here. **4.x text** — the tree
+> still builds this toolchain; the Lyric 5 specification replaces it in M17 (`design/v5/spec`).
 
 <!-- sync:body -->
 # Lyric `.lyrbc` Bytecode Format 4.0

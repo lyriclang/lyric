@@ -141,6 +141,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: lyriclang/lyric-spec
+          ref: script
           path: spec-repo
 
       - name: Diff the mirrored bodies
@@ -175,6 +176,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: lyriclang/lyric-spec
+          ref: script
           path: spec-repo
 
       - name: Build the toolchain
@@ -230,3 +232,69 @@ jobs:
           name: lyric-toolchain
           path: artifacts/publish
           retention-days: 14
+
+  c-toolchain:
+    # The C toolchain Lyric 5 compiles through (design/v5/spec/01 C1/C7/C8, 11 T4): zig cc builds
+    # and runs natively, cross-builds every Tier 1 triple, and clang's sanitizers report two
+    # planted faults. The zig version is pinned in one file.
+    name: C toolchain (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read the pinned zig version
+        id: zig
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < tooling/zig-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ steps.zig.outputs.version }}
+
+      - name: Build, cross-build and sanitize
+        shell: bash
+        run: bash tooling/c-smoke/run.sh
+
+  lyric5-aot:
+    # The seed of the Lyric 5 command line as one NativeAOT binary per Tier 1 target (11 C1). The
+    # x86-64 macOS binary is built on the arm64 runner and not run.
+    name: lyric5 NativeAOT (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64,   os: ubuntu-latest,    run: true }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, run: true }
+          - { rid: win-x64,     os: windows-latest,   run: true }
+          - { rid: osx-arm64,   os: macos-latest,     run: true }
+          - { rid: osx-x64,     os: macos-latest,     run: false }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET from global.json
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Publish
+        run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o aot
+
+      - name: Self-report
+        if: matrix.run
+        shell: bash
+        run: |
+          lyric5=aot/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=aot/lyric5.exe
+          "$lyric5" --version
+          "$lyric5" --version | head -1 | grep -q "^lyric 5\.0\.0"
