@@ -201,12 +201,48 @@ Werfende Iteratoren (`lines()`, `fs.walk`): Protokollfrage → B6.
 | K4 | **`FromArrayLiteral<T> { static fn fromLiteral(items: T[]): Self }`**: ein Array-Literal koerziert an den erwarteten Typ (T3) — `let s: Set<int> = [1, 2, 3];`, `let m: Map<string, int> = [("a", 1)];` (kein Map-Literal); eine Kopie, die `Set.of` auch hätte | Swift `ExpressibleByArrayLiteral`; Rust nur `vec!` |
 | K5 | **`Clone` folgt der Konformanz** (D7 revidiert): Zuweisung und `with` kopieren einen Struct ohnehin eine Ebene (Wertmodell) — `clone()` ist die ausdrückliche Kopie „so tief, wie der Typ besitzt", und Besitz steht in der Konformanzliste: Wertfelder kopiert, Referenzfelder `clone()`d, wenn ihr Typ `Clone` ist, sonst Fehler an der Synthese; **`@Shared`** am Feld kopiert die Referenz (Parent-Zeiger, Dienste, Zyklen); Container bedingt `Clone`. Kein `DeepClone` (zwei Mechanismen; C#s `ICloneable`-Unklarheit) | Rust; gegen Kotlin `copy`/Java `clone` (flach) |
 
-## B5 — Zahlen: **offen**
+## B5 — Zahlen: **entschieden** (2026-09-29)
 
-SL-07 mit 04 D4: kein `abs(int)`/`abs(float)` — also `interface Num`/`Integer`/`Float` mit
-statischen Membern (`zero`, `one`, `min`, `max`, `parse`) und `abs<T :: [Num]>`; alle 13 Typen
-gleich bedient; `checked*`/`saturating*`/`+%`-Familie als Methoden; Konstanten (`int.max`);
-`parse`/`format` je Typ; BigInt nein/Tür.
+Nach T1a sind es **10 Zahlentypen** (`int8…int64=int`, `uint8…uint64=uint`, `float32`,
+`float64=float`); nach D4 keine Typüberladung, nach N7 keine Suffixe — die Oberfläche läuft
+**generisch über Interfaces** mit statischen Membern (T5). Jeder Typ konformiert in
+`std.core`; Interface-Defaults liefern das meiste einmal (`checked*` über
+`__builtin_*_overflow`, `pow` per Quadrieren).
+
+```
+interface Num :: [Equatable, Ordered, Add, Sub, Mul, Div, Rem, Display, Debug, Parse, Default] {
+    static let zero: Self;  static let one: Self;  fn isZero(): bool;
+}
+interface Signed :: [Num, Neg] { fn abs(): Self; fn signum(): Self; }
+interface Integer :: [Num, TotalOrder, Hashable, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    static let min: Self;  static let max: Self;  static let bitWidth: int;  static let isSigned: bool;
+    fn checkedAdd(o: Self): ?Self; …   fn saturatingAdd(o: Self): Self; …   fn wrappingAdd(o: Self): Self; …
+    fn pow(n: uint): Self;  fn leadingZeros(): int;  fn trailingZeros(): int;  fn popCount(): int;
+    fn rotateLeft(n: int): Self;  fn toBytesLE(): uint8[N]; …
+    static fn parse(s: StringView, radix: int = 10): Self throws [ParseError];
+    static fn exact<T :: [Integer]>(v: T): ?Self;   static fn clamping<T :: [Integer]>(v: T): Self;
+}
+interface Float :: [Signed] {
+    static let epsilon: Self;  static let infinity: Self;  static let nan: Self;
+    static let min: Self;  static let max: Self;  static let leastPositive: Self;
+    fn isNan/isInfinite/isFinite(): bool;
+    fn floor/ceil/round/trunc/sqrt/cbrt/exp/ln/log2/log10/sin/cos/tan/…/atan2(y)/hypot(o): Self;
+    fn pow(e: Self): Self;  fn totalCompare(o: Self): Ordering;   // IEEE totalOrder, für sortBy
+    fn toBits(): uint64;  static fn fromBits(b: uint64): Self;
+    static fn parse(s: StringView): Self throws [ParseError];
+}
+```
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| Z1 | Turm `Num` / `Signed` / `Integer` / `Float`; `abs`/`signum` nur auf `Signed` (`uint.abs()` gibt es nicht) | Swift `Numeric`/`SignedNumeric`/`BinaryInteger`/`FloatingPoint`, .NET `INumber<T>`; verworfen: `abs` für alle (Rust `num`-Crate) |
+| Z2 | **Elementarfunktionen sind Methoden** (`x.sqrt()`, `x.sin()`). **Konstanten nach Herkunft**: was den **Typ** beschreibt, ist statisches Member (`float.epsilon`, `float.infinity`, `float.nan`, `float.min`/`max`/`leastPositive`, `int.min`/`max`/`bitWidth`); was die **Welt** beschreibt, liegt in `std.math` (`math.pi`, `math.e`, `math.tau`, typisiert `float`; `math.pi as float32` für die schmale Breite). `std.math` behält daneben Zweistelliges: `min(a, b)`, `max`, `gcd`, `lcm`, `lerp`; `x.clamp(lo, hi)` ist Methode auf `Ordered` | Rust `f64::sin`; Python `math.pi`, C# `Math.PI`, Go `math.Pi`; verworfen: Swift `Double.pi` (generisches π selten), freies `sqrt(x)` (Go, Python, C) |
+| Z3 | Generische Algorithmen einmal: `sum<T :: [Num]>()`, `product()`, `average()` (nur `Float`), `min()/max()` über `Ordered` (`?T`), `minBy/maxBy` | Rust `Sum`/`Product` |
+| Z4 | Geprüfte Verengung **statisch am Zieltyp**: `int8.exact(n): ?int8`, `int8.clamping(n)`; Weitung implizit (T1c); `as` wrappt (T1d). Verworfen: `n.toInt8()` (64 Methoden), `TryFrom` (zweites Konversionsinterface) | Swift `Int8(exactly:)`/`(clamping:)` |
+| Z5 | **Zahl → Text**: Ganzzahlen dezimal; Floats **kürzeste Darstellung, die zurückliest** (Ryu), ganze Werte mit `.0` (`1.0`), `nan`/`inf`/`-inf`; Radix/Breite/Präzision nur über die Formatsprache (`{x:x}`, `{x:.2f}`) — kein `toString(radix)` | Python `repr`, Swift, JS; verworfen: Go `%v` → `1`, C#-Kultur |
+| Z6 | `Parse`: `int.parse(s, radix: 10)`, `float.parse(s)` — ASCII-Ziffern, Vorzeichen, `_` erlaubt, kein Whitespace; wirft `ParseError { kind: Invalid \| Overflow \| Empty }` (B3) | Rust `str::parse`, Go `strconv` |
+| Z7 | **Kein BigInt, kein `decimal` in 5.0** — Türen (`int128` T1f, `decimal` als Paket; IEEE 754 decimal128 wäre per D zulässig, ohne Bedarf) | Python `int` verworfen |
+| Z8 | `char` und `bool` außerhalb des Turms (T1e); `char.toUint32()` / `char.fromUint32(n): ?char` statt `as` | — |
 
 ## B6 — Iterator-Protokoll, Adapter, Generatoren: **offen**
 
