@@ -167,7 +167,7 @@ das Format von Lyric-Script.
 | C4 | Mangling `lyr_<modul>_<name>` + kurzer Typ-Hash bei Überladung/Instanz; lesbar in gdb und perf | — |
 | C5 | Form: aus dem IR, Blöcke + `goto`, Werte in Locals; `if`/`while` wo der Block es hergibt; `__builtin_expect` auf Fehlerprüfungen | — |
 | C6 | `#line` überall → gdb/lldb/perf/Sanitizer zeigen `.lyr`-Quelle | — |
-| C7 | Runtime `liblyr.a`, **statisch gelinkt** → eine Binary; Debug-Variante mit ASan/UBSan als Profil | dynamische Runtime |
+| C7 | Runtime `liblyr.a`, **statisch gelinkt** → eine Binary; Debug-Variante mit ASan/UBSan als Profil. **Gemessen (WSL Arch, 2026-09-29)**: `zig cc 0.16-dev` hat **keine ASan/TSan-Runtime** (Linkfehler), aber UBSan mit eigener Meldung („thread panic: signed integer overflow … bug.c:7:53"); clang 22 hat ASan, UBSan, TSan, und ASan verträgt den Stackwechsel einer Koroutine. **Folge**: das Sanitizer-Profil kompiliert mit clang, Release und Cross mit `zig cc` — beide C11, dieselbe Emission. valgrind 3.25 braucht auf Arch `DEBUGINFOD_URLS` (glibc gestrippt) | dynamische Runtime |
 | C8 | **C-Compiler installiert voraussetzen**, Erkennung `zig cc` > clang > gcc, `zig cc` empfohlen; Bündelung: Tür | Bündelung in 5.0 |
 | C9 | Cross-Build über das Ziel-Tripel von `zig cc` | — |
 | C10 | Der Nutzer sieht das C nie, außer `lyric build --emit-c`; Cache unter `out/` | — |
