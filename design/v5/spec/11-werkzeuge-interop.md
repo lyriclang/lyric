@@ -233,16 +233,36 @@ Maintainer: viele sinnvolle Warnungen (in 4.x erst vergessen, dann dünn) und ei
 | **perf** (allow, außer *) | `string-concat-in-loop`* (warn → `StringBuilder`), `large-value-copy` (Struct > 64 B als Wert; 02: 16-B-Richtlinie bleibt Doku), `boxed-interface-in-hot-loop` |
 | **docs** (allow) | `missing-docs` (`pub` ohne `///`; Bibliotheken setzen `deny`), `broken-doc-link` (warn) |
 
-## W8 — Editor, Formatter, REPL, Doku: **offen**
+## W8 — Editor, Formatter, REPL, Doku: **entschieden** (2026-09-29)
 
-E1, E3–E9, E13–E20, E22–E27, E29–E34. Sprachserver-Analysemodell (abbrechbar, inkrementell,
-abfragebasiert), Code Actions, Tests im Editor; DAP über lldb-dap (Quellkarte, Koroutinen/Tasks,
-Panik-Stopp, Evaluate); Formatter (eine Form ohne Optionen, Stabilitätsvertrag, minimale Edits);
-REPL (über das interpretierbare IR, oder Lyric-Script, oder streichen); `lyric doc`, `lyric api
---diff`, Navigation in Abhängigkeiten; Clients.
+L12 (gdb/lldb, kein eigener Debugger/Profiler) und L7 (Quelle ist das Format) haben die
+schweren Fragen des Dossiers schon beantwortet.
 
-## W9 — Distribution und Toolchain: **offen**
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| E1 | **`lyric lsp`** im selben Binary (C1); **modulgranulare Wiederverwendung** (E1 B): Parse+Sema je Modul, Cache-Schlüssel Modulgraph, Diagnosen ohne Monomorphisierung/Lowering (= `check`), abbrechbar, inkrementeller Sync, Pull-Diagnosen; **kein zweites Frontend** | gopls; verworfen: Salsa/Roslyn, Ganz-Compile je Tastendruck |
+| E2 | **Fähigkeiten**: Hover, Completion aus dem Schnappschuss, Signaturhilfe, Definition/Referenzen/Rename paketweit **und in Abhängigkeiten** (alles Quelle, L7; `std`-Quelle bei der Toolchain), Code Actions (G7, Lints), Inlay-Hints, semantische Tokens, Symbole, Folding; Tests: CodeLens „Run/Debug test" + `lyric/tests` + `lyric test --json` (E24); `lyric expand` als Kommando; Formatierung als minimale Edits (E29 B) | gopls, rust-analyzer |
+| E3 | **Workspace**: ein Server je Workspace, jedes `lyric.toml` ein Projekt (P5), Dateien außerhalb = Skript-Modus (C8); `build.lyr` = Einheit „Build-Skript" (BS3), `tests/` = Paket (V4) | — |
+| E4 | **`lyric dap` = Adapter über lldb-dap** (L12): Namen entmangelt (C4), **Lyric-Typen als lldb-Summaries/synthetische Kinder** in `lyric.lldbinit`; **Panik = Breakpoint auf `lyr_panic`**; bedingte Breakpoints/Attach/`runInTerminal` nativ; Tasks: OS-Thread = DAP-Thread, schwebende Koroutinen als Scope „Tasks" über eine lldb-Erweiterung (E15 A); DWARF, Windows über `windows-gnu` — **Risiko benannt**: lldb auf Windows; `-windows-msvc` + PDB als Tür | `rust-lldb`, delve; verworfen: eigener Debugger |
+| E5 | **Formatter `lyric fmt`**: eine Form, keine Optionen (E6 A), `--check`; **Kommentare und redundante Klammern bleiben** (Trivia am AST); Semantik-Erhalt-Test (Korpus → beide Fassungen zu C, verglichen); Formvertrag (E30 A): Formänderung nur für Bedeutungsfehler/dokumentierte Regel, mit CHANGELOG-Satz | gofmt, zig fmt; verworfen: Optionen |
+| E6 | **Kein REPL in 5.0** (E5 C): Skript-Modus mit warmem Cache (C9); REPL braucht den IR-Interpreter (L7-Tür); Lyric-Script hat einen | Go; verworfen: Replay-REPL |
+| E7 | **`lyric doc`**: statische Seite aus `///` (CommonMark, Intra-Doc-Links `[Type.method]`), Paket + Abhängigkeiten; `///`-Blöcke als Tests (X5); **`lyric api`** Text + JSON, `--diff <version>` (07 B3) | rustdoc, `cargo semver-checks` |
+| E8 | **Clients** VS Code und JetBrains first-party, dünn; **eine Tree-sitter-Grammatik** im Org als Hervorhebungsquelle für alle Clients, semantische Tokens vom Server darüber (E13) | Zig, Rust |
+| E9 | **Profiling** nativ (`perf`, Instruments, Tracy; L12); `lyric demangle`; `lyric bench` mit GC-Zählern (X4) | Go `pprof` verworfen |
 
-CLI-18/30/31, Z1-Folgen. Installation (ein Archiv, `zig cc`/clang vorausgesetzt), Toolchain-
-Verwaltung (`lyric toolchain install/pin`), Selbst-Update, Ort der `std`, Versionskohärenz
-Treiber/Werkzeuge/Clients, Releasekanäle.
+## W9 — Distribution und Toolchain: **entschieden** (2026-09-29)
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| T1 | **Ein Archiv je Plattform**: `lyric` (NativeAOT, kein .NET nötig), `std/`, Runtime als **C-Quelle + vorgebautes `liblyr.a` für Tier 1**, `lyric.lldbinit`, Header-Vorlagen; **kein C-Compiler im Archiv** (C8), aber **`lyric toolchain install zig`** lädt `zig` hash-geprüft nach `~/.lyric/`; `lyric env`/`lyric doctor` | Go, Zig; verworfen: Bündelung |
+| T2 | **Installationsmodell wie Go 1.21**: Toolchains nebeneinander unter `~/.lyric/toolchains/<version>/`; **`lyric` re-exec't in die Version, die `[package] toolchain` verlangt** (P12), und bietet die Installation an; `lyric toolchain install/list/default/remove`; **kein Multiplexer-Binary** | Go `GOTOOLCHAIN`; rustup verworfen |
+| T3 | **Cross-Ziele**: Runtime aus der mitgelieferten C-Quelle je Tripel in `out/cache/runtime/<triple>/` (zig cc cross); `[native]`-Teile ebenso | Zig |
+| T4 | **Tiers**: Tier 1 (CI, Tests, Releases): `x86_64-linux-gnu`, `aarch64-linux-gnu`, `x86_64-windows-gnu`, `aarch64-macos`, `x86_64-macos`; Tier 2 (baut, ungetestet): `x86_64-linux-musl`, `aarch64-windows`; Tür: `wasm32-wasi` | Rust-Tiers |
+| T5 | **Zwei Kanäle, Zig-Modell** (Maintainer, 2026-09-29): **`stable`** = getaggte Releases (SemVer, GitHub Release + Website-Mirror, `SHA256SUMS`, **minisign-Signatur**); **`dev`** = fortlaufende Builds vom `dev`-Branch **ohne jedes Versprechen** (Version `5.2.0-dev.<datum>+<sha>`), dort wird ausprobiert und entwickelt, von dort wandert es in die stabile Release. **Kein `nightly`** (die 4.x-Nightlies wurden binnen Stunden von Stable ersetzt — ein Kanal ohne Inhalt). `lyric toolchain install dev` / `update` installieren daneben, nie in-place | Zig (Master-Builds + Tags); verworfen: Rust-Nightly-Kanal |
+| T6 | **Versionskohärenz**: ein Binary — kein Werkzeug-Versatz (CLI-31 entfällt); Clients prüfen `lyric lsp --version` + Protokollversion (E18); `std` in der Toolchain, `LYRIC_STDLIB` nur für Entwicklung | — |
+| T7 | **Toolchain-Pin im Manifest ist die Wahrheit** (P12); `~/.lyric/config.toml` hält `default`; Präzedenz C4 | Go |
+| T8 | **Vormerk Website** (Maintainer): Neudesign als eigener Bereich; die Seite **spiegelt die Toolchain-Downloads** (T1/T5) und ist Download-Quelle für `lyric toolchain` neben GitHub — dieselben Hashes und Signaturen; trägt Guide, Spec, Katalogseite (G9), Paket-Doku (`lyric doc`) | — |
+
+---
+
+**Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).
