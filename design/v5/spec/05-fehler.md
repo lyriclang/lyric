@@ -158,7 +158,7 @@ verhindern. Verworfen: nie (Swift, Zig — ein Request-Bug tötet den Server), �
 | C2 | eine Klausel, die eine frühere vollständig abdeckt (Interface, `sealed`-Elternteil, `Error`) → **Fehler „unerreichbare Klausel"** (heute still tot; Java) |
 | C3 | Catch-all `catch (e)` zuletzt, sonst Fehler; aus dem Anhang nach §9 |
 | C4 | Klauseln müssen die Menge nicht decken; Rest propagiert, wenn deklariert (K8) |
-| C5 | **Mehrfach-Klausel `catch (e: A, B)`**, `e` trägt die Menge (K7) — Java Multi-Catch ohne Unionstyp |
+| C5 | **Mehrfach-Klausel `catch (e in [A, B])`** (Bereich 8, Y6 — `in` + eckige Liste wie jede Mehrfachliste), `e` trägt die Menge (K7) — Java Multi-Catch ohne Unionstyp |
 | C6 | Wurf aus einer Klausel wird von Schwesterklauseln nicht gefangen (normiert) |
 
 ## E10 — Fehler über Grenzen: **entschieden** (2026-09-28)

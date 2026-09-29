@@ -184,7 +184,32 @@ Makro-`quote`; JS-ASI verworfen.
 | S9 | `match (e) { … }`; Ausdrucksarm endet mit `,`, Blockarm darf es weglassen (beide erlaubt; Formatter schreibt bei Blöcken keins) | Rust |
 | S10 | Leeres `;` erlaubt, Formatter entfernt es | — |
 
-## Y6 — Patterns: **offen**
+## Y6 — Patterns: **entschieden** (2026-09-29)
+
+**Bloße Namen** (der Catch-all-Befund): **ein bloßer Name ist immer eine Bindung**; Varianten
+schreibt man `.Red` (implizites Member, T9) oder `Signal.Red`. **Eine Bindung, die wie eine
+Variante des Scrutinee-Typs heißt, ist ein Fehler** („meinst du `.Red`?" — fängt Migration und
+Tippfehler; Rust `bindings_with_variant_name`); **ein unerreichbarer Arm ist eine Warnung**
+(Spec-Satz „not an error" bleibt; Rust `unreachable_patterns`). `Yelow =>` bekommt damit zwei
+Meldungen und keinen stillen Weg.
+
+| Form | Beispiel | Regel |
+|---|---|---|
+| Literal | `0`, `-5`, `'a'`, `"put"`, `1.5`, `true`, `null` | negative Literale in die Grammatik; `NaN` matcht nie |
+| Range | `0..5`, `5..=9`, `'a'..='z'`, `-5..=-1` | bleibt |
+| Bindung | `n`, `_` | `let`/`var` vor dem Pattern entscheidet die Mutabilität aller Bindungen; Bindungen kopieren (M3) |
+| Variante | `.Red`, `.Num(v)`, `.Rect { w = 0, h }` | Feld-Pattern mit **`=`** als Test (Initializer-Form; Rust `:` verworfen); weggelassene Felder erlaubt |
+| **Typ-Pattern** | `c: Circle =>`, `_: Circle =>` | T11; Form wie `catch (e: T)` |
+| **Typmengen-Pattern** | **`catch (e in [IoError, ParseError])`**, **`s in [Circle, Rect] =>`** im `match` | Maintainer: `in` + eckige Liste wie jede Mehrfachliste; in Klammern stehen **Typen** (Pattern-Kontext, nicht der `Contains`-Operator — `if (x in [1, 2])` bleibt der Operator auf Werten); die Bindung trägt die Menge (K7); korrigiert E9 C5 |
+| Tupel, Struct, Array | `(a, _)`, `P { x, y }`, `[first, ..rest]`, `[a, b, ..]` | bleiben; `..rest` bindet einen View (T13) |
+| Or, Guard | `.Red \| .Yellow`, `A(x) \| B(x)`, `.Num(n) if n > 0` | bleiben; Guard zählt nicht zur Erschöpfung |
+| Typargumente im Pattern-Pfad | `Opt<int>.Some(x)` | **entfällt** — mit `.Some(x)` und Inferenz nie nötig |
+
+**Erschöpfung**: über Enum-Varianten, `bool`, `?T`, `sealed`-Interfaces, Tupel/Structs durch
+alle Spalten, **Array-Längenklassen** (die Implementierung war der Spec voraus, jetzt Regel);
+offene Typen brauchen `_`; `@NonExhaustive` verlangt `_` außerhalb des Pakets; irrefutables
+`if let` warnt.
+
 ## Y7 — Literale und Formatsprache: **offen**
 ## Y8 — Kommentare und Dokumentation: **offen**
 ## Y9 — Zucker: implizites Member, Feldkurzform, Aufrufsyntax, `^n`, `!in`: **offen**
