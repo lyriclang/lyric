@@ -38,11 +38,89 @@ Ergebnis der ganzen Runde).
 | F2 | **Form**: `lyric fix --from-4 [pfad]` schreibt um (`--dry-run`, `--json` nach G8), konvertiert `lyric.json` → `lyric.toml`, entfernt Modulköpfe, schlägt das Layout vor; **mechanische** Regeln schreiben, **semantische** werden `needsReview`-Notizen mit Erklärung und Vorschlag (SL-28) | — |
 | F3 | **Kein Versprechen, dass das Ergebnis kompiliert** — danach `lyric check`; Maßstab ist der `examples/`-Lauf (R3). Verfallsdatum: eine Major-Linie, danach eingefroren | — |
 
-## R2 — Der Regelkatalog: **offen**
+## R2 — Der Regelkatalog: **entschieden** (2026-09-29)
 
-Vollständige Liste aus den Bereichen 0–11, je Regel: Erkennung, Ersetzung, Art (mechanisch /
-Review / Hand), Konformanzfall (vorher/nachher). Wo Sema-Wissen nötig ist (Typ des Empfängers
-für `abs`, Feldschreibungen für `var`), läuft `fix --from-4` auf dem 4.x-Sema-Modell.
+**Verifiziert gegen `docs/Grammar.md` und `docs/guide/01–21` (4.6)** — eine erste Fassung aus
+dem Gedächtnis hatte fünf Formen erfunden (`println` ohne Import, `inout`, `throws A, B`,
+`catch (e: A | B)`, `===`); der Maintainer hat sie gefangen. Art: **M** = mechanisch (`fix`
+schreibt), **R** = Review (`fix` schlägt vor, `needsReview`), **H** = Hand (nur Meldung).
+Jede Regel bekommt einen Vorher/Nachher-Fall in `tests/fix-from-4/`. **Listenregel** (08
+D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
+
+| # | 4.x (Beleg) | 5 | Art | Braucht |
+|---|---|---|---|---|
+| **Module / Pakete** | | | | |
+| K01 | `module a.b;` (Grammar §2, guide 12) | entfällt (07) | M | Dateipfad |
+| K02 | `lyric.json` (`name`, `sourceRoot`, `dependencies`, `nativeRoots`, `toolchain`; guide 12) | `lyric.toml` (`[package] name/version/edition`, `[dependencies] x = { path }`) ; `nativeRoots` → `[native]` (R) | M/R | — |
+| K03 | `import std.io.console { println }` (guide 01) | `import std.io { println }` | M | — |
+| K04 | `import std.io.file` / `std.io.stream` / `std.io.net` / `std.io.path` / `std.result` / `std.option` / `std.bytes` / `std.io.error` | `std.fs` / `std.io` / `std.net` / `std.path` / `std.core` / `std.core` / `std.encoding` / `std.io` | M | — |
+| K05 | `import std.core { panic, assert, Exception }`, `import std.test { Test }` | Prelude — Import entfällt | M | — |
+| K06 | nicht-`pub` = modulprivat | nicht-`pub` = `internal` (paketweit) — Sichtbarkeit wächst still | R | Hinweis je Modul |
+| K07 | `build.lyr` mit `executable("app", "src/main.lyr")`, `option`, `flag`, `Profile`, `packed`, `library` (guide 16) | `[[bin]]`, `[profile.*]` im Manifest; `packed` entfällt; Rest des Skripts bleibt (BS1) | R | — |
+| K08 | `stdlib-tests/`-Fremdkompilation | `tests/`-Root im Paket (V4) | H | — |
+| **Syntax** (Grammar §1.4, §3–7) | | | | |
+| S01 | `params xs: int[]` (§3.1) | `xs: int...` | M | — |
+| S02 | `throws T` (ein Typ) / `throws` bar (§3.1, guide 10) | bleibt (`throws [A, B]` neu; Listenregel) | — | — |
+| S03 | `catch (e: T)`, `catch (e)`, `catch (_)` (§5) | bleiben (`catch (e in [A, B])` neu) | — | — |
+| S04 | `resume c` (Keyword; guide 11) | `c.next()!` (Panik bei Ende wie `resume`); `Coroutine<void>.next(): bool` bleibt | M | — |
+| S05 | `opaque type H = int` (§2) | `struct H { v: int }`; `as`-Übergänge werden Feldzugriff/Konstruktion | R | Nutzungsstellen |
+| S06 | `Red =>` (bloßer Variantenname im Pattern, typgerichtet) | `.Red =>` (bloßer Name bindet immer, 08) | M | Sema: war es eine Variante? |
+| S07 | `'\xNN'` in `string`/`char` (§1.5) | `\u{NN}` (L4; `\xNN` nur in `b"…"`) | M | — |
+| S08 | f-String-Specs `{pi:N2}`, `{x:C}` (guide 02; .NET-Grammatik) | eine Formatsprache (Y7): `:N2` → `:.2f`, `:C` → Hand | M/R | Spec-Tabelle |
+| S09 | `Coroutine<T> throws E` als Typsuffix (§4) | bleibt | — | — |
+| S10 | `xs.length` (Array-**Feld**, guide 02) vs `s.length()` | `length()` überall (N8) | M | Typ |
+| S11 | `x` mit `Iterator<T>`/`Iterable<T>`, `Indexable<T>` als Typargument (guide 13) | `Iterator<Item = T>`, `Iterable<Item = T>`; Konformanz `:: Iterator { type Item = T; … }`; `Indexable<T>` → `Index<int> { type Output = T }` + `IndexSet<int>` | M/R | Methodenrümpfe |
+| **Interfaces / Werte** (guide 05, 07, 08) | | | | |
+| T01 | Felder ohne Modifikator, beschrieben (`b.x = 99`) | `var` an jedem geschriebenen Feld (02) | R | Schreibstellen |
+| T02 | `Equatable<Point>`, `Ordered<Version>`, `Hashable<K>` (guide 07/08) | `Equatable`, `Ordered`, `Hashable` (`Self`, T-Reihe) | M | — |
+| T03 | `Add<Vec2, Vec2>`, `Mul<float, Vec2>`, `Sub<…>` (zwei Typargumente: Rhs, Out) | `Add<Rhs = Vec2> { type Out = Vec2 }` (D6; Rhs Parameter, Out assoziiert) | M | — |
+| T04 | `fn compare(other: T): int` (guide 07) | `compare(o: Self): ?Ordering`; `TotalOrder.totalCompare` dazu | R | — |
+| T05 | `fn hash(): int` + `hashCombine`/`combineHash` | `hash<H :: Hasher>(h: &H)` mit `h.write…` (K2/Q3) | R | — |
+| T06 | `equals(other: T): bool`, `show(): string`, `message(): string` | bleiben | — | — |
+| T07 | `Into<Fahrenheit>` | bleibt (`From<T>` dazu) | — | — |
+| T08 | `int32`/`int64`/`float64` distinkt neben `int`/`float`; `x as int64` | `int` = `int64`-Alias: `int64` → `int`, `as` zwischen gleich breiten entfällt | M | Typen |
+| T09 | Überlauf wrappt still (Spec §3.2) | Panik (T2); Stellen, die Wrap wollen: `+%` | R | Bericht |
+| T10 | `abs(-3)` → `float` (Literal-Adaption) | `abs(-3)` → `int`; `fix` schreibt `-3.0`, wo `float` erwartet war | M | Kontexttyp |
+| T11 | `absInt`/`minInt`/`maxInt`/`clampInt`/`signInt`, `sum`/`sumFloat` | `abs`/`min`/`max`/`clamp`/`signum`, `sum()` | M | — |
+| T12 | `s.length()` in Codepoints, O(n) (guide 13) | Bytes, O(1); `charCount()`, wo Zeichen gezählt werden | R | — |
+| T13 | `s.charAt(i)`, `s.substring(start, count)` (Codepoint-Indizes) | `s[i]` (Byte), `s[a..b]` (Byte) — andere Semantik; Vorschlag `s.chars().nth(i)` / Byte-Grenzen aus `find` | R | — |
+| T14 | `s.split(",")`, `splitLines()` → `string[]` | `split(",")`, `lines()` → Iterator (`.toArray()` anhängen, wo ein Array gebraucht wird) | M | Nutzungstyp |
+| T15 | `s.indexOf(n): int` (−1) | `find(p): ?int` | R | — |
+| T16 | `s.toChars()`, `s.utf8Encode()`, `utf8Decode(bytes): ?string` | `chars().toArray()`, `asBytes().toArray()`, `try? string.fromUtf8(bytes)` | M | — |
+| T17 | `?T` nicht schachtelbar; `Iterator<?T>` verboten | `??T` erlaubt — nichts zu tun | — | — |
+| T18 | `T[]` als `Map`-Schlüssel (war Lowering-Loch) | Übersetzungsfehler → Wrapper | H | — |
+| **Fehler** (guide 10, 13) | | | | |
+| E01 | `xOrThrow(a)` (37 Zwillinge) | `x(a)` mit `try` | M | Bibliothekstabelle |
+| E02 | stille Form `x(a): ?T`/`bool` mit Grund (`file.text`, `writeText`, `json.parse`) | `try? x(a)` bzw. `try x(a)` (bool-Operationen werfen) | M | Bibliothekstabelle |
+| E03 | `xOrErr(a)`, `std.result { Result }` | `Result.of { try x(a) }`; `Result` im Prelude | M | — |
+| E04 | werfender Aufruf ohne Markierung | `try f()` an jeder werfenden Stelle (E4) | M | Sema |
+| E05 | `Throwable` (eingebaut), `class X :: [Throwable] { fn message() }` | `Error` (`message()`, `cause()`) | M | — |
+| E06 | `Exception { text = "…" }` (`std.core`, Feld `text`) | `Exception { message = "…" }` — **bleibt der Fertigtyp** (`:: Error`, `message`, `cause = null`), Feld heißt `message` | M | — |
+| E07 | `lastErrorKind()`/`lastErrorDetail()`-Rituale | entfällt (`IoError.kind`) | R | — |
+| E08 | `main` darf nicht `throws`; `catch` um alles | `main` darf werfen (O4) — Vorschlag: `throws` an `main`, Hülle weg | R | — |
+| E09 | `defer stream.close(f)` | `using let f = …` (Closeable, R1) — Vorschlag | R | Typ |
+| **Koroutinen / Tasks** (guide 11, 13) | | | | |
+| N01 | `fn worker(): Coroutine<Wait>`, `yield Wait.Now` / `Wait.Sleep(ms)` / `Wait.Readable(fd)` / `Wait.Interrupt` | Task-Funktion ohne `Wait`: `yieldNow()`, `sleep(Duration.ofMillis(ms))`, I/O parkt selbst, `os.signals(Signal.Interrupt)` | R | — |
+| N02 | `spawn(worker("a"))` (Koroutinenwert), `run()` | `spawn { worker("a") }` → `Task`; `run()` entfällt (`main` ist Task) | M/R | — |
+| N03 | `co.next()`, `Coroutine<int>` als Wert, `for` über Koroutine nicht möglich | bleiben; `for (x in co)` jetzt erlaubt | — | — |
+| **Bibliothek** (guide 13) | | | | |
+| B01 | freie `over(xs)`, `range(a, b)`, `rangeInclusive`, `collectArray(it)`, `sum(it)`, `compact(it)`; freie `groupBy(xs, k)`, `sortList(xs)`, `sortListByKey`, `sortArray`, `maxBy`/`minBy`, `slice`, `mapList`, `listContains`, `listRemove`, `union`/`intersect`/`difference`/`isSubset`; `std.option { map, andThen, filter, expect }` | Methoden: `xs.iter()`, `(a..b)`, `it.toArray()`, `it.sum()`, `it.compact()`, `xs.groupBy(k)`, `xs.sort()`, `xs.sortByKey`, `xs.maxBy`, `xs[a..b]`, `xs.map`, `xs.contains`, `xs.remove`, `a.union(b)`; `opt.map(f)` … | M | Empfängertyp |
+| B02 | `parseInt(s): ?int`, `parseIntOrErr`, `parseFloat`, `parseBool` | `try? int.parse(s)`, `Result.of { try int.parse(s) }` … | M | — |
+| B03 | `fromInt(n)`/`fromFloat`/`fromBool`/`fromChar`; `"n = " + fromInt(n)` | f-String `f"n = {n}"` / `n.toString()` | M | — |
+| B04 | `file.text(p)`/`bytes`/`lines`/`writeText`/`appendText`/`exists`/`remove`/`copy`/`move`/`createDir[All]`/`removeDir`/`entries`/`size`/`modifiedMillis`/`tempDir` | `fs.readText`/`readBytes`/`lines`/`writeText`/`appendText`/`exists`/`remove`/`copy`/**`rename`**/`createDir[All]`/`removeDir`/`readDir`/`metadata(p).size`/`metadata(p).modified`/`fs.tempDir` | M | — |
+| B05 | `stream.open(p)!`, `readSome(f, n): ?uint8[]`, `write(f, bytes)`, `stream.close(f)`, `stream.lineReader(f)` | `try File.open(p)`, `f.read(into: buf)` (Pufferübergabe — R), `f.writeAll(bytes)`, `f.close()`/`using`, `TextReader.new(f).lines()` | M/R | — |
+| B06 | `std.os.nowMillis()`/`nowNanos()`/`sleep(ms)` | `Instant.now().epochMillis()` / `Monotonic.now()` / `sleep(Duration.ofMillis(ms))` | M | — |
+| B07 | `Instant.ofEpochMillis`, `.plus(d)`, `.since(o)`, `Duration.ofMillis`, `.totalMillis()` | bleiben; `.plus(d)` → `+ d`; `totalMillis()` → `millis()` | M | — |
+| B08 | `List<int>.of([…])`, `.empty()`, `push`, `pushAll`, `xs.get(i)` (panikt), `groups.get(2)!`, `getOrInsert(k, () => …)`, `m.set(k, v)` | bleiben; `xs.get(i)` → `xs[i]` (`get` liefert jetzt `?T`), `m.get(k)!` → `m[k]!`, `m.set(k, v)` → `m[k] = v` | M | — |
+| B09 | `hexEncode`/`hexDecode`/`base64Encode`/`base64Decode`, `sha256Hex(text)`, `secureRandom(n)` | `Hex.encode`/`Hex.decode`/`Base64.encode`/`Base64.decode`, `Hex.encode(sha256(s.asBytes()))`, `crypto.randomBytes(n)` | M | — |
+| B10 | `json.parse(text): ?JsonValue`, `parseOrThrow`, `doc.field("n")`, `doc.at(i)`, `asString()`, `JsonValue.Obj(m)`, `serialize(v)`, `serializePretty(v, 2)` | `try? json.decode<JsonValue>(text)`, `try json.decode<JsonValue>`, `doc["n"]`, `doc[i]`, `asString()` bleibt, `JsonValue.Object(m)`, `json.encode(v)`, `json.encode(v, JsonOptions { pretty = true, indent = 2 })` | M | — |
+| B11 | `Random.seeded(42)`, `shuffle(r, xs)`, `choice(r, xs)`, `nextGaussian` | bleiben / `r.shuffle(xs)`, `r.choice(xs)`, `nextNormal`; **Zahlenfolge anders** (ChaCha8) | M/R | — |
+| B12 | `process.start(p, args)`, `readSomeOut(child, n)`, `write(child, b)`, `closeStdin`, `wait`, `kill`, `close` | `Command { program, args }.spawn()`, `child.stdout!.read(into)`, `child.stdin!.writeAll`, `child.stdin!.close()`, `wait()`, `kill()` | R | — |
+| B13 | `net.listen`/`accept`/`connect`/`readSome`/`write`/`close`/`bind`/`sendTo`/`receiveFrom` | `TcpListener.bind`/`accept`/`TcpStream.connect`/`read`/`writeAll`/`close`/`UdpSocket.bind`/`sendTo`/`recvFrom` | R | — |
+| B14 | `assertEq`, `assertTrue(c, msg)`, `@Test` aus `std.test` | bleiben; `@Test` Prelude | — | — |
+| B15 | `@Deprecated { message, until }` | bleibt (+ `replacement`) | — | — |
+| B16 | `extern "dotnet" fn … = "System.Math::Cbrt"` (guide 14) | entfällt — FFI über C (W4) | H | — |
+| B17 | `OnType`/`OnFunction`/`OnModule`/`WithArg` (guide 15) | bleiben (F1-Marker) | — | — |
 
 ## R3 — Reihenfolge der Korpora: **offen**
 

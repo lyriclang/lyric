@@ -84,10 +84,10 @@ Aufrufstelle (Y1); keine `ref`-Locals, keine `ref`-Rückgabe (T12 Tür).
 | D2 | **Enum-Methoden nach `;`** bleiben (`enum E { A, B; fn f() { } }`); `extend E` ebenso möglich |
 | D3 | Sichtbarkeitswort vor der Deklaration: `pub fn`, `internal struct`, `private let`; Reihenfolge `pub static fn`, `pub mut fn` |
 | D4 | `var`-Feld: `pub var count: int,`; ohne `var` unveränderlich (M2) |
-| D5/D6 | `struct S :: [I, J]`, `<T :: [I, Iterator<Item = int>]>` bleiben (Y1) |
+| D5/D6 | `struct S :: [I, J]`, `<T :: [I, Iterator<Item = int>]>` bleiben (Y1). **Listenregel (Maintainer, 2026-09-29), durchgehend**: **ein** Element → Klammern optional (`struct S :: I`, `<T :: Display>`, `throws IoError`, `catch (e in A)`, `@Test`); **mehrere** → Klammern Pflicht (`:: [I, J]`, `throws [A, B]`, `catch (e in [A, B])`, `@[A, B]`); `:: I, J` ohne Klammern ist ein Fehler |
 | D7 | `class Dog :: [Walker by legs]` — `by` im Listeneintrag |
 | D8 | **`sealed interface Shape { }`** — geschlossene Konformermenge im Paket: `match` über Typ-Patterns erschöpfend ohne `_`, ein neuer Konformer macht jedes `match` ohne ihn zum Fehler, fremde Pakete konformieren nicht, der Compiler darf `switch` über Deskriptoren emittieren. Gegen Enum: eigenständige Typen mit eigenen Membern (Kotlin, Java 17) |
-| D9 | `fn f(): int throws [IoError, ParseError]`; ein Typ auch ohne Klammern; bar = `Error` |
+| D9 | `fn f(): int throws [IoError, ParseError]`; ein Typ auch ohne Klammern (Listenregel D5/D6); bar = `Error` |
 | D10 | Interface: `type Item;` / `type Out = Self;`, `static fn parse(s: string): ?Self;`, `static let ZERO: Self;`, Default-Rümpfe, `private fn` Helfer |
 | D11 | **Koroutine nur über den Rückgabetyp** `Coroutine<int>` + `yield` — keine Signaturmarkierung (keine Färbung) |
 | D12 | `extend T { }`, `extend T :: [I] { }`, `extend<T :: [I]> T[] { }`, `private extend T { }` |
