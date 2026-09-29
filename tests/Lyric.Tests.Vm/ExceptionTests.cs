@@ -765,7 +765,7 @@ public class ExceptionTests
     // Not pinned here, because it is not decided: whether the defers scheduled BEFORE a throwing
     // one still run. They do not today, on either path. §7.5 says defers run in reverse scheduling
     // order and says nothing about one that throws; Go, whose defer this is shaped after, runs the
-    // rest. Recorded in docs/Befunde_und_Verbesserungen/SPEC-RUNDE.md.
+    // rest. Recorded in docs/archive/4.x/Befunde_und_Verbesserungen/SPEC-RUNDE.md.
     //
     // The RETURN path carries the same double-run and is not fixed either: the drain happens at the
     // return site, which lexically lies inside the region, so moving the region's end does not
