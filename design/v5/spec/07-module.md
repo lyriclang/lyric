@@ -147,6 +147,38 @@ Ausführung lesbar).
 | P9 | Features, Workspaces, Vendoring: Türen in Bereich 11 | Cargo |
 | P10 | Ein Paket ist ein Quellbaum (L7); der Cache liegt beim Nutzer | Go |
 
-## V8 — Bibliotheksform und öffentliche Fläche: **offen**
-## V9 — Toolchain- und Sprachversion im Paket: **offen**
-## V10 — `std` als Paket: **offen**
+## V8 — Bibliotheksform und öffentliche Fläche: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| B1 | Ein Paket ist ein Quellbaum (L7); alle Module per Pfad importierbar; die **Fläche** = `pub`-Deklarationen samt exportierten Membern (S6); ein Modul ohne `pub` exportiert nichts | Go, Rust |
+| B2 | Kuratierte Fläche über `pub import` im Wurzelmodul (I4) | Rust `lib.rs` |
+| B3 | **`lyric api`** zeigt die Fläche; `--diff <version>` als Semver-Tür | `cargo semver-checks`, `apidiff` — Bereich 11 |
+| B4 | `///`-Doku an `pub`-Deklarationen; `lyric doc` | Bereich 11 |
+| B5 | **C-Bibliotheken als Pakete**: nativer Teil (`extern "C"`-Deklarationsmodule + C-Quellen oder `lib.a` je Ziel) im Manifest (`[native]`), statisch gelinkt (C7); FFI-Details Bereich 11 | Rust `-sys`, Zig |
+| B6 | Reachability-Wurzeln (L11): Executable → `main` des Entry-Moduls; C-ABI-Artefakt (`lib.a`) → `pub extern`-Exporte (Bereich 11); ein Bibliotheks-Bau für Lyric-Nutzer ist Prüfung plus Cache | — |
+
+## V9 — Toolchain- und Sprachversion im Paket: **entschieden** (2026-09-29)
+
+**Beides**: `toolchain = "5.3"` (Minimum, Cargo `rust-version`, Lyric 4) **und** **Edition**
+`lyric = "5"` — „in der Sprache dieser Edition geschrieben"; der Compiler beherrscht alle
+Editionen, ein Programm mischt Pakete verschiedener Editionen; eine Edition ändert nur
+**Oberfläche und Defaults** (Syntax, Warnstufen, Prelude), nie ABI oder Typidentität (Rust
+Editions, Go's `go`-Zeile). Der Sinn: Sprache verändern, **ohne dafür einen Major zu brauchen**,
+solange keiner ansteht — 5.0 ist auf absehbare Zeit der letzte Major, nicht für immer (00). 5.0
+hat eine Edition; das Feld existiert ab Tag eins. `lyric fix --edition` migriert. `lyric
+toolchain`-Verb: Bereich 11.
+
+## V10 — `std` als Paket: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| D1 | **`std` wird mit der Toolchain ausgeliefert und mit ihr versioniert**; Root `std` reserviert | Go, Rust |
+| D2 | `std` ist Quelle (L7), in den Cache des Nutzers kompiliert; C-Schicht `liblyr.a` (L9); „fünf Module je Bau parsen" trifft den Cache | — |
+| D3 | `std.prelude` (I8) ist ein gewöhnliches Modul | Rust |
+| D4 | `std` darf **Compiler-Intrinsics** nutzen, die Nutzerpakete nicht sehen — gebunden an den Paketnamen | Rust `core`/`#[lang]` |
+| D5 | Umfang und Ringe (Bibliotheks-Umkehr): Bereich 10 | — |
+
+---
+
+**Bereich 7 ist damit vollständig entschieden** (V1–V10, 2026-09-29).

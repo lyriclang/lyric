@@ -15,7 +15,7 @@ entschieden.
 | Z3 | Primärer Einsatz | **Applikation, CLI, Server.** Die Rollen Sandbox, Instruktionsbudget, Hot-Reload und Einbettung als Mod-Sprache gehen an Lyric-Script. Lyric 5 darf deshalb, was eine Sandbox nie erlaubt hätte: Threads, direkte FFI, rohe Zeiger, falls spätere Bereiche es wollen. |
 | Z4 | Die zwei Flavors | **Lyric 5** ist das neue Lyric. **Lyric-Script** ist Lyric 4 auf der bestehenden C#-VM, **darf sich weiterentwickeln, um skriptartiger (python-ähnlicher) zu werden**, mit eigener Roadmap. Script-Module in Lyric-5-Programmen sind eine Zusatzfähigkeit (Bereich 11), keine Voraussetzung. |
 | Z5 | Ökosystem-Anker | **C-ABI ist die Muttersprache** der FFI; .NET-Interop ist keine Kernfähigkeit. Die Standardbibliothek setzt auf einer eigenen C-Schicht auf, nicht auf der BCL. |
-| — | Release-Politik | **5.0 ist der letzte Major.** Patches und Minors folgen, seltener als in 2.x–4.x. |
+| — | Release-Politik | **5.0 ist auf absehbare Zeit der letzte Major** (Maintainer, präzisiert 2026-09-29: ein 6 ist nicht ausgeschlossen, nur nicht in Sicht). Patches und Minors folgen, seltener als in 2.x–4.x. |
 | — | Migration | **Harter Cut.** Migrationswerkzeug, wo mechanisch möglich; manuelle Migration akzeptabel (Korpus: stdlib, Beispiele, Erato). Keine 4.x-Warnstufen für 5. |
 | — | Erato | Abnehmer, nicht Voraussetzer. |
 
