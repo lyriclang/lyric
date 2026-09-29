@@ -84,13 +84,55 @@ Compiler") entfällt; der C#-Compiler wird als NativeAOT-Binary ausgeliefert (W9
 | C9 | **Kosten** (CLI-25): Whole-Program-Compile je Lauf über den Cache (L7) — unverändert = kein Compile; Ratchets in Verhältnisform: Hello-World kalt ≤ 400 ms, **warm ≤ 50 ms über dem nackten Programmstart**; NativeAOT-Compiler + `zig cc` im selben Prozessbaum | Zig, Go |
 | C10 | **CLI = versionierter Vertrag** (CLI-30): Verben, Optionen, Exit-Codes, JSON-Schema in der Spec; ein Verb/Flag fällt nur in einem Major, vorher `deprecated` in `--help` und beim Aufruf; `lyric --version` nennt Compiler, Edition, `std`, C-Compiler | Go 1 |
 
-## W2 — Projektmodell: Manifest-Schema, Profile, Ziele, `out/`: **offen**
+## W2 — Projektmodell: Manifest-Schema, Profile, Ziele, `out/`: **entschieden** (2026-09-29)
 
-BP-03/04/10–17, 19–24, 26–32. `lyric.toml`-Schema (`[package]`, `[dependencies]`, `[native]`,
-`[lints]`, `[profile.*]`, `[[bin]]`, `[workspace]`), Profile (zwei feste + eigene?),
-Cross-Compilation-Ziele (C-Backend → `--target`), `out/`-Layout, Sperre, `clean`, Offline-Bau,
-Reproduzierbarkeit als Zusage, mehrere Programme je Paket, Workspaces/Features/Vendoring
-(Türen aus 07 P9), maschinenlesbare Projektauskunft (`lyric metadata`).
+Neu gegenüber dem Dossier: mit dem C-Backend ist **Cross-Compilation real** (`zig cc`), das
+Artefakt ist ein natives Binary je Ziel.
+
+```toml
+[package]
+name = "app"            # Pflicht; Modulpräfix (07)
+version = "0.1.0"       # Pflicht, SemVer
+edition = "5"
+description = "…"  license = "MIT"  repository = "…"  authors = ["…"]
+include = […]  exclude = […]        # Abweichung von der Vorgabe (P8)
+toolchain = ">=5.1"                 # P12
+
+[[bin]]                 # optional; Konvention: src/main.lyr = das eine Programm
+name = "tool"  entry = "src/tool.lyr"
+
+[dependencies]
+geo  = { path = "../geo" }
+http = { git = "https://…", tag = "v1.2.0" }
+util = "1.2"            # Registry-Form: Tür (07 P8)
+
+[native]                # 07 B5
+sources = ["native/*.c"]  include = ["native/include"]  libs = ["z"]
+[native.windows]  libs = ["ws2_32"]
+
+[lints]                 # 09 A10
+deny = ["unused-result"]  allow = ["dead-code"]
+
+[profile.release]       # eingebaut: debug, release
+opt = 2  lto = true  debugInfo = false
+[profile.staging]
+inherits = "release"  debugInfo = true
+```
+
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| P1 | **Manifest wird gelesen, nie ausgeführt** — Profile, Binaries, Abhängigkeiten, Lints stehen in `lyric.toml`; `build.lyr` (W3) *definiert* davon nichts | Cargo; gegen Zig (`build.zig` als Wahrheit) |
+| P2 | **Programme**: `src/main.lyr` per Konvention, weitere über `[[bin]]` (07 M7d) — nicht über ein Skript, nicht `src/bin/*` (BP-32: kein vierter Weg); ohne beides ist das Paket eine Bibliothek | Cargo `[[bin]]` |
+| P3 | **Profile** (BP-12 B + BP-24 D): `debug`/`release` eingebaut, benannte mit `inherits`; Felder `opt`, `lto`, `debugInfo`, `denyWarnings`, `overflowChecks` (nur explizit, T2), `fastMath` (L10); Kommandozeilen-Feldflag > Profil; unbekannter Profilname = Fehler (auch aus `LYRIC_PROFILE`) | Cargo |
+| P4 | **Ziele**: `--target x86_64-linux-gnu` (Zig-Tripel), Vorgabe = Wirt; Cross-Compile über `zig cc`; `[native.<os>]` je Ziel; **`out/<profil>/<ziel>/<name>`** — Zielachse immer im Pfad (BP-15/19); kein Zielverzeichnis im Manifest | Zig, Go |
+| P5 | **`out/` liegt beim Manifest** (BP-23 D); Projektsuche endet am nächsten Manifest, sonst `.git`/Wurzel; Bau aus Unterverzeichnis **nennt** das Projekt; `out/cache/` (L7), `out/.lock` (flock, BP-30); `lyric clean` = `out/` löschen | Cargo `target/`, Go |
+| P6 | **Reproduzierbarkeit als Zusage + Konformanztest** (BP-29 C): gleiche Quelle, Optionen, Toolchain **und C-Compiler** ⇒ gleiche Bytes; keine Zeitstempel, `-ffile-prefix-map`, deterministische Emission (L10) | Go `-trimpath`, Nix |
+| P7 | **Fremder Entry ist ein Fehler** (BP-14 D) mit Hinweis auf Pfadabhängigkeit; **Workspaces Tür** (`[workspace] members`, 07 P9) | Go, Cargo |
+| P8 | **Paketinhalt** (BP-28 D): Vorgabe = Manifest, `src/`, `native/`, `build.lyr`, `README*`, `LICENSE*`; nicht `tests/`, `out/`; `include`/`exclude` weichen ab; der Lock-Hash (07 P5) läuft über diese Menge | Cargo |
+| P9 | **Offline**: Git-Abhängigkeiten im Benutzer-Cache (`~/.cache/lyric/git`), `--offline`; `lyric vendor` Tür | Cargo |
+| P10 | **`lyric metadata --json`** (BP-27): Paketgraph, Binaries, Profile, Ziele, `out/`-Pfade | Cargo `metadata` |
+| P11 | **Build-Optionen ins Programm** (BP-17): nur `target.*` und `profile.*` als `comptime`-Konstanten (09 B4); `-D key=value`/Features **Tür** | Zig `-D…` verworfen für 5.0 |
+| P12 | **Toolchain-Pin**: `[package] toolchain = ">=5.1"` (Fehler mit Hinweis auf `lyric toolchain install`); Edition wählt die Sprachfassung (07) | Rust `rust-version` |
 
 ## W3 — `build.lyr`: Programm, Daten oder Graph: **offen**
 
