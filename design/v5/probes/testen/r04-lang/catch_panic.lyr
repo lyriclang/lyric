@@ -1,0 +1,11 @@
+import std.core { panic, Exception };
+import std.io.console { println };
+
+pub fn main(): int {
+    try {
+        panic("blown");
+    } catch (e: Exception) {
+        println("caught");
+    }
+    return 0;
+}

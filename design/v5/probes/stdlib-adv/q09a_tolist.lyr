@@ -1,0 +1,2 @@
+import std.iter { over };
+fn main(): int { let xs = over([1, 2, 3]).map((n: int) => n * 2).toList(); return 0; }

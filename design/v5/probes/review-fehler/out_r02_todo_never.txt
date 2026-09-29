@@ -1,0 +1,4 @@
+./r02_todo_never.lyr:3:1: error[LYR-SEM0017]: not all code paths of 'f' return a value
+fn f(): int { todo("x"); }
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+

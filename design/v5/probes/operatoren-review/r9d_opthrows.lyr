@@ -1,0 +1,12 @@
+import std.core { Add, Throwable };
+struct Boom :: [Throwable] { }
+struct V :: [Add<V, V>] {
+    n: int,
+    fn add(other: V): V throws { throw Boom { }; }
+}
+fn main(): int {
+    let a = V { n = 1 };
+    let b = V { n = 2 };
+    let c = a + b;
+    return c.n;
+}

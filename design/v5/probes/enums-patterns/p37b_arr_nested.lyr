@@ -1,0 +1,15 @@
+import std.io.console { println };
+enum Tok { Word(string), Num(int) }
+fn f(ts: Tok[]): int {
+    return match (ts) {
+        [Word("add"), Num(a), Num(b)] => a + b,
+        [Num(n), ..] => n,
+        _ => -1,
+    };
+}
+fn main(): int {
+    let xs = [Tok.Word("add"), Tok.Num(2), Tok.Num(3)];
+    let ys = [Tok.Num(9), Tok.Num(1)];
+    println(f"{f(xs)} {f(ys)}");
+    return 0;
+}

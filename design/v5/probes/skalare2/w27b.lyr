@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.core { Ordered };
+fn biggest<T :: [Ordered<T>]>(a: T, b: T): T { if (a.compare(b) > 0) { return a; } return b; }
+fn main(): int {
+    let s1 = "a";
+    let s2 = "b";
+    println(f"{biggest<int>(3, 7)}");
+    println(f"{biggest<uint>(3 as uint, 7 as uint)}");
+    println(f"{biggest<char>('a', 'b')}");
+    println(f"{biggest<float>(1.0, 2.0)}");
+    println(biggest<string>(s1, s2));
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.math { absInt };
+
+fn main(): int {
+    println(absInt(-3));
+    return 0;
+}

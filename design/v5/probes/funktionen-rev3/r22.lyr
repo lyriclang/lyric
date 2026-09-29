@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn apply(f: fn(int) -> int, v: int): int { return f(v); }
+fn run(f: fn(int) -> int): int { return f(1); }
+fn main(): int {
+    println(fromInt(apply(x => x * 3, 2)));
+    println(fromInt(run { it + 7 }));
+    return 0;
+}

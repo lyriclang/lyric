@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.string { fromInt };
+class P { x: int = 0, }
+fn main(): int {
+    let p = P { };
+    let t = (p.x = 3);
+    println(fromInt(t));
+    var xs = [1, 2];
+    let u = (xs[0] = 5);
+    println(fromInt(u));
+    var n = 0;
+    let w = (n += 1);
+    println(fromInt(w));
+    var a = 1;
+    var b = 1;
+    a += b += 1;
+    println(fromInt(a));
+    println(fromInt(b));
+    return 0;
+}

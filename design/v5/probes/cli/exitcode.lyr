@@ -1,0 +1,6 @@
+import std.io.console { println };
+
+fn main(args: string[]): int {
+    println(f"args={args.length}");
+    return 7;
+}

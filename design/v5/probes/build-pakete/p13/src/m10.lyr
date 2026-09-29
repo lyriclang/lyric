@@ -1,0 +1,3 @@
+module m10;
+pub fn v10(): int { return 10; }
+pub fn w10(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 10; } return s; }

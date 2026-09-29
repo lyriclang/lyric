@@ -1,0 +1,3 @@
+module g;
+pub interface Greeter { fn greet(): string { return "default"; } }
+pub class C :: [Greeter] { }

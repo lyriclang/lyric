@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let a: int32 = -7; let b: int = -7; let u: uint8 = 200; let s: int8 = -1; println(f"[{a:X}] [{b:X}] [{u:X}] [{s:X}] [{s:b}]"); return 0; }

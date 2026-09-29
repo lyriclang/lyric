@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(x: int): string { return "int"; }
+fn f(x: ?int): string { return "opt"; }
+fn main(): int {
+    println(f(3));
+    println(f(null));
+    return 0;
+}

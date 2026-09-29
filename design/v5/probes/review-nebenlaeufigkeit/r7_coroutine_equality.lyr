@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn gen(): Coroutine<int> { yield 1; }
+
+fn main(): int {
+    let a = gen();
+    let b = a;
+    let c = gen();
+    println(f"a==b: {a == b}");
+    println(f"a==c: {a == c}");
+    return 0;
+}

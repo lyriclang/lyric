@@ -1,0 +1,9 @@
+fn boom(): int {
+    let z = 0;
+    return 1 / z;
+}
+
+fn main(): int {
+    let v = comptime boom();
+    return v;
+}

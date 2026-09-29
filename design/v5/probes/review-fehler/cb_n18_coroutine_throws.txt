@@ -1,0 +1,4 @@
+./n18_coroutine_throws.lyr:11:22: error[LYR-SEM0034]: 'resume' may throw 'Boom', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch
+    println(f"first {resume c}");
+                     ^^^^^^^^
+

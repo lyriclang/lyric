@@ -1,0 +1,8 @@
+module glue;
+
+import shapes;
+import proto;
+
+extend shapes.Point :: [proto.Show2] {
+    pub fn s(): string { return "point"; }
+}

@@ -1,0 +1,8 @@
+import std.core { panic };
+
+fn pick(n: int): int {
+    if (n > 0) { return 1; }
+    panic("no");
+}
+
+fn main(): int { return pick(1); }

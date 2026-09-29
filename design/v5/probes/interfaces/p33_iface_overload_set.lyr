@@ -1,0 +1,18 @@
+import std.io.console { println };
+
+interface Writer {
+    fn put(v: int): void;
+    fn put(v: string): void;
+}
+
+struct W :: [Writer] {
+    fn put(v: int): void { println("int"); }
+    fn put(v: string): void { println("str"); }
+}
+
+fn main(): int {
+    let w: Writer = W { };
+    w.put(1);
+    w.put("x");
+    return 0;
+}

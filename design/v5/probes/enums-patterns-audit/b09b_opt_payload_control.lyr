@@ -1,0 +1,4 @@
+import std.io.console { println };
+enum E { Has(?int), No }
+fn f(e: E): int { return match (e) { Has(null) => 0, Has(n) => n ?? -9, No => -2 }; }
+fn main(): int { println(f"{f(E.Has(null))} {f(E.Has(4))} {f(E.No)}"); return 0; }

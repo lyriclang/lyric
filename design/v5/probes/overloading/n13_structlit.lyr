@@ -1,0 +1,5 @@
+import std.io.console { println };
+struct Box<T> { v: T, }
+fn f(x: Box<int>): string { return "int"; }
+fn f(x: Box<string>): string { return "str"; }
+fn main(): int { println(f(Box { v = 1 })); return 0; }

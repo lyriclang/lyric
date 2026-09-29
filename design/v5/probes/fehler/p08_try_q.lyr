@@ -1,0 +1,7 @@
+// ERWARTUNG: Parsefehler — 'try?' existiert nicht.
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Boom { what = "x" }; }
+fn main(): int {
+    let n: ?int = try? f();
+    return n ?? 0;
+}

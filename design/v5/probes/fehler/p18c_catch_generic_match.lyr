@@ -1,0 +1,14 @@
+// KONTROLLE zu p18b: E = Other, es wird Other geworfen. ERWARTUNG: wird gefangen.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class Other :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn attempt<E :: [Throwable]>(): int {
+    try {
+        throw Other { what = "other" };
+    } catch (e: E) {
+        println(f"caught as E: {e.message()}");
+        return 0;
+    }
+}
+fn main(): int { return attempt<Other>(); }

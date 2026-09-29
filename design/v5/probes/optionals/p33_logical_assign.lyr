@@ -1,0 +1,6 @@
+fn main(): int {
+    var b = true;
+    b &&= false;
+    b ||= true;
+    return if (b) 1 else 0;
+}

@@ -1,0 +1,9 @@
+import std.iter { Iterator };
+interface Tagged { fn tag(): int; }
+extend int[] :: [Tagged] {
+    fn tag(): int { return 5; }
+}
+fn main(): int {
+    let xs = [1, 2, 3];
+    return xs.tag();
+}

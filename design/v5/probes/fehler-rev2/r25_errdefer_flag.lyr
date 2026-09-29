@@ -1,0 +1,17 @@
+// ERWARTUNG: ein einfaches 'var bool' als errdefer-Ersatz reicht — KEIN Heap-Objekt noetig,
+// weil der defer den Local zum Ausfuehrungszeitpunkt liest. Ausgabe: "rollback" / "caught".
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn risky(fail: bool): int throws Boom {
+    var ok = false;
+    defer { if (!ok) { println("rollback"); } }
+    if (fail) { throw Boom { }; }
+    ok = true;
+    return 1;
+}
+fn main(): int {
+    try { let _ = risky(false); } catch (_: Boom) { println("unexpected"); }
+    println("--");
+    try { let _ = risky(true); } catch (_: Boom) { println("caught"); }
+    return 0;
+}

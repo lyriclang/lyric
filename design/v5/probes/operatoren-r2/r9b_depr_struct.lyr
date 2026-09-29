@@ -1,0 +1,3 @@
+@Deprecated(message = "gone", until = "5.0")
+struct Foo { n: int, }
+fn main(): int { return 0; }

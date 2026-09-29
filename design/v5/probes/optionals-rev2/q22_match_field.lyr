@@ -1,0 +1,11 @@
+import std.io.console { println };
+struct S { v: int }
+fn main(): int {
+    let o: ?S = S { v = 3 };
+    match (o) {
+        S { v = 3 } => println("three"),
+        null => println("none"),
+        s => println("other"),
+    }
+    return 0;
+}

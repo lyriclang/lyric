@@ -1,0 +1,9 @@
+import std.core { OnFunction };
+
+pub interface Marker :: [OnFunction] { }
+pub struct Tag :: [Marker] { n: int = 0 }
+
+@Tag { n = 1 }
+pub fn f(): void { }
+
+fn main(): int { return 0; }

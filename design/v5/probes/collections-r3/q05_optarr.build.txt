@@ -1,0 +1,4 @@
+q05_optarr.lyr:5:15: error[LYR-SEM0007]: '?int[]' is not iterable — it must implement 'Iterable<T>' or 'Iterator<T>' from std.iter
+    for (x in p) { println(f"{x}"); }
+              ^
+

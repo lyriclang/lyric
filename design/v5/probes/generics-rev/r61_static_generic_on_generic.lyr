@@ -1,0 +1,10 @@
+import std.io.console { println };
+class Box<T> {
+  v: T,
+  static fn of<U>(u: U): Box<U> { return Box<U> { v = u }; }
+}
+fn main(): int {
+  let b = Box<int>.of<string>("hi");
+  println(b.v);
+  return 0;
+}

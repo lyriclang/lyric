@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct P { x: int }
+fn main(): int {
+    var p = P { x = 1 };
+    p.x += 1;
+    var xs = [1, 2, 3];
+    xs[0] += 1;
+    println(fromInt(p.x));
+    println(fromInt(xs[0]));
+    var k = 0;
+    k++;
+    println(fromInt(k));
+    return 0;
+}

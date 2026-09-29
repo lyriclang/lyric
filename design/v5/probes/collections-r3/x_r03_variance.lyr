@@ -1,0 +1,26 @@
+import std.io.console { println };
+
+interface Shape { fn area(): float; }
+
+class Circle :: [Shape] {
+    r: float,
+    pub fn area(): float { return 3.14 * this.r * this.r; }
+}
+
+fn showAll(xs: Shape[]): void {
+    for (s in xs) { println(f"{s.area()}"); }
+}
+
+fn showAllG<T :: [Shape]>(xs: T[]): void {
+    for (s in xs) { println(f"{s.area()}"); }
+}
+
+fn main(): int {
+    let cs: Circle[] = [Circle{r=1.0}, Circle{r=2.0}];
+    let one: Shape = cs[0];
+    println(f"ctl element: {one.area()}");
+    showAllG(cs);
+    let ss: Shape[] = cs;
+    showAll(ss);
+    return 0;
+}

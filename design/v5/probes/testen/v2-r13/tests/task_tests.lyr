@@ -1,0 +1,19 @@
+import std.test { Test, assertEq };
+import std.task { Wait, spawn, pending };
+import std.io.console { println };
+
+fn worker(): Coroutine<Wait> {
+    yield Wait.Sleep(5000);
+    println("NEVER PRINTED");
+}
+
+@Test
+pub fn aa_leaves_a_task(): void {
+    spawn(worker());
+    assertEq(pending(), 1);
+}
+
+@Test
+pub fn bb_sees_a_clean_scheduler(): void {
+    assertEq(pending(), 0);
+}

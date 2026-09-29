@@ -1,0 +1,3 @@
+import std.time { Instant };
+fn t(): int { return Instant.now().epochMillis() % 1000; }
+fn main(): int { let m = comptime t(); return m as int; }

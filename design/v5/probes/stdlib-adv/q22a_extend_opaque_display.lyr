@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.core { Display };
+import std.io.stream { File, open };
+extend File :: [Display] {
+    fn show(): string { return "<file>"; }
+}
+fn main(): int { let f = open("q22a_extend_opaque_display.lyr"); if (f == null) { return 1; } println(f); return 0; }

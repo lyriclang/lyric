@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+class E :: [Throwable] { fn message(): string { return "e"; } }
+
+interface Risky {
+    fn run(): int throws E;
+}
+
+struct Safe :: [Risky] {
+    fn run(): int { return 1; }
+}
+
+fn main(): int {
+    let r: Risky = Safe { };
+    try {
+        println(f"{r.run()}");
+    } catch (e: E) {
+        println("caught");
+    }
+    return 0;
+}

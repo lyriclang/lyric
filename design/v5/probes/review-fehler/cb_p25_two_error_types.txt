@@ -1,0 +1,4 @@
+./p25_two_error_types.lyr:14:16: error[LYR-SEM0034]: call to 'f' may throw 'Throwable', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch
+        return f(0);
+               ^^^^
+

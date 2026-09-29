@@ -1,0 +1,8 @@
+module calc_test;
+import std.test { Test, assertEq };
+import calc;
+
+@Test
+pub fn testsInternal() {
+    assertEq(calc.internalDouble(3), 6);
+}

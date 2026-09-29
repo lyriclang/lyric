@@ -1,0 +1,13 @@
+import std.io.console { println };
+let BASE = 41;
+fn seed(): int { println("default evaluated"); return 7; }
+struct D {
+    a: int = seed(),
+    b: int = BASE + 1,
+}
+fn main(): int {
+    let d1 = D { };
+    let d2 = D { };
+    println(f"c01 d1.a={d1.a} d1.b={d1.b} d2.a={d2.a}");
+    return 0;
+}

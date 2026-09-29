@@ -1,0 +1,15 @@
+import std.core { Equatable };
+import std.io.console { println };
+
+class Tag :: [Equatable<Tag>, Equatable<int>] {
+    n: int,
+    fn equals(other: Tag): bool { return this.n == other.n; }
+    fn equals(other: int): bool { return this.n == other; }
+}
+
+fn main(): int {
+    let t = Tag { n = 3 };
+    if (t.equals(3)) { println("int-equal"); }
+    if (t.equals(Tag { n = 3 })) { println("tag-equal"); }
+    return 0;
+}

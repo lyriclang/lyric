@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.core { Hashable };
+fn takesHashable<K :: [Hashable<K>]>(k: K): int { return k.hash(); }
+fn main(): int {
+    // Erfuellt int[] die Schranke Hashable ueberhaupt?
+    let xs = [1, 2];
+    println(f"{takesHashable(xs)}");
+    return 0;
+}

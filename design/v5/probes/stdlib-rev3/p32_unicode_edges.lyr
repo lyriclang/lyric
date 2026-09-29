@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string { isDigit, fromBool, fromInt };
+fn main(): int {
+    let up = "ß".toUpper();
+    println(up);
+    println(fromInt(up.length()));
+    println(fromBool(isDigit('\u{0661}')));
+    let low = "\u{0130}".toLower();
+    println(fromInt(low.length()));
+    println("ﬁ".toUpper());
+    return 0;
+}

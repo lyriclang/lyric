@@ -1,0 +1,9 @@
+enum P { Pair(int, int) }
+
+fn f(p: P): int {
+    return match (p) {
+        Pair(x, x) => x,
+    };
+}
+
+fn main(): int { return f(P.Pair(1, 2)); }

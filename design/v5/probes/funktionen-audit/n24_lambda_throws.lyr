@@ -1,0 +1,8 @@
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn risky(): int throws Boom { throw Boom {}; }
+fn main(): int {
+    let f = () => risky();
+    println("x");
+    return 0;
+}

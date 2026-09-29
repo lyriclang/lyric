@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(x: float): int {
+    return match (x) {
+        0.0 => 1,
+        1.0 => 2,
+    };
+}
+fn main(): int { println(f"{f(0.0)}"); return 0; }

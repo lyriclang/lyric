@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn main(): int {
+    let c = true;
+    let a = if (c) 1 else 2;                                   // if-expression
+    println(fromInt(a));                                       // 1
+    let n = 3;
+    let b = match (n) { 1 => 10, 3 => { let y = 4; y * 5 }, _ => 0 };  // value block arm
+    println(fromInt(b));                                       // 20
+    let o: ?int = null;
+    let d = o ?? 7;
+    println(fromInt(d));                                       // 7
+    let e = (x: int) => { let t = x * 2; t + 1 };               // block lambda with tail
+    println(fromInt(e(5)));                                    // 11
+    return 0;
+}

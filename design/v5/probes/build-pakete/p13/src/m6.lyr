@@ -1,0 +1,3 @@
+module m6;
+pub fn v6(): int { return 6; }
+pub fn w6(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 6; } return s; }

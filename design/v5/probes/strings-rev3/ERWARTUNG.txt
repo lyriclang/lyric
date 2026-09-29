@@ -1,0 +1,24 @@
+Erwartungen VOR dem Lauf (strings-rev3, Checkout 6f6f029f v4.6.0-cut)
+n01a  f"{c:X}" c:char        -> Panik VM0006 "'X' is not a width"
+n01b  f"{s:>8}" s:string     -> Panik VM0006 "'>8' is not a width"
+n01c  f"{true:5}"            -> "true " (Breite 5, links)
+n02   int n=5: {n:>8} {n:<8} {n:*>8} {n:+} {n:^8}  -> ">8" "<8" "*>8" "+" "^8" (Literalzeichen, Wert verschluckt); Kontrolle {n:8} -> "5       "
+n03   int32 a=-7 {a:X} -> "FFFFFFFFFFFFFFF9" (16 Stellen, i64-Weitung); Kontrolle int -7 -> gleich; uint8 200:X -> "C8"
+n04a  "hello".substring(1,10) -> "ello" (Clamping); substring(10,2) -> "" ; substring(2,0) -> ""
+n04b  "abc".charAt(3)        -> Panik VM0006
+n04c  "hello".substring(-1,2) -> Panik oder ""  (unsicher)
+n05   "".hash() -> -3750763034362895579 ; "a".hash() -> FNV-1a("a") = 0xaf63dc4c8601ec8c als i64 = -5808557506176535412 (Rechnung: (offset ^ 97) * prime mod 2^64)
+n06   'a' < 'b' -> kompiliert, true
+n07   "a\0b": length 3, utf8Encode 3 Bytes
+n08   "abc\<newline>def" -> LEX0009 + Folgefehler
+n09   f"[{s:}] [{n:}]" -> "[x] [5]" (leerer Spec = kein Spec)
+n10   comptime f"{3.14159:.2}" -> "32" (VM-Sandbox, gleicher Fehler zur Compile-Zeit)
+n11   Display-Loch mit :N2 -> LYR-SEM0006 ; int[] im Loch -> LYR-SEM0006
+n12   "\u{E9}" == "e\u{301}" -> false
+n13   while (i < s.length()) ueber n=40000 ohne charAt: quadratisch ~ >1 s; Kontrolle mit gecachter Laenge ~ <100 ms Differenz
+n14   f"{x:2000000000}" -> unklar: entweder OutOfMemoryException als unbehandelter Absturz oder Panik; KEINE Budgetpruefung erwartet
+n18   formatFloat(3.14159, specVar) mit specVar aus Laufzeit-Variable -> kompiliert, "3.14" bei "F2"; ungueltig -> Panik zur Laufzeit
+n20   f"{255:#x}" -> .NET custom: '#' Platzhalter, 'x' Literal -> "255x"
+n21   f"{1234567:,}" -> .NET custom: Komma am Ende skaliert /1000 -> "1235"
+n22   f"{5:.2}" int -> "52"
+n23   f"{n:X8}" int 255 -> "000000FF" (Kontrolle: .NET-Praezision funktioniert)

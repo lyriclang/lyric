@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn scalars_compare(): void {
+    assertEq(1 + 1, 2);
+    assertEq("a" + "b", "ab");
+}

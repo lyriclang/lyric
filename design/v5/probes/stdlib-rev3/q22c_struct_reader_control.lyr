@@ -1,0 +1,6 @@
+import std.io.console { println };
+import std.io.error { IoError };
+pub interface Reader { fn read(into: uint8[]): int throws IoError; }
+struct Mem :: [Reader] { pos: int, fn read(into: uint8[]): int throws IoError { into[0] = 9; return 1; } }
+fn readAll(r: Reader): int throws IoError { let buf: uint8[] = [0, 0, 0, 0]; let n = r.read(buf); println(buf[0] as int); return n; }
+fn main(): int { let m = Mem { pos = 0 }; try { let n = readAll(m); println(n); } catch (e: IoError) { return 2; } return 0; }

@@ -1,0 +1,3 @@
+module main;
+import dep;
+fn main(): int { return dep.f(); }

@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn main(): int {
+    let base = 10;
+    var mutable = 1;
+    let f = (n: int) => n + base + mutable;
+    println(fromInt(f(0)));
+    mutable = 100;
+    println(fromInt(f(0)));
+    let g = () => { mutable = mutable + 5; return mutable; };
+    println(fromInt(g()));
+    println(fromInt(mutable));
+    return 0;
+}

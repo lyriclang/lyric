@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn main(): int {
+    let probe: float = 0.5;
+    println(f"control literal {probe}");
+    var n = 0;
+    for (x in 1.5..4.5) {
+        println(f"x={x} x+0.25={x + 0.25}");
+        n = n + 1;
+    }
+    return n;
+}

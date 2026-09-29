@@ -1,0 +1,3 @@
+module midl;
+import geo { label };
+pub fn via(): string { return "midl-sees-" + label(); }

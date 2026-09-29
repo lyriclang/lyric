@@ -1,0 +1,5 @@
+// ERWARTUNG: (2) der werfende Lambda-KOERPER gegen einen wurffreien Typ: LYR-SEM0034.
+fn risky(x: int): int throws Boom { throw Boom { }; }
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn apply(f: fn(int) -> int): int { return f(1); }
+fn main(): int { return apply((x: int): int => risky(x)); }

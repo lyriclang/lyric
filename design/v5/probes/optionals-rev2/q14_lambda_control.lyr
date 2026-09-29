@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    var x: ?int = 1;
+    var f: fn() -> int = () => 0;
+    if (x != null) {
+        f = () => x + 100;
+    }
+    println(f"{f()}");
+    return 0;
+}

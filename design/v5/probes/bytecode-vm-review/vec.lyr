@@ -1,0 +1,19 @@
+import std.io.console { println };
+
+struct Vec2 { x: float, y: float, }
+
+fn add(a: Vec2, b: Vec2): Vec2 {
+    return Vec2 { x = a.x + b.x, y = a.y + b.y };
+}
+
+fn main(): int {
+    var acc = Vec2 { x = 0.0, y = 0.0 };
+    var i = 0;
+    while (i < 3000000) {
+        let step = Vec2 { x = 1.0, y = 2.0 };
+        acc = add(acc, step);
+        i = i + 1;
+    }
+    println(acc.x);
+    return 0;
+}

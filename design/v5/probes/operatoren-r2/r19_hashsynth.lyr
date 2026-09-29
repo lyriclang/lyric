@@ -1,0 +1,12 @@
+import std.core { Hashable, Equatable };
+import std.io.console { println };
+import std.string { fromInt };
+struct P :: [Equatable<P>, Hashable] {
+    x: int,
+    fn equals(other: P): bool { return this.x == other.x; }
+}
+fn main(): int {
+    let p = P { x = 7 };
+    println(fromInt(p.hash()));
+    return 0;
+}

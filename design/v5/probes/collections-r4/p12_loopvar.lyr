@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    for (x in xs) { x = 5; }
+    return 0;
+}

@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+enum Res<T, E> {
+    Ok(T),
+    Err(E);
+
+    fn isOk(): bool {
+        return match (this) { Res<T, E>.Ok(_) => true, Res<T, E>.Err(_) => false };
+    }
+}
+
+fn main(): int {
+    let r = Res<int, string>.Ok(3);
+    println(f"{r.isOk()}");
+    return 0;
+}

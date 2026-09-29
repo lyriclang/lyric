@@ -1,0 +1,11 @@
+// ERWARTUNG: LYR-SEM0084 — 'throws' gehoert zu einem Coroutinentyp.
+class Boom :: [Throwable] {
+    what: string,
+    fn message(): string { return this.what; }
+}
+
+fn each(f: fn(int) -> void throws Boom): void {
+    f(1);
+}
+
+fn main(): int { return 0; }

@@ -1,0 +1,6 @@
+fn inner(a: int): int { return a; }
+fn f(x: int): string { return "i"; }
+fn main(): int {
+    let r = f(inner(1, 2));
+    return 0;
+}

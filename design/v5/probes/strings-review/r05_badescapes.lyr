@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn main(): int {
+    println("\e[31m");
+    println("\a");
+    println("\b");
+    println("\f");
+    println("\v");
+    println("\$");
+    return 0;
+}

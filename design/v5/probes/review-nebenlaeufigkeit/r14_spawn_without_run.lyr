@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.task as task;
+import std.task { Wait };
+
+fn worker(): Coroutine<Wait> {
+    println("worker ran");
+    yield Wait.Now;
+    println("worker finished");
+}
+
+fn main(): int {
+    task.spawn(worker());
+    println(f"pending = {task.pending()}");
+    println("main returns without run()");
+    return 0;
+}

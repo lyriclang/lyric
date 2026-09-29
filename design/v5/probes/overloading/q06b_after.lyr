@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn h(x: float): string { return "float"; }
+fn h(x: int): string { return "INT"; }
+fn main(): int { println(h(2)); return 0; }

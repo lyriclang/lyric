@@ -1,0 +1,4 @@
+./p38_lambda_throws.lyr:6:35: error[LYR-SEM0034]: call to 'risky' may throw 'Boom', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch
+    return apply((x: int): int => risky(x));
+                                  ^^^^^^^^
+

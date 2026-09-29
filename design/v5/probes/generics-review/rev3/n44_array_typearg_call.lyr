@@ -1,0 +1,2 @@
+fn take<U>(u: U): int { return 1; }
+fn main(): int { return take<int[]>([1]); }

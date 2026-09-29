@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let x: ?int = 3;
+    println(x);
+    return 0;
+}

@@ -1,0 +1,12 @@
+import std.core { Add };
+struct V :: [Add<V, V>] {
+    n: int,
+    fn add(other: V): V { return V { n = this.n + other.n }; }
+}
+struct Box { v: V }
+fn main(): int {
+    var b = Box { v = V { n = 1 } };
+    let w = V { n = 2 };
+    b.v += w;
+    return b.v.n;
+}

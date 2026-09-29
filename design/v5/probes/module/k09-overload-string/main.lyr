@@ -1,0 +1,6 @@
+import lib;
+
+fn main(): int {
+    let n = lib.h("a");
+    return n;
+}

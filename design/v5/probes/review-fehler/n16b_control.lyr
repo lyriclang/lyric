@@ -1,0 +1,8 @@
+// KONTROLLE zu n16: derselbe Aufbau, aber catch (e: Box<int>) -> muss fangen und 1 drucken.
+import std.io.console { println };
+class Box<T> :: [Throwable] { v: T, fn message(): string { return "box"; } }
+fn thrower(): int throws Box<int> { throw Box<int> { v = 1 }; }
+fn main(): int {
+    try { return thrower(); }
+    catch (e: Box<int>) { println(f"caught {e.v}"); return 0; }
+}

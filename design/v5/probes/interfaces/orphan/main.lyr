@@ -1,0 +1,11 @@
+import std.io.console { println };
+import shapes;
+import proto;
+import glue;
+
+fn use(v: proto.Show2): void { println(v.s()); }
+
+fn main(): int {
+    use(shapes.Point { x = 1, y = 2 });
+    return 0;
+}

@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt, fromFloat, fromUint };
+fn main(): int {
+    println(fromInt(-7 % 2));
+    println(fromInt(-7 / 2));
+    println(fromFloat(5.5 % 2.0));
+    let n = 1;
+    println(fromUint(-n as uint));
+    println("str: " + "cat");
+    return 0;
+}

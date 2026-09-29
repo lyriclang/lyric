@@ -1,0 +1,2 @@
+module a.b;
+pub fn g(): int { return 1; }

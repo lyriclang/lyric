@@ -1,0 +1,9 @@
+class Box<T> {
+    value: T,
+    static fn of(v: T): Box<T> { return Box<T> { value = v }; }
+}
+
+fn main(): int {
+    let b = Box<Box<int>>.of(Box<int> { value = 5 });
+    return b.value.value;
+}

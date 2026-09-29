@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f<T>(x: T): string { return "generic"; }
+fn f(x: int): string { return "concrete"; }
+fn main(): int {
+    println(f(3));
+    println(f<int>(3));
+    return 0;
+}

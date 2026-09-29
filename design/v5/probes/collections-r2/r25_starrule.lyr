@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct V { x: int, }
+fn main(): int {
+    var seed = V{x=1};
+    var c = [seed] * 3;
+    c[0].x = 7;
+    println(f"slots:  {c[0].x} {c[1].x} {c[2].x}");
+    println(f"quelle: {seed.x}");
+    return 0;
+}

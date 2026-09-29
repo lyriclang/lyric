@@ -1,0 +1,115 @@
+p09_iface.lyrbc
+  format          4.0
+  capabilities    0x0000000000000000
+  entry           main.main
+  strings         175
+  types           49 (2 enum)
+  imports         2
+  functions       97
+  source map      yes
+  debug info      yes
+  code            4607 bytes
+
+  imports:
+    std.string.fromInt
+    std.io.console.rawPrintln
+
+  functions:
+    name                               params  slots  stack  blocks   bytes
+    main.main                               0      5      2       4      71
+    main.Counter.next                       1      3      2       3      47
+    std.io.console.println<string>          1      1      1       1       7
+    std.core.<extend>.string.show           1      1      1       1       3
+    std.iter.Iterator<int>.filter           2      5      2       1      32
+    std.iter.Iterator<int>.take             2      5      2       1      32
+    std.iter.Iterator<int>.skip             2      5      2       1      32
+    std.iter.Iterator<int>.takeWhile        2      6      2       1      44
+    std.iter.Iterator<int>.chain            2      6      2       1      44
+    std.iter.Iterator<int>.skipWhile        2      6      2       1      44
+    std.iter.Iterator<int>.stepBy           2      6      2       1      44
+    std.iter.Iterator<int>.inspect          2      5      2       1      32
+    std.iter.Iterator<int>.dedupBy          2      7      2       1      56
+    std.iter.Iterator<int>.reduce           2      4      3       6      58
+    std.iter.Iterator<int>.count            1      3      2       4      38
+    std.iter.Iterator<int>.first            1      1      1       1       6
+    std.iter.Iterator<int>.last             1      3      1       6      51
+    std.iter.Iterator<int>.nth              2      6      2       8      68
+    std.iter.Iterator<int>.any              2      3      2       6      42
+    std.iter.Iterator<int>.all              2      3      2       6      43
+    std.iter.Iterator<int>.none             2      2      2       1       9
+    std.iter.Iterator<int>.find             2      3      2       6      43
+    std.iter.Iterator<int>.position         2      4      2       6      53
+    std.iter.Iterator<int>.countWhere       2      4      2       6      50
+    std.iter.Iterator<int>.forEach          2      3      2       4      32
+    std.iter.Iterator<int>.toArray          1      3      2       4      43
+    std.iter.Iterator<float>.filter         2      5      2       1      32
+    std.iter.Iterator<float>.take           2      5      2       1      32
+    std.iter.Iterator<float>.skip           2      5      2       1      32
+    std.iter.Iterator<float>.takeWhile      2      6      2       1      44
+    std.iter.Iterator<float>.chain          2      6      2       1      44
+    std.iter.Iterator<float>.skipWhile      2      6      2       1      44
+    std.iter.Iterator<float>.stepBy         2      6      2       1      44
+    std.iter.Iterator<float>.inspect        2      5      2       1      32
+    std.iter.Iterator<float>.dedupBy        2      7      2       1      56
+    std.iter.Iterator<float>.reduce         2      4      3       6      58
+    std.iter.Iterator<float>.count          1      3      2       4      38
+    std.iter.Iterator<float>.first          1      1      1       1       6
+    std.iter.Iterator<float>.last           1      3      1       6      51
+    std.iter.Iterator<float>.nth            2      6      2       8      68
+    std.iter.Iterator<float>.any            2      3      2       6      42
+    std.iter.Iterator<float>.all            2      3      2       6      43
+    std.iter.Iterator<float>.none           2      2      2       1       9
+    std.iter.Iterator<float>.find           2      3      2       6      43
+    std.iter.Iterator<float>.position       2      4      2       6      53
+    std.iter.Iterator<float>.countW...      2      4      2       6      50
+    std.iter.Iterator<float>.forEach        2      3      2       4      32
+    std.iter.Iterator<float>.toArray        1      3      2       4      43
+    std.iter.Iterator<string>.filter        2      5      2       1      32
+    std.iter.Iterator<string>.take          2      5      2       1      32
+    std.iter.Iterator<string>.skip          2      5      2       1      32
+    std.iter.Iterator<string>.takeW...      2      6      2       1      44
+    std.iter.Iterator<string>.chain         2      6      2       1      44
+    std.iter.Iterator<string>.skipW...      2      6      2       1      44
+    std.iter.Iterator<string>.stepBy        2      6      2       1      44
+    std.iter.Iterator<string>.inspect       2      5      2       1      32
+    std.iter.Iterator<string>.dedupBy       2      7      2       1      56
+    std.iter.Iterator<string>.reduce        2      4      3       6      58
+    std.iter.Iterator<string>.count         1      3      2       4      38
+    std.iter.Iterator<string>.first         1      1      1       1       6
+    std.iter.Iterator<string>.last          1      3      1       6      51
+    std.iter.Iterator<string>.nth           2      6      2       8      68
+    std.iter.Iterator<string>.any           2      3      2       6      42
+    std.iter.Iterator<string>.all           2      3      2       6      43
+    std.iter.Iterator<string>.none          2      2      2       1       9
+    std.iter.Iterator<string>.find          2      3      2       6      43
+    std.iter.Iterator<string>.position      2      4      2       6      53
+    std.iter.Iterator<string>.count...      2      4      2       6      50
+    std.iter.Iterator<string>.forEach       2      3      2       4      32
+    std.iter.Iterator<string>.toArray       1      3      2       4      43
+    std.iter.FilterIterator<int>.next       1      3      2       6      56
+    std.iter.TakeIterator<int>.next         1      1      3       3      40
+    std.iter.SkipIterator<int>.next         1      1      3       6      57
+    std.iter.TakeWhileIterator<int>...      1      3      2       7      73
+    std.iter.ChainIterator<int>.next        1      2      2       5      49
+    std.iter.SkipWhileIterator<int>...      1      5      2       8      89
+    std.iter.StepByIterator<int>.next       1      2      2      10      93
+    std.iter.InspectIterator<int>.next      1      3      2       3      35
+    std.iter.DedupIterator<int>.next        1      6      2       8     105
+    std.iter.FilterIterator<float>....      1      3      2       6      56
+    std.iter.TakeIterator<float>.next       1      1      3       3      40
+    std.iter.SkipIterator<float>.next       1      1      3       6      57
+    std.iter.TakeWhileIterator<floa...      1      3      2       7      73
+    std.iter.ChainIterator<float>.next      1      2      2       5      49
+    std.iter.SkipWhileIterator<floa...      1      5      2       8      89
+    std.iter.StepByIterator<float>....      1      2      2      10      93
+    std.iter.InspectIterator<float>...      1      3      2       3      35
+    std.iter.DedupIterator<float>.next      1      6      2       8     105
+    std.iter.FilterIterator<string>...      1      3      2       6      56
+    std.iter.TakeIterator<string>.next      1      1      3       3      40
+    std.iter.SkipIterator<string>.next      1      1      3       6      57
+    std.iter.TakeWhileIterator<stri...      1      3      2       7      73
+    std.iter.ChainIterator<string>....      1      2      2       5      49
+    std.iter.SkipWhileIterator<stri...      1      5      2       8      89
+    std.iter.StepByIterator<string>...      1      2      2      10      93
+    std.iter.InspectIterator<string...      1      3      2       3      35
+    std.iter.DedupIterator<string>....      1      6      2       8     105

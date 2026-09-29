@@ -1,0 +1,5 @@
+fn grow<T>(x: T, n: int): int {
+  if (n == 0) { return 0; }
+  return grow<T[]>([x], n - 1);
+}
+fn main(): int { return grow<int>(1, 3); }

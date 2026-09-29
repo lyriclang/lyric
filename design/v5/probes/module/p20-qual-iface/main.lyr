@@ -1,0 +1,5 @@
+import lib;
+
+struct S :: [lib.Named] { fn name(): int { return 5; } }
+
+fn main(): int { let s = S {}; return s.name(); }

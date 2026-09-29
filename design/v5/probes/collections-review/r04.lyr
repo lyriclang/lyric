@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [10, 20, 30];
+    let i: int32 = 1;
+    println(f"{xs[i]}");
+    return 0;
+}

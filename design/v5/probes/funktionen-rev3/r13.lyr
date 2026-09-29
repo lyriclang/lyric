@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let n = 1;
+    let f = (n: int) => n + 1;
+    println(fromInt(f(n)));
+    return 0;
+}

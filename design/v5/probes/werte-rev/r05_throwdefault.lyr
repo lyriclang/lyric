@@ -1,0 +1,4 @@
+class Boom { }
+fn mk(): int throws { throw Boom { }; }
+struct D { a: int = mk(), }
+fn main(): int { let d = D { }; return d.a; }

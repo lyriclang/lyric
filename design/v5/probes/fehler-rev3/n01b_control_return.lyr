@@ -1,0 +1,7 @@
+// KONTROLLE: mit return statt panic laeuft der defer. Ausgabe body / DEFER, Exit 0.
+import std.io.console { println };
+fn main(): int {
+    defer println("DEFER");
+    println("body");
+    return 0;
+}

@@ -1,0 +1,3 @@
+module mid;
+import geo;
+pub fn sees(): string { return geo.tag(); }

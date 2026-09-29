@@ -1,0 +1,9 @@
+// ERWARTUNG: kompiliert; druckt 5 und 18446744073709551615 (IntLiteralFits Uint = !negative, Magnitude ist ulong)
+import std.io.console { println };
+fn main(): int {
+  let u: uint = 5;
+  println(f"{u}");
+  let big: uint = 18446744073709551615;
+  println(f"{big}");
+  return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum S { Red, Green }
+fn f(s: S): int {
+    return match (s) {
+        x => 1,
+        Red => 2,
+        Green => 3,
+    };
+}
+fn main(): int { println(f"{f(S.Green)}"); return 0; }

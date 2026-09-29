@@ -1,0 +1,7 @@
+import std.io.console { println };
+extern "dotnet" fn parseInt(s: string): int32 = "System.Int32::Parse";
+fn work(): int32 {
+    defer { println("DEFER RAN"); }
+    return parseInt("zz");
+}
+fn main(): int { println(f"{work()}"); return 0; }

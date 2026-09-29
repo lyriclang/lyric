@@ -1,0 +1,3 @@
+import mod1 { value1 };
+
+fn main(): int { return value1(0); }

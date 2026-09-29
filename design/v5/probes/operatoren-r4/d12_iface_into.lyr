@@ -1,0 +1,12 @@
+import std.core { Into };
+import std.io.console { println };
+import std.string { fromInt };
+struct V :: [Into<int>] {
+    x: int,
+    fn into(): int { return this.x; }
+}
+fn conv(a: Into<int>): int { return a as int; }
+fn main(): int {
+    println(fromInt(conv(V { x = 7 })));
+    return 0;
+}

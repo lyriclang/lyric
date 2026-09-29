@@ -1,0 +1,8 @@
+q1_rebind.lyr:3:5: warning[LYR-SEM0107]: 'x' is already bound in this scope — this binding is unreachable today, and 5.0 settles which of the two a later use names
+    let x = 2;
+    ^^^^^^^^^^
+  note: previous binding — q1_rebind.lyr:2:5
+  note: a migration warning: the program is legal today, and 5.0 makes it a different program
+
+error[LYR-CLI0016]: 1 warning denied by --deny-warnings
+

@@ -1,0 +1,5 @@
+module lib;
+
+pub opaque type Ticket = int;
+
+pub fn issue(raw: int): Ticket { return raw as Ticket; }

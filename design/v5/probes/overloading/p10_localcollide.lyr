@@ -1,0 +1,7 @@
+import std.io.console { println };
+import mlibx { area };
+fn area(r: int): string { return "local-int"; }
+fn main(): int {
+    println(area(3));
+    return 0;
+}

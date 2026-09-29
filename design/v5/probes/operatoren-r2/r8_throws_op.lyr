@@ -1,0 +1,7 @@
+import std.core { Add };
+error Bad {}
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V throws { return V { x = this.x + other.x }; }
+}
+fn main(): int { return 0; }

@@ -1,0 +1,14 @@
+// ERWARTUNG (§3.1 "other operand of a binary expression"): 2 3 3 true
+import std.io.console { println };
+fn main(): int {
+  var x: int8 = 1i8;
+  x += 1;
+  println(f"{x}");
+  let y = x + 1;
+  println(f"{y}");
+  let z = 1 + x;
+  println(f"{z}");
+  let b = x == 2;
+  println(f"{b}");
+  return 0;
+}

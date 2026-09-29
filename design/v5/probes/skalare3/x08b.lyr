@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let a: int8 = 1i8; println(f"{a << 3}"); return 0; }

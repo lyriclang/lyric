@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let m: ?int64 = null; let filled = m ?? 7; println(f"{filled}"); return 0; }

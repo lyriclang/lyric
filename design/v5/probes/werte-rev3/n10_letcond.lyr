@@ -1,0 +1,12 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    let t = (S { v = 1 }, 2);
+    if (let (a, _) = t) { a.v = 9; }
+    let (b, _) = t;
+    println(f"n10 if-let b.v={b.v} (1 = copy)");
+    var o: ?S = S { v = 1 };
+    if (let c = o) { c.v = 9; }
+    println(f"n10 if-let-opt o!.v={o!.v} (1 = copy, 9 = alias)");
+    return 0;
+}

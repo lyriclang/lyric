@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn cb(x: float): float { return x * 3.0; }
+fn apply(f: fn(float) -> float, x: float): float { return f(x); }
+fn main(): int { println(f"{apply(cb, 4.0)}"); return 0; }

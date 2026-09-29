@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct Node { v: int, next: ?Node, }
+fn main(): int {
+    let n = Node { v = 1, next = Node { v = 2, next = null } };
+    println(f"{n.next!.v}");
+    return 0;
+}

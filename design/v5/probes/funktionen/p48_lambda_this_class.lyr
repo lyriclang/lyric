@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+class Box {
+    v: int,
+    fn scaled(k: int): int {
+        let f = (n: int) => n * this.v;
+        return f(k);
+    }
+}
+fn main(): int {
+    let b = Box { v = 6 };
+    println(fromInt(b.scaled(7)));
+    return 0;
+}

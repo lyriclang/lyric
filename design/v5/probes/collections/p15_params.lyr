@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn rows(params xs: int[][]): int { return xs.length; }
+
+fn poke(params xs: int[]): void { xs[0] = 77; }
+
+fn main(): int {
+    let grid = [[1, 2], [3, 4], [5, 6]];
+    println(f"forwarded whole: {rows(grid)}");
+    println(f"spread two rows: {rows([1], [2])}");
+
+    let xs = [1, 2, 3];
+    poke(xs);
+    println(f"aliased through params: {xs[0]}");
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let a: ?int = 1;
+    let b: ?int = 2;
+    if (let x = a && let y = b) { println(f"{x} {y}"); }
+    return 0;
+}

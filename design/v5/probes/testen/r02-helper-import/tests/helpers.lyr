@@ -1,0 +1,1 @@
+pub fn helperValue(): int { return 42; }

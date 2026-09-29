@@ -1,0 +1,3 @@
+module m9;
+pub fn v9(): int { return 9; }
+pub fn w9(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 9; } return s; }

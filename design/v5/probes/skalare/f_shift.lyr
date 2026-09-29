@@ -1,0 +1,32 @@
+import std.io.console { println };
+
+fn main(): int {
+    var one: int = 1;
+    var c64: int = 64;
+    var c65: int = 65;
+    var cm1: int = -1;
+    println(f"1 << 64 = {one << c64}");
+    println(f"1 << 65 = {one << c65}");
+    println(f"1 << -1 = {one << cm1}");
+
+    var neg: int = -8;
+    var s1: int = 1;
+    println(f"-8 >> 1 = {neg >> s1}");
+    var u: uint = 18446744073709551608;
+    var us: uint = 1;
+    println(f"uintbig >> 1 = {u >> us}");
+
+    var a8: int8 = 1i8;
+    var e8: int8 = 8i8;
+    println(f"1i8 << 8 = {a8 << e8}");
+    var n8: int8 = -8i8;
+    var one8: int8 = 1i8;
+    println(f"-8i8 >> 1 = {n8 >> one8}");
+    var u8: uint8 = 248u8;
+    var ou8: uint8 = 1u8;
+    println(f"248u8 >> 1 = {u8 >> ou8}");
+    var a16: int16 = 1i16;
+    var e16: int16 = 16i16;
+    println(f"1i16 << 16 = {a16 << e16}");
+    return 0;
+}

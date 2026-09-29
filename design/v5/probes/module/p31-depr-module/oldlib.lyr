@@ -1,0 +1,3 @@
+@Deprecated { message = "use newlib" }
+module oldlib;
+pub fn f(): int { return 1; }

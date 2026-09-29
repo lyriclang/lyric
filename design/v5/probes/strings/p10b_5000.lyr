@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+fn cmpOnce(a: string, b: string): bool {
+    return a < b;
+}
+
+fn main(): int {
+    let n = 5000;
+    let base = "x" * n;
+    let a = base + "a";
+    let b = base + "b";
+    return if (cmpOnce(a, b)) 0 else 1;
+}

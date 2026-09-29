@@ -1,0 +1,5 @@
+fn main(): int {
+    var k = 3;
+    let unusedThree = 9;
+    return k;
+}

@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let esc = '\u{1F600}';
+    let s = "a😀b";
+    println(f"{esc as int} len={s.length()} bytes={s.utf8Encode().length}");
+    let combining = 'é';
+    println(f"combining={combining as int}");
+    return 0;
+}

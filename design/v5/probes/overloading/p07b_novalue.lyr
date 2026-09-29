@@ -1,0 +1,6 @@
+fn describe(n: int): string { return "number"; }
+fn describe(s: string): string { return "word"; }
+fn main(): int {
+    let g = describe;
+    return 0;
+}

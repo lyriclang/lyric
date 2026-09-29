@@ -1,0 +1,10 @@
+// ERWARTUNG: NUR die Fangseite auf einem Enum, ohne jeden Wurf. LYR-IR0001.
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Missing(string);
+    pub fn message(): string { return match (this) { Missing(s) => s, }; }
+}
+fn f(): int throws Fault { return 1; }
+fn main(): int {
+    try { return f(); } catch (e: Fault) { println(e.message()); return 0; }
+}

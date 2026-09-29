@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    var x = 1;
+    var x = 2;
+    x = 5;
+    println(f"var re-binding: {x}");
+    return 0;
+}

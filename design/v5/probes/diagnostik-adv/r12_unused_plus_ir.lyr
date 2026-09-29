@@ -1,0 +1,8 @@
+struct P { x: int = 0 }
+
+fn main(): int {
+    let unusedOne = 1;
+    var p = P { x = 1 };
+    p.x++;
+    return p.x;
+}

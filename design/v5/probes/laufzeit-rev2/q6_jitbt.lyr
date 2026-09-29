@@ -1,0 +1,21 @@
+// Q6 — Ist ein Backtrace unabhaengig von der Ausfuehrungs-Engine?
+// ERWARTUNG VOR DEM LAUF (aus Interpreter.cs:246-266 gelesen):
+//   ohne --jit: drei benannte Frames MIT Quellposition (heiss, mittel, main)
+//   mit  --jit: kompilierte Frames fehlen; im Grenzfall EINE Zeile ohne Position
+import std.io.console { println };
+
+fn heiss(a: int, b: int): int {
+    return a / b;   // b == 0 -> LYR-VM0002
+}
+
+fn mittel(n: int): int {
+    var s = 0;
+    var i = 0;
+    while (i < n) { s = s + heiss(i, if (i == n - 1) 0 else 1); i += 1; }
+    return s;
+}
+
+fn main(): int {
+    println("start");
+    return mittel(50000);
+}

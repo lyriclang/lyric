@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn apply(f: fn(int) -> int): int { return f(1); }
+fn apply(f: fn(int, int) -> int): int { return f(1, 2); }
+fn main(): int {
+    let r = apply((n: int) => n + 1);
+    println("x");
+    return 0;
+}

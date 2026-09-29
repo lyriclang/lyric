@@ -1,0 +1,3 @@
+interface Show { fn show(): string; }
+extend int[] :: [Show] { pub fn show(): string { return "arr"; } }
+fn main(): int { return 0; }

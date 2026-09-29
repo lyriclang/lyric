@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn connect(host: string, port: int): string { return host; }
+fn main(): int {
+    println(connect(host: "h", port: 80));
+    return 0;
+}

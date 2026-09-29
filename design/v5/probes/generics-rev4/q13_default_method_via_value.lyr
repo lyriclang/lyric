@@ -1,0 +1,12 @@
+import std.io.console { println };
+interface Src<T> { fn v(): T; fn pair(): T[] { return [this.v(), this.v()]; } }
+class IntSrc :: [Src<int>] { fn v(): int { return 21; } }
+class StrSrc :: [Src<string>] { fn v(): string { return "a"; } }
+fn main(): int {
+  let a: Src<int> = IntSrc {};
+  let b: Src<string> = StrSrc {};
+  let xs = a.pair();
+  let ys = b.pair();
+  println(f"{xs[0] + xs[1]} {ys.length}");
+  return 0;
+}

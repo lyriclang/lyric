@@ -1,0 +1,10 @@
+// ERWARTUNG: catch (e: Boom) { throw e; } in fn throws Boom kompiliert; main faengt, Exit 0.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { throw Boom { }; }
+fn work(): int throws Boom {
+    try { return f(); } catch (e: Boom) { println("rethrow"); throw e; }
+}
+fn main(): int {
+    try { return work(); } catch (e: Boom) { println("main caught"); return 0; }
+}

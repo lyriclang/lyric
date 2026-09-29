@@ -1,0 +1,13 @@
+import std.io.console { println };
+fn main(): int {
+    var s = "";
+    var i = 0;
+    while (i < 5) {
+        s += "x";
+        i = i + 1;
+    }
+    println(s);
+    let t = "a" + "b";
+    println(t);
+    return 0;
+}

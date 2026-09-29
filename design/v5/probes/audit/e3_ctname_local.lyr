@@ -1,0 +1,4 @@
+fn main(): int {
+    let comptime = 2;
+    return comptime + 3;
+}

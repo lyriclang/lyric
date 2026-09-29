@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let f: float32 = 16777217 as float32; println(f"{f}"); return 0; }

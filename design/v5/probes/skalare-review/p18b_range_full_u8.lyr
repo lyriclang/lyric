@@ -1,0 +1,8 @@
+// ERWARTUNG: 256, terminiert
+import std.io.console { println };
+fn main(): int {
+  var n = 0;
+  for (i in 0u8..=255u8) { n += 1; }
+  println(f"{n}");
+  return 0;
+}

@@ -1,0 +1,76 @@
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\iter.lyr:13:1: error[LYR-RES0004]: module 'std.core' has no exported 'Deprecated'
+import std.core { Deprecated };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\iter.lyr:17:1: error[LYR-RES0004]: module 'std.core' has no exported 'Ordered'
+import std.core { Ordered };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\iter.lyr:971:13: error[LYR-SEM0027]: type parameter 'T' has no member 'compare' (no constraint provides it)
+        if (value.compare(best) < 0) {
+            ^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\iter.lyr:987:13: error[LYR-SEM0027]: type parameter 'T' has no member 'compare' (no constraint provides it)
+        if (value.compare(best) > 0) {
+            ^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:8:1: error[LYR-RES0004]: module 'std.core' has no exported 'Hashable'
+import std.core { Hashable, Equatable, Ordered };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:8:1: error[LYR-RES0004]: module 'std.core' has no exported 'Equatable'
+import std.core { Hashable, Equatable, Ordered };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:8:1: error[LYR-RES0004]: module 'std.core' has no exported 'Ordered'
+import std.core { Hashable, Equatable, Ordered };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:572:17: error[LYR-SEM0027]: type parameter 'K' has no member 'hash' (no constraint provides it)
+        let h = key.hash();
+                ^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:590:40: error[LYR-SEM0027]: type parameter 'K' has no member 'equals' (no constraint provides it)
+                if (present != null && present.equals(key)) {
+                                       ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:667:40: error[LYR-SEM0027]: type parameter 'K' has no member 'equals' (no constraint provides it)
+                if (present != null && present.equals(key)) {
+                                       ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:811:39: error[LYR-SEM0027]: type parameter 'T' has no member 'compare' (no constraint provides it)
+    sortListBy<T>(xs, (a: T, b: T) => a.compare(b) < 0);
+                                      ^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:961:17: error[LYR-SEM0027]: type parameter 'T' has no member 'hash' (no constraint provides it)
+        let h = value.hash();
+                ^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:977:40: error[LYR-SEM0027]: type parameter 'T' has no member 'equals' (no constraint provides it)
+                if (present != null && present.equals(value)) {
+                                       ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1033:40: error[LYR-SEM0027]: type parameter 'T' has no member 'equals' (no constraint provides it)
+                if (present != null && present.equals(value)) {
+                                       ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1315:39: error[LYR-SEM0027]: type parameter 'K' has no member 'compare' (no constraint provides it)
+    sortListBy<T>(xs, (a: T, b: T) => key(a).compare(key(b)) < 0);
+                                      ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1341:13: error[LYR-SEM0027]: type parameter 'K' has no member 'compare' (no constraint provides it)
+        if (k.compare(bestKey) > 0) {
+            ^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1361:13: error[LYR-SEM0027]: type parameter 'K' has no member 'compare' (no constraint provides it)
+        if (k.compare(bestKey) < 0) {
+            ^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1421:13: error[LYR-SEM0027]: type parameter 'T' has no member 'equals' (no constraint provides it)
+        if (xs.get(i).equals(value)) {
+            ^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\collections.lyr:1433:13: error[LYR-SEM0027]: type parameter 'T' has no member 'equals' (no constraint provides it)
+        if (xs.get(i).equals(value)) {
+            ^^^^^^^^^^^^^^^^
+

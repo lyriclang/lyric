@@ -1,0 +1,20 @@
+// R5 — Darf ein Skalar ein Interface-Wert werden?
+// Erwartung: extend int :: [Sized] wird angenommen, n.size() geht, let s: Sized = n ist ein Fehler.
+import std.io.console { println };
+
+interface Sized { fn size(): int; }
+
+extend int :: [Sized] {
+    fn size(): int { return this; }
+}
+
+fn viaConstraint<T :: [Sized]>(t: T): int { return t.size(); }
+
+fn main(): int {
+    let n = 7;
+    println(f"direkt={n.size()}");
+    println(f"constraint={viaConstraint(n)}");
+    let s: Sized = n;
+    println(f"wert={s.size()}");
+    return 0;
+}

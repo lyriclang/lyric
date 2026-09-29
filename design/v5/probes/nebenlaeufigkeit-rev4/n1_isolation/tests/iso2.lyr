@@ -1,0 +1,19 @@
+import std.test { Test, assertEq };
+import std.task { Wait, spawn, pending };
+
+fn worker(): Coroutine<Wait> {
+    yield Wait.Now;
+}
+
+// Order-independent control: if the scheduler were shared, whichever runs second sees 2.
+@Test
+pub fn c_spawns_one(): void {
+    spawn(worker());
+    assertEq(pending(), 1);
+}
+
+@Test
+pub fn d_spawns_one(): void {
+    spawn(worker());
+    assertEq(pending(), 1);
+}

@@ -1,0 +1,2 @@
+struct Box<T> { a: T, b: int, }
+fn main(): int { let d = Box<int> { a = 1 }; return d.b; }

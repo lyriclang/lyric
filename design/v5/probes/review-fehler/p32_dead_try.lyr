@@ -1,0 +1,20 @@
+// ERWARTUNG: keine Diagnose — ein try ueber einen Koerper, der nicht werfen kann, und eine
+// throws-Klausel, die nie greift, bleiben still.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn quiet(): int throws Boom { return 1; }
+
+fn main(): int {
+    try {
+        println("nothing throws here");
+    } catch (e: Boom) {
+        println("never");
+        return 1;
+    }
+    return quietCall();
+}
+
+fn quietCall(): int {
+    try { return quiet(); } catch (_: Boom) { return 2; }
+}

@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+interface Mapper {
+    fn wrap<U>(u: U): U;
+}
+
+struct M :: [Mapper] { fn wrap<U>(u: U): U { return u; } }
+
+fn main(): int {
+    let v: Mapper = M { };
+    println(v.wrap<string>("hi"));
+    return 0;
+}

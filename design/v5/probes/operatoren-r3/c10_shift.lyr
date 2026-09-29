@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var one = 1;
+    var c = 64;
+    println(fromInt(one << c));
+    var neg = 0 - 1;
+    println(fromInt(one << neg));
+    println(fromInt(comptime (1 << 64)));
+    return 0;
+}

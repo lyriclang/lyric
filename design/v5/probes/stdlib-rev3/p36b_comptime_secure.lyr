@@ -1,0 +1,3 @@
+import std.random { secureRandom };
+fn draw(): int { return secureRandom(1)[0] as int; }
+fn main(): int { let m = comptime draw(); return m; }

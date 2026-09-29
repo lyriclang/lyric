@@ -1,0 +1,5 @@
+fn each(g: fn(int) -> void): int { return 1; }
+fn each(g: fn(string) -> void): int { return 2; }
+fn main(): int {
+    return each(x => { });
+}

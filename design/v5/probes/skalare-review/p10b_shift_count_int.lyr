@@ -1,0 +1,9 @@
+// ERWARTUNG: unklar - SEM0003 oder 4 (Count als int auf int8-Operand)
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = 1i8;
+  let m: int = 2;
+  let r = a << m;
+  println(f"{r}");
+  return 0;
+}

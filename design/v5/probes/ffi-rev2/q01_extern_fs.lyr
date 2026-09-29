@@ -1,0 +1,14 @@
+module main;
+
+import std.io.console { println };
+
+extern "dotnet" fn readAll(p: string): string = "System.IO.File::ReadAllText";
+extern "dotnet" fn writeAll(p: string, s: string) = "System.IO.File::WriteAllText";
+extern "dotnet" fn getEnv(n: string): string = "System.Environment::GetEnvironmentVariable";
+
+fn main(): int {
+    writeAll("q01-out.txt", "written by extern");
+    println(readAll("q01-out.txt"));
+    println(getEnv("USERNAME"));
+    return 0;
+}

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let y = comptime (1 / 0); println(f"{y}"); return 0; }

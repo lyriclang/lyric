@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.core { Display };
+import std.string { fromInt };
+
+extend uint8 :: [Display] {
+    fn show(): string {
+        return fromInt(this as int);
+    }
+}
+
+fn main(): int {
+    let b: uint8[] = [65, 66];
+    println(b[0]);
+    return 0;
+}

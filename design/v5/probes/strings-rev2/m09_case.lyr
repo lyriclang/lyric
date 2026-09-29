@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let sharp = "\u{00DF}";
+    let lig = "\u{FB01}";
+    let dotted = "\u{0130}";
+    println(f"sharp up={sharp.toUpper()} len={sharp.toUpper().length()} was={sharp.length()}");
+    println(f"lig up={lig.toUpper()} len={lig.toUpper().length()} was={lig.length()}");
+    println(f"dotted low={dotted.toLower()} len={dotted.toLower().length()} was={dotted.length()}");
+    return 0;
+}

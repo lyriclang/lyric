@@ -1,0 +1,20 @@
+// Q8 — Hat float32 eine eigene Darstellung? Und was verspricht Kapitel 11 genau?
+// ERWARTUNG VOR DEM LAUF:
+//   f32   = 0.10000000149011612  (der f64, zu dem der f32 erweitert wird)
+//   f64   = 0.1
+//   f32b  = 0.30000001192092896
+//   rt    = true  KONTROLLE: der lange String liest als f64 zurueck auf denselben Wert,
+//                 d.h. §11s Zusage gilt fuer den f64 — ueber float32 sagt §11 nichts.
+import std.io.console { println };
+
+fn main(): int {
+    let a: float32 = 0.1;
+    let b: float = 0.1;
+    let c: float32 = 0.3;
+    println(f"f32  = {a}");
+    println(f"f64  = {b}");
+    println(f"f32b = {c}");
+    let weit: float = a as float;
+    println(f"weit = {weit}");
+    return 0;
+}

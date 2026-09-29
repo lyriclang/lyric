@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Greeter {
+    fn greet(who: string): string;
+}
+
+struct G :: [Greeter] {
+    fn greet(who: string): string { return "hi " + who; }
+}
+
+fn main(): int {
+    let g: Greeter = G { };
+    println(g.greet("you"));
+    return 0;
+}

@@ -1,0 +1,14 @@
+// ERWARTUNG (Guide 14:158): eine .NET-Exception ist eine Panik (LYR-VM0016), nicht fangbar.
+import std.io.console { println };
+extern "dotnet" fn parseInt32(s: string): int32 = "System.Int32::Parse";
+fn main(): int {
+    println("before");
+    try {
+        let n = parseInt32("zz");
+        println(f"{n}");
+    } catch (_) {
+        println("caught the host exception");
+        return 0;
+    }
+    return 1;
+}

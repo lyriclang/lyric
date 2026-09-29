@@ -1,0 +1,3 @@
+import app;
+pub fn fa(): int { return 1; }
+fn main(): int { return app.fa(); }

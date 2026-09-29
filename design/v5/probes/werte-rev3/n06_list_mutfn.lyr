@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.collections { List };
+struct S { v: int, mut fn bump(): void { this.v = this.v + 1; } }
+fn main(): int {
+    var l = List<S>.empty();
+    l.push(S { v = 1 });
+    l[0].bump();
+    println(f"n06 list mutfn l[0].v={l[0].v} (1 = no-op on copy)");
+    let g = l.get(0);
+    println(f"n06 get copy g.v={g.v}");
+    return 0;
+}

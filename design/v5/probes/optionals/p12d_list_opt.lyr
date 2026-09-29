@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    var xs = List<?int>.empty();
+    xs.push(1);
+    xs.push(null);
+    println(f"{xs.length()}");
+    return 0;
+}

@@ -1,0 +1,5 @@
+import std.build { executable };
+pub fn build() {
+    executable("app", "src/main.lyr");
+    executable("other", "../other/src/main.lyr");
+}

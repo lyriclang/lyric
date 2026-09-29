@@ -1,0 +1,11 @@
+import std.io.console { println };
+struct Box<T> {
+    v: T,
+    fn put(x: T): string { return "T"; }
+    fn put(x: int64): string { return "int64"; }
+}
+fn main(): int {
+    let b = Box<int64> { v = 1 };
+    println(b.put(2));
+    return 0;
+}

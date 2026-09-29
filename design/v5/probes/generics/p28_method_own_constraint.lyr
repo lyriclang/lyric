@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Describable { fn describe(): string; }
+class Coin :: [Describable] { fn describe(): string { return "coin"; } }
+
+class Box<T> {
+    value: T,
+    fn tell<U :: [Describable]>(u: U): string { return u.describe(); }
+}
+
+fn main(): int {
+    let b = Box<int> { value = 1 };
+    println(b.tell<Coin>(Coin { }));
+    return 0;
+}

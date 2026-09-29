@@ -1,0 +1,11 @@
+import std.test { Test, assertEq };
+import greeting { text };
+
+// Tests live here and nowhere else: `lyric test` compiles this directory, and a build never
+// looks at it. A test is a `pub fn` marked `@Test` that takes and returns nothing; it fails by
+// panicking, which is what the assertions do.
+
+@Test
+pub fn the_greeting_names_who_it_greets(): void {
+    assertEq(text("Lyric"), "Hello, Lyric!");
+}

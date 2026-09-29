@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let o: ?uint64 = null; let v: uint64 = o ?? 7; println(f"{v as int}"); return 0; }

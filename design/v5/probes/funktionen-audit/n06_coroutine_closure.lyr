@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn gen(): Coroutine<int> {
+    var n = 0;
+    let inc = () => { n = n + 1; return n; };
+    yield inc();
+    yield inc();
+}
+fn main(): int {
+    let c = gen();
+    println(fromInt(resume c));
+    println(fromInt(resume c));
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.iter { over };
+
+fn main(): int {
+    let xs = over([1, 2, 3]).toList();
+    println(xs.length());
+    return 0;
+}

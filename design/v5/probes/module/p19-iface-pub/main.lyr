@@ -1,0 +1,8 @@
+interface Greet {
+    pub fn hi(): int;
+    fn lo(): int { return 0; }
+}
+
+struct S :: [Greet] { pub fn hi(): int { return 1; } }
+
+fn main(): int { let s = S {}; return s.hi() + s.lo(); }

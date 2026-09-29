@@ -1,0 +1,2 @@
+pub fn pong(): int { return 2; }
+pub extend int { pub fn twice(): int { return this * 2; } }

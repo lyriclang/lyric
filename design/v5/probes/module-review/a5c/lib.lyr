@@ -1,0 +1,5 @@
+module lib;
+
+pub struct Inner { v: int, }
+
+pub type Id = Inner;

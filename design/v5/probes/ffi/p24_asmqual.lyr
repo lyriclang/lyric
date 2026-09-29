@@ -1,0 +1,4 @@
+import std.io.console { println };
+extern "dotnet" fn hostName(): string = "System.Net.Dns, System.Net.NameResolution::GetHostName";
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+fn main(): int { println(f"host={hostName()} cbrt={cbrt(27.0)}"); return 0; }

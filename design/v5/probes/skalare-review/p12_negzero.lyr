@@ -1,0 +1,11 @@
+// ERWARTUNG: -0 (oder 0?) / true / -Infinity / Infinity
+import std.io.console { println };
+fn main(): int {
+  let z = -0.0;
+  println(f"{z}");
+  println(f"{0.0 == z}");
+  println(f"{1.0 / z}");
+  let p = 0.0;
+  println(f"{1.0 / p}");
+  return 0;
+}

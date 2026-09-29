@@ -1,0 +1,10 @@
+fn main(): int {
+    let xs = [1] * 1000;
+    var acc = 0;
+    var r = 0;
+    while (r < 3000) {
+        for (x in xs) { acc = acc + x; }
+        r = r + 1;
+    }
+    return acc % 7;
+}

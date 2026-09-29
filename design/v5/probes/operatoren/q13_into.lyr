@@ -1,0 +1,17 @@
+import std.core { Into };
+import std.io.console { println };
+import std.string { fromInt };
+
+struct A { n: int, }
+struct B { n: int, }
+struct C :: [Into<A>, Into<B>] {
+    n: int,
+    fn into(): A { return A { n = this.n + 1 }; },
+    fn into(): B { return B { n = this.n + 2 }; }
+}
+fn main(): int {
+    let c = C { n = 10 };
+    println(fromInt((c as A).n));    // 11
+    println(fromInt((c as B).n));    // 12
+    return 0;
+}

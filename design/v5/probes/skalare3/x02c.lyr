@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let n = 1114112; println(f"{(n as char) as int}"); return 0; }

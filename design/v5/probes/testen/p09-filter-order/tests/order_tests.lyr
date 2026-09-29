@@ -1,0 +1,10 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn zebra(): void { assertEq(1, 1); }
+
+@Test
+pub fn apple(): void { assertEq(1, 1); }
+
+@Test
+pub fn mango(): void { assertEq(1, 1); }

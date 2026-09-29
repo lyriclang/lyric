@@ -1,0 +1,13 @@
+import std.io.console { println };
+enum Tree<T> { Leaf(T), Node(Tree<T>, Tree<T>) }
+fn count<T>(t: Tree<T>): int {
+  match (t) {
+    Leaf(_) => { return 1; },
+    Node(l, r) => { return count(l) + count(r); },
+  }
+}
+fn main(): int {
+  let t = Tree<int>.Node(Tree<int>.Leaf(1), Tree<int>.Node(Tree<int>.Leaf(2), Tree<int>.Leaf(3)));
+  println(f"{count(t)}");
+  return 0;
+}

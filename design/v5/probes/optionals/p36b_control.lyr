@@ -1,0 +1,7 @@
+interface Named { fn name(): string; }
+fn show<T :: [Named]>(x: T): string { return x.name(); }
+class D { }
+fn main(): int {
+    let s = show<D>(D {});
+    return 0;
+}

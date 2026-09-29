@@ -1,0 +1,30 @@
+import std.core { Add, Sub, Mul };
+import std.io.console { println };
+import std.string { fromInt };
+
+struct V :: [Add<V, V>, Sub<V, V>, Mul<int, V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; },
+    fn sub(other: V): V { return V { x = this.x - other.x }; },
+    fn mul(other: int): V { return V { x = this.x * other }; }
+}
+
+struct Box { v: V, }
+
+fn main(): int {
+    let a = V { x = 10 };
+    let b = V { x = 3 };
+    println(fromInt((a + b).x));      // 13
+    println(fromInt((a - b).x));      // 7
+    println(fromInt((a * 2).x));      // 20
+    var c = a;
+    c += b;                            // compound on a LOCAL
+    println(fromInt(c.x));            // 13
+    var bx = Box { v = a };
+    bx.v += b;                         // compound on a FIELD
+    println(fromInt(bx.v.x));         // 13
+    var xs = [a, a];
+    xs[0] += b;                        // compound on an ELEMENT
+    println(fromInt(xs[0].x));        // 13
+    return 0;
+}

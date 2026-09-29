@@ -1,0 +1,7 @@
+fn helper(): int { return 1; }
+
+struct Never { a: int }
+
+fn main(): int {
+    return 0;
+}

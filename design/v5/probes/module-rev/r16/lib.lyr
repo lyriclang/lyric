@@ -1,0 +1,4 @@
+module lib;
+fn h(x: int): int { return 1; }
+fn h(s: string): int { return 2; }
+pub fn anchor(): int { return 0; }

@@ -1,0 +1,17 @@
+// Q12 — Welche capability-FREIEN Natives erreichen tatsaechlich die Aussenwelt?
+// ERWARTUNG VOR DEM LAUF: mit '--grant none' laufen alle drei durch —
+//   std.io.console.readLine  (liest stdin; nichtdeterministisch, erreicht die Aussenwelt)
+//   std.io.console.isInteractive (fragt die Umgebung)
+//   std.random.secureRandom  (zieht Entropie aus der Kryptoquelle des Betriebssystems)
+// KONTROLLE: eine Datei oeffnen muss mit '--grant none' ABGEWIESEN werden.
+import std.io.console { println, readLine, isInteractive };
+import std.random { secureRandom };
+
+fn main(): int {
+    let zeile = readLine();
+    println(f"stdin        = {zeile ?? "<nichts>"}");
+    println(f"interaktiv   = {isInteractive()}");
+    let b = secureRandom(4);
+    println(f"entropieLaenge = {b.length}");
+    return 0;
+}

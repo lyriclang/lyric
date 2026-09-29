@@ -1,0 +1,11 @@
+import std.core { Display };
+import std.io.console { println };
+struct V :: [Display] {
+    x: int,
+    fn show(): string { return "V"; }
+}
+fn main(): int {
+    let v = V { x = 1 };
+    println(f"value {v}");
+    return 0;
+}

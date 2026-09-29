@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int }
+fn mutate(s: S): void { s.v = 99; }
+fn main(): int {
+    let s = S { v = 1 };
+    mutate(s);
+    println(fromInt(s.v));
+    return 0;
+}

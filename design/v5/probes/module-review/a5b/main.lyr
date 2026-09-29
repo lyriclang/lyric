@@ -1,0 +1,10 @@
+module main;
+
+import std.io.console { println };
+import mid { Id };
+
+fn main(): int {
+    let x: Id = Id { v = 8 };
+    println(x.v);
+    return 0;
+}

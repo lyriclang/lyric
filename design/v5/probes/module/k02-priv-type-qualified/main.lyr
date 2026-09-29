@@ -1,0 +1,9 @@
+import lib;
+import std.io.console;
+
+fn main(): int {
+    let s: lib.Secret = lib.make();
+    let t = lib.Secret { v = 3 };
+    console.println(f"{s.v} {t.v}");
+    return 0;
+}

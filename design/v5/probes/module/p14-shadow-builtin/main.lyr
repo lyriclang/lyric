@@ -1,0 +1,3 @@
+import std.string;
+
+fn main(): int { let s: string = "x"; return s.length(); }

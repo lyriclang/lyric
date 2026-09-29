@@ -1,0 +1,3 @@
+struct Box { v: int, static fn zero(): Box { return Box { v = 0 }; } }
+fn call(f: fn() -> Box): Box { return f(); }
+fn main(): int { let f = Box.zero; return call(f).v; }

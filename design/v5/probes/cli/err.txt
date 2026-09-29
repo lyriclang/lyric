@@ -1,0 +1,2 @@
+error[LYR-CLI0005]: lyrvm not found: C:/nope/lyrvm.exe (set LYRIC_VM or pass --vm)
+

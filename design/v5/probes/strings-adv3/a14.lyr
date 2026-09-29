@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "ab" * -2;
+    println(f"[{s}] {s.length()}");
+    return 0;
+}

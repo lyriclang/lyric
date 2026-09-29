@@ -1,0 +1,22 @@
+// R3e — Wird ein Struct beim EINFANGEN in eine Closure kopiert?
+// ERWARTUNG VOR DEM LAUF (LoadCaptured laedt den Slot, keine Kopierstelle greift):
+//   letCapture   = 1   (Alias)
+//   frischeKopie = 0   (KONTROLLE: let k = m kopiert)
+//   varCapture   = 1   (var gefangen = Zelle geteilt, per Spec erwartet)
+import std.io.console { println };
+struct Zaehler { n: int, mut fn hoch(): void { this.n += 1; } fn wert(): int { return this.n; } }
+fn main(): int {
+    let l = Zaehler { n = 0 };
+    let f = () => l.wert();
+    l.hoch();
+    println(f"letCapture   = {f()}");
+    let m = Zaehler { n = 0 };
+    let k = m;
+    m.hoch();
+    println(f"frischeKopie = {k.wert()}");
+    var v = Zaehler { n = 0 };
+    let g = () => v.wert();
+    v.hoch();
+    println(f"varCapture   = {g()}");
+    return 0;
+}

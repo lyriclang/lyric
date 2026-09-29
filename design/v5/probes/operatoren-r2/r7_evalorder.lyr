@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn f(): int { println("f"); return 1; }
+fn g(): int { println("g"); return 2; }
+fn h(a: int, b: int): int { return a + b; }
+struct P2 { a: int, b: int, }
+fn main(): int {
+    println(fromInt(f() + g()));
+    println("--- call args ---");
+    println(fromInt(h(f(), g())));
+    println("--- array literal ---");
+    let xs = [f(), g()];
+    println("--- struct init ---");
+    let p = P2 { a = f(), b = g() };
+    return 0;
+}

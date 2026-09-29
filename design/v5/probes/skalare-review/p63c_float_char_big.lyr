@@ -1,0 +1,11 @@
+// ERWARTUNG (§3.6): Panik VM0012 oder Saettigung auf 1114111 - NICHT 0
+import std.io.console { println };
+fn main(): int {
+  let f = 1114112.0;
+  let c = f as char;
+  println(f"{c as int}");
+  let g = 1e300;
+  let d = g as char;
+  println(f"{d as int}");
+  return 0;
+}

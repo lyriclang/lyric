@@ -1,0 +1,3 @@
+interface I { fn get(): ?int; }
+class C :: [I] { fn get(): int { return 1; } }
+fn main(): int { let c = C {}; return c.get(); }

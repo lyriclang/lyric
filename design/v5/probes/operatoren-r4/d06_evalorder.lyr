@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.string { fromInt };
+class R { fn m(v: int): int { println("m"); return v; } }
+fn f(): int { println("f"); return 0; }
+fn g(): int { println("g"); return 2; }
+fn r(): R { println("r"); return R { }; }
+fn t(): bool { println("t"); return true; }
+fn u(): bool { println("u"); return true; }
+fn main(): int {
+    var xs = [1, 2];
+    println("--- xs[f()] = g()");
+    xs[f()] = g();
+    println("--- xs[f()] += g()");
+    xs[f()] += g();
+    println("--- r().m(f())");
+    r().m(f());
+    println("--- t() && u()");
+    let b = t() && u();
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.build { executable };
+import std.io.file { writeText };
+
+pub fn build(): void {
+    writeText("EVIDENCE.txt", "the help call ran me");
+    executable("h", "src/main.lyr");
+}

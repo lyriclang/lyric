@@ -1,0 +1,8 @@
+import std.test { Test, assertEq };
+import std.os { exit };
+
+@Test
+pub fn calls_exit(): void { exit(0); }
+
+@Test
+pub fn never_runs(): void { assertEq(1, 1); }

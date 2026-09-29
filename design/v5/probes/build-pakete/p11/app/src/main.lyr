@@ -1,0 +1,2 @@
+import banana { label };
+fn main(): int { return label(); }

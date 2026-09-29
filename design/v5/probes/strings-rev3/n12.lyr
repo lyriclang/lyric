@@ -1,0 +1,3 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int { let a = "\u{E9}"; let b = "e\u{301}"; println(f"{a == b} {a.length()} {b.length()} {a < b}"); return 0; }

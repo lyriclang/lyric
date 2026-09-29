@@ -1,0 +1,4 @@
+fn main(): int {
+    let a = { let y = 2; y * 3 };
+    return a;
+}

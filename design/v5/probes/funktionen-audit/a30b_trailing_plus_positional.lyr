@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn each(f: fn(int) -> int, n: int = 2): int { return f(n); }
+fn main(): int {
+    println(fromInt(each(5) { it + 1 }));
+    return 0;
+}

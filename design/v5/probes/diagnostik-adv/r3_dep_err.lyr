@@ -1,0 +1,9 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use renew" }
+pub fn old(): int { return 1; }
+
+fn main(): int {
+    let v = old();
+    return nosuch;
+}

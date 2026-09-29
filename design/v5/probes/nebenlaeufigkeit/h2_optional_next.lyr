@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+fn maybe(): Coroutine<?int> {
+    yield 1;
+    yield null;
+}
+
+fn main(): int {
+    let m = maybe();
+    let v = m.next();
+    println("unreachable?");
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+var counter: int = 0;
+fn main(): int {
+    let f = () => { counter = counter + 1; return counter; };
+    println(fromInt(f()));
+    return 0;
+}

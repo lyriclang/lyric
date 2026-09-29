@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn f<T>(x: T): string { return "T"; }
+fn f<U>(x: U): string { return "U"; }
+fn main(): int { println(f(1)); return 0; }

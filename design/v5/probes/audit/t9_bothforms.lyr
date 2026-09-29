@@ -1,0 +1,5 @@
+import std.core { OnFunction, WithArg };
+pub struct Tag :: [OnFunction, WithArg<int>] { n: int = 0, m: int = 0 }
+@Tag(5) { m = 1 }
+pub fn f(): void { }
+fn main(): int { return 0; }

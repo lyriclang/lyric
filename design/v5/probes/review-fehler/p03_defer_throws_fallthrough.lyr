@@ -1,0 +1,34 @@
+// KONTROLLE zu p02: derselbe Aufbau OHNE return (Durchfall-Pfad).
+// ERWARTUNG: boom laeuft EINMAL, "A" laeuft NICHT.
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    what: string,
+    fn message(): string { return this.what; }
+}
+
+class Counter { n: int = 0 }
+
+fn boom(c: Counter): void throws Boom {
+    c.n = c.n + 1;
+    println(f"boom {c.n}");
+    throw Boom { what = "from defer" };
+}
+
+fn work(c: Counter): void throws Boom {
+    defer println("A");
+    defer boom(c);
+    println("body");
+}
+
+fn main(): int {
+    let c = Counter { };
+    try {
+        work(c);
+    } catch (e: Boom) {
+        println(f"caught: {e.message()}");
+        println(f"count = {c.n}");
+        return 0;
+    }
+    return 1;
+}

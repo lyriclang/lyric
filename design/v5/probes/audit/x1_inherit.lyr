@@ -1,0 +1,11 @@
+import std.core { OnType };
+import std.io.console { println };
+
+pub struct Comp :: [OnType] { n: int = 1 }
+
+@Comp { n = 7 }
+pub class Base { v: int = 0 }
+
+pub class Derived : Base { w: int = 0 }
+
+fn main(): int { return 0; }

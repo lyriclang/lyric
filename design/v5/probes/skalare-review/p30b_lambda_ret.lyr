@@ -1,0 +1,9 @@
+// ERWARTUNG: unklar - Lambda mit int8-Rueckgabetyp: adaptiert das Literal? (return-Kontext)
+import std.io.console { println };
+fn main(): int {
+  let l = (): int8 => 7;
+  println(f"{l()}");
+  let m = (): int8 => { return 7; };
+  println(f"{m()}");
+  return 0;
+}

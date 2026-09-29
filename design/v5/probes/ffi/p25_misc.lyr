@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+extern "dotnet" fn maxU(a: uint, b: uint): uint = "System.Math::Max";
+extern "dotnet" fn sqrtF(x: float32): float32 = "System.MathF::Sqrt";
+extern "dotnet" fn sleep(ms: int32) = "System.Threading.Thread::Sleep";
+
+fn main(): int {
+    println(f"maxU={maxU(18000000000000000000u64 as uint, 5u64 as uint)}");
+    println(f"sqrtF={sqrtF(2.0f32)}");
+    sleep(1i32);
+    println("slept");
+    return 0;
+}

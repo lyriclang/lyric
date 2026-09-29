@@ -1,0 +1,9 @@
+module lib;
+
+fn hidden(): int {
+    return 7;
+}
+
+pub fn shown(): int {
+    return 1;
+}

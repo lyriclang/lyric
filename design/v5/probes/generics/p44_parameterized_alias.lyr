@@ -1,0 +1,8 @@
+class Box<T> { value: T, }
+
+type Pair<T> = Box<T>;
+
+fn main(): int {
+    let b: Pair<int> = Box<int> { value = 4 };
+    return b.value;
+}

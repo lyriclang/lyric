@@ -1,0 +1,2 @@
+module geo;
+pub fn label(): string { return "A"; }

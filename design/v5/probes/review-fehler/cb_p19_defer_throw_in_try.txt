@@ -1,0 +1,2 @@
+error[LYR-CLI0020]: lowering: block bb4 is already sealed — this is a defect in the compiler, not in the program. Please report it with the source that produced it.
+

@@ -1,0 +1,9 @@
+struct Cfg {
+    host: string,
+    port: int,
+}
+
+fn main(): int {
+    let c = Cfg { host = "localhost", port = 80 };
+    return c.port - 80;
+}

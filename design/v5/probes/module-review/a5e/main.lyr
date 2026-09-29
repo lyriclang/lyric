@@ -1,0 +1,11 @@
+module main;
+
+import std.io.console { println };
+import mid;
+import leaf;
+
+fn main(): int {
+    let x: mid.Id = leaf.make();
+    println(x.v);
+    return 0;
+}

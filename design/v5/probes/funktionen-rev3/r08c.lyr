@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn apply(x: int, f: fn(int) -> int): int { return f(x); }
+fn apply(x: int, f: fn(int) -> bool): int { if (f(x)) { return 1; } return 0; }
+fn main(): int {
+    println(fromInt(apply(3, (n: int): bool => n > 1)));
+    return 0;
+}

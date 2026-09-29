@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let x: ?float = 1;
+    println(f"{x ?? 0.0}");
+    return 0;
+}

@@ -1,0 +1,33 @@
+// Q10 — KONTROLLE zu q9: blockiert 'structcopy' den JIT, oder blockieren Structs ihn ueberhaupt?
+// JitCompiler.cs:32-36 zaehlt auf, was der Emitter kann; 'structcopy' steht nicht darunter,
+// und der default-Zweig (ebd. 679-680) lehnt die GANZE Funktion ab.
+// ERWARTUNG VOR DEM LAUF:
+//   'lesen'  (Feldzugriff auf ein Struct im Array, KEINE Kopie) -> mit --jit deutlich schneller
+//   'kopie'  (dieselbe Schleife mit Bindung an eine lokale Variable, also structcopy)
+//            -> mit --jit KEIN Gewinn
+import std.io.console { println };
+
+struct S8 { a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, }
+
+fn lesen(n: int): int {
+    let xs = [S8 { a=0,b=1,c=2,d=3,e=4,f=5,g=6,h=7 }] * 4;
+    var s = 0;
+    var i = 0;
+    while (i < n) { s = s + xs[i % 4].a + i; i += 1; }
+    return s;
+}
+
+fn kopie(n: int): int {
+    var xs = [S8 { a=0,b=1,c=2,d=3,e=4,f=5,g=6,h=7 }] * 4;
+    var s = 0;
+    var i = 0;
+    while (i < n) { var v = xs[i % 4]; s = s + v.a + i; i += 1; }
+    return s;
+}
+
+fn main(args: string[]): int {
+    let n = 2000000;
+    if (args.length > 0) { println(f"kopie = {kopie(n)}"); }
+    else { println(f"lesen = {lesen(n)}"); }
+    return 0;
+}

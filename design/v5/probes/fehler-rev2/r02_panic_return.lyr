@@ -1,0 +1,3 @@
+// ERWARTUNG: kompiliert (panic ist never im Fluss), Exit 0 beim Bau.
+fn f(): int { panic("x"); }
+fn main(): int { return 0; }

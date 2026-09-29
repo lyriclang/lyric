@@ -1,0 +1,11 @@
+q23_hint.lyr:2:9: hint[LYR-SEM0075]: 'k' is never reassigned — 'let' would do
+    var k = 3;
+        ^
+
+q23_hint.lyr:3:9: warning[LYR-SEM0071]: 'unusedThree' is never used
+    let unusedThree = 9;
+        ^^^^^^^^^^^
+  note: name it '_' when the value is deliberately unused
+
+error[LYR-CLI0016]: 1 warning denied by --deny-warnings
+

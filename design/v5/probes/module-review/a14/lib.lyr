@@ -1,0 +1,7 @@
+module lib;
+
+interface Hidden {
+    fn tag(): int;
+}
+
+pub struct Marker { v: int, }

@@ -1,0 +1,4 @@
+module totally.different.name;
+import std.io.console;
+
+fn main(): int { console.println("entry header"); return 0; }

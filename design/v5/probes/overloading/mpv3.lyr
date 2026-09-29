@@ -1,0 +1,3 @@
+module mpv3;
+fn m(x: int): string { return "priv-exact-first"; }
+pub fn m(x: ?int): string { return "pub-opt-second"; }

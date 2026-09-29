@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.collections { List };
+struct S { v: int, mut fn shift(d: int): void { this.v = this.v + d; } }
+fn main(): int {
+    let xs = List<S>.new();
+    xs.add(S { v = 1 });
+    var e = xs.get(0);
+    e.v = 9;
+    println(f"i02 after local write xs0={xs.get(0).v}");
+    xs.get(0).shift(9);
+    println(f"i02 after mut fn xs0={xs.get(0).v}");
+    return 0;
+}

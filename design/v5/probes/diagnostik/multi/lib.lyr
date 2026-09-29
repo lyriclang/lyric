@@ -1,0 +1,5 @@
+module lib;
+
+pub interface Shape {
+    fn area(): int;
+}

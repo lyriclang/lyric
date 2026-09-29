@@ -1,0 +1,9 @@
+// ERWARTUNG (Spec 7.5): ein defer im Schleifenkoerper laeuft pro Iteration am Iterationsende.
+import std.io.console { println };
+fn main(): int {
+    for (i in 0..3) {
+        defer println(f"defer {i}");
+        println(f"body {i}");
+    }
+    return 0;
+}

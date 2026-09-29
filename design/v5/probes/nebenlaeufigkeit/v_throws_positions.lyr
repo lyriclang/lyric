@@ -1,0 +1,27 @@
+import std.collections { List };
+import std.core { Exception };
+import std.io.console { println };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    throw Exception { text = "x" };
+}
+
+fn makeIt(): fn() -> Coroutine<int> throws Exception {
+    return () => steps();
+}
+
+fn main(): int {
+    let xs = List<Coroutine<int> throws Exception>.empty();
+    xs.push(steps());
+    let f = makeIt();
+    let co = f();
+    try {
+        println(f"{resume co}");
+        println(f"{resume co}");
+    } catch (e: Exception) {
+        println("caught: " + e.message());
+    }
+    println(f"list holds {xs.length()}");
+    return 0;
+}

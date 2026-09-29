@@ -1,0 +1,10 @@
+import std.io.console { println };
+interface Named { fn name(): string; }
+enum Color :: [Named] {
+    Red, Green;
+    fn name(): string {
+        return match (this) { Red => "red", Green => "green" };
+    }
+}
+fn show(n: Named): string { return n.name(); }
+fn main(): int { println(show(Color.Green)); return 0; }

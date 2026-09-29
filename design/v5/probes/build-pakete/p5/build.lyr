@@ -1,0 +1,9 @@
+import std.build { executable, packed };
+import std.io.file { writeText };
+
+pub fn build() {
+    writeText("SIDE-EFFECT-RAN.txt", "the script ran");
+    let a = executable("app", "src/main.lyr");
+    let b = executable("app", "tools/other.lyr");
+    packed(a);
+}

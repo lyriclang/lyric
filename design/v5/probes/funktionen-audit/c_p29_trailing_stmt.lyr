@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct Runner { n: int, fn each(f: fn(int) -> void): void { f(this.n); } }
+fn each(f: fn(int) -> void): void { f(1); }
+fn main(): int {
+    let r = Runner { n = 3 };
+    r.each { println("method-trailing"); };
+    r.each { println("method-trailing-no-semi") }
+    return 0;
+}

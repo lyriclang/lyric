@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.collections { List };
+struct S { v: int, mut fn bump(): void { this.v = this.v + 1; } }
+fn main(): int {
+    // destructuring binding
+    let t = (S { v = 1 }, 2);
+    let (a, _) = t;
+    a.v = 9;
+    let (b, _) = t;
+    println(f"n01 destructure b.v={b.v} (1 = copy)");
+    // for-in over a List (class container)
+    var l = List<S>.empty();
+    l.push(S { v = 1 });
+    for (e in l) { e.v = 9; }
+    println(f"n01 forin-list l[0].v={l[0].v} (1 = copy)");
+    // mut fn on a loop variable over an array
+    var xs = [S { v = 1 }];
+    for (e in xs) { e.bump(); }
+    println(f"n01 forin-mutfn xs[0].v={xs[0].v} (1 = copy, 2 = alias)");
+    return 0;
+}

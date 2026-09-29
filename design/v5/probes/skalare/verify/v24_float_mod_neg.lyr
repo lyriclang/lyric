@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    let a: float = 5.5;
+    let b: float = 2.0;
+    println(f"fmod = {a % b}");
+    let u: uint = 3;
+    let n = -u;
+    println(f"neg uint = {n}");
+    return 0;
+}

@@ -1,0 +1,6 @@
+fn main(): int {
+    let a: char = 'a';
+    let z: char = 'z';
+    let d: int = z - a;
+    return d;
+}

@@ -1,0 +1,5 @@
+module mid;
+
+import leaf { f };
+
+pub fn g(): int { return f(); }

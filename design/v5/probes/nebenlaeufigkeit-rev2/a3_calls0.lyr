@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.os as os;
+
+fn deep(n: int): void {
+    if (n > 0) { deep(n - 1); return; }
+}
+
+fn main(): int {
+    let t0 = os.nowMillis();
+    var i = 0;
+    while (i < 200000) { deep(0); i += 1; }
+    println(f"calls depth 0, no yield: {os.nowMillis() - t0}ms");
+    return 0;
+}

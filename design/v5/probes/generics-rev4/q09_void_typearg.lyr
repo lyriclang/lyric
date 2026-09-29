@@ -1,0 +1,2 @@
+class Box<T> { v: T }
+fn main(): int { let _: ?Box<void> = null; return 0; }

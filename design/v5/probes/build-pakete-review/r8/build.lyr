@@ -1,0 +1,6 @@
+import std.build { executable };
+pub fn build() {
+    executable("one", "src/main.lyr");
+    executable("two", "src/main2.lyr");
+    executable("three", "src/main3.lyr");
+}

@@ -1,0 +1,15 @@
+// R3h — Rekursion unter --jit: (1) Backtrace einer Panik in rekursivem Code hat volle Positionen
+// auch mit --jit (weil die Funktion abgelehnt wird); (2) fib(27) ist mit --jit nicht schneller.
+// ERWARTUNG: Backtrace mit 'in main.tief (r3h_jitrec:N)'-Zeilen in beiden Engines; Zeit ~gleich.
+import std.io.console { println };
+fn fib(n: int): int { if (n < 2) { return n; } return fib(n - 1) + fib(n - 2); }
+fn tief(n: int, xs: int[]): int {
+    if (n == 0) { return xs[10]; }
+    return tief(n - 1, xs);
+}
+fn main(args: string[]): int {
+    if (args.length > 0) { println(f"fib = {fib(27)}"); return 0; }
+    let xs = [1] * 3;
+    println(f"{tief(3, xs)}");
+    return 0;
+}

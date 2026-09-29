@@ -1,0 +1,3 @@
+module lib;
+interface Hidden { fn h(): int; }
+pub fn mk(): int { return 0; }

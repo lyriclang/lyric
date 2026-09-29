@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn main(): int {
+    var xs = [1, 2, 3, 4];
+    match (xs) {
+        [first, ..rest] => {
+            rest[0] = 99;
+            println(f"rest-write: xs[1]={xs[1]} rest[0]={rest[0]} first={first}");
+        },
+        _ => { println("kein Treffer"); },
+    }
+    return 0;
+}

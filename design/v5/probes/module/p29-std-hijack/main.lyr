@@ -1,0 +1,4 @@
+module std.core;
+import std.io.console;
+
+fn main(): int { console.println("hijack"); return 0; }

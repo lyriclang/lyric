@@ -1,0 +1,3 @@
+import util;
+
+fn main(): int { return util.f(); }

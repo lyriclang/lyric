@@ -1,0 +1,7 @@
+fn main(): int {
+    let n = 40000;
+    let base = "x" * n;
+    let a = base + "a";
+    let b = base + "b";
+    return if (a == b) 1 else 0;
+}

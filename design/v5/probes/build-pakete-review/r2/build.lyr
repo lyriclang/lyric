@@ -1,0 +1,7 @@
+import std.build { executable };
+import std.io.file { writeText };
+pub fn build() {
+    writeText("SIDE_EFFECT.txt", "the script ran");
+    executable("app", "src/main.lyr");
+    executable("app", "tools/other.lyr");
+}

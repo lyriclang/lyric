@@ -1,0 +1,6 @@
+@Deprecated { message = "use newdep" }
+module dep;
+
+import std.core { Deprecated };
+
+pub fn f(): int { return 1; }

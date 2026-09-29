@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var one = 1; var two = 2; var three = 3;
+    println(fromInt(one << two + three));
+    if (one & three == one) { println("bit-tighter-than-eq"); } else { println("eq-tighter"); }
+    return 0;
+}

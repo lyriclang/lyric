@@ -1,0 +1,12 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var s = S { v = 1 };
+    var t = (s, 2);
+    var u = t;
+    let (a, b) = u;
+    var c = a;
+    c.v = 9;
+    println(f"r21 s.v={s.v} a.v={a.v} c.v={c.v}");
+    return 0;
+}

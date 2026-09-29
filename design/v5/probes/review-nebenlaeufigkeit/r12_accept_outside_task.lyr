@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.io.net as net;
+
+// No scheduler, no resume: an ordinary call to an std function whose signature
+// says nothing about waiting.
+fn main(): int {
+    let l = net.listen("127.0.0.1", 0);
+    if (l == null) { println("no listener"); return 1; }
+    println("listening");
+    let s = net.accept(l);
+    println("accept returned");
+    return 0;
+}

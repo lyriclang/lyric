@@ -1,0 +1,9 @@
+fn inner<U>(u: U): int { return 1; }
+
+fn outer<T>(x: T): int {
+    return inner<T>(x);
+}
+
+fn main(): int {
+    return outer<int>(1);
+}

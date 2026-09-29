@@ -1,0 +1,6 @@
+import std.core { Hashable };
+fn h<T :: [Hashable<T>]>(x: T): int { return x.hash(); }
+fn main(): int {
+    let o: ?string = "a";
+    return h<?string>(o);
+}

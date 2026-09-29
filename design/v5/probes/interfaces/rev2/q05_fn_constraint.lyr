@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn twice(a: int): int { return a + a; }
+fn main(): int {
+    let f: fn(int) -> int = twice;
+    println(f);
+    return 0;
+}

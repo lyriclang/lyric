@@ -1,0 +1,11 @@
+// ERWARTUNG: unklar - "1" oder "1.0"; 1E+21 oder 1e+21; 1E-07?
+import std.io.console { println };
+fn main(): int {
+  println(f"{1.0}");
+  println(1.0);
+  println(f"{100.0}");
+  println(f"{1e21}");
+  println(f"{1e-7}");
+  println(f"{123456789.125}");
+  return 0;
+}

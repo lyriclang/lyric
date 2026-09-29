@@ -1,0 +1,12 @@
+interface Cloneable {
+    fn duplicate(): Self;
+}
+
+class Node :: [Cloneable] {
+    v: int,
+    fn duplicate(): Node { return Node { v = this.v }; }
+}
+
+fn main(): int {
+    return 0;
+}

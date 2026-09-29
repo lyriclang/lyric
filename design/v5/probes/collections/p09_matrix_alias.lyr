@@ -1,0 +1,14 @@
+import std.io.console { println };
+fn main(): int {
+    let grid = [[0] * 3] * 2;
+    grid[0][0] = 5;
+    println(f"grid[0][0]={grid[0][0]} grid[1][0]={grid[1][0]}");
+
+    // control: two rows built separately
+    let a = [0] * 3;
+    let b = [0] * 3;
+    let grid2 = [a, b];
+    grid2[0][0] = 7;
+    println(f"ctl grid2[0][0]={grid2[0][0]} grid2[1][0]={grid2[1][0]}");
+    return 0;
+}

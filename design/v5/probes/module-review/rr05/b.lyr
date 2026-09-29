@@ -1,0 +1,2 @@
+import c;
+pub fn fb(): int { return 2; }

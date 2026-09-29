@@ -1,0 +1,29 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn waitBit(): void {
+    yield Wait.Now;
+}
+
+fn compute(n: int): int {
+    var s = 0;
+    var i = 0;
+    while (i < n) {
+        s = s + i * 2;
+        waitBit();
+        i += 1;
+    }
+    return s;
+}
+
+fn worker(): Coroutine<Wait> {
+    let r = compute(3);
+    println(f"worker computed {r}");
+}
+
+fn main(): int {
+    spawn(worker());
+    run();
+    println("done");
+    return 0;
+}

@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.string as strings;
+import std.time { Instant };
+fn main(): int {
+    let a = "a" * 20000;
+    let b = a + "b";
+    let c = a + "c";
+    let t0 = Instant.now();
+    let r = b < c;
+    let t1 = Instant.now();
+    println(f"{r} lt_ms={t1.epochMillis() - t0.epochMillis()}");
+    let t2 = Instant.now();
+    let e = b == c;
+    let t3 = Instant.now();
+    println(f"{e} eq_ms={t3.epochMillis() - t2.epochMillis()}");
+    let t4 = Instant.now();
+    let h = b.hash();
+    let t5 = Instant.now();
+    println(f"hash_ms={t5.epochMillis() - t4.epochMillis()}");
+    return 0;
+}

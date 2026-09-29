@@ -1,0 +1,6 @@
+// ERWARTUNG: LYR-SEM0042 — eine Implementierung darf nicht MEHR werfen als das Interface.
+class A :: [Throwable] { fn message(): string { return "A"; } }
+class B :: [Throwable] { fn message(): string { return "B"; } }
+interface Sink { fn put(x: int): void throws A; }
+class Impl :: [Sink] { fn put(x: int): void throws B { throw B { }; } }
+fn main(): int { return 0; }

@@ -1,0 +1,7 @@
+import std.test { Test, assertEq };
+import alpha.shared_tests { alphaValue };
+
+@Test
+pub fn imports_by_path(): void {
+    assertEq(alphaValue(), 1);
+}

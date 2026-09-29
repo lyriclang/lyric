@@ -1,0 +1,18 @@
+// ERWARTUNG: kompiliert; ein rethrow im catch braucht die throws-Klausel der umgebenden Funktion.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+class Wrapped :: [Throwable] { inner: string, fn message(): string { return "wrapped: " + this.inner; } }
+
+fn low(): int throws Boom { throw Boom { what = "low" }; }
+
+fn mid(): int throws Wrapped {
+    try {
+        return low();
+    } catch (e: Boom) {
+        throw Wrapped { inner = e.message() };
+    }
+}
+
+fn main(): int {
+    try { return mid(); } catch (e: Wrapped) { println(e.message()); return 0; }
+}

@@ -1,0 +1,2 @@
+pub fn ping(): int { return 1; }
+pub extend int { pub fn twice(): int { return this * 2; } }

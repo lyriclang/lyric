@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn main(): int {
+    let p = 255;
+    let n = -255;
+    let f = 3.14159;
+    println(f"x={p:x} X={p:X} b={p:b}");
+    println(f"negX={n:X} negb={n:b}");
+    println(f"e={f:e} E={f:E}");
+    println(f"dot2={f:.2}");
+    return 0;
+}

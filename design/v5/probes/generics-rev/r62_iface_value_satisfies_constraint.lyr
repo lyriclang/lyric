@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Show { fn show(): string; }
+class A :: [Show] { fn show(): string { return "A"; } }
+fn p<T :: [Show]>(x: T): string { return x.show(); }
+fn main(): int {
+  let s: Show = A {};
+  println(p<Show>(s));
+  return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct H { f: fn(int) -> int }
+fn main(): int {
+    let h = H { f = (n: int) => n + 1 };
+    println(fromInt(h.f(1)));
+    let g = h.f;
+    println(fromInt(g(10)));
+    return 0;
+}

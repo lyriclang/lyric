@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import mid;
+fn main(): int { println(mid.f()); return 0; }

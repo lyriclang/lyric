@@ -1,0 +1,18 @@
+// ERWARTUNG (§3.6 "saturates at the target's bounds"): 127 127 0 255 0 18446744073709551615 0 0 18446744073709551615 10000000000000000000 127
+import std.io.console { println };
+fn main(): int {
+  println(f"{300.0 as int8}");
+  println(f"{1e300 as int8}");
+  println(f"{(-1e300) as uint8}");
+  println(f"{300.0 as uint8}");
+  println(f"{(-5.0) as uint8}");
+  println(f"{1e300 as uint}");
+  println(f"{(-1.0) as uint}");
+  let nan = 0.0 / 0.0;
+  println(f"{nan as uint8}");
+  println(f"{2e19 as uint}");
+  println(f"{1e19 as uint}");
+  let g: float32 = 300f32;
+  println(f"{g as int8}");
+  return 0;
+}

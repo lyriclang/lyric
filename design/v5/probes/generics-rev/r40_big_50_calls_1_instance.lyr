@@ -1,0 +1,217 @@
+fn work<T>(x: T, k: int): int {
+  var s = 0;
+  var i = 0;
+  while (i < k) { s = s + i * 3; i = i + 1; }
+  var j = 0;
+  while (j < k) { s = s - j; j = j + 1; }
+  if (s > 100) { s = s / 2; }
+  if (s < 0) { s = 0 - s; }
+  var m = 0;
+  while (m < 4) { s = s + m * m; m = m + 1; }
+  return s;
+}
+struct S1 { v: int }
+struct S2 { v: int }
+struct S3 { v: int }
+struct S4 { v: int }
+struct S5 { v: int }
+struct S6 { v: int }
+struct S7 { v: int }
+struct S8 { v: int }
+struct S9 { v: int }
+struct S10 { v: int }
+struct S11 { v: int }
+struct S12 { v: int }
+struct S13 { v: int }
+struct S14 { v: int }
+struct S15 { v: int }
+struct S16 { v: int }
+struct S17 { v: int }
+struct S18 { v: int }
+struct S19 { v: int }
+struct S20 { v: int }
+struct S21 { v: int }
+struct S22 { v: int }
+struct S23 { v: int }
+struct S24 { v: int }
+struct S25 { v: int }
+struct S26 { v: int }
+struct S27 { v: int }
+struct S28 { v: int }
+struct S29 { v: int }
+struct S30 { v: int }
+struct S31 { v: int }
+struct S32 { v: int }
+struct S33 { v: int }
+struct S34 { v: int }
+struct S35 { v: int }
+struct S36 { v: int }
+struct S37 { v: int }
+struct S38 { v: int }
+struct S39 { v: int }
+struct S40 { v: int }
+struct S41 { v: int }
+struct S42 { v: int }
+struct S43 { v: int }
+struct S44 { v: int }
+struct S45 { v: int }
+struct S46 { v: int }
+struct S47 { v: int }
+struct S48 { v: int }
+struct S49 { v: int }
+struct S50 { v: int }
+fn main(): int {
+  let a1 = S1 { v = 1 };
+  let a2 = S2 { v = 2 };
+  let a3 = S3 { v = 3 };
+  let a4 = S4 { v = 4 };
+  let a5 = S5 { v = 5 };
+  let a6 = S6 { v = 6 };
+  let a7 = S7 { v = 7 };
+  let a8 = S8 { v = 8 };
+  let a9 = S9 { v = 9 };
+  let a10 = S10 { v = 10 };
+  let a11 = S11 { v = 11 };
+  let a12 = S12 { v = 12 };
+  let a13 = S13 { v = 13 };
+  let a14 = S14 { v = 14 };
+  let a15 = S15 { v = 15 };
+  let a16 = S16 { v = 16 };
+  let a17 = S17 { v = 17 };
+  let a18 = S18 { v = 18 };
+  let a19 = S19 { v = 19 };
+  let a20 = S20 { v = 20 };
+  let a21 = S21 { v = 21 };
+  let a22 = S22 { v = 22 };
+  let a23 = S23 { v = 23 };
+  let a24 = S24 { v = 24 };
+  let a25 = S25 { v = 25 };
+  let a26 = S26 { v = 26 };
+  let a27 = S27 { v = 27 };
+  let a28 = S28 { v = 28 };
+  let a29 = S29 { v = 29 };
+  let a30 = S30 { v = 30 };
+  let a31 = S31 { v = 31 };
+  let a32 = S32 { v = 32 };
+  let a33 = S33 { v = 33 };
+  let a34 = S34 { v = 34 };
+  let a35 = S35 { v = 35 };
+  let a36 = S36 { v = 36 };
+  let a37 = S37 { v = 37 };
+  let a38 = S38 { v = 38 };
+  let a39 = S39 { v = 39 };
+  let a40 = S40 { v = 40 };
+  let a41 = S41 { v = 41 };
+  let a42 = S42 { v = 42 };
+  let a43 = S43 { v = 43 };
+  let a44 = S44 { v = 44 };
+  let a45 = S45 { v = 45 };
+  let a46 = S46 { v = 46 };
+  let a47 = S47 { v = 47 };
+  let a48 = S48 { v = 48 };
+  let a49 = S49 { v = 49 };
+  let a50 = S50 { v = 50 };
+  var base = 0;
+  base = base + a1.v;
+  base = base + a2.v;
+  base = base + a3.v;
+  base = base + a4.v;
+  base = base + a5.v;
+  base = base + a6.v;
+  base = base + a7.v;
+  base = base + a8.v;
+  base = base + a9.v;
+  base = base + a10.v;
+  base = base + a11.v;
+  base = base + a12.v;
+  base = base + a13.v;
+  base = base + a14.v;
+  base = base + a15.v;
+  base = base + a16.v;
+  base = base + a17.v;
+  base = base + a18.v;
+  base = base + a19.v;
+  base = base + a20.v;
+  base = base + a21.v;
+  base = base + a22.v;
+  base = base + a23.v;
+  base = base + a24.v;
+  base = base + a25.v;
+  base = base + a26.v;
+  base = base + a27.v;
+  base = base + a28.v;
+  base = base + a29.v;
+  base = base + a30.v;
+  base = base + a31.v;
+  base = base + a32.v;
+  base = base + a33.v;
+  base = base + a34.v;
+  base = base + a35.v;
+  base = base + a36.v;
+  base = base + a37.v;
+  base = base + a38.v;
+  base = base + a39.v;
+  base = base + a40.v;
+  base = base + a41.v;
+  base = base + a42.v;
+  base = base + a43.v;
+  base = base + a44.v;
+  base = base + a45.v;
+  base = base + a46.v;
+  base = base + a47.v;
+  base = base + a48.v;
+  base = base + a49.v;
+  base = base + a50.v;
+  var t = 0;
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  t = t + work<S1>(a1, 3);
+  return (base + t) % 7;
+}

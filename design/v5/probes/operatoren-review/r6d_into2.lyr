@@ -1,0 +1,9 @@
+import std.core { Into };
+struct A { n: int }
+struct B { n: int }
+struct C :: [Into<A>, Into<B>] {
+    n: int,
+    fn into(): A { return A { n = this.n }; }
+    fn into(): B { return B { n = this.n }; }
+}
+fn main(): int { return 0; }

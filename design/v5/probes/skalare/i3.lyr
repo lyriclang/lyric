@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var x: int8 = 1i8; x += 1; println(f"{x}"); return 0; }

@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let f = () => { defer { println("d"); } println("body"); return 1; };
+    println("before");
+    let r = f();
+    println("after " + fromInt(r));
+    return 0;
+}

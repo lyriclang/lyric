@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.core { NonExhaustive };
+
+@NonExhaustive
+enum Wait { Ready, Timeout }
+
+fn f(w: Wait): int {
+    return match (w) {
+        Ready => 1,
+        Timeout => 2,
+    };
+}
+fn main(): int { println(f"{f(Wait.Ready)}"); return 0; }

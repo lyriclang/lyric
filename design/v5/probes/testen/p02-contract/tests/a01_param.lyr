@@ -1,0 +1,6 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn withParam(n: int): void {
+    assertEq(n, 1);
+}

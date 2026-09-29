@@ -1,0 +1,6 @@
+fn boom(n: int): int {
+    if (n > 1) { panic("boom"); }
+    return n;
+}
+let X: int = comptime boom(5);
+fn main(): int { return X; }

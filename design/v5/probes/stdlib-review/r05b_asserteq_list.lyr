@@ -1,0 +1,9 @@
+import std.collections { List };
+import std.test { assertEq };
+
+fn main(): int {
+    let a = List<int>.of([1, 2]);
+    let b = List<int>.of([1, 2]);
+    assertEq(a, b);
+    return 0;
+}

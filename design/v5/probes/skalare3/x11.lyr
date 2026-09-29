@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { println(f"{1.0}"); println(f"{1e21}"); println(f"{1e-7}"); println(f"{0.1f32}"); return 0; }

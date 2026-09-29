@@ -1,0 +1,3 @@
+pub struct Point { x: int }
+pub fn make(): Point { return Point { x = 4 }; }
+pub fn tag(): int { return 1; }

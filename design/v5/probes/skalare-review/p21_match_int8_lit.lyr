@@ -1,0 +1,11 @@
+// ERWARTUNG: kompiliert (AdaptLiteralType im Pattern), druckt 1
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = 5i8;
+  let r = match (a) {
+    5 => 1,
+    _ => 2,
+  };
+  println(f"{r}");
+  return 0;
+}

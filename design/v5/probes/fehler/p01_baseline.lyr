@@ -1,0 +1,24 @@
+// ERWARTUNG: kompiliert, Ausgabe: body / d2 / d1 / caught: boom, exit 0
+import std.core { Exception };
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    what: string,
+    fn message(): string { return this.what; }
+}
+
+fn work(): int throws Boom {
+    defer println("d1");
+    defer println("d2");
+    println("body");
+    throw Boom { what = "boom" };
+}
+
+fn main(): int {
+    try {
+        return work();
+    } catch (e: Boom) {
+        println("caught: " + e.message());
+        return 0;
+    }
+}

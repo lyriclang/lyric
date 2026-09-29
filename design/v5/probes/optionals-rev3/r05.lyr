@@ -1,0 +1,2 @@
+import std.test { assertEq };
+fn main(): int { let a: ?int = null; assertEq(a, null); return 0; }

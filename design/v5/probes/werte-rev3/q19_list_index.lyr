@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.collections { List };
+struct S { v: int, }
+fn main(): int {
+    var l = List<S>.empty();
+    l.push(S { v = 1 });
+    l[0].v = 9;
+    println(f"q19 list l[0].v={l[0].v} (9 = in place like S[], 1 = silent no-op on copy)");
+    var xs = [S { v = 1 }];
+    xs[0].v = 9;
+    println(f"q19 array xs[0].v={xs[0].v}");
+    return 0;
+}

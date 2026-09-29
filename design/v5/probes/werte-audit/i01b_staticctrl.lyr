@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct P {
+    x: int,
+    static let ORIGIN: P = P { x = 0 };
+}
+fn poison(): void { P.ORIGIN.x = 9; }
+fn read(): int { return P.ORIGIN.x; }
+fn main(): int {
+    println(f"i01b before={read()}");
+    poison();
+    println(f"i01b after={read()}");
+    return 0;
+}

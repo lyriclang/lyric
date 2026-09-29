@@ -1,0 +1,17 @@
+module main;
+import std.io.console { println };
+import lib;
+
+struct S { v: int, }
+
+extend S :: [lib.Named] {
+    fn name(): string { return "s"; }
+    fn other(): int { return 1; }
+}
+
+fn main(): int {
+    println((3).twice());
+    let s = S { v = 1 };
+    println(s.name());
+    return 0;
+}

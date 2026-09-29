@@ -1,0 +1,9 @@
+import std.collections { List };
+
+extend List<int> {
+    fn twice(): int { return 2; }
+}
+
+fn main(): int {
+    return 0;
+}

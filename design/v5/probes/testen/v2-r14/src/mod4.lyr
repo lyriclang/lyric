@@ -1,0 +1,2 @@
+pub fn value4(n: int): int { return n * 4; }
+pub fn other4(n: int): int { return value4(n) + 4; }

@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn take<T>(x: ?T): int { return if (x == null) 0 else 1; }
+fn main(): int {
+    let a: ?int = null;
+    println(f"{take(a)}");
+    println(f"{take<int>(5)}");
+    return 0;
+}

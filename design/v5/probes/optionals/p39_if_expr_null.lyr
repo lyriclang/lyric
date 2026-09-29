@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let c = true;
+    let v: ?int = if (c) null else 5;
+    println(f"{v ?? -1}");
+    return 0;
+}

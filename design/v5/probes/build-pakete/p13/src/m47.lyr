@@ -1,0 +1,3 @@
+module m47;
+pub fn v47(): int { return 47; }
+pub fn w47(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 47; } return s; }

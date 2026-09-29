@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int, static fn make(v: int = 3): S { return S { v = v }; } }
+fn main(): int { println(fromInt(S.make().v)); return 0; }

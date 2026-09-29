@@ -1,0 +1,30 @@
+import std.io.console { println };
+
+fn main(): int {
+    var a: int = 9223372036854775807;
+    a = a + 1;
+    println(f"int max +1 = {a}");
+
+    var b: int8 = 127i8;
+    b = b + 1i8;
+    println(f"int8 127+1 = {b}");
+
+    var c: uint8 = 255u8;
+    c = c + 1u8;
+    println(f"uint8 255+1 = {c}");
+
+    var d: int16 = 32767i16;
+    d = d * 2i16;
+    println(f"int16 32767*2 = {d}");
+
+    let mn: int = -9223372036854775808;
+    println(f"min / -1 = {mn / -1}");
+    println(f"min % -1 = {mn % -1}");
+    println(f"-min = {-mn}");
+
+    println(f"-7/2 = {-7 / 2}");
+    println(f"-7%2 = {-7 % 2}");
+    println(f"7/-2 = {7 / -2}");
+    println(f"7%-2 = {7 % -2}");
+    return 0;
+}

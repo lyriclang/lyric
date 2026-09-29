@@ -1,0 +1,29 @@
+import std.io.console { println };
+import std.io.stream { File, readSome };
+
+pub interface Reader {
+    mut fn readOne(max: int): ?uint8[];
+}
+
+pub class FileReader :: [Reader] {
+    handle: File,
+
+    pub mut fn readOne(max: int): ?uint8[] {
+        return readSome(this.handle, max);
+    }
+}
+
+pub fn drain(r: Reader): int {
+    var total = 0;
+    var got = r.readOne(16);
+    while (got != null && got.length > 0) {
+        total = total + got.length;
+        got = r.readOne(16);
+    }
+    return total;
+}
+
+fn main(): int {
+    println("compiled");
+    return 0;
+}

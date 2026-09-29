@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.collections { Indexable };
+struct Grid :: [Indexable<int>] {
+    cells: int[],
+    fn get(index: int): int { return this.cells[index]; }
+    mut fn set(index: int, value: int): void { this.cells[index] = value; }
+}
+fn main(): int {
+    let g = Grid { cells = [1, 2, 3] };
+    g[0] = 9;
+    println(f"j01 g[0]={g[0]}");
+    return 0;
+}

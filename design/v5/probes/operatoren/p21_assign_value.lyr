@@ -1,0 +1,5 @@
+fn main(): int {
+    var y = 0;
+    let x = (y = 3);
+    return x;
+}

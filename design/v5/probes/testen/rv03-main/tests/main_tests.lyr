@@ -1,0 +1,10 @@
+import std.test { Test, assertEq };
+import std.io.console { println };
+
+fn main(): int {
+    println("main ran");
+    return 0;
+}
+
+@Test
+pub fn one(): void { assertEq(1, 1); }

@@ -1,0 +1,9 @@
+module main;
+import std.io.console { println };
+import lib;
+
+fn main(): int {
+    let t = 42 as lib.Ticket;
+    println(t as int);
+    return 0;
+}

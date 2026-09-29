@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface Marker { }
+struct M :: [Marker] { n: int = 0 }
+fn main(): int {
+    let m = M { };
+    println(m.n.show());
+    return 0;
+}

@@ -1,0 +1,2 @@
+pub import lib { f };
+fn main(): int { return f(); }

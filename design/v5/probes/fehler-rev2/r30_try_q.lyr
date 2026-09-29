@@ -1,0 +1,4 @@
+// ERWARTUNG: 'try?' gibt es nicht -> LYR-PAR0002.
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { throw Boom { }; }
+fn main(): int { let n = try? f(); return 0; }

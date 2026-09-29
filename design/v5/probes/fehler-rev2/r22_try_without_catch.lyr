@@ -1,0 +1,6 @@
+// ERWARTUNG: LYR-PAR0023 und LYR-SEM0036 — zwei Diagnosen fuer einen Fehler.
+import std.io.console { println };
+fn main(): int {
+    try { println("body"); }
+    return 0;
+}

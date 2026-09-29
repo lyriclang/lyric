@@ -1,0 +1,31 @@
+import std.io.console { println };
+
+extern "dotnet" fn ms(): int = "System.Environment::get_TickCount64";
+extern "dotnet" fn ticks(): int = "System.Diagnostics.Stopwatch::GetTimestamp";
+
+fn main(): int {
+    // Aufloesung der ms-Uhr: warte auf den naechsten Sprung, fuenfmal
+    var k = 0;
+    while (k < 5) {
+        let t0 = ms();
+        var t1 = t0;
+        while (t1 == t0) { t1 = ms(); }
+        println(f"tickcount-step-ms={t1 - t0}");
+        k = k + 1;
+    }
+    // Aufloesung der Stopwatch-Uhr
+    let s0 = ticks();
+    var s1 = s0;
+    while (s1 == s0) { s1 = ticks(); }
+    println(f"stopwatch-step-ticks={s1 - s0}");
+    // Kalibrierung: Stopwatch-Ticks je Millisekunde, ueber ~500 ms
+    let a0 = ms();
+    var a1 = a0;
+    while (a1 == a0) { a1 = ms(); }      // an eine Flanke heran
+    let p0 = ticks();
+    var b = a1;
+    while (b - a1 < 500) { b = ms(); }
+    let p1 = ticks();
+    println(f"calib-ms={b - a1} calib-ticks={p1 - p0}");
+    return 0;
+}

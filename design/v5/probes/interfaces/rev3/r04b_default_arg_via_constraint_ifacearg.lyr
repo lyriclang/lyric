@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Greeter { fn greet(who: string = "world"): string; }
+class C :: [Greeter] { fn greet(who: string): string { return "hi " + who; } }
+fn viaT<T :: [Greeter]>(x: T): string { return x.greet(); }
+fn main(): int {
+    let g: Greeter = C { };
+    println(viaT(g));
+    return 0;
+}

@@ -1,0 +1,2 @@
+module b;
+pub fn h(): int { return 2; }

@@ -1,0 +1,9 @@
+// Q12b — KONTROLLE zu q12: ein gegattetes Modul mit '--grant none'.
+// ERWARTUNG: Abweisung beim Laden (LoadedProgram.cs:77-82).
+import std.io.console { println };
+import std.io.file { text };
+
+fn main(): int {
+    println(f"gelesen = {text("q12b_control.lyr") ?? "<nichts>"}");
+    return 0;
+}

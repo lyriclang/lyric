@@ -1,0 +1,2 @@
+module mlibz;
+pub fn area(r: int): string { return "z-int"; }

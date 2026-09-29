@@ -1,0 +1,12 @@
+import std.io.console { println };
+struct Id {
+    v: int,
+    static fn of(n: int): Id { return Id { v = n }; }
+    static fn of(s: string): Id { return Id { v = 0 }; }
+}
+fn main(): int {
+    let a = Id.of(7);
+    let b = Id.of("seven");
+    println("ok");
+    return a.v + b.v;
+}

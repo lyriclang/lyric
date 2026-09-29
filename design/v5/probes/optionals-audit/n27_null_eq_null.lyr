@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    if (null == null) { println("eq"); }
+    return 0;
+}

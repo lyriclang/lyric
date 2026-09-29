@@ -1,0 +1,5 @@
+fn main(): int {
+    var xs = [1, 2, 3];
+    xs[0]++;
+    return xs[0];
+}

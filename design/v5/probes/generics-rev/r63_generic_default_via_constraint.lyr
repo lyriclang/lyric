@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface Seq<T> {
+  fn at(i: int): T;
+  fn first(): T { return this.at(0); }
+}
+class L :: [Seq<int>] { fn at(i: int): int { return 42 + i; } }
+fn f<S :: [Seq<int>]>(s: S): int { return s.first(); }
+fn main(): int { println(f(L {})); return 0; }

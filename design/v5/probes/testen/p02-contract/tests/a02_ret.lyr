@@ -1,0 +1,6 @@
+import std.test { Test };
+
+@Test
+pub fn returnsInt(): int {
+    return 7;
+}

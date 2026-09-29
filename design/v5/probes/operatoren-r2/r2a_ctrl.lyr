@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct Box { n: int, }
+fn main(): int {
+    var b = Box { n = 10 };
+    b.n += 1;
+    var xs = [10, 20];
+    xs[0] += 1;
+    println(fromInt(b.n));
+    println(fromInt(xs[0]));
+    return 0;
+}

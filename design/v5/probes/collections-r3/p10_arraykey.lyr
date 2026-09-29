@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.collections { Map };
+fn main(): int {
+    let m = Map<int[], string>.empty();
+    m.set([1,2], "a");
+    println("ok");
+    return 0;
+}

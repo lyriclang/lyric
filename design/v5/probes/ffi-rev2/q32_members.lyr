@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.string;
+extern "dotnet" fn nlOk(): string = "System.Environment::get_NewLine";
+fn main(): int { println(f"len={nlOk().length()}"); return 0; }

@@ -1,0 +1,3 @@
+module main;
+import std.io.console { println };
+fn main(): int { println("OUTER"); return 0; }

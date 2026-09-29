@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct S { v: int, }
+extend S { mut fn bump(): void { this.v = this.v + 1; } }
+fn main(): int { let s = S { v = 1 }; s.bump(); println(f"q21 extend s.v={s.v}"); return 0; }

@@ -1,0 +1,23 @@
+// R3j — Was kostet ein string gegen ein char[]? 2^24 Zeichen: string per Verdopplung (24 Runden),
+// char[] per ['a'] * n. ERWARTUNG: string ~32 MB + Verdopplungsmuell, char[] ~256 MB (16 B/Element).
+// Argument "s" = string, "c" = char[].
+import std.io.console { println };
+fn main(args: string[]): int {
+    let n = 16777216;
+    if (args.length > 0 && args[0] == "s") {
+        var s = "a";
+        var r = 0;
+        while (r < 24) { s = s + s; r += 1; }
+        var runden = 0;
+        while (runden < 3) { runden += 1; }
+        println("string fertig");
+    } else if (args.length > 0) {
+        let cs = ['a'] * n;
+        var runden = 0; var sum = 0;
+        while (runden < 3) { var i = 0; while (i < cs.length) { if (cs[i] == 'a') { sum += 1; } i += 1; } runden += 1; }
+        println(f"chars = {cs.length} sum={sum}");
+    } else {
+        println("leer");
+    }
+    return 0;
+}

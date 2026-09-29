@@ -1,0 +1,19 @@
+import std.test { Test, assertEq };
+import std.io.console { println };
+
+fn announce(): int {
+    println("module init ran");
+    return 1;
+}
+
+pub let SEED = announce();
+
+@Test
+pub fn first(): void {
+    assertEq(SEED, 1);
+}
+
+@Test
+pub fn second(): void {
+    assertEq(SEED, 1);
+}

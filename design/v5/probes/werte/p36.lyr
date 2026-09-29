@@ -1,0 +1,12 @@
+import std.io.console { println };
+struct Inner { x: int, mut fn bump(): void { this.x = this.x + 1; } }
+struct Outer { i: Inner, }
+fn main(): int {
+    var o = Outer { i = Inner { x = 1 } };
+    o.i.bump();
+    println(f"nested mut fn write-back: o.i.x = {o.i.x}");
+    let p = Outer { i = Inner { x = 1 } };
+    p.i = Inner { x = 5 };
+    println(f"let struct whole-field assign: p.i.x = {p.i.x}");
+    return 0;
+}

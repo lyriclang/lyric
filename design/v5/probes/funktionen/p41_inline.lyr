@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn small(n: int): int { return n + 1; }
+fn main(): int {
+    println(fromInt(small(41)));
+    return 0;
+}

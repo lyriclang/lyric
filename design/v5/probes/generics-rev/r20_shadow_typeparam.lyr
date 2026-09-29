@@ -1,0 +1,8 @@
+class Box<T> {
+  v: T,
+  fn f<T>(x: T): int { return 1; }
+}
+fn main(): int {
+  let b = Box<int> { v = 5 };
+  return b.f<string>("x");
+}

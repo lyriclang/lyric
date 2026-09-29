@@ -1,0 +1,10 @@
+// R9 — Gibt es Gleichheit auf einem Struct ohne eigenes Equatable?
+// Erwartung: LYR-SEM0003 oder aehnlich (== ist nicht auf jedem Struct definiert)
+import std.io.console { println };
+struct P { x: int, y: int, }
+fn main(): int {
+    let a = P { x = 1, y = 2 };
+    let b = P { x = 1, y = 2 };
+    println(f"{a == b}");
+    return 0;
+}

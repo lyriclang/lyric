@@ -1,0 +1,26 @@
+Erwartungen VOR dem Lauf (r4):
+q10: concat 5 5 (teilt) | slice 2 9 (kopiert) | assign 1 3 (kopiert) | int-ctl 2 99
+q11: rest xs[1].x=9 (teilt) | list xs[0].x=1 back[0].x=7 (kopiert)
+q09: 9 9 (flach)
+q06: read-copy 7 42 | shared 7
+q05: LYR-SEM0007 '?int[]' is not iterable
+p21: 3 3 (Iterable gewinnt)
+p12b: range 3, array 3 (einmal ausgewertet)
+p13c: 1 2 3 ; p13d: SEM0001
+p18: panic VM0006 negative
+p14: SEM0010 ; q08: SEM0009
+p26: 7 7
+p11 disasm: call, kein callvirt
+p16: SEM0091
+p12: SEM0019
+q07: panic 'exceeds the array size limit'
+--- r4-Proben, Erwartung VOR dem Lauf:
+r4_01: LYR-CLI0020 (i32 index, expected i64)
+r4_02: [] * 3 ist SEM0010; r4_02b: filled 0 / emptyrep 0
+r4_03: count([]) Inferenzfehler (SEM0010 oder T unbestimmt); r4_03b: 0 0
+r4_04: empty / one 1 / many from 1 ; r4_04b: Nicht-Erschoepfung als Fehler
+r4_05: concat-Schleife Hunderte ms, List deutlich kleiner
+r4_06: 1 99 3 (Array wird waehrend der Koroutine live gelesen)
+r4_07: int rest xs[1]=2 rest[0]=99 (Slots kopiert)
+r4_08: 42 (let schuetzt Slots nicht)
+Erwartung r4_09: count < int.MaxValue passiert den Guard; die 32-GB-Allokation scheitert -> entweder LYR-VM0006-Panik ('cannot allocate') oder eine unbehandelte OutOfMemoryException

@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn touch(params xs: int[]): int { xs[0] = 99; return xs.length; }
+fn main(): int {
+    var arr: int[] = [1, 2, 3];
+    let n = touch(arr);
+    println(fromInt(n));
+    println(fromInt(arr[0]));
+    return 0;
+}

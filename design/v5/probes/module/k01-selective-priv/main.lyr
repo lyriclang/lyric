@@ -1,0 +1,3 @@
+import lib { hidden };
+
+fn main(): int { return hidden(); }

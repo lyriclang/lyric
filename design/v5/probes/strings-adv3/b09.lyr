@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let a: int32 = -7;
+    let u: uint8 = 200;
+    let f: float32 = 1.5;
+    println(f"[{a:8}] [{u:X}] [{f:F3}] [{a:X}]");
+    return 0;
+}

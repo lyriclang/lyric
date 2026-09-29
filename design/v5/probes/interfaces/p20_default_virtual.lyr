@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Greeter {
+    fn name(): string;
+    fn greet(): string { return "Hello, " + this.name(); }
+}
+
+class Casual :: [Greeter] { fn name(): string { return "Grace"; } }
+
+fn main(): int {
+    let g: Greeter = Casual { };
+    println(g.greet());
+    println(Casual { }.greet());
+    return 0;
+}

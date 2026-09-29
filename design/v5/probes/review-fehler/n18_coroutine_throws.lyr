@@ -1,0 +1,14 @@
+// ERWARTUNG: eine werfende Koroutine braucht 'throws' am Typ; der Wurf kommt beim resume an.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn gen(): Coroutine<int> throws Boom {
+    defer println("coroutine cleanup");
+    yield 1;
+    throw Boom { };
+}
+fn main(): int {
+    let c = gen();
+    println(f"first {resume c}");
+    try { println(f"second {resume c}"); return 1; }
+    catch (e: Boom) { println(f"caught {e.message()}"); return 0; }
+}

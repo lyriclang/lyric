@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn main(): int {
+    let direct = '😀';
+    let esc = '\u{1F600}';
+    println(f"{direct as int} {esc as int}");
+    return 0;
+}

@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.string { fromInt };
+interface Greeter { fn greet(name: string, greeting: string = "Hi"): string; }
+struct S :: [Greeter] {
+    v: int,
+    fn greet(name: string, greeting: string = "Hi"): string { return greeting + name; }
+    static fn make(v: int = 3): S { return S { v = v }; }
+}
+fn main(): int {
+    let s = S.make();
+    println(s.greet("A"));
+    let g: Greeter = s;
+    println(g.greet("B"));
+    println(fromInt(s.v));
+    return 0;
+}

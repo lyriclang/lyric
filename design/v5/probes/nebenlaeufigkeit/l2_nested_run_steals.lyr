@@ -1,0 +1,29 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn sibling(): Coroutine<Wait> {
+    println("sibling step 1");
+    yield Wait.Now;
+    println("sibling step 2");
+}
+
+fn inner(): Coroutine<Wait> {
+    println("inner runs");
+}
+
+fn outer(): Coroutine<Wait> {
+    println("outer: starting nested run");
+    spawn(inner());
+    run();
+    println("outer: nested run returned");
+    yield Wait.Now;
+    println("outer done");
+}
+
+fn main(): int {
+    spawn(outer());
+    spawn(sibling());
+    run();
+    println("main done");
+    return 0;
+}

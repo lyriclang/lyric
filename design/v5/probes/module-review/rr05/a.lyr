@@ -1,0 +1,2 @@
+import b;
+pub fn fa(): int { return 1; }

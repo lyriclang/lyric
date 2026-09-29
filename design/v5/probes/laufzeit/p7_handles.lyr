@@ -1,0 +1,22 @@
+// P7 — Ein File-Handle ist ein opaque int in einer VM-Tabelle. Was passiert ohne close?
+// Erwartung VOR dem Lauf: alle 5000 open gelingen, nichts wird zurueckgegeben, und der
+// Prozess-Handlecount steigt um ~5000 — der GC kann die Tabelle nicht raeumen.
+import std.io.console { println };
+import std.io.stream { open, close, File };
+
+fn main(args: string[]): int {
+    var n = 0;
+    if (args.length > 0) { n = 5000; }
+    var i = 0;
+    var ok = 0;
+    var behalten: ?File = null;
+    while (i < n) {
+        let f = open("data.txt");
+        if (f != null) { ok += 1; behalten = f; }
+        i += 1;
+    }
+    println(f"geoeffnet={ok} ohne close");
+    var j = 0;
+    while (j < 30000000) { j += 1; }
+    return 0;
+}

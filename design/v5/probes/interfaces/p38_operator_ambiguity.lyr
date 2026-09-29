@@ -1,0 +1,17 @@
+import std.core { Mul };
+import std.io.console { println };
+
+struct V :: [Mul<int, V>] {
+    x: int,
+    fn mul(other: int): V { return V { x = this.x * other }; }
+}
+
+extend V :: [Mul<int, int>] {
+    fn mul(other: int): int { return this.x * other; }
+}
+
+fn main(): int {
+    let v = V { x = 3 };
+    println(f"{(v * 2).x}");
+    return 0;
+}

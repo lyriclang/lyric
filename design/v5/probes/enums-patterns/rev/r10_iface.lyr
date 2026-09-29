@@ -1,0 +1,11 @@
+import std.io.console { println };
+interface Draw { fn area(): int; }
+struct Sq :: [Draw] { s: int; fn area(): int { return this.s * this.s; } }
+struct Ci :: [Draw] { r: int; fn area(): int { return this.r * 3; } }
+fn f(d: Draw): int {
+    return match (d) {
+        Sq { s } => s,
+        Ci { r } => r,
+    };
+}
+fn main(): int { println(f"{f(Sq { s = 4 })}"); return 0; }

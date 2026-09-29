@@ -1,0 +1,18 @@
+// E — Wird ein Struct beim EINFANGEN in eine Closure kopiert? Spec 07:82 sagt: ein 'let' wird
+// "als sein Wert" gefangen. Fuer ein Struct hiesse das eine Kopie.
+// ERWARTUNG VOR DEM LAUF (LoadCaptured laedt den Slot; keine der drei Kopierstellen greift):
+//   letCapture = 1   (Alias: l.hoch() nach dem Fangen ist in f() sichtbar)  -> Familie Nr. 4
+//   KONTROLLE frischeKopie = 0 (let k = l; ist eine Bindung -> kopiert; k bleibt 0)
+import std.io.console { println };
+struct Zaehler { n: int, mut fn hoch(): void { this.n += 1; } fn wert(): int { return this.n; } }
+fn main(): int {
+    let l = Zaehler { n = 0 };
+    let f = () => l.wert();
+    l.hoch();
+    println(f"letCapture   = {f()}");
+    let m = Zaehler { n = 0 };
+    let k = m;
+    m.hoch();
+    println(f"frischeKopie = {k.wert()}");
+    return 0;
+}

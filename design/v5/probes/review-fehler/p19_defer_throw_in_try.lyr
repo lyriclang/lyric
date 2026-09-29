@@ -1,0 +1,13 @@
+// ERWARTUNG (PLAN.md B, "Rest-ICEs aus gueltigem Code: defer { throw } in try"): ICE.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn main(): int {
+    try {
+        defer { throw Boom { what = "from defer" }; }
+        println("body");
+    } catch (e: Boom) {
+        println(f"caught {e.message()}");
+        return 0;
+    }
+    return 1;
+}

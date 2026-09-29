@@ -1,0 +1,4 @@
+import std.io.console { println };
+interface Tag { fn tag(): string; }
+extend int :: [Tag] { fn tag(): string { return "own-conf"; } }
+fn main(): int { let n = 3; println(n.tag()); return 0; }

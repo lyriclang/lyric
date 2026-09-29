@@ -1,0 +1,18 @@
+Erwartungen VOR dem Lauf (Dossier-Behauptungen):
+r01 float range 1.5..4.5   -> 1,2,3
+r02 float range 0.0..0.5   -> 0 Durchlaeufe
+r03 char range 'a'..'e'    -> a,b,c,d
+r04 int32 index xs[i]      -> LYR-CLI0020 ICE
+r05 char index             -> LYR-CLI0020 ICE
+r06 [[0]*3]*2 alias        -> grid[1][0]==5
+r07 for (kv in m) Map      -> LYR-SEM0007
+r08 extend int[]           -> akzeptiert, Aufruf LYR-SEM0012
+r09 for (n in (0..3))      -> akzeptiert
+r10 xs == ys               -> LYR-SEM0059
+r11 xs[0]++                -> LYR-IR0001
+r12 Iterator zweimal       -> 3 dann 0 Durchlaeufe
+r13 params aliasing        -> Callee schreibt ins Array des Aufrufers
+r14 [first,..rest] kopiert -> xs unberuehrt
+r15 List<int> = [1,2,3]    -> LYR-SEM0001
+r16 for ueber ?int[]       -> abgelehnt
+r17 int[3]                 -> LYR-PAR0043

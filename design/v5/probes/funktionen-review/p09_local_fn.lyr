@@ -1,0 +1,4 @@
+fn main(): int {
+    fn helper(n: int): int { return n + 1; }
+    return helper(1);
+}

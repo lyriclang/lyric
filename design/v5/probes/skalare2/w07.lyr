@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let xs = [1, 2, 3]; let j: int8 = 1i8; println(f"{xs[j]}"); return 0; }

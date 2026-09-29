@@ -1,0 +1,4 @@
+// ERWARTUNG: throw eines ?Boom ist SEM0030 (kein Throwable).
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { let e: ?Boom = Boom { }; throw e; }
+fn main(): int { try { return f(); } catch (_: Boom) { return 0; } }

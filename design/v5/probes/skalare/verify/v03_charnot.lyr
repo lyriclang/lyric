@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let a: char = 'a';
+    let n = ~a;
+    println(f"{n as int}");
+    return 0;
+}

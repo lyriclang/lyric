@@ -1,0 +1,31 @@
+import std.io.console { println };
+
+interface Drawable {
+    fn draw(): string;
+}
+
+class Circle :: [Drawable] {
+    r: int,
+    fn draw(): string { return "circle"; }
+}
+
+class Square :: [Drawable] {
+    s: int,
+    fn draw(): string { return "square"; }
+}
+
+class Holder {
+    d: Drawable,
+}
+
+fn show(d: Drawable): void { println(d.draw()); }
+
+fn main(): int {
+    let xs: Drawable[] = [Circle { r = 1 }, Square { s = 2 }];
+    for (x in xs) { show(x); }
+    let o: ?Drawable = Circle { r = 3 };
+    println(o!.draw());
+    let h = Holder { d = Square { s = 4 } };
+    println(h.d.draw());
+    return 0;
+}

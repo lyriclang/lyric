@@ -1,0 +1,12 @@
+module mine;
+
+import std.core { OnFunction };
+
+pub struct Test :: [OnFunction] { }
+
+@Test
+pub fn notReallyATest(): void {
+    panic("but the runner ran me");
+}
+
+fn main(): int { return 0; }

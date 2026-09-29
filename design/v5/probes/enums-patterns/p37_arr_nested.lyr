@@ -1,0 +1,13 @@
+import std.io.console { println };
+enum Tok { Word(string), Num(int) }
+fn f(ts: Tok[]): int {
+    return match (ts) {
+        [Word("add"), Num(a), Num(b)] => a + b,
+        [Num(n), ..] => n,
+        _ => -1,
+    };
+}
+fn main(): int {
+    println(f"{f([Tok.Word(\u0022add\u0022), Tok.Num(2), Tok.Num(3)])}");
+    return 0;
+}

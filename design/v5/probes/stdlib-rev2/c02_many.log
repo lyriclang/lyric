@@ -1,0 +1,29 @@
+c02_many.lyr:2:19: warning[LYR-SEM0072]: import 'parse' is never used
+import std.json { parse };
+                  ^^^^^
+
+c02_many.lyr:3:26: warning[LYR-SEM0072]: import 'List' is never used
+import std.collections { List };
+                         ^^^^
+
+c02_many.lyr:4:19: warning[LYR-SEM0072]: import 'over' is never used
+import std.iter { over };
+                  ^^^^
+
+c02_many.lyr:5:23: warning[LYR-SEM0072]: import 'base64Encode' is never used
+import std.encoding { base64Encode };
+                      ^^^^^^^^^^^^
+
+c02_many.lyr:6:18: warning[LYR-SEM0072]: import 'formatInt' is never used
+import std.fmt { formatInt };
+                 ^^^^^^^^^
+
+c02_many.lyr:7:19: warning[LYR-SEM0072]: import 'sqrt' is never used
+import std.math { sqrt };
+                  ^^^^
+
+c02_many.lyr:8:19: warning[LYR-SEM0072]: import 'sha256' is never used
+import std.hash { sha256 };
+                  ^^^^^^
+
+c02_many.lyrbc: 3942 bytes

@@ -1,0 +1,62 @@
+Lyric 4.6.0 — :help for commands, :quit to leave
+lyr> repl[1].lyr:3:1: error[LYR-PAR0002]: expected an expression, got Fn
+fn main(): int { return 0; }
+^^
+
+repl[1].lyr:3:4: error[LYR-PAR0016]: expected ';'
+fn main(): int { return 0; }
+   ^^^^
+
+repl[1].lyr:3:4: error[LYR-SEM0002]: unknown identifier 'main'
+fn main(): int { return 0; }
+   ^^^^
+
+repl[1].lyr:3:10: error[LYR-PAR0002]: expected an expression, got Colon
+fn main(): int { return 0; }
+         ^
+
+repl[1].lyr:3:10: error[LYR-PAR0016]: expected ';'
+fn main(): int { return 0; }
+         ^
+
+repl[1].lyr:3:12: error[LYR-PAR0016]: expected ';'
+fn main(): int { return 0; }
+           ^^^
+
+repl[1].lyr:3:12: error[LYR-SEM0052]: 'int' is a type, not a value
+fn main(): int { return 0; }
+           ^^^
+
+repl[1].lyr:3:12: error[LYR-SEM0022]: expression statement has no effect (only calls, assignments and resume are allowed)
+fn main(): int { return 0; }
+           ^^^^^
+
+repl[1].lyr:3:16: error[LYR-PAR0016]: expected ';'
+fn main(): int { return 0; }
+               ^
+
+repl[1].lyr:4:1: error[LYR-PAR0018]: expected '}' to close block
+
+^
+
+lyr> repl[2].lyr:3:12: error[LYR-SEM0002]: unknown identifier 'a'
+    return a + b;
+           ^
+
+repl[2].lyr:3:16: error[LYR-SEM0002]: unknown identifier 'b'
+    return a + b;
+               ^
+
+lyr> repl[3].lyr:2:1: error[LYR-SEM0017]: not all code paths of 'main' return a value
+fn main(): int {
+^
+
+repl[3].lyr:4:5: error[LYR-PAR0025]: expected a declaration, got Return
+    return 0;
+    ^^^^^^
+
+lyr> repl[5].lyr:3:5: error[LYR-SEM0002]: unknown identifier 'add'
+    add(2, 3);
+    ^^^
+
+lyr> 

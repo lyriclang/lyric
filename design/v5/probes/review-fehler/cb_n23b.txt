@@ -1,0 +1,2 @@
+error[LYR-CLI0020]: ir-verifier (after the lowering): malformed IR (1 finding(s))␊  main.f: bb0: terminator: throws t1 (enum ty0); only class and interface values are throwable — this is a defect in the compiler, not in the program. Please report it with the source that produced it.
+

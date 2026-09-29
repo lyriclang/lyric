@@ -1,0 +1,3 @@
+module mext;
+pub struct S { v: int, }
+pub extend S { fn m(x: int): string { return "mext-int"; } }

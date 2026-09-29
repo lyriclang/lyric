@@ -1,0 +1,15 @@
+import std.io.console { println };
+struct S { v: int, }
+fn gen(): Coroutine<S> {
+    var s = S { v = 1 };
+    yield s;
+    yield s;
+}
+fn main(): int {
+    let c = gen();
+    var got = resume c;
+    got.v = 9;
+    var again = resume c;
+    println(f"q11 yield again.v={again.v} (1 = copied, 9 = shared)");
+    return 0;
+}

@@ -1,0 +1,4 @@
+fn main(): int {
+    let n = 3 + 4; /* a */ /* b */
+    return n - 7;
+}

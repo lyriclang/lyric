@@ -1,0 +1,28 @@
+// P2b — KONTROLLE zu P2: kopiert das Einpacken in ein ?S, oder kopiert erst das Auspacken?
+// Erwartung VOR dem Lauf:
+//   inA   -> ?   wenn das Einpacken kopiert: 1; wenn es teilt: 99
+//   alias -> ?   zwei Optionals auf demselben Wert
+import std.io.console { println };
+
+struct S { n: int, }
+class C { s: S, }
+
+fn main(): int {
+    var a = S { n = 1 };
+    let opt: ?S = a;
+    a.n = 99;
+    println(f"inA   = {opt!.n}");
+
+    var o1: ?S = S { n = 1 };
+    var o2 = o1;
+    o2!.n = 99;
+    println(f"alias = {o1!.n}");
+    println(f"self  = {o2!.n}");
+
+    let c = C { s = S { n = 1 } };
+    var t = c.s;
+    t.n = 99;
+    println(f"field = {c.s.n}");
+
+    return 0;
+}

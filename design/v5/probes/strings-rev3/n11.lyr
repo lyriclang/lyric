@@ -1,0 +1,5 @@
+import std.io.console { println };
+import std.core { Display };
+struct P { x: int }
+extend P :: [Display] { fn show(): string { return "P"; } }
+fn main(): int { let p = P { x = 1 }; println(f"{p:N2}"); println(f"{[1, 2]}"); return 0; }

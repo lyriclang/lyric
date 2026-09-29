@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int, fn area(): int { return this.r; } }
+
+fn main(): int {
+    let c = Circle { r = 1 };
+    let a: Shape = c;
+    let b: Shape = c;
+    let x: ?Shape = null;
+    if (x == null) { println("null ok"); }
+    println(f"{a.area()}");
+    return 0;
+}

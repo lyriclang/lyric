@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct I { x: int, }
+struct S { v: int, inner: I, fn deep(): void { this.inner.x = 9; } }
+fn main(): int {
+    let s = S { v = 1, inner = I { x = 1 } };
+    s.deep();
+    println(f"q16 let s.inner.x={s.inner.x}");
+    return 0;
+}

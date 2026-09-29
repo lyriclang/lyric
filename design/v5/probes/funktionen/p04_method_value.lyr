@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct Counter { n: int, fn get(): int { return this.n; } }
+fn call(f: fn() -> int): int { return f(); }
+fn main(): int {
+    let c = Counter { n = 5 };
+    let f = c.get;
+    return call(f);
+}

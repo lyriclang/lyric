@@ -1,0 +1,10 @@
+// ERWARTUNG: Panik im Callee, defer im Caller: kein "DEFER", Exit 101 (spec 7.5: panic runs no defers).
+import std.io.console { println };
+import std.core { panic };
+fn inner(): void { panic("boom"); }
+fn main(): int {
+    defer println("DEFER");
+    println("body");
+    inner();
+    return 0;
+}

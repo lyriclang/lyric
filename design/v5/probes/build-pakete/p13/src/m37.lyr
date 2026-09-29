@@ -1,0 +1,3 @@
+module m37;
+pub fn v37(): int { return 37; }
+pub fn w37(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 37; } return s; }

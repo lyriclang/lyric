@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn main(): int {
+    println(5);
+    let u: uint = 5;
+    println(f"uint in fstring = {u}");
+    let n: int8 = 7i8;
+    println(f"int8 spec = {n:D4}");
+    let c: char = 'x';
+    println(c);
+    return 0;
+}

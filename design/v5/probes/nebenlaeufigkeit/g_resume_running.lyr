@@ -1,0 +1,20 @@
+import std.io.console { println };
+
+var self_: ?Coroutine<int> = null;
+
+fn body(): Coroutine<int> {
+    let me = self_;
+    if (me != null) {
+        println("about to resume myself");
+        let v = resume me;
+        println(f"got {v}");
+    }
+    yield 1;
+}
+
+fn main(): int {
+    let co = body();
+    self_ = co;
+    println(f"{resume co}");
+    return 0;
+}

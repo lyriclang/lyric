@@ -1,0 +1,11 @@
+import std.io.console { println };
+class Box<T> {
+    v: T,
+    fn map<U>(f: fn(T) -> U): Box<U> { return Box<U> { v = f(this.v) }; }
+}
+fn main(): int {
+    let b = Box<int> { v = 2 };
+    let s = b.map<string>((n) => f"n={n}");
+    println(s.v);
+    return 0;
+}

@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn run(f: fn(int) -> int): int { return f(2); }
+fn main(): int {
+    let triple = x => x * 3;
+    let r = run { it + 7 };
+    println(fromInt(triple(r)));
+    return 0;
+}

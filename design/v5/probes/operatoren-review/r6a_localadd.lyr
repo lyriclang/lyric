@@ -1,0 +1,10 @@
+interface Add<T, R> { fn add(other: T): R; }
+struct V :: [Add<V, V>] {
+    n: int,
+    fn add(other: V): V { return V { n = this.n + other.n }; }
+}
+fn main(): int {
+    let a = V { n = 1 };
+    let b = V { n = 2 };
+    return (a + b).n;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface Marker { }
+struct M :: [Marker] { n: int = 0 }
+fn tag<T :: [Marker]>(x: T): string { return "tagged"; }
+fn main(): int {
+    println(tag(M { }));
+    return 0;
+}

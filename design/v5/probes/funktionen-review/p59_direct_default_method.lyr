@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct S { v: int, fn greet(name: string, greeting: string = "Hi"): string { return greeting + name; } }
+fn main(): int {
+    let s = S { v = 1 };
+    println(s.greet("A"));
+    return 0;
+}

@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let xs = [1, 2, 3]; let u: uint = 1 as uint; println(f"{xs[u]}"); return 0; }

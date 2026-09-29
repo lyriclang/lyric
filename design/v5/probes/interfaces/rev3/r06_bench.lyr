@@ -1,0 +1,30 @@
+import std.io.console { println };
+import std.os { nowNanos };
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { r: int = 2, fn area(): int { return this.r; } }
+fn direct(c: Circle, n: int): int {
+    var acc = 0; var i = 0;
+    while (i < n) { acc = acc + c.area(); i = i + 1; }
+    return acc;
+}
+fn viaIface(s: Shape, n: int): int {
+    var acc = 0; var i = 0;
+    while (i < n) { acc = acc + s.area(); i = i + 1; }
+    return acc;
+}
+fn main(): int {
+    let n = 3000000;
+    let c = Circle { };
+    let s: Shape = c;
+    let t0 = nowNanos();
+    let a = direct(c, n);
+    let t1 = nowNanos();
+    let b = viaIface(s, n);
+    let t2 = nowNanos();
+    let a2 = direct(c, n);
+    let t3 = nowNanos();
+    let b2 = viaIface(s, n);
+    let t4 = nowNanos();
+    println(f"direct {(t1 - t0) / 1000000}ms iface {(t2 - t1) / 1000000}ms direct2 {(t3 - t2) / 1000000}ms iface2 {(t4 - t3) / 1000000}ms sum {a + b + a2 + b2}");
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+class Node<T> { v: T, next: ?Node<T> }
+fn len(n: ?Node<int>): int { if (n == null) { return 0; } return 1 + len(n.next); }
+fn main(): int {
+  let c = Node<int> { v = 3, next = null };
+  let b = Node<int> { v = 2, next = c };
+  let a = Node<int> { v = 1, next = b };
+  println(f"{len(a)}");
+  return 0;
+}

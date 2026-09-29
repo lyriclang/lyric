@@ -1,0 +1,3 @@
+struct S { x: int, }
+extern "dotnet" fn takes(s: S): int = "Some::Thing";
+fn main(): int { return 0; }

@@ -1,0 +1,1 @@
+{ "name": "app", "sourceRoot": "src", "dependencies": { "geo": "../geoA", "midl": "../midl" } }

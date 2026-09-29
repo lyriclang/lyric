@@ -1,0 +1,9 @@
+// ERWARTUNG (Spec 7.5): std.os.exit laeuft keine defers -> "d" wird NICHT gedruckt, exit 3.
+import std.io.console { println };
+import std.os { exit };
+fn main(): int {
+    defer println("d");
+    println("before");
+    exit(3);
+    return 0;
+}

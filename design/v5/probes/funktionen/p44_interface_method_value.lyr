@@ -1,0 +1,11 @@
+import std.io.console { println };
+interface Speaker { fn speak(): string }
+struct Dog :: [Speaker] { n: int, fn speak(): string { return "woof"; } }
+fn call(f: fn() -> string): string { return f(); }
+fn main(): int {
+    let d = Dog { n = 1 };
+    let s: Speaker = d;
+    let f = s.speak;
+    println(call(f));
+    return 0;
+}

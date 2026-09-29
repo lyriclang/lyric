@@ -1,0 +1,2 @@
+method-trailing
+method-trailing-no-semi

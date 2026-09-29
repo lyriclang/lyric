@@ -1,0 +1,25 @@
+// Q4 — Ist die Iterationsreihenfolge einer Map reproduzierbar?
+// ERWARTUNG VOR DEM LAUF: ja, ueber Laeufe und Prozesse identisch — string.hash ist FNV-1a
+// in Lyric ohne Seed (stdlib/std/core.lyr:300-316) und Map ist offene Adressierung darueber
+// (stdlib/std/collections.lyr:547-575). Die Spec nennt die Reihenfolge UNSPECIFIED.
+// KONTROLLE: dieselbe Map ein zweites Mal im SELBEN Lauf aufgebaut, andere Einfuegereihenfolge
+//            -> wenn die Ausgabe gleich ist, haengt die Reihenfolge nur am Hash, nicht am Ablauf.
+import std.io.console { println };
+import std.collections { Map };
+
+fn main(): int {
+    let m = Map<string, int>.empty();
+    m.set("alpha", 1); m.set("beta", 2); m.set("gamma", 3);
+    m.set("delta", 4); m.set("epsilon", 5); m.set("zeta", 6);
+    var s = "";
+    for (k in m.keys()) { s = s + k + " "; }
+    println(f"lauf1 = {s}");
+
+    let n = Map<string, int>.empty();
+    n.set("zeta", 6); n.set("epsilon", 5); n.set("delta", 4);
+    n.set("gamma", 3); n.set("beta", 2); n.set("alpha", 1);
+    var t = "";
+    for (k in n.keys()) { t = t + k + " "; }
+    println(f"lauf2 = {t}");
+    return 0;
+}

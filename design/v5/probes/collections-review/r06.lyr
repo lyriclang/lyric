@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn main(): int {
+    var grid = [[0] * 3] * 2;
+    grid[0][0] = 5;
+    println(f"aliased row1[0]={grid[1][0]}");
+    var a = [0] * 3;
+    var b = [0] * 3;
+    var grid2 = [a, b];
+    grid2[0][0] = 5;
+    println(f"control row1[0]={grid2[1][0]}");
+    return 0;
+}

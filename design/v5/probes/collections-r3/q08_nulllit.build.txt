@@ -1,0 +1,4 @@
+q08_nulllit.lyr:3:18: error[LYR-SEM0009]: array elements must share a type: 'int' vs 'null'
+    let xs = [1, null];
+                 ^^^^
+

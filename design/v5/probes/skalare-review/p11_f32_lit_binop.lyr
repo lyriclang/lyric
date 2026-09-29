@@ -1,0 +1,8 @@
+// ERWARTUNG: kompiliert (Float-Literal adaptiert an float32-Operand), druckt 3
+import std.io.console { println };
+fn main(): int {
+  let g: float32 = 1.5f32;
+  let h = g * 2.0;
+  println(f"{h}");
+  return 0;
+}

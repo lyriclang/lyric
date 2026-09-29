@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    var x: int8 = 3i8;
+    match (x) { 1 => println("one"), 3 => println("three"), 4..=9 => println("mid"), _ => println("other") }
+    return 0;
+}

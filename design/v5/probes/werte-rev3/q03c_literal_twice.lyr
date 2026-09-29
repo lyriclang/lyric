@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var s = S { v = 1 };
+    var xs = [s, s];
+    xs[0].v = 9;
+    println(f"q03c xs1={xs[1].v} s.v={s.v}");
+    return 0;
+}

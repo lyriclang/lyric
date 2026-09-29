@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let u: uint = 5; let big: uint = 18446744073709551615; println(f"{u}"); println(f"{big}"); return 0; }

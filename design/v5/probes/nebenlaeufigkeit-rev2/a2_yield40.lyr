@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.os as os;
+
+fn deep(n: int): void {
+    if (n > 0) { deep(n - 1); return; }
+    yield 1;
+}
+
+fn gen(): Coroutine<int> {
+    var i = 0;
+    while (i < 200000) { deep(40); i += 1; }
+}
+
+fn main(): int {
+    let t0 = os.nowMillis();
+    let co = gen();
+    var n = 0;
+    while (co.next() != null) { n += 1; }
+    println(f"yield at depth 40: {n} in {os.nowMillis() - t0}ms");
+    return 0;
+}

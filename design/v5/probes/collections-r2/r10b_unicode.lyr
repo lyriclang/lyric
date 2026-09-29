@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    // e mit Akut als KOMBINIERENDE Folge: U+0065 U+0301 -- ein Graphem, zwei Codepoints
+    let s = "e\u{0301}x";
+    var n = 0;
+    var line = "";
+    for (c in s) { n += 1; line = line + " " + strings.fromInt(c as int); }
+    println(f"codepoints: {n} ->{line}");
+    println(f"length(): {s.length()}");
+    return 0;
+}

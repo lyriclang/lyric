@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x = 1_000_000; let h = 0xFF_FF; let b = 0b1010_1010; let o = 0o7_7; let e = 1_0e1_0; println(f"{x} {h} {b} {o} {e}"); return 0; }

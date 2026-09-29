@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.core { Exception };
+
+fn boom(): void throws Exception {
+    throw Exception { text = "x" };
+}
+
+fn main(): int {
+    try {
+        boom();
+    } catch (e: Exception) {
+        println("caught");
+    }
+    println("after");
+    return 0;
+}

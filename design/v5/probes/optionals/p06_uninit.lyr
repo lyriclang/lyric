@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    var x: ?int;
+    if (x == null) { println("implicitly null"); } else { println("not null"); }
+    return 0;
+}

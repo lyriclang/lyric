@@ -1,0 +1,4 @@
+import std.core { Deprecated };
+@Deprecated { message = "x" }
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+fn main(): int { return 0; }

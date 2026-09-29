@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    println("\e[31m");
+    return 0;
+}

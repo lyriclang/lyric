@@ -1,0 +1,2 @@
+module other;
+pub fn use(): int { return (2).trp(); }

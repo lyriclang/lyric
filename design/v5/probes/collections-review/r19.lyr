@@ -1,0 +1,10 @@
+import std.io.console { println };
+class Ctr { n: int, }
+let c = Ctr { n = 0 };
+fn idx(): int { c.n = c.n + 1; return 1; }
+fn main(): int {
+    var xs = [10, 20, 30];
+    xs[idx()] += 5;
+    println(f"calls={c.n} xs1={xs[1]}");
+    return 0;
+}

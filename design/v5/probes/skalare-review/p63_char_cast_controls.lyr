@@ -1,0 +1,8 @@
+// KONTROLLE: int->char ausserhalb: ERWARTE Panik VM0012 (Dossier c1)
+import std.io.console { println };
+fn main(): int {
+  let n = 1114112;
+  let c = n as char;
+  println(f"{c as int}");
+  return 0;
+}

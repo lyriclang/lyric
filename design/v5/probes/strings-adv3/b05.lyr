@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let n = 5;
+    println(f"[{n:>8}]");
+    return 0;
+}

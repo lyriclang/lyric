@@ -1,0 +1,9 @@
+fn main(): int {
+    let esc = "\e[31m";
+    let bell = "\a";
+    let back = "\b";
+    let ff = "\f";
+    let vt = "\v";
+    let dollar = "\$";
+    return 0;
+}

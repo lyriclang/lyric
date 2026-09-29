@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let help = """
+usage: tool [options]
+  -h   help
+""";
+    println(help);
+    return 0;
+}

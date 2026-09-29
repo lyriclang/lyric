@@ -1,0 +1,2 @@
+read-copy 7 42
+shared 7

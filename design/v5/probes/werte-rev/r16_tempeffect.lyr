@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct S { x: int, }
+fn make(): S { println("r16 make ran"); return S { x = 1 }; }
+fn main(): int { make().x = 9; println("r16 done"); return 0; }

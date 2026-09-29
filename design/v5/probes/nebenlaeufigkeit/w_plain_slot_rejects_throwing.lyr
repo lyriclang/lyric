@@ -1,0 +1,13 @@
+import std.core { Exception };
+
+fn steps(): Coroutine<int> throws Exception {
+    yield 1;
+    throw Exception { text = "x" };
+}
+
+fn take(co: Coroutine<int>): void { }
+
+fn main(): int {
+    take(steps());
+    return 0;
+}

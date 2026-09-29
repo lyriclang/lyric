@@ -1,0 +1,5 @@
+module mathy;
+
+fn compute(): int { return 40 + 2; }
+pub let K: int = comptime compute();
+pub fn visible(): int { return K; }

@@ -1,0 +1,8 @@
+import std.build { executable };
+
+/// What `lyric build` runs. Every artifact is compiled whole from its entry file; nothing is
+/// compiled while this function runs, so a field set on the next line still applies. The
+/// program lands in out/<profile>/demo2.lyrbc.
+pub fn build() {
+    executable("demo2", "src/main.lyr");
+}

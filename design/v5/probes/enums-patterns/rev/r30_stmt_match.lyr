@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum S { Red, Yellow, Green }
+fn main(): int {
+    let s = S.Green;
+    match (s) {
+        Red => { println("r"); },
+        Yellow => { println("y"); },
+    }
+    return 0;
+}

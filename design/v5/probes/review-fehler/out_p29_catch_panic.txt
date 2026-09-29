@@ -1,0 +1,3 @@
+panic [LYR-VM0011]: nope
+    in main.boom (p29_catch_panic.lyr:4)
+    in main.main (p29_catch_panic.lyr:7)

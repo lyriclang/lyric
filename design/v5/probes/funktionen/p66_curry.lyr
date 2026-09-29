@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn adder(k: int): fn(int) -> int { return (n: int) => n + k; }
+fn main(): int {
+    let add5 = adder(5);
+    let add7 = adder(7);
+    println(fromInt(add5(1)));
+    println(fromInt(add7(1)));
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+extern "dotnet" fn tempPath(): string = "System.IO.Path::GetTempPath";
+
+fn main(): int {
+    println(f"cbrt(27)={cbrt(27.0)}");
+    println(f"tmp={tempPath()}");
+    return 0;
+}

@@ -1,0 +1,3 @@
+module m32;
+pub fn v32(): int { return 32; }
+pub fn w32(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 32; } return s; }

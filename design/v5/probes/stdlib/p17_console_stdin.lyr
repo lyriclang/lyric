@@ -1,0 +1,7 @@
+import std.io.console { readLine, println };
+
+fn main(): int {
+    let l = readLine();
+    println(l ?? "<none>");
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct P { x: int, static let ORIGIN: P = P { x = 0 }; }
+fn poke(): void { P.ORIGIN.x = 9; }
+fn peek(): int { return P.ORIGIN.x; }
+fn main(): int {
+    println(f"r03 before={peek()}");
+    poke();
+    println(f"r03 after={peek()}");
+    return 0;
+}

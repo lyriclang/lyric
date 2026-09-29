@@ -1,0 +1,59 @@
+Erwartungen VOR dem Lauf (Audit Fassung 2, 2026-09-27):
+c_q09  this im Lambda            -> CLI0020 lowering this
+c_q09b implizites Feld           -> CLI0020 ir: type not lowerable
+c_q10  break im Lambda           -> CLI0020 break outside a loop
+c_q11b yield im Lambda, gerufen  -> build ok, run VM0013 exit 101
+c_p61  Iface-Default weggelassen -> build CLI0020; check -> ok
+c_q02  aeusseres let it=100, run{it+1} mit f(2) -> 3 + SEM0071
+c_q13  default dann params       -> 100 500 501 502
+c_q07  let y = (x = 5)           -> 5
+c_q27  default nennt Param       -> IR0001 reference to a (only parameters, locals and constants)
+c_q21  Lambda-Ueberladung        -> SEM0086 (a lambda)
+c_q08  fold(1){acc,n=>}          -> 12 Diagnosen, 1.=SEM0017 2.=SEM0014 4.=SEM0045
+c_p65  Schleifen-Capture         -> 0 1 2
+c_p76  params-Aliasing           -> Callee-Schreiben sichtbar
+c_q26  Struct-Arg                -> 1 + SEM0109
+c_p39  100000 Rekursion          -> VM0004 exit 101
+c_q19  down(5000) Trace          -> ~2048 stderr-Zeilen
+c_q22..25 Methodenwert           -> IR0001 no field / SEM0055 / IR0001 member access / IR0001
+c_p24  fn ==                     -> SEM0059
+c_p07  generische fn als Wert    -> SEM0052
+c_p06/p05 throws-Wert/-Typ       -> SEM0037 / SEM0084
+c_p51  Koroutine als Wert        -> laeuft
+c_q15  return im Trailing        -> 5, after
+c_p25/p29 Statement-Trailing     -> SEM0022+Parse / laeuft
+c_p69  Rueckgabe verworfen       -> still
+c_p54/p55 main void/throws       -> SEM0021
+c_q12  default vor trailing      -> SEM0025
+c_q14  Lambda als Default        -> 42
+c_p11/p12 Lambda-Formen/Destr.   -> laufen
+c_p33  nested it                 -> 22
+c_p08/p09 rek. Lambda / lokale fn-> SEM0002 / PAR0002
+c_p67/p68 Default/params im Lambda -> PAR0002 / PAR0013
+c_p70  Parametername im fn-Typ   -> PAR0011
+c_p72  ?fn                       -> laeuft
+c_p01  f(host: "h")              -> 7 Fehler inkl. PAR0046
+c_p42  f(port = 8080) mit var port -> 8080 8080
+c_q29  release lower             -> mkclosure (no captures) + callind in main
+c_q16  escaping closure          -> 1 2 1
+c_p53  main-Formen               -> laeuft
+--- eigene Proben ---
+a10_default_callsite   side 2x gedruckt, dann 7; lower: call main.side in main
+a11_single_chain_rel   over(xs).map{it*2} allein, release: WENIGER als 4 callvirt/2 callind; Schaetzung 2/1
+n01_generic_infer      apply<T,U>(x, f) mit paren/bare/trailing Lambda: U wird inferiert (std.iter.map tut es) -> 6 6 6
+n02_fn_variance        fn()->S an fn()->Speaker: SEM0001 (invariant); fn(Speaker)->int an fn(S)->int: SEM0001
+n03_fn_void            fn()->void Lambda laeuft: x y
+n04_param_shadow       (n: int)=> bei aeusserem n: KEINE SEM0107 (eigener Scope); Ausgabe 2
+n05_defer_capture      defer sieht Endwert -> 2
+n07_nested_closure     zweistufiges Capture -> 1 2
+n08_global_in_lambda   Modul-var aus Lambda -> 1 2 (kein Capture noetig)
+n09_jit_closure        q16 mit --jit -> 1 2 1
+n14_trailing_typeargs  apply<int>(3) { it*2 } -> 6
+n15_fn_field_call      h.f(1) mit Feld f: fn -> 2
+n16_depth_callind      Rekursion ueber var-Lambda 2000 tief -> VM0004
+n17_bare_no_context    let f = x => x*2 ohne Kontext -> SEM-Fehler (Code offen)
+n18_paren_untyped      let f = (x) => x*2 ohne Kontext -> SEM-Fehler (Code offen)
+n22_default_order      f() -> a b; f(1) -> b
+n23_default_global     f() nach g=5 -> 1 dann 5
+n27_fmt_forms          lyrfmt behaelt x => x*3 und run { 7 } (offen)
+t_direct/t_ind/t_virt  3M Aufrufe release: ind > direct, virt >= direct (Zahlen offen)

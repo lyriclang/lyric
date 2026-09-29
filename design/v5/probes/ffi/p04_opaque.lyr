@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+opaque type Handle = int;
+type Meters = float;
+
+extern "dotnet" fn absH(x: Handle): int = "System.Math::Abs";
+extern "dotnet" fn absM(x: Meters): float = "System.Math::Abs";
+
+fn main(): int {
+    println(f"{absM(-1.5 as Meters)}");
+    return 0;
+}

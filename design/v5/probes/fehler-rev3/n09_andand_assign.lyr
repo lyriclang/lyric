@@ -1,0 +1,2 @@
+// ERWARTUNG: '&&=' ist laut Appendix A noch IR0001 (Dossier §1.4 sagt "beides ist gebaut").
+fn main(): int { var b = true; b &&= false; return if (b) 1 else 0; }

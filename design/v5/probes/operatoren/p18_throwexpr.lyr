@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+class E :: [Throwable] { msg: string, fn message(): string { return this.msg; } }
+
+fn pick(o: ?int, c: bool, n: int): int throws E {
+    let a = o ?? throw E { msg = "none" };
+    let b = if (c) a else throw E { msg = "no" };
+    let d = match (n) { 0 => throw E { msg = "zero" }, _ => b };
+    let e = match (n) { 0 => 0, _ => { println("arm"); throw E { msg = "tail" } } };
+    return d + e;
+}
+
+fn main(): int {
+    try {
+        println(fromInt(pick(1, true, 5)));
+    } catch (x: E) {
+        println(x.message());
+    }
+    return 0;
+}

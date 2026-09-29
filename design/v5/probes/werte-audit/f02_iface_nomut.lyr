@@ -1,0 +1,6 @@
+interface Bump { mut fn bump(): void; }
+class K :: [Bump] {
+    v: int,
+    fn bump(): void { this.v = this.v + 1; }
+}
+fn main(): int { return 0; }

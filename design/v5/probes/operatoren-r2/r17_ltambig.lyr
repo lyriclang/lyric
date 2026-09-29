@@ -1,0 +1,13 @@
+import std.io.console { println };
+fn id<T>(x: T): T { return x; }
+fn main(): int {
+    let a = 1;
+    let b = 2;
+    let c = 3;
+    if (a < b) { println("cmp ok"); }
+    println(id<string>("typeargs ok"));
+    let d = a < b;
+    let e = (a < b) == true;
+    if (d && e) { println("both"); }
+    return 0;
+}

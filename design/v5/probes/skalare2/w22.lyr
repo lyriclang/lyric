@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    let inf: float = 1.0 / 0.0;
+    let f: float32 = 3.4e38f32;
+    println(f"{inf}");
+    println(f"{f}");
+    let g: float32 = 1.0e-45f32;
+    println(f"{g}");
+    return 0;
+}

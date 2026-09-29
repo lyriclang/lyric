@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+interface Bump { mut fn bump(): void; fn get(): int; }
+
+struct S :: [Bump] {
+    n: int,
+    mut fn bump(): void { this.n = this.n + 1; },
+    fn get(): int { return this.n; }
+}
+
+fn hit(b: Bump): void { b.bump(); }
+
+fn main(): int {
+    var s = S { n = 0 };
+    hit(s);
+    println(f"{s.n}");
+    let b: Bump = s;
+    b.bump();
+    println(f"{s.n}");
+    println(f"{b.get()}");
+    return 0;
+}

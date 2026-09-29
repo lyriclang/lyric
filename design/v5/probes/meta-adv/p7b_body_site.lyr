@@ -1,0 +1,5 @@
+fn boom(n: int): int {
+    if (n > 1) { panic("boom"); }
+    return n;
+}
+fn main(): int { return comptime boom(5); }

@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct I { x: int, }
+struct O { i: I, }
+fn main(): int {
+    let o = O { i = I { x = 1 } };
+    o.i.x = 9;
+    println(f"g02 o.i.x={o.i.x}");
+    return 0;
+}

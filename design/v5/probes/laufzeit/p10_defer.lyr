@@ -1,0 +1,18 @@
+// P10 — Laeuft ein defer, wenn das Programm panikt? Davon haengt ab, ob defer ein
+// Ressourcen-Mechanismus ist oder nur ein Aufraeum-Mechanismus fuer den guten Fall.
+// Erwartung VOR dem Lauf: kein "aufgeraeumt" im Panik-Lauf.
+import std.io.console { println };
+
+fn arbeit(kaputt: bool): int {
+    defer println("aufgeraeumt");
+    println("offen");
+    if (kaputt) {
+        let xs = [1, 2, 3];
+        return xs[99];
+    }
+    return 0;
+}
+
+fn main(args: string[]): int {
+    return arbeit(args.length > 0);
+}

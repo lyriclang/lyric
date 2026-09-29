@@ -1,0 +1,19 @@
+import std.io.console { println };
+class H { s: S, }
+struct S {
+    v: int,
+    mut fn bump(): void { this.v = 5; println(f"q18 mid G.s.v={G.s.v} (5 = this is a reference, 1 = copy-in/copy-out)"); }
+}
+let G = H { s = S { v = 1 } };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+struct T {
+    v: int,
+    mut fn half(): void throws Boom { this.v = 5; throw Boom { }; }
+}
+fn main(): int {
+    G.s.bump();
+    var t = T { v = 1 };
+    try { t.half(); } catch (e: Boom) { }
+    println(f"q18 after throw t.v={t.v} (5 = partial write visible, 1 = rolled back)");
+    return 0;
+}

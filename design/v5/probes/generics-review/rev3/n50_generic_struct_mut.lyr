@@ -1,0 +1,3 @@
+import std.io.console { println };
+struct Pair<T> { a: T, b: T, mut fn swap(): void { let t = this.a; this.a = this.b; this.b = t; } }
+fn main(): int { var p = Pair<int> { a = 1, b = 3 }; p.swap(); println(f"{p.a}"); return 0; }

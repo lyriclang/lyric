@@ -1,0 +1,9 @@
+module main;
+
+import calc;
+import std.io.console { println };
+
+fn main(): int {
+    println(calc.publicTriple(2).toString());
+    return 0;
+}

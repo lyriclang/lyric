@@ -1,0 +1,3 @@
+import geo { a };
+import mathx { b };
+fn main(): int { return a() + b(); }

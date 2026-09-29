@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import Lib;
+fn main(): int { println(Lib.f()); return 0; }

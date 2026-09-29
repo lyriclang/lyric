@@ -1,0 +1,9 @@
+module main;
+
+import std.io.console { println };
+import lib { hidden };
+
+fn main(): int {
+    println(hidden());
+    return 0;
+}

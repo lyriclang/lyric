@@ -1,0 +1,3 @@
+fn helper(): int { return 1; }
+struct Unused { a: int = 0 }
+fn main(): int { return 0; }

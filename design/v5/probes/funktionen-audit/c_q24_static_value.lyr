@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct Id { v: int, static fn zero(): Id { return Id { v = 0 }; } }
+fn main(): int {
+    let g = Id.zero;
+    println("x");
+    return 0;
+}

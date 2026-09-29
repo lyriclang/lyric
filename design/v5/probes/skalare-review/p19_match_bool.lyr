@@ -1,0 +1,11 @@
+// ERWARTUNG: kompiliert ohne '_' (bool erschoepfend), druckt 1
+import std.io.console { println };
+fn main(): int {
+  let b = true;
+  let r = match (b) {
+    true => 1,
+    false => 2,
+  };
+  println(f"{r}");
+  return 0;
+}

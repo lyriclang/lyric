@@ -1,0 +1,25 @@
+import std.io.console { println };
+import std.io.net as net;
+import std.task as task;
+import std.task { Wait };
+
+fn server(l: net.Listener): Coroutine<Wait> {
+    println("server: accept()");
+    let s = net.accept(l);
+    println("server: accept returned");
+}
+
+fn stopper(): Coroutine<Wait> {
+    yield Wait.Sleep(80);
+    println("stopper: giving up");
+}
+
+fn main(): int {
+    let l = net.listen("127.0.0.1", 0);
+    if (l == null) { println("no listener"); return 1; }
+    task.spawn(server(l!));
+    task.spawn(stopper());
+    task.run();
+    println("done");
+    return 0;
+}

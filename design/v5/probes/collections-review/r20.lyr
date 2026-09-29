@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.collections { List };
+fn main(): int {
+    let l = List<int>.of([1, 2]);
+    var n = 0;
+    for (v in l) { n = n + 1; if (n < 5) { l.push(v); } }
+    println(f"grow passes={n}");
+    let k = List<int>.of([1, 2, 3, 4]);
+    var seen = "";
+    for (v in k) { seen = seen + f"{v},"; k.removeAt(0); }
+    println(f"shrink seen={seen}");
+    return 0;
+}

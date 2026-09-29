@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let e = [];
+    println(f"{e.length}");
+    return 0;
+}

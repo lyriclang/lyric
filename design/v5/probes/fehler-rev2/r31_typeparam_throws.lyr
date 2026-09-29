@@ -1,0 +1,7 @@
+// ERWARTUNG (p05 nachgefahren auf HEAD): LYR-SEM0034 — der Klausel-Typparameter wird
+// an der AUFRUFSTELLE nicht substituiert.
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn rethrowIt<E :: [Throwable]>(e: E): int throws E { throw e; }
+fn main(): int {
+    try { return rethrowIt<Boom>(Boom { }); } catch (_: Boom) { return 0; }
+}

@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    let a: ?int = 5;
+    match (a) {
+        1 => println("one"),
+        2 => println("two"),
+    }
+    return 0;
+}

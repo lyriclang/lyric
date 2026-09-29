@@ -1,0 +1,9 @@
+struct Rect { width: int, height: int }
+
+fn main(): int {
+    let count = 1;
+    let a = coutn;
+    let r = Rect { width = 1, height = 2 };
+    let b = r.widht;
+    return a;
+}

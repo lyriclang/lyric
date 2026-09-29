@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+fn main(): int {
+    let a: int32 = 7i32;
+    let u: uint = 18446744073709551615u64 as uint;
+    println(f"hole i32 = {a}");
+    println(f"hole uint = {u}");
+    println(f"spec i32 = {a:D4}");
+    return 0;
+}

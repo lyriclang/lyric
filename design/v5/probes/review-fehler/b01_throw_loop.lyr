@@ -1,0 +1,14 @@
+// ERWARTUNG: 200k Wuerfe messbar teurer als 200k stille Rueckgaben. Zahl unbekannt.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "b"; } }
+fn risky(i: int): int throws Boom { if (i % 2 == 0) { throw Boom { }; } return i; }
+fn main(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 200000) {
+        try { sum = sum + risky(i); } catch (_: Boom) { sum = sum + 1; }
+        i = i + 1;
+    }
+    println(f"{sum}");
+    return 0;
+}

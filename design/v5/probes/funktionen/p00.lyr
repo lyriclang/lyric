@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn add(a: int, b: int): int { return a + b; }
+
+fn main(): int {
+    println("ok");
+    return add(2, 3);
+}

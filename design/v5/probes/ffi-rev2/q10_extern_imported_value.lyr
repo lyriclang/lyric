@@ -1,0 +1,4 @@
+import std.io.console { println };
+import wrapx { cbrt };
+fn apply(f: fn(float) -> float, x: float): float { return f(x); }
+fn main(): int { println(f"{apply(cbrt, 27.0)}"); return 0; }

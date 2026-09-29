@@ -1,0 +1,4 @@
+import std.core { Deprecated };
+@Deprecated { message = "use Bar" }
+interface Foo { fn f(): int; }
+fn main(): int { return 0; }

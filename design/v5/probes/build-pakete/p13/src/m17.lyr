@@ -1,0 +1,3 @@
+module m17;
+pub fn v17(): int { return 17; }
+pub fn w17(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 17; } return s; }

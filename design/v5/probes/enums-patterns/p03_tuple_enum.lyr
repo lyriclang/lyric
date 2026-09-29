@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+enum State { Idle, Dialing(int), Up }
+enum Event { Dial(int), Hangup, Tick }
+
+fn step(s: State, e: Event): State {
+    return match ((s, e)) {
+        (Idle, Dial(n)) => State.Dialing(n),
+        (Dialing(n), Tick) => State.Up,
+        (_, Hangup) => State.Idle,
+        _ => s,
+    };
+}
+
+fn main(): int {
+    match (step(State.Idle, Event.Dial(42))) {
+        Dialing(n) => println(f"dialing {n}"),
+        _ => println("other"),
+    }
+    return 0;
+}

@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn drain<T>(co: Coroutine<T>): int {
+    var n = 0;
+    var live = true;
+    while (live) {
+        if (co.next() == null) { live = false; } else { n += 1; }
+    }
+    return n;
+}
+
+fn three(): Coroutine<int> { yield 1; yield 2; yield 3; }
+fn two(): Coroutine<string> { yield "a"; yield "b"; }
+
+fn main(): int {
+    println(strings.fromInt(drain<int>(three())));
+    println(strings.fromInt(drain<string>(two())));
+    return 0;
+}

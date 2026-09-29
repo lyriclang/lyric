@@ -1,0 +1,10 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use renew" }
+pub fn old(): int { return 1; }
+
+pub fn renew(): int { return 2; }
+
+fn main(): int {
+    return old() + renew();
+}

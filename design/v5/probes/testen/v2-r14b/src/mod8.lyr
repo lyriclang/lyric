@@ -1,0 +1,2 @@
+pub fn value8(n: int): int { return n * 8; }
+pub fn other8(n: int): int { return value8(n) + 8; }

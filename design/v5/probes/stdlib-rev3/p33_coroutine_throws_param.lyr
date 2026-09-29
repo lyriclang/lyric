@@ -1,0 +1,10 @@
+import std.core { Exception };
+import std.io.console { println };
+fn boom(): Coroutine<int> throws Exception {
+    if (true) { throw Exception { text = "x" }; }
+    yield 1;
+}
+fn assertThrows(c: Coroutine<int> throws Exception): bool {
+    try { resume c; return false; } catch (_: Exception) { return true; }
+}
+fn main(): int { if (assertThrows(boom())) { println("threw"); } return 0; }

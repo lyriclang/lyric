@@ -1,0 +1,13 @@
+import std.io.console { println };
+interface Bump { mut fn bump(): void; fn get(): int; }
+struct S :: [Bump] {
+    n: int = 0,
+    mut fn bump(): void { this.n = this.n + 1; }
+    fn get(): int { return this.n; }
+}
+fn main(): int {
+    let d = S { };
+    d.bump();
+    println(d.n.show());
+    return 0;
+}

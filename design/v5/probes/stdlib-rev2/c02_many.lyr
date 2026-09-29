@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.json { parse };
+import std.collections { List };
+import std.iter { over };
+import std.encoding { base64Encode };
+import std.fmt { formatInt };
+import std.math { sqrt };
+import std.hash { sha256 };
+fn main(): int { println("x"); return 0; }

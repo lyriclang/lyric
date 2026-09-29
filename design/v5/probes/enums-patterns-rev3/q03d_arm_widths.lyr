@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let b = true; let r = match (b) { true => 1i8, false => 2 }; println(f"{r}"); return 0; }

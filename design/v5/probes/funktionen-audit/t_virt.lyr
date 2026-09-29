@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.string { fromInt };
+interface Inc { fn inc(n: int): int; }
+struct A :: [Inc] { fn inc(n: int): int { return n + 1; } }
+fn pick(k: int): Inc { return A {}; }
+fn main(): int {
+    let f = pick(1);
+    var acc = 0;
+    var i = 0;
+    while (i < 3000000) { acc = f.inc(acc); i = i + 1; }
+    println(fromInt(acc));
+    return 0;
+}

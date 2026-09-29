@@ -1,0 +1,4 @@
+module std.notarealmodule;
+import std.io.console;
+
+fn main(): int { console.println("control"); return 0; }

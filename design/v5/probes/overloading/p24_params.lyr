@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn f(a: int): string { return "fixed"; }
+fn f(params xs: int[]): string { return "params"; }
+fn main(): int {
+    println(f(1));
+    println(f(1, 2));
+    return 0;
+}

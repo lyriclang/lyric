@@ -1,0 +1,10 @@
+import std.io.console { println };
+struct S { v: int }
+struct W { n: ?S }
+fn main(): int {
+    var a = W { n = S { v = 1 } };
+    var b = a;
+    b.n!.v = 9;
+    println(f"a.n={a.n!.v} b.n={b.n!.v}");
+    return 0;
+}

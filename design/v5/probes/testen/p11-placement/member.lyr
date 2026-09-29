@@ -1,0 +1,10 @@
+import std.test { Test };
+
+class Suite {
+    n: int,
+
+    @Test
+    pub fn checks(): void { }
+}
+
+fn main(): int { return 0; }

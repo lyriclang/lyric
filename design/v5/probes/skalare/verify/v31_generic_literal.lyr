@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn takes<T>(v: T): T { return v; }
+fn main(): int {
+    let a = takes<int8>(5);
+    println(f"{a as int}");
+    return 0;
+}

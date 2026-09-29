@@ -1,0 +1,6 @@
+struct S { v: int, }
+fn main(): int {
+    let v = 1;
+    let s = S { v };
+    return s.v;
+}

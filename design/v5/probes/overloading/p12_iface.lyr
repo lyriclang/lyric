@@ -1,0 +1,5 @@
+interface Show {
+    fn show(n: int): string;
+    fn show(s: string): string;
+}
+fn main(): int { return 0; }

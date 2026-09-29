@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.core { Display };
+
+pub class Box<T> {
+    value: T,
+
+    pub static fn of(v: T): Box<T> {
+        return Box<T> { value = v };
+    }
+}
+
+extend<T :: [Display]> Box<T> :: [Display] {
+    fn show(): string {
+        return "Box(" + this.value.show() + ")";
+    }
+}
+
+fn main(): int {
+    println(Box<int>.of(3));
+    return 0;
+}

@@ -1,0 +1,4 @@
+import std.io.console { println };
+interface I { mut fn a(): void; }
+class K :: [I] { v: int, mut fn a(): void { this.v = 1; } }
+fn main(): int { let k = K { v = 0 }; let i: I = k; i.a(); println(f"KONTROLLE mut class method via interface: k.v = {k.v}"); return 0; }

@@ -1,0 +1,6 @@
+fn take<U>(u: U): int { return 3; }
+
+fn main(): int {
+    let g = (n: int) => n + 1;
+    return take<fn(int) -> int>(g);
+}

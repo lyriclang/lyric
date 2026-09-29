@@ -1,0 +1,32 @@
+// R8b — KONTROLLE zu R8: ein FRISCHES Einpacken derselben Variablen muss unabhaengig sein.
+// Erwartung: frisch = 0 (zweimal eingepackt = zwei Kopien), gebunden = 1 (Bindung teilt)
+import std.io.console { println };
+
+interface Zaehlbar { mut fn hoch(): void; fn wert(): int; }
+
+struct Z {
+    n: int,
+    mut fn hoch(): void { this.n += 1; }
+    fn wert(): int { return this.n; }
+}
+
+extend Z :: [Zaehlbar] {}
+
+fn main(): int {
+    let a = Z { n = 0 };
+    let x: Zaehlbar = a;
+    let y: Zaehlbar = a;
+    x.hoch();
+    println(f"frisch   = {y.wert()}");
+
+    let p: Zaehlbar = a;
+    let q: Zaehlbar = p;
+    p.hoch();
+    println(f"gebunden = {q.wert()}");
+
+    let xs: Zaehlbar[] = [a];
+    let e = xs[0];
+    e.hoch();
+    println(f"ausArray = {xs[0].wert()}");
+    return 0;
+}

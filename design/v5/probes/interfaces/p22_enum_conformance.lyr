@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+interface Tell { fn tell(): string; }
+
+enum Color :: [Tell] {
+    Red, Green;
+    fn tell(): string { return "color"; }
+}
+
+fn main(): int {
+    let t: Tell = Color.Red;
+    println(t.tell());
+    return 0;
+}

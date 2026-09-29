@@ -1,0 +1,14 @@
+// Q3 — Bekommt ein struct memberwise '==' hergeleitet? Und ein 'hash'?
+// ERWARTUNG VOR DEM LAUF: ein Fehler (LYR-SEM0059 laut Kritiker), weil Lyric Gleichheit
+// ueber das Interface Equatable<T> erwartet und nichts herleitet.
+// KONTROLLE unten (q3b): dieselbe Frage mit handgeschriebenem Equatable -> kompiliert.
+import std.io.console { println };
+
+struct P { x: int, y: int, }
+
+fn main(): int {
+    let a = P { x = 1, y = 2 };
+    let b = P { x = 1, y = 2 };
+    println(f"gleich = {a == b}");
+    return 0;
+}

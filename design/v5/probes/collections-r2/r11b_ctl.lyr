@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.iter { over };
+fn twice(n: int): int { return n * 2; }
+fn main(): int {
+    let xs = [1, 2, 3];
+    let it = over(xs).map(twice);
+    println(f"{it.count()}");
+    return 0;
+}

@@ -1,0 +1,6 @@
+import std.collections { Map, mapNew, mapSet };
+fn main(): int {
+    var m = mapNew<string, int>();
+    m["k"] = 1;
+    return 0;
+}

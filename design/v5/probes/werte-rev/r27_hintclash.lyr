@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { x: int, }
+fn main(): int {
+    var v = S { x = 1 };
+    v.x = 9;
+    println(f"r27 v.x={v.x}");
+    return 0;
+}

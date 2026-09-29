@@ -1,0 +1,2 @@
+fn apply(f: fn(x: int) -> int, v: int): int { return f(v); }
+fn main(): int { return apply((n: int) => n, 1); }

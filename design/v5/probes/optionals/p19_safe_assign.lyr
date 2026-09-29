@@ -1,0 +1,6 @@
+class Inner { n: int }
+fn main(): int {
+    let o: ?Inner = Inner { n = 1 };
+    o?.n = 5;
+    return 0;
+}

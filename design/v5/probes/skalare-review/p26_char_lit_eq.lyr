@@ -1,0 +1,7 @@
+// ERWARTUNG: true (Literal adaptiert an char-Operand)
+import std.io.console { println };
+fn main(): int {
+  let c = 'a';
+  println(f"{c == 97}");
+  return 0;
+}

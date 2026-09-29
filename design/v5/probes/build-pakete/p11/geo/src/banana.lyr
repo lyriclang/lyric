@@ -1,0 +1,2 @@
+module banana;
+pub fn label(): int { return 7; }

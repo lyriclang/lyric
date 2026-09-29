@@ -1,0 +1,11 @@
+import std.io.console { println };
+class Inner { name: ?string }
+class Outer { inner: ?Inner, fn get(): ?Inner { return this.inner; } }
+fn main(): int {
+    let o: ?Outer = Outer { inner = Inner { name = "x" } };
+    println(o?.inner?.name ?? "none");
+    println(o?.get()?.name ?? "none2");
+    let e: ?Outer = null;
+    println(e?.inner?.name ?? "empty");
+    return 0;
+}

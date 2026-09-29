@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.iter { over };
+import std.collections { collect };
+
+fn main(): int {
+    let xs = collect(over([1, 2, 3]));
+    println(xs.length());
+    return 0;
+}

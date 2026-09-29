@@ -1,0 +1,1 @@
+fn main(): int { let t = true; let f = false; let r = t & f; return 0; }

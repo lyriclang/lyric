@@ -1,0 +1,18 @@
+./n23_enum_throw_catchall.lyr:3:16: error[LYR-SEM0020]: 'Fault' does not implement abstract method 'message' of interface 'Throwable'
+enum Fault :: [Throwable] {
+               ^^^^^^^^^
+  note: 'message' is declared here
+
+./n23_enum_throw_catchall.lyr:6:5: error[LYR-PAR0026]: expected enum variant name, got Fn
+    fn message(): string { return "fault"; }
+    ^^
+  note: 'fn' is a keyword and cannot be used as a name
+
+./n23_enum_throw_catchall.lyr:6:17: error[LYR-PAR0018]: expected '}' to close enum body
+    fn message(): string { return "fault"; }
+                ^
+
+./n23_enum_throw_catchall.lyr:6:17: error[LYR-PAR0025]: expected a declaration, got Colon
+    fn message(): string { return "fault"; }
+                ^
+

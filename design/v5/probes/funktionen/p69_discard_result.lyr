@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn f(): int { println("called"); return 7; }
+fn main(): int {
+    f();
+    return 0;
+}

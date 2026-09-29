@@ -1,0 +1,23 @@
+import std.io.console { println };
+import std.collections { Set, Map, entries };
+import std.string as strings;
+
+fn main(): int {
+    let s = Set<int>.empty();
+    s.add(50); s.add(3); s.add(17); s.add(99); s.add(1); s.add(64); s.add(8);
+    var line = "set:";
+    for (v in s) { line = line + " " + strings.fromInt(v); }
+    println(line);
+
+    let m = Map<string, int>.empty();
+    m.set("zeta", 1); m.set("alpha", 2); m.set("mu", 3); m.set("beta", 4);
+    var l2 = "map:";
+    for ((k, v) in entries(m)) { l2 = l2 + " " + k; }
+    println(l2);
+
+    let xs = [50, 3, 17, 99, 1, 64, 8];
+    var l3 = "arr:";
+    for (v in xs) { l3 = l3 + " " + strings.fromInt(v); }
+    println(l3);
+    return 0;
+}

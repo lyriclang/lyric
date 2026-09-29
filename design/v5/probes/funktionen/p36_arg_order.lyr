@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn a(): int { println("a"); return 1; }
+fn b(): int { println("b"); return 2; }
+fn take(x: int, y: int): int { return x + y; }
+fn main(): int { return take(a(), b()); }

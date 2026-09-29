@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.math { absInt };
+fn main(): int {
+    let u: uint = 3 as uint;
+    println(f"{absInt(u as int)}");
+    let neg: int8 = -128i8;
+    println(f"{-neg}");
+    return 0;
+}

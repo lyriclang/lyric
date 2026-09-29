@@ -1,0 +1,6 @@
+import std.io.error { IoError };
+pub interface Reader {
+    fn read(into: uint8[]): int throws IoError;
+}
+struct Mem :: [Reader] { pos: int, fn read(into: uint8[]): int throws IoError { return 0; } }
+fn main(): int { return 0; }

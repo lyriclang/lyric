@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.iter { Iterator, Iterable };
+pub class Both :: [Iterable<int>, Iterator<int>] {
+    n: int = 0,
+    pub mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n += 1;
+        return this.n;
+    }
+    pub fn iter(): Iterator<int> { return Both{}; }
+}
+fn main(): int {
+    let b = Both{};
+    var a = 0;
+    for (v in b) { a += 1; }
+    var c = 0;
+    for (v in b) { c += 1; }
+    println(f"{a} {c}");
+    return 0;
+}

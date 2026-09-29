@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "abc";
+    println(s.charAt(3) as int);
+    return 0;
+}

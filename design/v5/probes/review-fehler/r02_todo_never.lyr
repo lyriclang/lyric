@@ -1,0 +1,4 @@
+// ERWARTUNG: LYR-SEM0017 — todo ist als void deklariert (core.lyr:43-44).
+import std.core { todo };
+fn f(): int { todo("x"); }
+fn main(): int { return f(); }

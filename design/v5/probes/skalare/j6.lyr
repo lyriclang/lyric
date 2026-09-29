@@ -1,0 +1,13 @@
+import std.io.console { println };
+fn main(): int {
+    var a: int64 = 5i64;
+    var b: int64 = 6i64;
+    println(f"int64 add = {a + b}");
+    println(f"int64 cmp = {a < b}");
+    println(f"int64 eq  = {a == b}");
+    var f: float32 = 1.5f32;
+    println(f"f32 spec  = {f:N2}");
+    var n: int8 = 7i8;
+    println(f"i8 spec   = {n:D4}");
+    return 0;
+}

@@ -1,0 +1,10 @@
+import std.io.console { println };
+interface A { fn d(n: int): string { return "A"; } }
+interface B { fn d(s: string): string { return "B"; } }
+struct C :: [A, B] { v: int, }
+fn main(): int {
+    let c = C { v = 1 };
+    println(c.d(1));
+    println(c.d("x"));
+    return 0;
+}

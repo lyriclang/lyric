@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn tick(tag: string, v: int): int { println(f"r19 eval {tag}"); return v; }
+struct D { a: int = tick("defA", 1), b: int = tick("defB", 2), c: int, d: int, }
+fn main(): int {
+    let d = D { d = tick("explD", 4), c = tick("explC", 3) };
+    println(f"r19 a={d.a} b={d.b} c={d.c} d={d.d}");
+    return 0;
+}

@@ -1,0 +1,15 @@
+// ERWARTUNG: Der zweite, typisierte catch ist unerreichbar. Meine Erwartung: keine Diagnose.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Boom { what = "x" }; }
+fn main(): int {
+    try {
+        return f();
+    } catch (other) {
+        println("all");
+        return 0;
+    } catch (e: Boom) {
+        println("specific");
+        return 1;
+    }
+}

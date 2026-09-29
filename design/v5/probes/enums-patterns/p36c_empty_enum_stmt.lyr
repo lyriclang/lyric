@@ -1,0 +1,6 @@
+enum Void { }
+fn f(v: Void) {
+    match (v) {
+    }
+}
+fn main(): int { return 0; }

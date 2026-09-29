@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    println(f"{-255:X}|{-255:b}|{3.14159:e}|{255:x}");
+    println(f"{255:o}");
+    return 0;
+}

@@ -1,0 +1,4 @@
+module c;
+pub interface Named { fn name(): string; }
+pub class Tag :: [Named] { fn name(): string { return "tag"; } }
+pub fn describe(n: Named): string { return n.name(); }

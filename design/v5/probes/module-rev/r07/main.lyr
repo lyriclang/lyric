@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import a;
+fn main(): int { println(a.fa()); return 0; }

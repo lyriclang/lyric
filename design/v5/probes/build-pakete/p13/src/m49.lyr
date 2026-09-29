@@ -1,0 +1,3 @@
+module m49;
+pub fn v49(): int { return 49; }
+pub fn w49(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 49; } return s; }

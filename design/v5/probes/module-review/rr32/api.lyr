@@ -1,0 +1,10 @@
+module api;
+pub class Box {
+    n: int,
+    pub fn get(): int { return this.n; }
+    pub mut fn bump() { this.n = this.n + 1; }
+}
+pub struct Pt { x: int, y: int, }
+pub extend Pt { pub fn dist(): int { return this.x + this.y; } }
+fn helper(): int { return 1; }
+pub fn newBox(): Box { return Box { n = helper() }; }

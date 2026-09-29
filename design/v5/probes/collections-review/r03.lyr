@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    for (c in 'a'..'e') { println(f"{c}"); }
+    return 0;
+}

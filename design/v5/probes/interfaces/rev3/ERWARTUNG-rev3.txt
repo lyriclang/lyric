@@ -1,0 +1,35 @@
+Erwartungen VOR dem Lauf (Re-Run der Kritikerproben audit3/):
+n01  -> kompiliert, druckt 7 (Kritiker: Sub ohne eigenen Member ist als Wert legal)
+n02a -> SEM0043 ambiguous default method
+n02b -> druckt i1, i2
+n03  -> druckt circle, shape
+n04  -> SEM0009 array elements must share a type
+n05  -> println(s) mit s: Shape (Shape :: [Display]) -> SEM0028 (IF-02-Loch); s.show() selbst geht
+n06  -> IR0001 interface 'Shape' has no method 'describe'
+n07  -> CLI0020 (params ueber callvirt)
+n07b -> 3, 2
+n09  -> kompiliert still
+n09b -> 1, 1 (extend-Body verworfen)
+n09c -> 1, still
+n21  -> "caught not found" (Grosseltern-catch ueber Throwable)
+n28  -> default, default
+n28b -> SEM0027 type parameter 'T' has no member 'extra'
+n30  -> hi x
+n38  -> SEM0059 auf a == b (Datei als Ganzes kompiliert NICHT; der "true"-Lauf des Kritikers war ohne ==)
+n40  -> irgendeine Typzahl (lyrvm info)
+n41  -> unklar: direkt "shadow"+"direct", Wert "value" — ODER Sema-Fehler
+n50  -> druckt 3
+
+Neue Proben (Erwartung VOR dem Lauf):
+r01 n38-Kontrolle ohne ==      -> druckt true (equals ueber Chain-Prefix laeuft)
+r02 f(Shape) vs f(Named), Typ erfuellt beides -> Mehrdeutigkeitsfehler (SEM00xx) — Vermutung; Alternative: erste Deklaration gewinnt
+r03 extern fn mit Interface-Parameter -> SEM0099 (nur Skalare/string kreuzen)
+r04 Default-Argument ueber Constraint-Pfad, T=C -> "hi world"; T=Greeter -> CLI0020 (dritter Pfad = callvirt)
+r05 Interface-Wert in spawn-Task mutiert -> s bleibt 0, b wird 1 (geteilte Box, ein Thread)
+r06 Benchmark 5M Aufrufe direkt vs Interface-Wert -> Interface langsamer, Faktor 1.2-2 im Interpreter; Release evtl. gleich (Devirt)
+r07 nicht-pub interface in lib, pub class konformiert; Konsument ruft Member -> geht (Member sind heute oeffentlich); `pub fn` im Interface parst
+r08 Typeintraege wachsen pro materialisiertem Vorfahr -> types-Zahl +1 je zusaetzlicher Vorfahr-Wert
+r09 lyrc lower n09b -> genau eine impl-Zeile [f1], extend-Body nicht emittiert
+r04c Impl wiederholt den Default, Constraint-Pfad T=C -> "hi world"
+r04d Impl ohne Default, direkter Aufruf C{}.greet() -> Sema-Fehler fehlendes Argument (der konkrete Member hat keinen Default)
+r04e Impl wiederholt den Default, Interface-Wert g.greet() -> weiterhin CLI0020 (callvirt-Pfad kennt keinen Default)

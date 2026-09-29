@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.iter { over, Iterator };
+import std.collections { List };
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    let it = over(xs);
+    var a = 0;
+    for (v in it) { a = a + 1; }
+    var b = 0;
+    for (v in it) { b = b + 1; }
+    println(f"iterator value: first loop={a} second loop={b}");
+
+    let l = List<int>.of(xs);
+    var c = 0;
+    for (v in l) { c = c + 1; }
+    var d = 0;
+    for (v in l) { d = d + 1; }
+    println(f"iterable value: first loop={c} second loop={d}");
+    return 0;
+}

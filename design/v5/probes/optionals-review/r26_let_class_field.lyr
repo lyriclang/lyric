@@ -1,0 +1,8 @@
+import std.io.console { println };
+class P { v: ?int }
+fn main(): int {
+    let p = P { v = 1 };
+    p.v = null;
+    println("mutated through a let binding");
+    return 0;
+}

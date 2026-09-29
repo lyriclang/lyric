@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn pick(s: string): int { return match (s) { "a" => 1, "b" => 2, _ => 3 }; }
+fn pickc(c: char): int { return match (c) { 'x' => 10, 'y' => 20, _ => 30 }; }
+fn main(): int {
+    println(f"{pick("a")} {pick("b")} {pick("zz")} {pickc('x')} {pickc('y')} {pickc('q')}");
+    return 0;
+}

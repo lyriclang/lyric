@@ -1,0 +1,6 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "no seat", until = "5.0" }
+pub interface OldThing { }
+
+fn main(): int { return 0; }

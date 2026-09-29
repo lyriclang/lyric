@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct Node { v: int, next: ?Node, }
+fn main(): int {
+    let n2 = Node { v = 2, next = null };
+    let n1 = Node { v = 1, next = n2 };
+    println(f"d01 {n1.v} {n1.next!.v}");
+    return 0;
+}

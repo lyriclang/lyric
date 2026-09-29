@@ -1,0 +1,4 @@
+pub struct P { x: int }
+fn p(): P { return P { x = 1 }; }
+let Q = comptime p();
+fn main(): int { return Q.x; }

@@ -1,0 +1,24 @@
+import std.io.console { println };
+
+interface Bump { mut fn bump(): void; fn get(): int; }
+
+struct S :: [Bump] {
+    n: int,
+    mut fn bump(): void { this.n = this.n + 1; },
+    fn get(): int { return this.n; }
+}
+
+fn main(): int {
+    let s = S { n = 0 };
+    let a: Bump = s;
+    let b: Bump = a;
+    a.bump();
+    println(f"a={a.get()} b={b.get()}");
+    let c: Bump = s;
+    println(f"c={c.get()}");
+    var direct = s;
+    var copy = direct;
+    copy.bump();
+    println(f"direct={direct.n} copy={copy.n}");
+    return 0;
+}

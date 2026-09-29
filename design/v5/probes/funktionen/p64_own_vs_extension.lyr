@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct S { v: int, fn tell(): string { return "own"; } }
+extend S { fn tell2(): string { return "ext"; } }
+fn main(): int {
+    let s = S { v = 1 };
+    println(s.tell());
+    println(s.tell2());
+    return 0;
+}

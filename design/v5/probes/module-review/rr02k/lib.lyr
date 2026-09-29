@@ -1,0 +1,2 @@
+pub fn h(a: int): int { return 1; }
+pub fn h(a: string): int { return 2; }

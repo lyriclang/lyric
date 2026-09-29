@@ -1,0 +1,2 @@
+module shapes.circle;
+pub fn area(r: int): int { return 3 * r * r; }

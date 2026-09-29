@@ -1,0 +1,7 @@
+import std.io.console { println };
+extern "dotnet" fn bad(): int = "System.Diagnostics.Stopwatch::NoSuchMethodAtAll";
+fn main(): int {
+    println("BEFORE the bad call");
+    println(f"bad={bad()}");
+    return 0;
+}

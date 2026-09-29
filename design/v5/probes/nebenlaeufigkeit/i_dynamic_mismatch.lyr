@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn helper(): void {
+    yield "a string";
+}
+
+fn numbers(): Coroutine<int> {
+    helper();
+    yield 3;
+}
+
+fn main(): int {
+    let co = numbers();
+    println(f"{resume co}");
+    return 0;
+}

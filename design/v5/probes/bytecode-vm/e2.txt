@@ -1,0 +1,12 @@
+Unhandled exception. System.InvalidOperationException: null object reference
+   at Lyric.Vm.LyrValue.get_AsObject() in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\LyrValue.cs:line 130
+   at Lyric.Vm.Interpreter.Loop[TPolicy](Prepared[] prepared, IReadOnlyList`1 strings, IReadOnlyList`1 types, DispatchTable dispatch, BoundNative[] natives, LyrValue[] globals, IReadOnlyList`1 globalTypes, ArgumentPool arguments, Stack`1 frames, Frame& frame, Int32 outer, Boolean[] globalsReady, TPolicy policy, JitContext jit) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\Interpreter.cs:line 905
+   at Lyric.Vm.Interpreter.Execute(Prepared[] prepared, Int32 startIndex, IReadOnlyList`1 strings, IReadOnlyList`1 types, DispatchTable dispatch, BoundNative[] natives, LyrValue[] globals, IReadOnlyList`1 globalTypes, ArgumentPool arguments, LyrValue[] entryArguments, BytecodeSourceMap sourceMap, DebugController debug, ExecutionBudget budget, JitContext jit, Boolean[] globalsReady) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\Interpreter.cs:line 298
+   at Lyric.Vm.LoadedProgram.Execute(Int32 index, LyrValue[] arguments, DebugController debug, ExecutionBudget budget, Boolean[] globalsReady, Boolean interpretOnly) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\LoadedProgram.cs:line 330
+   at Lyric.Vm.LoadedProgram.RunEntryCore(IReadOnlyList`1 arguments, DebugController debug, ExecutionBudget budget) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\LoadedProgram.cs:line 263
+   at Lyric.Vm.LoadedProgram.RunEntry(IReadOnlyList`1 arguments) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\LoadedProgram.cs:line 235
+   at Lyric.Vm.Interpreter.Run(BytecodeModule module, IReadOnlyList`1 arguments, NativeRegistry natives, Capability granted, Boolean jit) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\Interpreter.cs:line 208
+   at Lyric.Vm.VmHost.Execute(BytecodeModule module, IReadOnlyList`1 arguments, TextWriter output, TextWriter error, Capability granted, Boolean compile) in C:\Users\Olivier\CLionProjects\lyric\src\Lyric.Vm\VmHost.cs:line 44
+   at Lyric.Cli.Runtime.Program.Run(Byte[] bytes, String[] args, TerminalOutput terminal) in C:\Users\Olivier\CLionProjects\lyric\src\Lyrvm\Program.cs:line 86
+   at Lyric.Cli.Runtime.Program.WithModule(String[] args, String command, TerminalOutput terminal, Func`4 run) in C:\Users\Olivier\CLionProjects\lyric\src\Lyrvm\Program.cs:line 177
+   at Lyric.Cli.Runtime.Program.Main(String[] rawArgs) in C:\Users\Olivier\CLionProjects\lyric\src\Lyrvm\Program.cs:line 34

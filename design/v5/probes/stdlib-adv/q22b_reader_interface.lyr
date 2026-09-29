@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.io.error { IoError };
+import std.io.stream { File, open, readSomeOrThrow };
+pub interface Reader {
+    fn read(into: uint8[]): int throws IoError;
+}
+extend File :: [Reader] {
+    fn read(into: uint8[]): int throws IoError { return 0; }
+}
+fn readAll(r: Reader): int throws IoError { let buf: uint8[] = [0, 0, 0, 0]; return r.read(buf); }
+fn main(): int throws IoError { let f = open("q22b_reader_interface.lyr"); if (f == null) { return 1; } let n = readAll(f); println(n); return 0; }

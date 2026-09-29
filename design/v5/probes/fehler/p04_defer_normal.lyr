@@ -1,0 +1,16 @@
+// KONTROLLE: nicht-werfende defer-Kette, LIFO, vor dem return.
+// ERWARTUNG: body / d3 / d2 / d1 / returned 7, exit 0
+import std.io.console { println };
+
+fn work(): int {
+    defer println("d1");
+    defer println("d2");
+    defer println("d3");
+    println("body");
+    return 7;
+}
+
+fn main(): int {
+    println(f"returned {work()}");
+    return 0;
+}

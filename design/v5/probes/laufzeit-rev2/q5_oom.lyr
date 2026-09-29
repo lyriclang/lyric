@@ -1,0 +1,14 @@
+// Q5 — Was verspricht die Laufzeit, wenn die ALLOKATION FEHLSCHLAEGT?
+// ERWARTUNG VOR DEM LAUF: KEINE Panik. VmHost.Execute (src/Lyric.Vm/VmHost.cs:36-58) faengt
+// nur LyricPanic und LyricRuntimeException; eine .NET-OutOfMemoryException aus
+// 'new LyrValue[n]' verlaesst die VM roh -> unbehandelte Ausnahme, .NET-Stacktrace,
+// Exit-Code ist NICHT 101.
+// KONTROLLE (q5b): dieselbe Stelle knapp UNTER der Grenze -> saubere Panik LYR-VM0006.
+import std.io.console { println };
+
+fn main(): int {
+    let n = 2000000000; // 2e9 Elemente x 16 B = 32 GB — kein Rechner hat das
+    let xs = [1] * n;
+    println(f"unerreichbar {xs.length}");
+    return 0;
+}

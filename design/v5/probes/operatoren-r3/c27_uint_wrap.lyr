@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromUint };
+fn main(): int {
+    var n = 1;
+    println(fromUint(-n as uint));
+    return 0;
+}

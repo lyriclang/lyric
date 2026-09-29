@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.math { sin, sqrt, pow };
+
+let S = comptime sin(1.0);
+let Q = comptime sqrt(2.0);
+let W = comptime pow(1.0000001, 100000.0);
+
+fn main(): int {
+    println(f"{S}");
+    println(f"{Q}");
+    println(f"{W}");
+    return 0;
+}

@@ -1,0 +1,3 @@
+module lib;
+
+pub fn hidden(): int { return 7; }

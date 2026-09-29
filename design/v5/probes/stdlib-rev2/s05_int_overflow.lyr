@@ -1,0 +1,12 @@
+import std.string { fromInt };
+import std.io.console { println };
+import std.math { checkedAdd };
+
+fn main(): int {
+    let a = 9223372036854775807;
+    let b = a + 1;
+    println(fromInt(b));
+    let c = checkedAdd(a, 1);
+    if (c == null) { println("checked: null"); } else { println("checked: value"); }
+    return 0;
+}

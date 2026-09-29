@@ -1,0 +1,7 @@
+module mid;
+
+import leaf;
+
+pub type Id = leaf.Inner;
+
+pub fn makeIt(): Id { return leaf.make(); }

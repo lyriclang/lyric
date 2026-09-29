@@ -1,0 +1,6 @@
+import std.core { Equatable, Hashable };
+struct P :: [Equatable<P>, Hashable<P>] {
+    x: int,
+    fn equals(other: P): bool { return this.x == other.x; }
+}
+fn main(): int { return 0; }

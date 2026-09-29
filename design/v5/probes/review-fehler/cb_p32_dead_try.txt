@@ -1,0 +1,6 @@
+./p32_dead_try.lyr:11:14: warning[LYR-SEM0071]: catch binding 'e' is never used
+    } catch (e: Boom) {
+             ^
+  note: name it '_' when the value is deliberately unused
+
+./p32_dead_try.lyrbc: 2902 bytes

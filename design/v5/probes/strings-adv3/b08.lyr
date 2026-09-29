@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let e = "";
+    let a = "a";
+    println(f"{e.hash()} {a.hash()} {e.compare(a)} {a.compare(e)}");
+    return 0;
+}

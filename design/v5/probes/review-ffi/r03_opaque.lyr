@@ -1,0 +1,4 @@
+import std.io.console { println };
+opaque type Handle = int;
+extern "dotnet" fn absH(h: Handle): int = "System.Math::Abs";
+fn main(): int { return 0; }

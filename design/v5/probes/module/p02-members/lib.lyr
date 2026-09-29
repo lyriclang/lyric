@@ -1,0 +1,11 @@
+module lib;
+
+pub struct Point { x: int, y: int, }
+
+pub class Counter {
+    count: int,
+    pub fn bump(): int { this.count = this.count + 1; return this.count; }
+    fn secret(): int { return 42; }
+}
+
+pub fn newCounter(): Counter { return Counter { count = 0 }; }

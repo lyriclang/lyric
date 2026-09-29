@@ -1,0 +1,5 @@
+module lib;
+
+extend int {
+    pub fn dbl(): int { return this * 2; }
+}

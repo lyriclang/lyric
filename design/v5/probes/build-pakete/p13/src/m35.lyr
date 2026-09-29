@@ -1,0 +1,3 @@
+module m35;
+pub fn v35(): int { return 35; }
+pub fn w35(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 35; } return s; }

@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn k(x: int64): string { return "i64"; }
+fn k(x: float): string { return "f"; }
+fn main(): int { println(k(2)); return 0; }

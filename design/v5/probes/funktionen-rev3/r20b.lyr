@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn run(v: int, f: fn(int) -> int): int { return f(v); }
+fn main(): int {
+    println(fromInt(run(5) { let g = (n: int) => { return it + n; }; return g(1); }));
+    return 0;
+}

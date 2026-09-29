@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    let b: ?bool = true;
+    match (b) {
+        true => println("t"),
+        false => println("f"),
+        null => println("n"),
+    }
+    return 0;
+}

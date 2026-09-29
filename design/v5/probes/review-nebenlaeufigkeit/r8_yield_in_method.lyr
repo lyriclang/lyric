@@ -1,0 +1,25 @@
+import std.io.console { println };
+
+class Box {
+    v: int,
+
+    fn emit(): void {
+        yield this.v;
+        yield this.v + 1;
+    }
+}
+
+fn gen(): Coroutine<int> {
+    let b = Box { v = 10 };
+    b.emit();
+}
+
+fn main(): int {
+    let co = gen();
+    var x = co.next();
+    while (x != null) {
+        println(f"got {x}");
+        x = co.next();
+    }
+    return 0;
+}

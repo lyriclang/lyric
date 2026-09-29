@@ -1,0 +1,10 @@
+import std.test { Test, assertEq };
+
+@Test
+pub fn aa_returns_int(): int { return 7; }
+
+@Test
+fn bb_not_public(): void { assertEq(1, 1); }
+
+@Test
+pub fn cc_takes_a_param(n: int): void { assertEq(n, n); }

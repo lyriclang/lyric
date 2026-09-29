@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [0] * 200;
+    xs[97] = 42;
+    let c: char = 'a';
+    println(f"via char index: {xs[c]}");
+    let u: uint8 = 3u8;
+    xs[u] = 7;
+    println(f"via uint8 index: {xs[3]}");
+    return 0;
+}

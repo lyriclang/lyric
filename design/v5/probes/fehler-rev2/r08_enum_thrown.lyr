@@ -1,0 +1,13 @@
+// ERWARTUNG: LYR-CLI0020 ir-verifier — "only class and interface values are throwable".
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Missing(string),
+    Broken(int);
+    pub fn message(): string {
+        return match (this) { Missing(s) => s, Broken(n) => "broken", };
+    }
+}
+fn f(): int throws Fault { throw Fault.Missing("k"); }
+fn main(): int {
+    try { return f(); } catch (e) { println("caught"); return 0; }
+}

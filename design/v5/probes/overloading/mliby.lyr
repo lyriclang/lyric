@@ -1,0 +1,2 @@
+module mliby;
+pub fn area(s: string): string { return "y-string"; }

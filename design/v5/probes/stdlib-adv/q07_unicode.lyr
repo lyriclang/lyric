@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { isAlpha, isWhitespace, isUpper, isDigit };
+fn main(): int {
+    println(isWhitespace(160 as char));
+    println(isAlpha(228 as char));
+    println(isUpper(196 as char));
+    println("\u{00C4}".toLower());
+    println(isAlpha('a'));
+    println(isDigit(1633 as char));
+    return 0;
+}

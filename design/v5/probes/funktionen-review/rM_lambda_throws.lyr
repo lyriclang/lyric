@@ -1,0 +1,8 @@
+import std.io.console { println };
+error Boom { }
+fn run(f: fn(int) -> int): int { return f(1); }
+fn main(): int {
+    let r = run((n: int) => { throw Boom { }; });
+    println("x");
+    return 0;
+}

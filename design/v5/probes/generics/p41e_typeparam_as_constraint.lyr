@@ -1,0 +1,3 @@
+fn f<T, U :: [T]>(x: T, y: U): int { return 1; }
+
+fn main(): int { return 0; }

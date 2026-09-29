@@ -1,0 +1,20 @@
+// R1c — KONTROLLE zu R1: main enthaelt eine Closure, die der JIT sicher ablehnt.
+// Erwartung: mit --jit derselbe vollstaendige Backtrace wie ohne.
+import std.io.console { println };
+
+fn hot(xs: int[], i: int): int {
+    return xs[i] + 1;
+}
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    var acc = 0;
+    let bump = (v: int): int => { return v + acc; };
+    var k = 0;
+    while (k < 200000) {
+        acc = acc + hot(xs, k % 3);
+        k = k + 1;
+    }
+    println(f"warm={acc} {bump(0)}");
+    return hot(xs, 99);
+}

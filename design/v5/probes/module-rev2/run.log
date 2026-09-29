@@ -1,0 +1,205 @@
+=================== q01 (main.lyr)
+main.lyr:1:12: error[LYR-PAR0011]: expected a type, got Pub
+struct S { pub x: int, }
+           ^^^
+
+main.lyr:1:12: error[LYR-PAR0026]: expected field name, got Pub
+struct S { pub x: int, }
+           ^^^
+  note: 'pub' is a keyword and cannot be used as a name
+
+main.lyr:1:12: error[LYR-PAR0031]: expected ':' after field name
+struct S { pub x: int, }
+           ^^^
+
+[build exit 1]
+=================== q01k (main.lyr)
+out.lyrbc: 1961 bytes
+[build exit 0]
+[run exit 4]
+=================== q02 (main.lyr)
+out.lyrbc: 1961 bytes
+[build exit 0]
+[run exit 4]
+=================== q03 (main.lyr)
+out.lyrbc: 1929 bytes
+[build exit 0]
+[run exit 3]
+=================== q03b (main.lyr)
+out.lyrbc: 2781 bytes
+[build exit 0]
+9
+[run exit 0]
+=================== q03d (main.lyr)
+out.lyrbc: 2880 bytes
+[build exit 0]
+ab
+X
+1-2
+[run exit 0]
+=================== q05a (main.lyr)
+out.lyrbc: 1937 bytes
+[build exit 0]
+[run exit 5]
+=================== q05b (main.lyr)
+main.lyr:1:1: error[LYR-RES0001]: 'lib' is already declared in this module
+import lib;
+^^^^^^^^^^^
+  note: previous declaration — main.lyr:2:1
+
+[build exit 1]
+=================== q10 (main.lyr)
+main.lyr:1:1: error[LYR-RES0003]: cannot find module 'std.io.consol'
+import std.io.consol { println };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[build exit 1]
+=================== q10k (main.lyr)
+main.lyr:2:25: error[LYR-SEM0002]: unknown identifier 'g'
+fn main(): int { return g(); }
+                        ^
+  note: did you mean 'f'?
+
+[build exit 1]
+=================== q03c (main.lyr)
+out.lyrbc: 2793 bytes
+[build exit 0]
+9
+[run exit 0]
+=================== q06 (main.lyr)
+out.lyrbc: 2786 bytes
+[build exit 0]
+2
+[run exit 0]
+=================== q06k (main.lyr)
+main.lyr:2:1: error[LYR-RES0004]: 'cbrt' is not public in 'lib'
+import lib { cbrt };
+^^^^^^^^^^^^^^^^^^^^
+
+[build exit 1]
+=================== q07 (main.lyr)
+error[LYR-CLI0020]: ir-verifier (after the lowering): malformed IR (1 finding(s))␊  a.b.c: duplicate function name — this is a defect in the compiler, not in the program. Please report it with the source that produced it.
+
+[build exit 1]
+=================== q07k (main.lyr)
+out.lyrbc: 2856 bytes
+[build exit 0]
+1
+2
+[run exit 0]
+=================== q08k (main.lyr)
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q08k\b.lyr:1:1: error[LYR-RES0005]: import cycle involving module 'main'
+import main;
+^^^^^^^^^^^^
+
+[build exit 1]
+=================== q09 (main.lyr)
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q09\lib.lyr:1:1: error[LYR-SEM0021]: duplicate 'main' function
+fn main(): int { return 1; }
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[build exit 1]
+=================== q12 (main.lyr)
+out.lyrbc: 1946 bytes
+[build exit 0]
+[run exit 13]
+=================== q12b (main.lyr)
+out.lyrbc: 1942 bytes
+[build exit 0]
+[run exit 6]
+=================== q12c (main.lyr)
+main.lyr:1:12: warning[LYR-SEM0072]: import 'L' is never used
+import lib as L;
+           ^^^^
+
+out.lyrbc: 1942 bytes
+[build exit 0]
+[run exit 6]
+=================== q13 (main.lyr)
+out.lyrbc: 2832 bytes
+[build exit 0]
+3
+[run exit 0]
+=================== q08 (app.lyr)
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q08\app.lyr:1:1: error[LYR-RES0005]: import cycle involving module 'b'
+import b;
+^^^^^^^^^
+
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q08\app.lyr:3:1: error[LYR-SEM0021]: duplicate 'main' function
+fn main(): int { return b.fb(); }
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[build exit 1]
+=================== q08c (app.lyr)
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q08c\app.lyr:1:1: error[LYR-RES0005]: import cycle involving module 'app'
+import app;
+^^^^^^^^^^^
+
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q08c\app.lyr:3:1: error[LYR-SEM0021]: duplicate 'main' function
+fn main(): int { return app.fa(); }
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[build exit 1]
+=================== q04 (api.lyr, lib)
+api.lyrbc: 1946 bytes
+[build exit 0]
+  entry           (library — no start section)
+  functions       2
+  functions:
+    main.helper                             0      0      1       1       4
+    main.newBox                             0      2      2       1      18
+=================== q04k (api.lyr, lib)
+api.lyrbc: 1944 bytes
+[build exit 0]
+  entry           (library — no start section)
+  functions       2
+  functions:
+    api.helper                              0      0      1       1       4
+    api.newBox                              0      2      2       1      18
+=================== q13 info
+  entry           main.main
+    lib.ident<Secret>                       1      1      1       1       5
+=================== q11 verbose
+out.lyrbc: 2731 bytes
+  read     main.lyr                                 3.6 ms
+  parse    main.lyr                                67.5 ms
+  load     std.string, std.core, std.iter, ...     92.5 ms
+  resolve  8 modules                               26.7 ms
+  check    8 modules                              217.4 ms
+  lower    3 functions                            283.6 ms
+  verify   3 functions                             91.2 ms
+  emit     3 functions                            103.3 ms
+  -----------------------------------------------------
+           total                                  959.6 ms
+=================== q14 lyric test / check
+PASS calc_test.doubles
+1 test(s), all passed
+[test exit 0]
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q14: 2 modules ok
+[check exit 0]
+=================== q14k lyric test
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\module-rev2\q14k\tests\calc_test.lyr:2:1: error[LYR-RES0004]: 'internalDouble' is not public in 'calc'
+import calc { internalDouble };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+0 test(s), 1 FAILED
+[test exit 1]
+=========== q13b
+error[LYR-CLI0020]: ir-verifier (after the lowering): malformed IR (2 finding(s))␊  other.go: bb0: #3: call to lib.ident<Secret>: arg 0 is val ty22, expected val ty0␊  other.go: bb0: #3: call dest t2 is val ty22 but lib.ident<Secret> returns val ty0 — this is a defect in the compiler, not in the program. Please report it with the source that produced it.
+
+[build 1]
+[run 1]
+=========== q13c
+out.lyrbc: 2950 bytes
+[build 0]
+3
+7
+[run 0]
+=========== q16
+out.lyrbc: 1946 bytes
+[build 0]
+[run 13]
+=========== q16b
+out.lyrbc: 1950 bytes
+[build 0]
+[run 20]

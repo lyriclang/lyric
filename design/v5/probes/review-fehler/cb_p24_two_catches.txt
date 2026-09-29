@@ -1,0 +1,12 @@
+./p24_two_catches.lyr:5:1: error[LYR-SEM0051]: 'f' has no body; only standard-library modules may declare native functions
+fn f(which: int): int throws A, B { return 0; }
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+./p24_two_catches.lyr:5:31: error[LYR-PAR0016]: expected '{' or ';' to end function
+fn f(which: int): int throws A, B { return 0; }
+                              ^
+
+./p24_two_catches.lyr:5:31: error[LYR-PAR0025]: expected a declaration, got Comma
+fn f(which: int): int throws A, B { return 0; }
+                              ^
+

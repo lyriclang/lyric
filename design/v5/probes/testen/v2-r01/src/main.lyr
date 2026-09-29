@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+pub fn twice(n: int): int { return n * 2; }
+
+fn main(): int {
+    println("ok");
+    return 0;
+}

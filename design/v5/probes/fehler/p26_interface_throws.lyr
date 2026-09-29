@@ -1,0 +1,11 @@
+// ERWARTUNG: Konformanz verlangt Teilmenge. Impl wirft mehr als das Interface deklariert -> Fehler.
+class A :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+interface Source {
+    fn read(): int throws A;
+}
+
+class Loud :: [Source] {
+    fn read(): int throws { throw A { what = "x" }; }
+}
+fn main(): int { return 0; }

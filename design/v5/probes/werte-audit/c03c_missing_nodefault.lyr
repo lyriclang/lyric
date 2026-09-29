@@ -1,0 +1,2 @@
+struct D { a: int, b: int, }
+fn main(): int { let d = D { }; return d.b; }

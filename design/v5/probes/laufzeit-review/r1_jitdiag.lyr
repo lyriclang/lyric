@@ -1,0 +1,21 @@
+// R1 — Hat eine Panik in JIT-kompiliertem Code denselben Backtrace wie im Interpreter?
+// Erwartung VOR dem Lauf:
+//   ohne --jit: panic LYR-VM0006, Backtrace nennt 'hot' und 'main'
+//   mit  --jit: 'hot' ist kompiliert (ldelem, arith, call) -> Backtrace ohne 'hot'?
+import std.io.console { println };
+
+fn hot(xs: int[], i: int): int {
+    return xs[i] + 1;
+}
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    var acc = 0;
+    var k = 0;
+    while (k < 200000) {
+        acc = acc + hot(xs, k % 3);
+        k = k + 1;
+    }
+    println(f"warm={acc}");
+    return hot(xs, 99);
+}

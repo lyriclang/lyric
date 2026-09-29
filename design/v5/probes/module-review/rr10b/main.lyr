@@ -1,0 +1,3 @@
+import e1 { ping };
+import e2;
+fn main(): int { return (3).twice() + ping(); }

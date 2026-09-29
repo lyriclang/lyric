@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    what: string,
+
+    fn message(): string {
+        return this.what;
+    }
+}
+
+fn f(): int throws Boom {
+    throw Boom { what = "x" };
+}
+
+fn main(): int {
+    try {
+        return f();
+    } catch (_: Boom) {
+        println("boom");
+        return 0;
+    }
+}

@@ -1,0 +1,5 @@
+module shapes;
+
+pub interface Named { fn name(): string; }
+pub interface Labeled :: [Named] { fn label(): string { return "L" + this.name(); } }
+pub class Tag :: [Labeled] { fn name(): string { return "tag"; } }

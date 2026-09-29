@@ -1,0 +1,2 @@
+import dep { stale };
+fn main(): int { return stale(); }

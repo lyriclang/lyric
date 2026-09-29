@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var z: int = 0; println(f"{1 / z}"); return 0; }

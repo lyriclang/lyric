@@ -1,0 +1,7 @@
+import std.io.console { println };
+import lib { T, viaHidden };
+fn main(): int {
+    println(T { }.h().show());
+    println(viaHidden(T { }).show());
+    return 0;
+}

@@ -1,0 +1,10 @@
+// R3 — float32 im f-String
+// Erwartung: a = 0.10000000149011612, b = 0.1
+import std.io.console { println };
+fn main(): int {
+    let a: float32 = 0.1;
+    let b: float = 0.1;
+    println(f"a={a}");
+    println(f"b={b}");
+    return 0;
+}

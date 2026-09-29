@@ -1,0 +1,5 @@
+module mylib;
+
+fn helper(): int { return 9; }
+pub fn api(): int { return helper(); }
+fn orphan(): int { return 5; }

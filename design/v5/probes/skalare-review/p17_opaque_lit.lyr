@@ -1,0 +1,8 @@
+// ERWARTUNG: SEM0001 (Literal adaptiert nicht an opaque)
+import std.io.console { println };
+opaque type Id = uint8;
+fn main(): int {
+  let i: Id = 5;
+  println(f"{i as uint8}");
+  return 0;
+}

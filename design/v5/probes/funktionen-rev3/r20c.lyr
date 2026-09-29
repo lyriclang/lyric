@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn run(v: int, f: fn(int) -> int): int { return f(v); }
+fn main(): int {
+    let p = (n: int) => { let d = n * 2; d + 1 };
+    println(fromInt(p(1)));
+    println(fromInt(run(5) { let d = it * 2; d + 1 }));
+    return 0;
+}

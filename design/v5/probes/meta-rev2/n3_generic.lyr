@@ -1,0 +1,4 @@
+fn id<T>(x: T): T { return x; }
+fn g<T>(x: T): int { return comptime (1 + 2); }
+let Y: int = comptime id<int>(41);
+fn main(): int { return Y + g<string>("a"); }

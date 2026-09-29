@@ -1,0 +1,11 @@
+interface I {
+    pub fn a(): int;
+    fn b(): int;
+}
+
+struct S :: [I] {
+    fn a(): int { return 1; }
+    fn b(): int { return 2; }
+}
+
+fn main(): int { return 0; }

@@ -1,0 +1,4 @@
+class Boom :: [Throwable] { msg: string, fn message(): string { return this.msg; } }
+fn risky(n: int): int throws Boom { if (n < 0) { throw Boom { msg = "neg" }; } return n; }
+fn useIt(f: fn(int) -> int throws Boom): int throws Boom { return f(1); }
+fn main(): int { return 0; }

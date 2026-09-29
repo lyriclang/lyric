@@ -1,0 +1,6 @@
+import std.core { OnType };
+pub struct Tag :: [OnType] { }
+pub struct Box { v: int }
+@Tag
+extend Box { pub fn get(): int { return this.v; } }
+fn main(): int { return 0; }

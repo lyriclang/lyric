@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let o: ?int8 = null; let v: int8 = o ?? 7; println(f"{v}"); return 0; }

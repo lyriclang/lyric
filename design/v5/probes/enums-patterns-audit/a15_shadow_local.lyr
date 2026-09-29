@@ -1,0 +1,8 @@
+import std.io.console { println };
+enum E { A, B }
+fn main(): int {
+    let B = 5; let e = E.A;
+    let r = match (e) { B => 2, A => 1 };
+    println(f"{r} {B}");
+    return 0;
+}

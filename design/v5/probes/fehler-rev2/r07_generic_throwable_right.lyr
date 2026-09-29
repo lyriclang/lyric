@@ -1,0 +1,15 @@
+// KONTROLLE zu r06: derselbe Bau mit der RICHTIGEN Instanz im catch. ERWARTUNG: faengt, Exit 0.
+import std.io.console { println };
+class Box<T> :: [Throwable] {
+    tag: T,
+    fn message(): string { return "boxed"; }
+}
+fn thrower(): int throws Box<int> { throw Box<int> { tag = 7 }; }
+fn main(): int {
+    try {
+        return thrower();
+    } catch (e: Box<int>) {
+        println(f"caught int box {e.tag}");
+        return 0;
+    }
+}

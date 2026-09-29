@@ -1,0 +1,11 @@
+import std.io.console { println };
+struct Box<T> {
+    v: T,
+    fn put(x: T): string { return "T"; }
+    fn put(x: float): string { return "float"; }
+}
+fn main(): int {
+    let b = Box<string> { v = "a" };
+    println(b.put(2));
+    return 0;
+}

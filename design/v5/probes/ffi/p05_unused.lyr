@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+extern "dotnet" fn neverCalled(x: float): float = "System.Math::Cbrt";
+
+fn main(): int {
+    println("hello");
+    return 0;
+}

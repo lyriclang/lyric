@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { fromInt };
+var g: int = 1;
+fn f(n: int = g): int { return n; }
+fn main(): int {
+    println(fromInt(f()));
+    g = 5;
+    println(fromInt(f()));
+    return 0;
+}

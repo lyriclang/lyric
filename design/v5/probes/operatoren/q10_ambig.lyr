@@ -1,0 +1,11 @@
+import std.core { Mul };
+struct V :: [Mul<int, V>, Mul<int, int>] {
+    x: int,
+    fn mul(other: int): V { return V { x = this.x * other }; },
+    fn mul2(other: int): int { return this.x * other; }
+}
+fn main(): int {
+    let v = V { x = 2 };
+    let r = v * 3;
+    return 0;
+}

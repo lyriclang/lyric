@@ -1,0 +1,9 @@
+import std.core { OnFunction };
+
+pub enum Level { Low, High }
+pub struct Tag :: [OnFunction] { level: Level = Level.Low }
+
+@Tag { level = Level.High }
+pub fn f(): void { }
+
+fn main(): int { return 0; }

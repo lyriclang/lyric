@@ -1,0 +1,4 @@
+import std.io.console { println };
+enum Opt<T> { Some(T), None }
+fn f(o: Opt<int>): int { return match (o) { Opt<int>.Some(x) => x, Opt<int>.None => 0 }; }
+fn main(): int { println(f"{f(Opt<int>.Some(3))}"); return 0; }

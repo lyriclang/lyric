@@ -1,0 +1,5 @@
+module wrap;
+
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+
+pub fn root(x: float): float { return cbrt(x); }

@@ -1,0 +1,2 @@
+module b;
+pub fn hi(): string { return "b"; }

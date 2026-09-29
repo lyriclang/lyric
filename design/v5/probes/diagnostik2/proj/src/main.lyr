@@ -1,0 +1,8 @@
+import std.io.console { println };
+import greeting { text };
+
+fn main(): int {
+    let unused = 42;
+    println(text("Lyric"));
+    return 0;
+}

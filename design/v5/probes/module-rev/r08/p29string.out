@@ -1,0 +1,36 @@
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:45:1: error[LYR-RES0004]: module 'std.string' has no exported 'repeat'
+import std.string { repeat, fromChar, digitToChar };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:45:1: error[LYR-RES0004]: module 'std.string' has no exported 'fromChar'
+import std.string { repeat, fromChar, digitToChar };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:45:1: error[LYR-RES0004]: module 'std.string' has no exported 'digitToChar'
+import std.string { repeat, fromChar, digitToChar };
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:105:12: error[LYR-SEM0012]: 'string' has no member 'padStart'
+    return formatHex(value).padStart(width, '0');
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:112:12: error[LYR-SEM0012]: 'string' has no member 'padStart'
+    return value.padStart(width, ' ');
+           ^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:117:12: error[LYR-SEM0012]: 'string' has no member 'padEnd'
+    return value.padEnd(width, ' ');
+           ^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:124:27: error[LYR-SEM0012]: 'string' has no member 'length'
+    let missing = width - value.length();
+                          ^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:182:21: error[LYR-SEM0012]: 'string' has no member 'length'
+            let l = rows[i][j].length();
+                    ^^^^^^^^^^^^^^^^^
+
+C:\Users\Olivier\CLionProjects\lyric\src\Lyrc\bin\Debug\net10.0\stdlib\std\fmt.lyr:205:64: error[LYR-SEM0012]: 'string' has no member 'padEnd'
+            result = result + (if (j == columns - 1) cell else cell.padEnd(widths[j], ' '));
+                                                               ^^^^^^^^^^^
+

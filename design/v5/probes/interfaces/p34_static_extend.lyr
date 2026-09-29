@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+struct P { x: int, }
+
+extend P {
+    static fn origin(): P { return P { x = 0 }; }
+}
+
+fn main(): int {
+    let p = P.origin();
+    println(f"{p.x}");
+    return 0;
+}

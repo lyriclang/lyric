@@ -1,0 +1,13 @@
+interface AlphaInterfaceOne { fn a1(): int; }
+interface BetaInterfaceTwo { fn b2(): int; }
+interface GammaInterfaceThree { fn g3(): int; }
+interface DeltaInterfaceFour { fn d4(): int; }
+interface EpsilonInterfaceFive { fn e5(): int; }
+class Everything :: [AlphaInterfaceOne, BetaInterfaceTwo, GammaInterfaceThree, DeltaInterfaceFour, EpsilonInterfaceFive] {
+    fn a1(): int { return 1; }
+    fn b2(): int { return 2; }
+    fn g3(): int { return 3; }
+    fn d4(): int { return 4; }
+    fn e5(): int { return 5; }
+}
+fn main(): int { return 0; }

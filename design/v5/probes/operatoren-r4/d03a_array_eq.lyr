@@ -1,0 +1,6 @@
+fn main(): int {
+    let a = [1, 2];
+    let b = [1, 2];
+    if (a == b) { return 1; }
+    return 0;
+}

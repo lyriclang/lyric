@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn main(): int {
+    let eq = "a" == "b";
+    let lt = "a" < "b";
+    println(f"{eq} {lt}");
+    return 0;
+}

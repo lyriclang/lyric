@@ -1,0 +1,41 @@
+import std.io.console { println };
+import std.math { sqrt };
+
+extern "dotnet" fn xsqrt(x: float): float = "System.Math::Sqrt";
+extern "dotnet" fn ticks(): int = "System.Diagnostics.Stopwatch::GetTimestamp";
+
+fn plain(x: float): float { return x * 0.5 + 1.0; }
+
+// 10 MHz kalibriert (q11): 1 Tick = 100 ns. ns je Iteration = (dt * 100) / n
+fn perIter(dt: int, n: int): float {
+    return (dt as float) * 100.0 / (n as float);
+}
+
+fn main(): int {
+    let n = 5000000;
+    var acc = 0.0;
+    // Aufwaermen: jede Form einmal, damit JIT und Bindung stehen
+    var w = 0;
+    while (w < 20000) { acc = acc + xsqrt(2.0) + sqrt(2.0) + plain(2.0); w = w + 1; }
+
+    let t0 = ticks();
+    var i = 0;
+    while (i < n) { acc = acc + 1.0; i = i + 1; }
+    let t1 = ticks();
+    i = 0;
+    while (i < n) { acc = acc + plain(2.0); i = i + 1; }
+    let t2 = ticks();
+    i = 0;
+    while (i < n) { acc = acc + sqrt(2.0); i = i + 1; }
+    let t3 = ticks();
+    i = 0;
+    while (i < n) { acc = acc + xsqrt(2.0); i = i + 1; }
+    let t4 = ticks();
+
+    println(f"empty   ns/iter={perIter(t1 - t0, n)}");
+    println(f"lyric   ns/iter={perIter(t2 - t1, n)}");
+    println(f"native  ns/iter={perIter(t3 - t2, n)}");
+    println(f"extern  ns/iter={perIter(t4 - t3, n)}");
+    println(f"acc={acc}");
+    return 0;
+}

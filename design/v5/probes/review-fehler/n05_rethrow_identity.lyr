@@ -1,0 +1,10 @@
+// ERWARTUNG: ein Rethrow reicht DASSELBE Objekt weiter (Referenzsemantik) -> mark == 7.
+import std.io.console { println };
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+fn inner(): int throws Boom { throw Boom { }; }
+fn mid(): int throws Boom {
+    try { return inner(); } catch (e: Boom) { e.mark = 7; throw e; }
+}
+fn main(): int {
+    try { return mid(); } catch (e: Boom) { println(f"mark={e.mark}"); return 0; }
+}

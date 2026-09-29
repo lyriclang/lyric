@@ -1,0 +1,3 @@
+// ERWARTUNG: LYR-CLI0020 ir-verifier — 'never' in Parameterposition wird zu void.
+fn g(x: never): int { return 1; }
+fn main(): int { return 0; }

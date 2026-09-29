@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let s = "hello";
+    let t = s + "";
+    let u = "hel" + "lo";
+    println(f"{s == t} {s == u} {s.substring(1, 10)}");
+    return 0;
+}

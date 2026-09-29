@@ -1,0 +1,30 @@
+// R4 — Wann laeuft ein defer? Drei Wege aus einer Funktion.
+// Erwartung VOR dem Lauf:
+//   normal:  "aufgeraeumt-normal" erscheint
+//   throw:   "aufgeraeumt-throw"  erscheint (Unwind zum catch ist kein Panik)
+//   panic:   "aufgeraeumt-panic"  erscheint NICHT
+import std.io.console { println };
+import std.core { Exception };
+
+fn gut(): int {
+    defer println("aufgeraeumt-normal");
+    return 1;
+}
+
+fn wirft(): int throws Exception {
+    defer println("aufgeraeumt-throw");
+    throw Exception { text = "weg" };
+}
+
+fn main(): int {
+    let a = gut();
+    println(f"gut={a}");
+    try {
+        let b = wirft();
+        println(f"unerreichbar={b}");
+    } catch (e: Exception) {
+        println("gefangen");
+    }
+    println("vor-panik");
+    return 0;
+}

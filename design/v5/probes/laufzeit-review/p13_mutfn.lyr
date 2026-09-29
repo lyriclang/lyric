@@ -1,0 +1,30 @@
+// P13 — 'mut fn' auf einem Struct schreibt den Empfaenger in den Wert des Aufrufers zurueck.
+// Wohin schreibt es, wenn der Empfaenger ein Array-Element, ein Klassenfeld oder ein
+// ausgepacktes Optional ist? (Die C#-Falle "mutable value type in a collection".)
+// Erwartung VOR dem Lauf: Variable 1, Array-Element ?, Klassenfeld ?, let-Bindung ?
+import std.io.console { println };
+
+struct Zaehler {
+    n: int,
+    mut fn hoch(): void { this.n += 1; }
+}
+class Halter { z: Zaehler, }
+
+fn main(): int {
+    var v = Zaehler { n = 0 };
+    v.hoch();
+    println(f"variable   = {v.n}");
+
+    var xs = [Zaehler { n = 0 }];
+    xs[0].hoch();
+    println(f"arrayElem  = {xs[0].n}");
+
+    let h = Halter { z = Zaehler { n = 0 } };
+    h.z.hoch();
+    println(f"klassenfeld= {h.z.n}");
+
+    let l = Zaehler { n = 0 };
+    l.hoch();
+    println(f"letBindung = {l.n}");
+    return 0;
+}

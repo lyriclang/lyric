@@ -1,0 +1,21 @@
+// ERWARTUNG (design/typed-throws.md): der Aufruf substituiert E nicht, ein typisiertes catch
+// deckt nicht -> LYR-SEM0034 o.ae. an der Aufrufstelle.
+import std.io.console { println };
+
+class Boom :: [Throwable] {
+    what: string,
+    fn message(): string { return this.what; }
+}
+
+fn rethrowIt<E :: [Throwable]>(e: E): int throws E {
+    throw e;
+}
+
+fn main(): int {
+    try {
+        return rethrowIt(Boom { what = "x" });
+    } catch (e: Boom) {
+        println("caught");
+        return 0;
+    }
+}

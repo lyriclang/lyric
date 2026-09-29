@@ -1,0 +1,6 @@
+s07_catch_any.lyr:13:13: warning[LYR-SEM0071]: 'v' is never used
+        let v = parseOrThrow("{oops");
+            ^
+  note: name it '_' when the value is deliberately unused
+
+s07.lyrbc: 15849 bytes

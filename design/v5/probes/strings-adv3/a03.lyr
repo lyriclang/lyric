@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    println(f"[{42:8}] [{42:-8}] [{42:08}] [{42:D8}]");
+    return 0;
+}

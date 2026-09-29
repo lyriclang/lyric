@@ -1,0 +1,8 @@
+import std.io.console { println };
+enum E { A(int) }
+fn f(e: E): int {
+    return match (e) {
+        A(x) => { x = x + 1; x },
+    };
+}
+fn main(): int { println(f"{f(E.A(1))}"); return 0; }

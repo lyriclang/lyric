@@ -1,0 +1,9 @@
+import std.core { Exception };
+import std.io.console { println };
+fn risky(n: int): int throws Exception { throw Exception { text = "x" }; }
+fn run(f: fn(int) -> int): int { return f(1); }
+fn main(): int {
+    let r = run((n: int) => risky(n));
+    println("x");
+    return 0;
+}

@@ -1,0 +1,5 @@
+// ERWARTUNG: Exit 101, Backtrace auf stderr.
+import std.core { panic };
+fn deep(): int { panic("kaputt"); return 0; }
+fn mid(): int { return deep(); }
+fn main(): int { return mid(); }

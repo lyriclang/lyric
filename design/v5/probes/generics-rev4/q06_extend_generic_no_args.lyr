@@ -1,0 +1,5 @@
+interface A1 { fn n(): int; }
+class Impl :: [A1] { fn n(): int { return 7; } }
+class Bag<T :: [A1]> { item: T }
+extend Bag { pub fn tell(): int { return this.item.n(); } }
+fn main(): int { let b = Bag<Impl> { item = Impl {} }; return b.tell(); }

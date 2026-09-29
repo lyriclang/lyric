@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.core { Into };
+struct W :: [Into<string>] {
+    v: int,
+    fn into(): string { return "w"; }
+}
+fn main(): int { let w = W { v = 4 }; println(w as string); return 0; }

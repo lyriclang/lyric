@@ -1,0 +1,8 @@
+import std.build { executable };
+import src.shared { label };
+import std.io.console { println };
+
+pub fn build(): void {
+    println(label());
+    executable("ms", "src/main.lyr");
+}

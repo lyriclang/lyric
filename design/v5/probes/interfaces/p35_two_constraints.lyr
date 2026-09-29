@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+interface A { fn a(): int; }
+interface B { fn b(): int; }
+
+struct S :: [A, B] { fn a(): int { return 1; } fn b(): int { return 2; } }
+
+fn both<T :: [A, B]>(x: T): int { return x.a() + x.b(); }
+
+fn main(): int {
+    println(f"{both(S { })}");
+    return 0;
+}

@@ -1,0 +1,69 @@
+// Q2 — Ist die ?Struct-Aliasierung eine FAMILIE? Der Kritiker behauptet: hinter einem
+// INTERFACE-Wert aliast ein Struct genauso, und ein aus einem Interface-Array gelesener
+// Wert auch.
+//
+// ERWARTUNG VOR DEM LAUF (aus FunctionLowerer.cs:3040-3052 gelesen):
+//   wrapKopie   = 0    das EINPACKEN kopiert (Zeile 3046-3047 kopiert, wenn source ein
+//                      Struct ist) -> die Quelle bleibt unberuehrt
+//   ifaceAlias  = 1    das BINDEN eines bereits gewrappten Interface-Werts kopiert NICHT
+//                      (source ist dann IrInterfaceType, die Kopierbedingung greift nicht)
+//   elemAlias   = 1    ein aus einem Interface-ARRAY gelesener Wert aliast ebenso
+//   frischKontr = 0    KONTROLLE: zwei FRISCHE Einpackungen derselben Variablen bleiben
+//                      unabhaengig
+//   nacktKontr  = 0    KONTROLLE: ein NACKTES Struct aus einem Array gelesen kopiert
+import std.io.console { println };
+
+interface Zaehlbar { mut fn hoch(): void; fn wert(): int; }
+
+struct Zaehler {
+    n: int,
+    mut fn hoch(): void { this.n += 1; }
+    fn wert(): int { return this.n; }
+}
+
+extend Zaehler :: [Zaehlbar] {}
+
+fn main(): int {
+    // 1. Einpacken kopiert?
+    var a = Zaehler { n = 0 };
+    let w: Zaehlbar = a;
+    w.hoch();
+    println(f"wrapKopie   = {a.wert()}");
+
+    // 2. Interface -> Interface binden
+    var b = Zaehler { n = 0 };
+    let p: Zaehlbar = b;
+    let q: Zaehlbar = p;
+    p.hoch();
+    println(f"ifaceAlias  = {q.wert()}");
+
+    // 3. Aus einem Interface-Array herauslesen
+    var c = Zaehler { n = 0 };
+    let xs: Zaehlbar[] = [c];
+    let el = xs[0];
+    el.hoch();
+    println(f"elemAlias   = {xs[0].wert()}");
+
+    // 4. KONTROLLE: zwei frische Einpackungen derselben Variablen
+    var d = Zaehler { n = 0 };
+    let e1: Zaehlbar = d;
+    let e2: Zaehlbar = d;
+    e1.hoch();
+    println(f"frischKontr = {e2.wert()}");
+
+    // 5. KONTROLLE: nacktes Struct aus einem Array
+    var ff = Zaehler { n = 0 };
+    let ys: Zaehler[] = [ff];
+    var el2 = ys[0];
+    el2.hoch();
+    println(f"nacktKontr  = {ys[0].wert()}");
+
+    // 6. Ein Interface-Wert als ARGUMENT an eine Funktion, die ihn mutiert
+    var g = Zaehler { n = 0 };
+    let h: Zaehlbar = g;
+    mutiere(h);
+    println(f"argAlias    = {h.wert()}");
+    return 0;
+}
+
+fn mutiere(z: Zaehlbar): void { z.hoch(); }

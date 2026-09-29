@@ -1,0 +1,32 @@
+// P1 — Wie tief geht eine Struct-Kopie?
+import std.io.console { println };
+
+struct Inner { n: int, }
+struct Outer { inner: Inner, }
+struct Boxed { xs: int[], }
+class Cell { v: int, }
+struct Holder { c: Cell, }
+
+fn main(): int {
+    var a = Inner { n = 1 };
+    var b = a;
+    b.n = 99;
+    println(f"flach   = {a.n}");
+
+    var o1 = Outer { inner = Inner { n = 1 } };
+    var o2 = o1;
+    o2.inner.n = 99;
+    println(f"nested  = {o1.inner.n}");
+
+    var x1 = Boxed { xs = [1, 2, 3] };
+    var x2 = x1;
+    x2.xs[0] = 99;
+    println(f"array   = {x1.xs[0]}");
+
+    var h1 = Holder { c = Cell { v = 1 } };
+    var h2 = h1;
+    h2.c.v = 99;
+    println(f"class   = {h1.c.v}");
+
+    return 0;
+}

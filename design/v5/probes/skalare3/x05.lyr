@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let big: uint = 18446744073709551615; println(f"{big >> 63}"); println(f"{big >> 1}"); let s: int = -1; println(f"{s >> 63}"); println(f"{s >> 1}"); return 0; }

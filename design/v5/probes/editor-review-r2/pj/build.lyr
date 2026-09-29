@@ -1,0 +1,5 @@
+import std.build { library };
+
+pub fn build() {
+    library("pj", "src");
+}

@@ -1,0 +1,21 @@
+Erwartungen VOR dem Lauf (ffi-rev3, Nachpruefung der Kritik an ffi.md 2. Fassung), 2026-09-27
+
+r01 Kosten (q12 unveraendert), Debug-lyrvm, Interp x3 und --jit x3:
+    Erwartung: Interp-Aufschlaege streuen stark (Debug-VM), keine stabile Reihenfolge Lyric vs extern.
+    JIT: extern > Lyric > native, Absolutwerte um 100 ns extern.
+r02 Kosten, Release-lyrvm (bin/Release/net10.0), Interp x3 und --jit x3:
+    Erwartung (nach Kritik): leer ~75, Lyric und extern im Interp etwa gleich (~90);
+    JIT: leer ~1, Lyric ~30, native ~20, extern ~75  => extern ~2.5x Lyric, extern-native ~50-58 ns.
+r03 lyrc build --no-optimize a09_bogus.lyr -> info: imports 1, capabilities 0x8 (Prune laeuft im Lowerer, ModuleLowerer.cs:586 unbedingt)
+r04 a06 Lambda: apply(x => cbrt(x), 27.0) mit import std.math -> druckt 3, exit 0.
+    Kontrolle a05: apply(cbrt, 27.0) -> LYR-IR0001 beim Bauen.
+r05 a13 comptime xsqrt(4.0) -> LYR-CT0002 (compile-time evaluation grants none), kein Bytecode.
+r06 a04 lone-surrogate string .charAt(0) -> roher CLR-Trace, exit 127 (VmHost faengt nur LyricPanic/LyricRuntimeException).
+r07 lyrc check mit Symbol "NoSeparator" (kein '::') -> SEM0099 (Spec sagt: 'a symbol that is not Type::Method').
+    lyrc check mit "No.Such.Type::Nope" -> ok (kein Assembly-Laden im Compiler).
+r08 Typnamen-Grammatik: "System.Math, System.Runtime::Cbrt" -> bindet (Type-Forwarding), 
+    "System.Math, System.Private.CoreLib::Cbrt" -> bindet; "global::System.Math::Cbrt" -> VM0005.
+r09 Bindekosten: 1 extern vs 40 externs (System.Math), lyrvm run --verbose: die Bind-/Load-Phase waechst messbar
+    (Erwartung: einige ms fuer 40, da GetMethods je Import).
+r10 lyrvm verify mit "Foo.Bar, NoSuchAssembly::Baz" -> VM0005 mit 'no .NET type' (verify bindet, versucht also zu laden).
+r11 lyrfmt auf einer extern-Datei: idempotent (zweiter Lauf aendert nichts).

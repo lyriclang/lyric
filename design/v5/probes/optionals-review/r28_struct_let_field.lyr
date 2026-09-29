@@ -1,0 +1,6 @@
+struct S { v: ?int }
+fn main(): int {
+    let s = S { v = 1 };
+    s.v = null;
+    return 0;
+}

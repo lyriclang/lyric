@@ -1,0 +1,9 @@
+// ERWARTUNG: kompiliert, druckt -128 und -1
+import std.io.console { println };
+fn main(): int {
+  let x: int8 = -128;
+  println(f"{x}");
+  let y: int8 = -1;
+  println(f"{y}");
+  return 0;
+}

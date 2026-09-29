@@ -1,0 +1,13 @@
+import std.io.console { println };
+fn main(): int {
+    let s = "e\u{301}x";
+    var n = 0;
+    for (c in s) { n = n + 1; }
+    println(f"iter_combining={n}");
+    let emoji = "\u{1F600}a";
+    var m = 0;
+    for (c in emoji) { m = m + 1; }
+    println(f"iter_emoji={m}");
+    println(f"{s}");
+    return 0;
+}

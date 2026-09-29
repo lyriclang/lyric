@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+enum E { Lit(int), Add(E, E) }
+
+fn f(e: E): int {
+    return match (e) {
+        Add(Lit(0) | Lit(1), r) => 100,
+        Add(_, _) => 2,
+        Lit(n) => n,
+    };
+}
+
+fn main(): int { println(f"{f(E.Add(E.Lit(1), E.Lit(9)))} {f(E.Add(E.Lit(5), E.Lit(9)))}"); return 0; }

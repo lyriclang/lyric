@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct S { b: bool, o: ?int }
+fn main(): int {
+    var s = S { b = false, o = null };
+    s.b ||= true;
+    s.o ??= 7;
+    var bs = [false, false];
+    bs[0] ||= true;
+    bs[1] &&= true;
+    if (s.b) { println("field-or"); }
+    if (bs[0]) { println("elem-or"); }
+    return 0;
+}

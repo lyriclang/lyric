@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.io.file;
+
+fn main(): int {
+    let t = file.text("q01-out.txt");
+    if (t != null) { println(t); } else { println("none"); }
+    return 0;
+}

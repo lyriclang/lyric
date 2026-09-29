@@ -1,0 +1,9 @@
+import std.io.console { println };
+enum S { Pair(bool, bool), Dot }
+fn f(s: S): int {
+    return match (s) {
+        Pair(x, y) => 1,
+        Dot => 2,
+    };
+}
+fn main(): int { println(f"{f(S.Pair(true,false))}"); return 0; }

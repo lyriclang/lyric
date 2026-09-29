@@ -1,0 +1,2 @@
+{ "name": "geo", "sourceRoot": "src", "toolchain": "1.0",
+  "nativeRoots": { "nat": "natdir" } }

@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct S { v: int, }
+struct Box<T> { t: T, }
+fn main(): int {
+    var s = S { v = 1 };
+    var b = Box<S> { t = s };
+    b.t.v = 9;
+    println(f"q12 s.v={s.v} b.t.v={b.t.v}");
+    var c = b;
+    c.t.v = 7;
+    println(f"q12 b.t.v={b.t.v} c.t.v={c.t.v}");
+    return 0;
+}

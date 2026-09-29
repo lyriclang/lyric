@@ -1,0 +1,7 @@
+module lib;
+pub fn greet(name: string, greeting: string = "Hello"): string { return greeting + ", " + name; }
+pub fn total(params values: int[]): int {
+    var sum = 0;
+    for (v in values) { sum = sum + v; }
+    return sum;
+}

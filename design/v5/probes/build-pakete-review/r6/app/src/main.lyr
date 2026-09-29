@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import dep;
+fn main(): int { println(dep.hi()); return 0; }

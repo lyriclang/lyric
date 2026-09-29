@@ -1,0 +1,8 @@
+import std.io.console { println };
+
+fn main(): int {
+    let w = 8;
+    println("before");
+    println(f"[{42:{w}}]");
+    return 0;
+}

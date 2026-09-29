@@ -1,0 +1,8 @@
+r3a_optfield.lyr:14:9: hint[LYR-SEM0075]: 'a' is never reassigned — 'let' would do
+    var a = A { plain = B { n = 1 }, opt = B { n = 1 } };
+        ^
+
+r3a_optfield.lyr:20:9: hint[LYR-SEM0075]: 'd1' is never reassigned — 'let' would do
+    var d1 = D { iface = C { n = 0 } };
+        ^^
+

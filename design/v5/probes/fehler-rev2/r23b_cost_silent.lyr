@@ -1,0 +1,17 @@
+// KONTROLLE zu r23: dieselbe Schleife, dieselbe Verzweigung, stille Form (?int).
+import std.io.console { println };
+fn maybeNull(i: int): ?int {
+    if (i % 2 == 0) { return null; }
+    return i;
+}
+fn main(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 2000000) {
+        let r = maybeNull(i);
+        if (r == null) { sum = sum + 1; } else { sum = sum + r; }
+        i = i + 1;
+    }
+    println(f"{sum}");
+    return 0;
+}

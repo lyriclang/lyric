@@ -1,0 +1,2 @@
+import Lib;
+fn main(): int { return Lib.f(); }

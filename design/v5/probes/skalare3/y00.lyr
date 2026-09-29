@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var a: int = 1; var b: int = 2; var r: int = 0; println(f"{r}"); return 0; }

@@ -1,0 +1,12 @@
+// ERWARTUNG: der defer im nackten Block laeuft am BLOCKENDE, nicht am Funktionsende.
+// Reihenfolge: inner / BLOCK-DEFER / after / FN-DEFER
+import std.io.console { println };
+fn main(): int {
+    defer println("FN-DEFER");
+    {
+        defer println("BLOCK-DEFER");
+        println("inner");
+    }
+    println("after");
+    return 0;
+}

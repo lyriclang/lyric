@@ -1,0 +1,13 @@
+import std.io.console { println };
+
+fn counter<T>(a: T, b: T): Coroutine<T> {
+    yield a;
+    yield b;
+}
+
+fn main(): int {
+    let c = counter<int>(3, 4);
+    var total = 0;
+    for (v in c) { total = total + v; }
+    return total;
+}

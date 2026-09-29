@@ -1,0 +1,32 @@
+// P3 — Ein Interface-Wert ueber einem SKALAR: was traegt der Fat Pointer?
+// LyrValue.FromInterface(instance, ct) => new(ct, instance.Ref). Bei einem int ist Ref == null,
+// also ginge die Zahl verloren.
+// Erwartung VOR dem Lauf:
+//   entweder der Compiler verweigert den Interface-WERT ueber int,
+//   oder "direkt" = 7 und "ueberWert" = 0 (die Zahl ist weg)
+//   und "optIface" waere sogar null (Ref == null == kein Wert)
+import std.io.console { println };
+
+interface Sized { fn size(): int; }
+
+extend int :: [Sized] {
+    pub fn size(): int { return this; }
+}
+
+fn viaValue(s: Sized): int { return s.size(); }
+
+fn main(): int {
+    let n = 7;
+    println(f"direkt    = {n.size()}");
+
+    let s: Sized = n;
+    println(f"ueberWert = {viaValue(s)}");
+
+    let o: ?Sized = s;
+    if (o == null) {
+        println("optIface  = null");
+    } else {
+        println(f"optIface  = {o!.size()}");
+    }
+    return 0;
+}

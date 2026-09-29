@@ -1,0 +1,4 @@
+import std.io.console { println };
+extern "C" fn sl(s: string): int = "libc:strlen";
+extern "dotnet" fn opt(x: int): int = "System.Math::Abs";
+fn main(): int { println("x"); return 0; }

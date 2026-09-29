@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    var f = 1.5;
+    f += 1;
+    println(fromFloat(f));
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct Oops :: [Throwable] { v: int, fn message(): string { return "oops"; } }
+fn boom(): void throws Oops { throw Oops { v = 1 }; }
+fn main(): int {
+    try { boom(); } catch (e: Oops) { e.v = 9; println(f"n07 catch e.v={e.v}"); }
+    return 0;
+}

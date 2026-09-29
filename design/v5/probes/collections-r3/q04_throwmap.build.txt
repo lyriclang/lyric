@@ -1,0 +1,12 @@
+q04_throwmap.lyr:3:33: error[LYR-RES0002]: unresolved type 'Exception'
+fn parse(s: string): int throws Exception { throw Exception("no"); }
+                                ^^^^^^^^^
+
+q04_throwmap.lyr:3:51: error[LYR-SEM0002]: unknown identifier 'Exception'
+fn parse(s: string): int throws Exception { throw Exception("no"); }
+                                                  ^^^^^^^^^
+
+q04_throwmap.lyr:6:27: error[LYR-SEM0037]: 'parse' declares 'throws' and cannot be used as a value — function types carry no throws information; call it directly
+    let it = over(xs).map(parse);
+                          ^^^^^
+

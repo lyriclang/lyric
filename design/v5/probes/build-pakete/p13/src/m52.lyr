@@ -1,0 +1,3 @@
+module m52;
+pub fn v52(): int { return 52; }
+pub fn w52(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 52; } return s; }

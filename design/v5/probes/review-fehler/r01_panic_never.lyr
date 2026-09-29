@@ -1,0 +1,4 @@
+// ERWARTUNG: kompiliert — panic ist 'never' fuer die Flussanalyse (core.lyr:20-23).
+import std.core { panic };
+fn f(): int { panic("x"); }
+fn main(): int { return f(); }

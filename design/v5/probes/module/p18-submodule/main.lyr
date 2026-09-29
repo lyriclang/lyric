@@ -1,0 +1,4 @@
+import a.b;
+import std.io.console;
+
+fn main(): int { console.println(f"{b.g()}"); return 0; }

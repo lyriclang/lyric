@@ -1,0 +1,2 @@
+module mpv2;
+fn m(x: int): string { return "priv-only"; }

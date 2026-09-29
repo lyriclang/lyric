@@ -1,0 +1,2 @@
+import geo { label };
+fn main(): int { return label(); }

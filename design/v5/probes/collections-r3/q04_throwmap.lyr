@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.iter { over };
+fn parse(s: string): int throws Exception { throw Exception("no"); }
+fn main(): int {
+    let xs = ["1", "2"];
+    let it = over(xs).map(parse);
+    println("x");
+    return 0;
+}

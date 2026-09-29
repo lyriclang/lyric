@@ -1,0 +1,2 @@
+struct S { v: int, fn bad(): void { this.v = 9; } }
+fn main(): int { var s = S { v = 1 }; s.bad(); return s.v; }

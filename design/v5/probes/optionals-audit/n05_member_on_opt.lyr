@@ -1,0 +1,8 @@
+import std.io.console { println };
+class P { v: int }
+fn main(): int {
+    let p: ?P = P { v = 1 };
+    let w = p.v;
+    println(f"{w}");
+    return 0;
+}

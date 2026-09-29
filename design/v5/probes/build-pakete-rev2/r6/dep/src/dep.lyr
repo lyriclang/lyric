@@ -1,0 +1,6 @@
+import std.core { Deprecated };
+
+@Deprecated { message = "use fresh()", until = "9.9" }
+pub fn stale(): int { return 1; }
+
+pub fn fresh(): int { return 2; }

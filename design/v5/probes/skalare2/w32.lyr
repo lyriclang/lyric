@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let c = comptime (127i8 + 1i8);
+    println(f"{c}");
+    let d = comptime (100i8 * 100i8);
+    println(f"{d}");
+    return 0;
+}

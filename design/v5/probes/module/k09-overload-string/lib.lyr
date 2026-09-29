@@ -1,0 +1,5 @@
+module lib;
+
+fn h(x: int): int { return x; }
+fn h(s: string): int { return 2; }
+pub fn keep(): int { return h(1) + h("a"); }

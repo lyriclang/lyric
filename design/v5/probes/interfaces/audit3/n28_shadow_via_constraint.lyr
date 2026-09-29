@@ -1,0 +1,14 @@
+import std.io.console { println };
+interface Greeter {
+    fn name(): string;
+    fn greet(): string { return "default"; }
+}
+class C :: [Greeter] { fn name(): string { return "c"; } }
+extend C { fn greet(): string { return "extension"; } }
+fn viaT<T :: [Greeter]>(x: T): string { return x.greet(); }
+fn main(): int {
+    println(viaT(C { }));
+    let g: Greeter = C { };
+    println(viaT(g));
+    return 0;
+}

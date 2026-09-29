@@ -1,0 +1,13 @@
+// ERWARTUNG: defer im catch-Block laeuft beim Verlassen des catch-Blocks.
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws Boom { throw Boom { what = "x" }; }
+fn main(): int {
+    try {
+        return f();
+    } catch (_) {
+        defer println("cleanup in catch");
+        println("handling");
+        return 0;
+    }
+}

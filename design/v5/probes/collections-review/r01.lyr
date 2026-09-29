@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    for (x in 1.5..4.5) { println(f"{x}"); }
+    println("--");
+    let probe: float = 0.5;
+    println(f"{probe}");
+    return 0;
+}

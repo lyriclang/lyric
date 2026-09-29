@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+interface Src<T> {
+    fn get(): T;
+    fn mapped<U>(f: fn(T) -> U): U { return f(this.get()); }
+}
+
+class One :: [Src<int>] {
+    fn get(): int { return 5; }
+}
+
+fn main(): int {
+    let s: Src<int> = One { };
+    println(f"{s.mapped<int>((n: int) => n * 2)}");
+    return 0;
+}

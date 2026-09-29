@@ -1,0 +1,7 @@
+import std.test { Test, assertTrue };
+import std.io.file { writeText };
+
+@Test
+pub fn bb_writes_the_same_file(): void {
+    assertTrue(writeText("probe_leak.txt", "hello"), "the write must succeed");
+}

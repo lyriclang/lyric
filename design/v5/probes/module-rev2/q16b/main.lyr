@@ -1,0 +1,4 @@
+import lib;
+import lib as L;
+import lib { f };
+fn main(): int { return f() + lib.g() + L.g(); }

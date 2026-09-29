@@ -1,0 +1,23 @@
+Erwartungen VOR dem Lauf (2026-09-24):
+r01 testroot-whitebox : Test ruft nicht-pub calc.internalDouble -> ERWARTE: gruen (Loch vorhanden)
+r01k Kontrolle selektiv: import calc { internalDouble } -> ERWARTE: RES0004
+r02 import lib; + import lib as L; -> ERWARTE: beide gebunden, beide rechnen (Kritiker hat recht)
+r03 zwei Module erweitern int mit twice() -> ERWARTE: SEM0044 am Benutzungsort
+r03b import e1 { ping }; (ohne twice zu nennen) + e2 -> ERWARTE: trotzdem SEM0044
+r04 pub type Id = leaf.Inner; als Annotation -> ERWARTE: ok; als Konstruktor mid.Id{v=8} -> ERWARTE: Fehler
+r04k gleicher Alias in EINER Datei, Konstruktor -> ERWARTE: derselbe Fehler (also keine Modulfrage)
+r05 nicht-pub static let in pub class von aussen -> ERWARTE: lesbar (5)
+r06 privates enum von aussen als Wert und im Pattern -> ERWARTE: geht
+r06b extend auf privaten Typ eines fremden Moduls -> ERWARTE: geht
+r06c privates interface als Generics-Schranke -> ERWARTE: geht
+r07 Zyklus a->b->c->a -> ERWARTE: genau 1 Diagnostikum, ohne Pfadangabe
+r08 module std.core; in Entry -> ERWARTE: rund 19 Fehlerzeilen, keiner an meiner Zeile
+r09 import Lib; findet lib.lyr auf Windows -> ERWARTE: kompiliert (ohne Header)
+r09b mit header module lib; -> ERWARTE: RES0006 und ein Pfad Lib.lyr der nicht existiert
+r10 std.io.console.println ohne Import -> ERWARTE: SEM0002 ohne Importvorschlag
+r10b import std; -> ERWARTE: RES0003 ohne Hinweis
+r11 let lib = 5; neben import lib; -> ERWARTE: kompiliert wortlos, lib ist die Zahl
+r12 filelib kapselt std.io.file -> ERWARTE: Capability-Bit im Entry gesetzt, ohne sichtbaren Grund
+r13 extension ohne jedes pub -> ERWARTE: von aussen aufrufbar
+r14 Bibliothek mit pub class Box -> ERWARTE: nur api.newBox in der Tabelle; nicht-pub helper mit vollem Namen
+r15 println ohne import -> ERWARTE: SEM0002 (keine Prelude)

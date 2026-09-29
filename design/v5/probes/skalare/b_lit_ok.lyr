@@ -1,0 +1,23 @@
+import std.io.console { println };
+
+fn takes8(v: int8): int8 { return v; }
+
+struct S { a: int8, b: uint32 }
+
+fn main(): int {
+    let a: int8 = 100;
+    let n: int8 = -8;
+    let mn: int = -9223372036854775808;
+    let u: uint = 18446744073709551615;
+    let h: uint = 0xFFFFFFFFFFFFFFFF;
+    let f32ok: float32 = 16777216;      // 2^24, exact in binary32
+    let fl: float = 9007199254740992;   // 2^53, exact in binary64
+    let arr: int64[] = [1, 2, 3];
+    let m: int64 = if (a > 0i8) 1 else 2;
+    let s = S { a = 7, b = 9 };
+    let x: int8 = 5i8;
+    let y = x + 1;                      // binary-operand context
+    let c = takes8(9);                  // call argument
+    println(f"{a} {n} {mn} {u} {h} {f32ok} {fl} {arr[2]} {m} {s.a} {s.b} {y} {c}");
+    return 0;
+}

@@ -1,0 +1,41 @@
+import std.io.console { println };
+struct S { v: int, }
+struct W2 { n: S, }
+struct A { xs: int[], }
+class C { s: S, o: ?S, }
+fn main(): int {
+    // nested struct copy (control)
+    var a = W2 { n = S { v = 1 } };
+    var b = a;
+    b.n.v = 9;
+    println(f"e01 nested a.n.v={a.n.v} b.n.v={b.n.v}");
+    // shallow copy of array field
+    var p = A { xs = [1, 2] };
+    var q = p;
+    q.xs[0] = 9;
+    println(f"e01 shallow p.xs0={p.xs[0]}");
+    // array of struct: read copies
+    var xs = [S { v = 1 }];
+    var e = xs[0];
+    e.v = 9;
+    println(f"e01 arrayread xs0.v={xs[0].v} e.v={e.v}");
+    // array itself is a reference
+    var ys = xs;
+    ys[0].v = 9;
+    println(f"e01 arrayref xs0.v={xs[0].v}");
+    // class struct field: read copies
+    let c = C { s = S { v = 1 }, o = S { v = 1 } };
+    var t = c.s;
+    t.v = 9;
+    println(f"e01 classfield c.s.v={c.s.v} t.v={t.v}");
+    // class optional-struct field: alias
+    var u = c.o;
+    u!.v = 9;
+    println(f"e01 classopt c.o!.v={c.o!.v}");
+    // closure captures struct by reference
+    var s = S { v = 1 };
+    let f = () => { s.v = 9; };
+    f();
+    println(f"e01 closure s.v={s.v}");
+    return 0;
+}

@@ -1,0 +1,3 @@
+module m26;
+pub fn v26(): int { return 26; }
+pub fn w26(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 26; } return s; }

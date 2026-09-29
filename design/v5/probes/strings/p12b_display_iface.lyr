@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.core { Display };
+import std.string { fromInt };
+
+struct P :: [Display] {
+    x: int,
+    fn show(): string {
+        return "P(" + fromInt(this.x) + ")";
+    }
+}
+
+fn main(): int {
+    let p = P { x = 1 };
+    let d: Display = p;
+    println(d);
+    println(f"hole {d}");
+    return 0;
+}

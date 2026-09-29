@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.iter { over };
+import std.string as strings;
+fn main(): int {
+    let xs = [1, 2, 3, 4, 5];
+    let it = over(xs);
+    for (v in it) { if (v == 3) { break; } }
+    // Was ist danach im Iterator?
+    var rest = "rest:";
+    for (v in it) { rest = rest + " " + strings.fromInt(v); }
+    println(rest);
+    return 0;
+}

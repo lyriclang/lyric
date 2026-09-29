@@ -1,0 +1,4 @@
+import std.core { Hashable };
+import std.collections { Map };
+extend float :: [Hashable<float>] { fn hash(): int { return 0; } }
+fn main(): int { var m = Map<float, int>.empty(); m.set(1.5, 1); return m.length(); }

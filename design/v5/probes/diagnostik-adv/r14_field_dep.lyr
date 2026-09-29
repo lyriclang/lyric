@@ -1,0 +1,11 @@
+import std.core { Deprecated };
+
+struct S {
+    @Deprecated { message = "use y" }
+    x: int = 1,
+}
+
+fn main(): int {
+    let s = S { };
+    return s.x;
+}

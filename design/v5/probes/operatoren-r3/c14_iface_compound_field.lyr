@@ -1,0 +1,11 @@
+import std.core { Add };
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; }
+}
+class H { v: V = V { x = 1 }, }
+fn main(): int {
+    let h = H { };
+    h.v += V { x = 2 };
+    return h.v.x;
+}

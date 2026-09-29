@@ -1,0 +1,7 @@
+import std.io.console { println };
+enum E { A(int), B(int), C }
+fn main(): int {
+    let e = E.B(7);
+    if (let A(x) | B(x) = e) { println(f"{x}"); } else { println("none"); }
+    return 0;
+}

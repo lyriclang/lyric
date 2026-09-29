@@ -1,0 +1,13 @@
+// R2 — Greift MaxCallDepth auch unter --jit?
+// Erwartung VOR dem Lauf: beide Male panic LYR-VM0004 (der JIT lehnt Rekursion ab)
+import std.io.console { println };
+
+fn rec(n: int): int {
+    if (n <= 0) { return 0; }
+    return rec(n - 1) + 1;
+}
+
+fn main(): int {
+    println(f"{rec(1500)}");
+    return 0;
+}

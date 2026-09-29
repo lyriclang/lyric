@@ -1,0 +1,5 @@
+interface A { fn a(): int; }
+interface B :: [A] { fn b(): int; }
+interface C :: [B] { fn c(): int; }
+class K :: [C] { fn a(): int { return 1; } fn b(): int { return 2; } fn c(): int { return 3; } }
+fn main(): int { let c: C = K { }; let b: B = K { }; let a: A = K { }; return c.a() + b.b() + a.a(); }

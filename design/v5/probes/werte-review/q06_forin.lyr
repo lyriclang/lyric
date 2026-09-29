@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var xs = [S { v = 1 }, S { v = 2 }];
+    for (e in xs) { e.v = 9; }
+    println(f"q06 forin xs0={xs[0].v} xs1={xs[1].v}");
+    return 0;
+}

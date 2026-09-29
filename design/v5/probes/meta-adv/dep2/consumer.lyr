@@ -1,0 +1,5 @@
+module main;
+
+import expired2 { fresh };
+
+fn main(): int { return fresh(); }

@@ -1,0 +1,4 @@
+fn main(): int {
+    let xs = [1];
+    return xs[5];
+}

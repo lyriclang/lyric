@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn each(f: fn(int) -> void): void { f(1); }
+fn main(): int {
+    each({ it; println("paren-block"); });
+    return 0;
+}

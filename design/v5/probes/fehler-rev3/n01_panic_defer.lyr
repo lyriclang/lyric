@@ -1,0 +1,8 @@
+// ERWARTUNG (spec 7.5): eine Panik laeuft KEINE defer. "DEFER" erscheint nicht, Exit 101.
+import std.io.console { println };
+import std.core { panic };
+fn main(): int {
+    defer println("DEFER");
+    println("body");
+    panic("boom");
+}

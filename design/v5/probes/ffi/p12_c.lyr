@@ -1,0 +1,6 @@
+extern "C" fn strlen(s: string): int = "libc:strlen";
+extern "dotnet" fn noSymbol(x: float): float;
+extern "dotnet" fn arr(xs: int[]): int = "X::Y";
+extern "dotnet" fn opt(x: ?int): int = "X::Y";
+
+fn main(): int { return 0; }

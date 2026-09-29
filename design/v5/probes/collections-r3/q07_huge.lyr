@@ -1,0 +1,9 @@
+import std.io.console { println };
+fn main(): int {
+    var n = 1;
+    var i = 0;
+    while (i < 40) { n = n * 2; i = i + 1; }
+    let xs = [0] * n;
+    println(f"{xs.length}");
+    return 0;
+}

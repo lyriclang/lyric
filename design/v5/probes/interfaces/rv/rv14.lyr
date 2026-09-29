@@ -1,0 +1,3 @@
+interface Teller { fn tell(): int; }
+extend int :: [Teller] { fn tell(): int { return this; } }
+fn main(): int { let t: Teller = 5; return t.tell(); }

@@ -1,0 +1,1 @@
+{ "name": "proj", "sourceRoot": "src", "dependencies": { "geo": "src/vendor/geo" } }

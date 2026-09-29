@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+class Box<T> { value: T, }
+
+fn main(): int {
+    let b = Box<?int> { value = null };
+    println(f"{b.value == null}");
+    return 0;
+}

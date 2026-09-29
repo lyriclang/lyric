@@ -1,0 +1,4 @@
+interface A1 { fn n(): int; }
+fn g<T :: [A1]>(x: T): int { return 1; }
+fn g(x: string): int { return 2; }
+fn main(): int { return g(5); }

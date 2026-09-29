@@ -1,0 +1,4 @@
+pub fn helper(): int {
+    let unusedTwo = 5;
+    return 7;
+}

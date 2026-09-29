@@ -1,0 +1,9 @@
+module main;
+import std.io.console { println };
+import filelib;
+
+fn main(): int {
+    let t = filelib.readIt("nope.txt");
+    println(t ?? "none");
+    return 0;
+}

@@ -1,0 +1,3 @@
+class B { n: int }
+class D : B { m: int }
+fn main(): int { return 0; }

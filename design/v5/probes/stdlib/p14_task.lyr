@@ -1,0 +1,13 @@
+import std.io.console { println };
+import std.task { spawn, run, Wait };
+
+fn work(): Coroutine<Wait> {
+    println("in task");
+    return;
+}
+
+fn main(): int {
+    spawn(work());
+    run();
+    return 0;
+}

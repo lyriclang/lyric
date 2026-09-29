@@ -1,0 +1,13 @@
+// R3g — Kostet 'return f(x)' (echter Tail Call) einen Frame? ERWARTUNG: 1500 -> LYR-VM0004, Exit 101,
+// in beiden Engines (JIT lehnt Rekursion ab).
+import std.io.console { println };
+fn down(n: int, acc: int): int {
+    if (n <= 0) { return acc; }
+    return down(n - 1, acc + 1);
+}
+fn main(args: string[]): int {
+    var limit = 1020;
+    if (args.length > 0) { limit = 1500; }
+    println(f"tief = {down(limit, 0)}");
+    return 0;
+}

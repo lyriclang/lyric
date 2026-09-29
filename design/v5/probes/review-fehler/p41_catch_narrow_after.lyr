@@ -1,0 +1,14 @@
+// ERWARTUNG: nach einem catch (e) vom Typ Throwable gibt es keinen Weg, den konkreten Typ
+// zu testen — kein Typ-Pattern auf Interface-Werten (v5-Feature 16). match (e) { c: Boom => }?
+import std.io.console { println };
+class Boom :: [Throwable] { what: string, fn message(): string { return this.what; } }
+fn f(): int throws { throw Boom { what = "x" }; }
+fn main(): int {
+    try { return f(); } catch (e) {
+        match (e) {
+            c: Boom => println("boom"),
+            _ => println("other"),
+        }
+        return 0;
+    }
+}

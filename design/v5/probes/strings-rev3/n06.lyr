@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x = 'a' < 'b'; let y = '\u{1F600}' > 'z'; println(f"{x} {y}"); return 0; }

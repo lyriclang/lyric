@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn g(): void { }
+fn f(): ?void { return g(); }
+fn main(): int {
+    let v: ?void = f();
+    if (v == null) { println("null"); } else { println("present"); }
+    return 0;
+}

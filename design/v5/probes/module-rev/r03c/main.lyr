@@ -1,0 +1,9 @@
+module main;
+
+import std.io.console { println };
+import e2;
+
+fn main(): int {
+    println((3).twice());
+    return 0;
+}

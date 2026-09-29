@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    var line = "";
+    for (x in 1.5..4.5) { line = line + f" {x}"; }
+    println(f"a:{line}");
+    var n = 0;
+    for (x in 0.0..0.5) { n += 1; }
+    println(f"b:{n}");
+    return 0;
+}

@@ -1,0 +1,6 @@
+s03_duration_only.lyr:5:9: warning[LYR-SEM0071]: 'd' is never used
+    let d = Duration.ofSeconds(5);
+        ^
+  note: name it '_' when the value is deliberately unused
+
+s03_duration_only.lyrbc: 3065 bytes

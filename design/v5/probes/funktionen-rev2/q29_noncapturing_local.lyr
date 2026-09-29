@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let twice = (n: int) => n * 2;
+    println(fromInt(twice(21)));
+    return 0;
+}

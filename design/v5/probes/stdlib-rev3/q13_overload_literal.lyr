@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn pick(x: int): string { return "int"; }
+fn pick(x: float): string { return "float"; }
+fn main(): int { println(pick(3)); println(pick(3.0)); return 0; }

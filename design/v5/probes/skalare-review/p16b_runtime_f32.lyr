@@ -1,0 +1,8 @@
+// KONTROLLE ERWARTUNG: 0.30000001192092896
+import std.io.console { println };
+fn main(): int {
+  let a: float32 = 0.1f32;
+  let b: float32 = 0.2f32;
+  println(f"{a + b}");
+  return 0;
+}

@@ -1,0 +1,4 @@
+pub enum E { A, B }
+fn e(): E { return E.B; }
+let V = comptime e();
+fn main(): int { return 0; }

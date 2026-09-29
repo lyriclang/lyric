@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    let n: int8 = 5i8;
+    println(f"{n:D4}");
+    let m: int64 = 7i64;
+    println(f"{m:D4}");
+    let u: uint = 9 as uint;
+    println(f"{u:D4}");
+    return 0;
+}

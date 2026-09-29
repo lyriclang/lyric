@@ -1,0 +1,19 @@
+import std.io.console { println };
+interface Bump { mut fn bump(): void; fn get(): int; }
+struct S :: [Bump] {
+    n: int = 0,
+    mut fn bump(): void { this.n = this.n + 1; }
+    fn get(): int { return this.n; }
+}
+fn dup<T :: [Bump]>(x: T): T { return x; }
+fn main(): int {
+    var s = S { };
+    let a: Bump = s;
+    let b = dup(a);
+    a.bump();
+    println("a=" + a.get().show() + " b=" + b.get().show());
+    var c = dup(s);
+    c.bump();
+    println("s=" + s.n.show() + " c=" + c.n.show());
+    return 0;
+}

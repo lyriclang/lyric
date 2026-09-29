@@ -1,0 +1,8 @@
+import geometry;
+import std.io.console;
+
+fn main(): int {
+    console.println(f"{geometry.area(3, 4)}");
+    console.println(f"{geometry.secret()}");
+    return 0;
+}

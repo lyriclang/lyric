@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.core { Display };
+
+fn main(): int {
+    let d: Display = 5;
+    let xs: Display[] = [1, "a"];
+    println(d);
+    return 0;
+}

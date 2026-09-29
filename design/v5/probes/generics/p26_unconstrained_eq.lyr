@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+fn same<T>(a: T, b: T): bool {
+    return a == b;
+}
+
+fn main(): int {
+    println(f"{same(1, 1)}");
+    return 0;
+}

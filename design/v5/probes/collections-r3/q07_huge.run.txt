@@ -1,0 +1,2 @@
+panic [LYR-VM0006]: array repetition of 1 element(s) x 1099511627776 exceeds the array size limit
+    in main.main (q07_huge.lyr:6)

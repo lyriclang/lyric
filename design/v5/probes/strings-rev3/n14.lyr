@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x = 5; let s = f"{x:2000000000}"; println("survived"); return 0; }

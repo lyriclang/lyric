@@ -1,0 +1,4 @@
+fn main(): int {
+    var ys: never[] = [];
+    return 0;
+}

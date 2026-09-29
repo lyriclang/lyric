@@ -1,0 +1,33 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+let t0 = os.nowMillis();
+
+fn cruncher(): Coroutine<Wait> {
+    yield Wait.Sleep(10);
+    println(f"cruncher starts at +{os.nowMillis() - t0}ms");
+    var s = 0;
+    var i = 0;
+    while (i < 20000000) {
+        s = s + i;
+        i += 1;
+    }
+    println(f"cruncher ends at +{os.nowMillis() - t0}ms (s={s})");
+}
+
+fn ticker(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 4) {
+        println(f"tick {i} at +{os.nowMillis() - t0}ms");
+        yield Wait.Sleep(20);
+        i += 1;
+    }
+}
+
+fn main(): int {
+    spawn(cruncher());
+    spawn(ticker());
+    run();
+    return 0;
+}

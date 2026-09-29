@@ -1,0 +1,35 @@
+// Q7 — Was kostet eine FALLENGELASSENE Koroutine im Frame-Pool?
+// Interpreter.cs:126-136 und 1556-1565: der Pool ist eine unbeschraenkte Freiliste pro
+// Funktion; nur ein RECYCELTER Frame kommt zurueck. Eine in eine Kette eingefangene Frame
+// verlaesst den Pool "oder fuer immer, wenn die Kette fallen gelassen wird".
+// ERWARTUNG VOR DEM LAUF:
+//   Der Pool WAECHST NICHT (er haelt nur zurueckgegebene Frames); er VERLIERT Eintraege.
+//   Also: eine Schleife, die Ketten anlegt und verwirft, allokiert pro Durchlauf neu und
+//   ist messbar langsamer als dieselbe Schleife, die jede Kette ZU ENDE zieht.
+//   Der Speicher darf dabei NICHT monoton wachsen (der GC holt die verworfenen Frames).
+// Argument 0 = jede Kette leer ziehen, 1 = nach einem Pull fallen lassen.
+import std.io.console { println };
+
+fn zaehler(n: int): Coroutine<int> {
+    var i = 0;
+    while (i < n) { yield i; i += 1; }
+}
+
+fn main(args: string[]): int {
+    let fallen = args.length > 0;
+    let runden = 400000;
+    var summe = 0;
+    var r = 0;
+    while (r < runden) {
+        let c = zaehler(8);
+        if (fallen) {
+            summe += resume c;           // ein Pull, dann faellt die Kette
+        } else {
+            var k = 0;
+            while (k < 8) { summe += resume c; k += 1; } // bis zum Ende gezogen
+        }
+        r += 1;
+    }
+    println(f"summe = {summe}");
+    return 0;
+}

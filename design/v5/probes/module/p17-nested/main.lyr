@@ -1,0 +1,4 @@
+import shapes.circle;
+import std.io.console;
+
+fn main(): int { console.println(f"{circle.area(2)}"); return 0; }

@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+fn inner(xs: int[], i: int): int {
+    return xs[i];
+}
+
+fn middle(xs: int[], i: int): int {
+    return inner(xs, i);
+}
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    println(middle(xs, 7));
+    return 0;
+}

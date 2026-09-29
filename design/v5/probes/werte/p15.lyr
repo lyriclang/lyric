@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct A { xs: int[], }
+fn main(): int {
+    var a = A { xs = [1, 2] };
+    var b = a;
+    b.xs[0] = 9;
+    println(f"shallow: a.xs[0] = {a.xs[0]}");
+    return 0;
+}

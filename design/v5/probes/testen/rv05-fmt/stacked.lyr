@@ -1,0 +1,13 @@
+import std.core { OnFunction, WithArg };
+
+pub struct Marker :: [OnFunction] { }
+
+pub struct Case :: [OnFunction, WithArg<int>] { n: int }
+
+@Marker
+@Case(1)
+pub fn f(): void { }
+
+fn main(): int {
+    return 0;
+}

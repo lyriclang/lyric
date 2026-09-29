@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { var n: int = 55296; let c = n as char; println(f"surrogate ok, as int = {c as int}"); return 0; }

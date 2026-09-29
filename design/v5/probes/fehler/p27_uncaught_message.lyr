@@ -1,0 +1,17 @@
+// ERWARTUNG: uncaught exception zeigt nur den TYP, nicht message(). (aus p18b abgeleitet)
+// Hier mit sprechender Nachricht. Bauart: E-Parameter-Trick, damit es ueberhaupt entkommt.
+import std.io.console { println };
+class Detailed :: [Throwable] {
+    what: string,
+    fn message(): string { return "file not found: " + this.what; }
+}
+class Other :: [Throwable] { what: string, fn message(): string { return this.what; } }
+
+fn attempt<E :: [Throwable]>(): int {
+    try {
+        throw Detailed { what = "/etc/app.conf" };
+    } catch (e: E) {
+        return 0;
+    }
+}
+fn main(): int { return attempt<Other>(); }

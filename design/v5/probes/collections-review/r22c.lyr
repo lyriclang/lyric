@@ -1,0 +1,20 @@
+import std.io.console { println };
+import std.collections { arrayFilled, arrayOf };
+struct Vec2 { x: float, y: float, }
+fn main(): int {
+    let seed = Vec2 { x = 1.0, y = 2.0 };
+    var a = arrayFilled(2, seed);
+    a[0].x = 9.0;
+    println(f"arrayFilled: {a[0].x} {a[1].x}");
+    var b = arrayOf(2, (i) => Vec2 { x = 1.0, y = 2.0 });
+    b[0].x = 8.0;
+    println(f"arrayOf:     {b[0].x} {b[1].x}");
+    var c = [seed] + [seed];
+    c[0].x = 7.0;
+    println(f"concat:      {c[0].x} {c[1].x}");
+    var d = [seed];
+    var e = d;
+    e[0].x = 5.0;
+    println(f"array-alias: {d[0].x} {e[0].x}");
+    return 0;
+}

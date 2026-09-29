@@ -1,0 +1,4 @@
+q14_err_plus_unused.lyr:3:12: error[LYR-SEM0002]: unknown identifier 'nosuch'
+    return nosuch;
+           ^^^^^^
+

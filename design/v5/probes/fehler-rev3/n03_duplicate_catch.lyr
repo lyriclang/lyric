@@ -1,0 +1,9 @@
+// ERWARTUNG: zwei catch (_: Boom) hintereinander — unbekannt ob Diagnose; vermutlich keine.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn f(): int throws Boom { throw Boom { }; }
+fn main(): int {
+    try { return f(); }
+    catch (_: Boom) { println("first"); return 0; }
+    catch (_: Boom) { println("second"); return 1; }
+}

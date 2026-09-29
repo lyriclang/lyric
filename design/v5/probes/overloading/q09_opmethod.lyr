@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.core { Mul };
+struct V :: [Mul<?int, V>] {
+    n: int,
+    fn mul(other: ?int): V { return V { n = this.n }; }
+}
+fn main(): int {
+    let v = V { n = 3 };
+    let a = v.mul(2);
+    println("method ok");
+    return 0;
+}

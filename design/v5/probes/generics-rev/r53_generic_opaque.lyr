@@ -1,0 +1,10 @@
+import std.io.console { println };
+opaque type Handle = int;
+class Box<T> { v: T }
+fn idb<T>(b: Box<T>): int { return 1; }
+fn main(): int {
+  let h: Handle = 5 as Handle;
+  let b = Box<Handle> { v = h };
+  println(f"{idb<Handle>(b)}");
+  return 0;
+}

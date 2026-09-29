@@ -1,0 +1,11 @@
+import std.io.console { println };
+fn describe(xs: int[]): string {
+    return match (xs) {
+        [] => "empty",
+        [a] => f"one {a}",
+    };
+}
+fn main(): int {
+    println(describe([1, 2]));
+    return 0;
+}

@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct Holder { f: fn(int) -> int }
+fn make(k: int): fn(int) -> int { return (n: int) => n * k; }
+fn main(): int {
+    let h = Holder { f = make(3) };
+    println(fromInt(h.f(4)));
+    let fs: (fn(int) -> int)[] = [make(1), make(2)];
+    println(fromInt(fs[1](5)));
+    return 0;
+}

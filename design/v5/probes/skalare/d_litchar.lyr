@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn takesChar(c: char): char { return c; }
+fn main(): int {
+    let c: char = 65;
+    println(f"let c: char = 65 -> [{c}]");
+    println(f"call -> [{takesChar(66)}]");
+    return 0;
+}

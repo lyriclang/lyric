@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.collections { sortArray, sortListByKey, List };
+import std.core { Ordered };
+fn main(): int {
+    // Ordnung nur ueber den ersten Buchstaben -> gleiche Schluessel, Reihenfolge beobachtbar
+    let xs = ["a1", "b1", "a2", "b2", "a3"];
+    var arr = ["a1", "b1", "a2", "b2", "a3"];
+    sortArray(arr);
+    var line = "sortArray:";
+    for (v in arr) { line = line + " " + v; }
+    println(line);
+    println(f"orig {xs.length}");
+    return 0;
+}

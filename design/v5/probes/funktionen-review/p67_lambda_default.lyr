@@ -1,0 +1,4 @@
+fn main(): int {
+    let f = (n: int = 3) => n;
+    return f();
+}

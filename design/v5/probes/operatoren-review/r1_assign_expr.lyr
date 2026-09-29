@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    var y = 0;
+    let x = (y = 3);
+    println(fromInt(x));
+    var a = 0;
+    var b = 0;
+    a = b = 7;
+    println(fromInt(a));
+    println(fromInt(b));
+    var f = false;
+    if (f = true) { println("branch"); }
+    var n = 0;
+    println(fromInt(1 + (n = 5)));
+    return 0;
+}

@@ -1,0 +1,6 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"{3.5:Q9}");
+    return 0;
+}

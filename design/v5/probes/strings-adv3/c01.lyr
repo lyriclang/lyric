@@ -1,0 +1,6 @@
+import std.io.console { println };
+import std.string;
+fn main(): int {
+    println("x".length());
+    return 0;
+}

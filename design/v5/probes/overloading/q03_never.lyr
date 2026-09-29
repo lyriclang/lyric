@@ -1,0 +1,4 @@
+import std.io.console { println };
+fn g(x: int): string { return "i"; }
+fn g(x: string): string { return "s"; }
+fn main(): int { println(g(panic("boom"))); return 0; }

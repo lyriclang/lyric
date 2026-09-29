@@ -1,0 +1,1 @@
+fn main(): int { let a = 100; let b: int8 = a; return 0; }

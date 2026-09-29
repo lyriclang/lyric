@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct V { x: int, mut fn shiftRet(d: int): int { this.x = this.x + d; return this.x; } }
+fn main(): int {
+    var a: ?V = V { x = 1 };
+    var b = a;
+    let r = b?.shiftRet(9);
+    println(f"n05 ?. with value-returning mut fn: r={r ?? -1} a={a!.x} b={b!.x} (a=10 -> alias hit)");
+    return 0;
+}

@@ -1,0 +1,7 @@
+import std.core { OnFunction };
+pub struct Hook :: [OnFunction] { }
+
+@Hook
+fn secret(): void { }
+
+fn main(): int { return 0; }

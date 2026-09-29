@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    var x = 1;
+    if (x = 5) { println("yes"); }
+    return 0;
+}

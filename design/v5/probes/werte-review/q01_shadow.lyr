@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    let x = 1;
+    let x = 2;
+    println(f"q01 x={x}");
+    let y = 1;
+    { let y = 2; println(f"q01 inner y={y}"); }
+    println(f"q01 outer y={y}");
+    return 0;
+}

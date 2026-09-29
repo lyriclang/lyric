@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let nan = 0.0 / 0.0; println(f"{nan as int8}"); println(f"{1e300 as int8}"); println(f"{-1e300 as uint8}"); return 0; }

@@ -1,0 +1,58 @@
+// Q1 — Faengt eine Closure die VARIABLE oder den WERT? Und bekommt ein Schleifenrumpf
+// pro Durchlauf eine frische Bindung?
+//
+// ERWARTUNG VOR DEM LAUF (Kritiker behauptet 3 3 3 / 0 1 2):
+//   whileVar  = 3 3 3   wenn es EINE Box pro Deklaration gibt (Fang der Variablen)
+//   forVar    = 0 1 2   wenn die for-Bindung pro Durchlauf frisch ist
+//   freshLet  = 0 1 2   KONTROLLE: ein frisches 'let' pro Durchlauf, in JEDER Sprache 0 1 2
+//   perCall   = 7 8 9   KONTROLLE: drei Aufrufe derselben Funktion, jede mit eigenem Parameter
+//                       -> beweist, dass eine Umgebung pro AUFRUF existiert, also der Fang
+//                          nicht global pro Symbol ist
+import std.io.console { println };
+
+fn machen(n: int): fn() -> int {
+    return () => n;
+}
+
+fn main(): int {
+    var a: fn() -> int = () => -1;
+    var b: fn() -> int = () => -1;
+    var c: fn() -> int = () => -1;
+    var i = 0;
+    while (i < 3) {
+        if (i == 0) { a = () => i; }
+        if (i == 1) { b = () => i; }
+        if (i == 2) { c = () => i; }
+        i += 1;
+    }
+    println(f"whileVar = {a()} {b()} {c()}");
+
+    var d: fn() -> int = () => -1;
+    var e: fn() -> int = () => -1;
+    var g: fn() -> int = () => -1;
+    for (j in 0..3) {
+        if (j == 0) { d = () => j; }
+        if (j == 1) { e = () => j; }
+        if (j == 2) { g = () => j; }
+    }
+    println(f"forVar   = {d()} {e()} {g()}");
+
+    var h: fn() -> int = () => -1;
+    var k: fn() -> int = () => -1;
+    var l: fn() -> int = () => -1;
+    var m = 0;
+    while (m < 3) {
+        let frisch = m;
+        if (m == 0) { h = () => frisch; }
+        if (m == 1) { k = () => frisch; }
+        if (m == 2) { l = () => frisch; }
+        m += 1;
+    }
+    println(f"freshLet = {h()} {k()} {l()}");
+
+    let p = machen(7);
+    let q = machen(8);
+    let r = machen(9);
+    println(f"perCall  = {p()} {q()} {r()}");
+    return 0;
+}

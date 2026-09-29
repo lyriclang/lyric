@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.io.file { textOrThrow };
+
+fn main(): int {
+    try {
+        let t = textOrThrow("/nope/nope.txt");
+        println(t);
+    } catch (e) {
+        println(e);
+    }
+    return 0;
+}

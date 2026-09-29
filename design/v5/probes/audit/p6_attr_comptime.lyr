@@ -1,0 +1,8 @@
+import std.core { OnFunction };
+
+pub struct Retry :: [OnFunction] { limit: int = 3 }
+
+@Retry { limit = comptime (1 + 2) }
+pub fn fetch(): void { }
+
+fn main(): int { return 0; }

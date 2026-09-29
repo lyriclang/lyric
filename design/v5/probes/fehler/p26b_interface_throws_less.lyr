@@ -1,0 +1,9 @@
+// KONTROLLE: Impl wirft WENIGER als das Interface deklariert. ERWARTUNG: erlaubt (Teilmenge).
+class A :: [Throwable] { what: string, fn message(): string { return this.what; } }
+interface Source {
+    fn read(): int throws A;
+}
+class Quiet :: [Source] {
+    fn read(): int { return 1; }
+}
+fn main(): int { return 0; }

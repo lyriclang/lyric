@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+interface Mapper<T> {
+    fn get(): T;
+    fn to<U>(f: fn(T) -> U): U { return f(this.get()); }
+}
+
+class Five :: [Mapper<int>] { fn get(): int { return 5; } }
+
+fn use<M :: [Mapper<int>]>(m: M): int { return m.to<int>((n: int) => n * 3); }
+
+fn main(): int {
+    return use(Five { });
+}

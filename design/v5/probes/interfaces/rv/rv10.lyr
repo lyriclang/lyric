@@ -1,0 +1,2 @@
+interface Parser { static fn parse(s: string): int; }
+fn main(): int { return 0; }

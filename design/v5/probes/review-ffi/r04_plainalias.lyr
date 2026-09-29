@@ -1,0 +1,4 @@
+import std.io.console { println };
+type Meters = float;
+extern "dotnet" fn cbrtM(x: Meters): Meters = "System.Math::Cbrt";
+fn main(): int { println(f"{cbrtM(27.0)}"); return 0; }

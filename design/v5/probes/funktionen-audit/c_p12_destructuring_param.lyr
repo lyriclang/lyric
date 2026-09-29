@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn useIt(f: fn((int, int)) -> int): int { return f((3, 4)); }
+fn main(): int {
+    println(fromInt(useIt(((a, b)) => a + b)));
+    let pairs: (int, int)[] = [(1, 2), (3, 4)];
+    for ((a, b) in pairs) { println(fromInt(a + b)); }
+    return 0;
+}

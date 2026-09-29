@@ -1,0 +1,26 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+
+fn bad(): Coroutine<Wait> {
+    yield Wait.Now;
+    let xs: int[] = [1, 2, 3];
+    println(f"{xs[99]}");
+}
+
+fn good(): Coroutine<Wait> {
+    var i = 0;
+    while (i < 4) {
+        println(f"good {i}");
+        yield Wait.Now;
+        i += 1;
+    }
+    println("good finished");
+}
+
+fn main(): int {
+    spawn(bad());
+    spawn(good());
+    run();
+    println("run returned");
+    return 0;
+}

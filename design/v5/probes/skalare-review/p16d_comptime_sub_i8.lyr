@@ -1,0 +1,7 @@
+// ERWARTUNG: CLI0020 (0i8 - 1i8 = -1 als i8-Konstante)
+import std.io.console { println };
+fn main(): int {
+  let c = comptime (0i8 - 1i8);
+  println(f"{c}");
+  return 0;
+}

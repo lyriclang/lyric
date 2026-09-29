@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn each(f: fn(int) -> void): void { f(1); f(2); }
+fn main(): int {
+    each((n: int) => println("x"));
+    each { println("y") };
+    return 0;
+}

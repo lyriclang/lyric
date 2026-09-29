@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    let c: char = 'b';
+    println(f"{xs[c]}");
+    return 0;
+}

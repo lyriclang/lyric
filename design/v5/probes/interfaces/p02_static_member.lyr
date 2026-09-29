@@ -1,0 +1,9 @@
+interface Maker {
+    static fn make(): int;
+}
+
+struct S :: [Maker] {
+    static fn make(): int { return 1; }
+}
+
+fn main(): int { return 0; }

@@ -1,0 +1,11 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var xs = [S { v = 1 }, S { v = 2 }];
+    var e = xs[0];
+    e.v = 9;
+    println(f"copy out of array: xs[0].v = {xs[0].v}");
+    xs[0].v = 5;
+    println(f"write into array: xs[0].v = {xs[0].v}");
+    return 0;
+}

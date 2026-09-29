@@ -1,0 +1,15 @@
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn get<T>(x: T, fail: bool): T throws Boom {
+  if (fail) { throw Boom {}; }
+  return x;
+}
+fn main(): int {
+  try {
+    let a = get<int>(5, false);
+    println(f"{a}");
+    let b = get<string>("x", true);
+    println(b);
+  } catch (e: Boom) { println("caught"); }
+  return 0;
+}

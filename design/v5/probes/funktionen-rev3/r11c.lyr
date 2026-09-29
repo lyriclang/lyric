@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    for (i in 0..3) {
+        defer { break; }
+    }
+    return 0;
+}

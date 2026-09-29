@@ -1,0 +1,10 @@
+import std.io.console { println };
+enum Col { Red, Blue }
+struct P { c: Col, y: int }
+fn f(p: P): int {
+    return match (p) {
+        P { c = Red, y } => 1,
+        P { c = Blue, y } => 2,
+    };
+}
+fn main(): int { println(f"{f(P { c = Col.Blue, y = 9 })}"); return 0; }

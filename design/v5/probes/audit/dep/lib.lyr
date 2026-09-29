@@ -1,0 +1,8 @@
+module lib;
+
+import std.core { Deprecated };
+
+@Deprecated { message = "use renew", until = "9.9" }
+pub fn old(): int { return 1; }
+
+pub fn fine(): int { return 2; }

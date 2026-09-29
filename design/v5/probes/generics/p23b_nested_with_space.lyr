@@ -1,0 +1,7 @@
+class Box<T> { value: T, }
+
+fn main(): int {
+    let inner = Box<int> { value = 7 };
+    let b: Box<Box<int> > = Box<Box<int> > { value = inner };
+    return b.value.value;
+}

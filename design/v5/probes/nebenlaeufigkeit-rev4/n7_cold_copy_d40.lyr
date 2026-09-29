@@ -1,0 +1,31 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run };
+
+fn deep(n: int): void {
+    if (n == 0) {
+        yield Wait.Now;
+        return;
+    }
+    deep(n - 1);
+}
+
+fn worker(): Coroutine<Wait> {
+    var r = 0;
+    while (r < 20) {
+        deep(40);
+        r += 1;
+    }
+}
+
+fn main(): int {
+    var i = 0;
+    while (i < 10000) {
+        spawn(worker());
+        i += 1;
+    }
+    let t0 = os.nowMillis();
+    run();
+    println(f"d40: {os.nowMillis() - t0} ms");
+    return 0;
+}

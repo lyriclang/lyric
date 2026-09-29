@@ -1,0 +1,11 @@
+import std.io.console { println };
+class Box { v: int, }
+fn main(): int {
+    let a = Box{v=1};
+    let b = a;
+    let c = Box{v=1};
+    // Kontrolle: geht Identitaetsvergleich wenigstens fuer Klassen?
+    if (a == b) { println("klassen gleich"); }
+    println(f"{c.v}");
+    return 0;
+}

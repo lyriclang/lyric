@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    for (i in 0..1 + 1) { println("plus"); }
+    for (j in 0..1 << 1) { println("shift"); }
+    return 0;
+}

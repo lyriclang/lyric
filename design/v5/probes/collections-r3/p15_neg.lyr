@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    var i = -1;
+    i = i + 0;
+    println(f"{xs[i]}");
+    return 0;
+}

@@ -1,0 +1,6 @@
+import std.collections { List };
+interface Display2 { fn show(): string; }
+extend<T :: [Display2]> List<T> :: [Display2] {
+    fn show(): string { return "list"; }
+}
+fn main(): int { return 0; }

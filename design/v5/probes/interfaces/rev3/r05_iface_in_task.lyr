@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.task { Wait, spawn, run };
+interface Bump { mut fn bump(): void; fn get(): int; }
+struct S :: [Bump] { n: int = 0, mut fn bump(): void { this.n = this.n + 1; } fn get(): int { return this.n; } }
+fn worker(b: Bump): Coroutine<Wait> {
+    yield Wait.Now;
+    b.bump();
+}
+fn main(): int {
+    let s = S { };
+    let b: Bump = s;
+    spawn(worker(b));
+    run();
+    println(f"s={s.get()} b={b.get()}");
+    return 0;
+}

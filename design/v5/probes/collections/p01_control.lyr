@@ -1,0 +1,30 @@
+import std.io.console { println };
+
+fn main(): int {
+    let xs = [3, 7, 1];
+    let zeros = [0] * 5;
+    let both = xs + zeros;
+    println(f"len xs={xs.length} zeros={zeros.length} both={both.length}");
+
+    for (x in xs) {
+        println(f"elem {x}");
+    }
+    for (n in 0..3) {
+        println(f"excl {n}");
+    }
+    for (n in 0..=3) {
+        println(f"incl {n}");
+    }
+
+    // let-bound array: the binding is the reference, the slots are writable
+    xs[0] = 9;
+    println(f"after write {xs[0]}");
+
+    // descending range
+    var count = 0;
+    for (n in 3..0) {
+        count = count + 1;
+    }
+    println(f"descending iterations {count}");
+    return 0;
+}

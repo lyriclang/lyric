@@ -1,0 +1,9 @@
+// ERWARTUNG: catch (e: Box<string>) faengt einen geworfenen Box<int> NICHT.
+import std.io.console { println };
+class Box<T> :: [Throwable] { v: T, fn message(): string { return "box"; } }
+fn thrower(): int throws Box<int> { throw Box<int> { v = 1 }; }
+fn main(): int {
+    try { return thrower(); }
+    catch (e: Box<string>) { println(f"WRONG: caught as Box<string>, v={e.v}"); return 1; }
+    catch (_) { println("ok: fell through to catch-all"); return 0; }
+}

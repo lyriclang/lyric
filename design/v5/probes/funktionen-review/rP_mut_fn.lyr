@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct Acc { n: int, mut fn add(k: int): void { this.n = this.n + k; } }
+fn main(): int {
+    var a = Acc { n = 1 };
+    a.add(4);
+    println(fromInt(a.n));
+    return 0;
+}

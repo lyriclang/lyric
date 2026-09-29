@@ -1,0 +1,6 @@
+interface Container {
+    type Item;
+    fn get(i: int): Item;
+}
+
+fn main(): int { return 0; }

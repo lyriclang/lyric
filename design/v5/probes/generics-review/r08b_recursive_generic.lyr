@@ -1,0 +1,19 @@
+import std.io.console { println };
+
+class Node<T> {
+    v: T,
+    next: ?Node<T>,
+}
+
+fn main(): int {
+    let tail = Node<int> { v = 2, next = null };
+    let head = Node<int> { v = 1, next = tail };
+    var total = 0;
+    var cur: ?Node<int> = head;
+    while (cur != null) {
+        total = total + cur.v;
+        cur = cur.next;
+    }
+    println(f"{total}");
+    return total;
+}

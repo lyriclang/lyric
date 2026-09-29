@@ -1,0 +1,5 @@
+module mid;
+
+import leaf;
+
+pub type Id = leaf.Inner;

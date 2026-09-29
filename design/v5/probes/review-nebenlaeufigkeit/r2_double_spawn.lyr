@@ -1,0 +1,21 @@
+import std.io.console { println };
+import std.task as task;
+import std.task { Wait };
+
+fn worker(): Coroutine<Wait> {
+    println("step 1");
+    yield Wait.Now;
+    println("step 2");
+    yield Wait.Now;
+    println("step 3");
+}
+
+fn main(): int {
+    let co = worker();
+    task.spawn(co);
+    task.spawn(co);
+    println(f"pending = {task.pending()}");
+    task.run();
+    println("run done");
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.core { Deprecated };
+
+pub struct P { x: int = 0 }
+
+@Deprecated { message = "gone", until = "5.0" }
+extend P { fn get(): int { return this.x; } }
+
+fn main(): int { return 0; }

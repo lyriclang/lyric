@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let base = "a" * 40000;
+    let x = base + "b";
+    let y = base + "c";
+    let r = x == y;
+    println(f"eq={r} len={x.length()}");
+    return 0;
+}

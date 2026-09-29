@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn tag(n: string, v: int): int { println(f"eval {n}"); return v; }
+struct D { a: int = tag("defaultA", 1), b: int, c: int = tag("defaultC", 3), }
+fn main(): int {
+    let d = D { b = tag("explicitB", 20), c = tag("explicitC", 30) };
+    println(f"j03b {d.a} {d.b} {d.c}");
+    return 0;
+}

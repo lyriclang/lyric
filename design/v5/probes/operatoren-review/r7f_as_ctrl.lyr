@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromFloat };
+fn main(): int {
+    let a = 6;
+    let b = 4;
+    println(fromFloat(a / b as float));
+    return 0;
+}

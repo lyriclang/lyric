@@ -1,0 +1,11 @@
+module main;
+
+import std.io.console { println };
+import e1;
+import e2;
+
+fn main(): int {
+    println((3).twice());
+    println(e1.ping() + e2.pong());
+    return 0;
+}

@@ -1,0 +1,5 @@
+// ERWARTUNG: LYR-SEM0030 — die per 'extend' gelieferte Throwable-Konformanz eines Enums.
+enum Fault { Missing, Broken }
+extend Fault :: [Throwable] { fn message(): string { return "f"; } }
+fn f(): int throws Fault { return 1; }
+fn main(): int { return 0; }

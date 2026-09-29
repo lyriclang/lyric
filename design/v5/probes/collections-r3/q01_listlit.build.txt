@@ -1,0 +1,4 @@
+q01_listlit.lyr:4:5: error[LYR-SEM0001]: cannot assign 'int[]' to 'List<int>'
+    let l: List<int> = [1, 2, 3];
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+

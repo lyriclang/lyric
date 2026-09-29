@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn loop(n: int, acc: int): int { if (n <= 0) { return acc; } return loop(n - 1, acc + 1); }
+fn main(): int {
+    println(fromInt(loop(100000, 0)));
+    return 0;
+}

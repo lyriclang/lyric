@@ -1,0 +1,8 @@
+fn boom(n: int): int {
+    if (n > 1) { panic("boom"); }
+    return n;
+}
+fn fine(n: int): int { return n + 1; }
+let A: int = comptime boom(5);
+let B: int = comptime fine(1);
+fn main(): int { return A + B; }

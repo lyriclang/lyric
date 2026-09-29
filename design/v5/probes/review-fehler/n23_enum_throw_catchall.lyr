@@ -1,0 +1,11 @@
+// ERWARTUNG (Dossier F12): kompiliert und laeuft, solange niemand den Enum-Typ FAENGT.
+import std.io.console { println };
+enum Fault :: [Throwable] {
+    Broken,
+    Missing,
+    fn message(): string { return "fault"; }
+}
+fn f(): int throws Fault { throw Fault.Broken; }
+fn main(): int {
+    try { return f(); } catch (e) { println(f"caught {e.message()}"); return 0; }
+}

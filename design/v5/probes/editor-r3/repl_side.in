@@ -1,0 +1,4 @@
+fn greet(): int { console.println("INIT"); return 1; }
+let g = greet();
+1 + 1
+2 + 2

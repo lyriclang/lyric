@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.string { fromInt };
+import std.iter { map, toList };
+import std.list { List, listOf, listGet };
+
+fn twice(v: int, f: fn(int) -> int): int { return f(f(v)); }
+
+fn main(): int {
+    println(fromInt(twice(3) { it + 1 }));
+    return 0;
+}

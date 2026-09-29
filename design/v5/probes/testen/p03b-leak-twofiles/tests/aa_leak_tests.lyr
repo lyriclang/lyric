@@ -1,0 +1,8 @@
+import std.test { Test, assertTrue };
+import std.io.stream { create };
+
+@Test
+pub fn aa_leaks_a_handle(): void {
+    let f = create("probe_leak.txt");
+    assertTrue(f != null, "the file must open");
+}

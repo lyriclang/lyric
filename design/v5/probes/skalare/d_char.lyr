@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+fn main(): int {
+    let a: char = 'a';
+    let z: char = 'z';
+    println(f"z - a = {(z - a) as int}");
+    println(f"a * 2 = {(a * 2) as int}");
+    println(f"a / 2 = {(a / 2) as int}");
+    println(f"a % 7 = {(a % 7) as int}");
+    let top: char = '\u{10FFFF}';
+    let over = top + 1;
+    println(f"maxchar + 1 = {over as int}");
+    println(f"is it a char? -> [{over}]");
+    return 0;
+}

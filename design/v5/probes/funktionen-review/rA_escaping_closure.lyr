@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn makeCounter(): fn() -> int {
+    var c = 0;
+    return () => { c = c + 1; return c; };
+}
+fn main(): int {
+    let f = makeCounter();
+    println(fromInt(f()));
+    println(fromInt(f()));
+    let g = makeCounter();
+    println(fromInt(g()));
+    return 0;
+}

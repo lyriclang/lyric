@@ -1,0 +1,11 @@
+// ERWARTUNG: 2 und 2 (§6.1: ++ auf integer variables)
+import std.io.console { println };
+fn main(): int {
+  var x: int8 = 1i8;
+  x++;
+  println(f"{x}");
+  var u: uint = 1 as uint;
+  u++;
+  println(f"{u}");
+  return 0;
+}

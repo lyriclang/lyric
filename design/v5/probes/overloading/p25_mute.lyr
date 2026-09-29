@@ -1,0 +1,7 @@
+fn inner(a: int): int { return a; }
+fn f(x: string): string { return "s"; }
+fn f(x: bool): string { return "b"; }
+fn main(): int {
+    let r = f(inner(1, 2));
+    return 0;
+}

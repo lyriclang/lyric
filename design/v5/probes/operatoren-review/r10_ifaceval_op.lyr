@@ -1,0 +1,15 @@
+import std.core { Add };
+import std.io.console { println };
+import std.string { fromInt };
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; }
+}
+fn viaOperator(a: Add<V, V>, b: V): V {
+    return a + b;
+}
+fn main(): int {
+    let a = V { x = 1 };
+    println(fromInt(viaOperator(a, V { x = 2 }).x));
+    return 0;
+}

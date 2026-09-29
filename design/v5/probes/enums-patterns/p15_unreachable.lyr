@@ -1,0 +1,14 @@
+import std.io.console { println };
+
+enum E { A(int), B }
+
+fn f(e: E): int {
+    return match (e) {
+        A(_) => 1,
+        A(0) => 2,
+        _ => 3,
+        B => 4,
+    };
+}
+
+fn main(): int { println(f"{f(E.B)}"); return 0; }

@@ -1,0 +1,28 @@
+import std.io.console { println };
+
+interface Bump {
+    mut fn bump(): void;
+    fn get(): int;
+}
+
+struct S :: [Bump] {
+    n: int = 0,
+    mut fn bump(): void { this.n = this.n + 1; }
+    fn get(): int { return this.n; }
+}
+
+fn main(): int {
+    var s = S { };
+    let b: Bump = s;
+    b.bump();
+    println("orig=" + s.n.show() + " box=" + b.get().show());
+    let a: Bump = s;
+    let aa: Bump = a;
+    a.bump();
+    println("a=" + a.get().show() + " aa=" + aa.get().show());
+    var direct = S { };
+    var copy = direct;
+    copy.bump();
+    println("direct=" + direct.n.show() + " copy=" + copy.n.show());
+    return 0;
+}

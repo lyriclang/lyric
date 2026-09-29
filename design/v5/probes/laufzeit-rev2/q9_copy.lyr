@@ -1,0 +1,39 @@
+// P14 — Was kostet structcopy dort, wo die Skalarersetzung NICHT greift?
+// 8-Feld-Struct in einem Array, 2 Mio mal lesen (Kopie), Feld aendern, zurueckschreiben (Kopie)
+// gegen dieselbe Schleife mit einer Klasse (keine Kopie).
+// Erwartung VOR dem Lauf: die Struct-Variante klar langsamer; Faktor unbekannt, geschaetzt 2-4x.
+import std.io.console { println };
+
+struct S8 { a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, }
+class C8 { a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, }
+
+fn structLauf(n: int): int {
+    var xs = [S8 { a=0,b=1,c=2,d=3,e=4,f=5,g=6,h=7 }] * 4;
+    var i = 0;
+    while (i < n) {
+        var v = xs[i % 4];
+        v.a = v.a + 1;
+        xs[i % 4] = v;
+        i += 1;
+    }
+    return xs[0].a;
+}
+
+fn classLauf(n: int): int {
+    var xs = [C8 { a=0,b=1,c=2,d=3,e=4,f=5,g=6,h=7 }] * 4;
+    var i = 0;
+    while (i < n) {
+        let v = xs[i % 4];
+        v.a = v.a + 1;
+        xs[i % 4] = v;
+        i += 1;
+    }
+    return xs[0].a;
+}
+
+fn main(args: string[]): int {
+    let n = 2000000;
+    if (args.length > 0) { println(f"class  = {classLauf(n)}"); }
+    else { println(f"struct = {structLauf(n)}"); }
+    return 0;
+}

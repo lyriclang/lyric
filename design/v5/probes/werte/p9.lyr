@@ -1,0 +1,9 @@
+import std.io.console { println };
+struct S { v: int, }
+fn main(): int {
+    var s = S { v = 1 };
+    let f = (): void => { s.v = 9; };
+    f();
+    println(f"closure wrote through: s.v = {s.v}");
+    return 0;
+}

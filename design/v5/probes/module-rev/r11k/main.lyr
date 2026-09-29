@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import string;
+fn main(): int { println(string.f()); return 0; }

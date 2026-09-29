@@ -1,0 +1,9 @@
+module main;
+import std.io.console { println };
+import lib;
+fn main(): int {
+    println(lib.f());
+    let lib = 5;
+    println(lib);
+    return 0;
+}

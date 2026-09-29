@@ -1,0 +1,7 @@
+fn f(n: int): int {
+    return match (n) {
+        d @ 1..=9 => d,
+        _ => 0,
+    };
+}
+fn main(): int { return f(5); }

@@ -1,0 +1,15 @@
+import std.io.console { println };
+interface AppError :: [Throwable] { fn detail(): string; }
+class NotFound :: [AppError] {
+    fn message(): string { return "not found"; },
+    fn detail(): string { return "detail"; }
+}
+fn boom(): void throws NotFound { throw NotFound { }; }
+fn main(): int {
+    try {
+        boom();
+    } catch (e: Throwable) {
+        println("caught " + e.message());
+    }
+    return 0;
+}

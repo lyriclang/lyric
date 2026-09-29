@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    for (i in 0..2 & 3) { println("amp"); }
+    return 0;
+}

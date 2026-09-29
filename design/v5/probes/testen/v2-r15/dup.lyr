@@ -1,0 +1,9 @@
+import std.core { OnFunction, WithArg };
+
+pub struct Case :: [OnFunction, WithArg<int>] { }
+
+@Case(1)
+@Case(2)
+pub fn f(): void { }
+
+fn main(): int { return 0; }

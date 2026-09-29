@@ -1,0 +1,3 @@
+module std.notarealmodule;
+
+fn main(): int { return 0; }

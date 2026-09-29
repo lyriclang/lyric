@@ -1,0 +1,7 @@
+C:\Users\Olivier\AppData\Local\Temp\claude\C--Users-Olivier-CLionProjects-lyric\6d1f3425-b9ac-45c5-b685-291491b2d632\scratchpad\v5-design\probes\diagnostik3\cross\lib.lyr:2:9: warning[LYR-SEM0071]: 'unusedTwo' is never used
+    let unusedTwo = 5;
+        ^^^^^^^^^
+  note: name it '_' when the value is deliberately unused
+
+error[LYR-CLI0016]: 1 warning denied by --deny-warnings
+

@@ -1,0 +1,10 @@
+// ERWARTUNG: defer ist BLOCK-scoped (p36) -> "inner defer" laeuft vor "after block".
+import std.io.console { println };
+fn main(): int {
+    {
+        defer println("inner defer");
+        println("in block");
+    }
+    println("after block");
+    return 0;
+}

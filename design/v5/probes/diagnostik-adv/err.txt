@@ -1,0 +1,4 @@
+r16b_control.lyr:2:26: error[LYR-SEM0002]: unknown identifier 'nosuch'
+    let s = "😀"; return nosuch;
+                         ^^^^^^
+

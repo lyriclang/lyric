@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    for (s in "a".."c") { println(s); }
+    return 0;
+}

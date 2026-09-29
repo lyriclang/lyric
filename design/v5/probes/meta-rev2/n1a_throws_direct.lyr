@@ -1,0 +1,4 @@
+import std.core { Exception };
+fn f(): int throws { throw Exception { text = "no" }; }
+let X: int = comptime f();
+fn main(): int { return X; }

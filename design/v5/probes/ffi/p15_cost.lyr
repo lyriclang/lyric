@@ -1,0 +1,30 @@
+import std.io.console { println };
+import std.math { sqrt };
+
+extern "dotnet" fn xsqrt(x: float): float = "System.Math::Sqrt";
+extern "dotnet" fn ms(): int = "System.Environment::get_TickCount64";
+
+fn plain(x: float): float { return x * 0.5 + 1.0; }
+
+fn main(): int {
+    let n = 1000000;
+    var acc = 0.0;
+    acc = acc + xsqrt(2.0) + sqrt(2.0) + plain(2.0);
+
+    let t0 = ms();
+    var i = 0;
+    while (i < n) { acc = acc + plain(2.0); i = i + 1; }
+    let t1 = ms();
+    i = 0;
+    while (i < n) { acc = acc + sqrt(2.0); i = i + 1; }
+    let t2 = ms();
+    i = 0;
+    while (i < n) { acc = acc + xsqrt(2.0); i = i + 1; }
+    let t3 = ms();
+
+    println(f"lyric-call  ms={t1 - t0}");
+    println(f"native-call ms={t2 - t1}");
+    println(f"extern-call ms={t3 - t2}");
+    println(f"acc={acc}");
+    return 0;
+}

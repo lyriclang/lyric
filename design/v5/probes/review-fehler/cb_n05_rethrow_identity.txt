@@ -1,0 +1,58 @@
+./n05_rethrow_identity.lyr:3:16: error[LYR-SEM0020]: 'Boom' does not implement abstract method 'message' of interface 'Throwable'
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+               ^^^^^^^^^
+  note: 'message' is declared here
+
+./n05_rethrow_identity.lyr:3:33: error[LYR-PAR0032]: expected 'fn', got Identifier
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                ^^^^
+
+./n05_rethrow_identity.lyr:3:37: error[LYR-PAR0019]: expected '(' after function name
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                    ^
+
+./n05_rethrow_identity.lyr:3:37: error[LYR-PAR0026]: expected parameter name, got Colon
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                    ^
+
+./n05_rethrow_identity.lyr:3:48: error[LYR-PAR0026]: expected parameter name, got Fn
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                               ^^
+  note: 'fn' is a keyword and cannot be used as a name
+
+./n05_rethrow_identity.lyr:3:48: error[LYR-PAR0031]: expected ':' after parameter name
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                               ^^
+
+./n05_rethrow_identity.lyr:3:48: error[LYR-SEM0025]: required parameter 'fn' follows a default parameter
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                               ^^^^^^^^^^^^
+
+./n05_rethrow_identity.lyr:3:51: error[LYR-PAR0008]: expected '(' after 'fn' in function type
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                  ^^^^^^^
+
+./n05_rethrow_identity.lyr:3:51: error[LYR-RES0002]: unresolved type 'message'
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                  ^^^^^^^
+
+./n05_rethrow_identity.lyr:3:58: error[LYR-PAR0008]: expected ')' in function type
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                         ^
+
+./n05_rethrow_identity.lyr:3:58: error[LYR-PAR0015]: expected '->' in function type, got LParen
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                         ^
+
+./n05_rethrow_identity.lyr:3:59: error[LYR-PAR0011]: expected a type, got RParen
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                          ^
+
+./n05_rethrow_identity.lyr:3:60: error[LYR-PAR0008]: expected ')' after parameters
+class Boom :: [Throwable] { mut mark: int = 0, fn message(): string { return "boom"; } }
+                                                           ^
+
+./n05_rethrow_identity.lyr:9:61: error[LYR-SEM0006]: 'fn(int, fn(<error>) -> <error>) -> string' does not render in an f-string — a value renders through 'Display': give the type the conformance ':: [Display]' with a 'fn show(): string', or narrow and convert it explicitly
+    try { return mid(); } catch (e: Boom) { println(f"mark={e.mark}"); return 0; }
+                                                            ^^^^^^
+

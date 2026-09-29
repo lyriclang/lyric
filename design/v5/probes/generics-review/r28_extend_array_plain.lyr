@@ -1,0 +1,4 @@
+extend int[] {
+    fn tag(): int { return 5; }
+}
+fn main(): int { return 0; }

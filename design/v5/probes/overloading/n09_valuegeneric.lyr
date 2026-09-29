@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn describe(n: int): string { return "int"; }
+fn describe(s: string): string { return "str"; }
+fn apply<T>(f: T): string { return "applied"; }
+fn main(): int { println(apply(describe)); return 0; }

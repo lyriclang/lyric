@@ -1,0 +1,1 @@
+import midl { m }; fn main(): int { return m(); }

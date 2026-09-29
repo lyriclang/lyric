@@ -1,0 +1,14 @@
+import std.test { Test, assertEq };
+import std.io.console { println };
+
+@Test
+pub fn aa_fails_with_defer(): void {
+    defer println("cleanup aa");
+    assertEq(1, 2);
+}
+
+@Test
+pub fn bb_passes_with_defer(): void {
+    defer println("cleanup bb");
+    assertEq(1, 1);
+}

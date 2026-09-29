@@ -1,0 +1,8 @@
+import std.io.console { println };
+struct S { x: int, }
+fn main(): int {
+    let xs: S[] = [S { x = 1 }];
+    xs[0].x = 9;
+    println(f"r10 xs[0].x={xs[0].x}");
+    return 0;
+}

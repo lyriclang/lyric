@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    var line = "";
+    for (c in 'a'..'d') { line = line + f"{c}"; }
+    println(line);
+    return 0;
+}

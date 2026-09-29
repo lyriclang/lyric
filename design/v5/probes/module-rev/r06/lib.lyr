@@ -1,0 +1,11 @@
+module lib;
+
+enum Mode { Fast, Slow }
+
+struct Secret { v: int }
+
+interface Hidden { fn id(): int; }
+
+pub fn makeSecret(): Secret { return Secret { v = 7 }; }
+
+pub fn modeOf(fast: bool): Mode { if (fast) { return Mode.Fast; } return Mode.Slow; }

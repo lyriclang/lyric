@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string { isAlpha, isWhitespace, isUpper };
+
+fn main(): int {
+    let nbsp = 160 as char;
+    let ae = 228 as char;
+    let AE = 196 as char;
+    println(isWhitespace(nbsp));
+    println(isAlpha(ae));
+    println(isUpper(AE));
+    println("\u{00C4}".toLower());
+    println(isAlpha('a'));
+    println("  x\u{00A0}".trim());
+    return 0;
+}

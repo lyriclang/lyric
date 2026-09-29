@@ -1,0 +1,10 @@
+./p11_enum_throwable.lyr:12:20: warning[LYR-SEM0071]: 'n' is never used
+            Broken(n) => "broken",
+                   ^
+  note: name it '_' when the value is deliberately unused
+
+./p11_enum_throwable.lyr:22:7: error[LYR-IR0001]: catching a non-class type (only classes and interfaces are throwable)
+    } catch (e: Fault) {
+      ^
+  note: this compiler version cannot lower it yet
+

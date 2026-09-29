@@ -1,0 +1,9 @@
+import std.io.console { println };
+interface Base { fn f(): int; }
+interface Sub :: [Base] { }
+struct S :: [Sub] { fn f(): int { return 7; } }
+fn main(): int {
+    let v: Sub = S { };
+    println(v.f().show());
+    return 0;
+}

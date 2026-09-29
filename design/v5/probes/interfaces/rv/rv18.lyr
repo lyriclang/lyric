@@ -1,0 +1,3 @@
+interface Copyable { fn copy(): Self; }
+class C :: [Copyable] { fn copy(): C { return C { }; } }
+fn main(): int { let c = C { }; let d = c.copy(); return 0; }

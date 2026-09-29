@@ -1,0 +1,36 @@
+Erwartungen VOR dem Lauf (collections-r3):
+p01 star struct: "star 7 7", "lit 8 1", "nested 9 9" (inneres Array geteilt), "zero 0"
+p02 float range: "1 2 3" und 0 Durchlaeufe fuer 0.0..0.5
+p03 char index: LYR-CLI0020 ; p03b uint index: LYR-CLI0020 (u64 statt i64) ; p03c int index: laeuft, druckt 2
+p04 extend int[] ohne Aufruf: kompiliert still ; p04b extend (int,int): still ; p04c extend List<int>: SEM0047
+p05 xs[0]++: LYR-IR0001 ; xs[0] += 1 laeuft
+p06 over(xs) zweimal: 3 dann 0
+p07 catch um Index: kompiliert, Exit 101, "gefangen" wird NICHT gedruckt
+p08 if (2 in xs): LYR-PAR0002
+p09 Iterator<int> als Wert: ~17.7 KB, 97 Funktionen; Elementtypen int/float/string sichtbar ; p09b konkret: ~3 KB, 4 Funktionen
+p10 Map<int[],string>: LYR-IR0001 in collections.lyr
+p11 disasm for-in ueber Array: direkter call auf ArrayIterator.next, KEIN callvirt (Quelle EmitNextCall)
+p12 loopvar: "x = 5" im for-in -> Fehler (unveraenderlich) ; p12b Bound-Neuzuweisung im Rumpf aendert Iterationszahl nicht (3) ; xs neu zuweisen im Rumpf: 3 Durchlaeufe ueber altes Array
+p13 0..n mit n: int64 -> unbekannt (SEM0003 oder Vereinheitlichung); p13b n: int32 -> unbekannt
+p14 let e = []; ohne Kontext -> Fehler (unbekannter Code)
+p15 xs[-1]: panic VM0006, Exit 101
+p16 for ueber (?int)[]: LYR-SEM0091
+p18 [1] * -1: unbekannt (panik oder leer)
+p19 s[0] auf string: LYR-SEM0007
+p21 Klasse mit Iterable UND Iterator: Iterable gewinnt, 3 und 3
+p25 for (c in 'a'..'d'): a b c
+p26 let c = [seed]*2; c[0].x=7.0 kompiliert, "7 7"
+p27 xs[i] += v mit struct Add: SEM0003 ; p27b p.x += 1 int-Feld: laeuft
+EXPECT p09c: ohne console-Import fehlt Iterator<string>: ~66 Funktionen, ~12 KB. p13c/p13d: genau eine der beiden kompiliert (Typ der Schleifenvariable bei 0..int32 unbekannt)
+--- Runde 2 der Proben:
+q01 let l: List<int> = [1,2,3]: LYR-SEM0001
+q02 f"{xs}" mit int[]: LYR-SEM0006
+q03 for (P{x,y} in ps): PAR0002 (+PAR0021)
+q04 over(xs).map(parse) mit throws: LYR-SEM0037
+q05 ?int[] ist ?(int[]): "let o: ?int[] = null;" kompiliert; for (x in o) -> SEM0007 (nicht SEM0091)
+q06 Struct-Slot-Kopie: "var a = c[0]; a.x = 42" laesst c[0].x bei 7 (Kopie beim Lesen); Kontrolle c[0].x = 7 schreibt durch
+q07 [0] * (1<<40): unbekannt — Panik, ICE oder Host-Exception
+q08 [1, null] ohne Kontext: unbekannt — (?int)[] oder Fehler
+q09 [[1,2]] + [[3]] dann inneres Array aendern: + ist flach, innere geteilt -> "9"
+q10 Struct-Boxen ueber + / slice / Element-Zuweisung: Erwartung UNSICHER. Wenn Slots Referenzen auf Struct-Boxen halten und + / slice / xs[i]=v nur Referenzen kopieren, dann schreibt b[0].x=5 in a[0] durch ("concat 5"), s[0].x=9 in xs[1] durch ("slice 9"), und v.x=3 nach c[1]=v aendert c[1] ("assign 3"). Kontrolle mit ints: alles getrennt.
+q11 [first, ..rest] mit Structs: Erwartung UNSICHER — wenn das Rest-Array wie + Referenzen kopiert: rest[0].x=9 schreibt in xs[1] durch. List.of(xs)/toArray: Erwartung Kopie (Element-Zuweisung kopiert).

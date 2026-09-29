@@ -1,0 +1,2 @@
+panic [LYR-VM0002]: division by zero
+    in main.main (q25_panic.lyr:3)

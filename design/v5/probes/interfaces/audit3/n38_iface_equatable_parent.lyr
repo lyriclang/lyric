@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.core { Equatable };
+interface Shape :: [Equatable<Shape>] { fn area(): int; }
+class Circle :: [Shape] {
+    r: int,
+    fn area(): int { return this.r; }
+    fn equals(other: Shape): bool { return this.area() == other.area(); }
+}
+fn main(): int {
+    let a: Shape = Circle { r = 1 };
+    let b: Shape = Circle { r = 1 };
+    println(a.equals(b).show());
+    if (a == b) { println("eq"); }
+    return 0;
+}

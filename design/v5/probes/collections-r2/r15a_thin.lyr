@@ -1,0 +1,20 @@
+import std.io.console { println };
+pub interface Thin<T> {
+    mut fn next(): ?T;
+}
+pub class Counter :: [Thin<int>] {
+    n: int = 0,
+    pub mut fn next(): ?int {
+        if (this.n >= 3) { return null; }
+        this.n += 1;
+        return this.n;
+    }
+}
+fn main(): int {
+    let c: Thin<int> = Counter{};
+    var total = 0;
+    var v = c.next();
+    while (v != null) { total += v; v = c.next(); }
+    println(f"{total}");
+    return 0;
+}

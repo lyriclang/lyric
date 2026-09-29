@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { println(f"{(97.0 as char) as int}"); println(f"{(65f32 as char) as int}"); println(f"{(1e300 as char) as int}"); println(f"{(97.5 as char) as int}"); return 0; }

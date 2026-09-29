@@ -1,0 +1,15 @@
+module main;
+import std.io.console { println };
+import lib;
+
+struct S :: [lib.Hidden] {
+    v: int,
+    fn tag(): int { return 6; }
+}
+
+fn useIt<T :: [lib.Hidden]>(x: T): int { return x.tag(); }
+
+fn main(): int {
+    println(useIt(S { v = 1 }));
+    return 0;
+}

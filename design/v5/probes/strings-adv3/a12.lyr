@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string as strings;
+fn main(): int {
+    let e = "\u{1F600}";
+    println(f"cp={e.length()}");
+    let big = e * 2000000000;
+    println(big.length());
+    return 0;
+}

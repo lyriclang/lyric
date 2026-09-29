@@ -1,0 +1,10 @@
+import std.test { Test };
+
+class Boom :: [Throwable] {
+    pub fn message(): string { return "boom"; }
+}
+
+@Test
+pub fn escapes(): void throws Boom {
+    throw Boom { };
+}

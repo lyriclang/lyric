@@ -1,0 +1,4 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn f(a: int, b: int = a * 2): int { return a + b; }
+fn main(): int { println(fromInt(f(3))); return 0; }

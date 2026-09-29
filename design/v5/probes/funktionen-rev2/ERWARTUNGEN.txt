@@ -1,0 +1,25 @@
+Erwartungen VOR dem Lauf (Runde 2, nach der Kritik):
+q01 inner let it     -> 6  (Kritiker)                 [falls 3: Kritiker irrt]
+q02 outer let it     -> 3 + SEM0071                   [Dossier p58]
+q03 generic params, nur Deklaration -> sauber         [Kritiker]
+q04 generic params, Aufruf count(1,2,3) -> SEM0060    [Kritiker]
+q05 generic params, count<int>(1,2,3)   -> IR0001     [Dossier p21]
+q06 take(1, port = 5) ohne Lokale       -> SEM0002    [Kritiker]
+q07 let y = (x = 5)                     -> 5          [Kritiker]
+q08 fold(1) { acc, n => } -> 12 Diagnosen, erste SEM0017/SEM0014 [Kritiker]
+q09 this im Lambda    -> CLI0020 lowering 'this'
+q09b implizites Feld  -> CLI0020 ir: type not lowerable
+q10 break im Lambda   -> CLI0020 lowering 'break' outside a loop
+q11 yield im Lambda   -> kompiliert, nur "never used"; Aufruf -> VM0013
+q12 default vor trailing param -> SEM0025
+q13 default dann params -> 100 500 501 502
+q14 Lambda als Default -> 42
+q15 return im Trailing -> 5, "after"
+q16 escaping closure   -> 1 2 1
+q17 iface devirt release -> callvirt verschwindet
+q18 iter-Kette release   -> ? callvirt/callind zaehlen
+q28 nicht-entkommende Closure ueber var, lokal gerufen, --release
+    -> Erwartung: newobj <env:...> bleibt stehen (ScalarReplacement disqualifiziert
+       Objekte, die als Call-Argument weitergegeben werden); callind bleibt.
+q29 nicht fangendes Lambda, lokal gerufen, --release
+    -> Erwartung: mkclosure (no captures) + callind bleiben (Inliner.cs:28 schliesst callind aus)

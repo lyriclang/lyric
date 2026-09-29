@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.iter { Iterator };
+interface Src<T> { fn one(): T; }
+class IntSrc :: [Src<int>] { fn one(): int { return 7; } }
+class StrSrc :: [Src<string>] { fn one(): string { return "s"; } }
+fn main(): int {
+    let a: Src<int> = IntSrc { };
+    let b: Src<string> = StrSrc { };
+    println(a.one().show() + b.one());
+    return 0;
+}

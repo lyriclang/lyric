@@ -1,0 +1,5 @@
+// KONTROLLE zu r24c/r24d: derselbe Bau mit 'int' statt 'never'. ERWARTUNG: kompiliert.
+class Box<T> { tag: T }
+let xs: int[] = [];
+fn g(b: ?Box<int>): int { return 0; }
+fn main(): int { return g(null); }

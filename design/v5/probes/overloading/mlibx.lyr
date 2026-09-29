@@ -1,0 +1,2 @@
+module mlibx;
+pub fn area(r: int): string { return "x-int"; }

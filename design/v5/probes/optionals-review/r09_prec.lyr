@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let x: ?bool = false;
+    println(f"{x ?? true || true}");
+    return 0;
+}

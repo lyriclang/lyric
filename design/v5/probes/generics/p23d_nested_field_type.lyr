@@ -1,0 +1,9 @@
+class Box<T> { value: T, }
+
+class Outer {
+    b: Box<Box<int>>,
+}
+
+fn main(): int {
+    return 0;
+}

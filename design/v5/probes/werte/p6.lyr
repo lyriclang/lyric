@@ -1,0 +1,14 @@
+import std.io.console { println };
+struct S { v: int, }
+struct W2 { n: S, }
+fn main(): int {
+    var a = W2 { n = S { v = 1 } };
+    var b = a;
+    b.n.v = 9;
+    println(f"KONTROLLE plain struct field: a.n.v = {a.n.v}");
+    var c: ?S = S { v = 1 };
+    var d = c;
+    d!.v = 9;
+    println(f"optional local to optional local: c!.v = {c!.v}");
+    return 0;
+}

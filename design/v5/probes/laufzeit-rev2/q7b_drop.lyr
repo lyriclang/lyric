@@ -1,0 +1,31 @@
+// Q7b — Dieselbe Arbeit, einmal mit ZU ENDE gezogener und einmal mit FALLEN GELASSENER Kette.
+// Beide Varianten ziehen GENAU 8 Werte; sie unterscheiden sich nur darin, ob die Kette danach
+// fertig (Frames recycelt) oder suspendiert (Frames fuer den Pool verloren) ist.
+// ERWARTUNG VOR DEM LAUF:
+//   'fallen' ist LANGSAMER — jede Runde muss die Frames neu allokieren
+//   Peak Working Set BLEIBT GLEICH und waechst nicht mit der Rundenzahl (der Pool waechst
+//   nicht; er verliert Eintraege, und der GC holt sie)
+// args: [0]=="x" -> fallen lassen; ein zweites Argument vervierfacht die Rundenzahl
+import std.io.console { println };
+
+fn zaehler(n: int): Coroutine<int> {
+    var i = 0;
+    while (i < n) { yield i; i += 1; }
+}
+
+fn main(args: string[]): int {
+    var runden = 400000;
+    if (args.length > 1) { runden = 400000 * 4; }
+    let fallen = args.length > 0 && args[0] == "x";
+    let laenge = if (fallen) 9 else 8;
+    var summe = 0;
+    var r = 0;
+    while (r < runden) {
+        let c = zaehler(laenge);
+        var k = 0;
+        while (k < 8) { summe += resume c; k += 1; }
+        r += 1;
+    }
+    println(f"summe = {summe}");
+    return 0;
+}

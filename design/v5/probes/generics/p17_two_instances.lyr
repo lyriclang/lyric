@@ -1,0 +1,13 @@
+interface Sink<T> { fn put(v: T): void; }
+
+class Both :: [Sink<int>, Sink<string>] {
+    fn put(v: int): void { }
+    fn put(v: string): void { }
+}
+
+fn drain<T>(s: Sink<T>): void { }
+
+fn main(): int {
+    drain(Both { });
+    return 0;
+}

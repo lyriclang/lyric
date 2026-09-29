@@ -1,0 +1,52 @@
+import std.io.console { println };
+import std.io.error { IoError, IoErrorKind };
+
+pub interface Reader {
+    fn read(into: uint8[]): int throws IoError;
+}
+
+pub interface Writer {
+    fn write(from: uint8[]): int throws IoError;
+}
+
+pub class Zeros :: [Reader] {
+    left: int,
+
+    pub static fn of(n: int): Zeros {
+        return Zeros { left = n };
+    }
+
+    pub mut fn read(into: uint8[]): int throws IoError {
+        if (this.left <= 0) {
+            return 0;
+        }
+        var i = 0;
+        while (i < into.length && this.left > 0) {
+            into[i] = 0;
+            i = i + 1;
+            this.left = this.left - 1;
+        }
+        return i;
+    }
+}
+
+pub fn drain(r: Reader): int throws IoError {
+    let buf: uint8[] = [0, 0, 0, 0];
+    var total = 0;
+    var n = r.read(buf);
+    while (n > 0) {
+        total = total + n;
+        n = r.read(buf);
+    }
+    return total;
+}
+
+fn main(): int {
+    let z = Zeros.of(10);
+    try {
+        println(drain(z));
+    } catch (e: IoError) {
+        println("err");
+    }
+    return 0;
+}

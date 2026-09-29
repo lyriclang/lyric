@@ -1,0 +1,11 @@
+import std.io.console { println };
+interface I1 { fn greet(): string { return "i1"; } }
+interface I2 { fn greet(): string { return "i2"; } }
+class C :: [I1, I2] { }
+fn main(): int {
+    let a: I1 = C { };
+    let b: I2 = C { };
+    println(a.greet());
+    println(b.greet());
+    return 0;
+}

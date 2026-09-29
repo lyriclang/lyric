@@ -1,0 +1,27 @@
+// R7 — Wertsemantik jenseits der gemessenen Raender: generischer Container und Closure-Capture.
+// Erwartung VOR dem Lauf:
+//   listGet   -> 1   (List<S>.get liefert eine Kopie)
+//   listAfter -> 1   (push hat kopiert)
+//   captured  -> 99  (ein gefangenes var wird geboxt, die Box wird geteilt)
+import std.io.console { println };
+import std.collections { List };
+
+struct S { n: int, }
+
+fn main(): int {
+    var a = S { n = 1 };
+    let xs = List<S>.empty();
+    xs.push(a);
+    a.n = 42;
+    println(f"listAfter = {xs.get(0).n}");
+
+    var got = xs.get(0);
+    got.n = 99;
+    println(f"listGet   = {xs.get(0).n}");
+
+    var c = S { n = 1 };
+    let f = (): int => { c.n = 99; return 0; };
+    let ignored = f();
+    println(f"captured  = {c.n}");
+    return 0;
+}

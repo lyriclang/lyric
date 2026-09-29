@@ -1,0 +1,7 @@
+import std.io.console { println };
+struct S {
+    n: int,
+    static fn of(x: int): string { return "static"; }
+    fn of(x: int): string { return "instance"; }
+}
+fn main(): int { return 0; }

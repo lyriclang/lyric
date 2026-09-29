@@ -1,0 +1,5 @@
+interface A1 { fn n(): int; }
+interface Keyed<K :: [A1]> { fn key(): K; }
+class Impl :: [A1] { fn n(): int { return 7; } }
+class C :: [Keyed<Impl>] { fn key(): Impl { return Impl {}; } }
+fn main(): int { let c = C {}; return c.key().n(); }

@@ -1,0 +1,32 @@
+// R10 — Faengt eine Closure pro ERZEUGUNG oder pro SCOPE? P6 hat ein frisches 'let k' gefangen
+// und damit die Frage umgangen. Hier wird die Schleifenvariable SELBST gefangen.
+// Erwartung VOR dem Lauf:
+//   whileVar: 3 3 3, wenn es eine Box fuer 'i' im ganzen Funktionsscope gibt (by reference)
+//             0 1 2, wenn jede Erzeugung ihre eigene Umgebung bekaeme
+//   forVar:   0 1 2, wenn die for-Variable pro Durchlauf frisch ist
+import std.io.console { println };
+
+fn main(): int {
+    var a: fn() -> int = () => -1;
+    var b: fn() -> int = () => -1;
+    var c: fn() -> int = () => -1;
+    var i = 0;
+    while (i < 3) {
+        if (i == 0) { a = () => i; }
+        if (i == 1) { b = () => i; }
+        if (i == 2) { c = () => i; }
+        i += 1;
+    }
+    println(f"whileVar = {a()} {b()} {c()}");
+
+    var d: fn() -> int = () => -1;
+    var e: fn() -> int = () => -1;
+    var f: fn() -> int = () => -1;
+    for (j in 0..3) {
+        if (j == 0) { d = () => j; }
+        if (j == 1) { e = () => j; }
+        if (j == 2) { f = () => j; }
+    }
+    println(f"forVar   = {d()} {e()} {f()}");
+    return 0;
+}

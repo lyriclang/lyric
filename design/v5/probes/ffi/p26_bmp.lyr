@@ -1,0 +1,7 @@
+import std.io.console { println };
+extern "dotnet" fn upper(c: char): char = "System.Char::ToUpper";
+fn main(): int {
+    println("before");
+    println(f"{upper('\u{1F600}')}");
+    return 0;
+}

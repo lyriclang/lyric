@@ -1,0 +1,3 @@
+import std.io.console { println };
+fn f(s: string): int { return match (s) { "get" => 1, "put" => 2, "post" => 3, _ => 0 }; }
+fn main(): int { println(f"{f("post")} {f("x")}"); return 0; }

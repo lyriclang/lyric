@@ -1,0 +1,4 @@
+module main;
+import std.io.console { println };
+import filelib;
+fn main(): int { println(filelib.readIt("nope.txt")); return 0; }

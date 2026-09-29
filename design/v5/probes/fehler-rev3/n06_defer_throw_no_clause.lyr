@@ -1,0 +1,7 @@
+// ERWARTUNG: ein defer, dessen Koerper wirft, in einer Funktion OHNE throws und ohne try:
+// SEM0034 (der Wurf ist ungedeckt) plus SEM0110.
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn boom(): void throws Boom { throw Boom { }; }
+fn work(): void { defer boom(); println("body"); }
+fn main(): int { work(); return 0; }

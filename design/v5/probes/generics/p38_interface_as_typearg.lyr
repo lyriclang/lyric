@@ -1,0 +1,15 @@
+import std.io.console { println };
+
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { fn area(): int { return 1; } }
+class Square :: [Shape] { fn area(): int { return 2; } }
+
+class Box<T> { value: T, }
+
+fn main(): int {
+    let xs: Shape[] = [Circle { }, Square { }];
+    let b = Box<Shape> { value = Circle { } };
+    var total = 0;
+    for (s in xs) { total = total + s.area(); }
+    return total + b.value.area();
+}

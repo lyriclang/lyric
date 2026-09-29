@@ -1,0 +1,19 @@
+import std.io.console { println };
+
+enum Box { Has(?int), Empty }
+
+fn f(b: Box): int {
+    return match (b) {
+        Has(v) => 1,
+        Empty => 0,
+    };
+}
+
+fn g(o: ?int): int {
+    return match (o) {
+        n => n + 1,
+        null => -1,
+    };
+}
+
+fn main(): int { println(f"{f(Box.Has(null))} {g(4)} {g(null)}"); return 0; }

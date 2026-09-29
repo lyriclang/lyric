@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string { fromInt };
+struct S { v: int }
+class C { v: int }
+fn mutate(s: S): void { s.v = 99; }
+fn mutateC(c: C): void { c.v = 99; }
+fn main(): int {
+    let s = S { v = 1 };
+    mutate(s);
+    println(fromInt(s.v));
+    let c = C { v = 1 };
+    mutateC(c);
+    println(fromInt(c.v));
+    return 0;
+}

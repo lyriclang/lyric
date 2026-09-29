@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    match (5) {
+        null => println("n"),
+        _ => println("o"),
+    }
+    return 0;
+}

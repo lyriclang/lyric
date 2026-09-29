@@ -1,0 +1,4 @@
+import a.b;
+import b;
+
+fn main(): int { return 0; }

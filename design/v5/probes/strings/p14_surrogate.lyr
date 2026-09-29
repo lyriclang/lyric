@@ -1,0 +1,12 @@
+import std.io.console { println };
+
+fn toChar(n: int): char {
+    return n as char;
+}
+
+fn main(): int {
+    println("before");
+    let c = toChar(55296);
+    println(f"got {c}");
+    return 0;
+}

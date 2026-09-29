@@ -1,0 +1,10 @@
+import std.io.console { println };
+
+extern "dotnet" fn newLine(): string = "System.Environment::get_NewLine";
+extern "dotnet" fn ms(): int = "System.Environment::get_TickCount64";
+
+fn main(): int {
+    println(f"newline-is-crlf={newLine() == "\r\n"}");
+    println(f"ms>0={ms() > 0}");
+    return 0;
+}

@@ -1,0 +1,11 @@
+import std.io.console { println };
+import std.collections { Map };
+
+fn main(): int {
+    let m = Map<string, int>.new();
+    m.put("a", 1);
+    for (kv in m) {
+        println(kv.0);
+    }
+    return 0;
+}

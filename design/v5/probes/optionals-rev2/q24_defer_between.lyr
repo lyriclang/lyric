@@ -1,0 +1,10 @@
+import std.io.console { println };
+fn main(): int {
+    var x: ?int = 1;
+    if (x != null) {
+        defer { x = null; }
+        println(f"{x + 1}");
+    }
+    println(f"{x ?? -1}");
+    return 0;
+}

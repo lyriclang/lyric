@@ -1,0 +1,11 @@
+enum Shape { Circle(float), Square(float), Tri(float, float) }
+
+fn area(s: Shape): float {
+    match (s) {
+        Shape.Circle(r) => { return r; }
+        Shape.Square(a) => { return a; }
+        Shape.Tri(a, b) => { return a + b; }
+    }
+}
+
+fn main(): int { return 0; }

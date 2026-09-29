@@ -1,0 +1,13 @@
+import std.io.console { println };
+struct Vec2 { x: float, y: float }
+fn main(): int {
+    let seed = Vec2{x=1.0, y=2.0};
+    var c = [seed] * 2;
+    c[0].x = 7.0;
+    var a = c[0];
+    a.x = 42.0;
+    println(f"read-copy {c[0].x} {a.x}");
+    let b = c[1];
+    println(f"shared {b.x}");
+    return 0;
+}

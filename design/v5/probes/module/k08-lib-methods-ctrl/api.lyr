@@ -1,0 +1,10 @@
+module api;
+
+pub class Box {
+    v: int,
+    pub fn get(): int { return this.v; }
+    pub fn bump(): int { this.v = this.v + 1; return this.v; }
+}
+
+pub fn newBox(): Box { return Box { v = 1 }; }
+pub fn boxGet(b: Box): int { return b.get(); }

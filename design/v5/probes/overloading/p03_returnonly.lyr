@@ -1,0 +1,3 @@
+fn g(a: int): int { return 1; }
+fn g(a: int): string { return "x"; }
+fn main(): int { return 0; }

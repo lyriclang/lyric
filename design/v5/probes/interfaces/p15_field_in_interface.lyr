@@ -1,0 +1,6 @@
+interface HasName {
+    name: string,
+    fn greet(): string;
+}
+
+fn main(): int { return 0; }

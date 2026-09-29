@@ -1,0 +1,3 @@
+opaque type Meters = int;
+class Box<T> { v: T }
+fn main(): int { let m = 3 as Meters; let b = Box<Meters> { v = m }; let c = b as Box<int>; return c.v; }

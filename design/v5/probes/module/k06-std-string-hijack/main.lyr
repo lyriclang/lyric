@@ -1,0 +1,4 @@
+module std.string;
+import std.io.console;
+
+fn main(): int { console.println("hijacked string"); return 0; }

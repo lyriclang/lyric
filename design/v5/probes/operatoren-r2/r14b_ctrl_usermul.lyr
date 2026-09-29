@@ -1,0 +1,13 @@
+import std.core { Mul };
+import std.io.console { println };
+import std.string { fromFloat };
+struct Vec2 :: [Mul<float, Vec2>] {
+    x: float,
+    fn mul(other: float): Vec2 { return Vec2 { x = this.x * other }; }
+}
+fn main(): int {
+    let v = Vec2 { x = 2.0 };
+    let w = v * 2.0;
+    println(fromFloat(w.x));
+    return 0;
+}

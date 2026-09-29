@@ -1,0 +1,6 @@
+import std.io.console { println };
+opaque type Handle = int;
+type Meters = float;
+extern "dotnet" fn h(x: Handle): int = "System.Math::Abs";
+extern "dotnet" fn m(x: Meters): float = "System.Math::Abs";
+fn main(): int { println("x"); return 0; }

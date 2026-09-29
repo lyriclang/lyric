@@ -1,0 +1,5 @@
+module mylib;
+
+fn helper(): int { return 4; }
+
+pub fn entry(): int { return helper(); }

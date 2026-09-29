@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    println("start");
+    let z = 1 / 0;
+    println(fromInt(z));
+    return 0;
+}

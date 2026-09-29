@@ -1,0 +1,6 @@
+import std.io.console { println };
+fn main(): int {
+    let a: ?int = null;
+    if (a ?? 0 == 5) { println("yes"); } else { println("no"); }
+    return 0;
+}

@@ -1,0 +1,23 @@
+import std.core { Ordered };
+import std.io.console { println };
+import std.string { fromInt };
+
+struct O :: [Ordered<O>] {
+    x: int,
+    fn compare(other: O): int { return this.x - other.x; }
+}
+
+fn main(): int {
+    var n = 8;
+    n <<= 2; println(fromInt(n));   // 32
+    n >>= 1; println(fromInt(n));   // 16
+    n &= 12; println(fromInt(n));   // 12
+    n |= 1;  println(fromInt(n));   // 13
+    n ^= 5;  println(fromInt(n));   // 8
+    println(fromInt(-7 % 2));       // truncation: -1, floor: 1
+    println(fromInt(-7 / 2));       // truncation: -3
+    let a = O { x = 1 };
+    let b = O { x = 2 };
+    if (a < b) { println("ordered works"); }
+    return 0;
+}

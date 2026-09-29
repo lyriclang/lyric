@@ -1,0 +1,11 @@
+// ERWARTUNG: FFFFFFFFFFFFFFFF (geweitet, wie SK-18 bei float32) und FF
+import std.io.console { println };
+fn main(): int {
+  let a: int8 = -1i8;
+  println(f"{a:X}");
+  let b: uint8 = 255u8;
+  println(f"{b:X}");
+  let c: int32 = -1i32;
+  println(f"{c:X}");
+  return 0;
+}

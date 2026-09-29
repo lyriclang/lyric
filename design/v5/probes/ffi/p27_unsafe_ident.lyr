@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn unsafe(x: int): int { return x + 1; }
+fn main(): int {
+    var extern = 5;
+    let ffi = unsafe(extern);
+    println(f"unsafe/extern as identifiers ok: {ffi}");
+    return 0;
+}

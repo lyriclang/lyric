@@ -1,0 +1,8 @@
+import std.io.console { println };
+import helper { twice };
+
+fn main(): int {
+    let n = twice(21);
+    println(f"{n}");
+    return 0;
+}

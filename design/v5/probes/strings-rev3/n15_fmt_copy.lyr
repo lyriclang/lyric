@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let x = 8;
+    let y = 2.5;
+    println(f"{ x : 8 }|{y:F2}|{x}");
+    return 0;
+}

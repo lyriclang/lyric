@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let n: int64 = 3;
+    var c = 0;
+    for (i in 0..n) { c += 1; }
+    println(f"{c}");
+    return 0;
+}

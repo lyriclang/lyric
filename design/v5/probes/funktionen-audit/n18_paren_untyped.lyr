@@ -1,0 +1,7 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn main(): int {
+    let f = (x) => x * 2;
+    println(fromInt(f(3)));
+    return 0;
+}

@@ -1,0 +1,19 @@
+import std.io.console { println };
+import std.io.file { textOrThrow };
+import std.json { parseOrThrow };
+
+fn main(): int {
+    try {
+        let t = textOrThrow("/nope/nope.txt");
+        println(t);
+    } catch (e) {
+        println("caught: " + e.message());
+    }
+    try {
+        let v = parseOrThrow("{oops");
+        println("ok");
+    } catch (e) {
+        println("caught: " + e.message());
+    }
+    return 0;
+}

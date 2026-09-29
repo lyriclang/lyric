@@ -1,0 +1,15 @@
+import std.io.console { println };
+fn gen(): Coroutine<int> {
+    var x: ?int = 1;
+    if (x != null) {
+        yield 0;
+        println(f"{x + 1}");
+    }
+    yield 9;
+}
+fn main(): int {
+    let c = gen();
+    resume c;
+    resume c;
+    return 0;
+}

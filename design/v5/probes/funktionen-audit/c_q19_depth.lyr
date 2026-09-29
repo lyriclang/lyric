@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn down(n: int): int {
+    println(fromInt(n));
+    if (n == 0) { return 0; }
+    return down(n - 1);
+}
+fn main(): int { return down(5000); }

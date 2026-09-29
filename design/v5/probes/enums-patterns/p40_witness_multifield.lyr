@@ -1,0 +1,8 @@
+enum S { Rect { w: int, h: int }, Dot }
+fn f(s: S): int {
+    return match (s) {
+        Rect { w = 0, h } => 1,
+        Dot => 3,
+    };
+}
+fn main(): int { return f(S.Dot); }

@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string as strings;
+import std.core { Hashable };
+
+fn hashOf<T :: [Hashable<T>]>(v: T): int {
+    return v.hash();
+}
+
+fn main(): int {
+    let base = "a" * 5000;
+    let h = hashOf(base);
+    println(f"h={h} len={base.length()}");
+    return 0;
+}

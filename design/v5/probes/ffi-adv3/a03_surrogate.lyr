@@ -1,0 +1,7 @@
+import std.io.console { println };
+extern "dotnet" fn toChar(v: int32): char = "System.Convert::ToChar";
+fn main(): int {
+    let c = toChar(55296);
+    println(f"code={c as int}");
+    return 0;
+}

@@ -1,0 +1,13 @@
+module main;
+
+import std.io.console { println };
+
+struct Inner { v: int }
+
+type Id = Inner;
+
+fn main(): int {
+    let x: Id = Id { v = 8 };
+    println(x.v);
+    return 0;
+}

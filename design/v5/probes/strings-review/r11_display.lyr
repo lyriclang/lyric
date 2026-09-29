@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.core { Display };
+
+fn main(): int {
+    let d: Display = 5;
+    println(d.show());
+    return 0;
+}

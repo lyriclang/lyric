@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.io.file { text };
+
+fn main(): int {
+    let t = text("secret.txt");
+    if (t != null) { println(f"file=[{t}]"); }
+    return 0;
+}

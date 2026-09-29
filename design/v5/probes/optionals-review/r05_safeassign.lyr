@@ -1,0 +1,6 @@
+class B { var v: int = 0 }
+fn main(): int {
+    let o: ?B = B {};
+    o?.v = 3;
+    return 0;
+}

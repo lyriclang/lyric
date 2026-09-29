@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn deep(v: ?int): int { return v!; }
+fn main(): int {
+    let a: ?int = null;
+    println(f"{deep(a)}");
+    return 0;
+}

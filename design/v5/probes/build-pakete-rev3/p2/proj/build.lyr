@@ -1,0 +1,5 @@
+import std.build { executable };
+pub fn build() {
+    let a = executable("tool", "src/main.lyr");
+    a.output = "out/custom/tool.lyrbc";
+}

@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+fn main(): int {
+    println(f"{"Z" < "a"}");
+    println(f"{"apple" < "banana"}");
+    println(f"{"é" < "z"}");
+    println(f"{"\u{1F600}" < "z"}");
+    return 0;
+}

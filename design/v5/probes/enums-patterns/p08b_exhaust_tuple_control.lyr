@@ -1,0 +1,10 @@
+enum A { A1, A2 }
+
+fn f(a: A): int {
+    return match (a) {
+        A1 => 1,
+        A2 => 2,
+    };
+}
+
+fn main(): int { return f(A.A1); }

@@ -1,0 +1,14 @@
+import std.io.console { println };
+struct Zaehler {
+    n: int,
+    pub mut fn hoch() { this.n += 1; }
+    pub fn wert(): int { return this.n; }
+}
+fn main(): int {
+    var ff = Zaehler { n: 0 };
+    let ys: Zaehler[] = [ff];
+    var el2 = ys[0];
+    el2.hoch();
+    println(f"nacktKontr  = {ys[0].wert()}");
+    return 0;
+}

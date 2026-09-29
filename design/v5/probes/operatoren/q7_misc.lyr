@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt, fromFloat };
+
+fn main(): int {
+    println("a" + "b");                 // string via Add?
+    println(fromFloat(5.5 % 2.0));      // float remainder?
+    let n = 2;
+    let u = -n as uint;                 // prefix - (2) binds tighter than as (3)
+    println(fromInt(u as int));
+    let a: ?int = null;
+    let b: ?int = null;
+    println(fromInt(a ?? b ?? 9));      // right-assoc
+    return 0;
+}

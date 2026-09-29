@@ -1,0 +1,17 @@
+import std.core { Into };
+import std.io.console { println };
+
+struct Fahrenheit { degrees: int, }
+
+struct Celsius :: [Into<Fahrenheit>] {
+    degrees: int,
+    fn into(): Fahrenheit { return Fahrenheit { degrees = this.degrees * 9 / 5 + 32 }; }
+}
+
+fn main(): int {
+    let boiling = Celsius { degrees = 100 };
+    let a = boiling as Fahrenheit;
+    let b = boiling.into();
+    println(f"{a.degrees} {b.degrees}");
+    return 0;
+}

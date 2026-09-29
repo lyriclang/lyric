@@ -1,0 +1,1 @@
+{ "name": "p7", "sourceRoot": "src", "dependencies": { "nope": "../nope" } }

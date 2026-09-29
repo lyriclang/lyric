@@ -1,0 +1,8 @@
+import std.core { Deprecated };
+
+pub interface Shape {
+    @Deprecated { message = "use area2", until = "1.0" }
+    fn area(): int;
+}
+
+fn main(): int { return 0; }

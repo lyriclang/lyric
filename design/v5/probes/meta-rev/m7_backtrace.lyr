@@ -1,0 +1,10 @@
+fn level3(n: int): int {
+    if (n > 10) { panic("too big"); }
+    return n;
+}
+fn level2(n: int): int { return level3(n * 2); }
+fn level1(n: int): int { return level2(n + 3); }
+
+let X: int = comptime level1(5);
+
+fn main(): int { return X; }

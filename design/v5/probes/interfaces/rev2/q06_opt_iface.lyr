@@ -1,0 +1,8 @@
+import std.io.console { println };
+interface Shape { fn area(): int; }
+class Circle :: [Shape] { fn area(): int { return 3; } }
+fn main(): int {
+    let s: ?Shape = Circle { };
+    if (s != null) { println("some"); } else { println("none"); }
+    return 0;
+}

@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+fn side(): int { println("  <default evaluated>"); return 7; }
+fn withDefault(a: int, b: int = side()): int { return a + b; }
+
+fn main(): int {
+    println("before first call");
+    println(fromInt(withDefault(10)));
+    println("before second call");
+    println(fromInt(withDefault(10)));
+    println("before explicit call");
+    println(fromInt(withDefault(10, 100)));
+    return 0;
+}

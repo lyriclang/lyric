@@ -1,0 +1,6 @@
+module lib;
+
+import std.core { NonExhaustive };
+
+@NonExhaustive
+pub enum Wait { Ready, Timeout }

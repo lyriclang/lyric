@@ -1,0 +1,2 @@
+interface I { x: int; fn f(): int; }
+fn main(): int { return 0; }

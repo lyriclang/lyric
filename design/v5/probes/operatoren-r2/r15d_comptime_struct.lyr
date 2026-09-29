@@ -1,0 +1,11 @@
+import std.core { Add };
+import std.io.console { println };
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V { return V { x = this.x + other.x }; }
+}
+fn main(): int {
+    let w = comptime (V { x = 1 } + V { x = 2 });
+    println("ok");
+    return w.x;
+}

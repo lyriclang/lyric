@@ -1,0 +1,16 @@
+import std.io.console { println };
+fn find(): ?int { return 7; }
+fn none(): ?int { return null; }
+fn main(): int {
+    if (let x = find()) {
+        println(f"{x + 1}");
+    } else {
+        println("absent");
+    }
+    if (let y = none()) {
+        println(f"{y + 1}");
+    } else {
+        println("absent2");
+    }
+    return 0;
+}

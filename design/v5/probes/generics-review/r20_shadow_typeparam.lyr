@@ -1,0 +1,9 @@
+import std.io.console { println };
+class Box<T> {
+    value: T,
+    fn f<T>(x: T): int { return 1; }
+}
+fn main(): int {
+    let b = Box<int> { value = 1 };
+    return b.f<string>("a");
+}

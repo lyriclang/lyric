@@ -1,0 +1,9 @@
+import std.test { Test, assertEq };
+import std.collections { List };
+
+@Test
+pub fn two_lists(): void {
+    let a = List<int>.of([1, 2, 3]);
+    let b = List<int>.of([1, 2, 3]);
+    assertEq(a, b);
+}

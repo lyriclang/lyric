@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let lo: int8 = 125i8;
+    let hi: int8 = 127i8;
+    var n = 0;
+    for (x in lo..=hi) { println(f"{x}"); n = n + 1; }
+    return n;
+}

@@ -1,0 +1,2 @@
+class C { v: int, mut fn bump(): void { this.v = this.v + 1; } fn viaThis(): void { this.bump(); } }
+fn main(): int { let c = C { v = 1 }; c.viaThis(); return c.v; }

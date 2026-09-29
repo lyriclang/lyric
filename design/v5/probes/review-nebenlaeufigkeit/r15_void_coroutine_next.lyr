@@ -1,0 +1,11 @@
+import std.io.console { println };
+
+fn pulse(): Coroutine<void> { yield; yield; }
+
+fn main(): int {
+    let co = pulse();
+    var n = 0;
+    while (co.next()) { n += 1; }
+    println(f"advances: {n}");
+    return 0;
+}

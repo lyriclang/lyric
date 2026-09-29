@@ -1,0 +1,3 @@
+module m18;
+pub fn v18(): int { return 18; }
+pub fn w18(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 18; } return s; }

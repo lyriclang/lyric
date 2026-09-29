@@ -1,0 +1,12 @@
+import std.io.console { println };
+fn main(): int {
+    var n = 3;
+    var count = 0;
+    for (i in 0..n) { n = 0; count += 1; }
+    println(f"range {count}");
+    var xs = [1, 2, 3];
+    var c2 = 0;
+    for (x in xs) { xs = [9]; c2 += 1; }
+    println(f"array {c2}");
+    return 0;
+}

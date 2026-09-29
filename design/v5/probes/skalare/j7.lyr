@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { println(5i64); return 0; }

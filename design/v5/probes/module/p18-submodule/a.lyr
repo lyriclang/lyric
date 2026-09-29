@@ -1,0 +1,3 @@
+module a;
+fn priv(): int { return 4; }
+pub fn pub1(): int { return 1; }

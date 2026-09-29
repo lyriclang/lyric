@@ -1,0 +1,1 @@
+import std.io.console { println }; fn main(): int { println("ms"); return 0; }

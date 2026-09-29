@@ -1,0 +1,16 @@
+// ERWARTUNG: der Wurf kommt beim zweiten resume an; laeuft der defer IN der Koroutine?
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn gen(): Coroutine<int> throws Boom {
+    defer println("coroutine cleanup");
+    yield 1;
+    throw Boom { };
+}
+fn main(): int {
+    let c = gen();
+    try {
+        println(f"first {resume c}");
+        println(f"second {resume c}");
+        return 1;
+    } catch (e: Boom) { println(f"caught {e.message()}"); return 0; }
+}

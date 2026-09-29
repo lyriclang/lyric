@@ -1,0 +1,16 @@
+interface Shape { fn area(): int; }
+
+class Circle :: [Shape] { fn area(): int { return 1; } }
+
+class Box<T> { value: T, }
+
+fn takesShapes(xs: Shape[]): int { return xs.length; }
+fn takesShapeBox(b: Box<Shape>): int { return b.value.area(); }
+
+fn main(): int {
+    let circles: Circle[] = [Circle { }];
+    let n = takesShapes(circles);
+    let cb = Box<Circle> { value = Circle { } };
+    let m = takesShapeBox(cb);
+    return n + m;
+}

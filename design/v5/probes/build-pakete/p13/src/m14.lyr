@@ -1,0 +1,3 @@
+module m14;
+pub fn v14(): int { return 14; }
+pub fn w14(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 14; } return s; }

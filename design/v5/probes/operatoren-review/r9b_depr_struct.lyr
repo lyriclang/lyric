@@ -1,0 +1,4 @@
+import std.core { Deprecated };
+@Deprecated { message = "use New", until = "5.0" }
+pub struct Oldish { n: int }
+fn main(): int { return 0; }

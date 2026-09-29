@@ -1,0 +1,4 @@
+// ERWARTUNG: zwei VERSCHIEDENE Loecher. (1) der Funktionstyp mit Klausel: LYR-SEM0084.
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn apply(f: fn(int) -> int throws Boom): int { return f(1); }
+fn main(): int { return 0; }

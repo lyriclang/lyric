@@ -1,0 +1,4 @@
+./n17_coroutine_defer_abandoned.lyr:7:5: error[LYR-SEM0039]: a coroutine ends with a bare 'return;' — it cannot return a value
+    return 0;
+    ^^^^^^^^^
+

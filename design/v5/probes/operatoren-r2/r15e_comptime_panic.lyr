@@ -1,0 +1,11 @@
+import std.core { Add, panic };
+import std.io.console { println };
+import std.string { fromInt };
+struct V :: [Add<V, V>] {
+    x: int,
+    fn add(other: V): V { panic("user operator ran at compile time"); }
+}
+fn main(): int {
+    println(fromInt(comptime (V { x = 1 } + V { x = 2 }).x));
+    return 0;
+}

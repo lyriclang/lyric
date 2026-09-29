@@ -1,0 +1,4 @@
+import std.io.console { println };
+struct S { v: int, }
+let G: S = S { v = 1 };
+fn main(): int { G.v = 9; println(f"r15 G.v={G.v}"); return 0; }

@@ -1,0 +1,6 @@
+import std.test { Test, assertEq };
+
+@Test
+fn notPublic(): void {
+    assertEq(1, 1);
+}

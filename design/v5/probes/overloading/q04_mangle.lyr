@@ -1,0 +1,10 @@
+import std.io.console { println };
+import mpa;
+import mpb;
+fn f(p: mpa.Point): string { return "a"; }
+fn f(p: mpb.Point): string { return "b"; }
+fn main(): int {
+    println(f(mpa.Point { x = 1 }));
+    println(f(mpb.Point { y = 2 }));
+    return 0;
+}

@@ -1,0 +1,8 @@
+import std.io.console { println };
+fn main(): int {
+    let xs = [1, 2, 3];
+    var total = 0;
+    for (x in xs) { total += x; }
+    println(f"{total}");
+    return 0;
+}

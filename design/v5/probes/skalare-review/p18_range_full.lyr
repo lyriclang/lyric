@@ -1,0 +1,8 @@
+// ERWARTUNG: 128, terminiert (Risiko: Zaehler wrappt bei 127 -> Endlosschleife)
+import std.io.console { println };
+fn main(): int {
+  var n = 0;
+  for (i in 0i8..=127i8) { n += 1; }
+  println(f"{n}");
+  return 0;
+}

@@ -1,0 +1,5 @@
+import std.io.console { println };
+fn main(): int {
+    for (b in false..true) { println(f"{b}"); }
+    return 0;
+}

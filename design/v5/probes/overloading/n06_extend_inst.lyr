@@ -1,0 +1,5 @@
+import std.io.console { println };
+struct Box<T> { v: T, }
+extend Box<int> { fn tag(): string { return "int-box"; } }
+extend Box<string> { fn tag(): string { return "str-box"; } }
+fn main(): int { let b = Box<int> { v = 1 }; println(b.tag()); return 0; }

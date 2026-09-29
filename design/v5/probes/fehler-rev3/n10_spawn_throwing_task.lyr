@@ -1,0 +1,6 @@
+// ERWARTUNG: spawn nimmt Coroutine<Wait> ohne throws (task.lyr:10-11); ein werfender Task ist ein
+// Typfehler beim Aufruf von spawn.
+import std.task { spawn, run, Wait };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn job(): Coroutine<Wait> throws Boom { yield Wait.Now; throw Boom { }; }
+fn main(): int { spawn(job()); run(); return 0; }

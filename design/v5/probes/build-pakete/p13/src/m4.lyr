@@ -1,0 +1,3 @@
+module m4;
+pub fn v4(): int { return 4; }
+pub fn w4(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 4; } return s; }

@@ -1,0 +1,12 @@
+import std.core { OnMethod };
+
+pub struct Hot :: [OnMethod] { }
+
+class Counter {
+    n: int,
+
+    @Hot
+    pub mut fn bump(): void { this.n = this.n + 1; }
+}
+
+fn main(): int { var c = Counter { n = 0 }; c.bump(); return c.n; }

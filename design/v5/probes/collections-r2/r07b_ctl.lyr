@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.collections { Map };
+fn main(): int {
+    // Kontrolle 1: ein gewoehnlicher Schluessel
+    let m = Map<int, string>.empty();
+    m.set(1, "a");
+    println(f"{m.get(1) ?? "-"}");
+    return 0;
+}

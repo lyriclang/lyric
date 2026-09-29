@@ -1,0 +1,2 @@
+fn make<T>(): T[] { return []; }
+fn main(): int { let s: string[] = make(); return s.length; }

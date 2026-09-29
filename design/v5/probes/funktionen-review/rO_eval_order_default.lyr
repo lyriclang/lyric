@@ -1,0 +1,6 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn first(): int { println("explicit"); return 1; }
+fn side(): int { println("default"); return 2; }
+fn f(a: int, b: int = side(), c: int = side()): int { return a + b + c; }
+fn main(): int { println(fromInt(f(first()))); return 0; }

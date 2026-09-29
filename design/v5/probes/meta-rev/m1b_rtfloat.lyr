@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.math { sin, pow, log };
+
+fn main(): int {
+    println(f"{sin(1.0)}");
+    println(f"{pow(1.0000001, 100000.0)}");
+    println(f"{log(2.0)}");
+    return 0;
+}

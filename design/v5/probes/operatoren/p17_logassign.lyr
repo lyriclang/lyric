@@ -1,0 +1,32 @@
+import std.io.console { println };
+import std.string { fromInt };
+
+struct B { f: bool, o: ?int, }
+
+fn side(): bool { println("RHS ran"); return true; }
+
+fn main(): int {
+    var a = false;
+    a ||= true;                 // local
+    var b = true;
+    b &&= false;                // local
+    var o: ?int = null;
+    o ??= 5;                    // local
+    println(fromInt(o!));       // 5
+    var s = B { f = false, o = null };
+    s.f ||= true;               // field
+    s.o ??= 7;                  // field
+    println(fromInt(s.o!));     // 7
+    var fs = [false, false];
+    fs[0] ||= true;             // element
+    var os: (?int)[] = [null, null];
+    os[0] ??= 9;                // element
+    println(fromInt(os[0]!));   // 9
+    // short circuit: RHS must not run
+    var t = false;
+    t &&= side();               // must NOT print
+    var u = true;
+    u ||= side();               // must NOT print
+    println("done");
+    return 0;
+}

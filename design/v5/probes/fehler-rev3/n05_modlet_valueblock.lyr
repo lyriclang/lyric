@@ -1,0 +1,10 @@
+// ERWARTUNG: unbekannt — kann ein Modul-let per Wertblock ein try/catch enthalten?
+import std.io.console { println };
+class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+fn risky(): int throws Boom { return 7; }
+let n: int = {
+    var v = 0;
+    try { v = risky(); } catch (_: Boom) { v = -1; }
+    v
+};
+fn main(): int { println(f"{n}"); return 0; }

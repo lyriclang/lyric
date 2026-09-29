@@ -1,0 +1,7 @@
+import std.io.console { println };
+
+fn main(): int {
+    println("before");
+    println(f"{42:Q9}");
+    return 0;
+}

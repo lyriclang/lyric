@@ -1,0 +1,18 @@
+import std.io.console { println };
+import std.os as os;
+import std.task { Wait, spawn, run, interrupt };
+
+let t0 = os.nowMillis();
+
+fn watcher(): Coroutine<Wait> {
+    yield Wait.Interrupt;
+    println(f"watcher woke at +{os.nowMillis() - t0}ms");
+}
+
+fn main(): int {
+    interrupt();
+    spawn(watcher());
+    run();
+    println("run returned");
+    return 0;
+}

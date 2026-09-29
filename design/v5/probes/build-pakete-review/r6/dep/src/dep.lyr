@@ -1,0 +1,7 @@
+module dep;
+import std.core { Deprecated };
+
+@Deprecated { message = "use fresh()", until = "5.0" }
+pub fn old(): string { return "old"; }
+
+pub fn hi(): string { return old(); }

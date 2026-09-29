@@ -1,0 +1,7 @@
+import std.io.console { println };
+interface A1 { fn n(): int; }
+interface A2 { fn m(): int; }
+class OnlyA2 :: [A2] { fn m(): int { return 7; } }
+fn g<T :: [A1]>(x: T): int { return 1; }
+fn g<T :: [A2]>(x: T): int { return 2; }
+fn main(): int { println(f"{g(OnlyA2 {})}"); return 0; }

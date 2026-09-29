@@ -1,0 +1,13 @@
+import std.core { Ordered };
+import std.io.console { println };
+fn main(): int {
+    let nan: float = 0.0 / 0.0;
+    let one: float = 1.0;
+    let two: float = 2.0;
+    println(f"nan<1 {nan < one} 1<nan {one < nan} nan==nan {nan == nan}");
+    println(f"compare(nan,1) = {nan.compare(one)}");
+    println(f"compare(nan,2) = {nan.compare(two)}");
+    println(f"equals(nan,nan) = {nan.equals(nan)}");
+    println(f"compare(nan,nan) = {nan.compare(nan)}");
+    return 0;
+}

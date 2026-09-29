@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn use(f: fn(int) -> int): string { return "int"; }
+fn use(f: fn(string) -> string): string { return "string"; }
+fn main(): int {
+    println(use(x => x));
+    return 0;
+}

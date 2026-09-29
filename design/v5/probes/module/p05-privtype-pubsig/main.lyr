@@ -1,0 +1,9 @@
+import lib;
+import std.io.console;
+
+fn main(): int {
+    let s = lib.make();
+    console.println(f"{lib.read(s)}");
+    console.println(f"{s.v}");
+    return 0;
+}

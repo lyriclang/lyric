@@ -1,0 +1,7 @@
+import std.io.console { println };
+fn main(): int {
+    let w = 8;
+    println(f"[{42:{w}}]");
+    println(f"[{42:(a)[b]}]");
+    return 0;
+}

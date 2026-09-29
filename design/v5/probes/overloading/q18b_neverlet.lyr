@@ -1,0 +1,2 @@
+import std.io.console { println };
+fn main(): int { let x: int = panic("boom"); println("x"); return x; }

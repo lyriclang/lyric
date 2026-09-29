@@ -1,0 +1,21 @@
+import std.io.console { println };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    // Kontrolle: der Handzug funktioniert
+    let a = three();
+    var live = true;
+    while (live) {
+        let v = a.next();
+        if (v == null) { live = false; } else { println(f"ctl {v}"); }
+    }
+    // Die Frage: ist Coroutine<T> ein Iterator<T>?
+    let co = three();
+    for (x in co) { println(f"forin {x}"); }
+    return 0;
+}

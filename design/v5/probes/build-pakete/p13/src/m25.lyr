@@ -1,0 +1,3 @@
+module m25;
+pub fn v25(): int { return 25; }
+pub fn w25(n: int): int { var s = 0; for (i in 0..n) { s = s + i * 25; } return s; }

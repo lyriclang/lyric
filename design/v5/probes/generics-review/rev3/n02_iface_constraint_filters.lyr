@@ -1,0 +1,4 @@
+interface A1 { fn n(): int; }
+class Impl :: [A1] { fn n(): int { return 7; } }
+fn f<T :: [A1]>(x: T): int { return x.n(); }
+fn main(): int { return f(Impl {}) + f(5); }

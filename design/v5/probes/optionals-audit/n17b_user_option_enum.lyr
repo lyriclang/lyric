@@ -1,0 +1,11 @@
+import std.io.console { println };
+enum Opt<T> { Some(T), None }
+fn main(): int {
+    let inner: ?int = null;
+    let o = Opt<?int>.Some(inner);
+    match (o) {
+        Some(v) => println(f"some {v ?? -1}"),
+        None => println("none"),
+    }
+    return 0;
+}

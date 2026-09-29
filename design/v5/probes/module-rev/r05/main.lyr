@@ -1,0 +1,10 @@
+module main;
+
+import std.io.console { println };
+import lib;
+
+fn main(): int {
+    println(lib.Counter.HIDDEN);
+    println(lib.Counter.SHOWN);
+    return 0;
+}

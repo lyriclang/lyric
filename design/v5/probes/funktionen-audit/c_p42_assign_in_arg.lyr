@@ -1,0 +1,9 @@
+import std.io.console { println };
+import std.string { fromInt };
+fn connect(host: string, port: int): int { return port; }
+fn main(): int {
+    var port = 1;
+    println(fromInt(connect("c", port = 8080)));
+    println(fromInt(port));
+    return 0;
+}
