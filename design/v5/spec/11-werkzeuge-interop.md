@@ -187,13 +187,25 @@ bewegt nicht (L1), Yields dürfen C-Frames durchqueren (L4), `extern "C"` wirft 
 | # | Entscheidung | Vorbild / Verworfenes |
 |---|---|---|
 | H9 | **Kein Script-Nesting in 5.0** (Z4). **Wird neu geplant, sobald die native Script-VM steht** (Maintainer, 2026-09-29 — „nur angestoßen"). Bis dahin: Prozessgrenze (`lyric-script` als Kindprozess, Pipes) als Ring-Paket; **CoreCLR-Hosting verworfen** (zieht das Laufzeitgewicht zurück, das Z1 ablegt). Vorgedacht für die spätere Planung: **(a) Modul-Mix im Paket** — `[script] root/toolchain/embed` im Manifest, Grenze **einmal** in Lyric 5 als `@ScriptApi`-Funktionen (→ Natives der VM) und `extern "script"`-Stubs, API-Beschreibung aus dieser Quelle, Bytecode per `embed` ins Binary oder daneben (Hot-Reload/Modding), VM als Bibliothek gelinkt, Marshalling = Native-Tabelle (Bibliotheks-, keine Sprachgrenze), zwei LSPs nach Dateiendung; **(b) Datei-Mix** (HTML-Idee des Maintainers) nur als Makro `script! { … }` (Q5) — braucht einen comptime-aufrufbaren Script-Compiler (Q3), kein Sprachfeature; die echte HTML-Analogie (Objektmodell + Verhalten in einer Datei) wäre ein Erato-Format, nicht Lyrics; **(c) die andere Tür**: Lyric-5-Module im IR-Interpreter (L7) — dasselbe Typsystem, keine Grenze, Hot-Reload/Budget/Sandbox durch den Interpreter, aber ohne Z4s Script-Freiheit | VS Code Extension-Host (Prozess), Rust `inline-python` (Makro) |
+| H10 | **Vormerk GUI-Format** (Maintainer, 2026-09-29; Ring, nicht `std`): XAML-artiger **Baum** (Elemente = Lyric-Klassen der UI-Bibliothek, Attribute = Felder, **Bindungen kompiliert** wie `x:Bind`), **Blöcke in Lyric 5** (`onClick = { … }`, Blazor/Compose-Modell — QML ist die Warnung: JS-Blöcke wurden zehn Jahre lang wegkompiliert), erzeugt per `embed` + `comptime`/`gen/` (09, BS6) als Klasse; **Code-Behind = `extend MainWindow { … }`** (methoden-only `extend` ist frei); **Lyric-Script-Blöcke als Sandbox-Variante** (`script = "lyric-script"`) für nutzereditierbare Oberflächen, sobald H9 steht; Layout-Hot-Reload braucht kein Script (Baum ist Daten); LSP-Schema aus `lyric api`/`std.meta`; Rendering-Backends als Ring-Pakete über FFI. Geplant mit dem Ring | XAML/`x:Bind`, Blazor `@code`, Compose; gegen QML |
 
-## W6 — Diagnostik: Katalog, Form, JSON, Fixes: **offen**
+## W6 — Diagnostik: Katalog, Form, JSON, Fixes: **entschieden** (2026-09-29)
 
-D1/D2/D5–D12, D15–D17, D23–D32. Codeschema (`LYR-XXX0000` bleibt?), Bereiche, Severities
-(`Info` überlebt?), mehrere beschriftete Spans, Notizen, Ausgabeform (rustc-artig), Fehler-
-obergrenze, Reihenfolge als Vertrag, JSON-Vertrag, `lyric explain CODE`, Fix-Vorschläge
-(`MachineApplicable`), Katalog-Erzwingung, fremde Diagnosen gedämpft, `comptime`-Spans.
+| # | Entscheidung | Vorbild / Verworfenes |
+|---|---|---|
+| G1 | **Record**: `Diagnostic { code, severity, spans: [LabeledSpan] (ein primärer, sekundäre mit Beschriftung), message, notes: [Note { kind: Place \| Help \| Suggestion \| Category, span?, text, replacement?, applicability? }] }` (D10 B, D26 B). **Severities `Error`, `Warning`, `Hint`** — `Info` gestrichen (D25 B); `Hint` = Editor-Abschwächung | rustc, Clang |
+| G2 | **Codes nummeriert** `LYR-<BEREICH><NNNN>`, Bereichssatz **offen** (`LEX PAR RES SEM CT MAC CG LNK RT CLI ICE`; D16 B, D31 D); **Lints tragen zusätzlich einen Namen** (`dead-code`); `@Allow` und `[lints]` nehmen Name oder Nummer | TypeScript/Go, Rust |
+| G3 | **Severity gehört dem Code** (§12.1); nur **Lints** haben eine bewegliche Stufe (`allow`/`warn`/`deny`, W7); `deny` = Fehler mit Exit 1 (C5; kein Exit 3, D30 B verworfen); **„Warnungen als Fehler" ist ein Schalter** (W7 L2) | Rust |
+| G4 | **Kein Sammelcode**: `IR0001` fällt; jede Ablehnung nennt ihren Grund im eigenen Code; Compilerfehler = `LYR-ICE0001` mit „bitte melden", Dump und Backtrace (D1/D2) | rustc ICE |
+| G5 | **Ausgabe rustc-artig**: `error[LYR-SEM0042]: message` · `--> pfad:zeile:spalte` · Snippet mit Rinne, mehrere beschriftete Unterstreichungen · `= note:`/`= help:`; Zeilenkürzung; Farbe nach C7; **Pfade projektrelativ** (`--absolute-paths`); Reihenfolge Datei → Position, deterministisch, kein Vertrag (D24) | rustc |
+| G6 | **Folgefehler**: Typfehler vergiftet den Ausdruckstyp (`<error>`), Abgeleitetes schweigt (D6 D); `--max-errors 50` (D8) | rustc/Clang |
+| G7 | **Fixes im Record** (D9 B): `Suggestion` mit `replacement` und `applicability: safe \| needsReview`; `lyric fix` wendet `safe` an, LSP zeigt beide; `@Deprecated.replacement` erzeugt eine (09 A11) | rustc `MachineApplicable` |
+| G8 | **`--json` = NDJSON** (D15 B): eine Diagnose je Zeile, `version`, Summenzeile; Schema in der Spec; Panik/ICE als Zeilen mit `kind`; SARIF Tür | Rust `--error-format=json` |
+| G9 | **`lyric explain CODE`** aus eingebettetem Katalog; LSP `codeDescription.href`. **Katalog-Heimat `diagnostics.toml` im Compiler-Repo**, Spec-Appendix daraus generiert (D16 E, D29) — Regeln spec-first, Katalog nicht | rustc `--explain`, GHC error index |
+| G10 | **Wächter** (D16 B+C+D, D27): jeder emittierte Code im Katalog, jeder Katalogcode emittiert oder zurückgezogen, **jede Warnung mit rotem und grünem Konformanzfall**; Meldungsinvarianten als Test; Stilfibel in `CONTRIBUTING` | Rust |
+| G11 | **Fremde Diagnosen** (D28 C): Warnungen aus Abhängigkeiten und `std` nicht gezeigt (`--warn-deps`), Fehler immer | Cargo `--cap-lints` |
+| G12 | **`comptime`/Makro-Spans** (D31 C+D): Hauptspan an der Aufrufstelle, Notizkette mit Frames; `lyric expand` | rustc |
+| G13 | **Laufzeit**: Paniken mit Code (`LYR-RT…`) und Backtrace, Exit 101; entkommener Fehler `error: message` + Ursachenkette, Exit 1 (05 O4/E8) — dieselbe Textform, `explain` kennt beides | Rust |
 
 ## W7 — Lints: **offen**
 

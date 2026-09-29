@@ -88,7 +88,7 @@ SL-01, SL-16, SL-18. **Regel D mit Trägerklausel, ein Ring in 5.0, der zweite a
 
 **Ring** (Pakete im Org): `cli`, `log`, `tls` (Systembibliothek per FFI), `tzdata`, `unicode`
 (Normalisierung, Grapheme, Konsolenbreite), `crypto.cipher` (AES, RSA), `proptest`/`snapshot`,
-HTTP/2. **Bewusst nein**: BigInt (Tür), GUI, ORM/Template, XML/CSV (per D zulässig, ohne
+HTTP/2, **`ui`** (XAML-artiges GUI-Format mit Lyric-5-Blöcken — Vormerk 11 H10). **Bewusst nein**: BigInt (Tür), GUI in `std`, ORM/Template, XML/CSV (per D zulässig, ohne
 Bedarf — Tür). **Fällt gegenüber 4.x**: `result`/`option`/`bytes`/`io.*`-Untermodule als
 eigene Module, Zeit in `os`, `OrThrow`/`OrErr`-Zwillinge, `lastError*`, Typsuffixe, freie
 Terminatoren, `LineReader`, `std.build` als Programmimport.
