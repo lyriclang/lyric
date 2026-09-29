@@ -128,11 +128,21 @@ public sealed class CBuild
         return target;
     }
 
+    /// <summary>
+    /// Archives objects into <paramref name="output"/>. The objects are content-addressed, so their
+    /// names are the archive's key: an archive that already holds exactly these objects is left
+    /// alone, and a new one is written beside it and moved into place — a linker that is reading
+    /// the old archive at that moment never sees a half-written or missing file.
+    /// </summary>
     public string Archive(IReadOnlyList<string> objects, string output)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-        if (File.Exists(output)) File.Delete(output);
+        var key = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+            string.Join('\n', objects.Select(Path.GetFileName)))));
+        var keyFile = output + ".key";
+        if (File.Exists(output) && File.Exists(keyFile) && File.ReadAllText(keyFile) == key) return output;
 
+        var partial = $"{output}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         string tool;
         var arguments = new List<string>();
         if (Compiler.Kind == CCompilerKind.Zig)
@@ -146,10 +156,26 @@ public sealed class CBuild
                 ?? throw new CBuildException("no archiver found (llvm-ar or ar)");
         }
         arguments.Add("rcs");
-        arguments.Add(output);
+        arguments.Add(partial);
         arguments.AddRange(objects);
         var result = ProcessRunner.Run(tool, arguments, TimeSpan.FromMinutes(2));
-        if (result.ExitCode != 0) throw new CBuildException($"archiving {output} failed:\n{result.Stderr}");
+        if (result.ExitCode != 0)
+        {
+            File.Delete(partial);
+            throw new CBuildException($"archiving {output} failed:\n{result.Stderr}");
+        }
+        try
+        {
+            File.Move(partial, output, overwrite: true);
+        }
+        catch (IOException) when (File.Exists(output))
+        {
+            // Windows refuses to replace a file a linker has open. Two builders with the same
+            // objects produce the same archive, so the one already in place is the one wanted.
+            File.Delete(partial);
+            return output;
+        }
+        File.WriteAllText(keyFile, key);
         return output;
     }
 

@@ -48,7 +48,7 @@ public class RuntimeBuildTests
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
-    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null)
+    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null)
     {
         var build = new CBuild(compiler ?? Zig(), Target.Host, profile, Cache);
         var archive = RuntimeLayout.BuildArchive(build, Root, Path.Combine(Cache, "lib"));
@@ -57,6 +57,6 @@ public class RuntimeBuildTests
         var objects = build.Compile([test]);
         var exe = build.LinkExecutable([.. objects, archive],
             Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), name + Target.Host.ExecutableSuffix));
-        return ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(2));
+        return ProcessRunner.Run(exe, args ?? [], TimeSpan.FromMinutes(2));
     }
 }
