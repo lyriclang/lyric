@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The seed of the Lyric 5 command line: one NativeAOT binary (design/v5/spec/11 C1). It starts
+    with the self-report of C10 and grows the verbs milestone by milestone; until it can build a
+    program, the 4.x driver (Lyric.Cli, 'lyric') stays the working toolchain beside it.
+  -->
+  <!--
+    Its own version: the rest of the tree is still the 4.x toolchain and says 4.6.0 (its
+    deprecation clocks aimed at 5.0 would turn into errors under a 5.0.0 claim). Dev builds stamp
+    the informational version 5.0.0-dev.<date>+<sha> at packaging time.
+  -->
+  <PropertyGroup>
+    <Version>5.0.0</Version>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>lyric5</AssemblyName>
+    <RootNamespace>Lyric5</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>
