@@ -240,10 +240,10 @@ Methode, die einen *anderen* Ort schreibt (`multiplyInto(other, inout target)`).
 | C# `out`, `in` | **nein** (Rückgabe/Tupel; große Structs gehen ohnehin per Zeiger) |
 | `ref`-Rückgabe (Ort im Backing-Speicher, statement-gebunden) | **Tür**, nicht 5.0; Get/Set-Rückschreibung (M4) deckt `list[0].x = 1` |
 
-**Keyword — Bereich 8, mit dieser Abwägung**: `ref` (C#) deutet auf eine Familie (Locals,
-Rückgabe, Felder), von der wir nur den Parameter haben, hält aber die `ref`-Rückgabe-Tür unter
-einem Namen; `inout` (Swift) sagt „Modus, nie ein Typ". `mut`/`var` als Parameterwort scheiden
-aus (Rust `mut x` = veränderliche lokale *Kopie*, das Gegenteil).
+**Schreibweise — Bereich 8 (Y1, entschieden)**: **kein Wort, ein Zeichen** — Parameter `x: &T`,
+Aufruf `swap(&a, &b)` (C++/Rust/C-Gewohnheit; Präfix-`&` war frei). `inout` (Swift) und `ref`
+(C#) verworfen; `mut`/`var` als Parameterwort schieden ohnehin aus (Rust `mut x` = veränderliche
+lokale *Kopie*).
 
 ## T13 — Arrays, Views, Ranges, `T[N]`: **entschieden** (2026-09-28)
 

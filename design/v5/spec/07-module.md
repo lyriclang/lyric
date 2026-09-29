@@ -69,7 +69,7 @@ verworfen (`pub`/`pub(crate)`-Rauschen in jeder App).
 | # | Regel | Vorbild |
 |---|---|---|
 | S0 | **Member folgen der Typregel**: ohne Wort `internal`, `pub` exportiert, `private` modulintern. `struct Point { x: int, y: int }` ist in einer App vollständig; an der Exportgrenze `pub x`. Enum-Varianten wie das Enum; Extension-Methoden wie Member | Swift |
-| S0a | **Felder: Lese-/Schreibtrennung** — ein `var`-Feld darf lesend weiter sichtbar sein als schreibend (Arbeitsnotation `pub(read) var n`; Syntax Bereich 8); unveränderliche Felder sind mit `pub` lesbar und nie schreibbar (M2) | Swift `private(set)`, Kotlin, C# |
+| S0a | **Felder: keine Lese-/Schreibtrennung** (Bereich 8, Y1 — `pub(read)` verworfen): `pub var` ist außen les- und schreibbar, `pub` (unveränderlich, M2) nur lesbar; „innen schreibbar, außen lesbar" ist ein Getter (Rust, Go); Property-Zucker als Y9-Tür | Rust, Go |
 | S1 | Sichtbarkeit wird **bei jeder Namensauflösung** geprüft — qualifiziert, selektiv, Pattern, Konformanzliste, Constraint, `extend`-Ziel, `extern`; **eine** Implementierung im Symbolmodell (schließt den zentralen 4.x-Befund) | — |
 | S2 | **Privater Typ in exportierter Fläche ist ein Fehler** (`pub fn make(): Secret`) | Rust E0446 |
 | S3 | `pub` auf einem Member eines nicht exportierten Typs ist erlaubt (exportiert, sobald der Typ es wird) — **mit Warnung** „Member `x` ist sichtbarer als sein Typ `Y`" | Rust (ohne Warnung) |

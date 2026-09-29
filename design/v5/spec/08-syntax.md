@@ -43,7 +43,39 @@ Aus `docs/Grammar.md`, `../operatoren.md` (46 Fragen), `../funktionen.md` (49),
   keine Mehrzeilen-, keine Byte-Strings; `///`-Doku gebunden.
 - **Format**: `lyric fmt` schreibt die eine Form; 4 Spaces; `@[…]` Normalform.
 
-## Y1 — Vokabular: die Schlüsselwortliste: **offen**
+## Y1 — Vokabular: **entschieden** (2026-09-29)
+
+**Prinzip**: reserviert nur, wo sonst ein Bezeichner stehen könnte; kontextuell, wo keiner
+stehen kann. `quote {` und `comptime {` sähen aus wie ein Trailing-Lambda-Aufruf → reserviert.
+
+| | Wörter |
+|---|---|
+| **Reserviert** (31) | `import as pub internal private static struct class enum interface extend fn mut let var if else while do for in is match loop break continue return yield defer using try catch throw quote comptime true false null this` |
+| **Entfällt** | `module` (M2), `resume` (N2: `co.next()`), `params` (→ `...`), `opaque` (T15) |
+| **Kontextuell** | `type`, `throws`, `extern`, `sealed` (vor `interface`), `by` (Konformanzliste), `with` (nach Ausdruck), `inline` (vor `fn`), `macro` (vor Namen) |
+| **Builtin-Typnamen** (Bezeichner, nicht deklarierbar, K5) | `int uint float int8…int64 uint8…uint64 float32 float64 bool char string void never Self` |
+| **Bibliothek, keine Wörter** | `wait`, `await`, `spawn`, `select`, `panic`, `assert`, `new`, `main`, `it` |
+| **Bewusst nicht** | `const`, `async`/`await`, `unsafe`, `where`, `override`/`abstract`/`super`/`virtual`, `impl`, `switch`/`case`/`goto`/`finally`, `ref`, `inout`, `params` |
+
+**Zeichen statt Wörter** (Maintainer): **`x: &T` + Aufruf `&x`** statt `inout` (C++/Rust/C-Gewohnheit;
+Präfix-`&` war frei) · **`nums: int...`** statt `params` (Java/Go) · **`throws [A, B]`** — die Liste in
+eckigen Klammern, **wie jede andere Mehrfachliste** (`:: [I, J]`, `@[A, B]`, `<T :: [I]>`); **`::`
+bleibt** (keine `:`-Form für Konformanzen/Constraints). Verworfen: `f()?` für `try` (Zeichen an
+`?.` vergeben), `!` für `never`, Zig-`E!T`, Nim-`*` für Export.
+
+**`inline fn`** (Semantik: Lambda-Argumente eingesetzt, keine Closure, nicht-lokales `return`;
+Kotlin) ist **nicht** der Optimierungshinweis — der heißt **`@AlwaysInline`/`@NoInline`/`@Cold`**
+(A11 korrigiert).
+
+**Kein `pub(read)`**: `pub var` ist außen les- und schreibbar, `pub` (unveränderlich) lesbar;
+„innen schreibbar, außen lesbar" ist ein Getter (Rust, Go). Property-Zucker: Y9-Tür.
+
+## Y3 — Mutabilitätswörter: **entschieden** (2026-09-29)
+
+`let`/`var` an Bindungen und Feldern (M2); **`mut fn`** bleibt der Methodenmarker (Swift
+`mutating` verworfen: länger, nichts gewonnen); **`&T`-Parameter** mit **`&x`** an der
+Aufrufstelle (Y1); keine `ref`-Locals, keine `ref`-Rückgabe (T12 Tür).
+
 ## Y2 — Deklarationssyntax: **offen**
 ## Y3 — Bindungs- und Mutabilitätswörter (`mut`, `inout`/`ref`, `&`): **offen**
 ## Y4 — Ausdrucksformen, Präzedenz, Zuweisung: **offen**

@@ -178,7 +178,7 @@ unterdrückt, warnt selbst (Clippy). Korpus W10 beantwortet.
 |---|---|
 | `@Deprecated { message, until, replacement }` | Warnung am Aufruf; `until` als Ratchet (4.x); **`replacement`** speist `lyric fix` (Bereich 11) |
 | `@Test`, `@Bench` | Wurzeln unter `lyric test`/`lyric bench` (V4); identitätsgebunden (A3) |
-| `@Inline`, `@NoInline`, `@Cold` | **Hinweise** an den C-Compiler (`always_inline`, `noinline`, `cold`), kein Versprechen; das 4.x-„documented No" fällt — es ist eine Zeile C, kein Interpreter-Budget |
+| `@AlwaysInline`, `@NoInline`, `@Cold` | **Hinweise** an den C-Compiler (`always_inline`, `noinline`, `cold`), kein Versprechen; das 4.x-„documented No" fällt — es ist eine Zeile C, kein Interpreter-Budget. **Nicht** das Schlüsselwort `inline` (Semantik: nicht-lokales `return`, keine Closure — Y1) |
 | `@MustUse` | Warnung bei verworfenem Rückgabewert (Funktionen; Typen wie `Result`, `Task`) |
 | `@NonExhaustive` | Enum/`sealed`-Interface: `match` außerhalb des Pakets braucht `_` — die Regel, die 4.x versprach und nie prüfte |
 | `@callerExpr(param)`, `@callerLine`, `@callerFile` | Quelltext/Position des Arguments als Parameterdefault (A8 Sprosse 3) |
