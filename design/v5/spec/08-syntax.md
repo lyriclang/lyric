@@ -210,7 +210,40 @@ alle Spalten, **Array-Längenklassen** (die Implementierung war der Spec voraus,
 offene Typen brauchen `_`; `@NonExhaustive` verlangt `_` außerhalb des Pakets; irrefutables
 `if let` warnt.
 
-## Y7 — Literale und Formatsprache: **offen**
+## Y7 — Literale und Formatsprache: **entschieden** (2026-09-29)
+
+| # | Regel | Vorbild |
+|---|---|---|
+| L1 | Ganzzahlen `1_000_000`, `0xFF`, `0b1010`, `0o755`, Suffixe; Floats mit Exponent, `f32` (T1b) | Rust |
+| L2 | Führendes `-` **direkt** vor dem Literal gehört dazu; **nicht durch Klammern** (`-(9223372036854775808)` ist Überlauf) | — |
+| L3 | **`'😀'` ist ein gültiges `char`-Literal** (Lexer zählt Skalarwerte — 4.x-Bug) | — |
+| L4 | Escapes `\n \r \t \\ \' \" \0 \u{…}`; **`\xNN` nur in Byte-Strings** (in `string`/`char` entfällt es) | Rust (strenger) |
+| L5 | **Raw** `r"…"`, `r#"…"#` (Regex, Pfade, SQL) | Rust |
+| L6 | **Mehrzeilig** `"""…"""` mit Abzug der gemeinsamen Einrückung (Basis: Einrückung des schließenden `"""`); `r"""…"""` roh | Swift, Kotlin, Java |
+| L7 | **Byte-Strings** `b"…"` → `uint8[]`; nur ASCII und `\xNN` | Rust |
+| L8 | f-Strings `f"…"`, Präfixe kombinierbar (`fr"…"`, `f"""…"""`); `+`/`*` auf Strings bleiben (D6) | Python |
+
+**Eine Formatsprache** (heute zwei; `{s:>8}` paniert, `{3.7:C}` gibt `¤3.70`), fest in der
+Spec, locale-frei, **zur Compile-Zeit geprüft**:
+
+```
+{ ausdruck [ : [[füll]ausrichtung] [vorzeichen] [#] [0] [breite] [gruppierung] [.präzision] [typ] ] }
+```
+
+Ausrichtung `< > ^` mit Füllzeichen; Vorzeichen `+`/`-`; `#` alternative Form (`{255:#x}` →
+`0xff`); `0`-Auffüllung; Breite, Präzision; Gruppierung `,`/`_` (`{1234567:,}` → `1,234,567`);
+Typ `b o x X e E f %` auf Zahlen, **`?` = Debug** auf allem (D7). Zahlen und `char`/`string`
+verstehen alles Passende; ein **`Display`-Typ** bekommt nur Breite/Ausrichtung/Füllung auf sein
+`show()`; ein Typ mit eigenen Specs konformiert **`Format { fn format(spec: str): string }`**.
+Kein `C`/`N2`/`P1`, keine Kultur. `std.fmt.format("{} {0:>4}", …)` zur Laufzeit mit derselben
+Sprache. (Python-Grammatik, Rust `{:?}`)
+
+**Comprehensions** (Maintainer-Nachfrage): keine Syntax — Iterator-Ketten mit `it`-Trailing-
+Lambdas (`xs.filter { it > 0 }.map { it * 2 }.toList()`, lazy bis zum Terminator) und
+**`sequence { … yield … }`** (ein yieldendes Lambda ist ein Generator, Y11) für Verschachtelung
+mit Statements. C#'s LINQ-Query-Syntax als Gegenbeispiel einer zweiten Schreibweise, die
+niemand nutzt.
+
 ## Y8 — Kommentare und Dokumentation: **offen**
 ## Y9 — Zucker: implizites Member, Feldkurzform, Aufrufsyntax, `^n`, `!in`: **offen**
 ## Y10 — Formatierung und Stil: **offen**
