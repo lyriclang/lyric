@@ -5,39 +5,45 @@ self-binding contract to avoid the failure modes of a previous language
 project ("Oil"), where scope creep and parallel-mechanism creep killed
 forward progress.
 
-Even when read by future contributors, the rules below are non-negotiable
-until v1.0 ships.
+The rules below bind the Lyric 5 line on `main`. The decisions they refer to
+live in [`design/v5/spec/`](design/v5/spec/) (areas 00–12, plan in 13); the
+Lyric 4.x line continues as [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script)
+under its own rules.
 
 ---
 
 ## The Three Rules
 
-### Rule 1 — No post-v1 roadmap document
+### Rule 1 — No open idea store
 
-Until v1.0 is released, the file `POST-V1-ROADMAP.md` **does not exist**.
-
-Ideas for post-v1 features go into GitHub issues with the `idea` label —
-still not a plan, just a structured discussion.
+Every idea written down in this repository carries **a decision or a clock**:
+it is decided in a `design/v5/spec` document (with the reasoning and what was
+rejected), or it is named there as a **door** together with what would open
+it, or it is an issue with a date by which it gets decided. A list of wishes
+without an answer does not exist here — not as a roadmap file, not as a
+section of one.
 
 Reason: Oil grew a 2761-line post-v1 roadmap that absorbed all design
-energy and prevented v1.0 from ever shipping. We will not repeat that.
+energy and prevented v1.0 from ever shipping. The 4.x wording of this rule
+("until v1.0 ships") had expired by its own clause; the lesson it carried
+had not.
 
 ### Rule 2 — One mechanism per concept
 
-Each language concept has exactly one mechanism in the language:
+Each language concept has exactly one mechanism in Lyric 5:
 
-| Concept | Single mechanism |
-|---|---|
-| Error handling | Typed exceptions with `throws` |
-| Cleanup on scope exit | `defer` only (no `finally`) |
-| Memory management | GC only (no manual/borrow/refcount) |
-| Polymorphism | Interfaces with default methods + `::` declaration |
-| Concurrency | Single-threaded + coroutines (no native threads) |
-| FFI / host integration | Host-controlled bindings + capability gating |
+| Concept | Single mechanism | Decided in |
+|---|---|---|
+| Error handling | Typed `throws` clauses, `try` marks every throwing call; `Result` is a value, never a propagation path | 05 |
+| Cleanup on scope exit | `defer` and `using let` on one LIFO list (no `finally`, no destructors) | 05 R2 |
+| Memory management | Tracing GC only (no manual/borrow/refcount) | 01 L1 |
+| Polymorphism | Interfaces with defaults, generic `extend`, delegation `by`; no class inheritance | 04 |
+| Concurrency | Explicit threads, one scheduler per thread, stackful coroutines and tasks; waiting parks | 06 |
+| Foreign code | `extern "C"` — the C ABI is the one boundary | 11 W4 |
+| Code generation | `comptime` and macros over typed syntax trees | 09 |
 
-Adding a parallel mechanism for any of these (e.g. `Result<T, E>` alongside
-exceptions, `finally` alongside `defer`) is a breaking design change and
-requires a written ADR plus 30 days of consideration.
+Changing a row reopens its area document: the change is written there with
+its reasoning and what it replaces, before any code.
 
 ### Rule 3 — Every milestone ships something
 
@@ -53,24 +59,25 @@ artifact.
 
 ---
 
-## How to add a language feature before v1.0
+## How to add a language feature before 5.0
 
-Don't, unless it's already in [`docs/Grammar.md`](docs/Grammar.md).
+Don't, unless its area document in [`design/v5/spec/`](design/v5/spec/)
+decides it. A door named there is not a feature; it opens with its own
+decision.
 
-If you really must add something not currently in v1:
+If you really must add something not decided there:
 
-1. Open a GitHub issue using the **Feature Idea** template. Fill in all
-   required fields. "It would be nice" is not a problem statement.
+1. Write the decision into the area document first — question, options,
+   comparison with other languages, what is rejected. "It would be nice"
+   is not a problem statement.
 2. Wait at least **7 days** before opening a PR. The waiting period is
-   mandatory even for the maintainer. If after 7 days you still consider
-   it essential, proceed.
-3. The PR must include:
-   - A change to `docs/Grammar.md` reflecting the new feature.
-   - A change to `docs/guide/` with a user-facing explanation and example.
-   - Tests covering the new behavior.
+   mandatory even for the maintainer.
+3. The PR must include the specification chapter and conformance cases
+   (spec-first: rule PR, then its twin), user-facing documentation, and
+   tests.
 
-If the change would push v1.0 by more than 4 weeks, it is rejected by
-default and goes to an `idea` issue for post-v1.
+If the change would push the milestone it lands in by more than 100 % of
+its size (13), it is rejected by default and stays a door.
 
 ---
 
@@ -169,13 +176,16 @@ Tags follow `vMAJOR.MINOR.PATCH` semver, with all three components written
 out from v1.0 on. Every release has an **annotated tag**; its message is the
 release note: what the version delivers, and what it cannot do yet.
 
-Two channels, both described in the [README](README.md#releases):
+Two channels (design/v5/spec/11 T5):
 
 - **stable** — pushing an annotated `vX.Y.Z` tag runs `.github/workflows/release.yml`,
-  which verifies on Linux and Windows, packages `win-x64`, `linux-x64` and
-  `osx-arm64`, and publishes the archives as a GitHub release.
-- **nightly** — `.github/workflows/nightly.yml` builds `main` once a day and
-  replaces the `nightly` prerelease. No compatibility promise.
+  which verifies, packages the Tier 1 targets and publishes the archives as a
+  GitHub release. The first Lyric 5 release is `v5.0.0`; the last Lyric 4
+  release was `v4.5.0`.
+- **dev** — `.github/workflows/dev.yml` builds every push to `main` and
+  replaces the rolling `dev` prerelease, versioned `5.0.0-dev.<date>+<sha>`.
+  **No promise of any kind**: this is where things are tried and grow before
+  they move into a stable release. There is no nightly channel.
 
 **The changelog starts at `v1.0.0`.** A changelog answers "what changed for me
 since last time", and that question presupposes something to be compatible with.
@@ -187,6 +197,23 @@ From `v1.0.0` on, every release has three things: the tag, a GitHub release page
 and an entry in [`CHANGELOG.md`](CHANGELOG.md). An entry lists what changed for
 someone USING the toolchain — the language, the standard library, the bytecode
 format, the command line, the embedding API. Compiler internals stay in `git log`.
+
+---
+
+## Development environment
+
+Runtime and backend work happens under **WSL2 (Arch Linux)**, with the
+repository in the WSL file system, and Windows as an equal CI target
+(design/v5/spec/00):
+
+| Need | Tool |
+|---|---|
+| Compiler (C#) | .NET SDK 10 (`global.json`) |
+| C for release and cross builds | `zig cc` (version in `tooling/zig-version`) |
+| C with sanitizers (ASan, UBSan, TSan) | clang — `zig cc` ships no ASan/TSan runtime (measured, 01 C7) |
+| Memory checking | valgrind; on Arch set `DEBUGINFOD_URLS=https://debuginfod.archlinux.org` (glibc is stripped) |
+| Debugging, profiling | gdb, lldb, perf |
+| GitHub | `gh` with the `workflow` scope (`gh auth refresh -s workflow`), or pushes that touch `.github/workflows` are refused |
 
 ---
 

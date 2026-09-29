@@ -10,7 +10,22 @@ bytecode format, the command line and the embedding API. Compiler internals are 
 
 ---
 
-## v4.6.0 — 2026-09-23
+## v5.0.0 — in development
+
+Lyric 5 is built on `main` along [`design/v5/spec/13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md).
+Nothing here is released; the rolling `dev` prerelease carries the current state without any
+promise. This entry fills with the milestones.
+
+- **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
+  design decided a hard cut with no 4.x warning stages toward 5.
+
+---
+
+## v4.6.0 — never released
+
+> **This version was never published.** The Lyric 4 line ended with **v4.5.0**. The state
+> described below continues in [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script),
+> without the Lyric 5 migration warnings, which were reverted there and here.
 
 **Patterns test and bind at every depth, expressions reach further, and the standard library
 answers with values.** A minor: the bytecode format stays 4.0, and every 4.5 project still
