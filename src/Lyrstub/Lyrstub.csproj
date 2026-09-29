@@ -11,7 +11,7 @@
       build/publish.proj) can then run inside a build that already restored, which a second
       restore-with-RID in the same session cannot — the assets are evaluated before it runs.
     -->
-    <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
     <Description>The runtime half of a packed program: executes the module appended to its own file.</Description>
   </PropertyGroup>
 
