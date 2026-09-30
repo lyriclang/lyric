@@ -3,7 +3,7 @@
   <!--
     The seed of the Lyric 5 command line: one NativeAOT binary (design/v5/spec/11 C1). It starts
     with the self-report of C10 and grows the verbs milestone by milestone; until it can build a
-    program, the 4.x driver (Lyric.Cli, 'lyric') stays the working toolchain beside it.
+    program, the 4.x line's driver lives on in lyric-script.
   -->
   <!--
     Its own version: the rest of the tree is still the 4.x toolchain and says 4.6.0 (its
@@ -22,6 +22,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
+    <!-- The compiler: the 4.x front end the Lyric 5 compiler grows out of, behind the subset gate (13, M2). -->
+    <ProjectReference Include="..\Lyric5.Compiler\Lyric5.Compiler.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The seed of the Lyric 5 standard library, beside the binary (the 4.x stdlib/ that the front
+         end's project copies is not what lyric5 compiles against). -->
+    <Content Include="..\..\stdlib5\**\*.lyr" Link="stdlib5\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

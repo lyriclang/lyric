@@ -138,6 +138,14 @@ S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 
    claim turned red are gone, but the 4.x `stdlib` carries `@Deprecated(until = "5.0")`
    promises that a 5.0.0 toolchain would turn into build errors (`DeprecationPromise`); that
    ends with M8a, when `std` is rewritten.
+2. S1: `lyric5 build <file> --emit ir` — the 4.x front end behind the subset gate
+   (`Lyric5.Compiler`, `LYR-CG0001` "not yet in Lyric 5: … (M<n>)"), compiling against
+   `stdlib5/`, the seed of the Lyric 5 standard library (`std.core`, `std.string`, `std.io`, as
+   natively backed declarations — the provisional intrinsic table, which falls with M8a). The
+   NativeAOT risk is gone: the front end publishes without a trim warning, 5.3 MB, and the
+   binary emits hello's IR in CI on every Tier 1 runner. Found on the way: `for` over a range
+   lowers through the 4.x iterator classes and optionals; S2 gives range literals a counted-loop
+   lowering.
 
 ## Design decisions
 

@@ -1,39 +1,99 @@
-using Lyric5.Toolchain;
 using System.Reflection;
+using Lyric.Compiler;
+using Lyric.Ir;
+using Lyric5.Compiler;
+using Lyric5.Toolchain;
 
 namespace Lyric5;
 
 /// <summary>
-/// The Lyric 5 driver. At this stage it answers one question — what toolchain is this and what
-/// will it build with — because every later verb needs the same answer first.
+/// The Lyric 5 driver: one binary with verbs (design/v5/spec/11 C1–C3), strict about what it
+/// does not know (exit 2), reporting what the program did wrong with exit 1 (C5). The verbs grow
+/// milestone by milestone; today: <c>version</c>, <c>help</c>, and <c>build --emit ir</c> — the
+/// front end behind the subset gate, up to the IR (M2 S1).
 /// </summary>
 public static class Program
 {
     public static int Main(string[] args)
     {
-        if (args.Length == 0 || args[0] is "--version" or "-V" or "version")
+        if (args.Length == 0) return Usage(Console.Out, 0);
+        return args[0] switch
         {
-            PrintVersion();
-            return 0;
-        }
+            "--version" or "-V" or "version" => Version(),
+            "--help" or "-h" or "help" => Usage(Console.Out, 0),
+            "build" => Build(args[1..]),
+            _ => Unknown($"unknown verb '{args[0]}'"),
+        };
+    }
 
-        if (args[0] is "--help" or "-h" or "help")
-        {
-            Console.Out.WriteLine("usage: lyric5 [--version | --help]");
-            Console.Out.WriteLine("The Lyric 5 command line, in development. Only the self-report exists yet.");
-            return 0;
-        }
+    private static int Usage(TextWriter output, int exit)
+    {
+        output.WriteLine("usage: lyric5 <verb> [options]");
+        output.WriteLine();
+        output.WriteLine("  build <file.lyr> --emit ir   compile up to the IR and print it");
+        output.WriteLine("  version                      the toolchain and the C compiler it found");
+        output.WriteLine("  help                         this");
+        output.WriteLine();
+        output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
+        return exit;
+    }
 
-        Console.Error.WriteLine($"error[LYR-CLI0003]: unknown argument '{args[0]}'");
-        Console.Error.WriteLine("  = help: lyric5 --help lists what exists");
+    private static int Unknown(string what)
+    {
+        Console.Error.WriteLine($"error[LYR-CLI0003]: {what}");
+        Console.Error.WriteLine("  = help: lyric5 help lists what exists");
         return 2;
     }
 
-    private static void PrintVersion()
+    // --- build ---------------------------------------------------------------------------------
+
+    private static int Build(string[] args)
+    {
+        string? file = null, emit = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg == "--emit")
+            {
+                if (i + 1 >= args.Length) return Unknown("'--emit' needs a value: ir");
+                emit = args[++i];
+            }
+            else if (arg.StartsWith("--emit=", StringComparison.Ordinal)) emit = arg["--emit=".Length..];
+            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'build'");
+            else if (file is null) file = arg;
+            else return Unknown($"'build' takes one file, got '{file}' and '{arg}'");
+        }
+        if (file is null) return Unknown("'build' needs a file: lyric5 build <file.lyr>");
+        if (emit is null) return Unknown("'build' can only '--emit ir' yet (M2 S1); the binary comes with S4");
+        if (emit != "ir") return Unknown($"unknown emission '{emit}': ir");
+        if (!File.Exists(file))
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
+            return 2;
+        }
+
+        // lyric5 compiles against the seed of the Lyric 5 standard library beside the binary, never
+        // against the 4.x stdlib the front end's own project carries (stdlib5/README.md).
+        var options = new CompilerOptions { StdlibRoot = Path.Combine(AppContext.BaseDirectory, "stdlib5") };
+        var result = SourceCompiler.Lower(file, options);
+        if (!result.Render(Console.Error) || result.Ir is null) return 1;
+        if (!SubsetGate.Check(result.Ir, result.Diagnostics))
+        {
+            result.Diagnostics.RenderText(Console.Error);
+            return 1;
+        }
+        Console.Out.Write(IrPrinter.Dump(result.Ir));
+        return 0;
+    }
+
+    // --- version -------------------------------------------------------------------------------
+
+    private static int Version()
     {
         Console.Out.WriteLine($"lyric {DisplayVersion()}");
         Console.Out.WriteLine("  edition     5");
         Console.Out.WriteLine($"  c compiler  {DescribeCompiler(CCompiler.Locate())}");
+        return 0;
     }
 
     /// <summary>
