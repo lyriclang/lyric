@@ -1,0 +1,21 @@
+// Recursive and iterative Fibonacci; the exit code is fib(10) = 55.
+fn fib(n: int): int {
+    if (n < 2) { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+
+fn fibIter(n: int): int {
+    var a = 0;
+    var b = 1;
+    for (i in 0..n) {
+        let next = a + b;
+        a = b;
+        b = next;
+    }
+    return a;
+}
+
+fn main(): int {
+    if (fib(10) != fibIter(10)) { return 1; }
+    return fib(10);
+}

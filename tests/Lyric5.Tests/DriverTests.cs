@@ -70,6 +70,27 @@ public class DriverTests
     }
 
     [Fact]
+    public void Fib_emits_its_c()
+    {
+        var (exit, output, err) = Run("build", Program_("fib.lyr"), "--emit", "c");
+        Assert.True(exit == 0, err);
+        Assert.Contains("static int64_t lyr_main_fib(int64_t l0_n)", output);
+        Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }", output);
+    }
+
+    /// <summary>Strings come with S3: until then the emitter says so through the gate's code, and
+    /// the driver ends with 1 rather than a stack trace.</summary>
+    [Fact]
+    public void Hello_as_c_waits_for_s3()
+    {
+        var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "c");
+        Assert.Equal(1, exit);
+        Assert.Equal("", output);
+        Assert.Contains("LYR-CG0001", err);
+        Assert.Contains("strings (M2 S3)", err);
+    }
+
+    [Fact]
     public void A_program_outside_the_core_is_exit_1_with_the_milestone()
     {
         var (exit, output, err) = Run("build", Program_("not_yet.lyr"), "--emit", "ir");

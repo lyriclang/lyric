@@ -181,6 +181,18 @@ static const char *keep(const char *text) {
 
 static int symbols_ready;
 
+/* The inline-site half of DbgHelp (functions the optimizer inlined at an address; Windows 8 and
+ * later): not in the MinGW headers zig ships, so it is taken from the loaded dbghelp.dll by name.
+ * Without it a trace shows the function an address is in and not what was inlined into it. */
+typedef DWORD (WINAPI *AddrIncludeInlineTraceFn)(HANDLE, DWORD64);
+typedef BOOL (WINAPI *QueryInlineTraceFn)(HANDLE, DWORD64, DWORD, DWORD64, DWORD64, LPDWORD, LPDWORD);
+typedef BOOL (WINAPI *FromInlineContextFn)(HANDLE, DWORD64, ULONG, PDWORD64, PSYMBOL_INFO);
+typedef BOOL (WINAPI *LineFromInlineContextFn)(HANDLE, DWORD64, ULONG, DWORD64, PDWORD, PIMAGEHLP_LINE64);
+static AddrIncludeInlineTraceFn inline_count;
+static QueryInlineTraceFn inline_query;
+static FromInlineContextFn inline_symbol;
+static LineFromInlineContextFn inline_line;
+
 /* zig records the PDB beside the executable under a relative name, which DbgHelp looks for in its
  * search path only: the executable's own directory goes first. */
 static void init_symbols(HANDLE process) {
@@ -199,6 +211,13 @@ static void init_symbols(HANDLE process) {
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES |
                   SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
     SymInitialize(process, search, TRUE);
+    HMODULE dbghelp = GetModuleHandleA("dbghelp.dll");
+    if (dbghelp) {
+        inline_count = (AddrIncludeInlineTraceFn)(void *)GetProcAddress(dbghelp, "SymAddrIncludeInlineTrace");
+        inline_query = (QueryInlineTraceFn)(void *)GetProcAddress(dbghelp, "SymQueryInlineTrace");
+        inline_symbol = (FromInlineContextFn)(void *)GetProcAddress(dbghelp, "SymFromInlineContext");
+        inline_line = (LineFromInlineContextFn)(void *)GetProcAddress(dbghelp, "SymGetLineFromInlineContext");
+    }
 }
 
 static void capture_at(uintptr_t fault_pc) {
@@ -213,6 +232,30 @@ static void capture_at(uintptr_t fault_pc) {
         /* A return address names the instruction after the call; one byte back is the call. The
          * faulting instruction itself is exact. */
         DWORD64 address = pc == fault_pc ? pc : pc - 1;
+        /* Functions the optimizer inlined here come first, innermost out — the PDB knows them
+         * as inline sites — then the function the address is in. */
+        DWORD inlined = inline_count && inline_query && inline_symbol && inline_line ? inline_count(process, address) : 0;
+        DWORD context = 0, index = 0;
+        if (inlined > 0 && inline_query(process, address, 0, address, address, &context, &index)) {
+            for (DWORD n = 0; n < inlined; n++) {
+                union {
+                    SYMBOL_INFO info;
+                    char bytes[sizeof(SYMBOL_INFO) + 256];
+                } symbol;
+                symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
+                symbol.info.MaxNameLen = 255;
+                DWORD64 offset = 0;
+                const char *function = inline_symbol(process, address, context + n, &offset, &symbol.info) ? keep(symbol.info.Name) : NULL;
+                IMAGEHLP_LINE64 line;
+                line.SizeOfStruct = sizeof line;
+                DWORD column = 0;
+                if (inline_line(process, address, context + n, 0, &column, &line)) {
+                    add_frame(pc, function, keep(line.FileName), (int)line.LineNumber);
+                } else {
+                    add_frame(pc, function, NULL, 0);
+                }
+            }
+        }
         union {
             SYMBOL_INFO info;
             char bytes[sizeof(SYMBOL_INFO) + 256];

@@ -19,17 +19,11 @@ public static class SubsetGate
     public const string NotYet = "LYR-CG0001";
 
     /// <summary>
-    /// The natively backed functions the emitter maps to the runtime (M2 S3). The 4.x front end
-    /// lowers a bodyless function of the standard library to a <c>CallImport</c> by qualified name;
-    /// these names are the provisional intrinsic table, which falls with M8a when <c>std</c> is
-    /// rewritten in Lyric.
+    /// The natively backed functions the emitter maps to the runtime: the 4.x front end lowers a
+    /// bodyless function of the standard library to a <c>CallImport</c> by qualified name, and
+    /// <see cref="Compiler.Intrinsics"/> says which names have a runtime call.
     /// </summary>
-    public static readonly IReadOnlySet<string> Intrinsics = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "std.core.panic",
-        "std.string.concat", "std.string.fromInt", "std.string.fromUint", "std.string.fromBool",
-        "std.io.print", "std.io.println",
-    };
+    public static IReadOnlySet<string> Intrinsics => Compiler.Intrinsics.Names;
 
     /// <summary>Reports every construct outside the subset and answers whether there was none.</summary>
     public static bool Check(IrModule module, DiagnosticEngine diagnostics)
@@ -126,6 +120,8 @@ public static class SubsetGate
                 case BinOp b:
                     if (b.Type is IrScalarType { Kind: IrScalar.String } && b.Kind != IrBinKind.Add)
                         Refuse(op.Span, "comparing strings with an operator", "M3");
+                    else if (b.Kind is IrBinKind.Shl or IrBinKind.Shr)
+                        Refuse(op.Span, "shifts (their overflow rule comes with the number tower)", "M3");
                     else Type(b.Type, op.Span, "the operand type");
                     break;
                 case UnOp u:

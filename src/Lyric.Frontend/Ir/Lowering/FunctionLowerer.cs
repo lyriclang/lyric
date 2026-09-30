@@ -1150,6 +1150,10 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(stmt) is not LocalSymbol loopVar)
             throw Bug($"loop variable '{stmt.Variable}' was not bound by the type checker");
 
+        if (stmt.Pattern is null && stmt.Iterable is RangeExpr literal
+            && SubstituteType(_types.TypeOf(stmt.Iterable)) is RangeOf)
+            return LowerCountedRange(stmt, literal, loopVar);
+
         var (iterator, iteratorType, owner, yieldOverride) = BuildIterator(stmt);
         var elementType = LowerType(loopVar.Type, stmt.Span);
         // What the iterator PRODUCES: the range adapters carry i64/u64 regardless of the
@@ -1211,6 +1215,76 @@ internal sealed class FunctionLowerer
         // once, with the last iteration's values (the 2.0.1 bug).
         if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
         _loops.Pop();
+
+        _b.SwitchTo(exitBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>for (i in a..b)</c> and <c>a..=b</c> over a range LITERAL: a counted loop on the element
+    /// type, no iterator object (design/v5/spec/13, M2 — the Lyric 5 backend has no runtime
+    /// object to hand a range to, and 03 A3 makes a range a value the compiler knows). The bounds
+    /// are read once, before the loop. An inclusive range ends on equality with its last value
+    /// BEFORE the step, so <c>..= MAX</c> never computes <c>MAX + 1</c> (the 2.0.1 bug, §7.2);
+    /// an exclusive one steps only while <c>i &lt; last</c>, where <c>i + 1</c> fits. <c>continue</c>
+    /// lands on the step, <c>break</c> after the loop.
+    /// </summary>
+    private bool LowerCountedRange(ForInStmt stmt, RangeExpr range, LocalSymbol loopVar)
+    {
+        var span = stmt.Span;
+        var elementType = LowerType(loopVar.Type, span);
+        var low = LowerExprAs(range.Low, elementType);
+        var high = LowerExprAs(range.High, elementType);
+
+        var cursor = _slots.DeclareSynthetic("range", elementType);
+        var last = _slots.DeclareSynthetic("last", elementType);
+        _b.Emit(new StoreLocal(cursor, low, span));
+        _b.Emit(new StoreLocal(last, high, span));
+
+        var condBlock = _b.NewBlock();
+        _b.Seal(new Branch(condBlock, span));
+
+        _b.SwitchTo(condBlock);
+        var current = _slots.NewTemp(elementType);
+        _b.Emit(new LoadLocal(current, cursor, elementType, span));
+        var bound = _slots.NewTemp(elementType);
+        _b.Emit(new LoadLocal(bound, last, elementType, span));
+        var goesOn = _slots.NewTemp(BoolType);
+        _b.Emit(new BinOp(goesOn, range.IsInclusive ? IrBinKind.Le : IrBinKind.Lt, BoolType, current, bound, span));
+
+        var bodyBlock = _b.NewBlock();
+        var stepBlock = _b.NewBlock();
+        var exitBlock = _b.NewBlock();
+        _b.Seal(new CondBranch(goesOn, bodyBlock, exitBlock, span));
+
+        _b.SwitchTo(bodyBlock);
+        var variable = _slots.DeclareFor(loopVar, elementType);
+        _b.Emit(new StoreLocal(variable, current, span));
+
+        _loops.Push(new LoopScope(_b, stepBlock, exitBlock)
+            { DeferDepth = _defers.Count, Label = stmt.Label });
+        if (LowerScope(stmt.Body)) _b.Seal(new Branch(stepBlock, stmt.Body.Span));
+        _loops.Pop();
+
+        _b.SwitchTo(stepBlock);
+        var again = _slots.NewTemp(elementType);
+        _b.Emit(new LoadLocal(again, cursor, elementType, span));
+        if (range.IsInclusive)
+        {
+            var end = _slots.NewTemp(elementType);
+            _b.Emit(new LoadLocal(end, last, elementType, span));
+            var done = _slots.NewTemp(BoolType);
+            _b.Emit(new BinOp(done, IrBinKind.Eq, BoolType, again, end, span));
+            var stepOn = _b.NewBlock();
+            _b.Seal(new CondBranch(done, exitBlock, stepOn, span));
+            _b.SwitchTo(stepOn);
+        }
+        var one = _slots.NewTemp(elementType);
+        _b.Emit(new Const(one, elementType, new IntConst(1), span));
+        var next = _slots.NewTemp(elementType);
+        _b.Emit(new BinOp(next, IrBinKind.Add, elementType, again, one, span));
+        _b.Emit(new StoreLocal(cursor, next, span));
+        _b.Seal(new Branch(condBlock, span));
 
         _b.SwitchTo(exitBlock);
         return true;

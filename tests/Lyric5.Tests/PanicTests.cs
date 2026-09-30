@@ -49,6 +49,8 @@ public partial class PanicTests
             data.Add("under", profile, "panic [LYR-RT0002]: arithmetic overflow in '-'");
             data.Add("div0", profile, "panic [LYR-RT0001]: division by zero");
             data.Add("divmin", profile, "panic [LYR-RT0002]: arithmetic overflow in '/'");
+            data.Add("rem0", profile, "panic [LYR-RT0001]: division by zero");
+            data.Add("remmin", profile, "panic [LYR-RT0002]: arithmetic overflow in '%'");
             data.Add("unwrap", profile, "panic [LYR-RT0004]: unwrapped a null value");
             data.Add("index", profile, "panic [LYR-RT0003]: index -1 out of bounds for length 4");
         }
