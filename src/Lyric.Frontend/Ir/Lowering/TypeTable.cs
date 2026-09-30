@@ -254,7 +254,7 @@ internal sealed class TypeTable
             if (IrType.Equal(existing, element)) return new IrRefType(id);
 
         var fresh = new TypeId(_defs.Count);
-        _defs.Add(new IrTypeDef($"<cell>", [element], ["value"]));
+        _defs.Add(new IrTypeDef($"<cell>", [element], ["value"]) { IsClass = true });
         _cells.Add((element, fresh));
         return new IrRefType(fresh);
     }
@@ -272,7 +272,7 @@ internal sealed class TypeTable
     public IrRefType EnvironmentFor(string lambdaName, IrType[] fieldTypes, string[] fieldNames)
     {
         var id = new TypeId(_defs.Count);
-        _defs.Add(new IrTypeDef($"<env:{lambdaName}>", fieldTypes, fieldNames));
+        _defs.Add(new IrTypeDef($"<env:{lambdaName}>", fieldTypes, fieldNames) { IsClass = true });
         return new IrRefType(id);
     }
 

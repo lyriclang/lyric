@@ -1,0 +1,79 @@
+// Function values (01 V8; 02 M8; 03 T17; 08 Y11): a pointer to the code and the environment it
+// runs in, two words; a captured 'let' lies in the environment as a copy, a captured 'var' in a
+// box both sides share; a free function is a value with no environment. Expected stdout:
+//   forms 2 6 6 14 3 5           paren, bare, free function, block body, trailing 'it', two parameters
+//   capture 3 30 92              a 'let' by value, a 'var' shared with the maker, a 'var' struct shared through its box
+//   counter 1 2 3 2              a closure kept in a field counts across calls; the maker's box is one
+//   loop 0 1 2                   a loop binding is fresh per pass (M8 C1)
+//   this 15                      'this' of a class captured, shared
+//   opt 4 none                   an optional function value
+//   made 0 10 20                 'arrayOf' from std.core: fresh elements from a function
+import std.core { arrayOf };
+import std.io { println };
+
+struct Point { var x: int, y: int }
+class Holder { var next: fn() -> int }
+class Scale { var factor: int, fn scaled(): fn(int) -> int { return (n: int): int => n * this.factor; } }
+
+fn apply(f: fn(int) -> int, x: int): int { return f(x); }
+fn twice(x: int): int { return x * 2; }
+fn fold(xs: int[], seed: int, f: fn(int, int) -> int): int {
+    var acc = seed;
+    for (i in 0..xs.length()) { acc = f(acc, xs[i]); }
+    return acc;
+}
+fn each(xs: int[], f: fn(int) -> void): void { for (i in 0..xs.length()) { f(xs[i]); } }
+
+fn counter(): fn() -> int {
+    var n = 0;
+    return (): int => { n += 1; return n; };
+}
+
+fn maybe(flag: bool): ?fn(int) -> int { return if (flag) twice else null; }
+
+fn main(): int {
+    let a = apply((n: int): int => n + 1, 1);
+    let b = apply(x => x * 3, 2);
+    let c = apply(twice, 3);
+    let d = fold([2, 3, 4], 5, (acc, x) => acc + x);
+    var seen = 0;
+    each([1, 2]) { seen += it; }
+    let e = apply((x: int): int => { let y = x + 1; y }, 4);
+    println(f"forms {a} {b} {c} {d} {seen} {e}");
+
+    let base = 3;
+    var shared = 10;
+    var p = Point { x = 1, y = 2 };
+    let addBase = (n: int): int => n + base;
+    let bump = (): int => { shared += 10; return shared; };
+    let readP = (): int => p.x * 10 + p.y;
+    shared += 10;
+    p.x = 9;
+    println(f"capture {addBase(0)} {bump()} {readP()}");
+
+    let count = counter();
+    let h = Holder { next = count };
+    let first = h.next();
+    let second = count();
+    let third = h.next();
+    let other = counter();
+    other();
+    println(f"counter {first} {second} {third} {other()}");
+
+    var fs: (fn() -> int)[] = [];
+    for (i in 0..3) { fs = fs + [(): int => i]; }
+    println(f"loop {fs[0]()} {fs[1]()} {fs[2]()}");
+
+    let scale = Scale { factor = 3 };
+    let times = scale.scaled();
+    scale.factor = 5;
+    println(f"this {times(3)}");
+
+    let some = maybe(true);
+    let none = maybe(false);
+    println(f"opt {(some ?? twice)(2)} " + (if (none == null) "none" else "some"));
+
+    let made = arrayOf(3, (i: int): int => i * 10);
+    println(f"made {made[0]} {made[1]} {made[2]}");
+    return 0;
+}

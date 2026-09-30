@@ -82,9 +82,7 @@ public static class SubsetGate
                 case IrRefType r when module.Types.Any(t => t.Variants.Contains(r.Type)):
                     break;
                 case IrRefType r:
-                    // A closure cell and a closure environment are heap entries of the 4.x
-                    // lowering; each gets its Lyric 5 form with its slice.
-                    Refuse(span, $"closures, {where}", "M3");
+                    Refuse(span, $"the reference type '{module.Types[r.Type.Value].Name}', {where}", "a later milestone");
                     break;
                 case IrArrayType array:
                     Type(array.Element, span, where);
@@ -106,8 +104,9 @@ public static class SubsetGate
                 case IrInterfaceType:
                     Refuse(span, $"interfaces, {where}", "M4");
                     break;
-                case IrFunctionType:
-                    Refuse(span, $"function values, {where}", "M3");
+                case IrFunctionType f:
+                    foreach (var p in f.Parameters) Type(p, span, where);
+                    Type(f.Return, span, where);
                     break;
                 case IrHostType:
                     Refuse(span, $"host types, {where}", "M14");
@@ -170,8 +169,10 @@ public static class SubsetGate
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;
-                case MakeClosure or CallIndirect:
-                    Refuse(op.Span, "closures", "M3");
+                case MakeClosure m:
+                    Type(m.Type, op.Span, "the function type");
+                    break;
+                case CallIndirect:
                     break;
                 case MakeCoroutine or ResumePull or YieldSuspend:
                     Refuse(op.Span, "coroutines", "M6");

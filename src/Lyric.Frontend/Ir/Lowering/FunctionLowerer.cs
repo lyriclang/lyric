@@ -2414,6 +2414,19 @@ internal sealed class FunctionLowerer
     /// static method), so a missing slot is a bug here.</summary>
     private TempId LowerThis(ThisExpr expr)
     {
+        // Inside a lambda 'this' is a captured value (02 M8 C2): read from the environment, at
+        // the field behind the named captures. A class's 'this' is the shared reference, a
+        // struct's the copy taken when the closure was made.
+        if (_thisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
+            && _thisType is { } captured)
+        {
+            var env = _slots.NewTemp(new IrRefType(envType));
+            _b.Emit(new LoadLocal(env, envSlot, new IrRefType(envType), expr.Span));
+            var self = _slots.NewTemp(captured);
+            _b.Emit(new LoadField(self, env, envType, new FieldId(field), captured, expr.Span));
+            return self;
+        }
+
         if (_thisSlot is not { } slot || _thisType is not { } type)
             throw Bug($"'this' reached lowering outside an instance method at {expr.Span}");
 

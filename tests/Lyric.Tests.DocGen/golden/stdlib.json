@@ -2393,6 +2393,17 @@
             "File": "stdlib/std/core.lyr",
             "Line": 592
           }
+        },
+        {
+          "Kind": "Function",
+          "Name": "arrayOf",
+          "Signature": "pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[]",
+          "Doc": "`arrayOf(n, f)` (design/v5/spec/10 C7): an array of `n` elements, the element at `i` the value\nof `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot. A negative\n`n` panics.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 597
+          }
         }
       ]
     },
