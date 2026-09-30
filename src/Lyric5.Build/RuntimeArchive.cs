@@ -1,3 +1,4 @@
+using System.Text;
 using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
@@ -17,30 +18,41 @@ public static class RuntimeArchive
         catch (DirectoryNotFoundException) { return null; }
     }
 
-    /// <summary>
-    /// <c>~/.cache/lyric/runtime/&lt;version&gt;</c> (the platform's local application data on
-    /// Windows), where a build of the runtime never collides with another version's.
-    /// </summary>
-    public static string CacheDir(string toolchainVersion)
-    {
-        var configured = Environment.GetEnvironmentVariable("LYRIC_CACHE");
-        var root = !string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : OperatingSystem.IsWindows()
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "lyric", "cache")
-                : Path.Combine(Environment.GetEnvironmentVariable("XDG_CACHE_HOME") is { Length: > 0 } xdg
-                    ? xdg
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache"), "lyric");
-        return Path.Combine(root, "runtime", toolchainVersion);
-    }
+    /// <summary><c>~/.cache/lyric/runtime/&lt;version&gt;</c>, where a build of the runtime never
+    /// collides with another version's.</summary>
+    public static string CacheDir(string toolchainVersion) => Path.Combine(UserCache.Root, "runtime", toolchainVersion);
 
-    /// <summary>The archive's path, building it when the cache has none.</summary>
+    /// <summary>
+    /// The archive's path, building it when the cache has none. Keying every runtime unit hashes
+    /// megabytes of collector source, so the answer is memoized under the toolchain version, the
+    /// compiler, the target, the profile and a stamp of the runtime's own files (their names,
+    /// sizes and times): a development tree that edits the runtime gets a new archive, a warm
+    /// build of a program gets the path.
+    /// </summary>
     public static string For(CCompiler compiler, Target target, Profile profile, string toolchainVersion)
     {
         var root = SourceRoot()
             ?? throw new CBuildException("this toolchain carries no runtime source (runtime/include/lyr not found above it)");
         var cache = CacheDir(toolchainVersion);
-        var build = new CBuild(compiler, target, profile, cache);
-        return RuntimeLayout.BuildArchive(build, root, Path.Combine(cache, "lib"));
+        var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name()}|{SourceStamp(root)}";
+        string Build() => RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
+        var archive = UserCache.Memo("runtime-archive", key, Build);
+        // The memo may outlive the archive (a cleaned cache): then build again.
+        return File.Exists(archive) ? archive : Build();
+    }
+
+    private static string SourceStamp(string root)
+    {
+        var stamp = new StringBuilder();
+        foreach (var part in new[] { "include", "src", "third_party" })
+        {
+            var dir = Path.Combine(root, "runtime", part);
+            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+            {
+                var info = new FileInfo(file);
+                stamp.Append(Path.GetRelativePath(root, file)).Append('|').Append(info.Length).Append('|').Append(info.LastWriteTimeUtc.Ticks).Append('\n');
+            }
+        }
+        return stamp.ToString();
     }
 }

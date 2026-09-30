@@ -198,7 +198,7 @@ public sealed class CBuild
     /// (design/v5/spec/01 L11); the sanitizer runtime comes along in the sanitizer profiles. The
     /// runtime's backtraces need an unwinder — zig cc links a C program without one, so its own
     /// libunwind comes along on Linux; clang and gcc bring libgcc's; macOS has one in libSystem —
-    /// and DbgHelp on Windows. On a macOS host the debug information is gathered into a .dSYM
+    /// and on Windows DbgHelp, loaded by the runtime at the first trace, not imported. On a macOS host the debug information is gathered into a .dSYM
     /// beside the executable when dsymutil is there: libbacktrace reads line tables only from one.
     /// </summary>
     public string LinkExecutable(IReadOnlyList<string> inputs, string output)
@@ -212,7 +212,7 @@ public sealed class CBuild
         arguments.AddRange(Target.Os switch
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
-            TargetOs.Windows => ["-Wl,--gc-sections", "-ldbghelp"],
+            TargetOs.Windows => ["-Wl,--gc-sections"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
         if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");

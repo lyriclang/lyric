@@ -181,17 +181,29 @@ static const char *keep(const char *text) {
 
 static int symbols_ready;
 
-/* The inline-site half of DbgHelp (functions the optimizer inlined at an address; Windows 8 and
- * later): not in the MinGW headers zig ships, so it is taken from the loaded dbghelp.dll by name.
- * Without it a trace shows the function an address is in and not what was inlined into it. */
+/* DbgHelp is loaded here, at the first trace, and never through the import table: as an import
+ * the DLL is mapped at every program start and costs 3 ms of it (measured), for a report most
+ * programs never write. The inline-site half (functions the optimizer inlined at an address;
+ * Windows 8 and later) is not in the MinGW headers zig ships; taking every entry by name treats
+ * both halves alike. Without the library a trace is bare addresses. */
+typedef BOOL (WINAPI *SymInitializeFn)(HANDLE, PCSTR, BOOL);
+typedef DWORD (WINAPI *SymSetOptionsFn)(DWORD);
+typedef BOOL (WINAPI *SymFromAddrFn)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
+typedef BOOL (WINAPI *SymGetLineFromAddr64Fn)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
 typedef DWORD (WINAPI *AddrIncludeInlineTraceFn)(HANDLE, DWORD64);
 typedef BOOL (WINAPI *QueryInlineTraceFn)(HANDLE, DWORD64, DWORD, DWORD64, DWORD64, LPDWORD, LPDWORD);
 typedef BOOL (WINAPI *FromInlineContextFn)(HANDLE, DWORD64, ULONG, PDWORD64, PSYMBOL_INFO);
 typedef BOOL (WINAPI *LineFromInlineContextFn)(HANDLE, DWORD64, ULONG, DWORD64, PDWORD, PIMAGEHLP_LINE64);
+static SymFromAddrFn sym_from_addr;
+static SymGetLineFromAddr64Fn sym_line;
 static AddrIncludeInlineTraceFn inline_count;
 static QueryInlineTraceFn inline_query;
 static FromInlineContextFn inline_symbol;
 static LineFromInlineContextFn inline_line;
+
+static void *entry(HMODULE dbghelp, const char *name) {
+    return (void *)GetProcAddress(dbghelp, name);
+}
 
 /* zig records the PDB beside the executable under a relative name, which DbgHelp looks for in its
  * search path only: the executable's own directory goes first. */
@@ -208,16 +220,20 @@ static void init_symbols(HANDLE process) {
             search = path;
         }
     }
-    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES |
-                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
-    SymInitialize(process, search, TRUE);
-    HMODULE dbghelp = GetModuleHandleA("dbghelp.dll");
-    if (dbghelp) {
-        inline_count = (AddrIncludeInlineTraceFn)(void *)GetProcAddress(dbghelp, "SymAddrIncludeInlineTrace");
-        inline_query = (QueryInlineTraceFn)(void *)GetProcAddress(dbghelp, "SymQueryInlineTrace");
-        inline_symbol = (FromInlineContextFn)(void *)GetProcAddress(dbghelp, "SymFromInlineContext");
-        inline_line = (LineFromInlineContextFn)(void *)GetProcAddress(dbghelp, "SymGetLineFromInlineContext");
-    }
+    HMODULE dbghelp = LoadLibraryA("dbghelp.dll");
+    if (dbghelp == NULL) return;
+    SymSetOptionsFn set_options = (SymSetOptionsFn)entry(dbghelp, "SymSetOptions");
+    SymInitializeFn initialize = (SymInitializeFn)entry(dbghelp, "SymInitialize");
+    sym_from_addr = (SymFromAddrFn)entry(dbghelp, "SymFromAddr");
+    sym_line = (SymGetLineFromAddr64Fn)entry(dbghelp, "SymGetLineFromAddr64");
+    inline_count = (AddrIncludeInlineTraceFn)entry(dbghelp, "SymAddrIncludeInlineTrace");
+    inline_query = (QueryInlineTraceFn)entry(dbghelp, "SymQueryInlineTrace");
+    inline_symbol = (FromInlineContextFn)entry(dbghelp, "SymFromInlineContext");
+    inline_line = (LineFromInlineContextFn)entry(dbghelp, "SymGetLineFromInlineContext");
+    if (set_options == NULL || initialize == NULL) return;
+    set_options(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES |
+                SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
+    initialize(process, search, TRUE);
 }
 
 static void capture_at(uintptr_t fault_pc) {
@@ -263,11 +279,11 @@ static void capture_at(uintptr_t fault_pc) {
         symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
         symbol.info.MaxNameLen = 255;
         DWORD64 offset = 0;
-        const char *function = SymFromAddr(process, address, &offset, &symbol.info) ? keep(symbol.info.Name) : NULL;
+        const char *function = sym_from_addr && sym_from_addr(process, address, &offset, &symbol.info) ? keep(symbol.info.Name) : NULL;
         IMAGEHLP_LINE64 line;
         line.SizeOfStruct = sizeof line;
         DWORD column = 0;
-        if (SymGetLineFromAddr64(process, address, &column, &line)) {
+        if (sym_line && sym_line(process, address, &column, &line)) {
             add_frame(pc, function, keep(line.FileName), (int)line.LineNumber);
         } else {
             add_frame(pc, function, NULL, 0);
