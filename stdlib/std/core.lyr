@@ -590,3 +590,14 @@ pub struct RangeTo<T> {
 
 /// `..`: everything. Written inside `[…]` only, where it takes a view of the whole.
 pub struct RangeFull { }
+
+/// `arrayOf(n, f)` (design/v5/spec/10 C7): an array of `n` elements, the element at `i` the value
+/// of `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot. A negative
+/// `n` panics.
+pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
+    var xs: T[] = [];
+    for (i in 0..n) {
+        xs = xs + [f(i)];
+    }
+    return xs;
+}

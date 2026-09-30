@@ -938,6 +938,17 @@ public sealed class AstFormatter
 
     private Doc LambdaDoc(LambdaExpr lambda)
     {
+        // '{ acc, x => … }': the parameters stand in the block's head, before '=>' (08 Y11 F2).
+        if (lambda.Form == LambdaForm.Trailing && lambda.Parameters is not [{ Implicit: true }] && lambda.Body is Block withParameters)
+        {
+            var head = Doc.Join(Doc.From(", "), lambda.Parameters.Select(p =>
+                p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From(p.Name)).ToArray());
+            var closing = withParameters.Span.End - 1;
+            return Doc.GroupOf(Doc.From("{ "), head, Doc.From(" =>"),
+                Doc.IndentOf(Doc.LineOrSpace, SequenceDoc(withParameters.Statements, StmtDoc, (_, _) => Air.User, closing)),
+                Doc.LineOrSpace, Doc.From("}"));
+        }
+
         if (lambda.Form == LambdaForm.Trailing)
             return lambda.Body is Block trailingBlock
                 ? BlockDoc(trailingBlock)

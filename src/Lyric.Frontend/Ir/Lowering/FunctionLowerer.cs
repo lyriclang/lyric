@@ -276,7 +276,10 @@ internal sealed class FunctionLowerer
             // declaration, so it needs a place of its own rather than an entry in the same map.
             if (capturesThis)
             {
-                _thisType = receiver is null ? null : _typeTable.RefTo(receiver);
+                // The type the environment holds it as (02 M8 C2): a class as its reference,
+                // a struct as a copy of the value — read off the environment's layout, not
+                // rebuilt from the receiver, which would make a struct's 'this' a reference.
+                _thisType = _typeTable.Defs[env.Type.Value].FieldTypes[captures.Count];
                 _capturedThisField = captures.Count;
             }
         }
@@ -2414,6 +2417,19 @@ internal sealed class FunctionLowerer
     /// static method), so a missing slot is a bug here.</summary>
     private TempId LowerThis(ThisExpr expr)
     {
+        // Inside a lambda 'this' is a captured value (02 M8 C2): read from the environment, at
+        // the field behind the named captures. A class's 'this' is the shared reference, a
+        // struct's the copy taken when the closure was made.
+        if (_thisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
+            && _thisType is { } captured)
+        {
+            var env = _slots.NewTemp(new IrRefType(envType));
+            _b.Emit(new LoadLocal(env, envSlot, new IrRefType(envType), expr.Span));
+            var self = _slots.NewTemp(captured);
+            _b.Emit(new LoadField(self, env, envType, new FieldId(field), captured, expr.Span));
+            return self;
+        }
+
         if (_thisSlot is not { } slot || _thisType is not { } type)
             throw Bug($"'this' reached lowering outside an instance method at {expr.Span}");
 
@@ -3944,6 +3960,76 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>
+    /// A method as a value. A static one is a function value without an environment, like a
+    /// free function. An instance method is a BOUND closure (08 Y11 F10): its environment holds
+    /// the receiver — the object shared, a struct copied (02 M8 C2) — and its code is a function
+    /// built here that takes the receiver out of the environment and calls the method with it.
+    /// </summary>
+    private TempId LowerMethodValue(MemberExpr expr, FunctionSymbol method)
+    {
+        if (method.Declaration is FunctionDecl { Generics.Length: > 0 })
+            throw NotSupported($"a generic method ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
+        if (TypeOfExpr(expr) is not IrFunctionType signature)
+            throw NotSupported($"'{method.Name}' as a value", expr.Span);
+        if (!TryResolveFunction(method, out var target))
+            throw NotSupported($"reference to '{method.Name}' as a value", expr.Span);
+
+        if (method.Declaration is FunctionDecl { IsStatic: true })
+        {
+            var direct = _slots.NewTemp(signature);
+            _b.Emit(new MakeClosure(direct, target, null, signature, expr.Span));
+            return direct;
+        }
+
+        var receiverType = SubstituteType(_types.TypeOf(expr.Target));
+        if (receiverType is GenericInstance)
+            throw NotSupported($"a method of a generic instance ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
+        var receiver = LowerType(receiverType, expr.Target.Span);
+        var envType = _typeTable.EnvironmentFor(_name, [receiver], ["this"]);
+        var env = _slots.NewTemp(envType);
+        _b.Emit(new NewObject(env, envType.Type, envType, expr.Span));
+        _b.Emit(new StoreField(env, envType.Type, new FieldId(0), LowerExprAs(expr.Target, receiver), expr.Span));
+
+        var name = _lambdas.BuiltName(_name, "bound:" + method.Name);
+        var code = _lambdas.RegisterBuilt(_ => BuildBoundMethod(name, envType, receiver, signature, target));
+        var dest = _slots.NewTemp(signature);
+        _b.Emit(new MakeClosure(dest, code, env, signature, expr.Span));
+        return dest;
+    }
+
+    /// <summary>The code of a bound method value: environment first, then the parameters; the
+    /// receiver is read from the environment and the method called with it.</summary>
+    private static IrFunction BuildBoundMethod(string name, IrRefType envType, IrType receiver,
+        IrFunctionType signature, FunctionId target)
+    {
+        var locals = new List<IrLocal> { new(new LocalId(0), "<env>", envType) };
+        for (var i = 0; i < signature.Parameters.Length; i++)
+            locals.Add(new IrLocal(new LocalId(i + 1), $"p{i}", signature.Parameters[i]));
+        var temps = new List<IrTemp>();
+        TempId Temp(IrType type) { var t = new TempId(temps.Count); temps.Add(new IrTemp(t, type)); return t; }
+
+        var blocks = new List<IrBlock>();
+        var b = new BlockBuilder(blocks);
+        var env = Temp(envType);
+        b.Emit(new LoadLocal(env, new LocalId(0), envType, default));
+        var self = Temp(receiver);
+        b.Emit(new LoadField(self, env, envType.Type, new FieldId(0), receiver, default));
+        var args = new TempId[signature.Parameters.Length + 1];
+        args[0] = self;
+        for (var i = 0; i < signature.Parameters.Length; i++)
+        {
+            args[i + 1] = Temp(signature.Parameters[i]);
+            b.Emit(new LoadLocal(args[i + 1], new LocalId(i + 1), signature.Parameters[i], default));
+        }
+        var isVoid = signature.Return is IrScalarType { Kind: IrScalar.Void };
+        TempId? result = isVoid ? null : Temp(signature.Return);
+        b.Emit(new Call(result, target, args, default));
+        b.Seal(new Return(result, default));
+
+        return new IrFunction(name, signature.Return, locals.Count, locals, temps, blocks) { Entry = new BlockId(0) };
+    }
+
     private TempId LowerFieldRead(MemberExpr expr)
     {
         // 'P.ZERO' is not a field read but a constant read: a 'static let' is a global slot rather than
@@ -3954,6 +4040,10 @@ internal sealed class FunctionLowerer
         // arguments.
         if (_types.RefOf(expr) is EnumVariantSymbol)
             return LowerVariantCall(expr.Member, [], expr, expr.Span);
+
+        // 'obj.method' and 'Type.staticFn' as VALUES (08 Y11 F10, 03 T17).
+        if (_types.RefOf(expr) is FunctionSymbol method && !expr.IsOptional)
+            return LowerMethodValue(expr, method);
 
         // 'a?.b' accesses only when 'a' has a value.
         if (expr.IsOptional) return LowerOptionalMember(expr);

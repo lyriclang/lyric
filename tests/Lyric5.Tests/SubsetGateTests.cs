@@ -61,9 +61,8 @@ public class SubsetGateTests
     }
 
     [Theory]
-    [InlineData("enum E { A(fn(int) -> int), B }\nfn main(): int { let e = E.B; return 0; }", "function values", "M3")]
-    [InlineData("fn main(): int { let xs = [(x: int): int => x]; return xs.length(); }", "function values", "M3")]
-    [InlineData("fn main(): int { let f = (x: int): int => x + 1; return f(1); }", "closures", "M3")]
+    [InlineData("interface Shape { fn area(): int; }\nclass C :: [Shape] { fn area(): int { return 1; } }\nfn main(): int { let s: Shape = C { }; return s.area(); }", "interfaces", "M4")]
+    [InlineData("interface Shape { fn area(): int; }\nenum E { A(Shape), B }\nfn main(): int { let e = E.B; return 0; }", "interfaces", "M4")]
     [InlineData("class C { var n: int }\nfn main(): int { let cs = [C { n = 1 }] * 3; return cs.length(); }", "'Clone'", "M4")]
     [InlineData("class C { var n: int }\nstruct S { c: C }\nfn main(): int { let ss = [S { c = C { n = 1 } }] * 3; return ss.length(); }", "'Clone'", "M4")]
     [InlineData("fn gen(): Coroutine<int> { yield 1; }\nfn main(): int { let g = gen(); return 0; }", "coroutines", "M6")]

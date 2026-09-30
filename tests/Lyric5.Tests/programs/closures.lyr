@@ -1,0 +1,113 @@
+// Function values (01 V8; 02 M8; 03 T17; 08 Y11): a pointer to the code and the environment it
+// runs in, two words; a captured 'let' lies in the environment as a copy, a captured 'var' in a
+// box both sides share; a free function is a value with no environment. Expected stdout:
+//   forms 2 6 6 14 3 5           paren, bare, free function, block body, trailing 'it', two parameters
+//   capture 3 30 92              a 'let' by value, a 'var' shared with the maker, a 'var' struct shared through its box
+//   counter 1 2 3 2              a closure kept in a field counts across calls; the maker's box is one
+//   loop 0 1 2                   a loop binding is fresh per pass (M8 C1)
+//   this 15 4                    'this' of a class captured, shared; of a struct, a copy
+//   opt 4 none                   an optional function value
+//   made 0 10 20                 'arrayOf' from std.core: fresh elements from a function
+//   trailing 6 14 6              a trailing block with parameters, a destructuring one, a block body
+//   bound 2 2 0 20 10            'obj.method' bound to its object (shared), 'Type.fn' as a value, a struct bound as a copy
+import std.core { arrayOf };
+import std.io { println };
+
+struct Point { var x: int, y: int }
+class Holder { var next: fn() -> int }
+class Scale { var factor: int, fn scaled(): fn(int) -> int { return (n: int): int => n * this.factor; } }
+struct Pair { var a: int, fn adder(): fn(int) -> int { return (n: int): int => n + this.a; } }
+class Counter {
+    var n: int,
+    mut fn bump(): int { this.n += 1; return this.n; }
+    fn peek(): int { return this.n; }
+    static fn make(): Counter { return Counter { n = 0 }; }
+}
+struct Acc { var total: int, mut fn add(x: int): int { this.total += x; return this.total; } }
+
+fn eachPair(ps: (int, int)[], f: fn((int, int)) -> void): void { for (i in 0..ps.length()) { f(ps[i]); } }
+
+fn apply(f: fn(int) -> int, x: int): int { return f(x); }
+fn twice(x: int): int { return x * 2; }
+fn fold(xs: int[], seed: int, f: fn(int, int) -> int): int {
+    var acc = seed;
+    for (i in 0..xs.length()) { acc = f(acc, xs[i]); }
+    return acc;
+}
+fn each(xs: int[], f: fn(int) -> void): void { for (i in 0..xs.length()) { f(xs[i]); } }
+
+fn counter(): fn() -> int {
+    var n = 0;
+    return (): int => { n += 1; return n; };
+}
+
+fn maybe(flag: bool): ?fn(int) -> int { return if (flag) twice else null; }
+
+fn main(): int {
+    let a = apply((n: int): int => n + 1, 1);
+    let b = apply(x => x * 3, 2);
+    let c = apply(twice, 3);
+    let d = fold([2, 3, 4], 5, (acc, x) => acc + x);
+    var seen = 0;
+    each([1, 2]) { seen += it; }
+    let e = apply((x: int): int => { let y = x + 1; y }, 4);
+    println(f"forms {a} {b} {c} {d} {seen} {e}");
+
+    let base = 3;
+    var shared = 10;
+    var p = Point { x = 1, y = 2 };
+    let addBase = (n: int): int => n + base;
+    let bump = (): int => { shared += 10; return shared; };
+    let readP = (): int => p.x * 10 + p.y;
+    shared += 10;
+    p.x = 9;
+    println(f"capture {addBase(0)} {bump()} {readP()}");
+
+    let count = counter();
+    let h = Holder { next = count };
+    let first = h.next();
+    let second = count();
+    let third = h.next();
+    let other = counter();
+    other();
+    println(f"counter {first} {second} {third} {other()}");
+
+    var fs: (fn() -> int)[] = [];
+    for (i in 0..3) { fs = fs + [(): int => i]; }
+    println(f"loop {fs[0]()} {fs[1]()} {fs[2]()}");
+
+    let scale = Scale { factor = 3 };
+    let times = scale.scaled();
+    scale.factor = 5;
+    var pair = Pair { a = 1 };
+    let add = pair.adder();
+    pair.a = 100;
+    println(f"this {times(3)} {add(3)}");
+
+    let some = maybe(true);
+    let none = maybe(false);
+    println(f"opt {(some ?? twice)(2)} " + (if (none == null) "none" else "some"));
+
+    let made = arrayOf(3, (i: int): int => i * 10);
+    println(f"made {made[0]} {made[1]} {made[2]}");
+
+    let t1 = fold([1, 2, 3], 0) { acc, x => acc + x };
+    var dot = 0;
+    eachPair([(1, 2), (3, 4)]) { (a, b) => dot += a * b; }
+    let t3 = fold([5], 1) { acc, x =>
+        let y = acc * x;
+        y + 1
+    };
+    println(f"trailing {t1} {dot} {t3}");
+
+    let cnt = Counter.make();
+    let bumpBound = cnt.bump;
+    bumpBound();
+    let bumped = bumpBound();
+    let make = Counter.make;
+    var acc = Acc { total = 10 };
+    let addAcc = acc.add;
+    addAcc(5);
+    println(f"bound {bumped} {cnt.peek()} {make().n} {addAcc(5)} {acc.total}");
+    return 0;
+}

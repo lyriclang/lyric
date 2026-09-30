@@ -28,7 +28,7 @@ public class CEmitterTests
         result.Diagnostics.RenderText(rendered);
         Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
         Assert.True(SubsetGate.Check(result.Ir!, result.Diagnostics), rendered.ToString());
-        return CEmitter.Emit(result.Ir!, result.Sources).Replace("\r\n", "\n");
+        return CEmitter.Emit(result.Ir!, result.Sources, options.StdlibRoot).Replace("\r\n", "\n");
     }
 
     [Theory]
@@ -49,6 +49,7 @@ public class CEmitterTests
     [InlineData("ranges")]
     [InlineData("with")]
     [InlineData("globals")]
+    [InlineData("closures")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -68,6 +69,10 @@ public class CEmitterTests
     private const string RANGES_EXPECTED = "value 1 4 3\ninclusive 5 9\nheld 2 8 6\nloop 16\n";
 
     private const string GLOBALS_EXPECTED = "start 3 6 hello!\ncounter 0 3 4\nstatic 0,0 100\nobject 2 bob 9 1\n";
+
+    private const string CLOSURES_EXPECTED =
+        "forms 2 6 6 14 3 5\ncapture 3 30 92\ncounter 1 2 3 2\nloop 0 1 2\nthis 15 4\nopt 4 none\nmade 0 10 20\n"
+        + "trailing 6 14 6\nbound 2 2 0 20 10\n";
 
     private const string WITH_EXPECTED =
         "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
@@ -114,6 +119,7 @@ public class CEmitterTests
             data.Add("ranges", profile, 0, RANGES_EXPECTED);
             data.Add("with", profile, 0, WITH_EXPECTED);
             data.Add("globals", profile, 0, GLOBALS_EXPECTED);
+            data.Add("closures", profile, 0, CLOSURES_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

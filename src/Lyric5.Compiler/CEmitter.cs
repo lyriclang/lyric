@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s5";
+    public const string Version = "m3-s7";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -56,17 +56,25 @@ public sealed class CEmitter
     /// has there: the tag.</summary>
     private readonly Dictionary<int, (int Enum, int Tag)> _variants = new();
 
-    private CEmitter(IrModule module, SourceManager sources)
+    private readonly string? _stdlibRoot;
+
+    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot)
     {
         _module = module;
         _sources = sources;
+        _stdlibRoot = stdlibRoot is null ? null : Path.GetFullPath(stdlibRoot).TrimEnd('/', '\\');
         for (var i = 0; i < module.Types.Count; i++)
             for (var tag = 0; tag < module.Types[i].Variants.Length; tag++)
                 _variants[module.Types[i].Variants[tag].Value] = (i, tag);
     }
 
     /// <summary>The C text of the module. <paramref name="sources"/> answers the <c>#line</c> positions.</summary>
-    public static string Emit(IrModule module, SourceManager sources) => new CEmitter(module, sources).Module();
+    /// <param name="stdlibRoot">The directory of the standard library, when known: a source
+    /// under it is named in <c>#line</c> relative to the directory's parent (<c>stdlib5/std/core.lyr</c>),
+    /// so the emitted C is the same on every machine — a golden compares it byte for byte, and
+    /// the build cache keys on it.</param>
+    public static string Emit(IrModule module, SourceManager sources, string? stdlibRoot = null) =>
+        new CEmitter(module, sources, stdlibRoot).Module();
 
     // --- names and types -------------------------------------------------------------------------
 
@@ -105,6 +113,7 @@ public sealed class CEmitter
         IrArrayType => "LyrArr *",
         IrSliceType s => SliceName(s),
         IrInlineArrayType ia => InlineName(ia),
+        IrFunctionType f => FnName(f),
         IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
@@ -195,6 +204,25 @@ public sealed class CEmitter
     /// C array so that C copies it as a value.</summary>
     private static string InlineName(IrInlineArrayType type) => $"lyr_inl{type.Length}_" + Mangle(type.Element);
 
+    /// <summary><c>lyr_fn_&lt;signature&gt;</c>: a function value (01 V8), a pointer to the code and
+    /// the environment it runs in — two words, a value. The code takes the environment first,
+    /// as <c>void *</c>; a function without one gets a thunk that drops it.</summary>
+    private static string FnName(IrFunctionType type) => "lyr_" + Mangle(type);
+
+    /// <summary>The C type of the code pointer of a function value: the environment first.</summary>
+    private string CodePointer(IrFunctionType type, string name) =>
+        $"{CType(type.Return)} (*{name})(void *{string.Concat(type.Parameters.Select(p => ", " + CType(p)))})";
+
+    /// <summary>The name a function's code takes as a function value's target: itself when it
+    /// takes an environment, its thunk otherwise (a free function, a lambda without captures).</summary>
+    private string CodeOf(IrFunction target) =>
+        TakesEnvironment(target) ? FunctionName(target.Name) : "lyr_thunk_" + FunctionName(target.Name)[4..];
+
+    /// <summary>Whether the function's parameter 0 is a closure's environment (the lowering
+    /// names it so): then the C signature takes it as <c>void *</c> and the body casts.</summary>
+    private static bool TakesEnvironment(IrFunction function) =>
+        function.ParamCount > 0 && function.Locals[0].Name == "<env>";
+
     private static string Mangle(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "str",
@@ -205,6 +233,7 @@ public sealed class CEmitter
         IrArrayType a => "arr_" + Mangle(a.Element),
         IrSliceType s => "slice_" + Mangle(s.Element),
         IrInlineArrayType ia => $"inl{ia.Length}_" + Mangle(ia.Element),
+        IrFunctionType f => "fn" + string.Concat(f.Parameters.Select(p => "_" + Mangle(p))) + "_to_" + Mangle(f.Return),
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
     };
@@ -224,6 +253,7 @@ public sealed class CEmitter
         IrArrayType a => Display(a.Element) + "[]",
         IrSliceType s => $"Slice<{Display(s.Element)}>",
         IrInlineArrayType ia => $"{Display(ia.Element)}[{ia.Length}]",
+        IrFunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Display))}) -> {Display(f.Return)}",
         IrOptionalType o => "?" + Display(o.Inner),
         _ => type.ToString() ?? "?",
     };
@@ -251,7 +281,7 @@ public sealed class CEmitter
         IrRefType or IrArrayType => "NULL",
         _ when IsNiche(type) => "NULL",
         _ when IsAggregate(type) => "{0}",
-        IrSliceType => "{0}",
+        IrSliceType or IrFunctionType => "{0}",
         _ => "0",
     };
 
@@ -272,7 +302,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
         IrRefType or IrArrayType => (8, 8),
-        IrSliceType => (16, 8),
+        IrSliceType or IrFunctionType => (16, 8),
         IrInlineArrayType ia => (LayoutOf(ia.Element).Size * ia.Length, LayoutOf(ia.Element).Align),
         IrOptionalType o when IsNiche(o) => (8, 8),
         IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
@@ -350,6 +380,7 @@ public sealed class CEmitter
             .Any(v => Payload(_module.Types[v.Value]).Any(HoldsReferences)),
         IrOptionalType o when !IsNiche(o) => HoldsReferences(o.Inner),
         IrSliceType => true, // its pointer, into the array's elements
+        IrFunctionType => true, // its environment
         IrInlineArrayType ia => HoldsReferences(ia.Element),
         _ => IsReference(type),
     };
@@ -376,6 +407,7 @@ public sealed class CEmitter
     {
         if (IsReference(type)) words.Add(offset / 8);
         else if (type is IrSliceType) words.Add(offset / 8); // the pointer, first word; an interior one
+        else if (type is IrFunctionType) words.Add(offset / 8 + 1); // the environment, second word
         else if (type is IrInlineArrayType inline)
             for (var i = 0; i < inline.Length; i++)
                 ReferenceWords(inline.Element, offset + i * LayoutOf(inline.Element).Size, words, ref ambiguous);
@@ -435,6 +467,25 @@ public sealed class CEmitter
         prototypes.AppendLine("/* prototypes */");
         foreach (var function in _module.Functions) prototypes.Append(Signature(function)).AppendLine(";");
 
+        // A function used as a value without an environment gets a thunk that takes and drops
+        // one, so every function value is called the same way (01 V8).
+        var thunked = _module.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts)
+            .OfType<MakeClosure>().Where(m => m.Environment is null).Select(m => m.Target.Value).Distinct().Order().ToList();
+        if (thunked.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* thunks: a function as a value, without an environment */");
+            foreach (var index in thunked)
+            {
+                var target = _module.Functions[index];
+                var parameters = target.Locals.Take(target.ParamCount).ToList();
+                var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(p))));
+                var call = $"{FunctionName(target.Name)}({string.Join(", ", parameters.Select(LocalName))})";
+                prototypes.AppendLine($"static {CType(target.ReturnType)} {CodeOf(target)}(void *lyr_env{signature}) {{ (void)lyr_env; "
+                    + (IsVoid(target.ReturnType) ? $"{call}; }}" : $"return {call}; }}"));
+            }
+        }
+
         var body = new StringBuilder();
         foreach (var function in _module.Functions) body.Append(Function(function));
         if (_module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
@@ -460,7 +511,7 @@ public sealed class CEmitter
             .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
             .Concat(_module.Types.SelectMany(t => t.FieldTypes))
             .ToList();
-        var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType).ToList();
+        var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType or IrFunctionType).ToList();
         // Every element type an array is made of, the array's own element type included when it
         // is itself an array: each gets a descriptor, after the structs it may hold.
         var elements = new List<IrType>();
@@ -471,6 +522,7 @@ public sealed class CEmitter
             else if (type is IrOptionalType o) Element(o.Inner);
             else if (type is IrSliceType s) Element(s.Element);
             else if (type is IrInlineArrayType ia) Element(ia.Element);
+            else if (type is IrFunctionType f) { foreach (var p in f.Parameters) Element(p); Element(f.Return); }
         }
         foreach (var type in named) Element(type);
         if (indices.Count == 0 && used.Count == 0 && elements.Count == 0) return;
@@ -498,6 +550,13 @@ public sealed class CEmitter
             {
                 Require(optional.Inner);
                 _out.AppendLine($"typedef struct {{ {Declare(optional.Inner, "value")}; uint8_t has; }} {OptionalName(optional)};");
+            }
+            else if (type is IrFunctionType fn && optionals.Add(FnName(fn)))
+            {
+                foreach (var p in fn.Parameters) Require(p);
+                Require(fn.Return);
+                _out.AppendLine($"typedef struct {{ {CodePointer(fn, "fn")}; void *env; }} {FnName(fn)};");
+                _out.AppendLine($"_Static_assert(sizeof({FnName(fn)}) == 16, \"layout of {FnName(fn)}\");");
             }
             else if (type is IrInlineArrayType inline && optionals.Add(InlineName(inline)))
             {
@@ -634,7 +693,9 @@ public sealed class CEmitter
     private string Parameter(IrFunction function, IrLocal local) =>
         function.ReceiverByRef && local.Id.Value == 0
             ? $"{CType(local.Type)} *{LocalName(local)}"
-            : Declare(local.Type, LocalName(local));
+            : TakesEnvironment(function) && local.Id.Value == 0
+                ? "void *lyr_env"
+                : Declare(local.Type, LocalName(local));
 
     private bool IsReceiverPlace(LocalId local) => _function.ReceiverByRef && local.Value == 0;
 
@@ -684,6 +745,10 @@ public sealed class CEmitter
         Line(FirstSpan(function));
         _fn.Append(Signature(function)).AppendLine(" {");
 
+        // The environment arrives as 'void *' — one code pointer type per function type, whatever
+        // the environment's own type — and is cast to it once, here.
+        if (TakesEnvironment(function))
+            _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
         foreach (var local in function.Locals.Skip(function.ParamCount))
             _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
         foreach (var temp in function.Temps)
@@ -743,9 +808,23 @@ public sealed class CEmitter
         if (span.File != _file)
         {
             _file = span.File;
-            _fn.AppendLine($"#line {position.Line} \"{_sources.GetPath(span.File).Replace("\\", "\\\\").Replace("\"", "\\\"")}\"");
+            _fn.AppendLine($"#line {position.Line} \"{SourcePath(span.File).Replace("\\", "\\\\").Replace("\"", "\\\"")}\"");
         }
         else _fn.AppendLine($"#line {position.Line}");
+    }
+
+    /// <summary>The path a <c>#line</c> names: a standard-library source relative to the
+    /// library's parent directory, with forward slashes; anything else as the source manager
+    /// has it.</summary>
+    private string SourcePath(FileId file)
+    {
+        var path = _sources.GetPath(file);
+        if (_stdlibRoot is null) return path;
+        var full = Path.IsPathRooted(path) ? Path.GetFullPath(path) : path;
+        var parent = Path.GetDirectoryName(_stdlibRoot) ?? "";
+        if (!full.StartsWith(_stdlibRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && !full.StartsWith(_stdlibRoot + '/', StringComparison.Ordinal)) return path;
+        return Path.GetRelativePath(parent, full).Replace('\\', '/');
     }
 
     private string Instruction(IrOp op) => op switch
@@ -774,6 +853,9 @@ public sealed class CEmitter
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         CopyValue c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         // An inline array (A4): its storage filled element by element, or from one value.
+        // A function value (01 V8): the code and its environment, or a thunk and no environment.
+        MakeClosure m => $"{Temp(m.Dest)} = ({CType(m.Type)}){{ {CodeOf(_module.Functions[m.Target.Value])}, {(m.Environment is { } e ? Temp(e) : "NULL")} }};",
+        CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))})"),
         NewInline n => n.Repeat
             ? $"for (int64_t lyr_i = 0; lyr_i < {n.Length}; lyr_i++) {Storage(n.Dest)}.v[lyr_i] = {Value(n.Elements[0])}; {Temp(n.Dest)} = &{Storage(n.Dest)};"
             : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{ .v = {{ {string.Join(", ", n.Elements.Select(Value))} }} }}; {Temp(n.Dest)} = &{Storage(n.Dest)};",

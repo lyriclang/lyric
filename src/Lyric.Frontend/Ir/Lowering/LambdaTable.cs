@@ -35,6 +35,23 @@ internal sealed class LambdaTable
 
     private readonly List<Pending> _pending = new();
 
+    /// <summary>Functions built directly as IR rather than lowered from a lambda: the bound
+    /// method values (08 Y11 F10), one per site.</summary>
+    private readonly List<(FunctionId Id, IrFunction Function)> _built = new();
+    private int _builtDrained;
+
+    /// <summary>Registers a function the caller builds itself, under a fresh id; the builder
+    /// gets the id so the body may refer to it.</summary>
+    public FunctionId RegisterBuilt(Func<FunctionId, IrFunction> build)
+    {
+        var id = _ids.Next();
+        _built.Add((id, build(id)));
+        return id;
+    }
+
+    /// <summary>A name for a built function, unique in the module.</summary>
+    public string BuiltName(string enclosing, string what) => $"{enclosing}.<{what}{_built.Count}>";
+
     /// <summary>The first id a lambda may take: behind all written functions and behind the global
     /// initializer.</summary>
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
@@ -82,6 +99,7 @@ internal sealed class LambdaTable
         TypeTable typeTable, GlobalTable globals, InstanceTable instances)
     {
         var lowered = new List<(FunctionId, IrFunction)>();
+        for (; _builtDrained < _built.Count; _builtDrained++) lowered.Add(_built[_builtDrained]);
 
         for (; _lowered < _pending.Count; _lowered++)
         {
