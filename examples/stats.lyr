@@ -15,7 +15,7 @@ fn sum(params nums: int[]): int {
 
 // An empty array has no maximum, hence ?int.
 fn max(xs: int[]): ?int {
-    if (xs.length == 0) {
+    if (xs.length() == 0) {
         return null;
     }
     var best = xs[0];
@@ -31,7 +31,7 @@ fn main(): int {
     let total = sum(3, 7, 1, 9, 4);
     let numbers = [3, 7, 1, 9, 4];
     let biggest = max(numbers) ?? 0;
-    let avg = total as float / numbers.length as float;
+    let avg = total as float / numbers.length() as float;
 
     println(f"Summe:        {total}");
     println(f"Maximum:      {biggest}");

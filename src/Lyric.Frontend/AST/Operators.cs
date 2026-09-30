@@ -17,7 +17,10 @@ namespace Lyric.AST
 
     public enum UnaryOp
     {
-        Not, Neg, BitNot, PreInc, PreDec
+        Not, Neg, BitNot, PreInc, PreDec,
+        /// <summary><c>^n</c>: the index <c>n</c> from the end, inside <c>[…]</c> only
+        /// (design/v5/spec/03 T14 N6) — sugar for <c>length() - n</c> of the indexed value.</summary>
+        FromEnd,
     }
 
     public enum PostfixOp
@@ -87,6 +90,7 @@ namespace Lyric.AST
             TokenKind.Tilde => UnaryOp.BitNot,
             TokenKind.Inc => UnaryOp.PreInc,
             TokenKind.Dec => UnaryOp.PreDec,
+            TokenKind.Caret => UnaryOp.FromEnd,
             _ => throw new InternalCompilationException($"unreachable: unexpected {op.ToString()}")
         };
 

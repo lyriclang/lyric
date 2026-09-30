@@ -857,7 +857,7 @@ public class LoweringTests
     public void Main_with_arguments_is_an_entry_point()
     {
         // The second entry form of the specification.
-        var (ir, de) = TryLower("fn main(args: string[]): int { return args.length; }");
+        var (ir, de) = TryLower("fn main(args: string[]): int { return args.length(); }");
 
         Assert.False(de.HasErrors);
         Assert.NotNull(ir!.EntryFunction);

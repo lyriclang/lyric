@@ -96,7 +96,7 @@ public class ImplicitMemberTests
                 let scene = Scene { light = .Green, shape = .Rect { w = 1, h = 2 } };
                 let s: Shape = match (pick(true)) { .Red => .Num(1), _ => .Empty };
                 let all: Color[] = [.Red, .Green];
-                return match (scene.shape) { .Rect { w, h } => w + h, _ => 0 } + all.length;
+                return match (scene.shape) { .Rect { w, h } => w + h, _ => 0 } + all.length();
             }
             """);
 

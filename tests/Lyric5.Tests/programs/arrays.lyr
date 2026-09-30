@@ -5,6 +5,7 @@
 //   store 99 20                 an element written under 'let', its neighbour untouched
 //   repeat 5 7 7                '[x] * n', its length and two elements
 //   concat 5 1 5                'xs + ys', its length, first and last
+//   fromend 30 99 50            '^n' counts from the end, as an index read and written
 //   struct 3,4 9 5 2            an array of structs: a copy kept, a field written in place, a copy changed
 //   nested 2 3 6                an array of arrays: lengths and an inner element
 //   refs alice bob 41 2         an array of objects written through, and one of strings
@@ -17,25 +18,27 @@ class Person { name: string, var age: int }
 
 fn sum(xs: int[]): int {
     var total = 0;
-    for (i in 0..xs.length) { total += xs[i]; }
+    for (i in 0..xs.length()) { total += xs[i]; }
     return total;
 }
 
 fn count(xs: ?int[]): string {
     if (xs == null) { return "none"; }
-    return f"{xs.length}";
+    return f"{xs.length()}";
 }
 
 fn main(): int {
     let xs = [10, 20, 30];
-    println(f"literal {xs.length} {xs[0]} {xs[1]} {xs[2]}");
+    println(f"literal {xs.length()} {xs[0]} {xs[1]} {xs[2]}");
     xs[0] = 99;
     println(f"store {xs[0]} {xs[1]}");
 
     let sevens = [7] * 5;
-    println(f"repeat {sevens.length} {sevens[0]} {sevens[4]}");
+    println(f"repeat {sevens.length()} {sevens[0]} {sevens[4]}");
     let both = [1, 2] + [3, 4, 5];
-    println(f"concat {both.length} {both[0]} {both[4]}");
+    println(f"concat {both.length()} {both[0]} {both[4]}");
+    both[^1] = 50;
+    println(f"fromend {xs[^1]} {xs[^3]} {both[4]}");
 
     let points = [Point { x = 1, y = 2 }, Point { x = 3, y = 4 }];
     let p = points[1];
@@ -45,12 +48,12 @@ fn main(): int {
     println(f"struct {p.x},{p.y} {points[1].x} {q.y} {points[0].y}");
 
     let grid = [[1, 2, 3], [4, 5, 6]];
-    println(f"nested {grid.length} {grid[0].length} {grid[1][2]}");
+    println(f"nested {grid.length()} {grid[0].length()} {grid[1][2]}");
 
     let people = [Person { name = "alice", age = 30 }, Person { name = "bob", age = 40 }];
     let names = ["alice", "bob"];
     people[1].age = 41;
-    println("refs " + people[0].name + " " + names[1] + f" {people[1].age} {people.length}");
+    println("refs " + people[0].name + " " + names[1] + f" {people[1].age} {people.length()}");
 
     println(f"sum {sum([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])}");
 

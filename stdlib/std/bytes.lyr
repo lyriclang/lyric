@@ -17,13 +17,13 @@ pub fn slice(bytes: uint8[], start: int, count: int): uint8[] {
     if (start < 0 || count < 0) {
         panic("std.bytes.slice: negative start or count");
     }
-    if (start > bytes.length) {
+    if (start > bytes.length()) {
         panic("std.bytes.slice: start is past the end");
     }
 
     var end = start + count;
-    if (end > bytes.length) {
-        end = bytes.length;
+    if (end > bytes.length()) {
+        end = bytes.length();
     }
 
     let zero: uint8 = 0;
@@ -45,7 +45,7 @@ pub fn indexOf(bytes: uint8[], value: uint8): int {
 /// searches from the front, one past the end finds nothing.
 pub fn indexOfFrom(bytes: uint8[], value: uint8, start: int): int {
     var i = if (start < 0) 0 else start;
-    while (i < bytes.length) {
+    while (i < bytes.length()) {
         if (bytes[i] == value) {
             return i;
         }

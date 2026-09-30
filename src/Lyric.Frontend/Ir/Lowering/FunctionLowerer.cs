@@ -3600,15 +3600,26 @@ internal sealed class FunctionLowerer
                 expr.Span);
 
         var target = LowerExpr(expr.Target);
-        var index = LowerExpr(expr.Index);
-        return (target, index, array.Element);
+        return (target, LowerIndexValue(expr.Index, target), array.Element);
     }
 
-    private TempId LowerArrayLength(MemberExpr expr)
+    /// <summary>The index as an <c>int</c>: a narrower one widened, <c>^n</c> as the length of
+    /// the indexed value less <c>n</c> (03 T14 N6) — the value is evaluated once, before.</summary>
+    private TempId LowerIndexValue(Expr index, TempId target)
     {
-        var array = LowerExpr(expr.Target);
+        if (index is not UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
+            return LowerExprAs(index, new IrScalarType(IrScalar.I64));
+        var length = _slots.NewTemp(new IrScalarType(IrScalar.I64));
+        _b.Emit(new ArrayLen(length, target, fromEnd.Span));
+        var n = LowerExprAs(fromEnd.Operand, new IrScalarType(IrScalar.I64));
+        return EmitBinary(IrBinKind.Sub, new IrScalarType(IrScalar.I64), length, n, fromEnd.Span);
+    }
+
+    private TempId LowerArrayLength(Expr array, Span span)
+    {
+        var value = LowerExpr(array);
         var dest = _slots.NewTemp(new IrScalarType(IrScalar.I64));
-        _b.Emit(new ArrayLen(dest, array, expr.Span));
+        _b.Emit(new ArrayLen(dest, value, span));
         return dest;
     }
 
@@ -3766,10 +3777,6 @@ internal sealed class FunctionLowerer
         // arguments.
         if (_types.RefOf(expr) is EnumVariantSymbol)
             return LowerVariantCall(expr.Member, [], expr, expr.Span);
-
-        // '.length' on an array is built in: neither a field nor a method.
-        if (expr.Member == "length" && TypeOfExpr(expr.Target) is IrArrayType)
-            return LowerArrayLength(expr);
 
         // 'a?.b' accesses only when 'a' has a value.
         if (expr.IsOptional) return LowerOptionalMember(expr);
@@ -4316,6 +4323,11 @@ internal sealed class FunctionLowerer
         // 'co.next()' — the safe pull on a coroutine, built in like '.length' on an array. Before
         // the indirect-call check: the sema types the member as a function type with no symbol
         // behind it, which is exactly what the value-call test matches.
+        // 'xs.length()' on an array is built in: neither a field nor a method (03 T13 A1).
+        if (expr.Callee is MemberExpr { Member: "length", IsOptional: false } length
+            && TypeOfExpr(length.Target) is IrArrayType)
+            return LowerArrayLength(length.Target, expr.Span);
+
         if (expr.Callee is MemberExpr { Member: "next" } pull
             && SubstituteType(_types.TypeOf(pull.Target)) is CoroutineOf pulled)
             return LowerCoroutineNext(pull, pulled, expr.Span);

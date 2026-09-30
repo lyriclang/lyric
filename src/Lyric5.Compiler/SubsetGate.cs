@@ -143,7 +143,15 @@ public static class SubsetGate
                 case NewArray n:
                     Type(n.Element, op.Span, "the element type");
                     break;
-                case LoadElem or StoreElem or ArrayLen or ArrayConcat or ArrayRepeat:
+                case LoadElem or StoreElem or ArrayLen or ArrayConcat:
+                    break;
+                // '[x] * n' clones every slot (10 C7): a value copies, a string is shared without
+                // anyone able to tell, a class or an array — held directly or inside the element
+                // — would be one object in every slot.
+                case ArrayRepeat r when HoldsObject(r.Element):
+                    Refuse(op.Span, "'[x] * n' with an element that is or holds a class or an array, which needs 'Clone'", "M4");
+                    break;
+                case ArrayRepeat:
                     break;
                 case OptNone or OptSome or OptIsSome or OptGet:
                     break;
@@ -166,6 +174,18 @@ public static class SubsetGate
                     break;
             }
         }
+
+        /// <summary>Whether a value of the type is or holds a reference to an object with
+        /// identity — a class or an array; a string has none to observe.</summary>
+        private bool HoldsObject(IrType type) => type switch
+        {
+            IrRefType or IrArrayType => true,
+            IrOptionalType o => HoldsObject(o.Inner),
+            IrStructType s => module.Types[s.Type.Value].FieldTypes.Any(HoldsObject),
+            IrEnumType e => module.Types[e.Type.Value].Variants
+                .Any(v => module.Types[v.Value].FieldTypes.Skip(1).Any(HoldsObject)),
+            _ => false,
+        };
 
         private void Terminator(IrTerminator? terminator, Span at)
         {

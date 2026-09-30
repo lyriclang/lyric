@@ -1,0 +1,8 @@
+Binary Add [0..15)
+  Index [0..6)
+    Ident xs [0..2)
+    Unary FromEnd [3..5)
+      Int 1 [4..5)
+  Binary BitXor [10..15)
+    Ident a [10..11)
+    Ident b [14..15)

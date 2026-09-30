@@ -227,11 +227,11 @@ pub class LineReader :: [Iterator<string>] {
             }
             if (this.ended) {
                 // A last line without a terminator is still a line; nothing left is the end.
-                if (this.at >= this.pending.length) {
+                if (this.at >= this.pending.length()) {
                     return null;
                 }
-                let rest = this.lineFrom(this.at, this.pending.length - this.at);
-                this.at = this.pending.length;
+                let rest = this.lineFrom(this.at, this.pending.length() - this.at);
+                this.at = this.pending.length();
                 return rest;
             }
             this.refill();
@@ -256,7 +256,7 @@ pub class LineReader :: [Iterator<string>] {
     // Drops what has been handed out and asks for more. Compacting HERE rather than per line is
     // what keeps the walk linear: it happens once per chunk, not once per line.
     mut fn refill(): void {
-        let kept = slice(this.pending, this.at, this.pending.length - this.at);
+        let kept = slice(this.pending, this.at, this.pending.length() - this.at);
         this.at = 0;
         let got = readSome(this.source, chunkSize);
         if (got == null) {
@@ -265,7 +265,7 @@ pub class LineReader :: [Iterator<string>] {
             this.ended = true;
             return;
         }
-        if (got.length == 0) {
+        if (got.length() == 0) {
             this.pending = kept;
             this.ended = true;
             return;

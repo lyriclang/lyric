@@ -783,6 +783,7 @@ public sealed class AstFormatter
         UnaryOp.BitNot => "~",
         UnaryOp.PreInc => "++",
         UnaryOp.PreDec => "--",
+        UnaryOp.FromEnd => "^",
         _ => throw new InternalCompilationException($"unreachable: unexpected {op}"),
     };
 

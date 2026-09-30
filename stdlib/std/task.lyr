@@ -54,7 +54,7 @@ pub fn interrupt(): void;
 fn ask(read: int[], write: int[], timeoutMillis: int): int[] {
     let answer = poll(read, write, timeoutMillis, scheduler.interrupted.length() > 0);
     var a = 1;
-    while (a < answer.length) {
+    while (a < answer.length()) {
         if (answer[a] == 0 - 1) {
             wakeInterrupted();
         }
@@ -254,7 +254,7 @@ fn wakeSleepers(clock: int): void {
 // both wake when it readies — whoever runs second sees the state the first one left.
 fn wakeReady(answer: int[]): void {
     var a = 1;
-    while (a < answer.length) {
+    while (a < answer.length()) {
         let fd = answer[a];
         wakeWaiters(scheduler.readers, scheduler.readerFds, fd);
         wakeWaiters(scheduler.writers, scheduler.writerFds, fd);

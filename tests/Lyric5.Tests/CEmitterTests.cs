@@ -85,7 +85,7 @@ public class CEmitterTests
                 + "describe round round flat square rect origin far@3,4\ngrade zero digit neg many\n"
                 + "maybe none green\nmethod true false 2\nscene 6 green\ntree 7\n");
             data.Add("arrays", profile, 0,
-                "literal 3 10 20 30\nstore 99 20\nrepeat 5 7 7\nconcat 5 1 5\nstruct 3,4 9 5 2\nnested 2 3 6\n"
+                "literal 3 10 20 30\nstore 99 20\nrepeat 5 7 7\nconcat 5 1 5\nfromend 30 99 50\nstruct 3,4 9 5 2\nnested 2 3 6\n"
                 + "refs alice bob 41 2\nsum 55\nopt 1 none\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"

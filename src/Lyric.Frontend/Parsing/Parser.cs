@@ -201,7 +201,9 @@ public sealed partial class Parser
     private Expr ParsePrefix()
     {
         var op = _buffer.Current.TokenKind;
-        if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec)
+        // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
+        // is still the exclusive or, which the binary loop takes before this is asked.
+        if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec or TokenKind.Caret)
         {
             var opTok = _buffer.Advance();
             var operand = ParsePrefix();

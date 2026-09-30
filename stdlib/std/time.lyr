@@ -237,14 +237,14 @@ fn parseIso(text: string): ?int {
 
     var at = 0;
     var yearSign = 1;
-    if (chars.length > 0 && chars[0] == '-') {
+    if (chars.length() > 0 && chars[0] == '-') {
         yearSign = 0 - 1;
         at = 1;
     }
 
     var yearDigits = 0;
     var year = 0;
-    while (at < chars.length && isDigit(chars[at])) {
+    while (at < chars.length() && isDigit(chars[at])) {
         year = year * 10 + digit(chars[at]);
         yearDigits = yearDigits + 1;
         at = at + 1;
@@ -277,13 +277,13 @@ fn parseIso(text: string): ?int {
 
     // .mmmZ, and then nothing: a trailing offset or stray character refuses the whole text.
     let msAt = at + 15;
-    if (msAt + 5 != chars.length || chars[msAt] != '.') {
+    if (msAt + 5 != chars.length() || chars[msAt] != '.') {
         return null;
     }
     if (!isDigit(chars[msAt + 1]) || !isDigit(chars[msAt + 2]) || !isDigit(chars[msAt + 3])) {
         return null;
     }
-    if (chars[chars.length - 1] != 'Z') {
+    if (chars[chars.length() - 1] != 'Z') {
         return null;
     }
     let ms = digit(chars[msAt + 1]) * 100 + digit(chars[msAt + 2]) * 10 + digit(chars[msAt + 3]);
@@ -313,7 +313,7 @@ fn parseIso(text: string): ?int {
 // A separator followed by exactly two digits, read at a fixed position; null when either is
 // not there. The separator comes FIRST because every two-digit field in the shape follows one.
 fn fixed2(chars: char[], at: int, separator: char): ?int {
-    if (at + 2 >= chars.length || chars[at] != separator) {
+    if (at + 2 >= chars.length() || chars[at] != separator) {
         return null;
     }
     if (!isDigit(chars[at + 1]) || !isDigit(chars[at + 2])) {
@@ -354,9 +354,9 @@ fn daysInMonth(year: int, month: int): int {
 fn isoFault(text: string): string {
     let head = "not an iso instant (expected YYYY-MM-DDTHH:MM:SS.mmmZ): ";
     let chars = text.toChars();
-    var at = if (chars.length > 0 && chars[0] == '-') 1 else 0;
+    var at = if (chars.length() > 0 && chars[0] == '-') 1 else 0;
     var digits = 0;
-    while (at < chars.length && isDigit(chars[at])) {
+    while (at < chars.length() && isDigit(chars[at])) {
         digits = digits + 1;
         at = at + 1;
     }
@@ -378,7 +378,7 @@ fn isoFault(text: string): string {
     if (fixed2(chars, at + 12, ':') == null) {
         return head + "the second did not read";
     }
-    if (at + 20 != chars.length || chars[at + 15] != '.' || chars[chars.length - 1] != 'Z') {
+    if (at + 20 != chars.length() || chars[at + 15] != '.' || chars[chars.length() - 1] != 'Z') {
         return head + "the tail is not .mmmZ";
     }
     return head + "a field is out of its range";

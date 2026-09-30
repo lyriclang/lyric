@@ -142,12 +142,12 @@ extend string {
     pub fn indexOfFrom(needle: string, start: int): int {
         let chars = rawToChars(this);
         let pattern = rawToChars(needle);
-        if (pattern.length == 0) {
-            return if (start <= chars.length) start else 0 - 1;
+        if (pattern.length() == 0) {
+            return if (start <= chars.length()) start else 0 - 1;
         }
 
         var i = if (start < 0) 0 else start;
-        while (i + pattern.length <= chars.length) {
+        while (i + pattern.length() <= chars.length()) {
             if (matchesAt(chars, pattern, i)) {
                 return i;
             }
@@ -160,11 +160,11 @@ extend string {
     pub fn lastIndexOf(needle: string): int {
         let chars = rawToChars(this);
         let pattern = rawToChars(needle);
-        if (pattern.length == 0) {
-            return chars.length;
+        if (pattern.length() == 0) {
+            return chars.length();
         }
 
-        var i = chars.length - pattern.length;
+        var i = chars.length() - pattern.length();
         while (i >= 0) {
             if (matchesAt(chars, pattern, i)) {
                 return i;
@@ -194,16 +194,16 @@ extend string {
     pub fn count(needle: string): int {
         let chars = rawToChars(this);
         let pattern = rawToChars(needle);
-        if (pattern.length == 0) {
+        if (pattern.length() == 0) {
             return 0;
         }
 
         var n = 0;
         var i = 0;
-        while (i + pattern.length <= chars.length) {
+        while (i + pattern.length() <= chars.length()) {
             if (matchesAt(chars, pattern, i)) {
                 n = n + 1;
-                i = i + pattern.length;
+                i = i + pattern.length();
             } else {
                 i = i + 1;
             }
@@ -220,7 +220,7 @@ extend string {
     pub fn isBlank(): bool {
         let chars = rawToChars(this);
         var i = 0;
-        while (i < chars.length) {
+        while (i < chars.length()) {
             if (!isWhitespace(chars[i])) {
                 return false;
             }
@@ -239,16 +239,16 @@ extend string {
     pub fn trimStart(): string {
         let chars = rawToChars(this);
         var i = 0;
-        while (i < chars.length && isWhitespace(chars[i])) {
+        while (i < chars.length() && isWhitespace(chars[i])) {
             i = i + 1;
         }
-        return rawSubstring(this, i, chars.length - i);
+        return rawSubstring(this, i, chars.length() - i);
     }
 
     /// Without trailing whitespace.
     pub fn trimEnd(): string {
         let chars = rawToChars(this);
-        var n = chars.length;
+        var n = chars.length();
         while (n > 0 && isWhitespace(chars[n - 1])) {
             n = n - 1;
         }
@@ -271,7 +271,7 @@ extend string {
     pub fn replace(needle: string, replacement: string): string {
         let chars = rawToChars(this);
         let pattern = rawToChars(needle);
-        if (pattern.length == 0) {
+        if (pattern.length() == 0) {
             return this;
         }
 
@@ -279,13 +279,13 @@ extend string {
         var segmentStart = 0;
         var i = 0;
 
-        while (i + pattern.length <= chars.length) {
+        while (i + pattern.length() <= chars.length()) {
             if (matchesAt(chars, pattern, i)) {
                 if (i > segmentStart) {
                     out.append(rawSubstring(this, segmentStart, i - segmentStart));
                 }
                 out.append(replacement);
-                i = i + pattern.length;
+                i = i + pattern.length();
                 segmentStart = i;
             } else {
                 i = i + 1;
@@ -295,8 +295,8 @@ extend string {
         if (segmentStart == 0) {
             return this; // nothing matched, nothing copied
         }
-        if (segmentStart < chars.length) {
-            out.append(rawSubstring(this, segmentStart, chars.length - segmentStart));
+        if (segmentStart < chars.length()) {
+            out.append(rawSubstring(this, segmentStart, chars.length() - segmentStart));
         }
         return out.build();
     }
@@ -462,7 +462,7 @@ pub fn digitToChar(value: int): ?char {
 // Whether `needle` stands at `at` in `chars` — the window comparison the searches below share.
 fn matchesAt(chars: char[], needle: char[], at: int): bool {
     var j = 0;
-    while (j < needle.length) {
+    while (j < needle.length()) {
         if (chars[at + j] != needle[j]) {
             return false;
         }
@@ -561,7 +561,7 @@ pub fn parseIntRadixOrErr(value: string, radix: int): Result<int, ParseError> {
 // zero, which for a non-positive dividend is the ceiling the inequality needs.
 fn scanInt(value: string, radix: int): (int, int, int) {
     let chars = rawToChars(value);
-    let n = chars.length;
+    let n = chars.length();
     if (radix < 2 || radix > 36) {
         return (2, 0, 0);
     }
@@ -649,8 +649,8 @@ pub class StringBuilder {
 
     /// Adds a piece; the backing array doubles when full.
     pub mut fn append(value: string): void {
-        if (this.count == this.parts.length) {
-            let grown = [""] * (if (this.parts.length == 0) 4 else this.parts.length * 2);
+        if (this.count == this.parts.length()) {
+            let grown = [""] * (if (this.parts.length() == 0) 4 else this.parts.length() * 2);
             var i = 0;
             while (i < this.count) {
                 grown[i] = this.parts[i];

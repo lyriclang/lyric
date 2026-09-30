@@ -182,7 +182,7 @@ fn writeString(sb: StringBuilder, text: string): void {
     sb.appendChar('"');
     let chars = text.toChars();
     var i = 0;
-    while (i < chars.length) {
+    while (i < chars.length()) {
         writeEscaped(sb, chars[i]);
         i = i + 1;
     }
@@ -337,7 +337,7 @@ pub fn parse(text: string): ?JsonValue {
         return null;
     }
     p.skipWhitespace();
-    if (p.pos != p.chars.length) {
+    if (p.pos != p.chars.length()) {
         return null;
     }
     return value;
@@ -351,7 +351,7 @@ pub fn parseOrThrow(text: string): JsonValue throws JsonError {
     let value = p.parseValue(0);
     if (value != null) {
         p.skipWhitespace();
-        if (p.pos == p.chars.length) {
+        if (p.pos == p.chars.length()) {
             return value;
         }
         p.fail("end of the document");
@@ -367,7 +367,7 @@ pub fn parseOrErr(text: string): Result<JsonValue, JsonError> {
     let value = p.parseValue(0);
     if (value != null) {
         p.skipWhitespace();
-        if (p.pos == p.chars.length) {
+        if (p.pos == p.chars.length()) {
             return Result<JsonValue, JsonError>.Ok(value);
         }
         p.fail("end of the document");
@@ -381,7 +381,7 @@ fn errorAt(p: JsonParser): JsonError {
     var line = 1;
     var column = 1;
     var i = 0;
-    while (i < p.errPos && i < p.chars.length) {
+    while (i < p.errPos && i < p.chars.length()) {
         if (p.chars[i] == '\n') {
             line = line + 1;
             column = 1;
@@ -418,7 +418,7 @@ class JsonParser {
     }
 
     mut fn skipWhitespace(): void {
-        while (this.pos < this.chars.length) {
+        while (this.pos < this.chars.length()) {
             let c = this.chars[this.pos];
             if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
                 return;
@@ -428,11 +428,11 @@ class JsonParser {
     }
 
     fn peekIs(c: char): bool {
-        return this.pos < this.chars.length && this.chars[this.pos] == c;
+        return this.pos < this.chars.length() && this.chars[this.pos] == c;
     }
 
     fn peekDigit(): bool {
-        if (this.pos >= this.chars.length) {
+        if (this.pos >= this.chars.length()) {
             return false;
         }
         let c = this.chars[this.pos];
@@ -452,25 +452,25 @@ class JsonParser {
 
     mut fn expectWord(word: string): bool {
         let expected = word.toChars();
-        if (this.pos + expected.length > this.chars.length) {
+        if (this.pos + expected.length() > this.chars.length()) {
             this.fail("'" + word + "'");
             return false;
         }
         var i = 0;
-        while (i < expected.length) {
+        while (i < expected.length()) {
             if (this.chars[this.pos + i] != expected[i]) {
                 this.fail("'" + word + "'");
                 return false;
             }
             i = i + 1;
         }
-        this.pos = this.pos + expected.length;
+        this.pos = this.pos + expected.length();
         return true;
     }
 
     // Dispatch on the first character; the caller has skipped whitespace.
     mut fn parseValue(depth: int): ?JsonValue {
-        if (this.pos >= this.chars.length) {
+        if (this.pos >= this.chars.length()) {
             this.fail("a value");
             return null;
         }
@@ -588,7 +588,7 @@ class JsonParser {
         this.pos = this.pos + 1;
         let sb = StringBuilder.new();
         while (true) {
-            if (this.pos >= this.chars.length) {
+            if (this.pos >= this.chars.length()) {
                 this.fail("the closing '\"'");
                 return null;
             }
@@ -619,7 +619,7 @@ class JsonParser {
 
     // The character after the backslash decides; `\uXXXX` may need a second escape to pair.
     mut fn appendEscape(sb: StringBuilder): bool {
-        if (this.pos >= this.chars.length) {
+        if (this.pos >= this.chars.length()) {
             return false;
         }
         let c = this.chars[this.pos];
@@ -674,7 +674,7 @@ class JsonParser {
             return false;
         }
         if (first >= 0xD800 && first <= 0xDBFF) {
-            if (this.pos + 1 >= this.chars.length) {
+            if (this.pos + 1 >= this.chars.length()) {
                 return false;
             }
             if (this.chars[this.pos] != '\\' || this.chars[this.pos + 1] != 'u') {
@@ -695,7 +695,7 @@ class JsonParser {
 
     // Four hex digits as their value, or -1 — the one shape `\u` accepts.
     mut fn readHex4(): int {
-        if (this.pos + 4 > this.chars.length) {
+        if (this.pos + 4 > this.chars.length()) {
             return -1;
         }
         var value = 0;
@@ -782,11 +782,11 @@ fn intFits(text: string): bool {
     let chars = text.toChars();
     var start = 0;
     var limit = "9223372036854775807";
-    if (chars.length > 0 && chars[0] == '-') {
+    if (chars.length() > 0 && chars[0] == '-') {
         start = 1;
         limit = "9223372036854775808";
     }
-    let digits = chars.length - start;
+    let digits = chars.length() - start;
     if (digits < 19) {
         return true;
     }

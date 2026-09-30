@@ -116,6 +116,7 @@ public class GoldenTests
     [InlineData("leading_operator")]  // * 3
     [InlineData("type_error")]        // x as 5 — a non-type after 'as'
     [InlineData("implicit_member")]   // .Red, .Num(3), .Rect { w = 1, h = 2 }, c == .Blue (08 Y9)
+    [InlineData("index_from_end")]    // xs[^1] beside a ^ b: a prefix from the end, an infix exclusive or (03 T14 N6)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 

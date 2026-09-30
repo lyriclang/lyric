@@ -71,7 +71,7 @@ pub class List<T> :: [Indexable<T>, Iterable<T>] {
     /// Appends every element of the array, in order.
     pub mut fn pushAll(items: T[]): void {
         var i = 0;
-        while (i < items.length) {
+        while (i < items.length()) {
             this.push(items[i]);
             i = i + 1;
         }
@@ -168,7 +168,7 @@ pub class List<T> :: [Indexable<T>, Iterable<T>] {
     /// How many slots are allocated, empty ones included. For tests and for anyone measuring what
     /// the list costs; `length` is the truth for everything else.
     pub fn capacity(): int {
-        return this.data.length;
+        return this.data.length();
     }
 
     mut fn resize(target: int): void {
@@ -185,11 +185,11 @@ pub class List<T> :: [Indexable<T>, Iterable<T>] {
 
     /// Appends at the end; amortized O(1).
     pub mut fn push(value: T): void {
-        if (this.count >= this.data.length) {
-            if (this.data.length == 0) {
+        if (this.count >= this.data.length()) {
+            if (this.data.length() == 0) {
                 this.resize(4);
             } else {
-                this.resize(this.data.length * 2);
+                this.resize(this.data.length() * 2);
             }
         }
         this.data[this.count] = value;
@@ -210,8 +210,8 @@ pub class List<T> :: [Indexable<T>, Iterable<T>] {
         this.data[this.count] = null;
 
         // Below a quarter: halve. Four slots always remain; below that the copying does not pay.
-        if (this.data.length > 4 && this.count * 4 < this.data.length) {
-            this.resize(this.data.length / 2);
+        if (this.data.length() > 4 && this.count * 4 < this.data.length()) {
+            this.resize(this.data.length() / 2);
         }
         return value;
     }
@@ -295,8 +295,8 @@ pub class List<T> :: [Indexable<T>, Iterable<T>] {
         // Release through `pop`'s own path, which also owns the shrink rule.
         this.count = this.count - 1;
         this.data[this.count] = null;
-        if (this.data.length > 4 && this.count * 4 < this.data.length) {
-            this.resize(this.data.length / 2);
+        if (this.data.length() > 4 && this.count * 4 < this.data.length()) {
+            this.resize(this.data.length() / 2);
         }
         return removed;
     }
@@ -427,7 +427,7 @@ pub class Deque<T> {
         let result = List<T>.empty();
         var i = 0;
         while (i < this.count) {
-            result.push(this.data[(this.head + i) % this.data.length]!);
+            result.push(this.data[(this.head + i) % this.data.length()]!);
             i = i + 1;
         }
         return result.toArray();
@@ -436,7 +436,7 @@ pub class Deque<T> {
     /// How many slots are allocated, empty ones included. For tests and for anyone measuring
     /// what the deque costs; `length` is the truth for everything else.
     pub fn capacity(): int {
-        return this.data.length;
+        return this.data.length();
     }
 
     // Unrolls the ring into a fresh array, front at 0. Also the growth step, which is why the
@@ -447,7 +447,7 @@ pub class Deque<T> {
 
         var i = 0;
         while (i < this.count) {
-            moved[i] = this.data[(this.head + i) % this.data.length];
+            moved[i] = this.data[(this.head + i) % this.data.length()];
             i = i + 1;
         }
         this.data = moved;
@@ -455,11 +455,11 @@ pub class Deque<T> {
     }
 
     mut fn growIfFull(): void {
-        if (this.count >= this.data.length) {
-            if (this.data.length == 0) {
+        if (this.count >= this.data.length()) {
+            if (this.data.length() == 0) {
                 this.unroll(4);
             } else {
-                this.unroll(this.data.length * 2);
+                this.unroll(this.data.length() * 2);
             }
         }
     }
@@ -467,14 +467,14 @@ pub class Deque<T> {
     /// Appends at the back; amortized O(1).
     pub mut fn pushBack(value: T): void {
         this.growIfFull();
-        this.data[(this.head + this.count) % this.data.length] = value;
+        this.data[(this.head + this.count) % this.data.length()] = value;
         this.count = this.count + 1;
     }
 
     /// Prepends at the front; amortized O(1) — the ring is the reason no slot moves.
     pub mut fn pushFront(value: T): void {
         this.growIfFull();
-        this.head = (this.head + this.data.length - 1) % this.data.length;
+        this.head = (this.head + this.data.length() - 1) % this.data.length();
         this.data[this.head] = value;
         this.count = this.count + 1;
     }
@@ -488,7 +488,7 @@ pub class Deque<T> {
         }
         let value = this.data[this.head];
         this.data[this.head] = null;
-        this.head = (this.head + 1) % this.data.length;
+        this.head = (this.head + 1) % this.data.length();
         this.count = this.count - 1;
         return value;
     }
@@ -498,7 +498,7 @@ pub class Deque<T> {
         if (this.count == 0) {
             return null;
         }
-        let at = (this.head + this.count - 1) % this.data.length;
+        let at = (this.head + this.count - 1) % this.data.length();
         let value = this.data[at];
         this.data[at] = null;
         this.count = this.count - 1;
@@ -518,14 +518,14 @@ pub class Deque<T> {
         if (this.count == 0) {
             return null;
         }
-        return this.data[(this.head + this.count - 1) % this.data.length];
+        return this.data[(this.head + this.count - 1) % this.data.length()];
     }
 
     /// Empties the deque; the backing stays allocated, as `List.clear` keeps its.
     pub mut fn clear(): void {
         var i = 0;
         while (i < this.count) {
-            this.data[(this.head + i) % this.data.length] = null;
+            this.data[(this.head + i) % this.data.length()] = null;
             i = i + 1;
         }
         this.head = 0;
@@ -571,14 +571,14 @@ pub class Map<K :: [Hashable<K>], V> {
     fn slotOf(key: K): int {
         let h = key.hash();
         let positive = if (h < 0) 0 - h else h;
-        return positive % this.keyColumn.length;
+        return positive % this.keyColumn.length();
     }
 
     // Finds the slot of a key, or -1. The loop terminates: the load factor keeps at least a
     // quarter of the slots empty, and an empty slot ends the search.
     fn findSlot(key: K): int {
         var i = this.slotOf(key);
-        let n = this.keyColumn.length;
+        let n = this.keyColumn.length();
         var steps = 0;
 
         while (steps < n) {
@@ -631,17 +631,17 @@ pub class Map<K :: [Hashable<K>], V> {
     // WHICH kind of full this is: when the live entries would fit at half the load, the table is
     // rehashed at its OWN size, which discards the tombstones; only real growth doubles.
     pub mut fn set(key: K, value: V): void {
-        if ((this.used + 1) * 4 > this.keyColumn.length * 3) {
+        if ((this.used + 1) * 4 > this.keyColumn.length() * 3) {
             let live = this.count + 1;
-            if (live * 8 <= this.keyColumn.length * 3) {
-                this.resize(this.keyColumn.length);
+            if (live * 8 <= this.keyColumn.length() * 3) {
+                this.resize(this.keyColumn.length());
             } else {
-                this.resize(this.keyColumn.length * 2);
+                this.resize(this.keyColumn.length() * 2);
             }
         }
 
         var i = this.slotOf(key);
-        let n = this.keyColumn.length;
+        let n = this.keyColumn.length();
         var tombstone = -1;
 
         while (true) {
@@ -718,7 +718,7 @@ pub class Map<K :: [Hashable<K>], V> {
     pub static fn fromEntries(pairs: (K, V)[]): Map<K, V> {
         let result = Map<K, V>.empty();
         var i = 0;
-        while (i < pairs.length) {
+        while (i < pairs.length()) {
             let (k, v) = pairs[i];
             result.set(k, v);
             i = i + 1;
@@ -729,14 +729,14 @@ pub class Map<K :: [Hashable<K>], V> {
     /// How many slots the table holds, empty ones included — what the map costs; `length` is
     /// the truth for everything else.
     pub fn capacity(): int {
-        return this.keyColumn.length;
+        return this.keyColumn.length();
     }
 
     /// Empties the map. The backing arrays are KEPT, as in `List.clear`; the tombstones vanish
     /// with everything else.
     pub mut fn clear(): void {
         var i = 0;
-        while (i < this.states.length) {
+        while (i < this.states.length()) {
             this.keyColumn[i] = null;
             this.valueColumn[i] = null;
             this.states[i] = 0;
@@ -778,7 +778,7 @@ pub class Map<K :: [Hashable<K>], V> {
         // Reinsert rather than copy: the slots depend on the capacity, and tombstones disappear
         // in the process.
         var i = 0;
-        while (i < oldStates.length) {
+        while (i < oldStates.length()) {
             if (oldStates[i] == 1) {
                 let k = oldKeys[i];
                 let v = oldValues[i];
@@ -938,7 +938,7 @@ pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
     pub mut fn addAll(items: T[]): int {
         var added = 0;
         var i = 0;
-        while (i < items.length) {
+        while (i < items.length()) {
             if (this.add(items[i])) {
                 added = added + 1;
             }
@@ -960,12 +960,12 @@ pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
     fn slotOf(value: T): int {
         let h = value.hash();
         let positive = if (h < 0) 0 - h else h;
-        return positive % this.items.length;
+        return positive % this.items.length();
     }
 
     fn findSlot(value: T): int {
         var i = this.slotOf(value);
-        let n = this.items.length;
+        let n = this.items.length();
         var steps = 0;
 
         while (steps < n) {
@@ -999,18 +999,18 @@ pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
     ///
     /// The return value saves a preceding `contains`, which would probe twice.
     pub mut fn add(value: T): bool {
-        if ((this.used + 1) * 4 > this.items.length * 3) {
+        if ((this.used + 1) * 4 > this.items.length() * 3) {
             // As in `Map.set`: a churned table rehashes at its own size, a full one doubles.
             let live = this.count + 1;
-            if (live * 8 <= this.items.length * 3) {
-                this.resize(this.items.length);
+            if (live * 8 <= this.items.length() * 3) {
+                this.resize(this.items.length());
             } else {
-                this.resize(this.items.length * 2);
+                this.resize(this.items.length() * 2);
             }
         }
 
         var i = this.slotOf(value);
-        let n = this.items.length;
+        let n = this.items.length();
         var tombstone = -1;
 
         while (true) {
@@ -1054,7 +1054,7 @@ pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
     /// with everything else.
     pub mut fn clear(): void {
         var i = 0;
-        while (i < this.states.length) {
+        while (i < this.states.length()) {
             this.items[i] = null;
             this.states[i] = 0;
             i = i + 1;
@@ -1079,7 +1079,7 @@ pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
         this.used = 0;
 
         var i = 0;
-        while (i < oldStates.length) {
+        while (i < oldStates.length()) {
             if (oldStates[i] == 1) {
                 let v = oldItems[i];
                 if (v != null) {
@@ -1101,7 +1101,7 @@ pub class SetIterator<T :: [Hashable<T>]> :: [Iterator<T>] {
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?T {
-        while (this.index < this.source.states.length) {
+        while (this.index < this.source.states.length()) {
             let i = this.index;
             this.index = this.index + 1;
             if (this.source.states[i] == 1) {
@@ -1183,7 +1183,7 @@ pub class MapKeyIterator<K :: [Hashable<K>], V> :: [Iterator<K>] {
 
     /// The next key, or `null` at the end.
     pub mut fn next(): ?K {
-        while (this.index < this.source.states.length) {
+        while (this.index < this.source.states.length()) {
             let i = this.index;
             this.index = this.index + 1;
             if (this.source.states[i] == 1) {
@@ -1203,7 +1203,7 @@ pub class MapValueIterator<K :: [Hashable<K>], V> :: [Iterator<V>] {
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?V {
-        while (this.index < this.source.states.length) {
+        while (this.index < this.source.states.length()) {
             let i = this.index;
             this.index = this.index + 1;
             if (this.source.states[i] == 1) {
@@ -1226,7 +1226,7 @@ pub class MapEntryIterator<K :: [Hashable<K>], V> :: [Iterator<(K, V)>] {
 
     /// The next `(key, value)` pair, or `null` at the end.
     pub mut fn next(): ?(K, V) {
-        while (this.index < this.source.states.length) {
+        while (this.index < this.source.states.length()) {
             let i = this.index;
             this.index = this.index + 1;
             if (this.source.states[i] == 1) {
@@ -1321,7 +1321,7 @@ pub fn sortArray<T :: [Ordered<T>]>(xs: T[]): void {
     let sorted = List<T>.of(xs);
     sortList<T>(sorted);
     var i = 0;
-    while (i < xs.length) {
+    while (i < xs.length()) {
         xs[i] = sorted.get(i);
         i = i + 1;
     }
@@ -1370,7 +1370,7 @@ pub fn minBy<T, K :: [Ordered<K>]>(xs: List<T>, key: fn(T) -> K): ?T {
 /// The elements from `from` up to but not including `to`, as a NEW array — `List.slice`'s
 /// edges: `0 <= from <= to <= length`, anything else a panic.
 pub fn slice<T>(xs: T[], from: int, to: int): T[] {
-    if (from < 0 || to > xs.length || from > to) {
+    if (from < 0 || to > xs.length() || from > to) {
         panic("slice out of range");
     }
     if (from == to) {

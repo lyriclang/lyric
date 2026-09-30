@@ -145,7 +145,7 @@ pub fn formatBytes(bytes: int): string {
     var level = -1;
 
     // Divide while a larger unit exists and the value fills it.
-    while (value >= 1024.0 && level + 1 < units.length) {
+    while (value >= 1024.0 && level + 1 < units.length()) {
         value = value / 1024.0;
         level = level + 1;
     }
@@ -160,25 +160,25 @@ pub fn formatBytes(bytes: int): string {
 /// No borders and no header handling: what a table means is the caller's business. This does the
 /// tedious part — two passes over the data, to know the column widths before printing.
 pub fn table(rows: string[][], separator: string): string {
-    if (rows.length == 0) {
+    if (rows.length() == 0) {
         return "";
     }
 
     // First pass: the widest cell per column.
     var columns = 0;
     var i = 0;
-    while (i < rows.length) {
-        if (rows[i].length > columns) {
-            columns = rows[i].length;
+    while (i < rows.length()) {
+        if (rows[i].length() > columns) {
+            columns = rows[i].length();
         }
         i = i + 1;
     }
 
     var widths = [0] * columns;
     i = 0;
-    while (i < rows.length) {
+    while (i < rows.length()) {
         var j = 0;
-        while (j < rows[i].length) {
+        while (j < rows[i].length()) {
             let l = rows[i][j].length();
             if (l > widths[j]) {
                 widths[j] = l;
@@ -191,7 +191,7 @@ pub fn table(rows: string[][], separator: string): string {
     // Second pass: pad and join.
     var result = "";
     i = 0;
-    while (i < rows.length) {
+    while (i < rows.length()) {
         if (i > 0) {
             result = result + "\n";
         }
@@ -200,7 +200,7 @@ pub fn table(rows: string[][], separator: string): string {
             if (j > 0) {
                 result = result + separator;
             }
-            let cell = if (j < rows[i].length) rows[i][j] else "";
+            let cell = if (j < rows[i].length()) rows[i][j] else "";
             // The last column is NOT padded, or invisible trailing spaces would remain.
             result = result + (if (j == columns - 1) cell else cell.padEnd(widths[j], ' '));
             j = j + 1;

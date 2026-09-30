@@ -89,6 +89,19 @@ public class FormatterTests
             """, Format("fn f(c:Color,s:Shape):int{let m=match(s){.Num(n)=>n,.Rect{w=0,h}=>h,.Empty=>0};return take(.Red,.Rect{w=1,h=2})+(if(c==.Blue)m else 0);}"));
     }
 
+    [Fact]
+    public void A_from_end_index_keeps_its_caret_against_the_operand()
+    {
+        // '^n' is a prefix inside the brackets (design/v5/spec/03 T14 N6); between operands the
+        // same character is the exclusive or and keeps its spaces.
+        Assert.Equal("""
+            fn f(xs: int[], a: int, b: int): int {
+                return xs[^1] + xs[a ^ b] + xs.length();
+            }
+
+            """, Format("fn f(xs:int[],a:int,b:int):int{return xs[ ^ 1]+xs[a^b]+xs.length();}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

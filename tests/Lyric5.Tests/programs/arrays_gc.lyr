@@ -1,6 +1,7 @@
 // An array keeps its elements alive (01 V4, V10): an array of objects holds a million dropped
 // objects' survivors, and an array of structs whose fields are references keeps those strings
-// — the descriptor of the array says which words of an element are references. Run under the
+// — the descriptor of the array says which words of an element are references; both arrays
+// are grown by concatenation, since '[x] * n' clones and a class has no 'Clone' before M4. Run under the
 // test's heap limit, as objects_gc. Expected stdout: "kept 499500 item-999999 tag-999999 500"
 // (0 + … + 999 = 499500; the last kept item is number 999999; 500 tagged slots). Exit 0.
 import std.io { println };
@@ -9,8 +10,11 @@ class Item { id: int, label: string }
 struct Tagged { id: int, tag: string }
 
 fn main(): int {
-    let items = [Item { id = 0, label = "none" }] * 1000;
-    let tags = [Tagged { id = 0, tag = "none" }] * 500;
+    var items: Item[] = [];
+    var k = 0;
+    while (k < 1000) { items = items + [Item { id = 0, label = "none" }]; k += 1; }
+    var tags: Tagged[] = [];
+    while (k < 1500) { tags = tags + [Tagged { id = 0, tag = "none" }]; k += 1; }
     var sum = 0;
     var i = 0;
     while (i < 1000000) {

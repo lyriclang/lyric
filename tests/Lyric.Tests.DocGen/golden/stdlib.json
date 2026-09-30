@@ -2372,7 +2372,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 138
+            "Line": 142
           }
         },
         {
@@ -2383,7 +2383,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 186
+            "Line": 190
           }
         },
         {
@@ -2394,7 +2394,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/encoding.lyr",
-            "Line": 192
+            "Line": 196
           }
         }
       ]

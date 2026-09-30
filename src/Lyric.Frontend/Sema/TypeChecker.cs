@@ -2348,6 +2348,9 @@ public sealed class TypeChecker
             case UnaryOp.BitNot:
                 if (!TypeFacts.IsInteger(t)) BadOp(u.Span, "~", t);
                 return t;
+            case UnaryOp.FromEnd: // as an index it never reaches here: CheckIndexValue takes it
+                return Report(u.Span, "LYR-SEM0114",
+                    "'^n' counts from the end inside '[…]' only — as the index, or as a bound of its range");
             default: // PreInc and PreDec
                 if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "++/--", t);
                 return t;
@@ -2660,8 +2663,8 @@ public sealed class TypeChecker
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r)) return LyrType.String;   // "x" * 3
         if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l)) return LyrType.String;   // 3 * "x"
+        // '[x] * n' repeats (10 C7); 'n * [x]' does not — one order, as for a string.
         if (l is ArrayOf la && TypeFacts.IsInteger(r)) return new ArrayOf(la.Element); // [0] * 5
-        if (r is ArrayOf ra && TypeFacts.IsInteger(l)) return new ArrayOf(ra.Element);
         return DesugarArithmetic(b, l, r, scope, _mul, "mul", "*") ?? BadBinary(b, l, r);
     }
 
@@ -3188,9 +3191,7 @@ public sealed class TypeChecker
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
     {
         var target = CheckExpr(ix.Target, scope);
-        var index = CheckExpr(ix.Index, scope);
-        if (!TypeFacts.IsInteger(index) && !index.IsError)
-            _de.Report("LYR-SEM0007", Severity.Error, ix.Index.Span, $"index must be an integer, got '{TypeFacts.Display(index)}'");
+        CheckIndexValue(ix.Index, target, scope);
         return target switch
         {
             ArrayOf a => a.Element,
@@ -3217,6 +3218,34 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(target)}' is not indexable — it must implement "
                      + "'Indexable<T>' from std.collections")
         };
+    }
+
+    /// <summary>
+    /// The index is an <c>int</c> (03 T14 N4): a narrower integer widens to it as at any
+    /// coercion site, a <c>uint</c> or a <c>uint64</c> is converted with <c>as</c>, nothing else
+    /// stands there. <c>^n</c> counts from the end (N6): sugar for <c>length() - n</c> of the
+    /// indexed value, so it stands inside <c>[…]</c> only and on a value that has a length.
+    /// </summary>
+    private void CheckIndexValue(Expr index, LyrType target, SymbolTable scope)
+    {
+        if (index is UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
+        {
+            var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
+            if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
+            _result.SetType(fromEnd, LyrType.Int);
+            if (target is not (ArrayOf or ErrorType))
+                _de.Report("LYR-SEM0114", Severity.Error, fromEnd.Span,
+                    $"'^' counts from the end of a value that has a length; '{TypeFacts.Display(target)}' has none");
+            return;
+        }
+
+        var t = CheckExpr(index, scope, LyrType.Int);
+        if (t.IsError) return;
+        if (TypeFacts.IsInteger(t) && !LyrType.Equal(t, LyrType.Int) && !TypeFacts.Widens(t, LyrType.Int))
+            _de.Report("LYR-SEM0007", Severity.Error, index.Span,
+                $"an index is an 'int'; a '{TypeFacts.Display(t)}' does not widen to it — convert with 'as int'");
+        else if (!TypeFacts.IsInteger(t))
+            _de.Report("LYR-SEM0007", Severity.Error, index.Span, $"an index is an 'int', got '{TypeFacts.Display(t)}'");
     }
 
     private LyrType CheckArrayLit(ArrayLitExpr arr, SymbolTable scope, LyrType? expected)
@@ -3530,10 +3559,15 @@ public sealed class TypeChecker
 
         var baseType = mem.IsOptional && targetType is Optional opt ? opt.Inner : targetType;
 
-        // 'length' on T[] is built in rather than a library method: T[] is a real array, and its
-        // length is a property of the value. Growing containers bring their members along through
-        // Indexable and Iterator.
-        if (baseType is ArrayOf && mem.Member == "length") return LyrType.Int;
+        // 'length()' on T[] is built in rather than a library method (03 T13 A1: the length and
+        // the index are the primitives), and it is a CALL, with parentheses like every length
+        // (10 N8). Without them the name is refused rather than read as a field: the two forms
+        // would otherwise mean one thing, and 'xs.length' read like a field of the array.
+        if (baseType is ArrayOf && mem.Member == "length")
+        {
+            if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
+            return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
+        }
 
         // 'next' on a coroutine is built in the same way: the safe pull beside the panicking
         // 'resume', same word and shape as Iterator<T>.next. '?T' answers value-or-done; a
