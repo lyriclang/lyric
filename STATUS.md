@@ -28,8 +28,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 |---|---|---|---|
 | M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
 | M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **done** 2026-09-30 |
-| M2 | First native program (IR → C → `zig cc`) | L | **in review** (#185) |
-| M3 | Value model and type system | XL | — |
+| M2 | First native program (IR → C → `zig cc`) | L | **done** 2026-09-30 |
+| M3 | Value model and type system | XL | **next** |
 | M4 | Interfaces and abstraction | L | — |
 | M5 | Errors | M | — |
 | M6 | Coroutines, scheduler, threads | XL | — |
@@ -124,7 +124,10 @@ mechanism is not found. The run is local only (`LYRIC5_SANITIZERS=all`) until M1
 collector stops threads at safepoints, not with signals; the other TSan runs and the race
 control stay in CI.
 
-### M2 — First native program (in review, #185)
+### M2 — done (2026-09-30)
+
+Merged as #180, #181, #182, #183, #184 and #185 (`07e1221e`); the spec side is lyric-spec#46
+and #47 (`ebfe2918`).
 
 The plan (13, M2): S0 prune, S1 front end behind the subset gate, S2 C emission, S3 strings and
 structs, S4 build and run, S5 measurement point 1 and spec. Exit criteria: `hello`, `fizzbuzz`
@@ -194,6 +197,10 @@ figures for every Tier 1 runner instead. Found on the way: on Windows `dbghelp.d
 through the import table and cost 3 ms of every program start for a report most programs never
 write — the runtime loads it at the first trace now, and the start costs ≈ 2.5 ms over plain C
 there (was 5).
+
+### M3 — Value model and type system
+
+Next. Plan first (13, M3), then slices.
 
 ## Design decisions
 
