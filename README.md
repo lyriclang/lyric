@@ -180,7 +180,9 @@ lyric/
 │   ├── Lyrfmt/           → lyrfmt.exe    formatter
 │   ├── Lyrtest/          → lyrtest.exe   runs a project's @Test functions
 │   ├── Lyric.Cli/        → lyric.exe
-│   └── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT (in development)
+│   ├── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT (in development)
+│   └── Lyric5.Toolchain/ → the C side: compiler, targets, profiles, cached C builds of the runtime
+├── runtime/              the Lyric 5 runtime in C (include/lyr, src, tests, third_party)
 ├── stdlib/               standard library, written in Lyric
 ├── tests/                xUnit test projects
 ├── examples/             22 example programs, plus embedded-host/

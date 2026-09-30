@@ -20,4 +20,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
+  </ItemGroup>
+
 </Project>

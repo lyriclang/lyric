@@ -1,0 +1,15 @@
+name: Set up zig
+description: Installs the zig version pinned in tooling/zig-version — the C compiler Lyric 5 builds through.
+
+runs:
+  using: composite
+  steps:
+    - name: Read the pinned zig version
+      id: pin
+      shell: bash
+      run: echo "version=$(tr -d '[:space:]' < tooling/zig-version)" >> "$GITHUB_OUTPUT"
+
+    - name: Install zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: ${{ steps.pin.outputs.version }}

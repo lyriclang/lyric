@@ -18,9 +18,11 @@
     <Project Path="src/Lyrtest/Lyrtest.csproj" />
     <Project Path="src/Lyric.Cli/Lyric.Cli.csproj" />
     <Project Path="src/Lyric5/Lyric5.csproj" />
+    <Project Path="src/Lyric5.Toolchain/Lyric5.Toolchain.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Lyric.Tests.Core/Lyric.Tests.Core.csproj" />
+    <Project Path="tests/Lyric5.Tests/Lyric5.Tests.csproj" />
     <Project Path="tests/Lyric.Tests.Lexing/Lyric.Tests.Lexing.csproj" />
     <Project Path="tests/Lyric.Tests.Parsing/Lyric.Tests.Parsing.csproj" />
     <Project Path="tests/Lyric.Tests.Resolver/Lyric.Tests.Resolver.csproj" />

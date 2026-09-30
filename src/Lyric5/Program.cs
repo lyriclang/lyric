@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using Lyric5.Toolchain;
 using System.Reflection;
 
 namespace Lyric5;
@@ -33,7 +33,7 @@ public static class Program
     {
         Console.Out.WriteLine($"lyric {DisplayVersion()}");
         Console.Out.WriteLine("  edition     5");
-        Console.Out.WriteLine($"  c compiler  {DescribeCompiler(FindCCompiler())}");
+        Console.Out.WriteLine($"  c compiler  {DescribeCompiler(CCompiler.Locate())}");
     }
 
     /// <summary>
@@ -54,70 +54,6 @@ public static class Program
             : stamped;
     }
 
-    private sealed record CCompiler(string Name, string Path, string Version);
-
-    /// <summary>
-    /// The C compiler a build would use (design/v5/spec/01 C8): <c>LYRIC_CC</c> when set, otherwise
-    /// the first of <c>zig cc</c>, clang and gcc that answers.
-    /// </summary>
-    private static CCompiler? FindCCompiler()
-    {
-        var chosen = Environment.GetEnvironmentVariable("LYRIC_CC");
-        if (!string.IsNullOrWhiteSpace(chosen))
-        {
-            return Probe(chosen, chosen.EndsWith("zig", StringComparison.Ordinal) ? "version" : "--version");
-        }
-
-        return Probe("zig", "version") ?? Probe("clang", "--version") ?? Probe("gcc", "--version");
-    }
-
-    private static CCompiler? Probe(string command, string versionArgument)
-    {
-        var path = Locate(command);
-        if (path is null) return null;
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo(path, versionArgument)
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            });
-            if (process is null) return null;
-            var first = process.StandardOutput.ReadLine() ?? "";
-            if (!process.WaitForExit(5000))
-            {
-                process.Kill();
-                return null;
-            }
-            return process.ExitCode == 0 ? new CCompiler(command, path, first.Trim()) : null;
-        }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            return null;
-        }
-    }
-
-    private static string? Locate(string command)
-    {
-        if (Path.IsPathRooted(command)) return File.Exists(command) ? command : null;
-
-        var extensions = OperatingSystem.IsWindows() ? new[] { ".exe", ".cmd", "" } : new[] { "" };
-        var directories = (Environment.GetEnvironmentVariable("PATH") ?? "")
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var directory in directories)
-        {
-            foreach (var extension in extensions)
-            {
-                var candidate = Path.Combine(directory, command + extension);
-                if (File.Exists(candidate)) return candidate;
-            }
-        }
-        return null;
-    }
-
     private static string DescribeCompiler(CCompiler? compiler) =>
-        compiler is null
-            ? "none found — install zig (recommended), clang or gcc"
-            : $"{compiler.Name} {compiler.Version} ({compiler.Path})";
+        compiler?.ToString() ?? "none found — install zig (recommended), clang or gcc";
 }

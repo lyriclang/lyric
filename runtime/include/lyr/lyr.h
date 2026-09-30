@@ -1,0 +1,11 @@
+/* Everything emitted Lyric code includes. */
+#ifndef LYR_H
+#define LYR_H
+
+#include "lyr/types.h"
+#include "lyr/gc.h"
+#include "lyr/panic.h"
+#include "lyr/string.h"
+#include "lyr/init.h"
+
+#endif

@@ -1,0 +1,30 @@
+# valgrind suppressions for the Lyric 5 runtime (M1 S5; design/v5/spec/13 M1, run locally only).
+#
+# The collector (Boehm, stage 1 of 01 L1) scans the stacks, registers and data segments
+# conservatively: every word is read as a possible pointer, initialized or not. Memcheck reports
+# each such read of an uninitialized word as a use of an uninitialized value. That is the
+# collector working as designed, so exactly these two kinds are suppressed, and only when the
+# innermost frame is the collector's own. Invalid reads and writes, and every report that starts
+# in the runtime or the program, stay visible. The file goes with the vendored collector (M11).
+{
+   boehm-conservative-scan-cond
+   Memcheck:Cond
+   fun:GC_*
+}
+{
+   boehm-conservative-scan-value8
+   Memcheck:Value8
+   fun:GC_*
+}
+# With threads, the stopped collector scans each suspended thread's stack from the stack pointer
+# it recorded when the thread stopped; memcheck tracks the stack pointer itself and calls the
+# words just below it unused ("Address … is on thread 1's stack", seen in the threads test). The
+# stack is mapped; reading it is the conservative scan again. Suppressed only in the mark loop of
+# a stopped-world collection.
+{
+   boehm-scan-below-recorded-stack-pointer
+   Memcheck:Addr8
+   fun:GC_mark_from
+   fun:GC_mark_some
+   fun:GC_stopped_mark
+}

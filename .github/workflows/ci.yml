@@ -54,6 +54,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Set up zig (the Lyric 5 runtime tests build C)
+        uses: ./.github/actions/setup-zig
+
       - name: Restore
         run: dotnet restore
 
@@ -89,6 +92,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Set up zig (the Lyric 5 runtime tests build C)
+        uses: ./.github/actions/setup-zig
+
       - name: Restore
         run: dotnet restore
 
@@ -113,6 +119,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Set up zig (the Lyric 5 runtime tests build C)
+        uses: ./.github/actions/setup-zig
 
       - name: Restore
         run: dotnet restore
@@ -249,19 +258,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Read the pinned zig version
-        id: zig
-        shell: bash
-        run: echo "version=$(tr -d '[:space:]' < tooling/zig-version)" >> "$GITHUB_OUTPUT"
-
       - name: Set up zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: ${{ steps.zig.outputs.version }}
+        uses: ./.github/actions/setup-zig
 
       - name: Build, cross-build and sanitize
         shell: bash
         run: bash tooling/c-smoke/run.sh
+
+      - name: Set up .NET from global.json
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # TSan's shadow memory needs the kernel's older mmap randomization; Ubuntu 24.04 raised it
+      # past what the runner's clang supports ("unexpected memory mapping").
+      - name: Make room for TSan
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner — on
+      # Linux x86-64 also under ASan+UBSan and TSan (clang), and there without clang they fail.
+      # Only this job asks for the sanitizer runs; the whole-suite jobs skip them.
+      - name: Runtime tests
+        env:
+          LYRIC5_SANITIZERS: '1'
+        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
 
   lyric5-aot:
     # The seed of the Lyric 5 command line as one NativeAOT binary per Tier 1 target (11 C1). The
