@@ -61,7 +61,10 @@ public sealed class CBuild
 
     public IReadOnlyList<string> FlagsFor(CUnit unit)
     {
-        var flags = new List<string> { "-std=c11", "-ffunction-sections", "-fdata-sections" };
+        // No contraction of a * b + c into a fused multiply-add: deterministic IEEE arithmetic is
+        // the standard (01 L10), and a fused result differs in the last bit from the two roundings
+        // the source spells. Fast-math and contraction come back only by an explicit flag.
+        var flags = new List<string> { "-std=c11", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off" };
         // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
         // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
         if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");

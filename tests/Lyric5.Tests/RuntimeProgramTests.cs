@@ -16,6 +16,7 @@ public class RuntimeProgramTests
         {
             data.Add("alloc", profile, 0, "alloc ok\n", []);
             data.Add("strings", profile, 0, "strings ok\n", []);
+            data.Add("numeric", profile, 0, "numeric ok\n", []);
             data.Add("arrays", profile, 0, "arrays ok\n", []);
             data.Add("config", profile, 0, "config ok\n", []);
             data.Add("hello", profile, 7, "Hello, Lyric!\nargs: 2\n", ["one", "two"]);

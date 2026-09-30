@@ -861,6 +861,18 @@ public sealed class Lexer
                     _pos += 2;
                     return new Token(TokenKind.Dec, new Span(_file, operatorStart, _pos));
                 }
+
+                // The wrap operators (08 Y4, Zig's spelling): '-%' and '-%='.
+                if (PeekAt(1) == '%')
+                {
+                    if (PeekAt(2) == '=')
+                    {
+                        _pos += 3;
+                        return new Token(TokenKind.MinusPercentEqual, new Span(_file, operatorStart, _pos));
+                    }
+                    _pos += 2;
+                    return new Token(TokenKind.MinusPercent, new Span(_file, operatorStart, _pos));
+                }
                 _pos++;
                 return new Token(TokenKind.Minus, new Span(_file, operatorStart, _pos));
             case '+':
@@ -875,6 +887,17 @@ public sealed class Lexer
                     _pos += 2;
                     return new Token(TokenKind.Inc, new Span(_file, operatorStart, _pos));
                 }
+
+                if (PeekAt(1) == '%')
+                {
+                    if (PeekAt(2) == '=')
+                    {
+                        _pos += 3;
+                        return new Token(TokenKind.PlusPercentEqual, new Span(_file, operatorStart, _pos));
+                    }
+                    _pos += 2;
+                    return new Token(TokenKind.PlusPercent, new Span(_file, operatorStart, _pos));
+                }
                 _pos++;
                 return new Token(TokenKind.Plus, new Span(_file, operatorStart, _pos));
             case '*':
@@ -882,6 +905,17 @@ public sealed class Lexer
                 {
                     _pos += 2;
                     return new Token(TokenKind.StarEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '%')
+                {
+                    if (PeekAt(2) == '=')
+                    {
+                        _pos += 3;
+                        return new Token(TokenKind.StarPercentEqual, new Span(_file, operatorStart, _pos));
+                    }
+                    _pos += 2;
+                    return new Token(TokenKind.StarPercent, new Span(_file, operatorStart, _pos));
                 }
                 _pos++;
                 return new Token(TokenKind.Star, new Span(_file, operatorStart, _pos));

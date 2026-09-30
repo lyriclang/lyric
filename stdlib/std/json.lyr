@@ -200,7 +200,7 @@ fn writeEscaped(sb: StringBuilder, c: char): void {
         sb.append("\\\\");
         return;
     }
-    let code = c as int;
+    let code = c as uint32 as int;
     if (code >= 0x20) {
         sb.appendChar(c);
         return;
@@ -233,9 +233,9 @@ fn writeEscaped(sb: StringBuilder, c: char): void {
 // The character for one hexadecimal digit value in `0..15`, lowercase.
 fn hexDigit(value: int): char {
     if (value < 10) {
-        return ('0' as int + value) as char;
+        return ('0' as uint32 as int + value) as uint32 as char;
     }
-    return ('a' as int + value - 10) as char;
+    return ('a' as uint32 as int + value - 10) as uint32 as char;
 }
 
 fn writeArray(sb: StringBuilder, items: List<JsonValue>, indent: int, depth: int): void {
@@ -606,7 +606,7 @@ class JsonParser {
             } else {
                 // Raw control characters must be escaped, says §7. The intermediate name
                 // sidesteps `as int <`, which would read as a type argument list.
-                let code = c as int;
+                let code = c as uint32 as int;
                 if (code < 0x20) {
                     this.fail("an escaped control character");
                     return null;
@@ -649,11 +649,11 @@ class JsonParser {
             return true;
         }
         if (c == 'b') {
-            sb.appendChar(8 as char);
+            sb.appendChar(8 as uint32 as char);
             return true;
         }
         if (c == 'f') {
-            sb.appendChar(12 as char);
+            sb.appendChar(12 as uint32 as char);
             return true;
         }
         if (c == 'u') {
@@ -686,10 +686,10 @@ class JsonParser {
                 return false;
             }
             let scalar = 0x10000 + (first - 0xD800 << 10) + (second - 0xDC00);
-            sb.appendChar(scalar as char);
+            sb.appendChar(scalar as uint32 as char);
             return true;
         }
-        sb.appendChar(first as char);
+        sb.appendChar(first as uint32 as char);
         return true;
     }
 
@@ -810,13 +810,13 @@ fn intFits(text: string): bool {
 // The value of one hexadecimal digit character, or -1 when the character is none.
 fn hexDigitValue(c: char): int {
     if (c >= '0' && c <= '9') {
-        return c as int - '0' as int;
+        return c as uint32 as int - '0' as uint32 as int;
     }
     if (c >= 'a' && c <= 'f') {
-        return c as int - 'a' as int + 10;
+        return c as uint32 as int - 'a' as uint32 as int + 10;
     }
     if (c >= 'A' && c <= 'F') {
-        return c as int - 'A' as int + 10;
+        return c as uint32 as int - 'A' as uint32 as int + 10;
     }
     return -1;
 }

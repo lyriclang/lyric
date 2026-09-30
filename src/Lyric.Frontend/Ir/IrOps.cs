@@ -6,6 +6,7 @@ namespace Lyric.Ir
     public enum IrBinKind
     {
         Add, Sub, Mul, Div, Rem,
+        AddWrap, SubWrap, MulWrap,
         Shl, Shr, BitAnd, BitOr, BitXor,
         Lt, Le, Gt, Ge, Eq, Ne
     }
@@ -19,6 +20,9 @@ namespace Lyric.Ir
             BinaryOp.Mul => IrBinKind.Mul,
             BinaryOp.Div => IrBinKind.Div,
             BinaryOp.Rem => IrBinKind.Rem,
+            BinaryOp.AddWrap => IrBinKind.AddWrap,
+            BinaryOp.SubWrap => IrBinKind.SubWrap,
+            BinaryOp.MulWrap => IrBinKind.MulWrap,
             BinaryOp.Shl => IrBinKind.Shl,
             BinaryOp.Shr => IrBinKind.Shr,
             BinaryOp.BitAnd => IrBinKind.BitAnd,

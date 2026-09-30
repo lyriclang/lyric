@@ -1,0 +1,3 @@
+// `as char` of a surrogate panics (RT0009): a char is a Unicode scalar value, always.
+fn toChar(x: uint32): char { return x as char; }
+fn main(): int { return if (toChar(0xD800) == 'a') 1 else 0; }

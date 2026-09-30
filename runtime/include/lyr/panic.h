@@ -14,6 +14,7 @@
 #define LYR_RT_STACK_OVERFLOW   "LYR-RT0006"
 #define LYR_RT_ARGUMENT         "LYR-RT0007"  /* a precondition from the program text: negative length, … */
 #define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) (05 E8) */
+#define LYR_RT_CHAR             "LYR-RT0009"  /* `as char` of a value that is no Unicode scalar value (03 T1d) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
@@ -61,7 +62,7 @@ LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
 
 /* Integer arithmetic that panics instead of wrapping, in every profile (03 T2). Both operands have
  * the operation's type (the emitter converts first); the expression's value is the result.
- * Shifts come with the number tower (M3). */
+ * Shifts, the wrap operators and the conversions are in numeric.h. */
 /* The type of x's value: a comma expression converts its operand as an assignment would — no
  * qualifiers (a volatile operand gives a plain result), and unlike arithmetic, no promotion. */
 #define LYR_VALUE_TYPE_(x) __typeof__(((void)0, (x)))

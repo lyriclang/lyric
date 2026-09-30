@@ -327,7 +327,7 @@ fn isDigit(c: char): bool {
 }
 
 fn digit(c: char): int {
-    return c as int - '0' as int;
+    return c as uint32 as int - '0' as uint32 as int;
 }
 
 fn isLeap(year: int): bool {

@@ -3,6 +3,9 @@
 #include "lyr/gc.h"
 #include "lyr/panic.h"
 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 const LyrDesc lyr_desc_string = {
@@ -104,6 +107,47 @@ LyrStr *lyr_str_from_uint(uint64_t value) {
 
 LyrStr *lyr_str_from_bool(bool value) {
     return lyr_str_from_cstr(value ? "true" : "false");
+}
+
+LyrStr *lyr_str_from_char(uint32_t value) {
+    unsigned char bytes[4];
+    int n;
+    if (value < 0x80) { bytes[0] = (unsigned char)value; n = 1; }
+    else if (value < 0x800) {
+        bytes[0] = (unsigned char)(0xC0 | (value >> 6));
+        bytes[1] = (unsigned char)(0x80 | (value & 0x3F));
+        n = 2;
+    } else if (value < 0x10000) {
+        bytes[0] = (unsigned char)(0xE0 | (value >> 12));
+        bytes[1] = (unsigned char)(0x80 | ((value >> 6) & 0x3F));
+        bytes[2] = (unsigned char)(0x80 | (value & 0x3F));
+        n = 3;
+    } else {
+        bytes[0] = (unsigned char)(0xF0 | (value >> 18));
+        bytes[1] = (unsigned char)(0x80 | ((value >> 12) & 0x3F));
+        bytes[2] = (unsigned char)(0x80 | ((value >> 6) & 0x3F));
+        bytes[3] = (unsigned char)(0x80 | (value & 0x3F));
+        n = 4;
+    }
+    return lyr_str_from_bytes(bytes, n);
+}
+
+/* Shortest round trip by trial: the first number of significant digits whose `%g` text reads
+ * back as the same double, from one digit up to the 17 that always suffice. Most values stop
+ * early — an integer or a short decimal at its own length — and the worst case is 17 trials of
+ * snprintf and strtod, both correctly rounded on every libc this toolchain links. Ryu answers
+ * the same question without the trials and is the door if this shows up in a profile. */
+LyrStr *lyr_str_from_float(double value) {
+    if (value != value) return lyr_str_from_cstr("NaN");
+    if (value == (double)INFINITY) return lyr_str_from_cstr("inf");
+    if (value == -(double)INFINITY) return lyr_str_from_cstr("-inf");
+    char text[32];
+    for (int precision = 1; precision <= 17; precision++) {
+        int n = snprintf(text, sizeof text, "%.*g", precision, value);
+        if (n <= 0 || (size_t)n >= sizeof text) break;
+        if (precision == 17 || strtod(text, NULL) == value) return lyr_str_from_bytes(text, n);
+    }
+    return lyr_str_from_cstr("?");
 }
 
 static int digit_value(unsigned char c) {

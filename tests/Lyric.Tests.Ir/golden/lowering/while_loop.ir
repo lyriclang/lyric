@@ -19,9 +19,8 @@ fn main.firstMultiple -> i64 {
     t6: bool = eq t4, t5
     condbr t6 -> bb4, bb5
   bb3:
-    t16: i64 = const 1
-    t17: i64 = neg t16
-    ret t17
+    t16: i64 = const 18446744073709551615
+    ret t16
   bb4:
     br bb3
   bb5:

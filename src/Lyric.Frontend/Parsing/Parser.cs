@@ -79,8 +79,8 @@ public sealed partial class Parser
     {
         TokenKind.As => (27, 28),
 
-        TokenKind.Star or TokenKind.Slash or TokenKind.Percent => (25, 26),
-        TokenKind.Plus or TokenKind.Minus => (23, 24),
+        TokenKind.Star or TokenKind.Slash or TokenKind.Percent or TokenKind.StarPercent => (25, 26),
+        TokenKind.Plus or TokenKind.Minus or TokenKind.PlusPercent or TokenKind.MinusPercent => (23, 24),
         TokenKind.Shl or TokenKind.Shr => (21, 22),
         TokenKind.DotDot or TokenKind.DotDotEqual => (19, 20), // non-associative, checked explicitly below
         TokenKind.Amp => (17, 18),
@@ -95,6 +95,7 @@ public sealed partial class Parser
         // Assignments, right-associative.
         TokenKind.Equal or TokenKind.PlusEqual or TokenKind.MinusEqual or TokenKind.StarEqual
             or TokenKind.SlashEqual or TokenKind.PercentEqual or TokenKind.ShlEqual or TokenKind.ShrEqual
+            or TokenKind.PlusPercentEqual or TokenKind.MinusPercentEqual or TokenKind.StarPercentEqual
             or TokenKind.AmpEqual or TokenKind.PipeEqual or TokenKind.CaretEqual or TokenKind.AmpAmpEqual
             or TokenKind.PipePipeEqual or TokenKind.QuestionQuestionEqual => (1, 0),
 

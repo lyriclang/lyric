@@ -409,7 +409,7 @@ pub fn isAlphanumeric(c: char): bool {
 /// U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000). Before 4.5 only four ASCII
 /// characters counted here while `trim` already used this set.
 pub fn isWhitespace(c: char): bool {
-    let n = c as int;
+    let n = c as uint32 as int;
     if (n <= 32) {
         return n == 32 || n >= 9 && n <= 13;
     }
@@ -444,7 +444,7 @@ pub fn charToDigit(c: char): ?int {
     if (!isDigit(c)) {
         return null;
     }
-    return c as int - '0' as int;
+    return c as uint32 as int - '0' as uint32 as int;
 }
 
 /// The digit as a character, or `null` outside `0..9`.
@@ -452,7 +452,7 @@ pub fn digitToChar(value: int): ?char {
     if (value < 0 || value > 9) {
         return null;
     }
-    return ('0' as int + value) as char;
+    return ('0' as uint32 as int + value) as uint32 as char;
 }
 
 // ------------------------------------------------------------------ predicates
@@ -587,11 +587,11 @@ fn scanInt(value: string, radix: int): (int, int, int) {
         let c = chars[i];
         var digit = -1;
         if (isDigit(c)) {
-            digit = c as int - '0' as int;
+            digit = c as uint32 as int - '0' as uint32 as int;
         } else if (isLower(c)) {
-            digit = c as int - 'a' as int + 10;
+            digit = c as uint32 as int - 'a' as uint32 as int + 10;
         } else if (isUpper(c)) {
-            digit = c as int - 'A' as int + 10;
+            digit = c as uint32 as int - 'A' as uint32 as int + 10;
         }
         if (digit < 0 || digit >= radix) {
             return (2, 0, i);

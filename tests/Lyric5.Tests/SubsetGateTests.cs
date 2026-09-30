@@ -61,8 +61,6 @@ public class SubsetGateTests
     }
 
     [Theory]
-    [InlineData("fn main(): int { let x = 1.5; return 0; }", "floating-point numbers", "M3")]
-    [InlineData("fn main(): int { let c = 'a'; return 0; }", "'char'", "M3")]
     [InlineData("class Box { v: int }\nfn main(): int { let b = Box { v = 1 }; return b.v; }", "classes", "M3")]
     [InlineData("fn main(): int { let xs = [1, 2, 3]; return xs[0]; }", "arrays", "M3")]
     [InlineData("fn main(): int { let o: ?int = null; return 0; }", "optionals", "M3")]

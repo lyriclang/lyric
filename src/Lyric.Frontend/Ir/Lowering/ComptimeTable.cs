@@ -37,7 +37,7 @@ public sealed class ComptimeTable
         PrimitiveType { Kind: PrimitiveKind.Bool } => new BoolConst((bool)value),
         PrimitiveType { Kind: PrimitiveKind.Char } => new CharConst(System.Convert.ToInt32(value)),
         PrimitiveType { Kind: PrimitiveKind.String } => new StringConst((string)value),
-        PrimitiveType { Kind: PrimitiveKind.Float or PrimitiveKind.Float32 or PrimitiveKind.Float64 }
+        PrimitiveType { Kind: PrimitiveKind.Float or PrimitiveKind.Float32 }
             => new FloatConst(System.Convert.ToDouble(value)),
         PrimitiveType => new IntConst(value switch
         {

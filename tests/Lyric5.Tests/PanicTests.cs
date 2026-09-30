@@ -77,6 +77,33 @@ public partial class PanicTests
         Assert.Equal("checks ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
+    public static TheoryData<string, Profile, string> NumericChecks()
+    {
+        var data = new TheoryData<string, Profile, string>();
+        foreach (var profile in new[] { Profile.Debug, Profile.Release })
+        {
+            data.Add("shl64", profile, "panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits");
+            data.Add("shr8", profile, "panic [LYR-RT0002]: shift by 8 exceeds the width of 8 bits");
+            data.Add("shlneg", profile, "panic [LYR-RT0002]: shift by -1 exceeds the width of 32 bits");
+            data.Add("surrogate", profile, "panic [LYR-RT0009]: 0xDFFF is not a Unicode scalar value");
+            data.Add("beyond", profile, "panic [LYR-RT0009]: 0x110000 is not a Unicode scalar value");
+        }
+        return data;
+    }
+
+    /// <summary>The number tower's checks (03 T1d, T2): a shift the width cannot take, and a
+    /// number that is no scalar value meeting <c>char</c>.</summary>
+    [Theory]
+    [MemberData(nameof(NumericChecks))]
+    public void A_failed_numeric_check_panics_with_its_code(string which, Profile profile, string firstLine)
+    {
+        var result = RuntimeBuildTests.RunTest("numeric", profile, args: [which]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = Lines(result.Stderr);
+        Assert.Equal(firstLine, lines[0]);
+        Assert.StartsWith("    at program (numeric.c:", lines[1]);
+    }
+
     [Theory]
     [MemberData(nameof(Profiles))]
     public void A_host_gets_the_report_through_its_writer_and_then_the_hook(Profile profile)

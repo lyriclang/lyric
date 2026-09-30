@@ -80,7 +80,7 @@ fn digitChar(value: int): string {
         // The short form works because the `if` expression narrows `c` in the else branch.
         return if (c == null) "?" else fromChar(c);
     }
-    return fromChar(('a' as int + value - 10) as char);
+    return fromChar(('a' as uint32 as int + value - 10) as uint32 as char);
 }
 
 /// Hexadecimal, lower case, no prefix — the VALUE, so a negative number carries a sign:

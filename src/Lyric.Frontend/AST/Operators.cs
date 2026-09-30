@@ -6,6 +6,9 @@ namespace Lyric.AST
     public enum BinaryOp
     {
         Add, Sub, Mul, Div, Rem,
+        // The wrap operators '+%' '-%' '*%' (design/v5/spec/08 Y4, 03 T2): the arithmetic that
+        // wraps instead of panicking on overflow, on integer types only.
+        AddWrap, SubWrap, MulWrap,
         Shl, Shr, BitAnd, BitXor, BitOr,
         Lt, Le, Gt, Ge, Eq, Ne,
         LogicalAnd, LogicalOr,
@@ -31,6 +34,9 @@ namespace Lyric.AST
             TokenKind.Star => BinaryOp.Mul,
             TokenKind.Slash => BinaryOp.Div,
             TokenKind.Percent => BinaryOp.Rem,
+            TokenKind.PlusPercent => BinaryOp.AddWrap,
+            TokenKind.MinusPercent => BinaryOp.SubWrap,
+            TokenKind.StarPercent => BinaryOp.MulWrap,
             TokenKind.Shl => BinaryOp.Shl,
             TokenKind.Shr => BinaryOp.Shr,
             TokenKind.Amp => BinaryOp.BitAnd,
@@ -58,6 +64,9 @@ namespace Lyric.AST
                 case TokenKind.StarEqual: binOp = BinaryOp.Mul; return true;
                 case TokenKind.SlashEqual: binOp = BinaryOp.Div; return true;
                 case TokenKind.PercentEqual: binOp = BinaryOp.Rem; return true;
+                case TokenKind.PlusPercentEqual: binOp = BinaryOp.AddWrap; return true;
+                case TokenKind.MinusPercentEqual: binOp = BinaryOp.SubWrap; return true;
+                case TokenKind.StarPercentEqual: binOp = BinaryOp.MulWrap; return true;
                 case TokenKind.ShlEqual: binOp = BinaryOp.Shl; return true;
                 case TokenKind.ShrEqual: binOp = BinaryOp.Shr; return true;
                 case TokenKind.AmpEqual: binOp = BinaryOp.BitAnd; return true;

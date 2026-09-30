@@ -15,6 +15,8 @@ public static class Intrinsics
         ["std.string.fromInt"] = "lyr_str_from_int",
         ["std.string.fromUint"] = "lyr_str_from_uint",
         ["std.string.fromBool"] = "lyr_str_from_bool",
+        ["std.string.fromFloat"] = "lyr_str_from_float",
+        ["std.string.fromChar"] = "lyr_str_from_char",
         ["std.core.panic"] = "lyr_panic_message",
     };
 

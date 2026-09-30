@@ -11,15 +11,14 @@ fn main.classify -> i64 {
     t3: bool = lt t1, t2
     condbr t3 -> bb1, bb2
   bb1:
-    t4: i64 = const 1
-    t5: i64 = neg t4
-    store l1, t5
+    t4: i64 = const 18446744073709551615
+    store l1, t4
     br bb3
   bb2:
-    t6: i64 = const 1
-    store l1, t6
+    t5: i64 = const 1
+    store l1, t5
     br bb3
   bb3:
-    t7: i64 = load l1
-    ret t7
+    t6: i64 = load l1
+    ret t6
 }

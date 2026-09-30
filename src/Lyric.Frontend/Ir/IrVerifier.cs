@@ -879,7 +879,7 @@ public static class IrVerifier
                         $"and dest {b.Dest} of {Show(TypeOf(b.Dest))}");
 
                 var ordering = b.Kind is not (IrBinKind.Eq or IrBinKind.Ne);
-                if (ordering && !IsNumeric(lhs))
+                if (ordering && !IsNumeric(lhs) && !IsChar(lhs))
                     Report(block, index,
                         $"ordering comparison {IrNames.Bin(b.Kind)} on non-numeric type {Show(lhs)}");
                 else if (!ordering && !IsEquatable(lhs))
@@ -942,11 +942,15 @@ public static class IrVerifier
 
             RequireDestType(cv.Dest, cv.To, "convert", block, index);
 
-            // 'as' converts between numeric types only.
-            if (!IsNumeric(cv.From) || !IsNumeric(cv.To))
+            // 'as' converts between numeric types, and a char to and from U32 (03 T1d).
+            var charSide = IsChar(cv.From) ? cv.To : IsChar(cv.To) ? cv.From : null;
+            var allowed = charSide is null
+                ? IsNumeric(cv.From) && IsNumeric(cv.To)
+                : charSide is IrScalarType { Kind: IrScalar.U32 };
+            if (!allowed)
             {
                 Report(block, index,
-                    $"convert {Show(cv.From)} -> {Show(cv.To)} is not numeric<->numeric");
+                    $"convert {Show(cv.From)} -> {Show(cv.To)} is not numeric<->numeric or char<->u32");
                 return;
             }
 
@@ -1746,14 +1750,15 @@ public static class IrVerifier
         private static bool IsBool(IrType type) => type is IrScalarType { Kind: IrScalar.Bool };
 
         // The twin of TypeFacts.IsInteger, on IrType instead of LyrType: the verifier has to check
-        // bytecode without the sema. 'Char' is included; missing here, the verifier would reject what
-        // the sema allows.
+        // the IR without the sema. 'Char' is NOT an integer (design/v5/spec/03 T1e): it orders and
+        // compares equal among its own, and converts to and from U32 only.
         private static bool IsInteger(IrType type) => type is IrScalarType
         {
             Kind: IrScalar.I8 or IrScalar.I16 or IrScalar.I32 or IrScalar.I64
             or IrScalar.U8 or IrScalar.U16 or IrScalar.U32 or IrScalar.U64
-            or IrScalar.Char
         };
+
+        private static bool IsChar(IrType type) => type is IrScalarType { Kind: IrScalar.Char };
 
         private static bool IsFloat(IrType type) =>
             type is IrScalarType { Kind: IrScalar.F32 or IrScalar.F64 };
@@ -1773,7 +1778,8 @@ public static class IrVerifier
 
         private static bool IsBitwiseOrShift(IrBinKind kind) => kind is
             IrBinKind.Shl or IrBinKind.Shr or
-            IrBinKind.BitAnd or IrBinKind.BitOr or IrBinKind.BitXor;
+            IrBinKind.BitAnd or IrBinKind.BitOr or IrBinKind.BitXor or
+            IrBinKind.AddWrap or IrBinKind.SubWrap or IrBinKind.MulWrap;
 
         /// <summary>IntConst is two's-complement encoded and zero-extended to 64 bits, so the bit pattern
         /// is what gets checked, not the signed value range.</summary>

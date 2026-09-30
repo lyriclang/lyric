@@ -627,7 +627,7 @@ internal sealed class WarningAnalyzer
     private void CheckLiteralInRange(IntLiteralExpr lit, bool negative)
     {
         if (lit.Suffix is not null) return;
-        if (_types.TypeOf(lit) is not PrimitiveType { Kind: PrimitiveKind.Int or PrimitiveKind.Int64 }) return;
+        if (_types.TypeOf(lit) is not PrimitiveType { Kind: PrimitiveKind.Int }) return;
         if (TypeFacts.IntLiteralFits(negative, lit.Value, PrimitiveKind.Int)) return;
         _de.Report("LYR-SEM0001", Severity.Error, lit.Span,
             "integer literal does not fit 'int' — annotate the uint type that holds it");

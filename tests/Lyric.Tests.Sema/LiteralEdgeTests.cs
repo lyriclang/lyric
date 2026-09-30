@@ -100,13 +100,15 @@ public class LiteralEdgeTests
     public void The_context_carries_no_forgiveness()
     {
         // A misfitting element errors AT the element, and a variable arm that is the wrong
-        // type errors at the arm — propagation moves the checkpoint, not the rule.
+        // type errors at the arm — propagation moves the checkpoint, not the rule. The arm
+        // is a 'uint' where 'int8' is expected: an 'int' against 'int64' was the pin's second
+        // error until 'int64' became 'int' itself (design/v5/spec/03 T1a).
         var de = Check(
             "fn main(): int {\n"
             + "    let xs: int8[] = [1, 200, 3];\n"
-            + "    let n = 5;\n"
+            + "    let n: uint = 5;\n"
             + "    let c = 1 < 2;\n"
-            + "    let i: int64 = if (c) n else 4;\n"
+            + "    let i: int8 = if (c) n else 4;\n"
             + "    let _ = xs[0];\n    let _ = i;\n"
             + "    return 0;\n}\n");
         Assert.Equal(2, de.Diagnostics.Count(d => d.Code == "LYR-SEM0001"));
