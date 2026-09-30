@@ -25,6 +25,9 @@ int lyr_str_cmp(const LyrStr *a, const LyrStr *b);
 
 /* Decimal text of an integer. */
 LyrStr *lyr_str_from_int(int64_t value);
+LyrStr *lyr_str_from_uint(uint64_t value);
+/* "true" or "false". */
+LyrStr *lyr_str_from_bool(bool value);
 
 typedef enum LyrParseStatus {
     LYR_PARSE_OK = 0,

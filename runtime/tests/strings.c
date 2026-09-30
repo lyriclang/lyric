@@ -56,6 +56,10 @@ static int64_t program(void) {
     CHECK(strcmp(lyr_str_from_int(-42)->bytes, "-42") == 0);
     CHECK(strcmp(lyr_str_from_int(INT64_MAX)->bytes, "9223372036854775807") == 0);
     CHECK(strcmp(lyr_str_from_int(INT64_MIN)->bytes, "-9223372036854775808") == 0);
+    CHECK(strcmp(lyr_str_from_uint(0)->bytes, "0") == 0);
+    CHECK(strcmp(lyr_str_from_uint(UINT64_MAX)->bytes, "18446744073709551615") == 0);
+    CHECK(lyr_str_from_uint(UINT64_MAX)->len == 20);
+    CHECK(strcmp(lyr_str_from_bool(true)->bytes, "true") == 0 && strcmp(lyr_str_from_bool(false)->bytes, "false") == 0);
 
     /* text to integers */
     int64_t v = 0;

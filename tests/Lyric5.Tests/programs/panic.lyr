@@ -1,0 +1,6 @@
+// `panic(message)` ends the process with the message and a trace, exit 101 (05 E8).
+fn check(n: int): int {
+    if (n > 2) { panic(f"{n} is too many"); }
+    return n;
+}
+fn main(): int { return check(3); }

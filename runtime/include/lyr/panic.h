@@ -13,6 +13,7 @@
 #define LYR_RT_OUT_OF_MEMORY    "LYR-RT0005"
 #define LYR_RT_STACK_OVERFLOW   "LYR-RT0006"
 #define LYR_RT_ARGUMENT         "LYR-RT0007"  /* a precondition from the program text: negative length, … */
+#define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) (05 E8) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
@@ -48,6 +49,9 @@ LYR_NORETURN void lyr_panic_index(int64_t index, int64_t length);
 LYR_NORETURN void lyr_panic_overflow(const char *operation);
 LYR_NORETURN void lyr_panic_division_by_zero(void);
 LYR_NORETURN void lyr_panic_null(void);
+/* `panic(message)` from the program: the message as written, code RT0008. */
+struct LyrStr;
+LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
 
 #define LYR_CHECK_INDEX(index, length)                                                              \
     do {                                                                                            \
