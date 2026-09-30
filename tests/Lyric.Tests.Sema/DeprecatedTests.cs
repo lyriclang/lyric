@@ -157,7 +157,7 @@ public class DeprecatedTests
     public void A_deprecated_method_warns_at_the_call()
     {
         var de = Check(Import
-            + "class Counter {\n    n: int,\n\n"
+            + "class Counter {\n    var n: int,\n\n"
             + "    @Deprecated { message = \"use tick()\" }\n"
             + "    pub mut fn bump(): void {\n        this.n = this.n + 1;\n    }\n}\n\n"
             + "fn main(): int {\n    var c = Counter { n = 0 };\n    c.bump();\n    return c.n;\n}\n");

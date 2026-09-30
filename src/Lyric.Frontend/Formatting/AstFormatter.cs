@@ -396,7 +396,7 @@ public sealed class AstFormatter
 
     private Doc FieldDoc(FieldDecl decl)
     {
-        var parts = new List<Doc> { Doc.From($"{decl.Name}: "), TypeDoc(decl.Type) };
+        var parts = new List<Doc> { Doc.From($"{(decl.IsVar ? "var " : "")}{decl.Name}: "), TypeDoc(decl.Type) };
         if (decl.Default is { } fallback)
         {
             parts.Add(Doc.From(" = "));

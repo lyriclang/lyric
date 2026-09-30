@@ -522,7 +522,7 @@ public sealed partial class Parser
     {
         var start = _buffer.Current.Span;
 
-        // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  a field.
+        // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  [var] a field.
         // 'static' precedes 'mut', so the order is unambiguous; 'mut static fn' does not exist.
         // The sema rejects the combination anyway: a static member has no receiver for 'mut' to
         // apply to.
@@ -545,18 +545,26 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Fn) || _buffer.Check(TokenKind.Mut))
             return ParseFunctionDecl(isPublic, start);
 
+        // 'var name: T' — the one word that makes a field writable (design/v5/spec/02 M2).
+        if (_buffer.Check(TokenKind.Var))
+        {
+            _buffer.Advance();
+            return ParseField(start, isVar: true);
+        }
+
         return ParseField();
     }
 
-    private FieldDecl ParseField()
+    private FieldDecl ParseField() => ParseField(_buffer.Current.Span, isVar: false);
+
+    private FieldDecl ParseField(Span start, bool isVar)
     {
-        var start = _buffer.Current.Span;
         var name = ExpectNamed("LYR-PAR0026", "field name");
         _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after field name");
         var type = ParseType();
         Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
         return new FieldDecl(name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
-            { NameSpan = name.Span };
+            { NameSpan = name.Span, IsVar = isVar };
     }
 
     // --- Enums (§3.4) ---

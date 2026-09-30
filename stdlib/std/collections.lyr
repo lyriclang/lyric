@@ -40,9 +40,9 @@ pub interface Indexable<T> {
 // oscillating around the boundary does not copy on every `push`/`pop`.
 pub class List<T> :: [Indexable<T>, Iterable<T>] {
     /// The backing slots; optional so a popped slot can actually release its value.
-    data: (?T)[],
+    var data: (?T)[],
     /// How many slots are filled.
-    count: int,
+    var count: int,
 
     /// How many values are in it.
     pub fn length(): int {
@@ -354,7 +354,7 @@ pub class ListIterator<T> :: [Iterator<T>] {
     /// The list being walked.
     source: List<T>,
     /// The next slot to look at.
-    index: int,
+    var index: int,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?T {
@@ -400,11 +400,11 @@ pub fn collect<T>(source: Iterator<T>): List<T> {
 /// `List` pop, and the whole truth, so there is no throwing twin.
 pub class Deque<T> {
     /// The backing ring; optional so a popped slot releases its value.
-    data: (?T)[],
+    var data: (?T)[],
     /// The index of the front value, meaningful while `count > 0`.
-    head: int,
+    var head: int,
     /// How many slots are filled.
-    count: int,
+    var count: int,
 
     /// An empty deque.
     pub static fn empty(): Deque<T> {
@@ -546,15 +546,15 @@ pub class Deque<T> {
 /// UNSPECIFIED.
 pub class Map<K :: [Hashable<K>], V> {
     /// The key column; `states` says which slots are real.
-    keyColumn: (?K)[],
+    var keyColumn: (?K)[],
     /// The value column, parallel to `keyColumn`.
-    valueColumn: (?V)[],
+    var valueColumn: (?V)[],
     /// Per slot: 0 empty, 1 occupied, 2 tombstone.
-    states: int[],
+    var states: int[],
     /// The occupied slots alone.
-    count: int,
+    var count: int,
     /// Occupied plus tombstones — what the load factor is measured over.
-    used: int,
+    var used: int,
 
     /// How many values are in it.
     pub fn length(): int {
@@ -909,13 +909,13 @@ fn min(a: int, b: int): int {
 /// UNSPECIFIED. `Iterable`, so `for (v in set)` walks it directly.
 pub class Set<T :: [Hashable<T>]> :: [Iterable<T>] {
     /// The element column; `states` says which slots are real.
-    items: (?T)[],
+    var items: (?T)[],
     /// Per slot: 0 empty, 1 occupied, 2 tombstone.
-    states: int[],
+    var states: int[],
     /// The occupied slots alone.
-    count: int,
+    var count: int,
     /// Occupied plus tombstones — what the load factor is measured over.
-    used: int,
+    var used: int,
 
     /// How many values are in it.
     pub fn length(): int {
@@ -1097,7 +1097,7 @@ pub class SetIterator<T :: [Hashable<T>]> :: [Iterator<T>] {
     /// The set being walked.
     source: Set<T>,
     /// The next slot to look at.
-    index: int,
+    var index: int,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?T {
@@ -1179,7 +1179,7 @@ pub class MapKeyIterator<K :: [Hashable<K>], V> :: [Iterator<K>] {
     /// The map being walked.
     source: Map<K, V>,
     /// The next slot to look at.
-    index: int,
+    var index: int,
 
     /// The next key, or `null` at the end.
     pub mut fn next(): ?K {
@@ -1199,7 +1199,7 @@ pub class MapValueIterator<K :: [Hashable<K>], V> :: [Iterator<V>] {
     /// The map being walked.
     source: Map<K, V>,
     /// The next slot to look at.
-    index: int,
+    var index: int,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?V {
@@ -1222,7 +1222,7 @@ pub class MapEntryIterator<K :: [Hashable<K>], V> :: [Iterator<(K, V)>] {
     /// The map being walked.
     source: Map<K, V>,
     /// The next slot to look at.
-    index: int,
+    var index: int,
 
     /// The next `(key, value)` pair, or `null` at the end.
     pub mut fn next(): ?(K, V) {

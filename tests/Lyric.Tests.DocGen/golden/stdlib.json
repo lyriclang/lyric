@@ -4169,7 +4169,7 @@
             {
               "Kind": "Method",
               "Name": "fold",
-              "Signature": "fn fold<A>(seed: A, step: fn(A, T) -> A): A",
+              "Signature": "mut fn fold<A>(seed: A, step: fn(A, T) -> A): A",
               "Doc": "Folds from the left: `range(1, 4).fold(0, (acc, n) => acc + n)` is `((0+1)+2)+3`.\n\nThe most general terminator; `count`, `any` and `all` are special cases of it that exist\nbecause a closure is too much ceremony for counting.",
               "Members": [],
               "Source": {
@@ -4180,7 +4180,7 @@
             {
               "Kind": "Method",
               "Name": "reduce",
-              "Signature": "fn reduce(step: fn(T, T) -> T): ?T",
+              "Signature": "mut fn reduce(step: fn(T, T) -> T): ?T",
               "Doc": "Folds without a seed: the first element starts the accumulator, and `null` says the\nsource was empty — the case a seed would have answered.",
               "Members": [],
               "Source": {
@@ -4191,7 +4191,7 @@
             {
               "Kind": "Method",
               "Name": "count",
-              "Signature": "fn count(): int",
+              "Signature": "mut fn count(): int",
               "Doc": "How many elements are left; drains the iterator.",
               "Members": [],
               "Source": {
@@ -4202,7 +4202,7 @@
             {
               "Kind": "Method",
               "Name": "first",
-              "Signature": "fn first(): ?T",
+              "Signature": "mut fn first(): ?T",
               "Doc": "The first element, or `null` for an empty source. One `next`, named for the chain that\nends on it.",
               "Members": [],
               "Source": {
@@ -4213,7 +4213,7 @@
             {
               "Kind": "Method",
               "Name": "last",
-              "Signature": "fn last(): ?T",
+              "Signature": "mut fn last(): ?T",
               "Doc": "The last element, or `null` for an empty source; drains the iterator.",
               "Members": [],
               "Source": {
@@ -4224,7 +4224,7 @@
             {
               "Kind": "Method",
               "Name": "nth",
-              "Signature": "fn nth(n: int): ?T",
+              "Signature": "mut fn nth(n: int): ?T",
               "Doc": "The element at position `n`, counting from zero, or `null` when the source ends first.\nThe elements before it are consumed.",
               "Members": [],
               "Source": {
@@ -4235,7 +4235,7 @@
             {
               "Kind": "Method",
               "Name": "any",
-              "Signature": "fn any(test: fn(T) -> bool): bool",
+              "Signature": "mut fn any(test: fn(T) -> bool): bool",
               "Doc": "Stops at the first match; the rest is never evaluated.",
               "Members": [],
               "Source": {
@@ -4246,7 +4246,7 @@
             {
               "Kind": "Method",
               "Name": "all",
-              "Signature": "fn all(test: fn(T) -> bool): bool",
+              "Signature": "mut fn all(test: fn(T) -> bool): bool",
               "Doc": "Stops at the first counterexample. An empty iterator yields `true`, the only convention\nfor which `a.all(p) && b.all(p) == a.chain(b).all(p)` holds.",
               "Members": [],
               "Source": {
@@ -4257,7 +4257,7 @@
             {
               "Kind": "Method",
               "Name": "none",
-              "Signature": "fn none(test: fn(T) -> bool): bool",
+              "Signature": "mut fn none(test: fn(T) -> bool): bool",
               "Doc": "Whether nothing matches: `!any`.",
               "Members": [],
               "Source": {
@@ -4268,7 +4268,7 @@
             {
               "Kind": "Method",
               "Name": "find",
-              "Signature": "fn find(test: fn(T) -> bool): ?T",
+              "Signature": "mut fn find(test: fn(T) -> bool): ?T",
               "Doc": "The first element that matches, or `null`.",
               "Members": [],
               "Source": {
@@ -4279,7 +4279,7 @@
             {
               "Kind": "Method",
               "Name": "position",
-              "Signature": "fn position(test: fn(T) -> bool): ?int",
+              "Signature": "mut fn position(test: fn(T) -> bool): ?int",
               "Doc": "The position of the first match, or `null`. Separate from `find`, because an `(int, T)`\ntuple would cost the common case where only one of the two is needed.",
               "Members": [],
               "Source": {
@@ -4290,7 +4290,7 @@
             {
               "Kind": "Method",
               "Name": "countWhere",
-              "Signature": "fn countWhere(test: fn(T) -> bool): int",
+              "Signature": "mut fn countWhere(test: fn(T) -> bool): int",
               "Doc": "How many elements match; drains the iterator. `filter(test).count()` in one step.",
               "Members": [],
               "Source": {
@@ -4301,7 +4301,7 @@
             {
               "Kind": "Method",
               "Name": "forEach",
-              "Signature": "fn forEach(f: fn(T) -> void): void",
+              "Signature": "mut fn forEach(f: fn(T) -> void): void",
               "Doc": "Calls `f` on every element, in order; drains the iterator. The terminator for a chain\nwhose point is the side effect.",
               "Members": [],
               "Source": {
@@ -4312,7 +4312,7 @@
             {
               "Kind": "Method",
               "Name": "toArray",
-              "Signature": "fn toArray(): T[]",
+              "Signature": "mut fn toArray(): T[]",
               "Doc": "Everything into an array.\n\nQuadratic: a `T[]` has a fixed length, so every append copies. For a large source\n`std.collections.collect` gathers into a doubling `List<T>`; it lives there because\n`std.iter` must not import `std.collections` — the dependency runs the other way.",
               "Members": [],
               "Source": {

@@ -16,8 +16,8 @@ let LEVELS = 4;
 let BASE = LEVELS * 10;
 
 pub struct Vector2 {
-    x: int,
-    y: int,
+    var x: int,
+    var y: int,
 
     // A type-bound constant that is an object. This case is why the globals section references an
     // init FUNCTION rather than holding values: 'Vector2 { … }' is an expression, not a literal.

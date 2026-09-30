@@ -44,7 +44,7 @@ public class ExtendConformanceTests
         AssertClean(Diags("""
             interface Damageable { mut fn takeDamage(amount: int); fn hp(): int; }
             class Player :: [Damageable] {
-                life: int = 100,
+                var life: int = 100,
                 mut fn takeDamage(amount: int) { this.life -= amount; }
                 fn hp(): int { return this.life; }
             }
@@ -113,7 +113,7 @@ public class ExtendConformanceTests
         AssertClean(Diags("""
             interface Container<T> { mut fn add(item: T); fn count(): int; }
             class IntBag :: [Container<int>] {
-                n: int = 0,
+                var n: int = 0,
                 mut fn add(item: int) { this.n += 1; }
                 fn count(): int { return this.n; }
             }

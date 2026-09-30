@@ -1,6 +1,6 @@
 // Objects: allocation, reading and writing a field, compound assignment to a field.
 class Counter {
-    value: int,
+    var value: int,
     step: int
 }
 

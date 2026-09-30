@@ -1,6 +1,6 @@
 // Structs are values (02 V2): a copy is a copy, a field write reaches the storage it names, a
 // struct inside a struct copies along. Exit code: 11 + 2 + 5 = 18.
-struct Point { x: int, y: int }
+struct Point { var x: int, var y: int }
 struct Segment { a: Point, b: Point }
 
 fn shift(p: Point, dx: int): Point {

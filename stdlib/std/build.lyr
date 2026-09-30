@@ -73,19 +73,19 @@ pub class Artifact {
     /// directory holding `build.lyr`.
     entry: string,
     /// The profile the options came from. It names the directory under `out/`.
-    profileName: string,
+    var profileName: string,
     /// Whether the IR optimizations run.
-    optimize: bool,
+    var optimize: bool,
     /// Whether the module carries line numbers.
-    sourceMap: bool,
+    var sourceMap: bool,
     /// Whether the module carries slot and field names.
-    debugInfo: bool,
+    var debugInfo: bool,
     /// Whether a warning fails this artifact.
-    denyWarnings: bool,
+    var denyWarnings: bool,
     /// Where it lands. `null` means `out/<profile>/<name>.lyrbc`, or `out/<profile>/<name>` for a
     /// packed program, where the toolchain adds the platform's executable suffix to an output
     /// without one.
-    output: ?string = null,
+    var output: ?string = null,
 
     /// Takes the options of `profile`, its name included: a tool shipped beside a game that is
     /// still being debugged is `tool.use(Profile.release())`.

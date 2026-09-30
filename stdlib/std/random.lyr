@@ -37,7 +37,7 @@ fn xorshift(state: int): int;
 /// `secureRandom` is.
 pub class Random {
     /// The generator state; every draw replaces it.
-    state: int,
+    var state: int,
 
     /// A generator with an explicit seed. A seed of 0 is a fixed point for xorshift — the
     /// sequence would stay 0 forever — so it is replaced silently rather than panicking on a
