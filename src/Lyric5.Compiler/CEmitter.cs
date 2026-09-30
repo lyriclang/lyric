@@ -288,6 +288,7 @@ public sealed class CEmitter
     private (int[] Offsets, (int Size, int Align) Total) Fields(IReadOnlyList<IrType> types, int start)
     {
         var offsets = new int[types.Count];
+        if (types.Count == 0 && start == 0) return (offsets, (1, 1)); // the unused byte of an empty struct
         var (at, align) = (start, start > 0 ? 8 : 1);
         for (var i = 0; i < types.Count; i++)
         {
@@ -510,6 +511,8 @@ public sealed class CEmitter
             var name = StructName(new TypeId(index));
             _out.AppendLine($"struct {name} {{");
             if (def.IsClass) _out.AppendLine("    LyrObj header;");
+            // A struct without fields holds one unused byte: C has no empty struct.
+            if (def.IsStruct && def.FieldTypes.Length == 0) _out.AppendLine("    uint8_t lyr_unit;");
             for (var i = 0; i < def.FieldTypes.Length; i++)
                 _out.AppendLine($"    {Declare(def.FieldTypes[i], FieldName(def.FieldNames[i]))};");
             _out.AppendLine("};");

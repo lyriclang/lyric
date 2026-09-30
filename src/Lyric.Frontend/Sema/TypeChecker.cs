@@ -70,6 +70,7 @@ public sealed class TypeChecker
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
+    private readonly TypeSymbol? _range, _rangeInclusive; // std.core's Range<T> and RangeInclusive<T> (03 A3)
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
     /// against. <c>null</c> when the stdlib is not loaded; the loop head then reports the ordinary
@@ -138,6 +139,8 @@ public sealed class TypeChecker
         // knows the built-in scalars, and everything else binds to an interface from the stdlib.
         var core = comp.FindModule(["std", "core"])?.Members;
         _equatable = core?.LookupLocal("Equatable") as TypeSymbol;
+        _range = core?.LookupLocal("Range") as TypeSymbol;
+        _rangeInclusive = core?.LookupLocal("RangeInclusive") as TypeSymbol;
         _ordered = core?.LookupLocal("Ordered") as TypeSymbol;
         _add = core?.LookupLocal("Add") as TypeSymbol;
         _sub = core?.LookupLocal("Sub") as TypeSymbol;
@@ -3061,21 +3064,15 @@ public sealed class TypeChecker
         if (elem is null && !lo.IsError && !hi.IsError)
             _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
 
-        if (!ReferenceEquals(r, _rangeInPosition))
-        {
-            _de.Report("LYR-SEM0090", Severity.Error, r.Span,
-                "a range is a loop head, not a value — it can stand in 'for (x in a..b)' and "
-                + "nowhere else",
-                new DiagnosticNote("to keep the numbers, write them as an array or as two "
-                    + "bindings; to walk them, put the range in the loop"));
-
-            // ErrorType, so whatever the range was handed to says nothing more: 'cannot assign
-            // range<int> to int' names a type the language does not have, and the sentence above
-            // is the one to act on.
-            return LyrType.Error;
-        }
-
-        return new RangeOf(elem ?? LyrType.Error);
+        // In a 'for' head the range is the counted loop and no value (03 T13 A3); everywhere
+        // else 'a..b' is a 'Range<T>' and 'a..=b' a 'RangeInclusive<T>' of std.core, holding its
+        // bounds. Lyric 4 refused the value.
+        if (ReferenceEquals(r, _rangeInPosition)) return new RangeOf(elem ?? LyrType.Error);
+        if (elem is null || elem.IsError) return LyrType.Error;
+        var symbol = r.IsInclusive ? _rangeInclusive : _range;
+        if (symbol is null)
+            return Report(r.Span, "LYR-SEM0090", "a range value needs 'Range' of std.core, which is not loaded");
+        return new GenericInstance(symbol, [elem]);
     }
 
     /// <summary>

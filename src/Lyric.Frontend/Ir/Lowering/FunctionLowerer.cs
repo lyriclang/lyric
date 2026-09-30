@@ -338,6 +338,21 @@ internal sealed class FunctionLowerer
     /// <para>The same sequence as for a struct initializer, except that the fields go by position rather
     /// than by name. An opcode of its own would be a second way to build an object.</para>
     /// </summary>
+    /// <summary><c>a..b</c> as a value (03 T13 A3): the std.core struct holding its bounds, a
+    /// fresh value like a tuple. In a <c>for</c> head the literal never gets here.</summary>
+    private TempId LowerRangeValue(RangeExpr expr)
+    {
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
+            throw Bug("range value has no struct type");
+        var layout = _typeTable.Defs[type.Type.Value];
+        var dest = _slots.NewTemp(type);
+        _b.Emit(new NewObject(dest, type.Type, type, expr.Span));
+        _b.Emit(new StoreField(dest, type.Type, new FieldId(0), LowerExprAs(expr.Low, layout.FieldTypes[0]), expr.Span));
+        _b.Emit(new StoreField(dest, type.Type, new FieldId(1), LowerExprAs(expr.High, layout.FieldTypes[1]), expr.Span));
+        _fresh.Add(dest);
+        return dest;
+    }
+
     private TempId LowerTupleLiteral(TupleLitExpr expr)
     {
         if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
@@ -1701,7 +1716,7 @@ internal sealed class FunctionLowerer
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
-        RangeExpr e => throw NotSupported("range expression", e.Span),
+        RangeExpr e => LowerRangeValue(e),
         ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),

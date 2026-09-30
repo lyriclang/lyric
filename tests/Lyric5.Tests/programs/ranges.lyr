@@ -1,0 +1,27 @@
+// Ranges (03 T13 A3): 'a..b' is a Range, 'a..=b' a RangeInclusive — values of std.core holding
+// their bounds; in a 'for' head a range literal is the counted loop and no value. Expected
+// stdout, in order:
+//   value 1 4 3          start, end, the difference through a function
+//   inclusive 5 9        RangeInclusive
+//   held 2 8 6           a range in a struct, passed on
+//   loop 16              the counted loop over the bounds of a value, and over a literal
+import std.core { Range, RangeInclusive };
+import std.io { println };
+
+struct Window { span: Range<int> }
+
+fn width(r: Range<int>): int { return r.end - r.start; }
+
+fn main(): int {
+    let r = 1..4;
+    println(f"value {r.start} {r.end} {width(r)}");
+    let inc: RangeInclusive<int> = 5..=9;
+    println(f"inclusive {inc.start} {inc.end}");
+    let w = Window { span = 2..8 };
+    println(f"held {w.span.start} {w.span.end} {width(w.span)}");
+    var total = 0;
+    for (i in r.start..r.end) { total += i; }
+    for (i in 0..5) { total += i; }
+    println(f"loop {total}");
+    return 0;
+}
