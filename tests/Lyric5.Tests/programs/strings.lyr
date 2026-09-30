@@ -1,0 +1,18 @@
+// Strings: literals, `+`, f-strings with int, uint and bool, and UTF-8 that is not ASCII.
+// Expected stdout, four lines: "Grüße, Lyric!", "n=42 u=7 b=true", "a-b-c", "tab\there".
+import std.io { println, print };
+
+fn greet(name: string): string { return "Grüße, " + name + "!"; }
+
+fn main(): int {
+    println(greet("Lyric"));
+    let n = 42;
+    let u: uint = 7;
+    let b = n > 40;
+    println(f"n={n} u={u} b={b}");
+    print("a-");
+    print("b-");
+    println("c");
+    println("tab\there");
+    return 0;
+}

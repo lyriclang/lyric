@@ -90,6 +90,22 @@ LyrStr *lyr_str_from_int(int64_t value) {
     return text;
 }
 
+LyrStr *lyr_str_from_uint(uint64_t value) {
+    char digits[24];
+    int n = 0;
+    do {
+        digits[n++] = (char)('0' + value % 10);
+        value /= 10;
+    } while (value != 0);
+    LyrStr *text = lyr_alloc_string(n);
+    for (int i = 0; i < n; i++) text->bytes[i] = digits[n - 1 - i];
+    return text;
+}
+
+LyrStr *lyr_str_from_bool(bool value) {
+    return lyr_str_from_cstr(value ? "true" : "false");
+}
+
 static int digit_value(unsigned char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'z') return c - 'a' + 10;

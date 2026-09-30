@@ -35,6 +35,8 @@ public class CEmitterTests
     [InlineData("fib")]
     [InlineData("count")]
     [InlineData("checks")]
+    [InlineData("hello")]
+    [InlineData("structs")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -48,20 +50,43 @@ public class CEmitterTests
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), actual);
     }
 
-    public static TheoryData<string, Profile, int> Programs_() => new()
+    public static TheoryData<string, Profile, int, string> Programs_()
     {
-        { "fib", Profile.Debug, 55 }, { "fib", Profile.Release, 55 },
-        { "count", Profile.Debug, 13 }, { "count", Profile.Release, 13 },
-        { "checks", Profile.Debug, 42 }, { "checks", Profile.Release, 42 },
-    };
+        var data = new TheoryData<string, Profile, int, string>();
+        foreach (var profile in new[] { Profile.Debug, Profile.Release })
+        {
+            data.Add("fib", profile, 55, "");
+            data.Add("count", profile, 13, "");
+            data.Add("checks", profile, 42, "");
+            data.Add("structs", profile, 18, "");
+            data.Add("hello", profile, 0, "Hello, Lyric!\n");
+            data.Add("fizzbuzz", profile, 0,
+                "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n");
+            data.Add("strings", profile, 0, "Grüße, Lyric!\nn=42 u=7 b=true\na-b-c\ntab\there\n");
+        }
+        return data;
+    }
 
     [Theory]
     [MemberData(nameof(Programs_))]
-    public void A_program_runs_natively(string name, Profile profile, int exit)
+    public void A_program_runs_natively(string name, Profile profile, int exit, string stdout)
     {
         var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, profile);
         Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
         Assert.Equal("", result.Stderr);
+        Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
+    }
+
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_panic_call_ends_with_its_message(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("panic"), "panic", profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("panic [LYR-RT0008]: 3 is too many", lines[0]);
+        Assert.Matches(@"^    at lyr_main_check \(.*programs[\\/]panic\.lyr:3\)$", lines[1]);
     }
 
     public static TheoryData<string, Profile, string> Panics() => new()

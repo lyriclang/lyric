@@ -153,6 +153,13 @@ S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 
    `lyr_run_main`. `for` over a range literal is a counted loop in the front end now (no
    iterator object, no `std.iter`). Golden C for three programs; programs run natively in both
    profiles, and a failed check panics with the `.lyr` line in the trace.
+4. S3: strings (literals as static objects, `+`, f-strings with int, uint and bool), structs as
+   C values (the IR's struct temps alias storage; `newobj` and `structcopy` make it fresh;
+   store, field write, argument and return copy), the intrinsic calls into the runtime
+   (`std.io`, `std.string`, `std.core.panic` with the new code RT0008 — the spec table gets it in
+   S5). `hello`, `fizzbuzz` and `fibonacci` (recursive and iterative) run natively on Linux and
+   Windows in both profiles, plus `structs`, `strings` (UTF-8) and `panic`. New runtime helpers:
+   text from `uint` and `bool`, `lyr_panic_message`.
 
 ## Design decisions
 

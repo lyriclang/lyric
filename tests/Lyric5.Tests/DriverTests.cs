@@ -78,16 +78,13 @@ public class DriverTests
         Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }", output);
     }
 
-    /// <summary>Strings come with S3: until then the emitter says so through the gate's code, and
-    /// the driver ends with 1 rather than a stack trace.</summary>
     [Fact]
-    public void Hello_as_c_waits_for_s3()
+    public void Hello_emits_its_c()
     {
         var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "c");
-        Assert.Equal(1, exit);
-        Assert.Equal("", output);
-        Assert.Contains("LYR-CG0001", err);
-        Assert.Contains("strings (M2 S3)", err);
+        Assert.True(exit == 0, err);
+        Assert.Contains("lyr_println(", output);
+        Assert.Contains("LYR_STR_INIT(\"Hello, \")", output);
     }
 
     [Fact]

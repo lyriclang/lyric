@@ -1,6 +1,7 @@
 /* The panic path (05 E8): message, backtrace, hook, exit 101. */
 #include "internal.h"
 #include "lyr/init.h"
+#include "lyr/types.h"
 
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -92,4 +93,8 @@ void lyr_panic_division_by_zero(void) {
 
 void lyr_panic_null(void) {
     lyr_panic(LYR_RT_NULL_UNWRAP, "unwrapped a null value");
+}
+
+void lyr_panic_message(const LyrStr *message) {
+    lyr_panic(LYR_RT_PANIC, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
 }
