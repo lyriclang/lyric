@@ -50,6 +50,7 @@ public class CEmitterTests
     [InlineData("with")]
     [InlineData("globals")]
     [InlineData("closures")]
+    [InlineData("generics")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -73,6 +74,9 @@ public class CEmitterTests
     private const string CLOSURES_EXPECTED =
         "forms 2 6 6 14 3 5\ncapture 3 30 92\ncounter 1 2 3 2\nloop 0 1 2\nthis 15 4\nopt 4 none\nmade 0 10 20\n"
         + "trailing 6 14 6\nbound 2 2 0 20 10\n";
+
+    private const string GENERICS_EXPECTED =
+        "value 4 5 hi\npair 3 x x 3\ncollect n7 9 11\nstatic 2 1 true\n";
 
     private const string WITH_EXPECTED =
         "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
@@ -120,6 +124,7 @@ public class CEmitterTests
             data.Add("with", profile, 0, WITH_EXPECTED);
             data.Add("globals", profile, 0, GLOBALS_EXPECTED);
             data.Add("closures", profile, 0, CLOSURES_EXPECTED);
+            data.Add("generics", profile, 0, GENERICS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

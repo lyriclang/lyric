@@ -1796,7 +1796,7 @@ public sealed class TypeChecker
             case CallExpr call: return CheckCall(call, scope, expected);
             case MemberExpr mem: return CheckMember(mem, scope, expected);
             case StructInitExpr si: return CheckStructInit(si, scope, expected);
-            case TypePathExpr tp: return CheckTypePath(tp, scope);
+            case TypePathExpr tp: return CheckTypePath(tp, scope, expected);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
             case LetCondExpr lc:
                 // Reached only OUTSIDE an if/while head, where CheckIf/CheckWhile take it first.
@@ -3454,16 +3454,22 @@ public sealed class TypeChecker
                         $"generic function '{fsym.Name}' expects {fsym.Generics.Length} type "
                         + $"argument(s), got {written.Length}");
 
+                // A placeholder ('collect<_, int>(xs)', 03 T8) is not bound here: it is the one
+                // position the inference below is asked to fill, the way it fills every argument
+                // of a call written without any. The constraints of a list with a placeholder are
+                // checked once the list is complete, with the inferred ones.
                 var explicitArgs = new LyrType[Math.Min(written.Length, fsym.Generics.Length)];
+                var placeholders = false;
                 for (var i = 0; i < explicitArgs.Length; i++)
                 {
+                    if (IsPlaceholder(written[i])) { placeholders = true; continue; }
                     explicitArgs[i] = ResolveType(written[i], scope);
                     map[fsym.Generics[i]] = explicitArgs[i];
                 }
 
                 // Constraints apply to written arguments too, or the explicit form would be a way
                 // around them.
-                CheckConstraints(fsym.Generics, explicitArgs, call.Span);
+                if (!placeholders) CheckConstraints(fsym.Generics, explicitArgs, call.Span);
             }
 
             var n = Math.Min(fn.Parameters.Length, args.Length);
@@ -3482,6 +3488,13 @@ public sealed class TypeChecker
         }
         if (map is not null)
         {
+            // The position's expected type binds what the arguments left open (03 T8: an
+            // assignment, an argument, a return, a field): 'let xs: int[] = empty();'. After the
+            // arguments, never over them — 'UnifyInfer' adds and does not overwrite — so a
+            // mismatch stays what it is, the assignment's, and is reported there.
+            if (expected is not null && !expected.IsError && fsym!.Generics.Any(g => !map.ContainsKey(g)))
+                UnifyInfer(fn.Return, expected, map, call.Span);
+
             CheckInferredConstraints(fsym!.Generics, map, call.Span);
             substituted = (FnType)Substitute(fn, map);
 
@@ -4740,12 +4753,15 @@ public sealed class TypeChecker
         // error, not a guess from the '1'.
         LyrType result;
         Dictionary<GenericParamSymbol, LyrType> subst;
+        Dictionary<StructInitField, LyrType>? prechecked = null;
         if (ts.Generics.Length > 0 || si.TypeArguments.Length > 0)
         {
             // Written arguments beat the context, as they do for an enum variant: 'Box<int> { … }'
             // says itself which instance is meant, and that holds where there is no context at all.
             LyrType[] args;
-            if (si.TypeArguments.Length > 0)
+            if (si.TypeArguments.Any(IsPlaceholder))
+                args = FillPlaceholders(si, ts, expected, scope, out prechecked);
+            else if (si.TypeArguments.Length > 0)
                 args = si.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
             else if (InstanceFromExpected(expected, ts) is { } fromContext)
                 args = fromContext.Arguments;
@@ -4790,7 +4806,9 @@ public sealed class TypeChecker
                 _result.BindRef(field, fs);
 
                 var ft = Substitute(FieldType(fs), subst);
-                CheckAssignable(field.Value, CheckExpr(field.Value, scope, ft), ft, field.Span);
+                var given = prechecked is not null && prechecked.TryGetValue(field, out var early)
+                    ? early : CheckExpr(field.Value, scope, ft);
+                CheckAssignable(field.Value, given, ft, field.Span);
             }
             else
             {
@@ -4801,6 +4819,63 @@ public sealed class TypeChecker
 
         ReportOmittedFields(si.Span, ts.Name, DeclaredFields(ts.Declaration), seen);
         return result;
+    }
+
+    /// <summary>
+    /// The type arguments of <c>Pair&lt;_, string&gt; { first = 3, second = "x" }</c> (design/v5/spec/03
+    /// T8): what is written stands, a placeholder comes from the context when the position names
+    /// an instance, else from the field values — each checked with as much of its field type as
+    /// is known, its type binding what is open, the way a call's arguments bind its parameters.
+    /// A list without a placeholder never infers from the values ('P { v = 1 }' with no context is
+    /// an error, not a guess); with one, the writer has asked for exactly that.
+    /// </summary>
+    /// <param name="prechecked">The values checked on the way, so the caller checks none twice;
+    /// <c>null</c> when the context answered.</param>
+    private LyrType[] FillPlaceholders(StructInitExpr si, TypeSymbol ts, LyrType? expected,
+        SymbolTable scope, out Dictionary<StructInitField, LyrType>? prechecked)
+    {
+        prechecked = null;
+        var written = si.TypeArguments.Select(a => IsPlaceholder(a) ? null : ResolveType(a, scope)).ToArray();
+        if (written.Length != ts.Generics.Length)
+            return written.Select(a => a ?? LyrType.Error).ToArray(); // the count is reported by the caller
+
+        if (InstanceFromExpected(expected, ts) is { } fromContext)
+            return written.Select((a, i) => a ?? fromContext.Arguments[i]).ToArray();
+
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < written.Length; i++)
+            if (written[i] is { } bound) map[ts.Generics[i]] = bound;
+
+        prechecked = new Dictionary<StructInitField, LyrType>(ReferenceEqualityComparer.Instance);
+        var reported = _de.Diagnostics.Count;
+        foreach (var field in si.Fields)
+        {
+            if (ts.Members.LookupLocal(field.Name) is not FieldSymbol fs || prechecked.ContainsKey(field)) continue;
+            var declared = FieldType(fs);
+            var partial = Substitute(declared, map);
+            var given = CheckExpr(field.Value, scope, HasOpenParam(partial, map) ? null : partial);
+            prechecked[field] = given;
+            UnifyInfer(declared, given, map, field.Value.Span);
+        }
+
+        // A value that fixes no type on its own ('[]', 'null') binds the parameter to a type with
+        // a hole in it; that is not an answer, and it is reported as none — unless the value was
+        // already reported, and a second line would be noise behind the cause.
+        var filled = new LyrType[written.Length];
+        for (var i = 0; i < filled.Length; i++)
+        {
+            if (written[i] is { } bound) filled[i] = bound;
+            else if (map.TryGetValue(ts.Generics[i], out var inferred) && !ContainsError(inferred)) filled[i] = inferred;
+            else
+            {
+                if (_de.Diagnostics.Count == reported)
+                    _de.Report("LYR-SEM0060", Severity.Error, si.TypeArguments[i].Span,
+                        $"cannot infer type argument '{ts.Generics[i].Name}' for '{ts.Name}' — no field "
+                        + "value determines it; write it");
+                filled[i] = LyrType.Error;
+            }
+        }
+        return filled;
     }
 
     /// <summary>The fields a type declares, in declaration order; empty for anything else.</summary>
@@ -4847,9 +4922,10 @@ public sealed class TypeChecker
     /// a value, and writing it alone gives <c>LYR-SEM0052</c>. It carries the resolved instance
     /// along.</para>
     /// </summary>
-    private LyrType CheckTypePath(TypePathExpr tp, SymbolTable scope)
+    private LyrType CheckTypePath(TypePathExpr tp, SymbolTable scope, LyrType? expected)
     {
         var (sym, _) = ResolveInitPath(tp.Path, scope);
+        if (sym is FunctionSymbol fs) return CheckInstantiatedFunction(tp, fs, scope, expected);
         if (sym is not TypeSymbol ts)
         {
             foreach (var a in tp.TypeArguments) ResolveType(a, scope);
@@ -4873,6 +4949,85 @@ public sealed class TypeChecker
         CheckConstraints(ts.Generics, args, tp.Span);
         return new NonValueType(ts, "type", new GenericInstance(ts, args));
     }
+
+    /// <summary>
+    /// <c>ident&lt;int&gt;</c> as a value (design/v5/spec/03 T17): the INSTANCE of a generic function
+    /// is a function value like any monomorphic function, where the bare generic name is none
+    /// (<c>LYR-SEM0052</c>, §8.1). The arguments are written; a placeholder among them is filled
+    /// from the function type this position expects (<c>let f: fn(int) -&gt; int = ident&lt;_&gt;</c>,
+    /// T8), and one nothing determines is reported, as at a call.
+    /// </summary>
+    private LyrType CheckInstantiatedFunction(TypePathExpr tp, FunctionSymbol fs, SymbolTable scope,
+        LyrType? expected)
+    {
+        // The import shell stays the bound symbol where there is one, as CheckIdentifier binds it,
+        // so unused-import accounting sees this reference too.
+        var shell = tp.Path is [var single] ? scope.Lookup(single) : null;
+        _result.BindRef(tp, shell is ImportBindingSymbol ? shell : fs);
+
+        // A method reached through its type: static, it is a function like any other; with a
+        // receiver, nothing here supplies the object — the sentence its monomorphic twin
+        // 'Counter.bump' gets, the value form being 'obj.bump'.
+        if (!fs.IsStatic && MemberOwnerOf(tp.Path, scope) is not null)
+            return Report(tp.Span, "LYR-SEM0055",
+                $"'{fs.Name}' is an instance method and needs a receiver — call it on a value, "
+                + $"or declare it 'static fn {fs.Name}(…)'");
+
+        if (tp.TypeArguments.Length != fs.Generics.Length)
+        {
+            foreach (var a in tp.TypeArguments) if (!IsPlaceholder(a)) ResolveType(a, scope);
+            return Report(tp.Span, "LYR-SEM0026", fs.Generics.Length == 0
+                ? $"'{fs.Name}' is not generic and takes no type arguments"
+                : $"generic function '{fs.Name}' expects {fs.Generics.Length} type argument(s), "
+                  + $"got {tp.TypeArguments.Length}");
+        }
+
+        var declared = FnTypeOf(fs);
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < fs.Generics.Length; i++)
+            if (!IsPlaceholder(tp.TypeArguments[i]))
+                map[fs.Generics[i]] = ResolveType(tp.TypeArguments[i], scope);
+
+        // What is written binds first (the rule of the call); the expected function type fills
+        // the rest, and only the rest, because UnifyInfer never overwrites.
+        if (expected is FnType wanted) UnifyInfer(declared, wanted, map, tp.Span);
+        foreach (var generic in fs.Generics)
+            if (!map.ContainsKey(generic))
+                return Report(tp.Span, "LYR-SEM0060",
+                    $"cannot infer type argument '{generic.Name}' for '{fs.Name}' — this position "
+                    + "expects no particular function type; write it");
+
+        CheckInferredConstraints(fs.Generics, map, tp.Span);
+
+        // Which instance is meant is settled here, in declaration order, as for a call.
+        _result.SetTypeArguments(tp, fs.Generics.Select(g => map[g]).ToArray());
+        return Substitute(declared, map);
+    }
+
+    /// <summary>The type whose member the last segment of <paramref name="path"/> is, when the
+    /// segment before it names a type; <c>null</c> for a free function, through a module or not.</summary>
+    private static TypeSymbol? MemberOwnerOf(string[] path, SymbolTable scope)
+    {
+        if (path.Length < 2) return null;
+        Symbol? cur = scope.Lookup(path[0]);
+        if (cur is ImportBindingSymbol ib0) cur = ib0.Target;
+        for (var i = 1; i < path.Length - 1 && cur is not null; i++)
+        {
+            cur = cur switch
+            {
+                ModuleSymbol mod => mod.Members.LookupLocal(path[i]),
+                TypeSymbol t => t.Members.LookupLocal(path[i]),
+                _ => null,
+            };
+            if (cur is ImportBindingSymbol ib) cur = ib.Target;
+        }
+        return cur as TypeSymbol;
+    }
+
+    /// <summary>The <c>_</c> of a type argument list (design/v5/spec/03 T8): a position the
+    /// inference fills. Only that — anywhere else <see cref="ResolveType"/> refuses it.</summary>
+    private static bool IsPlaceholder(TypeNode node) =>
+        node is NamedType { Path: ["_"], TypeArguments.Length: 0 };
 
     private (Symbol? sym, TypeSymbol? owner) ResolveInitPath(string[] path, SymbolTable scope)
     {
@@ -6600,6 +6755,14 @@ public sealed class TypeChecker
         switch (node)
         {
             case NamedType n:
+                // The placeholder stands only where an inference fills it — the type arguments of
+                // a call, an initializer, an instantiated function — and those sites take it
+                // before resolving. 'let x: List<_> = …' is not among them (T8: a binding's
+                // type is written or omitted).
+                if (IsPlaceholder(n))
+                    return Report(n.Span, "LYR-SEM0117",
+                        "'_' stands for a type argument the call infers; here nothing infers it — "
+                        + "write the type, or omit the annotation");
                 var sym = _binding.Resolve(n) ?? ResolveTypePath(n.Path, scope);
 
                 // Recorded in the SAME table the resolver writes into. The resolver binds the type

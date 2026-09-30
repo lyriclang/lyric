@@ -1726,6 +1726,7 @@ internal sealed class FunctionLowerer
         CharLiteralExpr e => EmitConst(new CharConst(e.CodePoint), TypeOfExpr(e), e.Span),
         StringLiteralExpr e => EmitConst(new StringConst(e.Value), TypeOfExpr(e), e.Span),
         IdentifierExpr e => LowerIdentifier(e),
+        TypePathExpr e => LowerInstantiatedFunction(e),
         ImplicitMemberExpr e => LowerImplicitMember(e),
         UnaryExpr e => LowerUnary(e),
         PostfixExpr e => LowerPostfix(e),
@@ -4229,11 +4230,41 @@ internal sealed class FunctionLowerer
     /// unresolved it reaches <see cref="InstanceTable.Request"/> as a bare parameter, which refuses
     /// it -- correctly, since there is no instance to build for a name.</para>
     /// </summary>
-    private LyrType[] SubstitutedTypeArguments(CallExpr expr) =>
+    private LyrType[] SubstitutedTypeArguments(Node expr) =>
         _types.TypeArgumentsOf(expr)
             .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
                 ? bound : t)
             .ToArray();
+
+    /// <summary>
+    /// <c>ident&lt;int&gt;</c> as a value (design/v5/spec/03 T17): the instance the sema settled,
+    /// requested as a call would request it, then a closure without an environment around it —
+    /// the same value a monomorphic function gives, and at the C level one more thunk.
+    /// </summary>
+    private TempId? LowerInstantiatedFunction(TypePathExpr expr)
+    {
+        var bound = _types.RefOf(expr);
+        if (bound is ImportBindingSymbol binding) bound = binding.Target;
+        if (bound is not FunctionSymbol { Declaration: FunctionDecl declaration } symbol
+            || symbol.Generics.Length == 0)
+            throw Bug($"a type path in value position reached lowering at {expr.Span}");
+
+        // A generic native has a row per signature and no code of its own to point at (see
+        // ImportTable.DeclareTemplate); a value needs the code.
+        if (_imports.IsGenericNative(symbol) || declaration.Body is null)
+            throw NotSupported($"the native generic '{symbol.Name}' as a value — wrap it in a lambda", expr.Span);
+
+        // Without a receiver, as its call requests it: a free function has none, and the sema
+        // lets only a static method through this route.
+        var target = _instances.Request(symbol, declaration, symbol.Name, null,
+            SubstitutedTypeArguments(expr), _typeTable, expr.Span);
+        if (TypeOfExpr(expr) is not IrFunctionType signature)
+            throw Bug($"an instantiated function without a function type at {expr.Span}");
+
+        var closure = _slots.NewTemp(signature);
+        _b.Emit(new MakeClosure(closure, target, null, signature, expr.Span));
+        return closure;
+    }
 
     private TempId? LowerGenericMethodCall(MemberExpr member, GenericInstance owner, CallExpr expr)
     {

@@ -121,6 +121,7 @@ public class GoldenTests
     [InlineData("tuple_elements")]    // t.0, n.0.1 (one float token, two members), p.x (03 T16)
     [InlineData("with_expr")]         // p with { x = 1, pos.y = p.y }.x: a postfix, a path, precedence (02 M6)
     [InlineData("trailing_params")]   // f(a) { acc, x => … } and { (k, v) => … }: parameters in the block (08 Y11 F2)
+    [InlineData("instantiated_fn")]   // ident<int> as a value, '_' as a type argument (03 T8, T17)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 
