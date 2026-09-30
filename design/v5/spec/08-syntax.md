@@ -57,8 +57,9 @@ stehen kann. `quote {` und `comptime {` sähen aus wie ein Trailing-Lambda-Aufru
 | **Bibliothek, keine Wörter** | `wait`, `await`, `spawn`, `select`, `panic`, `assert`, `new`, `main`, `it` |
 | **Bewusst nicht** | `const`, `async`/`await`, `unsafe`, `where`, `override`/`abstract`/`super`/`virtual`, `impl`, `switch`/`case`/`goto`/`finally`, `ref`, `inout`, `params` |
 
-**Zeichen statt Wörter** (Maintainer): **`x: &T` + Aufruf `&x`** statt `inout` (C++/Rust/C-Gewohnheit;
-Präfix-`&` war frei) · **`nums: int...`** statt `params` (Java/Go) · **`throws [A, B]`** — die Liste in
+**Zeichen statt Wörter** (Maintainer): **`&x: T` + Aufruf `&x`** statt `inout` — das Zeichen am
+Parameter, nicht am Typ (geändert 2026-09-30, vorher `x: &T`; Begründung in 03 T12; Präfix-`&`
+war frei) · **`nums: int...`** statt `params` (Java/Go) · **`throws [A, B]`** — die Liste in
 eckigen Klammern, **wie jede andere Mehrfachliste** (`:: [I, J]`, `@[A, B]`, `<T :: [I]>`); **`::`
 bleibt** (keine `:`-Form für Konformanzen/Constraints). Verworfen: `f()?` für `try` (Zeichen an
 `?.` vergeben), `!` für `never`, Zig-`E!T`, Nim-`*` für Export.
@@ -73,8 +74,9 @@ Kotlin) ist **nicht** der Optimierungshinweis — der heißt **`@AlwaysInline`/`
 ## Y3 — Mutabilitätswörter: **entschieden** (2026-09-29)
 
 `let`/`var` an Bindungen und Feldern (M2); **`mut fn`** bleibt der Methodenmarker (Swift
-`mutating` verworfen: länger, nichts gewonnen); **`&T`-Parameter** mit **`&x`** an der
-Aufrufstelle (Y1); keine `ref`-Locals, keine `ref`-Rückgabe (T12 Tür).
+`mutating` verworfen: länger, nichts gewonnen); **`&x: T`-Parameter** mit **`&x`** an der
+Aufrufstelle (Y1, T12) — `&` steht nie in einem Typ; keine `ref`-Locals, keine `ref`-Rückgabe
+(T12 Tür).
 
 ## Y2 — Deklarationssyntax: **entschieden** (2026-09-29)
 
@@ -126,7 +128,7 @@ enum Json { Null, Bool(bool), Num(float), Arr(Json[]), Obj(Map<string, Json>);
 }
 
 pub fn parse<T :: [Parse]>(s: StringView): T throws ParseError { return try T.parse(s); }
-fn swap<T>(a: &T, b: &T): void { let t = a; a = b; b = t; }
+fn swap<T>(&a: T, &b: T): void { let t = a; a = b; b = t; }
 fn sum(nums: int...): int { … }
 inline fn each<T>(xs: T[], f: fn(T) -> void): void { for (x in xs) { f(x); } }
 macro Builder(target: StructDecl): Decl { return quote { … }; }
@@ -134,13 +136,12 @@ type Handler = fn(Event) -> void throws IoError;
 extend<T :: [Display]> T[] :: [Display] { fn show(): string { … } }
 ```
 
-## Y3 — Bindungs- und Mutabilitätswörter (`mut`, `inout`/`ref`, `&`): **offen**
 ## Y4 — Ausdrucksformen und Präzedenz: **entschieden** (2026-09-29)
 
 | # | Operatoren | Assoz. | Bemerkung |
 |---|---|---|---|
 | 1 | Postfix `.` `?.` `[ ]` `( )` `!` `++` `--` `with { }` | links | `with` auf Postfix-Stufe (M6); Makro-`!` gehört zum Namen |
-| 2 | Präfix `!` `-` `~` `++` `--` `&` `comptime` `try` `try?` `try!` `throw` | rechts | `&x` nur in Argumentposition; `try` deckt den ganzen Ausdruck rechts (`try a + b` = `try (a + b)`) |
+| 2 | Präfix `!` `-` `~` `++` `--` `&` `comptime` `try` `try?` `try!` `throw` | rechts | `&x` nur in Argumentposition (und als Zeichen am Parameteranfang, T12 — dort kein Operator); `try` deckt den ganzen Ausdruck rechts (`try a + b` = `try (a + b)`) |
 | 3 | `as` | links | über `*` |
 | 4 | `*` `/` `%` `*%` | links | **Wrap-Operatoren in Zig-Schreibweise `+%` `-%` `*%`** (Swift-`&+` kollidiert mit Präfix-`&`); **nur auf Ganzzahltypen**, kein Interface, kein Default (ein Default `addWrap = add` wäre eine Lüge — Wickeln folgt nicht aus Addieren; `WrappingAdd :: [Add]` als additive Tür, Rust-`num-traits`-Form) |
 | 5 | `+` `-` `+%` `-%` | links | |

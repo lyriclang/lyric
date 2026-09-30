@@ -75,7 +75,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | T02 | `Equatable<Point>`, `Ordered<Version>`, `Hashable<K>` (guide 07/08) | `Equatable`, `Ordered`, `Hashable` (`Self`, T-Reihe) | M | — |
 | T03 | `Add<Vec2, Vec2>`, `Mul<float, Vec2>`, `Sub<…>` (zwei Typargumente: Rhs, Out) | `Add<Rhs = Vec2> { type Out = Vec2 }` (D6; Rhs Parameter, Out assoziiert) | M | — |
 | T04 | `fn compare(other: T): int` (guide 07) | `compare(o: Self): ?Ordering`; `TotalOrder.totalCompare` dazu | R | — |
-| T05 | `fn hash(): int` + `hashCombine`/`combineHash` | `hash<H :: Hasher>(h: &H)` mit `h.write…` (K2/Q3) | R | — |
+| T05 | `fn hash(): int` + `hashCombine`/`combineHash` | `hash<H :: Hasher>(&h: H)` mit `h.write…` (K2/Q3) | R | — |
 | T06 | `equals(other: T): bool`, `show(): string`, `message(): string` | bleiben | — | — |
 | T07 | `Into<Fahrenheit>` | bleibt (`From<T>` dazu) | — | — |
 | T08 | `int32`/`int64`/`float64` distinkt neben `int`/`float`; `x as int64` | `int` = `int64`-Alias: `int64` → `int`, `as` zwischen gleich breiten entfällt | M | Typen |
