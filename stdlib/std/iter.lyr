@@ -385,7 +385,7 @@ pub class ArrayIterator<T> :: [Iterator<T>] {
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?T {
-        if (this.index >= this.source.length) {
+        if (this.index >= this.source.length()) {
             return null;
         }
         let value = this.source[this.index];
@@ -404,7 +404,7 @@ pub class StringIterator :: [Iterator<char>] {
 
     /// The next character, or `null` at the end.
     pub mut fn next(): ?char {
-        if (this.index >= this.chars.length) {
+        if (this.index >= this.chars.length()) {
             return null;
         }
         let value = this.chars[this.index];
@@ -474,7 +474,7 @@ pub class CompactIterator<T> :: [Iterator<T>] {
 
     /// The next value that is not `null`, or `null` at the end of the array.
     pub mut fn next(): ?T {
-        while (this.index < this.source.length) {
+        while (this.index < this.source.length()) {
             let value = this.source[this.index];
             this.index = this.index + 1;
             if (value != null) {
@@ -712,10 +712,10 @@ pub class ChunksIterator<T> :: [Iterator<T[]>] {
     // `std.collections.collect` on the raw iterator instead.
     pub mut fn next(): ?T[] {
         var group: T[] = [];
-        while (group.length < this.size) {
+        while (group.length() < this.size) {
             let value = this.source.next();
             if (value == null) {
-                return if (group.length == 0) null else group;
+                return if (group.length() == 0) null else group;
             }
             group = group + [value];
         }

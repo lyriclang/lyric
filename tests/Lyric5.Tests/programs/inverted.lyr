@@ -1,0 +1,3 @@
+// A view whose end lies before its start is out of bounds like any other (03 T13 A2).
+fn part(xs: int[]): Slice<int> { return xs[3..1]; }
+fn main(): int { return part([1, 2, 3, 4, 5]).length(); }

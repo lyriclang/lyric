@@ -70,7 +70,7 @@ fn hexValue(c: char): int {
 pub fn hexEncode(bytes: uint8[]): string {
     let sb = strings.StringBuilder.new();
     var i = 0;
-    while (i < bytes.length) {
+    while (i < bytes.length()) {
         let b = bytes[i] as int;
         sb.appendChar(hexDigit(b >> 4));
         sb.appendChar(hexDigit(b & 15));
@@ -112,13 +112,17 @@ pub fn hexDecodeOrErr(text: string): Result<uint8[], EncodingError> {
 // The one implementation behind both forms: the value, or where and what it expected.
 fn hexDecodeCore(text: string): DecodeAttempt {
     let chars = text.toChars();
-    if (chars.length % 2 != 0) {
-        return DecodeAttempt { value = null, at = chars.length, what = "an even number of digits" };
+    if (chars.length() % 2 != 0) {
+        return DecodeAttempt {
+            value = null,
+            at = chars.length(),
+            what = "an even number of digits",
+        };
     }
     let zero: uint8 = 0;
-    var out = [zero] * (chars.length / 2);
+    var out = [zero] * (chars.length() / 2);
     var i = 0;
-    while (i < out.length) {
+    while (i < out.length()) {
         let hi = hexValue(chars[i * 2]);
         if (hi < 0) {
             return DecodeAttempt { value = null, at = i * 2, what = "a hexadecimal digit" };
@@ -137,7 +141,7 @@ fn hexDecodeCore(text: string): DecodeAttempt {
 /// characters. Empty bytes are the empty string.
 pub fn base64Encode(bytes: uint8[]): string {
     let sb = strings.StringBuilder.new();
-    let whole = bytes.length / 3 * 3;
+    let whole = bytes.length() / 3 * 3;
     var i = 0;
 
     while (i < whole) {
@@ -149,7 +153,7 @@ pub fn base64Encode(bytes: uint8[]): string {
         i = i + 3;
     }
 
-    let rest = bytes.length - whole;
+    let rest = bytes.length() - whole;
     if (rest == 1) {
         let group = bytes[i] as int << 16;
         sb.appendChar(base64Chars[group >> 18 & 63]);
@@ -170,7 +174,7 @@ pub fn base64Encode(bytes: uint8[]): string {
 // by neither on the sizes this is for, and the scan cannot be out of step with the alphabet.
 fn base64Value(c: char): int {
     var i = 0;
-    while (i < base64Chars.length) {
+    while (i < base64Chars.length()) {
         if (base64Chars[i] == c) {
             return i;
         }
@@ -201,34 +205,34 @@ pub fn base64DecodeOrThrow(text: string): uint8[] throws EncodingError {
 // The one implementation behind both forms: the value, or where and what it expected.
 fn base64DecodeCore(text: string): DecodeAttempt {
     let chars = text.toChars();
-    if (chars.length % 4 != 0) {
+    if (chars.length() % 4 != 0) {
         return DecodeAttempt {
             value = null,
-            at = chars.length,
+            at = chars.length(),
             what = "a multiple of four characters",
         };
     }
-    if (chars.length == 0) {
+    if (chars.length() == 0) {
         let zero: uint8 = 0;
         return DecodeAttempt { value = [zero] * 0, at = 0, what = "" };
     }
 
     // How many `=` end the string; only the last group may carry them.
     var padding = 0;
-    if (chars[chars.length - 1] == '=') {
+    if (chars[chars.length() - 1] == '=') {
         padding = 1;
-        if (chars[chars.length - 2] == '=') {
+        if (chars[chars.length() - 2] == '=') {
             padding = 2;
         }
     }
 
     let zero: uint8 = 0;
-    var out = [zero] * (chars.length / 4 * 3 - padding);
+    var out = [zero] * (chars.length() / 4 * 3 - padding);
     var outAt = 0;
     var i = 0;
 
-    while (i < chars.length) {
-        let last = i + 4 == chars.length;
+    while (i < chars.length()) {
+        let last = i + 4 == chars.length();
 
         let a = base64Value(chars[i]);
         if (a < 0) {

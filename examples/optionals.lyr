@@ -14,7 +14,7 @@ class Account {
 // No hit is a normal outcome rather than an error, hence `?Account` and not `throws`.
 fn findAccount(accounts: Account[], owner: string): ?Account {
     var i = 0;
-    while (i < accounts.length) {
+    while (i < accounts.length()) {
         if (accounts[i].owner == owner) {
             return accounts[i];
         }

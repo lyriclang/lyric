@@ -1,0 +1,78 @@
+// Views (03 T13 A2): 'xs[a..b]' is a Slice<T> — a pointer into the array's elements and a
+// length, no copy, sharing the elements; an array stands where a view is expected. Expected
+// stdout, in order:
+//   view 3 20 40 90                  a view, its length, its ends, passed to a function
+//   open 2 40 5 30                   the open forms '..b', 'a..', '..', and an inclusive end
+//   through 21 31 51 31              a write through the view, and through a view a function got
+//   nested 2 31 41                   a view of a view
+//   whole 154                        the array itself where a view is expected
+//   field 2 99 51                    a view held in an object, written through
+//   strings bob cy 2                 '^n' as a bound
+//   structs 30 6 0                   a struct element of a view is a place; a binding copies it
+//   match empty one 10 first 10 rest 4
+//                                    array patterns over a view; '..rest' binds a view
+//   empty 0 0                        an empty view, at the end too
+import std.io { println };
+
+struct Point { var x: int, var y: int }
+class Holder { var view: Slice<int> }
+
+fn total(xs: Slice<int>): int {
+    var sum = 0;
+    for (i in 0..xs.length()) { sum += xs[i]; }
+    return sum;
+}
+
+fn bump(xs: Slice<int>): void {
+    for (i in 0..xs.length()) { xs[i] += 1; }
+}
+
+fn describe(xs: Slice<int>): string {
+    return match (xs) {
+        [] => "empty",
+        [one] => f"one {one}",
+        [first, ..rest] => f"first {first} rest {rest.length()}",
+    };
+}
+
+fn main(): int {
+    let xs = [10, 20, 30, 40, 50];
+    let mid = xs[1..4];
+    println(f"view {mid.length()} {mid[0]} {mid[^1]} {total(mid)}");
+
+    let head = xs[..2];
+    let tail = xs[3..];
+    let all = xs[..];
+    let inc = xs[1..=2];
+    println(f"open {head.length()} {tail[0]} {all.length()} {inc[1]}");
+
+    mid[0] = 21;
+    bump(xs[2..]);
+    println(f"through {xs[1]} {xs[2]} {xs[4]} {mid[1]}");
+
+    let sub = mid[1..];
+    println(f"nested {sub.length()} {sub[0]} {sub[^1]}");
+
+    println(f"whole {total(xs)}");
+
+    let holder = Holder { view = xs[3..] };
+    holder.view[0] = 99;
+    println(f"field {holder.view.length()} {xs[3]} {holder.view[^1]}");
+
+    let names = ["ann", "bob", "cy"];
+    let last = names[^2..];
+    println("strings " + last[0] + " " + last[1] + f" {last.length()}");
+
+    let points = [Point { x = 1, y = 2 }, Point { x = 3, y = 4 }, Point { x = 5, y = 6 }];
+    let pv = points[1..];
+    pv[0].x = 30;
+    var copy = pv[1];
+    copy.y = 0;
+    println(f"structs {points[1].x} {pv[1].y} {copy.y}");
+
+    println("match " + describe(xs[..0]) + " " + describe(xs[..1]) + " " + describe(xs));
+
+    let empty = xs[2..2];
+    println(f"empty {empty.length()} {xs[5..].length()}");
+    return 0;
+}

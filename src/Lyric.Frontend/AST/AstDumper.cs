@@ -84,6 +84,11 @@ public static class AstDumper
                 Write(n.Low, indent + 1, sb);
                 Write(n.High, indent + 1, sb);
                 break;
+            case SliceRangeExpr n:
+                Line(sb, indent, $"SliceRange {(n.Low is null ? "open" : "low")}{(n.IsInclusive ? "..=" : "..")}{(n.High is null ? "open" : "high")}", n.Span);
+                if (n.Low is not null) Write(n.Low, indent + 1, sb);
+                if (n.High is not null) Write(n.High, indent + 1, sb);
+                break;
             case CastExpr n:
                 Line(sb, indent, "Cast", n.Span);
                 Write(n.Operand, indent + 1, sb);
@@ -157,7 +162,7 @@ public static class AstDumper
                 foreach (var a in n.TypeArguments) Write(a, indent + 1, sb);
                 break;
             case ArrayType n:
-                Line(sb, indent, "ArrayType", n.Span);
+                Line(sb, indent, n.Length is { } len ? $"ArrayType [{len}]" : "ArrayType", n.Span);
                 Write(n.Element, indent + 1, sb);
                 break;
             case TupleType n:

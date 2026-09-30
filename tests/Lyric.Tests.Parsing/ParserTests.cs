@@ -191,16 +191,18 @@ public class ParserTests
     }
 
     [Fact]
-    public void Array_type_with_a_length_is_refused()
+    public void Array_type_with_a_length_is_the_inline_array()
     {
-        // Grammar §4: TypeSuffix is '[' ']' — the length belongs to the value. The size used to
-        // parse into a type nothing could ever produce, ending in "cannot assign 'int[]' to
-        // 'int[3]'" or a lowering exception, depending on the route.
+        // 'T[8]' is the inline array (design/v5/spec/03 T13 A4), a value of eight elements; the
+        // length is a positive decimal literal. Lyric 4 refused the form: its length belonged to
+        // the value alone.
         var (expr, diag) = Parse("a as int[8]");
         var cast = Assert.IsType<CastExpr>(expr);
-        Assert.IsType<ArrayType>(cast.Type);
-        Assert.True(diag.HasErrors);
-        Assert.Equal("LYR-PAR0043", diag.Diagnostics[0].Code);
+        Assert.Equal(8, Assert.IsType<ArrayType>(cast.Type).Length);
+        Assert.False(diag.HasErrors);
+
+        var (_, bad) = Parse("a as int[0]");
+        Assert.Equal("LYR-PAR0043", bad.Diagnostics[0].Code);
     }
 
     // --- f-Strings ---

@@ -276,6 +276,11 @@ public static class AstChildren
                 yield return r.High;
                 break;
 
+            case SliceRangeExpr sr:
+                if (sr.Low is not null) yield return sr.Low;
+                if (sr.High is not null) yield return sr.High;
+                break;
+
             case CastExpr c:
                 yield return c.Operand;
                 yield return c.Type;

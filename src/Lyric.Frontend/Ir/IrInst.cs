@@ -50,6 +50,15 @@ public sealed record NewArray(TempId Dest, IrType Element, TempId[] Elements, Sp
 public sealed record LoadElem(TempId Dest, TempId Array, TempId Index, IrType Element, Span Span) : IrOp(Span);
 public sealed record StoreElem(TempId Array, TempId Index, TempId Value, Span Span) : IrOp(Span);
 public sealed record ArrayLen(TempId Dest, TempId Array, Span Span) : IrOp(Span);
+/// <summary>A view of the elements <c>[Low, High)</c> of an array or of a view (03 T13 A2): checked
+/// against the source's length, then a pointer and a length, no copy. <c>Array</c> is the source
+/// — an array or a slice — and loadelem, storeelem and arraylen take a slice too.</summary>
+public sealed record MakeSlice(TempId Dest, TempId Array, TempId Low, TempId High, IrType Element, Span Span) : IrOp(Span);
+/// <summary>An inline array (03 T13 A4) built from its elements — <c>Length</c> of them, or one
+/// repeated when <c>Repeat</c> is set (<c>[x] * N</c>, 10 C7). A fresh value, like a struct.</summary>
+public sealed record NewInline(TempId Dest, IrType Element, int Length, TempId[] Elements, bool Repeat, Span Span) : IrOp(Span);
+/// <summary>A copy of a value that is not a struct — an inline array — at a binding point.</summary>
+public sealed record CopyValue(TempId Dest, TempId Value, IrType Type, Span Span) : IrOp(Span);
 
 // xs + ys and xs * n — built-in language semantics, not a library. Both yield a NEW array.
 public sealed record ArrayConcat(TempId Dest, TempId Left, TempId Right, IrType Element, Span Span) : IrOp(Span);

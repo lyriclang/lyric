@@ -1,0 +1,3 @@
+// A negative index panics as any index outside the array does (03 T14 N4): no counting from the end.
+fn before(xs: int[]): int { return xs[-1]; }
+fn main(): int { return before([1, 2, 3]); }

@@ -606,6 +606,7 @@ internal sealed class WarningAnalyzer
             case IndexExpr ix: WalkExpr(ix.Target); WalkExpr(ix.Index); break;
             case CastExpr cs: WalkExpr(cs.Operand); break;
             case RangeExpr r: WalkExpr(r.Low); WalkExpr(r.High); break;
+            case SliceRangeExpr sr: WalkExpr(sr.Low); WalkExpr(sr.High); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) WalkExpr(e); break;
             case StructInitExpr si: foreach (var f in si.Fields) WalkExpr(f.Value); break;

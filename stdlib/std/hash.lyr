@@ -67,7 +67,7 @@ pub fn hashCombine(seed: int, value: int): int {
 pub fn hashAll(hashes: int[]): int {
     var h = 0;
     var i = 0;
-    while (i < hashes.length) {
+    while (i < hashes.length()) {
         h = combineHash(h, hashes[i]);
         i = i + 1;
     }

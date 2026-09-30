@@ -196,7 +196,7 @@ pub fn readSomeOrThrow(socket: Socket, max: int): uint8[] throws IoError {
 /// midway; `writeOrThrow` says why.
 pub fn write(socket: Socket, bytes: uint8[]): bool {
     var offset = 0;
-    while (offset < bytes.length) {
+    while (offset < bytes.length()) {
         let sent = netWriteFrom(socket as int, bytes, offset);
         if (sent >= 0) {
             offset = offset + sent;

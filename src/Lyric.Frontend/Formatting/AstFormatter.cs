@@ -743,6 +743,8 @@ public sealed class AstFormatter
         AssignExpr a => AssignDoc(a),
         RangeExpr r => Doc.Of(ExprDoc(r.Low, Range - 1),
             Doc.From(r.IsInclusive ? "..=" : ".."), ExprDoc(r.High, Range - 1)),
+        SliceRangeExpr sr => Doc.Of(sr.Low is null ? Doc.Nil : ExprDoc(sr.Low, Range - 1),
+            Doc.From(sr.IsInclusive ? "..=" : ".."), sr.High is null ? Doc.Nil : ExprDoc(sr.High, Range - 1)),
         CastExpr c => Doc.Of(ExprDoc(c.Operand, CastLevel), Doc.From(" as "), TypeDoc(c.Type)),
 
         CallExpr c => CallDoc(c),
@@ -783,6 +785,7 @@ public sealed class AstFormatter
         UnaryOp.BitNot => "~",
         UnaryOp.PreInc => "++",
         UnaryOp.PreDec => "--",
+        UnaryOp.FromEnd => "^",
         _ => throw new InternalCompilationException($"unreachable: unexpected {op}"),
     };
 
@@ -1039,7 +1042,7 @@ public sealed class AstFormatter
             a.Element is NullableType or FunctionType
                 ? Doc.Of(Doc.From("("), TypeDoc(a.Element), Doc.From(")"))
                 : TypeDoc(a.Element),
-            Doc.From("[]")),
+            Doc.From(a.Length is { } len ? $"[{len}]" : "[]")),
         TupleType t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select(TypeDoc).ToArray()), Doc.From(")")),
         FunctionType f => Doc.Of(Doc.From("fn("),

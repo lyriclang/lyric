@@ -54,6 +54,15 @@ LYR_NORETURN void lyr_panic_null(void);
 struct LyrStr;
 LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
 
+/* A view's bounds (03 T13 A2): 0 <= low <= high <= length, or a panic with the same code as an index. */
+LYR_NORETURN void lyr_panic_range(int64_t low, int64_t high, int64_t length);
+
+#define LYR_CHECK_RANGE(low, high, length)                                                          \
+    do {                                                                                            \
+        if (LYR_UNLIKELY((uint64_t)(low) > (uint64_t)(high) || (uint64_t)(high) > (uint64_t)(length))) \
+            lyr_panic_range((int64_t)(low), (int64_t)(high), (int64_t)(length));                    \
+    } while (0)
+
 #define LYR_CHECK_INDEX(index, length)                                                              \
     do {                                                                                            \
         if (LYR_UNLIKELY((uint64_t)(index) >= (uint64_t)(length)))                                  \

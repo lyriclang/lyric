@@ -160,10 +160,16 @@ public sealed partial class Parser
                 continue;
             }
 
-            // Range: not chainable.
+            // Range: not chainable. 'a..' before ']' is the view to the end (03 T13 A2), which
+            // only an index can close that way.
             if (op is TokenKind.DotDot or TokenKind.DotDotEqual)
             {
-                _buffer.Advance();
+                var opTok = _buffer.Advance();
+                if (_buffer.Check(TokenKind.RBracket))
+                {
+                    left = new SliceRangeExpr(left, null, op == TokenKind.DotDotEqual, Span.Union(left.Span, opTok.Span));
+                    continue;
+                }
                 var high = ParseExpr(rightBp);
                 left = new RangeExpr(left, high, op == TokenKind.DotDotEqual, Span.Union(left.Span, high.Span));
                 if (_buffer.Current.TokenKind is TokenKind.DotDot or TokenKind.DotDotEqual)
@@ -201,7 +207,9 @@ public sealed partial class Parser
     private Expr ParsePrefix()
     {
         var op = _buffer.Current.TokenKind;
-        if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec)
+        // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
+        // is still the exclusive or, which the binary loop takes before this is asked.
+        if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec or TokenKind.Caret)
         {
             var opTok = _buffer.Advance();
             var operand = ParsePrefix();
@@ -317,7 +325,7 @@ public sealed partial class Parser
                 case TokenKind.LBracket:
                 {
                     _buffer.Advance();
-                    var index = ParseSubExpr();
+                    var index = ParseIndexElement();
                     var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close index");
                     operand = new IndexExpr(operand, index, Span.Union(operand.Span, close.Span));
                     break;
@@ -554,6 +562,26 @@ public sealed partial class Parser
     /// Parses an expression inside a delimiter (parenthesis, argument, index, array, hole): a
     /// struct initializer is always allowed there, whatever the ambient flag says outside.
     /// </summary>
+    /// <summary>
+    /// What stands between <c>[</c> and <c>]</c>: an index, or a range that takes a view of the
+    /// indexed value (03 T13 A2) — <c>a..b</c>, <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c>,
+    /// with either bound left open. A closed range arrives as the ordinary range node and is
+    /// re-read here as the view it is in this position.
+    /// </summary>
+    private Expr ParseIndexElement()
+    {
+        if (_buffer.Current.TokenKind is TokenKind.DotDot or TokenKind.DotDotEqual)
+        {
+            var opTok = _buffer.Advance();
+            var inclusive = opTok.TokenKind == TokenKind.DotDotEqual;
+            if (_buffer.Check(TokenKind.RBracket)) return new SliceRangeExpr(null, null, inclusive, opTok.Span);
+            var high = ParseSubExpr();
+            return new SliceRangeExpr(null, high, inclusive, Span.Union(opTok.Span, high.Span));
+        }
+        var index = ParseSubExpr();
+        return index is RangeExpr r ? new SliceRangeExpr(r.Low, r.High, r.IsInclusive, r.Span) : index;
+    }
+
     private Expr ParseSubExpr(int minBindingPower = 0)
     {
         var saved = _allowStructInit;
@@ -991,17 +1019,20 @@ public sealed partial class Parser
         {
             _buffer.Advance();
 
-            // 'T[3]' is not a type of this grammar (§4): the length belongs to the VALUE. Parsed
-            // and refused here, so the message can say what was meant instead of "expected ']'".
+            // 'T[3]' is the inline array (design/v5/spec/03 T13 A4): a value of that many
+            // elements. The length is a literal in 5.0; a constant or a parameter is a door (T18).
+            int? length = null;
             if (_buffer.Check(TokenKind.IntLiteral))
             {
                 var sizeTok = _buffer.Advance();
-                _de.Report("LYR-PAR0043", Severity.Error, sizeTok.Span,
-                    "an array type carries no length — the length belongs to the value; "
-                    + "use 'T[]' and build the array with '[x] * n'");
+                var text = _sm.Slice(sizeTok.Span).ToString().Replace("_", "");
+                if (!int.TryParse(text, out var n) || n <= 0)
+                    _de.Report("LYR-PAR0043", Severity.Error, sizeTok.Span,
+                        "the length of an inline array is a positive decimal literal");
+                else length = n;
             }
             var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close array type");
-            type = new ArrayType(type, Span.Union(type.Span, close.Span));
+            type = new ArrayType(type, Span.Union(type.Span, close.Span)) { Length = length };
         }
 
         // 'Coroutine<int> throws Exception'. Binds tighter than '?', so '?Coroutine<int> throws E'

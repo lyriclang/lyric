@@ -34,6 +34,10 @@ public static class BuiltinTypes
         // Coroutine<T>: the name resolves here, the type form is built by the sema.
         scope.TryDeclare(new TypeSymbol("Coroutine", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
+        // Slice<T>, the view of T[] (design/v5/spec/03 T13 A2; 10 C2: a language primitive of
+        // std.core, visible without an import): the same way.
+        scope.TryDeclare(new TypeSymbol("Slice", TypeSymbolKind.Builtin, Visibility.Public,
+            new SymbolTable(), declaration: null));
         return scope;
     }
 

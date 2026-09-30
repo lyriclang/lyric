@@ -1,0 +1,3 @@
+// An index outside an inline array panics like one outside an array (03 T13 A4, T14 N5).
+fn fourth(xs: int[4]): int { return xs[4]; }
+fn main(): int { return fourth([1, 2, 3, 4]); }

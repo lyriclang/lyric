@@ -10,7 +10,7 @@ import std.io.console { println };
 fn sum(xs: int[]): int {
     var total = 0;
     var i = 0;
-    while (i < xs.length) {
+    while (i < xs.length()) {
         total += xs[i];
         i += 1;
     }
@@ -24,13 +24,13 @@ fn zeros(n: int): int[] {
 
 fn main(): int {
     let xs = [3, 7, 1, 9, 4];
-    println(f"Summe von {xs.length} Werten: {sum(xs)}");
+    println(f"Summe von {xs.length()} Werten: {sum(xs)}");
 
     // Concatenation yields a NEW array; xs stays unchanged.
     var padded = xs + zeros(3);
     padded[5] = 100;
     padded[6] += 20;
 
-    println(f"Nach dem Auffuellen: {padded.length} Werte, Summe {sum(padded)}");
+    println(f"Nach dem Auffuellen: {padded.length()} Werte, Summe {sum(padded)}");
     return sum(padded);
 }

@@ -42,6 +42,9 @@ public class CEmitterTests
     [InlineData("optionals")]
     [InlineData("enums")]
     [InlineData("patterns")]
+    [InlineData("arrays")]
+    [InlineData("slices")]
+    [InlineData("inline")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -54,6 +57,9 @@ public class CEmitterTests
         Assert.True(File.Exists(path), $"no golden at {path}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), actual);
     }
+
+    private const string INLINE_EXPECTED =
+        "copy 10 1 3 3\nrepeat 0 7 7\nheap 2 60 80\nstruct 100 1 40\ngrid 3 2 2\narray 8 7 7 7\nmatch 15\n";
 
     public static TheoryData<string, Profile, int, string> Programs_()
     {
@@ -83,6 +89,13 @@ public class CEmitterTests
                 "signals red yellow green\nareas 0 12 6 7\n"
                 + "describe round round flat square rect origin far@3,4\ngrade zero digit neg many\n"
                 + "maybe none green\nmethod true false 2\nscene 6 green\ntree 7\n");
+            data.Add("arrays", profile, 0,
+                "literal 3 10 20 30\nstore 99 20\nrepeat 5 7 7\nconcat 5 1 5\nfromend 30 99 50\nstruct 3,4 9 5 2\nnested 2 3 6\n"
+                + "refs alice bob 41 2\nsum 55\nopt 1 none\n");
+            data.Add("slices", profile, 0,
+                "view 3 20 40 90\nopen 2 40 5 30\nthrough 21 31 51 31\nnested 2 31 41\nwhole 154\nfield 2 99 51\n"
+                + "strings bob cy 2\nstructs 30 6 0\nmatch empty one 10 first 10 rest 4\nempty 0 0\n");
+            data.Add("inline", profile, 0, INLINE_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -120,6 +133,8 @@ public class CEmitterTests
     [InlineData("optionals_gc", Profile.Release, "list 1000 499500 node-999 tag-999")]
     [InlineData("enums_gc", Profile.Debug, "kept label-999999 tree 499500")]
     [InlineData("enums_gc", Profile.Release, "kept label-999999 tree 499500")]
+    [InlineData("arrays_gc", Profile.Debug, "kept 499500 item-999999 tag-999999 500")]
+    [InlineData("arrays_gc", Profile.Release, "kept 499500 item-999999 tag-999999 500")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
@@ -161,6 +176,16 @@ public class CEmitterTests
         { "unwrap", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
         { "unwrapref", Profile.Debug, "panic [LYR-RT0004]: unwrapped a null value" },
         { "unwrapref", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
+        { "index", Profile.Debug, "panic [LYR-RT0003]: index 3 out of bounds for length 3" },
+        { "index", Profile.Release, "panic [LYR-RT0003]: index 3 out of bounds for length 3" },
+        { "negindex", Profile.Debug, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
+        { "negindex", Profile.Release, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
+        { "badslice", Profile.Debug, "panic [LYR-RT0003]: range 2..7 out of bounds for length 5" },
+        { "badslice", Profile.Release, "panic [LYR-RT0003]: range 2..7 out of bounds for length 5" },
+        { "inverted", Profile.Debug, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
+        { "inverted", Profile.Release, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
+        { "inlineindex", Profile.Debug, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
+        { "inlineindex", Profile.Release, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the
