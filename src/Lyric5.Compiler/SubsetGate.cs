@@ -87,8 +87,8 @@ public static class SubsetGate
                     // 4.x lowering; each gets its Lyric 5 form with its slice.
                     Refuse(span, module.Types[r.Type.Value].Name == "<tuple>" ? $"tuples, {where}" : $"closures, {where}", "M3");
                     break;
-                case IrArrayType:
-                    Refuse(span, $"arrays, {where}", "M3");
+                case IrArrayType array:
+                    Type(array.Element, span, where);
                     break;
                 case IrOptionalType optional:
                     Type(optional.Inner, span, where);
@@ -140,8 +140,10 @@ public static class SubsetGate
                     break;
                 case LoadField or StoreField:
                     break;
-                case NewArray or LoadElem or StoreElem or ArrayLen or ArrayConcat or ArrayRepeat:
-                    Refuse(op.Span, "arrays", "M3");
+                case NewArray n:
+                    Type(n.Element, op.Span, "the element type");
+                    break;
+                case LoadElem or StoreElem or ArrayLen or ArrayConcat or ArrayRepeat:
                     break;
                 case OptNone or OptSome or OptIsSome or OptGet:
                     break;

@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s4";
+    public const string Version = "m3-s5";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -100,6 +100,7 @@ public sealed class CEmitter
         IrStructType s => StructName(s.Type),
         IrEnumType e => StructName(e.Type),
         IrRefType r => StructName(r.Type) + " *",
+        IrArrayType => "LyrArr *",
         IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
@@ -159,7 +160,7 @@ public sealed class CEmitter
     /// and needs its flag.
     /// </summary>
     private static bool IsNiche(IrType type) =>
-        type is IrOptionalType { Inner: IrRefType or IrScalarType { Kind: IrScalar.String } };
+        type is IrOptionalType { Inner: IrRefType or IrArrayType or IrScalarType { Kind: IrScalar.String } };
 
     /// <summary>
     /// A type C holds by value as an aggregate: a struct, and an optional outside the niche.
@@ -189,9 +190,29 @@ public sealed class CEmitter
         IrStructType s => $"ty{s.Type.Value}",
         IrEnumType e => $"en{e.Type.Value}",
         IrRefType r => $"ref{r.Type.Value}",
+        IrArrayType a => "arr_" + Mangle(a.Element),
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
     };
+
+    /// <summary>The type as Lyric writes it, for a descriptor's name.</summary>
+    private string Display(IrType type) => type switch
+    {
+        IrScalarType { Kind: IrScalar.String } => "string",
+        IrScalarType { Kind: IrScalar.I64 } => "int",
+        IrScalarType { Kind: IrScalar.U64 } => "uint",
+        IrScalarType { Kind: IrScalar.F64 } => "float",
+        IrScalarType { Kind: IrScalar.F32 } => "float32",
+        IrScalarType s => s.Kind.ToString().ToLowerInvariant(),
+        IrStructType s => Qualified(_module.Types[s.Type.Value]),
+        IrEnumType e => Qualified(_module.Types[e.Type.Value]),
+        IrRefType r => Qualified(_module.Types[r.Type.Value]),
+        IrArrayType a => Display(a.Element) + "[]",
+        IrOptionalType o => "?" + Display(o.Inner),
+        _ => type.ToString() ?? "?",
+    };
+
+    private static string Qualified(IrTypeDef def) => def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name;
 
     /// <summary><c>lyr_ty&lt;index&gt;_&lt;Name&gt;</c>: the index makes it unique (the IR's type names
     /// are not module-qualified), the name keeps it readable in a debugger.</summary>
@@ -211,7 +232,7 @@ public sealed class CEmitter
     private static string Zero(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "NULL",
-        IrRefType => "NULL",
+        IrRefType or IrArrayType => "NULL",
         _ when IsNiche(type) => "NULL",
         _ when IsAggregate(type) => "{0}",
         _ => "0",
@@ -233,7 +254,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I16 or IrScalar.U16 } => (2, 2),
         IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
-        IrRefType => (8, 8),
+        IrRefType or IrArrayType => (8, 8),
         IrOptionalType o when IsNiche(o) => (8, 8),
         IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
         IrOptionalType o => OptionalLayout(o),
@@ -298,7 +319,7 @@ public sealed class CEmitter
     /// <summary>A reference: one pointer-sized word the collector follows. An optional in the
     /// niche is one, null when absent.</summary>
     private static bool IsReference(IrType type) =>
-        type is IrRefType or IrScalarType { Kind: IrScalar.String } || IsNiche(type);
+        type is IrRefType or IrArrayType or IrScalarType { Kind: IrScalar.String } || IsNiche(type);
 
     /// <summary>Whether a value of the type holds a reference anywhere: itself, or in a struct
     /// or an optional it holds by value.</summary>
@@ -338,6 +359,12 @@ public sealed class CEmitter
     }
 
     private string DescriptorName(TypeId id) => $"lyr_desc_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
+
+    /// <summary>The descriptor of <c>T[]</c>, one per element type (V10).</summary>
+    private static string ArrayDescriptor(IrType element) => "lyr_desc_arr_" + Mangle(element);
+
+    /// <summary>The elements of an array temp, typed: <c>LYR_ARR_DATA(t, T)[i]</c>.</summary>
+    private string Elements(TempId array, IrType element) => $"LYR_ARR_DATA({Temp(array)}, {CType(element)})";
 
     /// <summary>The storage beside a struct-typed temp, for the values it makes fresh.</summary>
     private static string Storage(TempId temp) => $"t{temp.Value}_s";
@@ -379,10 +406,22 @@ public sealed class CEmitter
             .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum).ToList();
         // Every type a function names, for the optionals among them: an optional outside the
         // niche is a C struct of its own and is defined once, wherever it is first needed.
-        var used = _module.Functions
+        var named = _module.Functions
             .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
-            .Where(t => t is IrOptionalType && !IsNiche(t)).ToList();
-        if (indices.Count == 0 && used.Count == 0) return;
+            .Concat(_module.Types.SelectMany(t => t.FieldTypes))
+            .ToList();
+        var used = named.Where(t => t is IrOptionalType && !IsNiche(t)).ToList();
+        // Every element type an array is made of, the array's own element type included when it
+        // is itself an array: each gets a descriptor, after the structs it may hold.
+        var elements = new List<IrType>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        void Element(IrType type)
+        {
+            if (type is IrArrayType a && seen.Add(Mangle(a.Element))) { elements.Add(a.Element); Element(a.Element); }
+            else if (type is IrOptionalType o) Element(o.Inner);
+        }
+        foreach (var type in named) Element(type);
+        if (indices.Count == 0 && used.Count == 0 && elements.Count == 0) return;
 
         _out.AppendLine("/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */");
         foreach (var i in indices)
@@ -426,7 +465,37 @@ public sealed class CEmitter
         }
         foreach (var i in indices) Define(i);
         foreach (var type in used) Require(type);
+        foreach (var element in elements) { Require(element); ArrayDescriptorOf(element); }
         _out.AppendLine();
+    }
+
+    /// <summary>
+    /// The descriptor of an array of <paramref name="element"/> (V10): the fixed part is the
+    /// header and the length, then <c>len</c> elements of the element's size, each laid out as
+    /// the element type is — the reference map describes ONE element. An element that is an
+    /// enum holding references makes the whole array conservative, as it does an object.
+    /// </summary>
+    private void ArrayDescriptorOf(IrType element)
+    {
+        var name = ArrayDescriptor(element);
+        var (size, _) = LayoutOf(element);
+        var c = CType(element);
+        _out.AppendLine($"_Static_assert(sizeof({c}) == {size}, \"layout of {Display(element)}[]\");");
+        var words = new List<int>();
+        var ambiguous = false;
+        ReferenceWords(element, 0, words, ref ambiguous);
+        var text = Display(element).Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var flags = "LYR_DESC_ARRAY" + (words.Count > 0 || ambiguous ? " | LYR_DESC_HAS_REFS" : "") + (ambiguous ? " | LYR_DESC_CONSERVATIVE" : "");
+        if (words.Count == 0)
+        {
+            _out.AppendLine($"static const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), 0, NULL, \"{text}[]\", NULL }};");
+            return;
+        }
+        var map = new ulong[(size / 8 + 63) / 64];
+        foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
+        var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
+        _out.AppendLine($"static const uint64_t lyr_refmap_arr_{Mangle(element)}[] = {{ {bits} }};");
+        _out.AppendLine($"static const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), {map.Length}, lyr_refmap_arr_{Mangle(element)}, \"{text}[]\", NULL }};");
     }
 
     /// <summary>
@@ -649,6 +718,16 @@ public sealed class CEmitter
         OptGet g => Unwrap(g),
         NewVariant v => Variant(v),
         EnumTag t => $"{Temp(t.Dest)} = (int64_t){Temp(t.Value)}->tag;",
+        NewArray n => $"{Temp(n.Dest)} = lyr_alloc_array(&{ArrayDescriptor(n.Element)}, {n.Elements.Length});"
+            + string.Concat(n.Elements.Select((e, i) => $" {Elements(n.Dest, n.Element)}[{i}] = {Value(e)};")),
+        ArrayLen a => $"{Temp(a.Dest)} = {Temp(a.Array)}->len;",
+        // An element is a place in the array (02 M3): a struct element is aliased where it lies,
+        // a scalar or a reference read out. The check is the one of 03 T14 N5, in every profile.
+        LoadElem e => $"LYR_CHECK_INDEX({Temp(e.Index)}, {Temp(e.Array)}->len); {Temp(e.Dest)} = "
+            + (IsAggregate(e.Element) ? "&" : "") + $"{Elements(e.Array, e.Element)}[{Temp(e.Index)}];",
+        StoreElem s => StoreElement(s),
+        ArrayConcat c => $"{Temp(c.Dest)} = lyr_arr_concat(&{ArrayDescriptor(c.Element)}, {Temp(c.Left)}, {Temp(c.Right)});",
+        ArrayRepeat r => $"{Temp(r.Dest)} = lyr_arr_repeat(&{ArrayDescriptor(r.Element)}, {Temp(r.Array)}, {Temp(r.Count)});",
         // The variant of a value whose tag was tested: its payload, in place. A variant without
         // one has nothing to point at, and nothing reads through the pointer.
         EnumAs a => _module.Types[a.Variant.Value].FieldTypes.Length > 1
@@ -721,6 +800,18 @@ public sealed class CEmitter
         if (IsReference(type)) return $"LYR_WRITE_BARRIER({place}, &{slot}, {Value(f.Value)});";
         if (HoldsReferences(type)) return $"LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {Value(f.Value)});";
         return $"{slot} = {Value(f.Value)};";
+    }
+
+    /// <summary>An element write, through the barrier when the element is or holds a reference,
+    /// as a field write is.</summary>
+    private string StoreElement(StoreElem s)
+    {
+        var element = ((IrArrayType)TypeOf(s.Array)).Element;
+        var slot = $"{Elements(s.Array, element)}[{Temp(s.Index)}]";
+        var check = $"LYR_CHECK_INDEX({Temp(s.Index)}, {Temp(s.Array)}->len); ";
+        if (IsReference(element)) return $"{check}LYR_WRITE_BARRIER({Temp(s.Array)}, &{slot}, {Value(s.Value)});";
+        if (HoldsReferences(element)) return $"{check}LYR_WRITE_BARRIER_VALUE({Temp(s.Array)}, &{slot}, {Value(s.Value)});";
+        return $"{check}{slot} = {Value(s.Value)};";
     }
 
     private string Constant(Const c) => c.Value switch

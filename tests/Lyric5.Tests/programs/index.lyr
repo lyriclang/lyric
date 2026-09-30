@@ -1,0 +1,3 @@
+// An index outside the array panics (RT0003), in every profile (03 T14 N5).
+fn third(xs: int[]): int { return xs[3]; }
+fn main(): int { return third([1, 2, 3]); }

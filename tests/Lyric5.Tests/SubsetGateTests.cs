@@ -62,8 +62,8 @@ public class SubsetGateTests
 
     [Theory]
     [InlineData("fn main(): int { let (a, b) = (1, 2); return a + b; }", "tuples", "M3")]
-    [InlineData("fn main(): int { let xs = [1, 2, 3]; return xs[0]; }", "arrays", "M3")]
-    [InlineData("enum E { A(int[]), B }\nfn main(): int { let e = E.B; return 0; }", "arrays", "M3")]
+    [InlineData("enum E { A((int, int)), B }\nfn main(): int { let e = E.B; return 0; }", "tuples", "M3")]
+    [InlineData("fn main(): int { let xs = [(1, 2)]; return xs.length; }", "tuples", "M3")]
     [InlineData("fn main(): int { let f = (x: int): int => x + 1; return f(1); }", "closures", "M3")]
     [InlineData("let limit = 3;\nfn main(): int { return limit; }", "module-level 'let'", "M3")]
     [InlineData("fn gen(): Coroutine<int> { yield 1; }\nfn main(): int { let g = gen(); return 0; }", "coroutines", "M6")]

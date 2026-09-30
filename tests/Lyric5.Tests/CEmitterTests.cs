@@ -42,6 +42,7 @@ public class CEmitterTests
     [InlineData("optionals")]
     [InlineData("enums")]
     [InlineData("patterns")]
+    [InlineData("arrays")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -83,6 +84,9 @@ public class CEmitterTests
                 "signals red yellow green\nareas 0 12 6 7\n"
                 + "describe round round flat square rect origin far@3,4\ngrade zero digit neg many\n"
                 + "maybe none green\nmethod true false 2\nscene 6 green\ntree 7\n");
+            data.Add("arrays", profile, 0,
+                "literal 3 10 20 30\nstore 99 20\nrepeat 5 7 7\nconcat 5 1 5\nstruct 3,4 9 5 2\nnested 2 3 6\n"
+                + "refs alice bob 41 2\nsum 55\nopt 1 none\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -120,6 +124,8 @@ public class CEmitterTests
     [InlineData("optionals_gc", Profile.Release, "list 1000 499500 node-999 tag-999")]
     [InlineData("enums_gc", Profile.Debug, "kept label-999999 tree 499500")]
     [InlineData("enums_gc", Profile.Release, "kept label-999999 tree 499500")]
+    [InlineData("arrays_gc", Profile.Debug, "kept 499500 item-999999 tag-999999 500")]
+    [InlineData("arrays_gc", Profile.Release, "kept 499500 item-999999 tag-999999 500")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
@@ -161,6 +167,10 @@ public class CEmitterTests
         { "unwrap", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
         { "unwrapref", Profile.Debug, "panic [LYR-RT0004]: unwrapped a null value" },
         { "unwrapref", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
+        { "index", Profile.Debug, "panic [LYR-RT0003]: index 3 out of bounds for length 3" },
+        { "index", Profile.Release, "panic [LYR-RT0003]: index 3 out of bounds for length 3" },
+        { "negindex", Profile.Debug, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
+        { "negindex", Profile.Release, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the

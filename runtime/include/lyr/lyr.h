@@ -7,6 +7,7 @@
 #include "lyr/panic.h"
 #include "lyr/numeric.h"
 #include "lyr/string.h"
+#include "lyr/array.h"
 #include "lyr/init.h"
 
 #endif
