@@ -1,0 +1,60 @@
+// Inline arrays (03 T13 A4): 'T[N]' is a value of N elements laid out where it lies — in a
+// local, a struct, an object, an element of an array — copied at a binding point like a struct,
+// with a view taken only where it lies in the heap. Expected stdout, in order:
+//   copy 10 1 3 3                a literal, a copy that stays behind, the length, '^n'
+//   repeat 0 7 7                 '[x] * 4' as an 'int[4]', passed by value
+//   heap 2 60 80                 a view of an object's inline array writes into the object; the
+//                                array itself where a view is expected
+//   struct 100 1 40              a struct carries its inline array by value
+//   grid 3 2 2                   'int[2][2]': an inline array of inline arrays
+//   array 8 7 7 7                an array of inline arrays: each element its own copy, and a place
+//   match 15                     an array pattern of the one length covers the type
+import std.io { println };
+
+struct Mat { var m: int[4] }
+class Buffer { var data: int[4], name: string }
+
+fn sum(xs: Slice<int>): int {
+    var s = 0;
+    for (i in 0..xs.length()) { s += xs[i]; }
+    return s;
+}
+
+fn sumInline(xs: int[4]): int {
+    var s = 0;
+    for (i in 0..xs.length()) { s += xs[i]; }
+    return s;
+}
+
+fn main(): int {
+    var a: int[3] = [1, 2, 3];
+    let b = a;
+    a[0] = 10;
+    println(f"copy {a[0]} {b[0]} {a.length()} {a[^1]}");
+
+    var z: int[4] = [0] * 4;
+    z[2] = 7;
+    println(f"repeat {z[0]} {z[2]} {sumInline(z)}");
+
+    let buf = Buffer { data = [5, 6, 7, 8], name = "b" };
+    let view = buf.data[1..3];
+    view[0] = 60;
+    println(f"heap {view.length()} {buf.data[1]} {sum(buf.data)}");
+
+    var m = Mat { m = [1, 2, 3, 4] };
+    m.m[3] = 40;
+    let mc = m;
+    m.m[0] = 100;
+    println(f"struct {m.m[0]} {mc.m[0]} {mc.m[3]}");
+
+    let grid: int[2][2] = [[1, 2], [3, 4]];
+    println(f"grid {grid[1][0]} {grid.length()} {grid[0].length()}");
+
+    let rows = [z, z];
+    rows[0][2] = 8;
+    println(f"array {rows[0][2]} {rows[1][2]} {z[2]} {sum(rows[1])}");
+
+    let matched = match (a) { [x, y, w] => x + y + w };
+    println(f"match {matched}");
+    return 0;
+}

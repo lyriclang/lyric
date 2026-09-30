@@ -102,6 +102,7 @@ public sealed class CEmitter
         IrRefType r => StructName(r.Type) + " *",
         IrArrayType => "LyrArr *",
         IrSliceType s => SliceName(s),
+        IrInlineArrayType ia => InlineName(ia),
         IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
@@ -171,7 +172,7 @@ public sealed class CEmitter
     /// the struct it holds.
     /// </summary>
     private static bool IsAggregate(IrType type) =>
-        type is IrStructType or IrEnumType || (type is IrOptionalType && !IsNiche(type));
+        type is IrStructType or IrEnumType or IrInlineArrayType || (type is IrOptionalType && !IsNiche(type));
 
     /// <summary>
     /// An optional of an enum (01 V5): the enum itself, with a tag no variant has standing for
@@ -188,6 +189,10 @@ public sealed class CEmitter
     /// the elements and a length — two words, a value C passes and copies as one.</summary>
     private static string SliceName(IrSliceType type) => "lyr_slice_" + Mangle(type.Element);
 
+    /// <summary><c>lyr_inl&lt;N&gt;_&lt;element&gt;</c>: an inline array (03 T13 A4), a struct around a
+    /// C array so that C copies it as a value.</summary>
+    private static string InlineName(IrInlineArrayType type) => $"lyr_inl{type.Length}_" + Mangle(type.Element);
+
     private static string Mangle(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "str",
@@ -197,6 +202,7 @@ public sealed class CEmitter
         IrRefType r => $"ref{r.Type.Value}",
         IrArrayType a => "arr_" + Mangle(a.Element),
         IrSliceType s => "slice_" + Mangle(s.Element),
+        IrInlineArrayType ia => $"inl{ia.Length}_" + Mangle(ia.Element),
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
     };
@@ -215,6 +221,7 @@ public sealed class CEmitter
         IrRefType r => Qualified(_module.Types[r.Type.Value]),
         IrArrayType a => Display(a.Element) + "[]",
         IrSliceType s => $"Slice<{Display(s.Element)}>",
+        IrInlineArrayType ia => $"{Display(ia.Element)}[{ia.Length}]",
         IrOptionalType o => "?" + Display(o.Inner),
         _ => type.ToString() ?? "?",
     };
@@ -264,6 +271,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
         IrRefType or IrArrayType => (8, 8),
         IrSliceType => (16, 8),
+        IrInlineArrayType ia => (LayoutOf(ia.Element).Size * ia.Length, LayoutOf(ia.Element).Align),
         IrOptionalType o when IsNiche(o) => (8, 8),
         IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
         IrOptionalType o => OptionalLayout(o),
@@ -339,6 +347,7 @@ public sealed class CEmitter
             .Any(v => Payload(_module.Types[v.Value]).Any(HoldsReferences)),
         IrOptionalType o when !IsNiche(o) => HoldsReferences(o.Inner),
         IrSliceType => true, // its pointer, into the array's elements
+        IrInlineArrayType ia => HoldsReferences(ia.Element),
         _ => IsReference(type),
     };
 
@@ -364,6 +373,9 @@ public sealed class CEmitter
     {
         if (IsReference(type)) words.Add(offset / 8);
         else if (type is IrSliceType) words.Add(offset / 8); // the pointer, first word; an interior one
+        else if (type is IrInlineArrayType inline)
+            for (var i = 0; i < inline.Length; i++)
+                ReferenceWords(inline.Element, offset + i * LayoutOf(inline.Element).Size, words, ref ambiguous);
         else if (type is IrStructType inner) ReferenceWords(_module.Types[inner.Type.Value], offset, words, ref ambiguous);
         else if (type is IrEnumType) ambiguous |= HoldsReferences(type);
         else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words, ref ambiguous);
@@ -376,11 +388,20 @@ public sealed class CEmitter
 
     /// <summary>The elements of an array or a view temp, typed: <c>LYR_ARR_DATA(t, T)[i]</c>, or
     /// the view's pointer.</summary>
-    private string Elements(TempId array, IrType element) =>
-        TypeOf(array) is IrSliceType ? $"{Temp(array)}.ptr" : $"LYR_ARR_DATA({Temp(array)}, {CType(element)})";
+    private string Elements(TempId array, IrType element) => TypeOf(array) switch
+    {
+        IrSliceType => $"{Temp(array)}.ptr",
+        IrInlineArrayType => $"{Temp(array)}->v", // the temp aliases the value's storage
+        _ => $"LYR_ARR_DATA({Temp(array)}, {CType(element)})",
+    };
 
-    /// <summary>The length of an array or a view temp.</summary>
-    private string Length(TempId array) => TypeOf(array) is IrSliceType ? $"{Temp(array)}.len" : $"{Temp(array)}->len";
+    /// <summary>The length of an array, a view or an inline array temp.</summary>
+    private string Length(TempId array) => TypeOf(array) switch
+    {
+        IrSliceType => $"{Temp(array)}.len",
+        IrInlineArrayType ia => $"INT64_C({ia.Length})",
+        _ => $"{Temp(array)}->len",
+    };
 
     /// <summary>The storage beside a struct-typed temp, for the values it makes fresh.</summary>
     private static string Storage(TempId temp) => $"t{temp.Value}_s";
@@ -426,7 +447,7 @@ public sealed class CEmitter
             .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
             .Concat(_module.Types.SelectMany(t => t.FieldTypes))
             .ToList();
-        var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType).ToList();
+        var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType).ToList();
         // Every element type an array is made of, the array's own element type included when it
         // is itself an array: each gets a descriptor, after the structs it may hold.
         var elements = new List<IrType>();
@@ -436,6 +457,7 @@ public sealed class CEmitter
             if (type is IrArrayType a && seen.Add(Mangle(a.Element))) { elements.Add(a.Element); Element(a.Element); }
             else if (type is IrOptionalType o) Element(o.Inner);
             else if (type is IrSliceType s) Element(s.Element);
+            else if (type is IrInlineArrayType ia) Element(ia.Element);
         }
         foreach (var type in named) Element(type);
         if (indices.Count == 0 && used.Count == 0 && elements.Count == 0) return;
@@ -463,6 +485,13 @@ public sealed class CEmitter
             {
                 Require(optional.Inner);
                 _out.AppendLine($"typedef struct {{ {Declare(optional.Inner, "value")}; uint8_t has; }} {OptionalName(optional)};");
+            }
+            else if (type is IrInlineArrayType inline && optionals.Add(InlineName(inline)))
+            {
+                Require(inline.Element);
+                var (size, _) = LayoutOf(inline);
+                _out.AppendLine($"typedef struct {{ {Declare(inline.Element, $"v[{inline.Length}]")}; }} {InlineName(inline)};");
+                _out.AppendLine($"_Static_assert(sizeof({InlineName(inline)}) == {size}, \"layout of {InlineName(inline)}\");");
             }
             else if (type is IrSliceType slice && optionals.Add(SliceName(slice)))
             {
@@ -719,6 +748,11 @@ public sealed class CEmitter
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
+        CopyValue c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
+        // An inline array (A4): its storage filled element by element, or from one value.
+        NewInline n => n.Repeat
+            ? $"for (int64_t lyr_i = 0; lyr_i < {n.Length}; lyr_i++) {Storage(n.Dest)}.v[lyr_i] = {Value(n.Elements[0])}; {Temp(n.Dest)} = &{Storage(n.Dest)};"
+            : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{ .v = {{ {string.Join(", ", n.Elements.Select(Value))} }} }}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         LoadField f => IsAggregate(f.FieldType)
             ? $"{Temp(f.Dest)} = &{Temp(f.Object)}->{Field(f.Type, f.Field)};"
             : $"{Temp(f.Dest)} = {Temp(f.Object)}->{Field(f.Type, f.Field)};",
@@ -833,7 +867,12 @@ public sealed class CEmitter
     /// as a field write is.</summary>
     private string StoreElement(StoreElem s)
     {
-        var element = TypeOf(s.Array) is IrSliceType view ? view.Element : ((IrArrayType)TypeOf(s.Array)).Element;
+        var element = TypeOf(s.Array) switch
+        {
+            IrSliceType view => view.Element,
+            IrInlineArrayType inline => inline.Element,
+            _ => ((IrArrayType)TypeOf(s.Array)).Element,
+        };
         var slot = $"{Elements(s.Array, element)}[{Temp(s.Index)}]";
         var check = $"LYR_CHECK_INDEX({Temp(s.Index)}, {Length(s.Array)}); ";
         // Through a view the barrier gets the interior pointer as the place: it takes a place as

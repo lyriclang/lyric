@@ -48,6 +48,7 @@ public abstract record LyrType
         (Optional x, Optional y) => Equal(x.Inner, y.Inner),
         (ArrayOf x, ArrayOf y) => Equal(x.Element, y.Element),
         (SliceOf x, SliceOf y) => Equal(x.Element, y.Element),
+        (InlineArrayOf x, InlineArrayOf y) => x.Length == y.Length && Equal(x.Element, y.Element),
         (TupleOf x, TupleOf y) => SameSequence(x.Elements, y.Elements),
         (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters),
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
@@ -86,6 +87,7 @@ public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments)
 public sealed record Optional(LyrType Inner) : LyrType;              // ?T
 public sealed record ArrayOf(LyrType Element) : LyrType;             // T[]
 public sealed record SliceOf(LyrType Element) : LyrType;             // Slice<T>: a view of T[] (03 T13 A2)
+public sealed record InlineArrayOf(LyrType Element, int Length) : LyrType; // T[N]: N elements inline, a value (03 T13 A4)
 public sealed record TupleOf(LyrType[] Elements) : LyrType;
 public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType;
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type

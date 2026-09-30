@@ -1749,6 +1749,20 @@ public sealed class TypeChecker
                 return Report(t.Span, "LYR-SEM0008", "'this' is only valid inside a method");
             case UnaryExpr u: return CheckUnary(u, scope);
             case PostfixExpr p: return CheckPostfix(p, scope);
+            // '[x] * 64' where a 'T[64]' is expected builds the inline array at compile time (10 C7):
+            // the count is a literal equal to the type's length.
+            case BinaryExpr { Operator: BinaryOp.Mul, Left: ArrayLitExpr { Elements.Length: 1 } one, Right: IntLiteralExpr count } repeat
+                when expected is InlineArrayOf inline:
+            {
+                var element = CheckExpr(one.Elements[0], scope, inline.Element);
+                CheckAssignable(one.Elements[0], element, inline.Element, one.Elements[0].Span);
+                _result.SetType(one, inline);
+                _result.SetType(count, LyrType.Int);
+                if (count.Value != (ulong)inline.Length)
+                    return Report(repeat.Span, "LYR-SEM0001",
+                        $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the repetition makes {count.Value}");
+                return inline;
+            }
             case BinaryExpr b: return CheckBinary(b, scope);
             case AssignExpr a: return CheckAssign(a, scope);
             case RangeExpr r: return CheckRange(r, scope);
@@ -3204,6 +3218,7 @@ public sealed class TypeChecker
             {
                 ArrayOf a => new SliceOf(a.Element),
                 SliceOf s => s,
+                InlineArrayOf ia => ViewOfInline(ix.Target, ia, ix.Span),
                 ErrorType => LyrType.Error,
                 _ => Report(ix.Span, "LYR-SEM0007",
                     $"'{TypeFacts.Display(target)}' has no view to take — a range indexes an array or a 'Slice<T>'"),
@@ -3215,6 +3230,7 @@ public sealed class TypeChecker
         {
             ArrayOf a => a.Element,
             SliceOf s => s.Element,
+            InlineArrayOf ia => ia.Element,
 
             // A string has NO index operator. A code point position costs O(n) — a 'char' is a code
             // point and the length counts the same units — so the obvious indexing loop would be
@@ -3253,7 +3269,7 @@ public sealed class TypeChecker
             var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
             if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
             _result.SetType(fromEnd, LyrType.Int);
-            if (target is not (ArrayOf or SliceOf or ErrorType))
+            if (target is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType))
                 _de.Report("LYR-SEM0114", Severity.Error, fromEnd.Span,
                     $"'^' counts from the end of a value that has a length; '{TypeFacts.Display(target)}' has none");
             return;
@@ -3268,8 +3284,50 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0007", Severity.Error, index.Span, $"an index is an 'int', got '{TypeFacts.Display(t)}'");
     }
 
+    /// <summary>
+    /// A view of an inline array is taken where the array is HEAP-RESIDENT (03 T13 A4): a field
+    /// of an object, an element of an array or of a view, or inside a struct that is — reached
+    /// through a reference somewhere on the way. A view of a local, a parameter or a field of a
+    /// struct local would point into a frame that may end before the view does; that array is
+    /// copied or passed whole instead.
+    /// </summary>
+    private LyrType ViewOfInline(Expr array, InlineArrayOf type, Span span)
+    {
+        if (IsHeapResident(array)) return new SliceOf(type.Element);
+        return Report(span, "LYR-SEM0115",
+            $"a view of an inline array is taken only where the array lies in the heap — a field of an object or an element of an array; "
+            + "this one lies in a frame. Copy it into an object, or pass the array itself");
+    }
+
+    private bool IsHeapResident(Expr expr)
+    {
+        switch (expr)
+        {
+            case IndexExpr ix:
+                return _result.TypeOf(ix.Target) is ArrayOf or SliceOf || IsHeapResident(ix.Target);
+            case MemberExpr m:
+                return TypeFacts.KindOf(_result.TypeOf(m.Target)) == TypeSymbolKind.Class || IsHeapResident(m.Target);
+            case ThisExpr t:
+                return TypeFacts.KindOf(_result.TypeOf(t)) == TypeSymbolKind.Class;
+            default:
+                return false;
+        }
+    }
+
     private LyrType CheckArrayLit(ArrayLitExpr arr, SymbolTable scope, LyrType? expected)
     {
+        // '[a, b, c]' where a 'T[3]' is expected builds the inline array (03 T13 A4; 10 C7): the
+        // literal has exactly the length the type says, or it is refused.
+        if (expected is InlineArrayOf inline)
+        {
+            foreach (var element in arr.Elements)
+                CheckAssignable(element, CheckExpr(element, scope, inline.Element), inline.Element, element.Span);
+            if (arr.Elements.Length != inline.Length)
+                return Report(arr.Span, "LYR-SEM0001",
+                    $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the literal has {arr.Elements.Length}");
+            return inline;
+        }
+
         var elemExpected = expected is ArrayOf ea ? ea.Element : null;
         if (arr.Elements.Length == 0)
             return new ArrayOf(elemExpected ?? LyrType.Error); // empty: the element type comes from the context alone
@@ -3474,6 +3532,7 @@ public sealed class TypeChecker
         Optional o => MentionsTypeParam(o.Inner),
         ArrayOf a => MentionsTypeParam(a.Element),
         SliceOf s => MentionsTypeParam(s.Element),
+        InlineArrayOf ia => MentionsTypeParam(ia.Element),
         CoroutineOf c => MentionsTypeParam(c.Yield),
         TupleOf t => t.Elements.Any(MentionsTypeParam),
         GenericInstance g => g.Arguments.Any(MentionsTypeParam),
@@ -3584,7 +3643,7 @@ public sealed class TypeChecker
         // the index are the primitives), and it is a CALL, with parentheses like every length
         // (10 N8). Without them the name is refused rather than read as a field: the two forms
         // would otherwise mean one thing, and 'xs.length' read like a field of the array.
-        if (baseType is ArrayOf or SliceOf && mem.Member == "length")
+        if (baseType is ArrayOf or SliceOf or InlineArrayOf && mem.Member == "length")
         {
             if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
             return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
@@ -3693,6 +3752,7 @@ public sealed class TypeChecker
             Optional o => new Optional(Substitute(o.Inner, map)),
             ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
             SliceOf s => new SliceOf(Substitute(s.Element, map)),
+            InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()),
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
@@ -3726,6 +3786,8 @@ public sealed class TypeChecker
                 if (!arg.IsError) map.TryAdd(tp.Param, arg);
                 break;
             case ArrayOf pa when arg is ArrayOf aa: UnifyInfer(pa.Element, aa.Element, map, argSpan); break;
+            case InlineArrayOf pi when arg is InlineArrayOf ai && pi.Length == ai.Length:
+                UnifyInfer(pi.Element, ai.Element, map, argSpan); break;
             case SliceOf ps when arg is SliceOf or ArrayOf:
                 UnifyInfer(ps.Element, arg is SliceOf sa ? sa.Element : ((ArrayOf)arg).Element, map, argSpan); break;
             case Optional po when arg is Optional ao: UnifyInfer(po.Inner, ao.Inner, map, argSpan); break;
@@ -3822,6 +3884,7 @@ public sealed class TypeChecker
         Optional o => HasOpenParam(o.Inner, map),
         ArrayOf a => HasOpenParam(a.Element, map),
         SliceOf s => HasOpenParam(s.Element, map),
+        InlineArrayOf ia => HasOpenParam(ia.Element, map),
         TupleOf tu => tu.Elements.Any(e => HasOpenParam(e, map)),
         FnType f => f.Parameters.Any(p => HasOpenParam(p, map)) || HasOpenParam(f.Return, map),
         GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
@@ -3841,6 +3904,7 @@ public sealed class TypeChecker
             case Optional o: BindOpenParamsToError(o.Inner, map); break;
             case ArrayOf a: BindOpenParamsToError(a.Element, map); break;
             case SliceOf s: BindOpenParamsToError(s.Element, map); break;
+            case InlineArrayOf ia: BindOpenParamsToError(ia.Element, map); break;
             case TupleOf t: foreach (var e in t.Elements) BindOpenParamsToError(e, map); break;
             case FnType f:
                 foreach (var p in f.Parameters) BindOpenParamsToError(p, map);
@@ -3867,6 +3931,7 @@ public sealed class TypeChecker
         Optional o => ContainsError(o.Inner),
         ArrayOf a => ContainsError(a.Element),
         SliceOf s => ContainsError(s.Element),
+        InlineArrayOf ia => ContainsError(ia.Element),
         TupleOf t => t.Elements.Any(ContainsError),
         FnType f => f.Parameters.Any(ContainsError) || ContainsError(f.Return),
         GenericInstance g => g.Arguments.Any(ContainsError),
@@ -5130,6 +5195,8 @@ public sealed class TypeChecker
                 return MissingArrayCases(array, pats);
             case SliceOf view:
                 return MissingArrayCases(new ArrayOf(view.Element), pats);
+            case InlineArrayOf inline:
+                return MissingArrayCases(new ArrayOf(inline.Element), pats, inline.Length);
             case TupleOf tuple:
                 return MissingTupleCases(tuple, pats);
             default:
@@ -5245,7 +5312,7 @@ public sealed class TypeChecker
     /// testing covers its length exactly, or every length from there up when it carries a rest;
     /// the answer is the smallest length nothing covers, written as a pattern.
     /// </summary>
-    private List<string> MissingArrayCases(ArrayOf array, List<Pattern> pats)
+    private List<string> MissingArrayCases(ArrayOf array, List<Pattern> pats, int? fixedLength = null)
     {
         var exact = new HashSet<int>();
         var open = int.MaxValue; // the smallest length from which on everything is covered
@@ -5262,6 +5329,11 @@ public sealed class TypeChecker
             if (ap.Elements.Any(e => e is RestPattern)) open = Math.Min(open, positions.Length);
             else exact.Add(positions.Length);
         }
+
+        // An inline array has one length (A4): only that class needs covering.
+        if (fixedLength is { } only)
+            return exact.Contains(only) || only >= open ? []
+                : [only == 0 ? "[]" : "[" + string.Join(", ", Enumerable.Repeat("_", only)) + "]"];
 
         for (var n = 0; n < open && n <= 64; n++)
             if (!exact.Contains(n))
@@ -5504,14 +5576,19 @@ public sealed class TypeChecker
     /// unless it is nothing but a rest.</summary>
     private void BindArrayPattern(ArrayPattern ap, LyrType scrutinee, SymbolTable scope, bool mutable)
     {
-        if (scrutinee is not (ArrayOf or SliceOf))
+        if (scrutinee is not (ArrayOf or SliceOf or InlineArrayOf))
         {
             Report(ap.Span, "LYR-SEM0029",
                 $"array pattern cannot match '{TypeFacts.Display(scrutinee)}' — only an array has elements at positions");
             BindPoison(ap, scope);
             return;
         }
-        var array = scrutinee is ArrayOf whole ? whole : new ArrayOf(((SliceOf)scrutinee).Element);
+        var array = scrutinee switch
+        {
+            ArrayOf whole => whole,
+            SliceOf view => new ArrayOf(view.Element),
+            _ => new ArrayOf(((InlineArrayOf)scrutinee).Element),
+        };
 
         foreach (var element in ap.Elements)
         {
@@ -6082,6 +6159,7 @@ public sealed class TypeChecker
         Optional o => ContainsTypeParam(o.Inner),
         ArrayOf a => ContainsTypeParam(a.Element),
         SliceOf s => ContainsTypeParam(s.Element),
+        InlineArrayOf ia => ContainsTypeParam(ia.Element),
         TupleOf tu => tu.Elements.Any(ContainsTypeParam),
         FnType f => ContainsTypeParam(f.Return) || f.Parameters.Any(ContainsTypeParam),
         GenericInstance gi => gi.Arguments.Any(ContainsTypeParam),
@@ -6324,6 +6402,7 @@ public sealed class TypeChecker
             NamedType named => [named],
             NullableType optional => Inside(optional.Inner),
             TupleType tuple => tuple.Elements.SelectMany(Inside),
+            ArrayType { Length: not null } inline => Inside(inline.Element), // T[N] holds by value (A4)
             _ => [],
         };
 
@@ -6355,6 +6434,14 @@ public sealed class TypeChecker
 
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
             return true;                                                                    // T[] to Slice<T>, A2
+        if (coercionSite && to is SliceOf viewOfInline && from is InlineArrayOf inlineArray
+            && LyrType.Equal(inlineArray.Element, viewOfInline.Element))
+        {
+            // T[N] to Slice<T> (A4): where the array lies in the heap; otherwise the refusal is
+            // reported here, with its reason, and no second message follows.
+            ViewOfInline(expr, inlineArray, expr.Span);
+            return true;
+        }
         if (coercionSite && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
@@ -6493,6 +6580,7 @@ public sealed class TypeChecker
                 return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };
             }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
+            case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());
             case FunctionType f: return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope));

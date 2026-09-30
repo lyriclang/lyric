@@ -829,6 +829,7 @@ internal sealed class TypeTable
         // no named layout.
         ArrayOf a => new IrArrayType(Lower(a.Element, span)),
         SliceOf s => new IrSliceType(Lower(s.Element, span)),
+        InlineArrayOf ia => new IrInlineArrayType(Lower(ia.Element, span), ia.Length),
 
         // ?T is not nestable. The sema already collapses '??T'; a boundary stands here all the same,
         // rather than a silent assumption.
@@ -867,6 +868,8 @@ internal sealed class TypeTable
     {
         // T[]. There is no size in the type: the length is a property of the value, and the
         // parser refuses a written one (LYR-PAR0043).
+        if (node is ArrayType { Length: { } n } inline)
+            return new IrInlineArrayType(Lower(inline.Element, inline.Element.Span), n);
         if (node is ArrayType array)
             return new IrArrayType(Lower(array.Element, array.Element.Span));
 
@@ -1048,6 +1051,7 @@ internal sealed class TypeTable
                     generic.TypeArguments.Select(argument => Resolve(argument, span)).ToArray());
         }
 
+        if (node is ArrayType { Length: { } n } inline) return new InlineArrayOf(Resolve(inline.Element, span), n);
         if (node is ArrayType array) return new ArrayOf(Resolve(array.Element, span));
         if (node is NullableType option) return new Optional(Resolve(option.Inner, span));
         if (node is ThrowingType throwing) return Resolve(throwing.Inner, span);

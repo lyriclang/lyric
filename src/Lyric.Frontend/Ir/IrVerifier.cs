@@ -787,6 +787,8 @@ public static class IrVerifier
                 case StoreElem e: CheckStoreElem(e, block, index); break;
                 case ArrayLen a: CheckArrayLen(a, block, index); break;
                 case MakeSlice s: CheckMakeSlice(s, block, index); break;
+                case NewInline n: CheckNewInline(n, block, index); break;
+                case CopyValue c: CheckCopyValue(c, block, index); break;
                 case ArrayConcat c: CheckArrayConcat(c, block, index); break;
                 case ArrayRepeat r: CheckArrayRepeat(r, block, index); break;
                 case OptNone n: CheckOptNone(n, block, index); break;
@@ -1461,9 +1463,29 @@ public static class IrVerifier
     {
         if (TypeOf(array) is IrArrayType a) return a.Element;
         if (TypeOf(array) is IrSliceType s) return s.Element;
+        if (TypeOf(array) is IrInlineArrayType ia) return ia.Element;
 
         Report(block, index, $"{what} expects {array} to be an array or a slice, found {Show(TypeOf(array))}");
         return null;
+    }
+
+    private void CheckNewInline(NewInline n, BlockId block, int index)
+    {
+        RequireDestType(n.Dest, new IrInlineArrayType(n.Element, n.Length), "newinline", block, index);
+        if (n.Repeat ? n.Elements.Length != 1 : n.Elements.Length != n.Length)
+            Report(block, index, $"newinline of {n.Length} takes {(n.Repeat ? "one element" : $"{n.Length} elements")}, got {n.Elements.Length}");
+        foreach (var element in n.Elements)
+            if (!IrType.Equal(n.Element, TypeOf(element)))
+                Report(block, index, $"newinline element {element} is {Show(TypeOf(element))}, expected {Show(n.Element)}");
+    }
+
+    private void CheckCopyValue(CopyValue c, BlockId block, int index)
+    {
+        if (c.Type is not IrInlineArrayType)
+            Report(block, index, $"copyvalue copies an inline array; {Show(c.Type)} is not one");
+        if (!IrType.Equal(c.Type, TypeOf(c.Value)))
+            Report(block, index, $"copyvalue of {Show(c.Type)} takes {c.Value}, which is {Show(TypeOf(c.Value))}");
+        RequireDestType(c.Dest, c.Type, "copyvalue", block, index);
     }
 
     private void CheckMakeSlice(MakeSlice s, BlockId block, int index)
@@ -1851,6 +1873,7 @@ public static class IrVerifier
             IrRefType r => $"&{r.Type}",
             IrArrayType a => $"{Show(a.Element)}[]",
             IrSliceType s => $"Slice<{Show(s.Element)}>",
+            IrInlineArrayType ia => $"{Show(ia.Element)}[{ia.Length}]",
             IrOptionalType o => $"?{Show(o.Inner)}",
             IrEnumType e => $"enum {e.Type}",
         IrInterfaceType i => $"dyn {i.Type}",

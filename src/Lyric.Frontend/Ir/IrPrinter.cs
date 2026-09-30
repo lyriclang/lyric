@@ -178,6 +178,9 @@ public static class IrPrinter
         StoreElem e => $"storeelem {e.Array}, {e.Index}, {e.Value}",
         ArrayLen a => $"{a.Dest}: i64 = arraylen {a.Array}",
         MakeSlice s => $"{s.Dest}: {TypeStr(new IrSliceType(s.Element))} = mkslice {s.Array}, {s.Low}, {s.High}",
+        NewInline n => $"{n.Dest}: {TypeStr(new IrInlineArrayType(n.Element, n.Length))} = newinline "
+                       + (n.Repeat ? $"{n.Elements[0]} * {n.Length}" : $"[{string.Join(", ", n.Elements)}]"),
+        CopyValue c => $"{c.Dest}: {TypeStr(c.Type)} = copyvalue {c.Value}",
         ArrayConcat c => $"{c.Dest}: {TypeStr(new IrArrayType(c.Element))} = arrcat {c.Left}, {c.Right}",
         ArrayRepeat r => $"{r.Dest}: {TypeStr(new IrArrayType(r.Element))} = arrrep {r.Array}, {r.Count}",
 
@@ -263,6 +266,7 @@ public static class IrPrinter
         IrRefType r => $"&{r.Type}",
         IrArrayType a => $"{TypeStr(a.Element)}[]",
         IrSliceType s => $"Slice<{TypeStr(s.Element)}>",
+        IrInlineArrayType ia => $"{TypeStr(ia.Element)}[{ia.Length}]",
         IrOptionalType o => $"?{TypeStr(o.Inner)}",
         IrEnumType e => $"enum {e.Type}",
         IrInterfaceType i => $"dyn {i.Type}",

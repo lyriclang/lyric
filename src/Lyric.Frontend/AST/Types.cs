@@ -16,7 +16,12 @@ public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Spa
 {
     public required Span NameSpan { get; init; }
 }
-public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span);    // T[]; the length belongs to the value, not the type
+/// <summary><c>T[]</c>, the length a property of the value; or <c>T[N]</c> with a literal
+/// length, the inline array — a value of N elements (design/v5/spec/03 T13 A4).</summary>
+public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span)
+{
+    public int? Length { get; init; }
+}
 
 /// <remarks><c>Coroutine&lt;int&gt; throws Exception</c> — throwability as part of the TYPE, so it
 /// survives a field, an optional and a parameter. <see cref="Thrown"/> is null for the typeless

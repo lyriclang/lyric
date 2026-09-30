@@ -44,6 +44,7 @@ public class CEmitterTests
     [InlineData("patterns")]
     [InlineData("arrays")]
     [InlineData("slices")]
+    [InlineData("inline")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -56,6 +57,9 @@ public class CEmitterTests
         Assert.True(File.Exists(path), $"no golden at {path}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), actual);
     }
+
+    private const string INLINE_EXPECTED =
+        "copy 10 1 3 3\nrepeat 0 7 7\nheap 2 60 80\nstruct 100 1 40\ngrid 3 2 2\narray 8 7 7 7\nmatch 15\n";
 
     public static TheoryData<string, Profile, int, string> Programs_()
     {
@@ -91,6 +95,7 @@ public class CEmitterTests
             data.Add("slices", profile, 0,
                 "view 3 20 40 90\nopen 2 40 5 30\nthrough 21 31 51 31\nnested 2 31 41\nwhole 154\nfield 2 99 51\n"
                 + "strings bob cy 2\nstructs 30 6 0\nmatch empty one 10 first 10 rest 4\nempty 0 0\n");
+            data.Add("inline", profile, 0, INLINE_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -179,6 +184,8 @@ public class CEmitterTests
         { "badslice", Profile.Release, "panic [LYR-RT0003]: range 2..7 out of bounds for length 5" },
         { "inverted", Profile.Debug, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
         { "inverted", Profile.Release, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
+        { "inlineindex", Profile.Debug, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
+        { "inlineindex", Profile.Release, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the

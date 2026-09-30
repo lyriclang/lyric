@@ -152,6 +152,7 @@ public class GoldenTests
     [InlineData("match_stmt")]        // match (…) { arms } with a guard and a block arm
     [InlineData("struct_init_binding")] // let p = Point { … }; — a struct initializer in value position
     [InlineData("let_else_implicit")] // let .Num(n) = s else { … }; — a dotted pattern opens a let-else (08 Y6)
+    [InlineData("inline_array_type")] // let m: float[4][4] = …; — the inline array type (03 T13 A4)
     public void Golden_statement_matches_snapshot(string name)
         => Check(name, p => p.ParseStatement());
 

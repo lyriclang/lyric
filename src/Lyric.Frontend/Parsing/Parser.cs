@@ -1019,17 +1019,20 @@ public sealed partial class Parser
         {
             _buffer.Advance();
 
-            // 'T[3]' is not a type of this grammar (§4): the length belongs to the VALUE. Parsed
-            // and refused here, so the message can say what was meant instead of "expected ']'".
+            // 'T[3]' is the inline array (design/v5/spec/03 T13 A4): a value of that many
+            // elements. The length is a literal in 5.0; a constant or a parameter is a door (T18).
+            int? length = null;
             if (_buffer.Check(TokenKind.IntLiteral))
             {
                 var sizeTok = _buffer.Advance();
-                _de.Report("LYR-PAR0043", Severity.Error, sizeTok.Span,
-                    "an array type carries no length — the length belongs to the value; "
-                    + "use 'T[]' and build the array with '[x] * n'");
+                var text = _sm.Slice(sizeTok.Span).ToString().Replace("_", "");
+                if (!int.TryParse(text, out var n) || n <= 0)
+                    _de.Report("LYR-PAR0043", Severity.Error, sizeTok.Span,
+                        "the length of an inline array is a positive decimal literal");
+                else length = n;
             }
             var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close array type");
-            type = new ArrayType(type, Span.Union(type.Span, close.Span));
+            type = new ArrayType(type, Span.Union(type.Span, close.Span)) { Length = length };
         }
 
         // 'Coroutine<int> throws Exception'. Binds tighter than '?', so '?Coroutine<int> throws E'

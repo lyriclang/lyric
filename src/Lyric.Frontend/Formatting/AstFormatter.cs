@@ -1042,7 +1042,7 @@ public sealed class AstFormatter
             a.Element is NullableType or FunctionType
                 ? Doc.Of(Doc.From("("), TypeDoc(a.Element), Doc.From(")"))
                 : TypeDoc(a.Element),
-            Doc.From("[]")),
+            Doc.From(a.Length is { } len ? $"[{len}]" : "[]")),
         TupleType t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select(TypeDoc).ToArray()), Doc.From(")")),
         FunctionType f => Doc.Of(Doc.From("fn("),

@@ -116,6 +116,20 @@ public class FormatterTests
             """, Format("fn f(xs:int[]):Slice<int>{let v=xs[ 1 .. ^1 ];return v[..2][1..][ .. ][..=0];}"));
     }
 
+    [Fact]
+    public void An_inline_array_type_keeps_its_length()
+    {
+        // 'T[N]' (design/v5/spec/03 T13 A4) is a type of its own; the length is printed as written,
+        // and an optional element keeps its parentheses as it does for 'T[]'.
+        Assert.Equal("""
+            struct Mat {
+                m: float[16],
+                grid: (?int)[2][2],
+            }
+
+            """, Format("struct Mat{m:float[ 16 ],grid:(?int)[2][2]}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

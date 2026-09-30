@@ -39,6 +39,8 @@ public static class IrShape
         StoreElem e => new[] { e.Array, e.Index, e.Value },
         ArrayLen a => new[] { a.Array },
         MakeSlice s => new[] { s.Array, s.Low, s.High },
+        NewInline n => n.Elements,
+        CopyValue c => new[] { c.Value },
         ArrayConcat c => new[] { c.Left, c.Right },
         ArrayRepeat r => new[] { r.Array, r.Count },
 
@@ -106,6 +108,8 @@ public static class IrShape
         StoreElem => null,
         ArrayLen a => a.Dest,
         MakeSlice s => s.Dest,
+        NewInline n => n.Dest,
+        CopyValue c => c.Dest,
         ArrayConcat c => c.Dest,
         ArrayRepeat r => r.Dest,
 
@@ -183,6 +187,8 @@ public static class IrShape
             StoreElem e => e with { Array = temp(e.Array), Index = temp(e.Index), Value = temp(e.Value) },
             ArrayLen a => a with { Dest = temp(a.Dest), Array = temp(a.Array) },
             MakeSlice s => s with { Dest = temp(s.Dest), Array = temp(s.Array), Low = temp(s.Low), High = temp(s.High) },
+            NewInline n => n with { Dest = temp(n.Dest), Elements = n.Elements.Select(temp).ToArray() },
+            CopyValue c => c with { Dest = temp(c.Dest), Value = temp(c.Value) },
             ArrayConcat c => c with { Dest = temp(c.Dest), Left = temp(c.Left), Right = temp(c.Right) },
             ArrayRepeat r => r with { Dest = temp(r.Dest), Array = temp(r.Array), Count = temp(r.Count) },
 

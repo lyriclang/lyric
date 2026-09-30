@@ -1913,6 +1913,17 @@ internal sealed class FunctionLowerer
         // What to make of the result follows from the operator on this node: '==' is the call
         // itself, '!=' negates it, and the four orderings read the SIGN of what 'compare' answered —
         // against zero, with the same comparison instruction an 'int < int' emits.
+        // '[x] * 64' as a 'T[64]' (10 C7): the inline array, its one element repeated.
+        if (TypeOfExpr(expr) is IrInlineArrayType repeated
+            && expr is { Operator: BinaryOp.Mul, Left: ArrayLitExpr { Elements: [var one] } })
+        {
+            var element = LowerExprAs(one, repeated.Element);
+            var built = _slots.NewTemp(repeated);
+            _b.Emit(new NewInline(built, repeated.Element, repeated.Length, [element], Repeat: true, expr.Span));
+            _fresh.Add(built);
+            return built;
+        }
+
         if (_types.OperatorCallOf(expr) is { } desugared)
         {
             var value = LowerCall(desugared)
@@ -2373,7 +2384,7 @@ internal sealed class FunctionLowerer
         // NOT covered here and reports as a scope boundary: it would need a read and a write with the
         // same index, and whether the index may be evaluated twice is a language question the spec does
         // not answer.
-        if (TypeOfExpr(indexed.Target) is not (IrArrayType or IrSliceType))
+        if (TypeOfExpr(indexed.Target) is not (IrArrayType or IrSliceType or IrInlineArrayType))
         {
             if (expr.Operator is not null)
                 throw NotSupported("compound assignment on a container (only on arrays)",
@@ -3172,11 +3183,21 @@ internal sealed class FunctionLowerer
             from = target;
         }
 
-        // An array where a view is expected gives a view of itself, whole (03 T13 A2).
-        if (target is IrSliceType view && source is IrArrayType && from is not IrOptionalType)
+        // An array where a view is expected gives a view of itself, whole (03 T13 A2); an inline
+        // array too, where the sema found it in the heap (A4).
+        if (target is IrSliceType view && source is IrArrayType or IrInlineArrayType && from is not IrOptionalType)
         {
             value = ViewOf(value, view.Element, span);
             from = target;
+        }
+
+        // An inline array is a value like a struct (A4): copied at its binding point.
+        if (target is IrInlineArrayType inlineValue && from is not IrOptionalType && !_fresh.Contains(value))
+        {
+            var copy = _slots.NewTemp(inlineValue);
+            _b.Emit(new CopyValue(copy, value, inlineValue, span));
+            _fresh.Add(copy);
+            value = copy;
         }
 
         // Value semantics. The binding point is where a struct value gets a new home; that is where the
@@ -3523,6 +3544,18 @@ internal sealed class FunctionLowerer
     /// in source order at the <c>newarr</c>.</summary>
     private TempId LowerArrayLiteral(ArrayLitExpr expr)
     {
+        // '[a, b, c]' as a 'T[3]' (03 T13 A4): the inline array, a fresh value.
+        if (TypeOfExpr(expr) is IrInlineArrayType inline)
+        {
+            var parts = new TempId[expr.Elements.Length];
+            for (var i = 0; i < expr.Elements.Length; i++)
+                parts[i] = LowerExprAs(expr.Elements[i], inline.Element);
+            var built = _slots.NewTemp(inline);
+            _b.Emit(new NewInline(built, inline.Element, inline.Length, parts, Repeat: false, expr.Span));
+            _fresh.Add(built);
+            return built;
+        }
+
         if (TypeOfExpr(expr) is not IrArrayType type)
             throw NotSupported("array literal of a non-array type", expr.Span);
 
@@ -3565,7 +3598,7 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId? LowerIndexableCall(IndexExpr expr, string method, TempId? value)
     {
-        if (TypeOfExpr(expr.Target) is IrArrayType or IrSliceType) return null;
+        if (TypeOfExpr(expr.Target) is IrArrayType or IrSliceType or IrInlineArrayType) return null;
 
         var carrier = SubstituteType(_types.TypeOf(expr.Target));
         if (TypeFacts.SymbolOf(carrier) is not { } owner) return null;
@@ -3616,6 +3649,7 @@ internal sealed class FunctionLowerer
     {
         IrArrayType a => a.Element,
         IrSliceType s => s.Element,
+        IrInlineArrayType ia => ia.Element,
         _ => null,
     };
 
@@ -4382,7 +4416,7 @@ internal sealed class FunctionLowerer
         // behind it, which is exactly what the value-call test matches.
         // 'xs.length()' on an array or a view is built in: neither a field nor a method (03 T13 A1).
         if (expr.Callee is MemberExpr { Member: "length", IsOptional: false } length
-            && TypeOfExpr(length.Target) is IrArrayType or IrSliceType)
+            && TypeOfExpr(length.Target) is IrArrayType or IrSliceType or IrInlineArrayType)
             return LowerArrayLength(length.Target, expr.Span);
 
         if (expr.Callee is MemberExpr { Member: "next" } pull
