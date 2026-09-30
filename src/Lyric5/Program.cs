@@ -9,8 +9,8 @@ namespace Lyric5;
 /// <summary>
 /// The Lyric 5 driver: one binary with verbs (design/v5/spec/11 C1–C3), strict about what it
 /// does not know (exit 2), reporting what the program did wrong with exit 1 (C5). The verbs grow
-/// milestone by milestone; today: <c>version</c>, <c>help</c>, and <c>build --emit ir</c> — the
-/// front end behind the subset gate, up to the IR (M2 S1).
+/// milestone by milestone; today: <c>version</c>, <c>help</c>, and <c>build --emit ir|c</c> — the
+/// front end behind the subset gate, up to the IR (M2 S1) or the C (S2).
 /// </summary>
 public static class Program
 {
@@ -30,7 +30,7 @@ public static class Program
     {
         output.WriteLine("usage: lyric5 <verb> [options]");
         output.WriteLine();
-        output.WriteLine("  build <file.lyr> --emit ir   compile up to the IR and print it");
+        output.WriteLine("  build <file.lyr> --emit ir|c   compile up to the IR, or to the C, and print it");
         output.WriteLine("  version                      the toolchain and the C compiler it found");
         output.WriteLine("  help                         this");
         output.WriteLine();
@@ -64,8 +64,8 @@ public static class Program
             else return Unknown($"'build' takes one file, got '{file}' and '{arg}'");
         }
         if (file is null) return Unknown("'build' needs a file: lyric5 build <file.lyr>");
-        if (emit is null) return Unknown("'build' can only '--emit ir' yet (M2 S1); the binary comes with S4");
-        if (emit != "ir") return Unknown($"unknown emission '{emit}': ir");
+        if (emit is null) return Unknown("'build' can only '--emit ir' or '--emit c' yet (M2 S2); the binary comes with S4");
+        if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
         if (!File.Exists(file))
         {
             Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
@@ -82,8 +82,21 @@ public static class Program
             result.Diagnostics.RenderText(Console.Error);
             return 1;
         }
-        Console.Out.Write(IrPrinter.Dump(result.Ir));
-        return 0;
+        if (emit == "ir")
+        {
+            Console.Out.Write(IrPrinter.Dump(result.Ir));
+            return 0;
+        }
+        try
+        {
+            Console.Out.Write(CEmitter.Emit(result.Ir, result.Sources));
+            return 0;
+        }
+        catch (CEmitter.NotYetException notYet)
+        {
+            Console.Error.WriteLine($"error[{SubsetGate.NotYet}]: {notYet.Message}");
+            return 1;
+        }
     }
 
     // --- version -------------------------------------------------------------------------------

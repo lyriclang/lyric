@@ -146,6 +146,13 @@ S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 
    binary emits hello's IR in CI on every Tier 1 runner. Found on the way: `for` over a range
    lowers through the 4.x iterator classes and optionals; S2 gives range literals a counted-loop
    lowering.
+3. S2: `lyric5 build <file> --emit c` — the C emitter (`CEmitter`): one C function per IR
+   function in the platform ABI, locals and temps as C locals, blocks as labels and `goto`,
+   `#line` before every statement, checked integer arithmetic through the runtime's macros (with
+   `LYR_CHECKED_REM`: `MIN % -1` panics like `MIN / -1`), the `main` wrapper around
+   `lyr_run_main`. `for` over a range literal is a counted loop in the front end now (no
+   iterator object, no `std.iter`). Golden C for three programs; programs run natively in both
+   profiles, and a failed check panics with the `.lyr` line in the trace.
 
 ## Design decisions
 

@@ -48,13 +48,27 @@ public class RuntimeBuildTests
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
-    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null)
+    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null) =>
+        RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), name, profile, compiler, args);
+
+    /// <summary>C text (the emitter's) as a program: written into the cache, built and run like a
+    /// runtime test.</summary>
+    internal static ProcessRunner.Result RunEmitted(string cText, string name, Profile profile, string[]? args = null)
+    {
+        var dir = Path.Combine(Cache, "emitted");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, name + ".c");
+        File.WriteAllText(path, cText);
+        return RunC(path, name, profile, null, args);
+    }
+
+    private static ProcessRunner.Result RunC(string source, string name, Profile profile, CCompiler? compiler, string[]? args)
     {
         var build = new CBuild(compiler ?? Zig(), Target.Host, profile, Cache);
         var archive = RuntimeLayout.BuildArchive(build, Root, Path.Combine(Cache, "lib"));
-        var test = new CUnit(Path.Combine(Root, "runtime", "tests", name + ".c"), [],
+        var unit = new CUnit(source, [],
             [RuntimeLayout.IncludeDir(Root), Path.Combine(Root, "runtime", "third_party", "bdwgc", "include")]);
-        var objects = build.Compile([test]);
+        var objects = build.Compile([unit]);
         var exe = build.LinkExecutable([.. objects, archive],
             Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), name + Target.Host.ExecutableSuffix));
         return ProcessRunner.Run(exe, args ?? [], TimeSpan.FromMinutes(2));

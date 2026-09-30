@@ -1,0 +1,14 @@
+// A counted loop over a range literal, inclusive and exclusive, with continue and break; the
+// exit code is 525 masked to a byte, 13.
+fn main(): int {
+    var total = 0;
+    for (i in 1..=10) {
+        if (i % 2 == 0) { continue; }
+        total = total + i;
+    }
+    for (j in 0..100) {
+        if (j == 5) { break; }
+        total = total + 100;
+    }
+    return total;
+}

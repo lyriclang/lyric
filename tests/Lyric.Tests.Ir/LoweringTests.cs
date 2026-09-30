@@ -509,12 +509,33 @@ public class LoweringTests
     // At the first hole that is the converter, before the concat.
     [InlineData("fn f(): string { return f\"n={1}\"; }", "std.string.fromInt")]
     // 'match' over an enum lowers; over a scalar it needs literal patterns, which are a later stage.
-    // 'for-in' lowers with std.iter on the module path, and these tests run without it. The message
-    // names the reason rather than merely the construct, and that is what this test checks: that it says
-    // WHERE and WHAT.
-    [InlineData("fn f(): int { var s = 0; for (i in 0..3) { s += i; } return s; }", "std.iter")]
+    // 'for-in' over a string lowers with std.string on the module path, and these tests run without
+    // it. The message names the reason rather than merely the construct, and that is what this test
+    // checks: that it says WHERE and WHAT. (A range LITERAL no longer asks for std.iter: it lowers
+    // as a counted loop, see below.)
+    [InlineData("fn f(): int { var s = 0; for (c in \"abc\") { if (c == 'a') { s += 1; } } return s; }", "std.iter")]
     public void Out_of_scope_constructs_report_where_and_what(string source, string expected) =>
         AssertNotSupported(source, expected);
+
+    /// <summary>
+    /// <c>for (i in a..b)</c> over a range literal is a counted loop on the element type (M2 of
+    /// the Lyric 5 plan): no iterator object, no optional, no std.iter — it lowers without any
+    /// standard library, and the inclusive form ends on equality with its last value instead of
+    /// computing one past it.
+    /// </summary>
+    [Theory]
+    [InlineData("fn f(): int { var s = 0; for (i in 0..3) { s += i; } return s; }", false)]
+    [InlineData("fn f(): int { var s = 0; for (i in 0..=3) { s += i; } return s; }", true)]
+    public void A_range_literal_loops_by_counting(string source, bool inclusive)
+    {
+        var module = Lower(source);
+        var f = Assert.Single(module.Functions);
+        var ops = f.Blocks.SelectMany(b => b.Insts).ToList();
+        Assert.DoesNotContain(ops, op => op is CallVirt or NewObject or OptIsSome or OptGet);
+        Assert.Contains(ops, op => op is BinOp { Kind: IrBinKind.Add });
+        Assert.Contains(ops, op => op is BinOp { Kind: var k } && k == (inclusive ? IrBinKind.Le : IrBinKind.Lt));
+        Assert.Equal(inclusive, ops.Any(op => op is BinOp { Kind: IrBinKind.Eq }));
+    }
 
     /// <summary>What SURVIVES of the struct-destructuring refusal: a field pattern whose
     /// sub-pattern can fail.
@@ -847,9 +868,9 @@ public class LoweringTests
         // them in one run, so the lowering keeps collecting per function. The test measures at whichever
         // boundary still stands; it counts messages, it does not claim which constructs are missing.
         var (ir, de) = TryLower("""
-            fn a(): int { var s = 0; for (i in 0..4) { s += i; } return s; }
-            fn b(): int { var s = 0; for (i in 0..3) { s += i; } return s; }
-            fn c(): int { var s = 0; for (i in 0..2) { s += i; } return s; }
+            fn a(): int { var s = 0; for (c in "aaaa") { if (c == 'a') { s += 1; } } return s; }
+            fn b(): int { var s = 0; for (c in "aaa") { if (c == 'a') { s += 1; } } return s; }
+            fn c(): int { var s = 0; for (c in "aa") { if (c == 'a') { s += 1; } } return s; }
             """);
 
         Assert.Null(ir);

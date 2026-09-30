@@ -1,0 +1,3 @@
+// Division by zero panics (RT0001).
+fn div(a: int, b: int): int { return a / b; }
+fn main(): int { return div(1, 0); }

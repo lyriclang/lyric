@@ -9,6 +9,8 @@
  *   under   panic [LYR-RT0002]: arithmetic overflow in '-'      (uint8: 0 - 1)
  *   div0    panic [LYR-RT0001]: division by zero
  *   divmin  panic [LYR-RT0002]: arithmetic overflow in '/'      (INT64_MIN / -1)
+ *   rem0    panic [LYR-RT0001]: division by zero
+ *   remmin  panic [LYR-RT0002]: arithmetic overflow in '%'      (INT64_MIN % -1)
  *   unwrap  panic [LYR-RT0004]: unwrapped a null value
  *   index   panic [LYR-RT0003]: index -1 out of bounds for length 4 */
 #include "lyr/lyr.h"
@@ -33,6 +35,8 @@ static int64_t program(void) {
     else if (strcmp(which, "under") == 0) result = LYR_CHECKED_SUB(u8_zero, (uint8_t)1);
     else if (strcmp(which, "div0") == 0) result = LYR_CHECKED_DIV(big, zero);
     else if (strcmp(which, "divmin") == 0) result = LYR_CHECKED_DIV(small, minus_one);
+    else if (strcmp(which, "rem0") == 0) result = LYR_CHECKED_REM(big, zero);
+    else if (strcmp(which, "remmin") == 0) result = LYR_CHECKED_REM(small, minus_one);
     else if (strcmp(which, "unwrap") == 0) result = (int64_t)(intptr_t)LYR_UNWRAP(nothing);
     else if (strcmp(which, "index") == 0) LYR_CHECK_INDEX(minus_one, 4);
     else {
@@ -46,6 +50,9 @@ static int64_t program(void) {
         CHECK(LYR_CHECKED_DIV(small, two) == INT64_MIN / 2);
         CHECK(LYR_CHECKED_DIV(u64_max, (uint64_t)1) == UINT64_MAX);  /* unsigned: -1 is not special */
         CHECK(LYR_CHECKED_DIV((int8_t)-128, (int8_t)1) == -128);
+        CHECK(LYR_CHECKED_REM((int64_t)-7, two) == -1);
+        CHECK(LYR_CHECKED_REM(u64_max, (uint64_t)10) == 5);
+        CHECK(LYR_CHECKED_REM(small, two) == 0);
         int local = 5;
         CHECK(*LYR_UNWRAP(&local) == 5);
         LYR_CHECK_INDEX(3, 4);

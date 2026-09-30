@@ -57,7 +57,7 @@ LYR_NORETURN void lyr_panic_null(void);
 
 /* Integer arithmetic that panics instead of wrapping, in every profile (03 T2). Both operands have
  * the operation's type (the emitter converts first); the expression's value is the result.
- * Remainder and shifts come with the number tower (M3). */
+ * Shifts come with the number tower (M3). */
 /* The type of x's value: a comma expression converts its operand as an assignment would — no
  * qualifiers (a volatile operand gives a plain result), and unlike arithmetic, no promotion. */
 #define LYR_VALUE_TYPE_(x) __typeof__(((void)0, (x)))
@@ -81,6 +81,17 @@ LYR_NORETURN void lyr_panic_null(void);
                          lyr_a_ == LYR_MIN_OF_(lyr_a_)))                                            \
             lyr_panic_overflow("/");                                                                \
         lyr_a_ / lyr_b_;                                                                            \
+    })
+/* The remainder shares both faults: a zero divisor, and MIN % -1, whose quotient does not fit
+ * (C leaves it undefined; the panic keeps `%` in step with `/`, as Swift and Rust do). */
+#define LYR_CHECKED_REM(a, b)                                                                       \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(a) lyr_a_ = (a), lyr_b_ = (b);                                              \
+        if (LYR_UNLIKELY(lyr_b_ == 0)) lyr_panic_division_by_zero();                                \
+        if (LYR_UNLIKELY(LYR_IS_SIGNED_(lyr_a_) && lyr_b_ == (LYR_VALUE_TYPE_(a))-1 &&              \
+                         lyr_a_ == LYR_MIN_OF_(lyr_a_)))                                            \
+            lyr_panic_overflow("%");                                                                \
+        lyr_a_ % lyr_b_;                                                                            \
     })
 #define LYR_IS_SIGNED_(x) ((__typeof__(x))-1 < (__typeof__(x))0)
 /* The smallest value of a signed type without naming it: the sign bit alone, shifted as unsigned

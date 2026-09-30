@@ -1,0 +1,15 @@
+// The checked arithmetic that holds (03 T2), through calls so nothing folds; exit 42.
+fn add(a: int, b: int): int { return a + b; }
+fn div(a: int, b: int): int { return a / b; }
+fn rem(a: int, b: int): int { return a % b; }
+fn neg(a: int): int { return -a; }
+
+fn main(): int {
+    var v = add(40, 2);
+    v = div(v * 10, 10);
+    v = rem(v + 100, 100);
+    if (neg(neg(v)) != 42) { return 1; }
+    let bits = (v & 0xF0) | ((v ^ 0xFF) & 0x0F);
+    if (bits != 37) { return 2; }
+    return v;
+}
