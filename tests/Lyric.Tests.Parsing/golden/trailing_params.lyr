@@ -1,0 +1,1 @@
+fold(xs, 0) { acc, x => acc + x } + each(ps) { (k, v) => v }

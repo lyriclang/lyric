@@ -156,6 +156,24 @@ public class FormatterTests
             """, Format("fn f(p:Point):Point{let q=p with{x=1,pos.y=p.y};return (q with {x=2}).x;}"));
     }
 
+    [Fact]
+    public void A_trailing_block_keeps_its_parameters_in_the_head()
+    {
+        // '{ acc, x => … }' (design/v5/spec/08 Y11 F2): the parameters stand before '=>' in the
+        // block's head; a one-line body stays on the line, a longer one breaks like a block.
+        Assert.Equal("""
+            fn f(xs: int[]): int {
+                let a = fold(xs, 0) { acc, x => acc + x };
+                let b = fold(xs, 1) { acc, x =>
+                    let y = acc * x;
+                    y + 1
+                };
+                return a + b + count(xs) { it + 1 };
+            }
+
+            """, Format("fn f(xs:int[]):int{let a=fold(xs,0){acc,x=>acc+x};let b=fold(xs,1){acc,x=>let y=acc*x;y+1};return a+b+count(xs){it+1};}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

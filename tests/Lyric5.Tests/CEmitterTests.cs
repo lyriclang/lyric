@@ -71,7 +71,8 @@ public class CEmitterTests
     private const string GLOBALS_EXPECTED = "start 3 6 hello!\ncounter 0 3 4\nstatic 0,0 100\nobject 2 bob 9 1\n";
 
     private const string CLOSURES_EXPECTED =
-        "forms 2 6 6 14 3 5\ncapture 3 30 92\ncounter 1 2 3 2\nloop 0 1 2\nthis 15\nopt 4 none\nmade 0 10 20\n";
+        "forms 2 6 6 14 3 5\ncapture 3 30 92\ncounter 1 2 3 2\nloop 0 1 2\nthis 15 4\nopt 4 none\nmade 0 10 20\n"
+        + "trailing 6 14 6\nbound 2 2 0 20 10\n";
 
     private const string WITH_EXPECTED =
         "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";

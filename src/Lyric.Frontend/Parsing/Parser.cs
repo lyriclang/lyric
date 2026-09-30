@@ -934,6 +934,34 @@ public sealed partial class Parser
     private LambdaExpr ParseTrailingLambda()
     {
         var open = _buffer.Current; // '{'
+
+        // '{ acc, x => … }', '{ (k, v) => … }' (08 Y11 F2): a parameter list before '=>' names
+        // the parameters instead of the implicit 'it'; the body is the rest of the block, a
+        // value block whose tail is the result.
+        if (TrailingParametersAhead())
+        {
+            _buffer.Advance(); // '{'
+            var parameters = new List<LambdaParam>();
+            while (true)
+            {
+                if (_buffer.Check(TokenKind.LParen))
+                {
+                    var patternStart = new Span(_buffer.Current.Span.File, _buffer.Current.Span.Start, _buffer.Current.Span.Start);
+                    var pattern = ParseTuplePattern();
+                    parameters.Add(new LambdaParam("_", null, pattern.Span) { NameSpan = patternStart, Pattern = pattern });
+                }
+                else
+                {
+                    var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
+                        $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
+                    parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null, nameTok.Span) { NameSpan = nameTok.Span });
+                }
+                if (!_buffer.Match(TokenKind.Comma)) break;
+            }
+            _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012", $"expected '=>' after the parameters, got {_buffer.Current.TokenKind}");
+            var rest = ParseBlockRest(open, valueBlock: true);
+            return new LambdaExpr(parameters.ToArray(), null, rest, Span.Union(open.Span, rest.Span)) { Form = LambdaForm.Trailing };
+        }
         // 'it' is implicit: the source does not write it, so its name span is empty.
         var it = new LambdaParam("it", null, open.Span)
             { NameSpan = new Span(open.Span.File, open.Span.Start, open.Span.Start), Implicit = true };
@@ -952,6 +980,33 @@ public sealed partial class Parser
             return new LambdaExpr([it], null, body, Span.Union(open.Span, close.Span)) { Form = LambdaForm.Trailing };
         }
         return new LambdaExpr([it], null, body, Span.Union(open.Span, body.Span)) { Form = LambdaForm.Trailing };
+    }
+
+    /// <summary>Is there a parameter list before a <c>=&gt;</c> right after the <c>{</c> at the
+    /// cursor? Names or parenthesized patterns, comma-separated, then the arrow.</summary>
+    private bool TrailingParametersAhead()
+    {
+        var i = 1;
+        while (true)
+        {
+            if (_buffer.Peek(i).TokenKind == TokenKind.Identifier) i++;
+            else if (_buffer.Peek(i).TokenKind == TokenKind.LParen)
+            {
+                var depth = 0;
+                while (true)
+                {
+                    var kind = _buffer.Peek(i).TokenKind;
+                    if (kind == TokenKind.Eof) return false;
+                    if (kind == TokenKind.LParen) depth++;
+                    if (kind == TokenKind.RParen && --depth == 0) { i++; break; }
+                    i++;
+                }
+            }
+            else return false;
+            if (_buffer.Peek(i).TokenKind == TokenKind.FatArrow) return true;
+            if (_buffer.Peek(i).TokenKind != TokenKind.Comma) return false;
+            i++;
+        }
     }
 
     // Does the block at the cursor contain a ';' at its own level, or begin with a statement

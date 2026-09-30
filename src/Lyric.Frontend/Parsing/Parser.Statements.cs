@@ -91,6 +91,13 @@ public sealed partial class Parser
     private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
+        return ParseBlockRest(open, valueBlock);
+    }
+
+    /// <summary>The statements of a block whose <c>{</c> the caller has consumed, up to and
+    /// including its <c>}</c>.</summary>
+    private Block ParseBlockRest(Token open, bool valueBlock)
+    {
         var stmts = new List<Stmt>();
         var savedTail = _allowTail;
         _allowTail = valueBlock;
