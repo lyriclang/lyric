@@ -73,19 +73,19 @@ static const LyrStaticStr(6) lyr_lit21 = LYR_STR_INIT(" num ");
 static const LyrStaticStr(10) lyr_lit22 = LYR_STR_INIT("optional ");
 
 /* prototypes */
-static LyrStr * lyr_main_name(lyr_ty0_Signal l0_s);
-static lyr_ty0_Signal lyr_main_next(lyr_ty0_Signal l0_s);
-static LyrStr * lyr_main_either(lyr_ty0_Signal l0_s);
-static int64_t lyr_main_size(lyr_ty4_Shape l0_s);
-static LyrStr * lyr_main_describe(lyr_ty4_Shape l0_s);
-static int64_t lyr_main_inner(lyr_ty8_Opt_Shape_ l0_o);
-static LyrStr * lyr_main_show(lyr_ty8_Opt_Shape_ l0_o);
-static LyrStr * lyr_main_lit(lyr_ty0_Signal l0_m);
-static int64_t lyr_main_firstNum(lyr_ty4_Shape l0_s);
-static int64_t lyr_main_main(void);
+LyrStr * lyr_main_name(lyr_ty0_Signal l0_s);
+lyr_ty0_Signal lyr_main_next(lyr_ty0_Signal l0_s);
+LyrStr * lyr_main_either(lyr_ty0_Signal l0_s);
+int64_t lyr_main_size(lyr_ty4_Shape l0_s);
+LyrStr * lyr_main_describe(lyr_ty4_Shape l0_s);
+int64_t lyr_main_inner(lyr_ty8_Opt_Shape_ l0_o);
+LyrStr * lyr_main_show(lyr_ty8_Opt_Shape_ l0_o);
+LyrStr * lyr_main_lit(lyr_ty0_Signal l0_m);
+int64_t lyr_main_firstNum(lyr_ty4_Shape l0_s);
+int64_t lyr_main_main(void);
 
 #line 19 "programs/patterns.lyr"
-static LyrStr * lyr_main_name(lyr_ty0_Signal l0_s) {
+LyrStr * lyr_main_name(lyr_ty0_Signal l0_s) {
     LyrStr *l1__match0 = NULL;
     lyr_ty0_Signal t0_s = {0};
     lyr_ty0_Signal *t0 = &t0_s;
@@ -145,7 +145,7 @@ bb5:;
 }
 
 #line 23 "programs/patterns.lyr"
-static lyr_ty0_Signal lyr_main_next(lyr_ty0_Signal l0_s) {
+lyr_ty0_Signal lyr_main_next(lyr_ty0_Signal l0_s) {
     lyr_ty0_Signal l1__match0 = {0};
     lyr_ty0_Signal t0_s = {0};
     lyr_ty0_Signal *t0 = &t0_s;
@@ -209,7 +209,7 @@ bb5:;
 }
 
 #line 27 "programs/patterns.lyr"
-static LyrStr * lyr_main_either(lyr_ty0_Signal l0_s) {
+LyrStr * lyr_main_either(lyr_ty0_Signal l0_s) {
     LyrStr *l1__match0 = NULL;
     lyr_ty0_Signal t0_s = {0};
     lyr_ty0_Signal *t0 = &t0_s;
@@ -267,7 +267,7 @@ bb6:;
 }
 
 #line 31 "programs/patterns.lyr"
-static int64_t lyr_main_size(lyr_ty4_Shape l0_s) {
+int64_t lyr_main_size(lyr_ty4_Shape l0_s) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
     int64_t l3_w = 0;
@@ -357,7 +357,7 @@ bb5:;
 }
 
 #line 35 "programs/patterns.lyr"
-static LyrStr * lyr_main_describe(lyr_ty4_Shape l0_s) {
+LyrStr * lyr_main_describe(lyr_ty4_Shape l0_s) {
     LyrStr *l1__match0 = NULL;
     int64_t l2_n = 0;
     int64_t l3_h = 0;
@@ -574,7 +574,7 @@ bb11:;
 }
 
 #line 45 "programs/patterns.lyr"
-static int64_t lyr_main_inner(lyr_ty8_Opt_Shape_ l0_o) {
+int64_t lyr_main_inner(lyr_ty8_Opt_Shape_ l0_o) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
     lyr_ty4_Shape l3_s = {0};
@@ -676,7 +676,7 @@ bb6:;
 }
 
 #line 49 "programs/patterns.lyr"
-static LyrStr * lyr_main_show(lyr_ty8_Opt_Shape_ l0_o) {
+LyrStr * lyr_main_show(lyr_ty8_Opt_Shape_ l0_o) {
     LyrStr *l1__match0 = NULL;
     lyr_ty8_Opt_Shape_ t0_s = {0};
     lyr_ty8_Opt_Shape_ *t0 = &t0_s;
@@ -722,7 +722,7 @@ bb3:;
 }
 
 #line 53 "programs/patterns.lyr"
-static LyrStr * lyr_main_lit(lyr_ty0_Signal l0_m) {
+LyrStr * lyr_main_lit(lyr_ty0_Signal l0_m) {
     lyr_ty0_Signal t0_s = {0};
     lyr_ty0_Signal *t0 = &t0_s;
     uint8_t t1 = 0;
@@ -759,7 +759,7 @@ bb2:;
 }
 
 #line 58 "programs/patterns.lyr"
-static int64_t lyr_main_firstNum(lyr_ty4_Shape l0_s) {
+int64_t lyr_main_firstNum(lyr_ty4_Shape l0_s) {
     int64_t l1_n = 0;
     lyr_ty4_Shape t0_s = {0};
     lyr_ty4_Shape *t0 = &t0_s;
@@ -803,7 +803,7 @@ bb3:;
 }
 
 #line 63 "programs/patterns.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty0_Signal l0_a = {0};
     lyr_ty0_Signal l1_b = {0};
     LyrStr *l2_second = NULL;

@@ -26,10 +26,10 @@ struct lyr_ty3_Holder {
 };
 _Static_assert(sizeof(lyr_ty3_Holder) == 24, "layout of lyr_ty3_Holder");
 _Static_assert(offsetof(lyr_ty3_Holder, f_pos) == 8, "layout of lyr_ty3_Holder");
-static const LyrDesc lyr_desc_ty3_Holder = { sizeof(lyr_ty3_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty3_Holder = { sizeof(lyr_ty3_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
 typedef struct { lyr_ty0__tuple_ value; uint8_t has; } lyr_opt_ty0;
 _Static_assert(sizeof(lyr_ty0__tuple_) == 16, "layout of <tuple>[]");
-static const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0__tuple_), 0, NULL, "<tuple>[]", NULL };
+const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0__tuple_), 0, NULL, "<tuple>[]", NULL };
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("two");
@@ -48,12 +48,12 @@ static const LyrStaticStr(7) lyr_lit12 = LYR_STR_INIT("match ");
 static const LyrStaticStr(10) lyr_lit13 = LYR_STR_INIT("optional ");
 
 /* prototypes */
-static lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b);
-static int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p);
-static int64_t lyr_main_main(void);
+lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b);
+int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p);
+int64_t lyr_main_main(void);
 
 #line 16 "programs/tuples.lyr"
-static lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b) {
+lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b) {
     lyr_ty0__tuple_ l2__if0 = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -119,7 +119,7 @@ bb3:;
 }
 
 #line 18 "programs/tuples.lyr"
-static int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p) {
+int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p) {
     lyr_ty0__tuple_ t0_s = {0};
     lyr_ty0__tuple_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -163,7 +163,7 @@ bb0:;
 }
 
 #line 21 "programs/tuples.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty1__tuple_ l0_pair = {0};
     lyr_ty0__tuple_ l1_p = {0};
     int64_t l2_lo = 0;

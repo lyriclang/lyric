@@ -19,7 +19,7 @@ public class CEmitterTests
     private static readonly string Programs = Path.Combine(Root, "tests", "Lyric5.Tests", "programs");
     private static readonly string Golden = Path.Combine(Root, "tests", "Lyric5.Tests", "golden");
 
-    internal static string EmitC(string name)
+    internal static IReadOnlyList<CEmitter.Unit> EmitC(string name)
     {
         var text = File.ReadAllText(Path.Combine(Programs, name + ".lyr"));
         var options = new CompilerOptions { StdlibRoot = Path.Combine(Root, "stdlib5") };
@@ -28,7 +28,8 @@ public class CEmitterTests
         result.Diagnostics.RenderText(rendered);
         Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
         Assert.True(SubsetGate.Check(result.Ir!, result.Diagnostics), rendered.ToString());
-        return CEmitter.Emit(result.Ir!, result.Sources, options.StdlibRoot).Replace("\r\n", "\n");
+        return CEmitter.Emit(result.Ir!, result.Sources, options.StdlibRoot)
+            .Select(u => u with { Text = u.Text.Replace("\r\n", "\n") }).ToList();
     }
 
     [Theory]
@@ -53,7 +54,7 @@ public class CEmitterTests
     [InlineData("generics")]
     public void The_emission_matches_its_golden(string name)
     {
-        var actual = EmitC(name);
+        var actual = CEmitter.Join(EmitC(name));
         var path = Path.Combine(Golden, name + ".c");
         if (Environment.GetEnvironmentVariable("LYRIC_UPDATE_SNAPSHOTS") == "1")
         {
@@ -130,6 +131,40 @@ public class CEmitterTests
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
         }
         return data;
+    }
+
+    /// <summary>The cache unit a function belongs to (01 C3), read off its IR name.</summary>
+    [Theory]
+    [InlineData("main.main", null)]
+    [InlineData("main.main.<lambda1>", null)]
+    [InlineData("<globals>", null)]
+    [InlineData("main.main.<bound_add1>", null)]
+    [InlineData("std.core.arrayOf<int>", "std.core.arrayOf<int>")]
+    [InlineData("std.core.arrayOf<int>.<lambda0>", "std.core.arrayOf<int>")]
+    [InlineData("std.core.Range<int>.next<>", "std.core.Range<int>")]
+    [InlineData("main.Pair<Pair<int, string>>.swap<>", "main.Pair<Pair<int, string>>")]
+    [InlineData("main.collect<int, fn(int) -> string>", "main.collect<int, fn(int) -> string>")]
+    public void A_function_belongs_to_the_unit_of_its_instance(string irName, string? unit) =>
+        Assert.Equal(unit, CEmitter.InstanceOf(irName));
+
+    [Fact]
+    public void The_generic_instances_are_units_of_their_own()
+    {
+        var units = EmitC("generics");
+        Assert.Null(units[0].Instance);
+        Assert.Equal(
+            ["main.collect<int, string>", "main.ident<int>", "main.ident<string>", "main.make<bool>",
+             "main.swap<int, string>", "main.twice<int>"],
+            units.Skip(1).Select(u => u.Instance).ToArray());
+
+        // The module's unit defines the descriptors and the entry, and holds no instance body;
+        // an instance's unit holds its function, declares what it calls, and defines no descriptor.
+        Assert.Contains("int main(int argc, char **argv)", units[0].Text);
+        Assert.DoesNotContain("lyr_main_ident_int__365390bd(int64_t l0_x) {", units[0].Text);
+        var twice = units.Single(u => u.Instance == "main.twice<int>").Text;
+        Assert.Contains("int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {", twice);
+        Assert.DoesNotContain("const LyrDesc lyr_desc", twice.Replace("extern const LyrDesc", ""));
+        Assert.DoesNotContain("int main(", twice);
     }
 
     [Theory]

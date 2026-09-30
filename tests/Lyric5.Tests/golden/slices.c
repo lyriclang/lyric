@@ -15,7 +15,7 @@ struct lyr_ty0_Holder {
 _Static_assert(sizeof(lyr_ty0_Holder) == 24, "layout of lyr_ty0_Holder");
 _Static_assert(offsetof(lyr_ty0_Holder, f_view) == 8, "layout of lyr_ty0_Holder");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x2) };
-static const LyrDesc lyr_desc_ty0_Holder = { sizeof(lyr_ty0_Holder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty0_Holder = { sizeof(lyr_ty0_Holder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Holder", NULL };
 struct lyr_ty1_Point {
     int64_t f_x;
     int64_t f_y;
@@ -25,12 +25,12 @@ _Static_assert(sizeof(lyr_slice_str) == 16, "layout of lyr_slice_str");
 typedef struct { lyr_ty1_Point *ptr; int64_t len; } lyr_slice_ty1;
 _Static_assert(sizeof(lyr_slice_ty1) == 16, "layout of lyr_slice_ty1");
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
-static const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
+const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
 _Static_assert(sizeof(LyrStr *) == 8, "layout of string[]");
 static const uint64_t lyr_refmap_arr_str[] = { UINT64_C(0x1) };
-static const LyrDesc lyr_desc_arr_str = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrStr *), 1, lyr_refmap_arr_str, "string[]", NULL };
+const LyrDesc lyr_desc_arr_str = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrStr *), 1, lyr_refmap_arr_str, "string[]", NULL };
 _Static_assert(sizeof(lyr_ty1_Point) == 16, "layout of main.Point[]");
-static const LyrDesc lyr_desc_arr_ty1 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty1_Point), 0, NULL, "main.Point[]", NULL };
+const LyrDesc lyr_desc_arr_ty1 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty1_Point), 0, NULL, "main.Point[]", NULL };
 
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("empty");
@@ -53,13 +53,13 @@ static const LyrStaticStr(7) lyr_lit16 = LYR_STR_INIT("match ");
 static const LyrStaticStr(7) lyr_lit17 = LYR_STR_INIT("empty ");
 
 /* prototypes */
-static int64_t lyr_main_total(lyr_slice_i64 l0_xs);
-static void lyr_main_bump(lyr_slice_i64 l0_xs);
-static LyrStr * lyr_main_describe(lyr_slice_i64 l0_xs);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_total(lyr_slice_i64 l0_xs);
+void lyr_main_bump(lyr_slice_i64 l0_xs);
+LyrStr * lyr_main_describe(lyr_slice_i64 l0_xs);
+int64_t lyr_main_main(void);
 
 #line 21 "programs/slices.lyr"
-static int64_t lyr_main_total(lyr_slice_i64 l0_xs) {
+int64_t lyr_main_total(lyr_slice_i64 l0_xs) {
     int64_t l1_sum = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -142,7 +142,7 @@ bb4:;
 }
 
 #line 27 "programs/slices.lyr"
-static void lyr_main_bump(lyr_slice_i64 l0_xs) {
+void lyr_main_bump(lyr_slice_i64 l0_xs) {
     int64_t l1__range0 = 0;
     int64_t l2__last1 = 0;
     int64_t l3_i = 0;
@@ -216,7 +216,7 @@ bb4:;
 }
 
 #line 31 "programs/slices.lyr"
-static LyrStr * lyr_main_describe(lyr_slice_i64 l0_xs) {
+LyrStr * lyr_main_describe(lyr_slice_i64 l0_xs) {
     LyrStr *l1__match0 = NULL;
     int64_t l2_one = 0;
     int64_t l3_first = 0;
@@ -350,7 +350,7 @@ bb5:;
 }
 
 #line 39 "programs/slices.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     LyrArr *l0_xs = NULL;
     lyr_slice_i64 l1_mid = {0};
     lyr_slice_i64 l2_head = {0};

@@ -4,14 +4,14 @@
 #include <math.h>
 
 /* prototypes */
-static int64_t lyr_main_add(int64_t l0_a, int64_t l1_b);
-static int64_t lyr_main_div(int64_t l0_a, int64_t l1_b);
-static int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b);
-static int64_t lyr_main_neg(int64_t l0_a);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_add(int64_t l0_a, int64_t l1_b);
+int64_t lyr_main_div(int64_t l0_a, int64_t l1_b);
+int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b);
+int64_t lyr_main_neg(int64_t l0_a);
+int64_t lyr_main_main(void);
 
 #line 2 "programs/checks.lyr"
-static int64_t lyr_main_add(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_main_add(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -27,7 +27,7 @@ bb0:;
 }
 
 #line 3 "programs/checks.lyr"
-static int64_t lyr_main_div(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_main_div(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -43,7 +43,7 @@ bb0:;
 }
 
 #line 4 "programs/checks.lyr"
-static int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -59,7 +59,7 @@ bb0:;
 }
 
 #line 5 "programs/checks.lyr"
-static int64_t lyr_main_neg(int64_t l0_a) {
+int64_t lyr_main_neg(int64_t l0_a) {
     int64_t t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -72,7 +72,7 @@ bb0:;
 }
 
 #line 8 "programs/checks.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     int64_t l0_v = 0;
     int64_t l1_bits = 0;
     int64_t t0 = 0;

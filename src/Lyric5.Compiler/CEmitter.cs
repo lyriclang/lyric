@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s7";
+    public const string Version = "m3-s8";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -58,23 +58,80 @@ public sealed class CEmitter
 
     private readonly string? _stdlibRoot;
 
-    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot)
+    /// <summary>The generic instance this emitter writes the unit of, or <c>null</c> for the
+    /// module's own unit (01 C3); <see cref="_scope"/> are the functions that belong to it.</summary>
+    private readonly string? _instance;
+    private readonly bool _main;
+    private readonly List<int> _scope;
+
+    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot, string? instance)
     {
         _module = module;
         _sources = sources;
         _stdlibRoot = stdlibRoot is null ? null : Path.GetFullPath(stdlibRoot).TrimEnd('/', '\\');
+        _instance = instance;
+        _main = instance is null;
+        _scope = Enumerable.Range(0, module.Functions.Count)
+            .Where(i => InstanceOf(module.Functions[i].Name) == instance).ToList();
         for (var i = 0; i < module.Types.Count; i++)
             for (var tag = 0; tag < module.Types[i].Variants.Length; tag++)
                 _variants[module.Types[i].Variants[tag].Value] = (i, tag);
     }
 
-    /// <summary>The C text of the module. <paramref name="sources"/> answers the <c>#line</c> positions.</summary>
+    /// <summary>One translation unit of the emission: the module's own (<see cref="Instance"/>
+    /// is <c>null</c>) or the cache unit of one generic instance (01 C3), named by it.</summary>
+    public sealed record Unit(string? Instance, string Text);
+
+    /// <summary>
+    /// The C of the module, as units: the module's own — its types, descriptors, globals and
+    /// every function that is no generic instance — and one per generic instance, holding the
+    /// instance's functions and nothing the program would change under them, so the build caches
+    /// its object by content and compiles it once (01 C3). <paramref name="sources"/> answers the
+    /// <c>#line</c> positions.
+    /// </summary>
     /// <param name="stdlibRoot">The directory of the standard library, when known: a source
     /// under it is named in <c>#line</c> relative to the directory's parent (<c>stdlib5/std/core.lyr</c>),
     /// so the emitted C is the same on every machine — a golden compares it byte for byte, and
     /// the build cache keys on it.</param>
-    public static string Emit(IrModule module, SourceManager sources, string? stdlibRoot = null) =>
-        new CEmitter(module, sources, stdlibRoot).Module();
+    public static IReadOnlyList<Unit> Emit(IrModule module, SourceManager sources, string? stdlibRoot = null)
+    {
+        var units = new List<Unit> { new(null, new CEmitter(module, sources, stdlibRoot, null).Text()) };
+        var instances = module.Functions.Select(f => InstanceOf(f.Name)).OfType<string>()
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        foreach (var instance in instances)
+            units.Add(new Unit(instance, new CEmitter(module, sources, stdlibRoot, instance).Text()));
+        return units;
+    }
+
+    /// <summary>All units as one text, for reading (<c>--emit c</c>) and for the goldens. The
+    /// units are separate translation units and this text is not one: a struct two of them need
+    /// is defined in both.</summary>
+    public static string Join(IReadOnlyList<Unit> units) =>
+        string.Concat(units.Select(u => u.Instance is null ? u.Text : $"\n/* ==== unit: {u.Instance} ==== */\n{u.Text}"));
+
+    /// <summary>
+    /// The cache unit a function belongs to (01 C3): the generic instance whose body it is or
+    /// lies in — <c>std.core.arrayOf&lt;int&gt;</c>; <c>std.core.Range&lt;int&gt;</c> for every
+    /// method of that instance; the same for a lambda lifted out of one — or <c>null</c> for the
+    /// module itself. Read off the IR name: an instance carries its arguments in angle brackets
+    /// right behind an identifier, where a synthesized name (<c>&lt;lambda0&gt;</c>,
+    /// <c>&lt;globals&gt;</c>) opens them behind a dot or at the start.
+    /// </summary>
+    public static string? InstanceOf(string irName)
+    {
+        for (var i = 1; i < irName.Length; i++)
+        {
+            if (irName[i] != '<' || !(char.IsAsciiLetterOrDigit(irName[i - 1]) || irName[i - 1] == '_')) continue;
+            var depth = 0;
+            for (var j = i; j < irName.Length; j++)
+            {
+                if (irName[j] == '<') depth++;
+                else if (irName[j] == '>' && irName[j - 1] != '-' && --depth == 0) return irName[..(j + 1)];
+            }
+            return null;
+        }
+        return null;
+    }
 
     // --- names and types -------------------------------------------------------------------------
 
@@ -441,11 +498,17 @@ public sealed class CEmitter
     /// <summary>The storage beside a struct-typed temp, for the values it makes fresh.</summary>
     private static string Storage(TempId temp) => $"t{temp.Value}_s";
 
-    // --- module ----------------------------------------------------------------------------------
+    // --- the unit --------------------------------------------------------------------------------
 
-    private string Module()
+    private IEnumerable<IrFunction> Scope() => _scope.Select(i => _module.Functions[i]);
+
+    private IEnumerable<IrOp> ScopeOps() => Scope().SelectMany(f => f.Blocks).SelectMany(b => b.Insts);
+
+    private string Text()
     {
         _out.AppendLine("/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */");
+        if (_instance is { } instance)
+            _out.AppendLine($"/* The unit of the generic instance '{instance}' (01 C3): its functions, the types they reach, and nothing else. */");
         _out.AppendLine("#include \"lyr/lyr.h\"");
         _out.AppendLine("#include <stdint.h>");
         _out.AppendLine("#include <math.h>");
@@ -453,23 +516,51 @@ public sealed class CEmitter
 
         Structs();
 
-        // The module's globals (07 V5): static variables, filled by the initializer before the
-        // entry runs. Static data is a root the collector scans (01 L1).
-        if (_module.Globals.Count > 0)
+        // The module's globals (07 V5): variables of the module's unit, filled by the initializer
+        // before the entry runs; an instance's unit declares the ones it touches. Static data is
+        // a root the collector scans (01 L1).
+        if (_main && _module.Globals.Count > 0)
         {
             _out.AppendLine("/* module-level bindings */");
             for (var i = 0; i < _module.Globals.Count; i++)
-                _out.AppendLine($"static {Declare(_module.Globals[i].Type, GlobalName(i))} = {Zero(_module.Globals[i].Type)};");
+                _out.AppendLine($"{Declare(_module.Globals[i].Type, GlobalName(i))} = {Zero(_module.Globals[i].Type)};");
             _out.AppendLine();
         }
+        else if (!_main)
+        {
+            var touched = ScopeOps().Select(op => op switch
+            {
+                LoadGlobal l => l.Global.Value,
+                StoreGlobal s => s.Global.Value,
+                _ => -1,
+            }).Where(i => i >= 0).Distinct().Order().ToList();
+            if (touched.Count > 0)
+            {
+                _out.AppendLine("/* module-level bindings, defined by the module's unit */");
+                foreach (var i in touched) _out.AppendLine($"extern {Declare(_module.Globals[i].Type, GlobalName(i))};");
+                _out.AppendLine();
+            }
+        }
 
+        // The module's unit declares every function; an instance's unit its own and the ones
+        // they name, wherever those are defined — every function has external linkage, so a
+        // unit may call across.
+        var declared = _main ? Enumerable.Range(0, _module.Functions.Count)
+            : _scope.Concat(ScopeOps().Select(op => op switch
+            {
+                Call c => c.Target.Value,
+                MakeClosure m => m.Target.Value,
+                MakeCoroutine mc => mc.Body.Value,
+                _ => -1,
+            }).Where(i => i >= 0)).Distinct().Order();
         var prototypes = new StringBuilder();
         prototypes.AppendLine("/* prototypes */");
-        foreach (var function in _module.Functions) prototypes.Append(Signature(function)).AppendLine(";");
+        foreach (var index in declared) prototypes.Append(Signature(_module.Functions[index])).AppendLine(";");
 
         // A function used as a value without an environment gets a thunk that takes and drops
-        // one, so every function value is called the same way (01 V8).
-        var thunked = _module.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts)
+        // one, so every function value is called the same way (01 V8). Static, in every unit that
+        // makes the value: two thunks of one function are two spellings of the same call.
+        var thunked = ScopeOps()
             .OfType<MakeClosure>().Where(m => m.Environment is null).Select(m => m.Target.Value).Distinct().Order().ToList();
         if (thunked.Count > 0)
         {
@@ -487,8 +578,8 @@ public sealed class CEmitter
         }
 
         var body = new StringBuilder();
-        foreach (var function in _module.Functions) body.Append(Function(function));
-        if (_module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
+        foreach (var function in Scope()) body.Append(Function(function));
+        if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
 
         if (_constants.Length > 0) _out.AppendLine("/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
@@ -503,13 +594,19 @@ public sealed class CEmitter
     /// </summary>
     private void Structs()
     {
+        // The module's unit defines every type and every descriptor, whichever unit uses them; an
+        // instance's unit defines the types its functions reach — the same text, since a C struct
+        // may be defined in every translation unit that needs it — and declares the descriptors,
+        // whose addresses are the identities and are defined once, in the module's unit.
+        var reachable = _main ? null : Reachable();
         var indices = Enumerable.Range(0, _module.Types.Count)
-            .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum).ToList();
+            .Where(i => (_module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum)
+                        && (reachable is null || reachable.Contains(i))).ToList();
         // Every type a function names, for the optionals among them: an optional outside the
         // niche is a C struct of its own and is defined once, wherever it is first needed.
-        var named = _module.Functions
+        var named = (_main ? _module.Functions : Scope())
             .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
-            .Concat(_module.Types.SelectMany(t => t.FieldTypes))
+            .Concat(indices.SelectMany(i => _module.Types[i].FieldTypes))
             .ToList();
         var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType or IrFunctionType).ToList();
         // Every element type an array is made of, the array's own element type included when it
@@ -595,6 +692,43 @@ public sealed class CEmitter
         _out.AppendLine();
     }
 
+    /// <summary>The composite types an instance unit's functions reach: named by a local, a temp
+    /// or a return, or held by one of those through any field, at any depth. A variant brings
+    /// its enum, an enum its variants.</summary>
+    private HashSet<int> Reachable()
+    {
+        var reached = new HashSet<int>();
+        void Visit(IrType type)
+        {
+            switch (type)
+            {
+                case IrStructType s: Add(s.Type.Value); break;
+                case IrEnumType e: Add(e.Type.Value); break;
+                case IrRefType r: Add(r.Type.Value); break;
+                case IrOptionalType o: Visit(o.Inner); break;
+                case IrArrayType a: Visit(a.Element); break;
+                case IrSliceType sl: Visit(sl.Element); break;
+                case IrInlineArrayType ia: Visit(ia.Element); break;
+                case IrFunctionType f: foreach (var p in f.Parameters) Visit(p); Visit(f.Return); break;
+            }
+        }
+        void Add(int index)
+        {
+            if (!reached.Add(index)) return;
+            var def = _module.Types[index];
+            foreach (var field in def.FieldTypes) Visit(field);
+            foreach (var variant in def.Variants) Add(variant.Value);
+            if (_variants.TryGetValue(index, out var of)) Add(of.Enum);
+        }
+        foreach (var function in Scope())
+        {
+            foreach (var local in function.Locals) Visit(local.Type);
+            foreach (var temp in function.Temps) Visit(temp.Type);
+            Visit(function.ReturnType);
+        }
+        return reached;
+    }
+
     /// <summary>
     /// The descriptor of an array of <paramref name="element"/> (V10): the fixed part is the
     /// header and the length, then <c>len</c> elements of the element's size, each laid out as
@@ -607,6 +741,7 @@ public sealed class CEmitter
         var (size, _) = LayoutOf(element);
         var c = CType(element);
         _out.AppendLine($"_Static_assert(sizeof({c}) == {size}, \"layout of {Display(element)}[]\");");
+        if (!_main) { _out.AppendLine($"extern const LyrDesc {name};"); return; }
         var words = new List<int>();
         var ambiguous = false;
         ReferenceWords(element, 0, words, ref ambiguous);
@@ -614,14 +749,14 @@ public sealed class CEmitter
         var flags = "LYR_DESC_ARRAY" + (words.Count > 0 || ambiguous ? " | LYR_DESC_HAS_REFS" : "") + (ambiguous ? " | LYR_DESC_CONSERVATIVE" : "");
         if (words.Count == 0)
         {
-            _out.AppendLine($"static const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), 0, NULL, \"{text}[]\", NULL }};");
+            _out.AppendLine($"const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), 0, NULL, \"{text}[]\", NULL }};");
             return;
         }
         var map = new ulong[(size / 8 + 63) / 64];
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
         _out.AppendLine($"static const uint64_t lyr_refmap_arr_{Mangle(element)}[] = {{ {bits} }};");
-        _out.AppendLine($"static const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), {map.Length}, lyr_refmap_arr_{Mangle(element)}, \"{text}[]\", NULL }};");
+        _out.AppendLine($"const LyrDesc {name} = {{ (uint32_t)offsetof(LyrArr, data), {flags}, sizeof({c}), {map.Length}, lyr_refmap_arr_{Mangle(element)}, \"{text}[]\", NULL }};");
     }
 
     /// <summary>
@@ -658,8 +793,9 @@ public sealed class CEmitter
 
     /// <summary>
     /// The descriptor of a class (V4): its size, which of its words are references — the header
-    /// is word 0 and never one — and its qualified name. Static and constant; its address is
-    /// the type's identity. The asserts hold the emitter's layout against the compiler's.
+    /// is word 0 and never one — and its qualified name. Constant, defined once in the module's
+    /// unit and declared in every other; its address is the type's identity. The asserts hold
+    /// the emitter's layout against the compiler's.
     /// </summary>
     private void Descriptor(TypeId id, IrTypeDef def)
     {
@@ -669,6 +805,7 @@ public sealed class CEmitter
         for (var i = 0; i < offsets.Length; i++)
             _out.AppendLine($"_Static_assert(offsetof({name}, {FieldName(def.FieldNames[i])}) == {offsets[i]}, \"layout of {name}\");");
 
+        if (!_main) { _out.AppendLine($"extern const LyrDesc {DescriptorName(id)};"); return; }
         var words = new List<int>();
         var ambiguous = false;
         ReferenceWords(def, 8, words, ref ambiguous);
@@ -677,7 +814,7 @@ public sealed class CEmitter
         var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
         if (words.Count == 0)
         {
-            _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
+            _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
             return;
         }
 
@@ -685,7 +822,7 @@ public sealed class CEmitter
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
         _out.AppendLine($"static const uint64_t lyr_refmap_ty{id.Value}[] = {{ {bits} }};");
-        _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
+        _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
     }
 
     /// <summary>A parameter: a value, except the receiver of a struct method, which is the
@@ -704,7 +841,9 @@ public sealed class CEmitter
         var parameters = function.ParamCount == 0
             ? "void"
             : string.Join(", ", function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)));
-        return $"static {CType(function.ReturnType)} {FunctionName(function.Name)}({parameters})";
+        // External linkage: an instance's unit calls the module's functions and the module the
+        // instance's, and the names are unique by construction (01 C3, C4).
+        return $"{CType(function.ReturnType)} {FunctionName(function.Name)}({parameters})";
     }
 
     /// <summary>

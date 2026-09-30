@@ -17,7 +17,7 @@ _Static_assert(sizeof(lyr_ty0_Buffer) == 48, "layout of lyr_ty0_Buffer");
 _Static_assert(offsetof(lyr_ty0_Buffer, f_data) == 8, "layout of lyr_ty0_Buffer");
 _Static_assert(offsetof(lyr_ty0_Buffer, f_name) == 40, "layout of lyr_ty0_Buffer");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x20) };
-static const LyrDesc lyr_desc_ty0_Buffer = { sizeof(lyr_ty0_Buffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Buffer", NULL };
+const LyrDesc lyr_desc_ty0_Buffer = { sizeof(lyr_ty0_Buffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Buffer", NULL };
 struct lyr_ty1_Mat {
     lyr_inl4_i64 f_m;
 };
@@ -30,7 +30,7 @@ _Static_assert(sizeof(lyr_inl2_i64) == 16, "layout of lyr_inl2_i64");
 typedef struct { lyr_inl2_i64 v[2]; } lyr_inl2_inl2_i64;
 _Static_assert(sizeof(lyr_inl2_inl2_i64) == 32, "layout of lyr_inl2_inl2_i64");
 _Static_assert(sizeof(lyr_inl4_i64) == 32, "layout of int[4][]");
-static const LyrDesc lyr_desc_arr_inl4_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_inl4_i64), 0, NULL, "int[4][]", NULL };
+const LyrDesc lyr_desc_arr_inl4_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_inl4_i64), 0, NULL, "int[4][]", NULL };
 
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("copy ");
@@ -44,12 +44,12 @@ static const LyrStaticStr(7) lyr_lit7 = LYR_STR_INIT("array ");
 static const LyrStaticStr(7) lyr_lit8 = LYR_STR_INIT("match ");
 
 /* prototypes */
-static int64_t lyr_main_sum(lyr_slice_i64 l0_xs);
-static int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_sum(lyr_slice_i64 l0_xs);
+int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs);
+int64_t lyr_main_main(void);
 
 #line 18 "programs/inline.lyr"
-static int64_t lyr_main_sum(lyr_slice_i64 l0_xs) {
+int64_t lyr_main_sum(lyr_slice_i64 l0_xs) {
     int64_t l1_s = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -132,7 +132,7 @@ bb4:;
 }
 
 #line 24 "programs/inline.lyr"
-static int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs) {
+int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs) {
     int64_t l1_s = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -217,7 +217,7 @@ bb4:;
 }
 
 #line 30 "programs/inline.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_inl3_i64 l0_a = {0};
     lyr_inl3_i64 l1_b = {0};
     lyr_inl4_i64 l2_z = {0};

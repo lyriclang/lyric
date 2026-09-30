@@ -1,3 +1,4 @@
+using Lyric5.Build;
 using Lyric5.Toolchain;
 
 namespace Lyric5.Tests;
@@ -74,8 +75,34 @@ public class DriverTests
     {
         var (exit, output, err) = Run("build", Program_("fib.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
-        Assert.Contains("static int64_t lyr_main_fib(int64_t l0_n)", output);
+        // External linkage (01 C3, C4): an instance's unit may call it.
+        Assert.Contains("\nint64_t lyr_main_fib(int64_t l0_n)", output);
         Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }", output);
+    }
+
+    /// <summary>01 C3: the module's C is one unit, every generic instance another, named by its
+    /// content under 'cache/units/'; the list of them is the build's record, and a second build
+    /// of the same program compiles nothing.</summary>
+    [Fact]
+    public void A_build_writes_one_cache_unit_per_generic_instance()
+    {
+        var (exit, _, err) = Run("build", Program_("generics.lyr"));
+        Assert.True(exit == 0, err);
+
+        var project = Project.ForFile(Program_("generics.lyr"));
+        var manifest = Directory.EnumerateFiles(project.CacheDir, "generics-*.units")
+            .OrderByDescending(File.GetLastWriteTimeUtc).First();
+        var units = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
+        Assert.Equal(7, units.Count); // the module and six instances
+        Assert.StartsWith("generics-", Path.GetFileName(units[0]));
+        Assert.All(units.Skip(1), unit => Assert.StartsWith("inst-", Path.GetFileName(unit)));
+        Assert.All(units, unit => Assert.True(File.Exists(unit), unit));
+
+        var executable = project.Executable(Profile.Debug, Target.Host);
+        var linked = File.GetLastWriteTimeUtc(executable);
+        var (again, _, err2) = Run("build", Program_("generics.lyr"));
+        Assert.True(again == 0, err2);
+        Assert.Equal(linked, File.GetLastWriteTimeUtc(executable));
     }
 
     [Fact]

@@ -23,28 +23,28 @@ static const LyrStaticStr(5) lyr_lit15 = LYR_STR_INIT("cmp ");
 static const LyrStaticStr(5) lyr_lit16 = LYR_STR_INIT("big ");
 
 /* prototypes */
-static int64_t lyr_main_widen16(int16_t l0_x);
-static int16_t lyr_main_takeUint8(uint8_t l0_x);
-static int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b);
-static int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b);
-static uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b);
-static uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b);
-static uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b);
-static uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b);
-static int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b);
-static int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b);
-static double lyr_main_fadd(double l0_a, double l1_b);
-static double lyr_main_fsub(double l0_a, double l1_b);
-static double lyr_main_fdiv(double l0_a, double l1_b);
-static double lyr_main_frem(double l0_a, double l1_b);
-static float lyr_main_f32add(float l0_a, float l1_b);
-static int8_t lyr_main_toI8(double l0_x);
-static uint8_t lyr_main_toU8(double l0_x);
-static int64_t lyr_main_toInt(double l0_x);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_widen16(int16_t l0_x);
+int16_t lyr_main_takeUint8(uint8_t l0_x);
+int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b);
+int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b);
+uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b);
+int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b);
+int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b);
+double lyr_main_fadd(double l0_a, double l1_b);
+double lyr_main_fsub(double l0_a, double l1_b);
+double lyr_main_fdiv(double l0_a, double l1_b);
+double lyr_main_frem(double l0_a, double l1_b);
+float lyr_main_f32add(float l0_a, float l1_b);
+int8_t lyr_main_toI8(double l0_x);
+uint8_t lyr_main_toU8(double l0_x);
+int64_t lyr_main_toInt(double l0_x);
+int64_t lyr_main_main(void);
 
 #line 19 "programs/arith.lyr"
-static int64_t lyr_main_widen16(int16_t l0_x) {
+int64_t lyr_main_widen16(int16_t l0_x) {
     int16_t t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -57,7 +57,7 @@ bb0:;
 }
 
 #line 20 "programs/arith.lyr"
-static int16_t lyr_main_takeUint8(uint8_t l0_x) {
+int16_t lyr_main_takeUint8(uint8_t l0_x) {
     uint8_t t0 = 0;
     int16_t t1 = 0;
 bb0:;
@@ -70,7 +70,7 @@ bb0:;
 }
 
 #line 21 "programs/arith.lyr"
-static int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -86,7 +86,7 @@ bb0:;
 }
 
 #line 22 "programs/arith.lyr"
-static int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -102,7 +102,7 @@ bb0:;
 }
 
 #line 23 "programs/arith.lyr"
-static uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -118,7 +118,7 @@ bb0:;
 }
 
 #line 24 "programs/arith.lyr"
-static uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -134,7 +134,7 @@ bb0:;
 }
 
 #line 25 "programs/arith.lyr"
-static uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -150,7 +150,7 @@ bb0:;
 }
 
 #line 26 "programs/arith.lyr"
-static uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -166,7 +166,7 @@ bb0:;
 }
 
 #line 27 "programs/arith.lyr"
-static int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b) {
+int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b) {
     int8_t t0 = 0;
     int8_t t1 = 0;
     int8_t t2 = 0;
@@ -182,7 +182,7 @@ bb0:;
 }
 
 #line 28 "programs/arith.lyr"
-static int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b) {
+int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b) {
     int8_t t0 = 0;
     int8_t t1 = 0;
     int8_t t2 = 0;
@@ -198,7 +198,7 @@ bb0:;
 }
 
 #line 29 "programs/arith.lyr"
-static double lyr_main_fadd(double l0_a, double l1_b) {
+double lyr_main_fadd(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -214,7 +214,7 @@ bb0:;
 }
 
 #line 30 "programs/arith.lyr"
-static double lyr_main_fsub(double l0_a, double l1_b) {
+double lyr_main_fsub(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -230,7 +230,7 @@ bb0:;
 }
 
 #line 31 "programs/arith.lyr"
-static double lyr_main_fdiv(double l0_a, double l1_b) {
+double lyr_main_fdiv(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -246,7 +246,7 @@ bb0:;
 }
 
 #line 32 "programs/arith.lyr"
-static double lyr_main_frem(double l0_a, double l1_b) {
+double lyr_main_frem(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -262,7 +262,7 @@ bb0:;
 }
 
 #line 33 "programs/arith.lyr"
-static float lyr_main_f32add(float l0_a, float l1_b) {
+float lyr_main_f32add(float l0_a, float l1_b) {
     float t0 = 0;
     float t1 = 0;
     float t2 = 0;
@@ -278,7 +278,7 @@ bb0:;
 }
 
 #line 34 "programs/arith.lyr"
-static int8_t lyr_main_toI8(double l0_x) {
+int8_t lyr_main_toI8(double l0_x) {
     double t0 = 0;
     int8_t t1 = 0;
 bb0:;
@@ -291,7 +291,7 @@ bb0:;
 }
 
 #line 35 "programs/arith.lyr"
-static uint8_t lyr_main_toU8(double l0_x) {
+uint8_t lyr_main_toU8(double l0_x) {
     double t0 = 0;
     uint8_t t1 = 0;
 bb0:;
@@ -304,7 +304,7 @@ bb0:;
 }
 
 #line 36 "programs/arith.lyr"
-static int64_t lyr_main_toInt(double l0_x) {
+int64_t lyr_main_toInt(double l0_x) {
     double t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -317,7 +317,7 @@ bb0:;
 }
 
 #line 39 "programs/arith.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     int64_t l0_a = 0;
     int64_t l1_b = 0;
     int8_t l2_small = 0;

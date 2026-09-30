@@ -16,7 +16,7 @@ _Static_assert(sizeof(lyr_ty0_Node) == 24, "layout of lyr_ty0_Node");
 _Static_assert(offsetof(lyr_ty0_Node, f_value) == 8, "layout of lyr_ty0_Node");
 _Static_assert(offsetof(lyr_ty0_Node, f_next) == 16, "layout of lyr_ty0_Node");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x4) };
-static const LyrDesc lyr_desc_ty0_Node = { sizeof(lyr_ty0_Node), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Node", NULL };
+const LyrDesc lyr_desc_ty0_Node = { sizeof(lyr_ty0_Node), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Node", NULL };
 struct lyr_ty1_Point {
     int64_t f_x;
     int64_t f_y;
@@ -31,7 +31,7 @@ _Static_assert(sizeof(lyr_ty2_Box) == 32, "layout of lyr_ty2_Box");
 _Static_assert(offsetof(lyr_ty2_Box, f_count) == 8, "layout of lyr_ty2_Box");
 _Static_assert(offsetof(lyr_ty2_Box, f_label) == 24, "layout of lyr_ty2_Box");
 static const uint64_t lyr_refmap_ty2[] = { UINT64_C(0x8) };
-static const LyrDesc lyr_desc_ty2_Box = { sizeof(lyr_ty2_Box), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.Box", NULL };
+const LyrDesc lyr_desc_ty2_Box = { sizeof(lyr_ty2_Box), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.Box", NULL };
 typedef struct { lyr_opt_i64 value; uint8_t has; } lyr_opt_opt_i64;
 typedef struct { lyr_ty1_Point value; uint8_t has; } lyr_opt_ty1;
 
@@ -58,15 +58,15 @@ static const LyrStaticStr(5) lyr_lit18 = LYR_STR_INIT("box ");
 static const LyrStaticStr(7) lyr_lit19 = LYR_STR_INIT("iflet ");
 
 /* prototypes */
-static lyr_opt_i64 lyr_main_find(int64_t l0_n);
-static int64_t lyr_main_orZero(lyr_opt_i64 l0_v);
-static int64_t lyr_main_length(lyr_ty0_Node *l0_head);
-static lyr_opt_opt_i64 lyr_main_lookup(int64_t l0_key);
-static LyrStr * lyr_main_describe(lyr_opt_opt_i64 l0_v);
-static int64_t lyr_main_main(void);
+lyr_opt_i64 lyr_main_find(int64_t l0_n);
+int64_t lyr_main_orZero(lyr_opt_i64 l0_v);
+int64_t lyr_main_length(lyr_ty0_Node *l0_head);
+lyr_opt_opt_i64 lyr_main_lookup(int64_t l0_key);
+LyrStr * lyr_main_describe(lyr_opt_opt_i64 l0_v);
+int64_t lyr_main_main(void);
 
 #line 23 "programs/optionals.lyr"
-static lyr_opt_i64 lyr_main_find(int64_t l0_n) {
+lyr_opt_i64 lyr_main_find(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     uint8_t t2 = 0;
@@ -105,7 +105,7 @@ bb2:;
 }
 
 #line 28 "programs/optionals.lyr"
-static int64_t lyr_main_orZero(lyr_opt_i64 l0_v) {
+int64_t lyr_main_orZero(lyr_opt_i64 l0_v) {
     lyr_opt_i64 t0_s = {0};
     lyr_opt_i64 *t0 = &t0_s;
     uint8_t t1 = 0;
@@ -138,7 +138,7 @@ bb2:;
 }
 
 #line 33 "programs/optionals.lyr"
-static int64_t lyr_main_length(lyr_ty0_Node *l0_head) {
+int64_t lyr_main_length(lyr_ty0_Node *l0_head) {
     int64_t l1_n = 0;
     lyr_ty0_Node *l2_at = NULL;
     int64_t t0 = 0;
@@ -197,7 +197,7 @@ bb3:;
 }
 
 #line 43 "programs/optionals.lyr"
-static lyr_opt_opt_i64 lyr_main_lookup(int64_t l0_key) {
+lyr_opt_opt_i64 lyr_main_lookup(int64_t l0_key) {
     lyr_opt_i64 l1_stored = {0};
     lyr_opt_i64 l2__if0 = {0};
     int64_t t0 = 0;
@@ -272,7 +272,7 @@ bb5:;
 }
 
 #line 49 "programs/optionals.lyr"
-static LyrStr * lyr_main_describe(lyr_opt_opt_i64 l0_v) {
+LyrStr * lyr_main_describe(lyr_opt_opt_i64 l0_v) {
     lyr_opt_opt_i64 t0_s = {0};
     lyr_opt_opt_i64 *t0 = &t0_s;
     uint8_t t1 = 0;
@@ -335,7 +335,7 @@ bb4:;
 }
 
 #line 55 "programs/optionals.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_opt_i64 l0_a = {0};
     lyr_opt_i64 l1_b = {0};
     int64_t l2__coalesce0 = 0;
