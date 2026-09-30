@@ -101,11 +101,10 @@ public class StaticMemberTests
             """, "LYR-SEM0054");
 
     /// <summary>
-    /// <c>mut</c> on a class method stays ALLOWED. It enforces nothing there, but the documentation lists
-    /// it explicitly as a readability convention, and interfaces declare <c>mut fn</c> that implementing
-    /// classes have to satisfy.
-    ///
-    /// <para>The first version of the decision wanted to forbid it; the test holds why not.</para>
+    /// <c>mut</c> on a class method is allowed, and since Lyric 5 it is ENFORCED there as on a
+    /// struct (design/v5/spec/02 M4): a class method that writes <c>this</c> has to say so.
+    /// Interfaces declare <c>mut fn</c> that implementing classes have to satisfy; the word is
+    /// part of the contract, and <c>MutabilityTests</c> pins the site that keeps it.
     /// </summary>
     [Fact]
     public void Mut_on_a_class_method_stays_legal() =>
@@ -113,7 +112,7 @@ public class StaticMemberTests
             """
             interface Damageable { mut fn hurt(n: int); }
             class P :: [Damageable] {
-                hp: int,
+                var hp: int,
                 mut fn hurt(n: int) { this.hp -= n; }
             }
             fn main(): int { return 0; }

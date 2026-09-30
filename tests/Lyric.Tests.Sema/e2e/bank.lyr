@@ -15,7 +15,7 @@ pub class InsufficientFunds :: [Throwable] {
 
 pub class Account {
     owner: string,
-    balance: int = 0,
+    var balance: int = 0,
 
     // A factory method: no language magic, only convention.
     static fn new(owner: string, opening: int): Account {

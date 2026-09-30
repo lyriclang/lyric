@@ -404,9 +404,9 @@ let maxDepth = 128;
 // refusal is the one `parseOrThrow` reports and `parse` never looks at.
 class JsonParser {
     chars: char[],
-    pos: int,
-    errPos: int = 0,
-    errWhat: string = "",
+    var pos: int,
+    var errPos: int = 0,
+    var errWhat: string = "",
 
     // The first refusal wins: a leaf says what it expected, the parents above it just hand the
     // null up and must not overwrite the precise place with a vaguer one.

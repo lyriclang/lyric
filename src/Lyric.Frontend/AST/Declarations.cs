@@ -118,6 +118,11 @@ public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span S
 
     /// <summary>Since 2.1; the sema admits only <c>@Deprecated</c> on a member.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
+
+    /// <summary>Declared <c>var name: T</c> (design/v5/spec/02 M2): the field may be written,
+    /// through a root that may be written. Without the word a field is fixed once its value is
+    /// built — for a struct and for a class alike (M9).</summary>
+    public bool IsVar { get; init; }
 }
 
 // --- type declarations ---

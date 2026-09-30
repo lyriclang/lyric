@@ -82,7 +82,7 @@ public class InlinerTests
     public void A_void_callee_is_inlined()
     {
         var module = Optimized("""
-            class Counter { value: int }
+            class Counter { var value: int }
 
             let state = Counter { value = 0 };
 

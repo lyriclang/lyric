@@ -20,9 +20,16 @@ LyrArr *lyr_alloc_array(const LyrDesc *desc, int64_t count);
  * anyone else can see it. */
 LyrStr *lyr_alloc_string(int64_t len);
 
-/* Stores a reference into a heap slot. Empty in stage 1; stage 3 records old-to-young stores.
- * Emitted code writes every reference field through it from day one. */
+/* Stores a reference into a slot. A plain store in stage 1; stage 3 records old-to-young stores.
+ * Emitted code writes every reference field through it from day one. `object` is the place the
+ * emitter holds for the slot and not always an object's start: a struct lies inline in its
+ * object, so it may be an interior pointer, and a struct on the stack is no heap address at all.
+ * A barrier that needs the object finds it from the slot (a card table does not need it). */
 #define LYR_WRITE_BARRIER(object, slot, value) ((void)(object), (*(slot) = (value)))
+
+/* The same for a struct value that holds references, stored whole: every reference word of the
+ * value is a reference store. */
+#define LYR_WRITE_BARRIER_VALUE(object, slot, value) ((void)(object), (*(slot) = (value)))
 
 /* A point where a stop-the-world collection may stop this thread. Empty until stage 2. */
 #define LYR_SAFEPOINT() ((void)0)

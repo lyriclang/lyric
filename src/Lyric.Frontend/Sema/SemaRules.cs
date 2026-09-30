@@ -55,9 +55,17 @@ public sealed class SemaRules
                 CheckSignature(fn, isMethod: false);
                 RunBody(fn);
                 break;
-            case StructDecl s: CheckTypeDecl(s.Members.OfType<FunctionDecl>()); break;
-            case ClassDecl c: CheckTypeDecl(c.Members.OfType<FunctionDecl>()); break;
-            case EnumDecl e: CheckTypeDecl(e.Methods); break;
+            case StructDecl s:
+                CheckTypeDecl(s.Members.OfType<FunctionDecl>());
+                CheckMutHasATarget(s.Name, s.Interfaces, s.Members);
+                break;
+            case ClassDecl c:
+                CheckTypeDecl(c.Members.OfType<FunctionDecl>());
+                break;
+            case EnumDecl e:
+                CheckTypeDecl(e.Methods);
+                CheckMutHasATarget(e.Name, e.Interfaces, e.Methods);
+                break;
             case InterfaceDecl i: foreach (var m in i.Members) { CheckSignature(m, true); RunBody(m); } break;
             case ExtendDecl x: foreach (var m in x.Methods) { CheckSignature(m, true); RunBody(m); } break;
         }
@@ -69,6 +77,55 @@ public sealed class SemaRules
     {
         foreach (var fn in methods) { CheckSignature(fn, isMethod: true); RunBody(fn); }
     }
+
+    /// <summary>
+    /// A <c>mut fn</c> needs something to write (design/v5/spec/02 M4): a <c>var</c> field of
+    /// its type, or <c>this</c> as a whole. On a type that has neither, the word promises a
+    /// write that cannot happen — and costs its callers a <c>var</c> root for nothing.
+    ///
+    /// <para>Two methods keep the word without a target of their own: one that an interface of
+    /// the type declares <c>mut</c> (the signature has to match; an empty iterator's
+    /// <c>next</c> writes nothing and says <c>mut</c> all the same), and one that calls a
+    /// <c>mut fn</c> on <c>this</c>, which writes through the callee.</para>
+    ///
+    /// <para>Asked of VALUES only, a struct and an enum. On a class the word costs a caller
+    /// nothing (a reference is always a place), and a class without a <c>var</c> field changes
+    /// all the same when it holds a <c>let</c> reference to an object that does — a stack over
+    /// a list says <c>mut fn pop</c> and means it. Whether M4 wants that refused is the
+    /// maintainer's question; until it is answered, a class is not asked.</para>
+    /// </summary>
+    private void CheckMutHasATarget(string owner, TypeNode[] interfaces, IEnumerable<Decl> members)
+    {
+        var list = members.ToList();
+        if (list.OfType<FieldDecl>().Any(f => f.IsVar)) return;
+
+        HashSet<string>? demanded = null;
+        foreach (var method in list.OfType<FunctionDecl>())
+        {
+            if (!method.IsMut || method.IsStatic || method.Body is null) continue;
+            if (WritesThis(method.Body)) continue;
+
+            demanded ??= interfaces
+                .Select(t => Conformance.InterfaceOf(t, _binding)).OfType<TypeSymbol>()
+                .SelectMany(i => Conformance.WithParents(i, _binding))
+                .SelectMany(i => (i.Declaration as InterfaceDecl)?.Members ?? [])
+                .Where(m => m.IsMut).Select(m => m.Name).ToHashSet(StringComparer.Ordinal);
+            if (demanded.Contains(method.Name)) continue;
+
+            _de.Report("LYR-SEM0023", Severity.Error, method.NameSpan,
+                $"'mut fn {method.Name}' has nothing to write: '{owner}' has no 'var' field, and the method does not replace 'this'");
+        }
+    }
+
+    /// <summary>Does this body replace <c>this</c> as a whole, or call a <c>mut fn</c> on it?</summary>
+    private bool WritesThis(Node node) => node switch
+    {
+        AssignExpr { Target: ThisExpr } => true,
+        CallExpr { Callee: MemberExpr { Target: ThisExpr } callee }
+            when (_types.RefOf(callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(callee))
+                is FunctionSymbol { Declaration: FunctionDecl { IsMut: true } } => true,
+        _ => AstChildren.Of(node).Any(WritesThis),
+    };
 
     // --- signature rules ---
 
@@ -242,11 +299,17 @@ public sealed class SemaRules
         switch (expr)
         {
             case AssignExpr a:
-                if (!_types.TypeOf(a.Target).IsError && !IsMutableLvalue(a.Target))
-                    _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, "cannot assign to this target (not a mutable lvalue)");
+                if (!_types.TypeOf(a.Target).IsError && WhyNotWritable(a.Target) is { } reason)
+                    _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, $"cannot assign to this target — {reason}");
                 WalkExpr(a.Value);
                 WalkExpr(a.Target);
                 return;
+
+            // A 'mut fn' writes its receiver, so the receiver is a place that is written: the
+            // same rule as an assignment into it (design/v5/spec/02 M4).
+            case CallExpr { Callee: MemberExpr callee } call:
+                CheckMutCall(callee, call);
+                break;
 
             // '++' and '--' READ AND WRITE. Checked only as assignments, they were the one way past
             // §7.1: 'let x = 1; x++;' compiled without a word and answered 2.
@@ -287,20 +350,139 @@ public sealed class SemaRules
     /// <summary>The target of <c>++</c> or <c>--</c>, which is written as much as read.</summary>
     private void CheckIncrementTarget(Expr operand)
     {
-        if (_types.TypeOf(operand).IsError || IsMutableLvalue(operand)) return;
+        if (_types.TypeOf(operand).IsError || WhyNotWritable(operand) is not { } reason) return;
         _de.Report("LYR-SEM0019", Severity.Error, operand.Span,
-            "cannot increment or decrement this target (not a mutable lvalue)");
+            $"cannot increment or decrement this target — {reason}");
     }
 
-    private bool IsMutableLvalue(Expr expr) => expr switch
+    /// <summary>
+    /// Whether an expression names a place that may be written, as the reason it may not —
+    /// <c>null</c> when it may (design/v5/spec/02 M2, M3, M4, M9).
+    ///
+    /// <para>ONE RULE FOR STRUCTS AND CLASSES: a field is written only when it is declared
+    /// <c>var</c>, and only through a root that may be written. The root of <c>a.b[i].c</c> is
+    /// its first binding, and a <b>reference starts the chain anew</b>: behind a class value or
+    /// an array the object is the place, whatever the binding that holds the reference says —
+    /// <c>let c: Cls; c.count = 1</c> writes the object, <c>let xs: P[]; xs[0].x = 1</c> the
+    /// element. A struct is its storage, so a <c>let</c> freezes it to the bottom, and a
+    /// parameter is a <c>let</c>.</para>
+    ///
+    /// <para><c>this</c> is a place only inside a <c>mut fn</c>, for a class as for a struct:
+    /// the word is part of the method's contract and is kept at the site that would break it.
+    /// Lyric 4 enforced it on structs only.</para>
+    /// </summary>
+    private string? WhyNotWritable(Expr expr)
     {
-        IdentifierExpr id => _types.RefOf(id) is LocalSymbol { IsMutable: true },
-        MemberExpr m => IsFieldMutable(m),
-        // An element is writable as soon as the container is a REFERENCE, exactly like a class
-        // field. A 'let' pins the name, not the object behind it.
-        IndexExpr ix => IsIndexableTarget(_types.TypeOf(ix.Target)),
-        _ => false
-    };
+        switch (expr)
+        {
+            case IdentifierExpr id:
+                return _types.RefOf(id) switch
+                {
+                    LocalSymbol { IsMutable: true } => null,
+                    ParameterSymbol => $"'{id.Name}' is a parameter, and a parameter is a 'let' binding; copy it into a 'var' to change it",
+                    LocalSymbol => $"'{id.Name}' is bound with 'let'; declare it 'var' to write it",
+                    _ => $"'{id.Name}' is not a variable",
+                };
+
+            case ThisExpr:
+                // 'this = value' replaces a VALUE as a whole, a struct or an enum. Anything else
+                // is the reference (or the scalar copy) the caller handed in, and is not rebound.
+                if (TypeFacts.KindOf(_types.TypeOf(expr)) is not (TypeSymbolKind.Struct or TypeSymbolKind.Enum))
+                    return "'this' is replaced as a whole only in a 'mut fn' of a struct or an enum";
+                return _thisMut ? null : NotMutReason;
+
+            case MemberExpr m:
+            {
+                // 'Type.NAME' names a 'static let', and that is a constant (Lyric 4 let the
+                // assignment through: nothing asked what a member of a TYPE is).
+                var named = _types.RefOf(m.Target);
+                if (named is ImportBindingSymbol { Target: var imported }) named = imported;
+                if (named is TypeSymbol holder)
+                    return holder.Members.LookupLocal(m.Member) is GlobalSymbol
+                        ? $"'{m.Member}' is a 'static let' of '{holder.Name}', a constant"
+                        : $"'{m.Member}' is not a place in '{holder.Name}'";
+
+                var baseType = _types.TypeOf(m.Target);
+                if (baseType.IsError) return null; // poison: no follow-up error
+
+                // An instance of a generic type behaves like its definition: 'Box<int>' is a
+                // class when 'Box' is one.
+                var kind = TypeFacts.KindOf(baseType);
+                if (kind is not (TypeSymbolKind.Class or TypeSymbolKind.Struct))
+                    return "only a 'var' field of a struct or a class is written";
+
+                var owner = TypeFacts.SymbolOf(baseType)!;
+                if (owner.Members.LookupLocal(m.Member) is not FieldSymbol { Declaration: FieldDecl field })
+                    return $"'{m.Member}' is not a field of '{owner.Name}'";
+                if (!field.IsVar)
+                    return $"field '{m.Member}' of '{owner.Name}' is not declared 'var'";
+
+                return WhyNotAPlace(m.Target);
+            }
+
+            // An element is writable as soon as the container is a REFERENCE, exactly like a class
+            // field. A 'let' pins the name, not the object behind it.
+            case IndexExpr ix:
+                return IsIndexableTarget(_types.TypeOf(ix.Target)) ? null : "the target is not indexable";
+
+            default:
+                return "it is not a place a value is stored in";
+        }
+    }
+
+    private const string NotMutReason = "'this' is written, and the method is not declared 'mut fn'";
+
+    /// <summary>
+    /// Whether the value an expression names may be changed IN PLACE — the base of a field write
+    /// or the receiver of a <c>mut fn</c> — as the reason it may not.
+    ///
+    /// <para>A reference is always a place: the object behind it is written, and only
+    /// <c>this</c> keeps the <c>mut fn</c> rule. A struct is a place when the expression that
+    /// names it is: a <c>var</c> binding, <c>this</c> in a <c>mut fn</c>, a <c>var</c> field
+    /// of a place, an array element. Anything else is a temporary — the result of a call, an
+    /// element a container's <c>get</c> handed out — and writing into it would change a copy
+    /// nobody reads (M4): refused, never copied in silence.</para>
+    /// </summary>
+    private string? WhyNotAPlace(Expr expr)
+    {
+        var type = _types.TypeOf(expr);
+        if (type.IsError) return null;
+
+        var reference = TypeFacts.KindOf(type) is TypeSymbolKind.Class or TypeSymbolKind.Interface
+                        || type is ArrayOf or CoroutineOf;
+        if (reference)
+            return expr is ThisExpr && !_thisMut ? NotMutReason : null;
+
+        switch (expr)
+        {
+            case ThisExpr:
+                return _thisMut ? null : NotMutReason;
+            case IdentifierExpr or MemberExpr:
+                return WhyNotWritable(expr);
+            case IndexExpr ix when _types.TypeOf(ix.Target) is ArrayOf or ErrorType:
+                return null; // an array element is a place in the array's block
+            case IndexExpr:
+                return "the element is a copy a 'get' handed out, not a place; assign the whole element instead";
+            default:
+                return "the value is a temporary; bind it to a 'var' first";
+        }
+    }
+
+    /// <summary>
+    /// A call of a <c>mut fn</c> writes its receiver (M4): the receiver has to be a place, by
+    /// the rule a field write follows. Transitively, too — a method that is not <c>mut</c>
+    /// may not call a <c>mut fn</c> on <c>this</c>, or the word would promise nothing.
+    /// </summary>
+    private void CheckMutCall(MemberExpr callee, CallExpr call)
+    {
+        var bound = _types.RefOf(callee);
+        if (bound is ImportBindingSymbol import) bound = import.Target;
+        if (bound is not FunctionSymbol { Declaration: FunctionDecl { IsMut: true, IsStatic: false } method }) return;
+        if (WhyNotAPlace(callee.Target) is not { } reason) return;
+
+        _de.Report("LYR-SEM0019", Severity.Error, call.Span,
+            $"cannot call 'mut fn {method.Name}' on this receiver — {reason}");
+    }
 
     /// <summary>An array, or a type satisfying <c>Indexable&lt;T&gt;</c>. Both are references, so the
     /// element is writable: a <c>let</c> pins the name, not the object behind it.
@@ -314,26 +496,6 @@ public sealed class SemaRules
 
         return TypeFacts.SymbolOf(type) is { } symbol
                && Conformance.Implements(symbol, indexable, _binding);
-    }
-
-    private bool IsFieldMutable(MemberExpr m)
-    {
-        var baseType = _types.TypeOf(m.Target);
-        if (baseType.IsError) return true; // poison: no follow-up error
-
-        // An instance of a generic type behaves like its definition: 'Box<int>' is a class when
-        // 'Box' is one.
-        var kind = TypeFacts.KindOf(baseType);
-
-        if (kind == TypeSymbolKind.Class) return true;               // class fields are always mutable
-
-        // Struct fields likewise, except on 'this' inside a non-'mut' method: that a non-'mut'
-        // method does not touch its own receiver is the promise of 'mut fn', and '_thisMut' is what
-        // enforces it.
-        if (kind == TypeSymbolKind.Struct)
-            return m.Target is not ThisExpr || _thisMut;
-
-        return false;
     }
 
     // The direct child expressions, used to spot nested assignments.

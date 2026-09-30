@@ -1,6 +1,6 @@
 class Player {
     name: string,
-    hp: int,
+    var hp: int,
 
     fn getName(): string {
         return this.name;

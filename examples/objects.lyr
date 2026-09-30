@@ -5,7 +5,7 @@
 import std.io.console { println };
 
 class Counter {
-    value: int,
+    var value: int,
     step: int,
 
     // A factory: no receiver, hence `static`. The name `new` is only a convention.
@@ -14,7 +14,7 @@ class Counter {
     }
 
     // An instance method: `this` is the receiver and is passed as parameter 0.
-    fn advance() {
+    mut fn advance() {
         this.value += this.step;
     }
 

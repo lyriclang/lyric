@@ -1,7 +1,7 @@
 // Methods: the receiver is parameter 0, exactly as in CIL. The difference between an instance and a
 // static method therefore lies in the parameter list alone.
 class Counter {
-    value: int,
+    var value: int,
 
     // A factory: no receiver, hence 'static'. Without the marker it would need an object that does not
     // exist yet at this point.
@@ -13,7 +13,7 @@ class Counter {
         return this.value;
     }
 
-    fn bump(by: int) {
+    mut fn bump(by: int) {
         this.value += by;
     }
 

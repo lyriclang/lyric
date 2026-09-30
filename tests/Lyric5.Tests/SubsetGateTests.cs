@@ -61,7 +61,7 @@ public class SubsetGateTests
     }
 
     [Theory]
-    [InlineData("class Box { v: int }\nfn main(): int { let b = Box { v = 1 }; return b.v; }", "classes", "M3")]
+    [InlineData("fn main(): int { let (a, b) = (1, 2); return a + b; }", "tuples", "M3")]
     [InlineData("fn main(): int { let xs = [1, 2, 3]; return xs[0]; }", "arrays", "M3")]
     [InlineData("fn main(): int { let o: ?int = null; return 0; }", "optionals", "M3")]
     [InlineData("enum E { A, B }\nfn main(): int { let e = E.A; return 0; }", "enums", "M3")]

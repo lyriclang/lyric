@@ -638,9 +638,9 @@ pub fn parseFloat(value: string): ?float;
 /// `std.collections`.
 pub class StringBuilder {
     /// The collected pieces; `count` says how many are filled.
-    parts: string[],
+    var parts: string[],
     /// How many entries of `parts` are real.
-    count: int,
+    var count: int,
 
     /// An empty builder.
     pub static fn new(): StringBuilder {

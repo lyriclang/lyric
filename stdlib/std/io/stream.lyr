@@ -206,14 +206,14 @@ pub class LineReader :: [Iterator<string>] {
     /// The open file being walked.
     source: File,
     /// Bytes read and not yet handed out as a line.
-    pending: uint8[],
+    var pending: uint8[],
     /// The first unconsumed byte of `pending`; a cursor rather than a re-slice per line, so a
     /// chunk full of short lines costs one copy instead of one per line.
-    at: int,
+    var at: int,
     /// Whether the file has no more bytes to give.
-    ended: bool,
+    var ended: bool,
     /// Whether the walk stopped on a failure rather than on the end.
-    broke: bool,
+    var broke: bool,
 
     /// The next line, or `null` at the end of the file — and at a failure, which `failed()`
     /// tells apart.

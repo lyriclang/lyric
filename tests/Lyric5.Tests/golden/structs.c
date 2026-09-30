@@ -3,15 +3,17 @@
 #include <stdint.h>
 #include <math.h>
 
-/* structs, by value */
-typedef struct lyr_ty0_Point {
+/* types: a struct is a value, a class an object behind its header */
+typedef struct lyr_ty0_Point lyr_ty0_Point;
+typedef struct lyr_ty1_Segment lyr_ty1_Segment;
+struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
-} lyr_ty0_Point;
-typedef struct lyr_ty1_Segment {
+};
+struct lyr_ty1_Segment {
     lyr_ty0_Point f_a;
     lyr_ty0_Point f_b;
-} lyr_ty1_Segment;
+};
 
 /* prototypes */
 static lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx);

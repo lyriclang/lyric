@@ -64,13 +64,31 @@ public class RuntimeBuildTests
         return RunC(path, "emitted-" + name, profile, null, args);
     }
 
-    private static ProcessRunner.Result RunC(string source, string name, Profile profile, CCompiler? compiler, string[]? args)
+    /// <summary>
+    /// The emitter's C under a test harness instead of <c>lyr_run_main</c>: the program is
+    /// compiled with <c>lyr_run_main</c> renamed to <c>lyr_test_run_main</c>, which the harness
+    /// (a file under <c>tests/Lyric5.Tests/harness</c>) defines — so a test starts the runtime
+    /// its own way, under a heap limit for one, without the emitter knowing.
+    /// </summary>
+    internal static ProcessRunner.Result RunEmittedUnder(string harness, string cText, string name, Profile profile)
+    {
+        var dir = Path.Combine(Cache, "emitted");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, name + ".c");
+        File.WriteAllText(path, cText);
+        return RunC(path, $"emitted-{name}-{harness}", profile, null, null,
+            ["lyr_run_main=lyr_test_run_main"], Path.Combine(Root, "tests", "Lyric5.Tests", "harness", harness + ".c"));
+    }
+
+    private static ProcessRunner.Result RunC(string source, string name, Profile profile, CCompiler? compiler, string[]? args,
+        string[]? defines = null, string? beside = null)
     {
         var build = new CBuild(compiler ?? Zig(), Target.Host, profile, Cache);
         var archive = RuntimeLayout.BuildArchive(build, Root, Path.Combine(Cache, "lib"));
-        var unit = new CUnit(source, [],
-            [RuntimeLayout.IncludeDir(Root), Path.Combine(Root, "runtime", "third_party", "bdwgc", "include")]);
-        var objects = build.Compile([unit]);
+        string[] includes = [RuntimeLayout.IncludeDir(Root), Path.Combine(Root, "runtime", "third_party", "bdwgc", "include")];
+        var units = new List<CUnit> { new(source, defines ?? [], includes) };
+        if (beside is not null) units.Add(new CUnit(beside, [], includes));
+        var objects = build.Compile(units);
         var exe = build.LinkExecutable([.. objects, archive],
             Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), name + Target.Host.ExecutableSuffix));
         return ProcessRunner.Run(exe, args ?? [], TimeSpan.FromMinutes(2));

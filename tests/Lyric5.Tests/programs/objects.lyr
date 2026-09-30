@@ -1,0 +1,75 @@
+// Classes (design/v5/spec/01 V3/V4; 02 M2–M5, M9, M10; 08 Y9): an object behind a reference,
+// 'var' fields written through any reference, a struct inside an object written in place, a
+// struct method's 'this' as the caller's place. Expected stdout, in order:
+//   alice 150                  a 'mut fn' writes the object, a plain method reads it
+//   shared 175                 a second binding is the same object
+//   identity true false        same(a, b): one object, and two that only look alike
+//   team alice+bob             a class holding classes, read through the chain
+//   swapped alice              a 'var' reference field is reassigned
+//   origin 3,4 moved 13,4      a struct in an object: copied out by a binding, written in place
+//   counter 3                  three 'mut fn' calls on a struct field reach the object
+//   copy 3 then 4              a struct copied out of an object is its own value
+//   reset 0 kept 3             'this = value' replaces the copy whole, the object keeps its own
+//   made carol 0               a type name in call position is its factory, 'static fn new'
+import std.io { println };
+
+class Account {
+    owner: string,
+    var balance: int,
+
+    static fn new(owner: string): Account { return Account { owner = owner, balance = 0 }; }
+    mut fn deposit(amount: int): void { this.balance += amount; }
+    fn describe(): string { return f"{this.owner} {this.balance}"; }
+}
+
+class Team { lead: Account, var second: Account }
+
+struct Point { var x: int, var y: int }
+
+struct Counter {
+    var n: int,
+    mut fn bump(): void { this.n += 1; }
+    mut fn reset(): void { this = Counter { n = 0 }; }
+    fn read(): int { return this.n; }
+}
+
+class Shape { name: string, var at: Point, var hits: Counter }
+
+fn main(): int {
+    let alice = Account { owner = "alice", balance = 100 };
+    alice.deposit(50);
+    println(alice.describe());
+
+    let again = alice;
+    again.deposit(25);
+    println(f"shared {alice.balance}");
+
+    let twin = Account { owner = "alice", balance = 175 };
+    println(f"identity {same(alice, again)} {same(alice, twin)}");
+
+    let bob = Account { owner = "bob", balance = 1 };
+    let team = Team { lead = alice, second = bob };
+    println("team " + team.lead.owner + "+" + team.second.owner);
+    team.second = team.lead;
+    println("swapped " + team.second.owner);
+
+    let shape = Shape { name = "dot", at = Point { x = 3, y = 4 }, hits = Counter { n = 0 } };
+    let before = shape.at;
+    shape.at.x += 10;
+    println(f"origin {before.x},{before.y} moved {shape.at.x},{shape.at.y}");
+
+    shape.hits.bump();
+    shape.hits.bump();
+    shape.hits.bump();
+    println(f"counter {shape.hits.read()}");
+
+    var copy = shape.hits;
+    copy.bump();
+    println(f"copy {shape.hits.n} then {copy.n}");
+    copy.reset();
+    println(f"reset {copy.n} kept {shape.hits.n}");
+
+    let carol = Account("carol");
+    println("made " + carol.describe());
+    return 0;
+}

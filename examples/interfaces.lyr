@@ -16,7 +16,7 @@ pub interface Damageable {
 }
 
 pub class Player :: [Damageable] {
-    hp: int,
+    var hp: int,
 
     static fn new(hp: int): Player {
         return Player { hp = hp };
@@ -35,7 +35,7 @@ pub class Player :: [Damageable] {
 }
 
 pub class Wall :: [Damageable] {
-    hp: int,
+    var hp: int,
 
     static fn new(hp: int): Wall {
         return Wall { hp = hp };

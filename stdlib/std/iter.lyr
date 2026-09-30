@@ -107,7 +107,7 @@ pub interface Iterator<T> {
     ///
     /// The most general terminator; `count`, `any` and `all` are special cases of it that exist
     /// because a closure is too much ceremony for counting.
-    fn fold<A>(seed: A, step: fn(A, T) -> A): A {
+    mut fn fold<A>(seed: A, step: fn(A, T) -> A): A {
         var acc = seed;
         var value = this.next();
         while (value != null) {
@@ -119,7 +119,7 @@ pub interface Iterator<T> {
 
     /// Folds without a seed: the first element starts the accumulator, and `null` says the
     /// source was empty — the case a seed would have answered.
-    fn reduce(step: fn(T, T) -> T): ?T {
+    mut fn reduce(step: fn(T, T) -> T): ?T {
         var acc = this.next();
         if (acc == null) {
             return null;
@@ -133,7 +133,7 @@ pub interface Iterator<T> {
     }
 
     /// How many elements are left; drains the iterator.
-    fn count(): int {
+    mut fn count(): int {
         var n = 0;
         var value = this.next();
         while (value != null) {
@@ -145,12 +145,12 @@ pub interface Iterator<T> {
 
     /// The first element, or `null` for an empty source. One `next`, named for the chain that
     /// ends on it.
-    fn first(): ?T {
+    mut fn first(): ?T {
         return this.next();
     }
 
     /// The last element, or `null` for an empty source; drains the iterator.
-    fn last(): ?T {
+    mut fn last(): ?T {
         var held = this.next();
         if (held == null) {
             return null;
@@ -165,7 +165,7 @@ pub interface Iterator<T> {
 
     /// The element at position `n`, counting from zero, or `null` when the source ends first.
     /// The elements before it are consumed.
-    fn nth(n: int): ?T {
+    mut fn nth(n: int): ?T {
         if (n < 0) {
             return null;
         }
@@ -179,7 +179,7 @@ pub interface Iterator<T> {
     }
 
     /// Stops at the first match; the rest is never evaluated.
-    fn any(test: fn(T) -> bool): bool {
+    mut fn any(test: fn(T) -> bool): bool {
         var value = this.next();
         while (value != null) {
             if (test(value)) {
@@ -192,7 +192,7 @@ pub interface Iterator<T> {
 
     /// Stops at the first counterexample. An empty iterator yields `true`, the only convention
     /// for which `a.all(p) && b.all(p) == a.chain(b).all(p)` holds.
-    fn all(test: fn(T) -> bool): bool {
+    mut fn all(test: fn(T) -> bool): bool {
         var value = this.next();
         while (value != null) {
             if (!test(value)) {
@@ -204,12 +204,12 @@ pub interface Iterator<T> {
     }
 
     /// Whether nothing matches: `!any`.
-    fn none(test: fn(T) -> bool): bool {
+    mut fn none(test: fn(T) -> bool): bool {
         return !this.any(test);
     }
 
     /// The first element that matches, or `null`.
-    fn find(test: fn(T) -> bool): ?T {
+    mut fn find(test: fn(T) -> bool): ?T {
         var value = this.next();
         while (value != null) {
             if (test(value)) {
@@ -222,7 +222,7 @@ pub interface Iterator<T> {
 
     /// The position of the first match, or `null`. Separate from `find`, because an `(int, T)`
     /// tuple would cost the common case where only one of the two is needed.
-    fn position(test: fn(T) -> bool): ?int {
+    mut fn position(test: fn(T) -> bool): ?int {
         var index = 0;
         var value = this.next();
         while (value != null) {
@@ -236,7 +236,7 @@ pub interface Iterator<T> {
     }
 
     /// How many elements match; drains the iterator. `filter(test).count()` in one step.
-    fn countWhere(test: fn(T) -> bool): int {
+    mut fn countWhere(test: fn(T) -> bool): int {
         var n = 0;
         var value = this.next();
         while (value != null) {
@@ -250,7 +250,7 @@ pub interface Iterator<T> {
 
     /// Calls `f` on every element, in order; drains the iterator. The terminator for a chain
     /// whose point is the side effect.
-    fn forEach(f: fn(T) -> void): void {
+    mut fn forEach(f: fn(T) -> void): void {
         var value = this.next();
         while (value != null) {
             f(value);
@@ -263,7 +263,7 @@ pub interface Iterator<T> {
     /// Quadratic: a `T[]` has a fixed length, so every append copies. For a large source
     /// `std.collections.collect` gathers into a doubling `List<T>`; it lives there because
     /// `std.iter` must not import `std.collections` — the dependency runs the other way.
-    fn toArray(): T[] {
+    mut fn toArray(): T[] {
         var result: T[] = [];
         var value = this.next();
         while (value != null) {
@@ -287,7 +287,7 @@ pub interface Iterator<T> {
 /// loop runs zero times.
 pub class RangeIterator :: [Iterator<int>] {
     /// The next value to yield.
-    current: int,
+    var current: int,
     /// The first value NOT yielded.
     end: int,
 
@@ -308,11 +308,11 @@ pub class RangeIterator :: [Iterator<int>] {
 // both 'last + 1' and an incremented cursor would wrap (§7.2 of the specification).
 class InclusiveRangeIterator :: [Iterator<int>] {
     /// The next value to yield.
-    current: int,
+    var current: int,
     /// The LAST value yielded — inclusive, and possibly the type's maximum.
     last: int,
     /// Whether `last` has been yielded.
-    done: bool,
+    var done: bool,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?int {
@@ -335,7 +335,7 @@ class InclusiveRangeIterator :: [Iterator<int>] {
 // preserving and take the signed adapters; only the full-width uint needs these.
 class UnsignedRangeIterator :: [Iterator<uint>] {
     /// The next value to yield.
-    current: uint,
+    var current: uint,
     /// The first value NOT yielded.
     end: uint,
 
@@ -354,11 +354,11 @@ class UnsignedRangeIterator :: [Iterator<uint>] {
 // its own pair.
 class InclusiveUnsignedRangeIterator :: [Iterator<uint>] {
     /// The next value to yield.
-    current: uint,
+    var current: uint,
     /// The LAST value yielded — inclusive, and possibly the type's maximum.
     last: uint,
     /// Whether `last` has been yielded.
-    done: bool,
+    var done: bool,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?uint {
@@ -381,7 +381,7 @@ pub class ArrayIterator<T> :: [Iterator<T>] {
     /// The array being walked.
     source: T[],
     /// The next position.
-    index: int,
+    var index: int,
 
     /// The next value, or `null` at the end.
     pub mut fn next(): ?T {
@@ -400,7 +400,7 @@ pub class StringIterator :: [Iterator<char>] {
     /// The code points, extracted once.
     chars: char[],
     /// The next position.
-    index: int,
+    var index: int,
 
     /// The next character, or `null` at the end.
     pub mut fn next(): ?char {
@@ -470,7 +470,7 @@ pub class CompactIterator<T> :: [Iterator<T>] {
     /// The slots being read.
     source: (?T)[],
     /// The next slot to look at.
-    index: int = 0,
+    var index: int = 0,
 
     /// The next value that is not `null`, or `null` at the end of the array.
     pub mut fn next(): ?T {
@@ -541,7 +541,7 @@ pub class TakeIterator<T> :: [Iterator<T>] {
     /// The values being limited.
     source: Iterator<T>,
     /// How many may still pass.
-    remaining: int,
+    var remaining: int,
 
     /// The next value while the budget lasts, then `null`.
     pub mut fn next(): ?T {
@@ -558,7 +558,7 @@ pub class SkipIterator<T> :: [Iterator<T>] {
     /// The values being shortened.
     source: Iterator<T>,
     /// How many are still to be dropped, at the first `next`.
-    pending: int,
+    var pending: int,
 
     /// The next value past the dropped front, or `null` at the end.
     pub mut fn next(): ?T {
@@ -580,7 +580,7 @@ pub class TakeWhileIterator<T> :: [Iterator<T>] {
     /// Decides where the front ends.
     keep: fn(T) -> bool,
     /// Set at the first refusal; from then on everything is `null`.
-    done: bool = false,
+    var done: bool = false,
 
     /// The next value of the accepted front, then `null` forever.
     pub mut fn next(): ?T {
@@ -608,7 +608,7 @@ pub class EnumerateIterator<T> :: [Iterator<(int, T)>] {
     /// The values being numbered.
     source: Iterator<T>,
     /// The number the next value gets.
-    index: int = 0,
+    var index: int = 0,
 
     /// The next `(position, value)` pair, or `null` at the end.
     pub mut fn next(): ?(int, T) {
@@ -655,7 +655,7 @@ pub class ChainIterator<T> :: [Iterator<T>] {
     /// The back half.
     second: Iterator<T>,
     /// Whether the front half is still being walked.
-    onFirst: bool = true,
+    var onFirst: bool = true,
 
     /// The next value, first half first, or `null` when both end.
     pub mut fn next(): ?T {
@@ -677,7 +677,7 @@ pub class FlatMapIterator<T, U> :: [Iterator<U>] {
     /// Builds the sequence for one value.
     f: fn(T) -> Iterator<U>,
     /// The sequence currently being drained, or `null` before the first and after the last.
-    current: ?Iterator<U> = null,
+    var current: ?Iterator<U> = null,
 
     /// The next value of the current sequence, moving to the next source value when one ends.
     pub mut fn next(): ?U {
@@ -741,7 +741,7 @@ pub class SkipWhileIterator<T> :: [Iterator<T>] {
     /// Decides where the dropped front ends.
     drop: fn(T) -> bool,
     /// Set once the front has been dropped; from then on everything passes.
-    passing: bool = false,
+    var passing: bool = false,
 
     /// The next value past the dropped front, or `null` at the end.
     pub mut fn next(): ?T {
@@ -765,7 +765,7 @@ pub class StepByIterator<T> :: [Iterator<T>] {
     /// The distance between two yielded values.
     step: int,
     /// Whether the first value is still to come — it is yielded without skipping.
-    atStart: bool = true,
+    var atStart: bool = true,
 
     /// The next value on the step, or `null` at the end.
     pub mut fn next(): ?T {
@@ -812,9 +812,9 @@ pub class DedupIterator<T> :: [Iterator<T>] {
     /// What decides whether two neighbours are the same.
     key: fn(T) -> int,
     /// The key of the last yielded value.
-    lastKey: int = 0,
+    var lastKey: int = 0,
     /// Whether anything has been yielded yet — before that, `lastKey` means nothing.
-    started: bool = false,
+    var started: bool = false,
 
     /// The next value whose key differs from the previous one's, or `null` at the end.
     pub mut fn next(): ?T {

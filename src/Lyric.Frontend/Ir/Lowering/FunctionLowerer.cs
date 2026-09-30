@@ -524,6 +524,7 @@ internal sealed class FunctionLowerer
             _slots.Locals, _slots.Temps, _blocks)
         {
             Entry = new BlockId(0), Handlers = _handlers,
+            ReceiverByRef = _thisSlot is not null && _thisType is IrStructType,
         };
     }
 
@@ -2115,6 +2116,15 @@ internal sealed class FunctionLowerer
 
     private TempId LowerAssign(AssignExpr expr)
     {
+        // 'this = value' in a 'mut fn' of a struct replaces the caller's value as a whole
+        // (02 M4): 'this' is the caller's place (M5), and the store reaches it.
+        if (expr.Target is ThisExpr && expr.Operator is null && _thisSlot is { } self && _thisType is { } selfType)
+        {
+            var replacement = LowerExprAs(expr.Value, selfType);
+            _b.Emit(new StoreLocal(self, replacement, expr.Span));
+            return replacement;
+        }
+
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
         if (expr.Target is IndexExpr indexed) return LowerElementAssign(indexed, expr);
 
@@ -3649,11 +3659,21 @@ internal sealed class FunctionLowerer
         {
             if (values.ContainsKey(field.Name)) continue;
 
+            var index = Array.IndexOf(layout.FieldNames, field.Name);
+
+            // A '?T' field without a written default is 'null' (02 M14 I1).
+            if (field.Default is null && index >= 0 && layout.FieldTypes[index] is IrOptionalType absent)
+            {
+                var none = _slots.NewTemp(absent);
+                _b.Emit(new OptNone(none, absent.Inner, expr.Span));
+                values[field.Name] = none;
+                continue;
+            }
+
             if (field.Default is null)
                 throw NotSupported($"initializer omits field '{field.Name}', which has no default",
                     expr.Span);
 
-            var index = Array.IndexOf(layout.FieldNames, field.Name);
             values[field.Name] = index >= 0
                 ? LowerExprAs(field.Default, layout.FieldTypes[index])
                 : LowerExpr(field.Default);
@@ -4239,6 +4259,24 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerCall(CallExpr expr)
     {
+        // 'Point(1, 2)' IS the factory call the sema stored for it (08 Y9) — the seam of the
+        // operators, for a callee that names a type.
+        if (_types.OperatorCallOf(expr) is { } factory)
+            return LowerCall(factory);
+
+        // 'same(a, b)': identity is the comparison of two references (02 M10). The symbol is
+        // the builtin exactly when no module declares it; a user function of the name shadows.
+        if (expr.Callee is IdentifierExpr { Name: "same" } identity
+            && _types.RefOf(identity) is FunctionSymbol { Declaration: FunctionDecl { Body: null, Span: var where } } builtin
+            && where == default && !_functions.ContainsKey(builtin) && expr.Arguments.Length == 2)
+        {
+            var left = LowerExpr(expr.Arguments[0]);
+            var right = LowerExpr(expr.Arguments[1]);
+            var one = _slots.NewTemp(BoolType);
+            _b.Emit(new BinOp(one, IrBinKind.Eq, BoolType, left, right, expr.Span));
+            return one;
+        }
+
         // 'b?.get()' — optional chaining with a call. The same branch as for the field access, except
         // that the 'some' branch holds a call rather than an 'ldfld'. The call itself lands back here
         // afterwards, with an unwrapped receiver.

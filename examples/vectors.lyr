@@ -5,8 +5,8 @@
 import std.io.console;
 
 pub struct Vector2 {
-    x: int,
-    y: int,
+    var x: int,
+    var y: int,
 
     static fn zero(): Vector2 {
         return Vector2 { x = 0, y = 0 };
@@ -30,14 +30,16 @@ pub struct Vector2 {
 
 // A struct as a field of another struct: the copy has to reach through to here.
 pub struct Segment {
-    from: Vector2,
+    var from: Vector2,
     to: Vector2,
 }
 
-// The parameter is a copy. What happens here stays here.
+// The parameter is a copy, and a 'let': to change it, it is bound to a 'var' first. What
+// happens here stays here.
 fn shrink(v: Vector2): int {
-    v.scale(0);
-    return v.sum();
+    var w = v;
+    w.scale(0);
+    return w.sum();
 }
 
 fn main(): int {

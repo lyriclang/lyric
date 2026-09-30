@@ -172,6 +172,7 @@ public class GoldenTests
     // Types.
     [InlineData("struct_decl")]       // Felder + Methoden + :: [Interfaces]
     [InlineData("class_decl")]        // a default field value and a mut fn
+    [InlineData("var_field")]         // 'var name: T', the writable field of Lyric 5
     [InlineData("enum_decl")]         // tuple, struct and unit variants plus a method
     [InlineData("interface_decl")]    // abstract and default methods
     [InlineData("extend_decl")]       // extend T :: [I] { ... }

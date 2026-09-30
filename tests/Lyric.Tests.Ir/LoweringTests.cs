@@ -631,7 +631,7 @@ public class LoweringTests
             interface Producer {
                 mut fn next(): ?int;
 
-                fn firstMapped<U>(f: fn(int) -> U): ?U {
+                mut fn firstMapped<U>(f: fn(int) -> U): ?U {
                     let v = this.next();
                     if (v == null) {
                         return null;
@@ -641,7 +641,7 @@ public class LoweringTests
             }
 
             class Counter :: [Producer] {
-                current: int,
+                var current: int,
 
                 pub mut fn next(): ?int {
                     this.current = this.current + 1;

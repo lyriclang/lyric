@@ -57,7 +57,7 @@ public class GlobalBindingTests
     [Fact]
     public void The_fields_of_a_global_object_stay_mutable() =>
         Allowed("""
-            class Zaehler { stand: int = 0, }
+            class Zaehler { var stand: int = 0, }
             let z = Zaehler { };
             fn main(): int { z.stand = 42; return z.stand; }
             """);
