@@ -101,6 +101,9 @@ public enum TokenKind
     Star,
     Slash,
     Percent,
+    PlusPercent, // +%  wrapping add (design/v5/spec/08 Y4)
+    MinusPercent, // -%
+    StarPercent, // *%
     Inc, //++
     Dec, //--
     
@@ -135,6 +138,9 @@ public enum TokenKind
     StarEqual, // *=
     SlashEqual, // /=
     PercentEqual, // %=
+    PlusPercentEqual, // +%=
+    MinusPercentEqual, // -%=
+    StarPercentEqual, // *%=
     AmpEqual, // &=
     PipeEqual, // |=
     CaretEqual, // ^=

@@ -2288,15 +2288,21 @@ public sealed class TypeChecker
             // user type answers no question anyone has asked yet.
             case BinaryOp.Rem:
                 return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
-            case BinaryOp.Shl or BinaryOp.Shr or BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr:
+            // The wrap operators and the bit operators are for integers only (08 Y4): a float
+            // knows no wrap (IEEE has its infinities) and a 'char' is not a number (03 T1e).
+            case BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap
+                or BinaryOp.Shl or BinaryOp.Shr or BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr:
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
                     return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
                 return BadBinary(b, l, r);
             case BinaryOp.Lt or BinaryOp.Le or BinaryOp.Gt or BinaryOp.Ge:
-                // Numerics keep their opcodes; a 'char' is numeric itself and needs no branch of
-                // its own. Everything else orders through 'Ordered' — 'string < string' included,
-                // because the stdlib conforms string to Ordered<string>.
+                // Numerics keep their opcodes. Two chars order by scalar value (Rust, Swift) —
+                // that is not a comparison with a number, which T1e refuses. Everything else
+                // orders through 'Ordered' — 'string < string' included, because the stdlib
+                // conforms string to Ordered<string>.
                 if (UnifyNumeric(b.Left, l, b.Right, r) is not null)
+                    return LyrType.Bool;
+                if (TypeFacts.IsChar(l) && TypeFacts.IsChar(r))
                     return LyrType.Bool;
                 CheckOrdered(b, l, r, scope);
                 return LyrType.Bool;
@@ -2843,6 +2849,18 @@ public sealed class TypeChecker
         BinaryOp.BitXor => "^",
         BinaryOp.Shl => "<<",
         BinaryOp.Shr => ">>",
+        BinaryOp.AddWrap => "+%",
+        BinaryOp.SubWrap => "-%",
+        BinaryOp.MulWrap => "*%",
+        BinaryOp.Lt => "<",
+        BinaryOp.Le => "<=",
+        BinaryOp.Gt => ">",
+        BinaryOp.Ge => ">=",
+        BinaryOp.Eq => "==",
+        BinaryOp.Ne => "!=",
+        BinaryOp.LogicalAnd => "&&",
+        BinaryOp.LogicalOr => "||",
+        BinaryOp.Coalesce => "??",
         _ => op.ToString(),
     };
 
@@ -2911,7 +2929,31 @@ public sealed class TypeChecker
         var op = CheckExpr(c.Operand, scope);
         var target = ResolveType(c.Type, scope);
         if (op.IsError || target.IsError) return target;
-        if (TypeFacts.IsNumeric(op) && TypeFacts.IsNumeric(target)) return target; // numeric to numeric only
+
+        // 'as' between numbers always succeeds and is bit-near (03 T1d): a narrowing wraps, a
+        // float to an integer saturates and NaN gives 0, an integer to a float rounds. A 'char'
+        // meets only 'uint32' — outward freely, inward with a check of the scalar value at
+        // runtime — and 'bool' meets no number at all: neither is a number (T1e), and a cast
+        // that made one would be the arithmetic the type exists to refuse.
+        if (TypeFacts.IsNumeric(op) && TypeFacts.IsNumeric(target)) return target;
+        if (TypeFacts.IsChar(op) != TypeFacts.IsChar(target)
+            && (op is PrimitiveType { Kind: PrimitiveKind.Uint32 } || target is PrimitiveType { Kind: PrimitiveKind.Uint32 }))
+            return target;
+        if (TypeFacts.IsChar(op) && TypeFacts.IsNumeric(target) || TypeFacts.IsNumeric(op) && TypeFacts.IsChar(target))
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, c.Span,
+                $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — a 'char' "
+                + "converts to and from 'uint32' only, its scalar value; go through 'as uint32'");
+            return target;
+        }
+        if (TypeFacts.IsBool(op) && (TypeFacts.IsNumeric(target) || TypeFacts.IsChar(target))
+            || TypeFacts.IsBool(target) && (TypeFacts.IsNumeric(op) || TypeFacts.IsChar(op)))
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, c.Span,
+                $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'bool' is "
+                + "not a number; write the test or the choice out ('x != 0', 'if (b) 1 else 0')");
+            return target;
+        }
 
         // An opaque alias converts to EXACTLY its underlying and back — the one door in its
         // wall, and it is explicit by construction: this cast is the only way through. At
@@ -4664,8 +4706,8 @@ public sealed class TypeChecker
         // alone would only CHECK the fit while nothing records it: the literal keeps its default
         // type, and the lowering stores a `const i64` into the slot of the type this returns.
         // `UnifyArms` asks the same question for `match` and never had the hole.
-        if (IsAssignable(be, b, a, adaptLiterals: false)) return a;
-        if (IsAssignable(ae, a, b, adaptLiterals: false)) return b;
+        if (IsAssignable(be, b, a, coercionSite: false)) return a;
+        if (IsAssignable(ae, a, b, coercionSite: false)) return b;
         _de.Report("LYR-SEM0016", Severity.Error, span, $"incompatible branch types: '{TypeFacts.Display(a)}' vs '{TypeFacts.Display(b)}'");
         return a;
     }
@@ -5985,18 +6027,20 @@ public sealed class TypeChecker
         return false;
     }
 
-    /// <param name="adaptLiterals">Whether an unsuffixed literal counts as fitting the target
-    /// (§3.1). True at every adaptation context, where the caller records the adaptation
-    /// afterwards. False where the answer only decides a type and nothing writes it back — an arm
-    /// unification — because a yes on that ground alone leaves the literal at its default type
-    /// while the result claims the target's.</param>
-    private bool IsAssignable(Expr expr, LyrType from, LyrType to, bool adaptLiterals = true)
+    /// <param name="coercionSite">Whether the position is a coercion site — an assignment, an
+    /// argument, a return, an initializer — where an unsuffixed literal takes the target's type
+    /// (§3.1; the caller records the adaptation afterwards) and an integer widens losslessly
+    /// (design/v5/spec/03 T1c; the lowering converts). False where the answer only decides a type
+    /// and nothing writes it back — an arm unification — because a yes on either ground alone
+    /// leaves the value at its own type while the result claims the target's; coercion happens
+    /// after the unification, never inside it (T8).</param>
+    private bool IsAssignable(Expr expr, LyrType from, LyrType to, bool coercionSite = true)
     {
         if (from.IsError || to.IsError) return true;      // poison: no follow-up errors
         if (from is NeverType) return true;               // the bottom type: panic(...) fits anywhere
         if (LyrType.Equal(from, to)) return true;
         if (to is Optional inner)                          // T to ?T, widening
-            return from is NullType || IsAssignable(expr, from, inner.Inner, adaptLiterals);
+            return from is NullType || IsAssignable(expr, from, inner.Inner, coercionSite);
         if (from is NullType) return false;
 
         // A coroutine that cannot throw fits where one that may is expected: the target promises
@@ -6006,7 +6050,8 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield);
 
-        if (adaptLiterals && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
+        if (coercionSite && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
+        if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         return false;
     }
@@ -6230,12 +6275,12 @@ public sealed class TypeChecker
 
     private static LyrType IntSuffixType(IntSuffix s) => new PrimitiveType(s switch
     {
-        IntSuffix.I8 => PrimitiveKind.Int8, IntSuffix.I16 => PrimitiveKind.Int16, IntSuffix.I32 => PrimitiveKind.Int32, IntSuffix.I64 => PrimitiveKind.Int64,
-        IntSuffix.U8 => PrimitiveKind.Uint8, IntSuffix.U16 => PrimitiveKind.Uint16, IntSuffix.U32 => PrimitiveKind.Uint32, _ => PrimitiveKind.Uint64
+        IntSuffix.I8 => PrimitiveKind.Int8, IntSuffix.I16 => PrimitiveKind.Int16, IntSuffix.I32 => PrimitiveKind.Int32, IntSuffix.I64 => PrimitiveKind.Int,
+        IntSuffix.U8 => PrimitiveKind.Uint8, IntSuffix.U16 => PrimitiveKind.Uint16, IntSuffix.U32 => PrimitiveKind.Uint32, _ => PrimitiveKind.Uint
     });
 
     private static LyrType FloatSuffixType(FloatSuffix s) =>
-        new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float64);
+        new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float);
 
     /// <summary>Whether this is THE <c>Deprecated</c> struct of <c>std.core</c> — by identity,
     /// the same rule the WarningAnalyzer applies when it reads the attribute.</summary>
@@ -6284,7 +6329,20 @@ public sealed class TypeChecker
     {
         if (ContainsError(l) || ContainsError(r)) return LyrType.Error;
 
-        _de.Report("LYR-SEM0003", Severity.Error, b.Span, $"operator '{b.Operator}' is not applicable to '{TypeFacts.Display(l)}' and '{TypeFacts.Display(r)}'");
+        var hint = b.Operator switch
+        {
+            // The two places a reader most likely expected a conversion the language does not
+            // make (03 T1c, T1e): the hint names the explicit way.
+            BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap when !TypeFacts.IsInteger(l) || !TypeFacts.IsInteger(r)
+                => " — the wrap operators are for integer types only",
+            _ when TypeFacts.IsChar(l) != TypeFacts.IsChar(r) && (TypeFacts.IsNumeric(l) || TypeFacts.IsNumeric(r))
+                => " — a 'char' is not a number; 'as uint32' reaches its scalar value",
+            _ when TypeFacts.IsNumeric(l) && TypeFacts.IsNumeric(r)
+                => " — the operands of an operator have one type; convert with 'as' (an integer widens only at an assignment, an argument or a return)",
+            _ => "",
+        };
+        _de.Report("LYR-SEM0003", Severity.Error, b.Span,
+            $"operator '{OperatorText(b.Operator)}' is not applicable to '{TypeFacts.Display(l)}' and '{TypeFacts.Display(r)}'{hint}");
         return LyrType.Error;
     }
 }

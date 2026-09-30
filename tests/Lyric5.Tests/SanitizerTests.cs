@@ -42,6 +42,10 @@ public class SanitizerTests
         { "threads", [], 0 },
         { "panic_checks", ["ok"], 0 },
         { "panic_checks", ["divmin"], 101 },
+        // The number tower's macros compute in unsigned arithmetic exactly so that UBSan has
+        // nothing to say about a wrap, a shift into the sign bit or a saturated conversion.
+        { "numeric", ["ok"], 0 },
+        { "numeric", ["shlneg"], 101 },
         { "panic_index", [], 101 },
         { "panic_hook", [], 101 },
         { "heap_limit", [], 101 },

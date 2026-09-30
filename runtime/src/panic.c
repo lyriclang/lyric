@@ -95,6 +95,14 @@ void lyr_panic_null(void) {
     lyr_panic(LYR_RT_NULL_UNWRAP, "unwrapped a null value");
 }
 
+void lyr_panic_shift(int64_t count, int bits) {
+    lyr_panic(LYR_RT_OVERFLOW, "shift by %lld exceeds the width of %d bits", (long long)count, bits);
+}
+
+void lyr_panic_char(uint32_t value) {
+    lyr_panic(LYR_RT_CHAR, "0x%X is not a Unicode scalar value", (unsigned)value);
+}
+
 void lyr_panic_message(const LyrStr *message) {
     lyr_panic(LYR_RT_PANIC, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
 }

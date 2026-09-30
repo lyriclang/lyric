@@ -4,9 +4,10 @@ using Lyric.Ir;
 namespace Lyric5.Compiler;
 
 /// <summary>
-/// What of the front end's IR the Lyric 5 compiler takes today (design/v5/spec/13, M2): functions,
-/// the integer types and <c>bool</c>, strings, <c>if</c>/<c>while</c>/<c>for</c> over a range,
-/// calls, <c>let</c>/<c>var</c>, structs as values. Everything else the 4.x front end still lowers
+/// What of the front end's IR the Lyric 5 compiler takes today (design/v5/spec/13, M2–M3):
+/// functions, the number tower (integers, floats, <c>char</c>, <c>bool</c>), strings,
+/// <c>if</c>/<c>while</c>/<c>for</c> over a range, calls, <c>let</c>/<c>var</c>, structs as
+/// values. Everything else the 4.x front end still lowers
 /// is refused here with the milestone that brings it — one diagnostic per construct, never a
 /// silent miscompile and never a fork of the front end.
 ///
@@ -73,12 +74,6 @@ public static class SubsetGate
         {
             switch (type)
             {
-                case IrScalarType { Kind: IrScalar.F32 or IrScalar.F64 }:
-                    Refuse(span, $"floating-point numbers, {where}", "M3");
-                    break;
-                case IrScalarType { Kind: IrScalar.Char }:
-                    Refuse(span, $"'char', {where}", "M3");
-                    break;
                 case IrScalarType:
                 case IrStructType:
                     break;
@@ -113,15 +108,11 @@ public static class SubsetGate
         {
             switch (op)
             {
-                case Const c:
-                    if (c.Value is FloatConst) Refuse(op.Span, "floating-point numbers", "M3");
-                    else if (c.Value is CharConst) Refuse(op.Span, "'char'", "M3");
+                case Const:
                     break;
                 case BinOp b:
                     if (b.Type is IrScalarType { Kind: IrScalar.String } && b.Kind != IrBinKind.Add)
                         Refuse(op.Span, "comparing strings with an operator", "M3");
-                    else if (b.Kind is IrBinKind.Shl or IrBinKind.Shr)
-                        Refuse(op.Span, "shifts (their overflow rule comes with the number tower)", "M3");
                     else Type(b.Type, op.Span, "the operand type");
                     break;
                 case UnOp u:

@@ -1390,7 +1390,7 @@ internal sealed class FunctionLowerer
             // and the comparison calls a range crossing the sign bit empty — so uint has its
             // own pair. Smaller widths embed into the carrier order-preserving; the loop head
             // converts the yielded value back (Yield below).
-            var unsigned = ro.Element is PrimitiveType { Kind: PrimitiveKind.Uint or PrimitiveKind.Uint64 };
+            var unsigned = ro.Element is PrimitiveType { Kind: PrimitiveKind.Uint };
             var symbol = (range.IsInclusive, unsigned) switch
             {
                 (false, false) => _types.RangeIterator,
@@ -1826,6 +1826,26 @@ internal sealed class FunctionLowerer
         if (expr.Operator is UnaryOp.PreInc or UnaryOp.PreDec)
             return LowerIncDec(expr.Operand, expr.Operator is UnaryOp.PreInc,
                 yieldOldValue: false, expr.Span);
+
+        // '-128' as an int8 is one literal, not a negation of 128, which no int8 holds: the sema
+        // typed both nodes with the adapted type (3.1), and the value folds here, into the
+        // two's-complement bits at the type's width, so no checked negation ever runs on a
+        // magnitude the type has no room for. A float negates as an instruction; nothing
+        // overflows there.
+        if (expr.Operator is UnaryOp.Neg && expr.Operand is IntLiteralExpr literal
+            && TypeOfExpr(expr) is IrScalarType { Kind: not (IrScalar.F32 or IrScalar.F64) } integer)
+        {
+            var bits = unchecked(0UL - literal.Value);
+            var width = integer.Kind switch
+            {
+                IrScalar.I8 or IrScalar.U8 => 8,
+                IrScalar.I16 or IrScalar.U16 => 16,
+                IrScalar.I32 or IrScalar.U32 => 32,
+                _ => 64,
+            };
+            if (width < 64) bits &= (1UL << width) - 1;
+            return EmitConst(new IntConst(bits), integer, expr.Span);
+        }
 
         var operand = LowerExpr(expr.Operand);
         var type = TypeOfExpr(expr);
@@ -3106,6 +3126,19 @@ internal sealed class FunctionLowerer
         var target = to is IrOptionalType outer ? outer.Inner : to;
         var source = from is IrOptionalType inner ? inner.Inner : from;
 
+        // The third implicit transition, a lossless integer widening (design/v5/spec/03 T1c):
+        // the sema admitted 'int8' where 'int' is expected, and the value changes representation
+        // here, as a convert — the same instruction 'as' emits, on a pair the rule allows. Only
+        // where the scalar kinds differ; the sema vouches that they differ by a widening.
+        if (target is IrScalarType { Kind: var wanted } && source is IrScalarType { Kind: var given }
+            && wanted != given && from is not IrOptionalType && WidensScalar(given, wanted))
+        {
+            var widened = _slots.NewTemp(target);
+            _b.Emit(new Lyric.Ir.Convert(widened, source, target, value, span));
+            value = widened;
+            from = target;
+        }
+
         // Value semantics. The binding point is where a struct value gets a new home; that is where the
         // copy happens, and only there. A freshly built value does not need it: it has no other owner to
         // detach from.
@@ -3130,6 +3163,21 @@ internal sealed class FunctionLowerer
         var dest = _slots.NewTemp(to);
         _b.Emit(new OptSome(dest, value, option.Inner, span));
         return dest;
+    }
+
+    /// <summary>The IR side of <see cref="TypeFacts.Widens"/>: the same table on scalar kinds.</summary>
+    private static bool WidensScalar(IrScalar from, IrScalar to)
+    {
+        if (from == IrScalar.F32 && to == IrScalar.F64) return true;
+        static (int Bits, bool Signed)? Shape(IrScalar kind) => kind switch
+        {
+            IrScalar.I8 => (8, true), IrScalar.I16 => (16, true), IrScalar.I32 => (32, true), IrScalar.I64 => (64, true),
+            IrScalar.U8 => (8, false), IrScalar.U16 => (16, false), IrScalar.U32 => (32, false), IrScalar.U64 => (64, false),
+            _ => null,
+        };
+        if (Shape(from) is not { } s || Shape(to) is not { } t) return false;
+        if (s.Signed && !t.Signed) return false;
+        return t.Bits > s.Bits;
     }
 
     /// <summary>
@@ -4820,12 +4868,16 @@ internal sealed class FunctionLowerer
         if (receiver is { } self) args.Add(self);
         for (var i = 0; i < arguments.Length; i++)
         {
-            var value = LowerExpr(arguments[i]);
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
             {
-                args.Add(value);
+                // A scalar argument is coerced to the wire type it lands in, as an argument to
+                // a Lyric function is (03 T1c): 'fromInt(x)' with 'x: int8' widens here, or the
+                // call would hand an i8 to a parameter declared i64 — the verifier refused that,
+                // and a native callee would have read it as whatever C made of it.
+                args.Add(LowerExprAs(arguments[i], import.ParamTypes[args.Count]));
                 continue;
             }
+            var value = LowerExpr(arguments[i]);
 
             // A struct crosses as its fields, read at the call: the same snapshot a by-value
             // pass would take, without the copy — and without the object, once the scalarizer

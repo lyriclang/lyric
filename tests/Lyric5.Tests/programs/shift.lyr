@@ -1,0 +1,3 @@
+// A shift by the width or more panics (RT0002), in every profile: no silent masking.
+fn shl(a: int, b: int): int { return a << b; }
+fn main(): int { return shl(1, 64); }

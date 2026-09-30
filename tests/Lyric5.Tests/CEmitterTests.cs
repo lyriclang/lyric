@@ -37,6 +37,7 @@ public class CEmitterTests
     [InlineData("checks")]
     [InlineData("hello")]
     [InlineData("structs")]
+    [InlineData("arith")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -63,6 +64,11 @@ public class CEmitterTests
             data.Add("fizzbuzz", profile, 0,
                 "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n");
             data.Add("strings", profile, 0, "Grüße, Lyric!\nn=42 u=7 b=true\na-b-c\ntab\there\n");
+            data.Add("arith", profile, 0,
+                "alias 42\nwiden 300\nwrap -128 255 0\nsat 127 -128 0 255\ntrunc -3 3\nchar 65 A ok\n"
+                + "shl 8 -1 255\nwrapop 0 255 1\nswrap -128 127\nfloat 1.5 2 0.09999999999999998 0.5\n"
+                + "fdiv inf -inf NaN\nf32 0.10000000149011612 0.30000001192092896\ncmp true false\n"
+                + "big 9007199254740993 1e+21\n");
         }
         return data;
     }
@@ -99,6 +105,10 @@ public class CEmitterTests
         { "remmin", Profile.Release, "panic [LYR-RT0002]: arithmetic overflow in '%'" },
         { "negmin", Profile.Debug, "panic [LYR-RT0002]: arithmetic overflow in '-'" },
         { "negmin", Profile.Release, "panic [LYR-RT0002]: arithmetic overflow in '-'" },
+        { "shift", Profile.Debug, "panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits" },
+        { "shift", Profile.Release, "panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits" },
+        { "badchar", Profile.Debug, "panic [LYR-RT0009]: 0xD800 is not a Unicode scalar value" },
+        { "badchar", Profile.Release, "panic [LYR-RT0009]: 0xD800 is not a Unicode scalar value" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the

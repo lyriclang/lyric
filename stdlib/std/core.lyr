@@ -224,7 +224,7 @@ extend char :: [Ordered<char>] {
 
 extend char :: [Hashable<char>] {
     fn hash(): int {
-        return this as int;
+        return this as uint32 as int;
     }
 }
 
@@ -275,8 +275,8 @@ extend string :: [Ordered<string>] {
 
         var i = 0;
         while (i < kurz) {
-            let x = charAt(this, i) as int;
-            let y = charAt(other, i) as int;
+            let x = charAt(this, i) as uint32 as int;
+            let y = charAt(other, i) as uint32 as int;
             if (x < y) {
                 return -1;
             }
@@ -308,7 +308,7 @@ extend string :: [Hashable<string>] {
         let n = length(this);
         var i = 0;
         while (i < n) {
-            h = h ^ charAt(this, i) as int;
+            h = h ^ charAt(this, i) as uint32 as int;
             h = h * 1099511628211; // FNV-Prime
             i = i + 1;
         }

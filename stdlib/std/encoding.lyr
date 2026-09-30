@@ -44,23 +44,23 @@ let base64Chars: char[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0
 // The character for one hexadecimal digit value in `0..15`, lowercase.
 fn hexDigit(value: int): char {
     if (value < 10) {
-        return ('0' as int + value) as char;
+        return ('0' as uint32 as int + value) as uint32 as char;
     }
-    return ('a' as int + value - 10) as char;
+    return ('a' as uint32 as int + value - 10) as uint32 as char;
 }
 
 // The value of one hexadecimal digit character, or -1 when the character is none. Both cases are
 // accepted: encoders differ in what they emit, and the value is the same.
 fn hexValue(c: char): int {
-    let code = c as int;
-    if (code >= '0' as int && code <= '9' as int) {
-        return code - '0' as int;
+    let code = c as uint32 as int;
+    if (code >= '0' as uint32 as int && code <= '9' as uint32 as int) {
+        return code - '0' as uint32 as int;
     }
-    if (code >= 'a' as int && code <= 'f' as int) {
-        return code - 'a' as int + 10;
+    if (code >= 'a' as uint32 as int && code <= 'f' as uint32 as int) {
+        return code - 'a' as uint32 as int + 10;
     }
-    if (code >= 'A' as int && code <= 'F' as int) {
-        return code - 'A' as int + 10;
+    if (code >= 'A' as uint32 as int && code <= 'F' as uint32 as int) {
+        return code - 'A' as uint32 as int + 10;
     }
     return -1;
 }

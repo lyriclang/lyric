@@ -7,12 +7,19 @@ namespace Lyric.Sema;
 // structural through LyrType.Equal, NOT through record ==, under which arrays would compare by
 // reference.
 
+/// <summary>
+/// The scalar kinds. <c>int</c>, <c>uint</c> and <c>float</c> are 64 bits wide, and the names
+/// <c>int64</c>, <c>uint64</c> and <c>float64</c> are ALIASES of them (design/v5/spec/03 T1a):
+/// one type with two names, the C# form, so a generic instantiates once for both, the FFI maps
+/// them once and no <c>as</c> is needed between types of the same width. Lyric 4 kept them
+/// distinct, buying a 32-bit portability the language does not need.
+/// </summary>
 public enum PrimitiveKind
 {
     Int, Uint, Float,
-    Int8, Int16, Int32, Int64,
-    Uint8, Uint16, Uint32, Uint64,
-    Float32, Float64,
+    Int8, Int16, Int32,
+    Uint8, Uint16, Uint32,
+    Float32,
     Bool, Char, String, Void
 }
 
