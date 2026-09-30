@@ -953,8 +953,17 @@ public sealed partial class Parser
 
     private TypeNode ParseTypeInner(bool allowThrows)
     {
+        // '?T', and since Lyric 5 '??T' (design/v5/spec/03 T4 O1): an optional of an optional is
+        // a type. The lexer hands '??' over as one token, the coalesce operator; in type
+        // position it is two levels.
         var qTok = _buffer.Current;
-        var nullable = _buffer.Match(TokenKind.Question);
+        var levels = 0;
+        while (true)
+        {
+            if (_buffer.Match(TokenKind.Question)) levels++;
+            else if (_buffer.Match(TokenKind.QuestionQuestion)) levels += 2;
+            else break;
+        }
 
         var type = ParseTypeAtom();
 
@@ -985,13 +994,16 @@ public sealed partial class Parser
             type = new ThrowingType(type, thrown, Span.Union(type.Span, thrown?.Span ?? tk.Span));
         }
 
-        return nullable ? new NullableType(type, Span.Union(qTok.Span, type.Span)) : type;
+        for (var i = 0; i < levels; i++)
+            type = new NullableType(type, Span.Union(qTok.Span, type.Span));
+        return type;
     }
 
     /// <summary>Does a type start here? Asked after a type-level <c>throws</c>, which may stand
     /// alone: <c>Coroutine&lt;int&gt; throws</c> before a ',', a ')' or an '=' throws anything.</summary>
     private bool StartsType() => _buffer.Current.TokenKind
-        is TokenKind.Identifier or TokenKind.Fn or TokenKind.LParen or TokenKind.Question;
+        is TokenKind.Identifier or TokenKind.Fn or TokenKind.LParen or TokenKind.Question
+            or TokenKind.QuestionQuestion;
 
     private TypeNode ParseTypeAtom()
     {

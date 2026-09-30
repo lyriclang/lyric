@@ -19,12 +19,12 @@ namespace Lyric.Tests.Sema;
 /// has refused the <c>null</c> PATTERN against a non-optional all along), and <c>LYR-SEM0005</c>
 /// is the force-unwrap they sit beside. No new code, because neither is a new rule.</para>
 ///
-/// <para>THE TYPE PARAMETER IS EXEMPT and the second half of this file is why. In
-/// <c>fn f&lt;T&gt;(x: T)</c> the instantiation answers the question and the declaration cannot;
-/// a <c>T</c> bound to <c>?int</c> makes all three ordinary optional operations, measured and
-/// correct. Refusing them here would refuse bodies that work. The lowering keeps its check for
-/// what the substitution leaves non-optional — see the IR suite, where it is now a backstop
-/// rather than the rule.</para>
+/// <para>A BARE TYPE PARAMETER IS OPAQUE, since Lyric 5 (design/v5/spec/03 T4 O2): the three
+/// forms are refused on a <c>T</c> as on an <c>int</c>, and asked of a <c>?T</c>. Lyric 4
+/// exempted the type parameter here — "the instantiation answers the question" — while the
+/// force-unwrap and the <c>null</c> pattern refused it; with <c>??T</c> a type (O1) the
+/// exemption has no reading left: a generic <c>?T</c> at <c>T = ?int</c> is <c>??int</c>, and
+/// the body asks about its own level.</para>
 /// </summary>
 public class OptionalOperatorsOnPlainValuesTests
 {
@@ -116,14 +116,15 @@ public class OptionalOperatorsOnPlainValuesTests
     }
 
     /// <summary>
-    /// A TYPE PARAMETER keeps all three. The declaration cannot answer the question; only the
-    /// instantiation can, and this body is correct for every <c>T</c> that is optional.
+    /// A bare type parameter is opaque (O2): none of the three is asked of a <c>T</c>, whatever
+    /// an instantiation binds it to. The refusal stands at the declaration, where the body is
+    /// checked — not one phase later at the instantiation that happens to be non-optional.
     /// </summary>
     [Theory]
-    [InlineData("if (x == null) { return 1; } return 0;")]
-    [InlineData("let y: T = x ?? x; return 0;")]
-    [InlineData("var z = x; z ??= x; return 0;")]
-    public void A_type_parameter_is_exempt(string body)
+    [InlineData("if (x == null) { return 1; } return 0;", "LYR-SEM0059")]
+    [InlineData("let y: T = x ?? x; return 0;", "LYR-SEM0005")]
+    [InlineData("var z = x; z ??= x; return 0;", "LYR-SEM0005")]
+    public void A_bare_type_parameter_is_opaque(string body, string code)
     {
         var de = Check($$"""
             fn probe<T>(x: T): int {
@@ -132,23 +133,27 @@ public class OptionalOperatorsOnPlainValuesTests
             fn main(): int { let o: ?int = 1; return probe<?int>(o); }
             """);
 
-        Assert.False(de.HasErrors, Codes(de));
+        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal(code, error.Code);
+        Assert.Contains("bare type parameter is opaque", error.Message);
     }
 
-    /// <summary>
-    /// And the exemption is not a hole: the same body instantiated at a NON-optional is still
-    /// refused, one phase later, because that is the first moment anything can tell.
-    /// </summary>
-    [Fact]
-    public void The_exemption_ends_where_the_instantiation_answers_it()
+    /// <summary>The same three on a <c>?T</c>: the body's own level, which every instantiation
+    /// has — at <c>T = ?int</c> the parameter is a <c>??int</c> and the test asks about the
+    /// outer one.</summary>
+    [Theory]
+    [InlineData("if (x == null) { return 1; } return 0;")]
+    [InlineData("let y: T = x ?? fallback; return 0;")]
+    [InlineData("var z = x; z ??= fallback; return 0;")]
+    public void An_optional_of_a_type_parameter_is_asked(string body)
     {
-        var de = Check("""
-            fn probe<T>(x: T): int { if (x == null) { return 1; } return 0; }
-            fn main(): int { return probe<int>(5); }
+        var de = Check($$"""
+            fn probe<T>(x: ?T, fallback: T): int {
+                {{body}}
+            }
+            fn main(): int { let o: ?int = 1; return probe<?int>(o, o) + probe<int>(3, 4); }
             """);
 
-        // The SEMA says nothing — that is the exemption. The refusal is the lowering's, and the
-        // IR suite pins it; asserting it here would only re-test the other project's subject.
         Assert.False(de.HasErrors, Codes(de));
     }
 }

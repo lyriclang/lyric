@@ -1,0 +1,3 @@
+// 'x!' on an absent value panics (RT0004), in every profile: the one unwrap that can be wrong.
+fn must(v: ?int): int { return v!; }
+fn main(): int { return must(null); }

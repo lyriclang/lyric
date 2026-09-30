@@ -183,7 +183,7 @@ public static class IrPrinter
         OptNone n => $"{n.Dest}: {TypeStr(new IrOptionalType(n.Inner))} = optnone",
         OptSome s => $"{s.Dest}: {TypeStr(new IrOptionalType(s.Inner))} = optsome {s.Value}",
         OptIsSome i => $"{i.Dest}: bool = optissome {i.Option}",
-        OptGet g => $"{g.Dest}: {TypeStr(g.Inner)} = optget {g.Option}",
+        OptGet g => $"{g.Dest}: {TypeStr(g.Inner)} = {(g.Checked ? "optget!" : "optget")} {g.Option}",
 
         NewVariant v => $"{v.Dest}: {TypeStr(new IrEnumType(v.Enum))} = newvariant {v.Variant}" +
                         $" [{string.Join(", ", v.Fields)}]",

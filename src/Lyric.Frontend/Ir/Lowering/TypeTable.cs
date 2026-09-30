@@ -852,12 +852,9 @@ internal sealed class TypeTable
     public static IrFunctionType CoroutineSignature(IrType yield) =>
         new([new IrScalarType(IrScalar.Bool)], yield);
 
-    /// <summary>'?T' with the nesting boundary in one place rather than at every call site.</summary>
-    private static IrType OptionalOf(IrType inner, Core.Span span) =>
-        inner is IrOptionalType
-            ? throw new UnsupportedConstructException(
-                "a nested optional '??T' — optionals do not nest", span)
-            : new IrOptionalType(inner);
+    /// <summary>'?T' around whatever <c>T</c> is — an optional included: '??T' is a type since
+    /// Lyric 5 (design/v5/spec/03 T4 O1), and a generic '?T' at 'T = ?int' is exactly that.</summary>
+    private static IrType OptionalOf(IrType inner, Core.Span span) => new IrOptionalType(inner);
 
     /// <summary>
     /// A syntactically written type: a field, a parameter, a return type. A class type interns

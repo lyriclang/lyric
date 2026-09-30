@@ -15,7 +15,9 @@ namespace Lyric5.Compiler;
 /// <c>LyrStr *</c>, literals static objects (V9). A class is a heap object (V3): a C struct that
 /// begins with the header, reached through a pointer, allocated by <c>lyr_alloc</c> with a static
 /// descriptor the emitter writes beside it (V4) — size, reference bitmap, qualified name — and
-/// every reference stored into an object goes through the write barrier (L1). A struct is a C struct by value (V2): locals,
+/// every reference stored into an object goes through the write barrier (L1). An optional (V5)
+/// of a reference is that pointer, null when absent — the niche, zero bytes; of anything else a
+/// C struct of the value and a flag, held by value like a struct. A struct is a C struct by value (V2): locals,
 /// parameters, fields and results hold it; the IR's struct-typed temps are aliases into that
 /// storage — <c>load</c> and a struct-typed <c>loadfield</c> alias, <c>newobj</c> and
 /// <c>structcopy</c> make fresh storage, <c>store</c>, <c>storefield</c>, arguments and
@@ -37,7 +39,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s2";
+    public const string Version = "m3-s3";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -88,6 +90,8 @@ public sealed class CEmitter
     {
         IrStructType s => StructName(s.Type),
         IrRefType r => StructName(r.Type) + " *",
+        IrOptionalType o when IsNiche(o) => CType(o.Inner),
+        IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
         IrScalarType { Kind: IrScalar.I16 } => "int16_t",
         IrScalarType { Kind: IrScalar.I32 } => "int32_t",
@@ -136,7 +140,38 @@ public sealed class CEmitter
 
     private static bool IsVoid(IrType type) => type is IrScalarType { Kind: IrScalar.Void };
 
-    private static bool IsStruct(IrType type) => type is IrStructType;
+    /// <summary>
+    /// An optional in the niche (01 V5): around a reference — a class value or a string — the
+    /// pointer itself says whether there is a value, and the optional costs nothing. Around an
+    /// optional there is no niche left: <c>??Node</c> tells "absent" from "present and null",
+    /// and needs its flag.
+    /// </summary>
+    private static bool IsNiche(IrType type) =>
+        type is IrOptionalType { Inner: IrRefType or IrScalarType { Kind: IrScalar.String } };
+
+    /// <summary>
+    /// A type C holds by value as an aggregate: a struct, and an optional outside the niche.
+    /// Locals, fields, parameters and results hold the value; the IR's temps of such a type are
+    /// aliases into that storage, pointers in C, each with storage beside it for the values it
+    /// makes fresh. One scheme for both, so a narrowed <c>?Point</c> is written in place like
+    /// the struct it holds.
+    /// </summary>
+    private static bool IsAggregate(IrType type) =>
+        type is IrStructType || (type is IrOptionalType && !IsNiche(type));
+
+    /// <summary><c>lyr_opt_&lt;inner&gt;</c>: one C struct per optional type outside the niche,
+    /// named after what it holds.</summary>
+    private static string OptionalName(IrOptionalType type) => "lyr_opt_" + Mangle(type.Inner);
+
+    private static string Mangle(IrType type) => type switch
+    {
+        IrScalarType { Kind: IrScalar.String } => "str",
+        IrScalarType s => s.Kind.ToString().ToLowerInvariant(),
+        IrStructType s => $"ty{s.Type.Value}",
+        IrRefType r => $"ref{r.Type.Value}",
+        IrOptionalType o => "opt_" + Mangle(o.Inner),
+        _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
+    };
 
     /// <summary><c>lyr_ty&lt;index&gt;_&lt;Name&gt;</c>: the index makes it unique (the IR's type names
     /// are not module-qualified), the name keeps it readable in a debugger.</summary>
@@ -157,7 +192,8 @@ public sealed class CEmitter
     {
         IrScalarType { Kind: IrScalar.String } => "NULL",
         IrRefType => "NULL",
-        IrStructType => "{0}",
+        _ when IsNiche(type) => "NULL",
+        _ when IsAggregate(type) => "{0}",
         _ => "0",
     };
 
@@ -178,6 +214,8 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
         IrRefType => (8, 8),
+        IrOptionalType o when IsNiche(o) => (8, 8),
+        IrOptionalType o => OptionalLayout(o),
         IrStructType s => Fields(_module.Types[s.Type.Value], 0).Total,
         _ => throw new InvalidOperationException($"the C emitter has no layout for {type}; the gate let it through"),
     };
@@ -199,29 +237,43 @@ public sealed class CEmitter
         return (offsets, ((at + align - 1) / align * align, align));
     }
 
+    /// <summary>An optional outside the niche: the value, then the flag, one byte; padded to the
+    /// value's alignment.</summary>
+    private (int Size, int Align) OptionalLayout(IrOptionalType type)
+    {
+        var (size, align) = LayoutOf(type.Inner);
+        align = Math.Max(align, 1);
+        return ((size + 1 + align - 1) / align * align, align);
+    }
+
+    /// <summary>A reference: one pointer-sized word the collector follows. An optional in the
+    /// niche is one, null when absent.</summary>
     private static bool IsReference(IrType type) =>
-        type is IrRefType or IrScalarType { Kind: IrScalar.String };
+        type is IrRefType or IrScalarType { Kind: IrScalar.String } || IsNiche(type);
 
     /// <summary>Whether a value of the type holds a reference anywhere: itself, or in a struct
-    /// it holds by value.</summary>
+    /// or an optional it holds by value.</summary>
     private bool HoldsReferences(IrType type) => type switch
     {
         IrStructType s => _module.Types[s.Type.Value].FieldTypes.Any(HoldsReferences),
+        IrOptionalType o when !IsNiche(o) => HoldsReferences(o.Inner),
         _ => IsReference(type),
     };
 
     /// <summary>The pointer-sized words of an object that are references, as word indices: a
-    /// reference field's own word, and through a struct held by value the words of its
-    /// reference fields.</summary>
+    /// reference field's own word, and through a struct or an optional held by value the words
+    /// of what it holds. An absent optional is all zero, so its words are null and harmless.</summary>
     private void ReferenceWords(IrTypeDef def, int start, List<int> words)
     {
         var offsets = Fields(def, start).Offsets;
-        for (var i = 0; i < def.FieldTypes.Length; i++)
-        {
-            if (IsReference(def.FieldTypes[i])) words.Add(offsets[i] / 8);
-            else if (def.FieldTypes[i] is IrStructType inner)
-                ReferenceWords(_module.Types[inner.Type.Value], offsets[i], words);
-        }
+        for (var i = 0; i < def.FieldTypes.Length; i++) ReferenceWords(def.FieldTypes[i], offsets[i], words);
+    }
+
+    private void ReferenceWords(IrType type, int offset, List<int> words)
+    {
+        if (IsReference(type)) words.Add(offset / 8);
+        else if (type is IrStructType inner) ReferenceWords(_module.Types[inner.Type.Value], offset, words);
+        else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words);
     }
 
     private string DescriptorName(TypeId id) => $"lyr_desc_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
@@ -264,7 +316,12 @@ public sealed class CEmitter
     {
         var indices = Enumerable.Range(0, _module.Types.Count)
             .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass).ToList();
-        if (indices.Count == 0) return;
+        // Every type a function names, for the optionals among them: an optional outside the
+        // niche is a C struct of its own and is defined once, wherever it is first needed.
+        var used = _module.Functions
+            .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
+            .Where(t => t is IrOptionalType && !IsNiche(t)).ToList();
+        if (indices.Count == 0 && used.Count == 0) return;
 
         _out.AppendLine("/* types: a struct is a value, a class an object behind its header */");
         foreach (var i in indices)
@@ -274,12 +331,25 @@ public sealed class CEmitter
         }
 
         var done = new HashSet<int>();
+        var optionals = new HashSet<string>(StringComparer.Ordinal);
+
+        // What holding a type BY VALUE needs defined first: the struct itself, or the optional's
+        // own struct after what it holds.
+        void Require(IrType type)
+        {
+            if (type is IrStructType held) Define(held.Type.Value);
+            else if (type is IrOptionalType optional && !IsNiche(optional) && optionals.Add(OptionalName(optional)))
+            {
+                Require(optional.Inner);
+                _out.AppendLine($"typedef struct {{ {Declare(optional.Inner, "value")}; uint8_t has; }} {OptionalName(optional)};");
+            }
+        }
+
         void Define(int index)
         {
             var def = _module.Types[index];
             if (!(def.IsStruct || def.IsClass) || !done.Add(index)) return;
-            foreach (var field in def.FieldTypes)
-                if (field is IrStructType inner) Define(inner.Type.Value);
+            foreach (var field in def.FieldTypes) Require(field);
             var name = StructName(new TypeId(index));
             _out.AppendLine($"struct {name} {{");
             if (def.IsClass) _out.AppendLine("    LyrObj header;");
@@ -289,6 +359,7 @@ public sealed class CEmitter
             if (def.IsClass) Descriptor(new TypeId(index), def);
         }
         foreach (var i in indices) Define(i);
+        foreach (var type in used) Require(type);
         _out.AppendLine();
     }
 
@@ -378,7 +449,7 @@ public sealed class CEmitter
         foreach (var temp in function.Temps)
         {
             if (IsVoid(temp.Type)) continue;
-            if (IsStruct(temp.Type))
+            if (IsAggregate(temp.Type))
             {
                 _fn.AppendLine($"    {CType(temp.Type)} {Storage(temp.Id)} = {{0}};");
                 _fn.AppendLine($"    {CType(temp.Type)} *{Temp(temp.Id)} = &{Storage(temp.Id)};");
@@ -446,7 +517,7 @@ public sealed class CEmitter
         // The receiver of a struct method is already the place; every other struct local is
         // storage, and its temp aliases it.
         LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
-        LoadLocal l => IsStruct(l.Type)
+        LoadLocal l => IsAggregate(l.Type)
             ? $"{Temp(l.Dest)} = &{LocalName(_function.Locals[l.Local.Value])};"
             : $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
         StoreLocal s when IsReceiverPlace(s.Local) => $"*{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
@@ -456,20 +527,49 @@ public sealed class CEmitter
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
-        LoadField f => IsStruct(f.FieldType)
+        LoadField f => IsAggregate(f.FieldType)
             ? $"{Temp(f.Dest)} = &{Temp(f.Object)}->{Field(f.Type, f.Field)};"
             : $"{Temp(f.Dest)} = {Temp(f.Object)}->{Field(f.Type, f.Field)};",
         StoreField f => Store(f),
+        OptNone n => IsNiche(TypeOf(n.Dest))
+            ? $"{Temp(n.Dest)} = NULL;"
+            : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
+        OptSome s => IsNiche(TypeOf(s.Dest))
+            ? $"{Temp(s.Dest)} = {Temp(s.Value)};"
+            : $"{Storage(s.Dest)} = ({CType(TypeOf(s.Dest))}){{ .value = {Value(s.Value)}, .has = 1 }}; {Temp(s.Dest)} = &{Storage(s.Dest)};",
+        OptIsSome i => IsNiche(TypeOf(i.Option))
+            ? $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)} != NULL);"
+            : $"{Temp(i.Dest)} = {Temp(i.Option)}->has;",
+        OptGet g => Unwrap(g),
         _ => throw new InvalidOperationException($"the C emitter has no case for {op.GetType().Name}; the gate let it through"),
     };
 
     /// <summary>A temp as a value: a struct temp points at its value.</summary>
-    private string Value(TempId temp) => IsStruct(TypeOf(temp)) ? $"*{Temp(temp)}" : Temp(temp);
+    private string Value(TempId temp) => IsAggregate(TypeOf(temp)) ? $"*{Temp(temp)}" : Temp(temp);
+
+    /// <summary>
+    /// The value inside an optional. After a test — a narrowing, a <c>??</c>, a <c>?.</c> — it
+    /// is a read and nothing more. After <c>x!</c> it is the one unwrap that can be wrong, and
+    /// panics with <c>LYR-RT0004</c> at the program's line (03 T4 O4). A struct or an optional
+    /// inside is aliased in place, not copied out: a narrowed <c>?Point</c> is written where it
+    /// lies.
+    /// </summary>
+    private string Unwrap(OptGet g)
+    {
+        var option = Temp(g.Option);
+        if (IsNiche(TypeOf(g.Option)))
+            return g.Checked ? $"{Temp(g.Dest)} = LYR_UNWRAP({option});" : $"{Temp(g.Dest)} = {option};";
+
+        var check = g.Checked ? $"if (LYR_UNLIKELY(!{option}->has)) lyr_panic_null(); " : "";
+        return IsAggregate(g.Inner)
+            ? $"{check}{Temp(g.Dest)} = &{option}->value;"
+            : $"{check}{Temp(g.Dest)} = {option}->value;";
+    }
 
     private string Assign(TempId? dest, string call) => dest switch
     {
         null => $"{call};",
-        { } d when IsStruct(TypeOf(d)) => $"{Storage(d)} = {call}; {Temp(d)} = &{Storage(d)};",
+        { } d when IsAggregate(TypeOf(d)) => $"{Storage(d)} = {call}; {Temp(d)} = &{Storage(d)};",
         { } d => $"{Temp(d)} = {call};",
     };
 

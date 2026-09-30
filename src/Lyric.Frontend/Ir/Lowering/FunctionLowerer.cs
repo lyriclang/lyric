@@ -1815,11 +1815,24 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId Narrow(Expr expr, TempId value, IrType type)
     {
-        if (type is not IrOptionalType option || TypeOfExpr(expr) is IrOptionalType) return value;
+        // One 'optget' per level the sema narrowed away: a '??T' proven present once is a '?T',
+        // twice a 'T' (03 T4 O3). The slot keeps its declared depth; the expression has its own.
+        var wanted = OptionalDepth(TypeOfExpr(expr));
+        while (type is IrOptionalType option && OptionalDepth(type) > wanted)
+        {
+            var narrowed = _slots.NewTemp(option.Inner);
+            _b.Emit(new OptGet(narrowed, value, option.Inner, expr.Span));
+            (value, type) = (narrowed, option.Inner);
+        }
+        return value;
+    }
 
-        var narrowed = _slots.NewTemp(option.Inner);
-        _b.Emit(new OptGet(narrowed, value, option.Inner, expr.Span));
-        return narrowed;
+    /// <summary>How many optional levels a type has: 0 for <c>T</c>, 2 for <c>??T</c>.</summary>
+    private static int OptionalDepth(IrType type)
+    {
+        var depth = 0;
+        for (; type is IrOptionalType option; type = option.Inner) depth++;
+        return depth;
     }
 
     private TempId LowerUnary(UnaryExpr expr)
@@ -3133,8 +3146,14 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId Coerce(TempId value, IrType from, IrType to, Span span)
     {
-        var target = to is IrOptionalType outer ? outer.Inner : to;
-        var source = from is IrOptionalType inner ? inner.Inner : from;
+        // The optional levels the target has beyond the value: each becomes one 'optsome', from
+        // the inside out — a 'T' where '??T' is expected is wrapped twice, a '?T' once (03 T4
+        // O1). 'target' is the target with those levels taken off, the type the value itself
+        // has to reach first.
+        var missing = Math.Max(0, OptionalDepth(to) - OptionalDepth(from));
+        var target = to;
+        for (var i = 0; i < missing; i++) target = ((IrOptionalType)target).Inner;
+        var source = from;
 
         // The third implicit transition, a lossless integer widening (design/v5/spec/03 T1c):
         // the sema admitted 'int8' where 'int' is expected, and the value changes representation
@@ -3168,11 +3187,16 @@ internal sealed class FunctionLowerer
             from = iface;
         }
 
-        if (to is not IrOptionalType option || from is IrOptionalType) return value;
-
-        var dest = _slots.NewTemp(to);
-        _b.Emit(new OptSome(dest, value, option.Inner, span));
-        return dest;
+        // Wrap, innermost level first: the level at depth 'missing - 1 - i' of 'to'.
+        for (var i = missing - 1; i >= 0; i--)
+        {
+            var level = to;
+            for (var j = 0; j < i; j++) level = ((IrOptionalType)level).Inner;
+            var wrapped = _slots.NewTemp(level);
+            _b.Emit(new OptSome(wrapped, value, ((IrOptionalType)level).Inner, span));
+            value = wrapped;
+        }
+        return value;
     }
 
     /// <summary>The IR side of <see cref="TypeFacts.Widens"/>: the same table on scalar kinds.</summary>
@@ -3231,8 +3255,9 @@ internal sealed class FunctionLowerer
         if (TypeOfExpr(operand) is not IrOptionalType option)
             throw NotSupported("'!' on a non-optional", span, LoweringDiagnostics.NeverNull);
 
+        // The one unwrap that can be wrong: the program says the value is there (03 T4 O4).
         var dest = _slots.NewTemp(option.Inner);
-        _b.Emit(new OptGet(dest, value, option.Inner, span));
+        _b.Emit(new OptGet(dest, value, option.Inner, span) { Checked = true });
         return dest;
     }
 

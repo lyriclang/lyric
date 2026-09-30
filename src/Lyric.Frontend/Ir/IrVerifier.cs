@@ -1548,24 +1548,15 @@ public static class IrVerifier
 
     /// <summary>An optional is not nestable: <c>??T</c> would be indistinguishable from <c>?T</c> in the
     /// runtime representation.</summary>
-    private bool RequireNotOptional(IrType inner, string what, BlockId block, int index)
-    {
-        if (inner is not IrOptionalType) return true;
-
-        Report(block, index, $"{what} of {Show(inner)} — optionals do not nest");
-        return false;
-    }
-
+    // An optional of an optional is a type since Lyric 5 (design/v5/spec/03 T4 O1): 'optnone'
+    // and 'optsome' take any inner type, an optional included, and each works on one level.
     private void CheckOptNone(OptNone n, BlockId block, int index)
     {
-        if (!RequireNotOptional(n.Inner, "optnone", block, index)) return;
         RequireDestType(n.Dest, new IrOptionalType(n.Inner), "optnone", block, index);
     }
 
     private void CheckOptSome(OptSome s, BlockId block, int index)
     {
-        if (!RequireNotOptional(s.Inner, "optsome", block, index)) return;
-
         var actual = TypeOf(s.Value);
         if (!IrType.Equal(s.Inner, actual))
             Report(block, index, $"optsome wraps {Show(actual)} but the instruction says {Show(s.Inner)}");

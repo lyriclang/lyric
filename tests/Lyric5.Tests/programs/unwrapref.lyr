@@ -1,0 +1,3 @@
+// 'x!' on an absent reference panics the same way (RT0004): the niche is checked, not trusted.
+fn must(s: ?string): string { return s!; }
+fn main(): int { let s = must(null); return 0; }

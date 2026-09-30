@@ -42,7 +42,7 @@ fn main.main -> i64 {
     store l0, t5
     t6: i64 = const 5
     t7: ?i64 = call main.find(t6)
-    t8: i64 = optget t7
+    t8: i64 = optget! t7
     store l2, t8
     t9: i64 = load l0
     t10: i64 = load l2

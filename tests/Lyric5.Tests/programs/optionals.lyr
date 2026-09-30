@@ -1,0 +1,91 @@
+// Optionals (design/v5/spec/01 V5; 03 T4 O1–O4; 02 M14 I1): '?T' around a reference is the
+// pointer, around anything else the value and a flag; '??T' is a type; a test narrows the
+// binding by one level; '?.' flattens, '??' and '!' peel one level. Expected stdout, in order:
+//   find 8 -1                  '??' takes the value or the right side
+//   zero 8 0                   an early return narrows what follows
+//   length 3 0                 a list through '?Node': a loop narrows, an assignment widens again
+//   chain 3 -1                 '?.' through two links is one optional, not two
+//   force 2                    'x!' on a value that is there
+//   nested absent null 7       '??int': absent, present and null, present with a value
+//   place 9,5 copy 9,2         a narrowed '?Point' is written in place; a binding copies it
+//   name anon                  '??=' assigns only when there is no value
+//   box 0 5 b                  an omitted '?T' field is null; a '?int' field is written
+//   iflet 42                   'if (let v = …)' binds the value when there is one
+import std.io { println };
+
+class Node { value: int, var next: ?Node }
+
+struct Point { var x: int, var y: int }
+
+class Box { var count: ?int, label: ?string }
+
+fn find(n: int): ?int {
+    if (n > 0) { return n * 2; }
+    return null;
+}
+
+fn orZero(v: ?int): int {
+    if (v == null) { return 0; }
+    return v;
+}
+
+fn length(head: ?Node): int {
+    var n = 0;
+    var at = head;
+    while (at != null) {
+        n += 1;
+        at = at.next;
+    }
+    return n;
+}
+
+fn lookup(key: int): ??int {
+    if (key == 0) { return null; }
+    let stored: ?int = if (key == 1) null else key;
+    return stored;
+}
+
+fn describe(v: ??int): string {
+    if (v == null) { return "absent"; }
+    if (v == null) { return "null"; }
+    return f"{v}";
+}
+
+fn main(): int {
+    let a = find(4);
+    let b = find(0);
+    println(f"find {a ?? -1} {b ?? -1}");
+    println(f"zero {orZero(a)} {orZero(b)}");
+
+    let tail = Node { value = 3 };
+    let mid = Node { value = 2, next = tail };
+    let head = Node { value = 1, next = mid };
+    println(f"length {length(head)} {length(null)}");
+    println(f"chain {head.next?.next?.value ?? -1} {tail.next?.value ?? -1}");
+    println(f"force {head.next!.value}");
+
+    println("nested " + describe(lookup(0)) + " " + describe(lookup(1)) + " " + describe(lookup(7)));
+
+    var p: ?Point = Point { x = 1, y = 2 };
+    if (p != null) { p.x = 9; }
+    let q = p;
+    if (p != null) { p.y = 5; }
+    println(f"place {p!.x},{p!.y} copy {q!.x},{q!.y}");
+
+    var name: ?string = null;
+    name ??= "anon";
+    name ??= "other";
+    let shown = name ?? "none";
+    println("name " + shown);
+
+    let box = Box { label = "b" };
+    let before = box.count ?? 0;
+    box.count = 5;
+    let label = box.label ?? "?";
+    println(f"box {before} {box.count ?? 0} {label}");
+
+    if (let v = find(21)) {
+        println(f"iflet {v}");
+    }
+    return 0;
+}

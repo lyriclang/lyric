@@ -1,0 +1,44 @@
+// A list through '?Node' survives collections (01 V4, V5): a thousand nodes linked by an
+// optional reference (the niche: a pointer the collector follows), each holding a string and
+// an optional struct that holds another (a flag beside the value, the reference inside it),
+// while a million nodes are built and dropped. Run under the test's heap limit, as objects_gc.
+// Expected stdout: "list 1000 499500 node-999 tag-999" (0 + … + 999 = 499500; the head is the
+// node built last). Exit 0.
+import std.io { println };
+
+struct Tag { text: string }
+
+class Node { id: int, label: string, var tag: ?Tag, var next: ?Node }
+
+fn build(count: int): ?Node {
+    var head: ?Node = null;
+    var i = 0;
+    while (i < count) {
+        head = Node { id = i, label = f"node-{i}", tag = Tag { text = f"tag-{i}" }, next = head };
+        i += 1;
+    }
+    return head;
+}
+
+fn main(): int {
+    let list = build(1000);
+    var i = 0;
+    while (i < 1000000) {
+        let junk = Node { id = i, label = f"junk-{i}" };
+        if (junk.id < 0) { return 2; }
+        i += 1;
+    }
+
+    var count = 0;
+    var sum = 0;
+    var at = list;
+    while (at != null) {
+        count += 1;
+        sum += at.id;
+        at = at.next;
+    }
+    let head = list!;
+    let tag = head.tag!;
+    println(f"list {count} {sum} {head.label} {tag.text}");
+    return if (count == 1000) 0 else 1;
+}

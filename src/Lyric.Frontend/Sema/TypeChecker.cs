@@ -1600,10 +1600,14 @@ public sealed class TypeChecker
             return (then, els);
         }
 
+        // A test narrows by ONE level, from the type the name has where the test stands
+        // (design/v5/spec/03 T4 O3): a '??int' proven present is a '?int', and a second test on
+        // it reaches the 'int'. Reading the declared type instead narrowed every test to the same
+        // level, which was the whole story while optionals did not nest.
         if (cond is BinaryExpr { Operator: BinaryOp.Ne or BinaryOp.Eq } b
             && NullCompared(b) is { } id
             && _result.RefOf(id) is { } sym2
-            && DeclaredType(sym2) is Optional opt)
+            && (_result.TypeOf(id) is Optional tested ? tested : DeclaredType(sym2) as Optional) is { } opt)
         {
             (b.Operator == BinaryOp.Ne ? then : els)[sym2] = opt.Inner;
         }
@@ -2472,22 +2476,30 @@ public sealed class TypeChecker
     /// <c>null</c> pattern against a non-optional scrutinee); this is the expression side of the
     /// same sentence, and it now reaches <c>lyrc check</c> too.</para>
     ///
-    /// <para>A TYPE PARAMETER is exempt, deliberately: in <c>fn f&lt;T&gt;(x: T)</c> the
-    /// instantiation answers the question and the declaration cannot, and a <c>T</c> bound to
-    /// <c>?int</c> makes this an ordinary optional test — measured, and it behaves correctly.
-    /// That the force-unwrap and the <c>null</c> pattern refuse a <c>T</c> up front is a
-    /// DISAGREEMENT among the four ways of asking, recorded in STATUS.md; refusing here as well
-    /// would settle it in passing, in the direction that breaks generic bodies which compile
-    /// today.</para>
+    /// <para>A BARE TYPE PARAMETER IS OPAQUE (design/v5/spec/03 T4 O2): no null operation on an
+    /// expression of type <c>T</c> — not <c>== null</c>, not <c>??</c>, not <c>!</c>, not a
+    /// <c>null</c> pattern — only on <c>?…</c>. A generic body is checked at its declaration, and
+    /// there <c>T</c> is not an optional; that an instantiation may bind it to one changes
+    /// nothing, because a generic <c>?T</c> at <c>T = ?int</c> is <c>??int</c> (O1), and the body
+    /// asks about ITS level. Lyric 4 exempted the type parameter here and in <c>??</c> while
+    /// <c>!</c> and the pattern refused it — four ways of asking with two answers.</para>
     /// </summary>
     private void CheckNullTest(BinaryExpr b, LyrType l, LyrType r)
     {
         // Which side is the value: 'null == x' is the same test written round the other way.
         var value = l is NullType ? r : l;
 
-        if (value is NullType or ErrorType or Optional or TypeParamType) return;
+        if (value is NullType or ErrorType or Optional) return;
 
         var op = b.Operator is BinaryOp.Eq ? "==" : "!=";
+        if (value is TypeParamType parameter)
+        {
+            _de.Report("LYR-SEM0059", Severity.Error, b.Span,
+                $"'{op} null' on '{parameter.Param.Name}' — a bare type parameter is opaque: whether it is "
+                + $"absent is asked of a '?{parameter.Param.Name}'",
+                new DiagnosticNote($"declare the value '?{parameter.Param.Name}' if it may be absent"));
+            return;
+        }
         _de.Report("LYR-SEM0059", Severity.Error, b.Span,
             $"'{op} null' on '{TypeFacts.Display(value)}' — a value of this type is never null",
             new DiagnosticNote($"declare it '?{TypeFacts.Display(value)}' if it may be absent"));
@@ -2840,13 +2852,14 @@ public sealed class TypeChecker
         // LYR-SEM0005 all along; this is the same rule and now the same code, in the phase that
         // knows the types. 'lyrc check' sees it too, which it did not before.
         //
-        // The type parameter stays exempt for the reason CheckNullTest gives: only the
-        // instantiation answers the question, and the lowering still refuses what a substitution
-        // leaves non-optional.
-        if (l is not (ErrorType or TypeParamType))
+        // A bare type parameter is opaque, as CheckNullTest says (03 T4 O2): '??' is asked of a
+        // '?T', never of a 'T' that an instantiation might happen to make optional.
+        if (l is not ErrorType)
             _de.Report("LYR-SEM0005", Severity.Error, b.Span,
-                $"'??' on '{TypeFacts.Display(l)}' — a value of this type is never null, so the "
-                + "right side can never be reached");
+                l is TypeParamType
+                    ? $"'??' on '{TypeFacts.Display(l)}' — a bare type parameter is opaque; '??' is asked of a '?{TypeFacts.Display(l)}'"
+                    : $"'??' on '{TypeFacts.Display(l)}' — a value of this type is never null, so the "
+                      + "right side can never be reached");
 
         return l;
     }
@@ -2902,10 +2915,13 @@ public sealed class TypeChecker
             // '??=' carries the rule of the '??' it is named after: a target that can never be
             // null can never take the right side. Same code, same reason — see CheckCoalesce.
             if (a.Operator is BinaryOp.Coalesce
-                && targetType is not (ErrorType or TypeParamType or Optional or NullType))
+                && targetType is not (ErrorType or Optional or NullType))
                 _de.Report("LYR-SEM0005", Severity.Error, a.Span,
-                    $"'??=' on '{TypeFacts.Display(targetType)}' — a value of this type is never "
-                    + "null, so the assignment can never happen");
+                    targetType is TypeParamType
+                        ? $"'??=' on '{TypeFacts.Display(targetType)}' — a bare type parameter is opaque; "
+                          + $"'??=' is asked of a '?{TypeFacts.Display(targetType)}'"
+                        : $"'??=' on '{TypeFacts.Display(targetType)}' — a value of this type is never "
+                          + "null, so the assignment can never happen");
         }
 
         // The lvalue and mutability check happens in SemaRules; only type compatibility here.

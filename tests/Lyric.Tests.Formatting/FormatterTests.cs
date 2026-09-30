@@ -58,6 +58,19 @@ public class FormatterTests
             """, Format("struct Counter{var   n:int=0,step:int}"));
     }
 
+    [Fact]
+    public void A_nested_optional_type_is_written_without_a_gap()
+    {
+        // '??T' is a type (design/v5/spec/03 T4 O1). The lexer hands '??' over as one token, the
+        // coalesce operator; in type position it is two levels, however they were spaced.
+        Assert.Equal("""
+            fn f(x: ??int, y: ???string): ??int {
+                return x ?? null;
+            }
+
+            """, Format("fn f(x: ? ?int, y: ?? ?string): ??int { return x??null; }"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

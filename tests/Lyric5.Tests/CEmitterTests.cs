@@ -39,6 +39,7 @@ public class CEmitterTests
     [InlineData("structs")]
     [InlineData("arith")]
     [InlineData("objects")]
+    [InlineData("optionals")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -73,6 +74,9 @@ public class CEmitterTests
             data.Add("objects", profile, 0,
                 "alice 150\nshared 175\nidentity true false\nteam alice+bob\nswapped alice\n"
                 + "origin 3,4 moved 13,4\ncounter 3\ncopy 3 then 4\nreset 0 kept 3\nmade carol 0\n");
+            data.Add("optionals", profile, 0,
+                "find 8 -1\nzero 8 0\nlength 3 0\nchain 3 -1\nforce 2\nnested absent null 7\n"
+                + "place 9,5 copy 9,2\nname anon\nbox 0 5 b\niflet 42\n");
         }
         return data;
     }
@@ -94,16 +98,23 @@ public class CEmitterTests
     /// descriptors say which objects hold references, and an object wrongly marked as holding
     /// none would lose what it points at. The harness reports the collections that ran: the
     /// claim needs at least a handful.
+    ///
+    /// <para>What this does NOT test: the bits of the reference bitmap. The stage-1 collector
+    /// scans an object that holds references as a whole and reads only the flag; the bitmap is
+    /// held by the layout asserts in the emitted C and by the goldens until a collector reads
+    /// it (stage 2, M11).</para>
     /// </summary>
     [Theory]
-    [InlineData(Profile.Debug)]
-    [InlineData(Profile.Release)]
-    public void A_class_graph_survives_collections(Profile profile)
+    [InlineData("objects_gc", Profile.Debug, "kept 499500 held-999999 held-0 alice")]
+    [InlineData("objects_gc", Profile.Release, "kept 499500 held-999999 held-0 alice")]
+    [InlineData("optionals_gc", Profile.Debug, "list 1000 499500 node-999 tag-999")]
+    [InlineData("optionals_gc", Profile.Release, "list 1000 499500 node-999 tag-999")]
+    public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
-        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC("objects_gc"), "objects_gc", profile);
+        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("kept 499500 held-999999 held-0 alice", lines[0]);
+        Assert.Equal(line, lines[0]);
         Assert.StartsWith("collections ", lines[1]);
         var collections = int.Parse(lines[1]["collections ".Length..]);
         Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
@@ -135,6 +146,10 @@ public class CEmitterTests
         { "shift", Profile.Release, "panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits" },
         { "badchar", Profile.Debug, "panic [LYR-RT0009]: 0xD800 is not a Unicode scalar value" },
         { "badchar", Profile.Release, "panic [LYR-RT0009]: 0xD800 is not a Unicode scalar value" },
+        { "unwrap", Profile.Debug, "panic [LYR-RT0004]: unwrapped a null value" },
+        { "unwrap", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
+        { "unwrapref", Profile.Debug, "panic [LYR-RT0004]: unwrapped a null value" },
+        { "unwrapref", Profile.Release, "panic [LYR-RT0004]: unwrapped a null value" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the
