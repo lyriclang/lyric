@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
     <ProjectReference Include="..\..\src\Lyric5.Compiler\Lyric5.Compiler.csproj" />
+    <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
     <ProjectReference Include="..\..\src\Lyric5\Lyric5.csproj" />
   </ItemGroup>
 </Project>

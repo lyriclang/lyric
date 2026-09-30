@@ -22,8 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
-    <!-- The compiler: the 4.x front end the Lyric 5 compiler grows out of, behind the subset gate (13, M2). -->
-    <ProjectReference Include="..\Lyric5.Compiler\Lyric5.Compiler.csproj" />
+    <!-- The build: front end behind the subset gate, C emitter, cache, runtime archive, C toolchain (13, M2). -->
+    <ProjectReference Include="..\Lyric5.Build\Lyric5.Build.csproj" />
   </ItemGroup>
 
   <ItemGroup>

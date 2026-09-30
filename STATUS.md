@@ -160,6 +160,16 @@ S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 
    S5). `hello`, `fizzbuzz` and `fibonacci` (recursive and iterative) run natively on Linux and
    Windows in both profiles, plus `structs`, `strings` (UTF-8) and `panic`. New runtime helpers:
    text from `uint` and `bool`, `lyr_panic_message`.
+5. S4: `lyric5 build <file>` and `lyric5 run <file> [-- args]` (`Lyric5.Build`): a file is an
+   implicit package with `out/` by it, or at the nearest `.git` (P5), the binary under
+   `out/<profile>/<target>/` (P4); the C is cached by the source, the toolchain and the emitter
+   version, objects by content (L7), the link only when an input is newer — an unchanged program
+   compiles nothing twice; the runtime archive is built once per toolchain version, target and
+   profile into the user's cache (`~/.cache/lyric`, `LYRIC_CACHE`); `--profile`, `--target`
+   (cross builds, run refused), `--emit`; exit codes per C5, the program's own passed through.
+   Measured on the way: a warm `run` of hello takes ≈ 120 ms through `dotnet` — S5 measures the
+   NativeAOT binary against the C9 budget. The AOT job now runs hello and fib natively on every
+   Tier 1 runner.
 
 ## Design decisions
 
