@@ -186,3 +186,39 @@ jobs:
           print(f"lyric5 run warm:    {best([lyric5, 'run', 'tests/Lyric5.Tests/programs/hello.lyr', '--profile', 'release'], 10):.1f} ms (min of 10)")
           print(f"lyric5 --version:   {best([lyric5, '--version'], 10):.1f} ms (min of 10)")
           PY
+
+  conformance:
+    # The specification's suite (lyriclang/lyric-spec, main) against the WORKING TREE, in both
+    # profiles: the tree is the candidate for 5.0.0, and a candidate that breaks a spec sentence
+    # fails here, not after tagging. Spec-first (design/v5/spec/13): a case lands before the
+    # compiler does, so this job is red on main between the two merges and green after — that
+    # window is the point of it, not a flaw.
+    name: Conformance gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout the specification
+        uses: actions/checkout@v7
+        with:
+          repository: lyriclang/lyric-spec
+          ref: main
+          path: spec-repo
+
+      - name: Set up zig (the cases build to native binaries)
+        uses: ./.github/actions/setup-zig
+
+      - name: Build the compiler
+        run: dotnet build src/Lyric5/Lyric5.csproj --configuration Release
+
+      - name: Run the suite against the working tree, both profiles
+        run: |
+          lyric5=src/Lyric5/bin/Release/net10.0/lyric5
+          version=$("$lyric5" --version | head -1 | awk '{print $2}' | cut -d+ -f1)
+          echo "working tree claims $version"
+          for profile in debug release; do
+            python3 spec-repo/tools/run_conformance.py --lyric5 "$lyric5" --profile "$profile" --toolchain-version "$version"
+          done
