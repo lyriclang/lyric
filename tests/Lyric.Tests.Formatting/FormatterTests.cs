@@ -539,6 +539,16 @@ public class FormatterTests
     }
 
     [Fact]
+    public void An_instantiated_function_and_a_placeholder_keep_their_spelling()
+    {
+        // 'ident<int>' as a value and '_' among the type arguments (03 T8, T17) are printed as
+        // written: the arguments in angle brackets, comma-separated, with nothing else.
+        var formatted = Format("fn f(): int { let g = ident<int>; return apply(g, collect< _ ,string >(1, \"y\")); }");
+        Assert.Contains("let g = ident<int>;", formatted);
+        Assert.Contains("collect<_, string>(1, \"y\")", formatted);
+    }
+
+    [Fact]
     public void An_opaque_type_alias_round_trips()
     {
         Assert.Equal("""

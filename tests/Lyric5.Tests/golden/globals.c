@@ -19,19 +19,19 @@ _Static_assert(sizeof(lyr_ty1_Log) == 24, "layout of lyr_ty1_Log");
 _Static_assert(offsetof(lyr_ty1_Log, f_lines) == 8, "layout of lyr_ty1_Log");
 _Static_assert(offsetof(lyr_ty1_Log, f_last) == 16, "layout of lyr_ty1_Log");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x4) };
-static const LyrDesc lyr_desc_ty1_Log = { sizeof(lyr_ty1_Log), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Log", NULL };
+const LyrDesc lyr_desc_ty1_Log = { sizeof(lyr_ty1_Log), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Log", NULL };
 _Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of main.Point[]");
-static const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "main.Point[]", NULL };
+const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "main.Point[]", NULL };
 
 /* module-level bindings */
-static lyr_ty0_Point lyr_g0_Point_ORIGIN = {0};
-static int64_t lyr_g1_Point_LIMIT = 0;
-static int64_t lyr_g2_base = 0;
-static int64_t lyr_g3_twice = 0;
-static LyrStr *lyr_g4_greeting = NULL;
-static int64_t lyr_g5_counter = 0;
-static lyr_ty1_Log *lyr_g6_log = NULL;
-static LyrArr *lyr_g7_points = NULL;
+lyr_ty0_Point lyr_g0_Point_ORIGIN = {0};
+int64_t lyr_g1_Point_LIMIT = 0;
+int64_t lyr_g2_base = 0;
+int64_t lyr_g3_twice = 0;
+LyrStr *lyr_g4_greeting = NULL;
+int64_t lyr_g5_counter = 0;
+lyr_ty1_Log *lyr_g6_log = NULL;
+LyrArr *lyr_g7_points = NULL;
 
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("start ");
@@ -47,13 +47,13 @@ static const LyrStaticStr(2) lyr_lit9 = LYR_STR_INIT("!");
 static const LyrStaticStr(1) lyr_lit10 = LYR_STR_INIT("");
 
 /* prototypes */
-static void lyr_main_bump(void);
-static void lyr_main_note(LyrStr *l0_s);
-static int64_t lyr_main_main(void);
-static void lyr__globals__9ee5f9b5(void);
+void lyr_main_bump(void);
+void lyr_main_note(LyrStr *l0_s);
+int64_t lyr_main_main(void);
+void lyr__globals__9ee5f9b5(void);
 
 #line 27 "programs/globals.lyr"
-static void lyr_main_bump(void) {
+void lyr_main_bump(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -71,7 +71,7 @@ bb0:;
 }
 
 #line 30 "programs/globals.lyr"
-static void lyr_main_note(LyrStr *l0_s) {
+void lyr_main_note(LyrStr *l0_s) {
     lyr_ty1_Log *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -100,7 +100,7 @@ bb0:;
 }
 
 #line 35 "programs/globals.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     int64_t l0_before = 0;
     int64_t l1_mid = 0;
     LyrStr *t0 = NULL;
@@ -383,7 +383,7 @@ bb0:;
 }
 
 #line 14 "programs/globals.lyr"
-static void lyr__globals__9ee5f9b5(void) {
+void lyr__globals__9ee5f9b5(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     lyr_ty0_Point t2_s = {0};

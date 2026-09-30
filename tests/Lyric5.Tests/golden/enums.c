@@ -34,7 +34,7 @@ struct lyr_ty0_Box_Tree_ {
 };
 _Static_assert(sizeof(lyr_ty0_Box_Tree_) == 32, "layout of lyr_ty0_Box_Tree_");
 _Static_assert(offsetof(lyr_ty0_Box_Tree_, f_value) == 8, "layout of lyr_ty0_Box_Tree_");
-static const LyrDesc lyr_desc_ty0_Box_Tree_ = { sizeof(lyr_ty0_Box_Tree_), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "std.core.Box<Tree>", NULL };
+const LyrDesc lyr_desc_ty0_Box_Tree_ = { sizeof(lyr_ty0_Box_Tree_), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "std.core.Box<Tree>", NULL };
 struct lyr_ty5_Signal_Red {
     uint8_t lyr_unit;
 };
@@ -74,7 +74,7 @@ struct lyr_ty14_Scene {
 _Static_assert(sizeof(lyr_ty14_Scene) == 48, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_main) == 8, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_light) == 40, "layout of lyr_ty14_Scene");
-static const LyrDesc lyr_desc_ty14_Scene = { sizeof(lyr_ty14_Scene), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "main.Scene", NULL };
+const LyrDesc lyr_desc_ty14_Scene = { sizeof(lyr_ty14_Scene), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "main.Scene", NULL };
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("red");
@@ -104,22 +104,22 @@ static const LyrStaticStr(7) lyr_lit23 = LYR_STR_INIT("scene ");
 static const LyrStaticStr(6) lyr_lit24 = LYR_STR_INIT("tree ");
 
 /* prototypes */
-static lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n);
-static int64_t lyr_main_sum(lyr_ty1_Tree l0_t);
-static LyrStr * lyr_main_name(lyr_ty4_Signal l0_s);
-static lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s);
-static int64_t lyr_main_area(lyr_ty8_Shape l0_s);
-static LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s);
-static LyrStr * lyr_main_grade(int64_t l0_n);
-static lyr_ty4_Signal lyr_main_find(int64_t l0_n);
-static LyrStr * lyr_main_show(lyr_ty4_Signal l0_m);
-static int64_t lyr_main_main(void);
-static uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this);
-static int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this);
-static void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this);
+lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n);
+int64_t lyr_main_sum(lyr_ty1_Tree l0_t);
+LyrStr * lyr_main_name(lyr_ty4_Signal l0_s);
+lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s);
+int64_t lyr_main_area(lyr_ty8_Shape l0_s);
+LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s);
+LyrStr * lyr_main_grade(int64_t l0_n);
+lyr_ty4_Signal lyr_main_find(int64_t l0_n);
+LyrStr * lyr_main_show(lyr_ty4_Signal l0_m);
+int64_t lyr_main_main(void);
+uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this);
+int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this);
+void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this);
 
 #line 37 "programs/enums.lyr"
-static lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n) {
+lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n) {
     int64_t t0 = 0;
     lyr_ty1_Tree t1_s = {0};
     lyr_ty1_Tree *t1 = &t1_s;
@@ -138,7 +138,7 @@ bb0:;
 }
 
 #line 40 "programs/enums.lyr"
-static int64_t lyr_main_sum(lyr_ty1_Tree l0_t) {
+int64_t lyr_main_sum(lyr_ty1_Tree l0_t) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
     lyr_ty0_Box_Tree_ *l3_l = NULL;
@@ -225,7 +225,7 @@ bb3:;
 }
 
 #line 47 "programs/enums.lyr"
-static LyrStr * lyr_main_name(lyr_ty4_Signal l0_s) {
+LyrStr * lyr_main_name(lyr_ty4_Signal l0_s) {
     LyrStr *l1__match0 = NULL;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -285,7 +285,7 @@ bb5:;
 }
 
 #line 55 "programs/enums.lyr"
-static lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s) {
+lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s) {
     lyr_ty4_Signal l1__match0 = {0};
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -349,7 +349,7 @@ bb5:;
 }
 
 #line 63 "programs/enums.lyr"
-static int64_t lyr_main_area(lyr_ty8_Shape l0_s) {
+int64_t lyr_main_area(lyr_ty8_Shape l0_s) {
     int64_t l1__match0 = 0;
     double l2_r = 0;
     int64_t l3_w = 0;
@@ -505,7 +505,7 @@ bb7:;
 }
 
 #line 72 "programs/enums.lyr"
-static LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s) {
+LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s) {
     LyrStr *l1__match0 = NULL;
     int64_t l2_h = 0;
     int64_t l3_w = 0;
@@ -752,7 +752,7 @@ bb17:;
 }
 
 #line 83 "programs/enums.lyr"
-static LyrStr * lyr_main_grade(int64_t l0_n) {
+LyrStr * lyr_main_grade(int64_t l0_n) {
     LyrStr *l1__match0 = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -843,7 +843,7 @@ bb9:;
 }
 
 #line 92 "programs/enums.lyr"
-static lyr_ty4_Signal lyr_main_find(int64_t l0_n) {
+lyr_ty4_Signal lyr_main_find(int64_t l0_n) {
     lyr_ty4_Signal l1__if0 = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -912,7 +912,7 @@ bb5:;
 }
 
 #line 97 "programs/enums.lyr"
-static LyrStr * lyr_main_show(lyr_ty4_Signal l0_m) {
+LyrStr * lyr_main_show(lyr_ty4_Signal l0_m) {
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
     uint8_t t1 = 0;
@@ -949,7 +949,7 @@ bb2:;
 }
 
 #line 102 "programs/enums.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty4_Signal l0_red = {0};
     lyr_ty8_Shape l1_dot = {0};
     lyr_ty8_Shape l2_circle = {0};
@@ -1597,7 +1597,7 @@ bb0:;
 }
 
 #line 19 "programs/enums.lyr"
-static uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this) {
+uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this) {
     uint8_t l1__match0 = 0;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -1640,7 +1640,7 @@ bb3:;
 }
 
 #line 20 "programs/enums.lyr"
-static int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this) {
+int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this) {
     int64_t l1__match0 = 0;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -1700,7 +1700,7 @@ bb5:;
 }
 
 #line 21 "programs/enums.lyr"
-static void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this) {
+void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this) {
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
     lyr_ty4_Signal t1_s = {0};

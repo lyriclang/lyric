@@ -27,11 +27,11 @@ static const LyrStaticStr(6) lyr_lit3 = LYR_STR_INIT("held ");
 static const LyrStaticStr(6) lyr_lit4 = LYR_STR_INIT("loop ");
 
 /* prototypes */
-static int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r);
+int64_t lyr_main_main(void);
 
 #line 13 "programs/ranges.lyr"
-static int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r) {
+int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r) {
     lyr_ty0_Range_int_ t0_s = {0};
     lyr_ty0_Range_int_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -55,7 +55,7 @@ bb0:;
 }
 
 #line 16 "programs/ranges.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty0_Range_int_ l0_r = {0};
     lyr_ty1_RangeInclusive_int_ l1_inc = {0};
     lyr_ty2_Window l2_w = {0};

@@ -9,10 +9,10 @@ static const LyrStaticStr(8) lyr_lit1 = LYR_STR_INIT("Hello, ");
 static const LyrStaticStr(2) lyr_lit2 = LYR_STR_INIT("!");
 
 /* prototypes */
-static int64_t lyr_main_main(void);
+int64_t lyr_main_main(void);
 
 #line 4 "programs/hello.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     LyrStr *l0_name = NULL;
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;

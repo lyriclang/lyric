@@ -1,0 +1,1 @@
+apply(ident<int>, collect<_, string>(1, "y")) + [ident<_>, Counter.make<bool>].length()

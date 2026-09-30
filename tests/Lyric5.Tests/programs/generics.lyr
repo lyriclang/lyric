@@ -1,0 +1,39 @@
+// Generics natively (03 T5–T8, T17; 01 C3): every instance a function of its own, requested by
+// the call or by the value that names it, and compiled once. Expected stdout:
+//   value 4 5 hi          'ident<int>' as a value, held and passed; 'ident<_>' filled from the annotation
+//   pair 3 x x 3          'Pair<_, string>' inferred from a field; an instance returned through a generic
+//   collect n7 9 11       a placeholder beside a written argument, the rest from a lambda; a generic taking an instance as a value
+//   static 2 1 true       a static generic method as a value; 'Pair<_, _>' filled from the context
+import std.io { println };
+
+struct Pair<A, B> { first: A, second: B }
+struct Counter { n: int, static fn make<T>(seed: T, n: int): Counter { return Counter { n = n }; } }
+
+fn ident<T>(x: T): T { return x; }
+fn twice<T>(f: fn(T) -> T, x: T): T { return f(f(x)); }
+fn apply(f: fn(int) -> int, x: int): int { return f(x); }
+fn swap<A, B>(p: Pair<A, B>): Pair<B, A> { return Pair<B, A> { first = p.second, second = p.first }; }
+fn collect<T, U>(x: T, f: fn(T) -> U): U { return f(x); }
+fn inc(n: int): int { return n + 1; }
+
+fn main(): int {
+    let g = ident<int>;
+    let s: fn(string) -> string = ident<_>;
+    let h = s("hi");
+    println(f"value {apply(g, 4)} {apply(ident<int>, 5)} {h}");
+
+    let p = Pair<_, string> { first = 3, second = "x" };
+    let q = swap(p);
+    println(f"pair {p.first} {p.second} {q.first} {q.second}");
+
+    let u = collect<_, string>(7, (n) => f"n{n}");
+    let t = twice(ident<int>, 9);
+    let d = twice(inc, 9);
+    println(f"collect {u} {t} {d}");
+
+    let m = Counter.make<bool>;
+    let c = m(true, 2);
+    let w: Pair<int, bool> = Pair<_, _> { first = 1, second = true };
+    println(f"static {c.n} {w.first} {w.second}");
+    return 0;
+}

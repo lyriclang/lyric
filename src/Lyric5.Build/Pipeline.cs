@@ -40,7 +40,7 @@ public static class Pipeline
     {
         var result = Compile(project, error);
         if (result is null) return 1;
-        output.Write(what == "ir" ? IrPrinter.Dump(result.Ir!) : CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot));
+        output.Write(what == "ir" ? IrPrinter.Dump(result.Ir!) : CEmitter.Join(CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot)));
         return 0;
     }
 
@@ -51,27 +51,37 @@ public static class Pipeline
         Directory.CreateDirectory(project.CacheDir);
 
         // The C, keyed by the source, the toolchain and the emitter: the same program emits the
-        // same C, so the front end runs only for a program that changed.
+        // same C, so the front end runs only for a program that changed. The module's unit is
+        // named by that key; a generic instance's unit by its own content (01 C3), under 'units/',
+        // where nothing else changes — so its object survives every edit that leaves the
+        // instance alone. The list of units is written last: its presence says the C is complete.
         var source = File.ReadAllText(project.Source);
         var key = Key(source, request.ToolchainVersion, CEmitter.Version);
-        var cFile = Path.Combine(project.CacheDir, $"{project.Name}-{key}.c");
-        if (!File.Exists(cFile))
+        var manifest = Path.Combine(project.CacheDir, $"{project.Name}-{key}.units");
+        if (!File.Exists(manifest))
         {
             var result = Compile(project, error);
             if (result is null) return (1, null);
-            var partial = $"{cFile}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
-            File.WriteAllText(partial, CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot));
-            try { File.Move(partial, cFile, overwrite: false); }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException && File.Exists(cFile)) { File.Delete(partial); }
+            var paths = new List<string>();
+            foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot))
+            {
+                var path = unit.Instance is null
+                    ? Path.Combine(project.CacheDir, $"{project.Name}-{key}.c")
+                    : Path.Combine(project.CacheDir, "units", $"inst-{Key(unit.Text)}.c");
+                WriteOnce(path, unit.Text);
+                paths.Add(path);
+            }
+            WriteOnce(manifest, string.Join("\n", paths) + "\n");
         }
+        var sources = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
 
         try
         {
             var archive = RuntimeArchive.For(request.Compiler, request.Target, request.Profile, request.ToolchainVersion);
             var build = new CBuild(request.Compiler, request.Target, request.Profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
-            var unit = new CUnit(cFile, [], [RuntimeLayout.IncludeDir(runtimeRoot)]);
-            var objects = build.Compile([unit]);
+            var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)])).ToList();
+            var objects = build.Compile(units);
             var executable = project.Executable(request.Profile, request.Target);
             if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable);
             return (0, executable);
@@ -81,6 +91,18 @@ public static class Pipeline
             error.WriteLine($"error[LYR-BLD0001]: {failure.Message}");
             return (2, null);
         }
+    }
+
+    /// <summary>A content-named file is written once: a second writer of the same path writes
+    /// the same bytes, and the first to move wins.</summary>
+    private static void WriteOnce(string path, string text)
+    {
+        if (File.Exists(path)) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var partial = $"{path}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        File.WriteAllText(partial, text);
+        try { File.Move(partial, path, overwrite: false); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException && File.Exists(path)) { File.Delete(partial); }
     }
 
     /// <summary>A binary newer than every content-keyed input it was linked from is that link.</summary>

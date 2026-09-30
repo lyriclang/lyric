@@ -674,14 +674,18 @@ public sealed partial class Parser
 
     /// <summary>
     /// Lookahead from an identifier: is this a type path WITH arguments in value position, that is
-    /// segments joined by <c>.</c>, then <c>&lt;…&gt;</c>, then a <c>.</c> directly after?
+    /// segments joined by <c>.</c>, then <c>&lt;…&gt;</c>, then a <c>.</c> directly after — or the
+    /// end of the expression, which makes it an instantiated generic function as a value,
+    /// <c>map(xs, ident&lt;int&gt;)</c> (design/v5/spec/03 T17)?
     ///
     /// <para>Without arguments the <c>&lt;</c> is no type path: <c>P.neu()</c> is an ordinary
     /// identifier whose symbol happens to be a type and does not need this route. Hence there is NO
     /// optional <c>&lt;</c> here, unlike in <see cref="IsStructInitAhead"/>.</para>
     ///
     /// <para>The rule costs no ambiguity: a <c>.</c> after a comparison chain
-    /// (<c>a &lt; b &gt; .c</c>) is not a valid expression anyway.</para>
+    /// (<c>a &lt; b &gt; .c</c>) is not a valid expression anyway, and neither is one that ends
+    /// right after its <c>&gt;</c> (<c>f(a &lt; b, c &gt;)</c>). A call, <c>f&lt;int&gt;(x)</c>,
+    /// is not this route either: the postfix loop reads its arguments.</para>
     /// </summary>
     private bool IsTypePathAhead()
     {
@@ -693,7 +697,9 @@ public sealed partial class Parser
         if (_buffer.Peek(i).TokenKind != TokenKind.Less) return false;
 
         i = SkipTypeArgs(i);
-        return i >= 0 && _buffer.Peek(i).TokenKind == TokenKind.Dot;
+        return i >= 0 && _buffer.Peek(i).TokenKind is TokenKind.Dot
+            or TokenKind.RParen or TokenKind.Comma or TokenKind.Semicolon
+            or TokenKind.RBracket or TokenKind.RBrace or TokenKind.Eof;
     }
 
     private Expr ParseTypePath()

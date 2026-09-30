@@ -23,7 +23,7 @@ struct lyr_ty2_Holder {
 };
 _Static_assert(sizeof(lyr_ty2_Holder) == 24, "layout of lyr_ty2_Holder");
 _Static_assert(offsetof(lyr_ty2_Holder, f_at) == 8, "layout of lyr_ty2_Holder");
-static const LyrDesc lyr_desc_ty2_Holder = { sizeof(lyr_ty2_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty2_Holder = { sizeof(lyr_ty2_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
 struct lyr_ty3_Pair_int_ {
     int64_t f_first;
     LyrStr *f_second;
@@ -42,10 +42,10 @@ static const LyrStaticStr(3) lyr_lit8 = LYR_STR_INIT("hi");
 static const LyrStaticStr(9) lyr_lit9 = LYR_STR_INIT("generic ");
 
 /* prototypes */
-static int64_t lyr_main_main(void);
+int64_t lyr_main_main(void);
 
 #line 18 "programs/with.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty0_Point l0_p = {0};
     lyr_ty0_Point l1_q = {0};
     lyr_ty0_Point l2_s = {0};

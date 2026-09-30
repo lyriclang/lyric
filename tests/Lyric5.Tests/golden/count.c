@@ -4,10 +4,10 @@
 #include <math.h>
 
 /* prototypes */
-static int64_t lyr_main_main(void);
+int64_t lyr_main_main(void);
 
 #line 4 "programs/count.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     int64_t l0_total = 0;
     int64_t l1__range0 = 0;
     int64_t l2__last1 = 0;

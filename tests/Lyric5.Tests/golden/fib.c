@@ -4,12 +4,12 @@
 #include <math.h>
 
 /* prototypes */
-static int64_t lyr_main_fib(int64_t l0_n);
-static int64_t lyr_main_fibIter(int64_t l0_n);
-static int64_t lyr_main_main(void);
+int64_t lyr_main_fib(int64_t l0_n);
+int64_t lyr_main_fibIter(int64_t l0_n);
+int64_t lyr_main_main(void);
 
 #line 3 "programs/fib.lyr"
-static int64_t lyr_main_fib(int64_t l0_n) {
+int64_t lyr_main_fib(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     uint8_t t2 = 0;
@@ -61,7 +61,7 @@ bb2:;
 }
 
 #line 8 "programs/fib.lyr"
-static int64_t lyr_main_fibIter(int64_t l0_n) {
+int64_t lyr_main_fibIter(int64_t l0_n) {
     int64_t l1_a = 0;
     int64_t l2_b = 0;
     int64_t l3__range0 = 0;
@@ -152,7 +152,7 @@ bb4:;
 }
 
 #line 19 "programs/fib.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;

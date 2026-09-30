@@ -1,3 +1,4 @@
+using Lyric5.Compiler;
 using Lyric5.Toolchain;
 
 namespace Lyric5.Tests;
@@ -51,17 +52,25 @@ public class RuntimeBuildTests
     internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null) =>
         RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), name, profile, compiler, args);
 
-    /// <summary>C text (the emitter's) as a program: written into the cache, built and run like a
+    /// <summary>The emitter's units as a program: written into the cache, built and run like a
     /// runtime test.</summary>
-    internal static ProcessRunner.Result RunEmitted(string cText, string name, Profile profile, string[]? args = null)
-    {
-        var dir = Path.Combine(Cache, "emitted");
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, name + ".c");
-        File.WriteAllText(path, cText);
+    internal static ProcessRunner.Result RunEmitted(IReadOnlyList<CEmitter.Unit> units, string name, Profile profile, string[]? args = null) =>
         // Its own name in bin/: 'hello' is also a runtime test program, and two tests linking to
         // one path raced (seen on Windows).
-        return RunC(path, "emitted-" + name, profile, null, args);
+        RunC(WriteUnits(units, name), "emitted-" + name, profile, null, args);
+
+    /// <summary>One file per unit under <c>emitted/&lt;name&gt;/</c>, the module's first.</summary>
+    private static string[] WriteUnits(IReadOnlyList<CEmitter.Unit> units, string name)
+    {
+        var dir = Path.Combine(Cache, "emitted", name);
+        Directory.CreateDirectory(dir);
+        var paths = new string[units.Count];
+        for (var i = 0; i < units.Count; i++)
+        {
+            paths[i] = Path.Combine(dir, $"u{i}.c");
+            File.WriteAllText(paths[i], units[i].Text);
+        }
+        return paths;
     }
 
     /// <summary>
@@ -70,23 +79,21 @@ public class RuntimeBuildTests
     /// (a file under <c>tests/Lyric5.Tests/harness</c>) defines — so a test starts the runtime
     /// its own way, under a heap limit for one, without the emitter knowing.
     /// </summary>
-    internal static ProcessRunner.Result RunEmittedUnder(string harness, string cText, string name, Profile profile)
-    {
-        var dir = Path.Combine(Cache, "emitted");
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, name + ".c");
-        File.WriteAllText(path, cText);
-        return RunC(path, $"emitted-{name}-{harness}", profile, null, null,
+    internal static ProcessRunner.Result RunEmittedUnder(string harness, IReadOnlyList<CEmitter.Unit> units, string name, Profile profile) =>
+        RunC(WriteUnits(units, $"{name}-{harness}"), $"emitted-{name}-{harness}", profile, null, null,
             ["lyr_run_main=lyr_test_run_main"], Path.Combine(Root, "tests", "Lyric5.Tests", "harness", harness + ".c"));
-    }
 
     private static ProcessRunner.Result RunC(string source, string name, Profile profile, CCompiler? compiler, string[]? args,
+        string[]? defines = null, string? beside = null) =>
+        RunC([source], name, profile, compiler, args, defines, beside);
+
+    private static ProcessRunner.Result RunC(string[] sources, string name, Profile profile, CCompiler? compiler, string[]? args,
         string[]? defines = null, string? beside = null)
     {
         var build = new CBuild(compiler ?? Zig(), Target.Host, profile, Cache);
         var archive = RuntimeLayout.BuildArchive(build, Root, Path.Combine(Cache, "lib"));
         string[] includes = [RuntimeLayout.IncludeDir(Root), Path.Combine(Root, "runtime", "third_party", "bdwgc", "include")];
-        var units = new List<CUnit> { new(source, defines ?? [], includes) };
+        var units = sources.Select(source => new CUnit(source, defines ?? [], includes)).ToList();
         if (beside is not null) units.Add(new CUnit(beside, [], includes));
         var objects = build.Compile(units);
         var exe = build.LinkExecutable([.. objects, archive],

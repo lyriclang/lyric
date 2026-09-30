@@ -16,11 +16,11 @@ struct lyr_ty1_Segment {
 };
 
 /* prototypes */
-static lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx);
-static int64_t lyr_main_main(void);
+lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx);
+int64_t lyr_main_main(void);
 
 #line 7 "programs/structs.lyr"
-static lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx) {
+lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx) {
     lyr_ty0_Point l2_q = {0};
     lyr_ty0_Point t0_s = {0};
     lyr_ty0_Point *t0 = &t0_s;
@@ -65,7 +65,7 @@ bb0:;
 }
 
 #line 13 "programs/structs.lyr"
-static int64_t lyr_main_main(void) {
+int64_t lyr_main_main(void) {
     lyr_ty0_Point l0_p = {0};
     lyr_ty1_Segment l1_s = {0};
     int64_t t0 = 0;
