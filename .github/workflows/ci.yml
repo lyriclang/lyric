@@ -172,7 +172,8 @@ jobs:
         run: |
           lyric5=aot/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=aot/lyric5.exe
           "$lyric5" build tests/Lyric5.Tests/programs/hello.lyr --profile release
-          hello=$(find out/release -name 'hello' -o -name 'hello.exe' | head -1)
+          # Depth 2: out/release/<triple>/hello — a macOS .dSYM keeps another 'hello' deeper down.
+          hello=$(find out/release -maxdepth 2 -type f \( -name 'hello' -o -name 'hello.exe' \) | head -1)
           python3 - "$hello" "$lyric5" <<'PY'
           import subprocess, sys, time
           def best(cmd, n):
