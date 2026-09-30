@@ -40,7 +40,7 @@ public static class Pipeline
     {
         var result = Compile(project, error);
         if (result is null) return 1;
-        output.Write(what == "ir" ? IrPrinter.Dump(result.Ir!) : CEmitter.Emit(result.Ir!, result.Sources));
+        output.Write(what == "ir" ? IrPrinter.Dump(result.Ir!) : CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot));
         return 0;
     }
 
@@ -60,7 +60,7 @@ public static class Pipeline
             var result = Compile(project, error);
             if (result is null) return (1, null);
             var partial = $"{cFile}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
-            File.WriteAllText(partial, CEmitter.Emit(result.Ir!, result.Sources));
+            File.WriteAllText(partial, CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot));
             try { File.Move(partial, cFile, overwrite: false); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException && File.Exists(cFile)) { File.Delete(partial); }
         }

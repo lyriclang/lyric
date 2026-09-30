@@ -28,7 +28,7 @@ public class CEmitterTests
         result.Diagnostics.RenderText(rendered);
         Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
         Assert.True(SubsetGate.Check(result.Ir!, result.Diagnostics), rendered.ToString());
-        return CEmitter.Emit(result.Ir!, result.Sources).Replace("\r\n", "\n");
+        return CEmitter.Emit(result.Ir!, result.Sources, options.StdlibRoot).Replace("\r\n", "\n");
     }
 
     [Theory]

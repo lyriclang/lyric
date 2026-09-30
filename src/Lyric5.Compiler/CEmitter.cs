@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s5";
+    public const string Version = "m3-s7";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -56,17 +56,25 @@ public sealed class CEmitter
     /// has there: the tag.</summary>
     private readonly Dictionary<int, (int Enum, int Tag)> _variants = new();
 
-    private CEmitter(IrModule module, SourceManager sources)
+    private readonly string? _stdlibRoot;
+
+    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot)
     {
         _module = module;
         _sources = sources;
+        _stdlibRoot = stdlibRoot is null ? null : Path.GetFullPath(stdlibRoot).TrimEnd('/', '\\');
         for (var i = 0; i < module.Types.Count; i++)
             for (var tag = 0; tag < module.Types[i].Variants.Length; tag++)
                 _variants[module.Types[i].Variants[tag].Value] = (i, tag);
     }
 
     /// <summary>The C text of the module. <paramref name="sources"/> answers the <c>#line</c> positions.</summary>
-    public static string Emit(IrModule module, SourceManager sources) => new CEmitter(module, sources).Module();
+    /// <param name="stdlibRoot">The directory of the standard library, when known: a source
+    /// under it is named in <c>#line</c> relative to the directory's parent (<c>stdlib5/std/core.lyr</c>),
+    /// so the emitted C is the same on every machine — a golden compares it byte for byte, and
+    /// the build cache keys on it.</param>
+    public static string Emit(IrModule module, SourceManager sources, string? stdlibRoot = null) =>
+        new CEmitter(module, sources, stdlibRoot).Module();
 
     // --- names and types -------------------------------------------------------------------------
 
@@ -800,9 +808,23 @@ public sealed class CEmitter
         if (span.File != _file)
         {
             _file = span.File;
-            _fn.AppendLine($"#line {position.Line} \"{_sources.GetPath(span.File).Replace("\\", "\\\\").Replace("\"", "\\\"")}\"");
+            _fn.AppendLine($"#line {position.Line} \"{SourcePath(span.File).Replace("\\", "\\\\").Replace("\"", "\\\"")}\"");
         }
         else _fn.AppendLine($"#line {position.Line}");
+    }
+
+    /// <summary>The path a <c>#line</c> names: a standard-library source relative to the
+    /// library's parent directory, with forward slashes; anything else as the source manager
+    /// has it.</summary>
+    private string SourcePath(FileId file)
+    {
+        var path = _sources.GetPath(file);
+        if (_stdlibRoot is null) return path;
+        var full = Path.IsPathRooted(path) ? Path.GetFullPath(path) : path;
+        var parent = Path.GetDirectoryName(_stdlibRoot) ?? "";
+        if (!full.StartsWith(_stdlibRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && !full.StartsWith(_stdlibRoot + '/', StringComparison.Ordinal)) return path;
+        return Path.GetRelativePath(parent, full).Replace('\\', '/');
     }
 
     private string Instruction(IrOp op) => op switch
