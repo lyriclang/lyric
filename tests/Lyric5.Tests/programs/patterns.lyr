@@ -1,0 +1,92 @@
+// The enum the position names, unnamed (design/v5/spec/03 T9; 08 Y6, Y9): '.Red' where a
+// Signal is expected, '.Num(3)' and '.Rect { w = 1, h = 2 }' where a Shape is; in a pattern the
+// dotted form tests the variant and a bare name binds. Expected stdout, in order:
+//   lights red green green yellow        a written type, an argument, a return, an assignment
+//   shapes 3 6 0                         a payload call, an initializer, a unit variant
+//   match num-3 flat 5 wide 4 rect 2x3 empty
+//                                        dotted patterns: a payload, a field test, a guard, a unit variant
+//   either stop stop go                  an or-pattern of dotted names
+//   nested 7 none 0 6                    a generic enum, a variant inside a variant, both dotted
+//   iflet 7 else 1 num 3                 'if (let .Some(.Num(v)) = o)' and 'let .Num(n) = s else'
+//   optional none green                  '.Green' assigned into a '?Signal'
+import std.io { println };
+
+enum Signal { Red, Yellow, Green }
+enum Shape { Num(int), Rect { w: int, h: int }, Empty }
+enum Opt<T> { Some(T), None }
+
+fn name(s: Signal): string {
+    return match (s) { .Red => "red", .Yellow => "yellow", .Green => "green" };
+}
+
+fn next(s: Signal): Signal {
+    return match (s) { .Red => .Green, .Yellow => .Red, .Green => .Red };
+}
+
+fn either(s: Signal): string {
+    return match (s) { .Red | .Yellow => "stop", .Green => "go" };
+}
+
+fn size(s: Shape): int {
+    return match (s) { .Num(n) => n, .Rect { w, h } => w * h, .Empty => 0 };
+}
+
+fn describe(s: Shape): string {
+    return match (s) {
+        .Num(n) => f"num-{n}",
+        .Rect { w = 0, h } => f"flat {h}",
+        .Rect { w, h } if w > h => f"wide {w}",
+        .Rect { w, h } => f"rect {w}x{h}",
+        .Empty => "empty",
+    };
+}
+
+fn inner(o: Opt<Shape>): int {
+    return match (o) { .Some(.Num(n)) => n, .Some(s) => size(s), .None => 0 };
+}
+
+fn show(o: Opt<Shape>): string {
+    return match (o) { .Some(_) => "some", .None => "none" };
+}
+
+fn lit(m: ?Signal): string {
+    if (m == null) { return "none"; }
+    return name(m);
+}
+
+fn firstNum(s: Shape): int {
+    let .Num(n) = s else { return 1; };
+    return n;
+}
+
+fn main(): int {
+    let a: Signal = .Red;
+    var b = next(a);
+    let second = name(b);
+    b = .Yellow;
+    println("lights " + name(a) + " " + name(.Green) + " " + second + " " + name(b));
+
+    let num: Shape = .Num(3);
+    let rect: Shape = .Rect { w = 2, h = 3 };
+    let empty: Shape = .Empty;
+    println(f"shapes {size(num)} {size(rect)} {size(empty)}");
+
+    println("match " + describe(num) + " " + describe(.Rect { w = 0, h = 5 }) + " "
+        + describe(.Rect { w = 4, h = 1 }) + " " + describe(rect) + " " + describe(empty));
+
+    println("either " + either(.Red) + " " + either(.Yellow) + " " + either(.Green));
+
+    let some: Opt<Shape> = .Some(.Num(7));
+    let none: Opt<Shape> = .None;
+    println(f"nested {inner(some)} " + show(none) + f" {inner(none)} {inner(Opt<Shape>.Some(rect))}");
+
+    var iflet = 0;
+    if (let .Some(.Num(v)) = some) { iflet = v; }
+    println(f"iflet {iflet} else {firstNum(rect)} num {firstNum(num)}");
+
+    var light: ?Signal = null;
+    let before = lit(light);
+    light = .Green;
+    println("optional " + before + " " + lit(light));
+    return 0;
+}

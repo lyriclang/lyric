@@ -58,6 +58,14 @@ public sealed partial class Parser
             case TokenKind.Identifier:
                 if (AtContextual("_")) { _buffer.Advance(); return new WildcardPattern(cur.Span); }
                 return ParsePathPattern();
+            // '.Red', '.Num(v)', '.Rect { w = 0, h }': the variant of the scrutinee's enum, the
+            // enum unnamed (08 Y6).
+            case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.Identifier:
+            {
+                _buffer.Advance();
+                var name = _buffer.Advance();
+                return FinishVariantPattern([_sm.Slice(name.Span).ToString()], cur, name, implicitMember: true);
+            }
             case TokenKind.LParen:
                 return ParseTuplePattern();
             case TokenKind.LBracket:
@@ -119,6 +127,17 @@ public sealed partial class Parser
             path.Add(_sm.Slice(last.Span).ToString());
         }
 
+        // A single bare identifier is a binding — always (08 Y6: a variant is written '.Red' or
+        // 'Signal.Red'; a name that spells a variant is refused by the sema). A qualified one,
+        // and a name with a payload, is a variant.
+        if (path.Count == 1 && !_buffer.Check(TokenKind.LParen) && !_buffer.Check(TokenKind.LBrace))
+            return new BindingPattern(path[0], first.Span);
+        return FinishVariantPattern(path, first, last, implicitMember: false);
+    }
+
+    /// <summary>The payload of a variant pattern after its name: <c>(…)</c>, <c>{ … }</c>, or none.</summary>
+    private Pattern FinishVariantPattern(List<string> path, Token first, Token last, bool implicitMember)
+    {
         if (_buffer.Check(TokenKind.LParen)) // tuple variant: Circle(r)
         {
             _buffer.Advance();
@@ -126,7 +145,7 @@ public sealed partial class Parser
             if (!_buffer.Check(TokenKind.RParen))
                 do { elems.Add(ParseOrPattern()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RParen));
             var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in variant pattern");
-            return new VariantPattern(path.ToArray(), elems.ToArray(), null, Span.Union(first.Span, close.Span));
+            return new VariantPattern(path.ToArray(), elems.ToArray(), null, Span.Union(first.Span, close.Span)) { IsImplicit = implicitMember };
         }
 
         if (_buffer.Check(TokenKind.LBrace)) // struct variant: Triangle { a, b, c }
@@ -139,13 +158,10 @@ public sealed partial class Parser
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
             var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' in struct pattern");
-            return new VariantPattern(path.ToArray(), null, fields.ToArray(), Span.Union(first.Span, close.Span));
+            return new VariantPattern(path.ToArray(), null, fields.ToArray(), Span.Union(first.Span, close.Span)) { IsImplicit = implicitMember };
         }
 
-        // A single bare identifier is a binding or a unit variant, decided by the sema; a qualified
-        // one is always a unit variant.
-        if (path.Count == 1) return new BindingPattern(path[0], first.Span);
-        return new VariantPattern(path.ToArray(), null, null, Span.Union(first.Span, last.Span));
+        return new VariantPattern(path.ToArray(), null, null, Span.Union(first.Span, last.Span)) { IsImplicit = implicitMember };
     }
 
     private FieldPattern ParseFieldPattern()

@@ -41,6 +41,7 @@ public class CEmitterTests
     [InlineData("objects")]
     [InlineData("optionals")]
     [InlineData("enums")]
+    [InlineData("patterns")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -82,6 +83,9 @@ public class CEmitterTests
                 "signals red yellow green\nareas 0 12 6 7\n"
                 + "describe round round flat square rect origin far@3,4\ngrade zero digit neg many\n"
                 + "maybe none green\nmethod true false 2\nscene 6 green\ntree 7\n");
+            data.Add("patterns", profile, 0,
+                "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
+                + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
         }
         return data;
     }

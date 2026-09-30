@@ -1677,6 +1677,7 @@ internal sealed class FunctionLowerer
         CharLiteralExpr e => EmitConst(new CharConst(e.CodePoint), TypeOfExpr(e), e.Span),
         StringLiteralExpr e => EmitConst(new StringConst(e.Value), TypeOfExpr(e), e.Span),
         IdentifierExpr e => LowerIdentifier(e),
+        ImplicitMemberExpr e => LowerImplicitMember(e),
         UnaryExpr e => LowerUnary(e),
         PostfixExpr e => LowerPostfix(e),
         BinaryExpr e => LowerBinary(e),
@@ -2442,14 +2443,22 @@ internal sealed class FunctionLowerer
     /// <c>Shape.Circle(2.0)</c> the call, for the unit variant <c>Shape.Empty</c> the member itself. It
     /// does not stand at the target — <c>Opt.Some(5)</c> names its type arguments nowhere, and
     /// the sema resolved them from the context.</param>
-    private TempId LowerVariantCall(MemberExpr callee, Expr[] arguments, Expr constructed, Span span)
+    /// <summary><c>.Red</c> as a value: the variant of the enum the position expected, which the
+    /// sema bound; or a static constant reached the same way.</summary>
+    private TempId LowerImplicitMember(ImplicitMemberExpr expr)
+    {
+        if (_types.RefOf(expr) is GlobalSymbol constant) return LowerGlobalRead(constant, expr.Span);
+        if (_types.RefOf(expr) is EnumVariantSymbol) return LowerVariantCall(expr.Name, [], expr, expr.Span);
+        throw Bug($"implicit member '.{expr.Name}' is bound to nothing the lowering knows");
+    }
+
+    private TempId LowerVariantCall(string variantName, Expr[] arguments, Expr constructed, Span span)
     {
         // Which INSTANCE is constructed stands in the call's result type rather than at the target:
         // 'Opt.Some(5)' in a position with an expected 'Opt<int>' names the arguments nowhere, but the
-        // sema resolved them.
-        RefEnumSymbol(callee.Target, callee.Span);
+        // sema resolved them. The target need not be written at all ('.Some(5)').
         var enumType = RequireEnum(_types.TypeOf(constructed), span);
-        var variant = _typeTable.VariantOf(enumType.Type, callee.Member, span);
+        var variant = _typeTable.VariantOf(enumType.Type, variantName, span);
         var layout = _typeTable.Defs[variant.Value];
 
         // Against the FIELD'S type, as an argument is lowered against its parameter: the payload
@@ -2684,11 +2693,6 @@ internal sealed class FunctionLowerer
                 BindLocal(binding, local, value, slotType, binding.Span);
                 return;
             }
-
-            // A bare name that the sema resolved to a unit variant: a tag test, nothing bound.
-            case BindingPattern unit when _types.RefOf(pattern) is EnumVariantSymbol:
-                EmitVariantTest(unit.Name, ref value, ref valueType, onFail, assumeMatch, unit.Span);
-                return;
 
             case BindingPattern other:
                 throw Bug($"pattern binding '{other.Name}' was not bound by the type checker");
@@ -3761,7 +3765,7 @@ internal sealed class FunctionLowerer
         // 'Shape.Empty' is a unit variant. It looks like a member access but is a construction without
         // arguments.
         if (_types.RefOf(expr) is EnumVariantSymbol)
-            return LowerVariantCall(expr, [], expr, expr.Span);
+            return LowerVariantCall(expr.Member, [], expr, expr.Span);
 
         // '.length' on an array is built in: neither a field nor a method.
         if (expr.Member == "length" && TypeOfExpr(expr.Target) is IrArrayType)
@@ -4349,7 +4353,17 @@ internal sealed class FunctionLowerer
             // and that holds regardless of how the target is written. The case therefore stands BEFORE
             // the static call: 'Opt<int>.Some' looks like a static method on an instance and is not.
             case MemberExpr member when _types.RefOf(member) is EnumVariantSymbol:
-                return LowerVariantCall(member, expr.Arguments, expr, expr.Span);
+                return LowerVariantCall(member.Member, expr.Arguments, expr, expr.Span);
+
+            // '.Num(3)': the variant of the enum the position expected (08 Y9).
+            case ImplicitMemberExpr implied when _types.RefOf(implied) is EnumVariantSymbol:
+                return LowerVariantCall(implied.Name, expr.Arguments, expr, expr.Span);
+
+            // '.origin()': a static member reached the same way.
+            case ImplicitMemberExpr implied:
+                calleeName = implied.Name;
+                bound = _types.RefOf(implied);
+                break;
 
             // 'Pair<int>.of(3)' — a static method on a generic INSTANCE. The target here is not a value
             // but a type path; there is no receiver, but there is an instantiation. The case stands

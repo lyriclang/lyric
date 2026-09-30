@@ -43,6 +43,14 @@ public sealed class TypeChecker
     private readonly Dictionary<MemberExpr, (LyrType Type, Symbol Symbol)> _operatorTarget =
         new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>
+    /// The synthesized member expressions whose receiver is an IMPLICIT FORM the operator has
+    /// typed already: <c>.Red == c</c> desugars to <c>.Red.equals(c)</c>, and in receiver
+    /// position <c>.Red</c> has no context of its own (08 Y9) — its type is the one the operand
+    /// check gave it. Written source never puts an implicit form there and gets LYR-SEM0113.
+    /// </summary>
+    private readonly HashSet<MemberExpr> _typedReceiver = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>The member expressions standing in CALLEE position, marked by
     /// <see cref="CheckTargetOfCall"/>: only there may a generic function's unsubstituted name
     /// appear (§8.1) — everywhere else it is refused as a value (LYR-SEM0052).</summary>
@@ -1729,6 +1737,7 @@ public sealed class TypeChecker
             case BoolLiteralExpr: return LyrType.Bool;
             case NullLiteralExpr: return LyrType.Null;
             case IdentifierExpr id: return CheckIdentifier(id, scope, expected);
+            case ImplicitMemberExpr im: return CheckImplicitMember(im, expected);
             case ThisExpr t:
                 if (_currentThis is not null) return _currentThis;
                 return Report(t.Span, "LYR-SEM0008", "'this' is only valid inside a method");
@@ -2291,8 +2300,34 @@ public sealed class TypeChecker
         // the short circuit above, carried as a per-node mark.
         if (callee is MemberExpr marked) _calleePosition.Add(marked);
 
-        return callee is MemberExpr mem ? CheckExpr(mem, scope, expected) : CheckExpr(callee, scope);
+        return callee is MemberExpr or ImplicitMemberExpr ? CheckExpr(callee, scope, expected) : CheckExpr(callee, scope);
     }
+
+    /// <summary>
+    /// <c>.Red</c>: a member of the type this position expects, the type unnamed (design/v5/spec/03
+    /// T9, 08 Y9) — a variant as it stands, the callee of <c>.Num(3)</c>, a static member. The
+    /// expectation comes from the position: an initializer with a written type, an argument, a
+    /// return, an assignment, the other side of <c>==</c>. Where none is, the member has no type
+    /// to belong to, and the diagnostic says to name it.
+    /// </summary>
+    private LyrType CheckImplicitMember(ImplicitMemberExpr im, LyrType? expected)
+    {
+        if (EnumFromExpected(expected) is not { } target)
+        {
+            var hint = expected is null || expected.IsError
+                ? "this position expects no particular type; name the enum"
+                : $"this position expects '{TypeFacts.Display(expected)}', which is not an enum";
+            return Report(im.Span, "LYR-SEM0113", $"'.{im.Name}' names a member of the type this position expects — {hint}");
+        }
+
+        var (type, symbol) = MemberOfType(target.def, im.Name, im.Span, target.instance);
+        if (symbol is not null) _result.BindRef(im, symbol);
+        return type;
+    }
+
+    /// <summary>The forms that read the type they belong to from their position (Y9).</summary>
+    private static bool IsImplicitForm(Expr e) =>
+        e is ImplicitMemberExpr or CallExpr { Callee: ImplicitMemberExpr } or StructInitExpr { IsImplicit: true };
 
     private LyrType CheckUnary(UnaryExpr u, SymbolTable scope)
     {
@@ -2333,6 +2368,16 @@ public sealed class TypeChecker
 
     private LyrType CheckBinary(BinaryExpr b, SymbolTable scope)
     {
+        // 'x == .Red': the implicit member takes the other side's type (08 Y9). When the
+        // implicit side is the left one, the right side goes first and lends its type.
+        if (b.Operator is BinaryOp.Eq or BinaryOp.Ne && IsImplicitForm(b.Left) && !IsImplicitForm(b.Right))
+        {
+            var rightFirst = CheckExpr(b.Right, scope);
+            var leftAfter = CheckExpr(b.Left, scope, rightFirst.IsError ? null : rightFirst);
+            if (leftAfter.IsError || rightFirst.IsError) return LyrType.Error;
+            return CheckBinaryTyped(b, leftAfter, rightFirst, scope);
+        }
+
         var l = CheckExpr(b.Left, scope);
 
         // Short circuit: the right side runs only when the left is true, and for '||' only when it is
@@ -2349,11 +2394,15 @@ public sealed class TypeChecker
         }
         else
         {
-            r = CheckExpr(b.Right, scope);
+            r = CheckExpr(b.Right, scope, b.Operator is BinaryOp.Eq or BinaryOp.Ne && IsImplicitForm(b.Right) && !l.IsError ? l : null);
         }
 
         if (l.IsError || r.IsError) return LyrType.Error;
+        return CheckBinaryTyped(b, l, r, scope);
+    }
 
+    private LyrType CheckBinaryTyped(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
+    {
         switch (b.Operator)
         {
             case BinaryOp.Add: return CheckAdd(b, l, r, scope);
@@ -2536,6 +2585,7 @@ public sealed class TypeChecker
             { MemberSpan = default };
         var call = new CallExpr(member, [b.Right], b.Span);
         if (target is { } t) _operatorTarget[member] = t;
+        if (IsImplicitForm(b.Left)) _typedReceiver.Add(member);
 
         var type = CheckExpr(call, scope);
         if (type.IsError) return LyrType.Error;
@@ -3439,7 +3489,7 @@ public sealed class TypeChecker
     private LyrType CheckMember(MemberExpr mem, SymbolTable scope, LyrType? expected = null)
     {
         // CheckTarget rather than CheckExpr: a type or module name is allowed here.
-        var targetType = CheckTarget(mem.Target, scope);
+        var targetType = _typedReceiver.Contains(mem) ? _result.TypeOf(mem.Target) : CheckTarget(mem.Target, scope);
 
         // An operator that already resolved its target says so here; see _operatorTarget. The
         // receiver is still checked above, because it is the operand and has to be typed.
@@ -4432,6 +4482,20 @@ public sealed class TypeChecker
 
     private LyrType CheckStructInit(StructInitExpr si, SymbolTable scope, LyrType? expected)
     {
+        // '.Rect { w = 1 }': the variant of the enum this position expects (08 Y9).
+        if (si.IsImplicit)
+        {
+            if (EnumFromExpected(expected) is { } target
+                && target.def.Members.LookupLocal(si.Path[0]) is EnumVariantSymbol implied)
+                return CheckVariantInit(si, implied, target.def, target.instance, scope);
+            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
+            return Report(si.Span, "LYR-SEM0113", EnumFromExpected(expected) is { } known
+                ? $"'{known.def.Name}' has no variant '{si.Path[0]}'"
+                : $"'.{si.Path[0]} {{ … }}' names a variant of the type this position expects — "
+                  + (expected is null || expected.IsError ? "this position expects no particular type; name the enum"
+                      : $"this position expects '{TypeFacts.Display(expected)}', which is not an enum"));
+        }
+
         var (sym, owner) = ResolveInitPath(si.Path, scope);
 
         // An enum struct variant: qualified (Shape.Triangle { … }) or contextual (Triangle { … } in a
@@ -4884,8 +4948,58 @@ public sealed class TypeChecker
     // --- exhaustiveness: enum variants, bool and ?T are enumerated, while open types (int, string,
     // --- …) need a '_' or binding arm. Guards do not count. ---
 
+    /// <summary>
+    /// An arm no value reaches is a warning (08 Y6; Rust's <c>unreachable_patterns</c>): every
+    /// arm after an unguarded arm that matches everything, and an unguarded arm that repeats a
+    /// unit variant, a literal or <c>null</c> an unguarded arm above already tests. A warning
+    /// and not an error, as the specification says; a typo in a bare name gets this beside the
+    /// unused binding it leaves.
+    /// </summary>
+    private void CheckReachability(LyrType scrutinee, MatchArm[] arms)
+    {
+        MatchArm? everything = null;
+        var tested = new Dictionary<string, MatchArm>(StringComparer.Ordinal);
+        foreach (var arm in arms)
+        {
+            if (everything is { } above)
+            {
+                _de.Report("LYR-SEM0112", Severity.Warning, arm.Pattern.Span,
+                    "unreachable arm: the arm above matches every value", new DiagnosticNote(above.Pattern.Span, "this one"));
+                continue;
+            }
+
+            if (ExactKey(arm.Pattern) is { } key)
+            {
+                if (tested.TryGetValue(key, out var earlier))
+                {
+                    _de.Report("LYR-SEM0112", Severity.Warning, arm.Pattern.Span,
+                        $"unreachable arm: '{key}' is matched by an arm above", new DiagnosticNote(earlier.Pattern.Span, "this one"));
+                    continue;
+                }
+                if (arm.Guard is null) tested[key] = arm;
+            }
+
+            if (arm.Guard is null && IsIrrefutable(arm.Pattern, scrutinee)) everything = arm;
+        }
+    }
+
+    /// <summary>A pattern that tests one value and nothing else, as its text: a unit variant,
+    /// a literal, <c>null</c>. Anything with a binding or a payload is not one.</summary>
+    private static string? ExactKey(Pattern pattern) => pattern switch
+    {
+        VariantPattern { TupleElements: null, StructFields: null } v => "." + v.Path[^1],
+        LiteralPattern { Literal: NullLiteralExpr } => "null",
+        LiteralPattern { Literal: IntLiteralExpr n } => n.Value.ToString(),
+        LiteralPattern { Literal: UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr n } } => "-" + n.Value,
+        LiteralPattern { Literal: StringLiteralExpr s } => "\"" + s.Value + "\"",
+        LiteralPattern { Literal: CharLiteralExpr c } => "'" + char.ConvertFromUtf32(c.CodePoint) + "'",
+        LiteralPattern { Literal: BoolLiteralExpr b } => b.Value ? "true" : "false",
+        _ => null,
+    };
+
     private void CheckExhaustiveness(Node match, LyrType scrutinee, MatchArm[] arms)
     {
+        CheckReachability(scrutinee, arms);
         var pats = new List<Pattern>();
         foreach (var arm in arms)
             if (arm.Guard is null) Flatten(arm.Pattern, pats);
@@ -5034,7 +5148,7 @@ public sealed class TypeChecker
                     if (row is VariantPattern { TupleElements: [var only] }) Flatten(only, column);
                 var fieldType = Substitute(ResolveType(fields[0], enumTs.Members), subst);
                 foreach (var witness in MissingCases(fieldType, column, nested: true))
-                    missing.Add($"{variant.Name}({witness})");
+                    missing.Add($".{variant.Name}({witness})");
                 continue;
             }
 
@@ -5046,17 +5160,17 @@ public sealed class TypeChecker
     /// <summary>Does this pattern name that variant at all — covering it or only partly?</summary>
     private bool NamesVariant(Pattern p, string variant, TypeSymbol enumTs) => p switch
     {
-        BindingPattern b => b.Name == variant && VariantOf(enumTs, b.Name) is not null,
         VariantPattern v => v.Path[^1] == variant,
         _ => false,
     };
 
-    /// <summary>A variant written as a pattern, with its payload left open.</summary>
+    /// <summary>A variant written as a pattern, with its payload left open — in the dotted form,
+    /// since a bare name would be a binding (08 Y6).</summary>
     private static string WitnessOf(EnumVariant variant) => variant switch
     {
-        { TupleFields: { } tuple } => $"{variant.Name}({string.Join(", ", tuple.Select(_ => "_"))})",
-        { StructFields: not null } => variant.Name + " { … }",
-        _ => variant.Name,
+        { TupleFields: { } tuple } => $".{variant.Name}({string.Join(", ", tuple.Select(_ => "_"))})",
+        { StructFields: not null } => "." + variant.Name + " { … }",
+        _ => "." + variant.Name,
     };
 
     /// <summary>
@@ -5094,9 +5208,6 @@ public sealed class TypeChecker
     {
         switch (p)
         {
-            case BindingPattern b when VariantOf(enumTs, b.Name) is
-                { Declaration: EnumVariant { TupleFields: null, StructFields: null } } ev:
-                return ev.Name;
             case VariantPattern v when VariantOf(enumTs, v.Path[^1]) is { } ev
                 && VariantCovered(v, ev, scrutinee, enumTs):
                 return ev.Name;
@@ -5145,7 +5256,7 @@ public sealed class TypeChecker
                 // At the top a name binds the present half of a '?T' and leaves null uncovered;
                 // nested it binds the whole optional (BindPattern) and covers it.
                 if (type is Optional opt) return nested && BindsWholeOptional(b, opt);
-                return EnumDefOf(type) is not { } e || VariantOf(e, b.Name) is null; // a variant name is a test
+                return true; // a bare name binds, always (08 Y6)
             // An array pattern only covers everything when it tests no length: '[..]' and
             // '[..rest]' match every array, anything else asks how many elements there are.
             case ArrayPattern ap:
@@ -5268,14 +5379,13 @@ public sealed class TypeChecker
                 return;
 
             case BindingPattern b:
-                if (EnumDefOf(scrutinee) is { } be && VariantOf(be, b.Name) is { } bev)
-                {
-                    if ((EnumVariant)bev.Declaration! is not { TupleFields: null, StructFields: null })
-                        _de.Report("LYR-SEM0031", Severity.Error, b.Span,
-                            $"variant '{b.Name}' carries a payload — destructure it ('{b.Name}(…)' or '{b.Name} {{ … }}')");
-                    _result.BindRef(b, bev); // a unit variant test, not a binding
-                    return;
-                }
+                // A bare name is a binding, always (08 Y6). One that spells a variant of the
+                // scrutinee's enum would match everything under the variant's name: refused,
+                // with the spelling that tests the variant. Lyric 4 read it as the variant.
+                if (EnumDefOf(scrutinee) is { } be && VariantOf(be, b.Name) is not null)
+                    _de.Report("LYR-SEM0111", Severity.Error, b.Span,
+                        $"'{b.Name}' here is a binding that matches every value, and '{be.Name}' has a variant "
+                        + $"of that name — a variant is written '.{b.Name}' or '{be.Name}.{b.Name}'");
                 var local = new LocalSymbol(b.Name, scrutinee, mutable, b);
                 DeclareBinding(scope, local, b.Span);
                 _result.BindRef(b, local); // for definite-assignment analysis
@@ -5319,10 +5429,8 @@ public sealed class TypeChecker
     }
 
     /// <summary>Is this a plain name over a '?T' in nested position — one that binds the whole
-    /// optional rather than its present half? A name that spells a variant of the inner enum is
-    /// a test and still matches against 'T'.</summary>
-    private static bool BindsWholeOptional(Pattern pattern, Optional opt) =>
-        pattern is BindingPattern b && !(EnumDefOf(opt.Inner) is { } e && VariantOf(e, b.Name) is not null);
+    /// optional rather than its present half?</summary>
+    private static bool BindsWholeOptional(Pattern pattern, Optional opt) => pattern is BindingPattern;
 
     /// <summary><c>[a, b]</c> over a <c>T[]</c>: every fixed position binds a <c>T</c>, a named
     /// rest binds a <c>T[]</c> of its own. The length is a TEST, so the pattern is refutable

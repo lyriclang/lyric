@@ -252,6 +252,7 @@ public sealed class NameSpanTests
         nameof(IdentifierExpr),   // a use
         nameof(AtIdentifierExpr), // a use
         nameof(MemberExpr),       // a use
+        nameof(ImplicitMemberExpr), // a use: '.Red' names a variant declared on the enum
         nameof(StructInitField),  // a use: the field it assigns is declared on the type
         nameof(FieldPattern),     // its span is the name in the form that binds
         nameof(BindingPattern),   // its span is the name

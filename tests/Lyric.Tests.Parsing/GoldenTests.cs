@@ -115,6 +115,7 @@ public class GoldenTests
     [InlineData("missing_rhs")]       // 1 +
     [InlineData("leading_operator")]  // * 3
     [InlineData("type_error")]        // x as 5 — a non-type after 'as'
+    [InlineData("implicit_member")]   // .Red, .Num(3), .Rect { w = 1, h = 2 }, c == .Blue (08 Y9)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 
@@ -148,6 +149,7 @@ public class GoldenTests
     [InlineData("if_without_block")]  // if (a) b();
     [InlineData("match_stmt")]        // match (…) { arms } with a guard and a block arm
     [InlineData("struct_init_binding")] // let p = Point { … }; — a struct initializer in value position
+    [InlineData("let_else_implicit")] // let .Num(n) = s else { … }; — a dotted pattern opens a let-else (08 Y6)
     public void Golden_statement_matches_snapshot(string name)
         => Check(name, p => p.ParseStatement());
 
@@ -208,6 +210,8 @@ public class GoldenTests
     [InlineData("pat_nested")]         // Wrapper(Circle(r), _)
     [InlineData("pat_field_sub")]      // Point { x = 0, y }
     [InlineData("pat_negative_range")] // -10..=10
+    [InlineData("pat_implicit")]       // .Rect { w = 0, h } — the enum unnamed (08 Y6)
+    [InlineData("pat_implicit_unit")]  // .Red
     public void Golden_pattern_matches_snapshot(string name)
         => Check(name, p => p.ParsePattern());
 }

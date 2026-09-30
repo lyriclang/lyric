@@ -425,6 +425,20 @@ public sealed partial class Parser
             case TokenKind.Null:
                 _buffer.Advance();
                 return new NullLiteralExpr(cur.Span);
+            // '.Red', '.Num(3)', '.Rect { w = 1 }': a member of the type the position expects
+            // (08 Y9). The call and the initializer take the same shapes as after a name.
+            case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.Identifier:
+            {
+                _buffer.Advance();
+                var name = _buffer.Advance();
+                var text = _sm.Slice(name.Span).ToString();
+                var span = Span.Union(cur.Span, name.Span);
+                if (_allowStructInit && _buffer.Check(TokenKind.LBrace)
+                    && (_buffer.Peek(1).TokenKind == TokenKind.RBrace
+                        || (_buffer.Peek(1).TokenKind == TokenKind.Identifier && _buffer.Peek(2).TokenKind == TokenKind.Equal)))
+                    return ParseStructInitFields([text], [], span, name.Span, implicitMember: true);
+                return new ImplicitMemberExpr(text, span);
+            }
             case TokenKind.Identifier:
                 if (IsStructInitAhead()) return ParseStructInit();
                 if (IsTypePathAhead()) return ParseTypePath();
@@ -679,7 +693,13 @@ public sealed partial class Parser
             }
         }
 
-        _buffer.Advance(); // '{', guaranteed by IsStructInitAhead
+        return ParseStructInitFields(path, typeArgs, first.Span, nameSpan, implicitMember: false);
+    }
+
+    /// <summary>The <c>{ field = value, … }</c> of an initializer, after its name.</summary>
+    private Expr ParseStructInitFields(List<string> path, TypeNode[] typeArgs, Span start, Span nameSpan, bool implicitMember)
+    {
+        _buffer.Advance(); // '{', guaranteed by the caller's lookahead
         var fields = new List<StructInitField>();
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
@@ -693,7 +713,7 @@ public sealed partial class Parser
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close struct initializer");
         return new StructInitExpr(path.ToArray(), typeArgs, fields.ToArray(),
-            Span.Union(first.Span, close.Span)) { NameSpan = nameSpan };
+            Span.Union(start, close.Span)) { NameSpan = nameSpan, IsImplicit = implicitMember };
     }
 
     // ---------------------------------------------------------------------

@@ -156,7 +156,7 @@ fn step(task: Coroutine<Wait>): void {
         return;
     }
     match (asked) {
-        Now => scheduler.ready.pushBack(task),
+        .Now => scheduler.ready.pushBack(task),
         Sleep(ms) => {
             scheduler.sleepers.push(task);
             scheduler.deadlines.push(now() + ms);
@@ -169,7 +169,7 @@ fn step(task: Coroutine<Wait>): void {
             scheduler.writers.push(task);
             scheduler.writerFds.push(fd);
         }
-        Interrupt => scheduler.interrupted.push(task),
+        .Interrupt => scheduler.interrupted.push(task),
     }
 }
 

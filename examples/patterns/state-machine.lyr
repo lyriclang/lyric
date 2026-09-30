@@ -23,21 +23,21 @@ enum Event {
 
 fn step(s: State, ev: Event): State {
     return match ((s, ev)) {
-        (Idle, Dial(host)) => State.Connected(host),
-        (Connecting { attempt }, Timeout) if attempt < 3 => State.Connecting {
+        (.Idle, Dial(host)) => State.Connected(host),
+        (Connecting { attempt }, .Timeout) if attempt < 3 => State.Connecting {
             attempt = attempt + 1,
         },
-        (Connecting { attempt = 3 }, Timeout) => State.Closed { reason = "gave up" },
+        (Connecting { attempt = 3 }, .Timeout) => State.Closed { reason = "gave up" },
         (Connecting { attempt = _ }, Dial(h)) => State.Connected(h),
-        (Connected(_), Hangup) => State.Closed { reason = "hangup" },
-        (Connected(_) | Idle, Data(0)) => State.Closed { reason = "empty frame" },
+        (Connected(_), .Hangup) => State.Closed { reason = "hangup" },
+        (Connected(_) | .Idle, Data(0)) => State.Closed { reason = "empty frame" },
         _ => s,
     };
 }
 
 fn show(s: State): string {
     return match (s) {
-        Idle => "Idle",
+        .Idle => "Idle",
         Connecting { attempt } => f"Connecting({attempt})",
         Connected(h) => "Connected(" + h + ")",
         Closed { reason } => "Closed(" + reason + ")",

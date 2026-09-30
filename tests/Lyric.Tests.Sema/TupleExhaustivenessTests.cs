@@ -95,7 +95,7 @@ public class TupleExhaustivenessTests
             """);
         var gap = Gap(de);
         Assert.NotNull(gap);
-        Assert.Contains("(B, _)", gap!, StringComparison.Ordinal);
+        Assert.Contains("(.B, _)", gap!, StringComparison.Ordinal);
     }
 
     /// <summary>

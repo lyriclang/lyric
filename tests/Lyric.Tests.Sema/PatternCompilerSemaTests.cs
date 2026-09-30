@@ -37,7 +37,7 @@ public class PatternCompilerSemaTests
     [Fact]
     public void A_name_nested_over_an_optional_payload_covers_the_variant()
     {
-        var (_, de, _) = Check("enum Opt<T> { Some(T), None } fn f(o: Opt<?int>): int { return match (o) { Some(v) => v ?? 0, None => 0 }; }");
+        var (_, de, _) = Check("enum Opt<T> { Some(T), None } fn f(o: Opt<?int>): int { return match (o) { Some(v) => v ?? 0, .None => 0 }; }");
         AssertClean(de);
     }
 

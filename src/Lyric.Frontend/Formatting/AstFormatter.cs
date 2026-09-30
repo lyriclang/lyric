@@ -748,6 +748,7 @@ public sealed class AstFormatter
         CallExpr c => CallDoc(c),
         IndexExpr i => Doc.Of(ExprDoc(i.Target, Postfix), Doc.From("["),
             ExprDoc(i.Index, Assign), Doc.From("]")),
+        ImplicitMemberExpr im => Doc.From("." + im.Name),
         MemberExpr m => Doc.Of(ExprDoc(m.Target, Postfix),
             Doc.From(m.IsOptional ? "?." : "."), Doc.From(m.Member)),
 
@@ -966,7 +967,7 @@ public sealed class AstFormatter
 
     private Doc StructInitDoc(StructInitExpr init)
     {
-        var head = Doc.Of(Doc.From(string.Join(".", init.Path)), TypeArgsDoc(init.TypeArguments));
+        var head = Doc.Of(Doc.From((init.IsImplicit ? "." : "") + string.Join(".", init.Path)), TypeArgsDoc(init.TypeArguments));
         if (init.Fields.Length == 0) return Doc.Of(head, Doc.From(" { }"));
 
         return Doc.GroupOf(head, Doc.From(" {"),
@@ -1009,7 +1010,7 @@ public sealed class AstFormatter
 
     private Doc VariantPatternDoc(VariantPattern pattern)
     {
-        var head = Doc.From(string.Join(".", pattern.Path));
+        var head = Doc.From((pattern.IsImplicit ? "." : "") + string.Join(".", pattern.Path));
         if (pattern.TupleElements is { } tuple)
             return Doc.Of(head, Doc.From("("),
                 Doc.Join(Doc.From(", "), tuple.Select(PatternDoc).ToArray()), Doc.From(")"));

@@ -28,9 +28,9 @@ struct Item :: [Priced] {
 
     fn price(): int {
         return this.basePrice * match (this.rarity) {
-            Common => 1,
-            Rare => 3,
-            Legendary => 10,
+            .Common => 1,
+            .Rare => 3,
+            .Legendary => 10,
         };
     }
 }

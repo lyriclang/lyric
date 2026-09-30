@@ -1,0 +1,1 @@
+take(.Red, .Num(3), .Rect { w = 1, h = 2 }, c == .Blue)
