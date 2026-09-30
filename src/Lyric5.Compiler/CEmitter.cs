@@ -30,6 +30,10 @@ public sealed class CEmitter
         public string Milestone { get; } = milestone;
     }
 
+    /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
+    /// cache must not hand out the old C for it. Bump it with the emission.</summary>
+    public const string Version = "m2-s4";
+
     private readonly IrModule _module;
     private readonly SourceManager _sources;
     private readonly StringBuilder _out = new();

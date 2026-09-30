@@ -59,7 +59,9 @@ public class RuntimeBuildTests
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, name + ".c");
         File.WriteAllText(path, cText);
-        return RunC(path, name, profile, null, args);
+        // Its own name in bin/: 'hello' is also a runtime test program, and two tests linking to
+        // one path raced (seen on Windows).
+        return RunC(path, "emitted-" + name, profile, null, args);
     }
 
     private static ProcessRunner.Result RunC(string source, string name, Profile profile, CCompiler? compiler, string[]? args)

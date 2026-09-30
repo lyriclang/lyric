@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The build of a Lyric 5 program (design/v5/spec/11 P-series, 01 L7): where a program's files
+    live (out/ by the manifest, or by the file), the cache keyed by content, the runtime archive
+    per target and profile, and the pipeline from source through the compiler and the C toolchain
+    to a binary. The driver's build and run verbs are thin over this.
+  -->
+  <PropertyGroup>
+    <Version>5.0.0</Version>
+    <AssemblyName>lyric5.build</AssemblyName>
+    <RootNamespace>Lyric5.Build</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lyric5.Compiler\Lyric5.Compiler.csproj" />
+    <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -144,9 +144,13 @@ jobs:
       - name: Publish
         run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o aot
 
-      # The self-report, and the front end inside the native binary (M2 S1): hello's IR, with the
-      # calls into the seed standard library the emitter maps to the runtime.
-      - name: Self-report and the IR of hello
+      - name: Set up zig (the native binary builds programs with it)
+        if: matrix.run
+        uses: ./.github/actions/setup-zig
+
+      # The self-report, the front end inside the native binary (M2 S1): hello's IR, with the calls
+      # into the seed standard library — and the whole way (S4): hello built and run natively.
+      - name: Self-report, the IR of hello, and hello run natively
         if: matrix.run
         shell: bash
         run: |
@@ -155,3 +159,7 @@ jobs:
           "$lyric5" --version | head -1 | grep -q "^lyric 5\.0\.0"
           "$lyric5" build tests/Lyric5.Tests/programs/hello.lyr --emit ir | tee hello.ir
           grep -q "callimport std.io.println" hello.ir
+          "$lyric5" run tests/Lyric5.Tests/programs/hello.lyr | tee hello.out
+          grep -qx "Hello, Lyric!" hello.out
+          code=0; "$lyric5" run tests/Lyric5.Tests/programs/fib.lyr --profile release || code=$?
+          [ "$code" -eq 55 ]

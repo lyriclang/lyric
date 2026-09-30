@@ -114,6 +114,21 @@ public static class ProcessRunner
         return new Result(process.ExitCode, stdout.Result, stderr.Result);
     }
 
+    /// <summary>Runs a program on the caller's own console — its output is the user's, not the
+    /// toolchain's — and answers its exit code. <c>lyric run</c> (11 C5).</summary>
+    public static int RunInherited(string file, IEnumerable<string> arguments, string? workingDirectory = null)
+    {
+        var info = new ProcessStartInfo(file)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
+        };
+        foreach (var argument in arguments) info.ArgumentList.Add(argument);
+        using var process = Process.Start(info) ?? throw new InvalidOperationException($"could not start {file}");
+        process.WaitForExit();
+        return process.ExitCode;
+    }
+
     public static Result? TryRun(string file, IEnumerable<string> arguments, TimeSpan timeout)
     {
         try { return Run(file, arguments, timeout); }
