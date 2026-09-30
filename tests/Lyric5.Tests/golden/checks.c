@@ -9,12 +9,13 @@ static int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b);
 static int64_t lyr_main_neg(int64_t l0_a);
 static int64_t lyr_main_main(void);
 
+#line 2 "programs/checks.lyr"
 static int64_t lyr_main_add(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 2 "programs/checks.lyr"
+#line 2
     t0 = l0_a;
 #line 2
     t1 = l1_b;
@@ -24,12 +25,13 @@ bb0:;
     return t2;
 }
 
+#line 3 "programs/checks.lyr"
 static int64_t lyr_main_div(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 3 "programs/checks.lyr"
+#line 3
     t0 = l0_a;
 #line 3
     t1 = l1_b;
@@ -39,12 +41,13 @@ bb0:;
     return t2;
 }
 
+#line 4 "programs/checks.lyr"
 static int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 4 "programs/checks.lyr"
+#line 4
     t0 = l0_a;
 #line 4
     t1 = l1_b;
@@ -54,11 +57,12 @@ bb0:;
     return t2;
 }
 
+#line 5 "programs/checks.lyr"
 static int64_t lyr_main_neg(int64_t l0_a) {
     int64_t t0 = 0;
     int64_t t1 = 0;
 bb0:;
-#line 5 "programs/checks.lyr"
+#line 5
     t0 = l0_a;
 #line 5
     t1 = LYR_CHECKED_SUB((int64_t)0, t0);
@@ -66,6 +70,7 @@ bb0:;
     return t1;
 }
 
+#line 8 "programs/checks.lyr"
 static int64_t lyr_main_main(void) {
     int64_t l0_v = 0;
     int64_t l1_bits = 0;
@@ -103,7 +108,7 @@ static int64_t lyr_main_main(void) {
     int64_t t31 = 0;
     int64_t t32 = 0;
 bb0:;
-#line 8 "programs/checks.lyr"
+#line 8
     t0 = (int64_t)INT64_C(40);
 #line 8
     t1 = (int64_t)INT64_C(2);

@@ -86,7 +86,9 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(firstLine, lines[0]);
-        Assert.Matches(@"^    at lyr_main_\w+ \(programs/" + name + @"\.lyr:2\)$", lines[1]);
-        Assert.Matches(@"^    at lyr_main_main \(programs/" + name + @"\.lyr:3\)$", lines[2]);
+        // The path as the debug information resolved it: relative on Linux and macOS (DWARF keeps
+        // what #line said), absolute on Windows (the PDB resolves it against the build directory).
+        Assert.Matches(@"^    at lyr_main_\w+ \(.*programs[\\/]" + name + @"\.lyr:2\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]" + name + @"\.lyr:3\)$", lines[2]);
     }
 }

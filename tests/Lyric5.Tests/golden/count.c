@@ -5,6 +5,7 @@
 /* prototypes */
 static int64_t lyr_main_main(void);
 
+#line 4 "programs/count.lyr"
 static int64_t lyr_main_main(void) {
     int64_t l0_total = 0;
     int64_t l1__range0 = 0;
@@ -48,7 +49,7 @@ static int64_t lyr_main_main(void) {
     int64_t t32 = 0;
     int64_t t33 = 0;
 bb0:;
-#line 4 "programs/count.lyr"
+#line 4
     t0 = (int64_t)INT64_C(0);
 #line 4
     l0_total = t0;

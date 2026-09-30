@@ -144,6 +144,11 @@ public sealed class CEmitter
     {
         _function = function;
         _file = null;
+        // The definition itself under #line as well, at the function's first statement: a debugger
+        // places the function in the .lyr, and DbgHelp keeps the inline sites of a function whose
+        // definition and body are in one file — with the definition left in the C, the inlined
+        // frames of a Windows backtrace went missing (measured, M2 S2).
+        Line(FirstSpan(function));
         _out.Append(Signature(function)).AppendLine(" {");
 
         foreach (var local in function.Locals.Skip(function.ParamCount))
@@ -170,6 +175,16 @@ public sealed class CEmitter
         }
         _out.AppendLine("}");
         _out.AppendLine();
+    }
+
+    private static Span FirstSpan(IrFunction function)
+    {
+        foreach (var block in function.Blocks)
+        {
+            if (block.Insts.Count > 0) return block.Insts[0].Span;
+            if (block.Terminator is { } t && t.Span != default) return t.Span;
+        }
+        return default;
     }
 
     /// <summary>

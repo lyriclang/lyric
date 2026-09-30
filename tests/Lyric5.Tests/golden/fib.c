@@ -7,6 +7,7 @@ static int64_t lyr_main_fib(int64_t l0_n);
 static int64_t lyr_main_fibIter(int64_t l0_n);
 static int64_t lyr_main_main(void);
 
+#line 3 "programs/fib.lyr"
 static int64_t lyr_main_fib(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -22,7 +23,7 @@ static int64_t lyr_main_fib(int64_t l0_n) {
     int64_t t11 = 0;
     int64_t t12 = 0;
 bb0:;
-#line 3 "programs/fib.lyr"
+#line 3
     t0 = l0_n;
 #line 3
     t1 = (int64_t)INT64_C(2);
@@ -58,6 +59,7 @@ bb2:;
     return t12;
 }
 
+#line 8 "programs/fib.lyr"
 static int64_t lyr_main_fibIter(int64_t l0_n) {
     int64_t l1_a = 0;
     int64_t l2_b = 0;
@@ -82,7 +84,7 @@ static int64_t lyr_main_fibIter(int64_t l0_n) {
     int64_t t14 = 0;
     int64_t t15 = 0;
 bb0:;
-#line 8 "programs/fib.lyr"
+#line 8
     t0 = (int64_t)INT64_C(0);
 #line 8
     l1_a = t0;
@@ -148,6 +150,7 @@ bb4:;
     return t15;
 }
 
+#line 19 "programs/fib.lyr"
 static int64_t lyr_main_main(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -158,7 +161,7 @@ static int64_t lyr_main_main(void) {
     int64_t t6 = 0;
     int64_t t7 = 0;
 bb0:;
-#line 19 "programs/fib.lyr"
+#line 19
     t0 = (int64_t)INT64_C(10);
 #line 19
     t1 = lyr_main_fib(t0);
