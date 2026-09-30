@@ -107,7 +107,7 @@ public partial class PanicTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = Lines(result.Stderr);
         Assert.Equal("panic [LYR-RT0006]: stack overflow", lines[0]);
-        Assert.StartsWith("    at recurse (stack_overflow.c:", lines[1]);
+        Assert.True(lines[1].StartsWith("    at recurse (stack_overflow.c:"), $"stderr:\n{result.Stderr}");
         // The recursion shows its frame once, then a count — not 256 equal lines.
         Assert.True(lines.Length <= 6, $"stderr:\n{result.Stderr}");
         Assert.Matches(@"^    \.\.\. the frame above repeats \d+ more times$", lines[^2]);
@@ -131,7 +131,7 @@ public partial class PanicTests
             Assert.Equal(128 + 11, result.ExitCode);  // killed by SIGSEGV
             Assert.Equal("crash: SIGSEGV (invalid memory access at 0x0)", lines[0]);
         }
-        Assert.Equal("    at fault_here (crash.c:17)", lines[1]);
+        Assert.True(lines[1] == "    at fault_here (crash.c:17)", $"stderr:\n{result.Stderr}");
     }
 
     [Theory]

@@ -129,34 +129,45 @@ public sealed class CBuild
             File.Delete(partial);
             throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name()}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
-        try
-        {
-            File.Move(partial, target, overwrite: true);
-        }
-        catch (IOException) when (File.Exists(target))
-        {
-            // Windows refuses to replace a file another process has open; the object in place has
-            // the same content — the name is its key.
-            File.Delete(partial);
-        }
+        Publish(partial, target);
         return target;
     }
 
     /// <summary>
-    /// Archives objects into <paramref name="output"/>. The objects are content-addressed, so their
-    /// names are the archive's key: an archive that already holds exactly these objects is left
-    /// alone, and a new one is written beside it and moved into place — a linker that is reading
-    /// the old archive at that moment never sees a half-written or missing file.
+    /// Moves a finished file to its content-keyed name. A file under that name has the same
+    /// content, so it is never replaced: when another builder got there first, whichever file won
+    /// stays — and nobody has to replace a file a linker or a compiler may have open, which
+    /// Windows refuses ("access denied", "used by another process").
+    /// </summary>
+    private static void Publish(string partial, string target)
+    {
+        try
+        {
+            File.Move(partial, target, overwrite: false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && File.Exists(target))
+        {
+            File.Delete(partial);
+        }
+    }
+
+    /// <summary>
+    /// Archives objects. The objects are content-addressed, so their names are the archive's key,
+    /// and the archive is named by that key beside <paramref name="output"/>
+    /// (<c>liblyr-&lt;key&gt;.a</c>): an archive of exactly these objects is reused, a new one is
+    /// written under a temporary name and published — a builder never replaces an archive another
+    /// one may be linking against. Answers the archive's path.
     /// </summary>
     public string Archive(IReadOnlyList<string> objects, string output)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var key = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
             string.Join('\n', objects.Select(Path.GetFileName)))));
-        var keyFile = output + ".key";
-        if (File.Exists(output) && File.Exists(keyFile) && File.ReadAllText(keyFile) == key) return output;
+        var keyed = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output))!,
+            $"{Path.GetFileNameWithoutExtension(output)}-{key[..16]}{Path.GetExtension(output)}");
+        if (File.Exists(keyed)) return keyed;
 
-        var partial = $"{output}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        var partial = $"{keyed}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         string tool;
         var arguments = new List<string>();
         if (Compiler.Kind == CCompilerKind.Zig)
@@ -176,21 +187,10 @@ public sealed class CBuild
         if (result.ExitCode != 0)
         {
             File.Delete(partial);
-            throw new CBuildException($"archiving {output} failed:\n{result.Stderr}");
+            throw new CBuildException($"archiving {keyed} failed:\n{result.Stderr}");
         }
-        try
-        {
-            File.Move(partial, output, overwrite: true);
-        }
-        catch (IOException) when (File.Exists(output))
-        {
-            // Windows refuses to replace a file a linker has open. Two builders with the same
-            // objects produce the same archive, so the one already in place is the one wanted.
-            File.Delete(partial);
-            return output;
-        }
-        File.WriteAllText(keyFile, key);
-        return output;
+        Publish(partial, keyed);
+        return keyed;
     }
 
     /// <summary>

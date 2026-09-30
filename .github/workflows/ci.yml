@@ -278,7 +278,10 @@ jobs:
 
       # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner — on
       # Linux x86-64 also under ASan+UBSan and TSan (clang), and there without clang they fail.
+      # Only this job asks for the sanitizer runs; the whole-suite jobs skip them.
       - name: Runtime tests
+        env:
+          LYRIC5_SANITIZERS: '1'
         run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
 
   lyric5-aot:

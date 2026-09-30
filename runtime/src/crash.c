@@ -95,20 +95,26 @@ void lyr_crash_thread_end(void) {
     guard_low = guard_high = 0;
 }
 
-static uintptr_t context_pc(void *context) {
+/* The fault's place from the signal context. The frame pointer and link register only on macOS,
+ * where the trace walks the frame chain itself (trace.c); Linux unwinds through the signal frame. */
+static LyrFault context_fault(void *context) {
     ucontext_t *uc = context;
+    LyrFault fault = { 0, 0, 0 };
 #if defined(__linux__) && defined(__x86_64__)
-    return (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
+    fault.pc = (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
 #elif defined(__linux__) && defined(__aarch64__)
-    return (uintptr_t)uc->uc_mcontext.pc;
+    fault.pc = (uintptr_t)uc->uc_mcontext.pc;
 #elif defined(__APPLE__) && defined(__x86_64__)
-    return (uintptr_t)uc->uc_mcontext->__ss.__rip;
+    fault.pc = (uintptr_t)uc->uc_mcontext->__ss.__rip;
+    fault.fp = (uintptr_t)uc->uc_mcontext->__ss.__rbp;
 #elif defined(__APPLE__) && defined(__aarch64__)
-    return (uintptr_t)uc->uc_mcontext->__ss.__pc;
+    fault.pc = (uintptr_t)uc->uc_mcontext->__ss.__pc;
+    fault.fp = (uintptr_t)uc->uc_mcontext->__ss.__fp;
+    fault.lr = (uintptr_t)uc->uc_mcontext->__ss.__lr;
 #else
     (void)uc;
-    return 0;
 #endif
+    return fault;
 }
 
 static const char *signal_name(int sig) {
@@ -132,10 +138,10 @@ static void lyr_crash_on_signal(int sig, siginfo_t *info, void *context) {
     }
     in_crash = 1;
     uintptr_t address = (uintptr_t)info->si_addr;
-    uintptr_t pc = context_pc(context);
+    LyrFault fault = context_fault(context);
 
     if ((sig == SIGSEGV || sig == SIGBUS) && guard_high != 0 && address >= guard_low && address < guard_high) {
-        lyr_panic_report(LYR_RT_STACK_OVERFLOW, "stack overflow", pc, 1);
+        lyr_panic_report(LYR_RT_STACK_OVERFLOW, "stack overflow", &fault, 1);
     }
 
     if (atomic_exchange(&crashing, 1)) {
@@ -152,7 +158,7 @@ static void lyr_crash_on_signal(int sig, siginfo_t *info, void *context) {
     default: snprintf(what, sizeof what, "%s (abort)", signal_name(sig)); break;
     }
     size_t header = crash_header(what);
-    size_t frames = lyr_trace_format(report + header, sizeof report - header, pc);
+    size_t frames = lyr_trace_format(report + header, sizeof report - header, &fault);
     lyr_write_stderr(report, header + frames);
 
     /* The default action, so the process ends as that signal: a fault re-executes its instruction
@@ -197,7 +203,8 @@ static LONG WINAPI lyr_crash_on_exception(EXCEPTION_POINTERS *pointers) {
     EXCEPTION_RECORD *record = pointers->ExceptionRecord;
     DWORD code = record->ExceptionCode;
     uintptr_t pc = (uintptr_t)record->ExceptionAddress;
-    if (code == EXCEPTION_STACK_OVERFLOW) lyr_panic_report(LYR_RT_STACK_OVERFLOW, "stack overflow", pc, 1);
+    LyrFault fault = { pc, 0, 0 };
+    if (code == EXCEPTION_STACK_OVERFLOW) lyr_panic_report(LYR_RT_STACK_OVERFLOW, "stack overflow", &fault, 1);
 
     if (atomic_exchange(&crashing, 1)) {
         for (;;) Sleep(1000);
@@ -213,7 +220,7 @@ static LONG WINAPI lyr_crash_on_exception(EXCEPTION_POINTERS *pointers) {
     default: snprintf(what, sizeof what, "exception 0x%08lx", (unsigned long)code); break;
     }
     size_t header = crash_header(what);
-    size_t frames = lyr_trace_format(report + header, sizeof report - header, pc);
+    size_t frames = lyr_trace_format(report + header, sizeof report - header, &fault);
     lyr_write_stderr(report, header + frames);
     /* Ends as an unhandled exception would, with its code, but without the error-reporting dialog. */
     TerminateProcess(GetCurrentProcess(), code);
@@ -226,7 +233,7 @@ static void lyr_crash_on_abort(int sig) {
     (void)sig;
     if (atomic_exchange(&crashing, 1)) return;
     size_t header = crash_header("abort");
-    size_t frames = lyr_trace_format(report + header, sizeof report - header, 0);
+    size_t frames = lyr_trace_format(report + header, sizeof report - header, NULL);
     lyr_write_stderr(report, header + frames);
 }
 

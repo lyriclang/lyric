@@ -68,7 +68,9 @@ public static class RuntimeLayout
         {
             // The amalgamation compiles the whole collector as one unit. Third-party code: its own
             // warnings are not ours to fix, and it is never instrumented (it reads memory it does
-            // not own, on purpose — that is what a conservative scan is).
+            // not own, on purpose — that is what a conservative scan is). Not under TSan either:
+            // instrumented, it switches to its TSan mode, whose mutex is a place where TSan does
+            // NOT deliver the collector's stop signal — measured, 31 of 32 stressed runs aborted.
             new(Path.Combine(bdwgc, "extra", "gc.c"), CollectorDefines(target), [bdwgcInclude],
                 Instrument: false, ExtraFlags: ["-w", "-std=gnu11"]),
         };
@@ -92,7 +94,11 @@ public static class RuntimeLayout
         return units;
     }
 
-    /// <summary>Builds <c>liblyr.a</c> for the build's target and profile and returns its path.</summary>
+    /// <summary>
+    /// Builds the runtime archive for the build's target and profile and returns its path — under
+    /// <c>&lt;outputDir&gt;/&lt;triple&gt;/&lt;profile&gt;/</c>, named <c>liblyr-&lt;key&gt;.a</c> by its content
+    /// (<see cref="CBuild.Archive"/>).
+    /// </summary>
     public static string BuildArchive(CBuild build, string root, string outputDir)
     {
         var objects = build.Compile(Units(root, build.Target));

@@ -6,8 +6,10 @@ namespace Lyric5.Tests;
 /// <summary>
 /// The runtime under clang's sanitizers (M1 S5; design/v5/spec/01 C7): ASan with UBSan over every
 /// program that ends on its own or by a panic, TSan over the programs that run threads. They run
-/// on Linux x86-64, the platform the plan names for them; there a missing clang fails the test
-/// instead of passing it unexamined. Elsewhere the tests have nothing to do.
+/// on Linux x86-64, the platform the plan names for them, in the run that asks for them with
+/// <c>LYRIC5_SANITIZERS=1</c> — CI's C toolchain job, which also prepares the kernel for TSan.
+/// There a missing clang fails the test instead of passing it unexamined; everywhere else the
+/// tests have nothing to do (the whole-suite jobs would only repeat them, without that preparation).
 ///
 /// A finding fails the run twice over: the sanitizer's exit code (ASan and UBSan end the program,
 /// TSan exits with 66) and its report on stderr, which the test looks for as well — a report on
@@ -16,7 +18,9 @@ namespace Lyric5.Tests;
 /// </summary>
 public class SanitizerTests
 {
-    private static bool Applies => OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.X64;
+    private static bool Applies =>
+        Environment.GetEnvironmentVariable("LYRIC5_SANITIZERS") == "1"
+        && OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.X64;
 
     private static CCompiler Clang() =>
         CCompiler.Locate(CCompilerKind.Clang) ?? throw new InvalidOperationException("the sanitizer profiles need clang on PATH");

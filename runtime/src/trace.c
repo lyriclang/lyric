@@ -100,12 +100,52 @@ static void name_symbol(void *data, uintptr_t pc, const char *symbol, uintptr_t 
     *(const char **)data = symbol;
 }
 
-static void capture(void) {
+#if defined(__APPLE__)
+static const char *symbol_at(struct backtrace_state *st, uintptr_t pc) {
+    const char *symbol = NULL;
+    backtrace_syminfo(st, pc, name_symbol, ignore_error, &symbol);
+    return symbol;
+}
+
+/* Apple's unwinder does not step out of a signal handler's trampoline (_sigtramp), so a fault's
+ * trace would end there. The Apple ABIs require the frame-pointer chain; a fault's frames come
+ * from it instead: each record holds the caller's record and the return address into the caller.
+ * On arm64 a leaf function may keep no record of its own — its caller's return address is then
+ * only in the link register, taken unless the chain has it already or it points back into the
+ * faulting function (a stale one, from a call that function made earlier). */
+static void walk_frames(struct backtrace_state *st, Pcs *pcs, const LyrFault *fault) {
+    collect_pc(pcs, fault->pc);
+    uintptr_t fp = fault->fp;
+    int aligned = fp != 0 && fp % sizeof(uintptr_t) == 0;
+    if (fault->lr != 0) {
+        uintptr_t first_return = aligned ? ((const uintptr_t *)fp)[1] : 0;
+        const char *here = symbol_at(st, fault->pc), *there = symbol_at(st, fault->lr - 1);
+        if (fault->lr != first_return && !(here && there && strcmp(here, there) == 0)) collect_pc(pcs, fault->lr - 1);
+    }
+    while (aligned) {
+        const uintptr_t *record = (const uintptr_t *)fp;
+        uintptr_t next = record[0], ret = record[1];
+        if (ret == 0 || collect_pc(pcs, ret - 1)) break;
+        /* Callers live higher up the same stack; anything else is the end of the chain. */
+        if (next <= fp || next - fp > ((uintptr_t)8 << 20)) break;
+        fp = next;
+        aligned = fp % sizeof(uintptr_t) == 0;
+    }
+}
+#endif
+
+static void capture(const LyrFault *fault) {
     struct backtrace_state *st = get_state();
     if (st == NULL) return;
     static Pcs pcs;
     pcs.count = 0;
     pcs.full = 0;
+#if defined(__APPLE__)
+    if (fault != NULL && fault->fp != 0) walk_frames(st, &pcs, fault);
+    else
+#else
+    (void)fault;
+#endif
     backtrace_simple(st, 0, collect_pc, ignore_error, &pcs);
     trace.truncated = pcs.full;
     for (int i = 0; i < pcs.count; i++) {
@@ -229,20 +269,21 @@ static size_t note_repeats(char *out, size_t capacity, size_t used, int repeats)
     return append(out, capacity, used, "    ... the frame above repeats %d more time%s\n", repeats, repeats == 1 ? "" : "s");
 }
 
-size_t lyr_trace_format(char *out, size_t capacity, uintptr_t fault_pc) {
+size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
     if (capacity == 0) return 0;
     out[0] = '\0';
     trace.count = 0;
     trace.truncated = 0;
+    uintptr_t fault_pc = fault ? fault->pc : 0;
 #ifndef _WIN32
-    capture();
+    capture(fault);
 #else
     capture_at(fault_pc);
 #endif
 
     /* The faulting frame's pc is the fault address itself when the unwinder knows it came from a
-     * signal frame (Linux), and one byte less when it treats it as a return address like any
-     * other (macOS: libbacktrace steps back into "the call"). */
+     * signal frame (Linux, the macOS frame walk, Windows), and one byte less when it treats it as
+     * a return address like any other. */
     int start = -1;
     if (fault_pc != 0) {
         for (int i = 0; i < trace.count && start < 0; i++) {

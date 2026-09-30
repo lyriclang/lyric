@@ -42,7 +42,7 @@ LYR_NORETURN static void lyr_panic_wait(void) {
     }
 }
 
-void lyr_panic_report(const char *code, const char *message, uintptr_t fault_pc, int in_handler) {
+void lyr_panic_report(const char *code, const char *message, const LyrFault *fault, int in_handler) {
     if (this_thread_panicking) {
         char line[1200];
         int n = snprintf(line, sizeof line, "panic while panicking [%s]: %s\n", code, message);
@@ -55,7 +55,7 @@ void lyr_panic_report(const char *code, const char *message, uintptr_t fault_pc,
     snprintf(message_copy, sizeof message_copy, "%s", message);
     int n = snprintf(report, sizeof report, "panic [%s]: %s\n", code, message_copy);
     size_t header = n < 0 ? 0 : (size_t)n < sizeof report ? (size_t)n : sizeof report - 1;
-    size_t frames = lyr_trace_format(report + header, sizeof report - header, fault_pc);
+    size_t frames = lyr_trace_format(report + header, sizeof report - header, fault);
     lyr_write_stderr(report, header + frames);
 
     LyrPanicHook given = atomic_load(&hook);
@@ -75,7 +75,7 @@ void lyr_panic(const char *code, const char *format, ...) {
     va_start(args, format);
     vsnprintf(message, sizeof message, format, args);
     va_end(args);
-    lyr_panic_report(code, message, 0, 0);
+    lyr_panic_report(code, message, NULL, 0);
 }
 
 void lyr_panic_index(int64_t index, int64_t length) {
