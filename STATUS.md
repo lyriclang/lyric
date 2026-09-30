@@ -11,13 +11,16 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 - **Last Lyric 4 release: v4.5.0.** 4.6 was cut but never released; the 4.x line continues as
   [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script) (the 4.6 cut without the
   Lyric 5 migration warnings), on its own roadmap toward `lyric-script 1.0.0`.
-- **`main` is Lyric 5 in development**, no promise of any kind. The tree still builds the 4.x
-  compiler and VM and says **4.6.0** — the Lyric 5 frontend grows out of that code (13, M2), and
-  a 5.0.0 claim would fire the 4.x deprecation clocks aimed at 5.0. Beside it grows **`lyric5`**
+- **`main` is Lyric 5 in development**, no promise of any kind. Of the 4.x toolchain the tree
+  keeps the front end (lexer, parser, resolver, sema, IR) the Lyric 5 compiler grows out of
+  (13, M2), the language server (M13b decides), the standard library source (until M8a) and the
+  examples (the input of M16); the VM, the tools, the bytecode format and their tests went with
+  M2 S0 and live on in `lyric-script`. The 4.x code says **4.6.0**. Beside it grows **`lyric5`**
   (`src/Lyric5`), the Lyric 5 command line as one NativeAOT binary, at **5.0.0** (`dev` builds:
   `5.0.0-dev.<date>+<sha>`).
-- **Specification**: `lyriclang/lyric-spec` — branch `script` holds the 4.x text the tree is
-  checked against until M17; `main` becomes the Lyric 5 skeleton.
+- **Specification**: `lyriclang/lyric-spec` — `main` is the Lyric 5.0 text, written milestone by
+  milestone; branch `script` holds the 4.x text, which checks `lyric-script`, not this tree: the
+  milestones move the language away from it, so the 4.x conformance gate ended with M2 S0.
 
 ## Milestones
 
@@ -123,7 +126,18 @@ control stay in CI.
 
 ### M2 — First native program
 
-Next. Plan first (13, M2), then slices.
+In progress; the plan (13, M2) is agreed: S0 prune, S1 front end behind the subset gate,
+S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 and spec.
+
+1. S0: the 4.x VM, tools, bytecode writer and reader, embedding API, debug adapter, their tests,
+   `stdlib-tests/`, `templates/`, `tools/Bench`, `build/publish.proj`, the 4.x release workflow
+   and the CI jobs that ran the VM (compiled, release profile, conformance, spec mirror,
+   publish) are gone — 58 000 lines. `docs/Grammar.md`, `docs/Bytecode.md` and
+   `docs/Pack.md` stay as frozen 4.x references, because the guide links them and the site
+   renders them until the website round. The tree stays at 4.6.0: the 29 CLI tests a 5.0.0
+   claim turned red are gone, but the 4.x `stdlib` carries `@Deprecated(until = "5.0")`
+   promises that a 5.0.0 toolchain would turn into build errors (`DeprecationPromise`); that
+   ends with M8a, when `std` is rewritten.
 
 ## Design decisions
 

@@ -2,32 +2,30 @@
 
 > **`main` is Lyric 5 in development** (`5.0.0-dev`, no promise of any kind): a native successor
 > compiled through C, designed in [`design/v5/spec/`](design/v5/spec/) and built along the plan in
-> [`13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md). Until the milestones replace it,
-> the tree below still builds the Lyric 4 toolchain this README describes. The **last Lyric 4
-> release is [v4.5.0](https://github.com/lyriclang/lyric/releases/tag/v4.5.0)**; the 4.x line
-> continues as [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script).
+> [`13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md). The **last Lyric 4 release is
+> [v4.5.0](https://github.com/lyriclang/lyric/releases/tag/v4.5.0)**; the 4.x line continues as
+> [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script).
 
-A statically typed, GC-managed application language with an embeddable bytecode VM.
+A statically typed, GC-managed application language. Lyric 5 compiles to native code through C
+(`zig cc`), with a runtime in C and a compiler in C#; it embeds as a C library.
 
 ![CI](https://github.com/lyriclang/lyric/actions/workflows/ci.yml/badge.svg)
 
-Source files use `.lyr`, compiled modules use `.lyrbc`.
+Source files use `.lyr`.
 
 ## Status
 
-The compiler, the bytecode VM and the standard library work end to end; every construct in
-[`docs/Grammar.md`](docs/Grammar.md) compiles and runs. From v1.0 the language and the `.lyrbc`
-format carry the promise the versioning describes: a minor may add, a major may break.
+[`STATUS.md`](STATUS.md) says which milestone is open. What the tree holds today:
 
-Current version of the 4.x toolchain this tree builds: **4.6.0** (never released — the last
-release is v4.5.0), bytecode format **4.0**. Beside it grows `lyric5`, the Lyric 5 command line,
-at `5.0.0-dev`.
+- **`runtime/`** — the Lyric 5 runtime in C (M1): the collector contract with Boehm behind it,
+  the object model, strings, arrays, panics with backtraces. Built for every Tier 1 target.
+- **`src/Lyric5`** and **`src/Lyric5.Toolchain`** — the Lyric 5 command line as one NativeAOT
+  binary (`lyric5` is its working name until M18) and the C build driver behind it.
+- **`src/Lyric.Frontend`** — the 4.x front end (lexer, parser, resolver, sema, IR), which the
+  Lyric 5 compiler grows out of milestone by milestone. The 4.x VM, tools and bytecode format are
+  gone from this tree; they live on in `lyric-script`.
 
-## Targets
-
-- **Standalone applications** — CLI tools, desktop applications, servers.
-- **Embedded scripting** — the VM as a library in a C# host, with capability-gated access to
-  files, network and OS.
+The tree says **4.6.0** for the 4.x code it still carries and **5.0.0-dev** for `lyric5`.
 
 ## Example
 
@@ -59,16 +57,14 @@ fn main(): int {
 }
 ```
 
-```
-area = 19.63
-area = 12.00
-```
-
-The [`examples/`](examples/) directory has 22 programs; the test suite runs every one of them.
+This is 4.x Lyric, as the [`examples/`](examples/) are; `lyric fix --from-4` (M16) will carry
+them over, and the milestones on the way say what changes.
 
 ## Requirements
 
-.NET 10 SDK.
+.NET 10 SDK, and a C compiler for the runtime and the native programs: `zig` (recommended, the
+version in [`tooling/zig-version`](tooling/zig-version)), clang or gcc. The sanitizer profiles
+need clang.
 
 ## Build and run
 
@@ -81,141 +77,49 @@ dotnet test
 ```
 
 ```bash
-dotnet run --project src/Lyric.Cli -- run examples/hello.lyr
+dotnet run --project src/Lyric5 -- --version
 ```
-
-Publish the toolchain into one directory:
-
-```bash
-dotnet msbuild build/publish.proj
-```
-
-The output lands in `artifacts/publish/`. Pass `-p:PublishRoot=<dir>` to publish elsewhere; the
-target directory is wiped first. What the toolchain itself contributes, and nothing else:
-
-```
-lyric.exe  lyrc.exe               driver and compiler
-lyrvm.exe  lyrrepl.exe            runtime and interactive prompt
-lyrbuild.exe                       build runner, for a build.lyr
-lyrpack.exe                        packs a module into one executable
-lyrfmt.exe                         formatter
-lyrtest.exe                        runs a project's @Test functions
-lyrls.exe                          language server, for editors
-lyrdbg.exe                         debug adapter, for editors
-lyrcore.dll                        diagnostics and the bytecode reader
-lyrfe.dll                          lexer through emitter
-lyrrt.dll                          interpreter
-lyrembed.dll                       host API
-lyrlsp.dll                         language server protocol
-lyrdap.dll                         debug adapter protocol
-*.runtimeconfig.json               framework version to load
-stdlib/                            standard library, as .lyr source
-stubs/<rid>/lyrstub.exe            what lyrpack packs a program into
-```
-
-`lyrvm.exe` ships neither `lyrfe.dll` nor `stdlib/`: a runtime consumes bytecode, not source.
-
-Without a runtime identifier this is a portable build of about 1.6 MB that needs a .NET 10 runtime
-on the target machine — the quick form for local work. Naming one produces a build **for** that
-platform which brings its own runtime, about 79 MB, and runs straight out of the archive:
-
-```bash
-dotnet msbuild build/publish.proj -p:Rid=linux-x64
-```
-
-That is what a release ships, one archive per platform.
-
-## Binaries
-
-| Binary | Role |
-|---|---|
-| `lyric` | Driver: `new`, `run`, `build`, `pack`, `fmt`, `test`, `check`, `disasm`, `repl` — dispatches to the tools below, and in a project the verbs take no file |
-| `lyrc` | Compiler: `build`, `check`, and the `lower`/`parse`/`tokenize` dumps |
-| `lyrvm` | Runtime: `run`, `disasm`, `verify` on `.lyrbc` |
-| `lyrrepl` | Interactive prompt |
-| `lyrbuild` | Builds a project: its `build.lyr`, or `main.lyr` under the source root by convention |
-| `lyrpack` | Packs a compiled module and the stub runtime into one standalone executable |
-| `lyrfmt` | The formatter: in place, `--check` for CI, `--stdin` for editors — no style options |
-| `lyrtest` | Runs every function marked `@Test` in the project's test root, one fresh instance per test |
-| `lyrls` | Language server over stdio, started by an editor: diagnostics, hover, go to definition, outline, find references, completion, formatting |
-| `lyrdbg` | Debug adapter over stdio, started by an editor: breakpoints, stepping, stack and variables |
-
-`lyrembed.dll` is the host library: compile and run Lyric from C#.
-
-```
-$ lyric repl
-Lyric 4.6.0 — :help for commands, :quit to leave
-lyr> let x = 5
-lyr> x * 2
-10
-```
-
-Declarations persist across entries; statements run once. What persists is the DECLARATION, and
-the session re-runs everything it has accumulated on every entry — so a declaration whose
-initializer does something does it again each time, once per entry from the one that declared it.
-`:list` shows the session, `:reset` clears it.
-
-`.lyrbc` is a specified format, so a third-party runtime can replace `lyrvm`. Point the driver at
-it with `lyric run app.lyr --vm ./their-runtime`, or set `LYRIC_VM`.
 
 ## Repository layout
 
 ```
 lyric/
+├── runtime/              the Lyric 5 runtime in C: include/lyr, src, tests, third_party
 ├── src/
-│   ├── Lyric.Core/       → lyrcore.dll   diagnostics, source manager, bytecode reader
-│   ├── Lyric.Frontend/   → lyrfe.dll     lexer, parser, resolver, sema, IR, emitter
-│   ├── Lyric.Vm/         → lyrrt.dll     interpreter
-│   ├── Lyric.Embedding/  → lyrembed.dll  host API
-│   ├── Lyric.Lsp/        → lyrlsp.dll    language server protocol and analysis
-│   ├── Lyrc/             → lyrc.exe
-│   ├── Lyrvm/            → lyrvm.exe
-│   ├── Lyrrepl/          → lyrrepl.exe
-│   ├── Lyrbuild/         → lyrbuild.exe
-│   ├── Lyrls/            → lyrls.exe
-│   ├── Lyric.Dap/        → lyrdap.dll    debug adapter protocol
-│   ├── Lyrdbg/           → lyrdbg.exe    debug adapter, for editors
-│   ├── Lyrpack/          → lyrpack.exe   packs a module into one executable
-│   ├── Lyrstub/          → lyrstub.exe   the runtime half of a packed program
-│   ├── Lyrfmt/           → lyrfmt.exe    formatter
-│   ├── Lyrtest/          → lyrtest.exe   runs a project's @Test functions
-│   ├── Lyric.Cli/        → lyric.exe
-│   ├── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT (in development)
-│   └── Lyric5.Toolchain/ → the C side: compiler, targets, profiles, cached C builds of the runtime
-├── runtime/              the Lyric 5 runtime in C (include/lyr, src, tests, third_party)
-├── stdlib/               standard library, written in Lyric
+│   ├── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT
+│   ├── Lyric5.Toolchain/ → the C side: compiler, targets, profiles, cached C builds of the runtime
+│   ├── Lyric.Core/       → lyrcore.dll   diagnostics, source manager, shared tool basics
+│   ├── Lyric.Frontend/   → lyrfe.dll     lexer, parser, resolver, sema, IR (4.x, the basis of 5)
+│   └── Lyric.Lsp/        → lyrlsp.dll    language server protocol and analysis (4.x; M13b decides)
+├── stdlib/               the 4.x standard library in Lyric (the front-end tests import it; M8a)
 ├── tests/                xUnit test projects
-├── examples/             22 example programs, plus embedded-host/
-├── build/                publish.proj
+├── examples/             22 example programs (4.x; the input of M16)
 ├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–13)
-├── tooling/              textmate/ — the editor grammar, pinned against the lexer by the tests;
-│                         zig-version and c-smoke/ — the C toolchain Lyric 5 compiles through
+├── tooling/              zig-version and c-smoke/ — the C toolchain; valgrind/ — memcheck locally;
+│                         textmate/ — the editor grammar, pinned against the lexer by the tests
 ├── tools/                DocGen, the documentation site generator
-└── docs/                 specifications and documentation sources; archive/4.x/ — 4.x planning
+└── docs/                 guide and 4.x references; archive/4.x/ — 4.x planning
 ```
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [`docs/guide/`](docs/guide/) | User guide — start here to learn the language |
-| [`docs/Grammar.md`](docs/Grammar.md) | Formal grammar |
-| [`docs/Bytecode.md`](docs/Bytecode.md) | Formal `.lyrbc` format specification |
-| [`docs/Pack.md`](docs/Pack.md) | The pack format: how a program becomes one executable |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution rules and process |
+| [`design/v5/spec/`](design/v5/spec/) | The Lyric 5 decisions, one document per area, and the plan (13) |
+| [`STATUS.md`](STATUS.md) | The open milestone, what was learned on the way |
+| [`docs/guide/`](docs/guide/) | The 4.x user guide (the 5 guide comes with M17) |
+| [`docs/Grammar.md`](docs/Grammar.md), [`docs/Bytecode.md`](docs/Bytecode.md), [`docs/Pack.md`](docs/Pack.md) | The 4.x references, frozen at the 4.6 cut |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | The three rules and the process |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed per release, from v1.0.0 on |
 
-Every Lyric snippet in the guide is compiled by the test suite.
+The normative specification lives in [lyriclang/lyric-spec](https://github.com/lyriclang/lyric-spec):
+`main` is the Lyric 5.0 text, written milestone by milestone; `script` is the 4.x text.
 
-These sources are also the input of the documentation site. `tools/DocGen` renders the guide, both
-specifications and a standard library reference generated from the `.lyr` signatures:
+`tools/DocGen` renders the guide and the references into the documentation site:
 
 ```bash
-dotnet run --project tools/DocGen -- site . artifacts/site nightly
+dotnet run --project tools/DocGen -- site . artifacts/site dev
 ```
-
-One directory per version, side by side; a release is frozen once written. `.github/workflows/docs.yml`
-publishes `nightly` after a green nightly build and a `vX.Y.Z` directory on a release tag.
 
 ## Versioning
 
@@ -223,38 +127,28 @@ From v1.0 the project follows semantic versioning with three components, `vMAJOR
 
 | Component | Increments on |
 |---|---|
-| MAJOR | incompatible language, standard library or bytecode format change |
+| MAJOR | incompatible language or standard library change |
 | MINOR | backwards-compatible additions |
 | PATCH | backwards-compatible fixes |
-
-Before v1.0 the bytecode format may change incompatibly with a major bump of its own version,
-which is independent of the toolchain version.
 
 ## Branches
 
 | Branch | Purpose |
 |---|---|
-| `main` | Always green. Every commit passes CI on Linux and Windows. |
-| `feature/<name>` | New work. Merged into `main` through a pull request. |
-| `fix/<name>` | Corrections. Same process. |
-
-CI runs on `main`, on `feature/**` and `fix/**`, and on every pull request against `main`.
+| `main` | Always green. Every commit passes CI on Linux, Windows and macOS. |
+| `feature/<name>`, `fix/<name>`, `m<N>/<slice>` | Work, merged into `main` through a pull request. |
 
 ## Releases
 
-Two channels:
+Two channels ([11 T5](design/v5/spec/11-werkzeuge-interop.md)):
 
-- **Stable** — created by pushing an annotated tag `vX.Y.Z`. The release workflow verifies on
-  Linux and Windows, packages a self-contained build for `win-x64`, `linux-x64` and `osx-arm64`,
-  and publishes the archives as a GitHub release. Each one runs without a .NET install.
-- **Nightly** — built from `main` once a day and published as the `nightly` prerelease. The
-  `nightly` tag moves to the commit that was built. No compatibility promise.
+- **dev** — every push to `main` is built and replaces the rolling `dev` prerelease: one archive
+  per Tier 1 target with `lyric5`. No promise of any kind.
+- **Stable** — an annotated tag `vX.Y.Z`; the first Lyric 5 release is `v5.0.0` (M18).
 
 The editor clients live in their own repositories and release on their own cadence:
-[vscode-lyric](https://github.com/lyriclang/vscode-lyric) (the `.vsix`) and
-[jetbrains-lyric](https://github.com/lyriclang/jetbrains-lyric) (the plugin zip). Toolchain
-releases v1.8.0 through v1.9.1 carried both beside the archives; from here on they are found
-there.
+[vscode-lyric](https://github.com/lyriclang/vscode-lyric) and
+[jetbrains-lyric](https://github.com/lyriclang/jetbrains-lyric).
 
 ## License
 

@@ -3,24 +3,14 @@
   <PropertyGroup>
     <AssemblyName>lyrcore</AssemblyName>
     <RootNamespace>Lyric.Core</RootNamespace>
-    <Description>Diagnostics, source management and the reading side of the .lyrbc format.</Description>
+    <Description>Diagnostics, source management, the shared tool basics.</Description>
   </PropertyGroup>
 
   <!--
-    What BOTH sides need: diagnostics, the SourceManager, exit codes, CLI options — and the reading
-    side of the bytecode format (Format, BytecodeModule, Reader, CodeDecoder, Disassembler,
-    ModuleInfo) under Bytecode/.
-
-    Reading the format lives here rather than with the VM because it is the shared contract and not
-    a runtime property. 'lyrvm info' reads a module without executing it, 'lyric disasm' too, and
-    the writing side needs the same op and tag constants. With the VM, 'lyrc' would drag the
-    interpreter along.
-
-    The namespaces stay apart ('Lyric.Core', 'Lyric.Bytecode'): an assembly is a shipping unit, a
-    namespace is a concept.
-
-    This assembly depends on NOTHING. An edge from here to Lyric.Frontend or Lyric.Vm breaks the
-    split; tests/Lyric.Tests.Cli checks that mechanically.
+    What the compiler and every tool on it share: diagnostics, the SourceManager, exit codes, CLI
+    options. The reading side of the 4.x bytecode format lived here too; it went with the VM
+    (design/v5/spec/01 L7). This assembly depends on NOTHING: an edge from here to Lyric.Frontend
+    breaks the split.
   -->
 
 </Project>

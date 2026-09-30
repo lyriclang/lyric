@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <!-- Both sides of the format: lyrcore reads, lyrfe writes. -->
-    <ProjectReference Include="..\..\src\Lyric.Core\Lyric.Core.csproj" />
-    <ProjectReference Include="..\..\src\Lyric.Frontend\Lyric.Frontend.csproj" />
-  </ItemGroup>
-</Project>

@@ -136,10 +136,11 @@ Each subsystem has its own test project:
 - `tests/Lyric.Tests.Resolver/` — name resolution
 - `tests/Lyric.Tests.Sema/` — type checking
 - `tests/Lyric.Tests.Ir/` — AST to IR lowering
-- `tests/Lyric.Tests.Bytecode/` — the `.lyrbc` format, writer and reader
-- `tests/Lyric.Tests.Vm/` — bytecode execution
-- `tests/Lyric.Tests.Embedding/` — the host API
-- `tests/Lyric.Tests.Cli/` — the binaries end to end, plus the examples
+- `tests/Lyric.Tests.Formatting/` — the formatter, over the whole corpus
+- `tests/Lyric.Tests.Lsp/` — the language server over the front end
+- `tests/Lyric.Tests.DocGen/` — the documentation site generator
+- `tests/Lyric5.Tests/` — the Lyric 5 runtime (C, built and run for every Tier 1 target)
+  and its toolchain driver
 
 Tests use xUnit. Golden tests compare against snapshot files in
 `tests/<project>/golden/`; set `LYRIC_UPDATE_SNAPSHOTS=1` to rewrite them.

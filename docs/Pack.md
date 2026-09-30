@@ -1,5 +1,8 @@
 # The Pack Format
 
+> **4.x text, frozen.** `lyrpack` and `lyrstub` are gone from this tree (Lyric 5 builds native
+> binaries, `design/v5/spec/01` L7); they continue in `lyric-script`.
+
 How a Lyric program becomes one executable file. This document is the contract between
 `lyrpack`, which writes packed executables, and `lyrstub`, which is one. The module inside is an
 ordinary `.lyrbc` and is specified in [`Bytecode.md`](Bytecode.md); nothing here reaches into it.

@@ -78,12 +78,6 @@ jobs:
           echo "InformationalVersion=$stamp" >> "$GITHUB_ENV"
           echo "IncludeSourceRevisionInInformationalVersion=false" >> "$GITHUB_ENV"
 
-      - name: Publish the 4.x toolchain
-        run: >
-          dotnet msbuild build/publish.proj
-          -p:PublishRoot=${{ github.workspace }}/out
-          -p:Rid=${{ matrix.rid }}
-
       - name: Publish lyric5 (NativeAOT)
         run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o out
 
@@ -145,5 +139,5 @@ jobs:
           gh release create dev dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
-            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds the 4.x toolchain the tree still builds, plus lyric5 — the seed of the Lyric 5 command line." \
+            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows." \
             --prerelease

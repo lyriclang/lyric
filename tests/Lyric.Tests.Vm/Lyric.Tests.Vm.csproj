@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <!-- End to end: compiling (lyrfe) and executing (lyrrt). -->
-    <ProjectReference Include="..\..\src\Lyric.Core\Lyric.Core.csproj" />
-    <ProjectReference Include="..\..\src\Lyric.Frontend\Lyric.Frontend.csproj" />
-    <ProjectReference Include="..\..\src\Lyric.Vm\Lyric.Vm.csproj" />
-  </ItemGroup>
-</Project>

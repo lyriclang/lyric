@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Lyric.AST;
-using Lyric.Bytecode;
 using Lyric.Core;
 using Lyric.Ir;
 using Lyric.Ir.Lowering;
@@ -38,11 +37,6 @@ public static class SourceCompiler
     public static CompileResult Lower(string path, CompilerOptions? options = null) =>
         Lower(ScriptSource.FromDisk(path), options);
 
-    /// <summary>Up to the <c>.lyrbc</c> bytes. The basis of <c>lyrc build</c> and of
-    /// <c>lyric run</c> on a source file.</summary>
-    public static CompileResult Compile(string path, CompilerOptions? options = null) =>
-        Compile(ScriptSource.FromDisk(path), options);
-
     /// <inheritdoc cref="Check(string, CompilerOptions?)"/>
     public static CompileResult Check(ScriptSource source, CompilerOptions? options = null) =>
         Run(source, Stage.Check, options ?? new CompilerOptions());
@@ -51,11 +45,7 @@ public static class SourceCompiler
     public static CompileResult Lower(ScriptSource source, CompilerOptions? options = null) =>
         Run(source, Stage.Lower, options ?? new CompilerOptions());
 
-    /// <inheritdoc cref="Compile(string, CompilerOptions?)"/>
-    public static CompileResult Compile(ScriptSource source, CompilerOptions? options = null) =>
-        Run(source, Stage.Emit, options ?? new CompilerOptions());
-
-    private enum Stage { Check, Lower, Emit }
+    private enum Stage { Check, Lower }
 
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
@@ -67,7 +57,7 @@ public static class SourceCompiler
         if (source.Open(sources, diagnostics) is not { } id)
         {
             report?.EndPhase();
-            return new CompileResult(sources, diagnostics, null, null);
+            return new CompileResult(sources, diagnostics, null);
         }
         report?.EndPhase();
 
@@ -119,21 +109,12 @@ public static class SourceCompiler
 
         // On a faulty AST any lowering result would be guesswork.
         if (diagnostics.HasErrors)
-            return new CompileResult(sources, diagnostics, null, null, model);
+            return new CompileResult(sources, diagnostics, null, model);
 
-        // 'comptime' sites are evaluated before the real lowering, and only when bytes are the
-        // goal: a check lowers them as their inner expression and runs nothing. Without an
-        // evaluator there are no bytes to give — the sites are reported and the run ends here.
+        // 'comptime' sites lower as their inner expression: the 4.x evaluator was the VM over
+        // bytecode, both gone (01 L7); the IR interpreter that evaluates them comes with M9a.
+        // Until then a site is type-checked and lowered, and never evaluated.
         ComptimeTable? comptime = null;
-        if (types.ComptimeSites.Count > 0 && stage == Stage.Emit)
-        {
-            report?.BeginPhase(Phase.Lower, "comptime");
-            comptime = EvaluateComptime(compilation, binding, types, diagnostics, sources, source,
-                options);
-            report?.EndPhase();
-            if (comptime is null)
-                return new CompileResult(sources, diagnostics, null, null, model);
-        }
 
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -155,95 +136,7 @@ public static class SourceCompiler
             report?.ReportPhase(Phase.Verify,
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
-        if (ir is null || stage == Stage.Lower)
-            return new CompileResult(sources, diagnostics, ir, null, model);
-
-        // Everything a build does except turning the IR into bytes. That step is mechanical, but
-        // "mechanical" is not "cannot go wrong": a module whose loader refused it type-checked in
-        // silence for two milestones, because nothing in this pipeline ever read back what it had
-        // written. 'check --emit' runs the stage below for exactly that reason.
-        if (stage == Stage.Check)
-            return new CompileResult(sources, diagnostics, ir, null, model);
-
-        report?.BeginPhase(Phase.Emit, FunctionCount(ir));
-        var bytes = BytecodeWriter.Write(ir, options.SourceMap
-            ? new SourceMapContext(sources, source.BaseDirectory)
-            : null, options.DebugInfo, options.Fusion);
-        ReadBack(bytes, source.DisplayName);
-        report?.EndPhase();
-
-        return new CompileResult(sources, diagnostics, ir, bytes, model);
-    }
-
-    /// <summary>
-    /// The evaluation pass for <c>comptime</c>: lower the program with every site hoisted into a
-    /// function of its own, hand the module to the runner, read the values back as constants.
-    /// The runner is the runtime in a sandbox — no capability, an instruction budget — so a
-    /// site that reaches for a file or loops forever fails HERE, at the site, with the reason.
-    /// </summary>
-    /// <returns>The values for the real lowering, or <c>null</c> after reporting.</returns>
-    private static ComptimeTable? EvaluateComptime(Compilation compilation, BindingResult binding,
-        TypeResult types, DiagnosticEngine diagnostics, SourceManager sources, ScriptSource source,
-        CompilerOptions options)
-    {
-        var sites = types.ComptimeSites;
-
-        if (options.ComptimeRunner is not { } runner)
-        {
-            foreach (var site in sites)
-                diagnostics.Report(ComptimeDiagnostics.NoEvaluator, Severity.Error, site.Span,
-                    "'comptime' needs an evaluator, and this compiler was given none — a build "
-                    + "through 'lyrc', 'lyric build' or the embedding API evaluates it");
-            return null;
-        }
-
-        var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: options.Optimize, libraryRoots: true, comptime: new ComptimeTable { Hoist = true });
-        if (hoisted is null) return null;
-
-        // With a source map, so a panic inside a site names the line it happened on.
-        var bytes = BytecodeWriter.Write(hoisted,
-            new SourceMapContext(sources, source.BaseDirectory), options.DebugInfo);
-        var names = Enumerable.Range(0, sites.Count).Select(ComptimeTable.FunctionName).ToArray();
-        var outcomes = runner.Evaluate(bytes, names);
-
-        var values = new Dictionary<int, IrConstValue>();
-        for (var i = 0; i < sites.Count; i++)
-        {
-            var outcome = i < outcomes.Count ? outcomes[i] : ComptimeOutcome.Failed("the evaluator gave no answer");
-            if (outcome.Failure is { } why)
-                diagnostics.Report(ComptimeDiagnostics.EvaluationFailed, Severity.Error, sites[i].Span,
-                    $"'comptime' expression could not be evaluated: {why}");
-            else
-                values[i] = ComptimeTable.Constant(outcome.Value!, types.TypeOf(sites[i]));
-        }
-
-        return values.Count == sites.Count ? new ComptimeTable { Values = values } : null;
-    }
-
-    /// <summary>
-    /// The bytes, read with the loader that will read them for real.
-    ///
-    /// <para>Part of emitting rather than a phase of its own: a writer whose output its own reader
-    /// refuses has not finished writing. It runs in release too, unlike the IR verifier — the one
-    /// time this happened, the compiler and the runtime were the same released build, and the
-    /// finding surfaced two layers away in a test that opened a window.</para>
-    ///
-    /// <para>Not a diagnostic. A malformed module is not something the source did wrong, so it
-    /// belongs in the class <see cref="IrVerifier"/> uses: the compiler is broken, and the message
-    /// carries the loader's own words.</para>
-    /// </summary>
-    private static void ReadBack(byte[] bytes, string what)
-    {
-        try
-        {
-            BytecodeReader.ReadOrThrow(bytes);
-        }
-        catch (MalformedBytecodeException ex)
-        {
-            throw new InternalCompilationException(
-                $"emit: the module written for '{what}' cannot be read back — {ex.Message}", ex);
-        }
+        return new CompileResult(sources, diagnostics, ir, model);
     }
 
     /// <summary>
@@ -365,7 +258,7 @@ public static class SourceCompiler
 
         // No root could even be opened. The diagnostics say why, and there is no module to hang a
         // model on.
-        if (entry is null) return new CompileResult(sources, diagnostics, null, null);
+        if (entry is null) return new CompileResult(sources, diagnostics, null);
 
         var binding = compilation.Resolve();
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
@@ -373,13 +266,13 @@ public static class SourceCompiler
         var model = new SemanticModel(compilation, entry, binding, types);
 
         if (diagnostics.HasErrors)
-            return new CompileResult(sources, diagnostics, null, null, model);
+            return new CompileResult(sources, diagnostics, null, model);
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
-        if (ir is null) return new CompileResult(sources, diagnostics, null, null, model);
+        if (ir is null) return new CompileResult(sources, diagnostics, null, model);
 
-        return new CompileResult(sources, diagnostics, ir, null, model);
+        return new CompileResult(sources, diagnostics, ir, model);
     }
 
     private static string ModuleCount(List<string> loaded) =>
@@ -538,35 +431,11 @@ public sealed record CompilerOptions
     /// unless a diagnostic switch (<c>--no-inline</c> and its siblings) takes one out to bisect a
     /// finding.</summary>
     public IrPasses Passes { get; init; } = IrPasses.All;
-
-    /// <summary>Whether the emitter selects the fused instruction forms. Not a profile field:
-    /// fusion changes the encoding and not the frames, so no debugger is lied to by it. Off only
-    /// to bisect a finding down to the encoding.</summary>
-    public bool Fusion { get; init; } = true;
-
-    /// <summary>
-    /// What evaluates <c>comptime</c> expressions. <c>null</c> means this compiler cannot: a
-    /// check still type-checks them, a build reports every site as unevaluable
-    /// (<c>LYR-CT0001</c>). The drivers that own a runtime hand in the VM.
-    /// </summary>
-    public IComptimeRunner? ComptimeRunner { get; init; }
-}
-
-/// <summary>The codes of the evaluation pass. Neither sema nor lowering: the program was fine
-/// and lowered fine, and what failed was running a piece of it early.</summary>
-public static class ComptimeDiagnostics
-{
-    /// <summary>A build with <c>comptime</c> sites and no evaluator.</summary>
-    public const string NoEvaluator = "LYR-CT0001";
-
-    /// <summary>A site the evaluator could not finish: a panic, an exhausted budget, a capability
-    /// the sandbox does not grant.</summary>
-    public const string EvaluationFailed = "LYR-CT0002";
 }
 
 /// <summary>
-/// What a compiler run leaves behind. <see cref="Ir"/> and <see cref="Bytes"/> are <c>null</c>
-/// when the requested stage was not reached or was not requested at all;
+/// What a compiler run leaves behind. <see cref="Ir"/> is <c>null</c> when the lowering was not
+/// reached or not requested;
 /// </summary>
 /// <param name="Model">
 /// What the front end knew when it was done: the modules, the resolved names, the types. It is
@@ -582,7 +451,6 @@ public sealed record CompileResult(
     SourceManager Sources,
     DiagnosticEngine Diagnostics,
     IrModule? Ir,
-    byte[]? Bytes,
     SemanticModel? Model = null)
 {
     /// <summary>No error was reported. Warnings do not count.</summary>

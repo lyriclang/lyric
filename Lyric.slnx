@@ -2,21 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Lyric.Core/Lyric.Core.csproj" />
     <Project Path="src/Lyric.Frontend/Lyric.Frontend.csproj" />
-    <Project Path="src/Lyric.Vm/Lyric.Vm.csproj" />
-    <Project Path="src/Lyric.Embedding/Lyric.Embedding.csproj" />
     <Project Path="src/Lyric.Lsp/Lyric.Lsp.csproj" />
-    <Project Path="src/Lyrc/Lyrc.csproj" />
-    <Project Path="src/Lyrvm/Lyrvm.csproj" />
-    <Project Path="src/Lyrrepl/Lyrrepl.csproj" />
-    <Project Path="src/Lyrls/Lyrls.csproj" />
-    <Project Path="src/Lyrbuild/Lyrbuild.csproj" />
-    <Project Path="src/Lyrstub/Lyrstub.csproj" />
-    <Project Path="src/Lyrpack/Lyrpack.csproj" />
-    <Project Path="src/Lyrfmt/Lyrfmt.csproj" />
-    <Project Path="src/Lyric.Dap/Lyric.Dap.csproj" />
-    <Project Path="src/Lyrdbg/Lyrdbg.csproj" />
-    <Project Path="src/Lyrtest/Lyrtest.csproj" />
-    <Project Path="src/Lyric.Cli/Lyric.Cli.csproj" />
     <Project Path="src/Lyric5/Lyric5.csproj" />
     <Project Path="src/Lyric5.Toolchain/Lyric5.Toolchain.csproj" />
   </Folder>
@@ -28,20 +14,11 @@
     <Project Path="tests/Lyric.Tests.Resolver/Lyric.Tests.Resolver.csproj" />
     <Project Path="tests/Lyric.Tests.Sema/Lyric.Tests.Sema.csproj" />
     <Project Path="tests/Lyric.Tests.Ir/Lyric.Tests.Ir.csproj" />
-    <Project Path="tests/Lyric.Tests.Bytecode/Lyric.Tests.Bytecode.csproj" />
     <Project Path="tests/Lyric.Tests.Formatting/Lyric.Tests.Formatting.csproj" />
-    <Project Path="tests/Lyric.Tests.Vm/Lyric.Tests.Vm.csproj" />
-    <Project Path="tests/Lyric.Tests.Cli/Lyric.Tests.Cli.csproj" />
-    <Project Path="tests/Lyric.Tests.Embedding/Lyric.Tests.Embedding.csproj" />
     <Project Path="tests/Lyric.Tests.Lsp/Lyric.Tests.Lsp.csproj" />
     <Project Path="tests/Lyric.Tests.DocGen/Lyric.Tests.DocGen.csproj" />
-    <Project Path="tests/Lyric.Tests.Dap/Lyric.Tests.Dap.csproj" />
   </Folder>
   <Folder Name="/tools/">
-    <Project Path="tools/Bench/Bench.csproj" />
     <Project Path="tools/DocGen/DocGen.csproj" />
-  </Folder>
-  <Folder Name="/examples/">
-    <Project Path="examples/embedded-host/EmbeddedHost.csproj" />
   </Folder>
 </Solution>
