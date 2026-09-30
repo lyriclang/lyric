@@ -1774,7 +1774,10 @@ public static class IrVerifier
             IsNumeric(type) || type is IrScalarType
             {
                 Kind: IrScalar.Bool or IrScalar.Char or IrScalar.String
-            };
+            }
+            // Identity: 'same(a, b)' compares two references (design/v5/spec/02 M10). '==' never
+            // reaches here for them — the sema sends it through 'Equatable'.
+            || type is IrRefType or IrArrayType;
 
         private static bool IsBitwiseOrShift(IrBinKind kind) => kind is
             IrBinKind.Shl or IrBinKind.Shr or

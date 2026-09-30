@@ -55,9 +55,17 @@ public sealed class SemaRules
                 CheckSignature(fn, isMethod: false);
                 RunBody(fn);
                 break;
-            case StructDecl s: CheckTypeDecl(s.Members.OfType<FunctionDecl>()); break;
-            case ClassDecl c: CheckTypeDecl(c.Members.OfType<FunctionDecl>()); break;
-            case EnumDecl e: CheckTypeDecl(e.Methods); break;
+            case StructDecl s:
+                CheckTypeDecl(s.Members.OfType<FunctionDecl>());
+                CheckMutHasATarget(s.Name, s.Interfaces, s.Members);
+                break;
+            case ClassDecl c:
+                CheckTypeDecl(c.Members.OfType<FunctionDecl>());
+                break;
+            case EnumDecl e:
+                CheckTypeDecl(e.Methods);
+                CheckMutHasATarget(e.Name, e.Interfaces, e.Methods);
+                break;
             case InterfaceDecl i: foreach (var m in i.Members) { CheckSignature(m, true); RunBody(m); } break;
             case ExtendDecl x: foreach (var m in x.Methods) { CheckSignature(m, true); RunBody(m); } break;
         }
@@ -69,6 +77,55 @@ public sealed class SemaRules
     {
         foreach (var fn in methods) { CheckSignature(fn, isMethod: true); RunBody(fn); }
     }
+
+    /// <summary>
+    /// A <c>mut fn</c> needs something to write (design/v5/spec/02 M4): a <c>var</c> field of
+    /// its type, or <c>this</c> as a whole. On a type that has neither, the word promises a
+    /// write that cannot happen — and costs its callers a <c>var</c> root for nothing.
+    ///
+    /// <para>Two methods keep the word without a target of their own: one that an interface of
+    /// the type declares <c>mut</c> (the signature has to match; an empty iterator's
+    /// <c>next</c> writes nothing and says <c>mut</c> all the same), and one that calls a
+    /// <c>mut fn</c> on <c>this</c>, which writes through the callee.</para>
+    ///
+    /// <para>Asked of VALUES only, a struct and an enum. On a class the word costs a caller
+    /// nothing (a reference is always a place), and a class without a <c>var</c> field changes
+    /// all the same when it holds a <c>let</c> reference to an object that does — a stack over
+    /// a list says <c>mut fn pop</c> and means it. Whether M4 wants that refused is the
+    /// maintainer's question; until it is answered, a class is not asked.</para>
+    /// </summary>
+    private void CheckMutHasATarget(string owner, TypeNode[] interfaces, IEnumerable<Decl> members)
+    {
+        var list = members.ToList();
+        if (list.OfType<FieldDecl>().Any(f => f.IsVar)) return;
+
+        HashSet<string>? demanded = null;
+        foreach (var method in list.OfType<FunctionDecl>())
+        {
+            if (!method.IsMut || method.IsStatic || method.Body is null) continue;
+            if (WritesThis(method.Body)) continue;
+
+            demanded ??= interfaces
+                .Select(t => Conformance.InterfaceOf(t, _binding)).OfType<TypeSymbol>()
+                .SelectMany(i => Conformance.WithParents(i, _binding))
+                .SelectMany(i => (i.Declaration as InterfaceDecl)?.Members ?? [])
+                .Where(m => m.IsMut).Select(m => m.Name).ToHashSet(StringComparer.Ordinal);
+            if (demanded.Contains(method.Name)) continue;
+
+            _de.Report("LYR-SEM0023", Severity.Error, method.NameSpan,
+                $"'mut fn {method.Name}' has nothing to write: '{owner}' has no 'var' field, and the method does not replace 'this'");
+        }
+    }
+
+    /// <summary>Does this body replace <c>this</c> as a whole, or call a <c>mut fn</c> on it?</summary>
+    private bool WritesThis(Node node) => node switch
+    {
+        AssignExpr { Target: ThisExpr } => true,
+        CallExpr { Callee: MemberExpr { Target: ThisExpr } callee }
+            when (_types.RefOf(callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(callee))
+                is FunctionSymbol { Declaration: FunctionDecl { IsMut: true } } => true,
+        _ => AstChildren.Of(node).Any(WritesThis),
+    };
 
     // --- signature rules ---
 

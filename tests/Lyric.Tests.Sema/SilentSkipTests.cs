@@ -55,9 +55,8 @@ public class SilentSkipTests
     // --- a type or module name in value position ---
 
     [Theory]
-    // Looks like a constructor and is none: Lyric constructs through 'P { … }'. This used to yield Error,
-    // and the arity, the argument types and the '.nonsense' all stayed unchecked.
-    [InlineData("class P { hp: int }\nfn main(): int { return P(1, 2, 3).quatsch; }")]
+    // 'P(1, 2, 3)' stood here as the first case until Lyric 5 gave the form a meaning: a type name
+    // in call position is the type's factory (ConstructionTests pins it).
     [InlineData("class P { hp: int }\nfn main(): int { let x = P; return x.quatsch; }")]
     [InlineData("import std.io.console;\nfn main(): int { let x = console; return x.quatsch; }")]
     public void A_type_or_module_in_value_position_is_reported(string source) =>

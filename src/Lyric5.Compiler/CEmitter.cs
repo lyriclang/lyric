@@ -12,7 +12,10 @@ namespace Lyric5.Compiler;
 /// the runtime's checked forms, the wrap operators and shifts through <c>lyr/numeric.h</c> (03 T2);
 /// floats are C's <c>double</c> and <c>float</c> under IEEE semantics, compiled without
 /// contraction (01 L10); a conversion wraps, saturates or checks as T1d says. Strings are the runtime's
-/// <c>LyrStr *</c>, literals static objects (V9). A struct is a C struct by value (V2): locals,
+/// <c>LyrStr *</c>, literals static objects (V9). A class is a heap object (V3): a C struct that
+/// begins with the header, reached through a pointer, allocated by <c>lyr_alloc</c> with a static
+/// descriptor the emitter writes beside it (V4) — size, reference bitmap, qualified name — and
+/// every reference stored into an object goes through the write barrier (L1). A struct is a C struct by value (V2): locals,
 /// parameters, fields and results hold it; the IR's struct-typed temps are aliases into that
 /// storage — <c>load</c> and a struct-typed <c>loadfield</c> alias, <c>newobj</c> and
 /// <c>structcopy</c> make fresh storage, <c>store</c>, <c>storefield</c>, arguments and
@@ -34,7 +37,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s1";
+    public const string Version = "m3-s2";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -84,6 +87,7 @@ public sealed class CEmitter
     public string CType(IrType type) => type switch
     {
         IrStructType s => StructName(s.Type),
+        IrRefType r => StructName(r.Type) + " *",
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
         IrScalarType { Kind: IrScalar.I16 } => "int16_t",
         IrScalarType { Kind: IrScalar.I32 } => "int32_t",
@@ -152,9 +156,75 @@ public sealed class CEmitter
     private static string Zero(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "NULL",
+        IrRefType => "NULL",
         IrStructType => "{0}",
         _ => "0",
     };
+
+    // --- layout ----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The size and alignment C gives a type on every Tier 1 target (all LP64 or LLP64 with
+    /// natural alignment: a scalar aligns to its size, a pointer is eight bytes). The emitter
+    /// needs the numbers for one thing, the reference bitmap of a descriptor (V4), and it does
+    /// not trust them: every class carries a <c>_Static_assert</c> on its size and on each
+    /// field offset, so a target that lays a type out differently fails to compile instead of
+    /// handing the collector a wrong map.
+    /// </summary>
+    private (int Size, int Align) LayoutOf(IrType type) => type switch
+    {
+        IrScalarType { Kind: IrScalar.I8 or IrScalar.U8 or IrScalar.Bool } => (1, 1),
+        IrScalarType { Kind: IrScalar.I16 or IrScalar.U16 } => (2, 2),
+        IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
+        IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
+        IrRefType => (8, 8),
+        IrStructType s => Fields(_module.Types[s.Type.Value], 0).Total,
+        _ => throw new InvalidOperationException($"the C emitter has no layout for {type}; the gate let it through"),
+    };
+
+    /// <summary>The fields of a type laid out from <paramref name="start"/> (8 for a class, past
+    /// its header): the offset of each, and the size and alignment of the whole.</summary>
+    private (int[] Offsets, (int Size, int Align) Total) Fields(IrTypeDef def, int start)
+    {
+        var offsets = new int[def.FieldTypes.Length];
+        var (at, align) = (start, start > 0 ? 8 : 1);
+        for (var i = 0; i < def.FieldTypes.Length; i++)
+        {
+            var (size, fieldAlign) = LayoutOf(def.FieldTypes[i]);
+            at = (at + fieldAlign - 1) / fieldAlign * fieldAlign;
+            offsets[i] = at;
+            at += size;
+            align = Math.Max(align, fieldAlign);
+        }
+        return (offsets, ((at + align - 1) / align * align, align));
+    }
+
+    private static bool IsReference(IrType type) =>
+        type is IrRefType or IrScalarType { Kind: IrScalar.String };
+
+    /// <summary>Whether a value of the type holds a reference anywhere: itself, or in a struct
+    /// it holds by value.</summary>
+    private bool HoldsReferences(IrType type) => type switch
+    {
+        IrStructType s => _module.Types[s.Type.Value].FieldTypes.Any(HoldsReferences),
+        _ => IsReference(type),
+    };
+
+    /// <summary>The pointer-sized words of an object that are references, as word indices: a
+    /// reference field's own word, and through a struct held by value the words of its
+    /// reference fields.</summary>
+    private void ReferenceWords(IrTypeDef def, int start, List<int> words)
+    {
+        var offsets = Fields(def, start).Offsets;
+        for (var i = 0; i < def.FieldTypes.Length; i++)
+        {
+            if (IsReference(def.FieldTypes[i])) words.Add(offsets[i] / 8);
+            else if (def.FieldTypes[i] is IrStructType inner)
+                ReferenceWords(_module.Types[inner.Type.Value], offsets[i], words);
+        }
+    }
+
+    private string DescriptorName(TypeId id) => $"lyr_desc_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
 
     /// <summary>The storage beside a struct-typed temp, for the values it makes fresh.</summary>
     private static string Storage(TempId temp) => $"t{temp.Value}_s";
@@ -185,35 +255,87 @@ public sealed class CEmitter
         return _out.ToString();
     }
 
-    /// <summary>The struct types, each after the structs its fields hold: a field by value needs
-    /// a complete type.</summary>
+    /// <summary>
+    /// The types: every struct and class named first, so a field may point at any of them, then
+    /// each defined after the structs it holds by value (a field by value needs a complete
+    /// type). A class begins with the object header and is followed by its descriptor.
+    /// </summary>
     private void Structs()
     {
+        var indices = Enumerable.Range(0, _module.Types.Count)
+            .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass).ToList();
+        if (indices.Count == 0) return;
+
+        _out.AppendLine("/* types: a struct is a value, a class an object behind its header */");
+        foreach (var i in indices)
+        {
+            var name = StructName(new TypeId(i));
+            _out.AppendLine($"typedef struct {name} {name};");
+        }
+
         var done = new HashSet<int>();
-        var any = false;
         void Define(int index)
         {
-            if (!done.Add(index)) return;
             var def = _module.Types[index];
-            if (!def.IsStruct) return;
+            if (!(def.IsStruct || def.IsClass) || !done.Add(index)) return;
             foreach (var field in def.FieldTypes)
                 if (field is IrStructType inner) Define(inner.Type.Value);
-            if (!any) { _out.AppendLine("/* structs, by value */"); any = true; }
             var name = StructName(new TypeId(index));
-            _out.AppendLine($"typedef struct {name} {{");
+            _out.AppendLine($"struct {name} {{");
+            if (def.IsClass) _out.AppendLine("    LyrObj header;");
             for (var i = 0; i < def.FieldTypes.Length; i++)
                 _out.AppendLine($"    {Declare(def.FieldTypes[i], FieldName(def.FieldNames[i]))};");
-            _out.AppendLine($"}} {name};");
+            _out.AppendLine("};");
+            if (def.IsClass) Descriptor(new TypeId(index), def);
         }
-        for (var i = 0; i < _module.Types.Count; i++) Define(i);
-        if (any) _out.AppendLine();
+        foreach (var i in indices) Define(i);
+        _out.AppendLine();
     }
+
+    /// <summary>
+    /// The descriptor of a class (V4): its size, which of its words are references — the header
+    /// is word 0 and never one — and its qualified name. Static and constant; its address is
+    /// the type's identity. The asserts hold the emitter's layout against the compiler's.
+    /// </summary>
+    private void Descriptor(TypeId id, IrTypeDef def)
+    {
+        var name = StructName(id);
+        var (offsets, total) = Fields(def, 8);
+        _out.AppendLine($"_Static_assert(sizeof({name}) == {total.Size}, \"layout of {name}\");");
+        for (var i = 0; i < offsets.Length; i++)
+            _out.AppendLine($"_Static_assert(offsetof({name}, {FieldName(def.FieldNames[i])}) == {offsets[i]}, \"layout of {name}\");");
+
+        var words = new List<int>();
+        ReferenceWords(def, 8, words);
+        var qualified = def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name;
+        var text = qualified.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        if (words.Count == 0)
+        {
+            _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), 0, 0, 0, NULL, \"{text}\", NULL }};");
+            return;
+        }
+
+        var map = new ulong[(total.Size / 8 + 63) / 64];
+        foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
+        var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
+        _out.AppendLine($"static const uint64_t lyr_refmap_ty{id.Value}[] = {{ {bits} }};");
+        _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), LYR_DESC_HAS_REFS, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
+    }
+
+    /// <summary>A parameter: a value, except the receiver of a struct method, which is the
+    /// caller's place (02 M5).</summary>
+    private string Parameter(IrFunction function, IrLocal local) =>
+        function.ReceiverByRef && local.Id.Value == 0
+            ? $"{CType(local.Type)} *{LocalName(local)}"
+            : Declare(local.Type, LocalName(local));
+
+    private bool IsReceiverPlace(LocalId local) => _function.ReceiverByRef && local.Value == 0;
 
     private string Signature(IrFunction function)
     {
         var parameters = function.ParamCount == 0
             ? "void"
-            : string.Join(", ", function.Locals.Take(function.ParamCount).Select(p => $"{Declare(p.Type, LocalName(p))}"));
+            : string.Join(", ", function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)));
         return $"static {CType(function.ReturnType)} {FunctionName(function.Name)}({parameters})";
     }
 
@@ -321,18 +443,23 @@ public sealed class CEmitter
         BinOp b => $"{Temp(b.Dest)} = {Binary(b)};",
         UnOp u => $"{Temp(u.Dest)} = {Unary(u)};",
         Lyric.Ir.Convert v => $"{Temp(v.Dest)} = {Conversion(v)};",
+        // The receiver of a struct method is already the place; every other struct local is
+        // storage, and its temp aliases it.
+        LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
         LoadLocal l => IsStruct(l.Type)
             ? $"{Temp(l.Dest)} = &{LocalName(_function.Locals[l.Local.Value])};"
             : $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
+        StoreLocal s when IsReceiverPlace(s.Local) => $"*{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
         StoreLocal s => $"{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
-        Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(call.Args)})"),
+        Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)})"),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
+        NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         LoadField f => IsStruct(f.FieldType)
             ? $"{Temp(f.Dest)} = &{Temp(f.Object)}->{Field(f.Type, f.Field)};"
             : $"{Temp(f.Dest)} = {Temp(f.Object)}->{Field(f.Type, f.Field)};",
-        StoreField f => $"{Temp(f.Object)}->{Field(f.Type, f.Field)} = {Value(f.Value)};",
+        StoreField f => Store(f),
         _ => throw new InvalidOperationException($"the C emitter has no case for {op.GetType().Name}; the gate let it through"),
     };
 
@@ -346,7 +473,28 @@ public sealed class CEmitter
         { } d => $"{Temp(d)} = {call};",
     };
 
-    private string Arguments(TempId[] args) => string.Join(", ", args.Select(Value));
+    /// <summary>The arguments of a call: values, except the receiver of a struct method, which
+    /// goes as the place its temp aliases (02 M5) — so a <c>mut fn</c> writes the caller's
+    /// value and not a copy of it.</summary>
+    private string Arguments(IrFunction callee, TempId[] args) =>
+        string.Join(", ", args.Select((arg, i) => callee.ReceiverByRef && i == 0 ? Temp(arg) : Value(arg)));
+
+    /// <summary>
+    /// A field write. A reference goes through the write barrier (01 L1) wherever the field
+    /// lives: in an object, or in a struct that may itself lie inside one — the temp that names
+    /// the place does not say which, so the barrier takes the place as it is, a heap object, an
+    /// interior pointer or a stack address. A struct value that holds references is stored
+    /// through the barrier's value form for the same reason. Both are plain stores in stage 1.
+    /// </summary>
+    private string Store(StoreField f)
+    {
+        var place = Temp(f.Object);
+        var slot = $"{place}->{Field(f.Type, f.Field)}";
+        var type = _module.Types[f.Type.Value].FieldTypes[f.Field.Value];
+        if (IsReference(type)) return $"LYR_WRITE_BARRIER({place}, &{slot}, {Value(f.Value)});";
+        if (HoldsReferences(type)) return $"LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {Value(f.Value)});";
+        return $"{slot} = {Value(f.Value)};";
+    }
 
     private string Constant(Const c) => c.Value switch
     {

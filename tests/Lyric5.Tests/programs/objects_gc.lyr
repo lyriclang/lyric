@@ -1,0 +1,28 @@
+// A class graph survives collections (01 V4, L1): a million short-lived objects and their
+// strings are garbage, a holder keeps two items and a string alive across every collection the
+// churn forces. The test runs this under a heap limit far below what the churn allocates, so
+// it ends only if the garbage is collected, and it ends right only if what the holder
+// references is not. Expected stdout: "kept 499500 held-999999 held-0 alice"
+// (0 + 1 + … + 999 = 499500; the last item kept is number 999999). Exit 0.
+import std.io { println };
+
+class Item { id: int, label: string }
+
+class Holder { first: Item, var last: Item, name: string, var sum: int }
+
+fn make(i: int): Item { return Item { id = i, label = f"held-{i}" }; }
+
+fn main(): int {
+    let holder = Holder { first = make(0), last = make(0), name = "ali" + "ce", sum = 0 };
+    var i = 0;
+    while (i < 1000000) {
+        let item = make(i);
+        if (i % 1000 == 999) {
+            holder.last = item;
+            holder.sum += item.id / 1000;
+        }
+        i += 1;
+    }
+    println(f"kept {holder.sum} {holder.last.label} {holder.first.label} {holder.name}");
+    return if (holder.last.id == 999999) 0 else 1;
+}

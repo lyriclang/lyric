@@ -59,6 +59,7 @@ public sealed class TypeChecker
     private bool _inGlobalInitializer;
     private readonly TypeSymbol? _throwable; // the builtin Throwable interface
     private readonly FunctionSymbol? _panic; // the builtin panic, returning never
+    private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
@@ -92,6 +93,7 @@ public sealed class TypeChecker
         _de = de;
         _throwable = comp.Builtins.LookupLocal("Throwable") as TypeSymbol;
         _panic = comp.Builtins.LookupLocal("panic") as FunctionSymbol;
+        _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
 
         // 'Iterator<T>' lives in the stdlib rather than among the builtins: it is an ordinary
@@ -2096,6 +2098,81 @@ public sealed class TypeChecker
         return fitting[0].Fn;
     }
 
+    /// <summary>
+    /// <c>same(a, b)</c>: whether two references are one object (design/v5/spec/02 M10).
+    /// Identity belongs to references — a class, an array, a coroutine — and both sides have
+    /// one type. On a value it is an ERROR, not <c>false</c>: a struct has no identity to ask
+    /// about, not even a stable address, and an answer would invent one.
+    /// </summary>
+    private LyrType CheckSame(CallExpr call, IdentifierExpr callee, SymbolTable scope)
+    {
+        _result.BindRef(callee, _same!);
+        var types = call.Arguments.Select(a => CheckExpr(a, scope)).ToArray();
+        if (types.Length != 2)
+            return Report(call.Span, "LYR-SEM0014", $"'same' takes two references, got {types.Length} argument(s)");
+        if (types[0].IsError || types[1].IsError) return LyrType.Bool;
+
+        foreach (var type in types)
+        {
+            var reference = TypeFacts.KindOf(type) == TypeSymbolKind.Class || type is ArrayOf or CoroutineOf;
+            if (reference) continue;
+            Report(call.Span, "LYR-SEM0003",
+                $"'same' asks whether two references are one object, and '{TypeFacts.Display(type)}' is "
+                + (type is Optional ? "an optional; narrow it first"
+                    : "a value, which has no identity; compare values with '=='"));
+            return LyrType.Bool;
+        }
+
+        if (!LyrType.Equal(types[0], types[1]))
+            Report(call.Span, "LYR-SEM0003",
+                $"'same' compares two references of one type, got '{TypeFacts.Display(types[0])}' and '{TypeFacts.Display(types[1])}'");
+        return LyrType.Bool;
+    }
+
+    /// <summary>The class or struct a callee NAMES, when the callee is a type name in call
+    /// position: <c>Point</c>, or <c>geometry.Point</c> through a module. A local of that name
+    /// shadows the type as it does everywhere. Generic types wait for the generics slice.</summary>
+    private static TypeSymbol? ConstructedType(Expr callee, SymbolTable scope)
+    {
+        static Symbol? Unwrap(Symbol? symbol) => symbol is ImportBindingSymbol binding ? binding.Target : symbol;
+        var named = callee switch
+        {
+            IdentifierExpr id => Unwrap(scope.Lookup(id.Name)),
+            MemberExpr { IsOptional: false, Target: IdentifierExpr holder } member
+                when Unwrap(scope.Lookup(holder.Name)) is ModuleSymbol module
+                => Unwrap(module.Members.LookupLocal(member.Member)),
+            _ => null,
+        };
+        return named is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct, Generics.Length: 0 } type
+            ? type : null;
+    }
+
+    /// <summary>
+    /// <c>Point(1, 2)</c> is <c>Point.new(1, 2)</c> (design/v5/spec/08 Y9, 04 D11): a type name
+    /// in call position means the type's factory, and <c>new</c> is an ordinary static
+    /// function — there are no constructors, so there is no half-built <c>this</c>, and a
+    /// factory may validate, answer an optional, throw, or hand out an object that exists. The
+    /// call is checked as the member call it stands for and stored for the lowering, the seam
+    /// the operators use.
+    /// </summary>
+    private LyrType CheckConstruction(CallExpr call, TypeSymbol type, SymbolTable scope, LyrType? expected)
+    {
+        if (type.Members.LookupLocal("new") is not FunctionSymbol { Declaration: FunctionDecl { IsStatic: true } })
+        {
+            foreach (var argument in call.Arguments) CheckExpr(argument, scope);
+            return Report(call.Span, "LYR-SEM0013",
+                $"'{type.Name}(…)' calls '{type.Name}.new(…)', and '{type.Name}' declares no 'static fn new' — "
+                + $"build the value with its initializer, '{type.Name} {{ … }}', or declare the factory");
+        }
+
+        // MemberSpan stays invalid, as on the operator desugar: the text writes no 'new'.
+        var factory = new MemberExpr(call.Callee, "new", IsOptional: false, call.Callee.Span) { MemberSpan = default };
+        var meant = new CallExpr(factory, call.Arguments, call.Span);
+        var result = CheckExpr(meant, scope, expected);
+        _result.DesugarOperator(call, meant);
+        return result;
+    }
+
     /// <summary>How well a candidate fits, as a tuple that orders: fewer conversions first, then
     /// fewer type parameters, then the one that needs no defaults, then the one that is not
     /// variadic. Lower is better, and equal is ambiguous.</summary>
@@ -3107,6 +3184,14 @@ public sealed class TypeChecker
     /// 'let o: Opt&lt;int&gt; = Opt.Some(7);' names the instance only on the left.</param>
     private LyrType CheckCall(CallExpr call, SymbolTable scope, LyrType? expected = null)
     {
+        // The two calls that are not calls of what their callee names: identity, which the
+        // compiler answers itself, and a type name, which means its factory.
+        if (call.Callee is IdentifierExpr identity && _same is not null
+            && ReferenceEquals(scope.Lookup(identity.Name), _same))
+            return CheckSame(call, identity, scope);
+        if (ConstructedType(call.Callee, scope) is { } constructed)
+            return CheckConstruction(call, constructed, scope, expected);
+
         var calleeType = CheckTargetOfCall(call.Callee, scope, expected);
 
         // OVERLOADING: the lookup above answered with the first function of the name, which is the
@@ -4462,7 +4547,8 @@ public sealed class TypeChecker
     private void ReportOmittedFields(Span span, string owner, IReadOnlyList<FieldDecl> declared,
         HashSet<string> given)
     {
-        var missing = declared.Where(f => f.Default is null && !given.Contains(f.Name))
+        // A '?T' field has the default 'null' without saying so (design/v5/spec/02 M14 I1).
+        var missing = declared.Where(f => f.Default is null && f.Type is not NullableType && !given.Contains(f.Name))
             .Select(f => f.Name).ToArray();
         if (missing.Length == 0) return;
 

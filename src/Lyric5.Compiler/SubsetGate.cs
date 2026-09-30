@@ -77,8 +77,12 @@ public static class SubsetGate
                 case IrScalarType:
                 case IrStructType:
                     break;
-                case IrRefType:
-                    Refuse(span, $"classes, {where}", "M3");
+                case IrRefType r when module.Types[r.Type.Value].IsClass:
+                    break;
+                case IrRefType r:
+                    // A tuple, a closure cell and a closure environment are heap entries of the
+                    // 4.x lowering; each gets its Lyric 5 form with its slice.
+                    Refuse(span, module.Types[r.Type.Value].Name == "<tuple>" ? $"tuples, {where}" : $"closures, {where}", "M3");
                     break;
                 case IrArrayType:
                     Refuse(span, $"arrays, {where}", "M3");
@@ -129,7 +133,7 @@ public static class SubsetGate
                         Refuse(op.Span, $"the native function '{module.Imports[i.Target.Value].Name}'", "M8a");
                     break;
                 case NewObject n:
-                    if (n.Result is not IrStructType) Refuse(op.Span, "classes", "M3");
+                    Type(n.Result, op.Span, "the object");
                     break;
                 case LoadField or StoreField:
                     break;

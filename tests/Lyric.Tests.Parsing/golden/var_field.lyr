@@ -1,0 +1,8 @@
+class Account {
+    owner: string,
+    var balance: int = 0,
+
+    mut fn deposit(amount: int) {
+        this.balance += amount;
+    }
+}

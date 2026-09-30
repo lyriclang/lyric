@@ -38,6 +38,7 @@ public class CEmitterTests
     [InlineData("hello")]
     [InlineData("structs")]
     [InlineData("arith")]
+    [InlineData("objects")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -69,6 +70,9 @@ public class CEmitterTests
                 + "shl 8 -1 255\nwrapop 0 255 1\nswrap -128 127\nfloat 1.5 2 0.09999999999999998 0.5\n"
                 + "fdiv inf -inf NaN\nf32 0.10000000149011612 0.30000001192092896\ncmp true false\n"
                 + "big 9007199254740993 1e+21\n");
+            data.Add("objects", profile, 0,
+                "alice 150\nshared 175\nidentity true false\nteam alice+bob\nswapped alice\n"
+                + "origin 3,4 moved 13,4\ncounter 3\ncopy 3 then 4\nreset 0 kept 3\nmade carol 0\n");
         }
         return data;
     }
@@ -81,6 +85,28 @@ public class CEmitterTests
         Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
         Assert.Equal("", result.Stderr);
         Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>
+    /// A class graph survives collections (01 V4): the program churns through far more memory
+    /// than the 16 MiB the harness allows, so it ends only because its garbage is collected, and
+    /// it prints the right line only because what the holder references is not — the emitter's
+    /// descriptors say which objects hold references, and an object wrongly marked as holding
+    /// none would lose what it points at. The harness reports the collections that ran: the
+    /// claim needs at least a handful.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_class_graph_survives_collections(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC("objects_gc"), "objects_gc", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("kept 499500 held-999999 held-0 alice", lines[0]);
+        Assert.StartsWith("collections ", lines[1]);
+        var collections = int.Parse(lines[1]["collections ".Length..]);
+        Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
     }
 
     [Theory]

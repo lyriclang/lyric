@@ -44,6 +44,20 @@ public class FormatterTests
             """, Format("fn   main( ):int{let x=1;\n\n\n   return x;}"));
     }
 
+    [Fact]
+    public void A_var_field_keeps_its_word()
+    {
+        // 'var' is the one word that makes a field writable (design/v5/spec/02 M2): a formatter
+        // that dropped it would change what the program may do.
+        Assert.Equal("""
+            struct Counter {
+                var n: int = 0,
+                step: int,
+            }
+
+            """, Format("struct Counter{var   n:int=0,step:int}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

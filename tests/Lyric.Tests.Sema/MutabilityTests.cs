@@ -270,6 +270,39 @@ public class MutabilityTests
     }
 
     [Fact]
+    public void A_mut_fn_of_a_value_needs_something_to_write()
+    {
+        // M4: on a struct without a 'var' field the word promises a write that cannot happen,
+        // and costs every caller a 'var' root for it.
+        var errors = Check("""
+            struct V { x: int, mut fn poke(): void { } }
+            fn main(): int { return 0; }
+            """).Diagnostics.Where(d => d.Severity == Severity.Error).ToList();
+        var error = Assert.Single(errors);
+        Assert.Equal("LYR-SEM0023", error.Code);
+        Assert.Contains("'mut fn poke' has nothing to write", error.Message);
+
+        // Three ways to have something: a 'var' field, 'this' as a whole, a 'mut fn' on 'this'.
+        Allowed("""
+            struct A { var x: int, mut fn poke(): void { } }
+            struct B { x: int, mut fn reset(): void { this = B { x = 0 }; } mut fn again(): void { this.reset(); } }
+            fn main(): int { return 0; }
+            """);
+        // And one to be asked for it: an interface declares the method 'mut'.
+        Allowed("""
+            interface Source { mut fn next(): int; }
+            struct Empty :: [Source] { mut fn next(): int { return 0; } }
+            fn main(): int { return 0; }
+            """);
+        // A class is not asked: it changes through a 'let' reference to an object that does.
+        Allowed("""
+            class Inner { var n: int, mut fn bump(): void { this.n += 1; } }
+            class Outer { inner: Inner, mut fn bump(): void { this.inner.bump(); } }
+            fn main(): int { return 0; }
+            """);
+    }
+
+    [Fact]
     public void A_static_let_is_a_constant()
     {
         var message = Rejected("""

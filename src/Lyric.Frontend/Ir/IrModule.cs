@@ -89,6 +89,15 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     /// </summary>
     public List<IrHandler> Handlers { get; init; } = new();
 
+    /// <summary>
+    /// Whether parameter 0 is the receiver of a STRUCT method: <c>this</c> is then a reference
+    /// to the caller's place, not a copy (design/v5/spec/02 M5; C# <c>ref this</c>) — a write
+    /// through it is a write into the caller's value, and a partial write before a panic stays.
+    /// The local keeps its struct type; a back end passes the place. A class method needs no
+    /// flag: its receiver is a reference by type.
+    /// </summary>
+    public bool ReceiverByRef { get; init; }
+
     public List<IrBlock> Blocks { get; init; } = Blocks;
     public BlockId Entry { get; set; }
 }
@@ -144,6 +153,17 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// is that every binding copies. A flag rather than an entry type of its own, because nothing about
     /// the layout itself changes.</summary>
     public bool IsStruct { get; init; }
+
+    /// <summary>Declared with <c>class</c>: a heap object with a header, reached by reference.
+    /// A positive flag, because the entries that are neither a struct, an enum nor an interface
+    /// are not all classes — a variant, a tuple, a closure cell and an environment are entries
+    /// too.</summary>
+    public bool IsClass { get; init; }
+
+    /// <summary>The full name of the module that declares the type, empty for an entry no
+    /// module declares. With <see cref="Name"/> it is the qualified name a type descriptor
+    /// carries.</summary>
+    public string Module { get; init; } = "";
 
     public bool IsEnum => Variants.Length > 0;
 

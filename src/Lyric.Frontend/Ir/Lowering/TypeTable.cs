@@ -499,6 +499,17 @@ internal sealed class TypeTable
         return InternLayout(symbol, symbol.Name, null);
     }
 
+    /// <summary>The module a type is declared in, by identity: the one whose members hold this
+    /// very symbol. Empty when no module does (a bare snippet, a synthesized type).</summary>
+    private string ModuleNameOf(TypeSymbol symbol)
+    {
+        if (Compilation is not { } comp) return "";
+        foreach (var module in comp.Modules)
+            if (ReferenceEquals(module.Members.LookupLocal(symbol.Name), symbol))
+                return module.FullName;
+        return "";
+    }
+
     /// <summary>
     /// Builds the layout and records it. For an instance <paramref name="registry"/> is the instance map
     /// and <paramref name="name"/> carries the type arguments; otherwise the symbol counts.
@@ -553,6 +564,8 @@ internal sealed class TypeTable
             _defs[id.Value] = new IrTypeDef(name, types, names)
             {
                 IsStruct = symbol.Kind == TypeSymbolKind.Struct,
+                IsClass = symbol.Kind == TypeSymbolKind.Class,
+                Module = ModuleNameOf(symbol),
                 // Empty unless something is actually opaque: a list of empty strings per type would
                 // be a section that says nothing in most modules.
                 FieldOpaqueNames = anyOpaque ? opaque : [],
