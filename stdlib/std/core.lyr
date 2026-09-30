@@ -557,3 +557,10 @@ fn fromBool(value: bool): string;
 fn fromChar(value: char): string;
 fn length(text: string): int;
 fn charAt(text: string, index: int): char;
+
+/// A value behind a reference (design/v5/spec/02 M13): the indirection a value type needs to
+/// hold itself. `enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr,
+/// Expr)` is not. The box is shared, not copied; its value is fixed, so sharing is unobservable.
+pub class Box<T> {
+    value: T,
+}

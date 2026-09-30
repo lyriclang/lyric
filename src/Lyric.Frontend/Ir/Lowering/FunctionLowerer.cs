@@ -524,7 +524,7 @@ internal sealed class FunctionLowerer
             _slots.Locals, _slots.Temps, _blocks)
         {
             Entry = new BlockId(0), Handlers = _handlers,
-            ReceiverByRef = _thisSlot is not null && _thisType is IrStructType,
+            ReceiverByRef = _thisSlot is not null && _thisType is IrStructType or IrEnumType,
         };
     }
 

@@ -17,7 +17,9 @@ namespace Lyric5.Compiler;
 /// descriptor the emitter writes beside it (V4) — size, reference bitmap, qualified name — and
 /// every reference stored into an object goes through the write barrier (L1). An optional (V5)
 /// of a reference is that pointer, null when absent — the niche, zero bytes; of anything else a
-/// C struct of the value and a flag, held by value like a struct. A struct is a C struct by value (V2): locals,
+/// C struct of the value and a flag, held by value like a struct. An enum (V6) is a tag and a
+/// union of its variants' payloads, inline and by value; an optional of an enum takes a tag no
+/// variant has. A struct is a C struct by value (V2): locals,
 /// parameters, fields and results hold it; the IR's struct-typed temps are aliases into that
 /// storage — <c>load</c> and a struct-typed <c>loadfield</c> alias, <c>newobj</c> and
 /// <c>structcopy</c> make fresh storage, <c>store</c>, <c>storefield</c>, arguments and
@@ -39,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s3";
+    public const string Version = "m3-s4";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -50,10 +52,17 @@ public sealed class CEmitter
     private IrFunction _function = null!;
     private FileId? _file;
 
+    /// <summary>Which entry of the type table is a variant of which enum, and which number it
+    /// has there: the tag.</summary>
+    private readonly Dictionary<int, (int Enum, int Tag)> _variants = new();
+
     private CEmitter(IrModule module, SourceManager sources)
     {
         _module = module;
         _sources = sources;
+        for (var i = 0; i < module.Types.Count; i++)
+            for (var tag = 0; tag < module.Types[i].Variants.Length; tag++)
+                _variants[module.Types[i].Variants[tag].Value] = (i, tag);
     }
 
     /// <summary>The C text of the module. <paramref name="sources"/> answers the <c>#line</c> positions.</summary>
@@ -89,8 +98,9 @@ public sealed class CEmitter
     public string CType(IrType type) => type switch
     {
         IrStructType s => StructName(s.Type),
+        IrEnumType e => StructName(e.Type),
         IrRefType r => StructName(r.Type) + " *",
-        IrOptionalType o when IsNiche(o) => CType(o.Inner),
+        IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
         IrScalarType { Kind: IrScalar.I16 } => "int16_t",
@@ -140,6 +150,8 @@ public sealed class CEmitter
 
     private static bool IsVoid(IrType type) => type is IrScalarType { Kind: IrScalar.Void };
 
+    private static bool IsString(IrType type) => type is IrScalarType { Kind: IrScalar.String };
+
     /// <summary>
     /// An optional in the niche (01 V5): around a reference — a class value or a string — the
     /// pointer itself says whether there is a value, and the optional costs nothing. Around an
@@ -157,7 +169,14 @@ public sealed class CEmitter
     /// the struct it holds.
     /// </summary>
     private static bool IsAggregate(IrType type) =>
-        type is IrStructType || (type is IrOptionalType && !IsNiche(type));
+        type is IrStructType or IrEnumType || (type is IrOptionalType && !IsNiche(type));
+
+    /// <summary>
+    /// An optional of an enum (01 V5): the enum itself, with a tag no variant has standing for
+    /// "no value" (<c>LYR_ENUM_NONE</c>). No flag, no growth. Around that optional there is no
+    /// niche left, as for a reference.
+    /// </summary>
+    private static bool IsTagNiche(IrType type) => type is IrOptionalType { Inner: IrEnumType };
 
     /// <summary><c>lyr_opt_&lt;inner&gt;</c>: one C struct per optional type outside the niche,
     /// named after what it holds.</summary>
@@ -168,6 +187,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.String } => "str",
         IrScalarType s => s.Kind.ToString().ToLowerInvariant(),
         IrStructType s => $"ty{s.Type.Value}",
+        IrEnumType e => $"en{e.Type.Value}",
         IrRefType r => $"ref{r.Type.Value}",
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
@@ -215,26 +235,55 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
         IrRefType => (8, 8),
         IrOptionalType o when IsNiche(o) => (8, 8),
+        IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
         IrOptionalType o => OptionalLayout(o),
         IrStructType s => Fields(_module.Types[s.Type.Value], 0).Total,
+        IrEnumType e => EnumLayout(_module.Types[e.Type.Value]).Total,
         _ => throw new InvalidOperationException($"the C emitter has no layout for {type}; the gate let it through"),
     };
 
     /// <summary>The fields of a type laid out from <paramref name="start"/> (8 for a class, past
     /// its header): the offset of each, and the size and alignment of the whole.</summary>
-    private (int[] Offsets, (int Size, int Align) Total) Fields(IrTypeDef def, int start)
+    private (int[] Offsets, (int Size, int Align) Total) Fields(IrTypeDef def, int start) =>
+        Fields(def.FieldTypes, start);
+
+    private (int[] Offsets, (int Size, int Align) Total) Fields(IReadOnlyList<IrType> types, int start)
     {
-        var offsets = new int[def.FieldTypes.Length];
+        var offsets = new int[types.Count];
         var (at, align) = (start, start > 0 ? 8 : 1);
-        for (var i = 0; i < def.FieldTypes.Length; i++)
+        for (var i = 0; i < types.Count; i++)
         {
-            var (size, fieldAlign) = LayoutOf(def.FieldTypes[i]);
+            var (size, fieldAlign) = LayoutOf(types[i]);
             at = (at + fieldAlign - 1) / fieldAlign * fieldAlign;
             offsets[i] = at;
             at += size;
             align = Math.Max(align, fieldAlign);
         }
         return (offsets, ((at + align - 1) / align * align, align));
+    }
+
+    /// <summary>The payload of a variant: its fields without slot 0, which the IR keeps for the
+    /// tag and C keeps in the enum.</summary>
+    private static IrType[] Payload(IrTypeDef variant) => variant.FieldTypes.Skip(1).ToArray();
+
+    /// <summary>
+    /// An enum (01 V6): the tag, four bytes, then the union of the variants' payloads, aligned
+    /// as the widest of them asks. An enum whose variants carry nothing is the tag alone.
+    /// </summary>
+    private ((int Size, int Align) Total, int UnionOffset) EnumLayout(IrTypeDef def)
+    {
+        var (size, align) = (0, 1);
+        foreach (var variant in def.Variants)
+        {
+            var payload = Payload(_module.Types[variant.Value]);
+            if (payload.Length == 0) continue;
+            var (s, a) = Fields(payload, 0).Total;
+            (size, align) = (Math.Max(size, s), Math.Max(align, a));
+        }
+        if (size == 0) return ((4, 4), 4);
+        var outer = Math.Max(4, align);
+        var offset = (4 + align - 1) / align * align;
+        return (((offset + size + outer - 1) / outer * outer, outer), offset);
     }
 
     /// <summary>An optional outside the niche: the value, then the flag, one byte; padded to the
@@ -256,24 +305,36 @@ public sealed class CEmitter
     private bool HoldsReferences(IrType type) => type switch
     {
         IrStructType s => _module.Types[s.Type.Value].FieldTypes.Any(HoldsReferences),
+        IrEnumType e => _module.Types[e.Type.Value].Variants
+            .Any(v => Payload(_module.Types[v.Value]).Any(HoldsReferences)),
         IrOptionalType o when !IsNiche(o) => HoldsReferences(o.Inner),
         _ => IsReference(type),
     };
 
-    /// <summary>The pointer-sized words of an object that are references, as word indices: a
-    /// reference field's own word, and through a struct or an optional held by value the words
-    /// of what it holds. An absent optional is all zero, so its words are null and harmless.</summary>
-    private void ReferenceWords(IrTypeDef def, int start, List<int> words)
+    /// <summary>
+    /// The pointer-sized words of an object that are references, as word indices: a reference
+    /// field's own word, and through a struct or an optional held by value the words of what it
+    /// holds. An absent optional is all zero, so its words are null and harmless.
+    ///
+    /// <para>AN ENUM HAS NO SUCH WORDS TO NAME. A word of its union is a reference under one
+    /// tag and a number under another, and a bitmap has one bit for it. Where an enum that holds
+    /// references lies in an object, <paramref name="ambiguous"/> is set and the descriptor says
+    /// so (<c>LYR_DESC_CONSERVATIVE</c>): the bitmap is not the whole truth, and a collector
+    /// scans the object as it scans a stack. Nothing moves (01 L1), so that is sound.</para>
+    /// </summary>
+    private void ReferenceWords(IrTypeDef def, int start, List<int> words, ref bool ambiguous)
     {
         var offsets = Fields(def, start).Offsets;
-        for (var i = 0; i < def.FieldTypes.Length; i++) ReferenceWords(def.FieldTypes[i], offsets[i], words);
+        for (var i = 0; i < def.FieldTypes.Length; i++)
+            ReferenceWords(def.FieldTypes[i], offsets[i], words, ref ambiguous);
     }
 
-    private void ReferenceWords(IrType type, int offset, List<int> words)
+    private void ReferenceWords(IrType type, int offset, List<int> words, ref bool ambiguous)
     {
         if (IsReference(type)) words.Add(offset / 8);
-        else if (type is IrStructType inner) ReferenceWords(_module.Types[inner.Type.Value], offset, words);
-        else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words);
+        else if (type is IrStructType inner) ReferenceWords(_module.Types[inner.Type.Value], offset, words, ref ambiguous);
+        else if (type is IrEnumType) ambiguous |= HoldsReferences(type);
+        else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words, ref ambiguous);
     }
 
     private string DescriptorName(TypeId id) => $"lyr_desc_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
@@ -315,7 +376,7 @@ public sealed class CEmitter
     private void Structs()
     {
         var indices = Enumerable.Range(0, _module.Types.Count)
-            .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass).ToList();
+            .Where(i => _module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum).ToList();
         // Every type a function names, for the optionals among them: an optional outside the
         // niche is a C struct of its own and is defined once, wherever it is first needed.
         var used = _module.Functions
@@ -323,11 +384,13 @@ public sealed class CEmitter
             .Where(t => t is IrOptionalType && !IsNiche(t)).ToList();
         if (indices.Count == 0 && used.Count == 0) return;
 
-        _out.AppendLine("/* types: a struct is a value, a class an object behind its header */");
+        _out.AppendLine("/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */");
         foreach (var i in indices)
         {
             var name = StructName(new TypeId(i));
             _out.AppendLine($"typedef struct {name} {name};");
+            foreach (var variant in _module.Types[i].Variants)
+                _out.AppendLine($"typedef struct {StructName(variant)} {StructName(variant)};");
         }
 
         var done = new HashSet<int>();
@@ -338,6 +401,8 @@ public sealed class CEmitter
         void Require(IrType type)
         {
             if (type is IrStructType held) Define(held.Type.Value);
+            else if (type is IrEnumType chosen) Define(chosen.Type.Value);
+            else if (IsTagNiche(type)) Require(((IrOptionalType)type).Inner);
             else if (type is IrOptionalType optional && !IsNiche(optional) && optionals.Add(OptionalName(optional)))
             {
                 Require(optional.Inner);
@@ -348,7 +413,8 @@ public sealed class CEmitter
         void Define(int index)
         {
             var def = _module.Types[index];
-            if (!(def.IsStruct || def.IsClass) || !done.Add(index)) return;
+            if (!(def.IsStruct || def.IsClass || def.IsEnum) || !done.Add(index)) return;
+            if (def.IsEnum) { DefineEnum(index, def, Require); return; }
             foreach (var field in def.FieldTypes) Require(field);
             var name = StructName(new TypeId(index));
             _out.AppendLine($"struct {name} {{");
@@ -361,6 +427,38 @@ public sealed class CEmitter
         foreach (var i in indices) Define(i);
         foreach (var type in used) Require(type);
         _out.AppendLine();
+    }
+
+    /// <summary>
+    /// An enum (V6): one struct per variant for its payload, named fields as the IR names them,
+    /// then the enum itself — the tag and the union of the payloads that hold something. A
+    /// variant without a payload is a tag value and nothing else; its struct exists so the IR's
+    /// reference to it has a type, and holds one unused byte because C has no empty struct.
+    /// </summary>
+    private void DefineEnum(int index, IrTypeDef def, Action<IrType> require)
+    {
+        foreach (var variant in def.Variants)
+            foreach (var field in Payload(_module.Types[variant.Value])) require(field);
+
+        var members = new List<string>();
+        for (var tag = 0; tag < def.Variants.Length; tag++)
+        {
+            var variant = _module.Types[def.Variants[tag].Value];
+            var name = StructName(def.Variants[tag]);
+            _out.AppendLine($"struct {name} {{");
+            if (variant.FieldTypes.Length <= 1) _out.AppendLine("    uint8_t lyr_unit;");
+            for (var i = 1; i < variant.FieldTypes.Length; i++)
+                _out.AppendLine($"    {Declare(variant.FieldTypes[i], FieldName(variant.FieldNames[i]))};");
+            _out.AppendLine("};");
+            if (variant.FieldTypes.Length > 1) members.Add($"{name} v{tag};");
+        }
+
+        var (total, _) = EnumLayout(def);
+        var self = StructName(new TypeId(index));
+        _out.AppendLine(members.Count == 0
+            ? $"struct {self} {{ uint32_t tag; }};"
+            : $"struct {self} {{ uint32_t tag; union {{ {string.Join(" ", members)} }} as; }};");
+        _out.AppendLine($"_Static_assert(sizeof({self}) == {total.Size}, \"layout of {self}\");");
     }
 
     /// <summary>
@@ -377,12 +475,14 @@ public sealed class CEmitter
             _out.AppendLine($"_Static_assert(offsetof({name}, {FieldName(def.FieldNames[i])}) == {offsets[i]}, \"layout of {name}\");");
 
         var words = new List<int>();
-        ReferenceWords(def, 8, words);
+        var ambiguous = false;
+        ReferenceWords(def, 8, words, ref ambiguous);
         var qualified = def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name;
         var text = qualified.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
         if (words.Count == 0)
         {
-            _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), 0, 0, 0, NULL, \"{text}\", NULL }};");
+            _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
             return;
         }
 
@@ -390,7 +490,7 @@ public sealed class CEmitter
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
         _out.AppendLine($"static const uint64_t lyr_refmap_ty{id.Value}[] = {{ {bits} }};");
-        _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), LYR_DESC_HAS_REFS, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
+        _out.AppendLine($"static const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
     }
 
     /// <summary>A parameter: a value, except the receiver of a struct method, which is the
@@ -531,16 +631,29 @@ public sealed class CEmitter
             ? $"{Temp(f.Dest)} = &{Temp(f.Object)}->{Field(f.Type, f.Field)};"
             : $"{Temp(f.Dest)} = {Temp(f.Object)}->{Field(f.Type, f.Field)};",
         StoreField f => Store(f),
+        OptNone n when IsTagNiche(TypeOf(n.Dest)) =>
+            $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{ .tag = LYR_ENUM_NONE }}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         OptNone n => IsNiche(TypeOf(n.Dest))
             ? $"{Temp(n.Dest)} = NULL;"
             : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
+        OptSome s when IsTagNiche(TypeOf(s.Dest)) =>
+            $"{Storage(s.Dest)} = {Value(s.Value)}; {Temp(s.Dest)} = &{Storage(s.Dest)};",
         OptSome s => IsNiche(TypeOf(s.Dest))
             ? $"{Temp(s.Dest)} = {Temp(s.Value)};"
             : $"{Storage(s.Dest)} = ({CType(TypeOf(s.Dest))}){{ .value = {Value(s.Value)}, .has = 1 }}; {Temp(s.Dest)} = &{Storage(s.Dest)};",
+        OptIsSome i when IsTagNiche(TypeOf(i.Option)) =>
+            $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)}->tag != LYR_ENUM_NONE);",
         OptIsSome i => IsNiche(TypeOf(i.Option))
             ? $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)} != NULL);"
             : $"{Temp(i.Dest)} = {Temp(i.Option)}->has;",
         OptGet g => Unwrap(g),
+        NewVariant v => Variant(v),
+        EnumTag t => $"{Temp(t.Dest)} = (int64_t){Temp(t.Value)}->tag;",
+        // The variant of a value whose tag was tested: its payload, in place. A variant without
+        // one has nothing to point at, and nothing reads through the pointer.
+        EnumAs a => _module.Types[a.Variant.Value].FieldTypes.Length > 1
+            ? $"{Temp(a.Dest)} = &{Temp(a.Value)}->as.v{_variants[a.Variant.Value].Tag};"
+            : $"{Temp(a.Dest)} = ({StructName(a.Variant)} *)(void *){Temp(a.Value)};",
         _ => throw new InvalidOperationException($"the C emitter has no case for {op.GetType().Name}; the gate let it through"),
     };
 
@@ -559,6 +672,9 @@ public sealed class CEmitter
         var option = Temp(g.Option);
         if (IsNiche(TypeOf(g.Option)))
             return g.Checked ? $"{Temp(g.Dest)} = LYR_UNWRAP({option});" : $"{Temp(g.Dest)} = {option};";
+        if (IsTagNiche(TypeOf(g.Option)))
+            return (g.Checked ? $"if (LYR_UNLIKELY({option}->tag == LYR_ENUM_NONE)) lyr_panic_null(); " : "")
+                   + $"{Temp(g.Dest)} = {option};";
 
         var check = g.Checked ? $"if (LYR_UNLIKELY(!{option}->has)) lyr_panic_null(); " : "";
         return IsAggregate(g.Inner)
@@ -576,6 +692,17 @@ public sealed class CEmitter
     /// <summary>The arguments of a call: values, except the receiver of a struct method, which
     /// goes as the place its temp aliases (02 M5) — so a <c>mut fn</c> writes the caller's
     /// value and not a copy of it.</summary>
+    /// <summary>A value of a variant: the tag, and the payload under its name in the union. The
+    /// rest of the union stays zero, so a word no variant wrote is never a stray pointer.</summary>
+    private string Variant(NewVariant v)
+    {
+        var variant = _module.Types[v.Variant.Value];
+        var tag = _variants[v.Variant.Value].Tag;
+        var fields = string.Join(", ", v.Fields.Select((f, i) => $".{FieldName(variant.FieldNames[i + 1])} = {Value(f)}"));
+        var payload = v.Fields.Length == 0 ? "" : $", .as.v{tag} = {{ {fields} }}";
+        return $"{Storage(v.Dest)} = ({CType(TypeOf(v.Dest))}){{ .tag = {tag}{payload} }}; {Temp(v.Dest)} = &{Storage(v.Dest)};";
+    }
+
     private string Arguments(IrFunction callee, TempId[] args) =>
         string.Join(", ", args.Select((arg, i) => callee.ReceiverByRef && i == 0 ? Temp(arg) : Value(arg)));
 
@@ -689,6 +816,10 @@ public sealed class CEmitter
             IrBinKind.Le => $"(uint8_t)({lhs} <= {rhs})",
             IrBinKind.Gt => $"(uint8_t)({lhs} > {rhs})",
             IrBinKind.Ge => $"(uint8_t)({lhs} >= {rhs})",
+            // Two strings are equal when their bytes are (the runtime compares; a pointer
+            // comparison would ask whether they are one object).
+            IrBinKind.Eq when IsString(TypeOf(b.Lhs)) => $"(uint8_t)lyr_str_eq({lhs}, {rhs})",
+            IrBinKind.Ne when IsString(TypeOf(b.Lhs)) => $"(uint8_t)!lyr_str_eq({lhs}, {rhs})",
             IrBinKind.Eq => $"(uint8_t)({lhs} == {rhs})",
             IrBinKind.Ne => $"(uint8_t)({lhs} != {rhs})",
             _ => throw new InvalidOperationException($"the C emitter has no case for '{b.Kind}'; the gate let it through"),

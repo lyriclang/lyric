@@ -5,3 +5,8 @@ module std.core;
 
 /// Ends the process with a message and a backtrace, exit 101 (05 E8). Bound by the compiler.
 pub fn panic(message: string): void;
+
+/// A value behind a reference (design/v5/spec/02 M13): the indirection a value type needs to
+/// hold itself. `enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr,
+/// Expr)` is not. The box is shared, not copied; its value is fixed, so sharing is unobservable.
+pub class Box<T> { value: T }

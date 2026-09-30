@@ -376,7 +376,7 @@ public sealed class TypeChecker
             case StructDecl s:
                 CheckAttributes(s.Attributes, AttributeTarget.Type, s.Generics.Length > 0,
                     module.Members, "a struct");
-                CheckStructIsFinite(s, module);
+                CheckValueTypeIsFinite(s, s.Name, "struct", module);
                 if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
                     CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false);
                 CheckMethods(s.Name, s.Members, module);
@@ -393,6 +393,7 @@ public sealed class TypeChecker
             case EnumDecl e:
                 CheckAttributes(e.Attributes, AttributeTarget.Type, e.Generics.Length > 0,
                     module.Members, "an enum");
+                CheckValueTypeIsFinite(e, e.Name, "enum", module);
                 if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
                     CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
                 CheckEnumMethods(e, module);
@@ -6077,56 +6078,78 @@ public sealed class TypeChecker
 
 
     /// <summary>
-    /// A <c>struct</c> must not contain itself as a field, not even indirectly.
+    /// A value type must not contain itself, not even indirectly (design/v5/spec/02 M13).
     ///
-    /// <para>For a reference type <c>class Node { next: Node }</c> is fine: a field holds a reference,
-    /// and that is one machine word. A value type contains its fields BY SIZE, so a struct containing
-    /// itself would be infinitely large. Rust reports "recursive type has infinite size", C# reports
-    /// CS0523.</para>
+    /// <para>A struct holds its fields BY SIZE and an enum its payloads (01 V2, V6), so a value
+    /// type that contains itself would be infinitely large. Rust reports "recursive type has
+    /// infinite size", C# reports CS0523. For a reference, <c>class Node { next: Node }</c> is
+    /// fine: a field holds one machine word.</para>
     ///
-    /// <para>Without this check <see cref="Lyric.Ir.Lowering.TypeTable"/> would loop forever here:
-    /// for classes it terminates through the pre-assigned id, but a value type needs its layout
-    /// complete before it is finished.</para>
+    /// <para>What holds a value by size: a field of a struct, a payload of an enum variant, and
+    /// through them an optional (<c>?Node</c> is the node and a flag) and a tuple. What breaks
+    /// the chain is a reference: a class — <c>Box&lt;T&gt;</c> of <c>std.core</c> is the one made
+    /// for it — or an array. Lyric 4 checked structs only and looked through no optional: its
+    /// values were heap objects, and <c>enum Tree { Node(Tree, Tree) }</c> ran.</para>
     ///
-    /// <para>The way out is the same as in Rust and C#: an indirection, meaning <c>class</c>. A
-    /// <c>?T</c> does not suffice, because <c>?Struct</c> still holds the value by size.</para>
+    /// <para>Without this check the type table would loop forever: a class terminates through
+    /// its pre-assigned id, but a value type needs its layout complete before it is finished.</para>
     /// </summary>
-    private void CheckStructIsFinite(StructDecl decl, ModuleSymbol module)
+    private void CheckValueTypeIsFinite(Decl decl, string name, string kind, ModuleSymbol module)
     {
-        if (module.Members.LookupLocal(decl.Name) is not TypeSymbol self) return;
+        if (module.Members.LookupLocal(name) is not TypeSymbol self) return;
 
         // The path is carried along so the message can name the cycle rather than only its existence:
         // for 'A contains B contains A' that is the whole difference.
-        var path = new List<string> { decl.Name };
-        if (FindStructCycle(self, self, new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance), path))
+        var path = new List<string> { name };
+        if (FindValueCycle(self, self, new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance), path))
             _de.Report("LYR-SEM0056", Severity.Error, decl.Span,
-                $"struct '{decl.Name}' contains itself ({string.Join(" -> ", path)}) and would have "
-                + "infinite size; use a 'class' for the recursive part");
+                $"{kind} '{name}' contains itself ({string.Join(" -> ", path)}) and would have "
+                + "infinite size — a value type cannot hold itself; put the recursive part behind "
+                + "a class, such as 'Box<T>' of std.core");
     }
 
-    private bool FindStructCycle(TypeSymbol root, TypeSymbol current,
+    private bool FindValueCycle(TypeSymbol root, TypeSymbol current,
         HashSet<TypeSymbol> visited, List<string> path)
     {
         if (!visited.Add(current)) return false;
-        if (current.Declaration is not StructDecl decl) return false;
 
-        foreach (var field in decl.Members.OfType<FieldDecl>())
+        foreach (var held in HeldByValue(current.Declaration))
         {
-            // Only directly held structs count. An array is a reference and so is a class; both break
-            // the chain.
-            if (field.Type is not NamedType named) continue;
-
-            var bound = _binding.Resolve(named);
+            var bound = _binding.Resolve(held);
             if (bound is ImportBindingSymbol import) bound = import.Target;
-            if (bound is not TypeSymbol { Kind: TypeSymbolKind.Struct } nested) continue;
+            if (bound is not TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Enum } nested) continue;
 
             path.Add(nested.Name);
-            if (ReferenceEquals(nested, root) || FindStructCycle(root, nested, visited, path))
+            if (ReferenceEquals(nested, root) || FindValueCycle(root, nested, visited, path))
                 return true;
             path.RemoveAt(path.Count - 1);
         }
 
         return false;
+    }
+
+    /// <summary>The named types a struct or an enum holds by value: its fields or payloads,
+    /// looked through an optional and a tuple. An array and a function type are references and
+    /// end the walk; so does a class, which the caller sees by its kind.</summary>
+    private static IEnumerable<NamedType> HeldByValue(Node? declaration)
+    {
+        IEnumerable<TypeNode> written = declaration switch
+        {
+            StructDecl s => s.Members.OfType<FieldDecl>().Select(f => f.Type),
+            EnumDecl e => e.Variants.SelectMany(v =>
+                (v.TupleFields ?? []).Concat((v.StructFields ?? []).Select(f => f.Type))),
+            _ => [],
+        };
+
+        static IEnumerable<NamedType> Inside(TypeNode type) => type switch
+        {
+            NamedType named => [named],
+            NullableType optional => Inside(optional.Inner),
+            TupleType tuple => tuple.Elements.SelectMany(Inside),
+            _ => [],
+        };
+
+        return written.SelectMany(Inside);
     }
 
     /// <param name="coercionSite">Whether the position is a coercion site — an assignment, an

@@ -1,0 +1,52 @@
+// An enum's payload keeps what it references alive (01 V4, V6): an object whose only reference
+// lies in the union of an enum field — a string under one tag, a boxed tree under another —
+// holds it across the collections a million dropped values force. The descriptor of such an
+// object says it holds references and that its bitmap does not tell where (the word is a
+// reference under one tag only). Run under the test's heap limit, as objects_gc.
+// Expected stdout: "kept label-999999 tree 499500" (0 + … + 999 = 499500). Exit 0.
+import std.core { Box };
+import std.io { println };
+
+enum Tree { Leaf(int), Node(Box<Tree>, Box<Tree>) }
+
+enum Payload {
+    Nothing,
+    Count(int),
+    Label(string),
+    Grown(Tree),
+}
+
+class Holder { var first: Payload, var second: Payload }
+
+fn grow(tree: Tree, n: int): Tree {
+    return Tree.Node(Box<Tree> { value = tree }, Box<Tree> { value = Tree.Leaf(n) });
+}
+
+fn sum(t: Tree): int {
+    return match (t) {
+        Tree.Leaf(n) => n,
+        Tree.Node(l, r) => sum(l.value) + sum(r.value),
+    };
+}
+
+fn main(): int {
+    let holder = Holder { first = Payload.Nothing, second = Payload.Count(0) };
+    var tree = Tree.Leaf(0);
+    var i = 0;
+    while (i < 1000000) {
+        let junk = Payload.Label(f"junk-{i}");
+        if (i % 1000 == 999) {
+            holder.first = Payload.Label(f"label-{i}");
+            tree = grow(tree, i / 1000);
+            holder.second = Payload.Grown(tree);
+        }
+        let seen = match (junk) { Payload.Label(text) => 1, _ => 0 };
+        if (seen == 0) { return 2; }
+        i += 1;
+    }
+
+    let label = match (holder.first) { Payload.Label(text) => text, _ => "?" };
+    let total = match (holder.second) { Payload.Grown(t) => sum(t), _ => -1 };
+    println(f"kept {label} tree {total}");
+    return if (total == 499500) 0 else 1;
+}

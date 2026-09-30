@@ -90,7 +90,8 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     public List<IrHandler> Handlers { get; init; } = new();
 
     /// <summary>
-    /// Whether parameter 0 is the receiver of a STRUCT method: <c>this</c> is then a reference
+    /// Whether parameter 0 is the receiver of a method of a VALUE, a struct or an enum:
+    /// <c>this</c> is then a reference
     /// to the caller's place, not a copy (design/v5/spec/02 M5; C# <c>ref this</c>) — a write
     /// through it is a write into the caller's value, and a partial write before a panic stays.
     /// The local keeps its struct type; a back end passes the place. A class method needs no

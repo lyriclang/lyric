@@ -2245,6 +2245,29 @@
             "File": "stdlib/std/core.lyr",
             "Line": 536
           }
+        },
+        {
+          "Kind": "Class",
+          "Name": "Box",
+          "Signature": "pub class Box<T>",
+          "Doc": "A value behind a reference (design/v5/spec/02 M13): the indirection a value type needs to\nhold itself. `enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr,\nExpr)` is not. The box is shared, not copied; its value is fixed, so sharing is unobservable.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "value",
+              "Signature": "value: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 565
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 564
+          }
         }
       ]
     },

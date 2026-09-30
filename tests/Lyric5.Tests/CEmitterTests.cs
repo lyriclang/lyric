@@ -40,6 +40,7 @@ public class CEmitterTests
     [InlineData("arith")]
     [InlineData("objects")]
     [InlineData("optionals")]
+    [InlineData("enums")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -77,6 +78,10 @@ public class CEmitterTests
             data.Add("optionals", profile, 0,
                 "find 8 -1\nzero 8 0\nlength 3 0\nchain 3 -1\nforce 2\nnested absent null 7\n"
                 + "place 9,5 copy 9,2\nname anon\nbox 0 5 b\niflet 42\n");
+            data.Add("enums", profile, 0,
+                "signals red yellow green\nareas 0 12 6 7\n"
+                + "describe round round flat square rect origin far@3,4\ngrade zero digit neg many\n"
+                + "maybe none green\nmethod true false 2\nscene 6 green\ntree 7\n");
         }
         return data;
     }
@@ -109,6 +114,8 @@ public class CEmitterTests
     [InlineData("objects_gc", Profile.Release, "kept 499500 held-999999 held-0 alice")]
     [InlineData("optionals_gc", Profile.Debug, "list 1000 499500 node-999 tag-999")]
     [InlineData("optionals_gc", Profile.Release, "list 1000 499500 node-999 tag-999")]
+    [InlineData("enums_gc", Profile.Debug, "kept label-999999 tree 499500")]
+    [InlineData("enums_gc", Profile.Release, "kept label-999999 tree 499500")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
