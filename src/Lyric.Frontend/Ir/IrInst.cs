@@ -60,7 +60,16 @@ public sealed record ArrayRepeat(TempId Dest, TempId Array, TempId Count, IrType
 public sealed record OptNone(TempId Dest, IrType Inner, Span Span) : IrOp(Span);
 public sealed record OptSome(TempId Dest, TempId Value, IrType Inner, Span Span) : IrOp(Span);
 public sealed record OptIsSome(TempId Dest, TempId Option, Span Span) : IrOp(Span);
-public sealed record OptGet(TempId Dest, TempId Option, IrType Inner, Span Span) : IrOp(Span);
+public sealed record OptGet(TempId Dest, TempId Option, IrType Inner, Span Span) : IrOp(Span)
+{
+    /// <summary>
+    /// The unwrap the PROGRAM asked for, <c>x!</c>: the value may be absent, and then it
+    /// panics (<c>LYR-RT0004</c>). Every other unwrap materializes a proof already made — it
+    /// stands behind an <c>optissome</c>, or behind the sema's narrowing — and cannot fail. The
+    /// 4.x VM checked every one; a native back end checks the one that can be wrong.
+    /// </summary>
+    public bool Checked { get; init; }
+}
 
 // Enums. 'match' is NOT here: it reads the tag and branches on it like any other case distinction.
 // After the branch, EnumAs narrows to the variant, and a field access on that is an ordinary

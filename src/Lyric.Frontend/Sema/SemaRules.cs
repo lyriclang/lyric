@@ -391,6 +391,11 @@ public sealed class SemaRules
                     return "'this' is replaced as a whole only in a 'mut fn' of a struct or an enum";
                 return _thisMut ? null : NotMutReason;
 
+            // '?.' reads; it does not assign (design/v5/spec/03 T4 O4). What a write through a
+            // chain that may be absent would mean — skip it, or fail — is a door, not a rule.
+            case MemberExpr { IsOptional: true }:
+                return "'?.' reads a value that may be absent and does not assign through it; narrow first";
+
             case MemberExpr m:
             {
                 // 'Type.NAME' names a 'static let', and that is a constant (Lyric 4 let the

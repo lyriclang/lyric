@@ -87,8 +87,8 @@ public static class SubsetGate
                 case IrArrayType:
                     Refuse(span, $"arrays, {where}", "M3");
                     break;
-                case IrOptionalType:
-                    Refuse(span, $"optionals, {where}", "M3");
+                case IrOptionalType optional:
+                    Type(optional.Inner, span, where);
                     break;
                 case IrEnumType:
                     Refuse(span, $"enums, {where}", "M3");
@@ -141,7 +141,6 @@ public static class SubsetGate
                     Refuse(op.Span, "arrays", "M3");
                     break;
                 case OptNone or OptSome or OptIsSome or OptGet:
-                    Refuse(op.Span, "optionals", "M3");
                     break;
                 case NewVariant or EnumTag or EnumAs:
                     Refuse(op.Span, "enums", "M3");
