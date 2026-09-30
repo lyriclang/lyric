@@ -48,15 +48,20 @@ public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
         return CCompilerKind.Gcc;
     }
 
+    /// <summary>The compiler's own version line, asked once per installed binary: the answer is
+    /// memoized under the binary's path, size and time, because starting `zig version` costs
+    /// 25 ms — half of what a warm build may cost in all (11 C9).</summary>
     private static CCompiler? Probe(string command, CCompilerKind kind)
     {
         var path = FindOnPath(command);
         if (path is null) return null;
         var version = kind == CCompilerKind.Zig ? "version" : "--version";
-        var result = ProcessRunner.TryRun(path, [version], TimeSpan.FromSeconds(10));
-        if (result is null || result.ExitCode != 0) return null;
-        var first = result.Stdout.Split('\n', 2)[0].Trim();
-        return new CCompiler(kind, path, first);
+        var first = UserCache.Memo("compiler-version", UserCache.FileStamp(path), () =>
+        {
+            var result = ProcessRunner.TryRun(path, [version], TimeSpan.FromSeconds(10));
+            return result is null || result.ExitCode != 0 ? "" : result.Stdout.Split('\n', 2)[0].Trim();
+        });
+        return first.Length == 0 ? null : new CCompiler(kind, path, first);
     }
 
     /// <summary>Resolves a command against PATH, the way a shell would.</summary>

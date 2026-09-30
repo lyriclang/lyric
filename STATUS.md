@@ -28,7 +28,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 |---|---|---|---|
 | M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
 | M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **done** 2026-09-30 |
-| M2 | First native program (IR → C → `zig cc`) | L | **next** |
+| M2 | First native program (IR → C → `zig cc`) | L | **in review** (#185) |
 | M3 | Value model and type system | XL | — |
 | M4 | Interfaces and abstraction | L | — |
 | M5 | Errors | M | — |
@@ -124,10 +124,12 @@ mechanism is not found. The run is local only (`LYRIC5_SANITIZERS=all`) until M1
 collector stops threads at safepoints, not with signals; the other TSan runs and the race
 control stay in CI.
 
-### M2 — First native program
+### M2 — First native program (in review, #185)
 
-In progress; the plan (13, M2) is agreed: S0 prune, S1 front end behind the subset gate,
-S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 and spec.
+The plan (13, M2): S0 prune, S1 front end behind the subset gate, S2 C emission, S3 strings and
+structs, S4 build and run, S5 measurement point 1 and spec. Exit criteria: `hello`, `fizzbuzz`
+and `fibonacci` (recursive and iterative; the coroutine form returns with M6) run natively on
+every Tier 1 target; measurement point 1 holds (below).
 
 1. S0: the 4.x VM, tools, bytecode writer and reader, embedding API, debug adapter, their tests,
    `stdlib-tests/`, `templates/`, `tools/Bench`, `build/publish.proj`, the 4.x release workflow
@@ -170,6 +172,28 @@ S2 C emission, S3 strings and structs, S4 build and run, S5 measurement point 1 
    Measured on the way: a warm `run` of hello takes ≈ 120 ms through `dotnet` — S5 measures the
    NativeAOT binary against the C9 budget. The AOT job now runs hello and fib natively on every
    Tier 1 runner.
+6. S5: measurement point 1 as ratchet tests (`MeasurementTests`), the spec (lyric-spec#47: 14
+   §1 `build`/`run`, 13 §1.4 RT0008 and `MIN % -1`), and two memos that made the warm path:
+   the C compiler's version line (starting `zig version` cost 25 ms per invocation) and the
+   runtime archive's path (keying the collector's units hashed megabytes per invocation), both
+   in the user's cache under the binary's stamp.
+
+Measured (WSL2 x86-64, `lyric5` as NativeAOT, release profile, minimum of many runs):
+
+| | Value | Bound |
+|---|---|---|
+| hello binary, debug information included | 1.2 MB | < 2 MB (01 L11) |
+| hello start | ≈ 1.8 ms (plain C: ≈ 1.0 ms) | < 5 ms (01 L11) |
+| `lyric5 run hello` warm | ≈ 12 ms, ≈ 10 ms over the program | ≤ 50 ms over the program (11 C9) |
+| `lyric5 --version` | ≈ 7 ms (was 26 ms before the memo) | — |
+
+The ratchets run on Linux: the binary under 2 MB, the runtime's start cost under 4 ms over plain
+C and under 5 ms absolute, the warm run under 50 ms over the program. On Windows a process start
+is 10–30 ms of its own and the in-process measurement drowned in it; the NativeAOT job prints the
+figures for every Tier 1 runner instead. Found on the way: on Windows `dbghelp.dll` came in
+through the import table and cost 3 ms of every program start for a report most programs never
+write — the runtime loads it at the first trace now, and the start costs ≈ 2.5 ms over plain C
+there (was 5).
 
 ## Design decisions
 

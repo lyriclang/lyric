@@ -163,3 +163,26 @@ jobs:
           grep -qx "Hello, Lyric!" hello.out
           code=0; "$lyric5" run tests/Lyric5.Tests/programs/fib.lyr --profile release || code=$?
           [ "$code" -eq 55 ]
+
+      # Measurement point 1 on this runner, for the record (the ratchets are the Linux tests in
+      # Lyric5.Tests): the program's own start and a warm `run`, the minimum of several.
+      - name: Start times
+        if: matrix.run
+        shell: bash
+        run: |
+          lyric5=aot/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=aot/lyric5.exe
+          "$lyric5" build tests/Lyric5.Tests/programs/hello.lyr --profile release
+          # Depth 2: out/release/<triple>/hello — a macOS .dSYM keeps another 'hello' deeper down.
+          hello=$(find out/release -maxdepth 2 -type f \( -name 'hello' -o -name 'hello.exe' \) | head -1)
+          python3 - "$hello" "$lyric5" <<'PY'
+          import subprocess, sys, time
+          def best(cmd, n):
+              m = 1e9
+              for _ in range(n):
+                  t = time.perf_counter(); subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); m = min(m, time.perf_counter() - t)
+              return m * 1000
+          hello, lyric5 = sys.argv[1], sys.argv[2]
+          print(f"hello start:        {best([hello], 20):.1f} ms (min of 20)")
+          print(f"lyric5 run warm:    {best([lyric5, 'run', 'tests/Lyric5.Tests/programs/hello.lyr', '--profile', 'release'], 10):.1f} ms (min of 10)")
+          print(f"lyric5 --version:   {best([lyric5, '--version'], 10):.1f} ms (min of 10)")
+          PY
