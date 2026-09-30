@@ -47,6 +47,7 @@ public class CEmitterTests
     [InlineData("inline")]
     [InlineData("tuples")]
     [InlineData("ranges")]
+    [InlineData("with")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -64,6 +65,9 @@ public class CEmitterTests
         "pair 1 two\nlabels 3 4 3\nswap 2 9\nnested 5 hi\nfield 5,12 169\narray 3 2 5\nmatch two-first 3hi\noptional 2\n";
 
     private const string RANGES_EXPECTED = "value 1 4 3\ninclusive 5 9\nheld 2 8 6\nloop 16\n";
+
+    private const string WITH_EXPECTED =
+        "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
 
     private const string INLINE_EXPECTED =
         "copy 10 1 3 3\nrepeat 0 7 7\nheap 2 60 80\nstruct 100 1 40\ngrid 3 2 2\narray 8 7 7 7\nmatch 15\n";
@@ -105,6 +109,7 @@ public class CEmitterTests
             data.Add("inline", profile, 0, INLINE_EXPECTED);
             data.Add("tuples", profile, 0, TUPLES_EXPECTED);
             data.Add("ranges", profile, 0, RANGES_EXPECTED);
+            data.Add("with", profile, 0, WITH_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

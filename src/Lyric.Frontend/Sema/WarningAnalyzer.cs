@@ -610,6 +610,7 @@ internal sealed class WarningAnalyzer
             case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) WalkExpr(e); break;
             case StructInitExpr si: foreach (var f in si.Fields) WalkExpr(f.Value); break;
+            case WithExpr w: WalkExpr(w.Target); foreach (var f in w.Fields) WalkExpr(f.Value); break;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkExpr(h.Expr);
                 break;

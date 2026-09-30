@@ -470,6 +470,15 @@ public static class AstDumper
                 Line(sb, indent, $"InitField {n.Name}", n.Span);
                 Write(n.Value, indent + 1, sb);
                 break;
+            case WithExpr n:
+                Line(sb, indent, "With", n.Span);
+                Write(n.Target, indent + 1, sb);
+                foreach (var f in n.Fields) Write(f, indent + 1, sb);
+                break;
+            case WithField n:
+                Line(sb, indent, $"WithField {string.Join('.', n.Path)}", n.Span);
+                Write(n.Value, indent + 1, sb);
+                break;
 
             // --- a type path in value position: Pair<int>.of(3) ---
             case TypePathExpr n:

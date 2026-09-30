@@ -530,6 +530,7 @@ public sealed class SemaRules
         ArrayLitExpr arr => arr.Elements,
         TupleLitExpr tu => tu.Elements,
         StructInitExpr si => si.Fields.Select(f => f.Value),
+        WithExpr w => [w.Target, .. w.Fields.Select(f => f.Value)],
         InterpolatedStringExpr fs => fs.Segments.OfType<InterpHole>().Select(h => h.Expr),
         IfExpr iff => [iff.Condition, iff.Then, iff.Else],
         // MatchExpr and LambdaExpr are handled in WalkExpr: their block arms and block bodies are

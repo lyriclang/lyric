@@ -119,6 +119,7 @@ public class GoldenTests
     [InlineData("index_from_end")]    // xs[^1] beside a ^ b: a prefix from the end, an infix exclusive or (03 T14 N6)
     [InlineData("index_slice")]       // xs[1..^1], xs[..2], xs[2..], xs[..], xs[1..=2]: the views (03 T13 A2)
     [InlineData("tuple_elements")]    // t.0, n.0.1 (one float token, two members), p.x (03 T16)
+    [InlineData("with_expr")]         // p with { x = 1, pos.y = p.y }.x: a postfix, a path, precedence (02 M6)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 

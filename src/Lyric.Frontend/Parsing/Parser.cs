@@ -387,6 +387,29 @@ public sealed partial class Parser
                     break;
                 }
 
+                // 'p with { x = 1, pos.y = 2 }' (02 M6): a postfix, 'with' contextual, the
+                // fields as in an initializer with a path allowed on the left.
+                case TokenKind.Identifier when AtContextual("with") && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
+                {
+                    _buffer.Advance(); // 'with'
+                    _buffer.Advance(); // '{'
+                    var fields = new List<WithField>();
+                    while (!_buffer.Check(TokenKind.RBrace) && !_buffer.Check(TokenKind.Eof))
+                    {
+                        var first = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003", "expected a field name in 'with'");
+                        var path = new List<string> { _sm.Slice(first.Span).ToString() };
+                        while (_buffer.Match(TokenKind.Dot))
+                            path.Add(_sm.Slice(_buffer.Expect(TokenKind.Identifier, "LYR-PAR0003", "expected a field name after '.'").Span).ToString());
+                        _buffer.Expect(TokenKind.Equal, "LYR-PAR0003", "expected '=' after the field in 'with'");
+                        var value = ParseSubExpr();
+                        fields.Add(new WithField(path.ToArray(), value, Span.Union(first.Span, value.Span)));
+                        if (!_buffer.Match(TokenKind.Comma)) break;
+                    }
+                    var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close 'with'");
+                    operand = new WithExpr(operand, fields.ToArray(), Span.Union(operand.Span, close.Span));
+                    break;
+                }
+
                 // 'xs.map { it * 2 }', 'run { … }', 'fold(0) { acc + it }': a block directly
                 // after a callee or a call is its LAST argument, a lambda whose one parameter
                 // is 'it'. A '{' after an expression opened nothing before this — every block

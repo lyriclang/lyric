@@ -1772,6 +1772,7 @@ public sealed class TypeChecker
             case CastExpr c: return CheckCast(c, scope);
             case IndexExpr ix: return CheckIndex(ix, scope);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
+            case WithExpr w: return CheckWith(w, scope);
             case TupleLitExpr tu: return new TupleOf(tu.Elements.Select(e => CheckExpr(e, scope)).ToArray());
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments)
@@ -4619,6 +4620,65 @@ public sealed class TypeChecker
                 ? [id.Name, member.Member]
                 : [member.Member];
 
+    /// <summary>
+    /// <c>p with { x = 3, pos.y = 4 }</c> (design/v5/spec/02 M6): a copy of <c>p</c> with the
+    /// named fields replaced, of <c>p</c>'s type — on a struct only (W2): a class would be a
+    /// clone with a new identity, a tuple has no field names. A path reaches into a struct the
+    /// value holds by value (W6); a field named twice is refused, a field the type does not
+    /// have too (W4); no field needs <c>var</c>, since nothing is written in place. The values
+    /// see the old <c>p</c>: they are expressions over it, and the copy is what changes.
+    /// </summary>
+    private LyrType CheckWith(WithExpr w, SymbolTable scope)
+    {
+        var target = CheckExpr(w.Target, scope);
+        if (target.IsError) { foreach (var f in w.Fields) CheckExpr(f.Value, scope); return LyrType.Error; }
+        if (TypeFacts.KindOf(target) != TypeSymbolKind.Struct)
+        {
+            foreach (var f in w.Fields) CheckExpr(f.Value, scope);
+            return Report(w.Span, "LYR-SEM0116",
+                $"'with' copies a struct with fields replaced; '{TypeFacts.Display(target)}' is "
+                + (TypeFacts.KindOf(target) == TypeSymbolKind.Class ? "a class — an object is changed in place, or cloned"
+                    : target is TupleOf ? "a tuple, which has no fields to name" : "no struct"));
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in w.Fields)
+        {
+            var key = string.Join(".", field.Path);
+            if (!seen.Add(key))
+                _de.Report("LYR-SEM0070", Severity.Error, field.Span, $"duplicate field '{key}' in 'with'");
+
+            // Walk the path: every segment but the last names a struct held by value.
+            var holder = target;
+            LyrType? fieldType = null;
+            for (var i = 0; i < field.Path.Length; i++)
+            {
+                if (TypeFacts.KindOf(holder) != TypeSymbolKind.Struct)
+                {
+                    _de.Report("LYR-SEM0116", Severity.Error, field.Span,
+                        $"'{string.Join(".", field.Path.Take(i))}' is a '{TypeFacts.Display(holder)}', not a struct — a path in 'with' reaches through structs only");
+                    fieldType = null;
+                    break;
+                }
+                var owner = TypeFacts.SymbolOf(holder)!;
+                if (owner.Members.LookupLocal(field.Path[i]) is not FieldSymbol fs)
+                {
+                    _de.Report("LYR-SEM0015", Severity.Error, field.Span, $"'{owner.Name}' has no field '{field.Path[i]}'");
+                    fieldType = null;
+                    break;
+                }
+                if (i == field.Path.Length - 1) _result.BindRef(field, fs);
+                var subst = holder is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+                fieldType = Substitute(FieldType(fs), subst);
+                holder = fieldType;
+            }
+
+            if (fieldType is null) { CheckExpr(field.Value, scope); continue; }
+            CheckAssignable(field.Value, CheckExpr(field.Value, scope, fieldType), fieldType, field.Span);
+        }
+        return target;
+    }
+
     private LyrType CheckStructInit(StructInitExpr si, SymbolTable scope, LyrType? expected)
     {
         // '.Rect { w = 1 }': the variant of the enum this position expects (08 Y9).
@@ -6241,6 +6301,7 @@ public sealed class TypeChecker
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;
+                case WithExpr w: WalkNode(w.Target); foreach (var f in w.Fields) WalkNode(f.Value); return;
                 case InterpolatedStringExpr fs:
                     foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkNode(h.Expr);
                     return;

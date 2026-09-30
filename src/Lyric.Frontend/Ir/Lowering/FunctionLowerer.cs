@@ -353,6 +353,37 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>
+    /// <c>p with { x = 3, pos.y = 4 }</c> (02 M6): a copy of <c>p</c>, then one store per field
+    /// into the copy — through the structs a path names, aliased where they lie in the copy.
+    /// The values are expressions over <c>p</c> and see the old values (W4).
+    /// </summary>
+    private TempId LowerWith(WithExpr expr)
+    {
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
+            throw Bug("'with' on a value that is not a struct");
+        var copy = CopyStructValue(LowerExpr(expr.Target), type, expr.Span);
+
+        foreach (var field in expr.Fields)
+        {
+            var (place, placeType) = (copy, type);
+            for (var i = 0; i < field.Path.Length - 1; i++)
+            {
+                var layout = _typeTable.Defs[placeType.Type.Value];
+                var index = Array.IndexOf(layout.FieldNames, field.Path[i]);
+                var inner = (IrStructType)layout.FieldTypes[index];
+                var loaded = _slots.NewTemp(inner);
+                _b.Emit(new LoadField(loaded, place, placeType.Type, new FieldId(index), inner, field.Span));
+                (place, placeType) = (loaded, inner);
+            }
+            var last = _typeTable.Defs[placeType.Type.Value];
+            var at = Array.IndexOf(last.FieldNames, field.Path[^1]);
+            var value = LowerExprAs(field.Value, last.FieldTypes[at]);
+            _b.Emit(new StoreField(place, placeType.Type, new FieldId(at), value, field.Span));
+        }
+        return copy;
+    }
+
     private TempId LowerTupleLiteral(TupleLitExpr expr)
     {
         if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
@@ -1706,6 +1737,7 @@ internal sealed class FunctionLowerer
         NullLiteralExpr e => LowerNull(e),
         LambdaExpr e => LowerLambda(e),
         TupleLitExpr e => LowerTupleLiteral(e),
+        WithExpr e => LowerWith(e),
         // A match whose arms all leave has the type 'never' and no result slot: nothing ever
         // flows out of it, and 'never' has no IR type to give a slot.
         MatchExpr e => _types.TypeOf(e) is NeverType

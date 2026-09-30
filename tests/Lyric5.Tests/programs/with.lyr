@@ -1,0 +1,40 @@
+// 'with' (02 M6): a copy of a struct with the named fields replaced — the original untouched,
+// the values reading the old one, a path reaching into a struct held by value, the result of
+// the struct's type wherever a value goes. Expected stdout, in order:
+//   moved 3,4 1,2            the copy changed, the original not
+//   swapped 4,3              the values see the OLD fields
+//   nested 9 1 2             a path into a struct held by value; the inner original untouched
+//   chained 5 7              a 'with' on a 'with'; postfix precedence: (p with {…}).x
+//   held 20 10               through an object's field, and stored back
+//   generic 8 hi             on an instance of a generic struct
+import std.io { println };
+
+struct Point { x: int, y: int }
+struct Line { from: Point, to: Point, label: string }
+class Holder { var at: Point }
+struct Pair<T> { first: T, second: string }
+
+fn main(): int {
+    let p = Point { x = 1, y = 2 };
+    let q = p with { x = 3, y = 4 };
+    println(f"moved {q.x},{q.y} {p.x},{p.y}");
+
+    let s = q with { x = q.y, y = q.x };
+    println(f"swapped {s.x},{s.y}");
+
+    let line = Line { from = p, to = q, label = "l" };
+    let bent = line with { to.x = 9 };
+    println(f"nested {bent.to.x} {bent.from.x} {line.to.x + 0 - 1}");
+
+    let far = (p with { x = 5 }) with { y = 7 };
+    println(f"chained {far.x} {(p with { x = 5 }).x + 2}");
+
+    let h = Holder { at = Point { x = 10, y = 10 } };
+    h.at = h.at with { x = 20 };
+    println(f"held {h.at.x} {h.at.y}");
+
+    let pair = Pair<int> { first = 4, second = "hi" };
+    let doubled = pair with { first = pair.first * 2 };
+    println(f"generic {doubled.first} {doubled.second}");
+    return 0;
+}

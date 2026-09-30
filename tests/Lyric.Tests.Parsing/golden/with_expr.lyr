@@ -1,0 +1,1 @@
+p with { x = 1, pos.y = p.y }.x + q with { }

@@ -707,6 +707,7 @@ public sealed class AstFormatter
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
         RangeExpr => Range,
+        WithExpr => Postfix,
         AssignExpr => Assign,
         // An if or a lambda extends to the end of the expression: as an operand it must be
         // parenthesized or the reparse reads past the operator. Treated as the loosest level.
@@ -766,6 +767,7 @@ public sealed class AstFormatter
             ExprDoc(i.Then, Assign), Doc.LineOrSpace, Doc.From("else "), ExprDoc(i.Else, Assign)),
         MatchExpr m => MatchDoc(m.Scrutinee, m.Arms, m.Span),
         StructInitExpr s => StructInitDoc(s),
+        WithExpr w => WithDoc(w),
 
         _ => throw new InternalCompilationException($"unreachable: unformatted {expr.GetType().Name}"),
     };
@@ -983,6 +985,19 @@ public sealed class AstFormatter
 
     private Doc InitFieldDoc(StructInitField field) =>
         Doc.Of(Doc.From($"{field.Name} = "), ExprDoc(field.Value, Assign));
+
+    /// <summary><c>p with { x = 1, pos.y = 2 }</c>: the postfix and its fields like an initializer's.</summary>
+    private Doc WithDoc(WithExpr with)
+    {
+        var head = Doc.Of(ExprDoc(with.Target, Postfix), Doc.From(" with"));
+        if (with.Fields.Length == 0) return Doc.Of(head, Doc.From(" { }"));
+        return Doc.GroupOf(head, Doc.From(" {"),
+            Doc.IndentOf(Doc.LineOrSpace,
+                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
+                    with.Fields.Select(f => Doc.Of(Doc.From(string.Join(".", f.Path) + " = "), ExprDoc(f.Value, Assign))).ToArray()),
+                Doc.WhenBroken(Doc.From(","))),
+            Doc.LineOrSpace, Doc.From("}"));
+    }
 
     // ------------------------------------------------------------------ patterns
 

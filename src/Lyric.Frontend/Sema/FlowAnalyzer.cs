@@ -243,6 +243,7 @@ internal sealed class FlowAnalyzer
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e, assigned); return;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e, assigned); return;
             case StructInitExpr si: foreach (var fld in si.Fields) AnalyzeExpr(fld.Value, assigned); return;
+            case WithExpr w: AnalyzeExpr(w.Target, assigned); foreach (var fld in w.Fields) AnalyzeExpr(fld.Value, assigned); return;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr, assigned);
                 return;
