@@ -24,8 +24,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M | Name | Size | State |
 |---|---|---|---|
 | M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
-| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **in review** (#178) |
-| M2 | First native program (IR → C → `zig cc`) | L | — |
+| M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **done** 2026-09-30 |
+| M2 | First native program (IR → C → `zig cc`) | L | **next** |
 | M3 | Value model and type system | XL | — |
 | M4 | Interfaces and abstraction | L | — |
 | M5 | Errors | M | — |
@@ -67,7 +67,9 @@ Measured on the way and kept: the tree stays 4.6.0 because a 5.0.0 claim fires t
 deprecation clocks aimed at 5.0 (29 CLI tests red); `zig cc` ships no ASan/TSan runtime, so the
 sanitizer profile compiles with clang (01 C7).
 
-### M1 — Runtime core in C (in review, #178)
+### M1 — done (2026-09-30)
+
+Merged as #178 (`c8a76159`); the spec side is lyric-spec#46 (`70e7783`).
 
 1. S1 `6ce9d46e`: bdwgc 8.2.12 and libbacktrace vendored (`runtime/THIRD_PARTY.md`);
    `Lyric5.Toolchain` builds `liblyr.a` for all five Tier 1 triples, with a content-hash cache.
@@ -80,6 +82,8 @@ sanitizer profile compiles with clang (01 C7).
    shows a real fault is still reported; valgrind locally (`tooling/valgrind/run.sh`,
    `runtime/valgrind.supp`); the measurement below; spec chapter 13 §1, the runtime contract of
    stage 0 (lyric-spec#46).
+6. CI fixes after the slices (`ec4ef004`): macOS fault traces from the frame chain, archives
+   named by their key, the sanitizer runs confined to the C toolchain job.
 
 Measured (WSL2 x86-64, release profile, zig cc 0.16; no ratchet before M2):
 
@@ -101,7 +105,25 @@ Learned on the way and kept:
 - Under the conservative stage, a stale root handle in scanned memory keeps alive whatever
   reuses its cell (documented in `lyr/gc.h`).
 - Temporary object files were unique per process only, and parallel builds in one process
-  collided on them.
+  collided on them; on Windows a replace of a file in use fails, so objects and archives are
+  published once under content-keyed names and never replaced.
+- Apple's unwinder does not leave a signal handler's trampoline: a fault's frames come from the
+  frame-pointer chain there.
+- TSan delivers the collector's stop signal only at its own points; Boehm's TSan mode (a mutex)
+  has none, its spin lock (`nanosleep`) has one. The sanitizer runs live in the C toolchain job
+  alone.
+
+**Open thread — the threads program under TSan.** On GitHub's Ubuntu runner (clang 18) the
+collector's stop-the-world signals now and then reach a thread only after Boehm's retry limit
+(15 s) and it aborts, "Signals delivery fails constantly at GC #2": 3 of 5 runs, with and without
+the kernel's `mmap_rnd_bits` preparation. Locally (WSL2, clang 22) 96 stressed runs pass. The
+mechanism is not found. The run is local only (`LYRIC5_SANITIZERS=all`) until M11, whose
+collector stops threads at safepoints, not with signals; the other TSan runs and the race
+control stay in CI.
+
+### M2 — First native program
+
+Next. Plan first (13, M2), then slices.
 
 ## Design decisions
 
