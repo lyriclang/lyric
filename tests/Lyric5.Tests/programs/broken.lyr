@@ -1,0 +1,5 @@
+// A program the front end refuses: a type error, reported before the gate sees anything.
+fn main(): int {
+    let n: int = "seven";
+    return n;
+}

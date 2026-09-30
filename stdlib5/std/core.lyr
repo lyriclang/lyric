@@ -1,0 +1,7 @@
+/// What the language itself binds without an import (std.core, design/v5/spec/10 U-series).
+/// M2 seed: `panic` only; the interfaces the built-in types satisfy come with M4, the rest with
+/// M8a.
+module std.core;
+
+/// Ends the process with a message and a backtrace, exit 101 (05 E8). Bound by the compiler.
+pub fn panic(message: string): void;

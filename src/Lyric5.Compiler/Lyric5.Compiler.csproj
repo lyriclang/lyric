@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Lyric 5 compiler proper (design/v5/spec/13, M2 onward): what turns the front end's IR into
+    C. It sits behind the front end and in front of the toolchain driver; it executes nothing.
+    Until the front end has moved to the 5 language, the subset gate says which IR it accepts.
+  -->
+  <PropertyGroup>
+    <Version>5.0.0</Version>
+    <AssemblyName>lyric5.compiler</AssemblyName>
+    <RootNamespace>Lyric5.Compiler</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
+    <ProjectReference Include="..\Lyric.Frontend\Lyric.Frontend.csproj" />
+  </ItemGroup>
+
+</Project>

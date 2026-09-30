@@ -1,0 +1,10 @@
+// A program the front end accepts and the subset gate refuses: coroutines come with M6.
+fn count(): Coroutine<int> {
+    var i = 0;
+    while (true) { yield i; i = i + 1; }
+}
+
+fn main(): int {
+    let c = count();
+    return 0;
+}

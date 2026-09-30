@@ -144,10 +144,14 @@ jobs:
       - name: Publish
         run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o aot
 
-      - name: Self-report
+      # The self-report, and the front end inside the native binary (M2 S1): hello's IR, with the
+      # calls into the seed standard library the emitter maps to the runtime.
+      - name: Self-report and the IR of hello
         if: matrix.run
         shell: bash
         run: |
           lyric5=aot/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=aot/lyric5.exe
           "$lyric5" --version
           "$lyric5" --version | head -1 | grep -q "^lyric 5\.0\.0"
+          "$lyric5" build tests/Lyric5.Tests/programs/hello.lyr --emit ir | tee hello.ir
+          grep -q "callimport std.io.println" hello.ir
