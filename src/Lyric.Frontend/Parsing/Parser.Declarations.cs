@@ -758,12 +758,12 @@ public sealed partial class Parser
 
     // --- Global binding & type alias (§2) ---
 
+    /// <summary>A module-level <c>let</c> or <c>var</c> (design/v5/spec/07 V5 G2, G5): filled
+    /// eagerly at program start in declaration order; a <c>var</c> is written like a local one.
+    /// Lyric 4 allowed <c>let</c> only.</summary>
     private Decl ParseGlobalBinding(bool isPublic, Span start)
     {
-        if (_buffer.Check(TokenKind.Var))
-            _de.Report("LYR-PAR0027", Severity.Error, _buffer.Current.Span,
-                "global bindings must be immutable — use 'let', not 'var'");
-        var binding = RequireNamedBinding(ParseBinding(), "a module-level 'let'");
+        var binding = RequireNamedBinding(ParseBinding(), "a module-level binding");
         return new GlobalBindingDecl(isPublic, binding, Span.Union(start, binding.Span));
     }
 

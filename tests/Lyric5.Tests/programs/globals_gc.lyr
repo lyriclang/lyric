@@ -1,0 +1,25 @@
+// A module-level binding is a root (07 V5; 01 L1): what only a global references survives
+// the collections a million dropped objects force. Run under the test's heap limit, as
+// objects_gc. Expected stdout: "kept 499500 item-999999 anchor". Exit 0.
+import std.io { println };
+
+class Item { id: int, label: string }
+class Keeper { var last: Item, var sum: int, name: string }
+
+let keeper = Keeper { last = Item { id = 0, label = "none" }, sum = 0, name = "anc" + "hor" };
+var churned = 0;
+
+fn main(): int {
+    var i = 0;
+    while (i < 1000000) {
+        let item = Item { id = i, label = f"item-{i}" };
+        if (i % 1000 == 999) {
+            keeper.last = item;
+            keeper.sum += item.id / 1000;
+        }
+        churned += 1;
+        i += 1;
+    }
+    println(f"kept {keeper.sum} {keeper.last.label} {keeper.name}");
+    return if (keeper.last.id == 999999 && churned == 1000000) 0 else 1;
+}

@@ -95,6 +95,8 @@ public sealed class CEmitter
 
     private static string Temp(TempId temp) => $"t{temp.Value}";
 
+    private string GlobalName(int index) => $"lyr_g{index}_" + Identifier(_module.Globals[index].Name);
+
     public string CType(IrType type) => type switch
     {
         IrStructType s => StructName(s.Type),
@@ -419,6 +421,16 @@ public sealed class CEmitter
 
         Structs();
 
+        // The module's globals (07 V5): static variables, filled by the initializer before the
+        // entry runs. Static data is a root the collector scans (01 L1).
+        if (_module.Globals.Count > 0)
+        {
+            _out.AppendLine("/* module-level bindings */");
+            for (var i = 0; i < _module.Globals.Count; i++)
+                _out.AppendLine($"static {Declare(_module.Globals[i].Type, GlobalName(i))} = {Zero(_module.Globals[i].Type)};");
+            _out.AppendLine();
+        }
+
         var prototypes = new StringBuilder();
         prototypes.AppendLine("/* prototypes */");
         foreach (var function in _module.Functions) prototypes.Append(Signature(function)).AppendLine(";");
@@ -645,9 +657,13 @@ public sealed class CEmitter
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("/* the program */");
-        if (IsVoid(entry.ReturnType))
+        // The globals are filled first (07 V5 G2), in declaration order, then the entry runs.
+        var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
+        if (IsVoid(entry.ReturnType) || init.Length > 0)
         {
-            text.AppendLine($"static int64_t lyr_entry(void) {{ {name}(); return 0; }}");
+            text.AppendLine(IsVoid(entry.ReturnType)
+                ? $"static int64_t lyr_entry(void) {{ {init}{name}(); return 0; }}"
+                : $"static int64_t lyr_entry(void) {{ {init}return {name}(); }}");
             name = "lyr_entry";
         }
         text.AppendLine($"int main(int argc, char **argv) {{ return lyr_run_main(argc, argv, {name}); }}");
@@ -746,6 +762,11 @@ public sealed class CEmitter
             : $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
         StoreLocal s when IsReceiverPlace(s.Local) => $"*{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
         StoreLocal s => $"{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
+        // A global is storage like a local: an aggregate is aliased in place, anything else read.
+        LoadGlobal l => IsAggregate(l.Type)
+            ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
+            : $"{Temp(l.Dest)} = {GlobalName(l.Global.Value)};",
+        StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)})"),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",

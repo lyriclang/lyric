@@ -2203,6 +2203,10 @@ internal sealed class FunctionLowerer
         if (TryCapturedCell(expr.Target, out var cell, out var cellType, out var cellValueType))
             return LowerCapturedAssign(expr, cell, cellType, cellValueType);
 
+        // A module-level 'var' (07 V5 G5): the global slot, read and written as a local is.
+        if (expr.Target is IdentifierExpr globalName && GlobalOf(globalName) is { } global)
+            return LowerGlobalAssign(expr, global);
+
         var slot = ResolveLocalTarget(expr.Target, "assignment");
 
         if (expr.Operator is null)
@@ -3884,6 +3888,41 @@ internal sealed class FunctionLowerer
         var (id, type) = _globals.Resolve(stmt.Symbol, stmt.Span);
         var value = LowerExprAs(stmt.Binding.Initializer!, type);
         _b.Emit(new StoreGlobal(id, value, stmt.Span));
+    }
+
+    private GlobalSymbol? GlobalOf(IdentifierExpr expr)
+    {
+        var symbol = _types.RefOf(expr);
+        if (symbol is ImportBindingSymbol import) symbol = import.Target;
+        return symbol as GlobalSymbol;
+    }
+
+    private TempId LowerGlobalAssign(AssignExpr expr, GlobalSymbol global)
+    {
+        var (id, type) = _globals.Resolve(global, expr.Span);
+        TempId Load()
+        {
+            var loaded = _slots.NewTemp(type);
+            _b.Emit(new LoadGlobal(loaded, id, type, expr.Target.Span));
+            return loaded;
+        }
+        if (expr.Operator is null)
+        {
+            var value = LowerExprAs(expr.Value, type);
+            _b.Emit(new StoreGlobal(id, value, expr.Span));
+            return value;
+        }
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+            return LowerShortCircuitAssign(expr, type, Load, v => _b.Emit(new StoreGlobal(id, v, expr.Span)));
+        if (_types.OperatorCallOf(expr) is { } operatorCall)
+        {
+            var combined = LowerCall(operatorCall) ?? throw Bug("operator compound returned no value");
+            _b.Emit(new StoreGlobal(id, combined, expr.Span));
+            return combined;
+        }
+        var result = EmitBinary(IrBinKindExtensions.FromAst(expr.Operator.Value), type, Load(), LowerExpr(expr.Value), expr.Span);
+        _b.Emit(new StoreGlobal(id, result, expr.Span));
+        return result;
     }
 
     /// <summary>A global slot through a bare name: a module <c>let</c> in the own or an imported

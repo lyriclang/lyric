@@ -188,11 +188,11 @@ public class GoldenTests
     [InlineData("type_alias")]        // type X = int;
     [InlineData("global_let")]        // pub let ...
     [InlineData("module_full")]       // Header + Import + Struct + Fn
+    [InlineData("global_var")]        // var at top level (07 V5 G5; Lyric 4 refused it)
     // Attributes.
     [InlineData("attr_decl")]         // on fn, struct, class and enum; args, stacking, dotted path
     [InlineData("attr_module")]       // before the module header
     // Negativ.
-    [InlineData("global_var")]        // var at top level (LYR-PAR0027)
     [InlineData("bad_toplevel")]      // Ausdruck statt Deklaration
     [InlineData("attr_bad_target")]   // on interface, let and type alias (LYR-PAR0042)
     [InlineData("attr_dangling")]     // an attribute with nothing behind it (LYR-PAR0042)
