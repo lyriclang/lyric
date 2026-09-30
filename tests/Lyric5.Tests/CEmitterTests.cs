@@ -43,6 +43,7 @@ public class CEmitterTests
     [InlineData("enums")]
     [InlineData("patterns")]
     [InlineData("arrays")]
+    [InlineData("slices")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -87,6 +88,9 @@ public class CEmitterTests
             data.Add("arrays", profile, 0,
                 "literal 3 10 20 30\nstore 99 20\nrepeat 5 7 7\nconcat 5 1 5\nfromend 30 99 50\nstruct 3,4 9 5 2\nnested 2 3 6\n"
                 + "refs alice bob 41 2\nsum 55\nopt 1 none\n");
+            data.Add("slices", profile, 0,
+                "view 3 20 40 90\nopen 2 40 5 30\nthrough 21 31 51 31\nnested 2 31 41\nwhole 154\nfield 2 99 51\n"
+                + "strings bob cy 2\nstructs 30 6 0\nmatch empty one 10 first 10 rest 4\nempty 0 0\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -171,6 +175,10 @@ public class CEmitterTests
         { "index", Profile.Release, "panic [LYR-RT0003]: index 3 out of bounds for length 3" },
         { "negindex", Profile.Debug, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
         { "negindex", Profile.Release, "panic [LYR-RT0003]: index -1 out of bounds for length 3" },
+        { "badslice", Profile.Debug, "panic [LYR-RT0003]: range 2..7 out of bounds for length 5" },
+        { "badslice", Profile.Release, "panic [LYR-RT0003]: range 2..7 out of bounds for length 5" },
+        { "inverted", Profile.Debug, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
+        { "inverted", Profile.Release, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the

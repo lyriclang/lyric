@@ -102,6 +102,20 @@ public class FormatterTests
             """, Format("fn f(xs:int[],a:int,b:int):int{return xs[ ^ 1]+xs[a^b]+xs.length();}"));
     }
 
+    [Fact]
+    public void A_view_range_keeps_its_open_side_open()
+    {
+        // 'xs[a..b]' and the open forms (design/v5/spec/03 T13 A2): the range has no spaces, an
+        // open side prints nothing, and the type is written as any generic name.
+        Assert.Equal("""
+            fn f(xs: int[]): Slice<int> {
+                let v = xs[1..^1];
+                return v[..2][1..][..][..=0];
+            }
+
+            """, Format("fn f(xs:int[]):Slice<int>{let v=xs[ 1 .. ^1 ];return v[..2][1..][ .. ][..=0];}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

@@ -177,6 +177,7 @@ public static class IrPrinter
         LoadElem e => $"{e.Dest}: {TypeStr(e.Element)} = loadelem {e.Array}, {e.Index}",
         StoreElem e => $"storeelem {e.Array}, {e.Index}, {e.Value}",
         ArrayLen a => $"{a.Dest}: i64 = arraylen {a.Array}",
+        MakeSlice s => $"{s.Dest}: {TypeStr(new IrSliceType(s.Element))} = mkslice {s.Array}, {s.Low}, {s.High}",
         ArrayConcat c => $"{c.Dest}: {TypeStr(new IrArrayType(c.Element))} = arrcat {c.Left}, {c.Right}",
         ArrayRepeat r => $"{r.Dest}: {TypeStr(new IrArrayType(r.Element))} = arrrep {r.Array}, {r.Count}",
 
@@ -261,6 +262,7 @@ public static class IrPrinter
         IrScalarType s => IrNames.Scalar(s.Kind),
         IrRefType r => $"&{r.Type}",
         IrArrayType a => $"{TypeStr(a.Element)}[]",
+        IrSliceType s => $"Slice<{TypeStr(s.Element)}>",
         IrOptionalType o => $"?{TypeStr(o.Inner)}",
         IrEnumType e => $"enum {e.Type}",
         IrInterfaceType i => $"dyn {i.Type}",

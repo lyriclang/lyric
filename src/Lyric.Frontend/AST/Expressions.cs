@@ -54,6 +54,9 @@ public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : 
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment
 public sealed record RangeExpr(Expr Low, Expr High, bool IsInclusive, Span Span) : Expr(Span);
+/// <summary>The range inside <c>[…]</c> that takes a view (design/v5/spec/03 T13 A2): <c>a..b</c>,
+/// <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c> — either bound may be left open.</summary>
+public sealed record SliceRangeExpr(Expr? Low, Expr? High, bool IsInclusive, Span Span) : Expr(Span);
 public sealed record CastExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
 
 // --- nodes produced by postfix ---

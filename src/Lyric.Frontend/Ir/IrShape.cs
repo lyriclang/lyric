@@ -38,6 +38,7 @@ public static class IrShape
         // The order is a contract: array, index, value, from the bottom up.
         StoreElem e => new[] { e.Array, e.Index, e.Value },
         ArrayLen a => new[] { a.Array },
+        MakeSlice s => new[] { s.Array, s.Low, s.High },
         ArrayConcat c => new[] { c.Left, c.Right },
         ArrayRepeat r => new[] { r.Array, r.Count },
 
@@ -104,6 +105,7 @@ public static class IrShape
         LoadElem e => e.Dest,
         StoreElem => null,
         ArrayLen a => a.Dest,
+        MakeSlice s => s.Dest,
         ArrayConcat c => c.Dest,
         ArrayRepeat r => r.Dest,
 
@@ -180,6 +182,7 @@ public static class IrShape
             LoadElem e => e with { Dest = temp(e.Dest), Array = temp(e.Array), Index = temp(e.Index) },
             StoreElem e => e with { Array = temp(e.Array), Index = temp(e.Index), Value = temp(e.Value) },
             ArrayLen a => a with { Dest = temp(a.Dest), Array = temp(a.Array) },
+            MakeSlice s => s with { Dest = temp(s.Dest), Array = temp(s.Array), Low = temp(s.Low), High = temp(s.High) },
             ArrayConcat c => c with { Dest = temp(c.Dest), Left = temp(c.Left), Right = temp(c.Right) },
             ArrayRepeat r => r with { Dest = temp(r.Dest), Array = temp(r.Array), Count = temp(r.Count) },
 

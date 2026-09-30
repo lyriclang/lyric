@@ -2373,7 +2373,7 @@ internal sealed class FunctionLowerer
         // NOT covered here and reports as a scope boundary: it would need a read and a write with the
         // same index, and whether the index may be evaluated twice is a language question the spec does
         // not answer.
-        if (TypeOfExpr(indexed.Target) is not IrArrayType)
+        if (TypeOfExpr(indexed.Target) is not (IrArrayType or IrSliceType))
         {
             if (expr.Operator is not null)
                 throw NotSupported("compound assignment on a container (only on arrays)",
@@ -2852,7 +2852,7 @@ internal sealed class FunctionLowerer
                 if (valueType is IrOptionalType optional)
                     value = UnwrapPresent(value, optional, onFail, assumeMatch, array.Span);
                 var arrayType = valueType is IrOptionalType o ? o.Inner : valueType;
-                if (arrayType is not IrArrayType { Element: var elementType })
+                if (ElementOf(arrayType) is not { } elementType)
                     throw Bug("array pattern on a value that is not an array");
 
                 var restIndex = Array.FindIndex(array.Elements, e => e is RestPattern);
@@ -3169,6 +3169,13 @@ internal sealed class FunctionLowerer
             var widened = _slots.NewTemp(target);
             _b.Emit(new Lyric.Ir.Convert(widened, source, target, value, span));
             value = widened;
+            from = target;
+        }
+
+        // An array where a view is expected gives a view of itself, whole (03 T13 A2).
+        if (target is IrSliceType view && source is IrArrayType && from is not IrOptionalType)
+        {
+            value = ViewOf(value, view.Element, span);
             from = target;
         }
 
@@ -3539,6 +3546,7 @@ internal sealed class FunctionLowerer
         // labour as for 'for-in': the compiler knows ONE built-in form, the array, and everything else
         // runs through the interface.
         if (LowerIndexableCall(expr, "get", null) is { } viaInterface) return viaInterface;
+        if (expr.Index is SliceRangeExpr range) return LowerSlice(expr, range);
 
         var (array, index, element) = ResolveIndexAccess(expr);
         var dest = _slots.NewTemp(element);
@@ -3557,7 +3565,7 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId? LowerIndexableCall(IndexExpr expr, string method, TempId? value)
     {
-        if (TypeOfExpr(expr.Target) is IrArrayType) return null;
+        if (TypeOfExpr(expr.Target) is IrArrayType or IrSliceType) return null;
 
         var carrier = SubstituteType(_types.TypeOf(expr.Target));
         if (TypeFacts.SymbolOf(carrier) is not { } owner) return null;
@@ -3594,13 +3602,62 @@ internal sealed class FunctionLowerer
     /// everything else goes through the <c>Indexable&lt;T&gt;</c> interface.</summary>
     private (TempId Array, TempId Index, IrType Element) ResolveIndexAccess(IndexExpr expr)
     {
-        if (TypeOfExpr(expr.Target) is not IrArrayType array)
+        if (ElementOf(TypeOfExpr(expr.Target)) is not { } element)
             throw NotSupported($"indexing a '{TypeFacts.Display(_types.TypeOf(expr.Target))}' " +
                                "(only arrays; other containers need the Indexable interface)",
                 expr.Span);
 
         var target = LowerExpr(expr.Target);
-        return (target, LowerIndexValue(expr.Index, target), array.Element);
+        return (target, LowerIndexValue(expr.Index, target), element);
+    }
+
+    /// <summary>The element type of an array or of a view of one; null for anything else.</summary>
+    private static IrType? ElementOf(IrType type) => type switch
+    {
+        IrArrayType a => a.Element,
+        IrSliceType s => s.Element,
+        _ => null,
+    };
+
+    /// <summary>
+    /// <c>xs[a..b]</c>: a view of the elements from <c>a</c> to <c>b</c> (03 T13 A2), of an
+    /// array or of a view — checked against the source's length, no copy. An open bound is the
+    /// start or the length; an inclusive end is one past its bound. The source is evaluated once,
+    /// before the bounds, so <c>^n</c> reads its length.
+    /// </summary>
+    private TempId LowerSlice(IndexExpr expr, SliceRangeExpr range)
+    {
+        if (ElementOf(TypeOfExpr(expr.Target)) is not { } element)
+            throw NotSupported($"a view of a '{TypeFacts.Display(_types.TypeOf(expr.Target))}'", expr.Span);
+        var i64 = new IrScalarType(IrScalar.I64);
+        var source = LowerExpr(expr.Target);
+        var low = range.Low is null ? EmitConst(new IntConst(0), i64, range.Span) : LowerIndexValue(range.Low, source);
+        TempId high;
+        if (range.High is null)
+        {
+            high = _slots.NewTemp(i64);
+            _b.Emit(new ArrayLen(high, source, range.Span));
+        }
+        else
+        {
+            high = LowerIndexValue(range.High, source);
+            if (range.IsInclusive)
+                high = EmitBinary(IrBinKind.Add, i64, high, EmitConst(new IntConst(1), i64, range.Span), range.Span);
+        }
+        var dest = _slots.NewTemp(new IrSliceType(element));
+        _b.Emit(new MakeSlice(dest, source, low, high, element, expr.Span));
+        return dest;
+    }
+
+    /// <summary>An array where a view of it is expected gives a view of itself, whole (A2).</summary>
+    private TempId ViewOf(TempId array, IrType element, Span span)
+    {
+        var i64 = new IrScalarType(IrScalar.I64);
+        var length = _slots.NewTemp(i64);
+        _b.Emit(new ArrayLen(length, array, span));
+        var dest = _slots.NewTemp(new IrSliceType(element));
+        _b.Emit(new MakeSlice(dest, array, EmitConst(new IntConst(0), i64, span), length, element, span));
+        return dest;
     }
 
     /// <summary>The index as an <c>int</c>: a narrower one widened, <c>^n</c> as the length of
@@ -4323,9 +4380,9 @@ internal sealed class FunctionLowerer
         // 'co.next()' — the safe pull on a coroutine, built in like '.length' on an array. Before
         // the indirect-call check: the sema types the member as a function type with no symbol
         // behind it, which is exactly what the value-call test matches.
-        // 'xs.length()' on an array is built in: neither a field nor a method (03 T13 A1).
+        // 'xs.length()' on an array or a view is built in: neither a field nor a method (03 T13 A1).
         if (expr.Callee is MemberExpr { Member: "length", IsOptional: false } length
-            && TypeOfExpr(length.Target) is IrArrayType)
+            && TypeOfExpr(length.Target) is IrArrayType or IrSliceType)
             return LowerArrayLength(length.Target, expr.Span);
 
         if (expr.Callee is MemberExpr { Member: "next" } pull
@@ -4823,6 +4880,9 @@ internal sealed class FunctionLowerer
     /// <c>std.core.rawArrayAlloc</c>, whose slots are unwritten until the loop below fills every
     /// one of them. That the native is generic is what makes this work at any element type.</para>
     /// </summary>
+    /// <summary><c>..rest</c> binds a view of the elements between the fixed ones — from
+    /// <c>before</c> to <c>length - after</c> — sharing them, no copy (03 T13 A2). Lyric 4 copied
+    /// them into a new array.</summary>
     private void BindNamedRest(RestPattern rest, TempId value, IrType elementType, TempId length,
         int beforeCount, int afterCount)
     {
@@ -4830,56 +4890,16 @@ internal sealed class FunctionLowerer
             throw Bug($"the rest binding '{rest.Name}' was not bound by the type checker");
 
         var i64 = new IrScalarType(IrScalar.I64);
-        var arrayType = new IrArrayType(elementType);
         var span = rest.Span;
-
-        // length - (elements before it + elements after it)
-        var fixedCount = EmitConst(new IntConst((ulong)(beforeCount + afterCount)), i64, span);
-        var count = _slots.NewTemp(i64);
-        _b.Emit(new BinOp(count, IrBinKind.Sub, i64, length, fixedCount, span));
-
-        var target = _imports.Intern(new IrImport("std.core.rawArrayAlloc", [i64], arrayType));
-        var rested = _slots.NewTemp(arrayType);
-        _b.Emit(new CallImport(rested, target, [count], span));
-
-        var slot = _slots.DeclareFor(local, arrayType);
-        _b.Emit(new StoreLocal(slot, rested, span));
-
-        // for (i = 0; i < count; i++) rest[i] = value[i + beforeCount];
-        var cursor = _slots.DeclareSynthetic($"<rest:{rest.Name}>", i64);
-        _b.Emit(new StoreLocal(cursor, EmitConst(new IntConst(0), i64, span), span));
-
-        var head = _b.NewBlock();
-        _b.Seal(new Branch(head, span));
-        _b.SwitchTo(head);
-
-        var current = _slots.NewTemp(i64);
-        _b.Emit(new LoadLocal(current, cursor, i64, span));
-        var more = _slots.NewTemp(BoolType);
-        _b.Emit(new BinOp(more, IrBinKind.Lt, BoolType, current, count, span));
-
-        var body = _b.NewBlock();
-        var done = _b.NewBlock();
-        _b.Seal(new CondBranch(more, body, done, span));
-
-        _b.SwitchTo(body);
-        var offset = EmitConst(new IntConst((ulong)beforeCount), i64, span);
-        var source = _slots.NewTemp(i64);
-        _b.Emit(new BinOp(source, IrBinKind.Add, i64, current, offset, span));
-        var element = _slots.NewTemp(elementType);
-        _b.Emit(new LoadElem(element, value, source, elementType, span));
-
-        var into = _slots.NewTemp(arrayType);
-        _b.Emit(new LoadLocal(into, slot, arrayType, span));
-        _b.Emit(new StoreElem(into, current, element, span));
-
-        var next = _slots.NewTemp(i64);
-        _b.Emit(new BinOp(next, IrBinKind.Add, i64, current,
-            EmitConst(new IntConst(1), i64, span), span));
-        _b.Emit(new StoreLocal(cursor, next, span));
-        _b.Seal(new Branch(head, span));
-
-        _b.SwitchTo(done);
+        var low = EmitConst(new IntConst((ulong)beforeCount), i64, span);
+        var afterN = EmitConst(new IntConst((ulong)afterCount), i64, span);
+        var high = _slots.NewTemp(i64);
+        _b.Emit(new BinOp(high, IrBinKind.Sub, i64, length, afterN, span));
+        var viewType = new IrSliceType(elementType);
+        var view = _slots.NewTemp(viewType);
+        _b.Emit(new MakeSlice(view, value, low, high, elementType, span));
+        var slot = _slots.DeclareFor(local, viewType);
+        _b.Emit(new StoreLocal(slot, view, span));
     }
 
     /// <summary>

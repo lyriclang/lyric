@@ -236,6 +236,10 @@ internal sealed class FlowAnalyzer
             case IndexExpr ix: AnalyzeExpr(ix.Target, assigned); AnalyzeExpr(ix.Index, assigned); return;
             case CastExpr cs: AnalyzeExpr(cs.Operand, assigned); return;
             case RangeExpr r: AnalyzeExpr(r.Low, assigned); AnalyzeExpr(r.High, assigned); return;
+            case SliceRangeExpr sr:
+                if (sr.Low is not null) AnalyzeExpr(sr.Low, assigned);
+                if (sr.High is not null) AnalyzeExpr(sr.High, assigned);
+                return;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e, assigned); return;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e, assigned); return;
             case StructInitExpr si: foreach (var fld in si.Fields) AnalyzeExpr(fld.Value, assigned); return;

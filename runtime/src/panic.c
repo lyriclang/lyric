@@ -83,6 +83,11 @@ void lyr_panic_index(int64_t index, int64_t length) {
     lyr_panic(LYR_RT_INDEX, "index %lld out of bounds for length %lld", (long long)index, (long long)length);
 }
 
+void lyr_panic_range(int64_t low, int64_t high, int64_t length) {
+    lyr_panic(LYR_RT_INDEX, "range %lld..%lld out of bounds for length %lld", (long long)low, (long long)high,
+              (long long)length);
+}
+
 void lyr_panic_overflow(const char *operation) {
     lyr_panic(LYR_RT_OVERFLOW, "arithmetic overflow in '%s'", operation);
 }

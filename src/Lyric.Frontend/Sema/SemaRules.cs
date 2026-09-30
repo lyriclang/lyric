@@ -464,8 +464,8 @@ public sealed class SemaRules
                 return _thisMut ? null : NotMutReason;
             case IdentifierExpr or MemberExpr:
                 return WhyNotWritable(expr);
-            case IndexExpr ix when _types.TypeOf(ix.Target) is ArrayOf or ErrorType:
-                return null; // an array element is a place in the array's block
+            case IndexExpr ix when _types.TypeOf(ix.Target) is ArrayOf or SliceOf or ErrorType:
+                return null; // an array element is a place in the array's block, through a view too (A2)
             case IndexExpr:
                 return "the element is a copy a 'get' handed out, not a place; assign the whole element instead";
             default:
@@ -496,7 +496,7 @@ public sealed class SemaRules
     /// </summary>
     private bool IsIndexableTarget(LyrType type)
     {
-        if (type is ArrayOf or ErrorType) return true;
+        if (type is ArrayOf or SliceOf or ErrorType) return true;
         if (_types.Indexable is not { } indexable) return false;
 
         return TypeFacts.SymbolOf(type) is { } symbol
@@ -513,6 +513,7 @@ public sealed class SemaRules
         ThrowExpr te => [te.Value],
         BinaryExpr b => [b.Left, b.Right],
         RangeExpr r => [r.Low, r.High],
+        SliceRangeExpr sr => [.. new[] { sr.Low, sr.High }.OfType<Expr>()],
         CastExpr c => [c.Operand],
         CallExpr call => [call.Callee, .. call.Arguments],
         IndexExpr ix => [ix.Target, ix.Index],

@@ -828,6 +828,7 @@ internal sealed class TypeTable
         // T[] is a reference type with the element type inline; it needs no table entry, because it has
         // no named layout.
         ArrayOf a => new IrArrayType(Lower(a.Element, span)),
+        SliceOf s => new IrSliceType(Lower(s.Element, span)),
 
         // ?T is not nestable. The sema already collapses '??T'; a boundary stands here all the same,
         // rather than a silent assumption.
@@ -912,6 +913,10 @@ internal sealed class TypeTable
                 && named.TypeArguments.Length == 1)
                 return CoroutineSignature(
                     Lower(named.TypeArguments[0], named.TypeArguments[0].Span));
+            // 'Slice<T>' likewise (03 T13 A2): a view, with its element type inline.
+            if (bound is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "Slice" }
+                && named.TypeArguments.Length == 1)
+                return new IrSliceType(Lower(named.TypeArguments[0], named.TypeArguments[0].Span));
 
             // Written type arguments ('Box<int>' as a field or parameter type) are lowered BEFORE the
             // instance is interned: an argument may itself be a type parameter of the surrounding
@@ -1034,6 +1039,9 @@ internal sealed class TypeTable
             if (definition is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "Coroutine" }
                 && generic.TypeArguments.Length == 1)
                 return new CoroutineOf(Resolve(generic.TypeArguments[0], span));
+            if (definition is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "Slice" }
+                && generic.TypeArguments.Length == 1)
+                return new SliceOf(Resolve(generic.TypeArguments[0], span));
 
             if (definition is TypeSymbol generictype)
                 return new GenericInstance(generictype,

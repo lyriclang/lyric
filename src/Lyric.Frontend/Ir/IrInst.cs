@@ -50,6 +50,10 @@ public sealed record NewArray(TempId Dest, IrType Element, TempId[] Elements, Sp
 public sealed record LoadElem(TempId Dest, TempId Array, TempId Index, IrType Element, Span Span) : IrOp(Span);
 public sealed record StoreElem(TempId Array, TempId Index, TempId Value, Span Span) : IrOp(Span);
 public sealed record ArrayLen(TempId Dest, TempId Array, Span Span) : IrOp(Span);
+/// <summary>A view of the elements <c>[Low, High)</c> of an array or of a view (03 T13 A2): checked
+/// against the source's length, then a pointer and a length, no copy. <c>Array</c> is the source
+/// — an array or a slice — and loadelem, storeelem and arraylen take a slice too.</summary>
+public sealed record MakeSlice(TempId Dest, TempId Array, TempId Low, TempId High, IrType Element, Span Span) : IrOp(Span);
 
 // xs + ys and xs * n — built-in language semantics, not a library. Both yield a NEW array.
 public sealed record ArrayConcat(TempId Dest, TempId Left, TempId Right, IrType Element, Span Span) : IrOp(Span);

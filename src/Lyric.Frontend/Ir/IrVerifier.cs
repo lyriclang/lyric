@@ -786,6 +786,7 @@ public static class IrVerifier
                 case LoadElem e: CheckLoadElem(e, block, index); break;
                 case StoreElem e: CheckStoreElem(e, block, index); break;
                 case ArrayLen a: CheckArrayLen(a, block, index); break;
+                case MakeSlice s: CheckMakeSlice(s, block, index); break;
                 case ArrayConcat c: CheckArrayConcat(c, block, index); break;
                 case ArrayRepeat r: CheckArrayRepeat(r, block, index); break;
                 case OptNone n: CheckOptNone(n, block, index); break;
@@ -1459,9 +1460,21 @@ public static class IrVerifier
     private IrType? RequireArray(TempId array, string what, BlockId block, int index)
     {
         if (TypeOf(array) is IrArrayType a) return a.Element;
+        if (TypeOf(array) is IrSliceType s) return s.Element;
 
-        Report(block, index, $"{what} expects {array} to be an array, found {Show(TypeOf(array))}");
+        Report(block, index, $"{what} expects {array} to be an array or a slice, found {Show(TypeOf(array))}");
         return null;
+    }
+
+    private void CheckMakeSlice(MakeSlice s, BlockId block, int index)
+    {
+        if (RequireArray(s.Array, "mkslice", block, index) is not { } element) return;
+        RequireIndex(s.Low, "mkslice", block, index);
+        RequireIndex(s.High, "mkslice", block, index);
+        if (!IrType.Equal(s.Element, element))
+            Report(block, index, $"mkslice views {Show(element)} but the instruction says {Show(s.Element)}");
+        else
+            RequireDestType(s.Dest, new IrSliceType(element), "mkslice", block, index);
     }
 
     /// <summary>An index has to be <c>i64</c>. Not WHETHER it is within bounds — that is a runtime value
@@ -1837,6 +1850,7 @@ public static class IrVerifier
             IrScalarType s => IrNames.Scalar(s.Kind),
             IrRefType r => $"&{r.Type}",
             IrArrayType a => $"{Show(a.Element)}[]",
+            IrSliceType s => $"Slice<{Show(s.Element)}>",
             IrOptionalType o => $"?{Show(o.Inner)}",
             IrEnumType e => $"enum {e.Type}",
         IrInterfaceType i => $"dyn {i.Type}",

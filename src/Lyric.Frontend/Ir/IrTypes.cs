@@ -36,6 +36,8 @@ namespace Lyric.Ir
                     return x.Type == y.Type;
                 case (IrArrayType x, IrArrayType y):
                     return Equal(x.Element, y.Element);
+                case (IrSliceType x, IrSliceType y):
+                    return Equal(x.Element, y.Element);
                 case (IrOptionalType x, IrOptionalType y):
                     return Equal(x.Inner, y.Inner);
                 case (IrEnumType x, IrEnumType y):
@@ -54,9 +56,9 @@ namespace Lyric.Ir
                     return x.Parameters.Length == y.Parameters.Length
                            && Equal(x.Return, y.Return)
                            && x.Parameters.Zip(y.Parameters).All(pair => Equal(pair.First, pair.Second));
-                case (IrScalarType or IrRefType or IrArrayType or IrOptionalType or IrEnumType
+                case (IrScalarType or IrRefType or IrArrayType or IrSliceType or IrOptionalType or IrEnumType
                           or IrInterfaceType or IrStructType or IrFunctionType,
-                      IrScalarType or IrRefType or IrArrayType or IrOptionalType or IrEnumType
+                      IrScalarType or IrRefType or IrArrayType or IrSliceType or IrOptionalType or IrEnumType
                           or IrInterfaceType or IrStructType or IrFunctionType):
                     return false; // different kinds: comparable, merely unequal
                 default:
@@ -89,6 +91,11 @@ namespace Lyric.Ir
     /// cost.</para>
     /// </summary>
     public sealed record IrArrayType(IrType Element) : IrType;
+
+    /// <summary><c>Slice&lt;T&gt;</c> (design/v5/spec/03 T13 A2): a view of <c>T[]</c> — a
+    /// pointer into the array's elements and a length, a value of two words that shares the
+    /// elements. Like the array, the element type is inline.</summary>
+    public sealed record IrSliceType(IrType Element) : IrType;
 
     /// <summary>
     /// <c>?T</c>. As with the array the inner type is inline; an optional cannot be recursive either.

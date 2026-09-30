@@ -69,6 +69,7 @@ public sealed class TypeChecker
     private readonly FunctionSymbol? _panic; // the builtin panic, returning never
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
+    private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
     /// against. <c>null</c> when the stdlib is not loaded; the loop head then reports the ordinary
@@ -103,6 +104,7 @@ public sealed class TypeChecker
         _panic = comp.Builtins.LookupLocal("panic") as FunctionSymbol;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
+        _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
 
         // 'Iterator<T>' lives in the stdlib rather than among the builtins: it is an ordinary
         // interface anyone can implement. The compiler only has to FIND it to check 'for-in'
@@ -3191,10 +3193,28 @@ public sealed class TypeChecker
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
     {
         var target = CheckExpr(ix.Target, scope);
+
+        // 'xs[a..b]' takes a view (03 T13 A2): a Slice<T> of an array or of a view, sharing the
+        // elements. The bounds are indices, '^n' among them, either left open.
+        if (ix.Index is SliceRangeExpr range)
+        {
+            if (range.Low is not null) CheckIndexValue(range.Low, target, scope);
+            if (range.High is not null) CheckIndexValue(range.High, target, scope);
+            return target switch
+            {
+                ArrayOf a => new SliceOf(a.Element),
+                SliceOf s => s,
+                ErrorType => LyrType.Error,
+                _ => Report(ix.Span, "LYR-SEM0007",
+                    $"'{TypeFacts.Display(target)}' has no view to take — a range indexes an array or a 'Slice<T>'"),
+            };
+        }
+
         CheckIndexValue(ix.Index, target, scope);
         return target switch
         {
             ArrayOf a => a.Element,
+            SliceOf s => s.Element,
 
             // A string has NO index operator. A code point position costs O(n) — a 'char' is a code
             // point and the length counts the same units — so the obvious indexing loop would be
@@ -3233,7 +3253,7 @@ public sealed class TypeChecker
             var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
             if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
             _result.SetType(fromEnd, LyrType.Int);
-            if (target is not (ArrayOf or ErrorType))
+            if (target is not (ArrayOf or SliceOf or ErrorType))
                 _de.Report("LYR-SEM0114", Severity.Error, fromEnd.Span,
                     $"'^' counts from the end of a value that has a length; '{TypeFacts.Display(target)}' has none");
             return;
@@ -3453,6 +3473,7 @@ public sealed class TypeChecker
         TypeParamType => true,
         Optional o => MentionsTypeParam(o.Inner),
         ArrayOf a => MentionsTypeParam(a.Element),
+        SliceOf s => MentionsTypeParam(s.Element),
         CoroutineOf c => MentionsTypeParam(c.Yield),
         TupleOf t => t.Elements.Any(MentionsTypeParam),
         GenericInstance g => g.Arguments.Any(MentionsTypeParam),
@@ -3563,7 +3584,7 @@ public sealed class TypeChecker
         // the index are the primitives), and it is a CALL, with parentheses like every length
         // (10 N8). Without them the name is refused rather than read as a field: the two forms
         // would otherwise mean one thing, and 'xs.length' read like a field of the array.
-        if (baseType is ArrayOf && mem.Member == "length")
+        if (baseType is ArrayOf or SliceOf && mem.Member == "length")
         {
             if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
             return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
@@ -3671,6 +3692,7 @@ public sealed class TypeChecker
             TypeParamType tp => map.TryGetValue(tp.Param, out var m) ? m : tp,
             Optional o => new Optional(Substitute(o.Inner, map)),
             ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
+            SliceOf s => new SliceOf(Substitute(s.Element, map)),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()),
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
@@ -3704,6 +3726,8 @@ public sealed class TypeChecker
                 if (!arg.IsError) map.TryAdd(tp.Param, arg);
                 break;
             case ArrayOf pa when arg is ArrayOf aa: UnifyInfer(pa.Element, aa.Element, map, argSpan); break;
+            case SliceOf ps when arg is SliceOf or ArrayOf:
+                UnifyInfer(ps.Element, arg is SliceOf sa ? sa.Element : ((ArrayOf)arg).Element, map, argSpan); break;
             case Optional po when arg is Optional ao: UnifyInfer(po.Inner, ao.Inner, map, argSpan); break;
             case TupleOf pt when arg is TupleOf at && pt.Elements.Length == at.Elements.Length:
                 for (var i = 0; i < pt.Elements.Length; i++) UnifyInfer(pt.Elements[i], at.Elements[i], map, argSpan);
@@ -3797,6 +3821,7 @@ public sealed class TypeChecker
         TypeParamType tp => !map.ContainsKey(tp.Param),
         Optional o => HasOpenParam(o.Inner, map),
         ArrayOf a => HasOpenParam(a.Element, map),
+        SliceOf s => HasOpenParam(s.Element, map),
         TupleOf tu => tu.Elements.Any(e => HasOpenParam(e, map)),
         FnType f => f.Parameters.Any(p => HasOpenParam(p, map)) || HasOpenParam(f.Return, map),
         GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
@@ -3815,6 +3840,7 @@ public sealed class TypeChecker
             case TypeParamType tp: map.TryAdd(tp.Param, LyrType.Error); break;
             case Optional o: BindOpenParamsToError(o.Inner, map); break;
             case ArrayOf a: BindOpenParamsToError(a.Element, map); break;
+            case SliceOf s: BindOpenParamsToError(s.Element, map); break;
             case TupleOf t: foreach (var e in t.Elements) BindOpenParamsToError(e, map); break;
             case FnType f:
                 foreach (var p in f.Parameters) BindOpenParamsToError(p, map);
@@ -3840,6 +3866,7 @@ public sealed class TypeChecker
         OpaqueRef oq => ContainsError(oq.Underlying),
         Optional o => ContainsError(o.Inner),
         ArrayOf a => ContainsError(a.Element),
+        SliceOf s => ContainsError(s.Element),
         TupleOf t => t.Elements.Any(ContainsError),
         FnType f => f.Parameters.Any(ContainsError) || ContainsError(f.Return),
         GenericInstance g => g.Arguments.Any(ContainsError),
@@ -5101,6 +5128,8 @@ public sealed class TypeChecker
             }
             case ArrayOf array:
                 return MissingArrayCases(array, pats);
+            case SliceOf view:
+                return MissingArrayCases(new ArrayOf(view.Element), pats);
             case TupleOf tuple:
                 return MissingTupleCases(tuple, pats);
             default:
@@ -5475,19 +5504,21 @@ public sealed class TypeChecker
     /// unless it is nothing but a rest.</summary>
     private void BindArrayPattern(ArrayPattern ap, LyrType scrutinee, SymbolTable scope, bool mutable)
     {
-        if (scrutinee is not ArrayOf array)
+        if (scrutinee is not (ArrayOf or SliceOf))
         {
             Report(ap.Span, "LYR-SEM0029",
                 $"array pattern cannot match '{TypeFacts.Display(scrutinee)}' — only an array has elements at positions");
             BindPoison(ap, scope);
             return;
         }
+        var array = scrutinee is ArrayOf whole ? whole : new ArrayOf(((SliceOf)scrutinee).Element);
 
         foreach (var element in ap.Elements)
         {
+            // '..rest' binds a view of the elements it covers (03 T13 A2), never a copy.
             if (element is RestPattern { Name: { } restName } rest)
             {
-                var local = new LocalSymbol(restName, new ArrayOf(array.Element), mutable, rest);
+                var local = new LocalSymbol(restName, new SliceOf(array.Element), mutable, rest);
                 DeclareBinding(scope, local, rest.Span);
                 _result.BindRef(rest, local);
                 continue;
@@ -6050,6 +6081,7 @@ public sealed class TypeChecker
         TypeParamType => true,
         Optional o => ContainsTypeParam(o.Inner),
         ArrayOf a => ContainsTypeParam(a.Element),
+        SliceOf s => ContainsTypeParam(s.Element),
         TupleOf tu => tu.Elements.Any(ContainsTypeParam),
         FnType f => ContainsTypeParam(f.Return) || f.Parameters.Any(ContainsTypeParam),
         GenericInstance gi => gi.Arguments.Any(ContainsTypeParam),
@@ -6321,6 +6353,8 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield);
 
+        if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
+            return true;                                                                    // T[] to Slice<T>, A2
         if (coercionSite && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
@@ -6421,6 +6455,13 @@ public sealed class TypeChecker
                 if (sym is null)
                     return Report(n.Span, "LYR-SEM0011", $"unresolved type '{string.Join('.', n.Path)}'");
                 if (sym is GenericParamSymbol gp) return new TypeParamType(gp);
+                if (ReferenceEquals(sym, _slice)) // Slice<T> becomes the internal SliceOf
+                {
+                    if (n.TypeArguments.Length != 1)
+                        return Report(n.Span, "LYR-SEM0026",
+                            $"'Slice' expects exactly 1 type argument, got {n.TypeArguments.Length}");
+                    return new SliceOf(ResolveType(n.TypeArguments[0], scope));
+                }
                 if (ReferenceEquals(sym, _coroutine)) // Coroutine<T> becomes the internal CoroutineOf
                 {
                     if (n.TypeArguments.Length != 1)

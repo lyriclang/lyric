@@ -90,6 +90,9 @@ public static class SubsetGate
                 case IrArrayType array:
                     Type(array.Element, span, where);
                     break;
+                case IrSliceType slice:
+                    Type(slice.Element, span, where);
+                    break;
                 case IrOptionalType optional:
                     Type(optional.Inner, span, where);
                     break;
@@ -143,7 +146,7 @@ public static class SubsetGate
                 case NewArray n:
                     Type(n.Element, op.Span, "the element type");
                     break;
-                case LoadElem or StoreElem or ArrayLen or ArrayConcat:
+                case LoadElem or StoreElem or ArrayLen or ArrayConcat or MakeSlice:
                     break;
                 // '[x] * n' clones every slot (10 C7): a value copies, a string is shared without
                 // anyone able to tell, a class or an array — held directly or inside the element

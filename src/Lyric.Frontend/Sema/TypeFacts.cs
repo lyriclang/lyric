@@ -171,6 +171,7 @@ public static class TypeFacts
             case ArrayOf { Element: FnType } fnArray:
                 return $"({Display(fnArray.Element)})[]";
             case ArrayOf a: return Display(a.Element) + "[]";
+            case SliceOf s: return "Slice<" + Display(s.Element) + ">";
             case TupleOf tu: return "(" + string.Join(", ", tu.Elements.Select(Display)) + ")";
             case FnType f: return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> " + Display(f.Return);
             case RangeOf r: return "range<" + Display(r.Element) + ">";
