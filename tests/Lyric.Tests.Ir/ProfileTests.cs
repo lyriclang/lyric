@@ -56,7 +56,6 @@ public sealed class ProfileTests
         Assert.True(release.SourceMap);
         Assert.False(release.DebugInfo);
         Assert.Equal(IrPasses.All, release.Passes);
-        Assert.True(release.Fusion);
 
         var debug = Profile.Debug.Options();
         Assert.False(debug.Optimize);

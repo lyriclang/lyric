@@ -7,8 +7,6 @@ out/
 publish/
 artifacts/
 
-# 'build/' is tracked: it holds publish.proj, not build output.
-
 # Build configuration outputs
 *.user
 *.suo
@@ -99,7 +97,7 @@ playground/
 # Generated documentation site
 docs/_site/
 
-# Publish output (build/publish.proj)
+# Publish output
 artifacts/
 
 # =============================================================================

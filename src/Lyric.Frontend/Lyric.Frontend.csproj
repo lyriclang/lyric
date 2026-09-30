@@ -3,14 +3,11 @@
   <PropertyGroup>
     <AssemblyName>lyrfe</AssemblyName>
     <RootNamespace>Lyric</RootNamespace>
-    <Description>Everything between source and bytes: lexer, parser, resolver, sema, IR, emit.</Description>
+    <Description>From source to the IR: lexer, parser, resolver, sema, lowering.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <!--
-      One edge, the same one the runtime has: the format is read (opcodes, type tags, verification
-      after writing), not executed. NO edge to Lyric.Vm — 'lyrc' executes nothing.
-    -->
+    <!-- One edge: the shared basics. The front end executes nothing. -->
     <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
   </ItemGroup>
 

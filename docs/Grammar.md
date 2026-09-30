@@ -1,8 +1,9 @@
-> **Mirror.** The canonical home of this document is
-> [`lyriclang/lyric-spec` → `spec/02-grammar.md`](https://github.com/lyriclang/lyric-spec/blob/script/spec/02-grammar.md).
-> This copy exists for the toolchain's tests and doc site; CI diffs everything below the
-> marker against the canonical body. Edit it there, mirror it here. **4.x text** — the tree
-> still builds this toolchain; the Lyric 5 specification replaces it in M17 (`design/v5/spec`).
+> **4.x text, frozen.** The canonical home of this document is
+> [`lyriclang/lyric-spec` → `spec/02-grammar.md`](https://github.com/lyriclang/lyric-spec/blob/script/spec/02-grammar.md)
+> on the `script` branch, where the 4.x line continues. This copy is what the tree's own front
+> end and the doc site are checked against; it stops following the canonical text with the 4.6
+> cut, because the Lyric 5 milestones move the language away from it (`design/v5/spec`, M17
+> replaces it).
 
 <!-- sync:body -->
 # Lyric Grammar
