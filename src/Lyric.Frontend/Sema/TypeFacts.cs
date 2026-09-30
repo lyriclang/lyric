@@ -174,7 +174,8 @@ public static class TypeFacts
             case SliceOf s: return "Slice<" + Display(s.Element) + ">";
             case InlineArrayOf ia:
                 return (ia.Element is Optional or FnType ? $"({Display(ia.Element)})" : Display(ia.Element)) + $"[{ia.Length}]";
-            case TupleOf tu: return "(" + string.Join(", ", tu.Elements.Select(Display)) + ")";
+            case TupleOf tu:
+                return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Display(e) : Display(e))) + ")";
             case FnType f: return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> " + Display(f.Return);
             case RangeOf r: return "range<" + Display(r.Element) + ">";
             case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ">";

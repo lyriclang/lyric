@@ -166,7 +166,8 @@ public static class AstDumper
                 Write(n.Element, indent + 1, sb);
                 break;
             case TupleType n:
-                Line(sb, indent, "TupleType", n.Span);
+                Line(sb, indent, n.Labels is { } labels
+                    ? "TupleType " + string.Join(", ", labels.Select(l => l ?? "_")) : "TupleType", n.Span);
                 foreach (var e in n.Elements) Write(e, indent + 1, sb);
                 break;
             case FunctionType n:

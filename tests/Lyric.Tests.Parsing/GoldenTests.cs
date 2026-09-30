@@ -118,6 +118,7 @@ public class GoldenTests
     [InlineData("implicit_member")]   // .Red, .Num(3), .Rect { w = 1, h = 2 }, c == .Blue (08 Y9)
     [InlineData("index_from_end")]    // xs[^1] beside a ^ b: a prefix from the end, an infix exclusive or (03 T14 N6)
     [InlineData("index_slice")]       // xs[1..^1], xs[..2], xs[2..], xs[..], xs[1..=2]: the views (03 T13 A2)
+    [InlineData("tuple_elements")]    // t.0, n.0.1 (one float token, two members), p.x (03 T16)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 
@@ -153,6 +154,7 @@ public class GoldenTests
     [InlineData("struct_init_binding")] // let p = Point { … }; — a struct initializer in value position
     [InlineData("let_else_implicit")] // let .Num(n) = s else { … }; — a dotted pattern opens a let-else (08 Y6)
     [InlineData("inline_array_type")] // let m: float[4][4] = …; — the inline array type (03 T13 A4)
+    [InlineData("tuple_labels")]      // let p: (x: int, y: (int, string)) = q; — labelled elements (03 T16)
     public void Golden_statement_matches_snapshot(string name)
         => Check(name, p => p.ParseStatement());
 

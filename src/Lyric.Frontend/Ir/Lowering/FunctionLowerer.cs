@@ -340,7 +340,7 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId LowerTupleLiteral(TupleLitExpr expr)
     {
-        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrRefType type)
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
             throw Bug("tuple literal has no tuple type");
 
         var layout = _typeTable.Defs[type.Type.Value];
@@ -1024,7 +1024,7 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerDestructuring(DestructuringStmt stmt)
     {
-        if (LowerType(_types.TypeOf(stmt.Initializer), stmt.Span) is not IrRefType type)
+        if (LowerType(_types.TypeOf(stmt.Initializer), stmt.Span) is not IrStructType type)
             throw Bug("destructuring a value that is not a tuple");
 
         var source = LowerExprAs(stmt.Initializer, type);
@@ -2774,7 +2774,7 @@ internal sealed class FunctionLowerer
                 if (valueType is IrOptionalType optional)
                     value = UnwrapPresent(value, optional, onFail, assumeMatch, tuple.Span);
                 var tupleType = valueType is IrOptionalType o ? o.Inner : valueType;
-                if (tupleType is not IrRefType { Type: var tupleId })
+                if (tupleType is not IrStructType { Type: var tupleId })
                     throw Bug("tuple pattern on a value that is not a tuple");
 
                 var layout = _typeTable.Defs[tupleId.Value];
@@ -3886,6 +3886,17 @@ internal sealed class FunctionLowerer
         // rather than the definition — 'Box<int>' and 'Box<string>' have different field types at the
         // same position.
         var target = SubstituteType(_types.TypeOf(expr.Target));
+
+        // A tuple's element, by position or by the label the sema resolved (03 T16): the
+        // layout's fields are the positions.
+        if (target is Sema.TupleOf tuple)
+        {
+            var position = tuple.Labels is { } labels ? Array.IndexOf(labels, expr.Member) : -1;
+            if (position < 0) position = int.Parse(expr.Member, System.Globalization.CultureInfo.InvariantCulture);
+            var tupleType = (IrStructType)LowerType(tuple, expr.Span);
+            var tupleLayout = _typeTable.Defs[tupleType.Type.Value];
+            return (LowerExpr(expr.Target), tupleType.Type, new FieldId(position), tupleLayout.FieldTypes[position]);
+        }
 
         var declaring = target switch
         {
@@ -5406,7 +5417,7 @@ internal sealed class FunctionLowerer
         TypeParamType p when _substitution.TryGetValue(p.Param, out var bound) => bound,
         ArrayOf a => new ArrayOf(SubstituteType(a.Element)),
         Optional o => new Optional(SubstituteType(o.Inner)),
-        Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()),
+        Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
         CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },

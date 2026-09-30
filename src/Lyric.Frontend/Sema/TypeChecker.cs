@@ -3643,6 +3643,18 @@ public sealed class TypeChecker
         // the index are the primitives), and it is a CALL, with parentheses like every length
         // (10 N8). Without them the name is refused rather than read as a field: the two forms
         // would otherwise mean one thing, and 'xs.length' read like a field of the array.
+        // An element of a tuple, by position or by the label its type gives it (03 T16).
+        if (baseType is TupleOf tuple)
+        {
+            var at = tuple.Labels is { } labels ? Array.IndexOf(labels, mem.Member) : -1;
+            if (at < 0 && int.TryParse(mem.Member, out var position) && mem.Member.All(char.IsAsciiDigit)) at = position;
+            if (at < 0 || at >= tuple.Elements.Length)
+                return Report(mem.MemberSpan, "LYR-SEM0012",
+                    $"'{TypeFacts.Display(baseType)}' has no element '{mem.Member}' — the elements are '.0' to '.{tuple.Elements.Length - 1}'"
+                    + (tuple.Labels is not null ? " and their labels" : ""));
+            return mem.IsOptional ? Optionalized(tuple.Elements[at]) : tuple.Elements[at];
+        }
+
         if (baseType is ArrayOf or SliceOf or InlineArrayOf && mem.Member == "length")
         {
             if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
@@ -3753,7 +3765,7 @@ public sealed class TypeChecker
             ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
             SliceOf s => new SliceOf(Substitute(s.Element, map)),
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
-            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()),
+            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
@@ -6582,7 +6594,7 @@ public sealed class TypeChecker
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
-            case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());
+            case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray()) { Labels = t.Labels };
             case FunctionType f: return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope));
             default: return LyrType.Error; // ErrorType
         }

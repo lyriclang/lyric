@@ -29,7 +29,12 @@ public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span)
 /// coroutine cannot throw. Only a coroutine type may carry it (<c>LYR-SEM0084</c>): everything else
 /// runs at its call, where the function's own clause already says so.</remarks>
 public sealed record ThrowingType(TypeNode Inner, TypeNode? Thrown, Span Span) : TypeNode(Span);
-public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span);                       // (A, B[, C])
+/// <summary><c>(A, B)</c>, or with labels <c>(x: A, y: B)</c> (design/v5/spec/03 T16): a label
+/// names an element for <c>.x</c> beside <c>.0</c> and is no part of the type's identity.</summary>
+public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span)                        // (A, B[, C])
+{
+    public string?[]? Labels { get; init; }
+}
 public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span); // fn(A, B) -> R
 
 // Recovery placeholder, set when ParseType cannot continue, so later stages do not meet a null.

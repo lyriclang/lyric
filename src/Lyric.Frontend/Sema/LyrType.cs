@@ -88,7 +88,12 @@ public sealed record Optional(LyrType Inner) : LyrType;              // ?T
 public sealed record ArrayOf(LyrType Element) : LyrType;             // T[]
 public sealed record SliceOf(LyrType Element) : LyrType;             // Slice<T>: a view of T[] (03 T13 A2)
 public sealed record InlineArrayOf(LyrType Element, int Length) : LyrType; // T[N]: N elements inline, a value (03 T13 A4)
-public sealed record TupleOf(LyrType[] Elements) : LyrType;
+/// <summary>A tuple; the labels, if any, name elements for <c>.x</c> and are no part of the
+/// type's identity (03 T16): <c>(x: int, y: int)</c> and <c>(int, int)</c> are one type.</summary>
+public sealed record TupleOf(LyrType[] Elements) : LyrType
+{
+    public string?[]? Labels { get; init; }
+}
 public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType;
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type
 /// <param name="Throws">What a PULL of this coroutine may throw: null when it cannot, the

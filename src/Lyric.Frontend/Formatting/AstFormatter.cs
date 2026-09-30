@@ -1044,7 +1044,8 @@ public sealed class AstFormatter
                 : TypeDoc(a.Element),
             Doc.From(a.Length is { } len ? $"[{len}]" : "[]")),
         TupleType t => Doc.Of(Doc.From("("),
-            Doc.Join(Doc.From(", "), t.Elements.Select(TypeDoc).ToArray()), Doc.From(")")),
+            Doc.Join(Doc.From(", "), t.Elements.Select((e, i) => t.Labels?[i] is { } label
+                ? Doc.Of(Doc.From(label + ": "), TypeDoc(e)) : TypeDoc(e)).ToArray()), Doc.From(")")),
         FunctionType f => Doc.Of(Doc.From("fn("),
             Doc.Join(Doc.From(", "), f.Parameters.Select(TypeDoc).ToArray()),
             Doc.From(") -> "), TypeDoc(f.ReturnType)),

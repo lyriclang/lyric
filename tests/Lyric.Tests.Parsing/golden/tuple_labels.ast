@@ -1,0 +1,7 @@
+Let p [0..38)
+  TupleType x, y [7..33)
+    NamedType int [11..14)
+    TupleType [19..32)
+      NamedType int [20..23)
+      NamedType string [25..31)
+  Ident q [36..37)

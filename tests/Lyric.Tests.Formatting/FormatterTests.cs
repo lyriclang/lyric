@@ -130,6 +130,18 @@ public class FormatterTests
             """, Format("struct Mat{m:float[ 16 ],grid:(?int)[2][2]}"));
     }
 
+    [Fact]
+    public void A_tuple_keeps_its_labels_and_positions()
+    {
+        // '(x: int, y: int)' names the elements (design/v5/spec/03 T16); '.0' reads one by position.
+        Assert.Equal("""
+            fn f(p: (x: int, y: int), t: (int, string)): int {
+                return p.x + t.0 + p.1;
+            }
+
+            """, Format("fn f(p:(x :int,y: int),t:(int,string)):int{return p.x+t.0+p.1;}"));
+    }
+
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
     [Fact]

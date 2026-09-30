@@ -83,9 +83,9 @@ public static class SubsetGate
                 case IrRefType r when module.Types.Any(t => t.Variants.Contains(r.Type)):
                     break;
                 case IrRefType r:
-                    // A tuple, a closure cell and a closure environment are heap entries of the
-                    // 4.x lowering; each gets its Lyric 5 form with its slice.
-                    Refuse(span, module.Types[r.Type.Value].Name == "<tuple>" ? $"tuples, {where}" : $"closures, {where}", "M3");
+                    // A closure cell and a closure environment are heap entries of the 4.x
+                    // lowering; each gets its Lyric 5 form with its slice.
+                    Refuse(span, $"closures, {where}", "M3");
                     break;
                 case IrArrayType array:
                     Type(array.Element, span, where);

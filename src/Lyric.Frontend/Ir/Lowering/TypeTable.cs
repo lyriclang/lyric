@@ -207,29 +207,29 @@ internal sealed class TypeTable
     /// environments. A tuple IS an object with N fields, so <c>newobj</c> and <c>ldfld</c> do it; the
     /// verifier checks it like any other object, and the bytecode format stays unchanged.</para>
     ///
-    /// <para>REFERENCE RATHER THAN VALUE SEMANTICS, and that is not observable: a tuple is immutable.
-    /// There is no element access and therefore no assignment to an element — the only way in is
-    /// destructuring, and that reads. "Copying" is thus indistinguishable from "sharing", and the copy
-    /// would only be more expensive.</para>
+    /// <para>A VALUE, a struct with positional fields (design/v5/spec/01 V11): inline where it
+    /// lies, copied at a binding point. Lyric 4 made it an object, which a tuple's immutability
+    /// hid; the layout is now the one C gives an anonymous struct, which the ABI hands over by
+    /// value (01 S1).</para>
     ///
     /// <para>Interned, because two tuples of the same shape have the same layout. The field names are
-    /// the positions and appear only in disassembly and diagnostics.</para>
+    /// the positions; a label of the written type is a name for the sema, not for the layout.</para>
     /// </summary>
-    public IrRefType TupleOf(IrType[] elements)
+    public IrStructType TupleOf(IrType[] elements)
     {
         foreach (var (existing, id) in _tuples)
             if (existing.Length == elements.Length
                 && existing.Zip(elements).All(pair => IrType.Equal(pair.First, pair.Second)))
-                return new IrRefType(id);
+                return new IrStructType(id);
 
         var fresh = new TypeId(_defs.Count);
         var names = new string[elements.Length];
         for (var i = 0; i < names.Length; i++)
             names[i] = i.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-        _defs.Add(new IrTypeDef("<tuple>", elements, names));
+        _defs.Add(new IrTypeDef("<tuple>", elements, names) { IsStruct = true });
         _tuples.Add((elements, fresh));
-        return new IrRefType(fresh);
+        return new IrStructType(fresh);
     }
 
     /// <summary>Is this type a cell? Asked when reading a capture: a captured cell transports a variable,
@@ -1059,7 +1059,7 @@ internal sealed class TypeTable
         // A tuple as a type argument: 'Iterator<(int, T)>'. That is the signature of 'enumerate' and
         // 'zip'.
         if (node is AST.TupleType tuple)
-            return new TupleOf(tuple.Elements.Select(e => Resolve(e, span)).ToArray());
+            return new TupleOf(tuple.Elements.Select(e => Resolve(e, span)).ToArray()) { Labels = tuple.Labels };
 
         // 'fn(A) -> B' as a type argument. No known case needs it today; it stands here so the list is
         // not a partial copy of the others.

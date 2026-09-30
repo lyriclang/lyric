@@ -307,6 +307,30 @@ public sealed partial class Parser
                 case TokenKind.Dot:
                 {
                     _buffer.Advance();
+                    // 't.0': the element of a tuple by position (03 T16). The lexer hands the
+                    // number over as a literal; 't.0.1' arrives as the float '0.1' and is two
+                    // members, as Rust reads it.
+                    if (_buffer.Current.TokenKind is TokenKind.IntLiteral or TokenKind.FloatLiteral)
+                    {
+                        var number = _buffer.Advance();
+                        var text = _sm.Slice(number.Span).ToString();
+                        if (text.All(char.IsAsciiDigit))
+                        {
+                            operand = new MemberExpr(operand, text, false, Span.Union(operand.Span, number.Span)) { MemberSpan = number.Span };
+                            break;
+                        }
+                        var dot = text.IndexOf('.');
+                        if (dot > 0 && text[..dot].All(char.IsAsciiDigit) && text[(dot + 1)..].All(char.IsAsciiDigit))
+                        {
+                            var firstSpan = new Span(number.Span.File, number.Span.Start, number.Span.Start + dot);
+                            var secondSpan = new Span(number.Span.File, number.Span.Start + dot + 1, number.Span.End);
+                            operand = new MemberExpr(operand, text[..dot], false, Span.Union(operand.Span, firstSpan)) { MemberSpan = firstSpan };
+                            operand = new MemberExpr(operand, text[(dot + 1)..], false, Span.Union(operand.Span, secondSpan)) { MemberSpan = secondSpan };
+                            break;
+                        }
+                        _de.Report("LYR-PAR0003", Severity.Error, number.Span, $"expected member name after '.', got {text}");
+                        break;
+                    }
                     var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
                         $"expected member name after '.', got {_buffer.Current.TokenKind}");
                     operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), false,
@@ -1123,9 +1147,17 @@ public sealed partial class Parser
         var open = _buffer.Advance(); // '('
 
         var elems = new List<TypeNode>();
+        var labels = new List<string?>();
         var sawComma = false;
         do
         {
+            // '(x: int, y: int)': a label before an element (03 T16), 'name' then ':'.
+            if (_buffer.Check(TokenKind.Identifier) && _buffer.Peek(1).TokenKind == TokenKind.Colon)
+            {
+                labels.Add(_sm.Slice(_buffer.Advance().Span).ToString());
+                _buffer.Advance(); // ':'
+            }
+            else labels.Add(null);
             elems.Add(ParseType());
             if (!_buffer.Match(TokenKind.Comma)) break;
             sawComma = true;
@@ -1136,12 +1168,15 @@ public sealed partial class Parser
 
         // One element WITHOUT a comma is a grouping: the inner type moves up unchanged. With a
         // comma ('(T,)') a tuple was meant, and its second element is missing.
-        if (elems.Count == 1 && !sawComma) return elems[0];
+        if (elems.Count == 1 && !sawComma && labels[0] is null) return elems[0];
 
         if (elems.Count < 2) // no upper bound
             _de.Report("LYR-PAR0010", Severity.Error, span, "tuple types need at least 2 elements");
+        for (var i = 0; i < labels.Count; i++)
+            if (labels[i] is { } l && labels.IndexOf(l) != i)
+                _de.Report("LYR-PAR0010", Severity.Error, span, $"tuple label '{l}' is given twice");
 
-        return new TupleType(elems.ToArray(), span);
+        return new TupleType(elems.ToArray(), span) { Labels = labels.Any(l => l is not null) ? labels.ToArray() : null };
     }
 
     private TypeNode[] ParseTypeArguments(out Span closeSpan)
