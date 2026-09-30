@@ -161,7 +161,7 @@ public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Inter
 
 // --- global bindings and type aliases ---
 /// <inheritdoc cref="StaticBindingDecl"/>
-public sealed record GlobalBindingDecl(bool IsPublic, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' only, per the grammar
+public sealed record GlobalBindingDecl(bool IsPublic, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' or 'var' (07 V5 G5)
 {
     public string Name => Binding.Name;
 

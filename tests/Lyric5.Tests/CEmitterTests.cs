@@ -45,6 +45,10 @@ public class CEmitterTests
     [InlineData("arrays")]
     [InlineData("slices")]
     [InlineData("inline")]
+    [InlineData("tuples")]
+    [InlineData("ranges")]
+    [InlineData("with")]
+    [InlineData("globals")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = EmitC(name);
@@ -57,6 +61,16 @@ public class CEmitterTests
         Assert.True(File.Exists(path), $"no golden at {path}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), actual);
     }
+
+    private const string TUPLES_EXPECTED =
+        "pair 1 two\nlabels 3 4 3\nswap 2 9\nnested 5 hi\nfield 5,12 169\narray 3 2 5\nmatch two-first 3hi\noptional 2\n";
+
+    private const string RANGES_EXPECTED = "value 1 4 3\ninclusive 5 9\nheld 2 8 6\nloop 16\n";
+
+    private const string GLOBALS_EXPECTED = "start 3 6 hello!\ncounter 0 3 4\nstatic 0,0 100\nobject 2 bob 9 1\n";
+
+    private const string WITH_EXPECTED =
+        "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
 
     private const string INLINE_EXPECTED =
         "copy 10 1 3 3\nrepeat 0 7 7\nheap 2 60 80\nstruct 100 1 40\ngrid 3 2 2\narray 8 7 7 7\nmatch 15\n";
@@ -96,6 +110,10 @@ public class CEmitterTests
                 "view 3 20 40 90\nopen 2 40 5 30\nthrough 21 31 51 31\nnested 2 31 41\nwhole 154\nfield 2 99 51\n"
                 + "strings bob cy 2\nstructs 30 6 0\nmatch empty one 10 first 10 rest 4\nempty 0 0\n");
             data.Add("inline", profile, 0, INLINE_EXPECTED);
+            data.Add("tuples", profile, 0, TUPLES_EXPECTED);
+            data.Add("ranges", profile, 0, RANGES_EXPECTED);
+            data.Add("with", profile, 0, WITH_EXPECTED);
+            data.Add("globals", profile, 0, GLOBALS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -135,6 +153,8 @@ public class CEmitterTests
     [InlineData("enums_gc", Profile.Release, "kept label-999999 tree 499500")]
     [InlineData("arrays_gc", Profile.Debug, "kept 499500 item-999999 tag-999999 500")]
     [InlineData("arrays_gc", Profile.Release, "kept 499500 item-999999 tag-999999 500")]
+    [InlineData("globals_gc", Profile.Debug, "kept 499500 item-999999 anchor")]
+    [InlineData("globals_gc", Profile.Release, "kept 499500 item-999999 anchor")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);

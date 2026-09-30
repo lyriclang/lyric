@@ -2268,6 +2268,131 @@
             "File": "stdlib/std/core.lyr",
             "Line": 564
           }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "Range",
+          "Signature": "pub struct Range<T>",
+          "Doc": "`a..b` (design/v5/spec/03 T13 A3): the values from `start` up to but not including `end`, a\nvalue holding its bounds. In a `for` head a range literal is the counted loop and no value.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "start",
+              "Signature": "start: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 571
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "end",
+              "Signature": "end: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 572
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 570
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "RangeInclusive",
+          "Signature": "pub struct RangeInclusive<T>",
+          "Doc": "`a..=b`: the values from `start` to `end`, both included.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "start",
+              "Signature": "start: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 577
+              }
+            },
+            {
+              "Kind": "Field",
+              "Name": "end",
+              "Signature": "end: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 578
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 576
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "RangeFrom",
+          "Signature": "pub struct RangeFrom<T>",
+          "Doc": "`a..`: from `start` on. Written inside `[…]` only, where it takes a view (03 T13 A2).",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "start",
+              "Signature": "start: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 583
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 582
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "RangeTo",
+          "Signature": "pub struct RangeTo<T>",
+          "Doc": "`..b`: up to but not including `end`. Written inside `[…]` only, where it takes a view.",
+          "Members": [
+            {
+              "Kind": "Field",
+              "Name": "end",
+              "Signature": "end: T",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 588
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 587
+          }
+        },
+        {
+          "Kind": "Struct",
+          "Name": "RangeFull",
+          "Signature": "pub struct RangeFull",
+          "Doc": "`..`: everything. Written inside `[…]` only, where it takes a view of the whole.",
+          "Members": [],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 592
+          }
         }
       ]
     },

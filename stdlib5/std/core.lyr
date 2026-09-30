@@ -9,4 +9,32 @@ pub fn panic(message: string): void;
 /// A value behind a reference (design/v5/spec/02 M13): the indirection a value type needs to
 /// hold itself. `enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr,
 /// Expr)` is not. The box is shared, not copied; its value is fixed, so sharing is unobservable.
-pub class Box<T> { value: T }
+pub class Box<T> {
+    value: T,
+}
+
+/// `a..b` (design/v5/spec/03 T13 A3): the values from `start` up to but not including `end`, a
+/// value holding its bounds. In a `for` head a range literal is the counted loop and no value.
+pub struct Range<T> {
+    start: T,
+    end: T,
+}
+
+/// `a..=b`: the values from `start` to `end`, both included.
+pub struct RangeInclusive<T> {
+    start: T,
+    end: T,
+}
+
+/// `a..`: from `start` on. Written inside `[…]` only, where it takes a view (03 T13 A2).
+pub struct RangeFrom<T> {
+    start: T,
+}
+
+/// `..b`: up to but not including `end`. Written inside `[…]` only, where it takes a view.
+pub struct RangeTo<T> {
+    end: T,
+}
+
+/// `..`: everything. Written inside `[…]` only, where it takes a view of the whole.
+pub struct RangeFull { }

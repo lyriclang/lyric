@@ -7,17 +7,9 @@ using Lyric.Sema;
 namespace Lyric.Tests.Sema;
 
 /// <summary>
-/// <c>a..b</c> is a loop head, not a value.
-///
-/// <para>The grammar says so by omission: <c>..</c> occurs in a <c>match</c> pattern and in the
-/// iterable of a <c>for-in</c>, and there is no range expression among the primaries.
-/// <c>RangeOf</c> agrees in its own comment — "the internal type of 0..9, not a spec type" — and
-/// nothing in the lowering can represent one.</para>
-///
-/// <para>It was nevertheless accepted wherever the type was INFERRED, and crashed the compiler
-/// there: <c>let r = 1..5;</c> and <c>[1..3]</c> both reached <c>TypeLowering.Lower</c> and threw
-/// an internal exception with a stack trace and no source position. Where the type was written
-/// down the assignment had refused it all along, which is why this went unnoticed.</para>
+/// <c>a..b</c> in a <c>for</c> head is the counted loop and no value; everywhere else it is a
+/// value of std.core — <c>Range&lt;T&gt;</c>, or <c>RangeInclusive&lt;T&gt;</c> for <c>a..=b</c>
+/// — holding its bounds (design/v5/spec/03 T13 A3). Lyric 4 refused the value (LYR-SEM0090).
 /// </summary>
 public class RangePositionTests
 {
@@ -38,31 +30,37 @@ public class RangePositionTests
         return de.Diagnostics;
     }
 
-    private static void AssertOutOfPosition(string source)
+    private static void AssertClean(string source)
     {
         var diagnostics = Check(source);
-        var diagnostic = Assert.Single(diagnostics, d => d.Code == "LYR-SEM0090");
-        Assert.Equal(Severity.Error, diagnostic.Severity);
-        Assert.True(diagnostic.Span.File.IsValid, "the message has no source position");
-
-        // One message, not two. The range answers ErrorType, so whatever it was handed to says
-        // nothing further — 'cannot assign range<int> to int' would name a type the language does
-        // not have.
-        Assert.Single(diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == Severity.Error));
     }
 
     [Fact]
-    public void A_range_bound_to_a_let_is_refused() =>
-        AssertOutOfPosition("fn main(): int { let r = 1..5; return 0; }");
+    public void A_range_bound_to_a_let_is_a_value() =>
+        AssertClean("import std.core { Range };\nfn main(): int { let r = 1..5; let s: Range<int> = r; return s.end - r.start; }");
 
     [Fact]
-    public void A_range_inside_an_array_literal_is_refused() =>
-        AssertOutOfPosition("fn main(): int { let xs = [1..3]; return 0; }");
+    public void An_inclusive_range_is_its_own_type()
+    {
+        AssertClean("import std.core { RangeInclusive };\nfn main(): int { let r: RangeInclusive<int> = 1..=5; return r.end; }");
+        var d = Assert.Single(Check("import std.core { Range };\nfn main(): int { let r: Range<int> = 1..=5; return r.end; }"),
+            x => x.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0001", d.Code);
+    }
 
     [Fact]
-    public void A_range_passed_as_an_argument_is_refused() =>
-        AssertOutOfPosition(
-            "fn eat(x: int): int { return x; }\nfn main(): int { return eat(1..5); }");
+    public void A_range_inside_an_array_literal_is_a_value() =>
+        AssertClean("fn main(): int { let xs = [1..3, 4..6]; return xs[1].start; }");
+
+    [Fact]
+    public void A_range_is_not_an_int()
+    {
+        var d = Assert.Single(Check("fn eat(x: int): int { return x; }\nfn main(): int { return eat(1..5); }"),
+            x => x.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0001", d.Code);
+        Assert.Contains("'Range<int>'", d.Message);
+    }
 
     [Fact]
     public void A_range_in_a_for_head_is_fine() =>

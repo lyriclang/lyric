@@ -354,6 +354,15 @@ public static class AstChildren
                 foreach (var f in s.Fields) yield return f;
                 break;
 
+            case WithExpr w:
+                yield return w.Target;
+                foreach (var f in w.Fields) yield return f;
+                break;
+
+            case WithField wf:
+                yield return wf.Value;
+                break;
+
             case StructInitField f:
                 yield return f.Value;
                 break;

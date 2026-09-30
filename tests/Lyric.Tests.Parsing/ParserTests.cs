@@ -507,9 +507,12 @@ public class ParserTests
     }
 
     [Fact]
-    public void Global_var_is_reported()
+    public void Global_var_is_a_module_binding()
     {
-        Assert.Contains(ParseModule("var x = 1;").diag.Diagnostics, d => d.Code == "LYR-PAR0027");
+        // A module-level 'var' (design/v5/spec/07 V5 G5); Lyric 4 refused it (LYR-PAR0027).
+        var (module, diag) = ParseModule("var x = 1;");
+        Assert.False(diag.HasErrors);
+        Assert.True(Assert.IsType<GlobalBindingDecl>(module.Declarations[0]).Binding.IsMutable);
     }
 
     [Fact]

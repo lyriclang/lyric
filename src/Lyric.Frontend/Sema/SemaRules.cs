@@ -376,11 +376,17 @@ public sealed class SemaRules
         switch (expr)
         {
             case IdentifierExpr id:
-                return _types.RefOf(id) switch
+                var referenced = _types.RefOf(id);
+                if (referenced is ImportBindingSymbol { Target: var importedGlobal }) referenced = importedGlobal;
+                return referenced switch
                 {
                     LocalSymbol { IsMutable: true } => null,
                     ParameterSymbol => $"'{id.Name}' is a parameter, and a parameter is a 'let' binding; copy it into a 'var' to change it",
                     LocalSymbol => $"'{id.Name}' is bound with 'let'; declare it 'var' to write it",
+                    // A module-level 'var' is written (07 V5 G5); a module-level 'let' is not.
+                    GlobalSymbol { Declaration: GlobalBindingDecl { Binding.IsMutable: true } } => null,
+                    GlobalSymbol { Declaration: GlobalBindingDecl } => $"'{id.Name}' is a module-level 'let'; declare it 'var' to write it",
+                    GlobalSymbol => $"'{id.Name}' is a 'static let', a constant",
                     _ => $"'{id.Name}' is not a variable",
                 };
 
@@ -530,6 +536,7 @@ public sealed class SemaRules
         ArrayLitExpr arr => arr.Elements,
         TupleLitExpr tu => tu.Elements,
         StructInitExpr si => si.Fields.Select(f => f.Value),
+        WithExpr w => [w.Target, .. w.Fields.Select(f => f.Value)],
         InterpolatedStringExpr fs => fs.Segments.OfType<InterpHole>().Select(h => h.Expr),
         IfExpr iff => [iff.Condition, iff.Then, iff.Else],
         // MatchExpr and LambdaExpr are handled in WalkExpr: their block arms and block bodies are

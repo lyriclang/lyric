@@ -47,8 +47,7 @@ public static class SubsetGate
         public void Module()
         {
             foreach (var function in module.Functions) Function(function);
-            if (module.Globals.Count > 0 && module.GlobalInit is { } init)
-                Refuse(FirstSpan(module.Functions[init.Value]), "module-level 'let'", "M3");
+            foreach (var global in module.Globals) Type(global.Type, default, $"the type of '{global.Name}'");
             // A module-level finding has no instruction to point at: the entry's first line stands in.
             var anywhere = module.Functions.Select(FirstSpan).FirstOrDefault(s => s != default);
             if (module.Impls.Count > 0) Refuse(anywhere, "interfaces", "M4");
@@ -83,9 +82,9 @@ public static class SubsetGate
                 case IrRefType r when module.Types.Any(t => t.Variants.Contains(r.Type)):
                     break;
                 case IrRefType r:
-                    // A tuple, a closure cell and a closure environment are heap entries of the
-                    // 4.x lowering; each gets its Lyric 5 form with its slice.
-                    Refuse(span, module.Types[r.Type.Value].Name == "<tuple>" ? $"tuples, {where}" : $"closures, {where}", "M3");
+                    // A closure cell and a closure environment are heap entries of the 4.x
+                    // lowering; each gets its Lyric 5 form with its slice.
+                    Refuse(span, $"closures, {where}", "M3");
                     break;
                 case IrArrayType array:
                     Type(array.Element, span, where);
@@ -170,7 +169,6 @@ public static class SubsetGate
                     Refuse(op.Span, "interfaces", "M4");
                     break;
                 case LoadGlobal or StoreGlobal:
-                    Refuse(op.Span, "module-level 'let'", "M3");
                     break;
                 case MakeClosure or CallIndirect:
                     Refuse(op.Span, "closures", "M3");

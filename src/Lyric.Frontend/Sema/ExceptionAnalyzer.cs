@@ -197,6 +197,7 @@ internal sealed class ExceptionAnalyzer
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e); break;
             case StructInitExpr si: foreach (var f in si.Fields) AnalyzeExpr(f.Value); break;
+            case WithExpr w: AnalyzeExpr(w.Target); foreach (var f in w.Fields) AnalyzeExpr(f.Value); break;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr);
                 break;

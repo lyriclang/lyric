@@ -70,6 +70,7 @@ public sealed class TypeChecker
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
+    private readonly TypeSymbol? _range, _rangeInclusive; // std.core's Range<T> and RangeInclusive<T> (03 A3)
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
     /// against. <c>null</c> when the stdlib is not loaded; the loop head then reports the ordinary
@@ -138,6 +139,8 @@ public sealed class TypeChecker
         // knows the built-in scalars, and everything else binds to an interface from the stdlib.
         var core = comp.FindModule(["std", "core"])?.Members;
         _equatable = core?.LookupLocal("Equatable") as TypeSymbol;
+        _range = core?.LookupLocal("Range") as TypeSymbol;
+        _rangeInclusive = core?.LookupLocal("RangeInclusive") as TypeSymbol;
         _ordered = core?.LookupLocal("Ordered") as TypeSymbol;
         _add = core?.LookupLocal("Add") as TypeSymbol;
         _sub = core?.LookupLocal("Sub") as TypeSymbol;
@@ -1769,6 +1772,7 @@ public sealed class TypeChecker
             case CastExpr c: return CheckCast(c, scope);
             case IndexExpr ix: return CheckIndex(ix, scope);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
+            case WithExpr w: return CheckWith(w, scope);
             case TupleLitExpr tu: return new TupleOf(tu.Elements.Select(e => CheckExpr(e, scope)).ToArray());
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments)
@@ -3061,21 +3065,15 @@ public sealed class TypeChecker
         if (elem is null && !lo.IsError && !hi.IsError)
             _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
 
-        if (!ReferenceEquals(r, _rangeInPosition))
-        {
-            _de.Report("LYR-SEM0090", Severity.Error, r.Span,
-                "a range is a loop head, not a value — it can stand in 'for (x in a..b)' and "
-                + "nowhere else",
-                new DiagnosticNote("to keep the numbers, write them as an array or as two "
-                    + "bindings; to walk them, put the range in the loop"));
-
-            // ErrorType, so whatever the range was handed to says nothing more: 'cannot assign
-            // range<int> to int' names a type the language does not have, and the sentence above
-            // is the one to act on.
-            return LyrType.Error;
-        }
-
-        return new RangeOf(elem ?? LyrType.Error);
+        // In a 'for' head the range is the counted loop and no value (03 T13 A3); everywhere
+        // else 'a..b' is a 'Range<T>' and 'a..=b' a 'RangeInclusive<T>' of std.core, holding its
+        // bounds. Lyric 4 refused the value.
+        if (ReferenceEquals(r, _rangeInPosition)) return new RangeOf(elem ?? LyrType.Error);
+        if (elem is null || elem.IsError) return LyrType.Error;
+        var symbol = r.IsInclusive ? _rangeInclusive : _range;
+        if (symbol is null)
+            return Report(r.Span, "LYR-SEM0090", "a range value needs 'Range' of std.core, which is not loaded");
+        return new GenericInstance(symbol, [elem]);
     }
 
     /// <summary>
@@ -3643,6 +3641,18 @@ public sealed class TypeChecker
         // the index are the primitives), and it is a CALL, with parentheses like every length
         // (10 N8). Without them the name is refused rather than read as a field: the two forms
         // would otherwise mean one thing, and 'xs.length' read like a field of the array.
+        // An element of a tuple, by position or by the label its type gives it (03 T16).
+        if (baseType is TupleOf tuple)
+        {
+            var at = tuple.Labels is { } labels ? Array.IndexOf(labels, mem.Member) : -1;
+            if (at < 0 && int.TryParse(mem.Member, out var position) && mem.Member.All(char.IsAsciiDigit)) at = position;
+            if (at < 0 || at >= tuple.Elements.Length)
+                return Report(mem.MemberSpan, "LYR-SEM0012",
+                    $"'{TypeFacts.Display(baseType)}' has no element '{mem.Member}' — the elements are '.0' to '.{tuple.Elements.Length - 1}'"
+                    + (tuple.Labels is not null ? " and their labels" : ""));
+            return mem.IsOptional ? Optionalized(tuple.Elements[at]) : tuple.Elements[at];
+        }
+
         if (baseType is ArrayOf or SliceOf or InlineArrayOf && mem.Member == "length")
         {
             if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
@@ -3753,7 +3763,7 @@ public sealed class TypeChecker
             ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
             SliceOf s => new SliceOf(Substitute(s.Element, map)),
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
-            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()),
+            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
@@ -4609,6 +4619,65 @@ public sealed class TypeChecker
             : member.Target is IdentifierExpr id
                 ? [id.Name, member.Member]
                 : [member.Member];
+
+    /// <summary>
+    /// <c>p with { x = 3, pos.y = 4 }</c> (design/v5/spec/02 M6): a copy of <c>p</c> with the
+    /// named fields replaced, of <c>p</c>'s type — on a struct only (W2): a class would be a
+    /// clone with a new identity, a tuple has no field names. A path reaches into a struct the
+    /// value holds by value (W6); a field named twice is refused, a field the type does not
+    /// have too (W4); no field needs <c>var</c>, since nothing is written in place. The values
+    /// see the old <c>p</c>: they are expressions over it, and the copy is what changes.
+    /// </summary>
+    private LyrType CheckWith(WithExpr w, SymbolTable scope)
+    {
+        var target = CheckExpr(w.Target, scope);
+        if (target.IsError) { foreach (var f in w.Fields) CheckExpr(f.Value, scope); return LyrType.Error; }
+        if (TypeFacts.KindOf(target) != TypeSymbolKind.Struct)
+        {
+            foreach (var f in w.Fields) CheckExpr(f.Value, scope);
+            return Report(w.Span, "LYR-SEM0116",
+                $"'with' copies a struct with fields replaced; '{TypeFacts.Display(target)}' is "
+                + (TypeFacts.KindOf(target) == TypeSymbolKind.Class ? "a class — an object is changed in place, or cloned"
+                    : target is TupleOf ? "a tuple, which has no fields to name" : "no struct"));
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in w.Fields)
+        {
+            var key = string.Join(".", field.Path);
+            if (!seen.Add(key))
+                _de.Report("LYR-SEM0070", Severity.Error, field.Span, $"duplicate field '{key}' in 'with'");
+
+            // Walk the path: every segment but the last names a struct held by value.
+            var holder = target;
+            LyrType? fieldType = null;
+            for (var i = 0; i < field.Path.Length; i++)
+            {
+                if (TypeFacts.KindOf(holder) != TypeSymbolKind.Struct)
+                {
+                    _de.Report("LYR-SEM0116", Severity.Error, field.Span,
+                        $"'{string.Join(".", field.Path.Take(i))}' is a '{TypeFacts.Display(holder)}', not a struct — a path in 'with' reaches through structs only");
+                    fieldType = null;
+                    break;
+                }
+                var owner = TypeFacts.SymbolOf(holder)!;
+                if (owner.Members.LookupLocal(field.Path[i]) is not FieldSymbol fs)
+                {
+                    _de.Report("LYR-SEM0015", Severity.Error, field.Span, $"'{owner.Name}' has no field '{field.Path[i]}'");
+                    fieldType = null;
+                    break;
+                }
+                if (i == field.Path.Length - 1) _result.BindRef(field, fs);
+                var subst = holder is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+                fieldType = Substitute(FieldType(fs), subst);
+                holder = fieldType;
+            }
+
+            if (fieldType is null) { CheckExpr(field.Value, scope); continue; }
+            CheckAssignable(field.Value, CheckExpr(field.Value, scope, fieldType), fieldType, field.Span);
+        }
+        return target;
+    }
 
     private LyrType CheckStructInit(StructInitExpr si, SymbolTable scope, LyrType? expected)
     {
@@ -6232,6 +6301,7 @@ public sealed class TypeChecker
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
                 case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;
+                case WithExpr w: WalkNode(w.Target); foreach (var f in w.Fields) WalkNode(f.Value); return;
                 case InterpolatedStringExpr fs:
                     foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkNode(h.Expr);
                     return;
@@ -6582,7 +6652,7 @@ public sealed class TypeChecker
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
-            case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray());
+            case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray()) { Labels = t.Labels };
             case FunctionType f: return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope));
             default: return LyrType.Error; // ErrorType
         }

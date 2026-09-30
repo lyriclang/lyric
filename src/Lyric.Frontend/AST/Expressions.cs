@@ -148,6 +148,12 @@ public sealed record TypePathExpr(string[] Path, TypeNode[] TypeArguments, Span 
     public required Span NameSpan { get; init; }
 }
 
+/// <summary><c>p with { x = 3, pos.y = 4 }</c> (design/v5/spec/02 M6): a copy of the struct
+/// <c>p</c> with the named fields replaced, <c>p</c> untouched; a path reaches into a struct
+/// held by value. The values see the old <c>p</c>.</summary>
+public sealed record WithExpr(Expr Target, WithField[] Fields, Span Span) : Expr(Span);
+public sealed record WithField(string[] Path, Expr Value, Span Span) : Node(Span);
+
 public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(Span)
 {
     /// <summary>Where the field name alone stands; <see cref="Node.Span"/> covers

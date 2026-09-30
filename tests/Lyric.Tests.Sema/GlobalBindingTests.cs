@@ -36,10 +36,18 @@ public class GlobalBindingTests
             string.Join(" | ", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
     }
 
+    /// <summary>A module-level 'var' is written from any function (design/v5/spec/07 V5 G5);
+    /// a module-level 'let' and a 'static let' are not.</summary>
     [Fact]
-    public void A_module_level_var_is_rejected() =>
-        Assert.Contains(Check("var n = 0;\nfn main(): int { return 0; }").Diagnostics,
-            d => d.Code == "LYR-PAR0027");
+    public void A_module_level_var_is_written() =>
+        Allowed("var n = 0;\nfn bump(): void { n += 1; }\nfn main(): int { n = 5; bump(); return n; }");
+
+    [Fact]
+    public void A_module_level_let_is_not_written()
+    {
+        var d = Assert.Single(Check("let n = 0;\nfn main(): int { n = 5; return n; }").Diagnostics, x => x.Code == "LYR-SEM0019");
+        Assert.Contains("module-level 'let'", d.Message);
+    }
 
     [Fact]
     public void A_module_level_let_is_fine() =>

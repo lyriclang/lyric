@@ -1,0 +1,46 @@
+// Tuples (01 V11; 03 T16): a value of positional elements laid out inline where it lies, its
+// elements read by position or by the label its type gives them, taken apart by a pattern.
+// Expected stdout, in order:
+//   pair 1 two               '.0' and '.1'
+//   labels 3 4 3             '.x' and '.y' on a labelled type, '.0' beside them
+//   swap 2 9                 a function returns a tuple, a binding takes it apart
+//   nested 5 hi              a tuple in a tuple, '.0.0'
+//   field 5,12 169           a tuple held in an object, replaced whole
+//   array 3 2 5              tuples as array elements; '(int, int)' where '(x: int, y: int)' is expected
+//   match two-first 3hi      patterns over tuples, nested
+//   optional 2               an optional tuple
+import std.io { println };
+
+class Holder { var pos: (x: int, y: int) }
+
+fn minmax(a: int, b: int): (int, int) { return if (a < b) (a, b) else (b, a); }
+
+fn norm(p: (x: int, y: int)): int { return p.x * p.x + p.y * p.y; }
+
+fn main(): int {
+    let pair = (1, "two");
+    println(f"pair {pair.0} {pair.1}");
+
+    let p: (x: int, y: int) = (3, 4);
+    println(f"labels {p.x} {p.y} {p.0}");
+
+    let (lo, hi) = minmax(9, 2);
+    println(f"swap {lo} {hi}");
+
+    let nested = ((1, 2), "hi");
+    println(f"nested {nested.0.0 + nested.0.1 * 2} {nested.1}");
+
+    let h = Holder { pos = (3, 4) };
+    h.pos = (5, 12);
+    println(f"field {h.pos.x},{h.pos.y} {norm(h.pos)}");
+
+    let arr = [(1, 2), (3, 4)];
+    println(f"array {arr[1].0} {arr.length()} {norm(arr[0])}");
+
+    let kind = match ((lo, hi)) { (2, _) => "two-first", _ => "other" };
+    println("match " + kind + " " + (match (nested) { ((a, b), s) => f"{a + b}{s}" }));
+
+    let o: ?(int, int) = (1, 2);
+    println(f"optional {(o ?? (0, 0)).1}");
+    return 0;
+}

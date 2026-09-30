@@ -338,9 +338,55 @@ internal sealed class FunctionLowerer
     /// <para>The same sequence as for a struct initializer, except that the fields go by position rather
     /// than by name. An opcode of its own would be a second way to build an object.</para>
     /// </summary>
+    /// <summary><c>a..b</c> as a value (03 T13 A3): the std.core struct holding its bounds, a
+    /// fresh value like a tuple. In a <c>for</c> head the literal never gets here.</summary>
+    private TempId LowerRangeValue(RangeExpr expr)
+    {
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
+            throw Bug("range value has no struct type");
+        var layout = _typeTable.Defs[type.Type.Value];
+        var dest = _slots.NewTemp(type);
+        _b.Emit(new NewObject(dest, type.Type, type, expr.Span));
+        _b.Emit(new StoreField(dest, type.Type, new FieldId(0), LowerExprAs(expr.Low, layout.FieldTypes[0]), expr.Span));
+        _b.Emit(new StoreField(dest, type.Type, new FieldId(1), LowerExprAs(expr.High, layout.FieldTypes[1]), expr.Span));
+        _fresh.Add(dest);
+        return dest;
+    }
+
+    /// <summary>
+    /// <c>p with { x = 3, pos.y = 4 }</c> (02 M6): a copy of <c>p</c>, then one store per field
+    /// into the copy — through the structs a path names, aliased where they lie in the copy.
+    /// The values are expressions over <c>p</c> and see the old values (W4).
+    /// </summary>
+    private TempId LowerWith(WithExpr expr)
+    {
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
+            throw Bug("'with' on a value that is not a struct");
+        var copy = CopyStructValue(LowerExpr(expr.Target), type, expr.Span);
+
+        foreach (var field in expr.Fields)
+        {
+            var (place, placeType) = (copy, type);
+            for (var i = 0; i < field.Path.Length - 1; i++)
+            {
+                var layout = _typeTable.Defs[placeType.Type.Value];
+                var index = Array.IndexOf(layout.FieldNames, field.Path[i]);
+                var inner = (IrStructType)layout.FieldTypes[index];
+                var loaded = _slots.NewTemp(inner);
+                _b.Emit(new LoadField(loaded, place, placeType.Type, new FieldId(index), inner, field.Span));
+                (place, placeType) = (loaded, inner);
+            }
+            var last = _typeTable.Defs[placeType.Type.Value];
+            var at = Array.IndexOf(last.FieldNames, field.Path[^1]);
+            var value = LowerExprAs(field.Value, last.FieldTypes[at]);
+            _b.Emit(new StoreField(place, placeType.Type, new FieldId(at), value, field.Span));
+        }
+        return copy;
+    }
+
     private TempId LowerTupleLiteral(TupleLitExpr expr)
     {
-        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrRefType type)
+        if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
             throw Bug("tuple literal has no tuple type");
 
         var layout = _typeTable.Defs[type.Type.Value];
@@ -1024,7 +1070,7 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerDestructuring(DestructuringStmt stmt)
     {
-        if (LowerType(_types.TypeOf(stmt.Initializer), stmt.Span) is not IrRefType type)
+        if (LowerType(_types.TypeOf(stmt.Initializer), stmt.Span) is not IrStructType type)
             throw Bug("destructuring a value that is not a tuple");
 
         var source = LowerExprAs(stmt.Initializer, type);
@@ -1691,6 +1737,7 @@ internal sealed class FunctionLowerer
         NullLiteralExpr e => LowerNull(e),
         LambdaExpr e => LowerLambda(e),
         TupleLitExpr e => LowerTupleLiteral(e),
+        WithExpr e => LowerWith(e),
         // A match whose arms all leave has the type 'never' and no result slot: nothing ever
         // flows out of it, and 'never' has no IR type to give a slot.
         MatchExpr e => _types.TypeOf(e) is NeverType
@@ -1701,7 +1748,7 @@ internal sealed class FunctionLowerer
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
-        RangeExpr e => throw NotSupported("range expression", e.Span),
+        RangeExpr e => LowerRangeValue(e),
         ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),
@@ -2155,6 +2202,10 @@ internal sealed class FunctionLowerer
 
         if (TryCapturedCell(expr.Target, out var cell, out var cellType, out var cellValueType))
             return LowerCapturedAssign(expr, cell, cellType, cellValueType);
+
+        // A module-level 'var' (07 V5 G5): the global slot, read and written as a local is.
+        if (expr.Target is IdentifierExpr globalName && GlobalOf(globalName) is { } global)
+            return LowerGlobalAssign(expr, global);
 
         var slot = ResolveLocalTarget(expr.Target, "assignment");
 
@@ -2774,7 +2825,7 @@ internal sealed class FunctionLowerer
                 if (valueType is IrOptionalType optional)
                     value = UnwrapPresent(value, optional, onFail, assumeMatch, tuple.Span);
                 var tupleType = valueType is IrOptionalType o ? o.Inner : valueType;
-                if (tupleType is not IrRefType { Type: var tupleId })
+                if (tupleType is not IrStructType { Type: var tupleId })
                     throw Bug("tuple pattern on a value that is not a tuple");
 
                 var layout = _typeTable.Defs[tupleId.Value];
@@ -3839,6 +3890,41 @@ internal sealed class FunctionLowerer
         _b.Emit(new StoreGlobal(id, value, stmt.Span));
     }
 
+    private GlobalSymbol? GlobalOf(IdentifierExpr expr)
+    {
+        var symbol = _types.RefOf(expr);
+        if (symbol is ImportBindingSymbol import) symbol = import.Target;
+        return symbol as GlobalSymbol;
+    }
+
+    private TempId LowerGlobalAssign(AssignExpr expr, GlobalSymbol global)
+    {
+        var (id, type) = _globals.Resolve(global, expr.Span);
+        TempId Load()
+        {
+            var loaded = _slots.NewTemp(type);
+            _b.Emit(new LoadGlobal(loaded, id, type, expr.Target.Span));
+            return loaded;
+        }
+        if (expr.Operator is null)
+        {
+            var value = LowerExprAs(expr.Value, type);
+            _b.Emit(new StoreGlobal(id, value, expr.Span));
+            return value;
+        }
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+            return LowerShortCircuitAssign(expr, type, Load, v => _b.Emit(new StoreGlobal(id, v, expr.Span)));
+        if (_types.OperatorCallOf(expr) is { } operatorCall)
+        {
+            var combined = LowerCall(operatorCall) ?? throw Bug("operator compound returned no value");
+            _b.Emit(new StoreGlobal(id, combined, expr.Span));
+            return combined;
+        }
+        var result = EmitBinary(IrBinKindExtensions.FromAst(expr.Operator.Value), type, Load(), LowerExpr(expr.Value), expr.Span);
+        _b.Emit(new StoreGlobal(id, result, expr.Span));
+        return result;
+    }
+
     /// <summary>A global slot through a bare name: a module <c>let</c> in the own or an imported
     /// module.</summary>
     private TempId? TryLowerGlobalIdentifier(IdentifierExpr expr)
@@ -3886,6 +3972,17 @@ internal sealed class FunctionLowerer
         // rather than the definition — 'Box<int>' and 'Box<string>' have different field types at the
         // same position.
         var target = SubstituteType(_types.TypeOf(expr.Target));
+
+        // A tuple's element, by position or by the label the sema resolved (03 T16): the
+        // layout's fields are the positions.
+        if (target is Sema.TupleOf tuple)
+        {
+            var position = tuple.Labels is { } labels ? Array.IndexOf(labels, expr.Member) : -1;
+            if (position < 0) position = int.Parse(expr.Member, System.Globalization.CultureInfo.InvariantCulture);
+            var tupleType = (IrStructType)LowerType(tuple, expr.Span);
+            var tupleLayout = _typeTable.Defs[tupleType.Type.Value];
+            return (LowerExpr(expr.Target), tupleType.Type, new FieldId(position), tupleLayout.FieldTypes[position]);
+        }
 
         var declaring = target switch
         {
@@ -5406,7 +5503,7 @@ internal sealed class FunctionLowerer
         TypeParamType p when _substitution.TryGetValue(p.Param, out var bound) => bound,
         ArrayOf a => new ArrayOf(SubstituteType(a.Element)),
         Optional o => new Optional(SubstituteType(o.Inner)),
-        Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()),
+        Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
         CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },

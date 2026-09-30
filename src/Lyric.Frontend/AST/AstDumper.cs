@@ -166,7 +166,8 @@ public static class AstDumper
                 Write(n.Element, indent + 1, sb);
                 break;
             case TupleType n:
-                Line(sb, indent, "TupleType", n.Span);
+                Line(sb, indent, n.Labels is { } labels
+                    ? "TupleType " + string.Join(", ", labels.Select(l => l ?? "_")) : "TupleType", n.Span);
                 foreach (var e in n.Elements) Write(e, indent + 1, sb);
                 break;
             case FunctionType n:
@@ -467,6 +468,15 @@ public static class AstDumper
                 break;
             case StructInitField n:
                 Line(sb, indent, $"InitField {n.Name}", n.Span);
+                Write(n.Value, indent + 1, sb);
+                break;
+            case WithExpr n:
+                Line(sb, indent, "With", n.Span);
+                Write(n.Target, indent + 1, sb);
+                foreach (var f in n.Fields) Write(f, indent + 1, sb);
+                break;
+            case WithField n:
+                Line(sb, indent, $"WithField {string.Join('.', n.Path)}", n.Span);
                 Write(n.Value, indent + 1, sb);
                 break;
 

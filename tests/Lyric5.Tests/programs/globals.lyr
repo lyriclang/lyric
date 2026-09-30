@@ -1,0 +1,49 @@
+// Module-level bindings (07 V5 G2, G5): filled at program start in declaration order, a later
+// one reading an earlier one; a 'var' written from any function; a 'static let' on a type; an
+// object and an array held by the module. Expected stdout, in order:
+//   start 3 6 hello!         a let, a let over a let, a string
+//   counter 0 3 4            a module 'var' counted up from a function and written in main
+//   static 0,0 100           a 'static let' of a struct type and of an int
+//   object 2 bob 9 1         a global object written through, a global array of structs
+import std.io { println };
+
+struct Point {
+    var x: int,
+    var y: int,
+
+    static let ORIGIN: Point = Point { x = 0, y = 0 };
+    static let LIMIT: int = 100;
+}
+
+class Log { var lines: int, var last: string }
+
+let base = 3;
+let twice = base * 2;
+let greeting = "hello" + "!";
+var counter = 0;
+let log = Log { lines = 0, last = "" };
+let points = [Point { x = 1, y = 2 }] * 2;
+
+fn bump(): void { counter += 1; }
+
+fn note(s: string): void {
+    log.lines += 1;
+    log.last = s;
+}
+
+fn main(): int {
+    println(f"start {base} {twice} {greeting}");
+    let before = counter;
+    bump();
+    bump();
+    bump();
+    let mid = counter;
+    counter = counter + 1;
+    println(f"counter {before} {mid} {counter}");
+    println(f"static {Point.ORIGIN.x},{Point.ORIGIN.y} {Point.LIMIT}");
+    note("alice");
+    note("bob");
+    points[1].x = 9;
+    println(f"object {log.lines} {log.last} {points[1].x} {points[0].x}");
+    return 0;
+}

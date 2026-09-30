@@ -118,6 +118,8 @@ public class GoldenTests
     [InlineData("implicit_member")]   // .Red, .Num(3), .Rect { w = 1, h = 2 }, c == .Blue (08 Y9)
     [InlineData("index_from_end")]    // xs[^1] beside a ^ b: a prefix from the end, an infix exclusive or (03 T14 N6)
     [InlineData("index_slice")]       // xs[1..^1], xs[..2], xs[2..], xs[..], xs[1..=2]: the views (03 T13 A2)
+    [InlineData("tuple_elements")]    // t.0, n.0.1 (one float token, two members), p.x (03 T16)
+    [InlineData("with_expr")]         // p with { x = 1, pos.y = p.y }.x: a postfix, a path, precedence (02 M6)
     public void Golden_expression_matches_snapshot(string name)
         => Check(name, p => p.ParseExpression());
 
@@ -153,6 +155,7 @@ public class GoldenTests
     [InlineData("struct_init_binding")] // let p = Point { … }; — a struct initializer in value position
     [InlineData("let_else_implicit")] // let .Num(n) = s else { … }; — a dotted pattern opens a let-else (08 Y6)
     [InlineData("inline_array_type")] // let m: float[4][4] = …; — the inline array type (03 T13 A4)
+    [InlineData("tuple_labels")]      // let p: (x: int, y: (int, string)) = q; — labelled elements (03 T16)
     public void Golden_statement_matches_snapshot(string name)
         => Check(name, p => p.ParseStatement());
 
@@ -185,11 +188,11 @@ public class GoldenTests
     [InlineData("type_alias")]        // type X = int;
     [InlineData("global_let")]        // pub let ...
     [InlineData("module_full")]       // Header + Import + Struct + Fn
+    [InlineData("global_var")]        // var at top level (07 V5 G5; Lyric 4 refused it)
     // Attributes.
     [InlineData("attr_decl")]         // on fn, struct, class and enum; args, stacking, dotted path
     [InlineData("attr_module")]       // before the module header
     // Negativ.
-    [InlineData("global_var")]        // var at top level (LYR-PAR0027)
     [InlineData("bad_toplevel")]      // Ausdruck statt Deklaration
     [InlineData("attr_bad_target")]   // on interface, let and type alias (LYR-PAR0042)
     [InlineData("attr_dangling")]     // an attribute with nothing behind it (LYR-PAR0042)
