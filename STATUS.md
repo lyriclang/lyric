@@ -113,6 +113,14 @@ Learned on the way and kept:
   has none, its spin lock (`nanosleep`) has one. The sanitizer runs live in the C toolchain job
   alone.
 
+**Open thread — the threads program under TSan.** On GitHub's Ubuntu runner (clang 18) the
+collector's stop-the-world signals now and then reach a thread only after Boehm's retry limit
+(15 s) and it aborts, "Signals delivery fails constantly at GC #2": 3 of 5 runs, with and without
+the kernel's `mmap_rnd_bits` preparation. Locally (WSL2, clang 22) 96 stressed runs pass. The
+mechanism is not found. The run is local only (`LYRIC5_SANITIZERS=all`) until M11, whose
+collector stops threads at safepoints, not with signals; the other TSan runs and the race
+control stay in CI.
+
 ### M2 — First native program
 
 Next. Plan first (13, M2), then slices.
