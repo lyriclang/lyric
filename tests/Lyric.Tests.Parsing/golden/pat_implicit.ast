@@ -1,0 +1,5 @@
+VariantPattern .Rect [0..18)
+  FieldPattern w [8..13)
+    LitPattern [12..13)
+      Int 0 [12..13)
+  FieldPattern h [15..16)

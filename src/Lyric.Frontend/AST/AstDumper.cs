@@ -49,6 +49,9 @@ public static class AstDumper
             case IdentifierExpr n:
                 Line(sb, indent, $"Ident {n.Name}", n.Span);
                 break;
+            case ImplicitMemberExpr n:
+                Line(sb, indent, $"ImplicitMember .{n.Name}", n.Span);
+                break;
             case AtIdentifierExpr n:
                 Line(sb, indent, $"AtIdent {n.Name}{(n.Arguments is null ? "" : " (call)")}", n.Span);
                 foreach (var a in n.Arguments ?? []) Write(a, indent + 1, sb);
@@ -419,7 +422,7 @@ public static class AstDumper
                 Line(sb, indent, $"BindPattern {n.Name}", n.Span);
                 break;
             case VariantPattern n:
-                Line(sb, indent, $"VariantPattern {string.Join('.', n.Path)}", n.Span);
+                Line(sb, indent, $"VariantPattern {(n.IsImplicit ? "." : "")}{string.Join('.', n.Path)}", n.Span);
                 foreach (var p in n.TupleElements ?? []) Write(p, indent + 1, sb);
                 foreach (var f in n.StructFields ?? []) Write(f, indent + 1, sb);
                 break;
@@ -453,7 +456,7 @@ public static class AstDumper
 
             // --- struct initializers ---
             case StructInitExpr n:
-                Line(sb, indent, $"StructInit {string.Join('.', n.Path)}", n.Span);
+                Line(sb, indent, $"StructInit {(n.IsImplicit ? "." : "")}{string.Join('.', n.Path)}", n.Span);
                 foreach (var a in n.TypeArguments) { Line(sb, indent + 1, "TypeArg", a.Span); Write(a, indent + 2, sb); }
                 foreach (var f in n.Fields) Write(f, indent + 1, sb);
                 break;

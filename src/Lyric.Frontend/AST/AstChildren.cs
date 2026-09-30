@@ -232,6 +232,7 @@ public static class AstChildren
             case BoolLiteralExpr:
             case NullLiteralExpr:
             case IdentifierExpr:
+            case ImplicitMemberExpr:
             case ThisExpr:
             case ErrorExpr:
                 break;

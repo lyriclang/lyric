@@ -107,7 +107,7 @@ public class PatternTests
     [Fact]
     public void Generic_enum_payload_is_substituted()
     {
-        var (t, de) = LastInit("fn u(o: Opt<int>) { let x = match (o) { Some(v) => v, None => 0 }; }");
+        var (t, de) = LastInit("fn u(o: Opt<int>) { let x = match (o) { Some(v) => v, .None => 0 }; }");
         AssertClean(de);
         AssertType(LyrType.Int, t); // Some(T) → T=int
     }
@@ -115,7 +115,7 @@ public class PatternTests
     [Fact]
     public void Generic_struct_variant_payload_is_substituted()
     {
-        var (t, de) = LastInit("fn u(r: Res<int>) { let x = match (r) { Okv { v } => v, Err => 0 }; }");
+        var (t, de) = LastInit("fn u(r: Res<int>) { let x = match (r) { Okv { v } => v, .Err => 0 }; }");
         AssertClean(de);
         AssertType(LyrType.Int, t); // Okv { v: T } → T=int
     }
@@ -131,8 +131,26 @@ public class PatternTests
     [Fact]
     public void Unit_variant_name_matches_without_binding()
     {
-        var de = Diags("fn u(s: Shape) { let x = match (s) { Empty => 1.0, _ => 2.0 }; }");
+        var de = Diags("fn u(s: Shape) { let x = match (s) { .Empty => 1.0, _ => 2.0 }; }");
         AssertClean(de);
+    }
+
+    /// <summary>08 Y6: a bare name is a binding, always — and one that spells a variant of the
+    /// scrutinee's enum is refused rather than silently shadowing it.</summary>
+    [Fact]
+    public void A_bare_name_that_spells_a_unit_variant_is_refused()
+    {
+        var de = Diags("fn u(s: Shape) { let x = match (s) { Empty => 1.0, _ => 2.0 }; }");
+        var d = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0111");
+        Assert.Contains("'.Empty'", d.Message);
+    }
+
+    [Fact]
+    public void A_bare_name_that_spells_no_variant_binds()
+    {
+        var (t, de) = LastInit("fn u(s: Shape) { let x = match (s) { whole => whole }; }");
+        AssertClean(de);
+        Assert.True(t is NamedRef { Symbol.Name: "Shape" }, TypeFacts.Display(t));
     }
 
     // --- tuple and struct destructuring ---
@@ -242,7 +260,11 @@ public class PatternTests
     [Fact]
     public void Bare_name_of_payload_variant_is_reported()
     {
+        // Since 08 Y6 the bare name is a binding that spells a variant (SEM0111), not a
+        // payload-less variant pattern (SEM0031); the dotted form without its payload still is.
         var de = Diags("fn u(s: Shape) { match (s) { Circle => { }, _ => { } } }");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0111");
+        de = Diags("fn u(s: Shape) { match (s) { .Circle => { }, _ => { } } }");
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0031");
     }
 
@@ -303,7 +325,7 @@ public class PatternTests
                     Circle(_) => { }
                     Rectangle(_, _) => { }
                     Triangle { } => { }
-                    Empty => { }
+                    .Empty => { }
                 }
             }
             """);
@@ -313,7 +335,7 @@ public class PatternTests
     [Fact]
     public void Or_pattern_coverage_counts_each_alternative()
     {
-        var de = Diags("fn u(s: Shape) { match (s) { Circle(_) | Rectangle(_, _) | Triangle { } | Empty => { } } }");
+        var de = Diags("fn u(s: Shape) { match (s) { Circle(_) | Rectangle(_, _) | Triangle { } | .Empty => { } } }");
         AssertClean(de);
     }
 
@@ -326,7 +348,7 @@ public class PatternTests
                     Circle(r) if r > 0.0 => { }
                     Rectangle(_, _) => { }
                     Triangle { } => { }
-                    Empty => { }
+                    .Empty => { }
                 }
             }
             """);
@@ -342,7 +364,7 @@ public class PatternTests
                     Circle(1.0) => { }
                     Rectangle(_, _) => { }
                     Triangle { } => { }
-                    Empty => { }
+                    .Empty => { }
                 }
             }
             """);
@@ -411,7 +433,7 @@ public class PatternTests
                     Circle(_) => { return 1; }
                     Rectangle(_, _) => { return 2; }
                     Triangle { } => { return 3; }
-                    Empty => { return 4; }
+                    .Empty => { return 4; }
                 }
             }
             """);

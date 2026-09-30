@@ -1,0 +1,132 @@
+// Enums (design/v5/spec/01 V5, V6): a tag and the union of the variants' payloads, inline and
+// by value; 'match' branches on the tag and reads the payload in place; an optional of an enum
+// takes a tag no variant has. Expected stdout, in order:
+//   signals red yellow green           unit variants, a match that answers a value
+//   areas 0 12 6 7                     payloads: none, a float, named fields, a string and a struct
+//   describe round round flat square rect origin far@3,4
+//                                      a field test, a guard, an or-pattern, a string literal, a nested struct pattern
+//   grade zero digit neg many          integer literals and ranges, a negative one among them
+//   maybe none green                   '?Signal': null, and a value narrowed by a test
+//   method true false 2                methods on an enum; a 'mut fn' replaces 'this' whole
+//   scene 6 green                      an enum and an optional enum as fields of an object
+//   tree 7                             an enum that holds itself behind 'Box<T>' (02 M13)
+import std.core { Box };
+import std.io { println };
+
+enum Signal {
+    Red, Yellow, Green;
+
+    fn isStop(): bool { return match (this) { Signal.Red => true, _ => false }; }
+    fn ordinal(): int { return match (this) { Signal.Red => 0, Signal.Yellow => 1, Signal.Green => 2 }; }
+    mut fn advance(): void { this = next(this); }
+}
+
+struct Point { x: int, y: int }
+
+enum Shape {
+    Dot,
+    Circle(float),
+    Rect { w: int, h: int },
+    Tagged(string, Point),
+}
+
+class Scene { var main: Shape, var light: ?Signal }
+
+enum Tree { Leaf(int), Node(Box<Tree>, Box<Tree>) }
+
+fn leaf(n: int): Box<Tree> { return Box<Tree> { value = Tree.Leaf(n) }; }
+
+fn sum(t: Tree): int {
+    return match (t) {
+        Tree.Leaf(n) => n,
+        Tree.Node(l, r) => sum(l.value) + sum(r.value),
+    };
+}
+
+fn name(s: Signal): string {
+    return match (s) {
+        Signal.Red => "red",
+        Signal.Yellow => "yellow",
+        Signal.Green => "green",
+    };
+}
+
+fn next(s: Signal): Signal {
+    return match (s) {
+        Signal.Red => Signal.Yellow,
+        Signal.Yellow => Signal.Green,
+        Signal.Green => Signal.Red,
+    };
+}
+
+fn area(s: Shape): int {
+    return match (s) {
+        Shape.Dot => 0,
+        Shape.Circle(r) => (r * r * 3.0) as int,
+        Shape.Rect { w, h } => w * h,
+        Shape.Tagged(label, p) => p.x + p.y,
+    };
+}
+
+fn describe(s: Shape): string {
+    return match (s) {
+        Shape.Rect { w = 0, h } => "flat",
+        Shape.Rect { w, h } if w == h => "square",
+        Shape.Dot | Shape.Circle(_) => "round",
+        Shape.Tagged("origin", _) => "origin",
+        Shape.Tagged(label, Point { x, y }) => label + f"@{x},{y}",
+        _ => "rect",
+    };
+}
+
+fn grade(n: int): string {
+    return match (n) {
+        0 => "zero",
+        1..=9 => "digit",
+        -5..=-1 => "neg",
+        _ => "many",
+    };
+}
+
+fn find(n: int): ?Signal {
+    if (n == 0) { return null; }
+    return if (n > 2) Signal.Green else Signal.Red;
+}
+
+fn show(m: ?Signal): string {
+    if (m == null) { return "none"; }
+    return name(m);
+}
+
+fn main(): int {
+    let red = Signal.Red;
+    println("signals " + name(red) + " " + name(next(red)) + " " + name(next(next(red))));
+
+    let dot = Shape.Dot;
+    let circle = Shape.Circle(2.0);
+    let rect = Shape.Rect { w = 2, h = 3 };
+    let far = Shape.Tagged("far", Point { x = 3, y = 4 });
+    println(f"areas {area(dot)} {area(circle)} {area(rect)} {area(far)}");
+
+    println("describe " + describe(dot) + " " + describe(Shape.Circle(1.0)) + " "
+        + describe(Shape.Rect { w = 0, h = 5 }) + " " + describe(Shape.Rect { w = 4, h = 4 }) + " "
+        + describe(rect) + " " + describe(Shape.Tagged("origin", Point { x = 0, y = 0 })) + " " + describe(far));
+
+    println("grade " + grade(0) + " " + grade(7) + " " + grade(-3) + " " + grade(42));
+
+    println("maybe " + show(find(0)) + " " + show(find(3)));
+
+    var s = Signal.Red;
+    let stop = s.isStop();
+    s.advance();
+    s.advance();
+    println(f"method {stop} {s.isStop()} {s.ordinal()}");
+
+    let scene = Scene { main = rect };
+    scene.light = Signal.Green;
+    println(f"scene {area(scene.main)} " + show(scene.light));
+
+    let tree = Tree.Node(leaf(1), Box<Tree> { value = Tree.Node(leaf(2), leaf(4)) });
+    println(f"tree {sum(tree)}");
+    return 0;
+}

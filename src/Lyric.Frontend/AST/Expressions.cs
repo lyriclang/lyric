@@ -27,6 +27,11 @@ public sealed record NullLiteralExpr(Span Span) : Expr(Span);
 
 // --- names ---
 public sealed record IdentifierExpr(string Name, Span Span) : Expr(Span);
+
+/// <summary><c>.Red</c>: a member of the type the position expects, the type unnamed
+/// (design/v5/spec/03 T9, 08 Y9). A unit variant as it stands; the callee of <c>.Num(3)</c>;
+/// what the sema binds it to says which. Without an expected enum type it is an error.</summary>
+public sealed record ImplicitMemberExpr(string Name, Span Span) : Expr(Span);
 public sealed record AtIdentifierExpr(string Name, Expr[]? Arguments, Span Span) : Expr(Span); // Name INCLUDING the leading '@' (for example "@test"); Arguments == null when none were written
 public sealed record ThisExpr(Span Span) : Expr(Span);
 
@@ -116,6 +121,10 @@ public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Exp
 // with a block. The field separator is '='; ':' is reserved for types.
 public sealed record StructInitExpr(string[] Path, TypeNode[] TypeArguments, StructInitField[] Fields, Span Span) : Expr(Span)
 {
+    /// <summary><c>.Rect { w = 1 }</c>: the path is the one variant name, and the enum is the
+    /// type the position expects (08 Y9).</summary>
+    public bool IsImplicit { get; init; }
+
     /// <summary>The span of the LAST path segment — the name the initializer's symbol answers for.
     /// The segments before it qualify; only this one is the type's own name.</summary>
     public required Span NameSpan { get; init; }

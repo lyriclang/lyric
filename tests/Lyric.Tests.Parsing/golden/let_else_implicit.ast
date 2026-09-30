@@ -1,0 +1,7 @@
+LetPattern [0..35)
+  VariantPattern .Num [4..11)
+    BindPattern n [9..10)
+  Ident s [14..15)
+  Block [21..34)
+    Return [23..32)
+      Int 1 [30..31)

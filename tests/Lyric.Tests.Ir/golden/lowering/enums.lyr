@@ -13,7 +13,7 @@ enum Shape {
         return match (this) {
             Circle(r) => r * r * 3,
             Rect { w, h } => w * h,
-            Empty => 0,
+            .Empty => 0,
         };
     }
 }

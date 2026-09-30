@@ -125,6 +125,11 @@ public sealed partial class Parser
             && _buffer.Peek(1).TokenKind is TokenKind.LParen or TokenKind.LBrace or TokenKind.Dot)
             return ParseLetPattern(kw, isMutable);
 
+        // 'let .Num(n) = …': the dotted variant of the initializer's enum (08 Y6) is a pattern
+        // as well; a binding name never starts with a dot.
+        if (_buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
+            return ParseLetPattern(kw, isMutable);
+
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
             $"expected binding name, got {_buffer.Current.TokenKind}");
         TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;

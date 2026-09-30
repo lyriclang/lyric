@@ -45,7 +45,7 @@ pub enum JsonValue {
     /// Whether this is the JSON `null` — the value, not an absent optional.
     pub fn isNull(): bool {
         return match (this) {
-            Null => true,
+            .Null => true,
             _ => false,
         };
     }
@@ -139,7 +139,7 @@ pub fn serializePretty(value: JsonValue, indent: int): string {
 // The one writer behind both entry points; `indent < 0` means compact.
 fn writeValue(sb: StringBuilder, value: JsonValue, indent: int, depth: int): void {
     match (value) {
-        Null => {
+        .Null => {
             sb.append("null");
         }
         Bool(b) => {

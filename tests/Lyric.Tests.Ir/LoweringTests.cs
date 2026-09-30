@@ -933,7 +933,7 @@ public class LoweringTests
                 pub fn or(fallback: T): T {
                     return match (this) {
                         Full(v) => v,
-                        Empty => fallback,
+                        .Empty => fallback,
                     };
                 }
             }

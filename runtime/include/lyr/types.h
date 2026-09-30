@@ -14,7 +14,14 @@ enum {
     LYR_DESC_HAS_REFS = 1u << 0, /* some word of the object (or of an array element) is a reference */
     LYR_DESC_ARRAY    = 1u << 1, /* length-prefixed: size is the fixed part, elem_size the element */
     LYR_DESC_STRING   = 1u << 2, /* the string layout below */
+    LYR_DESC_CONSERVATIVE = 1u << 3, /* the refmap does not tell all: some word is a reference only in
+                                        some states of the object — a union under a tag (01 V6). A
+                                        collector that reads the map scans this object as it scans a
+                                        stack, word by word; nothing moves, so that is sound */
 };
+
+/* The tag of an absent `?Enum` (01 V5): the optional is the enum itself, with a tag no variant has. */
+#define LYR_ENUM_NONE UINT32_MAX
 
 typedef struct LyrDesc {
     uint32_t size;               /* bytes of a fixed object, header included; for arrays/strings the fixed part */

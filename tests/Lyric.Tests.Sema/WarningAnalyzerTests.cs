@@ -168,7 +168,7 @@ public class WarningAnalyzerTests
         AssertSilent(Check(
             "enum Shape {\n    Rect { w: int, h: int },\n    Empty;\n"
             + "    fn name(): string {\n        return match (this) {\n"
-            + "            Rect { w, h } => \"rect\",\n            Empty => \"empty\",\n        };\n    }\n}\n"
+            + "            Rect { w, h } => \"rect\",\n            .Empty => \"empty\",\n        };\n    }\n}\n"
             + "fn main(): int {\n    let s = Shape.Empty;\n    return if (s.name() == \"empty\") 1 else 0;\n}\n",
             withStdlib: true));
     }
@@ -179,7 +179,7 @@ public class WarningAnalyzerTests
         var de = Check(
             "enum Shape {\n    Rect { w: int, h: int },\n    Empty;\n"
             + "    fn wide(): bool {\n        return match (this) {\n"
-            + "            Rect { w = width, h = _ } => true,\n            Empty => false,\n        };\n    }\n}\n"
+            + "            Rect { w = width, h = _ } => true,\n            .Empty => false,\n        };\n    }\n}\n"
             + "fn main(): int {\n    let s = Shape.Empty;\n    return if (s.wide()) 1 else 0;\n}\n",
             withStdlib: true);
         AssertWarns(de, "LYR-SEM0071");

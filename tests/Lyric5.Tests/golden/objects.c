@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 
-/* types: a struct is a value, a class an object behind its header */
+/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Account lyr_ty0_Account;
 typedef struct lyr_ty1_Team lyr_ty1_Team;
 typedef struct lyr_ty2_Shape lyr_ty2_Shape;

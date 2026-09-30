@@ -79,6 +79,9 @@ public static class SubsetGate
                     break;
                 case IrRefType r when module.Types[r.Type.Value].IsClass:
                     break;
+                // The variant of an enum, behind an 'enumas': a view into the enum's payload.
+                case IrRefType r when module.Types.Any(t => t.Variants.Contains(r.Type)):
+                    break;
                 case IrRefType r:
                     // A tuple, a closure cell and a closure environment are heap entries of the
                     // 4.x lowering; each gets its Lyric 5 form with its slice.
@@ -90,8 +93,10 @@ public static class SubsetGate
                 case IrOptionalType optional:
                     Type(optional.Inner, span, where);
                     break;
-                case IrEnumType:
-                    Refuse(span, $"enums, {where}", "M3");
+                case IrEnumType e:
+                    foreach (var variant in module.Types[e.Type.Value].Variants)
+                        foreach (var field in module.Types[variant.Value].FieldTypes.Skip(1))
+                            Type(field, span, where);
                     break;
                 case IrInterfaceType:
                     Refuse(span, $"interfaces, {where}", "M4");
@@ -115,9 +120,7 @@ public static class SubsetGate
                 case Const:
                     break;
                 case BinOp b:
-                    if (b.Type is IrScalarType { Kind: IrScalar.String } && b.Kind != IrBinKind.Add)
-                        Refuse(op.Span, "comparing strings with an operator", "M3");
-                    else Type(b.Type, op.Span, "the operand type");
+                    Type(b.Type, op.Span, "the operand type");
                     break;
                 case UnOp u:
                     Type(u.Type, op.Span, "the operand type");
@@ -143,7 +146,6 @@ public static class SubsetGate
                 case OptNone or OptSome or OptIsSome or OptGet:
                     break;
                 case NewVariant or EnumTag or EnumAs:
-                    Refuse(op.Span, "enums", "M3");
                     break;
                 case MakeInterface or CallVirt:
                     Refuse(op.Span, "interfaces", "M4");

@@ -45,8 +45,8 @@ fn span(xs: int[]): int {
 
 fn command(ts: Token[]): string {
     return match (ts) {
-        [Word("add"), Number(n), End] => f"add {n}",
-        [Word("quit"), End] => "quit",
+        [Word("add"), Number(n), .End] => f"add {n}",
+        [Word("quit"), .End] => "quit",
         [Word(w), ..] => "unknown: " + w,
         _ => "empty",
     };
