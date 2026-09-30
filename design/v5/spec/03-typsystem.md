@@ -221,18 +221,21 @@ bei geboxten Structs eine Kopie).
 | Erschöpfung | Typ-Pattern-`match` braucht `_` (offene Menge) — außer bei **versiegelten** Interfaces (`sealed`, alle Konformer im Modul): **Bereich-4-Posten**, vorgemerkt | Kotlin, Java 17 |
 | Bloßes `T` | **kein Typtest** (O2); dynamische Typisierung nimmt `Any` als Parametertyp | Rust |
 
-## T12 — `inout`-Parameter: **entschieden** (2026-09-28); Keyword in Bereich 8
+## T12 — `inout`-Parameter: **entschieden** (2026-09-28); Schreibweise in Bereich 8, **geändert 2026-09-30**
 
 **Ein Parameter-Übergabemodus, kein Referenztyp** (Swift `inout`, Pascal `var`-Parameter):
 der Parameter kommt per Ort (ein Zeiger, S1) und darf geschrieben werden. `mut fn` ist der
-Sonderfall für den Receiver (`fn f(inout this: Self)`); `inout` ist dasselbe für jeden
-Parameter — freie Funktionen (`swap`), Skalare (`increment(inout n: int)`), ein Nicht-`mut`-
-Methode, die einen *anderen* Ort schreibt (`multiplyInto(other, inout target)`).
+Sonderfall für den Receiver (gedacht als `fn f(&this: Self)`); der Modus ist dasselbe für jeden
+Parameter — freie Funktionen (`swap`), Skalare (`increment(&n: int)`), eine Nicht-`mut`-
+Methode, die einen *anderen* Ort schreibt (`multiplyInto(other: Matrix, &target: Matrix)`). „`inout`"
+bleibt der Name des Konzepts in diesen Dokumenten; ein Wort der Sprache ist es nicht.
 
 | Regel | |
 |---|---|
 | Argument | ein **`var`-Ort** nach M3 (Local, `var`-Feld unter `var`-Wurzel, Array-Element); kein Temporary, kein `let` |
-| Aufrufstelle | **markiert** (Arbeitsnotation `&x`), damit die Mutation sichtbar ist (Swift, C#) |
+| Aufrufstelle | **markiert**: `&x`, damit die Mutation sichtbar ist (Swift, C#) — dasselbe Zeichen wie in der Signatur |
+| Optional | `&x: ?T` ist der Ort eines Optionals (der Aufgerufene darf `null` hineinschreiben); einen „optionalen Ort" gibt es nicht, und die Schreibweise hat keine Form dafür |
+| Funktionstyp | das Zeichen am Anfang des Parameters: `fn(&int, string) -> void` (T17) |
 | Entkommen | keine Closure fängt es (C3); nicht speicherbar (kein Referenztyp als Wert); Yield währenddessen harmlos (Aufrufer wartet auf demselben Stack) |
 | Aliasing (`swap(&a, &a)`) | erlaubt, Wirkung undefiniert, dokumentiert — keine Exklusivitätsprüfung (Linie von M5) |
 | Klassen-Parameter | `inout` biegt die *Variable* des Aufrufers um; erlaubt, selten |
@@ -240,10 +243,25 @@ Methode, die einen *anderen* Ort schreibt (`multiplyInto(other, inout target)`).
 | C# `out`, `in` | **nein** (Rückgabe/Tupel; große Structs gehen ohnehin per Zeiger) |
 | `ref`-Rückgabe (Ort im Backing-Speicher, statement-gebunden) | **Tür**, nicht 5.0; Get/Set-Rückschreibung (M4) deckt `list[0].x = 1` |
 
-**Schreibweise — Bereich 8 (Y1, entschieden)**: **kein Wort, ein Zeichen** — Parameter `x: &T`,
-Aufruf `swap(&a, &b)` (C++/Rust/C-Gewohnheit; Präfix-`&` war frei). `inout` (Swift) und `ref`
-(C#) verworfen; `mut`/`var` als Parameterwort schieden ohnehin aus (Rust `mut x` = veränderliche
-lokale *Kopie*).
+**Schreibweise — Bereich 8 (Y1)**: **kein Wort, ein Zeichen, und das Zeichen steht am
+Parameter, nicht am Typ** — Deklaration `fn swap<T>(&a: T, &b: T)`, Aufruf `swap(&a, &b)`
+(Präfix-`&` war frei). `inout` (Swift) und `ref` (C#) verworfen; `mut`/`var` als Parameterwort
+schieden ohnehin aus (Rust `mut x` = veränderliche lokale *Kopie*).
+
+**Geändert am 2026-09-30 (Maintainer): `&x: T` statt `x: &T`.** Die erste Fassung schrieb den
+Modus an die Typposition, gegen den ersten Satz dieses Abschnitts. Gründe:
+
+| | `x: &T` (verworfen) | `&x: T` |
+|---|---|---|
+| Modus oder Typ | `&T` liest sich als Referenztyp (Rust, C++) und macht alles schreibbar, was oben verboten ist — `let r: &int`, ein Feld `f: &int`, eine Rückgabe `&int`, `List<&int>`, `(&int)[]` —, jedes mit eigener Diagnose | das Zeichen kommt in keinem Typ vor; die Grammatik kennt die verbotenen Formen nicht |
+| Optional | drei Schreibweisen, eine sinnvoll: `&?T` (Ort eines Optionals), `?&T` und `?&?T` (optionaler Ort — gibt es nicht) | genau eine: `&x: ?T` |
+| „Adresse" | `&` am Typ legt einen Zeigertyp nahe; Lyric hat keine nativen Zeiger | die Lesart „Zeigertyp" entfällt. Am Aufruf bleibt `&x` als „Ort von x" lesbar — das trifft zu: der Aufgerufene bekommt den Ort. Einen Adress-Operator als Wert gibt es nicht (`&x` nur in Argumentposition, Y4) |
+| Deklaration gegen Aufruf | verschieden (`a: &T` / `&a`) | gleich (`&a: T` / `&a`), wie C# `ref` |
+
+Preis: die C++/Rust-Gewohnheit `&T` (gewollt aufgegeben — wer sie mitbringt, erwartet einen Typ
+erster Klasse und bekäme keinen), und der Funktionstyp, der keine Parameternamen hat, braucht
+die Regel „Zeichen am Parameteranfang" ausdrücklich (T17). Grammatik: ein Parameter ist
+`'&'? Name ':' Typ`, ein Parameter im Funktionstyp `'&'? Typ`.
 
 ## T13 — Arrays, Views, Ranges, `T[N]`: **entschieden** (2026-09-28)
 
@@ -288,7 +306,9 @@ Funktionstyp** (`fn(int) -> int throws ParseError`; ohne `throws` wirft er nicht
 Bereich 5. Instanziierte generische Funktion als Wert **ja** (`map(ident<int>)`, ein
 Funktionszeiger nach Monomorphisierung); die uninstanziierte bleibt verboten (Rust). Methode als
 Wert (`obj.method`) ergibt eine Closure, die `obj` fängt (C2). Keine Varianz (T3), keine
-benannten Parameter im Typ.
+benannten Parameter im Typ. Ein `inout`-Parameter (T12) trägt sein Zeichen am Anfang des
+Parameters: `fn(&int, string) -> void`. Das `&` gehört dort zur Parameterliste und ist kein
+Typkonstruktor — `fn(?&int)`, `(&int)[]` und `List<&int>` sind nicht schreibbar.
 
 ## T18 — Typparameter-Hygiene: **entschieden** (2026-09-28)
 
