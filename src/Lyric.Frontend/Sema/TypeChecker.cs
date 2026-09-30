@@ -528,10 +528,14 @@ public sealed class TypeChecker
             //
             // It only shows when an initializer OMITS the field: 'K { v = 9 }' never evaluates the
             // default, 'K { }' does.
+            //
+            // The field's type is the context: a literal adapts to it and '.Red' reads the enum
+            // from it (08 Y9), as at every other coercion site.
             if (m is FieldDecl { Default: not null } field)
             {
-                CheckAssignable(field.Default, CheckExpr(field.Default, module.Members),
-                    ResolveType(field.Type, module.Members), field.Default.Span);
+                var fieldType = ResolveType(field.Type, module.Members);
+                CheckAssignable(field.Default, CheckExpr(field.Default, module.Members, fieldType),
+                    fieldType, field.Default.Span);
                 continue;
             }
 

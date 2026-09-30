@@ -87,6 +87,19 @@ public class ImplicitMemberTests
             }
             """);
 
+    [Fact]
+    public void A_field_default_an_initializer_field_and_an_arm_name_the_enum() =>
+        Allowed("""
+            struct Scene { light: Color = .Red, var shape: Shape = .Empty }
+            fn pick(flag: bool): Color { return if (flag) .Red else .Green; }
+            fn main(): int {
+                let scene = Scene { light = .Green, shape = .Rect { w = 1, h = 2 } };
+                let s: Shape = match (pick(true)) { .Red => .Num(1), _ => .Empty };
+                let all: Color[] = [.Red, .Green];
+                return match (scene.shape) { .Rect { w, h } => w + h, _ => 0 } + all.length;
+            }
+            """);
+
     /// <summary>Equality itself comes from <c>Equatable</c> (02 M10); what the implicit member
     /// adds is the type, from the OTHER side — on either side of the operator.</summary>
     [Fact]
