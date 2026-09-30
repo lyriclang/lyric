@@ -14,6 +14,11 @@ namespace Lyric5.Tests;
 /// start costs 10–30 ms of its own, and measured through the .NET host and its JIT the
 /// differences drowned (measured, M2 S5); the Windows figures come from CI's NativeAOT job, which
 /// prints them.
+///
+/// <para>Measurement point 2 (13, M3) the same way: the three programs of <c>bench/</c> —
+/// integer loops, floating-point arithmetic, an array of structs — against their C twins,
+/// built by the same compiler with the release profile's flags, within 3×. The bound against Go
+/// (1.5×) is <c>bench/run.py</c>'s, which needs a Go toolchain the tests do not assume.</para>
 /// </summary>
 [Collection("console")]
 public class MeasurementTests
@@ -71,6 +76,32 @@ public class MeasurementTests
         var floor = MinMilliseconds(20, () => ProcessRunner.Run(plain, [], TimeSpan.FromSeconds(10)));
         Assert.True(lyric - floor < 4.0, $"hello starts {lyric:0.0} ms, plain C {floor:0.0} ms: the runtime adds {lyric - floor:0.0} ms, the bound is 4 ms");
         Assert.True(lyric < 5.0, $"hello starts in {lyric:0.0} ms; the bound is 5 ms (01 L11)");
+    }
+
+    [Theory]
+    [InlineData("loops")]
+    [InlineData("arith")]
+    [InlineData("structs")]
+    public void A_bench_program_runs_within_3x_of_its_C_twin(string name)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var dir = Directory.CreateTempSubdirectory("lyric5-bench").FullName;
+        var bench = Path.Combine(Root, "bench", name);
+        File.Copy(Path.Combine(bench, name + ".lyr"), Path.Combine(dir, name + ".lyr"));
+        Assert.Equal(0, Quiet("build", Path.Combine(dir, name + ".lyr"), "--profile", "release"));
+        var lyric = Path.Combine(dir, "out", "release", Target.Host.Triple, name + Target.Host.ExecutableSuffix);
+
+        var build = new CBuild(CCompiler.Locate()!, Target.Host, Profile.Release, Path.Combine(dir, "c-cache"));
+        var twin = build.LinkExecutable(build.Compile([new CUnit(Path.Combine(bench, name + ".c"), [], [])]),
+            Path.Combine(dir, name + "-c" + Target.Host.ExecutableSuffix));
+
+        // The same answer first: a faster program that computes something else measures nothing.
+        Assert.Equal(ProcessRunner.Run(twin, [], TimeSpan.FromMinutes(1)).Stdout, ProcessRunner.Run(lyric, [], TimeSpan.FromMinutes(1)).Stdout);
+
+        var ours = MinMilliseconds(3, () => ProcessRunner.RunInherited(lyric, []));
+        var theirs = MinMilliseconds(3, () => ProcessRunner.RunInherited(twin, []));
+        Assert.True(ours <= 3.0 * theirs,
+            $"{name}: Lyric {ours:0} ms, C {theirs:0} ms — {ours / theirs:0.00}×, the bound is 3× (13, measurement point 2)");
     }
 
     [Fact]
