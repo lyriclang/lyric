@@ -282,7 +282,7 @@ public sealed class SemaRules
     private void CheckClauses(CatchClause[] catches)
     {
         for (var i = 0; i < catches.Length - 1; i++)
-            if (catches[i].BindingType is null)
+            if (catches[i].TakesAll)
                 _de.Report("LYR-SEM0035", Severity.Error, catches[i].Span,
                     "catch-all must be the last catch clause");
     }

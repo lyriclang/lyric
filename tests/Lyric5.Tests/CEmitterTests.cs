@@ -69,6 +69,7 @@ public class CEmitterTests
     [InlineData("error_paths")]
     [InlineData("uncaught")]
     [InlineData("try_forms")]
+    [InlineData("catch_sets")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -203,6 +204,7 @@ public class CEmitterTests
             data.Add("errors", profile, 0, ERRORS_EXPECTED);
             data.Add("error_paths", profile, 0, ERROR_PATHS_EXPECTED);
             data.Add("try_forms", profile, 0, TRY_FORMS_EXPECTED);
+            data.Add("catch_sets", profile, 0, CATCH_SETS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -305,6 +307,10 @@ public class CEmitterTests
     private const string TRY_FORMS_EXPECTED =
         "a 42 b -1\nc true -7\nd false\ne true 42\nf 42\ng -1\nh caught disk\nh fallback\ni data\nj 2\n"
         + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
+
+    private const string CATCH_SETS_EXPECTED =
+        "set took parse\ndisk took disk\nset took timeout\nvalue 4\nsingle disk\nother\n-1\nrethrown disk\n"
+        + "parse\ndisk\ntimeout\nok 5\n";
 
     /// <summary>An error that escapes main (design/v5/spec/05 E6 O4): the output up to the throw,
     /// then on the error stream its message and each cause in the chain, and the exit code 1 — a

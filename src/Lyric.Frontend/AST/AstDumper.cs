@@ -405,8 +405,9 @@ public static class AstDumper
                 foreach (var c in n.Catches) Write(c, indent + 1, sb);
                 break;
             case CatchClause n:
-                Line(sb, indent, $"Catch {n.BindingName ?? "_"}", n.Span);
+                Line(sb, indent, $"Catch {n.BindingName ?? "_"}{(n.BindingTypes.Length > 0 ? " in" : "")}", n.Span);
                 if (n.BindingType is not null) Write(n.BindingType, indent + 1, sb);
+                foreach (var t in n.BindingTypes) Write(t, indent + 1, sb);
                 Write(n.Body, indent + 1, sb);
                 break;
             case ExprStmt n:

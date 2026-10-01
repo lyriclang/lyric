@@ -103,8 +103,9 @@ public sealed record MatchStmt(Expr Scrutinee, MatchArm[] Arms, Span Span) : Stm
 
 public sealed record TryStmt(Block Body, CatchClause[] Catches, Span Span) : Stmt(Span);
 
-// BindingName == null means '_', a catch-all without a binding
-// BindingType == null: catch-all with a binding (an Error); otherwise a typed catch.
+// BindingName == null means '_', no binding.
+// BindingType: 'catch (e: T)', a typed clause; BindingTypes: 'catch (e in [A, B])', the set form;
+// neither: 'catch (e)', the clause that takes everything (TakesAll).
 /// <remarks>
 /// The grammar gives a catch binding exactly one token, <c>_</c> included, so
 /// <see cref="INamedDecl.NameSpan"/> covers it in either form and <see cref="INamedDecl.Name"/>
@@ -121,6 +122,14 @@ public sealed record CatchClause(string? BindingName, TypeNode? BindingType, Blo
     /// <see cref="Body"/> is the value block <c>{ v }</c> the parser made of it, and the formatter
     /// writes it back bare.</summary>
     public bool ExpressionBody { get; init; }
+
+    /// <summary>The set form's types, <c>catch (e in [A, B])</c> (design/v5/spec/05 E9 C5, 08 Y6):
+    /// the clause takes a value of any of them, and the binding carries the set (K7). Empty for the
+    /// other forms.</summary>
+    public TypeNode[] BindingTypes { get; init; } = [];
+
+    /// <summary><c>catch (e)</c>: no type and no set — the clause takes everything.</summary>
+    public bool TakesAll => BindingType is null && BindingTypes.Length == 0;
 
     string INamedDecl.Name => BindingName ?? "_";
 }

@@ -1,0 +1,59 @@
+// The clauses (design/v5/spec/05 E9 C5, E2 K7): the set form 'catch (e in [A, B])' and 'in A', the
+// set a clause without a type carries, the precise rethrow of it, a match exhaustive over it.
+import std.io { println };
+
+enum ParseError :: [Error] { Empty, BadDigit(char, int); fn message(): string { return "parse"; } }
+interface IoError :: [Error] { }
+class Disk :: [IoError] { fn message(): string { return "disk"; } }
+class Timeout :: [Error] { fn message(): string { return "timeout"; } }
+
+fn work(n: int): int throws [ParseError, Disk, Timeout] {
+    if (n == 1) { throw ParseError.Empty; }
+    if (n == 2) { throw Disk { }; }
+    if (n == 3) { throw Timeout { }; }
+    return n;
+}
+
+fn set(n: int): string {
+    try { let v = work(n); return f"value {v}"; }
+    catch (e in [ParseError, Timeout]) { return f"set took {e.message()}"; }
+    catch (e: Disk) { return f"disk took {e.message()}"; }
+}
+
+fn single(n: int): string {
+    return try f"{work(n)}" catch (_ in Disk) "single disk" catch (_) "other";
+}
+
+fn rethrow(n: int): int throws [Disk, Timeout] {
+    try { return work(n); }
+    catch (_: ParseError) { return -1; }
+    catch (e) { throw e; }
+}
+
+fn classify(n: int): string {
+    try { let v = work(n); return f"ok {v}"; }
+    catch (e) {
+        return match (e) {
+            _: ParseError => "parse",
+            _: Disk => "disk",
+            _: Timeout => "timeout",
+        };
+    }
+}
+
+fn main(): void {
+    println(set(1));
+    println(set(2));
+    println(set(3));
+    println(set(4));
+    println(single(2));
+    println(single(1));
+    let r1 = try rethrow(1) catch (_) -9;
+    let r2 = try f"{rethrow(2)}" catch (e) f"rethrown {e.message()}";
+    println(f"{r1}");
+    println(r2);
+    println(classify(1));
+    println(classify(2));
+    println(classify(3));
+    println(classify(5));
+}

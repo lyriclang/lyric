@@ -944,47 +944,52 @@ internal sealed class FunctionLowerer
         var caughtAll = false;
         foreach (var clause in clauses)
         {
-            var symbol = clause.BindingName is not null || clause.BindingType is not null
-                ? _types.RefOf(clause) as LocalSymbol
-                  ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker")
-                : null;
-            var caught = symbol?.Type;
-            var everything = clause.BindingType is null || caught is null || LyrType.Equal(caught, root);
+            var symbol = clause.BindingName is null ? null
+                : _types.RefOf(clause) as LocalSymbol
+                  ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker");
+            // What the clause tests: its type, or each type of its set (C5); nothing — it takes
+            // everything — without a type, or where the root is among them.
+            LyrType[] tested = clause.BindingTypes.Length > 0
+                ? _types.CatchSet(clause) ?? throw Bug($"the set at {clause.Span} was not resolved by the type checker")
+                : clause.BindingType is not null
+                    ? [_types.CatchType(clause) ?? throw Bug($"the type at {clause.Span} was not resolved by the type checker")]
+                    : [];
+            if (tested.Any(t => LyrType.Equal(t, root))) tested = [];
 
             BlockId? next = null;
-            IrType? bindingType = null;
-            if (!everything)
+            if (tested.Length > 0)
             {
-                bindingType = LowerType(caught!, clause.Span);
-                var target = bindingType switch
-                {
-                    IrRefType r => r.Type,
-                    IrStructType st => st.Type,
-                    IrEnumType en => en.Type,
-                    IrInterfaceType i => i.Type,
-                    _ => throw NotSupported($"catching '{TypeFacts.Display(caught!)}'", clause.Span),
-                };
-                var test = _slots.NewTemp(BoolType);
-                _b.Emit(new TypeTest(test, error, target, clause.Span));
+                // A test per type, any of them taking the error.
                 var take = _b.NewBlock();
                 next = _b.NewBlock();
-                _b.Seal(new CondBranch(test, take, next.Value, clause.Span));
+                for (var i = 0; i < tested.Length; i++)
+                {
+                    var test = _slots.NewTemp(BoolType);
+                    _b.Emit(new TypeTest(test, error, TestTarget(tested[i], clause.Span).Target, clause.Span));
+                    var otherwise = i == tested.Length - 1 ? next.Value : _b.NewBlock();
+                    _b.Seal(new CondBranch(test, take, otherwise, clause.Span));
+                    _b.SwitchTo(otherwise);
+                }
                 _b.SwitchTo(take);
                 _b.Emit(new ClearError(clause.Span));
-                if (clause.BindingName is not null)
+                if (symbol is not null && clause.BindingType is not null)
                 {
                     // The value under its own type: a class's object, a struct's or an enum's
                     // payload out of the box, an interface value re-tabled.
+                    var (target, bindingType) = TestTarget(tested[0], clause.Span);
                     var bound = _slots.NewTemp(bindingType);
                     _b.Emit(new Downcast(bound, error, target, bindingType, clause.Span));
-                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, bindingType), bound, clause.Span));
+                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, bindingType), bound, clause.Span));
                 }
+                // A set's binding is the Error value itself; what it may hold is the sema's (K7).
+                else if (symbol is not null)
+                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, clause.Span));
             }
             else
             {
                 _b.Emit(new ClearError(clause.Span));
-                if (clause.BindingName is not null)
-                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, errorType), error, clause.Span));
+                if (symbol is not null)
+                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, clause.Span));
             }
 
             if (lowerBody(clause)) open.Add(_b.CurrentId);
@@ -997,6 +1002,21 @@ internal sealed class FunctionLowerer
         // bottom.
         if (!caughtAll) _b.Seal(new Branch(ErrorLanding(span), span));
         return open;
+    }
+
+    /// <summary>A caught type as a type test's target, and as the binding's IR type.</summary>
+    private (TypeId Target, IrType Type) TestTarget(LyrType caught, Span span)
+    {
+        var type = LowerType(caught, span);
+        var target = type switch
+        {
+            IrRefType r => r.Type,
+            IrStructType st => st.Type,
+            IrEnumType en => en.Type,
+            IrInterfaceType i => i.Type,
+            _ => throw NotSupported($"catching '{TypeFacts.Display(caught)}'", span),
+        };
+        return (target, type);
     }
 
     /// <summary>

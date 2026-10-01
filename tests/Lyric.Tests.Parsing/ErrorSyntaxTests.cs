@@ -246,6 +246,73 @@ public class ErrorSyntaxTests
         Assert.Single(Assert.IsType<TryExpr>(expr).Catches); // parsed on, so nothing cascades
     }
 
+    // --- the set form (05 E9 C5, 08 Y6) ---
+
+    private static CatchClause Clause(string clause)
+    {
+        var (m, de) = ParseModule("fn g() { try { f(); } " + clause + " { } }");
+        Assert.False(de.HasErrors, string.Join("; ", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        return Assert.Single(Assert.IsType<TryStmt>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Body!.Statements[0]).Catches);
+    }
+
+    [Fact]
+    public void A_set_clause_names_its_types_in_brackets()
+    {
+        var clause = Clause("catch (e in [A, B])");
+        Assert.Equal(2, clause.BindingTypes.Length);
+        Assert.Null(clause.BindingType);
+        Assert.False(clause.TakesAll);
+    }
+
+    [Fact]
+    public void A_set_of_one_needs_no_brackets()
+    {
+        Assert.Single(Clause("catch (e in A)").BindingTypes);
+        Assert.Single(Clause("catch (_ in [A])").BindingTypes);
+    }
+
+    [Fact]
+    public void The_typed_and_the_typeless_clause_are_no_sets()
+    {
+        Assert.Empty(Clause("catch (e: A)").BindingTypes);
+        Assert.True(Clause("catch (e)").TakesAll);
+    }
+
+    [Fact]
+    public void An_empty_set_is_refused() =>
+        Assert.Contains(ParseModule("fn g() { try { f(); } catch (e in []) { } }").De.Diagnostics, d => d.Code == "LYR-PAR0049");
+
+    [Fact]
+    public void Several_caught_types_without_brackets_are_the_list_rules_error()
+    {
+        var (m, de) = ParseModule("fn g() { try { f(); } catch (e in A, B) { } }");
+        var error = Assert.Single(de.Diagnostics);
+        Assert.Equal("LYR-PAR0049", error.Code);
+        Assert.Contains("in [A, B]", error.Message);
+        var tried = Assert.IsType<TryStmt>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Body!.Statements[0]);
+        Assert.Equal(2, Assert.Single(tried.Catches).BindingTypes.Length); // parsed as the set it meant
+    }
+
+    [Fact]
+    public void A_typed_clause_with_several_types_is_pointed_at_the_set_form()
+    {
+        var (m, de) = ParseModule("fn g() { try { f(); } catch (e: A, B) { } }");
+        var error = Assert.Single(de.Diagnostics);
+        Assert.Equal("LYR-PAR0049", error.Code);
+        Assert.Contains("set form", error.Message);
+        var clause = Assert.Single(Assert.IsType<TryStmt>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Body!.Statements[0]).Catches);
+        Assert.Null(clause.BindingType);
+        Assert.Equal(2, clause.BindingTypes.Length);
+    }
+
+    [Fact]
+    public void The_expression_form_takes_the_set_form_too()
+    {
+        var (expr, de) = ParseExpr("try f() catch (e in [A, B]) 0");
+        Assert.False(de.HasErrors);
+        Assert.Equal(2, Assert.Single(Assert.IsType<TryExpr>(expr).Catches).BindingTypes.Length);
+    }
+
     [Fact]
     public void The_expression_form_stands_as_a_statement()
     {

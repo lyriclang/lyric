@@ -87,6 +87,12 @@ public class AssociatedTypeTests
     public void A_second_block_of_the_same_conformance_is_a_duplicate() =>
         Rejected("extend IntBox :: [Container] { type Item = int; }\nfn f(): int { return 0; }", "LYR-SEM0133");
 
+    // Its answer, changed or not, is not asked again: the block is refused as a whole — one error.
+    // (Through M5 S2a a changed answer added SEM0129 to the SEM0133.)
+    [Fact]
+    public void A_second_block_that_changes_the_answer_is_one_error() =>
+        Rejected("extend IntBox :: [Container] { type Item = string; }\nfn f(): int { return 0; }", "LYR-SEM0133");
+
     [Fact]
     public void A_default_answers_where_the_conformer_says_nothing() =>
         Allowed("fn f(): IntBox { return IntBox { v = 1 }.mapped(); }");

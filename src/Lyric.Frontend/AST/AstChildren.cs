@@ -221,6 +221,7 @@ public static class AstChildren
 
             case CatchClause c:
                 if (c.BindingType is not null) yield return c.BindingType;
+                foreach (var t in c.BindingTypes) yield return t;
                 yield return c.Body;
                 break;
 

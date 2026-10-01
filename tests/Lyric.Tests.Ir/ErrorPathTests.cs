@@ -217,6 +217,25 @@ public class ErrorPathTests
     }
 
     [Fact]
+    public void A_set_clause_tests_each_of_its_types()
+    {
+        var module = Lowered("""
+            class Other :: [Error] { fn message(): string { return "other"; } }
+            fn both(): int throws [Boom, Other] { return 1; }
+            fn f(): int { return try both() catch (e in [Boom, Other]) 0; }
+            fn main(): int { return f(); }
+            """);
+        var f = Fn(module, "f");
+        var first = Assert.IsType<CondBranch>(Dispatch(f).Terminator);
+        // Either test takes it, into the same block.
+        var second = Assert.IsType<CondBranch>(f.Blocks[first.IfFalse.Value].Terminator);
+        Assert.Equal(first.IfTrue, second.IfTrue);
+        Assert.Equal(2, f.Blocks.Sum(b => b.Insts.Count(op => op is TypeTest)));
+        // The binding is the Error value itself: no downcast.
+        Assert.DoesNotContain(f.Blocks, b => b.Insts.Any(op => op is Downcast));
+    }
+
+    [Fact]
     public void A_try_whose_body_cannot_fail_has_no_dispatch()
     {
         var module = Lowered("""
