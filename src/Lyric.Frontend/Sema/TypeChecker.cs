@@ -687,14 +687,29 @@ public sealed class TypeChecker
         {
             _currentModule = block.Module;
 
+            if (block.IsConstructorTarget)
+            {
+                // A built-in constructor as the target (03 T7 X2): 'this' is the shape at the
+                // block's parameters. Its conformance — a table row for an array — is not written
+                // yet; the members are.
+                if (block.Decl.Interfaces.Length > 0)
+                    _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Interfaces[0].Span,
+                        $"a conformance of '{TypeFacts.Display(BlockTargetType(block))}' is not written yet — a block on a built-in constructor adds members only");
+                foreach (var fn in block.Decl.Methods)
+                {
+                    CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
+                    CheckFunction(fn, block.MethodScope, BlockTargetType(block));
+                }
+                continue;
+            }
+
             if (block.Target is null)
             {
                 // An unresolvable target, where RES0002 was already reported, against a resolved but
-                // non-extendable one — a generic instance, an array, a tuple, an alias. Only the
-                // latter reports SEM0047.
+                // non-extendable one — a function type, an alias. Only the latter reports SEM0047.
                 if (block.Decl.Target is not NamedType || _binding.Resolve(block.Decl.Target) is not (null or ErrorSymbol))
                     _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
-                        "an extend target is a named type (plain or an instance); an array, an optional, a tuple or a function type is not one yet");
+                        "an extend target is a named type, plain or an instance, or a built-in constructor — an array, an optional, a tuple; a function type is not one");
                 continue; // without a target there is no useful body check
             }
 
@@ -712,10 +727,10 @@ public sealed class TypeChecker
             // Body check: the outer scope is the block's method scope, which carries cross-calls and
             // the method generics. `this` is the target type — the primitive for builtins, the
             // reference otherwise.
-            var thisType = block.Target.Kind == TypeSymbolKind.Builtin
-                ? TypeFacts.FromBuiltinName(block.Target.Name)
-                : block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
-                    ? BlockTargetType(block) // 'List<T>' with the block's own T (03 T7 X1)
+            var thisType = block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
+                ? BlockTargetType(block) // 'List<T>' with the block's own T, 'Slice<T>' too (03 T7 X1, X2)
+                : block.Target.Kind == TypeSymbolKind.Builtin
+                    ? TypeFacts.FromBuiltinName(block.Target.Name)
                     : new NamedRef(block.Target);
             foreach (var fn in block.Decl.Methods)
             {
@@ -4248,9 +4263,14 @@ public sealed class TypeChecker
             var at = tuple.Labels is { } labels ? Array.IndexOf(labels, mem.Member) : -1;
             if (at < 0 && int.TryParse(mem.Member, out var position) && mem.Member.All(char.IsAsciiDigit)) at = position;
             if (at < 0 || at >= tuple.Elements.Length)
+            {
+                // A member a block on the tuple shape adds (03 T7 X2) comes before the refusal.
+                if (at < 0 && ConstructorMember(baseType, mem, mem.Span) is { } added)
+                    return mem.IsOptional ? Optionalized(added) : added;
                 return Report(mem.MemberSpan, "LYR-SEM0012",
                     $"'{TypeFacts.Display(baseType)}' has no element '{mem.Member}' — the elements are '.0' to '.{tuple.Elements.Length - 1}'"
                     + (tuple.Labels is not null ? " and their labels" : ""));
+            }
             return mem.IsOptional ? Optionalized(tuple.Elements[at]) : tuple.Elements[at];
         }
 
@@ -4313,9 +4333,40 @@ public sealed class TypeChecker
                 return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span));
             case PrimitiveType p when BuiltinSymbol(p) is { } bs: // extensions on builtins, such as string.shout()
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
+            case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf:
+                return ConstructorMember(baseType, mem, span);
             default:
                 return null;
         }
+    }
+
+    /// <summary>A member a block on a built-in constructor adds (03 T7 X2): the block whose
+    /// target matches the receiver's shape and whose constraints hold — 'extend&lt;T&gt; T[]',
+    /// 'extend&lt;T :: [Display]&gt; ?T', 'extend&lt;T&gt; Slice&lt;T&gt;'.</summary>
+    private LyrType? ConstructorMember(LyrType receiver, MemberExpr mem, Span span)
+    {
+        ExtensionBlock? shapeOnly = null; // the shape matched, the constraints did not
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!(block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice)))) continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (block.MethodScope.LookupLocal(mem.Member) is not FunctionSymbol found) continue;
+            if (BlockSubstitution(block, receiver) is not { } map)
+            {
+                if (TypeFacts.Match(BlockTargetType(block), receiver, new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance)))
+                    shapeOnly ??= block;
+                continue;
+            }
+            _result.BindRef(mem, found);
+            if (found.IsStatic)
+                return Report(span, "LYR-SEM0074", $"'{mem.Member}' is a static extension and belongs to the type — the instance form is an error");
+            return Substitute(FnTypeOf(found), map);
+        }
+        if (shapeOnly is { } failed)
+            return Report(span, "LYR-SEM0134",
+                $"'{mem.Member}' is added to '{TypeFacts.Display(BlockTargetType(failed))}' under the block's constraints, "
+                + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
+        return null;
     }
 
     // The builtin TypeSymbol for a primitive type, used for extension lookup on string, int and so on.

@@ -26,7 +26,7 @@ internal sealed class InstanceTable
     private readonly record struct Pending(
         FunctionDecl Decl, string Name, FunctionId Id, TypeSymbol? Receiver,
         IReadOnlyDictionary<GenericParamSymbol, LyrType> Substitution,
-        GenericInstance? Owner = null);
+        GenericInstance? Owner = null, LyrType? ReceiverType = null);
 
     private readonly List<Pending> _pending = new();
 
@@ -207,8 +207,11 @@ internal sealed class InstanceTable
         Guard(name, span);
         var id = _ids.Next();
         _byKey[name] = id;
+        // 'this' is the receiver: the instance for a named target, the shape itself for a
+        // built-in constructor (03 T7 X2), where no symbol stands.
         _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
-            substitution, receiver as GenericInstance));
+            substitution, receiver as GenericInstance,
+            method.IsStatic || receiver is GenericInstance ? null : receiver));
         return id;
     }
 
@@ -251,7 +254,7 @@ internal sealed class InstanceTable
         {
             var p = _pending[_lowered];
             lowered.Add((p.Id, new FunctionLowerer(p.Decl, p.Name, types, functions, imports, typeTable,
-                p.Substitution, globals, lambdas, this, p.Receiver, p.Owner).Run()));
+                p.Substitution, globals, lambdas, this, p.Receiver, p.Owner, receiverType: p.ReceiverType).Run()));
         }
 
         return lowered;

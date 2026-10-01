@@ -1,0 +1,54 @@
+// Extends on the built-in constructors (03 T7 X2): 'extend<T> T[]', a block on 'int[]' alone,
+// 'extend<T> ?T', a tuple of fixed arity, 'extend<T> Slice<T>' — members, bound by the shape.
+// Expected stdout:
+//   sum 6 first 1 last 3      'extend int[]' and 'extend<T> T[]' on one array
+//   opt 5 0 some true false   'extend<T> ?T': 'orElse' and 'some' over a present and an absent value
+//   pair 3                    'extend<A, B> (A, B)': the first element through destructuring 'this'
+//   view 2 slice 20           'extend<T> Slice<T>' on a view
+import std.io { println };
+
+extend<T> T[] {
+    fn first(): T { return this[0]; }
+    fn last(): T { return this[this.length() - 1]; }
+}
+
+extend int[] {
+    fn sum(): int {
+        var s = 0;
+        for (i in 0..this.length()) { s = s + this[i]; }
+        return s;
+    }
+}
+
+extend<T> ?T {
+    fn orElse(v: T): T {
+        if (this == null) { return v; }
+        return this!;
+    }
+    fn some(): bool { return this != null; }
+}
+
+extend<A, B> (A, B) {
+    fn firstOf(): A {
+        let (a, _) = this;
+        return a;
+    }
+}
+
+extend<T> Slice<T> {
+    fn count(): int { return this.length(); }
+    fn head(): T { return this[0]; }
+}
+
+fn main(): int {
+    let xs = [1, 2, 3];
+    println(f"sum {xs.sum()} first {xs.first()} last {xs.last()}");
+    let o: ?int = 5;
+    let n: ?int = null;
+    println(f"opt {o.orElse(0)} {n.orElse(0)} some {o.some()} {n.some()}");
+    let p = (3, "x");
+    println(f"pair {p.firstOf()}");
+    let v = [10, 20, 30][1..];
+    println(f"view {v.count()} slice {v.head()}");
+    return 0;
+}

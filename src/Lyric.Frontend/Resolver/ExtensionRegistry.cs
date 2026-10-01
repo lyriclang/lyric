@@ -61,6 +61,10 @@ public sealed class ExtensionBlock
     /// by the sema on first use. <c>null</c> until then and for a plain target.</summary>
     public Sema.LyrType? TargetType { get; set; }
 
+    /// <summary>The target is a built-in constructor — <c>T[]</c>, <c>?T</c>, a tuple (03 T7 X2):
+    /// no symbol of its own, matched by shape.</summary>
+    public bool IsConstructorTarget { get; set; }
+
     public ExtensionBlock(ExtendDecl decl, ModuleSymbol module, SymbolTable methodScope, FunctionSymbol[] methods)
     {
         Decl = decl;

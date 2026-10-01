@@ -198,6 +198,7 @@ public class GoldenTests
     [InlineData("type_test")]        // 'x is T' at the comparison level, 'c: T' and '_: T' as patterns (03 T11)
     [InlineData("sealed_interface")] // 'pub sealed interface' (04 D8)
     [InlineData("generic_extend")]   // 'extend<T :: [C], U> Pair<T, U> :: [I]' and a block on one instance (03 T7)
+    [InlineData("constructor_extend")] // 'extend<T> T[]', '?T', a tuple (03 T7 X2)
     // Attributes.
     [InlineData("attr_decl")]         // on fn, struct, class and enum; args, stacking, dotted path
     [InlineData("attr_module")]       // before the module header
