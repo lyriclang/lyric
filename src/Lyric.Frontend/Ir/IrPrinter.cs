@@ -125,23 +125,11 @@ public static class IrPrinter
     // --- structure ---
     private static void WriteFunction(StringBuilder sb, IrFunction func, CallContext ctx)
     {
-        sb.Append($"fn {func.Name} -> {TypeStr(func.ReturnType)} {{\n");
+        sb.Append($"fn {func.Name} -> {TypeStr(func.ReturnType)}{(func.Throws ? " throws" : "")} {{\n");
         sb.Append($"  params: {func.ParamCount.ToString(CultureInfo.InvariantCulture)}\n");
         sb.Append("  locals:\n");
         foreach (var loc in func.Locals)
             sb.Append($"    {loc.Id} {loc.Name}: {TypeStr(loc.Type)}\n");
-        // The protected regions come before the blocks: reading an unwind bug, the first thing wanted
-        // is which range is covered by whom.
-        if (func.Handlers.Count > 0)
-        {
-            sb.Append("  handlers:\n");
-            foreach (var h in func.Handlers)
-                sb.Append($"    [{h.Start}, {h.End}) " +
-                          (h.Kind == IrHandlerKind.Finally
-                              ? $"finally -> {h.Handler}\n"
-                              : $"catch {(h.CatchType is { } t ? t.ToString() : "*")} " +
-                                $"-> {h.Handler}{(h.Slot is { } s2 ? $" into {s2}" : "")}\n"));
-        }
         foreach (var block in func.Blocks)
             WriteBlock(sb, block, ctx);
         sb.Append("}\n");
@@ -212,6 +200,8 @@ public static class IrPrinter
                         $"resume{(r.Lenient ? ".lenient" : "")} {r.Coroutine}",
         YieldSuspend y => $"yield {TypeStr(y.YieldType)}" +
                           (y.Value is { } v ? $" {v}" : ""),
+        CurrentError e => $"{e.Dest}: {TypeStr(e.Type)} = curerr",
+        ClearError => "clearerr",
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 
@@ -254,8 +244,9 @@ public static class IrPrinter
         Branch b => $"br {b.Target}",
         CondBranch c => $"condbr {c.Cond} -> {c.IfTrue}, {c.IfFalse}",
         Unreachable => "unreachable",
-        Throw t => $"throw {t.Value}{(t.Concrete is { } c ? $", {c}" : "")}",
-        EndFinally => "endfinally",
+        Throw t => $"throw {t.Value} -> {t.Landing}",
+        ErrorBranch e => $"onerror {e.OnError} else {e.Continue}",
+        Propagate => "propagate",
         _ => throw new InternalCompilationException($"ir-printer: unhandled terminator {term.GetType().Name}")
     };
 

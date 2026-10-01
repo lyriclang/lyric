@@ -188,22 +188,32 @@ public sealed record Branch(BlockId Target, Span Span) : IrTerminator(Span);
 public sealed record CondBranch(TempId Cond, BlockId IfTrue, BlockId IfFalse, Span Span) : IrTerminator(Span);
 public sealed record Unreachable(Span Span) : IrTerminator(Span);
 
-// Exceptions. 'throw' is a terminator rather than an op: nothing runs after it in this block, and
-// holding that structurally is the same decision as for 'return'.
-/// <param name="Concrete">The concrete type of the thrown value, or <c>null</c> when it is only
-/// known at runtime, meaning the value is interface-typed and carries it along as a fat pointer.
-///
-/// <para>The static type suffices here because Lyric has NO INHERITANCE. A class is exactly its
-/// type and there are no subtypes, so the type at the throw site is the one a <c>catch</c> compares.
-/// In C# or Java that would be wrong and a tag in the object would be needed.</para></param>
-public sealed record Throw(TempId Value, TypeId? Concrete, Span Span) : IrTerminator(Span);
+// Errors (design/v5/spec/05 E1-E4, 01 L5): EXPLICIT edges. A throw or a failed call goes to a
+// landing — the defers of the scopes it leaves, then the catch dispatch of the innermost try
+// around it or the function's bottom — and every one of those is an ordinary block of the CFG. A
+// throw costs what a return costs (L5); no table describes where control goes.
 
 /// <summary>
-/// The end of a <c>finally</c> region: unwinding continues where it was interrupted.
-///
-/// <para>Lyric has no <c>finally</c>; this region arises solely from <c>defer</c>. At the bytecode
-/// level "runs while unwinding too" needs exactly this mechanism, so the language keeps one keyword
-/// and the format gets the carrier for it.
-/// </para>
+/// <c>throw</c> (05 E1): <paramref name="Value"/> — the thrown value as an <c>Error</c> interface
+/// value, boxed or re-tabled where it was not one — becomes the in-flight error, and control goes
+/// to <paramref name="Landing"/>.
 /// </summary>
-public sealed record EndFinally(Span Span) : IrTerminator(Span);
+public sealed record Throw(TempId Value, BlockId Landing, Span Span) : IrTerminator(Span);
+
+/// <summary>
+/// The edge after a call of a throwing function (01 L5 E3): when the call set the in-flight error,
+/// control goes to <paramref name="OnError"/>, otherwise on to <paramref name="Continue"/>, where the
+/// call's value is used. A terminator, so a block stays a straight line and the edge a CFG edge.
+/// </summary>
+public sealed record ErrorBranch(BlockId OnError, BlockId Continue, Span Span) : IrTerminator(Span);
+
+/// <summary>The in-flight error leaves the function through its caller's error slot (01 L5 E1).
+/// Only in a function that throws.</summary>
+public sealed record Propagate(Span Span) : IrTerminator(Span);
+
+/// <summary>The in-flight error's value, an <c>Error</c> interface value: what a catch clause tests
+/// and binds.</summary>
+public sealed record CurrentError(TempId Dest, IrType Type, Span Span) : IrOp(Span);
+
+/// <summary>A catch clause took the in-flight error: none is in flight any more.</summary>
+public sealed record ClearError(Span Span) : IrOp(Span);

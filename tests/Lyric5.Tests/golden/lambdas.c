@@ -11,7 +11,7 @@ typedef struct lyr_ty3_Pt lyr_ty3_Pt;
 typedef struct lyr_ty4__env_main_main_ lyr_ty4__env_main_main_;
 typedef struct lyr_ty5__env_main_main_ lyr_ty5__env_main_main_;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
-const char lyr_ifid_ty6[] = "Error";
+const char lyr_ifid_ty6[] = "std.core.Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;

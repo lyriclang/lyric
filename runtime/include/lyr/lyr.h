@@ -9,5 +9,6 @@
 #include "lyr/string.h"
 #include "lyr/array.h"
 #include "lyr/init.h"
+#include "lyr/error.h"
 
 #endif

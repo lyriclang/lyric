@@ -8,7 +8,7 @@ typedef struct lyr_ty0_Range_int_ lyr_ty0_Range_int_;
 typedef struct lyr_ty1_RangeInclusive_int_ lyr_ty1_RangeInclusive_int_;
 typedef struct lyr_ty2_Window lyr_ty2_Window;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Error";
+const char lyr_ifid_ty3[] = "std.core.Error";
 struct lyr_ty0_Range_int_ {
     int64_t f_start;
     int64_t f_end;

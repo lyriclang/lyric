@@ -9,7 +9,7 @@ typedef struct lyr_ty1_Pair_string__int_ lyr_ty1_Pair_string__int_;
 typedef struct lyr_ty2_Counter lyr_ty2_Counter;
 typedef struct lyr_ty3_Pair_int__bool_ lyr_ty3_Pair_int__bool_;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "Error";
+const char lyr_ifid_ty4[] = "std.core.Error";
 struct lyr_ty0_Pair_int__string_ {
     int64_t f_first;
     LyrStr *f_second;

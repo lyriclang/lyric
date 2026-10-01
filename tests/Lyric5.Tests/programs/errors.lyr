@@ -1,0 +1,126 @@
+// The error path natively (design/v5/spec/05 E1-E4, E7, E9 C6; 01 L5): a throw through three frames
+// running their defers on the way out; catch by an enum, an interface, the root, a struct with
+// data; a cause chain; defers inside a try body before its clause; a rethrow; a sister clause that
+// does not catch; the normal path through a try; a return from a try body.
+import std.io { println };
+
+enum ParseError :: [Error] { Empty, BadDigit(char, int);
+    fn message(): string { return "parse"; }
+}
+interface IoError :: [Error] { }
+class Disk :: [IoError] { fn message(): string { return "disk"; } }
+struct OutOfRange :: [Error] { low: int, high: int, got: int,
+    fn message(): string { return "range"; }
+}
+class Wrap :: [Error] { what: string, inner: Error,
+    fn message(): string { return this.what; }
+    fn cause(): ?Error { return this.inner; }
+}
+
+fn level3(): int throws ParseError {
+    defer println("defer 3");
+    throw ParseError.BadDigit('7', 3);
+}
+fn level2(): int throws ParseError {
+    defer println("defer 2");
+    let v = try level3();
+    println("not reached 2");
+    return v;
+}
+fn level1(): int throws ParseError {
+    defer { println("defer 1"); }
+    return try level2() + 1;
+}
+fn deep(): void {
+    try {
+        let n = level1();
+        println(f"not reached {n}");
+    } catch (e: ParseError) {
+        match (e) {
+            .BadDigit(ch, at) => println(f"deep caught {ch} at {at}"),
+            .Empty => println("deep empty"),
+        }
+    }
+}
+
+fn read(): string throws Disk { throw Disk { }; }
+fn iface(): void {
+    try { let s = read(); println(s); } catch (e: IoError) { println(f"iface caught {e.message()}"); }
+}
+
+fn all(): void {
+    try { let n = level3(); println(f"{n}"); } catch (e) { println(f"all caught {e.message()}"); }
+}
+
+fn check(n: int): int throws OutOfRange {
+    if (n < 1 || n > 9) { throw OutOfRange { low = 1, high = 9, got = n }; }
+    return n;
+}
+fn data(): void {
+    try { let n = check(12); println(f"{n}"); } catch (e: OutOfRange) { println(f"data caught {e.low}..{e.high} got {e.got}"); }
+}
+
+fn config(): string throws Wrap {
+    try { return read(); } catch (e: Disk) { throw Wrap { what = "config", inner = e }; }
+}
+fn cause(): void {
+    try { let s = config(); println(s); } catch (e: Wrap) {
+        let c = e.cause();
+        println(f"cause caught {e.message()} / {c!.message()}");
+    }
+}
+
+fn risky(): int throws ParseError { throw ParseError.Empty; }
+fn order(): void {
+    try {
+        defer println("order: inner defer");
+        println("order: body");
+        let n = risky();
+        println(f"{n}");
+    } catch (_: ParseError) {
+        println("order: clause");
+    }
+}
+
+fn rethrow(): void {
+    try {
+        try { let n = risky(); println(f"{n}"); } catch (e) { println(f"rethrow inner saw {e.message()}"); throw e; }
+    } catch (e) { println(f"rethrow outer got {e.message()}"); }
+}
+
+fn sister(): void {
+    try {
+        try { let n = risky(); println(f"{n}"); }
+        catch (_: ParseError) { throw Disk { }; }
+        catch (_: IoError) { println("sister wrong"); }
+    } catch (e: IoError) { println(f"sister outer got {e.message()}"); }
+}
+
+fn safeDiv(a: int, b: int): int throws ParseError {
+    if (b == 0) { throw ParseError.Empty; }
+    return a / b;
+}
+fn clean(): void {
+    try { let n = safeDiv(10, 2); println(f"clean {n} no error"); } catch (_: ParseError) { println("clean wrong"); }
+}
+
+fn ret(): int {
+    try {
+        defer println("ret defer ran");
+        return safeDiv(18, 2);
+    } catch (_: ParseError) { return -1; }
+}
+
+fn main(): int {
+    deep();
+    iface();
+    all();
+    data();
+    cause();
+    order();
+    rethrow();
+    sister();
+    clean();
+    println(f"ret {ret()}");
+    return 0;
+}

@@ -5,14 +5,14 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "Shape";
+const char lyr_ifid_ty0[] = "main.Shape";
 typedef struct lyr_ty1_Circle lyr_ty1_Circle;
 typedef struct lyr_ty2_Rect lyr_ty2_Rect;
 typedef struct lyr_ty3_Tri lyr_ty3_Tri;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "Display";
+const char lyr_ifid_ty4[] = "main.Display";
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
-const char lyr_ifid_ty5[] = "Error";
+const char lyr_ifid_ty5[] = "std.core.Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -44,9 +44,9 @@ struct lyr_vt_ty5 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-_Static_assert(sizeof(LyrIface) == 16, "layout of Shape[]");
+_Static_assert(sizeof(LyrIface) == 16, "layout of main.Shape[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "Shape[]", NULL };
+const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Shape[]", NULL };
 typedef struct { LyrObj header; lyr_ty1_Circle value; } lyr_box_ty1_Circle;
 _Static_assert(sizeof(lyr_box_ty1_Circle) == 16, "layout of lyr_box_ty1_Circle");
 _Static_assert(offsetof(lyr_box_ty1_Circle, value) == 8, "layout of lyr_box_ty1_Circle");

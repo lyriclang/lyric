@@ -64,8 +64,6 @@ internal static class Inliner
 
     private static bool InlineInto(IrFunction caller, IrModule module)
     {
-        if (caller.Handlers.Count > 0) return false;
-
         var sites = 0;
         var changed = false;
 
@@ -95,14 +93,18 @@ internal static class Inliner
 
     private static bool Inlinable(IrFunction callee)
     {
-        if (callee.Handlers.Count > 0) return false;
+        // A callee with an error path keeps its own frame (05, 01 L5): its landings end in ITS
+        // bottom — propagate into its caller's slot, or a dispatch — which spliced into another
+        // function would mean that function's error, or nothing.
+        if (callee.Throws) return false;
 
         var ops = 0;
         var returns = false;
         foreach (var block in callee.Blocks)
         {
             ops += block.Insts.Count;
-            if (block.Terminator is EndFinally) return false;
+            if (block.Terminator is Throw or ErrorBranch or Propagate) return false;
+            if (block.Insts.Any(op => op is CurrentError or ClearError)) return false;
             if (block.Terminator is Return) returns = true;
         }
 

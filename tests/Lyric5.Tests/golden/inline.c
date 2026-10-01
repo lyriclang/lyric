@@ -7,7 +7,7 @@
 typedef struct lyr_ty0_Buffer lyr_ty0_Buffer;
 typedef struct lyr_ty1_Mat lyr_ty1_Mat;
 typedef struct lyr_vt_ty2 lyr_vt_ty2;
-const char lyr_ifid_ty2[] = "Error";
+const char lyr_ifid_ty2[] = "std.core.Error";
 typedef struct { int64_t v[4]; } lyr_inl4_i64;
 _Static_assert(sizeof(lyr_inl4_i64) == 32, "layout of lyr_inl4_i64");
 struct lyr_ty0_Buffer {

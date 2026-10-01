@@ -37,10 +37,10 @@ typedef struct lyr_ty29_Mat lyr_ty29_Mat;
 typedef struct lyr_ty30_Buf lyr_ty30_Buf;
 typedef struct lyr_ty31_Held lyr_ty31_Held;
 typedef struct lyr_vt_ty32 lyr_vt_ty32;
-const char lyr_ifid_ty32[] = "Walker";
+const char lyr_ifid_ty32[] = "main.Walker";
 typedef struct lyr_ty33_Legs lyr_ty33_Legs;
 typedef struct lyr_vt_ty34 lyr_vt_ty34;
-const char lyr_ifid_ty34[] = "Error";
+const char lyr_ifid_ty34[] = "std.core.Error";
 typedef struct lyr_ty35__env_std_core_cloneArray_int__ lyr_ty35__env_std_core_cloneArray_int__;
 struct lyr_ty0_P {
     int64_t f_x;

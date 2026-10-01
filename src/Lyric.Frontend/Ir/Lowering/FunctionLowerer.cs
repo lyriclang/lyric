@@ -162,6 +162,9 @@ internal sealed class FunctionLowerer
         // parameters in slots, locals in slots, defers, lambdas — is the ordinary machinery,
         // which is the point: a frame the interpreter can capture is a frame like any other.
         _coroutineYield = coroutineYield;
+        // The caller's error slot (01 L5 E1): a function whose CALL may throw — a coroutine's
+        // clause belongs to its pulls, and its body is no call (05 E2, M6).
+        _irThrows = coroutineYield is null && types.ThrowsAtCall(decl);
         // A synthetic function — a comptime site's evaluator — has no written return type; the
         // sema type of its expression is handed in lowered instead.
         _returnType = coroutineYield is not null ? VoidType
@@ -577,7 +580,7 @@ internal sealed class FunctionLowerer
         return new IrFunction(_name, _returnType, _decl.Parameters.Length + (_thisSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
-            Entry = new BlockId(0), Handlers = _handlers,
+            Entry = new BlockId(0), Throws = _irThrows,
             ReceiverByRef = _thisSlot is not null && _thisType is IrStructType or IrEnumType,
         };
     }
@@ -634,7 +637,7 @@ internal sealed class FunctionLowerer
             _lambdaParameterCount + (_envSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
-            Entry = new BlockId(0), Handlers = _handlers,
+            Entry = new BlockId(0),
         };
     }
 
@@ -744,26 +747,131 @@ internal sealed class FunctionLowerer
     /// </summary>
     private readonly Stack<List<DeferStmt>> _defers = new();
 
+    // --- the error path (design/v5/spec/05 E1-E4, E9; 01 L5) ----------------------------------
+    //
+    // A throw site — a 'throw', a call of a throwing function — has a LANDING: the defers of every
+    // scope it leaves, innermost and latest first, then the catch dispatch of the innermost try
+    // around it, or the function's bottom. Each step is a block of the CFG; nothing unwinds. The
+    // chains are shared: a step is keyed by the scope and how many of its defers are registered,
+    // which fixes everything below it, so two sites with the same pending defers share one chain
+    // (L5 E3, the cleanup labels of Zig's emission).
+
+    /// <summary>Whether this function takes the caller's error slot (<see cref="IrFunction.Throws"/>).</summary>
+    private readonly bool _irThrows;
+
+    /// <summary>A try whose body is being lowered: the defer depth at which it stands, and its
+    /// dispatch block once a site needed one.</summary>
+    private sealed class TryFrame(int deferDepth)
+    {
+        public int DeferDepth { get; } = deferDepth;
+        public BlockId? Dispatch { get; set; }
+    }
+
+    private readonly Stack<TryFrame> _tryFrames = new();
+    private readonly Dictionary<(List<DeferStmt> Scope, int Count, TryFrame? Frame), BlockId> _chains = new();
+    private BlockId? _bottom;
+
+    /// <summary>The try depth at the start of each defer body being lowered: a site inside one
+    /// whose error would leave it is M5 S3's (first error wins, the second is appended, E7).</summary>
+    private readonly Stack<int> _deferBodies = new();
+
+    /// <summary>The calls whose error edge stands: a call lowered twice — the optional call lowers
+    /// its unwrapped self — gets one edge.</summary>
+    private readonly HashSet<CallExpr> _errorEdged = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The root of what is thrown as an interface type (05 E6 O1).</summary>
+    private IrInterfaceType ErrorType(Span span) =>
+        LowerType(ErrorRoot(span), span) as IrInterfaceType
+            ?? throw Bug("std.core's Error did not lower to an interface");
+
+    private NamedRef ErrorRoot(Span span) =>
+        _typeTable.Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error") is TypeSymbol { Kind: TypeSymbolKind.Interface } root
+            ? new NamedRef(root)
+            : throw NotSupported("an error without std.core's 'Error'", span);
+
     /// <summary>
-    /// The protected regions of this function, in creation order.
-    ///
-    /// <para>That order is already INNERMOST FIRST: an inner <c>try</c> is lowered completely before the
-    /// outer one records its handler. Exactly this order is the contract while unwinding.</para>
+    /// Where an error at this point goes: the pending defers above the innermost try (or all of
+    /// them), then that try's dispatch (or the bottom). Built on demand, shared by key.
     /// </summary>
-    private readonly List<IrHandler> _handlers = new();
+    private BlockId ErrorLanding(Span span)
+    {
+        var frame = _tryFrames.Count > 0 ? _tryFrames.Peek() : null;
+        if (_deferBodies.Count > 0 && _tryFrames.Count <= _deferBodies.Peek())
+            throw NotSupported("a 'defer' whose body throws", span,
+                "the first error wins and the second is appended to it (05 E7) — that comes with M5 S3");
+        var floor = frame?.DeferDepth ?? 0;
+        var scopes = _defers.ToArray(); // innermost first
+        var pending = new List<List<DeferStmt>>();
+        for (var i = 0; i < scopes.Length - floor; i++)
+            if (scopes[i].Count > 0) pending.Add(scopes[i]);
+        return Chain(pending, 0, pending.Count > 0 ? pending[0].Count : 0, frame, span);
+    }
+
+    /// <summary>The landing from the <paramref name="count"/>-th defer of the
+    /// <paramref name="at"/>-th pending scope down.</summary>
+    private BlockId Chain(List<List<DeferStmt>> pending, int at, int count, TryFrame? frame, Span span)
+    {
+        if (at == pending.Count) return frame is null ? Bottom(span) : frame.Dispatch ??= _b.NewBlock();
+        if (count == 0) return Chain(pending, at + 1, at + 1 < pending.Count ? pending[at + 1].Count : 0, frame, span);
+
+        var scope = pending[at];
+        if (_chains.TryGetValue((scope, count, frame), out var shared)) return shared;
+
+        var step = _b.NewBlock();
+        _chains[(scope, count, frame)] = step;
+        var resume = _b.CurrentId;
+        _b.SwitchTo(step);
+        // A defer body runs where it was registered (05 E7), and what it calls is its own business:
+        // a failure that would leave it is refused above.
+        _deferBodies.Push(_tryFrames.Count);
+        try { LowerStmt(scope[count - 1].Body); }
+        finally { _deferBodies.Pop(); }
+        if (!_b.IsSealed)
+            _b.Seal(new Branch(Chain(pending, at, count - 1, frame, span), span));
+        _b.SwitchTo(resume);
+        return step;
+    }
+
+    /// <summary>The end of every chain no try catches: the error leaves through the caller's slot —
+    /// or, in a function that throws nothing, cannot arrive at all: the sema proved every site
+    /// covered (05 K8), and a dispatch whose clauses do not end in a catch-all keeps an edge here.</summary>
+    private BlockId Bottom(Span span)
+    {
+        if (_bottom is { } known) return known;
+        var bottom = _b.NewBlock();
+        var resume = _b.CurrentId;
+        _b.SwitchTo(bottom);
+        _b.Seal(_irThrows ? new Propagate(span) : new Unreachable(span));
+        _b.SwitchTo(resume);
+        _bottom = bottom;
+        return bottom;
+    }
+
+    /// <summary>The edge after a call that may fail (01 L5 E3): the error to the landing, the value
+    /// on in a fresh block.</summary>
+    private void ErrorEdge(Span span)
+    {
+        var landing = ErrorLanding(span);
+        var next = _b.NewBlock();
+        _b.Seal(new ErrorBranch(landing, next, span));
+        _b.SwitchTo(next);
+    }
+
+    /// <summary>'throw e' (05 E1, E3): the value as an Error interface value — a class as it is, a
+    /// struct or an enum boxed, an interface value re-tabled — into flight, then to the landing.</summary>
+    private void Raise(Expr thrown, Span span)
+    {
+        var value = Coerce(LowerExpr(thrown), TypeOfExpr(thrown), ErrorType(span), span);
+        var landing = ErrorLanding(span);
+        _b.Seal(new Throw(value, landing, span));
+    }
 
     /// <summary>'throw' in value position: the same terminator as the statement, and no value —
     /// the type is 'never'. Whoever lowers the enclosing expression asks <see cref="Diverges"/>
     /// first, and so never asks this one for a temp it cannot give.</summary>
     private TempId? LowerThrowExpr(ThrowExpr expr)
     {
-        var value = LowerExpr(expr.Value);
-        var concrete = TypeOfExpr(expr.Value) switch
-        {
-            IrRefType r => (TypeId?)r.Type,
-            _ => null,
-        };
-        _b.Seal(new Throw(value, concrete, expr.Span));
+        Raise(expr.Value, expr.Span);
         return null;
     }
 
@@ -783,137 +891,99 @@ internal sealed class FunctionLowerer
 
     private bool LowerThrow(ThrowStmt stmt)
     {
-        // NO EmitAllPendingDefers here: a 'throw' unwinds, and while unwinding the defer bodies run
-        // through the finally region of their scope. Doing both would run every body twice.
-        //
-        // The difference from 'return': a return leaves the scope normally, no region applies, and the
-        // bodies have to stand inline.
-        var value = LowerExpr(stmt.Value);
-
-        // For a class type the concrete type is settled here, since there is no inheritance; for an
-        // interface value the fat pointer carries it, and the runtime reads it there.
-        var concrete = TypeOfExpr(stmt.Value) switch
-        {
-            IrRefType r => (TypeId?)r.Type,
-            _ => null,
-        };
-
-        _b.Seal(new Throw(value, concrete, stmt.Span));
+        // The defers of the scopes the throw leaves are the landing's (05 E7, L5 E3) — not inlined
+        // here, as a 'return' inlines them.
+        Raise(stmt.Value, stmt.Span);
         return false;
     }
 
     /// <summary>
-    /// <c>try { … } catch (e: T) { … }</c>.
-    ///
-    /// <para>The body occupies a CONTIGUOUS BLOCK RANGE. That is not an assumption but a consequence of
-    /// how <see cref="BlockBuilder"/> assigns ids: everything arising during the body lies in between,
-    /// nested constructs included. The handlers arise afterwards and therefore lie outside their own
-    /// range.</para>
-    ///
-    /// <para>The caught value goes into a SLOT rather than onto the stack: at a block boundary the stack
-    /// is empty, and a handler block is a block boundary. CIL pushes the value there and can afford to,
-    /// because it does not have this invariant.</para>
+    /// <c>try { … } catch (e: T) { … }</c> (05 E4, E9): the body's sites land — after the defers
+    /// they leave inside it — on ONE dispatch block, which tests the in-flight error against the
+    /// clauses in order: the first that covers it takes it off and runs; a catch-all ends the chain;
+    /// when no clause matches, the error goes on to the landing outside this try. The clauses are
+    /// lowered outside the try, so a throw in one is not caught by its sisters (E9 C6).
     /// </summary>
     private bool LowerTry(TryStmt stmt)
     {
-        // A block of its own for the body: the range has to start at a block boundary, or it would cover
-        // code before the 'try' as well.
-        var start = _b.NewBlock();
-        _b.Seal(new Branch(start, stmt.Span));
-        _b.SwitchTo(start);
+        var frame = new TryFrame(_defers.Count);
+        _tryFrames.Push(frame);
+        bool bodyFallsThrough;
+        try { bodyFallsThrough = LowerScope(stmt.Body); }
+        finally { _tryFrames.Pop(); }
 
-        var bodyFallsThrough = LowerScope(stmt.Body);
-        var bodyLast = _b.CurrentId;
-        var end = new BlockId(_blocks.Count);
-
-        // The merge block arises ONLY when someone reaches it. Created unconditionally, it would have no
-        // predecessors for 'try { return … } catch (…) { return … }', and the verifier rejects
-        // unreachable blocks, as there is no SimplifyCfg pass. The open ends are collected and sealed at
-        // the end.
         var open = new List<BlockId>();
-        if (bodyFallsThrough) open.Add(bodyLast);
+        if (bodyFallsThrough) open.Add(_b.CurrentId);
 
-        foreach (var clause in stmt.Catches)
+        // Nothing in the body can fail: no dispatch, the clauses are dead (the sema warned, SEM0139).
+        if (frame.Dispatch is { } dispatch)
         {
-            var handler = _b.NewBlock();
-            _b.SwitchTo(handler);
+            _b.SwitchTo(dispatch);
+            var errorType = ErrorType(stmt.Span);
+            var error = _slots.NewTemp(errorType);
+            _b.Emit(new CurrentError(error, errorType, stmt.Span));
+            var root = ErrorRoot(stmt.Span);
 
-            LocalId? slot = null;
-            TypeId? caught = null;
-
-            if (clause.BindingType is { } declared)
+            var caughtAll = false;
+            foreach (var clause in stmt.Catches)
             {
-                // Through the bound symbol rather than through the TypeNode: the sema records the
-                // resolution of a catch type in its own table (BindRef on the CatchClause), not in the
-                // resolver's. Resolving the TypeNode again here would be a second truth about
-                // visibility.
-                var symbol = _types.RefOf(clause) as LocalSymbol
-                    ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker");
+                var symbol = clause.BindingName is not null || clause.BindingType is not null
+                    ? _types.RefOf(clause) as LocalSymbol
+                      ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker")
+                    : null;
+                var caught = symbol?.Type;
+                var everything = clause.BindingType is null || caught is null || LyrType.Equal(caught, root);
 
-                var type = LowerType(symbol.Type, declared.Span);
-                switch (type)
+                BlockId? next = null;
+                IrType? bindingType = null;
+                if (!everything)
                 {
-                    case IrRefType r:
-                        caught = r.Type;
-                        break;
-
-                    // 'catch (e: Throwable)' IS the catch-all, written out: 'caught' stays null
-                    // exactly as for the typeless form, and the VM builds the fat pointer. Any
-                    // OTHER interface would need a conformance test during unwinding, which the
-                    // handler table cannot express yet — the id comparison would silently catch
-                    // nothing, so the boundary is a diagnostic instead.
-                    case IrInterfaceType when symbol.Type is Sema.NamedRef nr
-                        && ReferenceEquals(nr.Symbol,
-                            _typeTable.Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error")):
-                        caught = null;
-                        break;
-                    // ANY OTHER INTERFACE is the interface's own type id, and the unwinding asks
-                    // the dispatch table whether the thrown class conforms. This used to be a
-                    // refusal, on the reading that the handler table could not express a
-                    // conformance test -- it does not have to: the table that answers every
-                    // 'callvirt' answers this too, so nothing about the FORMAT had to change.
-                    case IrInterfaceType i:
-                        caught = i.Type;
-                        break;
-
-                    default:
-                        throw NotSupported(
-                            "catching a non-class type (only classes and interfaces are throwable)",
-                            clause.Span);
+                    bindingType = LowerType(caught!, clause.Span);
+                    var target = bindingType switch
+                    {
+                        IrRefType r => r.Type,
+                        IrStructType st => st.Type,
+                        IrEnumType en => en.Type,
+                        IrInterfaceType i => i.Type,
+                        _ => throw NotSupported($"catching '{TypeFacts.Display(caught!)}'", clause.Span),
+                    };
+                    var test = _slots.NewTemp(BoolType);
+                    _b.Emit(new TypeTest(test, error, target, clause.Span));
+                    var take = _b.NewBlock();
+                    next = _b.NewBlock();
+                    _b.Seal(new CondBranch(test, take, next.Value, clause.Span));
+                    _b.SwitchTo(take);
+                    _b.Emit(new ClearError(clause.Span));
+                    if (clause.BindingName is not null)
+                    {
+                        // The value under its own type: a class's object, a struct's or an enum's
+                        // payload out of the box, an interface value re-tabled.
+                        var bound = _slots.NewTemp(bindingType);
+                        _b.Emit(new Downcast(bound, error, target, bindingType, clause.Span));
+                        _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, bindingType), bound, clause.Span));
+                    }
+                }
+                else
+                {
+                    _b.Emit(new ClearError(clause.Span));
+                    if (clause.BindingName is not null)
+                        _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, errorType), error, clause.Span));
                 }
 
-                slot = _slots.DeclareFor(symbol, type);
-            }
-            else if (clause.BindingName is not null)
-            {
-                // 'catch (e)' without a type catches EVERY Throwable: 'caught' stays null, and that is
-                // what catch-all means in the handler table. The slot gets the type the sema already
-                // gave the name: 'Throwable', so an interface type.
-                //
-                // A fat pointer therefore lies in the slot rather than a bare reference. Only the VM can
-                // build it: which concrete type was thrown is settled at runtime, and it carries that in
-                // the frame anyway, because the typed catch compares against it. Without the fat pointer
-                // 'e.message()' would be a callvirt on a value that does not know its type.
-                var symbol = _types.RefOf(clause) as LocalSymbol
-                    ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker");
+                if (LowerScope(clause.Body)) open.Add(_b.CurrentId);
 
-                slot = _slots.DeclareFor(symbol, LowerType(symbol.Type, clause.Span));
+                if (next is null) { caughtAll = true; break; } // a catch-all ends the chain (E9 C3)
+                _b.SwitchTo(next.Value);
             }
 
-            var handlerFallsThrough = LowerScope(clause.Body);
-            var handlerLast = _b.CurrentId;
-            if (handlerFallsThrough) open.Add(handlerLast);
-
-            _handlers.Add(new IrHandler(start, end, IrHandlerKind.Catch, caught, handler, slot));
+            // No clause took it: the error goes on — the defers outside, then the next try or the
+            // bottom.
+            if (!caughtAll) _b.Seal(new Branch(ErrorLanding(stmt.Span), stmt.Span));
         }
 
-        // Nobody falls through: no merge block, and control flow ends here. The return value says exactly
-        // that, and the caller must not create another block afterwards.
         if (open.Count == 0) return false;
-
         var merge = _b.NewBlock();
         foreach (var id in open) _b.SealBlock(id, new Branch(merge, stmt.Span));
-
         _b.SwitchTo(merge);
         return true;
     }
@@ -928,12 +998,6 @@ internal sealed class FunctionLowerer
         // nearly all of them.
         var hasDefers = block.Statements.Any(st => st is DeferStmt);
         if (!hasDefers) return LowerPlainScope(block);
-
-        // A block of its own: the protected region has to start at a block boundary.
-        var start = _b.NewBlock();
-        _b.Seal(new Branch(start, block.Span));
-        _b.SwitchTo(start);
-
         _defers.Push(new List<DeferStmt>());
         List<DeferStmt> pending;
         bool fallsThrough;
@@ -947,47 +1011,9 @@ internal sealed class FunctionLowerer
             _defers.Pop();
         }
 
-        // The region ends with the BODY. Fixed after the inline copy below, it covered that copy
-        // too — and then a defer body that throws was caught by the very finally region those
-        // bodies are, which ran every defer of the scope a second time: the throwing one twice and
-        // the ones registered before it never, because the second pass threw at the same place.
-        var end = new BlockId(_blocks.Count);
-        var afterBody = _b.CurrentId;
-
-        // The normal path gets the bodies directly — no handler, no runtime cost — in a block of
-        // its own behind the region.
-        if (fallsThrough)
-        {
-            var normal = _b.NewBlock();
-            _b.SealBlock(afterBody, new Branch(normal, block.Span));
-            _b.SwitchTo(normal);
-            EmitDefers(pending);
-            afterBody = _b.CurrentId; // a defer body may have produced blocks of its own
-        }
-
-        // And the same body once more as a finally region, for the case where an exception runs through
-        // this scope. A defer runs on every scope exit, exceptions included; the normal exits are served
-        // above, this one is not.
-        //
-        // The price is code duplication: the bodies stand once inline and once here. The alternative,
-        // going through the region exclusively, would move the normal path into the unwinder too and
-        // make every scope exit a handler pass.
-        var cleanup = _b.NewBlock();
-        _b.SwitchTo(cleanup);
-        EmitDefers(pending);
-        _b.Seal(new EndFinally(block.Span));
-
-        _handlers.Add(new IrHandler(start, end, IrHandlerKind.Finally, null, cleanup, null));
-
-        // After the body execution continues behind the region; otherwise the cursor stands in the
-        // finally block, which is never reached on the normal path.
-        if (fallsThrough)
-        {
-            var after = _b.NewBlock();
-            _b.SealBlock(afterBody, new Branch(after, block.Span));
-            _b.SwitchTo(after);
-        }
-
+        // The normal exit runs the bodies here, inline, latest first; an error leaving the scope
+        // reaches them through its landing (ErrorLanding), which reads the same list.
+        if (fallsThrough) EmitDefers(pending);
         return fallsThrough;
     }
 
@@ -1008,7 +1034,12 @@ internal sealed class FunctionLowerer
     /// <summary>LIFO: registered last runs first.</summary>
     private void EmitDefers(List<DeferStmt> pending)
     {
-        for (var i = pending.Count - 1; i >= 0; i--) LowerStmt(pending[i].Body);
+        for (var i = pending.Count - 1; i >= 0; i--)
+        {
+            _deferBodies.Push(_tryFrames.Count);
+            try { LowerStmt(pending[i].Body); }
+            finally { _deferBodies.Pop(); }
+        }
     }
 
     /// <summary>All open <c>defer</c>s, innermost first, before a <c>return</c> or <c>throw</c> that
@@ -4847,7 +4878,16 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>A call, and — when its function throws (05 E1, 01 L5 E3) — the error edge after
+    /// it. Once per call node.</summary>
     private TempId? LowerCall(CallExpr expr)
+    {
+        var value = LowerCallSite(expr);
+        if (_types.CallThrows(expr).Length > 0 && !_b.IsSealed && _errorEdged.Add(expr)) ErrorEdge(expr.Span);
+        return value;
+    }
+
+    private TempId? LowerCallSite(CallExpr expr)
     {
         // 'Point(1, 2)' IS the factory call the sema stored for it (08 Y9) — the seam of the
         // operators, for a callee that names a type.

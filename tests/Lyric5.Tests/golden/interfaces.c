@@ -5,7 +5,7 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "Damageable";
+const char lyr_ifid_ty0[] = "main.Damageable";
 typedef struct lyr_ty1_Player lyr_ty1_Player;
 typedef struct lyr_ty2_Wall lyr_ty2_Wall;
 typedef struct lyr_ty3_Crate lyr_ty3_Crate;
@@ -14,10 +14,10 @@ typedef struct lyr_ty5_Light_On lyr_ty5_Light_On;
 typedef struct lyr_ty6_Light_Off lyr_ty6_Light_Off;
 typedef struct lyr_ty7_Holder lyr_ty7_Holder;
 typedef struct lyr_vt_ty8 lyr_vt_ty8;
-const char lyr_ifid_ty8[] = "Shape";
+const char lyr_ifid_ty8[] = "main.Shape";
 typedef struct lyr_ty9_Square lyr_ty9_Square;
 typedef struct lyr_vt_ty10 lyr_vt_ty10;
-const char lyr_ifid_ty10[] = "Error";
+const char lyr_ifid_ty10[] = "std.core.Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     void (*s0)(LyrIface, int64_t);
@@ -72,9 +72,9 @@ struct lyr_vt_ty10 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-_Static_assert(sizeof(LyrIface) == 16, "layout of Damageable[]");
+_Static_assert(sizeof(LyrIface) == 16, "layout of main.Damageable[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "Damageable[]", NULL };
+const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Damageable[]", NULL };
 typedef struct { LyrObj header; lyr_ty3_Crate value; } lyr_box_ty3_Crate;
 _Static_assert(sizeof(lyr_box_ty3_Crate) == 16, "layout of lyr_box_ty3_Crate");
 _Static_assert(offsetof(lyr_box_ty3_Crate, value) == 8, "layout of lyr_box_ty3_Crate");

@@ -8,7 +8,7 @@ typedef struct lyr_ty0_P lyr_ty0_P;
 typedef struct lyr_ty1_Cell lyr_ty1_Cell;
 typedef struct lyr_ty2_Holder lyr_ty2_Holder;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Error";
+const char lyr_ifid_ty3[] = "std.core.Error";
 typedef struct lyr_ty4__env_std_core_repeatArray_Cell__ lyr_ty4__env_std_core_repeatArray_Cell__;
 typedef struct lyr_ty5__env_std_core_repeatArray_Holder__ lyr_ty5__env_std_core_repeatArray_Holder__;
 typedef struct lyr_ty6__env_std_core_cloneArray_int__ lyr_ty6__env_std_core_cloneArray_int__;

@@ -25,7 +25,7 @@ typedef struct lyr_ty17__env_main_main_ lyr_ty17__env_main_main_;
 typedef struct lyr_ty18__env_main_Scale_scaled_ lyr_ty18__env_main_Scale_scaled_;
 typedef struct lyr_ty19__env_main_Pair_adder_ lyr_ty19__env_main_Pair_adder_;
 typedef struct lyr_vt_ty20 lyr_vt_ty20;
-const char lyr_ifid_ty20[] = "Error";
+const char lyr_ifid_ty20[] = "std.core.Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;

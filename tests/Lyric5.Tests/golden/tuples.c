@@ -9,7 +9,7 @@ typedef struct lyr_ty1__tuple_ lyr_ty1__tuple_;
 typedef struct lyr_ty2__tuple_ lyr_ty2__tuple_;
 typedef struct lyr_ty3_Holder lyr_ty3_Holder;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "Error";
+const char lyr_ifid_ty4[] = "std.core.Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;

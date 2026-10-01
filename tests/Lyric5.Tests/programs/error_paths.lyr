@@ -1,0 +1,118 @@
+// The error path's harder shapes (05 E1-E4, K6; 01 L5): a throwing interface slot filled by a quiet
+// implementation through its thunk, a throwing mut method of a struct, a generic throwing
+// function, defer chains shared across nested scopes, break and continue around a try, a try
+// inside a lambda that throws nothing, a try inside a clause, a return from a clause.
+import std.io { println };
+
+enum Bad :: [Error] { It; fn message(): string { return "bad"; } }
+struct BoxErr<T> :: [Error] { v: T, fn message(): string { return "Box"; } }
+
+interface Source { fn read(n: int): int throws Bad; }
+struct Good :: [Source] { fn read(n: int): int { return n; } }
+struct Fails :: [Source] { fn read(n: int): int throws Bad { throw Bad.It; } }
+
+fn slot(): string {
+    let a: Source = Good { };
+    let b: Source = Fails { };
+    var log = "slot:";
+    try {
+        log = log + f" {a.read(7)}";
+        log = log + f" {b.read(1)}";
+    } catch (e: Bad) { log = log + f" then caught {e.message()}"; }
+    return log;
+}
+
+struct Counter { var n: int,
+    mut fn bump(limit: int): int throws Bad {
+        this.n += 1;
+        if (this.n > limit) { throw Bad.It; }
+        return this.n;
+    }
+}
+fn method(): string {
+    var c = Counter { n = 2 };
+    var log = "method:";
+    try {
+        log = log + f" {c.bump(5)}";
+        log = log + f" {c.bump(3)}";
+    } catch (e: Bad) { log = log + f" then caught {e.message()}"; }
+    return log;
+}
+
+fn pick<T>(xs: T[], i: int): T throws BoxErr<int> {
+    if (i >= xs.length()) { throw BoxErr<int> { v = i }; }
+    return xs[i];
+}
+fn generic(): string {
+    var log = "generic:";
+    try {
+        log = log + f" {pick([4, 5, 6], 1)}";
+        log = log + f" {pick([4, 5, 6], 9)}";
+    } catch (e: BoxErr<int>) { log = log + f" then caught {e.message()}"; }
+    return log;
+}
+
+fn chain(): string {
+    var log = "chain:";
+    try {
+        defer { log = log + " c"; }
+        {
+            defer { log = log + " b"; }
+            {
+                defer { log = log + " a"; }
+                let n = pick([1], 5);
+                log = log + f" {n}";
+            }
+        }
+    } catch (_: BoxErr<int>) { log = log + " caught"; }
+    return log;
+}
+
+fn loop(): string {
+    var log = "loop:";
+    for (i in 1..6) {
+        try {
+            if (i == 3) { let x = pick([0], 7); log = log + f" {x}"; }
+            if (i == 5) { break; }
+            log = log + f" {i}";
+        } catch (_: BoxErr<int>) { log = log + " skip"; continue; }
+    }
+    return log + " done";
+}
+
+fn apply(f: fn(int) -> int, x: int): int { return f(x); }
+fn lambda(): string {
+    let r = apply((x: int): int => {
+        try { return pick([9], x); } catch (_: BoxErr<int>) { return -1; }
+    }, 0);
+    return f"lambda: caught inside {r}";
+}
+
+fn nested(): string {
+    var log = "nested:";
+    try {
+        let x = pick([1], 3);
+        log = log + f" {x}";
+    } catch (_: BoxErr<int>) {
+        try { let y = pick([1], 4); log = log + f" {y}"; }
+        catch (_: BoxErr<int>) { log = log + " inner clause caught"; }
+    }
+    return log;
+}
+
+fn clauseReturn(): int {
+    defer println("clausereturn defer");
+    try { return pick([1], 2); } catch (e: BoxErr<int>) { return 40 + e.v; }
+}
+
+fn main(): int {
+    println(slot());
+    println(method());
+    println(generic());
+    println(chain());
+    println(loop());
+    println(lambda());
+    println(nested());
+    println(f"clausereturn: {clauseReturn()}");
+    return 0;
+}

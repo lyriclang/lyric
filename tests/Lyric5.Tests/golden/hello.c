@@ -5,7 +5,7 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "Error";
+const char lyr_ifid_ty0[] = "std.core.Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);

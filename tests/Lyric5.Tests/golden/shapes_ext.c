@@ -6,7 +6,7 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0__tuple_ lyr_ty0__tuple_;
 typedef struct lyr_vt_ty1 lyr_vt_ty1;
-const char lyr_ifid_ty1[] = "Error";
+const char lyr_ifid_ty1[] = "std.core.Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     LyrStr *f_1;

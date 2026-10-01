@@ -16,7 +16,7 @@ typedef struct lyr_ty8_Opt_Shape_ lyr_ty8_Opt_Shape_;
 typedef struct lyr_ty9_Opt_Shape__Some lyr_ty9_Opt_Shape__Some;
 typedef struct lyr_ty10_Opt_Shape__None lyr_ty10_Opt_Shape__None;
 typedef struct lyr_vt_ty11 lyr_vt_ty11;
-const char lyr_ifid_ty11[] = "Error";
+const char lyr_ifid_ty11[] = "std.core.Error";
 struct lyr_ty1_Signal_Red {
     uint8_t lyr_unit;
 };

@@ -12,7 +12,7 @@ typedef struct lyr_ty4_Ordering_Greater lyr_ty4_Ordering_Greater;
 typedef struct lyr_ty5_Bits lyr_ty5_Bits;
 typedef struct lyr_ty6_Partial lyr_ty6_Partial;
 typedef struct lyr_vt_ty7 lyr_vt_ty7;
-const char lyr_ifid_ty7[] = "Error";
+const char lyr_ifid_ty7[] = "std.core.Error";
 struct lyr_ty0_V {
     int64_t f_x;
     int64_t f_y;
