@@ -321,4 +321,39 @@ public class ErrorPathTests
             """);
         Assert.DoesNotContain(Fn(module, "f").Blocks, b => b.Insts.Any(op => op is CurrentError));
     }
+
+    [Fact]
+    public void A_rethrown_binding_puts_its_record_back_into_flight()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                try { return try risky(); } catch (e) { note(); throw e; }
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        var f = Fn(module, "f");
+        // The clause keeps the record aside instead of dropping it, and the rethrow restores it on
+        // its way to the landing: the same error, no new record (05 E6 O3).
+        var stash = Assert.Single(Ops(f).OfType<StashError>()).Stash;
+        Assert.DoesNotContain(Ops(f), op => op is ClearError);
+        Assert.Contains(Ops(f), op => op is RestoreError r && r.Stash == stash);
+        Assert.Empty(Terminators(f).OfType<Throw>());
+    }
+
+    [Fact]
+    public void Only_the_binding_itself_thrown_again_keeps_the_record()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                try { return try risky(); } catch (e: Boom) { let other = e; throw other; }
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        var f = Fn(module, "f");
+        // Under another name the value starts an error of its own: the clause drops the record,
+        // and the throw makes a new one.
+        Assert.DoesNotContain(Ops(f), op => op is StashError or RestoreError);
+        Assert.Contains(Ops(f), op => op is ClearError);
+        Assert.Single(Terminators(f).OfType<Throw>());
+    }
 }

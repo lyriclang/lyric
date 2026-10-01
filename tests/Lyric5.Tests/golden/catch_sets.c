@@ -332,12 +332,12 @@ bb5:;
 int64_t lyr_main_rethrow(int64_t l0_n, LyrErr **lyr_err) {
     LyrIface l1_e = {0};
     LyrErr *lyr_e = NULL;
+    LyrErr *lyr_s0 = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrIface t2 = {0};
     uint8_t t3 = 0;
     int64_t t4 = 0;
-    LyrIface t5 = {0};
 bb0:;
 #line 28
     t0 = l0_n;
@@ -364,13 +364,13 @@ bb3:;
     return t4;
 bb4:;
 #line 30
-    lyr_e = NULL;
+    lyr_s0 = lyr_e; lyr_e = NULL;
 #line 30
     l1_e = t2;
 #line 30
-    t5 = l1_e;
+    lyr_e = lyr_s0;
 #line 30
-    lyr_e = lyr_err_new(t5); goto bb5;
+    goto bb5;
 bb5:;
 #line 30
     *lyr_err = lyr_e; return 0;

@@ -21,8 +21,23 @@ typedef struct LyrFault {
  * NUL-terminated; answers the length. For a fault it starts at the frame that was executing
  * there (a signal or an exception); for a panic (fault NULL), below the innermost frame of the
  * panic path (every runtime function on that path is named lyr_panic* or lyr_crash*). It stops
- * above lyr_run_main. Best effort: without debug information a frame is a bare address. */
+ * above the program's entry (lyr_run_main, or the emitted lyr_entry). Best effort: without debug
+ * information a frame is a bare address. */
 size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault);
+
+/* How many program counters a trace keeps, a panic's or an error's: a stack deeper than this is
+ * cut, and the trace says so. */
+enum { LYR_TRACE_PCS = 256 };
+
+/* trace.c — the program counters of the calling thread's stack, innermost first, up to `max`:
+ * what the debug profile keeps of where an error was thrown (01 E8), named only if the error is
+ * ever reported. Not for a signal handler: the work buffer is on the caller's stack. */
+int lyr_trace_capture(uintptr_t *pcs, int max);
+
+/* trace.c — the frames at `pcs` (from lyr_trace_capture) as lyr_trace_format's lines: below the
+ * capture's own runtime frames, stopping above the program's entry; a full LYR_TRACE_PCS reads as
+ * a cut stack. */
+size_t lyr_trace_format_pcs(char *out, size_t capacity, const uintptr_t *pcs, int count);
 
 /* panic.c — the report every panic ends in, also the one a stack overflow reaches from a signal
  * handler (in_handler: leave through _Exit, not exit). */

@@ -326,7 +326,8 @@ public class CEmitterTests
 
     /// <summary>An error that escapes main (design/v5/spec/05 E6 O4): the output up to the throw,
     /// then on the error stream its message and each cause in the chain, and the exit code 1 — a
-    /// panic's is 101.</summary>
+    /// panic's is 101. The debug profile goes on with where it was thrown (01 E8): 'config' at its
+    /// throw, then 'main' at its call; the release profile keeps no trace.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
     [InlineData(Profile.Release)]
@@ -335,7 +336,15 @@ public class CEmitterTests
         var result = RuntimeBuildTests.RunEmitted(EmitC("uncaught"), "uncaught", profile);
         Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
-        Assert.Equal("error: config\n  caused by: disk\n", result.Stderr.Replace("\r\n", "\n"));
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(["error: config", "  caused by: disk"], lines.Take(2));
+        if (profile == Profile.Release)
+        {
+            Assert.Equal(2, lines.Length);
+            return;
+        }
+        Assert.Matches(@"^    at lyr_main_config \(.*programs[\\/]uncaught\.lyr:14\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]uncaught\.lyr:19\)$", lines[3]);
     }
 
     /// <summary>A defer that fails while an error leaves main (design/v5/spec/05 E7, E6 O4): the first
@@ -348,7 +357,62 @@ public class CEmitterTests
         var result = RuntimeBuildTests.RunEmitted(EmitC("uncaught_suppressed"), "uncaught_suppressed", profile);
         Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.Equal("", result.Stdout);
-        Assert.Equal("error: first\n  suppressed: second\n", result.Stderr.Replace("\r\n", "\n"));
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(["error: first", "  suppressed: second"], lines.Take(2));
+        // The trace is the first error's, where it was thrown — not the defer's.
+        if (profile == Profile.Debug)
+            Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]uncaught_suppressed\.lyr:10\)$", lines[2]);
+        else
+            Assert.Equal(2, lines.Length);
+    }
+
+    /// <summary>An error thrown deep in a recursion (design/v5/spec/01 E8): the debug trace shows the
+    /// recursion's frame once with a count, as a panic's does, and says the stack went deeper than
+    /// it kept — the capture keeps as many frames as a panic's trace.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_deep_error_folds_its_recursion_and_says_the_trace_was_cut(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("deep_error"), "deep_error", profile);
+        Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("error: deep", lines[0]);
+        if (profile == Profile.Release)
+        {
+            Assert.Single(lines);
+            return;
+        }
+        Assert.True(lines.Length == 5, $"stderr:\n{result.Stderr}");
+        Assert.Matches(@"^    at lyr_main_down \(.*programs[\\/]deep_error\.lyr:4\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_main_down \(.*programs[\\/]deep_error\.lyr:5\)$", lines[2]);
+        Assert.Matches(@"^    \.\.\. the frame above repeats \d+ more times$", lines[3]);
+        Assert.Equal("    ... deeper frames not shown", lines[4]);
+    }
+
+    /// <summary>A clause that throws its own binding again goes on with the same error
+    /// (design/v5/spec/05 E6 O3): main's report still names what was suppressed into it after a
+    /// clause without a type and a typed one each threw it again, and the debug trace is where it
+    /// was first thrown, not where it was thrown again.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_rethrown_binding_is_the_error_it_caught(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("rethrow"), "rethrow", profile);
+        Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("middle saw first\nouter saw first\n", result.Stdout.Replace("\r\n", "\n"));
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(["error: first", "  suppressed: second"], lines.Take(2));
+        if (profile == Profile.Release)
+        {
+            Assert.Equal(2, lines.Length);
+            return;
+        }
+        (string Function, int Line)[] frames = [("fail", 10), ("inner", 16), ("middle", 20), ("outer", 27), ("main", 34)];
+        Assert.True(lines.Length == 2 + frames.Length, $"stderr:\n{result.Stderr}");
+        for (var i = 0; i < frames.Length; i++)
+            Assert.Matches($@"^    at lyr_main_{frames[i].Function} \(.*programs[\\/]rethrow\.lyr:{frames[i].Line}\)$", lines[2 + i]);
     }
 
     /// <summary><c>try!</c> on an error (design/v5/spec/05 E4, E8): a panic, <c>LYR-RT0010</c>, with

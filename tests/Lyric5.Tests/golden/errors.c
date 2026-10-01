@@ -967,6 +967,7 @@ void lyr_main_rethrow(void) {
     LyrIface l1_e = {0};
     LyrIface l2_e = {0};
     LyrErr *lyr_e = NULL;
+    LyrErr *lyr_s0 = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -976,11 +977,10 @@ void lyr_main_rethrow(void) {
     LyrStr *t6 = NULL;
     LyrStr *t7 = NULL;
     LyrIface t8 = {0};
-    LyrIface t9 = {0};
-    LyrStr *t10 = NULL;
-    LyrIface t11 = {0};
+    LyrStr *t9 = NULL;
+    LyrIface t10 = {0};
+    LyrStr *t11 = NULL;
     LyrStr *t12 = NULL;
-    LyrStr *t13 = NULL;
 bb0:;
 #line 87
     t0 = lyr_main_risky(&lyr_e);
@@ -990,7 +990,7 @@ bb1:;
 #line 87
     t3 = lyr_e->value;
 #line 87
-    lyr_e = NULL;
+    lyr_s0 = lyr_e; lyr_e = NULL;
 #line 87
     l1_e = t3;
 #line 87
@@ -1004,9 +1004,9 @@ bb1:;
 #line 87
     lyr_println(t7);
 #line 87
-    t8 = l1_e;
+    lyr_e = lyr_s0;
 #line 87
-    lyr_e = lyr_err_new(t8); goto bb3;
+    goto bb3;
 bb2:;
 #line 87
     l0_n = t0;
@@ -1020,21 +1020,21 @@ bb2:;
     goto bb4;
 bb3:;
 #line 86
-    t9 = lyr_e->value;
+    t8 = lyr_e->value;
 #line 88
     lyr_e = NULL;
 #line 88
-    l2_e = t9;
+    l2_e = t8;
 #line 88
-    t10 = (LyrStr *)&lyr_lit20;
+    t9 = (LyrStr *)&lyr_lit20;
 #line 88
-    t11 = l2_e;
+    t10 = l2_e;
 #line 88
-    t12 = ((const lyr_vt_ty3 *)t11.vt)->s0(t11);
+    t11 = ((const lyr_vt_ty3 *)t10.vt)->s0(t10);
 #line 88
-    t13 = lyr_str_concat(t10, t12);
+    t12 = lyr_str_concat(t9, t11);
 #line 88
-    lyr_println(t13);
+    lyr_println(t12);
 #line 86
     goto bb5;
 bb4:;

@@ -1,0 +1,35 @@
+// A clause that throws its own binding again goes on with the same error (design/v5/spec/05 E6
+// O3): main's report names what was suppressed into it, and the debug trace is where it was
+// first thrown — through a clause without a type and a typed one.
+import std.io { println };
+
+class First :: [Error] { fn message(): string { return "first"; } }
+class Second :: [Error] { fn message(): string { return "second"; } }
+
+fn fail(what: int): void throws [First, Second] {
+    if (what == 1) { throw First { }; }
+    if (what == 2) { throw Second { }; }
+}
+
+fn inner(): void throws [First, Second] {
+    defer try fail(2);
+    try fail(1);
+}
+
+fn middle(): void throws [First, Second] {
+    try { inner(); } catch (e) {
+        println(f"middle saw {e.message()}");
+        throw e;
+    }
+}
+
+fn outer(): void throws [First, Second] {
+    try { middle(); } catch (e: First) {
+        println(f"outer saw {e.message()}");
+        throw e;
+    }
+}
+
+fn main(): void throws [First, Second] {
+    try outer();
+}
