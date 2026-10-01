@@ -47,6 +47,7 @@ public enum TokenKind
     Do,
     For,
     In,
+    Is,
     Match,
 
     // Jumps

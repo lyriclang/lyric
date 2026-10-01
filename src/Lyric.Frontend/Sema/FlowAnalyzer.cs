@@ -61,6 +61,7 @@ internal sealed class FlowAnalyzer
         switch (pattern)
         {
             case BindingPattern: yield return pattern; break;
+            case TypePattern { Name: not null }: yield return pattern; break;
             case TuplePattern t:
                 foreach (var element in t.Elements)
                     foreach (var inner in BoundNames(element)) yield return inner;
@@ -235,6 +236,7 @@ internal sealed class FlowAnalyzer
             case MemberExpr m: AnalyzeExpr(m.Target, assigned); return;
             case IndexExpr ix: AnalyzeExpr(ix.Target, assigned); AnalyzeExpr(ix.Index, assigned); return;
             case CastExpr cs: AnalyzeExpr(cs.Operand, assigned); return;
+            case TypeTestExpr tt: AnalyzeExpr(tt.Operand, assigned); return;
             case RangeExpr r: AnalyzeExpr(r.Low, assigned); AnalyzeExpr(r.High, assigned); return;
             case SliceRangeExpr sr:
                 if (sr.Low is not null) AnalyzeExpr(sr.Low, assigned);
@@ -291,6 +293,7 @@ internal sealed class FlowAnalyzer
         switch (pattern)
         {
             case BindingPattern b: if (_types.RefOf(b) is { } s) set.Add(s); return;
+            case TypePattern tp: if (_types.RefOf(tp) is { } ts) set.Add(ts); return;
             case VariantPattern v:
                 foreach (var sub in v.TupleElements ?? []) AddPatternBindings(sub, set);
                 foreach (var f in v.StructFields ?? [])

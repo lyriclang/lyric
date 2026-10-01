@@ -89,6 +89,11 @@ public static class AstDumper
                 if (n.Low is not null) Write(n.Low, indent + 1, sb);
                 if (n.High is not null) Write(n.High, indent + 1, sb);
                 break;
+            case TypeTestExpr n:
+                Line(sb, indent, "TypeTest", n.Span);
+                Write(n.Operand, indent + 1, sb);
+                Write(n.Type, indent + 1, sb);
+                break;
             case CastExpr n:
                 Line(sb, indent, "Cast", n.Span);
                 Write(n.Operand, indent + 1, sb);
@@ -446,6 +451,10 @@ public static class AstDumper
             case LiteralPattern n:
                 Line(sb, indent, "LitPattern", n.Span);
                 Write(n.Literal, indent + 1, sb);
+                break;
+            case TypePattern n:
+                Line(sb, indent, $"TypePattern {n.Name ?? "_"}", n.Span);
+                Write(n.Type, indent + 1, sb);
                 break;
             case BindingPattern n:
                 Line(sb, indent, $"BindPattern {n.Name}", n.Span);

@@ -78,6 +78,7 @@ public sealed partial class Parser
     private static (int left, int right) BindingPower(TokenKind op) => op switch
     {
         TokenKind.As => (27, 28),
+        TokenKind.Is => (11, 12), // the comparison level, like '<' (08 line 11)
 
         TokenKind.Star or TokenKind.Slash or TokenKind.Percent or TokenKind.StarPercent => (25, 26),
         TokenKind.Plus or TokenKind.Minus or TokenKind.PlusPercent or TokenKind.MinusPercent => (23, 24),
@@ -157,6 +158,15 @@ public sealed partial class Parser
                 _buffer.Advance();
                 var type = ParseType();
                 left = new CastExpr(left, type, Span.Union(left.Span, type.Span));
+                continue;
+            }
+
+            // 'is' (03 T11): the right-hand side is a type as well.
+            if (op == TokenKind.Is)
+            {
+                _buffer.Advance();
+                var type = ParseType();
+                left = new TypeTestExpr(left, type, Span.Union(left.Span, type.Span));
                 continue;
             }
 

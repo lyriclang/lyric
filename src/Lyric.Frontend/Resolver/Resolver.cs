@@ -492,7 +492,13 @@ public sealed class Resolver
     /// when the situation bit. Fixing the resolution is what lets it be heard.</para>
     /// </summary>
     private Symbol? BuiltinType(string name) =>
-        _comp.Builtins.LookupLocal(name) as TypeSymbol;
+        _comp.Builtins.LookupLocal(name) as TypeSymbol ?? CoreType(name);
+
+    /// <summary>A public type of <c>std.core</c>, visible without an import (design/v5/spec/10
+    /// U-series; 03 T10 for <c>Any</c>): the last answer for a bare type name, after the scope
+    /// and the builtins — a program's own name of the kind wins.</summary>
+    private TypeSymbol? CoreType(string name) =>
+        _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
 
     // --- Helpers ---
 

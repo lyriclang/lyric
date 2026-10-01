@@ -1733,6 +1733,7 @@ internal sealed class FunctionLowerer
         BinaryExpr e => LowerBinary(e),
         AssignExpr e => LowerAssign(e),
         CastExpr e => LowerCast(e),
+        TypeTestExpr typeTest => LowerTypeTest(typeTest),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
 
@@ -1880,7 +1881,39 @@ internal sealed class FunctionLowerer
             _b.Emit(new OptGet(narrowed, value, option.Inner, expr.Span));
             (value, type) = (narrowed, option.Inner);
         }
+
+        // 'if (x is Circle)' (03 T11): the sema says 'Circle' where the slot holds the interface
+        // value — the downcast is the materialization of the test that guards the branch.
+        if (type is IrInterfaceType && TypeOfExpr(expr) is { } proven && proven is not IrOptionalType && !proven.Equals(type))
+        {
+            var cast = _slots.NewTemp(proven);
+            _b.Emit(new Downcast(cast, value, TargetIdOf(proven, expr.Span), proven, expr.Span));
+            if (proven is IrStructType or IrInlineArrayType) _fresh.Add(cast); // a copy out of the box (04 D12)
+            return cast;
+        }
         return value;
+    }
+
+    /// <summary>The type a test names, as the entry a descriptor identifies.</summary>
+    private TypeId TargetIdOf(IrType type, Span span) => type switch
+    {
+        IrRefType r => r.Type,
+        IrStructType s => s.Type,
+        IrEnumType e => e.Type,
+        IrInterfaceType i => i.Type,
+        _ => throw NotSupported($"a type test against '{type}'", span),
+    };
+
+    /// <summary><c>x is T</c> (03 T11): a bool off the interface value's table.</summary>
+    private TempId LowerTypeTest(TypeTestExpr test)
+    {
+        var value = LowerExpr(test.Operand);
+        if (TypeOfExpr(test.Operand) is not IrInterfaceType)
+            throw NotSupported("'is' on a value that is no interface value", test.Span);
+        var target = _typeTable.Lower(test.Type);
+        var dest = _slots.NewTemp(BoolType);
+        _b.Emit(new TypeTest(dest, value, TargetIdOf(target, test.Span), test.Span));
+        return dest;
     }
 
     /// <summary>How many optional levels a type has: 0 for <c>T</c>, 2 for <c>??T</c>.</summary>
@@ -2779,6 +2812,36 @@ internal sealed class FunctionLowerer
 
             case BindingPattern other:
                 throw Bug($"pattern binding '{other.Name}' was not bound by the type checker");
+
+            // 'c: Circle' (03 T11): the test, then the value out of the interface value as the
+            // name's type. The last arm of an exhaustive match is not tested; a type pattern is
+            // never the one that makes a match exhaustive, so the test always stands here.
+            case TypePattern tp:
+            {
+                if (valueType is IrOptionalType optionalIface)
+                    value = UnwrapPresent(value, optionalIface, onFail, assumeMatch, tp.Span);
+                var ifaceType = valueType is IrOptionalType oi ? oi.Inner : valueType;
+                if (ifaceType is not IrInterfaceType)
+                    throw NotSupported("a type pattern on a value that is no interface value", tp.Span);
+                var target = _typeTable.Lower(tp.Type);
+                var targetId = TargetIdOf(target, tp.Span);
+                if (!assumeMatch)
+                {
+                    var holds = _slots.NewTemp(BoolType);
+                    _b.Emit(new TypeTest(holds, value, targetId, tp.Span));
+                    var matched = _b.NewBlock();
+                    _b.Seal(new CondBranch(holds, matched, onFail(), tp.Span));
+                    _b.SwitchTo(matched);
+                }
+                if (tp.Name is not null && _types.RefOf(tp) is LocalSymbol tested)
+                {
+                    var cast = _slots.NewTemp(target);
+                    _b.Emit(new Downcast(cast, value, targetId, target, tp.Span));
+                    if (target is IrStructType) _fresh.Add(cast);
+                    BindLocal(tp, tested, cast, target, tp.Span);
+                }
+                return;
+            }
 
             // 'null' as a pattern is NO comparison but the question of a value's presence — the same
             // answer as for 'x == null' (TryLowerNullTest). A real equality comparison would need a

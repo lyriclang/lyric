@@ -1837,6 +1837,12 @@ public sealed class TypeChecker
             (b.Operator == BinaryOp.Ne ? then : els)[sym2] = opt.Inner;
         }
 
+        // 'x is Circle' (03 T11): in the branch the test guards, 'x' is a 'Circle' — the smart
+        // cast, the same mechanism as the null test. Nothing is known in the other branch.
+        if (cond is TypeTestExpr { Operand: IdentifierExpr tid } test
+            && _result.RefOf(tid) is { } tsym && _typeTests.TryGetValue(test, out var tested2))
+            then[tsym] = tested2;
+
         return (then, els);
     }
 
@@ -1977,6 +1983,7 @@ public sealed class TypeChecker
             case AssignExpr a: return CheckAssign(a, scope);
             case RangeExpr r: return CheckRange(r, scope);
             case CastExpr c: return CheckCast(c, scope);
+            case TypeTestExpr tt: return CheckTypeTest(tt, scope);
             case IndexExpr ix: return CheckIndex(ix, scope);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
             case WithExpr w: return CheckWith(w, scope);
@@ -3232,6 +3239,60 @@ public sealed class TypeChecker
     /// beside the visible one. And ONE target per type — <c>into</c> is a member name, and a type
     /// has one member of a name; the second conversion is an ordinary named method.</para>
     /// </remarks>
+    /// <summary>The types a test resolved, for the narrowing: the test stands in a condition,
+    /// and the facts are read off the condition without a scope.</summary>
+    private readonly Dictionary<TypeTestExpr, LyrType> _typeTests = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// <c>x is T</c> (03 T11): the operand is an interface value — on anything else the static
+    /// type answers already (<c>LYR-SEM0131</c>) — and <c>T</c> a struct, class, enum or an
+    /// interface a value can have. A type parameter is no test (O2): dynamic typing takes
+    /// <c>Any</c>.
+    /// </summary>
+    private LyrType CheckTypeTest(TypeTestExpr t, SymbolTable scope)
+    {
+        var op = CheckExpr(t.Operand, scope);
+        var target = ResolveType(t.Type, scope);
+        if (op.IsError || target.IsError) return LyrType.Bool;
+        if (TypeFacts.SymbolOf(op) is not { Kind: TypeSymbolKind.Interface })
+        {
+            _de.Report("LYR-SEM0131", Severity.Error, t.Span,
+                $"'is' asks an interface value what it holds; a '{TypeFacts.Display(op)}' is known already"
+                + (op is Optional ? " — test for null first, then the value" : ""));
+            return LyrType.Bool;
+        }
+        if (CheckTestTarget(target, t.Type.Span)) _typeTests[t] = target;
+        return LyrType.Bool;
+    }
+
+    /// <summary>What a value behind an interface can be: a struct, a class, an enum, or an
+    /// interface that is a value type itself (04 D9).</summary>
+    private bool CheckTestTarget(LyrType target, Span span)
+    {
+        switch (target)
+        {
+            case TypeParamType tp:
+                _de.Report("LYR-SEM0131", Severity.Error, span,
+                    $"no type test on the type parameter '{tp.Param.Name}' (03 T11): a value of 'Any' is what a dynamic test takes");
+                return false;
+            case NamedRef { Symbol.Kind: TypeSymbolKind.Interface } or GenericInstance { Definition.Kind: TypeSymbolKind.Interface }:
+                if (!ValueUsable(TypeFacts.SymbolOf(target)!, out var reason))
+                {
+                    _de.Report("LYR-SEM0126", Severity.Error, span,
+                        $"'{TypeFacts.Display(target)}' is a constraint, not a type for a value: {reason}");
+                    return false;
+                }
+                return true;
+            case NamedRef { Symbol.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
+                or GenericInstance { Definition.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }:
+                return true;
+            default:
+                _de.Report("LYR-SEM0131", Severity.Error, span,
+                    $"'{TypeFacts.Display(target)}' is never behind an interface value — only a struct, a class, an enum or an interface is");
+                return false;
+        }
+    }
+
     private LyrType CheckCast(CastExpr c, SymbolTable scope)
     {
         var op = CheckExpr(c.Operand, scope);
@@ -6283,6 +6344,27 @@ public sealed class TypeChecker
                 CheckLiteralPattern(lit, scrutinee, scope);
                 return;
 
+            case TypePattern tp:
+            {
+                // 'c: Circle' (03 T11): the scrutinee is an interface value, the type one it
+                // may hold; the name is bound as that type.
+                var tested = ResolveType(tp.Type, scope);
+                if (!tested.IsError && !scrutinee.IsError)
+                {
+                    if (TypeFacts.SymbolOf(scrutinee) is not { Kind: TypeSymbolKind.Interface })
+                        _de.Report("LYR-SEM0131", Severity.Error, tp.Span,
+                            $"a type pattern asks an interface value what it holds; a '{TypeFacts.Display(scrutinee)}' is known already");
+                    else CheckTestTarget(tested, tp.Type.Span);
+                }
+                if (tp.Name is { } bound)
+                {
+                    var tl = new LocalSymbol(bound, tested, mutable, tp);
+                    DeclareBinding(scope, tl, tp.NameSpan);
+                    _result.BindRef(tp, tl);
+                }
+                return;
+            }
+
             case BindingPattern b:
                 // A bare name is a binding, always (08 Y6). One that spells a variant of the
                 // scrutinee's enum would match everything under the variant's name: refused,
@@ -6615,6 +6697,9 @@ public sealed class TypeChecker
             case BindingPattern b when _result.RefOf(b) is LocalSymbol l:
                 if (canonical.Find(c => c.Name == l.Name) is { } cb) _result.BindRef(b, cb);
                 return;
+            case TypePattern tp when _result.RefOf(tp) is LocalSymbol tl:
+                if (canonical.Find(c => c.Name == tl.Name) is { } ctp) _result.BindRef(tp, ctp);
+                return;
             case FieldPattern { Pattern: null } f when _result.RefOf(f) is LocalSymbol l:
                 if (canonical.Find(c => c.Name == l.Name) is { } cf) _result.BindRef(f, cf);
                 return;
@@ -6672,6 +6757,11 @@ public sealed class TypeChecker
                 var lb = new LocalSymbol(b.Name, LyrType.Error, false, b);
                 scope.TryDeclare(lb);
                 _result.BindRef(b, lb);
+                return;
+            case TypePattern { Name: { } tname } tp:
+                var ltp = new LocalSymbol(tname, LyrType.Error, false, tp);
+                scope.TryDeclare(ltp);
+                _result.BindRef(tp, ltp);
                 return;
             case VariantPattern v:
                 foreach (var sub in v.TupleElements ?? []) BindPoison(sub, scope);
@@ -6989,6 +7079,7 @@ public sealed class TypeChecker
                 case AssignExpr a: WalkNode(a.Target); WalkNode(a.Value); return;
                 case RangeExpr r2: WalkNode(r2.Low); WalkNode(r2.High); return;
                 case CastExpr c2: WalkNode(c2.Operand); return;
+                case TypeTestExpr tt2: WalkNode(tt2.Operand); return;
                 case CallExpr call: WalkNode(call.Callee); foreach (var a in call.Arguments) WalkNode(a); return;
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
@@ -7224,6 +7315,10 @@ public sealed class TypeChecker
         if (coercionSite && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
+        // Every struct, class and enum value is an 'Any' at the transition (03 T10): the empty
+        // interface asks nothing, so nothing has to be declared.
+        if (IsAny(to) && TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum })
+            return true;
         return false;
     }
 
@@ -7559,7 +7654,11 @@ public sealed class TypeChecker
     // Compact path resolution for body types, which the resolver has not bound.
     private Symbol? ResolveTypePath(string[] path, SymbolTable scope)
     {
-        var head = scope.Lookup(path[0]);
+        // A public type of 'std.core' is visible without an import (10 U-series): the last
+        // answer, after the scope — the resolver's rule, repeated for the names only the sema
+        // reaches.
+        var head = scope.Lookup(path[0])
+            ?? (path.Length == 1 && _comp.FindModule(["std", "core"])?.Members.LookupLocal(path[0]) is TypeSymbol { Visibility: Visibility.Public } core ? core : null);
         if (head is null || path.Length == 1) return head;
         for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod }; i++)
             head = mod.Members.LookupLocal(path[i]);
@@ -7576,6 +7675,10 @@ public sealed class TypeChecker
 
     private static LyrType FloatSuffixType(FloatSuffix s) =>
         new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float);
+
+    /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
+    private bool IsAny(LyrType type) =>
+        TypeFacts.SymbolOf(type) is { } ts && ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
 
     /// <summary>Whether this is THE <c>Deprecated</c> struct of <c>std.core</c> — by identity,
     /// the same rule the WarningAnalyzer applies when it reads the attribute.</summary>

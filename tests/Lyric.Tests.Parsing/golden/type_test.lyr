@@ -1,0 +1,4 @@
+fn f(s: Shape): int {
+    if (s is Circle && s.r > 0) { return s.r; }
+    return match (s) { c: Circle => c.r, _: Rect => 2, _ => 0 };
+}

@@ -546,6 +546,15 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_type_test_and_a_type_pattern_keep_their_spelling()
+    {
+        var formatted = Format("fn f(s: Shape): int { if (s is Circle&&s.r>0) { return s.r; } return match (s) { c:Circle => c.r, _:Rect => 2, _ => 0 }; }");
+        Assert.Contains("s is Circle && s.r > 0", formatted);
+        Assert.Contains("c: Circle => c.r", formatted);
+        Assert.Contains("_: Rect => 2", formatted);
+    }
+
+    [Fact]
     public void An_associated_type_keeps_its_spelling()
     {
         var formatted = Format("interface C { type Item; type Out=Self; fn f(): Self.Item; }\n"

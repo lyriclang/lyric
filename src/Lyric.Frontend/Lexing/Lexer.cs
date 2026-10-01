@@ -98,6 +98,7 @@ public sealed class Lexer
         { "do", TokenKind.Do },
         { "for", TokenKind.For },
         { "in", TokenKind.In },
+        { "is", TokenKind.Is },
         { "match", TokenKind.Match },
 
         { "break", TokenKind.Break },

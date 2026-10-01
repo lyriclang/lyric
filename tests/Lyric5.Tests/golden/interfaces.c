@@ -5,6 +5,7 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
+const char lyr_ifid_ty0[] = "Damageable";
 typedef struct lyr_ty1_Player lyr_ty1_Player;
 typedef struct lyr_ty2_Wall lyr_ty2_Wall;
 typedef struct lyr_ty3_Crate lyr_ty3_Crate;
@@ -13,6 +14,7 @@ typedef struct lyr_ty5_Light_On lyr_ty5_Light_On;
 typedef struct lyr_ty6_Light_Off lyr_ty6_Light_Off;
 typedef struct lyr_ty7_Holder lyr_ty7_Holder;
 typedef struct lyr_vt_ty8 lyr_vt_ty8;
+const char lyr_ifid_ty8[] = "Shape";
 typedef struct lyr_ty9_Square lyr_ty9_Square;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
@@ -26,14 +28,16 @@ struct lyr_ty1_Player {
 };
 _Static_assert(sizeof(lyr_ty1_Player) == 16, "layout of lyr_ty1_Player");
 _Static_assert(offsetof(lyr_ty1_Player, f_hp) == 8, "layout of lyr_ty1_Player");
-const LyrDesc lyr_desc_ty1_Player = { sizeof(lyr_ty1_Player), 0, 0, 0, NULL, "main.Player", NULL };
+extern const LyrItable lyr_itab_ty1[];
+const LyrDesc lyr_desc_ty1_Player = { sizeof(lyr_ty1_Player), 0, 0, 0, NULL, "main.Player", lyr_itab_ty1 };
 struct lyr_ty2_Wall {
     LyrObj header;
     int64_t f_hp;
 };
 _Static_assert(sizeof(lyr_ty2_Wall) == 16, "layout of lyr_ty2_Wall");
 _Static_assert(offsetof(lyr_ty2_Wall, f_hp) == 8, "layout of lyr_ty2_Wall");
-const LyrDesc lyr_desc_ty2_Wall = { sizeof(lyr_ty2_Wall), 0, 0, 0, NULL, "main.Wall", NULL };
+extern const LyrItable lyr_itab_ty2[];
+const LyrDesc lyr_desc_ty2_Wall = { sizeof(lyr_ty2_Wall), 0, 0, 0, NULL, "main.Wall", lyr_itab_ty2 };
 struct lyr_ty3_Crate {
     int64_t f_hp;
 };
@@ -67,15 +71,18 @@ const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC
 typedef struct { LyrObj header; lyr_ty3_Crate value; } lyr_box_ty3_Crate;
 _Static_assert(sizeof(lyr_box_ty3_Crate) == 16, "layout of lyr_box_ty3_Crate");
 _Static_assert(offsetof(lyr_box_ty3_Crate, value) == 8, "layout of lyr_box_ty3_Crate");
-const LyrDesc lyr_desc_box_ty3_Crate = { sizeof(lyr_box_ty3_Crate), 0, 0, 0, NULL, "box<main.Crate>", NULL };
+extern const LyrItable lyr_itab_ty3[];
+const LyrDesc lyr_desc_box_ty3_Crate = { sizeof(lyr_box_ty3_Crate), 0, 0, 0, NULL, "box<main.Crate>", lyr_itab_ty3 };
 typedef struct { LyrObj header; lyr_ty4_Light value; } lyr_box_ty4_Light;
 _Static_assert(sizeof(lyr_box_ty4_Light) == 16, "layout of lyr_box_ty4_Light");
 _Static_assert(offsetof(lyr_box_ty4_Light, value) == 8, "layout of lyr_box_ty4_Light");
-const LyrDesc lyr_desc_box_ty4_Light = { sizeof(lyr_box_ty4_Light), 0, 0, 0, NULL, "box<Light>", NULL };
+extern const LyrItable lyr_itab_ty4[];
+const LyrDesc lyr_desc_box_ty4_Light = { sizeof(lyr_box_ty4_Light), 0, 0, 0, NULL, "box<Light>", lyr_itab_ty4 };
 typedef struct { LyrObj header; lyr_ty9_Square value; } lyr_box_ty9_Square;
 _Static_assert(sizeof(lyr_box_ty9_Square) == 16, "layout of lyr_box_ty9_Square");
 _Static_assert(offsetof(lyr_box_ty9_Square, value) == 8, "layout of lyr_box_ty9_Square");
-const LyrDesc lyr_desc_box_ty9_Square = { sizeof(lyr_box_ty9_Square), 0, 0, 0, NULL, "box<main.Square>", NULL };
+extern const LyrItable lyr_itab_ty9[];
+const LyrDesc lyr_desc_box_ty9_Square = { sizeof(lyr_box_ty9_Square), 0, 0, 0, NULL, "box<main.Square>", lyr_itab_ty9 };
 
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("alive");
@@ -123,6 +130,11 @@ static int64_t lyr_vt_ty0_ty4_s1(LyrIface self) { return lyr_main_Light_getHp(&(
 const lyr_vt_ty0 lyr_vt_ty0_ty4 = { &lyr_desc_box_ty4_Light, lyr_vt_ty0_ty4_s0, lyr_vt_ty0_ty4_s1, lyr_main_Damageable_isAlive };
 static int64_t lyr_vt_ty8_ty9_s0(LyrIface self) { return lyr_main_Square_area(&((lyr_box_ty9_Square *)self.data)->value); }
 const lyr_vt_ty8 lyr_vt_ty8_ty9 = { &lyr_desc_box_ty9_Square, lyr_vt_ty8_ty9_s0, lyr_main_Shape_doubled };
+const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty2 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty3 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty4[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty4 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty9[] = { { lyr_ifid_ty8, &lyr_vt_ty8_ty9 } , { NULL, NULL } };
 
 #line 59 "programs/interfaces.lyr"
 int64_t lyr_main_hit(LyrIface l0_target, int64_t l1_amount) {

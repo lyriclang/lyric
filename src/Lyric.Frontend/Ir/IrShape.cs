@@ -54,6 +54,8 @@ public static class IrShape
         EnumAs a => new[] { a.Value },
 
         MakeInterface m => new[] { m.Value },
+        TypeTest t => new[] { t.Value },
+        Downcast d => new[] { d.Value },
         StructCopy c => new[] { c.Value },
 
         LoadGlobal => Array.Empty<TempId>(),
@@ -123,6 +125,8 @@ public static class IrShape
         EnumAs a => a.Dest,
 
         MakeInterface m => m.Dest,
+        TypeTest t => t.Dest,
+        Downcast d => d.Dest,
         StructCopy c => c.Dest,
 
         LoadGlobal l => l.Dest,
@@ -202,6 +206,8 @@ public static class IrShape
             EnumAs a => a with { Dest = temp(a.Dest), Value = temp(a.Value) },
 
             MakeInterface m => m with { Dest = temp(m.Dest), Value = temp(m.Value) },
+            TypeTest t => t with { Dest = temp(t.Dest), Value = temp(t.Value) },
+            Downcast d => d with { Dest = temp(d.Dest), Value = temp(d.Value) },
             StructCopy c => c with { Dest = temp(c.Dest), Value = temp(c.Value) },
 
             LoadGlobal l => l with { Dest = temp(l.Dest) },

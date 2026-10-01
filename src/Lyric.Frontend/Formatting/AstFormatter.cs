@@ -716,6 +716,7 @@ public sealed class AstFormatter
         UnaryExpr or ResumeExpr or ComptimeExpr or ThrowExpr => Prefix,
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
+        TypeTestExpr => BinaryInfo(BinaryOp.Lt).Level,
         RangeExpr => Range,
         WithExpr => Postfix,
         AssignExpr => Assign,
@@ -757,6 +758,7 @@ public sealed class AstFormatter
         SliceRangeExpr sr => Doc.Of(sr.Low is null ? Doc.Nil : ExprDoc(sr.Low, Range - 1),
             Doc.From(sr.IsInclusive ? "..=" : ".."), sr.High is null ? Doc.Nil : ExprDoc(sr.High, Range - 1)),
         CastExpr c => Doc.Of(ExprDoc(c.Operand, CastLevel), Doc.From(" as "), TypeDoc(c.Type)),
+        TypeTestExpr t => Doc.Of(ExprDoc(t.Operand, BinaryInfo(BinaryOp.Lt).Level), Doc.From(" is "), TypeDoc(t.Type)),
 
         CallExpr c => CallDoc(c),
         IndexExpr i => Doc.Of(ExprDoc(i.Target, Postfix), Doc.From("["),
@@ -1036,6 +1038,7 @@ public sealed class AstFormatter
         RestPattern r => Doc.From(r.Name is null ? ".." : ".." + r.Name),
         LiteralPattern l => LiteralPatternDoc(l),
         BindingPattern b => Doc.From(b.Name),
+        TypePattern tp => Doc.Of(Doc.From((tp.Name ?? "_") + ": "), TypeDoc(tp.Type)),
         VariantPattern v => VariantPatternDoc(v),
         TuplePattern t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select(PatternDoc).ToArray()), Doc.From(")")),

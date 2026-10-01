@@ -1,0 +1,52 @@
+// 'Any', 'is' with narrowing, type patterns, the downcast (03 T10, T11).
+// Expected stdout:
+//   is circle r=2 rect 3x4 shape     'is' on an interface value, the name narrowed in the branch; a class, a struct, neither
+//   match 2 7 0                      type patterns in a match, bound as the type; '_' for the rest
+//   any true false 5 3               'Any' holds a struct and a class undeclared; the downcast copies the struct out (D12)
+//   named true false circle          interface to interface: the conformance list behind the descriptor
+import std.io { println };
+
+interface Shape { fn area(): int; }
+interface Named { fn name(): string; }
+struct Circle :: [Shape, Named] {
+    r: int,
+    fn area(): int { return 3 * this.r * this.r; }
+    fn name(): string { return "circle"; }
+}
+class Rect :: [Shape] {
+    w: int,
+    h: int,
+    fn area(): int { return this.w * this.h; }
+}
+struct Tri :: [Shape] { b: int, fn area(): int { return this.b; } }
+
+fn describe(s: Shape): string {
+    if (s is Circle) { return f"circle r={s.r}"; }
+    if (s is Rect) { return f"rect {s.w}x{s.h}"; }
+    return "shape";
+}
+
+fn kind(s: Shape): int {
+    return match (s) { c: Circle => c.r, r: Rect => r.w + r.h, _ => 0 };
+}
+
+fn main(): int {
+    let shapes: Shape[] = [Circle { r = 2 }, Rect { w = 3, h = 4 }, Tri { b = 9 }];
+    println(f"is {describe(shapes[0])} {describe(shapes[1])} {describe(shapes[2])}");
+    println(f"match {kind(shapes[0])} {kind(shapes[1])} {kind(shapes[2])}");
+
+    let a: Any = Circle { r = 5 };
+    let b: Any = Rect { w = 1, h = 2 };
+    var n = 0;
+    if (a is Circle) { n = a.r; }
+    var m = 0;
+    if (b is Rect) { m = b.w + b.h; }
+    println(f"any {a is Circle} {b is Circle} {n} {m}");
+
+    let s0 = shapes[0];
+    let s1 = shapes[1];
+    var named = "none";
+    if (s0 is Named) { named = s0.name(); }
+    println(f"named {s0 is Named} {s1 is Named} {named}");
+    return 0;
+}

@@ -287,6 +287,10 @@ public static class AstChildren
                 if (sr.High is not null) yield return sr.High;
                 break;
 
+            case TypeTestExpr tt:
+                yield return tt.Operand;
+                yield return tt.Type;
+                break;
             case CastExpr c:
                 yield return c.Operand;
                 yield return c.Type;
@@ -378,6 +382,9 @@ public static class AstChildren
                 break;
 
             // --- patterns ---
+            case TypePattern tp:
+                yield return tp.Type;
+                break;
             case WildcardPattern:
             case BindingPattern:
             case RestPattern:

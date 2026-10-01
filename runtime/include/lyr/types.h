@@ -32,8 +32,24 @@ typedef struct LyrDesc {
                                     word i of the object (word 0 is the header; its bit stays clear);
                                     for an array, word i of one element */
     const char *name;            /* "module.Type", for backtraces, debuggers and Debug */
-    const void *itables;         /* interface tables (M4) */
+    const void *itables;         /* the type's conformances, a NULL-terminated LyrItable[] (M4 S5) */
 } LyrDesc;
+
+/* One conformance of a concrete type (03 T11): the interface's identity — the address of its
+ * name, one object per interface and program — and the type's table for it. */
+typedef struct LyrItable {
+    const void *iface;
+    const void *vt;
+} LyrItable;
+
+/* `x is Display` on an interface value, and the table a downcast to an interface takes: the
+ * conformance list is short and read rarely, a linear search is the whole machinery. */
+static inline const void *lyr_iface_find(const LyrDesc *desc, const void *iface) {
+    const LyrItable *t = (const LyrItable *)desc->itables;
+    if (t == NULL) return NULL;
+    for (; t->iface != NULL; t++) if (t->iface == iface) return t->vt;
+    return NULL;
+}
 
 /* The header every heap object starts with. */
 typedef struct LyrObj {

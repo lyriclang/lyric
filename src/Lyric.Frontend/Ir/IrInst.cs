@@ -103,6 +103,22 @@ public sealed record MakeInterface(TempId Dest, TempId Value, TypeId Concrete, T
 public sealed record CallVirt(TempId? Dest, TypeId Interface, int Slot, TempId[] Args,
     IrType ReturnType, Span Span) : IrOp(Span);
 
+/// <summary>
+/// <c>x is T</c> (03 T11): does the interface value <paramref name="Value"/> hold a value of
+/// <paramref name="Target"/>? For a class, struct or enum a comparison of the descriptor the
+/// value's table begins with; for an interface a search of the concrete type's conformance list.
+/// The result is a bool.
+/// </summary>
+public sealed record TypeTest(TempId Dest, TempId Value, TypeId Target, Span Span) : IrOp(Span);
+
+/// <summary>
+/// The value behind an interface value, as <paramref name="Target"/> (03 T11): the object for a
+/// class, a copy out of the box for a struct or an enum (04 D12), the value with another table
+/// for an interface. Emitted only where a <see cref="TypeTest"/> or the sema's narrowing proved
+/// the type; it checks nothing.
+/// </summary>
+public sealed record Downcast(TempId Dest, TempId Value, TypeId Target, IrType Result, Span Span) : IrOp(Span);
+
 // Structs. The value semantics live entirely in this one instruction: the lowering places it at
 // every binding point where a struct value is read from an existing location. A freshly built value
 // (newobj, a call result) does not need it, because it belongs to nobody yet.
