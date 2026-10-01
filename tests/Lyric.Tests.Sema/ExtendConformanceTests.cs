@@ -212,14 +212,15 @@ public class ExtendConformanceTests
     }
 
     [Fact]
-    public void Duplicate_extension_method_from_two_blocks_is_ambiguous()
+    public void Duplicate_extension_method_from_two_blocks_is_refused_where_declared()
     {
+        // One method set (04 D2): the second block collides at its declaration, not at a use.
         AssertCode(Diags("""
             struct Vec { x: int }
             extend Vec { fn tag(): int { return 1; } }
             extend Vec { fn tag(): int { return 2; } }
             fn use(v: Vec): int { return v.tag(); }
-            """), "LYR-SEM0044");
+            """), "LYR-SEM0121");
     }
 
     [Fact]
@@ -270,19 +271,20 @@ public class ExtendConformanceTests
             """));
     }
 
-    // --- the orphan rule (SEM0041) ---
+    // --- no orphan rule (03 T7 X3): coherence is whole-program, an extend may stand anywhere ---
 
     [Fact]
-    public void Orphan_extension_is_reported()
+    public void An_extension_of_a_foreign_type_to_a_foreign_interface_is_allowed()
     {
-        // string is a builtin and Show lives in the other module, so neither target nor interface is local.
+        // string is a builtin and Show lives in the other module; Lyric 4 refused this as an
+        // orphan (SEM0041). Whole-program compilation needs no such rule.
         var de = Check(
             ("iface", "pub interface Show { fn show(): string; }"),
             ("main", """
                 import iface { Show };
                 extend string :: [Show] { fn show(): string { return "s"; } }
                 """)).de;
-        AssertCode(de, "LYR-SEM0041");
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics.Select(d => d.Message)));
     }
 
     [Fact]

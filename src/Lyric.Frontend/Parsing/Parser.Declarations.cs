@@ -478,14 +478,15 @@ public sealed partial class Parser
         _buffer.Advance(); // 'struct' / 'class'
         var name = ExpectNamed("LYR-PAR0026", isClass ? "class name" : "struct name");
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
-        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList() : [];
+        string?[]? delegates = null;
+        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList(out delegates, out _) : [];
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open type body");
         var members = ParseTypeMembers();
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close type body");
         var span = Span.Union(start, close.Span);
         return isClass
-            ? new ClassDecl(isPublic, name.Name, generics, interfaces, members, span) { NameSpan = name.Span }
-            : new StructDecl(isPublic, name.Name, generics, interfaces, members, span) { NameSpan = name.Span };
+            ? new ClassDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span }
+            : new StructDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span };
     }
 
     // struct or class body: FieldDecl | FunctionDecl. A field needs a ',', a block-bodied method
@@ -574,7 +575,7 @@ public sealed partial class Parser
         _buffer.Advance(); // 'enum'
         var name = ExpectNamed("LYR-PAR0026", "enum name");
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
-        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList() : [];
+        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open enum body");
 
         var variants = new List<EnumVariant>();
@@ -640,7 +641,7 @@ public sealed partial class Parser
         // 'interface B :: [A]' — B implies its parents: whoever conforms to B conforms to them
         // too. What the list does NOT do the sema explains where it matters; here it is just a
         // type list, shaped like the one on structs. (LYR-PAR0039 rejected this until v1.13.)
-        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList() : [];
+        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
 
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
@@ -656,7 +657,7 @@ public sealed partial class Parser
     {
         _buffer.Advance(); // 'extend'
         var target = ParseType();
-        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList() : [];
+        var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open extend body");
         var methods = new List<FunctionDecl>();
         ParseMethodSequence(methods, allowStatic: true);
@@ -822,14 +823,43 @@ public sealed partial class Parser
         return parameters.ToArray();
     }
 
-    private TypeNode[] ParseInterfaceList()
+    /// <param name="delegates">The field each entry delegates to — <c>Walker by legs</c> (04 D1)
+    /// — by index, <c>null</c> where none; <c>null</c> as a whole when no entry does.</param>
+    /// <param name="bySpan">The span of the first <c>by</c>, for a list that may not carry one.</param>
+    private TypeNode[] ParseInterfaceList(out string?[]? delegates, out Span bySpan)
     {
         _buffer.Advance(); // '::'
         _buffer.Expect(TokenKind.LBracket, "LYR-PAR0030", "expected '[' after '::'");
         var interfaces = new List<TypeNode>();
-        do { interfaces.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
+        List<string?>? fields = null;
+        bySpan = default;
+        do
+        {
+            interfaces.Add(ParseType());
+            string? field = null;
+            if (AtContextual("by"))
+            {
+                var by = _buffer.Advance();
+                if (bySpan == default) bySpan = by.Span;
+                field = ExpectName("LYR-PAR0026", "the field to delegate to");
+            }
+            if (field is not null) fields ??= new List<string?>(Enumerable.Repeat<string?>(null, interfaces.Count - 1));
+            fields?.Add(field);
+        } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
         _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close interface list");
+        delegates = fields?.ToArray();
         return interfaces.ToArray();
+    }
+
+    /// <summary>An interface list where <c>by</c> has no place: an enum, an interface's parents,
+    /// an extend block delegate nothing.</summary>
+    private TypeNode[] ParseInterfaceListWithoutBy()
+    {
+        var interfaces = ParseInterfaceList(out var delegates, out var bySpan);
+        if (delegates is not null)
+            _de.Report("LYR-PAR0047", Severity.Error, bySpan,
+                "'by' delegates a conformance of a struct or a class to one of its fields; it has no place here");
+        return interfaces;
     }
 
     // --- Shared helpers ---

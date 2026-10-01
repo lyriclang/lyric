@@ -27,7 +27,7 @@ public sealed class ExtensionRegistry
             if (!_byTarget.TryGetValue(b.Target, out var list))
                 _byTarget[b.Target] = list = new();
             foreach (var m in b.Methods)
-                list.Add(new ExtensionMethod(m, b.Module));
+                list.Add(new ExtensionMethod(m, b.Module, b));
         }
     }
 
@@ -56,4 +56,9 @@ public sealed class ExtensionBlock
     }
 }
 
-public readonly record struct ExtensionMethod(FunctionSymbol Symbol, ModuleSymbol Module);
+/// <param name="Block">The block that declares it: a conformance block (<c>extend T :: [I]</c>)
+/// scopes its members to the conformance (design/v5/spec/04 D3), an inherent one does not.</param>
+public readonly record struct ExtensionMethod(FunctionSymbol Symbol, ModuleSymbol Module, ExtensionBlock Block)
+{
+    public bool InConformanceBlock => Block.Decl.Interfaces.Length > 0;
+}

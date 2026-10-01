@@ -4735,6 +4735,24 @@ internal sealed class FunctionLowerer
                 return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)),
                     expr);
 
+            // An INTERFACE'S member bound on a concrete receiver — the qualified form 'Walker.walk(d)'
+            // (04 D2 R5) and a member delegated to a field (D1): the sema settled the member on
+            // the interface, and the call goes through that interface's table, where the type's
+            // implementation — own, in a block, a default, a forwarder — stands.
+            case MemberExpr member
+                when _types.RefOf(member) is FunctionSymbol promised
+                     && ReceiverType(member.Target) is NamedRef
+                         { Symbol: { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct
+                             or TypeSymbolKind.Enum } concrete }
+                     && !ReferenceEquals(concrete.Members.LookupLocal(member.Member), promised)
+                     && !BoundToExtension(member)
+                     && _typeTable.InterfaceDeclaring(concrete, promised) is { } declaring:
+            {
+                var into = _typeTable.InterfaceAsDeclared(concrete, declaring, expr.Span);
+                return LowerVirtualCall(member, declaring, expr, into.Type,
+                    LowerExprAs(member.Target, into));
+            }
+
             // An INTERFACE DEFAULT method on a concrete receiver: 'it.isFree()', where 'isFree' belongs
             // to the interface rather than to the struct. Its 'this' is the interface type, so no direct
             // call leads there — the receiver is lifted (mkiface) and then called virtually. The same

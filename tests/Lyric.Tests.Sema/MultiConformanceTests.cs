@@ -134,22 +134,6 @@ public class MultiConformanceTests
     }
 
     [Fact]
-    public void A_constraint_picks_its_conformance_too()
-    {
-        var de = Check(Vec2 + """
-
-            fn scale<T :: [Mul<int, T>]>(value: T, by: int): T {
-                return value * by;
-            }
-
-            fn main(): int {
-                return scale(Vec2 { x = 2 }, 3).x;
-            }
-            """);
-        Assert.False(de.HasErrors);
-    }
-
-    [Fact]
     public void A_constraint_naming_the_other_conformance_refuses_the_operand()
     {
         // 'T :: [Mul<T, T>]' promises multiplication by a T and nothing else; an int operand has

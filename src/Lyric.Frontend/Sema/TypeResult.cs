@@ -73,6 +73,20 @@ public sealed class TypeResult
         if (!entries.Any(e => LyrType.Equal(e.Instance, instance))) entries.Add((instance, impl));
     }
 
+    /// <summary><c>:: [Walker by legs]</c> (04 D1): the field a type delegates an interface's
+    /// members to — the interface and every parent of it. The lowering builds the forwarders
+    /// from it; the checker answers member lookups with it.</summary>
+    private readonly Dictionary<(TypeSymbol, TypeSymbol), (string Field, FieldSymbol Symbol)> _delegations = new();
+
+    public void RecordDelegation(TypeSymbol implementer, TypeSymbol iface, string field, FieldSymbol symbol) =>
+        _delegations[(implementer, iface)] = (field, symbol);
+
+    public string? DelegationOf(TypeSymbol implementer, TypeSymbol iface) =>
+        _delegations.TryGetValue((implementer, iface), out var d) ? d.Field : null;
+
+    public IEnumerable<(TypeSymbol Interface, string Field)> DelegationsOf(TypeSymbol implementer) =>
+        _delegations.Where(e => ReferenceEquals(e.Key.Item1, implementer)).Select(e => (e.Key.Item2, e.Value.Field));
+
     /// <summary>The implementation for one conformance, or <c>null</c> when the name was never
     /// ambiguous and the ordinary lookup answers just as well.</summary>
     public FunctionSymbol? ConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,

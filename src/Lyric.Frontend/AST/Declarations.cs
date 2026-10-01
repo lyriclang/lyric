@@ -128,6 +128,11 @@ public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span S
 // --- type declarations ---
 public sealed record StructDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
+    /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
+    /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
+    public string?[]? Delegates { get; init; }
+
     public required Span NameSpan { get; init; }
 
     public AttributeNode[] Attributes { get; init; } = [];
@@ -135,6 +140,11 @@ public sealed record StructDecl(bool IsPublic, string Name, GenericParam[] Gener
 
 public sealed record ClassDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
+    /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
+    /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
+    public string?[]? Delegates { get; init; }
+
     public required Span NameSpan { get; init; }
 
     public AttributeNode[] Attributes { get; init; } = [];

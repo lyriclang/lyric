@@ -539,6 +539,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_delegated_conformance_keeps_its_by()
+    {
+        var formatted = Format("class Dog :: [Walker by legs,Named] { var legs: Legs }");
+        Assert.Contains(":: [Walker by legs, Named]", formatted);
+    }
+
+    [Fact]
     public void A_named_argument_keeps_its_name()
     {
         var formatted = Format("fn f(): int { return connect(1,port :80, retries:  3); }");

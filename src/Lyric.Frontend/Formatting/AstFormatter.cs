@@ -226,9 +226,9 @@ public sealed class AstFormatter
         ImportDecl d => ImportDoc(d),
         FunctionDecl d => FunctionDoc(d),
         StructDecl d => TypeBodyDoc(Attributes(d.Attributes), d.IsPublic, "struct", d.Name,
-            d.Generics, d.Interfaces, d.Members, d.Span),
+            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
         ClassDecl d => TypeBodyDoc(Attributes(d.Attributes), d.IsPublic, "class", d.Name,
-            d.Generics, d.Interfaces, d.Members, d.Span),
+            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
         EnumDecl d => EnumDoc(d),
         InterfaceDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.IsPublic), Doc.From($"interface {d.Name}"), GenericsDoc(d.Generics),
@@ -371,10 +371,10 @@ public sealed class AstFormatter
     }
 
     private Doc TypeBodyDoc(Doc attributes, bool isPublic, string keyword, string name,
-        GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole)
+        GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole, string?[]? delegates = null)
     {
         var head = Doc.Of(attributes, Pub(isPublic), Doc.From($"{keyword} {name}"),
-            GenericsDoc(generics), InterfaceListDoc(interfaces), Doc.Space);
+            GenericsDoc(generics), InterfaceListDoc(interfaces, delegates), Doc.Space);
 
         var closing = whole.End - 1;
         return BracedDoc(head, members.Length == 0 && !AnyCommentBefore(closing),
@@ -406,11 +406,15 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
-    private Doc InterfaceListDoc(TypeNode[] interfaces) =>
+    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>, 04 D1).</param>
+    private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null) =>
         interfaces.Length == 0
             ? Doc.Nil
             : Doc.Of(Doc.From(" :: ["),
-                Doc.Join(Doc.From(", "), interfaces.Select(TypeDoc).ToArray()), Doc.From("]"));
+                Doc.Join(Doc.From(", "), interfaces.Select((t, i) =>
+                    delegates is not null && i < delegates.Length && delegates[i] is { } field
+                        ? Doc.Of(TypeDoc(t), Doc.From($" by {field}"))
+                        : TypeDoc(t)).ToArray()), Doc.From("]"));
 
     private Doc EnumDoc(EnumDecl decl)
     {

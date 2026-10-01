@@ -1,0 +1,65 @@
+// One method set (04 D2, D3), the qualified call (R5), delegation (D1). Expected stdout:
+//   paths 7 7 7           the static call, the table, the constraint call: one answer
+//   blocks hello hi       two conformance blocks, each reached through its interface's name
+//   by 4 4 walk run       a class delegating to a field; its own member wins; the field swapped at runtime
+//   outer run4            an interface's default runs on the outer type and reaches both
+import std.io { println };
+
+interface Counter {
+    fn count(): int;
+    fn twice(): int { return this.count() * 2; }
+}
+
+class Bag :: [Counter] {
+    var n: int,
+    fn count(): int { return this.n; }
+}
+
+fn viaTable(c: Counter): int { return c.count(); }
+fn viaConstraint<T :: [Counter]>(c: T): int { return c.count(); }
+
+interface Greeter { fn greet(): string; }
+interface Waver { fn greet(): string; }
+
+struct Person { name: string }
+extend Person :: [Greeter] { fn greet(): string { return "hello"; } }
+extend Person :: [Waver] { fn greet(): string { return "hi"; } }
+
+interface Walker {
+    fn walk(): string;
+    fn speed(): int;
+    fn pace(): string { return f"{this.walk()}{this.speed()}"; }
+}
+
+class Legs :: [Walker] {
+    var k: int,
+    fn walk(): string { return "walk"; }
+    fn speed(): int { return this.k; }
+}
+
+class Wheels :: [Walker] {
+    fn walk(): string { return "run"; }
+    fn speed(): int { return 9; }
+}
+
+class Dog :: [Walker by legs] {
+    var legs: Walker,
+    fn speed(): int { return 4; }
+}
+
+fn main(): int {
+    let bag = Bag { n = 7 };
+    println(f"paths {bag.count()} {viaTable(bag)} {viaConstraint(bag)}");
+
+    let p = Person { name = "x" };
+    println(f"blocks {Greeter.greet(p)} {Waver.greet(p)}");
+
+    let dog = Dog { legs = Legs { k = 2 } };
+    let w: Walker = dog;
+    let first = dog.walk();
+    dog.legs = Wheels { };
+    let second = w.walk();
+    println(f"by {dog.speed()} {w.speed()} {first} {second}");
+    println(f"outer {w.pace()}");
+    return 0;
+}

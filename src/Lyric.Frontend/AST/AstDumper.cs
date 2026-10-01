@@ -238,12 +238,12 @@ public static class AstDumper
             case StructDecl n:
                 Line(sb, indent, $"Struct {n.Name}{Vis(n.IsPublic)}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
-                WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb);
+                WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb, n.Delegates);
                 break;
             case ClassDecl n:
                 Line(sb, indent, $"Class {n.Name}{Vis(n.IsPublic)}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
-                WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb);
+                WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb, n.Delegates);
                 break;
             case EnumDecl n:
                 Line(sb, indent, $"Enum {n.Name}{Vis(n.IsPublic)}", n.Span);
@@ -506,10 +506,15 @@ public static class AstDumper
 
     // struct and class share their child order: generics, interfaces, members.
     private static void WriteTypeDeclChildren(GenericParam[] generics, TypeNode[] interfaces, Decl[] members,
-        int indent, StringBuilder sb)
+        int indent, StringBuilder sb, string?[]? delegates = null)
     {
         foreach (var g in generics) Write(g, indent + 1, sb);
-        foreach (var i in interfaces) Write(i, indent + 1, sb);
+        for (var i = 0; i < interfaces.Length; i++)
+        {
+            Write(interfaces[i], indent + 1, sb);
+            if (delegates is not null && i < delegates.Length && delegates[i] is { } field)
+                Line(sb, indent + 2, $"By {field}", interfaces[i].Span);
+        }
         foreach (var m in members) Write(m, indent + 1, sb);
     }
 
