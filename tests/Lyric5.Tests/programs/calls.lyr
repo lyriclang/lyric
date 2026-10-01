@@ -1,0 +1,42 @@
+// Calls (04 D4, D5; 08 Y9): one name with several argument counts, arguments by name, defaults
+// evaluated per call in the callee's scope. Expected stdout:
+//   arity 7 12 60          'of(hex)' and 'of(r, g, b)' — one name, told apart by the count
+//   named 1 2 3            arguments by name, in any order, after the positional ones
+//   default 10 2 3         a default reading an earlier parameter; a middle one skipped by name
+//   params 6 3             a 'params' tail after a positional head
+//   factory 3 4            Point(1, 2) is Point.new(1, 2); Point(4) picks the one-argument factory
+import std.io { println };
+
+struct Color {
+    v: int,
+    static fn of(hex: int): Color { return Color { v = hex }; }
+    static fn of(r: int, g: int, b: int): Color { return Color { v = r * 16 + g * 4 + b }; }
+}
+
+struct Point {
+    x: int,
+    y: int,
+    static fn new(x: int, y: int): Point { return Point { x = x, y = y }; }
+    static fn new(d: int): Point { return Point { x = d, y = d }; }
+}
+
+fn connect(host: int, port: int = 80, retries: int = 3): int { return host + port + retries; }
+fn span(from: int, to: int = from + 10, step: int = to - from): int { return step; }
+fn sum(base: int, params xs: int[]): int {
+    var s = base;
+    for (i in 0..xs.length()) { s = s + xs[i]; }
+    return s;
+}
+
+fn main(): int {
+    println(f"arity {Color.of(7).v} {Color.of(0, 3, 0).v} {Color.of(3, 3, 0).v}");
+    let a = connect(host: 1, port: 0, retries: 0);
+    let b = connect(port: 0, host: 2, retries: 0);
+    let c = connect(3, retries: 0, port: 0);
+    println(f"named {a} {b} {c}");
+    println(f"default {span(5)} {span(5, 7)} {span(5, step: 3)}");
+    println(f"params {sum(1, 2, 3)} {sum(3)}");
+    let p = Point(1, 2);
+    println(f"factory {p.x + p.y} {Point(4).y}");
+    return 0;
+}

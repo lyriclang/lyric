@@ -192,6 +192,16 @@ public sealed class TypeResult
     public void SetTypeArguments(Node call, LyrType[] arguments) =>
         _typeArguments[call] = arguments;
 
+    /// <summary>The arguments of a call that names some of them (04 D5), in PARAMETER order: the
+    /// entry of a parameter the call leaves to its default is <c>null</c>; what overflows into a
+    /// <c>params</c> tail follows the fixed parameters. Absent for a call that names nothing,
+    /// whose arguments stand in parameter order already.</summary>
+    private readonly Dictionary<Node, Expr?[]> _arranged = new(ReferenceEqualityComparer.Instance);
+
+    public void SetArrangedArguments(Node call, Expr?[] arranged) => _arranged[call] = arranged;
+
+    public Expr?[]? ArrangedArgumentsOf(Node call) => _arranged.TryGetValue(call, out var a) ? a : null;
+
     /// <summary>The type arguments of a call; empty when the callee is not generic.</summary>
     public LyrType[] TypeArgumentsOf(Node call) =>
         _typeArguments.TryGetValue(call, out var args) ? args : [];

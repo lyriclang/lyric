@@ -229,7 +229,7 @@ pub fn closeListener(listener: Listener): void {
 
 // ------------------------------------------------------------------------------------- UDP
 
-/// Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `localPort` says
+/// Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `udpLocalPort` says
 /// which. `null` when the address cannot be taken; `bindOrThrow` says why, `AddressInUse`
 /// being the usual answer.
 pub fn bind(host: string, port: int): ?UdpSocket {
@@ -250,7 +250,7 @@ pub fn bindOrThrow(host: string, port: int): UdpSocket throws IoError {
 }
 
 /// The port a UDP endpoint actually holds — the answer to `bind(host, 0)`.
-pub fn localPort(socket: UdpSocket): int {
+pub fn udpLocalPort(socket: UdpSocket): int {
     return netLocalPort(socket as int);
 }
 
@@ -314,6 +314,6 @@ pub fn receiveFromOrThrow(socket: UdpSocket, max: int): Packet throws IoError {
 }
 
 /// Closes a UDP endpoint. Closing twice closes once.
-pub fn close(socket: UdpSocket): void {
+pub fn closeUdp(socket: UdpSocket): void {
     netClose(socket as int);
 }

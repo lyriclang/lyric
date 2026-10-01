@@ -7,9 +7,9 @@ using Xunit;
 namespace Lyric.Tests.Sema;
 
 /// <summary>
-/// What overloading refuses (v3.0). The feature is the second mechanism this language has for
-/// "one name, several types", and it was admitted knowing that; what keeps it from becoming a
-/// place where nobody can predict the answer is the set of rules below.
+/// Overloading by arity and nothing else (design/v5/spec/04 D4): one name may take several
+/// argument COUNTS; two declarations whose counts overlap are a redeclaration, at the
+/// declaration and never at a call. A call counts its arguments and finds one candidate.
 /// </summary>
 public class OverloadTests
 {
@@ -32,18 +32,47 @@ public class OverloadTests
     }
 
     [Fact]
-    public void Two_with_the_same_parameters_are_a_redeclaration()
+    public void Two_of_one_count_are_a_redeclaration()
     {
-        // Even though the results differ: a call site cannot choose by what it gets back, so a
-        // rule that let it would be one nobody could hold in their head.
+        // Different parameter types are no distinction: a call chooses by how many arguments it
+        // passes, never by their types (D4) — one candidate, no ranking.
         var de = Check("""
             fn same(n: int): int { return n; }
-            fn same(n: int): string { return "x"; }
+            fn same(s: string): int { return 0; }
 
             fn main(): int { return 0; }
             """);
         var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0085");
-        Assert.Contains("what they TAKE", error.Message, StringComparison.Ordinal);
+        Assert.Contains("how many arguments", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Counts_that_overlap_through_a_default_are_a_redeclaration()
+    {
+        // 'f(a)' and 'f(a, b = 0)' both take one argument: the error stands at the declaration,
+        // where the overlap is, not at a call that happens to pass one.
+        var de = Check("""
+            fn f(a: int): int { return a; }
+            fn f(a: int, b: int = 0): int { return a + b; }
+
+            fn main(): int { return 0; }
+            """);
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0085");
+        Assert.Contains("taking 1 argument", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Counts_that_differ_are_one_name()
+    {
+        var de = Check("""
+            fn of(hex: int): int { return hex; }
+            fn of(r: int, g: int, b: int): int { return r + g + b; }
+            fn pad(s: string, width: int = 4): int { return width; }
+            fn pad(s: string, width: int, left: bool, fill: string): int { return width; }
+
+            fn main(): int { return of(1) + of(1, 2, 3) + pad("x") + pad("x", 1, true, " "); }
+            """);
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics.Select(d => d.Message)));
     }
 
     [Fact]
@@ -67,28 +96,28 @@ public class OverloadTests
     {
         var de = Check("""
             fn code(n: int): int { return 1; }
-            fn code(s: string): int { return 2; }
+            fn code(a: int, b: int, c: int): int { return 2; }
 
-            fn main(): int { return code(true); }
+            fn main(): int { return code(1, 2); }
             """);
         var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0087");
-        Assert.Contains("(bool)", error.Message, StringComparison.Ordinal);
+        Assert.Contains("takes 2 argument", error.Message, StringComparison.Ordinal);
         Assert.NotNull(error.Notes);
         Assert.Equal(2, error.Notes!.Count);
     }
 
     [Fact]
-    public void A_call_two_candidates_fit_equally_is_ambiguous()
+    public void Type_parameters_separate_nothing_either()
     {
-        // Two type parameters take the argument equally well, and nothing separates them.
+        // 4.x ranked 'pick<T>(a: T, b: int)' against 'pick<U>(a: int, b: U)' and found the call
+        // ambiguous; the two take two arguments each, and that is the whole question now.
         var de = Check("""
             fn pick<T>(a: T, b: int): int { return 1; }
             fn pick<U>(a: int, b: U): int { return 2; }
 
-            fn main(): int { return pick(1, 2); }
+            fn main(): int { return 0; }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0086");
-        Assert.Contains("ambiguous", error.Message, StringComparison.Ordinal);
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0085");
     }
 
     [Fact]
@@ -110,8 +139,8 @@ public class OverloadTests
     [Fact]
     public void A_function_beside_a_type_of_one_name_is_still_a_collision()
     {
-        // Only FUNCTIONS may share a name: they are told apart by their parameters, and a type
-        // has none.
+        // Only FUNCTIONS may share a name: they are told apart by how many arguments they take,
+        // and a type takes none.
         var de = Check("""
             fn thing(): int { return 0; }
             struct thing { x: int, }
@@ -138,12 +167,10 @@ public class OverloadTests
     }
 
     [Fact]
-    public void A_module_qualified_call_sees_the_whole_overload_set()
+    public void A_module_qualified_call_binds_through_the_alias()
     {
-        // §4.3a separates by the parameter list HOWEVER the name is reached. The alias route
-        // used to bind the first member only — `net.localPort(udp)` was refused with "cannot
-        // assign 'UdpSocket' to 'Listener'" while the selective import chose correctly, which
-        // made overload resolution depend on the import style.
+        // The alias route and the selective import reach the same member. (Through 4.x the UDP
+        // 'localPort'/'close' were the TCP names' second members by type; D4 gave them names.)
         var de = Check("""
             import std.io.net as net;
 
@@ -152,8 +179,8 @@ public class OverloadTests
                 if (sock == null) {
                     return 1;
                 }
-                let p = net.localPort(sock);
-                net.close(sock);
+                let p = net.udpLocalPort(sock);
+                net.closeUdp(sock);
                 return if (p > 0) 0 else 1;
             }
             """);

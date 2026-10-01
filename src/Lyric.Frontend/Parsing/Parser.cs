@@ -361,20 +361,20 @@ public sealed partial class Parser
                     var typeArguments = ParseTypeArguments(out _);
                     _buffer.Expect(TokenKind.LParen, "LYR-PAR0008",
                         "expected '(' after type arguments");
-                    var typedArgs = ParseArguments();
+                    var typedArgs = ParseArguments(out var typedNames);
                     var typedClose = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008",
                         "expected ')' to close call");
                     operand = new CallExpr(operand, typedArgs,
-                        Span.Union(operand.Span, typedClose.Span), typeArguments);
+                        Span.Union(operand.Span, typedClose.Span), typeArguments) { ArgumentNames = typedNames };
                     break;
                 }
 
                 case TokenKind.LParen:
                 {
                     _buffer.Advance();
-                    var args = ParseArguments();
+                    var args = ParseArguments(out var names);
                     var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close call");
-                    operand = new CallExpr(operand, args, Span.Union(operand.Span, close.Span));
+                    operand = new CallExpr(operand, args, Span.Union(operand.Span, close.Span)) { ArgumentNames = names };
                     break;
                 }
                 case TokenKind.Inc:
@@ -513,7 +513,7 @@ public sealed partial class Parser
                 if (_buffer.Check(TokenKind.LParen))
                 {
                     _buffer.Advance();
-                    var args = ParseArguments();
+                    var args = ParseArguments(out _);
                     var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close attribute arguments");
                     return new AtIdentifierExpr(name, args, Span.Union(cur.Span, close.Span));
                 }
@@ -592,16 +592,31 @@ public sealed partial class Parser
         return new ArrayLitExpr(elems.ToArray(), Span.Union(open.Span, close.Span));
     }
 
-    private Expr[] ParseArguments()
+    /// <param name="names">The name each argument was written with, or <c>null</c> for every
+    /// positional one — and <c>null</c> as a whole when none was named.</param>
+    private Expr[] ParseArguments(out string?[]? names)
     {
         var args = new List<Expr>();
+        List<string?>? written = null;
+        names = null;
         if (_buffer.Check(TokenKind.RParen)) return args.ToArray();
         while (true)
         {
+            // 'host: "h"' — an argument by its parameter's name (04 D5, 08 Y9): ':' after an
+            // identifier opens nothing else inside a call's parentheses.
+            string? name = null;
+            if (_buffer.Check(TokenKind.Identifier) && _buffer.Peek(1).TokenKind == TokenKind.Colon)
+            {
+                name = _sm.Slice(_buffer.Advance().Span).ToString();
+                _buffer.Advance();
+            }
             args.Add(ParseSubExpr());
+            if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
+            written?.Add(name);
             if (!_buffer.Match(TokenKind.Comma)) break;
             if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
         }
+        names = written?.ToArray();
         return args.ToArray();
     }
 

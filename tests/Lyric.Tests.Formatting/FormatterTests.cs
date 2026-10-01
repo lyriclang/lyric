@@ -539,6 +539,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_named_argument_keeps_its_name()
+    {
+        var formatted = Format("fn f(): int { return connect(1,port :80, retries:  3); }");
+        Assert.Contains("connect(1, port: 80, retries: 3)", formatted);
+    }
+
+    [Fact]
     public void An_instantiated_function_and_a_placeholder_keep_their_spelling()
     {
         // 'ident<int>' as a value and '_' among the type arguments (03 T8, T17) are printed as

@@ -66,8 +66,10 @@ internal static class NameMangling
     /// </summary>
     public static string OverloadSuffix(Param[] parameters, int ordinal)
     {
-        var written = string.Join(", ", parameters.Select(p => Written(p.Type)));
-        return ordinal == 0 ? $"({written})" : $"({written})#{ordinal}";
+        // The count and nothing else (design/v5/spec/04 D4, 01 C4): overloads differ in it by
+        // the declaration rule, so the name 'show/1' beside 'show/2' is stable and readable.
+        var count = parameters.Length.ToString();
+        return ordinal == 0 ? $"/{count}" : $"/{count}#{ordinal}";
     }
 
     /// <summary>A written type as one short token. Not a full printer: it separates signatures,

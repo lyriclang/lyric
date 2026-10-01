@@ -304,10 +304,11 @@ public sealed class TypeChecker
     /// <summary>
     /// The two rules a set of same-named functions has to keep.
     ///
-    /// <para>ONE: they must be told apart by their parameters, because that is the only thing a
-    /// call site offers. Two with the same list are a redeclaration however their results differ —
-    /// a call cannot choose by what it gets back, and a rule that sometimes could would be one
-    /// nobody can hold in their head (LYR-SEM0085).</para>
+    /// <para>ONE: they are told apart by HOW MANY arguments they take and by nothing else
+    /// (design/v5/spec/04 D4): a call counts its arguments and finds one candidate — no ranking,
+    /// no conversion rank, no ambiguity at the call, no interaction with inference. Two whose
+    /// argument counts overlap for any number — defaults widen a count to a range — are a
+    /// redeclaration (LYR-SEM0085), at the declaration and never at a call.</para>
     ///
     /// <para>TWO: an INTERFACE member may not be overloaded at all. A method table holds one
     /// function per slot and the slot is found by name; two of a name would need two slots, and
@@ -338,14 +339,19 @@ public sealed class TypeChecker
 
             for (var i = 0; i < overloads.Count; i++)
                 for (var j = i + 1; j < overloads.Count; j++)
-                    if (SameParameters(overloads[i], overloads[j]))
-                        _de.Report("LYR-SEM0085", Severity.Error,
-                            overloads[j].Declaration?.Span ?? default,
-                            $"'{fn.Name}' is declared twice in {what} with the same parameters "
-                            + $"({DisplayParameters(overloads[j])}) — overloads are told apart by "
-                            + "what they TAKE, never by what they give back",
-                            new DiagnosticNote(overloads[i].Declaration?.Span ?? default,
-                                "the other one is here"));
+                {
+                    var (aMin, aMax) = ArityOf(overloads[i]);
+                    var (bMin, bMax) = ArityOf(overloads[j]);
+                    if (aMin > bMax || bMin > aMax) continue;
+                    var shared = Math.Max(aMin, bMin);
+                    _de.Report("LYR-SEM0085", Severity.Error,
+                        overloads[j].Declaration?.Span ?? default,
+                        $"'{fn.Name}' is declared twice in {what} taking {shared} argument(s) — "
+                        + "overloads are told apart by how many arguments they take, never by their "
+                        + "types; give the two distinct names",
+                        new DiagnosticNote(overloads[i].Declaration?.Span ?? default,
+                            $"the other one takes {DisplayArity(overloads[i])}"));
+                }
         }
     }
 
@@ -2095,49 +2101,32 @@ public sealed class TypeChecker
         // named twice.
         if (candidates.Count > 1) candidates = candidates.Distinct().ToArray();
 
-        // Trial types, quietly: typing an argument against the WRONG candidate reports mismatches
-        // the program does not have. The winner is checked again for real by the caller.
-        var argumentTypes = new LyrType?[call.Arguments.Length];
-        using (_de.Mute())
-            for (var i = 0; i < call.Arguments.Length; i++)
-                if (call.Arguments[i] is not LambdaExpr)
-                    argumentTypes[i] = CheckExpr(call.Arguments[i], scope);
-
-        // An argument that does not type at all was silenced by the mute, and its error is the one
-        // the reader needs — not "no overload takes (<error>)", which describes a consequence and
-        // hides the cause. Check those again out loud and stop: the poison rule, which is why
-        // nothing is reported here afterwards.
-        if (argumentTypes.Any(t => t is not null && t.IsError))
-        {
-            for (var i = 0; i < call.Arguments.Length; i++)
-                if (argumentTypes[i] is { IsError: true })
-                    CheckExpr(call.Arguments[i], scope);
-            return null;
-        }
-
-        List<(FunctionSymbol Fn, OverloadFit Fit)> fitting = new();
-        foreach (var candidate in candidates)
-            if (FitOf(candidate, call, argumentTypes) is { } fit)
-                fitting.Add((candidate.Fn, fit));
+        // The count decides (04 D4), and the declaration rule made the count decisive: two
+        // candidates of one scope never take the same number. Names decide nothing (D5 F7).
+        var count = call.Arguments.Length;
+        var fitting = candidates.Where(c => Takes(c.Fn, count)).ToList();
 
         if (fitting.Count == 0)
         {
             _de.Report("LYR-SEM0087", Severity.Error, call.Span,
-                $"no '{candidates[0].Fn.Name}' takes ({DisplayArguments(call, argumentTypes)})",
+                $"no '{candidates[0].Fn.Name}' takes {count} argument(s)",
                 candidates.Select(c => new DiagnosticNote(c.Fn.Declaration?.Span ?? default,
-                    $"this one takes ({DisplayParameters(c.Fn)})")).ToArray());
+                    $"this one takes {DisplayArity(c.Fn)}")).ToArray());
             return null;
         }
 
-        fitting.Sort((a, b) => a.Fit.CompareTo(b.Fit));
-        if (fitting.Count > 1 && fitting[0].Fit.CompareTo(fitting[1].Fit) == 0)
+        // An own member and an extension of one count: the member, as since extensions exist.
+        // 04 D2 makes the pair a declaration error (M4 S3); until then the member wins.
+        if (fitting.Count > 1 && fitting.Any(f => !f.FromExtension))
+            fitting = fitting.Where(f => !f.FromExtension).ToList();
+
+        if (fitting.Count > 1)
         {
             _de.Report("LYR-SEM0086", Severity.Error, call.Span,
-                $"'{candidates[0].Fn.Name}' is ambiguous for ({DisplayArguments(call, argumentTypes)})"
-                + " — no candidate fits better than another",
-                fitting.Where(f => f.Fit.CompareTo(fitting[0].Fit) == 0)
-                    .Select(f => new DiagnosticNote(f.Fn.Declaration?.Span ?? default,
-                        $"this one takes ({DisplayParameters(f.Fn)})")).ToArray());
+                $"'{candidates[0].Fn.Name}' is ambiguous for {count} argument(s): "
+                + $"{fitting.Count} declarations take that many",
+                fitting.Select(f => new DiagnosticNote(f.Fn.Declaration?.Span ?? default,
+                    $"this one takes {DisplayArity(f.Fn)}")).ToArray());
             return null;
         }
 
@@ -2213,80 +2202,11 @@ public sealed class TypeChecker
 
         // MemberSpan stays invalid, as on the operator desugar: the text writes no 'new'.
         var factory = new MemberExpr(call.Callee, "new", IsOptional: false, call.Callee.Span) { MemberSpan = default };
-        var meant = new CallExpr(factory, call.Arguments, call.Span);
+        var meant = new CallExpr(factory, call.Arguments, call.Span) { ArgumentNames = call.ArgumentNames };
         var result = CheckExpr(meant, scope, expected);
         _result.DesugarOperator(call, meant);
         return result;
     }
-
-    /// <summary>How well a candidate fits, as a tuple that orders: fewer conversions first, then
-    /// fewer type parameters, then the one that needs no defaults, then the one that is not
-    /// variadic. Lower is better, and equal is ambiguous.</summary>
-    private readonly record struct OverloadFit(
-        int Converted, int Generic, int Defaulted, int Variadic, int Extension)
-        : IComparable<OverloadFit>
-    {
-        public int CompareTo(OverloadFit other)
-        {
-            if (Converted != other.Converted) return Converted - other.Converted;
-            if (Generic != other.Generic) return Generic - other.Generic;
-            if (Defaulted != other.Defaulted) return Defaulted - other.Defaulted;
-            if (Variadic != other.Variadic) return Variadic - other.Variadic;
-
-            // Last, so it decides nothing a parameter could decide: an extension that fits BETTER
-            // still wins, and only a tie goes to the type's own member.
-            return Extension - other.Extension;
-        }
-    }
-
-    /// <summary>Does this candidate take these arguments, and how exactly?</summary>
-    private OverloadFit? FitOf(OverloadCandidate candidate, CallExpr call, LyrType?[] argumentTypes)
-    {
-        if (candidate.Fn.Declaration is not FunctionDecl decl) return null;
-        var fn = FnTypeOf(candidate.Fn);
-        var parameters = decl.Parameters;
-        var variadic = parameters.Length > 0 && parameters[^1].IsParams;
-
-        var required = parameters.Count(p => p.Default is null) - (variadic ? 1 : 0);
-        if (argumentTypes.Length < required) return null;
-        if (!variadic && argumentTypes.Length > parameters.Length) return null;
-
-        var converted = 0;
-        var generic = 0;
-        for (var i = 0; i < argumentTypes.Length; i++)
-        {
-            if (argumentTypes[i] is not { } argument) continue;   // a lambda: no vote
-
-            var wanted = ParameterAt(fn, parameters, variadic, i);
-            if (wanted is null) return null;
-
-            // A type parameter takes anything, and takes it LAST: a candidate written for this
-            // exact type is more specific than one written for every type.
-            if (ContainsTypeParam(wanted)) { generic++; continue; }
-
-            if (LyrType.Equal(argument, wanted)) continue;
-            if (!IsAssignable(call.Arguments[i], argument, wanted)) return null;
-            converted++;
-        }
-
-        return new OverloadFit(converted, generic,
-            argumentTypes.Length < parameters.Length ? 1 : 0, variadic ? 1 : 0,
-            candidate.FromExtension ? 1 : 0);
-    }
-
-    /// <summary>The parameter an argument lands in: the one at its index, or the ELEMENT type of a
-    /// variadic tail once the fixed parameters are used up.</summary>
-    private static LyrType? ParameterAt(FnType fn, Param[] parameters, bool variadic, int index)
-    {
-        if (index < fn.Parameters.Length && (!variadic || index < parameters.Length - 1))
-            return fn.Parameters[index];
-        if (!variadic) return null;
-        return fn.Parameters[^1] is ArrayOf tail ? tail.Element : null;
-    }
-
-    private string DisplayArguments(CallExpr call, LyrType?[] argumentTypes) =>
-        string.Join(", ", argumentTypes.Select((t, i) =>
-            t is null ? (call.Arguments[i] is LambdaExpr ? "a lambda" : "?") : TypeFacts.Display(t)));
 
     private string DisplayParameters(FunctionSymbol candidate) =>
         string.Join(", ", FnTypeOf(candidate).Parameters.Select(TypeFacts.Display));
@@ -3426,8 +3346,10 @@ public sealed class TypeChecker
 
         var fsym = TargetSymbol(call.Callee) as FunctionSymbol;
         var decl = fsym?.Declaration as FunctionDecl;
-        var args = call.Arguments;
-        var argTypes = new LyrType[args.Length];
+        // In parameter order, a named argument where its name says (04 D5); a hole is a parameter
+        // the call leaves to its default.
+        var args = ArrangeArguments(call, decl);
+        var argTypes = new LyrType?[args.Length];
 
         // Phase A: non-lambdas, eagerly — with the declared parameter type as the context, the same
         // one phase C gives a lambda. It is what lets 'f(Opt.Some(5))' name its instance: without
@@ -3438,8 +3360,8 @@ public sealed class TypeChecker
         // type parameter, and offering 'Opt<T>' as the expected type would fix the instance to
         // something the inference is supposed to determine from this very argument.
         for (var i = 0; i < args.Length; i++)
-            if (args[i] is not LambdaExpr)
-                argTypes[i] = CheckExpr(args[i], scope, ConcreteExpectation(fn, decl, i, args[i]));
+            if (args[i] is { } given && given is not LambdaExpr)
+                argTypes[i] = CheckExpr(given, scope, ConcreteExpectation(fn, decl, i, given));
 
         // Phase B: type arguments from the eagerly typed arguments.
         Dictionary<GenericParamSymbol, LyrType>? map = null;
@@ -3482,17 +3404,17 @@ public sealed class TypeChecker
 
             var n = Math.Min(fn.Parameters.Length, args.Length);
             for (var i = 0; i < n; i++)
-                if (args[i] is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i], map, args[i].Span);
+                if (args[i] is { } given && given is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
             substituted = (FnType)Substitute(fn, map);
         }
 
         // Phase C: lambdas with context; their actual type binds the type arguments still open.
         for (var i = 0; i < args.Length; i++)
         {
-            if (args[i] is not LambdaExpr) continue;
-            argTypes[i] = CheckExpr(args[i], scope, ExpectedParamAt(substituted, decl, i, args[i]));
+            if (args[i] is not LambdaExpr lambda) continue;
+            argTypes[i] = CheckExpr(lambda, scope, ExpectedParamAt(substituted, decl, i, lambda));
             if (map is not null && i < fn.Parameters.Length)
-                UnifyInfer(Substitute(fn.Parameters[i], map), argTypes[i], map, args[i].Span);
+                UnifyInfer(Substitute(fn.Parameters[i], map), argTypes[i]!, map, lambda.Span);
         }
         if (map is not null)
         {
@@ -3512,7 +3434,7 @@ public sealed class TypeChecker
             //
             // Not reported when an argument was already faulty: the cause is reported then, and a
             // second line about a type argument would be follow-up noise.
-            if (!argTypes.Any(ContainsError))
+            if (!argTypes.Any(t => t is not null && ContainsError(t)))
                 foreach (var generic in fsym.Generics)
                     if (!map.ContainsKey(generic))
                         _de.Report("LYR-SEM0060", Severity.Error, call.Span,
@@ -3526,7 +3448,7 @@ public sealed class TypeChecker
                 .ToArray());
         }
 
-        CheckCallArgs(call, substituted, argTypes, decl);
+        CheckCallArgs(call, substituted, args, argTypes, decl);
 
         // If the receiver was optional the result is too, collapsed, because optionals do not nest.
         return optionalCall ? Optionalized(substituted.Return) : substituted.Return;
@@ -3591,29 +3513,133 @@ public sealed class TypeChecker
     private static bool PassesArrayDirectly(LyrType[] argTypes, int fixedCount, LyrType arrayType) =>
         argTypes.Length == fixedCount + 1 && LyrType.Equal(argTypes[fixedCount], arrayType);
 
-    private void CheckCallArgs(CallExpr call, FnType fn, LyrType[] argTypes, FunctionDecl? decl)
+    /// <param name="args">In parameter order (<see cref="ArrangeArguments"/>); a <c>null</c> is a
+    /// parameter the call leaves to its default.</param>
+    private void CheckCallArgs(CallExpr call, FnType fn, Expr?[] args, LyrType?[] argTypes, FunctionDecl? decl)
     {
         var ps = decl?.Parameters;
         var variadic = ps is { Length: > 0 } && ps[^1].IsParams;
         var fixedCount = variadic ? ps!.Length - 1 : ps?.Length ?? fn.Parameters.Length;
         var minRequired = ps is null ? fn.Parameters.Length : ps.Take(fixedCount).Count(p => p.Default is null);
+        var given = args.Count(a => a is not null);
 
-        if (argTypes.Length < minRequired || (!variadic && argTypes.Length > fn.Parameters.Length))
+        // What the call leaves out: by name when it names any argument — then a hole is a
+        // parameter, and the parameter is what to say — by count otherwise, as a positional
+        // call sees it.
+        if (call.ArgumentNames is not null && ps is not null)
+        {
+            for (var i = 0; i < fixedCount && i < args.Length; i++)
+                if (args[i] is null && ps[i].Default is null)
+                    _de.Report("LYR-SEM0014", Severity.Error, call.Span,
+                        $"call gives no argument for '{ps[i].Name}', which has no default");
+        }
+        else if (given < minRequired || (!variadic && given > fn.Parameters.Length))
             _de.Report("LYR-SEM0014", Severity.Error, call.Span,
-                $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {argTypes.Length}");
+                $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}");
 
-        for (var i = 0; i < argTypes.Length && i < fixedCount && i < fn.Parameters.Length; i++)
-            CheckAssignable(call.Arguments[i], argTypes[i], fn.Parameters[i], call.Arguments[i].Span);
+        for (var i = 0; i < args.Length && i < fixedCount && i < fn.Parameters.Length; i++)
+            if (args[i] is { } a) CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span);
 
         if (variadic && fn.Parameters[^1] is ArrayOf elem)
         {
             // A ready-made array passes through as a whole, or one variadic function could not
             // delegate to another. See PassesArrayDirectly.
-            if (PassesArrayDirectly(argTypes, fixedCount, fn.Parameters[^1])) return;
+            var typed = argTypes.Select(t => t ?? LyrType.Error).ToArray();
+            if (PassesArrayDirectly(typed, fixedCount, fn.Parameters[^1])) return;
 
-            for (var i = fixedCount; i < argTypes.Length; i++)
-                CheckAssignable(call.Arguments[i], argTypes[i], elem.Element, call.Arguments[i].Span);
+            for (var i = fixedCount; i < args.Length; i++)
+                if (args[i] is { } a) CheckAssignable(a, argTypes[i]!, elem.Element, a.Span);
         }
+    }
+
+    /// <summary>
+    /// The arguments of a call in PARAMETER order (design/v5/spec/04 D5): the positional ones
+    /// first, in their order, then each named one where its name says. A name decides nothing
+    /// about WHICH function is called — the count does (D4) — and names every parameter but a
+    /// <c>params</c> tail; a positional argument after a named one, a name given twice or for a
+    /// parameter already set, and a name no parameter has are refused (<c>LYR-SEM0119</c>). The
+    /// arrangement is recorded for the lowering, which materializes a hole from its default.
+    /// </summary>
+    private Expr?[] ArrangeArguments(CallExpr call, FunctionDecl? decl)
+    {
+        if (call.ArgumentNames is not { } names) return call.Arguments;
+        if (decl is null)
+        {
+            _de.Report("LYR-SEM0119", Severity.Error, call.Span,
+                "a named argument needs a declared function to name a parameter of — a function value has none");
+            return call.Arguments;
+        }
+
+        var parameters = decl.Parameters;
+        var variadic = parameters.Length > 0 && parameters[^1].IsParams;
+        var fixedCount = variadic ? parameters.Length - 1 : parameters.Length;
+        var arranged = new List<Expr?>(new Expr?[fixedCount]);
+        var positional = 0;
+        var namedSeen = false;
+        for (var i = 0; i < call.Arguments.Length; i++)
+        {
+            var argument = call.Arguments[i];
+            if (i >= names.Length || names[i] is not { } name)
+            {
+                if (namedSeen)
+                    _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
+                        "a positional argument after a named one — the named ones come last");
+                if (positional < fixedCount) arranged[positional] = argument;
+                else arranged.Add(argument);
+                positional++;
+                continue;
+            }
+
+            namedSeen = true;
+            var index = Array.FindIndex(parameters, p => p.Name == name);
+            if (index < 0)
+            {
+                _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
+                    $"'{decl.Name}' has no parameter '{name}' — its parameters are "
+                    + string.Join(", ", parameters.Select(p => $"'{p.Name}'")));
+                continue;
+            }
+            if (variadic && index == parameters.Length - 1)
+            {
+                _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
+                    $"'{name}' is the 'params' parameter, which takes the rest and is not named");
+                continue;
+            }
+            if (arranged[index] is not null)
+            {
+                _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
+                    index < positional
+                        ? $"'{name}' is already set by the argument at position {index + 1}"
+                        : $"'{name}' is given twice");
+                continue;
+            }
+            arranged[index] = argument;
+        }
+
+        var result = arranged.ToArray();
+        _result.SetArrangedArguments(call, result);
+        return result;
+    }
+
+    private static (int Min, int Max) ArityOf(FunctionSymbol fn)
+    {
+        if (fn.Declaration is not FunctionDecl decl) return (0, int.MaxValue);
+        var variadic = decl.Parameters.Length > 0 && decl.Parameters[^1].IsParams;
+        var fixedCount = variadic ? decl.Parameters.Length - 1 : decl.Parameters.Length;
+        var min = decl.Parameters.Take(fixedCount).Count(p => p.Default is null);
+        return (min, variadic ? int.MaxValue : fixedCount);
+    }
+
+    private static bool Takes(FunctionSymbol fn, int count)
+    {
+        var (min, max) = ArityOf(fn);
+        return count >= min && count <= max;
+    }
+
+    private static string DisplayArity(FunctionSymbol fn)
+    {
+        var (min, max) = ArityOf(fn);
+        return max == int.MaxValue ? $"{min} or more" : min == max ? $"{min}" : $"{min}–{max}";
     }
 
     /// <param name="expected">Needed for an enum variant without written type arguments only;

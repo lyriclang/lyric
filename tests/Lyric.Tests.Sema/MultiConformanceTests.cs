@@ -48,21 +48,6 @@ public class MultiConformanceTests
         """;
 
     [Fact]
-    public void Two_conformances_with_two_implementations_are_accepted()
-    {
-        var de = Check(Vec2 + """
-
-            fn main(): int {
-                let a = Vec2 { x = 2 };
-                let b = a * a;
-                let c = a * 3;
-                return b.x + c.x;
-            }
-            """);
-        Assert.False(de.HasErrors);
-    }
-
-    [Fact]
     public void A_conformance_without_a_matching_implementation_is_reported()
     {
         // Two conformances, one 'mul'. The name is there, so this is not "does not implement" but

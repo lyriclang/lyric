@@ -3754,7 +3754,7 @@
           "Kind": "Function",
           "Name": "bind",
           "Signature": "pub fn bind(host: string, port: int): ?UdpSocket",
-          "Doc": "Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `localPort` says\nwhich. `null` when the address cannot be taken; `bindOrThrow` says why, `AddressInUse`\nbeing the usual answer.",
+          "Doc": "Binds a UDP endpoint on `host:port`. Port 0 asks the OS for a free one — `udpLocalPort` says\nwhich. `null` when the address cannot be taken; `bindOrThrow` says why, `AddressInUse`\nbeing the usual answer.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/io/net.lyr",
@@ -3774,8 +3774,8 @@
         },
         {
           "Kind": "Function",
-          "Name": "localPort",
-          "Signature": "pub fn localPort(socket: UdpSocket): int",
+          "Name": "udpLocalPort",
+          "Signature": "pub fn udpLocalPort(socket: UdpSocket): int",
           "Doc": "The port a UDP endpoint actually holds — the answer to `bind(host, 0)`.",
           "Members": [],
           "Source": {
@@ -3829,8 +3829,8 @@
         },
         {
           "Kind": "Function",
-          "Name": "close",
-          "Signature": "pub fn close(socket: UdpSocket): void",
+          "Name": "closeUdp",
+          "Signature": "pub fn closeUdp(socket: UdpSocket): void",
           "Doc": "Closes a UDP endpoint. Closing twice closes once.",
           "Members": [],
           "Source": {

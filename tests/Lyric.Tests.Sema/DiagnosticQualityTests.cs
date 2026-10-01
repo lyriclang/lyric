@@ -169,11 +169,11 @@ public class DiagnosticQualityTests
     }
 
     /// <summary>
-    /// The control: a REAL ambiguity is still one. The deduplication must not make two different
-    /// functions look like one.
+    /// The control: two DIFFERENT functions of one count are still refused — at the declaration
+    /// (04 D4), where the overlap is. The deduplication must not make them look like one.
     /// </summary>
     [Fact]
-    public void Two_different_functions_are_still_ambiguous()
+    public void Two_different_functions_of_one_count_are_refused()
     {
         var de = Check("""
             fn take(x: int, y: int64): int { return 1; }
@@ -181,7 +181,7 @@ public class DiagnosticQualityTests
             fn main(): int { return take(1, 1); }
             """);
 
-        Assert.Contains(de.Diagnostics, d => d.Code is "LYR-SEM0086" or "LYR-SEM0087");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0085");
     }
 
     // ---------------------------------------------------------- a parameter declared twice
