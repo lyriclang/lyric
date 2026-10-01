@@ -1,0 +1,1 @@
+pub sealed interface Shape :: [Display] { fn area(): int; }

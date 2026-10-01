@@ -546,6 +546,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_sealed_interface_keeps_its_word()
+    {
+        var formatted = Format("pub   sealed   interface Shape { fn area(): int; }");
+        Assert.Contains("pub sealed interface Shape", formatted);
+    }
+
+    [Fact]
     public void A_type_test_and_a_type_pattern_keep_their_spelling()
     {
         var formatted = Format("fn f(s: Shape): int { if (s is Circle&&s.r>0) { return s.r; } return match (s) { c:Circle => c.r, _:Rect => 2, _ => 0 }; }");

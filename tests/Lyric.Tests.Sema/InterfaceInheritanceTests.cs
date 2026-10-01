@@ -203,8 +203,11 @@ public class InterfaceInheritanceTests
         Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
     }
 
+    // Through S5a a Labeled VALUE did not widen into Named — only concrete types implied. With
+    // 04 D10 the child interface value IS a parent value, as a coercion (SealedTests pins the
+    // limits: up the chain only).
     [Fact]
-    public void An_interface_value_does_not_convert_to_the_parents_type()
+    public void An_interface_value_converts_to_the_parents_type()
     {
         var de = Check(Chain +
             """
@@ -216,7 +219,7 @@ public class InterfaceInheritanceTests
                 return 0;
             }
             """);
-        Assert.True(de.HasErrors, "a Labeled VALUE must not widen into Named — only concrete types imply");
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
     }
 
     // --- shape rules ---

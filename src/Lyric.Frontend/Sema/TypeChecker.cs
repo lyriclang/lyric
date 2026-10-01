@@ -426,6 +426,7 @@ public sealed class TypeChecker
                 break;
             case InterfaceDecl i:
                 CheckInterfaceParents(i, module);
+                RequireSealedInModule(i.Interfaces, module, i.Name);
                 // An interface's members are public always (design/v5/spec/04 D14): a conformance
                 // is visible wherever the type and the interface are, and a member nobody could
                 // call through the interface would be no member of it. 'pub' says nothing here,
@@ -852,6 +853,54 @@ public sealed class TypeChecker
     private bool DeclaredInModule(TypeSymbol ts, ModuleSymbol module) =>
         ReferenceEquals(module.Members.LookupLocal(ts.Name), ts);
 
+    private static bool IsSealed(TypeSymbol iface) => iface.Declaration is InterfaceDecl { IsSealed: true };
+
+    /// <summary>
+    /// A sealed interface's conformers stand in the module that declares it (04 D8) — a type, a
+    /// conformance block, a child interface alike; the set is closed there, and a match of type
+    /// patterns over it may rely on that.
+    /// </summary>
+    private void RequireSealedInModule(TypeNode[] interfaces, ModuleSymbol module, string name)
+    {
+        foreach (var node in interfaces)
+            foreach (var (iface, _) in ClosureOfNode(node))
+                if (IsSealed(iface) && !DeclaredInModule(iface, module))
+                    _de.Report("LYR-SEM0132", Severity.Error, NodeSpan(node),
+                        $"'{iface.Name}' is sealed: its conformers stand in the module that declares it, and '{name}' does not");
+    }
+
+    /// <summary>The conformers of a sealed interface: the structs, classes and enums of its module
+    /// that reach it, directly or through a parent, in their own list or in a conformance block
+    /// of that module.</summary>
+    private IEnumerable<TypeSymbol> SealedConformers(TypeSymbol iface)
+    {
+        var module = _comp.Modules.FirstOrDefault(m => DeclaredInModule(iface, m));
+        if (module is null) yield break;
+        bool Reaches(TypeNode node) => ClosureOfNode(node).Any(p => ReferenceEquals(p.iface, iface));
+        var seen = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+        foreach (var symbol in module.Members.Symbols)
+            if (symbol is TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum } ts
+                && DeclaredInModule(ts, module) && DeclaredInterfaceNodes(ts).Any(Reaches) && seen.Add(ts))
+                yield return ts;
+        foreach (var block in _comp.Extensions.Blocks)
+            if (ReferenceEquals(block.Module, module)
+                && block.Target is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum } target
+                && block.Decl.Interfaces.Any(Reaches) && seen.Add(target))
+                yield return target;
+    }
+
+    /// <summary>What the type patterns leave uncovered of a sealed interface's conformers, as the
+    /// patterns to add.</summary>
+    private List<string> MissingConformers(TypeSymbol iface, List<Pattern> pats)
+    {
+        var covered = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+        foreach (var p in pats)
+            if (p is TypePattern { Type: NamedType nt } && _binding.Resolve(nt) is { } bound
+                && (bound is ImportBindingSymbol ib ? ib.Target : bound) is TypeSymbol tested)
+                covered.Add(tested);
+        return SealedConformers(iface).Where(c => !covered.Contains(c)).Select(c => $"_: {c.Name}").ToList();
+    }
+
     // --- interface conformance with a signature match ---
 
     private void CheckTypeConformance(string typeName, TypeNode[] interfaces, ModuleSymbol module, string?[]? delegates = null)
@@ -869,6 +918,7 @@ public sealed class TypeChecker
         string?[]? delegates = null)
     {
         if (interfaces.Length == 0) return;
+        RequireSealedInModule(interfaces, module, name);
         var candidates = CandidateMethods(implementer, module);
         var delegated = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < interfaces.Length; i++)
@@ -4855,6 +4905,7 @@ public sealed class TypeChecker
         StructDecl s => s.Interfaces,
         ClassDecl c => c.Interfaces,
         EnumDecl e => e.Interfaces,
+        InterfaceDecl i => i.Interfaces, // the parents, for the child-to-parent transition (04 D10)
         _ => []
     };
 
@@ -6029,6 +6080,10 @@ public sealed class TypeChecker
             default:
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
                     return MissingVariants(type, ed, enumTs, pats);
+                // A sealed interface's conformers are a closed set (04 D8): type patterns
+                // cover it; an open interface needs the default.
+                if (TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Interface } sealedIface && IsSealed(sealedIface))
+                    return MissingConformers(sealedIface, pats);
                 return ["_"]; // an open type is coverable only by a default
         }
     }
@@ -7318,6 +7373,12 @@ public sealed class TypeChecker
         // Every struct, class and enum value is an 'Any' at the transition (03 T10): the empty
         // interface asks nothing, so nothing has to be declared.
         if (IsAny(to) && TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum })
+            return true;
+        // A child interface value where a parent is expected (04 D10): a coercion, the parent's
+        // table found at the transition through the concrete type's conformance list.
+        if (TypeFacts.KindOf(from) == TypeSymbolKind.Interface && TypeFacts.KindOf(to) == TypeSymbolKind.Interface
+            && TypeFacts.SymbolOf(from) is { } child && TypeFacts.SymbolOf(to) is { } parent && !ReferenceEquals(child, parent)
+            && ImplementsWithExtensions(child, parent, to, from is GenericInstance childInstance ? SubstMap(childInstance) : EmptySubst))
             return true;
         return false;
     }

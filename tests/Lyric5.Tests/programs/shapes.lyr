@@ -1,0 +1,47 @@
+// 'sealed' (04 D8): a closed set of conformers, a match of type patterns exhaustive without '_';
+// the child interface value as a parent value (D10). The plan's 'shapes' artefact.
+// Expected stdout:
+//   areas 12 12 6                a struct, a class and a type conformed in an extend block, through the interface
+//   names circle rect tri        type patterns over the sealed interface, no '_'
+//   display circle rect          'Shape :: [Display]': a Shape value where a Display is expected, by binding and by argument
+//   kinds 2 7 4                  the bound names as the types
+import std.io { println };
+
+interface Display { fn show(): string; }
+sealed interface Shape :: [Display] { fn area(): int; }
+struct Circle :: [Shape] {
+    r: int,
+    fn area(): int { return 3 * this.r * this.r; }
+    fn show(): string { return "circle"; }
+}
+class Rect :: [Shape] {
+    w: int,
+    h: int,
+    fn area(): int { return this.w * this.h; }
+    fn show(): string { return "rect"; }
+}
+struct Tri { b: int, h: int }
+extend Tri :: [Shape] {
+    fn area(): int { return this.b * this.h / 2; }
+    fn show(): string { return "tri"; }
+}
+
+fn name(s: Shape): string {
+    return match (s) { _: Circle => "circle", _: Rect => "rect", _: Tri => "tri" };
+}
+
+fn kind(s: Shape): int {
+    return match (s) { c: Circle => c.r, r: Rect => r.w + r.h, t: Tri => t.b };
+}
+
+fn shown(d: Display): string { return d.show(); }
+
+fn main(): int {
+    let shapes: Shape[] = [Circle { r = 2 }, Rect { w = 3, h = 4 }, Tri { b = 4, h = 3 }];
+    println(f"areas {shapes[0].area()} {shapes[1].area()} {shapes[2].area()}");
+    println(f"names {name(shapes[0])} {name(shapes[1])} {name(shapes[2])}");
+    let d: Display = shapes[0];
+    println(f"display {d.show()} {shown(shapes[1])}");
+    println(f"kinds {kind(shapes[0])} {kind(shapes[1])} {kind(shapes[2])}");
+    return 0;
+}

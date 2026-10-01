@@ -3341,6 +3341,18 @@ internal sealed class FunctionLowerer
         if (target is IrStructType value_ && from is not IrOptionalType && !_fresh.Contains(value))
             value = CopyStructValue(value, value_, span);
 
+        // A child interface value where a parent is expected (04 D10): the parent's table, found
+        // through the concrete type's conformance list — the same op as the downcast to an
+        // interface, since both read that list.
+        if (target is IrInterfaceType parentIface && source is IrInterfaceType childIface
+            && from is not IrOptionalType && childIface.Type != parentIface.Type)
+        {
+            var up = _slots.NewTemp(parentIface);
+            _b.Emit(new Downcast(up, value, parentIface.Type, parentIface, span));
+            value = up;
+            from = parentIface;
+        }
+
         if (target is IrInterfaceType iface && source is not IrInterfaceType
             && from is not IrOptionalType)
         {

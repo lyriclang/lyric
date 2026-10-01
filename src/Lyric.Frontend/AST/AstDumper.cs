@@ -277,7 +277,7 @@ public static class AstDumper
                 foreach (var f in n.StructFields ?? []) Write(f, indent + 1, sb);
                 break;
             case InterfaceDecl n:
-                Line(sb, indent, $"Interface {n.Name}{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Interface {n.Name}{Vis(n.IsPublic)}{(n.IsSealed ? " sealed" : "")}", n.Span);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
                 foreach (var t in n.Types) Write(t, indent + 1, sb);

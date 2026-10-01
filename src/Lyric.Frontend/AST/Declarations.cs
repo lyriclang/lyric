@@ -175,6 +175,10 @@ public sealed record InterfaceDecl(bool IsPublic, string Name, GenericParam[] Ge
 
     /// <summary>The associated types the interface declares, <c>type Item;</c> (design/v5/spec/03 T6).</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
+
+    /// <summary><c>sealed interface Shape</c> (04 D8): every conformer stands in the declaring
+    /// module, and a match of type patterns over it is exhaustive without <c>_</c>.</summary>
+    public bool IsSealed { get; init; }
 }
 
 public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
