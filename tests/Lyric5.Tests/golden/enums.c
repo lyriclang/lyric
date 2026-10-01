@@ -21,6 +21,7 @@ typedef struct lyr_ty12_Point lyr_ty12_Point;
 typedef struct lyr_ty14_Scene lyr_ty14_Scene;
 typedef struct lyr_vt_ty15 lyr_vt_ty15;
 const char lyr_ifid_ty15[] = "std.core.Error";
+typedef struct lyr_ty16_Exception lyr_ty16_Exception;
 struct lyr_ty2_Tree_Leaf {
     int64_t f_0;
 };
@@ -82,6 +83,17 @@ struct lyr_vt_ty15 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface15;
+struct lyr_ty16_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface15 f_inner;
+};
+_Static_assert(sizeof(lyr_ty16_Exception) == 40, "layout of lyr_ty16_Exception");
+_Static_assert(offsetof(lyr_ty16_Exception, f_text) == 8, "layout of lyr_ty16_Exception");
+_Static_assert(offsetof(lyr_ty16_Exception, f_inner) == 16, "layout of lyr_ty16_Exception");
+static const uint64_t lyr_refmap_ty16[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty16_Exception = { sizeof(lyr_ty16_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty16, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("red");

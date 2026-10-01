@@ -13,6 +13,7 @@ typedef struct lyr_ty5_Bits lyr_ty5_Bits;
 typedef struct lyr_ty6_Partial lyr_ty6_Partial;
 typedef struct lyr_vt_ty7 lyr_vt_ty7;
 const char lyr_ifid_ty7[] = "std.core.Error";
+typedef struct lyr_ty8_Exception lyr_ty8_Exception;
 struct lyr_ty0_V {
     int64_t f_x;
     int64_t f_y;
@@ -39,6 +40,17 @@ struct lyr_vt_ty7 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface7;
+struct lyr_ty8_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface7 f_inner;
+};
+_Static_assert(sizeof(lyr_ty8_Exception) == 40, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_text) == 8, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_inner) == 16, "layout of lyr_ty8_Exception");
+static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty8_Exception = { sizeof(lyr_ty8_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(5) lyr_lit0 = LYR_STR_INIT("add ");
@@ -1926,19 +1938,19 @@ bb0:;
     return t4;
 }
 
-#line 210 "stdlib5/std/core.lyr"
+#line 236 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 210
+#line 236
     t0 = l0_this;
-#line 210
+#line 236
     t1 = l1_rhs;
-#line 210
+#line 236
     t2 = LYR_CHECKED_ADD(t0, t1);
-#line 210
+#line 236
     return t2;
 }
 

@@ -553,7 +553,8 @@ public sealed class AstFormatter
 
     private Doc BindingDoc(BindingStmt binding)
     {
-        var parts = new List<Doc> { Doc.From(binding.IsMutable ? "var " : "let "), Doc.From(binding.Name) };
+        var keyword = binding.Cleanup is not null ? "using let " : binding.IsMutable ? "var " : "let ";
+        var parts = new List<Doc> { Doc.From(keyword), Doc.From(binding.Name) };
         if (binding.Type is { } type)
         {
             parts.Add(Doc.From(": "));

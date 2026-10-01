@@ -1,0 +1,49 @@
+// 'using let' (design/v5/spec/05 E7 R1–R4): closed when the scope is left, in one LIFO list with
+// the defers; close's error leaves on a normal exit and is suppressed with one in flight; the
+// ready-made 'Exception' with the error it wraps.
+import std.io { println };
+
+class Res :: [Closeable] {
+    name: string,
+    failing: bool = false,
+
+    fn close(): void throws Exception {
+        println(f"close {this.name}");
+        if (this.failing) { throw Exception { text = f"close {this.name} failed" }; }
+    }
+}
+
+fn open(name: string): Res { return Res { name = name }; }
+fn openFailing(name: string): Res { return Res { name = name, failing = true }; }
+
+fn scope(): void throws Exception {
+    using let a = open("a");
+    defer println("defer between");
+    using let b = open("b");
+    println("body");
+}
+
+fn closeFails(): void throws Exception {
+    using let x = openFailing("x");
+    println("work");
+}
+
+fn bodyFails(): void throws Exception {
+    using let y = openFailing("y");
+    throw Exception { text = "body failed" };
+}
+
+fn wrapped(): void throws Exception {
+    try { closeFails(); }
+    catch (e) { throw Exception { text = "wrapped", inner = e }; }
+}
+
+fn main(): void {
+    try { scope(); } catch (_) { println("unexpected"); }
+    try { closeFails(); } catch (e) { println(f"caught {e.message()}"); }
+    try { bodyFails(); } catch (e) { println(f"caught {e.message()}"); }
+    try { wrapped(); } catch (e) {
+        let because = e.cause()!.message();
+        println(f"caught {e.message()} because {because}");
+    }
+}

@@ -841,6 +841,10 @@ public class FormatterTests
     }
 
     [Fact]
+    public void Using_let_round_trips() =>
+        Assert.Contains("using let f = open();", Format("fn g() { using   let f = open(); }"), StringComparison.Ordinal);
+
+    [Fact]
     public void A_set_clause_keeps_the_list_rule()
     {
         // One type alone, several in brackets (08 D5/D6), as 'throws' does.

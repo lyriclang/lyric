@@ -70,6 +70,7 @@ internal sealed class WarningAnalyzer
         }
 
         WarnUnusedLocals();
+        WarnNeverClosed();
         HintNeverReassigned();
         WarnUnusedImports();
         WarnBuiltinShadowingImports();
@@ -324,6 +325,60 @@ internal sealed class WarningAnalyzer
             _de.Report("LYR-SEM0071", Severity.Warning, span, message,
                 new DiagnosticNote("name it '_' when the value is deliberately unused"));
         }
+    }
+
+    /// <summary>
+    /// A <c>Closeable</c> nobody closes (design/v5/spec/05 E7 R3): one a call makes and an
+    /// expression statement drops, and one a plain <c>let</c> binds and uses only to call its other
+    /// methods — not closed, not <c>using</c>-bound, not stored, returned or passed on. The
+    /// collector catches the rest (01 L1); this catches the usual slip. A binding never used at all
+    /// is the unused warning's.
+    /// </summary>
+    private void WarnNeverClosed()
+    {
+        if (_comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") is not TypeSymbol { Kind: TypeSymbolKind.Interface } closeable)
+            return;
+        bool IsCloseable(LyrType t) =>
+            TypeFacts.SymbolOf(t) is { } s && (ReferenceEquals(s, closeable) || Conformance.Implements(s, closeable, _binding));
+
+        var bound = new Dictionary<Symbol, BindingStmt>(ReferenceEqualityComparer.Instance);
+        var called = new HashSet<Symbol>(ReferenceEqualityComparer.Instance);
+        var otherwise = new HashSet<Symbol>(ReferenceEqualityComparer.Instance);
+
+        void Visit(Node node)
+        {
+            switch (node)
+            {
+                case BindingStmt { Cleanup: null } b when _types.RefOf(b) is LocalSymbol l && IsCloseable(l.Type):
+                    bound[l] = b;
+                    break;
+                case ExprStmt es when TypeChecker.Unmarked(es.Expr) is CallExpr made && IsCloseable(_types.TypeOf(made)):
+                    _de.Report("LYR-SEM0144", Severity.Warning, made.Span,
+                        $"this makes a '{TypeFacts.Display(_types.TypeOf(made))}' nothing closes — bind it with 'using let'");
+                    break;
+                // 'f.read()': a use that neither closes nor lets the value go.
+                case CallExpr { Callee: MemberExpr { Target: IdentifierExpr receiver, Member: not "close" } } call
+                    when _types.RefOf(receiver) is LocalSymbol target:
+                    called.Add(target);
+                    foreach (var argument in call.Arguments) Visit(argument);
+                    return;
+                case IdentifierExpr id when _types.RefOf(id) is LocalSymbol used:
+                    otherwise.Add(used);
+                    break;
+            }
+            foreach (var child in AstChildren.Of(node)) Visit(child);
+        }
+
+        foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsNative(module)) continue;
+            foreach (var decl in _comp.AstOf(module).Declarations) Visit(decl);
+        }
+        foreach (var (local, binding) in bound)
+            if (called.Contains(local) && !otherwise.Contains(local))
+                _de.Report("LYR-SEM0144", Severity.Warning, binding.NameSpan,
+                    $"'{binding.Name}' is a '{TypeFacts.Display(((LocalSymbol)local).Type)}' that is never closed — "
+                    + "'using let' closes it when the scope is left");
     }
 
     /// <summary>

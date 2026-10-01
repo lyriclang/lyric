@@ -313,6 +313,33 @@ public class ErrorSyntaxTests
         Assert.Equal(2, Assert.Single(Assert.IsType<TryExpr>(expr).Catches).BindingTypes.Length);
     }
 
+    // --- using let (05 E7 R1–R2, 08 Y5 S5) ---
+
+    [Fact]
+    public void Using_let_is_a_binding_that_owes_its_scope_a_close()
+    {
+        var (m, de) = ParseModule("fn g() { using let f = open(); }");
+        Assert.False(de.HasErrors);
+        var binding = Assert.IsType<BindingStmt>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Body!.Statements[0]);
+        Assert.False(binding.IsMutable);
+        // The close, written as the defer it is: 'defer try f.close();'.
+        var call = Assert.IsType<CallExpr>(Assert.IsType<TryExpr>(Assert.IsType<ExprStmt>(binding.Cleanup!.Body).Expr).Value);
+        Assert.Equal("close", Assert.IsType<MemberExpr>(call.Callee).Member);
+    }
+
+    [Fact]
+    public void Using_var_is_refused() =>
+        Assert.Equal("LYR-PAR0052", Assert.Single(ParseModule("fn g() { using var f = open(); }").De.Diagnostics).Code);
+
+    [Fact]
+    public void Using_binds_one_name_to_a_value() =>
+        Assert.Contains(ParseModule("fn g() { using let (a, b) = pair(); }").De.Diagnostics, d => d.Code == "LYR-PAR0052");
+
+    [Fact]
+    public void Using_stays_a_name_elsewhere() =>
+        // Contextual: only 'using' before 'let' or 'var' opens the form.
+        Assert.False(ParseModule("fn g() { var using = 1; using = 2; }").De.HasErrors);
+
     [Fact]
     public void The_expression_form_stands_as_a_statement()
     {

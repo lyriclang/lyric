@@ -26,6 +26,7 @@ public class ExceptionTests
             fn message(): string;
             fn cause(): ?Error { return null; }
         }
+        pub interface Closeable { fn close(): void throws Error; }
         """;
 
     private const string Prelude = """
@@ -566,6 +567,55 @@ public class ExceptionTests
         // 'e' is a NotFound, a type of its own: a match over it is the type's question.
         AssertCode(Diags("""fn t(): string { try { return f"{mayThrow()}"; } catch (e: NotFound) { return match (e) { _: NotFound => "n" }; } }"""),
             "LYR-SEM0131");
+
+    // --- using let (05 E7 R1–R6) ---
+
+    private const string Resources = """
+        class Res :: [Closeable] {
+            fn close(): void throws NotFound { }
+            fn check(): void { }
+        }
+        class Unclosable { fn close(): void { } }
+        fn open(): Res { return Res { }; }
+        fn keep(r: Res): void { }
+
+        """;
+
+    [Fact]
+    public void Using_binds_a_closeable() =>
+        AssertCode(Diags(Resources + "fn t() { using let p = Unclosable { }; }"), "LYR-SEM0143");
+
+    [Fact]
+    public void What_the_close_throws_is_a_site_of_the_scope()
+    {
+        AssertCode(Diags(Resources + "fn t() { using let r = open(); }"), "LYR-SEM0034");
+        AssertClean(Diags(Resources + "fn t() throws NotFound { using let r = open(); r.check(); }"));
+        AssertClean(Diags(Resources + "fn t() { try { using let r = open(); } catch (_: NotFound) { } }"));
+    }
+
+    [Fact]
+    public void A_using_binding_is_not_unused() =>
+        Assert.DoesNotContain(Diags(Resources + "fn t() throws NotFound { using let r = open(); }").Diagnostics,
+            d => d.Code == "LYR-SEM0071");
+
+    [Fact]
+    public void A_dropped_closeable_warns() =>
+        AssertCode(Diags(Resources + "fn t() { open(); }"), "LYR-SEM0144");
+
+    [Fact]
+    public void A_closeable_used_only_for_its_other_methods_warns() =>
+        AssertCode(Diags(Resources + "fn t() { let r = open(); r.check(); }"), "LYR-SEM0144");
+
+    [Fact]
+    public void A_closeable_closed_passed_or_using_bound_does_not_warn()
+    {
+        Assert.DoesNotContain(Diags(Resources + "fn t() throws NotFound { let r = open(); try r.close(); }").Diagnostics,
+            d => d.Code == "LYR-SEM0144");
+        Assert.DoesNotContain(Diags(Resources + "fn t() { let r = open(); keep(r); }").Diagnostics,
+            d => d.Code == "LYR-SEM0144");
+        Assert.DoesNotContain(Diags(Resources + "fn t() throws NotFound { using let r = open(); r.check(); }").Diagnostics,
+            d => d.Code == "LYR-SEM0144");
+    }
 
     [Fact]
     public void What_the_operand_assigns_counts_when_every_clause_leaves() =>

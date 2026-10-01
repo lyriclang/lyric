@@ -71,6 +71,7 @@ public class CEmitterTests
     [InlineData("try_forms")]
     [InlineData("catch_sets")]
     [InlineData("defer_errors")]
+    [InlineData("resources")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -207,6 +208,7 @@ public class CEmitterTests
             data.Add("try_forms", profile, 0, TRY_FORMS_EXPECTED);
             data.Add("catch_sets", profile, 0, CATCH_SETS_EXPECTED);
             data.Add("defer_errors", profile, 0, DEFER_ERRORS_EXPECTED);
+            data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -309,6 +311,10 @@ public class CEmitterTests
     private const string TRY_FORMS_EXPECTED =
         "a 42 b -1\nc true -7\nd false\ne true 42\nf 42\ng -1\nh caught disk\nh fallback\ni data\nj 2\n"
         + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
+
+    private const string RESOURCES_EXPECTED =
+        "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"
+        + "work\nclose x\ncaught wrapped because close x failed\n";
 
     private const string DEFER_ERRORS_EXPECTED =
         "earlier defer ran\nnormal: first\nin flight: first\ntwo: second\noutside: first\ninside caught second\n"

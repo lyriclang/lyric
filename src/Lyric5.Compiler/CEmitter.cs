@@ -684,24 +684,30 @@ public sealed class CEmitter
         var optionals = new HashSet<string>(StringComparer.Ordinal);
 
         // What holding a type BY VALUE needs defined first: the struct itself, or the optional's
-        // own struct after what it holds.
+        // own struct after what it holds. Marked written only once what it holds is: the path in
+        // can lead back to it — a field '?Error' requires Error's table, whose 'cause()' slot
+        // returns '?Error' — and the inner request must then write it, before the table needs it.
         void Require(IrType type)
         {
             if (type is IrStructType held) Define(held.Type.Value);
             else if (type is IrInterfaceType dyn) Define(dyn.Type.Value);
             else if (type is IrEnumType chosen) Define(chosen.Type.Value);
             else if (IsTagNiche(type)) Require(((IrOptionalType)type).Inner);
-            else if (type is IrOptionalType optional && !IsNiche(optional) && optionals.Add(OptionalName(optional)))
+            else if (type is IrOptionalType optional && !IsNiche(optional) && !optionals.Contains(OptionalName(optional)))
             {
                 Require(optional.Inner);
-                _out.AppendLine($"typedef struct {{ {Declare(optional.Inner, "value")}; uint8_t has; }} {OptionalName(optional)};");
+                if (optionals.Add(OptionalName(optional)))
+                    _out.AppendLine($"typedef struct {{ {Declare(optional.Inner, "value")}; uint8_t has; }} {OptionalName(optional)};");
             }
-            else if (type is IrFunctionType fn && optionals.Add(FnName(fn)))
+            else if (type is IrFunctionType fn && !optionals.Contains(FnName(fn)))
             {
                 foreach (var p in fn.Parameters) Require(p);
                 Require(fn.Return);
-                _out.AppendLine($"typedef struct {{ {CodePointer(fn, "fn")}; void *env; }} {FnName(fn)};");
-                _out.AppendLine($"_Static_assert(sizeof({FnName(fn)}) == 16, \"layout of {FnName(fn)}\");");
+                if (optionals.Add(FnName(fn)))
+                {
+                    _out.AppendLine($"typedef struct {{ {CodePointer(fn, "fn")}; void *env; }} {FnName(fn)};");
+                    _out.AppendLine($"_Static_assert(sizeof({FnName(fn)}) == 16, \"layout of {FnName(fn)}\");");
+                }
             }
             else if (type is IrInlineArrayType inline && optionals.Add(InlineName(inline)))
             {

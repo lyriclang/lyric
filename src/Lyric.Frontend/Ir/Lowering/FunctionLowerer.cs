@@ -1200,7 +1200,7 @@ internal sealed class FunctionLowerer
         // Whether this scope has defers stands in its OWN statements; a defer in a nested block belongs
         // there. Asking in advance saves every defer-free scope the extra block boundary, and that is
         // nearly all of them.
-        var hasDefers = block.Statements.Any(st => st is DeferStmt);
+        var hasDefers = block.Statements.Any(st => st is DeferStmt or BindingStmt { Cleanup: not null });
         if (!hasDefers) return LowerPlainScope(block);
         _defers.Push(new List<DeferStmt>());
         try
@@ -1303,6 +1303,9 @@ internal sealed class FunctionLowerer
         if (binding.Initializer is not null)
             _b.Emit(new StoreLocal(slot, LowerExprAs(binding.Initializer, type), binding.Span));
 
+        // 'using let' (05 E7 R2): its close joins the scope's one LIFO list, registered once the
+        // value stands — a failure in the initializer has nothing to close yet.
+        if (binding.Cleanup is { } cleanup) _defers.Peek().Add(cleanup);
         return true;
     }
 

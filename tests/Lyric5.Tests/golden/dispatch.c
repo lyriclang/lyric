@@ -19,6 +19,7 @@ typedef struct lyr_ty7_Legs lyr_ty7_Legs;
 typedef struct lyr_ty8_Wheels lyr_ty8_Wheels;
 typedef struct lyr_vt_ty9 lyr_vt_ty9;
 const char lyr_ifid_ty9[] = "std.core.Error";
+typedef struct lyr_ty10_Exception lyr_ty10_Exception;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -77,6 +78,17 @@ struct lyr_vt_ty9 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface9;
+struct lyr_ty10_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface9 f_inner;
+};
+_Static_assert(sizeof(lyr_ty10_Exception) == 40, "layout of lyr_ty10_Exception");
+_Static_assert(offsetof(lyr_ty10_Exception, f_text) == 8, "layout of lyr_ty10_Exception");
+_Static_assert(offsetof(lyr_ty10_Exception, f_inner) == 16, "layout of lyr_ty10_Exception");
+static const uint64_t lyr_refmap_ty10[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty10_Exception = { sizeof(lyr_ty10_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty10, "std.core.Exception", NULL };
 typedef struct { LyrObj header; lyr_ty2_Person value; } lyr_box_ty2_Person;
 _Static_assert(sizeof(lyr_box_ty2_Person) == 16, "layout of lyr_box_ty2_Person");
 _Static_assert(offsetof(lyr_box_ty2_Person, value) == 8, "layout of lyr_box_ty2_Person");

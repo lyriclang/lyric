@@ -27,6 +27,9 @@ public sealed partial class Parser
         // 'name:' at the start of a statement is a loop label — nothing else begins that way
         // (§6.8: an expression statement is a call, an assignment or 'resume').
         TokenKind.Identifier when _buffer.Peek(1).TokenKind == TokenKind.Colon => ParseLabeled(),
+        // 'using let f = …;' (08 Y5 S5): contextual, as nothing else starts with a name and 'let'.
+        TokenKind.Identifier when AtContextual("using") && _buffer.Peek(1).TokenKind is TokenKind.Let or TokenKind.Var
+            => ParseUsing(),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
         TokenKind.If => ParseIf(),
@@ -113,6 +116,34 @@ public sealed partial class Parser
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close block");
         _allowTail = savedTail;
         return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
+    }
+
+    /// <summary>
+    /// <c>using let f = open(p);</c> (design/v5/spec/05 E7 R1–R2, 08 Y5 S5): a binding whose value
+    /// is closed when its scope is left — on every way out but a panic, in the scope's one LIFO list
+    /// with the <c>defer</c>s. The parser writes that close beside the binding as the
+    /// <c>defer try f.close();</c> it is, at the keyword. One name and a value; a <c>let</c>, since
+    /// <c>using var</c> could rebind the name and leave the first value open (LYR-PAR0052).
+    /// </summary>
+    private Stmt ParseUsing()
+    {
+        var kw = _buffer.Advance(); // 'using'
+        if (_buffer.Check(TokenKind.Var))
+            _de.Report("LYR-PAR0052", Severity.Error, Span.Union(kw.Span, _buffer.Current.Span),
+                "a resource binding is a 'let' — 'using var' could rebind it and leave the first value open");
+        var parsed = ParseBinding();
+        if (parsed is not BindingStmt { Initializer: not null } binding)
+        {
+            _de.Report("LYR-PAR0052", Severity.Error, Span.Union(kw.Span, parsed.Span),
+                "'using' binds one name to a value — 'using let f = open(p);'");
+            return parsed;
+        }
+        var at = kw.Span;
+        var close = new CallExpr(
+            new MemberExpr(new IdentifierExpr(binding.Name, at), "close", false, at) { MemberSpan = default },
+            [], at);
+        var cleanup = new DeferStmt(new ExprStmt(new TryExpr(close, at) { KeywordSpan = at }, at), at);
+        return binding with { IsMutable = false, Span = Span.Union(kw.Span, binding.Span), Cleanup = cleanup };
     }
 
     private Stmt ParseBinding()

@@ -149,7 +149,13 @@ internal sealed class ExceptionAnalyzer
         {
             case Block b: foreach (var s in b.Statements) AnalyzeStmt(s); break;
             case TailExprStmt tail: AnalyzeExpr(tail.Expr); break;
-            case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
+            case BindingStmt bd:
+                if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer);
+                // 'using let': the close it owes the scope, a site of the scope (05 E7 R4) — where
+                // the checker took it up: a binding that is no Closeable (SEM0143) owes nothing.
+                if (bd.Cleanup is { Body: ExprStmt { Expr: TryExpr { Value: { } close } } } && !_types.TypeOf(close).IsError)
+                    AnalyzeStmt(bd.Cleanup);
+                break;
             // A destructuring binding REQUIRES its initializer, and that initializer is a call like
             // any other: missing here, a throwing one escaped the walk entirely.
             case DestructuringStmt ds: AnalyzeExpr(ds.Initializer); break;

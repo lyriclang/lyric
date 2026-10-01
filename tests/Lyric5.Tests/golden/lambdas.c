@@ -12,6 +12,7 @@ typedef struct lyr_ty4__env_main_main_ lyr_ty4__env_main_main_;
 typedef struct lyr_ty5__env_main_main_ lyr_ty5__env_main_main_;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "std.core.Error";
+typedef struct lyr_ty7_Exception lyr_ty7_Exception;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -54,6 +55,17 @@ struct lyr_vt_ty6 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface6;
+struct lyr_ty7_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface6 f_inner;
+};
+_Static_assert(sizeof(lyr_ty7_Exception) == 40, "layout of lyr_ty7_Exception");
+_Static_assert(offsetof(lyr_ty7_Exception, f_text) == 8, "layout of lyr_ty7_Exception");
+_Static_assert(offsetof(lyr_ty7_Exception, f_inner) == 16, "layout of lyr_ty7_Exception");
+static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty7_Exception = { sizeof(lyr_ty7_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "std.core.Exception", NULL };
 typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 typedef struct { int64_t (*fn)(void *); void *env; } lyr_fn_to_i64;

@@ -10,6 +10,7 @@ typedef struct lyr_ty2__tuple_ lyr_ty2__tuple_;
 typedef struct lyr_ty3_Holder lyr_ty3_Holder;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
 const char lyr_ifid_ty4[] = "std.core.Error";
+typedef struct lyr_ty5_Exception lyr_ty5_Exception;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -34,6 +35,17 @@ struct lyr_vt_ty4 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface4;
+struct lyr_ty5_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface4 f_inner;
+};
+_Static_assert(sizeof(lyr_ty5_Exception) == 40, "layout of lyr_ty5_Exception");
+_Static_assert(offsetof(lyr_ty5_Exception, f_text) == 8, "layout of lyr_ty5_Exception");
+_Static_assert(offsetof(lyr_ty5_Exception, f_inner) == 16, "layout of lyr_ty5_Exception");
+static const uint64_t lyr_refmap_ty5[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty5_Exception = { sizeof(lyr_ty5_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "std.core.Exception", NULL };
 typedef struct { lyr_ty0__tuple_ value; uint8_t has; } lyr_opt_ty0;
 _Static_assert(sizeof(lyr_ty0__tuple_) == 16, "layout of <tuple>[]");
 const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0__tuple_), 0, NULL, "<tuple>[]", NULL };
