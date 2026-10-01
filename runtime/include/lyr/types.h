@@ -40,6 +40,14 @@ typedef struct LyrObj {
     const LyrDesc *desc;
 } LyrObj;
 
+/* An interface value (01 V7): the data — an object, or the box a value was copied into at the
+ * transition — and the table of the concrete type's implementations, which begins with that
+ * type's descriptor. Two words, passed and copied by value; the data word is a reference. */
+typedef struct LyrIface {
+    void *data;
+    const void *vt;
+} LyrIface;
+
 /* A string: immutable UTF-8, length in bytes (10 S1), NUL-terminated so it crosses to C as a
  * `const char *` without a copy (11 X3). */
 typedef struct LyrStr {

@@ -49,8 +49,6 @@ public static class SubsetGate
             foreach (var function in module.Functions) Function(function);
             foreach (var global in module.Globals) Type(global.Type, default, $"the type of '{global.Name}'");
             // A module-level finding has no instruction to point at: the entry's first line stands in.
-            var anywhere = module.Functions.Select(FirstSpan).FirstOrDefault(s => s != default);
-            if (module.Impls.Count > 0) Refuse(anywhere, "interfaces", "M4");
         }
 
         private static Span FirstSpan(IrFunction function) =>
@@ -102,7 +100,6 @@ public static class SubsetGate
                             Type(field, span, where);
                     break;
                 case IrInterfaceType:
-                    Refuse(span, $"interfaces, {where}", "M4");
                     break;
                 case IrFunctionType f:
                     foreach (var p in f.Parameters) Type(p, span, where);
@@ -165,7 +162,6 @@ public static class SubsetGate
                 case NewVariant or EnumTag or EnumAs:
                     break;
                 case MakeInterface or CallVirt:
-                    Refuse(op.Span, "interfaces", "M4");
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;

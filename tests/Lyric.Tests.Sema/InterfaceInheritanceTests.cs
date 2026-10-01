@@ -46,6 +46,18 @@ public class InterfaceInheritanceTests
 
         """;
 
+    // --- members are public always (design/v5/spec/04 D14) ---
+
+    [Fact]
+    public void Pub_on_an_interface_member_is_refused()
+    {
+        var de = Check("interface Named { pub fn name(): string; fn id(): int; }");
+        var errors = de.Diagnostics.Where(d => d.Severity == Severity.Error).ToList();
+        Assert.Single(errors);
+        Assert.Equal("LYR-SEM0118", errors[0].Code);
+        Assert.Contains("'name'", errors[0].Message);
+    }
+
     // --- implication ---
 
     [Fact]

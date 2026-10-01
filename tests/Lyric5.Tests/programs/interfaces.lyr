@@ -1,0 +1,95 @@
+// Interface values natively (01 V7; 04 D2, D12): a fat pointer — the data and the table of the
+// concrete type's implementations — two words, by value. A class is pointed at; a struct or an
+// enum is copied into a box at the transition, and the value lives there from then on. A
+// default method runs with 'this' as the interface value and dispatches again. Expected stdout:
+//   hit 60 80                 two classes behind one parameter, two implementations
+//   alive alive alive down    the default against the override: a Wall with 5 hp is down
+//   box 3 10 3                a struct copied into the box: the original changes, the value does not; a 'mut fn' writes the box
+//   enum 1 0                  an enum conformer, its 'mut fn' writing the box's tag
+//   array 4 143 60 60         interface values in an array and in a field; a class shared through both
+//   chain 882                 a default calling another slot virtually, on a boxed struct
+import std.io { println };
+
+interface Damageable {
+    mut fn takeDamage(amount: int);
+    fn getHp(): int;
+    fn isAlive(): bool { return this.getHp() > 0; }
+}
+
+class Player :: [Damageable] {
+    var hp: int,
+    static fn new(hp: int): Player { return Player { hp = hp }; }
+    mut fn takeDamage(amount: int) { this.hp -= amount; if (this.hp < 0) { this.hp = 0; } }
+    fn getHp(): int { return this.hp; }
+}
+
+class Wall :: [Damageable] {
+    var hp: int,
+    static fn new(hp: int): Wall { return Wall { hp = hp }; }
+    mut fn takeDamage(amount: int) { this.hp -= amount / 2; if (this.hp < 0) { this.hp = 0; } }
+    fn getHp(): int { return this.hp; }
+    fn isAlive(): bool { return this.hp > 10; }
+}
+
+struct Crate :: [Damageable] {
+    var hp: int,
+    mut fn takeDamage(amount: int) { this.hp -= amount; }
+    fn getHp(): int { return this.hp; }
+}
+
+enum Light :: [Damageable] {
+    On, Off;
+    mut fn takeDamage(amount: int) { this = .Off; }
+    fn getHp(): int { return match (this) { .On => 1, .Off => 0 }; }
+}
+
+interface Shape {
+    fn area(): int;
+    fn doubled(): int { return this.area() * 2; }
+}
+
+struct Square :: [Shape] {
+    side: int,
+    fn area(): int { return this.side * this.side; }
+}
+
+class Holder { var target: Damageable }
+
+fn hit(target: Damageable, amount: int): int {
+    target.takeDamage(amount);
+    return target.getHp();
+}
+
+fn describe(target: Damageable): string {
+    return if (target.isAlive()) "alive" else "down";
+}
+
+fn main(): int {
+    let player = Player.new(100);
+    let wall = Wall.new(100);
+    println(f"hit {hit(player, 40)} {hit(wall, 40)}");
+    println(f"alive {describe(player)} {describe(Player.new(5))} {describe(Wall.new(5))}");
+
+    var crate = Crate { hp = 10 };
+    let boxed: Damageable = crate;
+    crate.hp = 3;
+    let before = boxed.getHp();
+    let after = hit(boxed, 7);
+    println(f"box {crate.hp} {before} {after}");
+
+    let light: Damageable = Light.On;
+    let on = light.getHp();
+    light.takeDamage(1);
+    println(f"enum {on} {light.getHp()}");
+
+    let all: Damageable[] = [player, wall, crate, light];
+    var sum = 0;
+    for (i in 0..all.length()) { sum = sum + all[i].getHp(); }
+    let holder = Holder { target = wall };
+    holder.target.takeDamage(40);
+    println(f"array {all.length()} {sum} {holder.target.getHp()} {wall.getHp()}");
+
+    let shape: Shape = Square { side = 21 };
+    println(f"chain {shape.doubled()}");
+    return 0;
+}

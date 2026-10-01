@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m3-s8";
+    public const string Version = "m4-s1";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -171,6 +171,7 @@ public sealed class CEmitter
         IrSliceType s => SliceName(s),
         IrInlineArrayType ia => InlineName(ia),
         IrFunctionType f => FnName(f),
+        IrInterfaceType => "LyrIface",
         IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
@@ -291,6 +292,7 @@ public sealed class CEmitter
         IrSliceType s => "slice_" + Mangle(s.Element),
         IrInlineArrayType ia => $"inl{ia.Length}_" + Mangle(ia.Element),
         IrFunctionType f => "fn" + string.Concat(f.Parameters.Select(p => "_" + Mangle(p))) + "_to_" + Mangle(f.Return),
+        IrInterfaceType i => $"iface{i.Type.Value}",
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
     };
@@ -311,6 +313,7 @@ public sealed class CEmitter
         IrSliceType s => $"Slice<{Display(s.Element)}>",
         IrInlineArrayType ia => $"{Display(ia.Element)}[{ia.Length}]",
         IrFunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Display))}) -> {Display(f.Return)}",
+        IrInterfaceType i => Qualified(_module.Types[i.Type.Value]),
         IrOptionalType o => "?" + Display(o.Inner),
         _ => type.ToString() ?? "?",
     };
@@ -338,7 +341,7 @@ public sealed class CEmitter
         IrRefType or IrArrayType => "NULL",
         _ when IsNiche(type) => "NULL",
         _ when IsAggregate(type) => "{0}",
-        IrSliceType or IrFunctionType => "{0}",
+        IrSliceType or IrFunctionType or IrInterfaceType => "{0}",
         _ => "0",
     };
 
@@ -359,7 +362,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
         IrRefType or IrArrayType => (8, 8),
-        IrSliceType or IrFunctionType => (16, 8),
+        IrSliceType or IrFunctionType or IrInterfaceType => (16, 8),
         IrInlineArrayType ia => (LayoutOf(ia.Element).Size * ia.Length, LayoutOf(ia.Element).Align),
         IrOptionalType o when IsNiche(o) => (8, 8),
         IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
@@ -438,6 +441,7 @@ public sealed class CEmitter
         IrOptionalType o when !IsNiche(o) => HoldsReferences(o.Inner),
         IrSliceType => true, // its pointer, into the array's elements
         IrFunctionType => true, // its environment
+        IrInterfaceType => true, // its data word
         IrInlineArrayType ia => HoldsReferences(ia.Element),
         _ => IsReference(type),
     };
@@ -465,6 +469,7 @@ public sealed class CEmitter
         if (IsReference(type)) words.Add(offset / 8);
         else if (type is IrSliceType) words.Add(offset / 8); // the pointer, first word; an interior one
         else if (type is IrFunctionType) words.Add(offset / 8 + 1); // the environment, second word
+        else if (type is IrInterfaceType) words.Add(offset / 8); // the data word; the table is static
         else if (type is IrInlineArrayType inline)
             for (var i = 0; i < inline.Length; i++)
                 ReferenceWords(inline.Element, offset + i * LayoutOf(inline.Element).Size, words, ref ambiguous);
@@ -577,12 +582,31 @@ public sealed class CEmitter
             }
         }
 
+        // The interface tables (01 V7): one per (type, interface) row, defined in the module's
+        // unit with the thunks they point at, declared in an instance's unit that lifts a value.
+        var tables = new StringBuilder();
+        if (_main && _module.Impls.Count > 0)
+        {
+            tables.AppendLine("/* interface tables: the descriptor, then the implementation of every slot */");
+            foreach (var row in _module.Impls) tables.Append(Table(row));
+        }
+        else if (!_main)
+        {
+            var lifted = ScopeOps().OfType<MakeInterface>().Select(m => (Concrete: m.Concrete.Value, Interface: m.Interface.Value)).Distinct().Order().ToList();
+            if (lifted.Count > 0)
+            {
+                tables.AppendLine("/* interface tables, defined by the module's unit */");
+                foreach (var (concrete, iface) in lifted) tables.AppendLine($"extern const {VtType(iface)} {VtName(concrete, iface)};");
+            }
+        }
+
         var body = new StringBuilder();
         foreach (var function in Scope()) body.Append(Function(function));
         if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
 
         if (_constants.Length > 0) _out.AppendLine("/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
+        if (tables.Length > 0) _out.Append(tables).AppendLine();
         _out.Append(body);
         return _out.ToString();
     }
@@ -600,7 +624,7 @@ public sealed class CEmitter
         // whose addresses are the identities and are defined once, in the module's unit.
         var reachable = _main ? null : Reachable();
         var indices = Enumerable.Range(0, _module.Types.Count)
-            .Where(i => (_module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum)
+            .Where(i => (_module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum || _module.Types[i].IsInterface)
                         && (reachable is null || reachable.Contains(i))).ToList();
         // Every type a function names, for the optionals among them: an optional outside the
         // niche is a C struct of its own and is defined once, wherever it is first needed.
@@ -627,6 +651,13 @@ public sealed class CEmitter
         _out.AppendLine("/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */");
         foreach (var i in indices)
         {
+            // An interface is its table's type (01 V7): the value itself is 'LyrIface' for every
+            // interface, and only the table knows the slots.
+            if (_module.Types[i].IsInterface)
+            {
+                _out.AppendLine($"typedef struct {VtType(i)} {VtType(i)};");
+                continue;
+            }
             var name = StructName(new TypeId(i));
             _out.AppendLine($"typedef struct {name} {name};");
             foreach (var variant in _module.Types[i].Variants)
@@ -641,6 +672,7 @@ public sealed class CEmitter
         void Require(IrType type)
         {
             if (type is IrStructType held) Define(held.Type.Value);
+            else if (type is IrInterfaceType dyn) Define(dyn.Type.Value);
             else if (type is IrEnumType chosen) Define(chosen.Type.Value);
             else if (IsTagNiche(type)) Require(((IrOptionalType)type).Inner);
             else if (type is IrOptionalType optional && !IsNiche(optional) && optionals.Add(OptionalName(optional)))
@@ -673,6 +705,7 @@ public sealed class CEmitter
         void Define(int index)
         {
             var def = _module.Types[index];
+            if (def.IsInterface) { if (done.Add(index)) DefineInterface(index, Require); return; }
             if (!(def.IsStruct || def.IsClass || def.IsEnum) || !done.Add(index)) return;
             if (def.IsEnum) { DefineEnum(index, def, Require); return; }
             foreach (var field in def.FieldTypes) Require(field);
@@ -689,7 +722,155 @@ public sealed class CEmitter
         foreach (var i in indices) Define(i);
         foreach (var type in used) Require(type);
         foreach (var element in elements) { Require(element); ArrayDescriptorOf(element); }
+        // The boxes (V7, D12): a value type copied to the heap at its transition to an interface
+        // value, behind a header, with a descriptor of its own that maps the value's references.
+        foreach (var boxed in Boxed())
+        {
+            Require(_module.Types[boxed].IsEnum ? new IrEnumType(new TypeId(boxed)) : new IrStructType(new TypeId(boxed)));
+            DefineBox(boxed);
+        }
         _out.AppendLine();
+    }
+
+    // --- interfaces (01 V7) ----------------------------------------------------------------------
+
+    private string VtType(int iface) => $"lyr_vt_ty{iface}";
+
+    private string VtName(int concrete, int iface) => $"lyr_vt_ty{iface}_ty{concrete}";
+
+    private string BoxName(int type) => $"lyr_box_ty{type}_" + Identifier(_module.Types[type].Name);
+
+    private string BoxDesc(int type) => $"lyr_desc_box_ty{type}_" + Identifier(_module.Types[type].Name);
+
+    private readonly Dictionary<int, (IrType[] Params, IrType Return)[]> _slots = new();
+
+    /// <summary>
+    /// The signature of every slot of an interface, the receiver left out: read off the first
+    /// table row — every row's functions agree, conformance saw to that — else off the calls
+    /// through the interface; a slot nothing names takes nothing and returns nothing. The IR's
+    /// interface entry carries the slot names only; its signatures are the rows'.
+    /// </summary>
+    private (IrType[] Params, IrType Return)[] SlotSignatures(int iface)
+    {
+        if (_slots.TryGetValue(iface, out var known)) return known;
+        var count = _module.Types[iface].MethodSlots.Length;
+        var sigs = new (IrType[], IrType)[count];
+        var found = new bool[count];
+        foreach (var row in _module.Impls)
+        {
+            if (row.Interface.Value != iface) continue;
+            for (var k = 0; k < count; k++)
+            {
+                var f = _module.Functions[row.Methods[k].Value];
+                sigs[k] = (f.Locals.Take(f.ParamCount).Skip(1).Select(l => l.Type).ToArray(), f.ReturnType);
+                found[k] = true;
+            }
+            break;
+        }
+        if (found.Any(seen => !seen))
+            foreach (var function in _module.Functions)
+                foreach (var op in function.Blocks.SelectMany(b => b.Insts))
+                    if (op is CallVirt c && c.Interface.Value == iface && !found[c.Slot])
+                    {
+                        sigs[c.Slot] = (c.Args.Skip(1).Select(a => function.Temps[a.Value].Type).ToArray(), c.ReturnType);
+                        found[c.Slot] = true;
+                    }
+        for (var k = 0; k < count; k++)
+            if (!found[k]) sigs[k] = ([], new IrScalarType(IrScalar.Void));
+        return _slots[iface] = sigs;
+    }
+
+    private string SlotPointer((IrType[] Params, IrType Return) sig, string name) =>
+        $"{(IsVoid(sig.Return) ? "void" : CType(sig.Return))} (*{name})(LyrIface{string.Concat(sig.Params.Select(p => ", " + CType(p)))})";
+
+    /// <summary>The table's type: the concrete type's descriptor first, then one function
+    /// pointer per slot, each taking the interface value — the same for a default, whose
+    /// receiver IS the interface value, and for a thunk around a concrete method.</summary>
+    private void DefineInterface(int index, Action<IrType> require)
+    {
+        var sigs = SlotSignatures(index);
+        foreach (var (parameters, result) in sigs)
+        {
+            foreach (var p in parameters) require(p);
+            if (!IsVoid(result)) require(result);
+        }
+        _out.AppendLine($"struct {VtType(index)} {{");
+        _out.AppendLine("    const LyrDesc *desc;");
+        for (var k = 0; k < sigs.Length; k++) _out.AppendLine($"    {SlotPointer(sigs[k], $"s{k}")};");
+        _out.AppendLine("};");
+    }
+
+    /// <summary>The value types boxed in this unit: lifted by one of its functions, and — in the
+    /// module's unit, where the tables are defined — every one a table row names.</summary>
+    private IEnumerable<int> Boxed()
+    {
+        bool IsValue(int type) => _module.Types[type].IsStruct || _module.Types[type].IsEnum;
+        var lifted = ScopeOps().OfType<MakeInterface>().Select(m => m.Concrete.Value).Where(IsValue);
+        var rows = _main ? _module.Impls.Select(r => r.Type.Value).Where(IsValue) : [];
+        return lifted.Concat(rows).Distinct().Order();
+    }
+
+    private void DefineBox(int type)
+    {
+        var def = _module.Types[type];
+        var inner = def.IsEnum ? (IrType)new IrEnumType(new TypeId(type)) : new IrStructType(new TypeId(type));
+        var (size, align) = LayoutOf(inner);
+        if (align > 8) throw new InvalidOperationException($"a box of {Display(inner)} would need {align}-byte alignment");
+        var total = 8 + (size + 7) / 8 * 8;
+        var name = BoxName(type);
+        _out.AppendLine($"typedef struct {{ LyrObj header; {Declare(inner, "value")}; }} {name};");
+        _out.AppendLine($"_Static_assert(sizeof({name}) == {total}, \"layout of {name}\");");
+        _out.AppendLine($"_Static_assert(offsetof({name}, value) == 8, \"layout of {name}\");");
+        if (!_main) { _out.AppendLine($"extern const LyrDesc {BoxDesc(type)};"); return; }
+
+        var words = new List<int>();
+        var ambiguous = false;
+        ReferenceWords(inner, 8, words, ref ambiguous);
+        var text = $"box<{Qualified(def)}>".Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
+        if (words.Count == 0)
+        {
+            _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
+            return;
+        }
+        var map = new ulong[(total / 8 + 63) / 64];
+        foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
+        var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
+        _out.AppendLine($"static const uint64_t lyr_refmap_box{type}[] = {{ {bits} }};");
+        _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_box{type}, \"{text}\", NULL }};");
+    }
+
+    /// <summary>
+    /// One table row (V7): the descriptor, then per slot the implementation — a default as it is,
+    /// since its receiver is the interface value; a concrete method behind a thunk that takes the
+    /// value out of the data word (the object, or the box's payload — as the place, for a
+    /// struct's or an enum's method, which writes through it).
+    /// </summary>
+    private string Table(IrImpl row)
+    {
+        var text = new StringBuilder();
+        var iface = row.Interface.Value;
+        var concrete = row.Type.Value;
+        var sigs = SlotSignatures(iface);
+        var isClass = _module.Types[concrete].IsClass;
+        var entries = new List<string>();
+        for (var k = 0; k < sigs.Length; k++)
+        {
+            var f = _module.Functions[row.Methods[k].Value];
+            if (f.ParamCount > 0 && f.Locals[0].Type is IrInterfaceType) { entries.Add(FunctionName(f.Name)); continue; }
+            var (parameters, result) = sigs[k];
+            var thunk = $"{VtName(concrete, iface)}_s{k}";
+            var receiver = isClass ? $"({CType(new IrRefType(row.Type))})self.data"
+                : f.ReceiverByRef ? $"&(({BoxName(concrete)} *)self.data)->value"
+                : $"(({BoxName(concrete)} *)self.data)->value";
+            var call = $"{FunctionName(f.Name)}({receiver}{string.Concat(parameters.Select((_, j) => $", a{j}"))})";
+            text.AppendLine($"static {(IsVoid(result) ? "void" : CType(result))} {thunk}(LyrIface self{string.Concat(parameters.Select((p, j) => ", " + Declare(p, $"a{j}")))}) "
+                + $"{{ {(IsVoid(result) ? call + ";" : "return " + call + ";")} }}");
+            entries.Add(thunk);
+        }
+        var desc = isClass ? DescriptorName(row.Type) : BoxDesc(concrete);
+        text.AppendLine($"const {VtType(iface)} {VtName(concrete, iface)} = {{ &{desc}, {string.Join(", ", entries)} }};");
+        return text.ToString();
     }
 
     /// <summary>The composite types an instance unit's functions reach: named by a local, a temp
@@ -710,12 +891,15 @@ public sealed class CEmitter
                 case IrSliceType sl: Visit(sl.Element); break;
                 case IrInlineArrayType ia: Visit(ia.Element); break;
                 case IrFunctionType f: foreach (var p in f.Parameters) Visit(p); Visit(f.Return); break;
+                case IrInterfaceType i: Add(i.Type.Value); break;
             }
         }
         void Add(int index)
         {
             if (!reached.Add(index)) return;
             var def = _module.Types[index];
+            if (def.IsInterface)
+                foreach (var (parameters, result) in SlotSignatures(index)) { foreach (var p in parameters) Visit(p); Visit(result); }
             foreach (var field in def.FieldTypes) Visit(field);
             foreach (var variant in def.Variants) Add(variant.Value);
             if (_variants.TryGetValue(index, out var of)) Add(of.Enum);
@@ -992,6 +1176,14 @@ public sealed class CEmitter
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         CopyValue c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         // An inline array (A4): its storage filled element by element, or from one value.
+        // An interface value (01 V7): an object as it is; a value copied into a fresh box. The
+        // call goes through the table the value carries, by slot.
+        MakeInterface m when _module.Types[m.Concrete.Value].IsClass =>
+            $"{Temp(m.Dest)} = (LyrIface){{ {Temp(m.Value)}, &{VtName(m.Concrete.Value, m.Interface.Value)} }};",
+        MakeInterface m =>
+            $"{{ {BoxName(m.Concrete.Value)} *lyr_box = lyr_alloc(&{BoxDesc(m.Concrete.Value)}); lyr_box->value = {Value(m.Value)}; "
+            + $"{Temp(m.Dest)} = (LyrIface){{ lyr_box, &{VtName(m.Concrete.Value, m.Interface.Value)} }}; }}",
+        CallVirt c => Assign(c.Dest, $"((const {VtType(c.Interface.Value)} *){Temp(c.Args[0])}.vt)->s{c.Slot}({string.Join(", ", c.Args.Select(Value))})"),
         // A function value (01 V8): the code and its environment, or a thunk and no environment.
         MakeClosure m => $"{Temp(m.Dest)} = ({CType(m.Type)}){{ {CodeOf(_module.Functions[m.Target.Value])}, {(m.Environment is { } e ? Temp(e) : "NULL")} }};",
         CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))})"),

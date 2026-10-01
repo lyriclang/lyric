@@ -49,8 +49,11 @@ public class RuntimeBuildTests
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
-    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null) =>
-        RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), name, profile, compiler, args);
+    /// <param name="binary">The executable's own name in <c>bin/</c> when another test class
+    /// links the same program: two classes run in parallel, and on Windows one linking the path
+    /// the other is running fails with "Permission denied" (seen in CI, M4 S1).</param>
+    internal static ProcessRunner.Result RunTest(string name, Profile profile, CCompiler? compiler = null, string[]? args = null, string? binary = null) =>
+        RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), binary ?? name, profile, compiler, args);
 
     /// <summary>The emitter's units as a program: written into the cache, built and run like a
     /// runtime test.</summary>

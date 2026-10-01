@@ -1,0 +1,33 @@
+// A box keeps what it holds alive (01 V7, 04 D12): a struct copied into a box at its transition
+// to an interface value, holding a string, referenced only through an array of interface values
+// — two words each, the first a reference — across the collections a million dropped boxes
+// force. Run under the test's heap limit, as objects_gc.
+// Expected stdout: "kept 1000 junk-999999 500499000" (sum of 1000 j + 999 over j < 1000). Exit 0.
+import std.io { println };
+
+interface Named {
+    fn name(): string;
+    fn id(): int;
+}
+
+struct Tag :: [Named] {
+    number: int,
+    label: string,
+    fn name(): string { return this.label; }
+    fn id(): int { return this.number; }
+}
+
+fn main(): int {
+    var kept: Named[] = [];
+    var i = 0;
+    while (i < 1000000) {
+        let junk: Named = Tag { number = i, label = f"junk-{i}" };
+        if (i % 1000 == 999) { kept = kept + [junk]; }
+        if (junk.id() != i) { return 2; }
+        i += 1;
+    }
+    var sum = 0;
+    for (k in 0..kept.length()) { sum = sum + kept[k].id(); }
+    println(f"kept {kept.length()} {kept[999].name()} {sum}");
+    return if (sum == 500499000) 0 else 1;
+}
