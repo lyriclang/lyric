@@ -546,6 +546,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_generic_extend_keeps_its_parameters()
+    {
+        var formatted = Format("extend<T::[Display]>   List<T> :: [Display] { fn show(): string { return \"l\"; } }");
+        Assert.Contains("extend<T :: [Display]> List<T> :: [Display]", formatted);
+    }
+
+    [Fact]
     public void A_sealed_interface_keeps_its_word()
     {
         var formatted = Format("pub   sealed   interface Shape { fn area(): int; }");

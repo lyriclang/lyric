@@ -1,0 +1,2 @@
+extend<T :: [Display], U> Pair<T, U> :: [Display] { fn show(): string { return "p"; } }
+extend Box<int> { fn doubled(): int { return this.v * 2; } }

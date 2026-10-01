@@ -671,6 +671,8 @@ public sealed partial class Parser
     private Decl ParseExtend(bool isPublic, Span start)
     {
         _buffer.Advance(); // 'extend'
+        // 'extend<T :: [C]> Target' (03 T7): the block's parameters before the target.
+        var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         var target = ParseType();
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open extend body");
@@ -678,7 +680,7 @@ public sealed partial class Parser
         var boundTypes = new List<AssociatedTypeDecl>();
         ParseMethodSequence(methods, allowStatic: true, types: boundTypes);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close extend body");
-        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span)) { Types = boundTypes.ToArray() };
+        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span)) { Types = boundTypes.ToArray(), Generics = generics };
     }
 
     /// <summary>

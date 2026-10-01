@@ -285,7 +285,8 @@ public static class AstDumper
                 break;
             case ExtendDecl n:
                 Line(sb, indent, $"Extend{Vis(n.IsPublic)}", n.Span);
-                Write(n.Target, indent + 1, sb);            // the first child is the target type
+                foreach (var g in n.Generics) Write(g, indent + 1, sb);
+                Write(n.Target, indent + 1, sb);            // then the target type
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
                 foreach (var t in n.Types) Write(t, indent + 1, sb);
                 foreach (var m in n.Methods) Write(m, indent + 1, sb);

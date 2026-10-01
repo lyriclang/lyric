@@ -64,6 +64,19 @@ public sealed class TypeResult
     private readonly Dictionary<(TypeSymbol, TypeSymbol, string), List<(LyrType Instance, FunctionSymbol Impl)>>
         _conformanceImpls = new();
 
+    // The conformances a GENERIC block gave (03 T7 X1), as the sema proved them at a use: the
+    // instance, the interface, the block. A row in the lowering's tables is built for exactly
+    // these, since a block's constraints may hold for one instance and not for another.
+    private readonly List<(LyrType Instance, TypeSymbol Iface, ExtensionBlock Block)> _blockConformances = new();
+
+    public void RecordBlockConformance(LyrType instance, TypeSymbol iface, ExtensionBlock block)
+    {
+        if (!BlockConformanceRecorded(instance, iface, block)) _blockConformances.Add((instance, iface, block));
+    }
+
+    public bool BlockConformanceRecorded(LyrType instance, TypeSymbol iface, ExtensionBlock block) =>
+        _blockConformances.Any(e => ReferenceEquals(e.Block, block) && ReferenceEquals(e.Iface, iface) && LyrType.Equal(e.Instance, instance));
+
     public void RecordConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
         LyrType instance, FunctionSymbol impl)
     {

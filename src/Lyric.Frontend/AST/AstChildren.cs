@@ -118,6 +118,7 @@ public static class AstChildren
                 break;
 
             case ExtendDecl e:
+                foreach (var g in e.Generics) yield return g;
                 foreach (var t in e.Types) yield return t;
                 yield return e.Target;
                 foreach (var i in e.Interfaces) yield return i;

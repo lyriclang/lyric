@@ -235,7 +235,7 @@ public sealed class AstFormatter
                 InterfaceListDoc(d.Interfaces), Doc.Space),
             InOrder(d.Types, d.Members), d.Span),
         ExtendDecl d => MethodBodyDoc(
-            Doc.Of(Pub(d.IsPublic), Doc.From("extend "), TypeDoc(d.Target),
+            Doc.Of(Pub(d.IsPublic), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
             InOrder(d.Types, d.Methods), d.Span),
         GlobalBindingDecl d => Doc.Of(Pub(d.IsPublic), StmtDoc(d.Binding)),
