@@ -139,6 +139,7 @@ public sealed class TypeChecker
         // knows the built-in scalars, and everything else binds to an interface from the stdlib.
         var core = comp.FindModule(["std", "core"])?.Members;
         _equatable = core?.LookupLocal("Equatable") as TypeSymbol;
+        _clone = core?.LookupLocal("Clone") as TypeSymbol;
         _range = core?.LookupLocal("Range") as TypeSymbol;
         _rangeInclusive = core?.LookupLocal("RangeInclusive") as TypeSymbol;
         _ordered = core?.LookupLocal("Ordered") as TypeSymbol;
@@ -201,6 +202,10 @@ public sealed class TypeChecker
 
     /// <summary>What <c>&lt;</c> and its three siblings resolve through, under the same rules.</summary>
     private readonly TypeSymbol? _ordered;
+
+    /// <summary>What <c>[x] * n</c> asks of an element that is or holds an object (03 §5.1,
+    /// 10 C7), under the same rules.</summary>
+    private readonly TypeSymbol? _clone;
 
     /// <summary>The native declaration from <c>std.core</c>. See the constructor.</summary>
     private readonly FunctionSymbol? _stdPanic;
@@ -2889,6 +2894,12 @@ public sealed class TypeChecker
                 CheckOrdered(b, l, r, scope);
                 return LyrType.Bool;
             case BinaryOp.Eq or BinaryOp.Ne:
+                // '?T == ?T', and 'x == 5' with 'x: ?int' through the coercion (03 O6).
+                if (OptionalEquality(l, r) is { } inner)
+                {
+                    CheckOptionalEquality(b, inner, scope);
+                    return LyrType.Bool;
+                }
                 if (!LyrType.Equal(l, r) && UnifyNumeric(b.Left, l, b.Right, r) is null
                     && l is not NullType && r is not NullType)
                     BadBinary(b, l, r);
@@ -3051,6 +3062,86 @@ public sealed class TypeChecker
     }
 
     /// <summary>
+    /// An operator that IS a call of a <c>std.core</c> function: <c>equalOptionals(a, b)</c> for
+    /// <c>?T == ?T</c>, <c>repeatArray(xs, n)</c> for <c>[x] * n</c> over objects. The name
+    /// resolves as any callee does — the scope first, <c>std.core</c> unasked — and the call is
+    /// checked like one written, so inference binds the function's <c>T</c> from the operands.
+    /// </summary>
+    private LyrType DesugarToFreeCall(BinaryExpr b, string function, SymbolTable scope, params Expr[] args)
+    {
+        var call = new CallExpr(new IdentifierExpr(function, b.Span), args, b.Span);
+        var type = CheckExpr(call, scope);
+        if (type.IsError) return LyrType.Error;
+        _result.DesugarOperator(b, call);
+        return type;
+    }
+
+    /// <summary>The value type of an equality between optionals (design/v5/spec/03 O6): two
+    /// optionals of one type, or an optional and a value of its type, which coerces up at the
+    /// argument. <c>null</c> where this is no such equality.</summary>
+    private static LyrType? OptionalEquality(LyrType l, LyrType r) =>
+        l is Optional lo && (LyrType.Equal(l, r) || LyrType.Equal(lo.Inner, r)) ? lo.Inner
+        : r is Optional ro && LyrType.Equal(ro.Inner, l) ? ro.Inner
+        : null;
+
+    /// <summary>
+    /// <c>?T == ?T</c>: both absent, or both present and equal through the value's own equality
+    /// (03 O6) — <c>std.core</c>'s <c>equalOptionals</c> under <c>T :: [Equatable]</c>, which the
+    /// scalars satisfy through their conformances in <c>std.core</c>. No ordering on an optional.
+    /// </summary>
+    private void CheckOptionalEquality(BinaryExpr b, LyrType inner, SymbolTable scope)
+    {
+        if (inner is ErrorType) return;
+        var equatable = inner is PrimitiveType
+            || (CanConform(inner) && _equatable is { } eq && Satisfies(inner, eq, SelfInstance(eq, inner)));
+        if (!equatable)
+        {
+            _de.Report("LYR-SEM0059", Severity.Error, b.Span,
+                $"'{(b.Operator is BinaryOp.Eq ? "==" : "!=")}' is not defined for '?{TypeFacts.Display(inner)}' — two optionals "
+                + $"compare through their values, and '{TypeFacts.Display(inner)}' carries no 'Equatable'");
+            return;
+        }
+        DesugarToFreeCall(b, "equalOptionals", scope, b.Left, b.Right);
+    }
+
+    /// <summary>Does a value of this type hold an object — a class, an array, a view, a closure,
+    /// an interface value — directly or inside a struct, an enum payload, a tuple, an optional
+    /// or an inline array? A string does not count: shared, nobody can tell. What <c>[x] * n</c>
+    /// asks before it clones.</summary>
+    private bool HoldsReference(LyrType type) => type switch
+    {
+        ArrayOf or SliceOf or FnType or CoroutineOf => true,
+        Optional o => HoldsReference(o.Inner),
+        InlineArrayOf ia => HoldsReference(ia.Element),
+        TupleOf t => t.Elements.Any(HoldsReference),
+        _ when TypeFacts.Is(type, TypeSymbolKind.Class) || TypeFacts.Is(type, TypeSymbolKind.Interface) => true,
+        _ when TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts =>
+            PayloadTypes(ts, type).Any(HoldsReference),
+        _ => false,
+    };
+
+    /// <summary>The field types of a struct, or every payload type of an enum, in the instance's
+    /// terms.</summary>
+    private IEnumerable<LyrType> PayloadTypes(TypeSymbol ts, LyrType instance)
+    {
+        var subst = instance is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        LyrType Of(LyrType t) => instance is GenericInstance ? Substitute(t, subst) : t;
+        switch (ts.Declaration)
+        {
+            case StructDecl or ClassDecl:
+                foreach (var fs in ts.Members.Symbols.OfType<FieldSymbol>()) yield return Of(FieldType(fs));
+                break;
+            case EnumDecl e:
+                foreach (var v in e.Variants)
+                {
+                    foreach (var t in v.TupleFields ?? []) yield return Of(ResolveType(t, ts.Members));
+                    foreach (var f in v.StructFields ?? []) yield return Of(ResolveType(f.Type, ts.Members));
+                }
+                break;
+        }
+    }
+
+    /// <summary>
     /// What <c>&lt;</c>, <c>&lt;=</c>, <c>&gt;</c> and <c>&gt;=</c> may compare beyond numerics:
     /// every type that conforms to <c>Ordered</c>.
     /// </summary>
@@ -3113,7 +3204,23 @@ public sealed class TypeChecker
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r)) return LyrType.String;   // "x" * 3
         if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l)) return LyrType.String;   // 3 * "x"
         // '[x] * n' repeats (10 C7); 'n * [x]' does not — one order, as for a string.
-        if (l is ArrayOf la && TypeFacts.IsInteger(r)) return new ArrayOf(la.Element); // [0] * 5
+        if (l is ArrayOf la && TypeFacts.IsInteger(r))
+        {
+            // An element that is or holds an object is CLONED into every slot (03 §5.1), never
+            // shared: the array is built by std.core's 'repeatArray' under 'T :: [Clone]'. A
+            // value element copies natively.
+            if (!HoldsReference(la.Element)) return new ArrayOf(la.Element); // [0] * 5
+            // A shape — 'int[]', '?C', a tuple, a function — has no conformance of its own yet
+            // (05 §13.6), and 'Satisfies' passes it through opaquely; asked here, not there.
+            var cloneable = la.Element is NamedRef or GenericInstance or TypeParamType
+                && _clone is not null && Satisfies(la.Element, _clone, SelfInstance(_clone, la.Element));
+            if (!cloneable)
+                return Report(b.Span, "LYR-SEM0136",
+                    $"'[x] * n' with an element of type '{TypeFacts.Display(la.Element)}', which is or holds "
+                    + "an object, clones every slot — declare the element type with ':: [Clone]', or build "
+                    + "the array with 'arrayOf(n, (i) => …)'");
+            return DesugarToFreeCall(b, "repeatArray", scope, b.Left, b.Right);
+        }
         return DesugarArithmetic(b, l, r, scope, _mul, "mul", "*") ?? BadBinary(b, l, r);
     }
 

@@ -55,6 +55,15 @@ pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
     return xs;
 }
 
+/// `[x] * n` over an element that is or holds an object (03 §5.1, 10 C7): every slot a `clone()`
+/// of the pattern's element, so no object is shared into several slots. The compiler desugars
+/// the operator to this call; a value element copies natively. A negative `n` panics.
+pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
+    if (n < 0) { panic("negative repeat count"); }
+    let m = xs.length();
+    return arrayOf(m * n, (i: int) => xs[i % m].clone());
+}
+
 // ---------------------------------------------------------------------------------------------
 // The operator interfaces (design/v5/spec/04 D6). 'a + b' is exactly 'a.add(b)': the conformance
 // is chosen by the static type of 'b', the result is the conformer's 'Out' — 'Self' unless it

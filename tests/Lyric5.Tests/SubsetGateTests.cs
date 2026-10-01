@@ -60,9 +60,10 @@ public class SubsetGateTests
         Assert.Empty(refusals);
     }
 
+    // The '[x] * n'-over-objects rows retired with their rule (M4 S9): the sema refuses the
+    // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
+    // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]
-    [InlineData("class C { var n: int }\nfn main(): int { let cs = [C { n = 1 }] * 3; return cs.length(); }", "'Clone'", "M4")]
-    [InlineData("class C { var n: int }\nstruct S { c: C }\nfn main(): int { let ss = [S { c = C { n = 1 } }] * 3; return ss.length(); }", "'Clone'", "M4")]
     [InlineData("fn gen(): Coroutine<int> { yield 1; }\nfn main(): int { let g = gen(); return 0; }", "coroutines", "M6")]
     public void A_construct_outside_the_core_names_its_milestone(string source, string what, string milestone)
     {

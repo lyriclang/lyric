@@ -1,0 +1,50 @@
+// Expected (written before the run):
+//   forms 12 6 500 7
+//   fold 10 24
+//   each 10
+//   pairs 14 10
+//   bound 21 7
+// Lambdas (design/v5/spec/08 Y11, 02 M8): the long, bare and trailing forms, 'it', parameters and
+// a pattern in a trailing block, a pattern where a parameter stands, a method as a value.
+import std.io { println };
+
+struct Pt { x: int, y: int,
+    fn scaled(k: int): int { return this.x * k + this.y; }
+}
+fn twice(x: int, f: fn(int) -> int): int { return f(f(x)); }
+fn run(f: fn() -> int): int { return f(); }
+fn fold(xs: int[], seed: int, f: fn(int, int) -> int): int {
+    var acc = seed;
+    for (i in 0..xs.length()) { acc = f(acc, xs[i]); }
+    return acc;
+}
+fn each(xs: int[], f: fn(int) -> void): void { for (i in 0..xs.length()) { f(xs[i]); } }
+fn pairs(ps: (int, int)[], f: fn(int, (int, int)) -> int): int {
+    var acc = 0;
+    for (i in 0..ps.length()) { acc = f(acc, ps[i]); }
+    return acc;
+}
+
+fn main(): int {
+    let long = (n: int): int => n * 2;
+    let a = twice(3, long);
+    let b = twice(4, n => n + 1);
+    let c = twice(5) { it * 10 };
+    let d = run { 7 };
+    println(f"forms {a} {b} {c} {d}");
+    let xs = [1, 2, 3, 4];
+    let s1 = fold(xs, 0, (acc, x) => acc + x);
+    let s2 = fold(xs, 1) { acc, x => acc * x };
+    println(f"fold {s1} {s2}");
+    var seen = 0;
+    each(xs) { seen += it; }
+    println(f"each {seen}");
+    let ps = [(1, 2), (3, 4)];
+    let p1 = pairs(ps, (acc, (m, n)) => acc + m * n);
+    let p2 = pairs(ps) { acc, (m, n) => acc + m + n };
+    println(f"pairs {p1} {p2}");
+    let pt = Pt { x = 2, y = 1 };
+    let bound = pt.scaled;
+    println(f"bound {bound(10)} {twice(1, pt.scaled)}");
+    return 0;
+}
