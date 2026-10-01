@@ -71,6 +71,12 @@ public class NamedArgumentTests
         Allowed("fn tag(prefix: string = \"#\", n: int): string { return prefix; }\nfn f(): string { return tag(n: 1) + tag(\"-\", 2); }");
 
     [Fact]
+    public void A_default_may_not_read_this() =>
+        Assert.Contains("'this'", Rejected(
+            "struct S { n: int, fn f(x: int = this.n): int { return x; } }\nfn f(): int { return S { n = 2 }.f(); }",
+            "LYR-SEM0120"));
+
+    [Fact]
     public void A_default_may_not_read_a_later_parameter() =>
         Rejected("fn later(a: int = b, b: int): int { return a; }\nfn f(): int { return later(b: 1); }", "LYR-SEM0002");
 

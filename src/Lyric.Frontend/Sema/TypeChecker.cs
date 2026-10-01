@@ -1079,7 +1079,16 @@ public sealed class TypeChecker
                     Array.Find(fn.Parameters, q => q.Name == p.Name && !ReferenceEquals(q, p))?.Span);
             _result.BindRef(p, ps); // for definite-assignment analysis
             if (p.Default is not null)
+            {
                 CheckAssignable(p.Default, CheckExpr(p.Default, scope, pt), pt, p.Span);
+                // A default runs at the call, before the receiver is anyone's (04 D5 F2): it may
+                // read the parameters before it and nothing of 'this'. The sema sees the method's
+                // scope here, so without this walk the lowering met 'this' outside a method.
+                if (Descendants(p.Default).OfType<ThisExpr>().FirstOrDefault() is { } receiver)
+                    _de.Report("LYR-SEM0120", Severity.Error, receiver.Span,
+                        $"a default of '{p.Name}' cannot read 'this' — it is evaluated at the call, "
+                        + "before the receiver; it may read the parameters before it");
+            }
         }
         _currentReturn = fn.ReturnType is not null ? ResolveType(fn.ReturnType, scope) : LyrType.Void;
         // Coroutine: the body never produces the coroutine value, which the runtime builds at the
@@ -3619,6 +3628,14 @@ public sealed class TypeChecker
         var result = arranged.ToArray();
         _result.SetArrangedArguments(call, result);
         return result;
+    }
+
+    /// <summary>The node and everything under it, in tree order.</summary>
+    private static IEnumerable<Node> Descendants(Node node)
+    {
+        yield return node;
+        foreach (var child in AstChildren.Of(node))
+            foreach (var below in Descendants(child)) yield return below;
     }
 
     private static (int Min, int Max) ArityOf(FunctionSymbol fn)
