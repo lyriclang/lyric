@@ -162,7 +162,7 @@ das Format von Lyric-Script.
 | # | Entscheidung | Verworfen |
 |---|---|---|
 | C1 | **C11** plus `__builtin_expect`, `__attribute__`, `restrict`, `_Thread_local`. **Kein MSVC** als Backend-Compiler; unter Windows `zig cc` oder clang | MSVC |
-| C2 | **eine `.c` je Lyric-Modul**; Release mit **ThinLTO**, Debug ohne LTO | Unity-Build als Release-Option: Tür |
+| C2 | **eine `.c` je Lyric-Modul**; Debug ohne LTO. **ThinLTO im Release: Uhr** — entschieden nach Messpunkt 3 (M8a), wenn die Einheitengrenzen von C3 messbar kosten. Befund M3 S8 (2026-10-01): `zig cc -flto=thin` bricht den Cross-Link nach Windows (zigs mingw-Brücke verliert `frexpf`, `modfl`, `wmemchr`, …) und verzehnfacht die Link-Zeit der Suite; Messpunkt 2 hält ohne. Alternative zum LTO: kleine Instanzen `static inline` in der Einheit des Aufrufers | Unity-Build als Release-Option: Tür |
 | C3 | generische Instanziierungen **whole-program gesammelt**, je Instanz eine Hash-benannte Cache-Einheit, einmal kompiliert (C hat kein COMDAT) | `static` je Einheit |
 | C4 | Mangling `lyr_<modul>_<name>` + kurzer Typ-Hash bei Überladung/Instanz; lesbar in gdb und perf | — |
 | C5 | Form: aus dem IR, Blöcke + `goto`, Werte in Locals; `if`/`while` wo der Block es hergibt; `__builtin_expect` auf Fehlerprüfungen | — |

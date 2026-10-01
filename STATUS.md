@@ -21,6 +21,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 - **Specification**: `lyriclang/lyric-spec` — `main` is the Lyric 5.0 text, written milestone by
   milestone; branch `script` holds the 4.x text, which checks `lyric-script`, not this tree: the
   milestones move the language away from it, so the 4.x conformance gate ended with M2 S0.
+  The Lyric 5 suite runs against this tree in CI since M3 S9 (*Conformance gate*, both
+  profiles); spec-first means the job is red between a spec merge and its compiler merge.
 
 ## Milestones
 
@@ -29,8 +31,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M0 | Preparation: repos, archive, CI with `zig cc` and NativeAOT, `dev` channel | M | **done** 2026-09-29 |
 | M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **done** 2026-09-30 |
 | M2 | First native program (IR → C → `zig cc`) | L | **done** 2026-09-30 |
-| M3 | Value model and type system | XL | **next** |
-| M4 | Interfaces and abstraction | L | — |
+| M3 | Value model and type system | XL | **done** 2026-10-01 |
+| M4 | Interfaces and abstraction | L | **next** |
 | M5 | Errors | M | — |
 | M6 | Coroutines, scheduler, threads | XL | — |
 | M7 | Modules and packages | L | — |
@@ -198,9 +200,78 @@ through the import table and cost 3 ms of every program start for a report most 
 write — the runtime loads it at the first trace now, and the start costs ≈ 2.5 ms over plain C
 there (was 5).
 
-### M3 — Value model and type system
+### M3 — done (2026-10-01)
 
-Next. Plan first (13, M3), then slices.
+Merged as #187, #189, #190, #191, #192, #193, #194, #195 and #196 (`648474da`), with #188 for
+the `inout` sign; the spec side is lyric-spec#48–#56 (`8149109`).
+
+The plan (13, M3): 02/03 complete, generics by monomorphization with cache units (C3), the
+pattern rules of 08. Nine slices: S1 numbers, S2 classes, S3 optionals, S4 enums and patterns,
+S5 arrays, views and inline arrays, S6 tuples, ranges, `with` and module-level bindings, S7
+function values, S8 generics, S9 the conformance gate and measurement point 2. Exit criteria:
+`arith/arrays/structs/enums/tuples/optionals/patterns/generics` run natively; conformance 02/03;
+measurement point 2 holds (below).
+
+1. S1: the number tower (03 T1a–T1e, T2): `int64`/`uint64`/`float64` as aliases, lossless
+   widening at coercion sites only, `as` with its refusals, `char` and `bool` not numbers,
+   shifts and the wrap operators `+% -% *%`, floats as IEEE doubles with `-ffp-contract=off`
+   everywhere (01 L10), float text by shortest round trip. The 4.x standard library's 49
+   `char as int` sites migrated from the compiler's own diagnostics.
+2. S2: classes as objects behind a header with a static descriptor (size, reference bitmap,
+   name), the write barrier; fields `var` or fixed and `mut fn` kept (02 M2–M4); a struct
+   method's `this` is the caller's place (M5); `Point(1, 2)` ≡ `Point.new(1, 2)`; `same(a, b)`.
+3. S3: optionals with the niche for references and `{T; bool}` otherwise (01 V5), `??T`, a
+   bare `T` opaque, narrowing by the type the name has where the test stands (a 4.x bug,
+   invisible with one level), `x!` as the one checked unwrap (RT0004 with the line).
+4. S4: enums as a tag and a union inline (01 V6), the finiteness rule with `Box<T>` in
+   `std.core` as the way out (02 M13), `LYR_DESC_CONSERVATIVE` for a word that is a reference
+   under one tag only; a bare name in a pattern binds, always (08 Y6, `LYR-SEM0111`), `.Red`
+   wherever the position expects an enum (T9/Y9, `LYR-SEM0113`), unreachable arms warned.
+5. S5: `T[]` with the elements inline (01 V10), `length()` a call, `^n` in the brackets,
+   `Slice<T>` as a 16-byte view (03 T13 A2), `T[N]` as a value (A4); the `[x] * n` gate for
+   objects until `Clone` (M4). Deferred, flagged: `StringView` and `s[i]` wait for the string
+   round (M8).
+6. S6: tuples as structs with positional fields and labels on the type only (03 T16), ranges as
+   `std.core` structs with the `for` head still a counted loop, `with` (02 M6), module-level
+   `let`/`var` as C statics filled by the module's initializer (07 V5).
+7. S7: function values as `{ code, env }` with a thunk for the environment-less (01 V8), the
+   three lambda forms and the trailing block with parameters (08 Y11), captures by copy or
+   shared box (02 M8), `obj.method` bound, `arrayOf(n, f)`. A 4.x bug on the way: a captured
+   `this` was never lowered.
+8. S8: `_` in a list of type arguments (03 T8), `ident<int>` as a value (T17), the expected type
+   binding what the arguments leave open (`let xs: int[] = empty();` — a 4.x gap T8 lists);
+   one C unit per generic instance, content-named, its object never recompiled for an edit
+   that leaves it alone (01 C3), every function with external linkage (C4). Tried and left
+   out: ThinLTO (C2) — the zig cross-link to Windows loses the mingw libm under it.
+9. S9: the conformance runner for `lyric5` (lyric-spec `tools/`), the *Conformance gate* job —
+   lyric-spec `main` against the working tree in both profiles, red between a spec merge and
+   its compiler merge by design — and `bench/` with measurement point 2 (below).
+
+Conformance: 176 cases (03-types 143, 04-modules 4, 09-patterns 29), all `since: 5.0.0`, green
+in both profiles. Test suite: 3420 across the ten projects.
+
+Measured (WSL2 x86-64, release profile through `zig cc 0.16`, Go 1.27, .NET 10; minimum of 5
+runs, wall time of the whole process; `bench/run.py`):
+
+| | Lyric | C | Go | C# | Lyric / C | Lyric / Go | Bound |
+|---|---|---|---|---|---|---|---|
+| `loops` — 200 M checked int passes | 0.676 s | 0.699 s | 0.695 s | 0.695 s | 0.97 | 0.97 | ≤ 3× C, ≤ 1.5× Go |
+| `arith` — Mandelbrot 2000², 200 iterations | 0.331 s | 0.290 s | 0.338 s | 0.330 s | 1.14 | 0.98 | ≤ 3× C, ≤ 1.5× Go |
+| `structs` — 100 k particles × 2000 steps | 0.162 s | 0.160 s | 0.252 s | 0.218 s | 1.02 | 0.64 | ≤ 3× C, ≤ 1.5× Go |
+
+The bound against C is a ratchet test on Linux (`MeasurementTests`); the bound against Go is
+`bench/run.py --ratchet`'s. The checked integer arithmetic costs nothing measurable against
+C's unchecked one; the 14 % on `arith` is the loop's shape after the IR, a number to beat in
+the optimizer round.
+
+Open from M3, not in the plan: unification with a literal (T8's `same(1, s)` → `T = string`;
+the checker binds the first argument), same-scope `let` shadowing in the 4.x front end (the
+second binding is accepted and calls resolve to the first), local `fn` / `inline fn` / the
+`it`-shadowing warning of 08 Y11, `?E == E` and the `[x] * n` gate wait for M4's synthesis.
+
+### M4 — Interfaces and abstraction
+
+Next. Plan first (13, M4), then slices.
 
 ## Design decisions
 
