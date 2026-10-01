@@ -2,6 +2,7 @@
 #include "lyr/error.h"
 #include "lyr/gc.h"
 #include "lyr/init.h"
+#include "lyr/panic.h"
 #include <string.h>
 
 /* Word 1 is the value's object and word 3 the suppressed array; word 2 is the value's table, which
@@ -35,4 +36,10 @@ int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) 
         at = next;
     }
     return 1;
+}
+
+void lyr_panic_error(const LyrErr *err, LyrErrMessage message) {
+    const LyrStr *text = message != NULL ? (const LyrStr *)message(err->value) : NULL;
+    if (text == NULL) lyr_panic(LYR_RT_FORCED_TRY, "'try!' on an error");
+    lyr_panic(LYR_RT_FORCED_TRY, "'try!' on an error: %.*s", (int)(text->len < 1000 ? text->len : 1000), text->bytes);
 }

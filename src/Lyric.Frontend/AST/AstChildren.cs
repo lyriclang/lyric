@@ -266,6 +266,7 @@ public static class AstChildren
 
             case TryExpr tr:
                 yield return tr.Value;
+                foreach (var c in tr.Catches) yield return c;
                 break;
 
             case PostfixExpr p:

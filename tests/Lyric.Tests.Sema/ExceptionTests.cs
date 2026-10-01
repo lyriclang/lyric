@@ -13,7 +13,10 @@ namespace Lyric.Tests.Sema;
 /// SET (SEM0137); the <c>try</c> mark on every throwing call (SEM0138) and the warning for a mark
 /// over nothing (SEM0139); coverage by a catch around the site or by the function's set, on the
 /// instance (SEM0034); an implementation throwing at most its member (SEM0042); throwing functions
-/// as values (SEM0037); the try/catch structure (SEM0035, SEM0036); panic returning never.
+/// as values (SEM0037); the try/catch structure (SEM0035, SEM0036); panic returning never; the
+/// expression forms (05 E4): <c>try?</c> worth <c>?T</c> unflattened, <c>try!</c> worth <c>T</c>,
+/// <c>try e catch (x: A) v</c> unified like match arms, a clause without a value (SEM0033),
+/// <c>try?</c> over a call without one (SEM0140); a <c>try</c> no error reaches (SEM0139).
 /// </summary>
 public class ExceptionTests
 {
@@ -351,4 +354,127 @@ public class ExceptionTests
                 catch (e: NotFound) { return 0; }
             }
             """));
+
+    // --- the expression forms: try?, try!, try … catch (05 E4) ---
+
+    private static LyrType TypeOfTry(string body)
+    {
+        var (types, de, module) = Check(Prelude + "\n" + body);
+        AssertClean(de);
+        var tried = module.Declarations.OfType<FunctionDecl>().Where(f => f.Name == "t")
+            .SelectMany(f => Descendants(f.Body!)).OfType<TryExpr>().First();
+        return types.TypeOf(tried);
+    }
+
+    private static IEnumerable<Node> Descendants(Node node) =>
+        AstChildren.Of(node).SelectMany(child => Descendants(child).Prepend(child));
+
+    [Fact]
+    public void Try_question_is_worth_an_optional() =>
+        Assert.Equal("?int", TypeFacts.Display(TypeOfTry("fn t(): ?int { return try? mayThrow(); }")));
+
+    [Fact]
+    public void Try_question_does_not_flatten() =>
+        // "Failed" stays apart from "gave null": the optional operand is wrapped once more.
+        Assert.Equal("??int", TypeFacts.Display(TypeOfTry(
+            "fn opt(): ?int throws NotFound { return null; }\nfn t(): ??int { return try? opt(); }")));
+
+    [Fact]
+    public void Try_bang_is_worth_the_value() =>
+        Assert.Equal("int", TypeFacts.Display(TypeOfTry("fn t(): int { return try! mayThrow(); }")));
+
+    [Fact]
+    public void The_expression_form_unifies_its_value_and_its_clauses()
+    {
+        Assert.Equal("int", TypeFacts.Display(TypeOfTry("fn t() { let x = try mayThrow() catch (_) 0; }")));
+        // A null clause makes the value optional, as a null arm does; a clause that leaves adds nothing.
+        Assert.Equal("?int", TypeFacts.Display(TypeOfTry("fn t() { let x = try mayThrow() catch (_) null; }")));
+        Assert.Equal("int", TypeFacts.Display(TypeOfTry("fn t() { let x = try mayThrow() catch (_) { return; }; }")));
+    }
+
+    [Fact]
+    public void Clauses_of_another_type_do_not_unify() =>
+        AssertCode(Diags("""fn t() { let x = try mayThrow() catch (_) "none"; }"""), "LYR-SEM0016");
+
+    [Fact]
+    public void A_context_types_every_part() =>
+        AssertClean(Diags("fn t() { let x: ?int = try mayThrow() catch (_: NotFound) null; }"));
+
+    [Fact]
+    public void Try_question_and_try_bang_take_every_error() =>
+        AssertClean(Diags("fn t(): int { let a = try? mayThrowBoth(); return try! mayThrowAny(); }"));
+
+    [Fact]
+    public void The_expression_forms_clauses_take_what_they_cover()
+    {
+        AssertClean(Diags("fn t(): int { return try mayThrow() catch (_: NotFound) 0; }"));
+        AssertCode(Diags("fn t(): int { return try mayThrowBoth() catch (_: NotFound) 0; }"), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_clause_of_the_expression_form_is_not_inside_its_own_try() =>
+        // The throw in the first clause passes its sister: nothing covers 'Parse' (E9 C6).
+        AssertCode(Diags("fn t(): int { return try mayThrow() catch (_: NotFound) throw Parse.Empty catch (_: Parse) 1; }"),
+            "LYR-SEM0034");
+
+    [Fact]
+    public void A_clause_without_a_value_leaves()
+    {
+        AssertCode(Diags("fn t(): int { return try mayThrow() catch (_) { safe(); }; }"), "LYR-SEM0033");
+        AssertClean(Diags("fn t(): int { return try mayThrow() catch (_) { return 0; }; }"));
+    }
+
+    [Fact]
+    public void A_valueless_expression_form_needs_no_value_from_its_clauses() =>
+        AssertClean(Diags("fn s(): void throws NotFound { }\nfn t() { try s() catch (_) { safe(); }; }"));
+
+    [Fact]
+    public void Try_question_over_a_call_without_a_value_stands_as_a_statement()
+    {
+        const string s = "fn s(): void throws NotFound { }\n";
+        AssertClean(Diags(s + "fn t() { try? s(); }"));
+        AssertCode(Diags(s + "fn t() { let x = try? s(); }"), "LYR-SEM0140");
+    }
+
+    [Fact]
+    public void A_catch_all_stands_last_in_the_expression_form_too() =>
+        AssertCode(Diags("fn t(): int { return try mayThrow() catch (_) 0 catch (_: NotFound) 1; }"), "LYR-SEM0035");
+
+    [Fact]
+    public void A_signed_try_over_nothing_warns()
+    {
+        var de = Diags("fn t(): ?int { return try? safe(); }");
+        AssertClean(de);
+        AssertCode(de, "LYR-SEM0139");
+    }
+
+    [Fact]
+    public void A_try_block_whose_errors_an_inner_try_takes_warns()
+    {
+        // Nothing reaches the block's clauses: the try? inside takes all of it.
+        var de = Diags("fn t() { try { let a = try? mayThrow(); } catch (_) { } }");
+        AssertClean(de);
+        AssertCode(de, "LYR-SEM0139");
+    }
+
+    [Fact]
+    public void An_error_an_inner_clause_misses_reaches_the_outer_try()
+    {
+        var de = Diags("""
+            fn t() {
+                try {
+                    try { mayThrow(); } catch (_: DbError) { }
+                } catch (_: NotFound) { }
+            }
+            """);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0139");
+    }
+
+    [Fact]
+    public void What_a_try_question_operand_assigns_is_not_definite_after_it() =>
+        AssertCode(Diags("fn t(): int { var x: int; let y = try? (x = mayThrow()); return x; }"), "LYR-SEM0018");
+
+    [Fact]
+    public void What_the_operand_assigns_counts_when_every_clause_leaves() =>
+        AssertClean(Diags("fn t(): int { var x: int; let y = try (x = mayThrow()) catch (_) { return 0; }; return x; }"));
 }

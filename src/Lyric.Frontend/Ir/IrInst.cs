@@ -211,6 +211,10 @@ public sealed record ErrorBranch(BlockId OnError, BlockId Continue, Span Span) :
 /// Only in a function that throws.</summary>
 public sealed record Propagate(Span Span) : IrTerminator(Span);
 
+/// <summary><c>try!</c> on an error (05 E4, E8): the in-flight error ends the program as a panic
+/// with its message (<c>LYR-RT0010</c>). No <c>defer</c> runs after it, as after any panic.</summary>
+public sealed record PanicError(Span Span) : IrTerminator(Span);
+
 /// <summary>The in-flight error's value, an <c>Error</c> interface value: what a catch clause tests
 /// and binds.</summary>
 public sealed record CurrentError(TempId Dest, IrType Type, Span Span) : IrOp(Span);

@@ -606,6 +606,12 @@ public sealed class CEmitter
             }
         }
 
+        // The members of Error the runtime reports through (05 E6 O4, E8): defined by the module's
+        // unit wherever an error can end the program, declared by an instance's unit that panics.
+        var adapters = !ErrorsEndTheProgram() ? ""
+            : _main ? ReportAdapters(define: true)
+            : Scope().Any(f => f.Blocks.Any(b => b.Terminator is PanicError)) ? ReportAdapters(define: false) : "";
+
         var body = new StringBuilder();
         foreach (var function in Scope()) body.Append(Function(function));
         if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
@@ -613,6 +619,7 @@ public sealed class CEmitter
         if (_constants.Length > 0) _out.AppendLine("/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
         if (tables.Length > 0) _out.Append(tables).AppendLine();
+        if (adapters.Length > 0) _out.Append(adapters).AppendLine();
         _out.Append(body);
         return _out.ToString();
     }
@@ -1082,7 +1089,7 @@ public sealed class CEmitter
     /// <summary>Whether a function handles errors at all: the in-flight error local exists only
     /// where something can set or read it.</summary>
     private bool UsesErrors(IrFunction function) =>
-        function.Blocks.Any(b => b.Terminator is Throw or ErrorBranch or Propagate
+        function.Blocks.Any(b => b.Terminator is Throw or ErrorBranch or Propagate or PanicError
             || b.Insts.Any(op => op is CurrentError or ClearError
                 || op is Call c && _module.Functions[c.Target.Value].Throws
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
@@ -1116,7 +1123,7 @@ public sealed class CEmitter
         {
             // An error that escapes main (05 E6 O4): its message and its causes on the error
             // writer, and the exit code 1 — through Error's own table, which the runtime cannot name.
-            var (message, cause) = ErrorReport(text);
+            var (message, cause) = ReportNames();
             var call = $"{name}(&lyr_e)";
             text.AppendLine($"static int64_t lyr_entry(void) {{ {init}LyrErr *lyr_e = NULL; "
                 + (IsVoid(entry.ReturnType) ? $"{call}; int64_t lyr_r = 0; " : $"int64_t lyr_r = {call}; ")
@@ -1135,25 +1142,52 @@ public sealed class CEmitter
         return text.ToString();
     }
 
-    /// <summary>
-    /// The two members of <c>Error</c> the report calls (05 E6 O1, O4): <c>message()</c> and
-    /// <c>cause()</c>, each through the value's own table. Where no type of the program conforms,
-    /// nothing can be thrown, and the report gets no members.
-    /// </summary>
-    private (string Message, string Cause) ErrorReport(StringBuilder text)
+    /// <summary>Whether an error can end the program: <c>main</c> throws (05 E6 O4), or a
+    /// <c>try!</c> panics with an error's message (E4, E8). Asked of the whole module, so every
+    /// unit agrees on whether the adapters exist.</summary>
+    private bool ErrorsEndTheProgram() =>
+        _module.EntryFunction is { } entry && _module.Functions[entry.Value].Throws
+        || _module.Functions.Any(f => f.Blocks.Any(b => b.Terminator is PanicError));
+
+    /// <summary><c>std.core</c>'s <c>Error</c> with the slots the report calls, or -1 where no type
+    /// of the program conforms — nothing can be thrown then, and the report gets no members.</summary>
+    private (int Index, int Message, int Cause) ErrorSlots()
     {
         var index = Enumerable.Range(0, _module.Types.Count).FirstOrDefault(i =>
             _module.Types[i].IsInterface && _module.Types[i].Name == "Error" && _module.Types[i].Module == "std.core", -1);
-        if (index < 0 || !_module.Impls.Any(r => r.Interface.Value == index)) return ("NULL", "NULL");
+        if (index < 0 || !_module.Impls.Any(r => r.Interface.Value == index)) return (-1, -1, -1);
         var slots = _module.Types[index].MethodSlots;
         var message = Array.IndexOf(slots, "message");
         var cause = Array.IndexOf(slots, "cause");
-        if (message < 0 || cause < 0) return ("NULL", "NULL");
+        return message < 0 || cause < 0 ? (-1, -1, -1) : (index, message, cause);
+    }
+
+    /// <summary>The adapters the runtime calls, or <c>NULL</c> for each where there are none.</summary>
+    private (string Message, string Cause) ReportNames() =>
+        ErrorSlots().Index < 0 ? ("NULL", "NULL") : ("lyr_error_message", "lyr_error_cause");
+
+    /// <summary>
+    /// The two members of <c>Error</c> the runtime calls (05 E6 O1, O4, E8): <c>message()</c> and
+    /// <c>cause()</c>, each through the value's own table. External, so an instance's unit that
+    /// panics with an error reaches the module's definition.
+    /// </summary>
+    private string ReportAdapters(bool define)
+    {
+        var (index, message, cause) = ErrorSlots();
+        if (index < 0) return "";
+        var text = new StringBuilder();
+        text.AppendLine("/* the members of Error the runtime reports through */");
+        if (!define)
+        {
+            text.AppendLine("const LyrStr *lyr_error_message(LyrIface e);");
+            text.AppendLine("int lyr_error_cause(LyrIface e, LyrIface *next);");
+            return text.ToString();
+        }
         var causeType = SlotSignatures(index)[cause].Return;
-        text.AppendLine($"static const LyrStr *lyr_error_message(LyrIface e) {{ return ((const {VtType(index)} *)e.vt)->s{message}(e); }}");
-        text.AppendLine($"static int lyr_error_cause(LyrIface e, LyrIface *next) {{ {CType(causeType)} c = ((const {VtType(index)} *)e.vt)->s{cause}(e); "
+        text.AppendLine($"const LyrStr *lyr_error_message(LyrIface e) {{ return ((const {VtType(index)} *)e.vt)->s{message}(e); }}");
+        text.AppendLine($"int lyr_error_cause(LyrIface e, LyrIface *next) {{ {CType(causeType)} c = ((const {VtType(index)} *)e.vt)->s{cause}(e); "
             + "*next = c.value; return c.has; }");
-        return ("lyr_error_message", "lyr_error_cause");
+        return text.ToString();
     }
 
     // --- functions -------------------------------------------------------------------------------
@@ -1602,6 +1636,8 @@ public sealed class CEmitter
         Propagate => IsVoid(_function.ReturnType)
             ? "*lyr_err = lyr_e; return;"
             : $"*lyr_err = lyr_e; return {ZeroValue(_function.ReturnType)};",
+        // 'try!' (05 E4, E8): the error's message through Error's own table, then the panic.
+        PanicError => $"lyr_panic_error(lyr_e, {ReportNames().Message});",
         _ => throw new InvalidOperationException($"the C emitter has no case for {terminator.GetType().Name}; the gate let it through"),
     };
 }

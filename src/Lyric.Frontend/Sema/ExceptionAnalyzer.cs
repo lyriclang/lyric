@@ -14,7 +14,8 @@ namespace Lyric.Sema;
 /// <item>every type a site may throw is covered by a <c>catch</c> of an enclosing block or by the
 /// context's <c>throws</c> set (K8, <c>LYR-SEM0034</c>) — a <c>throw</c> needs no mark, but the
 /// same cover;</item>
-/// <item>a <c>try</c> under which nothing throws is warned about (<c>LYR-SEM0139</c>).</item>
+/// <item>a <c>try</c> no error reaches is warned about (<c>LYR-SEM0139</c>): nothing under it
+/// throws, or a <c>try</c> inside takes all of it.</item>
 /// </list>
 ///
 /// <para>A lambda is a context of its own — its body runs later, outside every <c>try</c> around
@@ -41,11 +42,13 @@ internal sealed class ExceptionAnalyzer
         public List<Frame> Frames { get; } = new();
     }
 
-    /// <summary>An open <c>try</c>: a mark over an expression, or a block with its clauses. Reached
-    /// when a site stands under it.</summary>
-    private sealed class Frame(CatchClause[] catches)
+    /// <summary>An open <c>try</c>: a mark over an expression, a block or an expression with its
+    /// clauses, or a <c>try?</c> or <c>try!</c>, which takes every error itself. Reached when an
+    /// error of a site under it gets that far — no <c>try</c> inside took it.</summary>
+    private sealed class Frame(CatchClause[] catches, bool takesAll)
     {
         public CatchClause[] Catches { get; } = catches;
+        public bool TakesAll { get; } = takesAll;
         public bool Reached { get; set; }
     }
 
@@ -154,7 +157,7 @@ internal sealed class ExceptionAnalyzer
             {
                 // The block form marks its whole body (05 E4: the block form of the same thing);
                 // a clause is not covered by its own try (E9 C6), only by those around it.
-                var frame = Open(tr.Catches);
+                var frame = Open(tr.Catches, takesAll: false);
                 try { AnalyzeStmt(tr.Body); }
                 finally { Close(); }
                 if (!frame.Reached)
@@ -214,12 +217,16 @@ internal sealed class ExceptionAnalyzer
                 break;
             case TryExpr tried:
             {
-                var frame = Open([]);
+                // 'try?' and 'try!' take every error themselves; the expression form's clauses take
+                // what they cover and are not inside their own try (E9 C6), as the block's are not.
+                var frame = Open(tried.Catches, takesAll: tried.Kind != TryKind.Propagate);
                 try { AnalyzeExpr(tried.Value); }
                 finally { Close(); }
                 if (!frame.Reached)
-                    _de.Report("LYR-SEM0139", Severity.Warning, tried.KeywordSpan,
-                        "nothing under this 'try' throws — the mark says a call may fail where none can");
+                    _de.Report("LYR-SEM0139", Severity.Warning, tried.KeywordSpan, tried.Catches.Length > 0
+                        ? "nothing under this 'try' throws — its 'catch' clauses never run"
+                        : $"nothing under this '{Spelled(tried.Kind)}' throws — the mark says a call may fail where none can");
+                foreach (var c in tried.Catches) AnalyzeStmt(c.Body);
                 break;
             }
             case UnaryExpr u: AnalyzeExpr(u.Operand); Operator(u); break;
@@ -295,11 +302,9 @@ internal sealed class ExceptionAnalyzer
                 $"{what} throws {SetText(thrown)} — mark it 'try', so the propagation is seen where it happens");
             return;
         }
-        foreach (var frame in _context.Frames) frame.Reached = true;
-
         foreach (var t in thrown)
         {
-            if (Caught(t) || _context.Declared.Any(d => _covers(t, d, _module))) continue;
+            if (Taken(t) || _context.Declared.Any(d => _covers(t, d, _module))) continue;
             _de.Report("LYR-SEM0034", Severity.Error, at, _context.CanDeclare
                 ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' here and no 'throws' of "
                   + $"{_context.Name} covers — catch it, or add it to the 'throws'"
@@ -310,22 +315,33 @@ internal sealed class ExceptionAnalyzer
         }
     }
 
-    /// <summary>Does a clause of an enclosing <c>try</c> block catch it — a catch-all, or a clause
-    /// whose type covers it?</summary>
-    private bool Caught(LyrType thrown)
+    /// <summary>
+    /// Does an enclosing <c>try</c> take it — a <c>try?</c> or <c>try!</c>, a catch-all, or a clause
+    /// whose type covers it? The error reaches the open <c>try</c>s from the innermost out, up to
+    /// and including the one that takes it, and no further.
+    /// </summary>
+    private bool Taken(LyrType thrown)
     {
         for (var i = _context.Frames.Count - 1; i >= 0; i--)
-            foreach (var clause in _context.Frames[i].Catches)
+        {
+            var frame = _context.Frames[i];
+            frame.Reached = true;
+            if (frame.TakesAll) return true;
+            foreach (var clause in frame.Catches)
             {
                 if (clause.BindingType is null) return true;
                 if (_types.CatchType(clause) is not { } caught || _covers(thrown, caught, _module)) return true;
             }
+        }
         return false;
     }
 
-    private Frame Open(CatchClause[] catches)
+    private static string Spelled(TryKind kind) =>
+        kind switch { TryKind.Optional => "try?", TryKind.Force => "try!", _ => "try" };
+
+    private Frame Open(CatchClause[] catches, bool takesAll)
     {
-        var frame = new Frame(catches);
+        var frame = new Frame(catches, takesAll);
         _context.Frames.Add(frame);
         return frame;
     }

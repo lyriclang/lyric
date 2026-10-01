@@ -86,7 +86,7 @@ public static class IrShape
         CondBranch c => new[] { c.Cond },
         Unreachable => Array.Empty<TempId>(),
         Throw t => new[] { t.Value },
-        ErrorBranch or Propagate => Array.Empty<TempId>(),
+        ErrorBranch or Propagate or PanicError => Array.Empty<TempId>(),
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };
@@ -156,7 +156,7 @@ public static class IrShape
         // fail to its continuation or its landing; the error leaves the function by Propagate.
         Throw t => new[] { t.Landing },
         ErrorBranch e => new[] { e.Continue, e.OnError },
-        Unreachable or Propagate => Array.Empty<BlockId>(),
+        Unreachable or Propagate or PanicError => Array.Empty<BlockId>(),
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };
@@ -249,7 +249,7 @@ public static class IrShape
         },
         Throw t => t with { Value = temp(t.Value), Landing = block(t.Landing) },
         ErrorBranch e => e with { OnError = block(e.OnError), Continue = block(e.Continue) },
-        Unreachable or Propagate => terminator,
+        Unreachable or Propagate or PanicError => terminator,
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };

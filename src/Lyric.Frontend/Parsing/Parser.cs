@@ -226,12 +226,35 @@ public sealed partial class Parser
         if (op is TokenKind.Try && _buffer.Peek(1).TokenKind is not TokenKind.LBrace)
         {
             var kw = _buffer.Advance();
+            // 'try?' and 'try!' (05 E4): the sign written against the keyword. With a space between,
+            // '!' is the negation of what follows — 'try !done()' marks 'not done()'.
+            var kind = TryKind.Propagate;
+            var keyword = kw.Span;
+            if (_buffer.Current.TokenKind is TokenKind.Question or TokenKind.Exclamation
+                && _buffer.Current.Span.Start == kw.Span.End)
+            {
+                var sign = _buffer.Advance();
+                kind = sign.TokenKind == TokenKind.Question ? TryKind.Optional : TryKind.Force;
+                keyword = Span.Union(kw.Span, sign.Span);
+            }
+            var spelled = _sm.Slice(keyword).ToString();
             if (!atStart)
-                _de.Report("LYR-PAR0050", Severity.Error, kw.Span,
-                    "'try' covers everything to its right, so it stands at the start of the expression "
-                    + "it covers — 'try a + b', not 'a + try b'");
+                _de.Report("LYR-PAR0050", Severity.Error, keyword,
+                    $"'{spelled}' covers everything to its right, so it stands at the start of the expression "
+                    + $"it covers — '{spelled} a + b', not 'a + {spelled} b'");
             var marked = atStart ? ParseExpr(0) : ParsePrefix();
-            return new TryExpr(marked, Span.Union(kw.Span, marked.Span)) { KeywordSpan = kw.Span };
+
+            // 'try e catch (x: A) v' (08 Y4): the clauses belong to the nearest 'try' on their left,
+            // so a clause body that is a 'try' of its own takes the clauses after it.
+            var catches = new List<CatchClause>();
+            while (_buffer.Check(TokenKind.Catch))
+                catches.Add(ParseCatch(expressionForm: true));
+            if (catches.Count > 0 && kind != TryKind.Propagate)
+                _de.Report("LYR-PAR0051", Severity.Error, catches[0].Span,
+                    $"'{spelled}' takes every error itself — a 'catch' clause belongs to a plain 'try'");
+            var end = catches.Count > 0 ? catches[^1].Span : marked.Span;
+            return new TryExpr(marked, Span.Union(kw.Span, end))
+                { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray() };
         }
         // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
         // is still the exclusive or, which the binary loop takes before this is asked.

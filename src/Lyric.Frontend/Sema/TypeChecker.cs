@@ -218,6 +218,11 @@ public sealed class TypeChecker
     /// the owner around <see cref="CheckBlock"/>, and only read by the tail itself.</summary>
     private LyrType? _tailExpected;
 
+    /// <summary>The expression an expression statement stands for while it is checked: where a
+    /// value goes nowhere, <c>try?</c> over a <c>void</c> call has nothing to make optional and
+    /// only drops the error.</summary>
+    private Expr? _statementValue;
+
     /// <summary>Is <paramref name="f"/> the <c>panic</c> function, no matter which of the two names
     /// reached it?</summary>
     private bool IsPanic(FunctionSymbol f) =>
@@ -1577,7 +1582,14 @@ public sealed class TypeChecker
                 else if (!TypeFacts.IsVoid(_currentReturn) && !_currentReturn.IsError)
                     _de.Report("LYR-SEM0001", Severity.Error, r.Span, "return without a value in a non-void function");
                 break;
-            case ExprStmt es: CheckExpr(es.Expr, scope); break;
+            case ExprStmt es:
+            {
+                var savedStatement = _statementValue;
+                _statementValue = es.Expr;
+                CheckExpr(es.Expr, scope);
+                _statementValue = savedStatement;
+                break;
+            }
             case ThrowStmt t:
                 CheckThrown(CheckExpr(t.Value, scope), t.Span);
                 break;
@@ -1905,7 +1917,79 @@ public sealed class TypeChecker
         finally { _currentModule = saved; }
     }
 
-    private void CheckCatch(CatchClause clause, SymbolTable scope)
+    private void CheckCatch(CatchClause clause, SymbolTable scope) => CheckBlock(clause.Body, BindCatch(clause, scope));
+
+    /// <summary>
+    /// The <c>try</c> family as an expression (design/v5/spec/05 E4). A mark is worth its operand,
+    /// and so is <c>try!</c> — an error panics. <c>try?</c> is worth <c>?T</c>, never flattened: "the
+    /// call failed" stays apart from "the call gave null". The expression form is worth its operand
+    /// or the value of the clause that took the error, unified like the arms of a <c>match</c>.
+    /// </summary>
+    private LyrType CheckTry(TryExpr tried, SymbolTable scope, LyrType? expected)
+    {
+        var asStatement = ReferenceEquals(_statementValue, tried);
+        // Clauses after 'try?' or 'try!' were refused by the parser (PAR0051); they are checked all
+        // the same, so nothing downstream meets a body without types.
+        if (tried.Kind != TryKind.Propagate)
+            foreach (var clause in tried.Catches) CheckCatchValue(clause, scope, null, valueless: true);
+        switch (tried.Kind)
+        {
+            case TryKind.Optional:
+            {
+                var value = CheckExpr(tried.Value, scope, expected is Optional wanted ? wanted.Inner : null);
+                if (value.IsError) return value;
+                if (!TypeFacts.IsVoid(value)) return new Optional(value);
+                // Nothing to make optional: as a statement it drops the error, and that is all it does.
+                return asStatement ? value : Report(tried.KeywordSpan, "LYR-SEM0140",
+                    "'try?' over an expression without a value has nothing to make optional — it stands "
+                    + "as a statement, where it drops the error");
+            }
+            case TryKind.Force:
+                return CheckExpr(tried.Value, scope, expected);
+        }
+
+        var operand = CheckExpr(tried.Value, scope, expected);
+        if (tried.Catches.Length == 0) return operand;
+
+        // With a context every part checks against it and the expression HAS it, as an 'if' or a
+        // 'match' expression does (§6.9); without one the parts unify.
+        var context = expected is not null && !expected.IsError;
+        if (context) CheckAssignable(tried.Value, operand, expected!, tried.Value.Span);
+        var values = new List<LyrType> { operand };
+        var valueless = TypeFacts.IsVoid(operand);
+        foreach (var clause in tried.Catches)
+            if (CheckCatchValue(clause, scope, context ? expected : null, valueless) is { } value) values.Add(value);
+        return context ? expected! : UnifyArms(values, tried.Span, "a 'try' expression's value and its clauses");
+    }
+
+    /// <summary>A clause of the expression form: the binding as for the statement, the body a value
+    /// block whose tail is the clause's value. A body without a tail leaves — by return, throw,
+    /// break or continue — unless the expression has no value at all; leaving, it contributes
+    /// nothing (<c>null</c>).</summary>
+    private LyrType? CheckCatchValue(CatchClause clause, SymbolTable scope, LyrType? expected, bool valueless)
+    {
+        var catchScope = BindCatch(clause, scope);
+        var savedTail = _tailExpected;
+        _tailExpected = valueless ? null : expected;
+        CheckBlock(clause.Body, catchScope);
+        _tailExpected = savedTail;
+
+        if (clause.Body.Tail is { } tail)
+        {
+            var value = _result.TypeOf(tail.Expr);
+            if (expected is not null && !valueless) CheckAssignable(tail.Expr, value, expected, tail.Span);
+            return value;
+        }
+        if (valueless || Flow.AlwaysExits(clause.Body, _result)) return null;
+        _de.Report("LYR-SEM0033", Severity.Error, clause.Span,
+            "a clause of a 'try' expression delivers its value — end it in a tail expression without ';', "
+            + "or leave on every path");
+        return null;
+    }
+
+    /// <summary>A clause's binding in a scope of its own: the type it names, checked to be an error,
+    /// or the root for a clause without one.</summary>
+    private SymbolTable BindCatch(CatchClause clause, SymbolTable scope)
     {
         var catchScope = new SymbolTable(scope);
         LyrType bt;
@@ -1932,7 +2016,7 @@ public sealed class TypeChecker
             if (clause.BindingName is not null) catchScope.TryDeclare(local);
             _result.BindRef(clause, local); // for definite-assignment analysis: the catch assigns the binding
         }
-        CheckBlock(clause.Body, catchScope);
+        return catchScope;
     }
 
     private void CheckCondition(Expr cond, SymbolTable scope)
@@ -2337,9 +2421,9 @@ public sealed class TypeChecker
                 CheckThrown(CheckExpr(te.Value, scope), te.Span);
                 return LyrType.Never;
             }
-            // 'try e' (design/v5/spec/05 E4): the value and the type are e's; what the mark means —
-            // which sites it covers, where they propagate — is the exception analysis's question.
-            case TryExpr tried: return CheckExpr(tried.Value, scope, expected);
+            // The 'try' family (design/v5/spec/05 E4): the types here; what each form covers —
+            // which sites, where they propagate — is the exception analysis's question.
+            case TryExpr tried: return CheckTry(tried, scope, expected);
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -7654,7 +7738,7 @@ public sealed class TypeChecker
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
-                case TryExpr tr: WalkNode(tr.Value); return;
+                case TryExpr tr: WalkNode(tr.Value); foreach (var c in tr.Catches) WalkNode(c.Body); return;
                 case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;

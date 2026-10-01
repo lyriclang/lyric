@@ -228,6 +228,26 @@ internal sealed class FlowAnalyzer
             case ResumeExpr re: AnalyzeExpr(re.Coroutine, assigned); return;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner, assigned); return;
             case ThrowExpr te: AnalyzeExpr(te.Value, assigned); return;
+            // 'try?' may fail anywhere in its operand and go on with null: what the operand assigns
+            // is definite only inside it.
+            case TryExpr { Kind: TryKind.Optional } tr: AnalyzeExpr(tr.Value, Clone(assigned)); return;
+            // The expression form, as the block form: the operand may have failed mid-way, so what it
+            // assigns counts afterwards only when every clause leaves (§7.7).
+            case TryExpr { Catches.Length: > 0 } tr:
+            {
+                var afterValue = Clone(assigned);
+                AnalyzeExpr(tr.Value, afterValue);
+                var everyClauseLeaves = true;
+                foreach (var c in tr.Catches)
+                {
+                    var clauseSet = Clone(assigned);
+                    if (_types.RefOf(c) is { } bind) clauseSet.Add(bind); // the catch assigns the binding
+                    AnalyzeStatements(c.Body.Statements, clauseSet);
+                    if (!Flow.AlwaysExits(c.Body, _types)) everyClauseLeaves = false;
+                }
+                if (everyClauseLeaves) assigned.UnionWith(afterValue);
+                return;
+            }
             case TryExpr tr: AnalyzeExpr(tr.Value, assigned); return;
             case PostfixExpr p: AnalyzeExpr(p.Operand, assigned); return;
             case CallExpr c:

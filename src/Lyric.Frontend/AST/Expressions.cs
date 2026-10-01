@@ -50,13 +50,39 @@ public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
 // 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
 // ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
 public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
+/// <summary>Which member of the <c>try</c> family a <see cref="TryExpr"/> is (design/v5/spec/05
+/// E4; 08 Y4).</summary>
+public enum TryKind
+{
+    /// <summary><c>try e</c>: an error goes on — to a clause of this expression, to a <c>catch</c>
+    /// around it, or out of the function.</summary>
+    Propagate,
+
+    /// <summary><c>try? e</c>: an error becomes <c>null</c>. The value is <c>?T</c>, never
+    /// flattened — a <c>?int</c> operand makes a <c>??int</c>, so "failed" stays apart from "gave
+    /// null".</summary>
+    Optional,
+
+    /// <summary><c>try! e</c>: an error is a panic (05 E8, <c>LYR-RT0010</c>).</summary>
+    Force,
+}
+
 /// <summary><c>try e</c> (design/v5/spec/05 E1, E4; 08 Y4): marks every throw site in <c>e</c> —
 /// the whole expression to its right (<c>try a + b</c> is <c>try (a + b)</c>) — as propagated to the
-/// enclosing function, or to a <c>catch</c> around it. The value is <c>e</c>'s.</summary>
+/// enclosing function, or to a <c>catch</c> around it. The value is <c>e</c>'s. <c>try?</c> and
+/// <c>try!</c> take every error themselves (<see cref="Kind"/>); <c>try e catch (x: A) v</c> takes
+/// what its clauses cover and is worth the taking clause's value then.</summary>
 public sealed record TryExpr(Expr Value, Span Span) : Expr(Span)
 {
-    /// <summary>The <c>try</c> keyword alone, where a diagnostic about the mark itself points.</summary>
+    /// <summary>The keyword alone — with its <c>?</c> or <c>!</c> — where a diagnostic about the
+    /// mark itself points.</summary>
     public required Span KeywordSpan { get; init; }
+
+    public TryKind Kind { get; init; }
+
+    /// <summary>The clauses of the expression form, in order; empty for a mark. A clause body is a
+    /// value block: <c>catch (e) v</c> is <c>catch (e) { v }</c> (<see cref="CatchClause.ExpressionBody"/>).</summary>
+    public CatchClause[] Catches { get; init; } = [];
 }
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);

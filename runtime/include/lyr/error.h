@@ -6,6 +6,7 @@
 #define LYR_ERROR_H
 
 #include "lyr/types.h"
+#include "lyr/panic.h"
 
 /* The record a throw allocates (01 L5 E2): the thrown value as an `Error` interface value - the
  * object, or the box a value was copied into, with its table - and what lives beside the value
@@ -32,5 +33,9 @@ struct LyrStr;
 typedef const struct LyrStr *(*LyrErrMessage)(LyrIface error);
 typedef int (*LyrErrCause)(LyrIface error, LyrIface *next);
 int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause);
+
+/* `try!` on an error (05 E4, E8): a panic, code RT0010, with the error's message - or without one
+ * where the program has no member to ask. */
+LYR_NORETURN void lyr_panic_error(const LyrErr *err, LyrErrMessage message);
 
 #endif

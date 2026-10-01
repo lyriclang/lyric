@@ -104,7 +104,7 @@ public sealed record MatchStmt(Expr Scrutinee, MatchArm[] Arms, Span Span) : Stm
 public sealed record TryStmt(Block Body, CatchClause[] Catches, Span Span) : Stmt(Span);
 
 // BindingName == null means '_', a catch-all without a binding
-// BindingType == null: catch-all with a binding (Throwable); otherwise a typed catch.
+// BindingType == null: catch-all with a binding (an Error); otherwise a typed catch.
 /// <remarks>
 /// The grammar gives a catch binding exactly one token, <c>_</c> included, so
 /// <see cref="INamedDecl.NameSpan"/> covers it in either form and <see cref="INamedDecl.Name"/>
@@ -116,6 +116,11 @@ public sealed record TryStmt(Block Body, CatchClause[] Catches, Span Span) : Stm
 public sealed record CatchClause(string? BindingName, TypeNode? BindingType, Block Body, Span Span) : Node(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary>A clause of the expression form written without braces, <c>catch (e) v</c>: the
+    /// <see cref="Body"/> is the value block <c>{ v }</c> the parser made of it, and the formatter
+    /// writes it back bare.</summary>
+    public bool ExpressionBody { get; init; }
 
     string INamedDecl.Name => BindingName ?? "_";
 }

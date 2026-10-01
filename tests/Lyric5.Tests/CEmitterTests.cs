@@ -68,6 +68,7 @@ public class CEmitterTests
     [InlineData("errors")]
     [InlineData("error_paths")]
     [InlineData("uncaught")]
+    [InlineData("try_forms")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -201,6 +202,7 @@ public class CEmitterTests
                 + "repeat 3 1 0 0 true\nnested 2 5 0\n");
             data.Add("errors", profile, 0, ERRORS_EXPECTED);
             data.Add("error_paths", profile, 0, ERROR_PATHS_EXPECTED);
+            data.Add("try_forms", profile, 0, TRY_FORMS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -300,6 +302,10 @@ public class CEmitterTests
         + "loop: 1 2 skip 4 done\nlambda: caught inside 9\nnested: inner clause caught\nclausereturn defer\n"
         + "clausereturn: 42\n";
 
+    private const string TRY_FORMS_EXPECTED =
+        "a 42 b -1\nc true -7\nd false\ne true 42\nf 42\ng -1\nh caught disk\nh fallback\ni data\nj 2\n"
+        + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
+
     /// <summary>An error that escapes main (design/v5/spec/05 E6 O4): the output up to the throw,
     /// then on the error stream its message and each cause in the chain, and the exit code 1 — a
     /// panic's is 101.</summary>
@@ -312,6 +318,22 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
         Assert.Equal("error: config\n  caused by: disk\n", result.Stderr.Replace("\r\n", "\n"));
+    }
+
+    /// <summary><c>try!</c> on an error (design/v5/spec/05 E4, E8): a panic, <c>LYR-RT0010</c>, with
+    /// the error's message and the trace at the <c>try!</c>'s line — and no <c>defer</c> runs, main's
+    /// included.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void Try_bang_on_an_error_panics_with_its_message(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("forced"), "forced", profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("panic [LYR-RT0010]: 'try!' on an error: boom", lines[0]);
+        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]forced\.lyr:11\)$", lines[1]);
     }
 
     [Theory]
