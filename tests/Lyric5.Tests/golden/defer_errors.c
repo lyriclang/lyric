@@ -9,6 +9,7 @@ typedef struct lyr_vt_ty1 lyr_vt_ty1;
 const char lyr_ifid_ty1[] = "std.core.Error";
 typedef struct lyr_ty2_Second lyr_ty2_Second;
 typedef struct lyr_ty3_Third lyr_ty3_Third;
+typedef struct lyr_ty4_Exception lyr_ty4_Exception;
 struct lyr_ty0_First {
     LyrObj header;
 };
@@ -33,6 +34,16 @@ struct lyr_ty3_Third {
 _Static_assert(sizeof(lyr_ty3_Third) == 8, "layout of lyr_ty3_Third");
 extern const LyrItable lyr_itab_ty3[];
 const LyrDesc lyr_desc_ty3_Third = { sizeof(lyr_ty3_Third), 0, 0, 0, NULL, "main.Third", lyr_itab_ty3 };
+struct lyr_ty4_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface1 f_inner;
+};
+_Static_assert(sizeof(lyr_ty4_Exception) == 40, "layout of lyr_ty4_Exception");
+_Static_assert(offsetof(lyr_ty4_Exception, f_text) == 8, "layout of lyr_ty4_Exception");
+_Static_assert(offsetof(lyr_ty4_Exception, f_inner) == 16, "layout of lyr_ty4_Exception");
+static const uint64_t lyr_refmap_ty4[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty4_Exception = { sizeof(lyr_ty4_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty4, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(18) lyr_lit0 = LYR_STR_INIT("earlier defer ran");

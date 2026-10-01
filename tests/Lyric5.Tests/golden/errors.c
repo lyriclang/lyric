@@ -14,6 +14,7 @@ typedef struct lyr_vt_ty5 lyr_vt_ty5;
 const char lyr_ifid_ty5[] = "main.IoError";
 typedef struct lyr_ty6_OutOfRange lyr_ty6_OutOfRange;
 typedef struct lyr_ty7_Wrap lyr_ty7_Wrap;
+typedef struct lyr_ty8_Exception lyr_ty8_Exception;
 struct lyr_ty1_ParseError_Empty {
     uint8_t lyr_unit;
 };
@@ -56,6 +57,16 @@ _Static_assert(offsetof(lyr_ty7_Wrap, f_inner) == 16, "layout of lyr_ty7_Wrap");
 extern const LyrItable lyr_itab_ty7[];
 static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty7_Wrap = { sizeof(lyr_ty7_Wrap), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "main.Wrap", lyr_itab_ty7 };
+struct lyr_ty8_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface3 f_inner;
+};
+_Static_assert(sizeof(lyr_ty8_Exception) == 40, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_text) == 8, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_inner) == 16, "layout of lyr_ty8_Exception");
+static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty8_Exception = { sizeof(lyr_ty8_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.core.Exception", NULL };
 typedef struct { LyrObj header; lyr_ty0_ParseError value; } lyr_box_ty0_ParseError;
 _Static_assert(sizeof(lyr_box_ty0_ParseError) == 32, "layout of lyr_box_ty0_ParseError");
 _Static_assert(offsetof(lyr_box_ty0_ParseError, value) == 8, "layout of lyr_box_ty0_ParseError");

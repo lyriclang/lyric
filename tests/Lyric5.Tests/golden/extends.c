@@ -13,6 +13,7 @@ typedef struct lyr_ty4_Pair_int__string_ lyr_ty4_Pair_int__string_;
 typedef struct lyr_ty5_Box_int_ lyr_ty5_Box_int_;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "std.core.Error";
+typedef struct lyr_ty7_Exception lyr_ty7_Exception;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -49,6 +50,17 @@ struct lyr_vt_ty6 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface6;
+struct lyr_ty7_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface6 f_inner;
+};
+_Static_assert(sizeof(lyr_ty7_Exception) == 40, "layout of lyr_ty7_Exception");
+_Static_assert(offsetof(lyr_ty7_Exception, f_text) == 8, "layout of lyr_ty7_Exception");
+_Static_assert(offsetof(lyr_ty7_Exception, f_inner) == 16, "layout of lyr_ty7_Exception");
+static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty7_Exception = { sizeof(lyr_ty7_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "std.core.Exception", NULL };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
 _Static_assert(sizeof(LyrStr *) == 8, "layout of string[]");
@@ -336,26 +348,26 @@ bb0:;
     return t3;
 }
 
-#line 209 "stdlib5/std/core.lyr"
+#line 235 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this) {
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 209
+#line 235
     t0 = l0_this;
-#line 209
+#line 235
     t1 = lyr_str_from_int(t0);
-#line 209
+#line 235
     return t1;
 }
 
-#line 474 "stdlib5/std/core.lyr"
+#line 500 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 474
+#line 500
     t0 = l0_this;
-#line 474
+#line 500
     return t0;
 }
 

@@ -23,6 +23,11 @@ public sealed record TailExprStmt(Expr Expr, Span Span) : Stmt(Span);
 public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Expr? Initializer, Span Span) : Stmt(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>using let f = open(p);</c> (design/v5/spec/05 E7 R1–R2, 08 Y5 S5): the
+    /// <c>defer try f.close();</c> the binding owes its scope, written by the parser at the
+    /// keyword — one LIFO list with the scope's other defers. <c>null</c> for a plain binding.</summary>
+    public DeferStmt? Cleanup { get; init; }
 }
 
 /// <summary>

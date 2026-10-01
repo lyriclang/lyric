@@ -26,6 +26,7 @@ typedef struct lyr_ty18__env_main_Scale_scaled_ lyr_ty18__env_main_Scale_scaled_
 typedef struct lyr_ty19__env_main_Pair_adder_ lyr_ty19__env_main_Pair_adder_;
 typedef struct lyr_vt_ty20 lyr_vt_ty20;
 const char lyr_ifid_ty20[] = "std.core.Error";
+typedef struct lyr_ty21_Exception lyr_ty21_Exception;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -167,6 +168,17 @@ struct lyr_vt_ty20 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface20;
+struct lyr_ty21_Exception {
+    LyrObj header;
+    LyrStr *f_text;
+    lyr_opt_iface20 f_inner;
+};
+_Static_assert(sizeof(lyr_ty21_Exception) == 40, "layout of lyr_ty21_Exception");
+_Static_assert(offsetof(lyr_ty21_Exception, f_text) == 8, "layout of lyr_ty21_Exception");
+_Static_assert(offsetof(lyr_ty21_Exception, f_inner) == 16, "layout of lyr_ty21_Exception");
+static const uint64_t lyr_refmap_ty21[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty21_Exception = { sizeof(lyr_ty21_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty21, "std.core.Exception", NULL };
 typedef struct { void (*fn)(void *, lyr_ty0__tuple_); void *env; } lyr_fn_ty0_to_void;
 _Static_assert(sizeof(lyr_fn_ty0_to_void) == 16, "layout of lyr_fn_ty0_to_void");
 typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;

@@ -76,6 +76,32 @@ pub interface Error {
     }
 }
 
+/// The ready-made `Error` for throwing a message (design/v5/spec/12 E06):
+/// `throw Exception { text = "…" };`, with `inner` for the error it wraps. The field is `text`,
+/// not `message`: `Error` requires a METHOD `message()`, and one type's members cannot share a
+/// name.
+pub class Exception :: [Error] {
+    /// What `message()` returns.
+    text: string,
+    /// The error this one wraps, if any: what `cause()` returns.
+    inner: ?Error = null,
+
+    pub fn message(): string {
+        return this.text;
+    }
+
+    pub fn cause(): ?Error {
+        return this.inner;
+    }
+}
+
+/// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).
+/// `close()` may throw: on a normal exit the error leaves like any other, while one is in flight
+/// it is appended to it as suppressed.
+pub interface Closeable {
+    fn close(): void throws Error;
+}
+
 // ---------------------------------------------------------------------------------------------
 // The operator interfaces (design/v5/spec/04 D6). 'a + b' is exactly 'a.add(b)': the conformance
 // is chosen by the static type of 'b', the result is the conformer's 'Out' — 'Self' unless it

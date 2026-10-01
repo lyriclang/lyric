@@ -69,6 +69,10 @@ public sealed class TypeChecker
     /// (design/v5/spec/05 E6 O1). Null without a standard library, and throwability is then not
     /// asked — a missing root must not cascade into every throw.</summary>
     private readonly TypeSymbol? _error;
+
+    /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
+    /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
+    private readonly TypeSymbol? _closeable;
     private readonly FunctionSymbol? _panic; // the builtin panic, returning never
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
@@ -105,6 +109,7 @@ public sealed class TypeChecker
         _binding = binding;
         _de = de;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
+        _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _panic = comp.Builtins.LookupLocal("panic") as FunctionSymbol;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
@@ -1646,6 +1651,17 @@ public sealed class TypeChecker
         var local = new LocalSymbol(bnd.Name, type, bnd.IsMutable, bnd);
         scope.TryDeclare(local);
         _result.BindRef(bnd, local); // for definite-assignment analysis
+
+        // 'using let' (05 E7 R1–R6): what it binds is Closeable (R6), and the close it owes its
+        // scope is checked as the defer it is — a site of this scope, the keyword its mark.
+        if (bnd.Cleanup is { } cleanup && !type.IsError)
+        {
+            if (_closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
+                CheckStmt(cleanup, scope);
+            else
+                _de.Report("LYR-SEM0143", Severity.Error, cleanup.Span,
+                    $"'using' closes what it binds — '{TypeFacts.Display(type)}' is no 'Closeable'");
+        }
     }
 
     /// <summary>
@@ -6362,7 +6378,10 @@ public sealed class TypeChecker
 
     private (Symbol? sym, TypeSymbol? owner) ResolveInitPath(string[] path, SymbolTable scope)
     {
-        var cur = scope.Lookup(path[0]);
+        // A public type of std.core is visible without an import (design/v5/spec/10 U-series), in
+        // an initializer as in a type position: 'Exception { text = "…" }'. The scope wins.
+        var cur = scope.Lookup(path[0])
+            ?? (_comp.FindModule(["std", "core"])?.Members.LookupLocal(path[0]) is TypeSymbol { Visibility: Visibility.Public } core ? core : null);
         if (cur is ImportBindingSymbol ib0) cur = ib0.Target;
         TypeSymbol? owner = null;
         for (var i = 1; i < path.Length && cur is not null; i++)
@@ -7798,7 +7817,7 @@ public sealed class TypeChecker
                     WalkNode(inner.Body);
                     return;
                 case Block b: foreach (var s in b.Statements) WalkNode(s); return;
-                case BindingStmt bd: WalkNode(bd.Initializer); return;
+                case BindingStmt bd: WalkNode(bd.Initializer); WalkNode(bd.Cleanup); return;
                 case DestructuringStmt ds: WalkNode(ds.Initializer); return;
                 case LetPatternStmt lp: WalkNode(lp.Initializer); WalkNode(lp.Else); return;
                 case LetCondExpr lc: WalkNode(lc.Initializer); return;

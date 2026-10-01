@@ -321,7 +321,7 @@ public static class AstDumper
                 Write(n.Expr, indent + 1, sb);
                 break;
             case BindingStmt n:
-                Line(sb, indent, $"{(n.IsMutable ? "Var" : "Let")} {n.Name}", n.Span);
+                Line(sb, indent, $"{(n.Cleanup is not null ? "Using " : "")}{(n.IsMutable ? "Var" : "Let")} {n.Name}", n.Span);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 if (n.Initializer is not null) Write(n.Initializer, indent + 1, sb);
                 break;
