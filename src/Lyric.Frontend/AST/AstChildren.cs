@@ -49,6 +49,7 @@ public static class AstChildren
 
             case GenericParam g:
                 foreach (var c in g.Constraints) yield return c;
+                if (g.Default is not null) yield return g.Default;
                 break;
 
             case Param p:

@@ -55,6 +55,7 @@ public class CEmitterTests
     [InlineData("interfaces")]
     [InlineData("calls")]
     [InlineData("dispatch")]
+    [InlineData("selfish")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -90,6 +91,9 @@ public class CEmitterTests
 
     private const string DISPATCH_EXPECTED =
         "paths 7 7 7\nblocks hello hi\nby 4 4 walk run\nouter run4\n";
+
+    private const string SELFISH_EXPECTED =
+        "self true false 2\nconstraint true 7\ndefault 3 6 4\n";
 
     private const string WITH_EXPECTED =
         "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
@@ -141,6 +145,7 @@ public class CEmitterTests
             data.Add("interfaces", profile, 0, INTERFACES_EXPECTED);
             data.Add("calls", profile, 0, CALLS_EXPECTED);
             data.Add("dispatch", profile, 0, DISPATCH_EXPECTED);
+            data.Add("selfish", profile, 0, SELFISH_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

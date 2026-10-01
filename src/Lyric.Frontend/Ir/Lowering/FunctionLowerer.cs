@@ -4466,6 +4466,30 @@ internal sealed class FunctionLowerer
         return false;
     }
 
+    /// <summary>The static member the constraint promised, on the type the parameter stands for:
+    /// the type's own, or a static of a visible extend block — a builtin's through its symbol.</summary>
+    private TempId? LowerStaticConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
+    {
+        var owner = TypeFacts.SymbolOf(concrete) ?? _typeTable.BuiltinSymbolOf(concrete);
+        var function = owner?.Members.LookupLocal(member.Member) as FunctionSymbol
+                       ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, member.Member));
+        if (function is not { IsStatic: true, Declaration: FunctionDecl declaration }
+            || !TryResolveFunction(function, out var target))
+            throw NotSupported($"the static '{member.Member}' of '{TypeFacts.Display(concrete)}' through a constraint", expr.Span);
+
+        var passed = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, passed, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, passed, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
@@ -4734,6 +4758,14 @@ internal sealed class FunctionLowerer
                      && _substitution.ContainsKey(parameter.Param):
                 return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)),
                     expr);
+
+            // A STATIC interface member through a constraint, 'T.parse(s)' (03 T5): under this
+            // instance's substitution T is a type, and the call is that type's own static — direct.
+            case MemberExpr member
+                when (_types.RefOf(member.Target) as GenericParamSymbol
+                      ?? (_types.TypeOf(member.Target) as NonValueType)?.Symbol as GenericParamSymbol) is { } parameter
+                     && _substitution.TryGetValue(parameter, out var boundTo):
+                return LowerStaticConstraintCall(member, boundTo, expr);
 
             // An INTERFACE'S member bound on a concrete receiver — the qualified form 'Walker.walk(d)'
             // (04 D2 R5) and a member delegated to a field (D1): the sema settled the member on

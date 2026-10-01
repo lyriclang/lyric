@@ -12,10 +12,8 @@ namespace Lyric.Tests.Parsing;
 /// body all contain <c>FunctionDecl</c> — but only a struct or class body ever read it, so all three
 /// gave <c>LYR-PAR0008</c> plus two follow-ups, none of them about the cause.</para>
 ///
-/// <para>An interface is the exception and stays rejected: its members are dispatched through a
-/// vtable slot, which takes a receiver, and a static member has none. Accepting it there produced a
-/// VERIFIER CRASH once the type was used as an interface value — worse than the parse error it
-/// replaced, and in Release, where the verifier may be off, it would be malformed bytecode.</para>
+/// <para>An interface declares static members too (design/v5/spec/03 T5): they have no slot and
+/// are reached through a constraint; the sema keeps such an interface from becoming a value.</para>
 /// </summary>
 public class StaticMemberTests
 {
@@ -91,41 +89,20 @@ public class StaticMemberTests
         Assert.IsType<StructDecl>(module.Declarations[1]);
     }
 
-    // ------------------------------------------------------------------ rejected
+    // ------------------------------------------------------------------ interfaces
 
     [Fact]
-    public void An_interface_member_cannot_be_static()
+    public void An_interface_member_may_be_static()
     {
-        var (_, de) = Parse("interface I { static fn make(): int; }");
-        Assert.Equal(["LYR-PAR0041"], Codes(de));
-    }
-
-    [Fact]
-    public void The_interface_message_names_the_way_out()
-    {
-        var (_, de) = Parse("interface I { static fn make(): int; }");
-        var message = Assert.Single(de.Diagnostics).Message;
-        Assert.Contains("receiver", message);
-        Assert.Contains("implementing type", message);
-    }
-
-    [Fact]
-    public void The_rejected_interface_member_is_kept_as_an_instance_member()
-    {
-        // Reading on rather than skipping: the rest of the member is well formed, and stopping would
-        // report every following member as well.
-        var (module, _) = Parse("interface I { static fn a(): int; fn b(): int; }");
+        // 03 T5: a static interface member declares; it is reached through a constraint,
+        // 'T.make()', as the conformer's own static. (Lyric 4 refused it with LYR-PAR0041.)
+        var (module, de) = Parse("interface I { static fn make(): int; fn tag(): int; }");
+        Assert.False(de.HasErrors);
         var members = Assert.IsType<InterfaceDecl>(module.Declarations[0]).Members;
-        Assert.Equal(["a", "b"], members.Select(m => m.Name));
-        Assert.All(members, m => Assert.False(m.IsStatic));
+        Assert.Equal([true, false], members.Select(m => m.IsStatic));
     }
 
-    [Fact]
-    public void Two_static_interface_members_give_two_messages_and_no_cascade()
-    {
-        var (_, de) = Parse("interface I { static fn a(): int; static fn b(): int; }");
-        Assert.Equal(["LYR-PAR0041", "LYR-PAR0041"], Codes(de));
-    }
+    // ------------------------------------------------------------------ rejected
 
     [Theory]
     [InlineData("enum E { A; static let x: int = 1; }")]

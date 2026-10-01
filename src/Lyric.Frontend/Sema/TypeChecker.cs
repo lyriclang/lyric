@@ -561,6 +561,11 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
+            // A static interface member declares and does not define (03 T5): a body would run
+            // for no type — 'T.parse(s)' is the conformer's static, direct under monomorphization.
+            if (isInterface && fn.IsStatic && fn.Body is not null)
+                _de.Report("LYR-SEM0127", Severity.Error, fn.NameSpan,
+                    $"'{fn.Name}' is a static member of an interface and declares only — it is implemented by every conforming type and reached as 'T.{fn.Name}(…)'; drop the body");
 
             // A GENERIC interface member must have a body (2.17). It gets no vtable slot — a slot
             // holds one function and this is one per instantiation — so it is reached by
@@ -1003,7 +1008,7 @@ public sealed class TypeChecker
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
                         continue; // a default method is inherited
                     }
-                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), subst);
+                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, SelfType(implementer)));
 
                     // With several candidates the CONFORMANCE decides which one is meant, so a
                     // match anywhere in the list satisfies it. Only when none fits is there
@@ -1164,6 +1169,8 @@ public sealed class TypeChecker
     {
         var decl = (FunctionDecl)impl.Declaration!;
         var have = FnTypeOf(impl);
+        if (ifaceMethod.IsStatic != decl.IsStatic)
+            return ifaceMethod.IsStatic ? "expected a static member" : "expected an instance member, found a static one";
         if (want.Parameters.Length != have.Parameters.Length)
             return $"expected {want.Parameters.Length} parameter(s), found {have.Parameters.Length}";
         for (var i = 0; i < want.Parameters.Length; i++)
@@ -2114,6 +2121,7 @@ public sealed class TypeChecker
             // A type or module name is not a value. As a member TARGET it is legitimate all the same,
             // so no immediate error here; CheckExpr reports it where a value is needed.
             TypeSymbol ts => new NonValueType(ts, "type"),
+            GenericParamSymbol gp => new NonValueType(gp, "type parameter"),
             ModuleSymbol ms => new NonValueType(ms, "module"),
 
             // ExternalSymbol: the module could not be found and was reported as LYR-RES0003, so Error
@@ -3923,6 +3931,10 @@ public sealed class TypeChecker
                         + "value is monomorphic; call it, or write a lambda that calls it"),
                         qualifiedGeneric);
                 return BindMember(mem, moduleMember);
+
+            // 'T.parse(s)': a static member through the constraint (03 T5).
+            case NonValueType { Symbol: GenericParamSymbol gp }:
+                return BindMember(mem, StaticMemberOfTypeParam(gp, mem.Member, mem.Span));
         }
 
         var baseType = mem.IsOptional && targetType is Optional opt ? opt.Inner : targetType;
@@ -4020,19 +4032,61 @@ public sealed class TypeChecker
             foreach (var (it, subst) in ClosureOfNode(nt))
             {
                 if (it.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
+                if (fn.IsStatic)
+                    return (Report(span, "LYR-SEM0055",
+                        $"'{member}' is a static member of '{it.Name}' — call it on the type parameter: '{gp.Name}.{member}(…)'"), fn);
 
                 // Substitute the type arguments OF THE CONSTRAINT. 'T :: [Eq<T>]' means the 'T' in
                 // 'Eq<T>.eq(other: T)' is the 'T' of the calling function — two different symbols
-                // with the same name.
+                // with the same name. 'Self' is the type parameter itself (03 T5).
                 //
                 // Without the substitution the raw interface type comes back and 'a.eq(b)' fails
                 // with "cannot assign 'T' to 'T'".
-                return (Substitute(FnTypeOf(fn), subst), fn);
+                return (Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp))), fn);
             }
         }
         return (Report(span, "LYR-SEM0027",
             $"type parameter '{gp.Name}' has no member '{member}' (no constraint provides it)"), null);
     }
+
+    /// <summary><c>T.parse(s)</c> (03 T5): a STATIC member of an interface the type parameter is
+    /// constrained by, reachable through the parameter alone — monomorphization makes it the
+    /// concrete type's static, a direct call.</summary>
+    private (LyrType, Symbol?) StaticMemberOfTypeParam(GenericParamSymbol gp, string member, Span span)
+    {
+        foreach (var c in gp.Constraints)
+        {
+            if (c is not NamedType nt) continue;
+            foreach (var (it, subst) in ClosureOfNode(nt))
+            {
+                if (it.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
+                if (!fn.IsStatic)
+                    return (Report(span, "LYR-SEM0055",
+                        $"'{member}' is an instance member of '{it.Name}' and needs a receiver — call it on a value of '{gp.Name}'"), fn);
+                return (Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp))), fn);
+            }
+        }
+        return (Report(span, "LYR-SEM0027",
+            $"type parameter '{gp.Name}' has no static member '{member}' (no constraint provides it)"), null);
+    }
+
+    /// <summary>The substitution with the interface's <c>Self</c> bound (03 T5): to the conforming
+    /// type at a conformance, to the type parameter at a constraint, to the type at a lookup.</summary>
+    private static Dictionary<GenericParamSymbol, LyrType> WithSelf(
+        Dictionary<GenericParamSymbol, LyrType> subst, TypeSymbol iface, LyrType self)
+    {
+        if (iface.SelfParam is not { } param) return subst;
+        // The instance's own arguments may name 'Self' too — 'Add' is 'Add<Self>' (T18) — and the
+        // substitution is one pass, so they are resolved here as well.
+        var selfOnly = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [param] = self };
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [param] = self };
+        foreach (var (key, value) in subst) map[key] = Substitute(value, selfOnly);
+        return map;
+    }
+
+    /// <summary>The substitution of an interface's <c>Self</c> alone.</summary>
+    private static Dictionary<GenericParamSymbol, LyrType> SelfMap(TypeSymbol iface, LyrType self) =>
+        WithSelf(EmptySubst, iface, self);
 
     private static Dictionary<GenericParamSymbol, LyrType> SubstMap(GenericInstance gi)
     {
@@ -4304,7 +4358,7 @@ public sealed class TypeChecker
                               || ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
 
         TypeParamType tp => tp.Param.Constraints.Any(c =>
-            NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst)),
+            NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst, tp)),
 
         PrimitiveType prim when BuiltinSymbol(prim) is { } builtin =>
             ImplementsWithExtensions(builtin, iface, wanted, EmptySubst),
@@ -4341,8 +4395,9 @@ public sealed class TypeChecker
     private bool ImplementsWithExtensions(TypeSymbol ts, TypeSymbol iface, LyrType wanted,
         Dictionary<GenericParamSymbol, LyrType> ofInstance)
     {
+        var self = Substitute(SelfType(ts), ofInstance);
         foreach (var node in DeclaredInterfaceNodes(ts))
-            if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance))
+            if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance, self))
                 return true;
 
         foreach (var block in _comp.Extensions.Blocks)
@@ -4350,7 +4405,7 @@ public sealed class TypeChecker
             if (!ReferenceEquals(block.Target, ts)) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
             foreach (var node in block.Decl.Interfaces)
-                if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance))
+                if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance, self))
                     return true;
         }
         return false;
@@ -4359,12 +4414,17 @@ public sealed class TypeChecker
     // Does this conformance node reach 'iface' — directly or through a parent — with matching
     // type arguments?
     private bool NodeReaches(TypeNode node, SymbolTable scope, TypeSymbol iface, LyrType wanted,
-        Dictionary<GenericParamSymbol, LyrType> ofInstance)
+        Dictionary<GenericParamSymbol, LyrType> ofInstance, LyrType? self = null)
     {
         if (Conformance.InterfaceOf(node, _binding) is not { } direct) return false;
         foreach (var (p, inst) in InterfaceClosure(direct, ResolveType(node, scope)))
-            if (ReferenceEquals(p, iface) && Matches(inst, ofInstance, wanted))
-                return true;
+        {
+            if (!ReferenceEquals(p, iface)) continue;
+            // 'Self' on both sides is the conforming type (03 T5): 'Vec2 :: [Add]' is 'Add<Vec2>'
+            // written short, and so is the constraint 'T :: [Add]' at 'T = Vec2'.
+            var selfMap = self is null ? EmptySubst : SelfMap(p, self);
+            if (Matches(Substitute(inst, selfMap), ofInstance, Substitute(wanted, selfMap))) return true;
+        }
         return false;
     }
 
@@ -4496,7 +4556,7 @@ public sealed class TypeChecker
         {
             if (_result.DelegationOf(ts, iface) is null) continue;
             if (iface.Members.LookupLocal(member) is not FunctionSymbol { IsStatic: false } fn) continue;
-            return (Substitute(FnTypeOf(fn), subst), fn);
+            return (Substitute(FnTypeOf(fn), WithSelf(subst, iface, SelfType(ts))), fn);
         }
         return null;
     }
@@ -4512,7 +4572,7 @@ public sealed class TypeChecker
         {
             if (iface.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
             if (fn.Declaration is not FunctionDecl { Body: not null }) continue; // defaults only, not abstract ones
-            var t = Substitute(FnTypeOf(fn), subst);
+            var t = Substitute(FnTypeOf(fn), WithSelf(subst, iface, SelfType(ts)));
             if (found is null) found = (t, fn);
             else if (!ReferenceEquals(found.Value.sym, fn)) ambiguous = true;
         }
@@ -5055,7 +5115,7 @@ public sealed class TypeChecker
             if (si.TypeArguments.Any(IsPlaceholder))
                 args = FillPlaceholders(si, ts, expected, scope, out prechecked);
             else if (si.TypeArguments.Length > 0)
-                args = si.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
+                args = FillDefaults(ts, si.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
             else if (InstanceFromExpected(expected, ts) is { } fromContext)
                 args = fromContext.Arguments;
             else
@@ -5230,7 +5290,7 @@ public sealed class TypeChecker
 
         _result.BindRef(tp, ts);
 
-        var args = tp.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
+        var args = FillDefaults(ts, tp.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
         if (args.Length != ts.Generics.Length)
         {
             _de.Report("LYR-SEM0026", Severity.Error, tp.Span,
@@ -6804,6 +6864,17 @@ public sealed class TypeChecker
 
     private void CheckAssignable(Expr expr, LyrType from, LyrType to, Span span)
     {
+        // A value of an interface arises here (04 D9): an interface a table cannot serve — a
+        // member naming 'Self' beyond the receiver, a static, a generic one — is a constraint
+        // and no type for a value; said where the value would come to be.
+        if (TypeFacts.KindOf(to) == TypeSymbolKind.Interface && !LyrType.Equal(from, to) && !from.IsError
+            && TypeFacts.SymbolOf(to) is { } boxedInto && !ValueUsable(boxedInto, out var why))
+        {
+            _de.Report("LYR-SEM0126", Severity.Error, span,
+                $"'{boxedInto.Name}' is usable as a constraint only, not as the type of a value — {why}; "
+                + $"write 'fn f<T :: [{boxedInto.Name}]>(…)'");
+            return;
+        }
         if (AdaptEmptyArray(expr, to)) return;
 
         // An error INSIDE one of the types means the cause is already reported, by the poison rule.
@@ -6976,6 +7047,45 @@ public sealed class TypeChecker
     /// <para>The question itself is answered by <see cref="Conformance"/>, the same place the
     /// conformance check and the IR lowering ask.</para>
     /// </summary>
+    /// <summary>
+    /// Whether an interface can be the type of a VALUE (design/v5/spec/04 D9): not when a member
+    /// names <c>Self</c> outside the receiver, is static, or is generic — a table slot holds one
+    /// function for every conformer, and such a member has no one function. Such an interface is
+    /// a constraint, and the diagnostic says so where a value of it would arise.
+    /// </summary>
+    private bool ValueUsable(TypeSymbol iface, out string reason)
+    {
+        foreach (var part in Conformance.WithParents(iface, _binding))
+            foreach (var symbol in part.Members.Symbols)
+            {
+                if (symbol is not FunctionSymbol fn) continue;
+                if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
+                // D9 names generic members too; the 4.x standard library reaches 'Iterator<T>'
+                // values with a generic 'map' (05 §5.2a of the 4.x text, monomorphized and not
+                // overridable), and it compiles until M8a rewrites it. That clause waits there.
+                if (part.SelfParam is { } self && FnTypeOf(fn) is { } signature
+                    && signature.Parameters.Append(signature.Return).Any(t => MentionsParam(t, self)))
+                { reason = $"its member '{fn.Name}' names 'Self'"; return false; }
+            }
+        reason = "";
+        return true;
+    }
+
+    private static bool MentionsParam(LyrType type, GenericParamSymbol param) => type switch
+    {
+        TypeParamType tp => ReferenceEquals(tp.Param, param),
+        Optional o => MentionsParam(o.Inner, param),
+        ArrayOf a => MentionsParam(a.Element, param),
+        SliceOf s => MentionsParam(s.Element, param),
+        InlineArrayOf ia => MentionsParam(ia.Element, param),
+        TupleOf tu => tu.Elements.Any(e => MentionsParam(e, param)),
+        FnType f => f.Parameters.Any(p => MentionsParam(p, param)) || MentionsParam(f.Return, param),
+        GenericInstance g => g.Arguments.Any(a => MentionsParam(a, param)),
+        RangeOf r => MentionsParam(r.Element, param),
+        CoroutineOf c => MentionsParam(c.Yield, param),
+        _ => false,
+    };
+
     private bool ImplementsInterface(LyrType from, LyrType to)
     {
         // The target may be a generic interface ('Src<int>'), in which case it is a GenericInstance
@@ -7067,6 +7177,9 @@ public sealed class TypeChecker
                 if (sym is ImportBindingSymbol ibt) sym = ibt.Target;
                 if (sym is null)
                     return Report(n.Span, "LYR-SEM0011", $"unresolved type '{string.Join('.', n.Path)}'");
+                // 'Self' in the body of a generic type is the type at its own parameters (03 T5).
+                if (n.Path is ["Self"] && n.TypeArguments.Length == 0 && sym is TypeSymbol { Generics.Length: > 0 } selfType)
+                    return new GenericInstance(selfType, selfType.Generics.Select(g => (LyrType)new TypeParamType(g)).ToArray());
                 if (sym is GenericParamSymbol gp) return new TypeParamType(gp);
                 if (ReferenceEquals(sym, _slice)) // Slice<T> becomes the internal SliceOf
                 {
@@ -7180,11 +7293,34 @@ public sealed class TypeChecker
     // through the conformance model.
     private LyrType MakeGenericInstance(TypeSymbol ts, NamedType n, SymbolTable scope)
     {
-        var args = n.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
+        var args = FillDefaults(ts, n.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
         if (ts.Generics.Length != args.Length)
             _de.Report("LYR-SEM0026", Severity.Error, n.Span,
                 $"generic type '{ts.Name}' expects {ts.Generics.Length} type argument(s), got {args.Length}");
         return new GenericInstance(ts, args);
+    }
+
+    /// <summary>
+    /// A trailing parameter left unwritten takes its default (03 T18), resolved in the
+    /// declaration's scope — where <c>Self</c> and the earlier parameters stand — the earlier
+    /// ones then meaning what was written: <c>Add</c> is <c>Add&lt;Self&gt;</c>, <c>Map&lt;K, V&gt;</c>
+    /// is <c>Map&lt;K, V, DefaultHasher&gt;</c>. A list the defaults cannot complete is returned
+    /// as it is, for the arity error of the site.
+    /// </summary>
+    private LyrType[] FillDefaults(TypeSymbol ts, LyrType[] args)
+    {
+        if (args.Length >= ts.Generics.Length
+            || !ts.Generics.Skip(args.Length).All(g => g.Declaration is GenericParam { Default: not null }))
+            return args;
+        var filled = new List<LyrType>(args);
+        for (var i = args.Length; i < ts.Generics.Length; i++)
+        {
+            var fallback = ((GenericParam)ts.Generics[i].Declaration!).Default!;
+            var earlier = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            for (var j = 0; j < i; j++) earlier[ts.Generics[j]] = filled[j];
+            filled.Add(Substitute(ResolveType(fallback, DeclarationScope(ts)), earlier));
+        }
+        return filled.ToArray();
     }
 
     // Compact path resolution for body types, which the resolver has not bound.

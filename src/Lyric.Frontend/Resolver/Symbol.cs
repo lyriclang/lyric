@@ -53,6 +53,11 @@ public sealed class TypeSymbol : Symbol
     public SymbolTable Members { get; } // fields, methods and enum variants; empty for a builtin or an alias
     public GenericParamSymbol[] Generics { get; set; } = []; // the type parameters, set after the declaration
 
+    /// <summary>An interface's <c>Self</c> (design/v5/spec/03 T5): the conforming type, as a type
+    /// parameter of its own — bound to the implementer at a conformance, to the type parameter
+    /// at a constraint. <c>null</c> for every other kind of type, whose <c>Self</c> is itself.</summary>
+    public GenericParamSymbol? SelfParam { get; init; }
+
     public TypeSymbol(string name, TypeSymbolKind kind, Visibility visibility, SymbolTable members, Node? declaration)
         : base(name, declaration)
     {

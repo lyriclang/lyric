@@ -55,6 +55,10 @@ public sealed record ImportAlias(string Alias, Span Span) : ImportClause(Span); 
 public sealed record GenericParam(string Name, TypeNode[] Constraints, Span Span) : Node(Span), INamedDecl // T, or T :: [I1, I2]
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>Rhs = Self</c> (design/v5/spec/03 T18): the argument the parameter takes when a
+    /// use writes none; <c>null</c> when it must be written.</summary>
+    public TypeNode? Default { get; init; }
 }
 
 // --- functions and members ---

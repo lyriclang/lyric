@@ -1,5 +1,6 @@
 Module main
   Enum Shape
+    Import Self -> Enum Shape
     Variant Circle
     Variant Rectangle
     Variant Empty

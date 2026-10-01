@@ -1,0 +1,42 @@
+// 'Self' (03 T5), static members through a constraint (T5), default type arguments (T18).
+// Expected stdout:
+//   self true false 2      'equals(o: Self)' implemented with the conformer's own type; 'twin(): Self' in a type body
+//   constraint true 7      'Self' as the type parameter in a constraint call; 'T.parse(s)' as the conformer's static
+//   default 3 6 4          'Add' is 'Add<Self>': a conformance written short, one written out, a heterogeneous one
+import std.io { println };
+
+interface Equatable { fn equals(o: Self): bool; }
+interface Parse { static fn parse(s: string): Self; }
+interface Add<Rhs = Self> { fn add(o: Rhs): Self; }
+
+struct P :: [Equatable, Parse, Add] {
+    n: int,
+    fn equals(o: P): bool { return this.n == o.n; }
+    static fn parse(s: string): P { return P { n = 7 }; }
+    fn add(o: P): P { return P { n = this.n + o.n }; }
+    fn twin(): Self { return P { n = this.n }; }
+}
+
+struct V :: [Add<V>] { n: int, fn add(o: V): V { return V { n = this.n * o.n }; } }
+struct Q :: [Add<int>] { n: int, fn add(o: int): Q { return Q { n = this.n + o }; } }
+
+fn same<T :: [Equatable]>(a: T, b: T): bool { return a.equals(b); }
+fn make<T :: [Parse]>(s: string): T { return T.parse(s); }
+fn plus<T :: [Add]>(a: T, b: T): T { return a.add(b); }
+
+fn main(): int {
+    let p = P { n = 2 };
+    let three = P { n = 3 };
+    let twin = p.twin();
+    println(f"self {p.equals(twin)} {p.equals(three)} {twin.n}");
+
+    let parsed: P = make("x");
+    println(f"constraint {same(p, twin)} {parsed.n}");
+
+    let one = P { n = 1 };
+    let two = V { n = 2 };
+    let threeV = V { n = 3 };
+    let q = Q { n = 1 };
+    println(f"default {plus(p, one).n} {plus(two, threeV).n} {q.add(3).n}");
+    return 0;
+}

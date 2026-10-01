@@ -335,11 +335,12 @@ public sealed class AstFormatter
     {
         if (generics.Length == 0) return Doc.Nil;
 
-        var parts = generics.Select(g => g.Constraints.Length == 0
+        var parts = generics.Select(g => Doc.Of(g.Constraints.Length == 0
             ? Doc.From(g.Name)
             : Doc.Of(Doc.From($"{g.Name} :: ["),
                 Doc.Join(Doc.From(", "), g.Constraints.Select(TypeDoc).ToArray()),
-                Doc.From("]")));
+                Doc.From("]")),
+            g.Default is { } fallback ? Doc.Of(Doc.From(" = "), TypeDoc(fallback)) : Doc.Nil));
         return Doc.Of(Doc.From("<"), Doc.Join(Doc.From(", "), parts.ToArray()), Doc.From(">"));
     }
 
