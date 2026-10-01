@@ -788,6 +788,10 @@ internal sealed class FunctionLowerer
     private readonly Stack<Suppressing> _suppressing = new();
     private int _stashes;
 
+    /// <summary>The bindings of the clauses being lowered whose bodies throw them again, and the
+    /// stash each one's record waits in for that throw (05 E6 O3).</summary>
+    private readonly Dictionary<LocalSymbol, int> _kept = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>The error edges and throws lowered so far: a defer body on the error path that adds
     /// none cannot fail, and needs no stash.</summary>
     private int _errorSites;
@@ -910,10 +914,19 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>'throw e' (05 E1, E3): the value as an Error interface value — a class as it is, a
-    /// struct or an enum boxed, an interface value re-tabled — into flight, then to the landing.</summary>
+    /// struct or an enum boxed, an interface value re-tabled — into flight, then to the landing. A
+    /// clause's own binding thrown again is the same error going on (E6 O3): its record — where it
+    /// was first thrown, what was suppressed into it — goes back into flight from its stash.</summary>
     private void Raise(Expr thrown, Span span)
     {
         _errorSites++;
+        if (thrown is IdentifierExpr && _types.RefOf(thrown) is LocalSymbol caught && _kept.TryGetValue(caught, out var stash))
+        {
+            var again = ErrorLanding(span);
+            _b.Emit(new RestoreError(stash, span));
+            _b.Seal(new Branch(again, span));
+            return;
+        }
         var value = Coerce(LowerExpr(thrown), TypeOfExpr(thrown), ErrorType(span), span);
         var landing = ErrorLanding(span);
         _b.Seal(new Throw(value, landing, span));
@@ -1024,7 +1037,7 @@ internal sealed class FunctionLowerer
                     _b.SwitchTo(otherwise);
                 }
                 _b.SwitchTo(take);
-                _b.Emit(new ClearError(clause.Span));
+                Take(clause, symbol);
                 if (symbol is not null && clause.BindingType is not null)
                 {
                     // The value under its own type: a class's object, a struct's or an enum's
@@ -1040,12 +1053,13 @@ internal sealed class FunctionLowerer
             }
             else
             {
-                _b.Emit(new ClearError(clause.Span));
+                Take(clause, symbol);
                 if (symbol is not null)
                     _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, clause.Span));
             }
 
             if (lowerBody(clause)) open.Add(_b.CurrentId);
+            if (symbol is not null) _kept.Remove(symbol);
 
             if (next is null) { caughtAll = true; break; } // a catch-all ends the chain (E9 C3)
             _b.SwitchTo(next.Value);
@@ -1056,6 +1070,29 @@ internal sealed class FunctionLowerer
         if (!caughtAll) _b.Seal(new Branch(ErrorLanding(span), span));
         return open;
     }
+
+    /// <summary>A clause takes the error off the slot: the record dropped — or, where the body throws
+    /// the binding again, kept aside for that throw (05 E6 O3), which is one store more.</summary>
+    private void Take(CatchClause clause, LocalSymbol? symbol)
+    {
+        if (symbol is not null && ThrowsAgain(clause.Body, symbol))
+        {
+            var stash = _stashes++;
+            _kept[symbol] = stash;
+            _b.Emit(new StashError(stash, clause.Span));
+        }
+        else _b.Emit(new ClearError(clause.Span));
+    }
+
+    /// <summary>Does this code throw the binding itself — not under another name, and not from a
+    /// lambda, whose body is a function of its own?</summary>
+    private bool ThrowsAgain(Node node, LocalSymbol binding) => node switch
+    {
+        LambdaExpr => false,
+        ThrowStmt { Value: IdentifierExpr id } when ReferenceEquals(_types.RefOf(id), binding) => true,
+        ThrowExpr { Value: IdentifierExpr id } when ReferenceEquals(_types.RefOf(id), binding) => true,
+        _ => AstChildren.Of(node).Any(child => ThrowsAgain(child, binding)),
+    };
 
     /// <summary>A caught type as a type test's target, and as the binding's IR type.</summary>
     private (TypeId Target, IrType Type) TestTarget(LyrType caught, Span span)

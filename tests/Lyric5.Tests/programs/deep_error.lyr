@@ -1,0 +1,10 @@
+// An error thrown deep in a recursion (design/v5/spec/01 E8): the debug trace shows the
+// recursion's frame once with a count, and says the stack went deeper than it kept.
+fn down(n: int): int throws Exception {
+    if (n == 0) { throw Exception { text = "deep" }; }
+    return try down(n - 1) + 1;
+}
+
+fn main(): int throws Exception {
+    return try down(1000);
+}

@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { MAX_PCS = 256, MAX_FRAMES = 384 };
+enum { MAX_PCS = LYR_TRACE_PCS, MAX_FRAMES = 384 };
 
 typedef struct Frame {
     uintptr_t pc;          /* as the unwinder answered it */
@@ -134,31 +134,56 @@ static void walk_frames(struct backtrace_state *st, Pcs *pcs, const LyrFault *fa
 }
 #endif
 
-static void capture(const LyrFault *fault) {
-    struct backtrace_state *st = get_state();
-    if (st == NULL) return;
-    static Pcs pcs;
-    pcs.count = 0;
-    pcs.full = 0;
+/* The program counters of the calling thread's stack — of the faulting frame first, for a fault. */
+static void collect(struct backtrace_state *st, Pcs *pcs, const LyrFault *fault) {
+    pcs->count = 0;
+    pcs->full = 0;
 #if defined(__APPLE__)
-    if (fault != NULL && fault->fp != 0) walk_frames(st, &pcs, fault);
+    if (fault != NULL && fault->fp != 0) walk_frames(st, pcs, fault);
     else
 #else
     (void)fault;
 #endif
-    backtrace_simple(st, 0, collect_pc, ignore_error, &pcs);
-    trace.truncated = pcs.full;
-    for (int i = 0; i < pcs.count; i++) {
-        Lookup lookup = { pcs.pc[i], 0 };
-        backtrace_pcinfo(st, pcs.pc[i], name_frame, ignore_error, &lookup);
+    backtrace_simple(st, 0, collect_pc, ignore_error, pcs);
+}
+
+/* Each pc named into the trace, a function inlined at it first. */
+static void name_pcs(struct backtrace_state *st, const uintptr_t *pc, int count) {
+    for (int i = 0; i < count; i++) {
+        Lookup lookup = { pc[i], 0 };
+        backtrace_pcinfo(st, pc[i], name_frame, ignore_error, &lookup);
         if (!lookup.found) {
             /* No line table here (a system library, a stripped build): the symbol table may still
              * know the function. */
             const char *symbol = NULL;
-            backtrace_syminfo(st, pcs.pc[i], name_symbol, ignore_error, &symbol);
-            add_frame(pcs.pc[i], symbol, NULL, 0);
+            backtrace_syminfo(st, pc[i], name_symbol, ignore_error, &symbol);
+            add_frame(pc[i], symbol, NULL, 0);
         }
     }
+}
+
+static void capture(const LyrFault *fault) {
+    struct backtrace_state *st = get_state();
+    if (st == NULL) return;
+    static Pcs pcs;
+    collect(st, &pcs, fault);
+    trace.truncated = pcs.full;
+    name_pcs(st, pcs.pc, pcs.count);
+}
+
+int lyr_trace_capture(uintptr_t *out, int max) {
+    struct backtrace_state *st = get_state();
+    if (st == NULL || max <= 0) return 0;
+    Pcs pcs;
+    collect(st, &pcs, NULL);
+    int n = pcs.count < max ? pcs.count : max;
+    memcpy(out, pcs.pc, (size_t)n * sizeof(uintptr_t));
+    return n;
+}
+
+static void name_captured(const uintptr_t *pcs, int count) {
+    struct backtrace_state *st = get_state();
+    if (st != NULL) name_pcs(st, pcs, count);
 }
 
 #else
@@ -236,15 +261,13 @@ static void init_symbols(HANDLE process) {
     initialize(process, search, TRUE);
 }
 
-static void capture_at(uintptr_t fault_pc) {
-    static void *pcs[MAX_PCS];
-    USHORT count = RtlCaptureStackBackTrace(0, MAX_PCS, pcs, NULL);
-    trace.truncated = count == MAX_PCS;
+/* Each pc named into the trace, the functions inlined at it first. */
+static void name_pcs(const uintptr_t *pcs, int count, uintptr_t fault_pc) {
     HANDLE process = GetCurrentProcess();
     init_symbols(process);
     names_used = 0;
-    for (USHORT i = 0; i < count; i++) {
-        uintptr_t pc = (uintptr_t)pcs[i];
+    for (int i = 0; i < count; i++) {
+        uintptr_t pc = pcs[i];
         /* A return address names the instruction after the call; one byte back is the call. The
          * faulting instruction itself is exact. */
         DWORD64 address = pc == fault_pc ? pc : pc - 1;
@@ -290,6 +313,27 @@ static void capture_at(uintptr_t fault_pc) {
         }
     }
 }
+
+static void capture_at(uintptr_t fault_pc) {
+    static void *raw[MAX_PCS];
+    static uintptr_t pcs[MAX_PCS];
+    USHORT count = RtlCaptureStackBackTrace(0, MAX_PCS, raw, NULL);
+    trace.truncated = count == MAX_PCS;
+    for (USHORT i = 0; i < count; i++) pcs[i] = (uintptr_t)raw[i];
+    name_pcs(pcs, count, fault_pc);
+}
+
+int lyr_trace_capture(uintptr_t *out, int max) {
+    void *raw[MAX_PCS];
+    USHORT count = RtlCaptureStackBackTrace(0, MAX_PCS, raw, NULL);
+    int n = count < max ? count : max;
+    for (int i = 0; i < n; i++) out[i] = (uintptr_t)raw[i];
+    return n;
+}
+
+static void name_captured(const uintptr_t *pcs, int count) {
+    name_pcs(pcs, count, 0);
+}
 #endif
 
 /* --- filtering and format ------------------------------------------------------------------ */
@@ -300,7 +344,7 @@ static int starts_with(const char *text, const char *prefix) {
 
 static int is_runtime_frame(const Frame *frame) {
     return starts_with(frame->function, "lyr_panic") || starts_with(frame->function, "lyr_crash") ||
-           starts_with(frame->function, "lyr_trace");
+           starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new");
 }
 
 static int same_text(const char *a, const char *b) {
@@ -328,6 +372,8 @@ static size_t note_repeats(char *out, size_t capacity, size_t used, int repeats)
     return append(out, capacity, used, "    ... the frame above repeats %d more time%s\n", repeats, repeats == 1 ? "" : "s");
 }
 
+static size_t emit(char *out, size_t capacity, uintptr_t fault_pc);
+
 size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
     if (capacity == 0) return 0;
     out[0] = '\0';
@@ -339,6 +385,21 @@ size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
 #else
     capture_at(fault_pc);
 #endif
+    return emit(out, capacity, fault_pc);
+}
+
+size_t lyr_trace_format_pcs(char *out, size_t capacity, const uintptr_t *pcs, int count) {
+    if (capacity == 0) return 0;
+    out[0] = '\0';
+    trace.count = 0;
+    trace.truncated = count >= MAX_PCS;  /* the capture filled its buffer */
+    name_captured(pcs, count);
+    return emit(out, capacity, 0);
+}
+
+/* The named trace as lines: from the faulting frame, or below the runtime's own frames; up to
+ * lyr_run_main; a recursion's repeats folded. */
+static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
 
     /* The faulting frame's pc is the fault address itself when the unwinder knows it came from a
      * signal frame (Linux, the macOS frame walk, Windows), and one byte less when it treats it as
@@ -355,9 +416,12 @@ size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
             if (is_runtime_frame(&trace.frames[i])) start = i + 1;
         }
     }
+    /* The program's frames end at the runtime's entry — or at the emitted glue that calls main from
+     * there, 'lyr_entry', whose line is whatever '#line' stood last. */
     int end = trace.count, reached_main = 0;
     for (int i = start; i < trace.count; i++) {
-        if (trace.frames[i].function && strcmp(trace.frames[i].function, "lyr_run_main") == 0) {
+        const char *function = trace.frames[i].function;
+        if (function && (strcmp(function, "lyr_run_main") == 0 || strcmp(function, "lyr_entry") == 0)) {
             end = i;
             reached_main = 1;
             break;

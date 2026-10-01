@@ -3,16 +3,33 @@
 #include "lyr/gc.h"
 #include "lyr/init.h"
 #include "lyr/panic.h"
+#include "internal.h"
 #include <string.h>
 
-/* Word 1 is the value's object and word 3 the suppressed array; word 2 is the value's table, which
- * is static, and word 4 the trace, which the collector does not own. */
-static const uint64_t err_refmap[] = { (UINT64_C(1) << 1) | (UINT64_C(1) << 3) };
+/* Word 1 is the value's object, word 3 the suppressed array and word 4 the trace; word 2 is the
+ * value's table, which is static. */
+static const uint64_t err_refmap[] = { (UINT64_C(1) << 1) | (UINT64_C(1) << 3) | (UINT64_C(1) << 4) };
 const LyrDesc lyr_desc_err = { sizeof(LyrErr), LYR_DESC_HAS_REFS, 0, 1, err_refmap, "error", NULL };
 
-LyrErr *lyr_err_new(LyrIface value) {
+/* The name in parentheses: the debug profile's macro of the same name is for emitted code. */
+LyrErr *(lyr_err_new)(LyrIface value) {
     LyrErr *err = (LyrErr *)lyr_alloc(&lyr_desc_err);
     err->value = value;
+    return err;
+}
+
+/* The program counters of a throw: words, no references. */
+static const LyrDesc trace_desc = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uintptr_t), 0, NULL, "trace", NULL };
+
+LyrErr *lyr_err_new_traced(LyrIface value) {
+    LyrErr *err = (lyr_err_new)(value);
+    uintptr_t pcs[LYR_TRACE_PCS];
+    int count = lyr_trace_capture(pcs, LYR_TRACE_PCS);
+    if (count > 0) {
+        LyrArr *kept = lyr_alloc_array(&trace_desc, count);
+        memcpy(kept->data, pcs, (size_t)count * sizeof(uintptr_t));
+        err->trace = kept;
+    }
     return err;
 }
 
@@ -52,6 +69,12 @@ int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) 
     if (err->suppressed != NULL)
         for (int64_t i = 0; i < err->suppressed->len; i++)
             write_line("  suppressed: ", (const LyrStr *)message(LYR_ARR_DATA(err->suppressed, LyrIface)[i]));
+    /* Where it was thrown, where the profile kept it (01 E8). */
+    if (err->trace != NULL) {
+        static char text[16 * 1024];
+        size_t n = lyr_trace_format_pcs(text, sizeof text, LYR_ARR_DATA(err->trace, uintptr_t), (int)err->trace->len);
+        lyr_write_stderr(text, n);
+    }
     return 1;
 }
 

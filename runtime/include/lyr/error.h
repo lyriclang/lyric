@@ -17,13 +17,21 @@ typedef struct LyrErr {
     LyrObj header;
     LyrIface value;
     struct LyrArr *suppressed;
-    void *trace;
+    struct LyrArr *trace;
 } LyrErr;
 
 extern const LyrDesc lyr_desc_err;
 
 /* The record for a value thrown here. */
 LyrErr *lyr_err_new(LyrIface value);
+
+/* The same, keeping where it was thrown (01 E8): the program counters of the throw, named only if
+ * the error is ever reported. The debug profile's — emitted code compiled without NDEBUG calls it
+ * under the plain name. */
+LyrErr *lyr_err_new_traced(LyrIface value);
+#ifndef NDEBUG
+#define lyr_err_new(value) lyr_err_new_traced(value)
+#endif
 
 /* A defer body failed while `into` was in flight (05 E7): the first error wins, and the body's is
  * appended to its suppressed errors. */
