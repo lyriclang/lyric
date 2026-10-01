@@ -16,6 +16,9 @@
 #define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) (05 E8) */
 #define LYR_RT_CHAR             "LYR-RT0009"  /* `as char` of a value that is no Unicode scalar value (03 T1d) */
 #define LYR_RT_FORCED_TRY       "LYR-RT0010"  /* `try!` on an error (05 E4, E8) */
+#define LYR_RT_ASSERT           "LYR-RT0011"  /* `assert(condition, message)` with a false condition (05 E8) */
+#define LYR_RT_UNREACHABLE      "LYR-RT0012"  /* `unreachable(message)` reached (05 E8, E12) */
+#define LYR_RT_TODO             "LYR-RT0013"  /* `todo(message)` reached (05 E8, 10 prelude) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
@@ -54,6 +57,17 @@ LYR_NORETURN void lyr_panic_null(void);
 /* `panic(message)` from the program: the message as written, code RT0008. */
 struct LyrStr;
 LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
+/* The catalogue's other three (05 E8): the message as written, each under its own code. */
+LYR_NORETURN void lyr_panic_assert(const struct LyrStr *message);
+LYR_NORETURN void lyr_panic_unreachable(const struct LyrStr *message);
+LYR_NORETURN void lyr_panic_todo(const struct LyrStr *message);
+
+/* `assert(condition, message)`: the check at the call, so the trace starts in the program's own
+ * frame; the message is the argument as evaluated, before the check. */
+#define LYR_ASSERT(condition, message)                                                              \
+    do {                                                                                            \
+        if (LYR_UNLIKELY(!(condition))) lyr_panic_assert(message);                                  \
+    } while (0)
 
 /* A view's bounds (03 T13 A2): 0 <= low <= high <= length, or a panic with the same code as an index. */
 LYR_NORETURN void lyr_panic_range(int64_t low, int64_t high, int64_t length);

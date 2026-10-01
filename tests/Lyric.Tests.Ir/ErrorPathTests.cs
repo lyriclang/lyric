@@ -421,4 +421,49 @@ public class ErrorPathTests
         Assert.True(bound.Throws);
         Assert.Contains(Terminators(bound), t => t is Propagate);
     }
+
+    // --- never where a value is wanted (05 E12) ---
+
+    [Fact]
+    public void A_never_value_ends_the_statement_it_stands_in()
+    {
+        // A binding's value, an assignment's, a call's argument: the block ends where the value
+        // would be, and nothing after it is lowered.
+        var module = Lowered("""
+            fn fail(): never { panic("x"); }
+            fn pick(a: int, b: int): int { return a; }
+            fn f(n: int): int { let k: int = fail(); return k; }
+            fn g(n: int): int { var k = n; k = fail(); return k; }
+            fn h(n: int): int { return pick(n, fail()); }
+            fn main(): int { return f(1) + g(1) + h(1); }
+            """);
+        foreach (var name in new[] { "f", "g", "h" })
+            Assert.Contains(Terminators(Fn(module, name)), t => t is Unreachable);
+    }
+
+    [Fact]
+    public void A_short_circuit_whose_right_side_gives_no_value_goes_on()
+    {
+        var module = Lowered("""
+            fn fail(): never { panic("x"); }
+            fn f(ok: bool): int { let b = ok || fail(); if (b) { return 1; } return 0; }
+            fn main(): int { return f(true); }
+            """);
+        var f = Fn(module, "f");
+        Assert.Contains(Terminators(f), t => t is Unreachable); // the right side's block
+        Assert.Contains(Terminators(f), t => t is Return);      // and what follows the operator
+    }
+
+    [Fact]
+    public void An_if_whose_both_branches_give_no_value_ends_the_statement()
+    {
+        var module = Lowered("""
+            fn fail(): never { panic("x"); }
+            fn f(c: bool): int { let x: int = if (c) fail() else fail(); return x; }
+            fn main(): int { return f(true); }
+            """);
+        var f = Fn(module, "f");
+        Assert.Equal(2, Terminators(f).Count(t => t is Unreachable));
+        Assert.DoesNotContain(Terminators(f), t => t is Return);
+    }
 }

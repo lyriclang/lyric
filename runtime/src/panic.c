@@ -111,3 +111,15 @@ void lyr_panic_char(uint32_t value) {
 void lyr_panic_message(const LyrStr *message) {
     lyr_panic(LYR_RT_PANIC, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
 }
+
+void lyr_panic_assert(const LyrStr *message) {
+    lyr_panic(LYR_RT_ASSERT, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+}
+
+void lyr_panic_unreachable(const LyrStr *message) {
+    lyr_panic(LYR_RT_UNREACHABLE, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+}
+
+void lyr_panic_todo(const LyrStr *message) {
+    lyr_panic(LYR_RT_TODO, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+}

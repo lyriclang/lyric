@@ -475,6 +475,14 @@ public class CEmitterTests
         { "inverted", Profile.Release, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
         { "inlineindex", Profile.Debug, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
         { "inlineindex", Profile.Release, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
+        // The catalogue of std.core (05 E8): 'assert' checks at the call, so the trace starts in
+        // the program as a check's does; 'unreachable()' takes its default message at the call.
+        { "assertfail", Profile.Debug, "panic [LYR-RT0011]: 3 is too many" },
+        { "assertfail", Profile.Release, "panic [LYR-RT0011]: 3 is too many" },
+        { "unreachable", Profile.Debug, "panic [LYR-RT0012]: entered unreachable code" },
+        { "unreachable", Profile.Release, "panic [LYR-RT0012]: entered unreachable code" },
+        { "todo", Profile.Debug, "panic [LYR-RT0013]: negative numbers" },
+        { "todo", Profile.Release, "panic [LYR-RT0013]: negative numbers" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the

@@ -1,0 +1,3 @@
+// 'unreachable()' reached ends the program (05 E8, E12): LYR-RT0012, the default message.
+fn pick(n: int): int { if (n == 0) { return 1; } return unreachable(); }
+fn main(): int { return pick(1); }

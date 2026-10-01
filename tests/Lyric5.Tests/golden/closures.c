@@ -2423,7 +2423,7 @@ extern const LyrDesc lyr_desc_arr_i64;
 /* prototypes */
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
 
-#line 51 "stdlib5/std/core.lyr"
+#line 62 "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f) {
     LyrArr *l2_xs = NULL;
     int64_t l3__range0 = 0;
@@ -2446,63 +2446,63 @@ LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f
     int64_t t14 = 0;
     LyrArr *t15 = NULL;
 bb0:;
-#line 51
+#line 62
     t0 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
-#line 51
+#line 62
     l2_xs = t0;
-#line 52
+#line 63
     t1 = (int64_t)INT64_C(0);
-#line 52
+#line 63
     t2 = l0_n;
-#line 52
+#line 63
     l3__range0 = t1;
-#line 52
+#line 63
     l4__last1 = t2;
-#line 52
+#line 63
     goto bb1;
 bb1:;
-#line 52
+#line 63
     t3 = l3__range0;
-#line 52
+#line 63
     t4 = l4__last1;
-#line 52
+#line 63
     t5 = (uint8_t)(t3 < t4);
-#line 52
+#line 63
     if (t5) goto bb2; else goto bb4;
 bb2:;
-#line 52
+#line 63
     l5_i = t3;
-#line 53
+#line 64
     t6 = l2_xs;
-#line 53
+#line 64
     t7 = l1_f;
-#line 53
+#line 64
     t8 = l5_i;
-#line 53
+#line 64
     t9 = t7.fn(t7.env, t8, NULL);
-#line 53
+#line 64
     t10 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t10, int64_t)[0] = t9;
-#line 53
+#line 64
     t11 = lyr_arr_concat(&lyr_desc_arr_i64, t6, t10);
-#line 53
+#line 64
     l2_xs = t11;
-#line 52
+#line 63
     goto bb3;
 bb3:;
-#line 52
+#line 63
     t12 = l3__range0;
-#line 52
+#line 63
     t13 = (int64_t)INT64_C(1);
-#line 52
+#line 63
     t14 = LYR_CHECKED_ADD(t12, t13);
-#line 52
+#line 63
     l3__range0 = t14;
-#line 52
+#line 63
     goto bb1;
 bb4:;
-#line 55
+#line 66
     t15 = l2_xs;
-#line 55
+#line 66
     return t15;
 }
 

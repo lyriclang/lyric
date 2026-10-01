@@ -20,7 +20,7 @@ module std.core;
 ///
 /// Not catchable. Its return type is `never`, so the flow analysis treats everything after a call as
 /// unreachable — which is why `expect` can return a non-optional after panicking.
-pub fn panic(message: string): void;
+pub fn panic(message: string): never;
 
 // A 'resume' on a coroutine whose body has run to the end. Bound by the compiler like 'panic':
 // the call sits in a dispatcher nobody wrote, so nobody could have written the import either.

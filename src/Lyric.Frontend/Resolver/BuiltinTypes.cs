@@ -42,8 +42,8 @@ public static class BuiltinTypes
         return scope;
     }
 
-    // `panic(message: string)`: the never return type is not nameable, so the sema sets it for
-    // this symbol directly.
+    // `panic(message: string): never` (05 E8, E12): it does not return, which its type says like
+    // any other function's would.
     private static FunctionSymbol CreatePanic()
     {
         var decl = new FunctionDecl(
@@ -52,7 +52,8 @@ public static class BuiltinTypes
                 Type: new NamedType(["string"], [], default) { NameSpan = default },
                 Default: null, Span: default)
                 { NameSpan = default }],
-            ReturnType: null, Throws: null, Body: null, Span: default) { NameSpan = default };
+            ReturnType: new NamedType(["never"], [], default) { NameSpan = default },
+            Throws: null, Body: null, Span: default) { NameSpan = default };
         return new FunctionSymbol("panic", Visibility.Public, isMut: false, decl);
     }
 

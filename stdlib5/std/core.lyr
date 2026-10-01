@@ -3,8 +3,19 @@
 /// M8a.
 module std.core;
 
-/// Ends the process with a message and a backtrace, exit 101 (05 E8). Bound by the compiler.
-pub fn panic(message: string): void;
+/// Ends the process with a message and a backtrace, exit 101 (05 E8): `LYR-RT0008`. Its type is
+/// `never`, so a call stands wherever a value is wanted and ends the path it is on.
+pub fn panic(message: string): never;
+
+/// Ends the process unless `condition` holds (05 E8): `LYR-RT0011` with `message`. The check
+/// stands at the call; the message is built before it, as every argument is.
+pub fn assert(condition: bool, message: string = "assertion failed"): void;
+
+/// A branch the program never takes (05 E8, E12): taking it ends the process, `LYR-RT0012`.
+pub fn unreachable(message: string = "entered unreachable code"): never;
+
+/// A place still to be written (10 prelude): reaching it ends the process, `LYR-RT0013`.
+pub fn todo(message: string = "not implemented yet"): never;
 
 /// The empty interface (design/v5/spec/03 T10): every struct, class and enum value is an `Any`
 /// at the transition, and `is` or a type pattern takes it out again (T11). `Any[]` is the

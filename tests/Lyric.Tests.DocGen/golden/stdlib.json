@@ -1842,7 +1842,7 @@
         {
           "Kind": "Function",
           "Name": "panic",
-          "Signature": "pub fn panic(message: string): void",
+          "Signature": "pub fn panic(message: string): never",
           "Doc": "Ends the program with `message` and a backtrace.\n\nNot catchable. Its return type is `never`, so the flow analysis treats everything after a call as\nunreachable — which is why `expect` can return a non-optional after panicking.",
           "Members": [],
           "Source": {

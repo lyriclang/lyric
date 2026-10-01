@@ -43,9 +43,34 @@ public sealed class SemaRules
     {
         foreach (var module in _comp.Modules)
             foreach (var decl in _comp.AstOf(module).Declarations)
+            {
                 CheckDecl(decl);
+                CheckNeverPositions(decl, null);
+            }
         CheckMain();
     }
+
+    /// <summary>
+    /// <c>never</c> stands only as a return type (design/v5/spec/05 E12): the whole return type of a
+    /// function, a lambda or a function type. Anywhere else — a parameter, a binding, a field, an
+    /// element, an optional, a type argument, a thrown set, an alias — it would type a value that
+    /// cannot exist (<c>LYR-SEM0145</c>); three of those positions crashed the compiler before.
+    /// </summary>
+    private void CheckNeverPositions(Node node, Node? parent)
+    {
+        if (node is NamedType { Path: ["never"], TypeArguments.Length: 0 } never && !IsReturnType(never, parent))
+            _de.Report("LYR-SEM0145", Severity.Error, never.Span,
+                "'never' stands only as a return type — no value of it can exist");
+        foreach (var child in AstChildren.Of(node)) CheckNeverPositions(child, node);
+    }
+
+    private static bool IsReturnType(TypeNode type, Node? parent) => parent switch
+    {
+        FunctionDecl f => ReferenceEquals(f.ReturnType, type),
+        LambdaExpr l => ReferenceEquals(l.ReturnType, type),
+        FunctionType t => ReferenceEquals(t.ReturnType, type),
+        _ => false,
+    };
 
     private void CheckDecl(Decl decl)
     {
