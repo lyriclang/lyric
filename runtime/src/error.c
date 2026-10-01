@@ -16,6 +16,20 @@ LyrErr *lyr_err_new(LyrIface value) {
     return err;
 }
 
+/* The suppressed errors, an `Error[]` (05 E6 O3): interface values, whose object word is the
+ * reference. Grown by one on the rare path where a defer fails during a failure. */
+static const uint64_t suppressed_refmap[] = { UINT64_C(0x1) };
+static const LyrDesc suppressed_desc = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS,
+                                         sizeof(LyrIface), 1, suppressed_refmap, "Error[]", NULL };
+
+void lyr_err_suppress(LyrErr *into, const LyrErr *err) {
+    int64_t had = into->suppressed != NULL ? into->suppressed->len : 0;
+    LyrArr *grown = lyr_alloc_array(&suppressed_desc, had + 1);
+    if (had > 0) memcpy(grown->data, into->suppressed->data, (size_t)had * sizeof(LyrIface));
+    LYR_ARR_DATA(grown, LyrIface)[had] = err->value;
+    into->suppressed = grown;
+}
+
 static void write_line(const char *prefix, const LyrStr *text) {
     lyr_write_stderr(prefix, strlen(prefix));
     if (text != NULL) lyr_write_stderr(text->bytes, (size_t)text->len);
@@ -35,6 +49,9 @@ int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) 
         write_line("  caused by: ", (const LyrStr *)message(next));
         at = next;
     }
+    if (err->suppressed != NULL)
+        for (int64_t i = 0; i < err->suppressed->len; i++)
+            write_line("  suppressed: ", (const LyrStr *)message(LYR_ARR_DATA(err->suppressed, LyrIface)[i]));
     return 1;
 }
 

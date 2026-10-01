@@ -235,6 +235,81 @@ public class ErrorPathTests
         Assert.DoesNotContain(f.Blocks, b => b.Insts.Any(op => op is Downcast));
     }
 
+    // --- a defer that throws (05 E7) ---
+
+    private static IEnumerable<IrOp> Ops(IrFunction function) => function.Blocks.SelectMany(b => b.Insts);
+
+    [Fact]
+    public void A_defer_that_cannot_fail_runs_on_the_error_path_as_it_stands()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                defer note();
+                return try risky();
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        Assert.DoesNotContain(Ops(Fn(module, "f")), op => op is StashError or RestoreError or SuppressError);
+    }
+
+    [Fact]
+    public void A_defer_that_can_fail_stashes_the_error_in_flight()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                defer try risky();
+                return try risky();
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        var f = Fn(module, "f");
+        // The error path's step: stashed first, restored where the body ran clean, merged where it
+        // failed — the first error winning.
+        var step = Assert.Single(f.Blocks, b => b.Insts.FirstOrDefault() is StashError);
+        var stash = ((StashError)step.Insts[0]).Stash;
+        Assert.Contains(Ops(f), op => op is RestoreError r && r.Stash == stash);
+        Assert.Contains(Ops(f), op => op is SuppressError s && s.Stash == stash);
+    }
+
+    [Fact]
+    public void A_defer_that_throws_on_a_normal_exit_runs_the_earlier_ones()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                defer note();
+                defer try risky();
+                return 1;
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        var f = Fn(module, "f");
+        // The normal exit runs the later defer first; its failure lands on a step that runs the
+        // earlier one — a call of 'note' — and goes on to the bottom.
+        var branch = Assert.Single(Terminators(f).OfType<ErrorBranch>());
+        var landing = f.Blocks[branch.OnError.Value];
+        Assert.Contains(landing.Insts, op => op is Call);
+        Assert.IsType<Propagate>(f.Blocks[Assert.IsType<Branch>(landing.Terminator).Target.Value].Terminator);
+    }
+
+    [Fact]
+    public void A_defer_outside_a_try_is_not_the_trys_to_catch()
+    {
+        var module = Lowered("""
+            fn f(): int throws Boom {
+                defer try risky();
+                try { let a = try risky(); return a; } catch (_) { return 0; }
+            }
+            fn main(): int throws Boom { return try f(); }
+            """);
+        var f = Fn(module, "f");
+        // The defer runs at the return inside the try, but it was registered outside: its failure
+        // leaves the function rather than reaching the try's dispatch.
+        var dispatch = Dispatch(f).Id;
+        var branches = Terminators(f).OfType<ErrorBranch>().ToList();
+        Assert.Contains(branches, b => b.OnError == dispatch);                                   // the call in the try
+        Assert.Contains(branches, b => f.Blocks[b.OnError.Value].Terminator is Propagate);        // the defer's
+    }
+
     [Fact]
     public void A_try_whose_body_cannot_fail_has_no_dispatch()
     {

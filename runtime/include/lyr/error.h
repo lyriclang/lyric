@@ -25,8 +25,13 @@ extern const LyrDesc lyr_desc_err;
 /* The record for a value thrown here. */
 LyrErr *lyr_err_new(LyrIface value);
 
-/* `main`'s report (05 E6 O4): `error: <message>`, then `  caused by: <message>` for each cause, on
- * the error writer; the answer is the exit code, 1. The emitted entry passes the two members of
+/* A defer body failed while `into` was in flight (05 E7): the first error wins, and the body's is
+ * appended to its suppressed errors. */
+void lyr_err_suppress(LyrErr *into, const LyrErr *err);
+
+/* `main`'s report (05 E6 O4): `error: <message>`, then `  caused by: <message>` for each cause and
+ * `  suppressed: <message>` for each suppressed error, on the error writer; the answer is the exit
+ * code, 1. The emitted entry passes the two members of
  * `Error` it can call - the runtime knows no Lyric method. `cause` writes the cause to `next` and
  * answers whether there is one; both may be NULL where no error can ever be thrown. */
 struct LyrStr;

@@ -52,6 +52,11 @@ internal sealed class BlockBuilder
         _current.Insts.Add(op);
     }
 
+    /// <summary>Puts an op at the START of a block written already: what a block needs first is
+    /// sometimes known only once its code stands — a defer body that can fail stashes the error in
+    /// flight before it runs (05 E7), and whether it can is known once it is lowered.</summary>
+    public void Prepend(BlockId id, IrOp op) => _blocks[id.Value].Insts.Insert(0, op);
+
     public void Seal(IrTerminator terminator) => SealBlock(_current.Id, terminator);
 
     public void SealBlock(BlockId id, IrTerminator terminator)

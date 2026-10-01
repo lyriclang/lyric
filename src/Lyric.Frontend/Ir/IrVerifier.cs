@@ -753,6 +753,9 @@ public static class IrVerifier
                     RequireDestType(e.Dest, e.Type, "curerr", block, index);
                     break;
                 case ClearError:
+                case StashError:
+                case RestoreError:
+                case SuppressError:
                     break;
                 default:
                     throw new InternalCompilationException(

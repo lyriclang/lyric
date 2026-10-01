@@ -1090,7 +1090,7 @@ public sealed class CEmitter
     /// where something can set or read it.</summary>
     private bool UsesErrors(IrFunction function) =>
         function.Blocks.Any(b => b.Terminator is Throw or ErrorBranch or Propagate or PanicError
-            || b.Insts.Any(op => op is CurrentError or ClearError
+            || b.Insts.Any(op => op is CurrentError or ClearError or StashError or RestoreError or SuppressError
                 || op is Call c && _module.Functions[c.Target.Value].Throws
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
 
@@ -1213,6 +1213,9 @@ public sealed class CEmitter
         // The in-flight error (01 L5 E1): what a throw sets, what a call that failed wrote, what a
         // catch reads and clears.
         if (UsesErrors(function)) _fn.AppendLine("    LyrErr *lyr_e = NULL;");
+        // The errors set aside while a defer body runs with one in flight (05 E7).
+        foreach (var stash in function.Blocks.SelectMany(b => b.Insts).OfType<StashError>().Select(s => s.Stash).Distinct().Order())
+            _fn.AppendLine($"    LyrErr *lyr_s{stash} = NULL;");
         foreach (var temp in function.Temps)
         {
             if (IsVoid(temp.Type)) continue;
@@ -1328,6 +1331,11 @@ public sealed class CEmitter
         // The in-flight error's value, and the clause that takes it (05 E4, E9).
         CurrentError e => $"{Temp(e.Dest)} = lyr_e->value;",
         ClearError => "lyr_e = NULL;",
+        // A defer body with an error in flight (05 E7): set aside, back, or the body's own appended
+        // to it as suppressed — the first wins.
+        StashError s => $"lyr_s{s.Stash} = lyr_e; lyr_e = NULL;",
+        RestoreError r => $"lyr_e = lyr_s{r.Stash};",
+        SuppressError s => $"lyr_err_suppress(lyr_s{s.Stash}, lyr_e); lyr_e = lyr_s{s.Stash};",
         // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>

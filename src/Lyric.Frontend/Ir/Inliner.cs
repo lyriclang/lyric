@@ -104,7 +104,7 @@ internal static class Inliner
         {
             ops += block.Insts.Count;
             if (block.Terminator is Throw or ErrorBranch or Propagate or PanicError) return false;
-            if (block.Insts.Any(op => op is CurrentError or ClearError)) return false;
+            if (block.Insts.Any(op => op is CurrentError or ClearError or StashError or RestoreError or SuppressError)) return false;
             if (block.Terminator is Return) returns = true;
         }
 
