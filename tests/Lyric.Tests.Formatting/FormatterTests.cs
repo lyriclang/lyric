@@ -822,4 +822,34 @@ public class FormatterTests
     public void A_parenthesized_try_keeps_its_parentheses() =>
         // '(try f()) + 1' marks the call alone; without the parentheses 'try' would cover the sum.
         Assert.Contains("(try f()) + 1", Format("fn g(): int throws E { return (try f()) + 1; }"), StringComparison.Ordinal);
+
+    [Fact]
+    public void Try_question_and_try_bang_keep_their_sign()
+    {
+        var formatted = Format("fn g() { let a = try?  f(); let b = try!f(); try? h(); }").Replace("\r\n", "\n");
+        Assert.Contains("let a = try? f();", formatted, StringComparison.Ordinal);
+        Assert.Contains("let b = try! f();", formatted, StringComparison.Ordinal);
+        Assert.Contains("    try? h();\n", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_expression_form_keeps_its_clauses_and_their_bodies()
+    {
+        var formatted = Format("fn g(): int { let a = try f() catch (e: A)  1 catch (_) { log(); 2 }; return a; }").Replace("\r\n", "\n");
+        Assert.Contains("let a = try f() catch (e: A) 1 catch (_) {", formatted, StringComparison.Ordinal);
+        Assert.Contains("        log();\n        2\n    };", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_try_the_clauses_would_take_keeps_its_parentheses()
+    {
+        // A clause belongs to the nearest 'try' on its left: bare, the inner 'try' would take the
+        // outer's clauses on the reparse. Last, a clause body needs none.
+        Assert.Contains("try (try f() catch (_: A) 1) catch (_: B) 2",
+            Format("fn g(): int { return try (try f() catch (_: A) 1) catch (_: B) 2; }"), StringComparison.Ordinal);
+        Assert.Contains("catch (_: A) (try h() catch (_: C) 3) catch (_: B) 2",
+            Format("fn g(): int { return try f() catch (_: A) (try h() catch (_: C) 3) catch (_: B) 2; }"), StringComparison.Ordinal);
+        Assert.Contains("catch (_: A) try h() catch (_: C) 3;",
+            Format("fn g(): int { return try f() catch (_: A) (try h() catch (_: C) 3); }"), StringComparison.Ordinal);
+    }
 }

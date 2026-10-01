@@ -275,9 +275,15 @@ public sealed class SemaRules
         if (tr.Catches.Length == 0)
             _de.Report("LYR-SEM0036", Severity.Error, tr.Span,
                 "'try' needs at least one 'catch' ('finally' does not exist — use 'defer')");
-        for (var i = 0; i < tr.Catches.Length - 1; i++)
-            if (tr.Catches[i].BindingType is null)
-                _de.Report("LYR-SEM0035", Severity.Error, tr.Catches[i].Span,
+        CheckClauses(tr.Catches);
+    }
+
+    /// <summary>The rules of a clause list, the block's or the expression's (05 E9).</summary>
+    private void CheckClauses(CatchClause[] catches)
+    {
+        for (var i = 0; i < catches.Length - 1; i++)
+            if (catches[i].BindingType is null)
+                _de.Report("LYR-SEM0035", Severity.Error, catches[i].Span,
                     "catch-all must be the last catch clause");
     }
 
@@ -337,6 +343,14 @@ public sealed class SemaRules
                     if (arm.Body is Block armBlock) WalkStmt(armBlock);
                     else if (arm.Body is Expr armExpr) WalkExpr(armExpr);
                 }
+                return;
+
+            // The clauses of a 'try' expression (05 E4): their bodies are blocks, which 'Children'
+            // cannot carry either, and the clause rules are the statement's.
+            case TryExpr { Catches.Length: > 0 } tried:
+                CheckClauses(tried.Catches);
+                WalkExpr(tried.Value);
+                foreach (var clause in tried.Catches) WalkStmt(clause.Body);
                 return;
         }
 

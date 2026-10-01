@@ -1,0 +1,82 @@
+// The expression forms of the try family (design/v5/spec/05 E4): try? -> ?T without flattening,
+// try! -> T, try e catch (x: A) v with expression and value-block bodies, void forms as statements,
+// a clause that leaves the loop, defers of the callee before the clause.
+import std.io { println };
+
+enum ParseError :: [Error] { Empty, BadDigit(char, int); fn message(): string { return "parse"; } }
+interface IoError :: [Error] { }
+class Disk :: [IoError] { fn message(): string { return "disk"; } }
+
+fn parse(s: string): int throws ParseError {
+    if (s == "") { throw ParseError.Empty; }
+    if (s == "x") { throw ParseError.BadDigit('x', 0); }
+    return 42;
+}
+
+fn maybe(s: string): ?int throws ParseError {
+    if (s == "none") { return null; }
+    return try parse(s);
+}
+
+fn read(ok: bool): string throws Disk {
+    if (!ok) { throw Disk { }; }
+    return "data";
+}
+
+fn save(ok: bool): void throws Disk {
+    if (!ok) { throw Disk { }; }
+    println("saved");
+}
+
+fn withDefer(): int throws Disk {
+    defer println("defer in callee");
+    throw Disk { };
+}
+
+fn main(): void {
+    let a = try? parse("1");
+    let b = try? parse("");
+    println(f"a {a ?? -1} b {b ?? -1}");
+
+    let c = try? maybe("none");
+    let d = try? maybe("");
+    let e = try? maybe("2");
+    println(f"c {c != null} {c! ?? -7}");
+    println(f"d {d != null}");
+    println(f"e {e != null} {e! ?? -7}");
+
+    let f = try! parse("3");
+    println(f"f {f}");
+
+    let g = try parse("x") catch (_: ParseError) -1;
+    println(f"g {g}");
+    let h = try read(false) catch (err: IoError) { println(f"h caught {err.message()}"); "fallback" };
+    println(f"h {h}");
+    let i = try read(true) catch (_) "never";
+    println(f"i {i}");
+
+    let j = try parse("") catch (_: IoError) 1 catch (_: ParseError) 2 catch (_) 3;
+    println(f"j {j}");
+
+    let none = "none";
+    let k = try? (try read(false) catch (_: Disk) throw ParseError.Empty);
+    println(f"k {k ?? none}");
+
+    try! save(true);
+    try? save(false);
+    try save(false) catch (err) println(f"save failed: {err.message()}");
+
+    let inputs = ["1", "", "x", "4"];
+    var sum = 0;
+    var at = 0;
+    while (at < 4) {
+        let s = inputs[at];
+        at += 1;
+        let n = try parse(s) catch (_) { continue; };
+        sum += n;
+    }
+    println(f"sum {sum}");
+
+    let m = try withDefer() catch (_) 0;
+    println(f"m {m}");
+}

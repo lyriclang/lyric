@@ -9,7 +9,10 @@ namespace Lyric.Tests.Parsing;
 /// The syntax of errors (design/v5/spec/08 D9, D18, Y4, Y5; spec chapter 06 §2–§3): the
 /// <c>throws</c> set — one type, a bracketed list, the bare form — with the list rule's error
 /// (PAR0049); the <c>try</c> prefix covering everything to its right, at the start of the
-/// expression it covers (PAR0050); <c>try {</c> as the block form at a statement start.
+/// expression it covers (PAR0050); <c>try {</c> as the block form at a statement start; the
+/// expression forms (05 E4): <c>try?</c> and <c>try!</c> written against the keyword, and
+/// <c>try e catch (x: A) v</c> whose clauses belong to the nearest <c>try</c> on their left (PAR0051
+/// after a signed one).
 /// </summary>
 public class ErrorSyntaxTests
 {
@@ -161,5 +164,94 @@ public class ErrorSyntaxTests
         var (m, de) = ParseModule("fn main(): void throws [A, B] { }");
         Assert.False(de.HasErrors);
         Assert.Equal(2, Assert.IsType<FunctionDecl>(m.Declarations[0]).Throws!.Types.Length);
+    }
+
+    // --- try? and try! ---
+
+    [Fact]
+    public void Try_with_a_question_mark_is_the_optional_form()
+    {
+        var (expr, de) = ParseExpr("try? f() + 1");
+        Assert.False(de.HasErrors);
+        var tried = Assert.IsType<TryExpr>(expr);
+        Assert.Equal(TryKind.Optional, tried.Kind);
+        Assert.IsType<BinaryExpr>(tried.Value); // it covers everything to its right, as the mark does
+        Assert.Equal(4, tried.KeywordSpan.End);  // 'try?' is what a diagnostic about it points at
+    }
+
+    [Fact]
+    public void Try_with_a_bang_is_the_forced_form()
+    {
+        var (expr, de) = ParseExpr("try! f()");
+        Assert.False(de.HasErrors);
+        Assert.Equal(TryKind.Force, Assert.IsType<TryExpr>(expr).Kind);
+    }
+
+    [Fact]
+    public void A_bang_after_a_space_is_the_negation_the_mark_covers()
+    {
+        var (expr, de) = ParseExpr("try !done()");
+        Assert.False(de.HasErrors);
+        var tried = Assert.IsType<TryExpr>(expr);
+        Assert.Equal(TryKind.Propagate, tried.Kind);
+        Assert.Equal(UnaryOp.Not, Assert.IsType<UnaryExpr>(tried.Value).Operator);
+    }
+
+    [Fact]
+    public void The_signed_forms_stand_at_the_start_too()
+    {
+        var error = Assert.Single(ParseExpr("1 + try? f()").De.Diagnostics);
+        Assert.Equal("LYR-PAR0050", error.Code);
+        Assert.Contains("'try?'", error.Message);
+    }
+
+    // --- the expression form ---
+
+    [Fact]
+    public void Clauses_after_a_try_make_the_expression_form()
+    {
+        var (expr, de) = ParseExpr("try f() catch (e: A) 1 catch (_) { g(); 2 }");
+        Assert.False(de.HasErrors);
+        var tried = Assert.IsType<TryExpr>(expr);
+        Assert.Equal(2, tried.Catches.Length);
+        Assert.True(tried.Catches[0].ExpressionBody);
+        Assert.IsType<IntLiteralExpr>(tried.Catches[0].Body.Tail!.Expr);
+        Assert.False(tried.Catches[1].ExpressionBody);
+        Assert.NotNull(tried.Catches[1].Body.Tail); // a value block: its tail is the clause's value
+    }
+
+    [Fact]
+    public void A_clause_belongs_to_the_nearest_try_on_its_left()
+    {
+        var (expr, de) = ParseExpr("try f() catch (_: A) try g() catch (_: B) 2");
+        Assert.False(de.HasErrors);
+        var outer = Assert.IsType<TryExpr>(expr);
+        var inner = Assert.IsType<TryExpr>(Assert.Single(outer.Catches).Body.Tail!.Expr);
+        Assert.Single(inner.Catches);
+    }
+
+    [Fact]
+    public void A_clause_body_is_a_value_position()
+    {
+        // At a statement's start a struct initializer is refused; a clause body is past the start.
+        var (_, de) = ParseModule("fn g() { try f() catch (_) P { x = 0 }; }");
+        Assert.False(de.HasErrors, string.Join("; ", de.Diagnostics.Select(d => d.Message)));
+    }
+
+    [Fact]
+    public void A_clause_after_a_signed_try_is_refused()
+    {
+        var (expr, de) = ParseExpr("try? f() catch (_) 0");
+        Assert.Equal("LYR-PAR0051", Assert.Single(de.Diagnostics).Code);
+        Assert.Single(Assert.IsType<TryExpr>(expr).Catches); // parsed on, so nothing cascades
+    }
+
+    [Fact]
+    public void The_expression_form_stands_as_a_statement()
+    {
+        var (m, de) = ParseModule("fn g() { try f() catch (e) log(e); }");
+        Assert.False(de.HasErrors);
+        var statement = Assert.IsType<ExprStmt>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Body!.Statements[0]);
+        Assert.Single(Assert.IsType<TryExpr>(statement.Expr).Catches);
     }
 }

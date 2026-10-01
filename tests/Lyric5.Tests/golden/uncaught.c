@@ -55,6 +55,10 @@ const lyr_vt_ty1 lyr_vt_ty1_ty2 = { &lyr_desc_ty2_Wrap, lyr_vt_ty1_ty2_s0, lyr_v
 const LyrItable lyr_itab_ty0[] = { { lyr_ifid_ty1, &lyr_vt_ty1_ty0 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty1, &lyr_vt_ty1_ty2 } , { NULL, NULL } };
 
+/* the members of Error the runtime reports through */
+const LyrStr *lyr_error_message(LyrIface e) { return ((const lyr_vt_ty1 *)e.vt)->s0(e); }
+int lyr_error_cause(LyrIface e, LyrIface *next) { lyr_opt_iface1 c = ((const lyr_vt_ty1 *)e.vt)->s1(e); *next = c.value; return c.has; }
+
 #line 12 "programs/uncaught.lyr"
 LyrStr * lyr_main_read(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
@@ -217,7 +221,5 @@ bb0:;
 
 
 /* the program */
-static const LyrStr *lyr_error_message(LyrIface e) { return ((const lyr_vt_ty1 *)e.vt)->s0(e); }
-static int lyr_error_cause(LyrIface e, LyrIface *next) { lyr_opt_iface1 c = ((const lyr_vt_ty1 *)e.vt)->s1(e); *next = c.value; return c.has; }
 static int64_t lyr_entry(void) { LyrErr *lyr_e = NULL; int64_t lyr_r = lyr_main_main(&lyr_e); if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, lyr_error_message, lyr_error_cause); return lyr_r; }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

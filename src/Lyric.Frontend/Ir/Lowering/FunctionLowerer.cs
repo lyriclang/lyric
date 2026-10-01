@@ -917,75 +917,206 @@ internal sealed class FunctionLowerer
 
         // Nothing in the body can fail: no dispatch, the clauses are dead (the sema warned, SEM0139).
         if (frame.Dispatch is { } dispatch)
-        {
-            _b.SwitchTo(dispatch);
-            var errorType = ErrorType(stmt.Span);
-            var error = _slots.NewTemp(errorType);
-            _b.Emit(new CurrentError(error, errorType, stmt.Span));
-            var root = ErrorRoot(stmt.Span);
-
-            var caughtAll = false;
-            foreach (var clause in stmt.Catches)
-            {
-                var symbol = clause.BindingName is not null || clause.BindingType is not null
-                    ? _types.RefOf(clause) as LocalSymbol
-                      ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker")
-                    : null;
-                var caught = symbol?.Type;
-                var everything = clause.BindingType is null || caught is null || LyrType.Equal(caught, root);
-
-                BlockId? next = null;
-                IrType? bindingType = null;
-                if (!everything)
-                {
-                    bindingType = LowerType(caught!, clause.Span);
-                    var target = bindingType switch
-                    {
-                        IrRefType r => r.Type,
-                        IrStructType st => st.Type,
-                        IrEnumType en => en.Type,
-                        IrInterfaceType i => i.Type,
-                        _ => throw NotSupported($"catching '{TypeFacts.Display(caught!)}'", clause.Span),
-                    };
-                    var test = _slots.NewTemp(BoolType);
-                    _b.Emit(new TypeTest(test, error, target, clause.Span));
-                    var take = _b.NewBlock();
-                    next = _b.NewBlock();
-                    _b.Seal(new CondBranch(test, take, next.Value, clause.Span));
-                    _b.SwitchTo(take);
-                    _b.Emit(new ClearError(clause.Span));
-                    if (clause.BindingName is not null)
-                    {
-                        // The value under its own type: a class's object, a struct's or an enum's
-                        // payload out of the box, an interface value re-tabled.
-                        var bound = _slots.NewTemp(bindingType);
-                        _b.Emit(new Downcast(bound, error, target, bindingType, clause.Span));
-                        _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, bindingType), bound, clause.Span));
-                    }
-                }
-                else
-                {
-                    _b.Emit(new ClearError(clause.Span));
-                    if (clause.BindingName is not null)
-                        _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, errorType), error, clause.Span));
-                }
-
-                if (LowerScope(clause.Body)) open.Add(_b.CurrentId);
-
-                if (next is null) { caughtAll = true; break; } // a catch-all ends the chain (E9 C3)
-                _b.SwitchTo(next.Value);
-            }
-
-            // No clause took it: the error goes on — the defers outside, then the next try or the
-            // bottom.
-            if (!caughtAll) _b.Seal(new Branch(ErrorLanding(stmt.Span), stmt.Span));
-        }
+            open.AddRange(Dispatch(dispatch, stmt.Catches, stmt.Span, clause => LowerScope(clause.Body)));
 
         if (open.Count == 0) return false;
         var merge = _b.NewBlock();
         foreach (var id in open) _b.SealBlock(id, new Branch(merge, stmt.Span));
         _b.SwitchTo(merge);
         return true;
+    }
+
+    /// <summary>
+    /// A try's dispatch (05 E9): the in-flight error tested against the clauses in order — the first
+    /// that covers it takes it off, binds it under its own type and runs <paramref name="lowerBody"/>;
+    /// a catch-all ends the chain. No clause took it: the error goes on to the landing outside — the
+    /// defers there, then the next try or the bottom. Answers the blocks the bodies fall out of.
+    /// </summary>
+    private List<BlockId> Dispatch(BlockId dispatch, CatchClause[] clauses, Span span, Func<CatchClause, bool> lowerBody)
+    {
+        var open = new List<BlockId>();
+        _b.SwitchTo(dispatch);
+        var errorType = ErrorType(span);
+        var error = _slots.NewTemp(errorType);
+        _b.Emit(new CurrentError(error, errorType, span));
+        var root = ErrorRoot(span);
+
+        var caughtAll = false;
+        foreach (var clause in clauses)
+        {
+            var symbol = clause.BindingName is not null || clause.BindingType is not null
+                ? _types.RefOf(clause) as LocalSymbol
+                  ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker")
+                : null;
+            var caught = symbol?.Type;
+            var everything = clause.BindingType is null || caught is null || LyrType.Equal(caught, root);
+
+            BlockId? next = null;
+            IrType? bindingType = null;
+            if (!everything)
+            {
+                bindingType = LowerType(caught!, clause.Span);
+                var target = bindingType switch
+                {
+                    IrRefType r => r.Type,
+                    IrStructType st => st.Type,
+                    IrEnumType en => en.Type,
+                    IrInterfaceType i => i.Type,
+                    _ => throw NotSupported($"catching '{TypeFacts.Display(caught!)}'", clause.Span),
+                };
+                var test = _slots.NewTemp(BoolType);
+                _b.Emit(new TypeTest(test, error, target, clause.Span));
+                var take = _b.NewBlock();
+                next = _b.NewBlock();
+                _b.Seal(new CondBranch(test, take, next.Value, clause.Span));
+                _b.SwitchTo(take);
+                _b.Emit(new ClearError(clause.Span));
+                if (clause.BindingName is not null)
+                {
+                    // The value under its own type: a class's object, a struct's or an enum's
+                    // payload out of the box, an interface value re-tabled.
+                    var bound = _slots.NewTemp(bindingType);
+                    _b.Emit(new Downcast(bound, error, target, bindingType, clause.Span));
+                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, bindingType), bound, clause.Span));
+                }
+            }
+            else
+            {
+                _b.Emit(new ClearError(clause.Span));
+                if (clause.BindingName is not null)
+                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol!, errorType), error, clause.Span));
+            }
+
+            if (lowerBody(clause)) open.Add(_b.CurrentId);
+
+            if (next is null) { caughtAll = true; break; } // a catch-all ends the chain (E9 C3)
+            _b.SwitchTo(next.Value);
+        }
+
+        // No clause took it: the error goes on — the defers outside, then the next try or the
+        // bottom.
+        if (!caughtAll) _b.Seal(new Branch(ErrorLanding(span), span));
+        return open;
+    }
+
+    /// <summary>
+    /// The <c>try</c> family as an expression (05 E4). A mark is its operand: the sites in it got
+    /// their edges where they were lowered. The other forms open a frame, as the block does, so the
+    /// operand's errors land on ONE dispatch: <c>try!</c> panics there, <c>try?</c> clears the error
+    /// and gives <c>null</c>, and the expression form asks its clauses, each delivering the value
+    /// from its value block. Nothing under it can fail: no dispatch, the operand's value alone.
+    /// </summary>
+    private TempId? LowerTryExpr(TryExpr expr) => expr switch
+    {
+        { Kind: TryKind.Force } => LowerTryForce(expr),
+        { Kind: TryKind.Optional } => LowerTryOptional(expr),
+        { Catches.Length: > 0 } => LowerTryCatch(expr),
+        _ => LowerExprOrVoid(expr.Value),
+    };
+
+    /// <summary>The operand under a frame of its own, so its sites land on the frame's dispatch.</summary>
+    private T UnderFrame<T>(TryFrame frame, Func<T> lower)
+    {
+        _tryFrames.Push(frame);
+        try { return lower(); }
+        finally { _tryFrames.Pop(); }
+    }
+
+    /// <summary><c>try! e</c> (05 E4, E8): the value is the operand's; an error ends the program as a
+    /// panic with its message. The dispatch has no way back, so the value needs no slot.</summary>
+    private TempId? LowerTryForce(TryExpr expr)
+    {
+        var frame = new TryFrame(_defers.Count);
+        var value = UnderFrame(frame, () => LowerExprOrVoid(expr.Value));
+        if (frame.Dispatch is { } dispatch) _b.SealBlock(dispatch, new PanicError(expr.Span));
+        return value;
+    }
+
+    /// <summary><c>try? e</c> (05 E4): the operand's value wrapped, or <c>null</c> when it fails — the
+    /// error cleared and dropped. Never flattened: a <c>?T</c> operand is wrapped once more. Over an
+    /// expression without a value it stands as a statement (the sema saw to it) and only drops the
+    /// error.</summary>
+    private TempId? LowerTryOptional(TryExpr expr)
+    {
+        if (Diverges(expr.Value))
+            throw NotSupported("a 'try?' over an expression that never gives a value", expr.Span,
+                "its value could only ever be null, and '?never' has no layout yet");
+
+        var frame = new TryFrame(_defers.Count);
+        var type = TypeOfExpr(expr);
+        if (IsVoid(type))
+        {
+            UnderFrame(frame, () => LowerExprOrVoid(expr.Value));
+            if (frame.Dispatch is not { } drop) return null;
+            var after = _b.NewBlock();
+            _b.Seal(new Branch(after, expr.Span));
+            _b.SwitchTo(drop);
+            _b.Emit(new ClearError(expr.Span));
+            _b.Seal(new Branch(after, expr.Span));
+            _b.SwitchTo(after);
+            return null;
+        }
+
+        var inner = ((IrOptionalType)type).Inner;
+        var value = UnderFrame(frame, () => LowerExprAs(expr.Value, inner));
+        var some = _slots.NewTemp(type);
+        _b.Emit(new OptSome(some, value, inner, expr.Span));
+        if (frame.Dispatch is not { } dispatch) return some;
+
+        var slot = _slots.DeclareSynthetic("try", type);
+        _b.Emit(new StoreLocal(slot, some, expr.Span));
+        var merge = _b.NewBlock();
+        _b.Seal(new Branch(merge, expr.Span));
+        _b.SwitchTo(dispatch);
+        _b.Emit(new ClearError(expr.Span));
+        var none = _slots.NewTemp(type);
+        _b.Emit(new OptNone(none, inner, expr.Span));
+        _b.Emit(new StoreLocal(slot, none, expr.Span));
+        _b.Seal(new Branch(merge, expr.Span));
+        _b.SwitchTo(merge);
+        var dest = _slots.NewTemp(type);
+        _b.Emit(new LoadLocal(dest, slot, type, expr.Span));
+        return dest;
+    }
+
+    /// <summary><c>try e catch (x: A) v</c> (05 E4): the operand under a frame; its dispatch asks the
+    /// clauses in order as the block form's does, and the clause that takes the error delivers the
+    /// value from its value block. No clause takes it: the error goes on to the landing outside.
+    /// A form whose every part leaves has the type 'never' and no slot.</summary>
+    private TempId? LowerTryCatch(TryExpr expr)
+    {
+        IrType? type = _types.TypeOf(expr) is NeverType ? null : TypeOfExpr(expr);
+        if (type is not null && IsVoid(type)) type = null;
+        LocalId? slot = type is null ? null : _slots.DeclareSynthetic("try", type);
+
+        var frame = new TryFrame(_defers.Count);
+        UnderFrame(frame, () =>
+        {
+            if (Diverges(expr.Value)) { LowerDiverging(expr.Value); return 0; }
+            var value = type is null ? LowerExprOrVoid(expr.Value) : LowerExprAs(expr.Value, type);
+            if (slot is { } s && value is { } v) _b.Emit(new StoreLocal(s, v, expr.Value.Span));
+            return 0;
+        });
+
+        var open = new List<BlockId>();
+        if (!_b.IsSealed) open.Add(_b.CurrentId);
+        if (frame.Dispatch is { } dispatch)
+            open.AddRange(Dispatch(dispatch, expr.Catches, expr.Span, clause =>
+            {
+                var savedSink = _tailSink;
+                _tailSink = new TailSink(slot, type, AsReturn: false);
+                try { return LowerScope(clause.Body); }
+                finally { _tailSink = savedSink; }
+            }));
+
+        if (open.Count == 0) return null; // every part leaves: the type is 'never', the block sealed
+        var merge = _b.NewBlock();
+        foreach (var id in open) _b.SealBlock(id, new Branch(merge, expr.Span));
+        _b.SwitchTo(merge);
+        if (slot is not { } result) return null;
+        var dest = _slots.NewTemp(type!);
+        _b.Emit(new LoadLocal(dest, result, type!, expr.Span));
+        return dest;
     }
 
     /// <summary>
@@ -1793,8 +1924,7 @@ internal sealed class FunctionLowerer
         ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),
-        // 'try e' (05 E4): e's value; its throw sites get their error edges in M5 S1b.
-        TryExpr e => LowerExprOrVoid(e.Value),
+        TryExpr e => LowerTryExpr(e),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),

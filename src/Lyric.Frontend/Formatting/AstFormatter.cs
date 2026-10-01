@@ -631,16 +631,41 @@ public sealed class AstFormatter
     {
         var parts = new List<Doc> { Doc.From("try "), BlockDoc(stmt.Body) };
         foreach (var clause in stmt.Catches)
-        {
-            // '_' is "no name", never "no type": 'catch (_: Boom)' selects by its type without
-            // binding, and dropping the annotation would turn it into the catch-all.
-            var name = clause.BindingName ?? "_";
-            var binding = clause.BindingType is null
-                ? Doc.From(name)
-                : Doc.Of(Doc.From($"{name}: "), TypeDoc(clause.BindingType));
-            parts.Add(Doc.Of(Doc.From(" catch ("), binding, Doc.From(") "), BlockDoc(clause.Body)));
-        }
+            parts.Add(Doc.Of(Doc.From(" catch ("), CatchBindingDoc(clause), Doc.From(") "), BlockDoc(clause.Body)));
 
+        return new Doc.Concat(parts);
+    }
+
+    // '_' is "no name", never "no type": 'catch (_: Boom)' selects by its type without binding, and
+    // dropping the annotation would turn it into the catch-all.
+    private Doc CatchBindingDoc(CatchClause clause)
+    {
+        var name = clause.BindingName ?? "_";
+        return clause.BindingType is null
+            ? Doc.From(name)
+            : Doc.Of(Doc.From($"{name}: "), TypeDoc(clause.BindingType));
+    }
+
+    /// <summary><c>try e</c>, <c>try? e</c>, <c>try! e</c> and the expression form with its clauses
+    /// (05 E4). A clause binds to the nearest <c>try</c> on its left, so a <c>try</c> standing as
+    /// the operand of one with clauses, or as the body of a clause another follows, keeps its
+    /// parentheses — without them the reparse hands it the clauses.</summary>
+    private Doc TryExprDoc(TryExpr t)
+    {
+        var keyword = t.Kind switch { TryKind.Optional => "try? ", TryKind.Force => "try! ", _ => "try " };
+        var parts = new List<Doc>
+        {
+            Doc.From(keyword),
+            ExprDoc(t.Value, t.Catches.Length > 0 && t.Value is TryExpr ? Primary : Assign),
+        };
+        for (var i = 0; i < t.Catches.Length; i++)
+        {
+            var clause = t.Catches[i];
+            var body = clause.ExpressionBody && clause.Body.Tail is { } tail
+                ? ExprDoc(tail.Expr, i < t.Catches.Length - 1 && tail.Expr is TryExpr ? Primary : Assign)
+                : BlockDoc(clause.Body);
+            parts.Add(Doc.Of(Doc.From(" catch ("), CatchBindingDoc(clause), Doc.From(") "), body));
+        }
         return new Doc.Concat(parts);
     }
 
@@ -754,7 +779,7 @@ public sealed class AstFormatter
         ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
         ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
-        TryExpr t => Doc.Of(Doc.From("try "), ExprDoc(t.Value, Assign)),
+        TryExpr t => TryExprDoc(t),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),
         BinaryExpr b => BinaryDoc(b),
         AssignExpr a => AssignDoc(a),

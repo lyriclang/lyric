@@ -201,7 +201,7 @@ public static class SubsetGate
             {
                 case null:
                 // The error path (05 E1-E4, 01 L5): explicit edges, native since M5 S1b.
-                case Return or Branch or CondBranch or Unreachable or Throw or ErrorBranch or Propagate:
+                case Return or Branch or CondBranch or Unreachable or Throw or ErrorBranch or Propagate or PanicError:
                     break;
                 default:
                     Refuse(at, $"the terminator {terminator.GetType().Name}", "a later milestone");

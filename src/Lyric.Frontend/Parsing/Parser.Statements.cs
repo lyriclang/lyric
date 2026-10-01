@@ -394,7 +394,10 @@ public sealed partial class Parser
         return new TryStmt(body, catches.ToArray(), Span.Union(kw.Span, end));
     }
 
-    private CatchClause ParseCatch()
+    /// <summary>A clause: <c>catch (e: T) { … }</c>. In the expression form (08 Y4) the body is a
+    /// value block, or an expression standing for one — <c>catch (e) v</c> is <c>catch (e) { v }</c>
+    /// with the braces left off.</summary>
+    private CatchClause ParseCatch(bool expressionForm = false)
     {
         var kw = _buffer.Advance(); // catch
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'catch'");
@@ -405,7 +408,15 @@ public sealed partial class Parser
         string? name = text == "_" ? null : text; // '_' means catch-all without a binding
         TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after catch binding");
-        var body = ParseBlock();
+        if (expressionForm && !_buffer.Check(TokenKind.LBrace))
+        {
+            // A value position: a struct initializer may stand here, as on the right of an '='.
+            var value = ParseSubExpr();
+            var tail = new Block([new TailExprStmt(value, value.Span)], value.Span);
+            return new CatchClause(name, type, tail, Span.Union(kw.Span, value.Span))
+                { NameSpan = idTok.Span, ExpressionBody = true };
+        }
+        var body = ParseBlock(valueBlock: expressionForm);
         return new CatchClause(name, type, body, Span.Union(kw.Span, body.Span)) { NameSpan = idTok.Span };
     }
 

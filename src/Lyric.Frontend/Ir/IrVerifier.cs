@@ -1717,6 +1717,7 @@ public static class IrVerifier
                 case Throw:
                 case ErrorBranch:
                 case Propagate:
+                case PanicError:
                 case Branch:
                 case Unreachable:
                     break; // no type conditions

@@ -387,8 +387,9 @@ public static class AstDumper
                 Write(n.Value, indent + 1, sb);
                 break;
             case TryExpr n:
-                Line(sb, indent, "Try", n.Span);
+                Line(sb, indent, n.Kind switch { TryKind.Optional => "Try?", TryKind.Force => "Try!", _ => "Try" }, n.Span);
                 Write(n.Value, indent + 1, sb);
+                foreach (var c in n.Catches) Write(c, indent + 1, sb);
                 break;
             case DeferStmt n:
                 Line(sb, indent, "Defer", n.Span);

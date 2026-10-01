@@ -175,6 +175,48 @@ public class ErrorPathTests
     }
 
     [Fact]
+    public void Try_bang_ends_its_dispatch_in_a_panic()
+    {
+        var module = Lowered("""
+            fn f(): int { return try! risky(); }
+            fn main(): int { return f(); }
+            """);
+        var f = Fn(module, "f");
+        Assert.False(f.Throws);
+        var branch = Assert.Single(Terminators(f).OfType<ErrorBranch>());
+        Assert.IsType<PanicError>(f.Blocks[branch.OnError.Value].Terminator);
+    }
+
+    [Fact]
+    public void Try_question_clears_the_error_and_gives_null()
+    {
+        var module = Lowered("""
+            fn f(): ?int { return try? risky(); }
+            fn main(): int { return f() ?? 0; }
+            """);
+        var f = Fn(module, "f");
+        var dispatch = f.Blocks[Assert.Single(Terminators(f).OfType<ErrorBranch>()).OnError.Value];
+        Assert.IsType<ClearError>(dispatch.Insts[0]);
+        Assert.Contains(dispatch.Insts, op => op is OptNone);
+        // Nothing asks what the error was.
+        Assert.DoesNotContain(f.Blocks, b => b.Insts.Any(op => op is CurrentError));
+    }
+
+    [Fact]
+    public void The_expression_form_dispatches_like_the_block()
+    {
+        var module = Lowered("""
+            fn f(): int { return try risky() catch (_: Boom) 0; }
+            fn main(): int { return f(); }
+            """);
+        var f = Fn(module, "f");
+        var test = Assert.IsType<CondBranch>(Dispatch(f).Terminator);
+        Assert.IsType<ClearError>(f.Blocks[test.IfTrue.Value].Insts[0]);
+        var onward = Assert.IsType<Branch>(f.Blocks[test.IfFalse.Value].Terminator);
+        Assert.IsType<Unreachable>(f.Blocks[onward.Target.Value].Terminator);
+    }
+
+    [Fact]
     public void A_try_whose_body_cannot_fail_has_no_dispatch()
     {
         var module = Lowered("""

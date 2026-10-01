@@ -247,6 +247,7 @@ public static class IrPrinter
         Throw t => $"throw {t.Value} -> {t.Landing}",
         ErrorBranch e => $"onerror {e.OnError} else {e.Continue}",
         Propagate => "propagate",
+        PanicError => "panicerror",
         _ => throw new InternalCompilationException($"ir-printer: unhandled terminator {term.GetType().Name}")
     };
 

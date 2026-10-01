@@ -1,0 +1,13 @@
+// try! on an error (05 E4, E8): a panic with the error's message, exit 101, no defer runs.
+import std.io { println };
+
+class Boom :: [Error] { fn message(): string { return "boom"; } }
+
+fn risky(): int throws Boom { throw Boom { }; }
+
+fn main(): void {
+    println("before");
+    defer println("main's defer must not run");
+    let n = try! risky();
+    println(f"after {n}");
+}

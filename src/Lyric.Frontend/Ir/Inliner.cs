@@ -103,7 +103,7 @@ internal static class Inliner
         foreach (var block in callee.Blocks)
         {
             ops += block.Insts.Count;
-            if (block.Terminator is Throw or ErrorBranch or Propagate) return false;
+            if (block.Terminator is Throw or ErrorBranch or Propagate or PanicError) return false;
             if (block.Insts.Any(op => op is CurrentError or ClearError)) return false;
             if (block.Terminator is Return) returns = true;
         }

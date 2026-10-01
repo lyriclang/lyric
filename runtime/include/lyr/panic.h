@@ -15,6 +15,7 @@
 #define LYR_RT_ARGUMENT         "LYR-RT0007"  /* a precondition from the program text: negative length, … */
 #define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) (05 E8) */
 #define LYR_RT_CHAR             "LYR-RT0009"  /* `as char` of a value that is no Unicode scalar value (03 T1d) */
+#define LYR_RT_FORCED_TRY       "LYR-RT0010"  /* `try!` on an error (05 E4, E8) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
