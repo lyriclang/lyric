@@ -74,7 +74,7 @@ public static class IrShape
         ResumePull r => new[] { r.Coroutine },
         YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
 
-        CurrentError or ClearError => Array.Empty<TempId>(),
+        CurrentError or ClearError or StashError or RestoreError or SuppressError => Array.Empty<TempId>(),
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
@@ -142,7 +142,7 @@ public static class IrShape
         YieldSuspend => null,
 
         CurrentError e => e.Dest,
-        ClearError => null,
+        ClearError or StashError or RestoreError or SuppressError => null,
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
@@ -231,7 +231,7 @@ public static class IrShape
             YieldSuspend y => y with { Value = Opt(y.Value) },
 
             CurrentError e => e with { Dest = temp(e.Dest) },
-            ClearError => op,
+            ClearError or StashError or RestoreError or SuppressError => op,
 
             _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
         };

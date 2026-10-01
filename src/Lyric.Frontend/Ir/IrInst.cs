@@ -221,3 +221,15 @@ public sealed record CurrentError(TempId Dest, IrType Type, Span Span) : IrOp(Sp
 
 /// <summary>A catch clause took the in-flight error: none is in flight any more.</summary>
 public sealed record ClearError(Span Span) : IrOp(Span);
+
+/// <summary>A <c>defer</c> body runs with an error in flight (05 E7): the error is set aside in
+/// stash <paramref name="Stash"/> — a slot of the function, not a temp — and none is in flight
+/// while the body runs.</summary>
+public sealed record StashError(int Stash, Span Span) : IrOp(Span);
+
+/// <summary>The body ran clean: the stashed error is in flight again.</summary>
+public sealed record RestoreError(int Stash, Span Span) : IrOp(Span);
+
+/// <summary>The body failed: its error is appended to the stashed one's suppressed errors — the
+/// first wins — and the stashed one is in flight again.</summary>
+public sealed record SuppressError(int Stash, Span Span) : IrOp(Span);

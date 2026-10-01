@@ -70,6 +70,7 @@ public class CEmitterTests
     [InlineData("uncaught")]
     [InlineData("try_forms")]
     [InlineData("catch_sets")]
+    [InlineData("defer_errors")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -205,6 +206,7 @@ public class CEmitterTests
             data.Add("error_paths", profile, 0, ERROR_PATHS_EXPECTED);
             data.Add("try_forms", profile, 0, TRY_FORMS_EXPECTED);
             data.Add("catch_sets", profile, 0, CATCH_SETS_EXPECTED);
+            data.Add("defer_errors", profile, 0, DEFER_ERRORS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -308,6 +310,10 @@ public class CEmitterTests
         "a 42 b -1\nc true -7\nd false\ne true 42\nf 42\ng -1\nh caught disk\nh fallback\ni data\nj 2\n"
         + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
 
+    private const string DEFER_ERRORS_EXPECTED =
+        "earlier defer ran\nnormal: first\nin flight: first\ntwo: second\noutside: first\ninside caught second\n"
+        + "break: first\ncontinue: first\ncaught in the defer\nown try: third\ninner defer\nnested: third\n";
+
     private const string CATCH_SETS_EXPECTED =
         "set took parse\ndisk took disk\nset took timeout\nvalue 4\nsingle disk\nother\n-1\nrethrown disk\n"
         + "parse\ndisk\ntimeout\nok 5\n";
@@ -324,6 +330,19 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
         Assert.Equal("error: config\n  caused by: disk\n", result.Stderr.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>A defer that fails while an error leaves main (design/v5/spec/05 E7, E6 O4): the first
+    /// error is reported, the defer's below it as suppressed, and the exit code is 1.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_suppressed_error_is_reported_below_the_one_that_won(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("uncaught_suppressed"), "uncaught_suppressed", profile);
+        Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("", result.Stdout);
+        Assert.Equal("error: first\n  suppressed: second\n", result.Stderr.Replace("\r\n", "\n"));
     }
 
     /// <summary><c>try!</c> on an error (design/v5/spec/05 E4, E8): a panic, <c>LYR-RT0010</c>, with

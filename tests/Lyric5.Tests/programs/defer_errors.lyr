@@ -1,0 +1,96 @@
+// A defer that throws (design/v5/spec/05 E7): on a normal exit its error leaves like any other and
+// the defers before it run all the same; with an error in flight the first wins; two on a normal
+// exit, the first that ran wins; a defer runs where it was registered - outside a try, its error is
+// not the try's, inside one it is; break and continue leave through it; a defer body with a try of
+// its own, and one with a defer of its own, on the error path.
+import std.io { println };
+
+class First :: [Error] { fn message(): string { return "first"; } }
+class Second :: [Error] { fn message(): string { return "second"; } }
+class Third :: [Error] { fn message(): string { return "third"; } }
+
+fn fail(what: int): void throws [First, Second] {
+    if (what == 1) { throw First { }; }
+    if (what == 2) { throw Second { }; }
+}
+
+fn failAt(n: int): void throws First { if (n == 3) { throw First { }; } }
+fn boom(): void throws Third { throw Third { }; }
+
+fn normal(): int throws [First, Second] {
+    defer println("earlier defer ran");
+    defer try fail(1);
+    return 7;
+}
+
+fn inFlight(): int throws [First, Second] {
+    defer try fail(2);
+    try fail(1);
+    return 0;
+}
+
+fn twoThrow(): int throws [First, Second] {
+    defer try fail(1);
+    defer try fail(2);
+    return 0;
+}
+
+fn outside(n: int): string throws [First, Second] {
+    defer try fail(1);
+    try { try fail(n); return "body"; } catch (_) { return "caught by the inner try"; }
+}
+
+fn inside(): string {
+    try {
+        defer try fail(2);
+        return "body";
+    } catch (e: Second) { return f"inside caught {e.message()}"; }
+    catch (_) { return "other"; }
+}
+
+fn loopBreak(): string throws First {
+    var i = 0;
+    while (i < 5) {
+        defer try failAt(i);
+        i += 1;
+        if (i == 3) { break; }
+    }
+    return f"done {i}";
+}
+
+fn loopContinue(): string throws First {
+    var i = 0;
+    while (i < 5) {
+        defer try failAt(i);
+        i += 1;
+        if (i == 3) { continue; }
+    }
+    return f"done {i}";
+}
+
+fn ownTry(): string throws Third {
+    defer { try { boom(); } catch (_) { println("caught in the defer"); } }
+    try boom();
+    return "unreached";
+}
+
+fn nested(): string throws [First, Third] {
+    defer {
+        defer println("inner defer");
+        try failAt(3);
+    }
+    try boom();
+    return "unreached";
+}
+
+fn main(): void {
+    println(try f"{normal()}" catch (e) f"normal: {e.message()}");
+    println(try f"{inFlight()}" catch (e) f"in flight: {e.message()}");
+    println(try f"{twoThrow()}" catch (e) f"two: {e.message()}");
+    println(try outside(0) catch (e) f"outside: {e.message()}");
+    println(inside());
+    println(try loopBreak() catch (e) f"break: {e.message()}");
+    println(try loopContinue() catch (e) f"continue: {e.message()}");
+    println(try ownTry() catch (e) f"own try: {e.message()}");
+    println(try nested() catch (e) f"nested: {e.message()}");
+}

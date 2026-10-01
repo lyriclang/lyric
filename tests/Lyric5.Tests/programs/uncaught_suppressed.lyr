@@ -1,0 +1,11 @@
+// An error that leaves main with a defer that failed on its way out (05 E7, E6 O4): the first
+// error is reported, the defer's below it as suppressed, and the exit code is 1.
+class First :: [Error] { fn message(): string { return "first"; } }
+class Second :: [Error] { fn message(): string { return "second"; } }
+
+fn fail2(): void throws Second { throw Second { }; }
+
+fn main(): void throws [First, Second] {
+    defer try fail2();
+    throw First { };
+}

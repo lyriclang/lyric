@@ -202,6 +202,9 @@ public static class IrPrinter
                           (y.Value is { } v ? $" {v}" : ""),
         CurrentError e => $"{e.Dest}: {TypeStr(e.Type)} = curerr",
         ClearError => "clearerr",
+        StashError s => $"stash s{s.Stash}",
+        RestoreError r => $"restore s{r.Stash}",
+        SuppressError s => $"suppress s{s.Stash}",
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 

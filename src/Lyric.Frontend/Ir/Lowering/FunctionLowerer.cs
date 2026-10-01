@@ -669,8 +669,7 @@ internal sealed class FunctionLowerer
         {
             // Exactly what 'return tail;' lowers to: the value first, then every pending defer.
             var returned = IsVoid(_returnType) ? LowerExprOrVoidDiscarding(tail.Expr) : LowerExprAs(tail.Expr, _returnType);
-            EmitAllPendingDefers();
-            _b.Seal(new Return(returned, tail.Span));
+            if (EmitLeavingDefers(_defers.Count)) _b.Seal(new Return(returned, tail.Span));
             return false;
         }
 
@@ -768,12 +767,30 @@ internal sealed class FunctionLowerer
     }
 
     private readonly Stack<TryFrame> _tryFrames = new();
-    private readonly Dictionary<(List<DeferStmt> Scope, int Count, TryFrame? Frame), BlockId> _chains = new();
+    private readonly Dictionary<(List<DeferStmt> Scope, int Count, object? End), BlockId> _chains = new();
     private BlockId? _bottom;
 
-    /// <summary>The try depth at the start of each defer body being lowered: a site inside one
-    /// whose error would leave it is M5 S3's (first error wins, the second is appended, E7).</summary>
-    private readonly Stack<int> _deferBodies = new();
+    /// <summary>How many of a scope's defers a landing runs, where not all of them: while the scope's
+    /// defers run on a normal exit, those registered before the one running (05 E7: they run all
+    /// the same); none, once they all ran. Keyed by the scope's list itself.</summary>
+    private readonly Dictionary<List<DeferStmt>, int> _deferLimits = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A defer body running with an error in flight: the try and defer depths it began at —
+    /// a site deeper in either is the body's own business — and the block where an error of its
+    /// own is merged into the stashed one, once a site needs it.</summary>
+    private sealed class Suppressing(int tryDepth, int deferDepth)
+    {
+        public int TryDepth { get; } = tryDepth;
+        public int DeferDepth { get; } = deferDepth;
+        public BlockId? Merge { get; set; }
+    }
+
+    private readonly Stack<Suppressing> _suppressing = new();
+    private int _stashes;
+
+    /// <summary>The error edges and throws lowered so far: a defer body on the error path that adds
+    /// none cannot fail, and needs no stash.</summary>
+    private int _errorSites;
 
     /// <summary>The calls whose error edge stands: a call lowered twice — the optional call lowers
     /// its unwrapped self — gets one edge.</summary>
@@ -791,43 +808,77 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// Where an error at this point goes: the pending defers above the innermost try (or all of
-    /// them), then that try's dispatch (or the bottom). Built on demand, shared by key.
+    /// them), then that try's dispatch (or the bottom). Inside a defer body that runs with an error
+    /// in flight — and not inside a try of its own — the body's own scopes, then the merge into the
+    /// stashed error (05 E7). Built on demand, shared by key.
     /// </summary>
     private BlockId ErrorLanding(Span span)
     {
-        var frame = _tryFrames.Count > 0 ? _tryFrames.Peek() : null;
-        if (_deferBodies.Count > 0 && _tryFrames.Count <= _deferBodies.Peek())
-            throw NotSupported("a 'defer' whose body throws", span,
-                "the first error wins and the second is appended to it (05 E7) — that comes with M5 S3");
-        var floor = frame?.DeferDepth ?? 0;
+        object? end = _tryFrames.Count > 0 ? _tryFrames.Peek() : null;
+        var floor = _tryFrames.Count > 0 ? _tryFrames.Peek().DeferDepth : 0;
+        if (_suppressing.Count > 0 && _tryFrames.Count <= _suppressing.Peek().TryDepth)
+        {
+            end = _suppressing.Peek();
+            floor = _suppressing.Peek().DeferDepth;
+        }
         var scopes = _defers.ToArray(); // innermost first
         var pending = new List<List<DeferStmt>>();
         for (var i = 0; i < scopes.Length - floor; i++)
-            if (scopes[i].Count > 0) pending.Add(scopes[i]);
-        return Chain(pending, 0, pending.Count > 0 ? pending[0].Count : 0, frame, span);
+            if (CountOf(scopes[i]) > 0) pending.Add(scopes[i]);
+        return Chain(pending, 0, pending.Count > 0 ? CountOf(pending[0]) : 0, end, span);
     }
 
+    /// <summary>How many of a scope's defers a landing runs (<see cref="_deferLimits"/>).</summary>
+    private int CountOf(List<DeferStmt> scope) =>
+        _deferLimits.TryGetValue(scope, out var limit) ? limit : scope.Count;
+
     /// <summary>The landing from the <paramref name="count"/>-th defer of the
-    /// <paramref name="at"/>-th pending scope down.</summary>
-    private BlockId Chain(List<List<DeferStmt>> pending, int at, int count, TryFrame? frame, Span span)
+    /// <paramref name="at"/>-th pending scope down, ending at <paramref name="end"/>: a try's
+    /// dispatch, a defer body's merge, or (null) the bottom.</summary>
+    private BlockId Chain(List<List<DeferStmt>> pending, int at, int count, object? end, Span span)
     {
-        if (at == pending.Count) return frame is null ? Bottom(span) : frame.Dispatch ??= _b.NewBlock();
-        if (count == 0) return Chain(pending, at + 1, at + 1 < pending.Count ? pending[at + 1].Count : 0, frame, span);
+        if (at == pending.Count) return end switch
+        {
+            TryFrame frame => frame.Dispatch ??= _b.NewBlock(),
+            Suppressing running => running.Merge ??= _b.NewBlock(),
+            _ => Bottom(span),
+        };
+        if (count == 0) return Chain(pending, at + 1, at + 1 < pending.Count ? CountOf(pending[at + 1]) : 0, end, span);
 
         var scope = pending[at];
-        if (_chains.TryGetValue((scope, count, frame), out var shared)) return shared;
+        if (_chains.TryGetValue((scope, count, end), out var shared)) return shared;
 
         var step = _b.NewBlock();
-        _chains[(scope, count, frame)] = step;
+        _chains[(scope, count, end)] = step;
         var resume = _b.CurrentId;
         _b.SwitchTo(step);
-        // A defer body runs where it was registered (05 E7), and what it calls is its own business:
-        // a failure that would leave it is refused above.
-        _deferBodies.Push(_tryFrames.Count);
-        try { LowerStmt(scope[count - 1].Body); }
-        finally { _deferBodies.Pop(); }
-        if (!_b.IsSealed)
-            _b.Seal(new Branch(Chain(pending, at, count - 1, frame, span), span));
+        // The body runs where it was registered, with an error in flight (05 E7). Where it can fail,
+        // that error is stashed while it runs — the body's own calls report through the same slot,
+        // and a call that went well leaves it as it was — and an error of the body's own is
+        // appended to the stashed one as suppressed, the first winning, before the chain goes on
+        // with the stashed one. A body that cannot fail runs as it stands.
+        var body = new Suppressing(_tryFrames.Count, _defers.Count);
+        var sites = _errorSites;
+        _suppressing.Push(body);
+        bool open;
+        try { open = LowerStmt(scope[count - 1].Body); }
+        finally { _suppressing.Pop(); }
+        int? stash = _errorSites == sites ? null : _stashes++;
+        if (stash is { } aside) _b.Prepend(step, new StashError(aside, span));
+        BlockId? next = null;
+        if (open && !_b.IsSealed)
+        {
+            next = Chain(pending, at, count - 1, end, span);
+            if (stash is { } back) _b.Emit(new RestoreError(back, span));
+            _b.Seal(new Branch(next.Value, span));
+        }
+        if (body.Merge is { } merge)
+        {
+            next ??= Chain(pending, at, count - 1, end, span);
+            _b.SwitchTo(merge);
+            _b.Emit(new SuppressError(stash!.Value, span));
+            _b.Seal(new Branch(next.Value, span));
+        }
         _b.SwitchTo(resume);
         return step;
     }
@@ -851,6 +902,7 @@ internal sealed class FunctionLowerer
     /// on in a fresh block.</summary>
     private void ErrorEdge(Span span)
     {
+        _errorSites++;
         var landing = ErrorLanding(span);
         var next = _b.NewBlock();
         _b.Seal(new ErrorBranch(landing, next, span));
@@ -861,6 +913,7 @@ internal sealed class FunctionLowerer
     /// struct or an enum boxed, an interface value re-tabled — into flight, then to the landing.</summary>
     private void Raise(Expr thrown, Span span)
     {
+        _errorSites++;
         var value = Coerce(LowerExpr(thrown), TypeOfExpr(thrown), ErrorType(span), span);
         var landing = ErrorLanding(span);
         _b.Seal(new Throw(value, landing, span));
@@ -1150,22 +1203,17 @@ internal sealed class FunctionLowerer
         var hasDefers = block.Statements.Any(st => st is DeferStmt);
         if (!hasDefers) return LowerPlainScope(block);
         _defers.Push(new List<DeferStmt>());
-        List<DeferStmt> pending;
-        bool fallsThrough;
         try
         {
-            fallsThrough = LowerStatements(block);
-            pending = _defers.Peek();
+            // The normal exit runs the bodies here, inline, latest first, while the scope still
+            // stands; an error leaving the scope reaches them through its landing (ErrorLanding),
+            // which reads the same list.
+            return LowerStatements(block) && EmitLeavingDefers(1);
         }
         finally
         {
             _defers.Pop();
         }
-
-        // The normal exit runs the bodies here, inline, latest first; an error leaving the scope
-        // reaches them through its landing (ErrorLanding), which reads the same list.
-        if (fallsThrough) EmitDefers(pending);
-        return fallsThrough;
     }
 
     /// <summary>A scope without a <c>defer</c>: nothing to guard, nothing to clean up.</summary>
@@ -1182,37 +1230,44 @@ internal sealed class FunctionLowerer
         }
     }
 
-    /// <summary>LIFO: registered last runs first.</summary>
-    private void EmitDefers(List<DeferStmt> pending)
+    /// <summary>
+    /// The defers of the scopes a normal exit leaves — the top <paramref name="count"/> scopes,
+    /// innermost first, each scope's latest first (LIFO): a scope's end, a <c>return</c> (all of
+    /// them), a <c>break</c> or <c>continue</c> (those above the loop). Each body runs where its
+    /// defer was registered — under the trys around its scope, not those inside it — and should
+    /// one throw (05 E7), the error leaves like any other: the defers registered before it run all
+    /// the same, then those of the scopes below, never again one that ran, then the try around or
+    /// the bottom. Answers whether the exit is still open: a body that always throws ends it.
+    /// </summary>
+    private bool EmitLeavingDefers(int count)
     {
-        for (var i = pending.Count - 1; i >= 0; i--)
+        // Over a COPY rather than over the stack itself: lowering a defer body enters a scope and
+        // pushes onto exactly this stack. Stack<T>.ToArray() yields top to bottom, innermost first.
+        var scopes = _defers.ToArray();
+        var hidden = new Stack<TryFrame>();
+        var limited = new List<List<DeferStmt>>();
+        try
         {
-            _deferBodies.Push(_tryFrames.Count);
-            try { LowerStmt(pending[i].Body); }
-            finally { _deferBodies.Pop(); }
+            for (var k = 0; k < count && k < scopes.Length; k++)
+            {
+                var scope = scopes[k];
+                var depth = scopes.Length - k;
+                while (_tryFrames.Count > 0 && _tryFrames.Peek().DeferDepth >= depth) hidden.Push(_tryFrames.Pop());
+                limited.Add(scope);
+                for (var i = scope.Count - 1; i >= 0; i--)
+                {
+                    _deferLimits[scope] = i;
+                    if (!LowerStmt(scope[i].Body)) return false;
+                }
+                _deferLimits[scope] = 0;
+            }
+            return true;
         }
-    }
-
-    /// <summary>All open <c>defer</c>s, innermost first, before a <c>return</c> or <c>throw</c> that
-    /// leaves several scopes at once. A <c>Stack&lt;T&gt;</c> enumerates from the top, so the order is
-    /// right by itself.</summary>
-    private void EmitAllPendingDefers()
-    {
-        // Over a COPY rather than over the stack itself: lowering a defer body enters a scope and pushes
-        // a new entry onto exactly this stack, which invalidates the enumerator and throws in the middle
-        // of the compiler.
-        //
-        // The order is preserved: Stack<T>.ToArray() yields top to bottom, so innermost scope first —
-        // the same as the enumeration did.
-        foreach (var scope in _defers.ToArray()) EmitDefers(scope);
-    }
-
-    /// <summary>The defers of every scope ABOVE the given stack depth, innermost first — what a
-    /// <c>break</c> or <c>continue</c> owes the scopes it leaves, and only those.</summary>
-    private void EmitPendingDefersAbove(int depth)
-    {
-        var scopes = _defers.ToArray(); // top-down; a copy for the same reentrancy reason as above
-        for (var i = 0; i < scopes.Length - depth; i++) EmitDefers(scopes[i]);
+        finally
+        {
+            foreach (var scope in limited) _deferLimits.Remove(scope);
+            while (hidden.Count > 0) _tryFrames.Push(hidden.Pop());
+        }
     }
 
     private bool LowerBinding(BindingStmt binding)
@@ -1286,8 +1341,7 @@ internal sealed class FunctionLowerer
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
         var returned = stmt.Value is null ? null : (TempId?)LowerExprAs(stmt.Value, _returnType);
-        EmitAllPendingDefers();
-        _b.Seal(new Return(returned, stmt.Span));
+        if (EmitLeavingDefers(_defers.Count)) _b.Seal(new Return(returned, stmt.Span));
         return false;
     }
 
@@ -1296,16 +1350,15 @@ internal sealed class FunctionLowerer
         var loop = TargetLoop(stmt.Label, "break", stmt.Span);
         // A break leaves every scope between it and the loop it names — their defers run first,
         // innermost first, down to the depth the target loop was entered at (§7.5).
-        EmitPendingDefersAbove(loop.DeferDepth);
-        _b.Seal(new Branch(loop.BreakTarget, stmt.Span));
+        if (EmitLeavingDefers(_defers.Count - loop.DeferDepth)) _b.Seal(new Branch(loop.BreakTarget, stmt.Span));
         return false;
     }
 
     private bool LowerContinue(ContinueStmt stmt)
     {
         var loop = TargetLoop(stmt.Label, "continue", stmt.Span);
-        EmitPendingDefersAbove(loop.DeferDepth); // continue ends the iteration — same exit path
-        _b.Seal(new Branch(loop.ContinueTarget, stmt.Span));
+        // continue ends the iteration — the same exit path
+        if (EmitLeavingDefers(_defers.Count - loop.DeferDepth)) _b.Seal(new Branch(loop.ContinueTarget, stmt.Span));
         return false;
     }
 
