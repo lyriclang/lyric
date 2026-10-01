@@ -641,6 +641,11 @@ public sealed class AstFormatter
     private Doc CatchBindingDoc(CatchClause clause)
     {
         var name = clause.BindingName ?? "_";
+        // The set form: one type alone, several in brackets (the list rule, 08 D5/D6).
+        if (clause.BindingTypes is [var only]) return Doc.Of(Doc.From($"{name} in "), TypeDoc(only));
+        if (clause.BindingTypes.Length > 1)
+            return Doc.Of(Doc.From($"{name} in ["),
+                Doc.Join(Doc.From(", "), clause.BindingTypes.Select(TypeDoc).ToArray()), Doc.From("]"));
         return clause.BindingType is null
             ? Doc.From(name)
             : Doc.Of(Doc.From($"{name}: "), TypeDoc(clause.BindingType));

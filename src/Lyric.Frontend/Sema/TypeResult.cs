@@ -134,6 +134,8 @@ public sealed class TypeResult
     private readonly Dictionary<Node, LyrType[]> _declaredThrows = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<CallExpr, LyrType[]> _callThrows = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<CatchClause, LyrType> _catchTypes = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<CatchClause, LyrType[]> _catchSets = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<TypePattern, LyrType> _typesTested = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The thrown set a function declares, resolved — the bare <c>throws</c> as
     /// <c>Error</c>; empty when it throws nothing. What its BODY may throw: for a coroutine
@@ -161,6 +163,20 @@ public sealed class TypeResult
     public void RecordCatchType(CatchClause clause, LyrType type) => _catchTypes[clause] = type;
 
     public LyrType? CatchType(CatchClause clause) => _catchTypes.GetValueOrDefault(clause);
+
+    /// <summary>
+    /// The set a catch binding carries (design/v5/spec/05 E2 K7): the types of a set clause, or
+    /// what reaches a clause without a type. A rethrow of the binding throws exactly it, a match
+    /// over the binding is exhaustive without a default; stored, the binding is an <c>Error</c>.
+    /// </summary>
+    public void RecordCatchSet(CatchClause clause, LyrType[] set) => _catchSets[clause] = set;
+
+    public LyrType[]? CatchSet(CatchClause clause) => _catchSets.GetValueOrDefault(clause);
+
+    /// <summary>The type a type pattern tests, resolved — named or not.</summary>
+    public void RecordTypeTested(TypePattern pattern, LyrType type) => _typesTested[pattern] = type;
+
+    public LyrType? TypeTested(TypePattern pattern) => _typesTested.GetValueOrDefault(pattern);
 
     public Symbol? RefOf(Node node) => _refs.TryGetValue(node, out var s) ? s : null;
 

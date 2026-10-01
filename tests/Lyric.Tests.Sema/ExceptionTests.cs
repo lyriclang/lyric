@@ -474,6 +474,99 @@ public class ExceptionTests
     public void What_a_try_question_operand_assigns_is_not_definite_after_it() =>
         AssertCode(Diags("fn t(): int { var x: int; let y = try? (x = mayThrow()); return x; }"), "LYR-SEM0018");
 
+    // --- the clauses: the set form, C1, C2, the set a binding carries (05 E9, E2 K7) ---
+
+    [Fact]
+    public void A_set_clause_covers_each_of_its_types()
+    {
+        AssertClean(Diags("fn t() { try { mayThrowBoth(); } catch (_ in [NotFound, Parse]) { } }"));
+        AssertCode(Diags("fn t() { try { mayThrowBoth(); } catch (_ in NotFound) { } }"), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_set_names_errors_only() =>
+        AssertCode(Diags("fn t() { try { mayThrow(); } catch (_ in [NotFound, Plain]) { } }"), "LYR-SEM0030");
+
+    [Fact]
+    public void A_type_caught_twice_is_refused()
+    {
+        AssertCode(Diags("fn t() { try { mayThrowBoth(); } catch (_: Parse) { } catch (_: Parse) { } catch (_) { } }"), "LYR-SEM0141");
+        AssertCode(Diags("fn t() { try { mayThrowBoth(); } catch (_ in [Parse, Parse]) { } catch (_) { } }"), "LYR-SEM0141");
+        AssertCode(Diags("fn t() { try { mayThrowBoth(); } catch (_ in [Parse, NotFound]) { } catch (_: Parse) { } }"), "LYR-SEM0141");
+    }
+
+    [Fact]
+    public void A_clause_a_clause_above_takes_whole_is_refused()
+    {
+        // An interface takes its conformers, the root everything (C2, Java's reading of it).
+        AssertCode(Diags("fn t() { try { mayThrowDb(); } catch (_: IOError) { } catch (_: DbError) { } }"), "LYR-SEM0142");
+        AssertCode(Diags("fn t() { try { mayThrowDb(); } catch (_ in [IOError, DbError]) { } }"), "LYR-SEM0142");
+        AssertCode(Diags("fn t() { try { mayThrowDb(); } catch (_: Error) { } catch (_: DbError) { } }"), "LYR-SEM0142");
+    }
+
+    [Fact]
+    public void The_other_way_round_both_clauses_are_reached() =>
+        // A conformer before its interface: other IOErrors still reach the second clause.
+        AssertClean(Diags("fn t() { try { mayThrowDb(); } catch (_: DbError) { } catch (_: IOError) { } }"));
+
+    [Fact]
+    public void A_clause_below_the_catch_all_is_refused_once()
+    {
+        var de = Diags("fn t() { try { mayThrow(); } catch (_) { } catch (_: NotFound) { } }");
+        Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        AssertCode(de, "LYR-SEM0035");
+    }
+
+    [Fact]
+    public void A_try_without_a_clause_is_one_error()
+    {
+        var de = Diags("fn t() { try { safe(); } }");
+        Assert.Equal("LYR-SEM0036", Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error).Code);
+    }
+
+    [Fact]
+    public void The_catch_all_rethrows_exactly_what_reached_it()
+    {
+        // K7: 'e' carries what the clauses above left — 'Parse' — and 'throw e' throws just that.
+        AssertClean(Diags("fn t(): int throws Parse { try { return mayThrowBoth(); } catch (_: NotFound) { return 0; } catch (e) { throw e; } }"));
+        AssertCode(Diags("fn t(): int throws Parse { try { return mayThrowBoth(); } catch (e) { throw e; } }"), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_set_clause_rethrows_its_set() =>
+        AssertClean(Diags("fn t(): int throws [NotFound, Parse] { try { return mayThrowBoth(); } catch (e in [NotFound, Parse]) { throw e; } }"));
+
+    [Fact]
+    public void Stored_the_binding_is_an_error() =>
+        // The set is the binding's, not a second type: 'x' is an Error, and so is what it throws.
+        AssertCode(Diags("fn t(): int throws Parse { try { return mayThrowBoth(); } catch (_: NotFound) { return 0; } catch (e) { let x = e; throw x; } }"),
+            "LYR-SEM0034");
+
+    [Fact]
+    public void A_match_over_the_set_needs_no_default()
+    {
+        AssertClean(Diags("""fn t(): string { try { return f"{mayThrowBoth()}"; } catch (e) { return match (e) { _: NotFound => "n", _: Parse => "p" }; } }"""));
+        AssertClean(Diags("""fn t(): string { try { return f"{mayThrowDb()}"; } catch (e) { return match (e) { _: IOError => "io" }; } }"""));
+    }
+
+    [Fact]
+    public void A_match_over_the_set_names_what_it_misses()
+    {
+        var de = Diags("""fn t(): string { try { return f"{mayThrowBoth()}"; } catch (e) { return match (e) { _: NotFound => "n" }; } }""");
+        AssertCode(de, "LYR-SEM0050");
+        Assert.Contains(de.Diagnostics, d => d.Message.Contains("'_: Parse'"));
+    }
+
+    [Fact]
+    public void A_match_over_a_set_clause_needs_no_default() =>
+        AssertClean(Diags("""fn t(): string { try { return f"{mayThrowBoth()}"; } catch (e in [NotFound, Parse]) { return match (e) { _: NotFound => "n", _: Parse => "p" }; } }"""));
+
+    [Fact]
+    public void A_typed_binding_carries_no_set() =>
+        // 'e' is a NotFound, a type of its own: a match over it is the type's question.
+        AssertCode(Diags("""fn t(): string { try { return f"{mayThrow()}"; } catch (e: NotFound) { return match (e) { _: NotFound => "n" }; } }"""),
+            "LYR-SEM0131");
+
     [Fact]
     public void What_the_operand_assigns_counts_when_every_clause_leaves() =>
         AssertClean(Diags("fn t(): int { var x: int; let y = try (x = mayThrow()) catch (_) { return 0; }; return x; }"));

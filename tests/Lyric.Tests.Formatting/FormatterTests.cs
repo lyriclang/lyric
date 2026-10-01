@@ -841,6 +841,16 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_set_clause_keeps_the_list_rule()
+    {
+        // One type alone, several in brackets (08 D5/D6), as 'throws' does.
+        var formatted = Format("fn g() { try { f(); } catch (e in [ A,B ]) { } catch (x in [C]) { } catch (y in D) { } }");
+        Assert.Contains("catch (e in [A, B])", formatted, StringComparison.Ordinal);
+        Assert.Contains("catch (x in C)", formatted, StringComparison.Ordinal);
+        Assert.Contains("catch (y in D)", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_try_the_clauses_would_take_keeps_its_parentheses()
     {
         // A clause belongs to the nearest 'try' on its left: bare, the inner 'try' would take the

@@ -323,11 +323,14 @@ public class ParserTests
         Assert.Null(t.Catches[1].BindingType);
     }
 
+    // 'Try_without_catch_reports' (PAR0023) retired with the parser's rule (M5 S2b): a block
+    // without a clause is the sema's to refuse, SEM0036 — one rule, one diagnostic.
     [Fact]
-    public void Try_without_catch_reports()
+    public void A_try_without_a_clause_parses_for_the_sema_to_refuse()
     {
-        var (_, de) = ParseStatement("try { x(); }");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-PAR0023");
+        var (stmt, de) = ParseStatement("try { x(); }");
+        Assert.Empty(de.Diagnostics);
+        Assert.Empty(Assert.IsType<TryStmt>(stmt).Catches);
     }
 
     [Fact]

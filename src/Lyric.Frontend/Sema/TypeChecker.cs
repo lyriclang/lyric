@@ -1614,7 +1614,7 @@ public sealed class TypeChecker
             case DeferStmt de: CheckStmt(de.Body, scope); break;
             case TryStmt tr:
                 CheckBlock(tr.Body, scope);
-                foreach (var c in tr.Catches) CheckCatch(c, scope);
+                CheckClauses(tr.Body, tr.Catches, scope, (clause, catchScope) => CheckBlock(clause.Body, catchScope));
                 break;
             case MatchStmt m: CheckMatch(m, m.Scrutinee, m.Arms, scope, asExpression: false); break;
             // break, continue and error need no check.
@@ -1917,7 +1917,74 @@ public sealed class TypeChecker
         finally { _currentModule = saved; }
     }
 
-    private void CheckCatch(CatchClause clause, SymbolTable scope) => CheckBlock(clause.Body, BindCatch(clause, scope));
+    /// <summary>
+    /// The clauses of a try, in order (05 E9): each bound in a scope of its own and held against the
+    /// clauses above it (C1, C2) before <paramref name="body"/> checks it. A clause without a type
+    /// gets the set that reaches it first (K7) — what <paramref name="tried"/> throws past every try
+    /// inside it, less what the clauses above take whole — so a match in its body can be exhaustive
+    /// over it.
+    /// </summary>
+    private void CheckClauses(Node tried, CatchClause[] clauses, SymbolTable scope, Action<CatchClause, SymbolTable> body)
+    {
+        for (var i = 0; i < clauses.Length; i++)
+        {
+            var above = clauses[..i];
+            if (clauses[i].TakesAll) _result.RecordCatchSet(clauses[i], Reaching(tried, above));
+            var catchScope = BindCatch(clauses[i], scope);
+            CheckAgainstAbove(clauses[i], above);
+            body(clauses[i], catchScope);
+        }
+    }
+
+    /// <summary>What reaches a clause without a type (05 E2 K7): what the sites under the try throw
+    /// past every try inside it — the exception analysis's own walk, run muted, so there is one
+    /// notion of a site — less what the clauses above take whole.</summary>
+    private LyrType[] Reaching(Node tried, CatchClause[] above)
+    {
+        LyrType[] escaping;
+        using (_de.Mute())
+            escaping = new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot).Escaping(tried, _currentModule);
+        return escaping.Where(t => !above.Any(c => TakesWhole(c, t))).ToArray();
+    }
+
+    /// <summary>The types a clause names: its type, or its set's; none for the clause without a type.</summary>
+    private LyrType[] CaughtTypes(CatchClause clause) =>
+        clause.BindingTypes.Length > 0 ? _result.CatchSet(clause) ?? []
+        : _result.CatchType(clause) is { } caught ? [caught] : [];
+
+    /// <summary>Does a clause take every value of a type — the type itself, or an interface it
+    /// conforms to, among what the clause names; everything, for the clause without a type?</summary>
+    private bool TakesWhole(CatchClause clause, LyrType thrown) =>
+        clause.TakesAll || CaughtTypes(clause).Any(c => ThrownCoveredBy(thrown, c, _currentModule));
+
+    /// <summary>
+    /// A clause against the clauses above it (05 E9): a type caught a second time is refused (C1,
+    /// <c>LYR-SEM0141</c>), and so is one a type caught before it takes whole — an interface it
+    /// conforms to, <c>Error</c> — since no value of it can reach the clause (C2,
+    /// <c>LYR-SEM0142</c>). Within a set the same holds from left to right. A clause below the one
+    /// without a type is SEM0035's, and not asked again.
+    /// </summary>
+    private void CheckAgainstAbove(CatchClause clause, CatchClause[] above)
+    {
+        if (above.Any(c => c.TakesAll)) return;
+        var nodes = clause.BindingTypes.Length > 0 ? clause.BindingTypes : clause.BindingType is { } one ? [one] : [];
+        var mine = CaughtTypes(clause);
+        if (mine.Length != nodes.Length) return;
+        var before = above.SelectMany(CaughtTypes).ToList();
+        for (var i = 0; i < mine.Length; i++)
+        {
+            var t = mine[i];
+            if (t.IsError) continue;
+            if (before.FirstOrDefault(b => LyrType.Equal(b, t)) is not null)
+                _de.Report("LYR-SEM0141", Severity.Error, NodeSpan(nodes[i]),
+                    $"'{TypeFacts.Display(t)}' is caught twice — one clause per type");
+            else if (before.FirstOrDefault(b => !b.IsError && ThrownCoveredBy(t, b, _currentModule)) is { } taker)
+                _de.Report("LYR-SEM0142", Severity.Error, NodeSpan(nodes[i]),
+                    $"no '{TypeFacts.Display(t)}' reaches this — '{TypeFacts.Display(taker)}' is caught before it, "
+                    + $"and every '{TypeFacts.Display(t)}' is one");
+            before.Add(t);
+        }
+    }
 
     /// <summary>
     /// The <c>try</c> family as an expression (design/v5/spec/05 E4). A mark is worth its operand,
@@ -1927,25 +1994,13 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CheckTry(TryExpr tried, SymbolTable scope, LyrType? expected)
     {
-        var asStatement = ReferenceEquals(_statementValue, tried);
-        // Clauses after 'try?' or 'try!' were refused by the parser (PAR0051); they are checked all
-        // the same, so nothing downstream meets a body without types.
         if (tried.Kind != TryKind.Propagate)
-            foreach (var clause in tried.Catches) CheckCatchValue(clause, scope, null, valueless: true);
-        switch (tried.Kind)
         {
-            case TryKind.Optional:
-            {
-                var value = CheckExpr(tried.Value, scope, expected is Optional wanted ? wanted.Inner : null);
-                if (value.IsError) return value;
-                if (!TypeFacts.IsVoid(value)) return new Optional(value);
-                // Nothing to make optional: as a statement it drops the error, and that is all it does.
-                return asStatement ? value : Report(tried.KeywordSpan, "LYR-SEM0140",
-                    "'try?' over an expression without a value has nothing to make optional — it stands "
-                    + "as a statement, where it drops the error");
-            }
-            case TryKind.Force:
-                return CheckExpr(tried.Value, scope, expected);
+            var signed = CheckSignedTry(tried, scope, expected);
+            // Clauses after 'try?' or 'try!' were refused by the parser (PAR0051); they are checked
+            // all the same, so nothing downstream meets a body without types.
+            CheckClauses(tried.Value, tried.Catches, scope, (clause, catchScope) => ClauseValue(clause, catchScope, null, valueless: true));
+            return signed;
         }
 
         var operand = CheckExpr(tried.Value, scope, expected);
@@ -1957,18 +2012,31 @@ public sealed class TypeChecker
         if (context) CheckAssignable(tried.Value, operand, expected!, tried.Value.Span);
         var values = new List<LyrType> { operand };
         var valueless = TypeFacts.IsVoid(operand);
-        foreach (var clause in tried.Catches)
-            if (CheckCatchValue(clause, scope, context ? expected : null, valueless) is { } value) values.Add(value);
+        CheckClauses(tried.Value, tried.Catches, scope, (clause, catchScope) =>
+        {
+            if (ClauseValue(clause, catchScope, context ? expected : null, valueless) is { } value) values.Add(value);
+        });
         return context ? expected! : UnifyArms(values, tried.Span, "a 'try' expression's value and its clauses");
     }
 
-    /// <summary>A clause of the expression form: the binding as for the statement, the body a value
-    /// block whose tail is the clause's value. A body without a tail leaves — by return, throw,
-    /// break or continue — unless the expression has no value at all; leaving, it contributes
-    /// nothing (<c>null</c>).</summary>
-    private LyrType? CheckCatchValue(CatchClause clause, SymbolTable scope, LyrType? expected, bool valueless)
+    /// <summary><c>try?</c> and <c>try!</c>: worth <c>?T</c> unflattened, and the value.</summary>
+    private LyrType CheckSignedTry(TryExpr tried, SymbolTable scope, LyrType? expected)
     {
-        var catchScope = BindCatch(clause, scope);
+        if (tried.Kind == TryKind.Force) return CheckExpr(tried.Value, scope, expected);
+        var value = CheckExpr(tried.Value, scope, expected is Optional wanted ? wanted.Inner : null);
+        if (value.IsError) return value;
+        if (!TypeFacts.IsVoid(value)) return new Optional(value);
+        // Nothing to make optional: as a statement it drops the error, and that is all it does.
+        return ReferenceEquals(_statementValue, tried) ? value : Report(tried.KeywordSpan, "LYR-SEM0140",
+            "'try?' over an expression without a value has nothing to make optional — it stands "
+            + "as a statement, where it drops the error");
+    }
+
+    /// <summary>A clause of the expression form, bound: the body a value block whose tail is the
+    /// clause's value. A body without a tail leaves — by return, throw, break or continue — unless
+    /// the expression has no value at all; leaving, it contributes nothing (<c>null</c>).</summary>
+    private LyrType? ClauseValue(CatchClause clause, SymbolTable catchScope, LyrType? expected, bool valueless)
+    {
         var savedTail = _tailExpected;
         _tailExpected = valueless ? null : expected;
         CheckBlock(clause.Body, catchScope);
@@ -1987,13 +2055,30 @@ public sealed class TypeChecker
         return null;
     }
 
-    /// <summary>A clause's binding in a scope of its own: the type it names, checked to be an error,
-    /// or the root for a clause without one.</summary>
+    /// <summary>A clause's binding in a scope of its own: the type it names, checked to be an error;
+    /// the root for a set, which the binding carries besides (K7), and for a clause without a type.</summary>
     private SymbolTable BindCatch(CatchClause clause, SymbolTable scope)
     {
         var catchScope = new SymbolTable(scope);
         LyrType bt;
-        if (clause.BindingType is not null)
+        if (clause.BindingTypes.Length > 0)
+        {
+            // The set form (05 E9 C5): every type an error; the binding an 'Error' that carries the
+            // set (K7) — what it may hold, asked by a rethrow and a match, not a second type.
+            var set = new List<LyrType>();
+            foreach (var node in clause.BindingTypes)
+            {
+                var caught = ResolveType(node, scope);
+                if (!caught.IsError && !IsThrowable(caught))
+                    _de.Report("LYR-SEM0030", Severity.Error, node.Span,
+                        $"cannot catch '{TypeFacts.Display(caught)}' — what is caught conforms to 'Error'");
+                if (TypeFacts.SymbolOf(caught) is { } named) _result.BindRef(node, named); // for the editor
+                set.Add(caught);
+            }
+            _result.RecordCatchSet(clause, set.ToArray());
+            bt = _error is not null ? new NamedRef(_error) : LyrType.Error;
+        }
+        else if (clause.BindingType is not null)
         {
             bt = ResolveType(clause.BindingType, scope);
             if (!bt.IsError && !IsThrowable(bt))
@@ -4879,15 +4964,10 @@ public sealed class TypeChecker
                     asked.Add(member.Name);
                     var answer = answers.LookupLocal(member.Name) is AssociatedTypeSymbol own
                         && own.Declaration is AssociatedTypeDecl { Type: { } bound } ? (own, bound) : default;
-                    if (member.Answer(ts, instance, exact: true) is { } earlier)
-                    {
-                        // One answer per type and conformance instance: a second conformance
-                        // block may repeat it, not change it.
-                        if (answer.bound is { } again && !LyrType.Equal(earlier, ResolveType(again, answers)) && !earlier.IsError)
-                            _de.Report("LYR-SEM0129", Severity.Error, answer.own.Declaration?.Span ?? at,
-                                $"'{ts.Name}' already answers '{TypeFacts.Display(instance)}.{member.Name}' with '{TypeFacts.Display(earlier)}' — one answer per type and conformance");
-                        continue;
-                    }
+                    // Answered already: this is a second block of the same conformance, which
+                    // coherence refuses as a whole (03 T7 X3, LYR-SEM0133) — its answers are not
+                    // asked again, so the one mistake gets one error.
+                    if (member.Answer(ts, instance, exact: true) is not null) continue;
                     if (answer.bound is { } written)
                     {
                         member.Bind(ts, instance, ResolveType(written, answers));
@@ -6546,7 +6626,7 @@ public sealed class TypeChecker
         }
         // Faulty patterns would only produce follow-up noise, so exhaustiveness is skipped then.
         if (patternsClean && !st.IsError)
-            CheckExhaustiveness(match, st, arms);
+            CheckExhaustiveness(match, st, arms, CatchSetOf(scrutinee));
         return bodies;
     }
 
@@ -6602,13 +6682,13 @@ public sealed class TypeChecker
         _ => null,
     };
 
-    private void CheckExhaustiveness(Node match, LyrType scrutinee, MatchArm[] arms)
+    private void CheckExhaustiveness(Node match, LyrType scrutinee, MatchArm[] arms, LyrType[]? set = null)
     {
         CheckReachability(scrutinee, arms);
         var pats = new List<Pattern>();
         foreach (var arm in arms)
             if (arm.Guard is null) Flatten(arm.Pattern, pats);
-        var missing = MissingCases(scrutinee, pats);
+        var missing = set is not null ? MissingFromSet(set, pats, scrutinee) : MissingCases(scrutinee, pats);
         if (missing.Count == 0)
         {
             _result.MarkMatchExhaustive(match);
@@ -6625,6 +6705,23 @@ public sealed class TypeChecker
                 : $"no arm matches {string.Join(", ", missing.Select(m => $"'{m}'"))}";
         _de.Report("LYR-SEM0050", Severity.Error, match.Span,
             $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
+    }
+
+    /// <summary>The set a catch binding carries (05 E2 K7), when the scrutinee is one: the binding
+    /// of a set clause or of a clause without a type — a 'let', so it holds what the clause took.</summary>
+    private LyrType[]? CatchSetOf(Expr scrutinee) =>
+        scrutinee is IdentifierExpr id && _result.RefOf(id) is LocalSymbol { Declaration: CatchClause clause }
+            ? _result.CatchSet(clause) : null;
+
+    /// <summary>What the arms leave of a catch binding's set (K7): every type of the set no
+    /// unguarded type pattern covers — the type itself, or an interface it conforms to — as the
+    /// pattern to add. A default covers all of it.</summary>
+    private List<string> MissingFromSet(LyrType[] set, List<Pattern> pats, LyrType scrutinee)
+    {
+        if (pats.Any(p => IsIrrefutable(p, scrutinee, nested: false))) return [];
+        var tested = pats.OfType<TypePattern>().Select(p => _result.TypeTested(p)).OfType<LyrType>().ToList();
+        return set.Where(t => !tested.Any(u => ThrownCoveredBy(t, u, _currentModule)))
+            .Select(t => $"_: {TypeFacts.Display(t)}").ToList();
     }
 
     private static void Flatten(Pattern p, List<Pattern> into)
@@ -7001,6 +7098,7 @@ public sealed class TypeChecker
                 // 'c: Circle' (03 T11): the scrutinee is an interface value, the type one it
                 // may hold; the name is bound as that type.
                 var tested = ResolveType(tp.Type, scope);
+                _result.RecordTypeTested(tp, tested);
                 if (!tested.IsError && !scrutinee.IsError)
                 {
                     if (TypeFacts.SymbolOf(scrutinee) is not { Kind: TypeSymbolKind.Interface })

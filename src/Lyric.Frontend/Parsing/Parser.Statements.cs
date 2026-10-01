@@ -387,9 +387,7 @@ public sealed partial class Parser
         var catches = new List<CatchClause>();
         while (_buffer.Check(TokenKind.Catch))
             catches.Add(ParseCatch());
-        if (catches.Count == 0)
-            _de.Report("LYR-PAR0023", Severity.Error, Span.Union(kw.Span, body.Span),
-                "try needs at least one catch clause");
+        // A block without a clause is the sema's to refuse (SEM0036): one rule, one diagnostic.
         var end = catches.Count > 0 ? catches[^1].Span : body.Span;
         return new TryStmt(body, catches.ToArray(), Span.Union(kw.Span, end));
     }
@@ -401,12 +399,25 @@ public sealed partial class Parser
     {
         var kw = _buffer.Advance(); // catch
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'catch'");
-        // CatchBinding: '_' | IDENTIFIER ':' TypeExpr | IDENTIFIER  ('_' is an identifier)
+        // CatchBinding: '_' | IDENTIFIER ':' TypeExpr | IDENTIFIER 'in' TypeList | IDENTIFIER
+        // ('_' is an identifier)
         var idTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
             $"expected catch binding, got {_buffer.Current.TokenKind}");
         var text = _sm.Slice(idTok.Span).ToString();
-        string? name = text == "_" ? null : text; // '_' means catch-all without a binding
-        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        string? name = text == "_" ? null : text; // '_' binds nothing
+        TypeNode? type = null;
+        TypeNode[] set = [];
+        if (_buffer.Match(TokenKind.Colon))
+        {
+            type = ParseType();
+            // 'catch (e: A, B)' meant the set form: said so, and read as it.
+            if (_buffer.Check(TokenKind.Comma))
+            {
+                set = ParseCaughtList(type, colon: true);
+                type = null;
+            }
+        }
+        else if (_buffer.Match(TokenKind.In)) set = ParseCaughtSet();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after catch binding");
         if (expressionForm && !_buffer.Check(TokenKind.LBrace))
         {
@@ -414,10 +425,47 @@ public sealed partial class Parser
             var value = ParseSubExpr();
             var tail = new Block([new TailExprStmt(value, value.Span)], value.Span);
             return new CatchClause(name, type, tail, Span.Union(kw.Span, value.Span))
-                { NameSpan = idTok.Span, ExpressionBody = true };
+                { NameSpan = idTok.Span, ExpressionBody = true, BindingTypes = set };
         }
         var body = ParseBlock(valueBlock: expressionForm);
-        return new CatchClause(name, type, body, Span.Union(kw.Span, body.Span)) { NameSpan = idTok.Span };
+        return new CatchClause(name, type, body, Span.Union(kw.Span, body.Span))
+            { NameSpan = idTok.Span, BindingTypes = set };
+    }
+
+    /// <summary>The types after a clause's <c>in</c> (05 E9 C5, 08 Y6): one type, or a bracketed
+    /// list — the list rule (D5/D6), as for <c>throws</c>.</summary>
+    private TypeNode[] ParseCaughtSet()
+    {
+        if (!_buffer.Check(TokenKind.LBracket))
+        {
+            var first = ParseType();
+            return _buffer.Check(TokenKind.Comma) ? ParseCaughtList(first, colon: false) : [first];
+        }
+        var open = _buffer.Advance();
+        var listed = new List<TypeNode>();
+        while (!_buffer.Check(TokenKind.RBracket) && !_buffer.AtEnd)
+        {
+            listed.Add(ParseType());
+            if (!_buffer.Match(TokenKind.Comma)) break;
+        }
+        var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the caught types");
+        if (listed.Count == 0)
+            _de.Report("LYR-PAR0049", Severity.Error, Span.Union(open.Span, close.Span),
+                "a 'catch' list names its types — 'catch (e)' is the clause that takes everything");
+        return listed.ToArray();
+    }
+
+    /// <summary>Several caught types without the brackets: the list rule's error, with the form to
+    /// write, parsed as the set they meant.</summary>
+    private TypeNode[] ParseCaughtList(TypeNode first, bool colon)
+    {
+        var types = new List<TypeNode> { first };
+        while (_buffer.Match(TokenKind.Comma)) types.Add(ParseType());
+        var written = string.Join(", ", types.Select(t => _sm.Slice(t.Span).ToString()));
+        _de.Report("LYR-PAR0049", Severity.Error, Span.Union(first.Span, types[^1].Span), colon
+            ? $"several caught types are the set form — write 'in [{written}]'"
+            : $"several caught types are a list — write 'in [{written}]'");
+        return types.ToArray();
     }
 
     private Stmt ParseExprStmt()

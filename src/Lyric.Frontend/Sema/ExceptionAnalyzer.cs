@@ -50,6 +50,9 @@ internal sealed class ExceptionAnalyzer
         public CatchClause[] Catches { get; } = catches;
         public bool TakesAll { get; } = takesAll;
         public bool Reached { get; set; }
+
+        /// <summary>Where the types that reach the frame are kept, for <see cref="Escaping"/>.</summary>
+        public List<LyrType>? Kept { get; init; }
     }
 
     private Context _context = new([], "the program", canDeclare: false);
@@ -63,6 +66,23 @@ internal sealed class ExceptionAnalyzer
         _types = types;
         _de = de;
         _covers = covers;
+    }
+
+    /// <summary>
+    /// What the sites under a try throw past every try inside it — what reaches the try's clauses
+    /// (05 E2 K7). The analysis's own walk, under a frame that takes everything and keeps what
+    /// reached it; the checker asks it while it checks the clauses, with the diagnostics muted —
+    /// the analysis proper runs after the checker and reports.
+    /// </summary>
+    internal LyrType[] Escaping(Node tried, ModuleSymbol? module)
+    {
+        _module = module;
+        var kept = new List<LyrType>();
+        _context = new Context([], "the try", canDeclare: false);
+        _context.Frames.Add(new Frame([], takesAll: true) { Kept = kept });
+        if (tried is Stmt stmt) AnalyzeStmt(stmt);
+        else if (tried is Expr expr) AnalyzeExpr(expr);
+        return kept.ToArray();
     }
 
     public void Run()
@@ -284,6 +304,14 @@ internal sealed class ExceptionAnalyzer
 
     private void Throw(Expr value, Span span)
     {
+        // A binding that carries a set throws exactly the set (K7, precise rethrow): what reached
+        // its clause, not the 'Error' it is typed as.
+        if (value is IdentifierExpr id && _types.RefOf(id) is LocalSymbol { Declaration: CatchClause clause }
+            && _types.CatchSet(clause) is { } set)
+        {
+            Site(set, span, "'throw'", needsMark: false);
+            return;
+        }
         var thrown = _types.TypeOf(value);
         if (thrown is null || thrown.IsError) return;
         // What is no Error was refused where it is thrown (SEM0030); covering it is no question.
@@ -326,10 +354,16 @@ internal sealed class ExceptionAnalyzer
         {
             var frame = _context.Frames[i];
             frame.Reached = true;
+            if (frame.Kept is { } kept && !kept.Any(t => LyrType.Equal(t, thrown))) kept.Add(thrown);
             if (frame.TakesAll) return true;
             foreach (var clause in frame.Catches)
             {
-                if (clause.BindingType is null) return true;
+                if (clause.TakesAll) return true;
+                if (clause.BindingTypes.Length > 0)
+                {
+                    if (_types.CatchSet(clause) is not { } set || set.Any(s => _covers(thrown, s, _module))) return true;
+                    continue;
+                }
                 if (_types.CatchType(clause) is not { } caught || _covers(thrown, caught, _module)) return true;
             }
         }
