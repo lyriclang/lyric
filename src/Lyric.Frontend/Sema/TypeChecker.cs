@@ -147,6 +147,14 @@ public sealed class TypeChecker
         _mul = core?.LookupLocal("Mul") as TypeSymbol;
         _div = core?.LookupLocal("Div") as TypeSymbol;
         _into = core?.LookupLocal("Into") as TypeSymbol;
+        _rem = core?.LookupLocal("Rem") as TypeSymbol;
+        _neg = core?.LookupLocal("Neg") as TypeSymbol;
+        _bitAnd = core?.LookupLocal("BitAnd") as TypeSymbol;
+        _bitOr = core?.LookupLocal("BitOr") as TypeSymbol;
+        _bitXor = core?.LookupLocal("BitXor") as TypeSymbol;
+        _bitNot = core?.LookupLocal("BitNot") as TypeSymbol;
+        _shl = core?.LookupLocal("Shl") as TypeSymbol;
+        _shr = core?.LookupLocal("Shr") as TypeSymbol;
         _display = core?.LookupLocal("Display") as TypeSymbol;
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
@@ -171,6 +179,10 @@ public sealed class TypeChecker
 
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
+
+    /// <summary>The rest of the operator interfaces (design/v5/spec/04 D6), on the same footing
+    /// as <see cref="_add"/>: present where <c>std.core</c> declares them.</summary>
+    private readonly TypeSymbol? _rem, _neg, _bitAnd, _bitOr, _bitXor, _bitNot, _shl, _shr;
 
     /// <summary>What an f-string hole renders a non-scalar value through (§6.6): the hole becomes
     /// <c>value.show()</c> when the type conforms. Null without a standard library, and such a hole
@@ -660,7 +672,10 @@ public sealed class TypeChecker
     // `this` inside a method: for a generic type the self-instance Stack<T>, with the type parameters
     // as arguments; otherwise plainly the reference.
     private static LyrType SelfType(TypeSymbol ts) =>
-        ts.Generics.Length == 0
+        // A builtin's 'Self' is the primitive ('extend int :: [Equatable]'): its symbol stands
+        // in no type, the scalar does.
+        ts.Kind == TypeSymbolKind.Builtin && TypeFacts.FromBuiltinName(ts.Name) is { } primitive ? primitive
+        : ts.Generics.Length == 0
             ? new NamedRef(ts)
             : new GenericInstance(ts, Array.ConvertAll(ts.Generics, g => (LyrType)new TypeParamType(g)));
 
@@ -757,13 +772,17 @@ public sealed class TypeChecker
     private void CheckMethodSet(TypeSymbol ts)
     {
         var entries = new List<(string Name, Provenance Kind, Symbol Symbol, Span Span, string Where)>();
+        var blockOf = new Dictionary<Symbol, ExtensionBlock>(ReferenceEqualityComparer.Instance);
         foreach (var s in ts.Members.Symbols)
             if (s is FunctionSymbol own)
                 entries.Add((own.Name, Provenance.Own, own, own.Declaration?.Span ?? default, $"'{ts.Name}'"));
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
+        {
             entries.Add((ext.Symbol.Name, ext.InConformanceBlock ? Provenance.Block : Provenance.Inherent,
                 ext.Symbol, ext.Symbol.Declaration?.Span ?? default,
                 ext.InConformanceBlock ? $"the conformance block of '{ts.Name}'" : $"an extension of '{ts.Name}'"));
+            blockOf[ext.Symbol] = ext.Block;
+        }
         // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
         // they are the ordinary defaults, and only the abstract members go to the field.
         foreach (var (iface, _) in InterfacesOf(ts))
@@ -786,16 +805,25 @@ public sealed class TypeChecker
             var delegations = list.Where(e => e.Kind == Provenance.Delegated).ToList();
             var name = group.Key;
 
-            // An own member settles the name for every conformance; what else declares it collides.
+            // An own member settles the name for every conformance; what else declares it collides
+            // — except a block implementing ANOTHER INSTANCE of an interface the own member
+            // implements too ('Mul<float>' beside the own 'mul' of 'Mul<int>', 04 D6): the
+            // operand picks between them, and the block's stays reachable qualified.
             if (owns.Count > 0)
             {
                 foreach (var other in inherent.Concat(blocks))
+                {
+                    if (other.Kind == Provenance.Block && blockOf.TryGetValue(other.Symbol, out var block)
+                        && block.Decl.Interfaces.Any(n => ResolveType(n, DeclarationScope(ts)) is GenericInstance { Definition: var heterogeneous }
+                            && heterogeneous.Members.LookupLocal(name) is FunctionSymbol))
+                        continue;
                     _de.Report("LYR-SEM0121", Severity.Error, other.Span,
                         $"'{name}' is a member of '{ts.Name}' already, and a type holds one function of a name — "
                         + (other.Kind == Provenance.Block
                             ? $"'{ts.Name}.{name}' implements it for every conformance; drop this one"
                             : "rename the extension, or make it the member"),
                         new DiagnosticNote(owns[0].Span, $"'{name}' is declared here"));
+                }
                 continue;
             }
 
@@ -2157,7 +2185,7 @@ public sealed class TypeChecker
             return FnTypeOf(matching[0]);
         }
 
-        var sym = scope.Lookup(id.Name);
+        var sym = scope.Lookup(id.Name) ?? CoreType(id.Name); // 'Ordering.Less': std.core's types, unasked (10 U-series)
         if (sym is null)
             return Report(id.Span, "LYR-SEM0002", $"unknown identifier '{id.Name}'",
                 NameSuggestion.Note(id.Name, NamesIn(scope, typesOnly: false)));
@@ -2563,11 +2591,11 @@ public sealed class TypeChecker
                 if (!TypeFacts.IsBool(t)) BadOp(u.Span, "!", t);
                 return LyrType.Bool;
             case UnaryOp.Neg:
-                if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "-", t);
-                return t;
+                if (TypeFacts.IsNumeric(t)) return t;
+                return DesugarUnary(u, t, scope, _neg, "neg", "-") ?? BadOpType(u.Span, "-", t);
             case UnaryOp.BitNot:
-                if (!TypeFacts.IsInteger(t)) BadOp(u.Span, "~", t);
-                return t;
+                if (TypeFacts.IsInteger(t)) return t;
+                return DesugarUnary(u, t, scope, _bitNot, "bitNot", "~") ?? BadOpType(u.Span, "~", t);
             case UnaryOp.FromEnd: // as an index it never reaches here: CheckIndexValue takes it
                 return Report(u.Span, "LYR-SEM0114",
                     "'^n' counts from the end inside '[…]' only — as the index, or as a bound of its range");
@@ -2575,6 +2603,33 @@ public sealed class TypeChecker
                 if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "++/--", t);
                 return t;
         }
+    }
+
+    /// <summary><c>-x</c> as <c>x.neg()</c>, <c>~x</c> as <c>x.bitNot()</c> (04 D6): the one
+    /// conformance, the call checked through the ordinary member path and recorded as what the
+    /// operator means. <c>null</c> where no interface takes part; the caller reports.</summary>
+    private LyrType? DesugarUnary(UnaryExpr u, LyrType t, SymbolTable scope, TypeSymbol? iface, string method, string opText)
+    {
+        if (!CanConform(t) || iface is null) return null;
+        if (!Satisfies(t, iface, new NamedRef(iface)))
+        {
+            _de.Report("LYR-SEM0003", Severity.Error, u.Span,
+                $"'{opText}' is not defined for '{TypeFacts.Display(t)}' — it comes from '{iface.Name}': "
+                + $"declare the type with ':: [{iface.Name}]' and a 'fn {method}(): {TypeFacts.Display(t)}'");
+            return LyrType.Error;
+        }
+        var member = new MemberExpr(u.Operand, method, IsOptional: false, u.Span) { MemberSpan = default };
+        var call = new CallExpr(member, [], u.Span);
+        var type = CheckExpr(call, scope);
+        if (type.IsError) return LyrType.Error;
+        _result.DesugarOperator(u, call);
+        return type;
+    }
+
+    private LyrType BadOpType(Span span, string op, LyrType t)
+    {
+        BadOp(span, op, t);
+        return t;
     }
 
     private LyrType CheckPostfix(PostfixExpr p, SymbolTable scope)
@@ -2642,17 +2697,32 @@ public sealed class TypeChecker
                 return UnifyNumeric(b.Left, l, b.Right, r)
                        ?? DesugarArithmetic(b, l, r, scope, _div, "div", "/")
                        ?? BadBinary(b, l, r);
-            // '%' stays numeric-only: no interface exists for it, deliberately — a remainder on a
-            // user type answers no question anyone has asked yet.
             case BinaryOp.Rem:
-                return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
-            // The wrap operators and the bit operators are for integers only (08 Y4): a float
-            // knows no wrap (IEEE has its infinities) and a 'char' is not a number (03 T1e).
-            case BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap
-                or BinaryOp.Shl or BinaryOp.Shr or BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr:
+                return UnifyNumeric(b.Left, l, b.Right, r)
+                       ?? DesugarArithmetic(b, l, r, scope, _rem, "rem", "%")
+                       ?? BadBinary(b, l, r);
+            // The wrap operators are for integers only (08 Y4): a float knows no wrap (IEEE has
+            // its infinities) and a 'char' is not a number (03 T1e).
+            case BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap:
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
                     return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
                 return BadBinary(b, l, r);
+            // The bit operators and the shifts: integers natively, a conforming type through its
+            // interface (04 D6) — 'BitAnd<Rhs = Self>', 'Shl<Rhs = int>'.
+            case BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr or BinaryOp.Shl or BinaryOp.Shr:
+            {
+                if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
+                    return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
+                var (bitIface, bitMethod, bitText) = b.Operator switch
+                {
+                    BinaryOp.BitAnd => (_bitAnd, "bitAnd", "&"),
+                    BinaryOp.BitOr => (_bitOr, "bitOr", "|"),
+                    BinaryOp.BitXor => (_bitXor, "bitXor", "^"),
+                    BinaryOp.Shl => (_shl, "shl", "<<"),
+                    _ => (_shr, "shr", ">>"),
+                };
+                return DesugarArithmetic(b, l, r, scope, bitIface, bitMethod, bitText) ?? BadBinary(b, l, r);
+            }
             case BinaryOp.Lt or BinaryOp.Le or BinaryOp.Gt or BinaryOp.Ge:
                 // Numerics keep their opcodes. Two chars order by scalar value (Rust, Swift) —
                 // that is not a comparison with a number, which T1e refuses. Everything else
@@ -2697,6 +2767,12 @@ public sealed class TypeChecker
     /// sema lets <c>a == b</c> through and the verifier rejects it afterwards, as a compiler crash
     /// rather than a diagnostic.</para>
     /// </remarks>
+    /// <summary>The instance a conformance question about <paramref name="self"/> asks for: the
+    /// bare interface where <c>Self</c> names the conformer (<c>Equatable</c>, 04 D6), the
+    /// instance at the type where the library parametrizes it (<c>Equatable&lt;T&gt;</c> of 4.x).</summary>
+    private static LyrType SelfInstance(TypeSymbol iface, LyrType self) =>
+        iface.Generics.Length == 0 ? new NamedRef(iface) : new GenericInstance(iface, [self]);
+
     private void CheckEquatable(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         if (l is NullType || r is NullType) { CheckNullTest(b, l, r); return; }
@@ -2725,8 +2801,7 @@ public sealed class TypeChecker
 
         if (CanConform(l))
         {
-            if (_equatable is { } equatable
-                && Satisfies(l, equatable, new GenericInstance(equatable, [l])))
+            if (_equatable is { } equatable && Satisfies(l, equatable, SelfInstance(equatable, l)))
             {
                 // A failed check inside the call has reported already; no second message.
                 DesugarToMethodCall(b, "equals", scope);
@@ -2735,8 +2810,8 @@ public sealed class TypeChecker
 
             _de.Report("LYR-SEM0059", Severity.Error, b.Span,
                 $"'{op}' is not defined for '{TypeFacts.Display(l)}' — equality comes from "
-                + $"'Equatable': declare the type with ':: [Equatable<{TypeFacts.Display(l)}>]' "
-                + $"and a 'fn equals(other: {TypeFacts.Display(l)}): bool'");
+                + $"'Equatable': declare the type with ':: [Equatable]' "
+                + $"and a 'fn equals(o: {TypeFacts.Display(l)}): bool'");
             return;
         }
 
@@ -2844,7 +2919,7 @@ public sealed class TypeChecker
 
         if ((CanConform(l) || l is PrimitiveType)
             && _ordered is { } ordered
-            && Satisfies(l, ordered, new GenericInstance(ordered, [l])))
+            && Satisfies(l, ordered, SelfInstance(ordered, l)))
         {
             DesugarToMethodCall(b, "compare", scope);
             return;
@@ -2861,8 +2936,8 @@ public sealed class TypeChecker
             };
             _de.Report("LYR-SEM0003", Severity.Error, b.Span,
                 $"'{op}' is not defined for '{TypeFacts.Display(l)}' — ordering comes from "
-                + $"'Ordered': declare the type with ':: [Ordered<{TypeFacts.Display(l)}>]' and a "
-                + $"'fn compare(other: {TypeFacts.Display(l)}): int'");
+                + $"'Ordered': declare the type with ':: [Ordered]' and a "
+                + $"'fn compare(o: {TypeFacts.Display(l)}): ?Ordering'");
             return;
         }
 
@@ -2909,10 +2984,11 @@ public sealed class TypeChecker
 
         var lt = TypeFacts.Display(l);
         var rt = TypeFacts.Display(r);
+        var conformance = LyrType.Equal(l, r) ? iface.Name : $"{iface.Name}<{rt}>";
         _de.Report("LYR-SEM0003", Severity.Error, b.Span,
             $"'{opText}' is not defined for '{lt}' and '{rt}' — it comes from '{iface.Name}': "
-            + $"declare the type with ':: [{iface.Name}<{rt}, {lt}>]' and a "
-            + $"'fn {method}(other: {rt}): {lt}'"
+            + $"declare the type with ':: [{conformance}]' and a "
+            + $"'fn {method}(rhs: {rt}): {lt}'"
             + (LyrType.Equal(l, r) ? "" : $", or write the operand as a '{lt}'"));
         return LyrType.Error;
     }
@@ -2992,11 +3068,16 @@ public sealed class TypeChecker
                 if (constraint is not NamedType nt) continue;
                 foreach (var (it, subst) in ClosureOfNode(nt))
                 {
-                    if (!ReferenceEquals(it, iface) || it.Generics.Length != 2) continue;
+                    if (!ReferenceEquals(it, iface) || it.Generics.Length is not (1 or 2)) continue;
                     if (!subst.TryGetValue(it.Generics[0], out var operand)) continue;
                     if (it.Members.LookupLocal(method) is not FunctionSymbol member) continue;
-                    yield return new ArithmeticCandidate(
-                        operand, Substitute(FnTypeOf(member), subst), member);
+                    // 'Self' in the constraint is the parameter (03 T5); the 5 shape's 'Out'
+                    // stays 'T.Out' until the constraint fixes it ('Add<Out = T>').
+                    var withSelf = WithSelf(subst, it, receiver);
+                    var signature = Substitute(FnTypeOf(member), withSelf);
+                    if (ResolveType(nt, _currentModule?.Members ?? _comp.Builtins) is GenericInstance { Fixations: { Length: > 0 } fixations })
+                        signature = ApplyFixations(signature, tp.Param, fixations);
+                    yield return new ArithmeticCandidate(Substitute(operand, withSelf), signature, member);
                 }
             }
             yield break;
@@ -3007,14 +3088,16 @@ public sealed class TypeChecker
 
         foreach (var (instance, site) in ConformancesTo(ts, iface, ofInstance))
         {
-            // Only the two-parameter form takes part. An interface of another shape reaching this
-            // path is a stdlib mismatch, not a program error; it simply matches nothing.
-            if (instance is not GenericInstance { Arguments.Length: 2 } inst) continue;
-            if (ImplementationOf(ts, site, method, inst.Arguments[0], ofInstance) is not { } impl)
+            // Two shapes: 'Add<T, R>' of the 4.x library, and 'Add<Rhs = Self>' with its 'Out'
+            // answer (04 D6) — the one argument is the operand either way. Another shape is a
+            // stdlib mismatch, not a program error; it matches nothing.
+            if (instance is not GenericInstance { Arguments.Length: 1 or 2 } inst) continue;
+            var operandType = Substitute(inst.Arguments[0], SelfMap(iface, receiver));
+            if (ImplementationOf(ts, site, method, operandType, ofInstance) is not { } impl)
                 continue;
 
             yield return new ArithmeticCandidate(
-                inst.Arguments[0], Substitute(FnTypeOf(impl), ofInstance), impl);
+                operandType, Substitute(FnTypeOf(impl), ofInstance), impl);
         }
     }
 
@@ -4237,7 +4320,7 @@ public sealed class TypeChecker
                 { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
             CoroutineOf co => co with { Yield = Substitute(co.Yield, map) },
-            AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member),
+            AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
             _ => type // primitive, NamedRef, error, null
         };
     }
@@ -4247,17 +4330,30 @@ public sealed class TypeChecker
     /// type, read off the interface's declaration symbol, through the conformer's own type
     /// arguments; still a type parameter, the question stays open as it is.
     /// </summary>
-    internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member)
+    internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member, LyrType? instance = null)
     {
         switch (@base)
         {
             case TypeParamType or AssocOf: return new AssocOf(@base, member);
-            case NamedRef nr when member.Bindings.TryGetValue(nr.Symbol, out var bound): return bound;
-            case GenericInstance gi when member.Bindings.TryGetValue(gi.Definition, out var bound):
+            case NamedRef nr when member.Answer(nr.Symbol, instance) is { } bound: return bound;
+            case GenericInstance gi when member.Answer(gi.Definition, instance) is { } bound:
                 return Substitute(bound, SubstMap(gi));
+            case PrimitiveType p when member.BuiltinAnswer(TypeFacts.Display(p), instance) is { } bound: return bound;
             case ErrorType: return LyrType.Error;
             default: return new AssocOf(@base, member);
         }
+    }
+
+    /// <summary>The conformance instance a substitution names, where it binds the interface's
+    /// own parameters — the conformance check does; a call site binding 'T' alone does not,
+    /// and the question then takes the conformer's first answer.</summary>
+    private static LyrType? InstanceFromMap(AssociatedTypeSymbol member, Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        if (member.Owner is not { Generics.Length: > 0 } owner) return null;
+        var args = new LyrType[owner.Generics.Length];
+        for (var i = 0; i < args.Length; i++)
+            if (!map.TryGetValue(owner.Generics[i], out args[i]!)) return null;
+        return new GenericInstance(owner, args);
     }
 
     /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
@@ -4301,7 +4397,9 @@ public sealed class TypeChecker
         }
         foreach (var block in _comp.Extensions.Blocks)
         {
-            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } target) continue;
+            // A built-in conforms through its block alone ('extend int :: [Add]'): its answers
+            // hang on the builtin's symbol, found by the type's name.
+            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target) continue;
             _currentModule = block.Module;
             BindAssociatedTypes(target, block.Decl.Interfaces, block.MethodScope, block.Decl.Span);
         }
@@ -4315,35 +4413,37 @@ public sealed class TypeChecker
         {
             foreach (var (iface, subst) in ClosureOfNode(node))
             {
+                // The answer belongs to the conformance INSTANCE (04 D6): 'Mul<int>' and
+                // 'Mul<float>' of one type answer 'Out' each for themselves.
+                var instance = Substitute(InstanceOfConformance(iface, subst), SelfMap(iface, SelfType(ts)));
                 foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
                 {
                     asked.Add(member.Name);
                     var answer = answers.LookupLocal(member.Name) is AssociatedTypeSymbol own
                         && own.Declaration is AssociatedTypeDecl { Type: { } bound } ? (own, bound) : default;
-                    if (member.Bindings.TryGetValue(ts, out var earlier))
+                    if (member.Answer(ts, instance, exact: true) is { } earlier)
                     {
-                        // One answer per type and interface (T6): a second conformance block
-                        // may repeat it, not change it. An answer per interface INSTANCE
-                        // ('Index<int>.Output' beside 'Index<string>.Output') is not written.
+                        // One answer per type and conformance instance: a second conformance
+                        // block may repeat it, not change it.
                         if (answer.bound is { } again && !LyrType.Equal(earlier, ResolveType(again, answers)) && !earlier.IsError)
                             _de.Report("LYR-SEM0129", Severity.Error, answer.own.Declaration?.Span ?? at,
-                                $"'{ts.Name}' already answers '{iface.Name}.{member.Name}' with '{TypeFacts.Display(earlier)}' — one answer per type");
+                                $"'{ts.Name}' already answers '{TypeFacts.Display(instance)}.{member.Name}' with '{TypeFacts.Display(earlier)}' — one answer per type and conformance");
                         continue;
                     }
                     if (answer.bound is { } written)
                     {
-                        member.Bindings[ts] = ResolveType(written, answers);
+                        member.Bind(ts, instance, ResolveType(written, answers));
                         continue;
                     }
                     if (member.Declaration is AssociatedTypeDecl { Type: { } fallback })
                     {
-                        member.Bindings[ts] = Substitute(ResolveType(fallback, DeclarationScope(iface)),
-                            WithSelf(subst, iface, SelfType(ts)));
+                        member.Bind(ts, instance, Substitute(ResolveType(fallback, DeclarationScope(iface)),
+                            WithSelf(subst, iface, SelfType(ts))));
                         continue;
                     }
                     _de.Report("LYR-SEM0128", Severity.Error, NodeSpan(node),
                         $"'{ts.Name}' does not say what '{iface.Name}'s associated type '{member.Name}' is — write 'type {member.Name} = …;'");
-                    member.Bindings[ts] = LyrType.Error;
+                    member.Bind(ts, instance, LyrType.Error);
                 }
             }
         }
@@ -4720,7 +4820,7 @@ public sealed class TypeChecker
             {
                 var all = true;
                 foreach (var (member, fixedTo) in fixations)
-                    if (!LyrType.Equal(ResolveAssociated(self, member), Substitute(fixedTo, ofInstance))) { all = false; break; }
+                    if (!LyrType.Equal(ResolveAssociated(self, member, Substitute(inst, selfMap)), Substitute(fixedTo, ofInstance))) { all = false; break; }
                 if (!all) continue;
             }
             return true;
@@ -7718,8 +7818,7 @@ public sealed class TypeChecker
         // A public type of 'std.core' is visible without an import (10 U-series): the last
         // answer, after the scope — the resolver's rule, repeated for the names only the sema
         // reaches.
-        var head = scope.Lookup(path[0])
-            ?? (path.Length == 1 && _comp.FindModule(["std", "core"])?.Members.LookupLocal(path[0]) is TypeSymbol { Visibility: Visibility.Public } core ? core : null);
+        var head = scope.Lookup(path[0]) ?? (path.Length == 1 ? CoreType(path[0]) : null);
         if (head is null || path.Length == 1) return head;
         for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod }; i++)
             head = mod.Members.LookupLocal(path[i]);
@@ -7736,6 +7835,10 @@ public sealed class TypeChecker
 
     private static LyrType FloatSuffixType(FloatSuffix s) =>
         new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float);
+
+    /// <summary>A public type of <c>std.core</c>, visible without an import (10 U-series).</summary>
+    private TypeSymbol? CoreType(string name) =>
+        _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
 
     /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
     private bool IsAny(LyrType type) =>

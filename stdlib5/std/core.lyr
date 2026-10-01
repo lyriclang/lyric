@@ -54,3 +54,403 @@ pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
     }
     return xs;
 }
+
+// ---------------------------------------------------------------------------------------------
+// The operator interfaces (design/v5/spec/04 D6). 'a + b' is exactly 'a.add(b)': the conformance
+// is chosen by the static type of 'b', the result is the conformer's 'Out' — 'Self' unless it
+// says otherwise. The built-in scalars conform below, through the operators the compiler binds
+// itself; a generic 'fn sum<T :: [Add<Out = T>]>' reaches them the same way.
+// ---------------------------------------------------------------------------------------------
+
+/// `a + b` is `a.add(b)` (04 D6).
+pub interface Add<Rhs = Self> {
+    type Out = Self;
+    fn add(rhs: Rhs): Self.Out;
+}
+
+/// `a - b` is `a.sub(b)` (04 D6).
+pub interface Sub<Rhs = Self> {
+    type Out = Self;
+    fn sub(rhs: Rhs): Self.Out;
+}
+
+/// `a * b` is `a.mul(b)` (04 D6).
+pub interface Mul<Rhs = Self> {
+    type Out = Self;
+    fn mul(rhs: Rhs): Self.Out;
+}
+
+/// `a / b` is `a.div(b)` (04 D6).
+pub interface Div<Rhs = Self> {
+    type Out = Self;
+    fn div(rhs: Rhs): Self.Out;
+}
+
+/// `a % b` is `a.rem(b)` (04 D6).
+pub interface Rem<Rhs = Self> {
+    type Out = Self;
+    fn rem(rhs: Rhs): Self.Out;
+}
+
+/// `-x` is `x.neg()`.
+pub interface Neg {
+    type Out = Self;
+    fn neg(): Self.Out;
+}
+
+/// `a & b` is `a.bitAnd(b)`.
+pub interface BitAnd<Rhs = Self> {
+    type Out = Self;
+    fn bitAnd(rhs: Rhs): Self.Out;
+}
+
+/// `a | b` is `a.bitOr(b)`.
+pub interface BitOr<Rhs = Self> {
+    type Out = Self;
+    fn bitOr(rhs: Rhs): Self.Out;
+}
+
+/// `a ^ b` is `a.bitXor(b)`.
+pub interface BitXor<Rhs = Self> {
+    type Out = Self;
+    fn bitXor(rhs: Rhs): Self.Out;
+}
+
+/// `~x` is `x.bitNot()`.
+pub interface BitNot {
+    type Out = Self;
+    fn bitNot(): Self.Out;
+}
+
+/// `a << b` is `a.shl(b)`; the count is an `int` unless the conformer says otherwise.
+pub interface Shl<Rhs = int> {
+    type Out = Self;
+    fn shl(rhs: Rhs): Self.Out;
+}
+
+/// `a >> b` is `a.shr(b)`; the count is an `int` unless the conformer says otherwise.
+pub interface Shr<Rhs = int> {
+    type Out = Self;
+    fn shr(rhs: Rhs): Self.Out;
+}
+
+/// `a == b` is `a.equals(b)`, `!=` its negation (04 D6). Both sides are the conformer's own
+/// type: there is no heterogeneous equality.
+pub interface Equatable {
+    fn equals(o: Self): bool;
+}
+
+/// The answer of a comparison.
+pub enum Ordering { Less, Equal, Greater }
+
+/// `a < b`, `<=`, `>`, `>=` read `a.compare(b)` (04 D6): `.Less` for `<`, and `null` where the
+/// two are not ordered — `float` is partial, NaN compares with nothing — in which case every one
+/// of the four is false.
+pub interface Ordered :: [Equatable] {
+    fn compare(o: Self): ?Ordering;
+}
+
+/// A total order, what sorting and keys need; `float` has none of its own (D6).
+pub interface TotalOrder :: [Ordered] {
+    fn totalCompare(o: Self): Ordering;
+}
+
+/// What a `Map` key and a `Set` element need. Equal values hash equal; nothing checks it.
+pub interface Hashable :: [Equatable] {
+    fn hash(): int;
+}
+
+/// `x in xs` is `xs.contains(x)` (04 D6; the operator comes with the collections).
+pub interface Contains<T> {
+    fn contains(x: T): bool;
+}
+
+/// `{x}` in an f-string renders through `show()` (04 D6); the scalars render natively and conform
+/// here so a constraint `T :: [Display]` takes them.
+pub interface Display {
+    fn show(): string;
+}
+
+// --- the scalars ------------------------------------------------------------------------------
+extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: int): bool { return this == o; }
+    fn compare(o: int): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: int): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: int): int { return this + rhs; }
+    fn sub(rhs: int): int { return this - rhs; }
+    fn mul(rhs: int): int { return this * rhs; }
+    fn div(rhs: int): int { return this / rhs; }
+    fn rem(rhs: int): int { return this % rhs; }
+    fn neg(): int { return -this; }
+    fn bitAnd(rhs: int): int { return this & rhs; }
+    fn bitOr(rhs: int): int { return this | rhs; }
+    fn bitXor(rhs: int): int { return this ^ rhs; }
+    fn bitNot(): int { return ~this; }
+    fn shl(rhs: int): int { return this << rhs; }
+    fn shr(rhs: int): int { return this >> rhs; }
+}
+
+extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: int8): bool { return this == o; }
+    fn compare(o: int8): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: int8): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: int8): int8 { return this + rhs; }
+    fn sub(rhs: int8): int8 { return this - rhs; }
+    fn mul(rhs: int8): int8 { return this * rhs; }
+    fn div(rhs: int8): int8 { return this / rhs; }
+    fn rem(rhs: int8): int8 { return this % rhs; }
+    fn neg(): int8 { return -this; }
+    fn bitAnd(rhs: int8): int8 { return this & rhs; }
+    fn bitOr(rhs: int8): int8 { return this | rhs; }
+    fn bitXor(rhs: int8): int8 { return this ^ rhs; }
+    fn bitNot(): int8 { return ~this; }
+    fn shl(rhs: int): int8 { return this << (rhs as int8); }
+    fn shr(rhs: int): int8 { return this >> (rhs as int8); }
+}
+
+extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: int16): bool { return this == o; }
+    fn compare(o: int16): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: int16): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: int16): int16 { return this + rhs; }
+    fn sub(rhs: int16): int16 { return this - rhs; }
+    fn mul(rhs: int16): int16 { return this * rhs; }
+    fn div(rhs: int16): int16 { return this / rhs; }
+    fn rem(rhs: int16): int16 { return this % rhs; }
+    fn neg(): int16 { return -this; }
+    fn bitAnd(rhs: int16): int16 { return this & rhs; }
+    fn bitOr(rhs: int16): int16 { return this | rhs; }
+    fn bitXor(rhs: int16): int16 { return this ^ rhs; }
+    fn bitNot(): int16 { return ~this; }
+    fn shl(rhs: int): int16 { return this << (rhs as int16); }
+    fn shr(rhs: int): int16 { return this >> (rhs as int16); }
+}
+
+extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: int32): bool { return this == o; }
+    fn compare(o: int32): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: int32): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: int32): int32 { return this + rhs; }
+    fn sub(rhs: int32): int32 { return this - rhs; }
+    fn mul(rhs: int32): int32 { return this * rhs; }
+    fn div(rhs: int32): int32 { return this / rhs; }
+    fn rem(rhs: int32): int32 { return this % rhs; }
+    fn neg(): int32 { return -this; }
+    fn bitAnd(rhs: int32): int32 { return this & rhs; }
+    fn bitOr(rhs: int32): int32 { return this | rhs; }
+    fn bitXor(rhs: int32): int32 { return this ^ rhs; }
+    fn bitNot(): int32 { return ~this; }
+    fn shl(rhs: int): int32 { return this << (rhs as int32); }
+    fn shr(rhs: int): int32 { return this >> (rhs as int32); }
+}
+
+extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: uint): bool { return this == o; }
+    fn compare(o: uint): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: uint): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: uint): uint { return this + rhs; }
+    fn sub(rhs: uint): uint { return this - rhs; }
+    fn mul(rhs: uint): uint { return this * rhs; }
+    fn div(rhs: uint): uint { return this / rhs; }
+    fn rem(rhs: uint): uint { return this % rhs; }
+    fn bitAnd(rhs: uint): uint { return this & rhs; }
+    fn bitOr(rhs: uint): uint { return this | rhs; }
+    fn bitXor(rhs: uint): uint { return this ^ rhs; }
+    fn bitNot(): uint { return ~this; }
+    fn shl(rhs: int): uint { return this << (rhs as uint); }
+    fn shr(rhs: int): uint { return this >> (rhs as uint); }
+}
+
+extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: uint8): bool { return this == o; }
+    fn compare(o: uint8): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: uint8): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: uint8): uint8 { return this + rhs; }
+    fn sub(rhs: uint8): uint8 { return this - rhs; }
+    fn mul(rhs: uint8): uint8 { return this * rhs; }
+    fn div(rhs: uint8): uint8 { return this / rhs; }
+    fn rem(rhs: uint8): uint8 { return this % rhs; }
+    fn bitAnd(rhs: uint8): uint8 { return this & rhs; }
+    fn bitOr(rhs: uint8): uint8 { return this | rhs; }
+    fn bitXor(rhs: uint8): uint8 { return this ^ rhs; }
+    fn bitNot(): uint8 { return ~this; }
+    fn shl(rhs: int): uint8 { return this << (rhs as uint8); }
+    fn shr(rhs: int): uint8 { return this >> (rhs as uint8); }
+}
+
+extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: uint16): bool { return this == o; }
+    fn compare(o: uint16): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: uint16): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: uint16): uint16 { return this + rhs; }
+    fn sub(rhs: uint16): uint16 { return this - rhs; }
+    fn mul(rhs: uint16): uint16 { return this * rhs; }
+    fn div(rhs: uint16): uint16 { return this / rhs; }
+    fn rem(rhs: uint16): uint16 { return this % rhs; }
+    fn bitAnd(rhs: uint16): uint16 { return this & rhs; }
+    fn bitOr(rhs: uint16): uint16 { return this | rhs; }
+    fn bitXor(rhs: uint16): uint16 { return this ^ rhs; }
+    fn bitNot(): uint16 { return ~this; }
+    fn shl(rhs: int): uint16 { return this << (rhs as uint16); }
+    fn shr(rhs: int): uint16 { return this >> (rhs as uint16); }
+}
+
+extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    fn equals(o: uint32): bool { return this == o; }
+    fn compare(o: uint32): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: uint32): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return this as int; }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: uint32): uint32 { return this + rhs; }
+    fn sub(rhs: uint32): uint32 { return this - rhs; }
+    fn mul(rhs: uint32): uint32 { return this * rhs; }
+    fn div(rhs: uint32): uint32 { return this / rhs; }
+    fn rem(rhs: uint32): uint32 { return this % rhs; }
+    fn bitAnd(rhs: uint32): uint32 { return this & rhs; }
+    fn bitOr(rhs: uint32): uint32 { return this | rhs; }
+    fn bitXor(rhs: uint32): uint32 { return this ^ rhs; }
+    fn bitNot(): uint32 { return ~this; }
+    fn shl(rhs: int): uint32 { return this << (rhs as uint32); }
+    fn shr(rhs: int): uint32 { return this >> (rhs as uint32); }
+}
+
+extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
+    fn equals(o: float): bool { return this == o; }
+    fn compare(o: float): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        if (this == o) { return Ordering.Equal; }
+        return null;
+    }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: float): float { return this + rhs; }
+    fn sub(rhs: float): float { return this - rhs; }
+    fn mul(rhs: float): float { return this * rhs; }
+    fn div(rhs: float): float { return this / rhs; }
+    fn rem(rhs: float): float { return this % rhs; }
+    fn neg(): float { return -this; }
+}
+
+extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
+    fn equals(o: float32): bool { return this == o; }
+    fn compare(o: float32): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        if (this == o) { return Ordering.Equal; }
+        return null;
+    }
+    fn show(): string { return f"{this}"; }
+    fn add(rhs: float32): float32 { return this + rhs; }
+    fn sub(rhs: float32): float32 { return this - rhs; }
+    fn mul(rhs: float32): float32 { return this * rhs; }
+    fn div(rhs: float32): float32 { return this / rhs; }
+    fn rem(rhs: float32): float32 { return this % rhs; }
+    fn neg(): float32 { return -this; }
+}
+
+extend bool :: [Equatable, Hashable, Display] {
+    fn equals(o: bool): bool { return this == o; }
+    fn hash(): int { return if (this) 1 else 0; }
+    fn show(): string { return f"{this}"; }
+}
+
+extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
+    fn equals(o: char): bool { return this == o; }
+    fn compare(o: char): ?Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn totalCompare(o: char): Ordering {
+        if (this < o) { return Ordering.Less; }
+        if (this > o) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn hash(): int { return (this as uint32) as int; }
+    fn show(): string { return f"{this}"; }
+}
+
+extend string :: [Equatable, Display, Add] {
+    fn equals(o: string): bool { return this == o; }
+    fn show(): string { return this; }
+    fn add(rhs: string): string { return this + rhs; }
+}
+

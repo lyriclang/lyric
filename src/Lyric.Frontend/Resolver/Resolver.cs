@@ -141,7 +141,7 @@ public sealed class Resolver
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
         foreach (var fn in i.Members) DeclareMember(scope, Fn(fn), fn);
-        foreach (var t in i.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t);
+        foreach (var t in i.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
     }
 
     private static FunctionSymbol Fn(FunctionDecl fn) =>

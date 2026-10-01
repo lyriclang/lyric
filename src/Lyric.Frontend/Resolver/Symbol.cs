@@ -117,7 +117,41 @@ public sealed class AssociatedTypeSymbol : Symbol
 {
     public AssociatedTypeSymbol(string name, Node? declaration) : base(name, declaration) { }
 
-    public Dictionary<TypeSymbol, Sema.LyrType> Bindings { get; } = new(ReferenceEqualityComparer.Instance);
+    /// <summary>The interface that declares it; <c>null</c> for a conformer's answer.</summary>
+    public TypeSymbol? Owner { get; set; }
+
+    // The answers, per conformer and per conformance INSTANCE (04 D6): 'Mul<int>' and
+    // 'Mul<float>' of one type each answer 'Out' for themselves. The instance is the interface
+    // at the conformance's arguments with 'Self' as the conformer.
+    private readonly Dictionary<TypeSymbol, List<(Sema.LyrType Instance, Sema.LyrType Answer)>> _answers =
+        new(ReferenceEqualityComparer.Instance);
+
+    public void Bind(TypeSymbol conformer, Sema.LyrType instance, Sema.LyrType answer)
+    {
+        if (!_answers.TryGetValue(conformer, out var list)) _answers[conformer] = list = new();
+        list.Add((instance, answer));
+    }
+
+    /// <summary>The conformer's answer: for the instance asked, else — the question reached
+    /// here without one — the first conformance's. <c>null</c> where the type gave none.</summary>
+    public Sema.LyrType? Answer(TypeSymbol conformer, Sema.LyrType? instance, bool exact = false)
+    {
+        if (!_answers.TryGetValue(conformer, out var list) || list.Count == 0) return null;
+        if (instance is not null)
+            foreach (var (at, answer) in list)
+                if (Sema.LyrType.Equal(at, instance)) return answer;
+        return exact ? null : list[0].Answer;
+    }
+
+    /// <summary>A built-in conformer's answer, the builtin named by its type name ('int'):
+    /// the primitive types have no symbol of their own in the types.</summary>
+    public Sema.LyrType? BuiltinAnswer(string name, Sema.LyrType? instance)
+    {
+        foreach (var conformer in _answers.Keys)
+            if (conformer.Kind == TypeSymbolKind.Builtin && conformer.Name == name)
+                return Answer(conformer, instance);
+        return null;
+    }
 }
 
 public sealed class EnumVariantSymbol : Symbol
