@@ -62,6 +62,7 @@ public class CEmitterTests
     [InlineData("vectors")]
     [InlineData("extends")]
     [InlineData("shapes_ext")]
+    [InlineData("synth")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -81,6 +82,17 @@ public class CEmitterTests
     private const string RANGES_EXPECTED = "value 1 4 3\ninclusive 5 9\nheld 2 8 6\nloop 16\n";
 
     private const string GLOBALS_EXPECTED = "start 3 6 hello!\ncounter 0 3 4\nstatic 0,0 100\nobject 2 bob 9 1\n";
+
+    // Conformance synthesis (04 D7): the family, generic types conditionally, enums, the implicit Debug.
+    private const string SYNTH_EXPECTED =
+        "eq true false lt true false hash true\nclone 1 default 0 0 show P { x = 1, y = 2 }\n"
+        + "pair true Pair { a = \"a\", b = \"b\" }\nenum true false true E.B(3) E.R { w = 4 }\n"
+        + "class 2 C { items = [1, 2], o = null, t = (7, \"x\") }\nw true\n"
+        + "color false true false true false Color.Green\n"
+        + "outer true Outer { i = Inner { v = 1 }, s = \"s\", c = 'c', b = true, f = 1.5 }\n"
+        + "opt true false true Opt.Some(1)\ndefault D { n = 0, label = \"lbl\" } Box { v = 0 }\n"
+        + "total Ordering.Greater true false false\nshape true true false true true true true\n"
+        + "inline Mat { m = [1, 2, 3, 4] } true 2 Buf { b = [0, 0] }\nheld 5\n";
 
     private const string CLOSURES_EXPECTED =
         "forms 2 6 6 14 3 5\ncapture 3 30 92\ncounter 1 2 3 2\nloop 0 1 2\nthis 15 4\nopt 4 none\nmade 0 10 20\n"
@@ -177,6 +189,7 @@ public class CEmitterTests
             data.Add("vectors", profile, 0, VECTORS_EXPECTED);
             data.Add("extends", profile, 0, EXTENDS_EXPECTED);
             data.Add("shapes_ext", profile, 0, SHAPES_EXT_EXPECTED);
+            data.Add("synth", profile, 0, SYNTH_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

@@ -1,0 +1,73 @@
+// Conformance synthesis (design/v5/spec/04 D7, 05 §14): the family written without a body,
+// generic types conditionally, enums, the implicit Debug, and what is withdrawn or refused.
+import std.io { println };
+
+struct P :: [Equatable, Hashable, Ordered, Clone, Default, Display] { x: int, y: int }
+struct Pair<T> :: [Equatable, Debug] { a: T, b: T }
+enum E :: [Equatable, Clone] { A, B(int), R { w: int } }
+class C :: [Clone] { items: int[], o: ?int, t: (int, string) }
+
+// a written member replaces the synthesis for that member (Swift)
+struct W :: [Equatable] { x: int, y: int,
+    fn equals(o: W): bool { return this.x == o.x; }
+}
+// Ordered and Hashable alone: the Equatable they imply comes along
+enum Color :: [Ordered, Hashable, Clone] { Red, Green, Blue }
+struct Inner :: [Equatable, Debug] { v: int }
+struct Outer :: [Equatable] { i: Inner, s: string, c: char, b: bool, f: float }
+enum Opt<T> :: [Equatable] { None, Some(T) }
+struct D :: [Default] { n: int, label: string = "lbl" }
+struct TO :: [TotalOrder] { a: int, b: int }
+// a payload enum ordered: the variant's position first, then the payload lexicographically
+enum Sh :: [Ordered] { Dot, Box(int), Rect { w: int, h: int } }
+struct Box<T> :: [Default] { v: T }
+// an inline array field is unrolled — a view of it is not taken in a frame
+struct Mat :: [Equatable, Clone] { m: int[4] }
+struct Buf :: [Default] { b: int[2] }
+// the implicit Debug is withdrawn where a field has none to give: this class still compiles
+interface Walker { fn walk(): int; }
+struct Legs :: [Walker] { n: int, fn walk(): int { return this.n; } }
+class Held { w: Walker, f: fn() -> int, n: int }
+
+fn main(): int {
+    let p = P { x = 1, y = 2 };
+    let q = P { x = 1, y = 2 };
+    let r = P { x = 2, y = 2 };
+    println(f"eq {p == q} {p == r} lt {p < r} {r < p} hash {p.hash() == q.hash()}");
+    let c = p.clone();
+    let d = P.default();
+    println(f"clone {c.x} default {d.x} {d.y} show {p}");
+    let pa = Pair<string> { a = "a", b = "b" };
+    println(f"pair {pa == Pair<string> { a = "a", b = "b" }} {pa.debug()}");
+    let e1 = E.B(3);
+    let e2 = e1.clone();
+    println(f"enum {e1 == E.B(3)} {e1 == E.A} {E.A == E.A} {e2.debug()} {E.R { w = 4 }.debug()}");
+    let cl = C { items = [1, 2], o = null, t = (7, "x") };
+    let cl2 = cl.clone();
+    println(f"class {cl2.items.length()} {cl.debug()}");
+
+    println(f"w {W { x = 1, y = 2 } == W { x = 1, y = 9 }}");
+    let red = Color.Red;
+    let g = Color.Green;
+    println(f"color {red == g} {red < g} {g < red} {red.hash() == Color.Red.hash()} {red.hash() == g.hash()} {g.clone().debug()}");
+    let o1 = Outer { i = Inner { v = 1 }, s = "s", c = 'c', b = true, f = 1.5 };
+    let o2 = Outer { i = Inner { v = 1 }, s = "s", c = 'c', b = true, f = 1.5 };
+    println(f"outer {o1 == o2} {o1.debug()}");
+    let s1 = Opt<int>.Some(1);
+    println(f"opt {s1 == Opt<int>.Some(1)} {s1 == Opt<int>.None} {Opt<int>.None == Opt<int>.None} {s1.debug()}");
+    println(f"default {D.default().debug()} {Box<int>.default().debug()}");
+    let t1 = TO { a = 1, b = 5 };
+    let t2 = TO { a = 1, b = 3 };
+    println(f"total {t1.totalCompare(t2).debug()} {t1 > t2} {t1 <= t2} {t1 == t2}");
+    let dot = Sh.Dot;
+    let b3 = Sh.Box(3);
+    let b4 = Sh.Box(4);
+    let rc = Sh.Rect { w = 1, h = 2 };
+    println(f"shape {dot < b3} {b3 < b4} {b4 < b3} {b4 < rc} {rc > dot} {rc == Sh.Rect { w = 1, h = 2 }} {b3 <= Sh.Box(3)}");
+    let m = Mat { m = [1, 2, 3, 4] };
+    let m2 = Mat { m = [1, 2, 3, 4] };
+    println(f"inline {m.debug()} {m == m2} {m.clone().m[1]} {Buf.default().debug()}");
+    let held = Held { w = Legs { n = 2 }, f = () => 1, n = 5 };
+    println(f"held {held.n}");
+    return 0;
+}

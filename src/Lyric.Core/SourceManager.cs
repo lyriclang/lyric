@@ -9,7 +9,27 @@ public sealed class SourceManager
         public required string Path { get; init; }
         public required string Text { get; init; }
         public required int[] LineStarts { get; init; }
+        public Synthesized? Origin { get; init; }
     }
+
+    /// <summary>Where a synthesized file comes from: the written node it stands for (a conformance
+    /// list entry, a declaration) and how to name it in a diagnostic (<c>"'Equatable' synthesized
+    /// for 'P'"</c>). Nobody wrote the file, so nothing in it can be pointed at.</summary>
+    public readonly record struct Synthesized(Span At, string Label);
+
+    /// <summary>A file the compiler wrote on the program's behalf (conformance synthesis, 04 D7).
+    /// It parses and checks like any other; its diagnostics are re-pointed at <paramref name="at"/>
+    /// by the <see cref="DiagnosticEngine"/>.</summary>
+    public FileId AddSynthesized(string displayName, string text, Span at, string label)
+    {
+        var id = AddVirtual(displayName, text);
+        _files[id.Value - 1] = _files[id.Value - 1] with { Origin = new Synthesized(at, label) };
+        return id;
+    }
+
+    /// <summary>The origin of a synthesized file; <c>null</c> for one that was written.</summary>
+    public Synthesized? OriginOf(FileId id) =>
+        id.IsValid && id.Value <= _files.Count ? _files[id.Value - 1].Origin : null;
     
     private readonly List<FileEntry> _files = new();
     
