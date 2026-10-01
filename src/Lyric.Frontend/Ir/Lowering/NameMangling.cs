@@ -84,7 +84,8 @@ internal static class NameMangling
         TupleType tuple => "(" + string.Join(", ", tuple.Elements.Select(Written)) + ")",
         ThrowingType throwing => Written(throwing.Inner) + " throws",
         FunctionType fn => "fn(" + string.Join(", ", fn.Parameters.Select(Written)) + ") -> "
-                           + Written(fn.ReturnType),
+                           + Written(fn.ReturnType)
+                           + (fn.Throws is { } thrown ? " throws " + string.Join(", ", thrown.Types.Select(Written)) : ""),
         _ => "?",
     };
 }

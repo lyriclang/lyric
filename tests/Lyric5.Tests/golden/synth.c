@@ -160,7 +160,7 @@ struct lyr_vt_ty32 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
 };
-typedef struct { int64_t (*fn)(void *); void *env; } lyr_fn_to_i64;
+typedef struct { int64_t (*fn)(void *, LyrErr **); void *env; } lyr_fn_to_i64;
 _Static_assert(sizeof(lyr_fn_to_i64) == 16, "layout of lyr_fn_to_i64");
 struct lyr_ty31_Held {
     LyrObj header;
@@ -201,7 +201,7 @@ _Static_assert(sizeof(lyr_ty36__env_std_core_cloneArray_int__) == 16, "layout of
 _Static_assert(offsetof(lyr_ty36__env_std_core_cloneArray_int__, f_xs) == 8, "layout of lyr_ty36__env_std_core_cloneArray_int__");
 static const uint64_t lyr_refmap_ty36[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_ty36__env_std_core_cloneArray_int__ = { sizeof(lyr_ty36__env_std_core_cloneArray_int__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty36, "<env:std.core.cloneArray<int>>", NULL };
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
@@ -340,10 +340,10 @@ LyrStr * lyr_std_core__extend__bool_debug_5bdb8024(uint8_t l0_this);
 LyrStr * lyr_std_core__extend__float_debug_6991a0fc(double l0_this);
 lyr_ty1_Ordering lyr_std_core__extend__int_totalCompare_53718511(int64_t l0_this, int64_t l1_o);
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
-int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i);
+int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
 
 /* thunks: a function as a value, without an environment */
-static int64_t lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env) { (void)lyr_env; return lyr_main_main__lambda0__1de246d4(); }
+static int64_t lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_main__lambda0__1de246d4(); }
 
 /* interface tables: the descriptor, then the implementation of every slot */
 static int64_t lyr_vt_ty32_ty33_s0(LyrIface self) { return lyr_main_Legs_walk(&((lyr_box_ty33_Legs *)self.data)->value); }
@@ -6623,7 +6623,7 @@ bb0:;
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 extern const LyrDesc lyr_desc_arr_i64;
@@ -6687,7 +6687,7 @@ bb2:;
 #line 53
     t8 = l5_i;
 #line 53
-    t9 = t7.fn(t7.env, t8);
+    t9 = t7.fn(t7.env, t8, NULL);
 #line 53
     t10 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t10, int64_t)[0] = t9;
 #line 53
@@ -6731,7 +6731,7 @@ struct lyr_ty36__env_std_core_cloneArray_int__ {
 _Static_assert(sizeof(lyr_ty36__env_std_core_cloneArray_int__) == 16, "layout of lyr_ty36__env_std_core_cloneArray_int__");
 _Static_assert(offsetof(lyr_ty36__env_std_core_cloneArray_int__, f_xs) == 8, "layout of lyr_ty36__env_std_core_cloneArray_int__");
 extern const LyrDesc lyr_desc_ty36__env_std_core_cloneArray_int__;
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 extern const LyrDesc lyr_desc_arr_i64;
@@ -6740,7 +6740,7 @@ extern const LyrDesc lyr_desc_arr_i64;
 int64_t lyr_std_core__extend__int_clone_535f4ead(int64_t l0_this);
 LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs);
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
-int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i);
+int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
 
 #line 678 "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs) {
@@ -6770,8 +6770,9 @@ bb0:;
 }
 
 #line 678 "stdlib5/std/core.lyr"
-int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i) {
+int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i, LyrErr **lyr_err) {
     lyr_ty36__env_std_core_cloneArray_int__ *l0__env_ = (lyr_ty36__env_std_core_cloneArray_int__ *)lyr_env;
+    (void)lyr_err;
     lyr_ty36__env_std_core_cloneArray_int__ *t0 = NULL;
     LyrArr *t1 = NULL;
     int64_t t2 = 0;

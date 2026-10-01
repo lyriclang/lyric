@@ -147,7 +147,13 @@ public sealed record MakeClosure(TempId Dest, FunctionId Target, TempId? Environ
 /// <param name="ReturnType">A copy for the printer, for the same reason as on
 /// <see cref="CallVirt"/>: there is no target function to ask.</param>
 public sealed record CallIndirect(TempId? Dest, TempId Callee, TempId[] Args,
-    IrType ReturnType, Span Span) : IrOp(Span);
+    IrType ReturnType, Span Span) : IrOp(Span)
+{
+    /// <summary>Whether the value's type throws (05 E2, 03 T17): the caller's error slot goes with
+    /// the call and an error branch follows it. Every function value takes a slot; one whose type
+    /// cannot throw is handed none to write.</summary>
+    public bool Throws { get; init; }
+}
 
 // Coroutines as CHAINS (format 4.0). A coroutine value holds captured frames, not a compiled
 // state machine: mkcoro builds it suspended-before-start, resume pushes its frames back onto

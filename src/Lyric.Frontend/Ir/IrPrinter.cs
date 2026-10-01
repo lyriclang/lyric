@@ -192,7 +192,7 @@ public static class IrPrinter
         MakeClosure m => $"{m.Dest}: {TypeStr(m.Type)} = mkclosure {m.Target}" +
                          (m.Environment is { } env ? $", {env}" : " (no captures)"),
         CallIndirect c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "") +
-                          $"callind {c.Callee}({string.Join(", ", c.Args)})",
+                          $"callind {c.Callee}({string.Join(", ", c.Args)})" + (c.Throws ? " throws" : ""),
         StoreGlobal g => $"stglobal {g.Global}, {g.Value}",
         MakeCoroutine m => $"{m.Dest}: {TypeStr(m.Type)} = mkcoro {m.Body}" +
                            (m.Args.Length > 0 ? $", {string.Join(", ", m.Args)}" : ""),

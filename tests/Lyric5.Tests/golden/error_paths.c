@@ -52,7 +52,7 @@ _Static_assert(offsetof(lyr_ty8_Exception, f_text) == 8, "layout of lyr_ty8_Exce
 _Static_assert(offsetof(lyr_ty8_Exception, f_inner) == 16, "layout of lyr_ty8_Exception");
 static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty8_Exception = { sizeof(lyr_ty8_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.core.Exception", NULL };
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
@@ -119,7 +119,7 @@ LyrStr * lyr_main_BoxErr_int__message_e630ecb2(lyr_ty7_BoxErr_int_ *l0_this);
 int64_t lyr_main_lambda__lambda0__1c85569e(int64_t l0_x);
 
 /* thunks: a function as a value, without an environment */
-static int64_t lyr_thunk_main_lambda__lambda0__1c85569e(void *lyr_env, int64_t l0_x) { (void)lyr_env; return lyr_main_lambda__lambda0__1c85569e(l0_x); }
+static int64_t lyr_thunk_main_lambda__lambda0__1c85569e(void *lyr_env, int64_t l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_lambda__lambda0__1c85569e(l0_x); }
 
 /* interface tables: the descriptor, then the implementation of every slot */
 static int64_t lyr_vt_ty0_ty1_s0(LyrIface self, int64_t a0, LyrErr **lyr_err) { return lyr_main_Good_read(&((lyr_box_ty1_Good *)self.data)->value, a0); }
@@ -932,7 +932,7 @@ bb0:;
 #line 83
     t1 = l1_x;
 #line 83
-    t2 = t0.fn(t0.env, t1);
+    t2 = t0.fn(t0.env, t1, NULL);
 #line 83
     return t2;
 }

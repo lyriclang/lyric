@@ -320,15 +320,8 @@ public sealed class AstFormatter
             ParamListDoc(decl.Parameters),
         };
 
-        if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), TypeDoc(ret)));
-        if (decl.Throws is { } throws)
-        {
-            // One type alone, several in brackets (the list rule, 08 D5/D6), none for the bare form.
-            head.Add(Doc.From(" throws"));
-            if (throws.Types is [var only]) head.Add(Doc.Of(Doc.Space, TypeDoc(only)));
-            else if (throws.Types.Length > 1)
-                head.Add(Doc.Of(Doc.From(" ["), Doc.Join(Doc.From(", "), throws.Types.Select(TypeDoc).ToArray()), Doc.From("]")));
-        }
+        if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, decl.Throws)));
+        if (decl.Throws is { } throws) head.Add(ThrowsDoc(throws));
 
         if (decl.Extern is { SymbolSpan: { } symbol })
             head.Add(Doc.Of(Doc.From(" = "), Src(symbol)));
@@ -1027,8 +1020,9 @@ public sealed class AstFormatter
         if (lambda.ReturnType is { } ret)
         {
             parts.Add(Doc.From(": "));
-            parts.Add(TypeDoc(ret));
+            parts.Add(ReturnDoc(ret, lambda.Throws));
         }
+        if (lambda.Throws is { } throws) parts.Add(ThrowsDoc(throws));
 
         parts.Add(Doc.From(" => "));
         parts.Add(lambda.Body is Block block ? BlockDoc(block) : ExprDoc((Expr)lambda.Body, Assign));
@@ -1129,8 +1123,24 @@ public sealed class AstFormatter
                 ? Doc.Of(Doc.From(label + ": "), TypeDoc(e)) : TypeDoc(e)).ToArray()), Doc.From(")")),
         FunctionType f => Doc.Of(Doc.From("fn("),
             Doc.Join(Doc.From(", "), f.Parameters.Select(TypeDoc).ToArray()),
-            Doc.From(") -> "), TypeDoc(f.ReturnType)),
+            Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),
         _ => throw new InternalCompilationException($"unreachable: unformatted {type.GetType().Name}"),
+    };
+
+    /// <summary>A return type with a set after it: a function type there is parenthesized, or the
+    /// set would read as its own — the nearest function type takes a 'throws' (03 T17).</summary>
+    private Doc ReturnDoc(TypeNode ret, ThrowsClause? after) =>
+        after is not null && ret is FunctionType
+            ? Doc.Of(Doc.From("("), TypeDoc(ret), Doc.From(")"))
+            : TypeDoc(ret);
+
+    /// <summary>A thrown set (05 E2): one type alone, several in brackets (the list rule, 08 D5/D6),
+    /// none for the bare form.</summary>
+    private Doc ThrowsDoc(ThrowsClause throws) => throws.Types switch
+    {
+        [] => Doc.From(" throws"),
+        [var only] => Doc.Of(Doc.From(" throws "), TypeDoc(only)),
+        var several => Doc.Of(Doc.From(" throws ["), Doc.Join(Doc.From(", "), several.Select(TypeDoc).ToArray()), Doc.From("]")),
     };
 
     /// <param name="names">The associated type an argument fixes, 'Iterator&lt;Item = int&gt;' (03 T6).</param>

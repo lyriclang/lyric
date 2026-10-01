@@ -42,13 +42,13 @@ _Static_assert(offsetof(lyr_ty5_Exception, f_text) == 8, "layout of lyr_ty5_Exce
 _Static_assert(offsetof(lyr_ty5_Exception, f_inner) == 16, "layout of lyr_ty5_Exception");
 static const uint64_t lyr_refmap_ty5[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty5_Exception = { sizeof(lyr_ty5_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "std.core.Exception", NULL };
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
-typedef struct { LyrStr * (*fn)(void *, LyrStr *); void *env; } lyr_fn_str_to_str;
+typedef struct { LyrStr * (*fn)(void *, LyrStr *, LyrErr **); void *env; } lyr_fn_str_to_str;
 _Static_assert(sizeof(lyr_fn_str_to_str) == 16, "layout of lyr_fn_str_to_str");
-typedef struct { lyr_ty2_Counter (*fn)(void *, uint8_t, int64_t); void *env; } lyr_fn_bool_i64_to_ty2;
+typedef struct { lyr_ty2_Counter (*fn)(void *, uint8_t, int64_t, LyrErr **); void *env; } lyr_fn_bool_i64_to_ty2;
 _Static_assert(sizeof(lyr_fn_bool_i64_to_ty2) == 16, "layout of lyr_fn_bool_i64_to_ty2");
-typedef struct { LyrStr * (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_str;
+typedef struct { LyrStr * (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_str;
 _Static_assert(sizeof(lyr_fn_i64_to_str) == 16, "layout of lyr_fn_i64_to_str");
 
 /* string literals */
@@ -74,11 +74,11 @@ int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
 lyr_ty2_Counter lyr_main_make_bool__03e961ae(uint8_t l0_seed, int64_t l1_n);
 
 /* thunks: a function as a value, without an environment */
-static int64_t lyr_thunk_main_inc(void *lyr_env, int64_t l0_n) { (void)lyr_env; return lyr_main_inc(l0_n); }
-static int64_t lyr_thunk_main_ident_int__365390bd(void *lyr_env, int64_t l0_x) { (void)lyr_env; return lyr_main_ident_int__365390bd(l0_x); }
-static LyrStr * lyr_thunk_main_ident_string__7191eed5(void *lyr_env, LyrStr *l0_x) { (void)lyr_env; return lyr_main_ident_string__7191eed5(l0_x); }
-static LyrStr * lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, int64_t l0_n) { (void)lyr_env; return lyr_main_main__lambda0__1de246d4(l0_n); }
-static lyr_ty2_Counter lyr_thunk_main_make_bool__03e961ae(void *lyr_env, uint8_t l0_seed, int64_t l1_n) { (void)lyr_env; return lyr_main_make_bool__03e961ae(l0_seed, l1_n); }
+static int64_t lyr_thunk_main_inc(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_inc(l0_n); }
+static int64_t lyr_thunk_main_ident_int__365390bd(void *lyr_env, int64_t l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_ident_int__365390bd(l0_x); }
+static LyrStr * lyr_thunk_main_ident_string__7191eed5(void *lyr_env, LyrStr *l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_ident_string__7191eed5(l0_x); }
+static LyrStr * lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_main__lambda0__1de246d4(l0_n); }
+static lyr_ty2_Counter lyr_thunk_main_make_bool__03e961ae(void *lyr_env, uint8_t l0_seed, int64_t l1_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_make_bool__03e961ae(l0_seed, l1_n); }
 
 #line 14 "programs/generics.lyr"
 int64_t lyr_main_apply(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {
@@ -91,7 +91,7 @@ bb0:;
 #line 14
     t1 = l1_x;
 #line 14
-    t2 = t0.fn(t0.env, t1);
+    t2 = t0.fn(t0.env, t1, NULL);
 #line 14
     return t2;
 }
@@ -249,7 +249,7 @@ bb0:;
 #line 22
     t3 = (LyrStr *)&lyr_lit0;
 #line 22
-    t4 = t2.fn(t2.env, t3);
+    t4 = t2.fn(t2.env, t3, NULL);
 #line 22
     l2_h = t4;
 #line 23
@@ -415,7 +415,7 @@ bb0:;
 #line 35
     t74 = (int64_t)INT64_C(2);
 #line 35
-    t75_s = t72.fn(t72.env, t73, t74); t75 = &t75_s;
+    t75_s = t72.fn(t72.env, t73, t74, NULL); t75 = &t75_s;
 #line 35
     l9_c = *t75;
 #line 36
@@ -503,7 +503,7 @@ int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main)
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct { LyrStr * (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_str;
+typedef struct { LyrStr * (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_str;
 _Static_assert(sizeof(lyr_fn_i64_to_str) == 16, "layout of lyr_fn_i64_to_str");
 
 /* prototypes */
@@ -520,7 +520,7 @@ bb0:;
 #line 16
     t1 = l0_x;
 #line 16
-    t2 = t0.fn(t0.env, t1);
+    t2 = t0.fn(t0.env, t1, NULL);
 #line 16
     return t2;
 }
@@ -661,7 +661,7 @@ bb0:;
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
+typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 
 /* prototypes */
@@ -682,9 +682,9 @@ bb0:;
 #line 13
     t2 = l1_x;
 #line 13
-    t3 = t1.fn(t1.env, t2);
+    t3 = t1.fn(t1.env, t2, NULL);
 #line 13
-    t4 = t0.fn(t0.env, t3);
+    t4 = t0.fn(t0.env, t3, NULL);
 #line 13
     return t4;
 }

@@ -1186,10 +1186,16 @@ internal sealed class TypeTable
             return new TupleOf(tuple.Elements.Select(e => Resolve(e, span)).ToArray()) { Labels = tuple.Labels };
 
         // 'fn(A) -> B' as a type argument. No known case needs it today; it stands here so the list is
-        // not a partial copy of the others.
+        // not a partial copy of the others — the set included, which is part of the type (03 T17)
+        // and so of the instance's name.
         if (node is FunctionType fn)
             return new FnType(fn.Parameters.Select(p => Resolve(p, span)).ToArray(),
-                Resolve(fn.ReturnType, span));
+                Resolve(fn.ReturnType, span))
+            {
+                Throws = fn.Throws is not { } thrown ? []
+                    : thrown.Types.Length > 0 ? TypeChecker.ThrownAfter(thrown.Types.Select(t => Resolve(t, span)))
+                    : Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error") is TypeSymbol root ? [new NamedRef(root)] : [],
+            };
 
         throw new UnsupportedConstructException(
             "this type argument", span);

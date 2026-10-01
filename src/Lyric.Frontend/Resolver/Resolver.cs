@@ -502,6 +502,7 @@ public sealed class Resolver
             case FunctionType f:
                 foreach (var p in f.Parameters) BindType(p, scope);
                 BindType(f.ReturnType, scope);
+                foreach (var thrown in f.Throws?.Types ?? []) BindType(thrown, scope);
                 break;
             case ErrorType: break;
         }

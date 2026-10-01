@@ -267,9 +267,12 @@ public sealed class CEmitter
     /// as <c>void *</c>; a function without one gets a thunk that drops it.</summary>
     private static string FnName(IrFunctionType type) => "lyr_" + Mangle(type);
 
-    /// <summary>The C type of the code pointer of a function value: the environment first.</summary>
+    /// <summary>The C type of the code pointer of a function value: the environment first, the
+    /// caller's error slot last (03 T17) — whether the type throws or not. One code pointer per
+    /// signature makes a value with a smaller set fit a type with a larger one as it is (05 E2 K6):
+    /// nothing is wrapped, and code that cannot throw never writes the slot.</summary>
     private string CodePointer(IrFunctionType type, string name) =>
-        $"{CType(type.Return)} (*{name})(void *{string.Concat(type.Parameters.Select(p => ", " + CType(p)))})";
+        $"{CType(type.Return)} (*{name})(void *{string.Concat(type.Parameters.Select(p => ", " + CType(p)))}, LyrErr **)";
 
     /// <summary>The name a function's code takes as a function value's target: itself when it
     /// takes an environment, its thunk otherwise (a free function, a lambda without captures).</summary>
@@ -563,8 +566,9 @@ public sealed class CEmitter
         foreach (var index in declared) prototypes.Append(Signature(_module.Functions[index])).AppendLine(";");
 
         // A function used as a value without an environment gets a thunk that takes and drops
-        // one, so every function value is called the same way (01 V8). Static, in every unit that
-        // makes the value: two thunks of one function are two spellings of the same call.
+        // one, so every function value is called the same way (01 V8) — and takes the error slot,
+        // forwarded where the function throws (03 T17). Static, in every unit that makes the value:
+        // two thunks of one function are two spellings of the same call.
         var thunked = ScopeOps()
             .OfType<MakeClosure>().Where(m => m.Environment is null).Select(m => m.Target.Value).Distinct().Order().ToList();
         if (thunked.Count > 0)
@@ -576,8 +580,10 @@ public sealed class CEmitter
                 var target = _module.Functions[index];
                 var parameters = target.Locals.Take(target.ParamCount).ToList();
                 var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(p))));
-                var call = $"{FunctionName(target.Name)}({string.Join(", ", parameters.Select(LocalName))})";
-                prototypes.AppendLine($"static {CType(target.ReturnType)} {CodeOf(target)}(void *lyr_env{signature}) {{ (void)lyr_env; "
+                var arguments = parameters.Select(LocalName).Concat(target.Throws ? ["lyr_err"] : []);
+                var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
+                prototypes.AppendLine($"static {CType(target.ReturnType)} {CodeOf(target)}(void *lyr_env{signature}, LyrErr **lyr_err) {{ (void)lyr_env; "
+                    + (target.Throws ? "" : "(void)lyr_err; ")
                     + (IsVoid(target.ReturnType) ? $"{call}; }}" : $"return {call}; }}"));
             }
         }
@@ -1085,8 +1091,9 @@ public sealed class CEmitter
     {
         var parameters = function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)).ToList();
         // The caller's error slot (01 L5 E1), the last parameter: a throwing function's own keep
-        // their places, and a set slot is the status.
-        if (function.Throws) parameters.Add("LyrErr **lyr_err");
+        // their places, and a set slot is the status. A closure's code takes it either way: every
+        // function value is called with one (03 T17).
+        if (function.Throws || TakesEnvironment(function)) parameters.Add("LyrErr **lyr_err");
         // External linkage: an instance's unit calls the module's functions and the module the
         // instance's, and the names are unique by construction (01 C3, C4).
         return $"{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
@@ -1098,6 +1105,7 @@ public sealed class CEmitter
         function.Blocks.Any(b => b.Terminator is Throw or ErrorBranch or Propagate or PanicError
             || b.Insts.Any(op => op is CurrentError or ClearError or StashError or RestoreError or SuppressError
                 || op is Call c && _module.Functions[c.Target.Value].Throws
+                || op is CallIndirect { Throws: true }
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
 
     /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot (05 E2).</summary>
@@ -1107,6 +1115,13 @@ public sealed class CEmitter
     /// <summary>The error slot as the last argument of a call of a throwing function.</summary>
     private static string ErrorArgument(bool throws, int arguments) =>
         !throws ? "" : arguments == 0 ? "&lyr_e" : ", &lyr_e";
+
+    /// <summary>The slot a direct call hands its callee: the caller's for a function that throws,
+    /// none to write for a closure's code that cannot (it takes one either way), else nothing.</summary>
+    private static string SlotArgument(IrFunction callee, int arguments) =>
+        callee.Throws ? ErrorArgument(true, arguments)
+        : TakesEnvironment(callee) ? (arguments == 0 ? "NULL" : ", NULL")
+        : "";
 
     /// <summary>A zero of the type as an expression, for the return that leaves with an error: the
     /// caller reads its error slot and nothing else.</summary>
@@ -1213,7 +1228,11 @@ public sealed class CEmitter
         // The environment arrives as 'void *' — one code pointer type per function type, whatever
         // the environment's own type — and is cast to it once, here.
         if (TakesEnvironment(function))
+        {
             _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
+            // A closure's code that cannot throw has the slot every function value takes, unused.
+            if (!function.Throws) _fn.AppendLine("    (void)lyr_err;");
+        }
         foreach (var local in function.Locals.Skip(function.ParamCount))
             _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
         // The in-flight error (01 L5 E1): what a throw sets, what a call that failed wrote, what a
@@ -1318,7 +1337,7 @@ public sealed class CEmitter
             : $"{Temp(l.Dest)} = {GlobalName(l.Global.Value)};",
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
-            + $"{ErrorArgument(_module.Functions[call.Target.Value].Throws, call.Args.Length)})"),
+            + $"{SlotArgument(_module.Functions[call.Target.Value], call.Args.Length)})"),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -1354,7 +1373,10 @@ public sealed class CEmitter
         Downcast d => Assign(d.Dest, $"(({BoxName(d.Target.Value)} *){Temp(d.Value)}.data)->value"),
         // A function value (01 V8): the code and its environment, or a thunk and no environment.
         MakeClosure m => $"{Temp(m.Dest)} = ({CType(m.Type)}){{ {CodeOf(_module.Functions[m.Target.Value])}, {(m.Environment is { } e ? Temp(e) : "NULL")} }};",
-        CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))})"),
+        // The slot goes with every call of a function value (03 T17): the caller's own where the
+        // type throws, none to write where it cannot.
+        CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))}, "
+            + $"{(c.Throws ? "&lyr_e" : "NULL")})"),
         NewInline n => n.Repeat
             ? $"for (int64_t lyr_i = 0; lyr_i < {n.Length}; lyr_i++) {Storage(n.Dest)}.v[lyr_i] = {Value(n.Elements[0])}; {Temp(n.Dest)} = &{Storage(n.Dest)};"
             : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{ .v = {{ {string.Join(", ", n.Elements.Select(Value))} }} }}; {Temp(n.Dest)} = &{Storage(n.Dest)};",

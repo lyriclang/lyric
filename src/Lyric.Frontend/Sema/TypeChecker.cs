@@ -1874,6 +1874,51 @@ public sealed class TypeChecker
         if (DeclaredThrowsOf(fn).Length > 0) _result.RecordThrowsAtCall(fn);
     }
 
+    /// <summary>
+    /// The set a function type or a lambda writes (03 T17, 08 Y11 F7), under a declaration's rules:
+    /// every type throwable (<c>LYR-SEM0030</c>), each named once (<c>LYR-SEM0137</c>), the bare form
+    /// <c>Error</c> (K2). Reported once per clause — a parameter's type is resolved again through its
+    /// function's type at every call.
+    /// </summary>
+    private LyrType[] ResolveThrownSet(ThrowsClause clause, SymbolTable scope)
+    {
+        if (clause.Types.Length == 0) return _error is { } root ? [new NamedRef(root)] : [];
+        var report = _checkedSets.Add(clause);
+        var set = new List<(LyrType Type, Span Span)>();
+        foreach (var node in clause.Types)
+        {
+            var t = ResolveType(node, scope);
+            if (t.IsError) continue;
+            if (report && !IsThrowable(t))
+                _de.Report("LYR-SEM0030", Severity.Error, node.Span,
+                    $"'{TypeFacts.Display(t)}' in 'throws' does not conform to 'Error' — what is thrown is an 'Error'");
+            if (set.FindIndex(s => LyrType.Equal(s.Type, t)) is var first && first >= 0)
+            {
+                if (report)
+                    _de.Report("LYR-SEM0137", Severity.Error, node.Span,
+                        $"'{TypeFacts.Display(t)}' is named twice in 'throws' — a set names each type once",
+                        new DiagnosticNote(set[first].Span, "named first here"));
+                continue;
+            }
+            set.Add((t, node.Span));
+            if (report && TypeFacts.SymbolOf(t) is { } named) _result.BindRef(node, named);
+        }
+        return set.Select(s => s.Type).ToArray();
+    }
+
+    /// <summary>The written sets whose diagnostics are out (<see cref="ResolveThrownSet"/>).</summary>
+    private readonly HashSet<ThrowsClause> _checkedSets = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A set after a substitution: <c>never</c> names nothing — <c>throws E</c> at
+    /// <c>E = never</c> is no clause (05 E2 K4) — and two entries bound to one type are one.</summary>
+    internal static LyrType[] ThrownAfter(IEnumerable<LyrType> substituted)
+    {
+        var set = new List<LyrType>();
+        foreach (var t in substituted)
+            if (t is not NeverType && !set.Any(s => LyrType.Equal(s, t))) set.Add(t);
+        return set.ToArray();
+    }
+
     /// <summary>What a function's clause names, resolved — the bare form as <c>Error</c> (K2),
     /// nothing without a clause. What its BODY may throw, a coroutine's included.</summary>
     private LyrType[] ClauseSetOf(FunctionDecl fn)
@@ -2570,7 +2615,7 @@ public sealed class TypeChecker
             var wanted = expected as FnType;
             var matching = wanted is null
                 ? []
-                : overloads.Where(f => LyrType.Equal(FnTypeOf(f), wanted)).ToArray();
+                : overloads.Where(f => FitsFunctionType(FnTypeOf(f), wanted)).ToArray();
 
             if (matching.Length != 1)
             {
@@ -4444,7 +4489,7 @@ public sealed class TypeChecker
         CoroutineOf c => MentionsTypeParam(c.Yield),
         TupleOf t => t.Elements.Any(MentionsTypeParam),
         GenericInstance g => g.Arguments.Any(MentionsTypeParam),
-        FnType f => f.Parameters.Any(MentionsTypeParam) || MentionsTypeParam(f.Return),
+        FnType f => f.Parameters.Any(MentionsTypeParam) || MentionsTypeParam(f.Return) || f.Throws.Any(MentionsTypeParam),
         _ => false,
     };
 
@@ -4874,7 +4919,7 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = f.Throws.Select(t => Substitute(t, map)).ToArray() },
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))) },
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
                 { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
@@ -5092,6 +5137,16 @@ public sealed class TypeChecker
             case FnType pf when arg is FnType af && pf.Parameters.Length == af.Parameters.Length:
                 for (var i = 0; i < pf.Parameters.Length; i++) UnifyInfer(pf.Parameters[i], af.Parameters[i], map, argSpan);
                 UnifyInfer(pf.Return, af.Return, map, argSpan);
+                // A set written as one type parameter, 'throws E', takes the argument's (05 E2 K4):
+                // nothing thrown binds 'never', one type binds it, several their join — 'Error', as
+                // composed sets join (K7). The first binding wins, as for every parameter.
+                if (pf.Throws is [TypeParamType thrownBy] && !map.ContainsKey(thrownBy.Param) && !af.Throws.Any(t => t.IsError))
+                    map[thrownBy.Param] = af.Throws switch
+                    {
+                        [] => LyrType.Never,
+                        [var one] => one,
+                        _ => ErrorRoot ?? LyrType.Error,
+                    };
                 break;
             case CoroutineOf pc when arg is CoroutineOf ac: UnifyInfer(pc.Yield, ac.Yield, map, argSpan); break;
 
@@ -5178,7 +5233,8 @@ public sealed class TypeChecker
         SliceOf s => HasOpenParam(s.Element, map),
         InlineArrayOf ia => HasOpenParam(ia.Element, map),
         TupleOf tu => tu.Elements.Any(e => HasOpenParam(e, map)),
-        FnType f => f.Parameters.Any(p => HasOpenParam(p, map)) || HasOpenParam(f.Return, map),
+        FnType f => f.Parameters.Any(p => HasOpenParam(p, map)) || HasOpenParam(f.Return, map)
+                    || f.Throws.Any(t => HasOpenParam(t, map)),
         GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
         RangeOf r => HasOpenParam(r.Element, map),
         CoroutineOf c => HasOpenParam(c.Yield, map),
@@ -5201,6 +5257,7 @@ public sealed class TypeChecker
             case FnType f:
                 foreach (var p in f.Parameters) BindOpenParamsToError(p, map);
                 BindOpenParamsToError(f.Return, map);
+                foreach (var t in f.Throws) BindOpenParamsToError(t, map);
                 break;
             case GenericInstance g: foreach (var a in g.Arguments) BindOpenParamsToError(a, map); break;
             case RangeOf r: BindOpenParamsToError(r.Element, map); break;
@@ -5226,7 +5283,7 @@ public sealed class TypeChecker
         SliceOf s => ContainsError(s.Element),
         InlineArrayOf ia => ContainsError(ia.Element),
         TupleOf t => t.Elements.Any(ContainsError),
-        FnType f => f.Parameters.Any(ContainsError) || ContainsError(f.Return),
+        FnType f => f.Parameters.Any(ContainsError) || ContainsError(f.Return) || f.Throws.Any(ContainsError),
         GenericInstance g => g.Arguments.Any(ContainsError),
         RangeOf r => ContainsError(r.Element),
         CoroutineOf c => ContainsError(c.Yield),
@@ -5301,6 +5358,10 @@ public sealed class TypeChecker
 
         PrimitiveType prim when BuiltinSymbol(prim) is { } builtin =>
             ImplementsWithExtensions(builtin, iface, wanted, EmptySubst),
+
+        // 'never' has no value and so every conformance vacuously: 'E = never', what a set of
+        // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
+        NeverType => true,
 
         // An OPAQUE alias satisfies nothing: it has no conformance list, and falling into the
         // permissive default below would let 'Map<Entity, V>' compile against members the type
@@ -7650,6 +7711,13 @@ public sealed class TypeChecker
 
         var expFn = expected is FnType ef && ef.Parameters.Length == parameters.Length ? ef : null;
 
+        // What the lambda throws (05 E2 K3, 08 Y11 F7): the set it writes; else the one its position
+        // expects, which the body is then held to; else — no position, or an expected set still
+        // waiting for this lambda to bind its type parameter — what the body lets escape, read once
+        // the body is checked.
+        var thrown = lam.Throws is { } written ? ResolveThrownSet(written, scope)
+            : expFn is not null && !expFn.Throws.Any(ContainsTypeParam) ? expFn.Throws : null;
+
         var savedYield = _currentYield;
         var savedReturn = _currentReturn;
         var savedInference = _returnInference;
@@ -7757,7 +7825,15 @@ public sealed class TypeChecker
         _returnInference = savedInference;
 
         RecordCaptures(lam);
-        return new FnType(pTypes, ret);
+        return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body) };
+    }
+
+    /// <summary>What a lambda's body lets escape (05 E2 K3): the exception analysis's own walk, run
+    /// muted, as for a clause without a type (<see cref="Reaching"/>) — one notion of a site.</summary>
+    private LyrType[] EscapingOf(Node body)
+    {
+        using (_de.Mute())
+            return new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot).Escaping(body, _currentModule);
     }
 
     // Does the block return a VALUE on any path (`return expr;`)? Descends through the statement
@@ -7787,7 +7863,7 @@ public sealed class TypeChecker
         SliceOf s => ContainsTypeParam(s.Element),
         InlineArrayOf ia => ContainsTypeParam(ia.Element),
         TupleOf tu => tu.Elements.Any(ContainsTypeParam),
-        FnType f => ContainsTypeParam(f.Return) || f.Parameters.Any(ContainsTypeParam),
+        FnType f => ContainsTypeParam(f.Return) || f.Parameters.Any(ContainsTypeParam) || f.Throws.Any(ContainsTypeParam),
         GenericInstance gi => gi.Arguments.Any(ContainsTypeParam),
         RangeOf r => ContainsTypeParam(r.Element),
         CoroutineOf c => ContainsTypeParam(c.Yield),
@@ -8072,6 +8148,12 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield);
 
+        // A function value that throws less fits where one may throw more (05 E2 K6): the same
+        // parameters and return — no variance (03 T17) — and its set covered by the target's. Free
+        // at run time, since every function value takes the error slot; never the way back, which
+        // is how the demand to mark a call would vanish.
+        if (to is FnType wantedFn && from is FnType givenFn && FitsFunctionType(givenFn, wantedFn)) return true;
+
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
             return true;                                                                    // T[] to Slice<T>, A2
         if (coercionSite && to is SliceOf viewOfInline && from is InlineArrayOf inlineArray
@@ -8097,6 +8179,15 @@ public sealed class TypeChecker
             return true;
         return false;
     }
+
+    /// <summary>Whether a function value of type <paramref name="given"/> may stand where
+    /// <paramref name="wanted"/> is expected (05 E2 K6): one signature, its set covered by the
+    /// wanted one's — equal sets included.</summary>
+    private bool FitsFunctionType(FnType given, FnType wanted) =>
+        given.Parameters.Length == wanted.Parameters.Length
+        && given.Parameters.Zip(wanted.Parameters).All(p => LyrType.Equal(p.First, p.Second))
+        && LyrType.Equal(given.Return, wanted.Return)
+        && given.Throws.All(t => wanted.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule)));
 
     /// <summary>
     /// Nominal subtyping: a value may stand wherever one of its declared interfaces is expected.
@@ -8151,7 +8242,8 @@ public sealed class TypeChecker
         SliceOf s => MentionsParam(s.Element, param),
         InlineArrayOf ia => MentionsParam(ia.Element, param),
         TupleOf tu => tu.Elements.Any(e => MentionsParam(e, param)),
-        FnType f => f.Parameters.Any(p => MentionsParam(p, param)) || MentionsParam(f.Return, param),
+        FnType f => f.Parameters.Any(p => MentionsParam(p, param)) || MentionsParam(f.Return, param)
+                    || f.Throws.Any(t => MentionsParam(t, param)),
         GenericInstance g => g.Arguments.Any(a => MentionsParam(a, param)),
         RangeOf r => MentionsParam(r.Element, param),
         CoroutineOf c => MentionsParam(c.Yield, param),
@@ -8307,7 +8399,9 @@ public sealed class TypeChecker
             case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray()) { Labels = t.Labels };
-            case FunctionType f: return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope));
+            case FunctionType f:
+                return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope))
+                    { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [] };
             default: return LyrType.Error; // ErrorType
         }
     }

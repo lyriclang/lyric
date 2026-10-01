@@ -52,7 +52,10 @@ public abstract record LyrType
         (SliceOf x, SliceOf y) => Equal(x.Element, y.Element),
         (InlineArrayOf x, InlineArrayOf y) => x.Length == y.Length && Equal(x.Element, y.Element),
         (TupleOf x, TupleOf y) => SameSequence(x.Elements, y.Elements),
-        (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters),
+        // The thrown set counts (03 T17): 'fn() -> int' and 'fn() -> int throws E' are two types —
+        // a set, in any order (05 E2 K1).
+        (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters)
+                                && SameSet(x.Throws, y.Throws),
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
         // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
         // the second would pass for the first and the demand would be lost again at the binding.
@@ -76,6 +79,11 @@ public abstract record LyrType
         }
         return true;
     }
+
+    /// <summary>Two thrown sets name the same types, in any order. A set names each type once
+    /// (05 E2 K1), so the lengths and one containment decide.</summary>
+    private static bool SameSet(LyrType[] a, LyrType[] b) =>
+        a.Length == b.Length && a.All(x => b.Any(y => Equal(x, y)));
 
     private static bool SameSequence(LyrType[] a, LyrType[] b)
     {
@@ -122,9 +130,9 @@ public sealed record TupleOf(LyrType[] Elements) : LyrType
 public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType
 {
     /// <summary>What a call of this function may throw (design/v5/spec/05 E2): the declared set,
-    /// substituted with the function's instance (K5); empty when it throws nothing. Not yet part of
-    /// the type's identity — a function value of a throwing function is refused until function
-    /// types carry the set (T17, M5 S4).</summary>
+    /// substituted with the function's instance (K5); empty when it throws nothing. Part of the
+    /// type's identity as a set (03 T17); a value with a smaller set coerces to a type with a
+    /// larger one (K6), never the reverse.</summary>
     public LyrType[] Throws { get; init; } = [];
 }
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type

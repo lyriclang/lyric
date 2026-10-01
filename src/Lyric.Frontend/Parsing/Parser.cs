@@ -948,8 +948,15 @@ public sealed partial class Parser
         }
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after lambda parameters");
 
+        // A return type, and after it the lambda's own set (08 Y11 F7) — read as a declaration's
+        // clause is, so the return type does not take it.
         TypeNode? returnType = null;
-        if (_buffer.Match(TokenKind.Colon)) returnType = ParseType();
+        ThrowsClause? throws = null;
+        if (_buffer.Match(TokenKind.Colon))
+        {
+            returnType = ParseType(allowThrows: false);
+            if (AtContextual("throws")) throws = ParseThrowsTypes(_buffer.Advance().Span);
+        }
 
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012",
             $"expected '=>' in lambda, got {_buffer.Current.TokenKind}");
@@ -957,7 +964,7 @@ public sealed partial class Parser
         // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
         // its tail is the lambda's result, like 'return tail;' at its end.
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
-        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span));
+        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span)) { Throws = throws };
     }
 
     /// <summary><c>x =&gt; body</c>: one parameter without parentheses and without an annotation —
@@ -1277,8 +1284,27 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {_buffer.Current.TokenKind}");
-        var returnType = ParseType();
-        return new FunctionType(parameters.ToArray(), returnType, Span.Union(start.Span, returnType.Span));
+        // A 'throws' after the return type is the function TYPE's set (03 T17): the return type is
+        // read without the coroutine suffix, so the nearest function type takes it.
+        var returnType = ParseType(allowThrows: false);
+        ThrowsClause? throws = null;
+        if (AtContextual("throws")) throws = ParseTypeThrows(_buffer.Advance().Span);
+        return new FunctionType(parameters.ToArray(), returnType,
+            Span.Union(start.Span, throws?.Span ?? returnType.Span)) { Throws = throws };
+    }
+
+    /// <summary>
+    /// What follows a function type's <c>throws</c> (design/v5/spec/03 T17, 05 E2): a bracketed list,
+    /// one type, or nothing — the bare form, <c>Error</c> — where no type starts. Unlike a
+    /// declaration's clause, a comma ends the type: in <c>fn(f: fn() -&gt; void throws A, b: B)</c> it
+    /// separates two parameters, so several types without the brackets are no list here.
+    /// </summary>
+    private ThrowsClause ParseTypeThrows(Span keyword)
+    {
+        if (_buffer.Check(TokenKind.LBracket)) return ParseThrownList(keyword);
+        if (!StartsType()) return new ThrowsClause([], keyword);
+        var one = ParseType(allowThrows: false);
+        return new ThrowsClause([one], Span.Union(keyword, one.Span));
     }
 
     /// <summary>

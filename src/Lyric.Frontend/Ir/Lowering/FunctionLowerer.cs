@@ -164,7 +164,7 @@ internal sealed class FunctionLowerer
         _coroutineYield = coroutineYield;
         // The caller's error slot (01 L5 E1): a function whose CALL may throw — a coroutine's
         // clause belongs to its pulls, and its body is no call (05 E2, M6).
-        _irThrows = coroutineYield is null && types.ThrowsAtCall(decl);
+        _irThrows = coroutineYield is null && types.ThrowsAtCall(decl) && ThrownHere(types.DeclaredThrows(decl)).Length > 0;
         // A synthetic function — a comptime site's evaluator — has no written return type; the
         // sema type of its expression is handed in lowered instead.
         _returnType = coroutineYield is not null ? VoidType
@@ -266,6 +266,10 @@ internal sealed class FunctionLowerer
         // as a separate function is an implementation decision and must not change the types.
         _substitution = substitution ?? ModuleLowerer.NoSubstitution;
         _b = new BlockBuilder(_blocks);
+
+        // A lambda throws what its type says (05 E2 K3), in the enclosing instance's terms: a set
+        // naming the enclosing function's 'E' is empty where 'E = never' (K4).
+        _irThrows = _types.TypeOf(lambda) is FnType thrower && ThrownHere(thrower.Throws).Length > 0;
 
         _returnType = _types.TypeOf(lambda) is FnType fn
             ? LowerType(fn.Return, lambda.Span)
@@ -637,7 +641,7 @@ internal sealed class FunctionLowerer
             _lambdaParameterCount + (_envSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
-            Entry = new BlockId(0),
+            Entry = new BlockId(0), Throws = _irThrows,
         };
     }
 
@@ -901,6 +905,11 @@ internal sealed class FunctionLowerer
         _bottom = bottom;
         return bottom;
     }
+
+    /// <summary>A recorded set in this instance's terms (05 E2 K4): substituted, <c>never</c> dropped
+    /// — a call through a <c>fn() throws E</c> throws nothing where <c>E = never</c>, and the sema,
+    /// which checks a generic body once, recorded the <c>E</c>.</summary>
+    private LyrType[] ThrownHere(LyrType[] set) => TypeChecker.ThrownAfter(set.Select(SubstituteType));
 
     /// <summary>The edge after a call that may fail (01 L5 E3): the error to the landing, the value
     /// on in a fresh block.</summary>
@@ -4402,16 +4411,18 @@ internal sealed class FunctionLowerer
         _b.Emit(new StoreField(env, envType.Type, new FieldId(0), LowerExprAs(expr.Target, receiver), expr.Span));
 
         var name = _lambdas.BuiltName(_name, "bound:" + method.Name);
-        var code = _lambdas.RegisterBuilt(_ => BuildBoundMethod(name, envType, receiver, signature, target));
+        var throws = _types.TypeOf(expr) is FnType bound && ThrownHere(bound.Throws).Length > 0;
+        var code = _lambdas.RegisterBuilt(_ => BuildBoundMethod(name, envType, receiver, signature, target, throws));
         var dest = _slots.NewTemp(signature);
         _b.Emit(new MakeClosure(dest, code, env, signature, expr.Span));
         return dest;
     }
 
     /// <summary>The code of a bound method value: environment first, then the parameters; the
-    /// receiver is read from the environment and the method called with it.</summary>
+    /// receiver is read from the environment and the method called with it. A method that throws
+    /// passes its error on through the closure's slot (05 E2, 03 T17).</summary>
     private static IrFunction BuildBoundMethod(string name, IrRefType envType, IrType receiver,
-        IrFunctionType signature, FunctionId target)
+        IrFunctionType signature, FunctionId target, bool throws)
     {
         var locals = new List<IrLocal> { new(new LocalId(0), "<env>", envType) };
         for (var i = 0; i < signature.Parameters.Length; i++)
@@ -4435,9 +4446,18 @@ internal sealed class FunctionLowerer
         var isVoid = signature.Return is IrScalarType { Kind: IrScalar.Void };
         TempId? result = isVoid ? null : Temp(signature.Return);
         b.Emit(new Call(result, target, args, default));
+        if (throws)
+        {
+            var fail = b.NewBlock();
+            var next = b.NewBlock();
+            b.Seal(new ErrorBranch(fail, next, default));
+            b.SwitchTo(fail);
+            b.Seal(new Propagate(default));
+            b.SwitchTo(next);
+        }
         b.Seal(new Return(result, default));
 
-        return new IrFunction(name, signature.Return, locals.Count, locals, temps, blocks) { Entry = new BlockId(0) };
+        return new IrFunction(name, signature.Return, locals.Count, locals, temps, blocks) { Entry = new BlockId(0), Throws = throws };
     }
 
     private TempId LowerFieldRead(MemberExpr expr)
@@ -5106,14 +5126,17 @@ internal sealed class FunctionLowerer
                 ? LowerExprAs(expr.Arguments[i], signature.Parameters[i])
                 : LowerExpr(expr.Arguments[i]); // an arity error was already reported by the sema
 
+        // A value whose type throws hands the call the caller's slot (03 T17); the edge follows in
+        // LowerCall, from the same recorded set.
+        var throws = ThrownHere(_types.CallThrows(expr)).Length > 0;
         if (IsVoid(signature.Return))
         {
-            _b.Emit(new CallIndirect(null, callee, args, signature.Return, expr.Span));
+            _b.Emit(new CallIndirect(null, callee, args, signature.Return, expr.Span) { Throws = throws });
             return null;
         }
 
         var dest = _slots.NewTemp(signature.Return);
-        _b.Emit(new CallIndirect(dest, callee, args, signature.Return, expr.Span));
+        _b.Emit(new CallIndirect(dest, callee, args, signature.Return, expr.Span) { Throws = throws });
 
         // The result belongs to nobody yet; for a struct that saves the structcopy when binding, exactly
         // as for an ordinary call.
@@ -5126,7 +5149,7 @@ internal sealed class FunctionLowerer
     private TempId? LowerCall(CallExpr expr)
     {
         var value = LowerCallSite(expr);
-        if (_types.CallThrows(expr).Length > 0 && !_b.IsSealed && _errorEdged.Add(expr)) ErrorEdge(expr.Span);
+        if (ThrownHere(_types.CallThrows(expr)).Length > 0 && !_b.IsSealed && _errorEdged.Add(expr)) ErrorEdge(expr.Span);
         return value;
     }
 
@@ -6218,7 +6241,7 @@ internal sealed class FunctionLowerer
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
-            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
+            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws) },
         CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },
         GenericInstance g => new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations },
