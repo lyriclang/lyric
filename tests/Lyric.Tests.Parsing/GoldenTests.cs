@@ -192,6 +192,7 @@ public class GoldenTests
     [InlineData("global_let")]        // pub let ...
     [InlineData("module_full")]       // Header + Import + Struct + Fn
     [InlineData("global_var")]        // var at top level (07 V5 G5; Lyric 4 refused it)
+    [InlineData("delegation")]       // class Dog :: [Walker by legs] (04 D1)
     // Attributes.
     [InlineData("attr_decl")]         // on fn, struct, class and enum; args, stacking, dotted path
     [InlineData("attr_module")]       // before the module header

@@ -54,6 +54,7 @@ public class CEmitterTests
     [InlineData("generics")]
     [InlineData("interfaces")]
     [InlineData("calls")]
+    [InlineData("dispatch")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -86,6 +87,9 @@ public class CEmitterTests
 
     private const string CALLS_EXPECTED =
         "arity 7 12 60\nnamed 1 2 3\ndefault 10 2 3\nparams 6 3\nfactory 3 4\n";
+
+    private const string DISPATCH_EXPECTED =
+        "paths 7 7 7\nblocks hello hi\nby 4 4 walk run\nouter run4\n";
 
     private const string WITH_EXPECTED =
         "moved 3,4 1,2\nswapped 4,3\nnested 9 1 2\nchained 5 7\nheld 20 10\ngeneric 8 hi\n";
@@ -136,6 +140,7 @@ public class CEmitterTests
             data.Add("generics", profile, 0, GENERICS_EXPECTED);
             data.Add("interfaces", profile, 0, INTERFACES_EXPECTED);
             data.Add("calls", profile, 0, CALLS_EXPECTED);
+            data.Add("dispatch", profile, 0, DISPATCH_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

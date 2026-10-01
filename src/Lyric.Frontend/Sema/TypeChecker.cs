@@ -256,7 +256,8 @@ public sealed class TypeChecker
             foreach (var decl in ast.Declarations)
                 CheckDecl(decl, module);
         }
-        CheckExtensionBlocks(); // extend bodies, the orphan rule, conformance
+        CheckExtensionBlocks(); // extend bodies, conformance
+        CheckMethodSets();      // one name, one function per type (04 D2, D3)
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
         return _result;
@@ -399,7 +400,7 @@ public sealed class TypeChecker
                 if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
                     CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false);
                 CheckMethods(s.Name, s.Members, module);
-                CheckTypeConformance(s.Name, s.Interfaces, module);
+                CheckTypeConformance(s.Name, s.Interfaces, module, s.Delegates);
                 break;
             case ClassDecl c:
                 CheckAttributes(c.Attributes, AttributeTarget.Type, c.Generics.Length > 0,
@@ -407,7 +408,7 @@ public sealed class TypeChecker
                 if (module.Members.LookupLocal(c.Name) is TypeSymbol cType)
                     CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false);
                 CheckMethods(c.Name, c.Members, module);
-                CheckTypeConformance(c.Name, c.Interfaces, module);
+                CheckTypeConformance(c.Name, c.Interfaces, module, c.Delegates);
                 break;
             case EnumDecl e:
                 CheckAttributes(e.Attributes, AttributeTarget.Type, e.Generics.Length > 0,
@@ -671,6 +672,17 @@ public sealed class TypeChecker
                 continue; // without a target there is no useful body check
             }
 
+            // An interface is extended through the generic form only (04 D15): 'extend Walker
+            // { … }' would be a second spelling of 'extend<T :: [Walker]> T { … }', and a
+            // conformance of an interface to an interface has no meaning either.
+            if (block.Target.Kind == TypeSymbolKind.Interface)
+            {
+                _de.Report("LYR-SEM0124", Severity.Error, block.Decl.Target.Span,
+                    $"'{block.Target.Name}' is an interface, which an extend block does not extend — "
+                    + $"write the generic form, 'extend<T :: [{block.Target.Name}]> T {{ … }}'");
+                continue;
+            }
+
             // Body check: the outer scope is the block's method scope, which carries cross-calls and
             // the method generics. `this` is the target type — the primitive for builtins, the
             // reference otherwise.
@@ -684,41 +696,197 @@ public sealed class TypeChecker
                 CheckFunction(fn, block.MethodScope, thisType);
             }
 
-            CheckOrphanRule(block);
+            // No orphan rule (03 T7 X3): coherence is checked whole-program, and an extend may
+            // stand in any module.
             CheckTypeConformance(block.Target, block.Decl.Interfaces, block.Module, block.Target.Name);
         }
     }
 
-    // Orphan rule: `extend T :: [I]` only when T or one of the I is declared in the module itself.
-    // Inherent extends, `extend T { }` without interfaces, are unrestricted.
-    private void CheckOrphanRule(ExtensionBlock block)
+    /// <summary>Does the type conform to the interface — by its own list, or through an extend
+    /// block anywhere in the program?</summary>
+    private bool ConformsTo(TypeSymbol ts, TypeSymbol iface)
     {
-        if (block.Decl.Interfaces.Length == 0) return;
-        if (DeclaredInModule(block.Target!, block.Module)) return;
-        foreach (var iface in block.Decl.Interfaces)
-            if (Conformance.InterfaceOf(iface, _binding) is { } it && DeclaredInModule(it, block.Module))
-                return;
-        _de.Report("LYR-SEM0041", Severity.Error, block.Decl.Span,
-            $"orphan extension: neither '{block.Target!.Name}' nor any implemented interface is declared in this module");
+        if (Conformance.Implements(ts, iface, _binding)) return true;
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!ReferenceEquals(block.Target, ts)) continue;
+            foreach (var node in block.Decl.Interfaces)
+                if (Conformance.InterfaceOf(node, _binding) is { } declared
+                    && Conformance.WithParents(declared, _binding).Any(p => ReferenceEquals(p, iface)))
+                    return true;
+        }
+        return false;
     }
+
+    /// <summary>
+    /// One method set per type (design/v5/spec/04 D2): own members, inherent extension members,
+    /// the implementations of its conformances — own, in a conformance block, a default, or
+    /// delegated — hold every name ONCE, and a collision is an error where the second comer is
+    /// declared (<c>LYR-SEM0121</c>), never a silent preference. The exceptions are the rules
+    /// themselves: an own member IS the implementation of every conformance's member of that
+    /// name; a default is overridden by an own member or a conformance block; two conformance
+    /// blocks may each implement one name for their interface, scoped to it (D3), and the
+    /// unqualified call is then refused where it stands. Two defaults nobody overrides are the
+    /// type's to settle (<c>LYR-SEM0043</c>).
+    /// </summary>
+    private void CheckMethodSets()
+    {
+        foreach (var module in _comp.Modules)
+        {
+            _currentModule = module;
+            foreach (var symbol in module.Members.Symbols)
+                if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts
+                    && DeclaredInModule(ts, module))
+                    CheckMethodSet(ts);
+        }
+    }
+
+    private enum Provenance { Own, Inherent, Block, Default, Delegated }
+
+    private void CheckMethodSet(TypeSymbol ts)
+    {
+        var entries = new List<(string Name, Provenance Kind, Symbol Symbol, Span Span, string Where)>();
+        foreach (var s in ts.Members.Symbols)
+            if (s is FunctionSymbol own)
+                entries.Add((own.Name, Provenance.Own, own, own.Declaration?.Span ?? default, $"'{ts.Name}'"));
+        foreach (var ext in _comp.Extensions.MethodsFor(ts))
+            entries.Add((ext.Symbol.Name, ext.InConformanceBlock ? Provenance.Block : Provenance.Inherent,
+                ext.Symbol, ext.Symbol.Declaration?.Span ?? default,
+                ext.InConformanceBlock ? $"the conformance block of '{ts.Name}'" : $"an extension of '{ts.Name}'"));
+        // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
+        // they are the ordinary defaults, and only the abstract members go to the field.
+        foreach (var (iface, _) in InterfacesOf(ts))
+            foreach (var m in iface.Members.Symbols)
+                if (m is FunctionSymbol { Declaration: FunctionDecl { Body: not null, Generics.Length: 0 } } def)
+                    entries.Add((def.Name, Provenance.Default, def, ts.Declaration?.Span ?? default, $"a default of '{iface.Name}'"));
+        foreach (var (iface, field) in _result.DelegationsOf(ts))
+            foreach (var m in iface.Members.Symbols)
+                if (m is FunctionSymbol { IsStatic: false, Declaration: FunctionDecl { Body: null } } forwarded)
+                    entries.Add((forwarded.Name, Provenance.Delegated, forwarded, ts.Declaration?.Span ?? default, $"'{iface.Name}' delegated to '{field}'"));
+
+        foreach (var group in entries.GroupBy(e => e.Name, StringComparer.Ordinal))
+        {
+            var list = group.ToList();
+            if (list.Count < 2) continue;
+            var owns = list.Where(e => e.Kind == Provenance.Own).ToList();
+            var inherent = list.Where(e => e.Kind == Provenance.Inherent).ToList();
+            var blocks = list.Where(e => e.Kind == Provenance.Block).ToList();
+            var defaults = list.Where(e => e.Kind == Provenance.Default).Select(e => e.Symbol).Distinct().ToList();
+            var delegations = list.Where(e => e.Kind == Provenance.Delegated).ToList();
+            var name = group.Key;
+
+            // An own member settles the name for every conformance; what else declares it collides.
+            if (owns.Count > 0)
+            {
+                foreach (var other in inherent.Concat(blocks))
+                    _de.Report("LYR-SEM0121", Severity.Error, other.Span,
+                        $"'{name}' is a member of '{ts.Name}' already, and a type holds one function of a name — "
+                        + (other.Kind == Provenance.Block
+                            ? $"'{ts.Name}.{name}' implements it for every conformance; drop this one"
+                            : "rename the extension, or make it the member"),
+                        new DiagnosticNote(owns[0].Span, $"'{name}' is declared here"));
+                continue;
+            }
+
+            // Inherent extensions: one, and not beside a default or a conformance's implementation.
+            for (var i = 1; i < inherent.Count; i++)
+                _de.Report("LYR-SEM0121", Severity.Error, inherent[i].Span,
+                    $"'{name}' is added to '{ts.Name}' twice — a type holds one function of a name",
+                    new DiagnosticNote(inherent[0].Span, "the other one is here"));
+            if (inherent.Count > 0)
+            {
+                foreach (var block in blocks)
+                    _de.Report("LYR-SEM0121", Severity.Error, block.Span,
+                        $"'{name}' is both an extension of '{ts.Name}' and the implementation of a conformance — "
+                        + "one function of a name: make the extension the implementation, or rename it",
+                        new DiagnosticNote(inherent[0].Span, "the extension is here"));
+                foreach (var def in defaults)
+                    _de.Report("LYR-SEM0121", Severity.Error, inherent[0].Span,
+                        $"'{name}' is a default of an interface '{ts.Name}' conforms to, and an extension of the "
+                        + "same name is a second function of it — make the extension the conformance's "
+                        + "implementation ('extend' with the interface), or rename it",
+                        new DiagnosticNote(def.Declaration?.Span ?? default, "the default is here"));
+                foreach (var d in delegations)
+                    _de.Report("LYR-SEM0121", Severity.Error, inherent[0].Span,
+                        $"'{name}' is forwarded by {d.Where}, and an extension of the same name is a second function of it");
+                continue;
+            }
+
+            // Delegations: one field answers a name, and no default of another interface beside it.
+            if (delegations.Count > 0)
+            {
+                var fields = delegations.Select(d => d.Where).Distinct().ToList();
+                if (fields.Count > 1)
+                    _de.Report("LYR-SEM0121", Severity.Error, delegations[0].Span,
+                        $"'{name}' would be delegated twice on '{ts.Name}': {string.Join(" and ", fields)} — one function of a name; write '{name}' on '{ts.Name}'");
+                else if (blocks.Count > 0 || defaults.Count > 0)
+                    _de.Report("LYR-SEM0121", Severity.Error, delegations[0].Span,
+                        $"'{name}' is forwarded by {delegations[0].Where} and also "
+                        + (blocks.Count > 0 ? "implemented in a conformance block" : "a default of another interface")
+                        + $" — one function of a name; write '{name}' on '{ts.Name}' or drop one");
+                continue;
+            }
+
+            // Two defaults, nobody's implementation: the type decides (D3).
+            if (blocks.Count == 0 && defaults.Count > 1)
+                _de.Report("LYR-SEM0043", Severity.Error, ts.Declaration?.Span ?? default,
+                    $"'{ts.Name}' conforms to interfaces that both default '{name}' — implement '{name}' on "
+                    + $"'{ts.Name}', one function for both",
+                    defaults.Select(d => new DiagnosticNote(d.Declaration?.Span ?? default, "a default is here")).ToArray());
+            // Conformance blocks each implementing the name for their interface are the one case
+            // of two functions, scoped (D3): the unqualified call is refused where it stands.
+        }
+    }
+
 
     private bool DeclaredInModule(TypeSymbol ts, ModuleSymbol module) =>
         ReferenceEquals(module.Members.LookupLocal(ts.Name), ts);
 
     // --- interface conformance with a signature match ---
 
-    private void CheckTypeConformance(string typeName, TypeNode[] interfaces, ModuleSymbol module)
+    private void CheckTypeConformance(string typeName, TypeNode[] interfaces, ModuleSymbol module, string?[]? delegates = null)
     {
         if (module.Members.LookupLocal(typeName) is TypeSymbol ts)
-            CheckTypeConformance(ts, interfaces, module, typeName);
+            CheckTypeConformance(ts, interfaces, module, typeName, delegates);
     }
 
     // One matching implementation per abstract interface method, either an own member or a visible
     // extension; default methods may be missing. The signature has to match exactly.
-    private void CheckTypeConformance(TypeSymbol implementer, TypeNode[] interfaces, ModuleSymbol module, string name)
+    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>, 04 D1), by
+    /// index: its members the type does not write itself are forwarded, and conformance is
+    /// satisfied by that.</param>
+    private void CheckTypeConformance(TypeSymbol implementer, TypeNode[] interfaces, ModuleSymbol module, string name,
+        string?[]? delegates = null)
     {
         if (interfaces.Length == 0) return;
         var candidates = CandidateMethods(implementer, module);
+        var delegated = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < interfaces.Length; i++)
+        {
+            if (delegates is null || i >= delegates.Length || delegates[i] is not { } field) continue;
+            if (Conformance.InterfaceOf(interfaces[i], _binding) is not { } target) continue;
+            foreach (var reached in Conformance.WithParents(target, _binding)) delegated.Add(reached);
+            if (implementer.Members.LookupLocal(field) is not FieldSymbol fs)
+            {
+                _de.Report("LYR-SEM0123", Severity.Error, NodeSpan(interfaces[i]),
+                    $"'{name}' delegates '{target.Name}' to '{field}', which is no field of it");
+                continue;
+            }
+            // The field conforms to the interface, or is a value of it (or of a child of it).
+            var fieldType = FieldType(fs);
+            var ok = fieldType is NamedRef { Symbol: { Kind: TypeSymbolKind.Interface } held }
+                ? Conformance.WithParents(held, _binding).Any(p => ReferenceEquals(p, target))
+                : TypeFacts.SymbolOf(fieldType) is { } sym && ConformsTo(sym, target);
+            if (!ok)
+            {
+                _de.Report("LYR-SEM0123", Severity.Error, NodeSpan(interfaces[i]),
+                    $"'{name}' delegates '{target.Name}' to '{field}', and '{field}: "
+                    + $"{TypeFacts.Display(fieldType)}' does not conform to it");
+                continue;
+            }
+            foreach (var reached in Conformance.WithParents(target, _binding))
+                _result.RecordDelegation(implementer, reached, field, fs);
+        }
         // One instance list across the walk: a parent written out beside its child is checked
         // once, while two instances of one interface are still two conformances to check.
         var seen = new List<LyrType>();
@@ -828,6 +996,7 @@ public sealed class TypeChecker
                     var found = candidates.TryGetValue(im.Name, out var c) ? c : null;
                     if (found is null)
                     {
+                        if (delegated.Contains(iface)) continue; // forwarded to the field (D1)
                         if (im.Body is null) // abstract and not implemented
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                 $"'{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
@@ -2024,9 +2193,14 @@ public sealed class TypeChecker
             {
                 var found = ts.Members.OverloadsLocal(mem.Member)
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
+                // Members of several CONFORMANCE blocks are scoped to their interfaces (04 D3),
+                // not a set to choose from: the lookup refused the unqualified call already.
+                var blocks = _comp.Extensions.MethodsFor(ts)
+                    .Count(ext => ext.Symbol.Name == mem.Member && ext.InConformanceBlock);
                 foreach (var ext in _comp.Extensions.MethodsFor(ts))
                     if (ext.Symbol.Name == mem.Member
                         && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
+                        && !(blocks > 1 && ext.InConformanceBlock)
                         && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
                         found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
                 return found;
@@ -2171,6 +2345,22 @@ public sealed class TypeChecker
             Report(call.Span, "LYR-SEM0003",
                 $"'same' compares two references of one type, got '{TypeFacts.Display(types[0])}' and '{TypeFacts.Display(types[1])}'");
         return LyrType.Bool;
+    }
+
+    /// <summary>The interface an expression names — bare, or through a module — and <c>null</c>
+    /// for everything else, a local of that name included.</summary>
+    private static TypeSymbol? InterfaceNamed(Expr target, SymbolTable scope)
+    {
+        static Symbol? Unwrap(Symbol? symbol) => symbol is ImportBindingSymbol binding ? binding.Target : symbol;
+        var named = target switch
+        {
+            IdentifierExpr id => Unwrap(scope.Lookup(id.Name)),
+            MemberExpr { IsOptional: false, Target: IdentifierExpr holder } member
+                when Unwrap(scope.Lookup(holder.Name)) is ModuleSymbol module
+                => Unwrap(module.Members.LookupLocal(member.Member)),
+            _ => null,
+        };
+        return named is TypeSymbol { Kind: TypeSymbolKind.Interface } iface ? iface : null;
     }
 
     /// <summary>The class or struct a callee NAMES, when the callee is a type name in call
@@ -3305,13 +3495,49 @@ public sealed class TypeChecker
         if (ConstructedType(call.Callee, scope) is { } constructed)
             return CheckConstruction(call, constructed, scope, expected);
 
+        // 'Walker.describe(x)' (04 D2 R5): the interface's member, called with its receiver as
+        // the first argument — the qualified form that reaches an implementation the unqualified
+        // call cannot name (D3). Checked as the method call it stands for, on a receiver that
+        // conforms, with the member settled here rather than looked up on the receiver's type.
+        if (call.Callee is MemberExpr { IsOptional: false } qualified
+            && InterfaceNamed(qualified.Target, scope) is { } named
+            && Conformance.WithParents(named, _binding)
+                .Select(i => i.Members.LookupLocal(qualified.Member)).OfType<FunctionSymbol>()
+                .FirstOrDefault() is { IsStatic: false, Generics.Length: 0 } promised
+            && named.Generics.Length == 0)
+        {
+            if (call.Arguments.Length == 0)
+                return Report(call.Span, "LYR-SEM0014",
+                    $"'{named.Name}.{qualified.Member}' takes the receiver as its first argument");
+            var receiverExpr = call.Arguments[0];
+            var receiverType = CheckExpr(receiverExpr, scope);
+            var conforms = receiverType.IsError
+                || (receiverType is NamedRef { Symbol: { Kind: TypeSymbolKind.Interface } held }
+                    ? Conformance.WithParents(held, _binding).Any(p => ReferenceEquals(p, named))
+                    : TypeFacts.SymbolOf(receiverType) is { } rs && ConformsTo(rs, named));
+            if (!conforms)
+                return Report(receiverExpr.Span, "LYR-SEM0125",
+                    $"'{TypeFacts.Display(receiverType)}' does not conform to '{named.Name}', so "
+                    + $"'{named.Name}.{qualified.Member}' is not one of its members");
+
+            var member = new MemberExpr(receiverExpr, qualified.Member, IsOptional: false, qualified.Span) { MemberSpan = qualified.MemberSpan };
+            var names = call.ArgumentNames is { } all ? all.Skip(1).ToArray() : null;
+            var meant = new CallExpr(member, call.Arguments[1..], call.Span) { ArgumentNames = names is { } n && n.Any(x => x is not null) ? n : null };
+            _typedReceiver.Add(member);
+            _operatorTarget[member] = (FnTypeOf(promised), promised);
+            var result = CheckExpr(meant, scope, expected);
+            _result.DesugarOperator(call, meant);
+            return result;
+        }
+
         var calleeType = CheckTargetOfCall(call.Callee, scope, expected);
 
         // OVERLOADING: the lookup above answered with the first function of the name, which is the
         // right answer whenever there is only one. With several, the arguments decide, and the
         // decision is recorded by rebinding the callee — from here on everything downstream, the
         // lowering included, reads one target and knows nothing of the set.
-        if (OverloadCandidates(call.Callee, scope) is { Count: > 1 } candidates)
+        if (!(call.Callee is MemberExpr settled && _operatorTarget.ContainsKey(settled))
+            && OverloadCandidates(call.Callee, scope) is { Count: > 1 } candidates)
         {
             if (SelectOverload(call, candidates, scope) is not { } chosen) return LyrType.Error;
             _result.BindRef(call.Callee, chosen);
@@ -4223,6 +4449,7 @@ public sealed class TypeChecker
             return (FnTypeOf(ext), ext);
         }
         if (DefaultMember(ts, member, span) is { } def) return def;
+        if (DelegatedMember(ts, member) is { } forwarded) return forwarded;
         return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'",
             NameSuggestion.Note(member, MemberFacts
                 .OfInstance(_comp, _binding, ts, _currentModule)
@@ -4238,25 +4465,40 @@ public sealed class TypeChecker
     /// parameters — nothing could ever tell those apart (LYR-SEM0044).</para></summary>
     private FunctionSymbol? ExtensionMember(TypeSymbol ts, string member, Span span)
     {
-        List<FunctionSymbol> visible = new();
+        List<ExtensionMethod> visible = new();
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
         {
             if (ext.Symbol.Name != member) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
-            if (!visible.Any(f => ReferenceEquals(f, ext.Symbol))) visible.Add(ext.Symbol);
+            if (!visible.Any(f => ReferenceEquals(f.Symbol, ext.Symbol))) visible.Add(ext);
         }
 
-        for (var i = 0; i < visible.Count; i++)
-            for (var j = i + 1; j < visible.Count; j++)
-                if (SameParameters(visible[i], visible[j]))
-                {
-                    _de.Report("LYR-SEM0044", Severity.Error, span,
-                        $"ambiguous member '{member}' on '{ts.Name}': two visible extensions "
-                        + $"provide it with the same parameters ({DisplayParameters(visible[j])})");
-                    return visible[0];
-                }
+        // Two conformance blocks each implementing the name for their interface (04 D3): the
+        // name belongs to the block, and the unqualified call says nothing about which. Every
+        // other duplicate was refused at its declaration (LYR-SEM0121).
+        if (visible.Count > 1 && visible.All(v => v.InConformanceBlock))
+        {
+            var interfaces = visible.Select(v => Conformance.InterfaceOf(v.Block.Decl.Interfaces[0], _binding)?.Name ?? "?").ToList();
+            _de.Report("LYR-SEM0122", Severity.Error, span,
+                $"'{member}' is implemented on '{ts.Name}' for {string.Join(" and ", interfaces.Select(i => $"'{i}'"))} "
+                + $"separately — qualify the call: '{interfaces[0]}.{member}(…)'");
+            return visible[0].Symbol;
+        }
 
-        return visible.Count > 0 ? visible[0] : null;
+        return visible.Count > 0 ? visible[0].Symbol : null;
+    }
+
+    /// <summary>A member a type forwards to a field (<c>:: [Walker by legs]</c>, 04 D1): the
+    /// interface's member, typed as the interface declares it.</summary>
+    private (LyrType, Symbol?)? DelegatedMember(TypeSymbol ts, string member)
+    {
+        foreach (var (iface, subst) in InterfacesOf(ts))
+        {
+            if (_result.DelegationOf(ts, iface) is null) continue;
+            if (iface.Members.LookupLocal(member) is not FunctionSymbol { IsStatic: false } fn) continue;
+            return (Substitute(FnTypeOf(fn), subst), fn);
+        }
+        return null;
     }
 
     // An interface default method, one with a body, through the type's interfaces, declared or via
@@ -4274,9 +4516,9 @@ public sealed class TypeChecker
             if (found is null) found = (t, fn);
             else if (!ReferenceEquals(found.Value.sym, fn)) ambiguous = true;
         }
-        if (ambiguous)
-            _de.Report("LYR-SEM0043", Severity.Error, span,
-                $"ambiguous default method '{member}' on '{ts.Name}': multiple interfaces provide it — override it explicitly");
+        // Two defaults nobody overrides were refused at the type's declaration (CheckMethodSet,
+        // LYR-SEM0043); here the first answers, so the call types and the error stays one.
+        _ = ambiguous;
         return found is { } f ? (f.type, f.sym) : null;
     }
 

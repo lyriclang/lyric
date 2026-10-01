@@ -461,7 +461,7 @@ public static class ModuleLowerer
                 var typesBefore = typeTable.Interned.Count();
 
                 impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances, types,
-                    de, ref failed);
+                    lambdas, de, ref failed);
                 if (failed) return null;
 
                 DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
@@ -992,7 +992,7 @@ public static class ModuleLowerer
     private static List<IrImpl> BuildImpls(TypeTable typeTable, BindingResult binding,
         Compilation compilation, Dictionary<FunctionSymbol, FunctionId> ids,
         ExtensionTable extensions, InstanceTable instances, TypeResult types,
-        DiagnosticEngine de, ref bool failed)
+        LambdaTable lambdas, DiagnosticEngine de, ref bool failed)
     {
         var impls = new List<IrImpl>();
         var interned = typeTable.Interned.ToList();
@@ -1081,6 +1081,16 @@ public static class ModuleLowerer
                                  ?? ResolveInInstance(typeTable, ifaceId, slots[i], instances);
                     if (target is { } id) { methods[i] = id; continue; }
 
+                    // Delegated (04 D1): the slot forwards to the field — the type's own members and
+                    // the interface's defaults came first above, as the rule says.
+                    if (types.DelegationOf(type, iface) is { } field)
+                    {
+                        var slot = i;
+                        methods[i] = lambdas.RegisterBuilt(forwarderId => BuildForwarder(
+                            $"{type.Name}.{slots[slot]}<by {field}>", typeTable, type, typeId, iface, ifaceId, slot, field));
+                        continue;
+                    }
+
                     // The sema already checked conformance. If something is missing here all the same, it
                     // is a lowering gap — a generic or bodyless implementation pass 1 skipped.
                     LoweringDiagnostics.ReportUnsupported(de,
@@ -1163,6 +1173,80 @@ public static class ModuleLowerer
                     sites.Add(new ConformanceSite(node, block));
         }
         return sites;
+    }
+
+    /// <summary>
+    /// The forwarder of one delegated slot (04 D1): <c>fn walk(d) { this.legs.walk(d); }</c> as IR
+    /// — the receiver, the field read, the field lifted to the interface (or taken as it is when
+    /// the field holds an interface value), and the slot called through the field's table. The
+    /// receiver of a struct or an enum is the caller's place, as every method's is.
+    /// </summary>
+    private static IrFunction BuildForwarder(string name, TypeTable typeTable, TypeSymbol type, TypeId typeId,
+        TypeSymbol iface, TypeId ifaceId, int slot, string field)
+    {
+        var def = typeTable.Defs[typeId.Value];
+        var fieldIndex = Array.IndexOf(def.FieldNames, field);
+        if (fieldIndex < 0)
+            throw new UnsupportedConstructException($"'{type.Name}' delegates to '{field}', which its layout does not hold", type.Declaration?.Span ?? default);
+        var fieldType = def.FieldTypes[fieldIndex];
+        if (iface.Members.LookupLocal(typeTable.MethodSlotsOf(ifaceId)[slot]) is not FunctionSymbol { Declaration: FunctionDecl promised })
+            throw new UnsupportedConstructException($"'{iface.Name}' has no declaration for slot {slot}", type.Declaration?.Span ?? default);
+        var parameters = promised.Parameters.Select(p => typeTable.Lower(p.Type)).ToArray();
+        var returnType = promised.ReturnType is null ? new IrScalarType(IrScalar.Void) : typeTable.Lower(promised.ReturnType);
+        var isClass = type.Kind == TypeSymbolKind.Class;
+        IrType receiver = isClass ? new IrRefType(typeId) : type.Kind == TypeSymbolKind.Enum ? new IrEnumType(typeId) : new IrStructType(typeId);
+
+        var locals = new List<IrLocal> { new(new LocalId(0), "this", receiver) };
+        for (var i = 0; i < parameters.Length; i++)
+            locals.Add(new IrLocal(new LocalId(i + 1), promised.Parameters[i].Name, parameters[i]));
+        var temps = new List<IrTemp>();
+        TempId Temp(IrType t) { var id = new TempId(temps.Count); temps.Add(new IrTemp(id, t)); return id; }
+
+        var blocks = new List<IrBlock>();
+        var b = new BlockBuilder(blocks);
+        var self = Temp(receiver);
+        b.Emit(new LoadLocal(self, new LocalId(0), receiver, default));
+        var held = Temp(fieldType);
+        b.Emit(new LoadField(held, self, typeId, new FieldId(fieldIndex), fieldType, default));
+
+        TempId lifted;
+        var ifaceType = new IrInterfaceType(ifaceId);
+        if (fieldType is IrInterfaceType already)
+        {
+            if (already.Type != ifaceId)
+                throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', a value of another interface — not yet", type.Declaration?.Span ?? default);
+            lifted = held;
+        }
+        else
+        {
+            var concrete = fieldType switch
+            {
+                IrRefType r => r.Type,
+                IrStructType s => s.Type,
+                IrEnumType e => e.Type,
+                _ => throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', whose type cannot carry an interface value", type.Declaration?.Span ?? default),
+            };
+            lifted = Temp(ifaceType);
+            b.Emit(new MakeInterface(lifted, held, concrete, ifaceId, default));
+        }
+
+        var args = new TempId[parameters.Length + 1];
+        args[0] = lifted;
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            args[i + 1] = Temp(parameters[i]);
+            b.Emit(new LoadLocal(args[i + 1], new LocalId(i + 1), parameters[i], default));
+        }
+        var isVoid = returnType is IrScalarType { Kind: IrScalar.Void };
+        TempId? result = isVoid ? null : Temp(returnType);
+        b.Emit(new CallVirt(result, ifaceId, slot, args, returnType, default));
+        b.Seal(new Return(result, default));
+
+        return new IrFunction(name, returnType, locals.Count, locals, temps, blocks)
+        {
+            Entry = new BlockId(0),
+            ReceiverByRef = !isClass,
+        };
     }
 
     private static List<ExtensionBlock> ExtendBlocksFor(Compilation compilation, TypeSymbol type,

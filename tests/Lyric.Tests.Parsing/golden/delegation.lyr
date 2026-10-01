@@ -1,0 +1,1 @@
+class Dog :: [Walker by legs, Named] { var legs: Legs, fn speed(): int { return 4; } }

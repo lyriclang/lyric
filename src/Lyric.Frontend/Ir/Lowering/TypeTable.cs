@@ -102,6 +102,25 @@ internal sealed class TypeTable
     /// binding lives here.</summary>
     public TypeSymbol? ConstraintInterface(TypeNode node) => Conformance.InterfaceOf(node, _binding);
 
+    /// <summary>The interface among <paramref name="concrete"/>'s conformances — its own list and
+    /// every extend block, parents included — that declares <paramref name="member"/> itself, or
+    /// <c>null</c>: the sema bound a call to an interface's member on a concrete receiver (the
+    /// qualified form, a delegated member), and the call goes through that interface's table.</summary>
+    public TypeSymbol? InterfaceDeclaring(TypeSymbol concrete, FunctionSymbol member)
+    {
+        IEnumerable<TypeSymbol> declared = Conformance.DeclaredInterfaces(concrete, _binding);
+        if (Compilation is { } comp)
+            declared = declared.Concat(comp.Extensions.Blocks
+                .Where(b => ReferenceEquals(b.Target, concrete))
+                .SelectMany(b => b.Decl.Interfaces)
+                .Select(n => Conformance.InterfaceOf(n, _binding)).OfType<TypeSymbol>()
+                .SelectMany(i => Conformance.WithParents(i, _binding)));
+        foreach (var iface in declared)
+            if (iface.Members.LookupLocal(member.Name) is { } found && ReferenceEquals(found, member))
+                return iface;
+        return null;
+    }
+
     /// <summary>The interface <paramref name="ts"/> inherits a member named <paramref name="member"/>
     /// from, or <c>null</c> when none has it.
     ///
