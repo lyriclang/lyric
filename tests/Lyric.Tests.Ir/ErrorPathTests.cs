@@ -356,4 +356,69 @@ public class ErrorPathTests
         Assert.Contains(Ops(f), op => op is ClearError);
         Assert.Single(Terminators(f).OfType<Throw>());
     }
+
+    // --- function values that throw (03 T17; 05 E2 K3, K4) ---
+
+    [Fact]
+    public void A_call_through_a_throwing_value_hands_its_slot_and_branches()
+    {
+        var module = Lowered("""
+            fn f(g: fn() -> int throws Boom): int throws Boom { return try g(); }
+            fn main(): int throws Boom { return try f(risky); }
+            """);
+        var f = Fn(module, "f");
+        Assert.True(Assert.Single(Ops(f).OfType<CallIndirect>()).Throws);
+        Assert.Single(Terminators(f).OfType<ErrorBranch>());
+    }
+
+    [Fact]
+    public void A_call_through_a_value_that_cannot_throw_has_no_edge()
+    {
+        var module = Lowered("""
+            fn f(g: fn() -> int): int { return g(); }
+            fn main(): int { return f(() => 1); }
+            """);
+        var f = Fn(module, "f");
+        Assert.False(Assert.Single(Ops(f).OfType<CallIndirect>()).Throws);
+        Assert.Empty(Terminators(f).OfType<ErrorBranch>());
+    }
+
+    [Fact]
+    public void A_lambda_that_throws_passes_its_error_on()
+    {
+        var module = Lowered("""
+            fn f(g: fn() -> int throws Boom): int throws Boom { return try g(); }
+            fn main(): int throws Boom { return try f(() => try risky()); }
+            """);
+        var lambda = module.Functions.Single(fn => fn.Name == "main.main.<lambda0>");
+        Assert.True(lambda.Throws);
+        Assert.Contains(Terminators(lambda), t => t is Propagate);
+    }
+
+    [Fact]
+    public void An_instance_whose_set_is_never_throws_nothing()
+    {
+        var module = Lowered("""
+            fn each<E :: [Error]>(g: fn() -> int throws E): int throws E { return try g(); }
+            fn main(): int { return each(() => 1); }
+            """);
+        // The body was checked once with 'E'; the instance at 'E = never' takes no slot and its
+        // call through the value no edge.
+        var instance = module.Functions.Single(fn => fn.Name.StartsWith("main.each", StringComparison.Ordinal));
+        Assert.False(instance.Throws);
+        Assert.False(Assert.Single(Ops(instance).OfType<CallIndirect>()).Throws);
+        Assert.Empty(Terminators(instance).OfType<ErrorBranch>());
+    }
+
+    [Fact]
+    public void A_bound_method_that_throws_passes_its_error_on()
+    {
+        var module = Lowered("""
+            class C { fn m(): int throws Boom { return 1; } }
+            fn main(): int throws Boom { let c = C { }; let f = c.m; return try f(); }
+            """);
+        var bound = module.Functions.Single(fn => fn.Name.Contains("<bound:m", StringComparison.Ordinal));
+        Assert.True(bound.Throws);
+        Assert.Contains(Terminators(bound), t => t is Propagate);
+    }
 }

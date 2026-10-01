@@ -191,6 +191,15 @@ public static class TypeFacts
         return LyrType.Equal(a, b);
     }
 
+    /// <summary>A function type's set as written after its return type, in one order whatever the
+    /// declaration's (05 E2 K1): the display names an instance, and two orders are one type.</summary>
+    private static string ThrownText(LyrType[] thrown) => thrown.Length switch
+    {
+        0 => "",
+        1 => " throws " + Display(thrown[0]),
+        _ => " throws [" + string.Join(", ", thrown.Select(Display).Order(StringComparer.Ordinal)) + "]",
+    };
+
     public static string Display(LyrType t)
     {
         switch (t)
@@ -224,7 +233,12 @@ public static class TypeFacts
                 return (ia.Element is Optional or FnType ? $"({Display(ia.Element)})" : Display(ia.Element)) + $"[{ia.Length}]";
             case TupleOf tu:
                 return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Display(e) : Display(e))) + ")";
-            case FnType f: return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> " + Display(f.Return);
+            case FnType f:
+                // A function type returned by one with a set reads parenthesized: the nearest
+                // function type takes a 'throws' (03 T17).
+                return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> "
+                       + (f.Return is FnType && f.Throws.Length > 0 ? $"({Display(f.Return)})" : Display(f.Return))
+                       + ThrownText(f.Throws);
             case RangeOf r: return "range<" + Display(r.Element) + ">";
             case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ">";
             case CoroutineOf co:

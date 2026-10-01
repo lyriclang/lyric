@@ -12,8 +12,8 @@ namespace Lyric.Tests.Sema;
 /// <c>Error</c> as the root of everything thrown, caught and declared (SEM0030); the <c>throws</c>
 /// SET (SEM0137); the <c>try</c> mark on every throwing call (SEM0138) and the warning for a mark
 /// over nothing (SEM0139); coverage by a catch around the site or by the function's set, on the
-/// instance (SEM0034); an implementation throwing at most its member (SEM0042); throwing functions
-/// as values (SEM0037); the try/catch structure (SEM0035, SEM0036); panic returning never; the
+/// instance (SEM0034); an implementation throwing at most its member (SEM0042); the thrown set of a
+/// function type (03 T17; K3, K4, K6); the try/catch structure (SEM0035, SEM0036); panic returning never; the
 /// expression forms (05 E4): <c>try?</c> worth <c>?T</c> unflattened, <c>try!</c> worth <c>T</c>,
 /// <c>try e catch (x: A) v</c> unified like match arms, a clause without a value (SEM0033),
 /// <c>try?</c> over a call without one (SEM0140); a <c>try</c> no error reaches (SEM0139).
@@ -252,8 +252,9 @@ public class ExceptionTests
     [Fact]
     public void A_lambda_body_is_its_own_context()
     {
-        // Its function declares the type; the lambda, which runs later, does not — and cannot yet.
-        AssertCode(Diags("fn t() throws NotFound { let f = (x: int) => try mayThrow(); }"), "LYR-SEM0034");
+        // The enclosing function's set does not cover it: the lambda runs later and throws what its
+        // own type says (05 E2 K3) — here nothing, the position expecting a function that cannot.
+        AssertCode(Diags("fn t() throws NotFound { let f: fn(int) -> int = (x: int) => try mayThrow(); }"), "LYR-SEM0034");
         AssertCode(Diags("fn t() throws NotFound { let f = (x: int) => mayThrow(); }"), "LYR-SEM0138");
     }
 
@@ -288,11 +289,94 @@ public class ExceptionTests
         AssertClean(Diags("fn main(): void throws { try mayThrowAny(); }"));
     }
 
-    // --- a throws function as a value (SEM0037) ---
+    // --- a throwing function as a value (03 T17): its set in its type; SEM0037 retired ---
 
     [Fact]
-    public void Throws_function_as_value_is_reported() =>
-        AssertCode(Diags("fn t() { let f = mayThrow; }"), "LYR-SEM0037");
+    public void A_throwing_function_is_a_value_that_throws()
+    {
+        AssertClean(Diags("fn t(): int throws NotFound { let f = mayThrow; return try f(); }"));
+        AssertCode(Diags("fn t(): int throws NotFound { let f = mayThrow; return f(); }"), "LYR-SEM0138");
+        AssertCode(Diags("fn t(): int { let f = mayThrow; return try f(); }"), "LYR-SEM0034");
+        // A method bound to its object likewise.
+        AssertClean(Diags("class C { fn m(): int throws NotFound { return 1; } }\n"
+            + "fn t(c: C): int throws NotFound { let f = c.m; return try f(); }"));
+    }
+
+    // --- the thrown set of a function type (03 T17; 05 E2 K3, K4, K6) ---
+
+    private const string Each = "fn each<E :: [Error]>(f: fn() -> int throws E): int throws E { return try f(); }\n";
+
+    [Fact]
+    public void The_set_is_part_of_the_type_and_has_no_order()
+    {
+        AssertClean(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): fn() -> int throws [DbError, NotFound] { return k; }"));
+        AssertCode(Diags("fn t(k: fn() -> int throws NotFound): fn() -> int { return k; }"), "LYR-SEM0001");
+    }
+
+    [Fact]
+    public void A_value_that_throws_less_fits_a_type_that_throws_more()
+    {
+        // K6, element by element: an interface covers its conformers. Never the way back.
+        AssertClean(Diags("fn t(): fn() -> int throws NotFound { return safe; }"));
+        AssertClean(Diags("fn t(k: fn() -> int throws DbError): fn() -> int throws [IOError, NotFound] { return k; }"));
+        AssertCode(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): fn() -> int throws NotFound { return k; }"), "LYR-SEM0001");
+    }
+
+    [Fact]
+    public void A_written_set_follows_a_declared_ones_rules_once()
+    {
+        AssertCode(Diags("fn t(k: fn() -> int throws Plain) { }"), "LYR-SEM0030");
+        // The parameter's type is resolved again at every call of 't'; the twice-named type is
+        // reported once.
+        var de = Diags("fn t(k: fn() -> int throws [NotFound, NotFound]) { }\nfn u() { t(safe); t(safe); }");
+        Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0137");
+    }
+
+    [Fact]
+    public void A_lambda_is_held_to_the_set_its_position_expects()
+    {
+        const string run = "fn run(f: fn() -> int throws NotFound): int throws NotFound { return try f(); }\n";
+        AssertClean(Diags(run + "fn t(): int throws NotFound { return try run(() => try mayThrow()); }"));
+        AssertCode(Diags(run + "fn t(): int throws [NotFound, DbError] { return try run(() => try mayThrowDb()); }"), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_lambda_without_a_position_throws_what_its_body_lets_escape()
+    {
+        AssertClean(Diags("fn t(): int throws NotFound { let f = (x: int) => try mayThrow(); return try f(1); }"));
+        AssertCode(Diags("fn t(): int throws NotFound { let f = (x: int) => try mayThrow(); return f(1); }"), "LYR-SEM0138");
+        // What a try inside the body takes does not escape it.
+        AssertClean(Diags("fn t(): int { let f = (x: int) => try mayThrow() catch (_: NotFound) 0; return f(1); }"));
+    }
+
+    [Fact]
+    public void A_lambda_may_write_its_set()
+    {
+        AssertClean(Diags("fn t(): int throws NotFound { let f = (x: int): int throws NotFound => try mayThrow(); return try f(1); }"));
+        AssertCode(Diags("fn t() { let f = (x: int): int throws DbError => try mayThrow(); }"), "LYR-SEM0034");
+    }
+
+    [Fact]
+    public void A_type_parameter_in_a_set_is_inferred_from_the_argument()
+    {
+        AssertClean(Diags(Each + "fn t(): int throws NotFound { return try each(() => try mayThrow()); }"));
+        AssertClean(Diags(Each + "fn t(): int throws NotFound { return try each(mayThrow); }"));
+        // Nothing thrown binds 'never': the call throws nothing, and a mark over it is warned about.
+        AssertClean(Diags(Each + "fn t(): int { return each(safe); }"));
+        AssertCode(Diags(Each + "fn t(): int { return try each(safe); }"), "LYR-SEM0139");
+    }
+
+    [Fact]
+    public void Several_thrown_types_bind_the_root()
+    {
+        // K7's join: two types make 'Error', which a set of the two does not cover.
+        AssertCode(Diags(Each + "fn t(): int throws [NotFound, Parse] { return try each(mayThrowBoth); }"), "LYR-SEM0034");
+        AssertClean(Diags(Each + "fn t(): int throws { return try each(mayThrowBoth); }"));
+    }
+
+    [Fact]
+    public void A_set_names_a_type_parameter_only_under_a_constraint() =>
+        AssertCode(Diags("fn bad<E>(f: fn() -> int throws E): int throws E { return try f(); }"), "LYR-SEM0030");
 
     [Fact]
     public void Plain_function_as_value_is_fine() =>

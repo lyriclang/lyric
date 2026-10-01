@@ -72,6 +72,7 @@ public class CEmitterTests
     [InlineData("catch_sets")]
     [InlineData("defer_errors")]
     [InlineData("resources")]
+    [InlineData("fn_throws")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -209,6 +210,7 @@ public class CEmitterTests
             data.Add("catch_sets", profile, 0, CATCH_SETS_EXPECTED);
             data.Add("defer_errors", profile, 0, DEFER_ERRORS_EXPECTED);
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
+            data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -311,6 +313,8 @@ public class CEmitterTests
     private const string TRY_FORMS_EXPECTED =
         "a 42 b -1\nc true -7\nd false\ne true 42\nf 42\ng -1\nh caught disk\nh fallback\ni data\nj 2\n"
         + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
+
+    private const string FN_THROWS_EXPECTED = "1 2 4 4 3\n40\ncaught negative\n7\ntoo big\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

@@ -1,0 +1,49 @@
+// Function values that throw (design/v5/spec/03 T17, 05 E2 K3, K4, K6): a throwing function and a
+// bound throwing method as values, a value that throws less where more may be thrown, a lambda
+// whose set is inferred or written, and a generic set inferred from the argument — 'never' where
+// nothing is thrown, so that instance takes no slot.
+import std.io { println };
+
+class Negative :: [Error] { fn message(): string { return "negative"; } }
+
+fn check(n: int): int throws Negative {
+    if (n < 0) { throw Negative { }; }
+    return n;
+}
+
+fn plain(n: int): int { return n + 1; }
+
+fn twice<T, E :: [Error]>(x: T, f: fn(T) -> T throws E): T throws E {
+    let y = try f(x);
+    return try f(y);
+}
+
+fn apply(f: fn(int) -> int throws Negative, n: int): int throws Negative {
+    return try f(n);
+}
+
+class Limit { max: int,
+    fn take(n: int): int throws Negative {
+        if (n > this.max) { throw Negative { }; }
+        return n;
+    }
+}
+
+fn main(): void {
+    let f = check;
+    let g: fn(int) -> int throws Negative = plain;
+    let h = (n: int): int => try check(n) * 2;
+    let w = (n: int): int throws Negative => try check(n - 1);
+    let l = Limit { max = 10 };
+    let m = l.take;
+    try {
+        println(f"{apply(f, 1)} {apply(g, 1)} {apply(h, 2)} {apply(w, 5)} {apply(m, 3)}");
+        println(f"{twice(10, (n: int): int => try check(n) * 2)}");
+        println(f"{apply(h, -1)}");
+    } catch (e: Negative) {
+        println(f"caught {e.message()}");
+    }
+    println(f"{twice(5, plain)}");
+    let r = try? m(30);
+    if (r == null) { println("too big"); }
+}

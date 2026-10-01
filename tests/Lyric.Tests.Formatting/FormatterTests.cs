@@ -855,6 +855,28 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_function_types_set_keeps_the_list_rule()
+    {
+        var formatted = Format("fn g(a: fn(int)->int throws E, b: fn()->void throws [ A,B ], c: fn()->void throws) { }");
+        Assert.Contains("a: fn(int) -> int throws E", formatted, StringComparison.Ordinal);
+        Assert.Contains("b: fn() -> void throws [A, B]", formatted, StringComparison.Ordinal);
+        Assert.Contains("c: fn() -> void throws)", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_function_type_before_an_outer_set_keeps_its_parentheses()
+    {
+        // The nearest function type takes a 'throws' (03 T17): bare, the declaration's set would
+        // become the returned type's.
+        Assert.Contains("fn g(): (fn() -> int) throws E", Format("fn g(): (fn() -> int) throws E { return f; }"), StringComparison.Ordinal);
+        Assert.Contains("fn h(): fn() -> int throws E", Format("fn h(): fn() -> int throws E { return f; }"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_lambda_keeps_its_written_set() =>
+        Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);
+
+    [Fact]
     public void A_try_the_clauses_would_take_keeps_its_parentheses()
     {
         // A clause belongs to the nearest 'try' on its left: bare, the inner 'try' would take the

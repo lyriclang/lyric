@@ -19,8 +19,8 @@ namespace Lyric.Sema;
 /// </list>
 ///
 /// <para>A lambda is a context of its own — its body runs later, outside every <c>try</c> around
-/// it — and, until function types carry a set (T17, M5 S4), one that throws nothing; a global's
-/// initializer and a default have no handler at all. Coverage is the checker's question: an
+/// it — that throws what its type says (K3): the set it writes or its position expects, or the one
+/// read off its body. A global's initializer and a default have no handler at all. Coverage is the checker's question: an
 /// element covers a thrown type when it IS the type, on the instance, or an interface the type
 /// conforms to (<see cref="TypeChecker.ThrownCoveredBy"/>), asked in the module the site stands in.</para>
 /// </summary>
@@ -229,13 +229,12 @@ internal sealed class ExceptionAnalyzer
                 }
                 break;
             case IdentifierExpr or MemberExpr:
-                CheckFnValue(expr);
                 if (expr is MemberExpr m) AnalyzeExpr(m.Target);
                 break;
             case LambdaExpr lam:
-                // Its own context: the body runs later, outside every try around it; and until
-                // function types carry a set (T17, M5 S4) it throws nothing.
-                InContext(new Context([], "the lambda", canDeclare: false), () =>
+                // Its own context: the body runs later, outside every try around it, and throws what
+                // the lambda's type says (05 E2 K3).
+                InContext(new Context(_types.TypeOf(lam) is FnType { Throws: var lambdaSet } ? lambdaSet : [], "the lambda", canDeclare: false), () =>
                 {
                     if (lam.Body is Block b) AnalyzeStmt(b);
                     else if (lam.Body is Expr e) AnalyzeExpr(e);
@@ -343,8 +342,9 @@ internal sealed class ExceptionAnalyzer
                 ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' here and no 'throws' of "
                   + $"{_context.Name} covers — catch it, or add it to the 'throws'"
                 : _context.Name == "the lambda"
-                    ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' in the lambda covers — "
-                      + "a lambda does not throw yet (its set is inferred from M5 S4 on): catch it inside"
+                    ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' in the lambda covers and its type "
+                      + (_context.Declared.Length == 0 ? "does not throw" : $"throws only {SetText(_context.Declared)}")
+                      + " — catch it inside, or give the lambda a type that throws it"
                     : $"{what} throws '{TypeFacts.Display(t)}', and {_context.Name} cannot throw — catch it there");
         }
     }
@@ -393,16 +393,6 @@ internal sealed class ExceptionAnalyzer
 
     private static string SetText(LyrType[] set) =>
         set.Length == 1 ? $"'{TypeFacts.Display(set[0])}'" : $"[{string.Join(", ", set.Select(TypeFacts.Display))}]";
-
-    // --- a throwing function as a value (SEM0037): until function types carry a set (T17, M5 S4) ---
-
-    private void CheckFnValue(Expr expr)
-    {
-        if (_types.RefOf(expr) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } fn })
-            _de.Report("LYR-SEM0037", Severity.Error, expr.Span,
-                $"'{fn.Name}' declares 'throws' and cannot be used as a value — function types carry no "
-                + "thrown set yet (M5 S4); call it directly");
-    }
 
     private static string CalleeName(Expr callee) => callee switch
     {

@@ -137,6 +137,11 @@ public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, 
     /// <c>x =&gt; …</c>, or as a trailing block <c>f { … }</c> whose single parameter is the
     /// implicit <c>it</c>. The formatter prints the form back; the meaning is the same.</summary>
     public LambdaForm Form { get; init; } = LambdaForm.Parenthesized;
+
+    /// <summary>The set the parenthesized form writes after its return type,
+    /// <c>(s: string): int throws ParseError =&gt; …</c> (design/v5/spec/08 Y11 F7); null where the
+    /// lambda's set comes from its position or from its body (05 E2 K3).</summary>
+    public ThrowsClause? Throws { get; init; }
 }
 
 public enum LambdaForm { Parenthesized, Bare, Trailing }

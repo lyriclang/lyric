@@ -40,7 +40,15 @@ public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span) 
 {
     public string?[]? Labels { get; init; }
 }
-public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span); // fn(A, B) -> R
+/// <summary><c>fn(A, B) -&gt; R</c>, and with a thrown set <c>fn(A) -&gt; R throws E</c>
+/// (design/v5/spec/03 T17, 05 E2): <see cref="Throws"/> is the TYPE's set, written after its return
+/// type. The nearest function type takes it — <c>fn() -&gt; fn() -&gt; int throws E</c> returns a
+/// throwing function — and a parenthesized return gives it to the outer one. Null when the type
+/// throws nothing.</summary>
+public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span)
+{
+    public ThrowsClause? Throws { get; init; }
+}
 
 // Recovery placeholder, set when ParseType cannot continue, so later stages do not meet a null.
 // The counterpart of ErrorExpr.

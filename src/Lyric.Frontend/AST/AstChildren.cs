@@ -342,6 +342,7 @@ public static class AstChildren
             case LambdaExpr l:
                 foreach (var p in l.Parameters) yield return p;
                 if (l.ReturnType is not null) yield return l.ReturnType;
+                if (l.Throws is not null) yield return l.Throws;
                 yield return l.Body;
                 break;
 
@@ -459,6 +460,7 @@ public static class AstChildren
             case FunctionType f:
                 foreach (var p in f.Parameters) yield return p;
                 yield return f.ReturnType;
+                if (f.Throws is not null) yield return f.Throws;
                 break;
 
             case ErrorType:

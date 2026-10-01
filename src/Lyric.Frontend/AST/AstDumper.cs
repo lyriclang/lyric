@@ -152,6 +152,7 @@ public static class AstDumper
                 Line(sb, indent, "Lambda", n.Span);
                 foreach (var p in n.Parameters) Write(p, indent + 1, sb);
                 if (n.ReturnType is not null) Write(n.ReturnType, indent + 1, sb);
+                if (n.Throws is not null) Write(n.Throws, indent + 1, sb);
                 Write(n.Body, indent + 1, sb);
                 break;
             case LambdaParam n:
@@ -199,6 +200,7 @@ public static class AstDumper
                 Line(sb, indent, "FunctionType", n.Span);
                 foreach (var p in n.Parameters) Write(p, indent + 1, sb);
                 Write(n.ReturnType, indent + 1, sb);
+                if (n.Throws is not null) Write(n.Throws, indent + 1, sb);
                 break;
             case ErrorType n:
                 Line(sb, indent, "ErrorType", n.Span);

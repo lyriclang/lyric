@@ -86,6 +86,80 @@ public class ErrorSyntaxTests
     public void An_empty_list_is_refused() =>
         Assert.Contains(ParseModule("fn f(): int throws [] { return 0; }").De.Diagnostics, d => d.Code == "LYR-PAR0049");
 
+    // --- the set of a function type and of a lambda (03 T17, 08 Y11 F7) ---
+
+    private static FunctionType ParamType(string declaration, int index = 0)
+    {
+        var (m, de) = ParseModule(declaration);
+        Assert.False(de.HasErrors, string.Join("; ", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        return Assert.IsType<FunctionType>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Parameters[index].Type);
+    }
+
+    [Fact]
+    public void A_function_type_carries_its_set()
+    {
+        Assert.Equal("E", Assert.IsType<NamedType>(Assert.Single(ParamType("fn f(g: fn(int) -> int throws E) { }").Throws!.Types)).Path[0]);
+        Assert.Equal(2, ParamType("fn f(g: fn() -> void throws [A, B]) { }").Throws!.Types.Length);
+        Assert.Empty(ParamType("fn f(g: fn() -> void throws) { }").Throws!.Types);
+        Assert.Null(ParamType("fn f(g: fn() -> void) { }").Throws);
+    }
+
+    [Fact]
+    public void A_comma_after_a_function_types_set_ends_the_type()
+    {
+        // No list rule here: the comma separates two parameters.
+        var (m, de) = ParseModule("fn f(g: fn() -> void throws A, b: int) { }");
+        Assert.False(de.HasErrors);
+        var fn = Assert.IsType<FunctionDecl>(m.Declarations[0]);
+        Assert.Equal(2, fn.Parameters.Length);
+        Assert.Single(Assert.IsType<FunctionType>(fn.Parameters[0].Type).Throws!.Types);
+    }
+
+    [Fact]
+    public void The_nearest_function_type_takes_the_set()
+    {
+        // In a return position too: the function returns a throwing function and throws nothing.
+        var (m, de) = ParseModule("fn f(): fn() -> int throws E { return g; }");
+        Assert.False(de.HasErrors);
+        var fn = Assert.IsType<FunctionDecl>(m.Declarations[0]);
+        Assert.Null(fn.Throws);
+        Assert.NotNull(Assert.IsType<FunctionType>(fn.ReturnType).Throws);
+
+        // Parenthesized, the function type is closed and the set is the declaration's.
+        (m, de) = ParseModule("fn f(): (fn() -> int) throws E { return g; }");
+        Assert.False(de.HasErrors);
+        fn = Assert.IsType<FunctionDecl>(m.Declarations[0]);
+        Assert.NotNull(fn.Throws);
+        Assert.Null(Assert.IsType<FunctionType>(fn.ReturnType).Throws);
+
+        // A function type returning one: the inner takes it.
+        var outer = ParamType("fn f(g: fn() -> fn() -> int throws E) { }");
+        Assert.Null(outer.Throws);
+        Assert.NotNull(Assert.IsType<FunctionType>(outer.ReturnType).Throws);
+    }
+
+    [Fact]
+    public void A_coroutine_keeps_its_suffix_outside_a_function_type()
+    {
+        var (m, de) = ParseModule("fn f(c: Coroutine<int> throws E) { }");
+        Assert.False(de.HasErrors);
+        Assert.IsType<ThrowingType>(Assert.IsType<FunctionDecl>(m.Declarations[0]).Parameters[0].Type);
+    }
+
+    [Fact]
+    public void A_parenthesized_lambda_may_write_its_set()
+    {
+        var (expr, de) = ParseExpr("(x: int): int throws [A, B] => x");
+        Assert.False(de.HasErrors);
+        Assert.Equal(2, Assert.IsType<LambdaExpr>(expr).Throws!.Types.Length);
+        Assert.Empty(Assert.IsType<LambdaExpr>(ParseExpr("(x: int): int throws => x").Expr).Throws!.Types);
+        Assert.Null(Assert.IsType<LambdaExpr>(ParseExpr("(x: int): int => x").Expr).Throws);
+    }
+
+    [Fact]
+    public void A_lambdas_set_follows_the_list_rule() =>
+        Assert.Contains(ParseExpr("(x: int): int throws A, B => x").De.Diagnostics, d => d.Code == "LYR-PAR0049");
+
     // --- the try mark ---
 
     [Fact]

@@ -113,7 +113,14 @@ public static class SignatureWriter
         NullableType n => "?" + Type(n.Inner),
         ArrayType a => Element(a.Element) + "[]",
         TupleType t2 => "(" + string.Join(", ", t2.Elements.Select(Type)) + ")",
-        FunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Type))}) -> {Type(f.ReturnType)}",
+        FunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Type))}) -> {Type(f.ReturnType)}"
+                           + f.Throws switch
+                           {
+                               null => "",
+                               { Types: [] } => " throws",
+                               { Types: [var one] } => $" throws {Type(one)}",
+                               { Types: var several } => $" throws [{string.Join(", ", several.Select(Type))}]",
+                           },
         ErrorType => "<error>",
         _ => "<unknown>",
     };
