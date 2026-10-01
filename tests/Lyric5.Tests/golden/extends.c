@@ -11,6 +11,8 @@ typedef struct lyr_ty2_List_string_ lyr_ty2_List_string_;
 typedef struct lyr_ty3_Pair_string__string_ lyr_ty3_Pair_string__string_;
 typedef struct lyr_ty4_Pair_int__string_ lyr_ty4_Pair_int__string_;
 typedef struct lyr_ty5_Box_int_ lyr_ty5_Box_int_;
+typedef struct lyr_vt_ty6 lyr_vt_ty6;
+const char lyr_ifid_ty6[] = "Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -41,6 +43,11 @@ struct lyr_ty4_Pair_int__string_ {
 };
 struct lyr_ty5_Box_int_ {
     int64_t f_v;
+};
+struct lyr_vt_ty6 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
@@ -329,26 +336,26 @@ bb0:;
     return t3;
 }
 
-#line 197 "stdlib5/std/core.lyr"
+#line 209 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this) {
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 197
+#line 209
     t0 = l0_this;
-#line 197
+#line 209
     t1 = lyr_str_from_int(t0);
-#line 197
+#line 209
     return t1;
 }
 
-#line 462 "stdlib5/std/core.lyr"
+#line 474 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 462
+#line 474
     t0 = l0_this;
-#line 462
+#line 474
     return t0;
 }
 

@@ -8,39 +8,53 @@ using Xunit;
 namespace Lyric.Tests.Sema;
 
 /// <summary>
-/// Exception sema: the Throwable constraint on throw, throws and catch (SEM0030), the try/catch
-/// structure (SEM0035, SEM0036), throws propagation over calls including interface widening and catch
-/// matching (SEM0034), throws functions as values (SEM0037), catch binding types (typeless becomes
-/// Throwable) and panic returning never. Runs over the full sema pipeline.
+/// Errors in the sema (design/v5/spec/05 E1–E3, E6; spec chapter 06 §1–§3): <c>std.core</c>'s
+/// <c>Error</c> as the root of everything thrown, caught and declared (SEM0030); the <c>throws</c>
+/// SET (SEM0137); the <c>try</c> mark on every throwing call (SEM0138) and the warning for a mark
+/// over nothing (SEM0139); coverage by a catch around the site or by the function's set, on the
+/// instance (SEM0034); an implementation throwing at most its member (SEM0042); throwing functions
+/// as values (SEM0037); the try/catch structure (SEM0035, SEM0036); panic returning never.
 /// </summary>
 public class ExceptionTests
 {
+    private const string Core = """
+        module std.core;
+        pub interface Error {
+            fn message(): string;
+            fn cause(): ?Error { return null; }
+        }
+        """;
+
     private const string Prelude = """
-        interface IOError { fn message(): string; }
-        class NotFound :: [Throwable] {
+        interface IOError :: [Error] { }
+        class NotFound :: [Error] {
             path: string,
             fn message(): string { return this.path; }
         }
-        class DbError :: [Throwable, IOError] {
+        class DbError :: [IOError] {
             fn message(): string { return "db"; }
         }
+        struct Box<T> :: [Error] { v: T, fn message(): string { return "box"; } }
+        enum Parse :: [Error] { Empty, Bad(int); fn message(): string { return "parse"; } }
         struct Plain { x: int }
         fn mayThrow(): int throws NotFound { return 1; }
         fn mayThrowDb(): int throws DbError { return 1; }
         fn mayThrowAny(): int throws { return 1; }
+        fn mayThrowBoth(): int throws [NotFound, Parse] { return 1; }
         fn safe(): int { return 1; }
         """;
 
     private static (TypeResult types, DiagnosticEngine de, Module module) Check(string source)
     {
         var sm = new SourceManager();
-        var id = sm.AddVirtual("test.lyr", source);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
+        var core = sm.AddVirtual("core.lyr", Core);
+        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var id = sm.AddVirtual("test.lyr", source);
         var module = new Parser(sm, id, de).ParseModule();
         comp.AddModule(module);
-        var binding = comp.Resolve();
-        var types = Semantics.Analyze(comp, binding, de);
+        var types = Semantics.Analyze(comp, comp.Resolve(), de);
         return (types, de, module);
     }
 
@@ -50,102 +64,151 @@ public class ExceptionTests
         Assert.False(de.HasErrors, string.Join("; ", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
 
     private static void AssertCode(DiagnosticEngine de, string code) =>
-        Assert.Contains(de.Diagnostics, d => d.Code == code);
+        Assert.True(de.Diagnostics.Any(d => d.Code == code),
+            $"expected {code}, got: " + string.Join("; ", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
 
-    // --- the Throwable constraint (SEM0030) ---
+    // --- what is thrown (SEM0030) ---
 
     [Fact]
-    public void Throw_of_throwable_class_is_clean()
-    {
+    public void Throw_of_an_error_class_is_clean() =>
         AssertClean(Diags("""fn t(): int throws NotFound { throw NotFound { path = "x" }; }"""));
-    }
 
     [Fact]
-    public void Throw_of_non_throwable_is_reported()
-    {
-        AssertCode(Diags("fn t() throws { throw Plain { x = 1 }; }"), "LYR-SEM0030");
-    }
-
-    [Fact]
-    public void Throws_clause_with_non_throwable_type_is_reported()
-    {
-        AssertCode(Diags("fn t(): int throws Plain { return 1; }"), "LYR-SEM0030");
-    }
-
-    [Fact]
-    public void Catch_of_non_throwable_type_is_reported()
-    {
-        AssertCode(Diags("fn t() { try { safe(); } catch (e: Plain) { } }"), "LYR-SEM0030");
-    }
-
-    // --- try/catch-Struktur (SEM0035/0036) ---
-
-    [Fact]
-    public void Catch_all_must_be_last()
-    {
-        AssertCode(Diags("fn t() { try { safe(); } catch (e) { } catch (x: NotFound) { } }"), "LYR-SEM0035");
-    }
-
-    [Fact]
-    public void Try_without_catch_is_reported()
-    {
-        AssertCode(Diags("fn t() { try { safe(); } }"), "LYR-SEM0036");
-    }
-
-    // --- catch bindings ---
-
-    [Fact]
-    public void Untyped_catch_binds_throwable_with_message()
-    {
-        // e: Throwable, so e.message() is a string; no SEM0018 on e, because the catch assigns it.
-        AssertClean(Diags("fn t() { try { safe(); } catch (e) { let m: string = e.message(); } }"));
-    }
-
-    [Fact]
-    public void Typed_catch_binds_the_declared_type()
-    {
+    public void An_enum_and_a_generic_struct_are_throwable() =>
         AssertClean(Diags("""
-            fn t() {
-                try { mayThrow(); } catch (e: NotFound) { let p: string = e.path; }
+            fn t(n: int): int throws [Parse, Box<int>] {
+                if (n > 0) { throw Parse.Bad(n); }
+                throw Box<int> { v = n };
             }
             """));
-    }
-
-    // --- propagation: handling through a try ---
 
     [Fact]
-    public void Unhandled_call_is_reported()
-    {
-        AssertCode(Diags("fn t() { let x = mayThrow(); }"), "LYR-SEM0034");
-    }
+    public void An_interface_value_of_an_error_is_throwable() =>
+        AssertClean(Diags("fn t(e: IOError): int throws IOError { throw e; }"));
 
     [Fact]
-    public void Call_handled_by_matching_catch_is_clean()
+    public void Throw_of_a_non_error_is_reported() =>
+        AssertCode(Diags("fn t() throws { throw Plain { x = 1 }; }"), "LYR-SEM0030");
+
+    [Fact]
+    public void A_number_is_not_thrown() =>
+        AssertCode(Diags("fn t() throws { throw 5; }"), "LYR-SEM0030");
+
+    [Fact]
+    public void Throws_clause_with_a_non_error_type_is_reported() =>
+        AssertCode(Diags("fn t(): int throws Plain { return 1; }"), "LYR-SEM0030");
+
+    [Fact]
+    public void Catch_of_a_non_error_type_is_reported() =>
+        AssertCode(Diags("fn t() { try { safe(); } catch (e: Plain) { } }"), "LYR-SEM0030");
+
+    [Fact]
+    public void A_refused_throw_is_not_reported_twice()
     {
+        var de = Diags("fn t(): int throws NotFound { throw 5; }");
+        Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        AssertCode(de, "LYR-SEM0030");
+    }
+
+    // --- the throws set (SEM0137) ---
+
+    [Fact]
+    public void A_set_names_each_type_once() =>
+        AssertCode(Diags("fn t(): int throws [NotFound, NotFound] { return 1; }"), "LYR-SEM0137");
+
+    [Fact]
+    public void The_bare_throws_is_the_root() =>
+        AssertClean(Diags("fn t(): int throws { return try mayThrowBoth(); }"));
+
+    [Fact]
+    public void A_set_covers_each_of_its_types() =>
+        AssertClean(Diags("fn t(): int throws [Parse, NotFound] { return try mayThrowBoth(); }"));
+
+    [Fact]
+    public void A_set_missing_one_type_does_not_cover_the_call() =>
+        AssertCode(Diags("fn t(): int throws NotFound { return try mayThrowBoth(); }"), "LYR-SEM0034");
+
+    // --- the try mark (SEM0138, SEM0139) ---
+
+    [Fact]
+    public void An_unmarked_call_is_reported() =>
+        AssertCode(Diags("fn t(): int throws NotFound { return mayThrow(); }"), "LYR-SEM0138");
+
+    [Fact]
+    public void Try_covers_everything_to_its_right() =>
+        AssertClean(Diags("fn t(): int throws NotFound { return try mayThrow() + mayThrow(); }"));
+
+    [Fact]
+    public void A_try_block_marks_its_body() =>
         AssertClean(Diags("fn t() { try { let x = mayThrow(); } catch (e: NotFound) { } }"));
+
+    [Fact]
+    public void A_try_over_nothing_that_throws_warns()
+    {
+        var de = Diags("fn t(): int { return try safe(); }");
+        AssertClean(de);
+        AssertCode(de, "LYR-SEM0139");
     }
 
     [Fact]
-    public void Call_handled_by_interface_catch_is_clean()
+    public void A_try_block_over_nothing_that_throws_warns()
     {
+        var de = Diags("fn t() { try { safe(); } catch (_) { } }");
+        AssertClean(de);
+        AssertCode(de, "LYR-SEM0139");
+    }
+
+    [Fact]
+    public void A_throw_needs_no_mark() =>
+        AssertClean(Diags("""fn t(): int throws NotFound { throw NotFound { path = "x" }; }"""));
+
+    [Fact]
+    public void A_marked_statement_is_the_call_it_marks() =>
+        AssertClean(Diags("fn t() throws NotFound { try mayThrow(); }"));
+
+    // --- coverage (SEM0034) ---
+
+    [Fact]
+    public void A_marked_call_nothing_covers_is_reported() =>
+        AssertCode(Diags("fn t(): int { return try mayThrow(); }"), "LYR-SEM0034");
+
+    [Fact]
+    public void Coverage_is_on_the_instance()
+    {
+        AssertCode(Diags("""fn t(): int throws Box<int> { throw Box<string> { v = "s" }; }"""), "LYR-SEM0034");
+        AssertClean(Diags("""fn t(): int throws Box<string> { throw Box<string> { v = "s" }; }"""));
+    }
+
+    [Fact]
+    public void Call_covered_by_interface_throws_is_clean() =>
+        AssertClean(Diags("fn t(): int throws IOError { return try mayThrowDb(); }"));
+
+    [Fact]
+    public void Interface_throws_does_not_cover_unrelated_type() =>
+        AssertCode(Diags("fn t(): int throws IOError { return try mayThrow(); }"), "LYR-SEM0034");
+
+    [Fact]
+    public void Call_handled_by_matching_catch_is_clean() =>
+        AssertClean(Diags("fn t() { try { let x = mayThrow(); } catch (e: NotFound) { } }"));
+
+    [Fact]
+    public void Call_handled_by_interface_catch_is_clean() =>
         AssertClean(Diags("fn t() { try { mayThrowDb(); } catch (e: IOError) { } }"));
-    }
 
     [Fact]
-    public void Call_handled_by_catch_all_is_clean()
-    {
+    public void Call_handled_by_catch_all_is_clean() =>
         AssertClean(Diags("fn t() { try { mayThrow(); } catch (_) { } }"));
-    }
 
     [Fact]
-    public void Non_matching_catch_does_not_handle()
-    {
+    public void A_catch_of_the_root_covers_everything() =>
+        AssertClean(Diags("fn t() { try { mayThrowAny(); } catch (e: Error) { } }"));
+
+    [Fact]
+    public void Non_matching_catch_does_not_handle() =>
         AssertCode(Diags("fn t() { try { mayThrow(); } catch (e: DbError) { } }"), "LYR-SEM0034");
-    }
 
     [Fact]
-    public void Outer_try_handles_through_inner()
-    {
+    public void Outer_try_handles_through_inner() =>
         AssertClean(Diags("""
             fn t() {
                 try {
@@ -153,96 +216,104 @@ public class ExceptionTests
                 } catch (e: NotFound) { }
             }
             """));
-    }
-
-    // --- propagation: handling through an own throws clause ---
 
     [Fact]
-    public void Call_covered_by_exact_throws_is_clean()
-    {
-        AssertClean(Diags("fn t(): int throws NotFound { return mayThrow(); }"));
-    }
-
-    [Fact]
-    public void Call_covered_by_untyped_throws_is_clean()
-    {
-        AssertClean(Diags("fn t(): int throws { return mayThrow(); }"));
-    }
-
-    [Fact]
-    public void Call_covered_by_interface_throws_is_clean()
-    {
-        AssertClean(Diags("fn t(): int throws IOError { return mayThrowDb(); }"));
-    }
-
-    [Fact]
-    public void Interface_throws_does_not_cover_unrelated_type()
-    {
-        AssertCode(Diags("fn t(): int throws IOError { return mayThrow(); }"), "LYR-SEM0034");
-    }
-
-    [Fact]
-    public void Untyped_throws_call_needs_catch_all_or_untyped_clause()
+    public void A_bare_throws_call_needs_a_catch_all_or_a_bare_clause()
     {
         AssertCode(Diags("fn t() { try { mayThrowAny(); } catch (e: NotFound) { } }"), "LYR-SEM0034");
-        AssertClean(Diags("fn u(): int throws { return mayThrowAny(); }"));
+        AssertClean(Diags("fn u(): int throws { return try mayThrowAny(); }"));
         AssertClean(Diags("fn v() { try { mayThrowAny(); } catch (_) { } }"));
     }
 
     // --- catch bodies, rethrow, defer ---
 
     [Fact]
-    public void Throw_in_catch_body_is_not_caught_by_its_own_try()
-    {
-        AssertCode(Diags("fn t() { try { safe(); } catch (e) { throw e; } }"), "LYR-SEM0034");
-    }
+    public void Throw_in_catch_body_is_not_caught_by_its_own_try() =>
+        AssertCode(Diags("fn t() { try { mayThrow(); } catch (e) { throw e; } }"), "LYR-SEM0034");
 
     [Fact]
-    public void Rethrow_with_untyped_throws_is_clean()
-    {
+    public void Rethrow_with_bare_throws_is_clean() =>
         AssertClean(Diags("fn t(): int throws { try { return mayThrow(); } catch (e) { throw e; } }"));
-    }
 
     [Fact]
-    public void Defer_body_participates_in_propagation()
+    public void A_defer_body_is_a_site_of_its_scope()
     {
-        AssertCode(Diags("fn t() { defer mayThrow(); }"), "LYR-SEM0034");
-        AssertClean(Diags("fn u() throws NotFound { defer mayThrow(); }"));
+        AssertCode(Diags("fn t() { defer try mayThrow(); }"), "LYR-SEM0034");
+        AssertCode(Diags("fn w() throws NotFound { defer mayThrow(); }"), "LYR-SEM0138");
+        AssertClean(Diags("fn u() throws NotFound { defer try mayThrow(); }"));
     }
 
     // --- lambdas and context boundaries ---
 
     [Fact]
-    public void Lambda_body_is_its_own_context()
+    public void A_lambda_body_is_its_own_context()
     {
-        AssertCode(Diags("fn t() { let f = (x: int) => mayThrow(); }"), "LYR-SEM0034");
+        // Its function declares the type; the lambda, which runs later, does not — and cannot yet.
+        AssertCode(Diags("fn t() throws NotFound { let f = (x: int) => try mayThrow(); }"), "LYR-SEM0034");
+        AssertCode(Diags("fn t() throws NotFound { let f = (x: int) => mayThrow(); }"), "LYR-SEM0138");
     }
 
     [Fact]
-    public void Enclosing_try_does_not_protect_lambda_bodies()
-    {
-        AssertCode(Diags("fn t() { try { let f = (x: int) => mayThrow(); } catch (_) { } }"), "LYR-SEM0034");
-    }
+    public void An_enclosing_try_does_not_mark_lambda_bodies() =>
+        AssertCode(Diags("fn t() { try { let f = (x: int) => mayThrow(); } catch (_) { } }"), "LYR-SEM0138");
 
     [Fact]
-    public void Global_initializer_has_no_handler()
+    public void A_global_initializer_has_no_handler()
     {
-        AssertCode(Diags("let g = mayThrow();"), "LYR-SEM0034");
+        AssertCode(Diags("let g = try mayThrow();"), "LYR-SEM0034");
+        AssertCode(Diags("let g = mayThrow();"), "LYR-SEM0138");
+    }
+
+    // --- an implementation throws at most its member (K6, SEM0042) ---
+
+    [Fact]
+    public void An_implementation_throws_at_most_its_member()
+    {
+        const string risky = "interface Risky { fn run(): int throws IOError; }\n";
+        AssertClean(Diags(risky + "struct S :: [Risky] { fn run(): int throws DbError { return 1; } }"));
+        AssertClean(Diags(risky + "struct S :: [Risky] { fn run(): int { return 1; } }"));
+        AssertCode(Diags(risky + "struct S :: [Risky] { fn run(): int throws NotFound { return 1; } }"), "LYR-SEM0042");
+    }
+
+    // --- main may throw (08 D18) ---
+
+    [Fact]
+    public void Main_may_declare_throws()
+    {
+        AssertClean(Diags("fn main(): int throws NotFound { return try mayThrow(); }"));
+        AssertClean(Diags("fn main(): void throws { try mayThrowAny(); }"));
     }
 
     // --- a throws function as a value (SEM0037) ---
 
     [Fact]
-    public void Throws_function_as_value_is_reported()
-    {
+    public void Throws_function_as_value_is_reported() =>
         AssertCode(Diags("fn t() { let f = mayThrow; }"), "LYR-SEM0037");
-    }
 
     [Fact]
-    public void Plain_function_as_value_is_fine()
-    {
+    public void Plain_function_as_value_is_fine() =>
         AssertClean(Diags("fn t() { let f = safe; }"));
-    }
+
+    // --- try/catch structure (SEM0035/0036) ---
+
+    [Fact]
+    public void Catch_all_must_be_last() =>
+        AssertCode(Diags("fn t() { try { mayThrow(); } catch (e) { } catch (x: NotFound) { } }"), "LYR-SEM0035");
+
+    [Fact]
+    public void Try_without_catch_is_reported() =>
+        AssertCode(Diags("fn t() { try { safe(); } }"), "LYR-SEM0036");
+
+    // --- catch bindings ---
+
+    [Fact]
+    public void Untyped_catch_binds_the_root_with_message() =>
+        // e: Error, so e.message() is a string; no SEM0018 on e, because the catch assigns it.
+        AssertClean(Diags("fn t() { try { mayThrow(); } catch (e) { let m: string = e.message(); } }"));
+
+    [Fact]
+    public void Typed_catch_binds_the_declared_type() =>
+        AssertClean(Diags("fn t() { try { mayThrow(); } catch (e: NotFound) { let p: string = e.path; } }"));
 
     // --- panic: never diverges but does not throw ---
 
@@ -254,31 +325,25 @@ public class ExceptionTests
     }
 
     [Fact]
-    public void Panic_needs_no_throws_declaration()
-    {
+    public void Panic_needs_no_throws_declaration() =>
         AssertClean(Diags("""fn t() { panic("boom"); }"""));
-    }
 
     // --- every initializer is a site, including the one a destructuring requires ---
 
     /// <summary>
     /// A destructuring binding was the one statement the walk had no case for, so its initializer
     /// was never a call site at all: <c>let (a, b) = mk();</c> with a throwing <c>mk</c> compiled
-    /// clean in a function that declares nothing, and the program ended as <c>LYR-VM0010</c> —
-    /// the panic §9.2 describes as unreachable from source.
+    /// clean in a function that declares nothing.
     /// </summary>
     [Fact]
-    public void A_destructuring_initializer_is_a_call_site()
-    {
+    public void A_destructuring_initializer_is_a_call_site() =>
         AssertCode(Diags("""
             fn pair(): (int, int) throws NotFound { return (1, 2); }
             fn t(): int { let (a, b) = pair(); return a + b; }
-            """), "LYR-SEM0034");
-    }
+            """), "LYR-SEM0138");
 
     [Fact]
-    public void A_handled_destructuring_initializer_is_clean()
-    {
+    public void A_handled_destructuring_initializer_is_clean() =>
         AssertClean(Diags("""
             fn pair(): (int, int) throws NotFound { return (1, 2); }
             fn t(): int {
@@ -286,5 +351,4 @@ public class ExceptionTests
                 catch (e: NotFound) { return 0; }
             }
             """));
-    }
 }

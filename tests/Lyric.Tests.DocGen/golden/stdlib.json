@@ -1837,7 +1837,7 @@
     },
     {
       "Path": "std.core",
-      "Doc": "What the language itself needs: aborting with a reason, the ready-made `Throwable`, and the\ninterfaces the built-in types satisfy.\n\n`panic` and `coroutineEnded` are bound by the compiler, so nothing has to import this module to\nreach them.",
+      "Doc": "What the language itself needs: aborting with a reason, the root `Error` with the ready-made\n`Exception`, and the interfaces the built-in types satisfy.\n\n`panic` and `coroutineEnded` are bound by the compiler, so nothing has to import this module to\nreach them.",
       "Items": [
         {
           "Kind": "Function",
@@ -1895,10 +1895,44 @@
           }
         },
         {
+          "Kind": "Interface",
+          "Name": "Error",
+          "Signature": "pub interface Error",
+          "Doc": "The root of everything thrown, caught and declared: a struct, a class or an enum that conforms.",
+          "Members": [
+            {
+              "Kind": "Method",
+              "Name": "message",
+              "Signature": "fn message(): string",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 77
+              }
+            },
+            {
+              "Kind": "Method",
+              "Name": "cause",
+              "Signature": "fn cause(): ?Error",
+              "Doc": null,
+              "Members": [],
+              "Source": {
+                "File": "stdlib/std/core.lyr",
+                "Line": 79
+              }
+            }
+          ],
+          "Source": {
+            "File": "stdlib/std/core.lyr",
+            "Line": 76
+          }
+        },
+        {
           "Kind": "Class",
           "Name": "Exception",
-          "Signature": "pub class Exception :: [Throwable]",
-          "Doc": "The ready-made `Throwable` for throwing a message: `throw Exception { text = \"…\" };`.",
+          "Signature": "pub class Exception :: [Error]",
+          "Doc": "The ready-made `Error` for throwing a message: `throw Exception { text = \"…\" };`.",
           "Members": [
             {
               "Kind": "Field",
@@ -1908,7 +1942,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 80
+                "Line": 94
               }
             },
             {
@@ -1919,13 +1953,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 83
+                "Line": 97
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 78
+            "Line": 92
           }
         },
         {
@@ -1942,13 +1976,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 103
+                "Line": 117
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 101
+            "Line": 115
           }
         },
         {
@@ -1965,13 +1999,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 157
+                "Line": 171
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 155
+            "Line": 169
           }
         },
         {
@@ -1988,13 +2022,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 169
+                "Line": 183
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 167
+            "Line": 181
           }
         },
         {
@@ -2011,13 +2045,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 178
+                "Line": 192
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 175
+            "Line": 189
           }
         },
         {
@@ -2034,13 +2068,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 360
+                "Line": 374
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 358
+            "Line": 372
           }
         },
         {
@@ -2057,13 +2091,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 366
+                "Line": 380
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 364
+            "Line": 378
           }
         },
         {
@@ -2080,13 +2114,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 372
+                "Line": 386
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 370
+            "Line": 384
           }
         },
         {
@@ -2103,13 +2137,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 379
+                "Line": 393
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 376
+            "Line": 390
           }
         },
         {
@@ -2126,13 +2160,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 475
+                "Line": 489
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 473
+            "Line": 487
           }
         },
         {
@@ -2143,7 +2177,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 483
+            "Line": 497
           }
         },
         {
@@ -2154,7 +2188,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 486
+            "Line": 500
           }
         },
         {
@@ -2165,7 +2199,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 489
+            "Line": 503
           }
         },
         {
@@ -2176,7 +2210,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 495
+            "Line": 509
           }
         },
         {
@@ -2193,7 +2227,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 502
+                "Line": 516
               }
             },
             {
@@ -2204,13 +2238,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 509
+                "Line": 523
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 500
+            "Line": 514
           }
         },
         {
@@ -2221,7 +2255,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 521
+            "Line": 535
           }
         },
         {
@@ -2232,7 +2266,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 530
+            "Line": 544
           }
         },
         {
@@ -2243,7 +2277,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 536
+            "Line": 550
           }
         },
         {
@@ -2260,13 +2294,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 565
+                "Line": 579
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 564
+            "Line": 578
           }
         },
         {
@@ -2283,7 +2317,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 571
+                "Line": 585
               }
             },
             {
@@ -2294,13 +2328,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 572
+                "Line": 586
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 570
+            "Line": 584
           }
         },
         {
@@ -2317,7 +2351,7 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 577
+                "Line": 591
               }
             },
             {
@@ -2328,13 +2362,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 578
+                "Line": 592
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 576
+            "Line": 590
           }
         },
         {
@@ -2351,13 +2385,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 583
+                "Line": 597
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 582
+            "Line": 596
           }
         },
         {
@@ -2374,13 +2408,13 @@
               "Members": [],
               "Source": {
                 "File": "stdlib/std/core.lyr",
-                "Line": 588
+                "Line": 602
               }
             }
           ],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 587
+            "Line": 601
           }
         },
         {
@@ -2391,7 +2425,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 592
+            "Line": 606
           }
         },
         {
@@ -2402,7 +2436,7 @@
           "Members": [],
           "Source": {
             "File": "stdlib/std/core.lyr",
-            "Line": 597
+            "Line": 611
           }
         }
       ]
@@ -2414,7 +2448,7 @@
         {
           "Kind": "Class",
           "Name": "EncodingError",
-          "Signature": "pub class EncodingError :: [Throwable]",
+          "Signature": "pub class EncodingError :: [Error]",
           "Doc": "Where and why a text was refused: the 0-based character offset of the refusal, and what the\ndecoder expected there.",
           "Members": [
             {
@@ -3068,7 +3102,7 @@
         {
           "Kind": "Class",
           "Name": "IoError",
-          "Signature": "pub class IoError :: [Throwable]",
+          "Signature": "pub class IoError :: [Error]",
           "Doc": "The reason an I/O operation failed: which kind, on which path, and what the platform said.\n\n§9.0's answer to \"why not?\" — the silent forms (`text`, `writeText`, …) answer only whether.",
           "Members": [
             {
@@ -5913,7 +5947,7 @@
         {
           "Kind": "Class",
           "Name": "JsonError",
-          "Signature": "pub class JsonError :: [Throwable]",
+          "Signature": "pub class JsonError :: [Error]",
           "Doc": "Where and why a document was refused: the first place the parser could not continue, and\nwhat it expected there. `line` and `column` are 1-based and counted in code points.",
           "Members": [
             {
@@ -7218,7 +7252,7 @@
           "Kind": "Enum",
           "Name": "Result",
           "Signature": "pub enum Result<T, E>",
-          "Doc": "The outcome of something that can fail: the value, or the reason it did not happen.\n\nTwo variants and nothing else, so a `match` covers it with two arms. The reason type `E` is\nunconstrained — a `string` is a fine reason for a config line, and `orThrow` alone asks for\na `Throwable`.",
+          "Doc": "The outcome of something that can fail: the value, or the reason it did not happen.\n\nTwo variants and nothing else, so a `match` covers it with two arms. The reason type `E` is\nunconstrained — a `string` is a fine reason for a config line, and `orThrow` alone asks for\na `Error`.",
           "Members": [
             {
               "Kind": "Variant",
@@ -7372,8 +7406,8 @@
         {
           "Kind": "Function",
           "Name": "orThrow",
-          "Signature": "pub fn orThrow<T, E :: [Throwable]>(r: Result<T, E>): T throws E",
-          "Doc": "The value, or the reason THROWN — the bridge from the value form back to the language's\nmechanism, for the moment a stored failure is finally handled.\n\nThe catch that goes with it is `catch (e: Throwable)` today: the compiler substitutes a\nthrows clause's type parameter at no call site yet, so a `catch (e: IoError)` beside it is\nreported as not covering. That is a compiler limitation, not a property of this function.",
+          "Signature": "pub fn orThrow<T, E :: [Error]>(r: Result<T, E>): T throws E",
+          "Doc": "The value, or the reason THROWN — the bridge from the value form back to the language's\nmechanism, for the moment a stored failure is finally handled.\n\nThe catch that goes with it is `catch (e: Error)` today: the compiler substitutes a\nthrows clause's type parameter at no call site yet, so a `catch (e: IoError)` beside it is\nreported as not covering. That is a compiler limitation, not a property of this function.",
           "Members": [],
           "Source": {
             "File": "stdlib/std/result.lyr",
@@ -7499,7 +7533,7 @@
         {
           "Kind": "Class",
           "Name": "Utf8Error",
-          "Signature": "pub class Utf8Error :: [Throwable]",
+          "Signature": "pub class Utf8Error :: [Error]",
           "Doc": "Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.",
           "Members": [
             {
@@ -7710,7 +7744,7 @@
         {
           "Kind": "Class",
           "Name": "ParseError",
-          "Signature": "pub class ParseError :: [Throwable]",
+          "Signature": "pub class ParseError :: [Error]",
           "Doc": "Why a text is not a number: which kind, and at which code-point offset the reading stopped.\n\nThe carrier-plus-kind shape of `std.io.error.IoError`: a class that throws, holding an enum\nthat matches, so a kind can be added without breaking a `match` over the ones known.",
           "Members": [
             {
@@ -8271,7 +8305,7 @@
         {
           "Kind": "Class",
           "Name": "TimeError",
-          "Signature": "pub class TimeError :: [Throwable]",
+          "Signature": "pub class TimeError :: [Error]",
           "Doc": "A failed reading of a time text: what was handed in, and what broke.",
           "Members": [
             {

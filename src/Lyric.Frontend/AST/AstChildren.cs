@@ -58,7 +58,7 @@ public static class AstChildren
                 break;
 
             case ThrowsClause t:
-                if (t.Type is not null) yield return t.Type;
+                foreach (var thrown in t.Types) yield return thrown;
                 break;
 
             // The ABI and the symbol are strings, not nodes: a leaf.
@@ -262,6 +262,10 @@ public static class AstChildren
 
             case ThrowExpr te:
                 yield return te.Value;
+                break;
+
+            case TryExpr tr:
+                yield return tr.Value;
                 break;
 
             case PostfixExpr p:

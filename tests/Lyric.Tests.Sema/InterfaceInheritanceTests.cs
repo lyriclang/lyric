@@ -174,11 +174,11 @@ public class InterfaceInheritanceTests
     }
 
     [Fact]
-    public void A_throws_clause_accepts_a_type_whose_chain_reaches_Throwable()
+    public void A_throws_clause_accepts_a_type_whose_chain_reaches_Error()
     {
         var de = Check(
             """
-            interface AppError :: [Throwable] {
+            interface AppError :: [Error] {
                 fn code(): int;
             }
 

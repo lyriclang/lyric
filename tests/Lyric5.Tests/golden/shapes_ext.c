@@ -5,9 +5,16 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0__tuple_ lyr_ty0__tuple_;
+typedef struct lyr_vt_ty1 lyr_vt_ty1;
+const char lyr_ifid_ty1[] = "Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     LyrStr *f_1;
+};
+struct lyr_vt_ty1 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { int64_t *ptr; int64_t len; } lyr_slice_i64;

@@ -17,6 +17,8 @@ typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "Walker";
 typedef struct lyr_ty7_Legs lyr_ty7_Legs;
 typedef struct lyr_ty8_Wheels lyr_ty8_Wheels;
+typedef struct lyr_vt_ty9 lyr_vt_ty9;
+const char lyr_ifid_ty9[] = "Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -70,6 +72,11 @@ struct lyr_ty8_Wheels {
 _Static_assert(sizeof(lyr_ty8_Wheels) == 8, "layout of lyr_ty8_Wheels");
 extern const LyrItable lyr_itab_ty8[];
 const LyrDesc lyr_desc_ty8_Wheels = { sizeof(lyr_ty8_Wheels), 0, 0, 0, NULL, "main.Wheels", lyr_itab_ty8 };
+struct lyr_vt_ty9 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 typedef struct { LyrObj header; lyr_ty2_Person value; } lyr_box_ty2_Person;
 _Static_assert(sizeof(lyr_box_ty2_Person) == 16, "layout of lyr_box_ty2_Person");
 _Static_assert(offsetof(lyr_box_ty2_Person, value) == 8, "layout of lyr_box_ty2_Person");

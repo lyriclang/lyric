@@ -229,7 +229,7 @@ public static class TypeFacts
             case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ">";
             case CoroutineOf co:
                 return "Coroutine<" + Display(co.Yield) + "> throws "
-                       + (co.Throws is NamedRef { Symbol.Name: "Throwable" } ? "" : Display(co.Throws!));
+                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : Display(co.Throws!));
             case NullType: return "null";
             case NeverType: return "never";
             case ErrorType: return "<error>";

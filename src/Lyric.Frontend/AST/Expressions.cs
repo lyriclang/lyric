@@ -50,6 +50,14 @@ public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
 // 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
 // ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
 public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
+/// <summary><c>try e</c> (design/v5/spec/05 E1, E4; 08 Y4): marks every throw site in <c>e</c> —
+/// the whole expression to its right (<c>try a + b</c> is <c>try (a + b)</c>) — as propagated to the
+/// enclosing function, or to a <c>catch</c> around it. The value is <c>e</c>'s.</summary>
+public sealed record TryExpr(Expr Value, Span Span) : Expr(Span)
+{
+    /// <summary>The <c>try</c> keyword alone, where a diagnostic about the mark itself points.</summary>
+    public required Span KeywordSpan { get; init; }
+}
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment

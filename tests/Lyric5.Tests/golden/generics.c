@@ -8,6 +8,8 @@ typedef struct lyr_ty0_Pair_int__string_ lyr_ty0_Pair_int__string_;
 typedef struct lyr_ty1_Pair_string__int_ lyr_ty1_Pair_string__int_;
 typedef struct lyr_ty2_Counter lyr_ty2_Counter;
 typedef struct lyr_ty3_Pair_int__bool_ lyr_ty3_Pair_int__bool_;
+typedef struct lyr_vt_ty4 lyr_vt_ty4;
+const char lyr_ifid_ty4[] = "Error";
 struct lyr_ty0_Pair_int__string_ {
     int64_t f_first;
     LyrStr *f_second;
@@ -22,6 +24,11 @@ struct lyr_ty2_Counter {
 struct lyr_ty3_Pair_int__bool_ {
     int64_t f_first;
     uint8_t f_second;
+};
+struct lyr_vt_ty4 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");

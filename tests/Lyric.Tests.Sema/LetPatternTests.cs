@@ -15,12 +15,19 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class LetPatternTests
 {
+    // The root of what is thrown (design/v5/spec/05 E6 O1), for the one test that throws.
+    private const string Core = """
+        module std.core;
+        pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }
+        """;
+
     private static DiagnosticEngine Check(string source)
     {
         var sm = new SourceManager();
-        var id = sm.AddVirtual("test.lyr", source);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
+        comp.AddModule(new Parser(sm, sm.AddVirtual("core.lyr", Core), de).ParseModule());
+        var id = sm.AddVirtual("test.lyr", source);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();
         Semantics.Analyze(comp, binding, de);
@@ -136,10 +143,11 @@ public class LetPatternTests
     public void A_throwing_initializer_in_a_let_else_is_seen_by_the_exception_analysis()
     {
         var de = Check("""
-            fn risky(): ?int throws Exception { return 1; }
+            class Oops :: [Error] { fn message(): string { return "oops"; } }
+            fn risky(): ?int throws Oops { return 1; }
             fn f(): int { let v = risky() else { return 0; }; return v; }
             """);
-        // 'f' does not declare throws: the initializer's throw must be reported, not lost.
-        Assert.Contains(de.Diagnostics, d => d.Code.StartsWith("LYR-SEM", StringComparison.Ordinal) && d.Message.Contains("throw"));
+        // The initializer is a throwing call, and it is seen: unmarked, as the missing 'try'.
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138" && d.Message.Contains("risky"));
     }
 }

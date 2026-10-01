@@ -64,6 +64,18 @@ pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
     return arrayOf(m * n, (i: int) => xs[i % m].clone());
 }
 
+/// The root of everything thrown, caught and declared (design/v5/spec/05 E6 O1): a struct, a class
+/// or an enum that conforms is throwable (E3), an enum the natural form —
+/// `enum ParseError :: [Error] { Empty, BadDigit(char, int) }`. `cause` names the error this one
+/// wraps, for a report that walks the chain; the wrapping is the type's own field (O2).
+pub interface Error {
+    fn message(): string;
+
+    fn cause(): ?Error {
+        return null;
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // The operator interfaces (design/v5/spec/04 D6). 'a + b' is exactly 'a.add(b)': the conformance
 // is chosen by the static type of 'b', the result is the conformer's 'Out' — 'Self' unless it

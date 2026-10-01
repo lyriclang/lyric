@@ -15,6 +15,8 @@ typedef struct lyr_ty7_Shape_Empty lyr_ty7_Shape_Empty;
 typedef struct lyr_ty8_Opt_Shape_ lyr_ty8_Opt_Shape_;
 typedef struct lyr_ty9_Opt_Shape__Some lyr_ty9_Opt_Shape__Some;
 typedef struct lyr_ty10_Opt_Shape__None lyr_ty10_Opt_Shape__None;
+typedef struct lyr_vt_ty11 lyr_vt_ty11;
+const char lyr_ifid_ty11[] = "Error";
 struct lyr_ty1_Signal_Red {
     uint8_t lyr_unit;
 };
@@ -46,6 +48,11 @@ struct lyr_ty10_Opt_Shape__None {
 };
 struct lyr_ty8_Opt_Shape_ { uint32_t tag; union { lyr_ty9_Opt_Shape__Some v0; } as; };
 _Static_assert(sizeof(lyr_ty8_Opt_Shape_) == 32, "layout of lyr_ty8_Opt_Shape_");
+struct lyr_vt_ty11 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("red");

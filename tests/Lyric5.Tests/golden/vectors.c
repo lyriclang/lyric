@@ -11,6 +11,8 @@ typedef struct lyr_ty3_Ordering_Equal lyr_ty3_Ordering_Equal;
 typedef struct lyr_ty4_Ordering_Greater lyr_ty4_Ordering_Greater;
 typedef struct lyr_ty5_Bits lyr_ty5_Bits;
 typedef struct lyr_ty6_Partial lyr_ty6_Partial;
+typedef struct lyr_vt_ty7 lyr_vt_ty7;
+const char lyr_ifid_ty7[] = "Error";
 struct lyr_ty0_V {
     int64_t f_x;
     int64_t f_y;
@@ -31,6 +33,11 @@ struct lyr_ty5_Bits {
 };
 struct lyr_ty6_Partial {
     int64_t f_v;
+};
+struct lyr_vt_ty7 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 
 /* string literals */
@@ -1919,19 +1926,19 @@ bb0:;
     return t4;
 }
 
-#line 198 "stdlib5/std/core.lyr"
+#line 210 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 198
+#line 210
     t0 = l0_this;
-#line 198
+#line 210
     t1 = l1_rhs;
-#line 198
+#line 210
     t2 = LYR_CHECKED_ADD(t0, t1);
-#line 198
+#line 210
     return t2;
 }
 

@@ -444,7 +444,7 @@ public sealed class Resolver
         var sig = fsym is { Generics.Length: > 0 } ? WithGenerics(scope, fsym.Generics) : scope;
         foreach (var p in fn.Parameters) BindType(p.Type, sig);
         if (fn.ReturnType is not null) BindType(fn.ReturnType, sig);
-        if (fn.Throws?.Type is not null) BindType(fn.Throws.Type, sig);
+        foreach (var thrown in fn.Throws?.Types ?? []) BindType(thrown, sig);
         foreach (var g in fn.Generics)
             foreach (var c in g.Constraints)
                 BindType(c, sig);

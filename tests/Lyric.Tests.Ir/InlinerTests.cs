@@ -130,7 +130,7 @@ public class InlinerTests
     public void A_caller_with_handlers_is_left_alone()
     {
         var module = Optimized("""
-            class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+            class Boom :: [Error] { fn message(): string { return "boom"; } }
 
             fn risky(): int { return 1; }
 
@@ -148,7 +148,7 @@ public class InlinerTests
     public void A_callee_with_handlers_is_not_spliced()
     {
         var module = Optimized("""
-            class Boom :: [Throwable] { fn message(): string { return "boom"; } }
+            class Boom :: [Error] { fn message(): string { return "boom"; } }
 
             fn guarded(): int {
                 try { return 1; }

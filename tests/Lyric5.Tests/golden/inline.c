@@ -6,6 +6,8 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Buffer lyr_ty0_Buffer;
 typedef struct lyr_ty1_Mat lyr_ty1_Mat;
+typedef struct lyr_vt_ty2 lyr_vt_ty2;
+const char lyr_ifid_ty2[] = "Error";
 typedef struct { int64_t v[4]; } lyr_inl4_i64;
 _Static_assert(sizeof(lyr_inl4_i64) == 32, "layout of lyr_inl4_i64");
 struct lyr_ty0_Buffer {
@@ -20,6 +22,11 @@ static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x20) };
 const LyrDesc lyr_desc_ty0_Buffer = { sizeof(lyr_ty0_Buffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Buffer", NULL };
 struct lyr_ty1_Mat {
     lyr_inl4_i64 f_m;
+};
+struct lyr_vt_ty2 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 typedef struct { int64_t *ptr; int64_t len; } lyr_slice_i64;
 _Static_assert(sizeof(lyr_slice_i64) == 16, "layout of lyr_slice_i64");

@@ -6,6 +6,8 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Point lyr_ty0_Point;
 typedef struct lyr_ty1_Segment lyr_ty1_Segment;
+typedef struct lyr_vt_ty2 lyr_vt_ty2;
+const char lyr_ifid_ty2[] = "Error";
 struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
@@ -13,6 +15,11 @@ struct lyr_ty0_Point {
 struct lyr_ty1_Segment {
     lyr_ty0_Point f_a;
     lyr_ty0_Point f_b;
+};
+struct lyr_vt_ty2 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 
 /* prototypes */

@@ -66,7 +66,10 @@ public sealed record Param(bool IsParams, string Name, TypeNode Type, Expr? Defa
 {
     public required Span NameSpan { get; init; }
 }
-public sealed record ThrowsClause(TypeNode? Type, Span Span) : Node(Span); // Type == null means 'throws' without a type: any Throwable
+/// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c> (design/v5/spec/05 E2 K1,
+/// K2; 08 D9): a SET of thrown types, written in brackets from two on (the list rule, 08 D5/D6).
+/// <see cref="Types"/> empty is the bare form, which means <c>throws Error</c>.</summary>
+public sealed record ThrowsClause(TypeNode[] Types, Span Span) : Node(Span);
 
 /// <param name="IsStatic">A member without a receiver: no <c>this</c>, reachable only through
 /// the type. Always <c>false</c> at top level.</param>

@@ -95,5 +95,5 @@ pub fn fail(message: string): void {
 // `assertThrows(f)` is not here yet, and the reason is worth stating: a lambda cannot carry a
 // `throws` clause (`fn() -> void throws E` is refused as a parameter type, LYR-SEM0084), so
 // there is no way to hand a throwing action to a function. It arrives with typed throws on
-// function types, as `assertThrows<E :: [Throwable]>(f: fn() -> void throws E): E` — the
+// function types, as `assertThrows<E :: [Error]>(f: fn() -> void throws E): E` — the
 // exception itself is the answer, for the test to inspect.

@@ -19,6 +19,8 @@ typedef struct lyr_ty11_Shape_Rect lyr_ty11_Shape_Rect;
 typedef struct lyr_ty13_Shape_Tagged lyr_ty13_Shape_Tagged;
 typedef struct lyr_ty12_Point lyr_ty12_Point;
 typedef struct lyr_ty14_Scene lyr_ty14_Scene;
+typedef struct lyr_vt_ty15 lyr_vt_ty15;
+const char lyr_ifid_ty15[] = "Error";
 struct lyr_ty2_Tree_Leaf {
     int64_t f_0;
 };
@@ -75,6 +77,11 @@ _Static_assert(sizeof(lyr_ty14_Scene) == 48, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_main) == 8, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_light) == 40, "layout of lyr_ty14_Scene");
 const LyrDesc lyr_desc_ty14_Scene = { sizeof(lyr_ty14_Scene), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "main.Scene", NULL };
+struct lyr_vt_ty15 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("red");

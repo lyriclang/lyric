@@ -323,8 +323,11 @@ public sealed class AstFormatter
         if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), TypeDoc(ret)));
         if (decl.Throws is { } throws)
         {
+            // One type alone, several in brackets (the list rule, 08 D5/D6), none for the bare form.
             head.Add(Doc.From(" throws"));
-            if (throws.Type is { } thrown) head.Add(Doc.Of(Doc.Space, TypeDoc(thrown)));
+            if (throws.Types is [var only]) head.Add(Doc.Of(Doc.Space, TypeDoc(only)));
+            else if (throws.Types.Length > 1)
+                head.Add(Doc.Of(Doc.From(" ["), Doc.Join(Doc.From(", "), throws.Types.Select(TypeDoc).ToArray()), Doc.From("]")));
         }
 
         if (decl.Extern is { SymbolSpan: { } symbol })
@@ -722,7 +725,8 @@ public sealed class AstFormatter
         AssignExpr => Assign,
         // An if or a lambda extends to the end of the expression: as an operand it must be
         // parenthesized or the reparse reads past the operator. Treated as the loosest level.
-        IfExpr or LambdaExpr => Assign,
+        // So does 'try', which covers everything to its right (08 Y4).
+        IfExpr or LambdaExpr or TryExpr => Assign,
         _ => Primary,
     };
 
@@ -750,6 +754,7 @@ public sealed class AstFormatter
         ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
         ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
+        TryExpr t => Doc.Of(Doc.From("try "), ExprDoc(t.Value, Assign)),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),
         BinaryExpr b => BinaryDoc(b),
         AssignExpr a => AssignDoc(a),

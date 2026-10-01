@@ -406,14 +406,7 @@ public sealed partial class Parser
         TypeNode? returnType = _buffer.Match(TokenKind.Colon) ? ParseType(allowThrows: false) : null;
 
         ThrowsClause? throws = null;
-        if (AtContextual("throws"))
-        {
-            var tk = _buffer.Advance();
-            // 'throws' without a type when the body or ';' follows directly.
-            TypeNode? thrown = _buffer.Check(TokenKind.LBrace) || _buffer.Check(TokenKind.Semicolon)
-                ? null : ParseType();
-            throws = new ThrowsClause(thrown, Span.Union(tk.Span, thrown?.Span ?? tk.Span));
-        }
+        if (AtContextual("throws")) throws = ParseThrowsTypes(_buffer.Advance().Span);
 
         Block? body = null;
         Span end;
@@ -447,6 +440,44 @@ public sealed partial class Parser
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
             Span.Union(start, end)) { NameSpan = name.Span, Extern = spec };
+    }
+
+    /// <summary>
+    /// What follows a declaration's <c>throws</c> (design/v5/spec/08 D9): nothing — the bare form,
+    /// <c>Error</c> — before the body, the <c>;</c> or an extern's <c>=</c>; one type; or a bracketed
+    /// list (the list rule, D5/D6). Several types without the brackets are the list rule's error,
+    /// reported with the form to write and parsed as the list they meant.
+    /// </summary>
+    private ThrowsClause ParseThrowsTypes(Span keyword)
+    {
+        if (_buffer.Check(TokenKind.LBrace) || _buffer.Check(TokenKind.Semicolon) || _buffer.Check(TokenKind.Equal))
+            return new ThrowsClause([], keyword);
+
+        if (_buffer.Check(TokenKind.LBracket))
+        {
+            var open = _buffer.Advance();
+            var listed = new List<TypeNode>();
+            while (!_buffer.Check(TokenKind.RBracket) && !_buffer.AtEnd)
+            {
+                listed.Add(ParseType());
+                if (!_buffer.Match(TokenKind.Comma)) break;
+            }
+            var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the thrown types");
+            if (listed.Count == 0)
+                _de.Report("LYR-PAR0049", Severity.Error, Span.Union(open.Span, close.Span),
+                    "a 'throws' list names its types — the bare 'throws' is the one that means 'Error'");
+            return new ThrowsClause(listed.ToArray(), Span.Union(keyword, close.Span));
+        }
+
+        var first = ParseType();
+        if (!_buffer.Check(TokenKind.Comma)) return new ThrowsClause([first], Span.Union(keyword, first.Span));
+
+        var types = new List<TypeNode> { first };
+        while (_buffer.Match(TokenKind.Comma)) types.Add(ParseType());
+        var all = Span.Union(first.Span, types[^1].Span);
+        _de.Report("LYR-PAR0049", Severity.Error, all,
+            $"several thrown types are a list — write 'throws [{string.Join(", ", types.Select(t => _sm.Slice(t.Span).ToString()))}]'");
+        return new ThrowsClause(types.ToArray(), Span.Union(keyword, all));
     }
 
     private Param[] ParseParamList()

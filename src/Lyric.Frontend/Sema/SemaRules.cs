@@ -160,7 +160,8 @@ public sealed class SemaRules
         foreach (var main in mains)
             if (!ValidMain(main))
                 _de.Report("LYR-SEM0021", Severity.Error, main.Span,
-                    "'main' must be 'fn main(): int' or 'fn main(args: string[]): int'");
+                    "'main' must be 'fn main(): int' or 'fn main(): void', with or without 'args: string[]' "
+                    + "— and may declare 'throws'");
 
         // One 'main' per EXECUTABLE. A workspace compilation holds several programs side by side,
         // and there a second 'main' is the entry point of another script, not a duplicate.
@@ -170,13 +171,12 @@ public sealed class SemaRules
             _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");
     }
 
+    /// <summary>The entry contract (design/v5/spec/08 D18): <c>fn main(): void | int</c>, with or
+    /// without <c>args: string[]</c>, and it may declare <c>throws</c> — an error that escapes is
+    /// reported with its message and causes, and the process exits with 1 (05 E6 O4).</summary>
     private static bool ValidMain(FunctionDecl fn)
     {
-        if (!IsNamed(fn.ReturnType, "int")) return false;
-        // The entry point declares nothing (§9.2): a throws clause on main would let an
-        // exception escape the program as LYR-VM0010 — the panic that is supposed to be
-        // unreachable from source.
-        if (fn.Throws is not null) return false;
+        if (fn.ReturnType is not null && !IsNamed(fn.ReturnType, "int") && !IsNamed(fn.ReturnType, "void")) return false;
         return fn.Parameters.Length switch
         {
             0 => true,
@@ -283,7 +283,8 @@ public sealed class SemaRules
 
     private void CheckExprStmt(ExprStmt es)
     {
-        var ok = es.Expr is CallExpr or AssignExpr or ResumeExpr or ThrowExpr
+        // 'try f();' is the call it marks (05 E4).
+        var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ResumeExpr or ThrowExpr
             or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } or ErrorExpr;
         if (!ok)
             _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls, assignments and resume are allowed)");
@@ -521,6 +522,7 @@ public sealed class SemaRules
         ResumeExpr re => [re.Coroutine],
         ComptimeExpr ct => [ct.Inner],
         ThrowExpr te => [te.Value],
+        TryExpr tr => [tr.Value],
         BinaryExpr b => [b.Left, b.Right],
         RangeExpr r => [r.Low, r.High],
         SliceRangeExpr sr => [.. new[] { sr.Low, sr.High }.OfType<Expr>()],

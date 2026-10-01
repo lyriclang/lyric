@@ -4,8 +4,10 @@ using Lyric.Core;
 namespace Lyric.Resolver;
 
 /// <summary>
-/// The built-in types plus the language built-ins `Throwable` (an interface with an abstract
-/// `message(): string`), `panic` (return type never) and `same` (identity of two references).
+/// The built-in types plus the language built-ins `panic` (return type never) and `same`
+/// (identity of two references). The root of what is thrown is no built-in since Lyric 5: it is
+/// `std.core`'s `Error` (design/v5/spec/05 E6 O1), visible without an import like every public
+/// type of `std.core`.
 ///
 /// They live in a scope that is the root parent of every module scope, so a name resolves through
 /// the ordinary lookup chain with no special case in the resolver.
@@ -28,7 +30,6 @@ public static class BuiltinTypes
         foreach (var name in Names)
             scope.TryDeclare(new TypeSymbol(name, TypeSymbolKind.Builtin, Visibility.Public,
                 new SymbolTable(), declaration: null));
-        scope.TryDeclare(CreateThrowable());
         scope.TryDeclare(CreatePanic());
         scope.TryDeclare(CreateSame());
         // Coroutine<T>: the name resolves here, the type form is built by the sema.
@@ -39,24 +40,6 @@ public static class BuiltinTypes
         scope.TryDeclare(new TypeSymbol("Slice", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
         return scope;
-    }
-
-    // `Throwable` as a real interface symbol with a synthetic AST, so the conformance check and
-    // member lookup run through the ordinary paths.
-    private static TypeSymbol CreateThrowable()
-    {
-        // Nothing here stands in a file, so both spans are the default one and carry an invalid
-        // FileId. A consumer that offers to jump to a declaration checks for that already.
-        var message = new FunctionDecl(
-            IsPublic: true, IsMut: false, IsStatic: false, Name: "message", Generics: [], Parameters: [],
-            ReturnType: new NamedType(["string"], [], default) { NameSpan = default },
-            Throws: null, Body: null, Span: default)
-            { NameSpan = default };
-        var decl = new InterfaceDecl(IsPublic: true, Name: "Throwable", Generics: [], Interfaces: [], Members: [message], Span: default)
-            { NameSpan = default };
-        var members = new SymbolTable();
-        members.TryDeclare(new FunctionSymbol("message", Visibility.Public, isMut: false, message));
-        return new TypeSymbol("Throwable", TypeSymbolKind.Interface, Visibility.Public, members, decl);
     }
 
     // `panic(message: string)`: the never return type is not nameable, so the sema sets it for

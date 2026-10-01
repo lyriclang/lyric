@@ -5,41 +5,71 @@ using Lyric.Resolver;
 namespace Lyric.Sema;
 
 /// <summary>
-/// throws propagation, a read-only post pass after the TypeChecker: every throw site — a throw
-/// statement or a call to a throws function — is either covered by a surrounding try with a matching
-/// catch, or by the throws clause of the surrounding function, which propagates automatically.
-/// Lambdas are contexts of their own without a throws clause; global initializers and default values
-/// have no handler. Type matching accepts the same type, an interface implementation, a catch-all,
-/// or a typeless throws.
+/// Marked propagation (design/v5/spec/05 E1, E2), a read-only pass after the checker:
+///
+/// <list type="bullet">
+/// <item>every call of a throwing function stands under a <c>try</c> — a <c>try</c> expression,
+/// or the body of a <c>try</c> block — of its own function context (<c>LYR-SEM0138</c>): the
+/// propagation is seen where it happens;</item>
+/// <item>every type a site may throw is covered by a <c>catch</c> of an enclosing block or by the
+/// context's <c>throws</c> set (K8, <c>LYR-SEM0034</c>) — a <c>throw</c> needs no mark, but the
+/// same cover;</item>
+/// <item>a <c>try</c> under which nothing throws is warned about (<c>LYR-SEM0139</c>).</item>
+/// </list>
+///
+/// <para>A lambda is a context of its own — its body runs later, outside every <c>try</c> around
+/// it — and, until function types carry a set (T17, M5 S4), one that throws nothing; a global's
+/// initializer and a default have no handler at all. Coverage is the checker's question: an
+/// element covers a thrown type when it IS the type, on the instance, or an interface the type
+/// conforms to (<see cref="TypeChecker.ThrownCoveredBy"/>), asked in the module the site stands in.</para>
 /// </summary>
 internal sealed class ExceptionAnalyzer
 {
     private readonly Compilation _comp;
-    private readonly BindingResult _binding;
     private readonly TypeResult _types;
     private readonly DiagnosticEngine _de;
-    private readonly TypeSymbol? _throwable;
+    private readonly Func<LyrType, LyrType, ModuleSymbol?, bool> _covers;
+    private readonly LyrType? _root; // std.core's Error; null without a standard library
 
-    // What the current function may throw: nothing, anything, or exactly one symbol.
-    private enum Permit { None, Any, Typed }
-    private Permit _permit = Permit.None;
-    private TypeSymbol? _permitted;
-    private readonly List<CatchClause[]> _tryStack = new(); // only try BODIES are protected
-
-    public ExceptionAnalyzer(Compilation comp, BindingResult binding, TypeResult types, DiagnosticEngine de)
+    /// <summary>One function context: the set it may throw, how a message names it, whether it
+    /// can declare at all, and the <c>try</c>s open in it, innermost last.</summary>
+    private sealed class Context(LyrType[] declared, string name, bool canDeclare)
     {
+        public LyrType[] Declared { get; } = declared;
+        public string Name { get; } = name;
+        public bool CanDeclare { get; } = canDeclare;
+        public List<Frame> Frames { get; } = new();
+    }
+
+    /// <summary>An open <c>try</c>: a mark over an expression, or a block with its clauses. Reached
+    /// when a site stands under it.</summary>
+    private sealed class Frame(CatchClause[] catches)
+    {
+        public CatchClause[] Catches { get; } = catches;
+        public bool Reached { get; set; }
+    }
+
+    private Context _context = new([], "the program", canDeclare: false);
+    private ModuleSymbol? _module;
+
+    public ExceptionAnalyzer(Compilation comp, TypeResult types, DiagnosticEngine de,
+        Func<LyrType, LyrType, ModuleSymbol?, bool> covers, LyrType? root)
+    {
+        _root = root;
         _comp = comp;
-        _binding = binding;
         _types = types;
         _de = de;
-        _throwable = comp.Builtins.LookupLocal("Throwable") as TypeSymbol;
+        _covers = covers;
     }
 
     public void Run()
     {
         foreach (var module in _comp.Modules)
+        {
+            _module = module;
             foreach (var decl in _comp.AstOf(module).Declarations)
                 AnalyzeDecl(decl);
+        }
     }
 
     private void AnalyzeDecl(Decl decl)
@@ -52,8 +82,8 @@ internal sealed class ExceptionAnalyzer
             case EnumDecl e: foreach (var f in e.Methods) AnalyzeFunction(f); break;
             case InterfaceDecl i: foreach (var f in i.Members) AnalyzeFunction(f); break; // default bodies
             case ExtendDecl x: foreach (var f in x.Methods) AnalyzeFunction(f); break;
-            case GlobalBindingDecl g: // top level: no try possible, no throws declarable
-                if (g.Binding.Initializer is not null) AnalyzeExpr(g.Binding.Initializer);
+            case GlobalBindingDecl { Binding.Initializer: { } init }:
+                InContext(new Context([], "a global's initializer", canDeclare: false), () => AnalyzeExpr(init));
                 break;
         }
     }
@@ -64,35 +94,31 @@ internal sealed class ExceptionAnalyzer
             switch (m)
             {
                 case FunctionDecl f: AnalyzeFunction(f); break;
-                case FieldDecl { Default: not null } fd: AnalyzeExpr(fd.Default); break; // no handler context
+                case FieldDecl { Default: { } value }:
+                    InContext(new Context([], "a field's default", canDeclare: false), () => AnalyzeExpr(value));
+                    break;
             }
     }
 
     private void AnalyzeFunction(FunctionDecl fn)
     {
         foreach (var p in fn.Parameters)
-            if (p.Default is not null) AnalyzeExpr(p.Default); // default values have no handler
+            if (p.Default is { } value)
+                InContext(new Context([], "a parameter's default", canDeclare: false), () => AnalyzeExpr(value));
 
-        if (fn.Body is null) return;
-        var (savedPermit, savedType) = (_permit, _permitted);
-        (_permit, _permitted) = PermitOf(fn);
-        var savedStack = _tryStack.Count;
-        AnalyzeStmt(fn.Body);
-        _tryStack.RemoveRange(savedStack, _tryStack.Count - savedStack);
-        (_permit, _permitted) = (savedPermit, savedType);
+        if (fn.Body is not { } body) return;
+        InContext(new Context(_types.DeclaredThrows(fn), $"'{fn.Name}'", canDeclare: true), () => AnalyzeStmt(body));
     }
 
-    private (Permit, TypeSymbol?) PermitOf(FunctionDecl fn)
+    private void InContext(Context context, Action walk)
     {
-        if (fn.Throws is null) return (Permit.None, null);
-        if (fn.Throws.Type is null) return (Permit.Any, null);
-        // The symbol the TypeChecker bound to the clause; 'throws Throwable' is the typeless case.
-        var sym = _types.RefOf(fn.Throws) as TypeSymbol;
-        if (sym is null) return (Permit.Any, null); // unresolvable or external, so lenient
-        return ReferenceEquals(sym, _throwable) ? (Permit.Any, null) : (Permit.Typed, sym);
+        var saved = _context;
+        _context = context;
+        try { walk(); }
+        finally { _context = saved; }
     }
 
-    // --- statement walk with a try stack ---
+    // --- statements ---
 
     private void AnalyzeStmt(Stmt stmt)
     {
@@ -102,9 +128,7 @@ internal sealed class ExceptionAnalyzer
             case TailExprStmt tail: AnalyzeExpr(tail.Expr); break;
             case BindingStmt bd: if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer); break;
             // A destructuring binding REQUIRES its initializer, and that initializer is a call like
-            // any other. Missing here, a throwing one escaped the walk entirely: `let (a, b) = mk();`
-            // in a `main` that declares nothing compiled clean and ended as LYR-VM0010 — the panic
-            // §9.2 calls unreachable from source. The same holds for the pattern form.
+            // any other: missing here, a throwing one escaped the walk entirely.
             case DestructuringStmt ds: AnalyzeExpr(ds.Initializer); break;
             case LetPatternStmt lp:
                 AnalyzeExpr(lp.Initializer);
@@ -121,20 +145,24 @@ internal sealed class ExceptionAnalyzer
             case ForInStmt fo: AnalyzeExpr(fo.Iterable); AnalyzeStmt(fo.Body); break;
             case ReturnStmt r: if (r.Value is not null) AnalyzeExpr(r.Value); break;
             case YieldStmt y: if (y.Value is not null) AnalyzeExpr(y.Value); break;
-            case DeferStmt de: AnalyzeStmt(de.Body); break; // treated like code at the declaration site
+            case DeferStmt de: AnalyzeStmt(de.Body); break; // runs in the scope that registered it
             case ThrowStmt t:
                 AnalyzeExpr(t.Value);
-                var thrownType = _types.TypeOf(t.Value);
-                // Non-throwable types were already reported by the TypeChecker (SEM0030).
-                if (Conformance.IsThrowable(thrownType, _throwable, _binding))
-                    CheckSite(ThrownOf(thrownType), t.Span, "'throw'");
+                Throw(t.Value, t.Span);
                 break;
             case TryStmt tr:
-                _tryStack.Add(tr.Catches);
-                AnalyzeStmt(tr.Body);
-                _tryStack.RemoveAt(_tryStack.Count - 1);
-                foreach (var c in tr.Catches) AnalyzeStmt(c.Body); // a catch does not catch itself
+            {
+                // The block form marks its whole body (05 E4: the block form of the same thing);
+                // a clause is not covered by its own try (E9 C6), only by those around it.
+                var frame = Open(tr.Catches);
+                try { AnalyzeStmt(tr.Body); }
+                finally { Close(); }
+                if (!frame.Reached)
+                    _de.Report("LYR-SEM0139", Severity.Warning, KeywordOf(tr.Span),
+                        "nothing in this 'try' block throws — its 'catch' clauses never run");
+                foreach (var c in tr.Catches) AnalyzeStmt(c.Body);
                 break;
+            }
             case MatchStmt m:
                 AnalyzeExpr(m.Scrutinee);
                 foreach (var arm in m.Arms) AnalyzeArm(arm);
@@ -149,8 +177,7 @@ internal sealed class ExceptionAnalyzer
         else if (arm.Body is Expr e) AnalyzeExpr(e);
     }
 
-    // --- expression walk: calls are throw sites, function references outside call position lose
-    // --- the throws information (SEM0037), and lambdas are contexts of their own ---
+    // --- expressions: calls, pulls and desugared operators are the sites that need a mark ---
 
     private void AnalyzeExpr(Expr expr)
     {
@@ -160,41 +187,59 @@ internal sealed class ExceptionAnalyzer
                 AnalyzeCallee(call.Callee);
                 foreach (var a in call.Arguments) AnalyzeExpr(a);
 
-                // 'c.next()' — a PULL, and the throw site of a coroutine. Marked by the checker,
-                // which is the pass that knows the receiver's type; the safe pull is lenient about
-                // exhaustion, never about throwing.
+                // A pull — 'c.next()' — is the throw site of a coroutine, never the call that
+                // built it (#73); the checker marked it, knowing the receiver's type.
                 if (_types.ThrownByPull(call.Callee) is { } pulled)
-                    CheckSite(ThrownOf(pulled), call.Span, "'next()'");
-                else if (ThrowsOf(call.Callee) is { } thrown)
-                    CheckSite(thrown, call.Span, $"call to '{CalleeName(call.Callee)}'");
+                    Site([pulled], call.Span, "'next()'");
+                else
+                {
+                    // 'Walker.walk(d)' stands for the member call it was checked as (04 D2 R5).
+                    var thrown = _types.CallThrows(call);
+                    if (thrown.Length == 0 && _types.OperatorCallOf(call) is { } meant) thrown = _types.CallThrows(meant);
+                    Site(thrown, call.Span, $"the call to '{CalleeName(call.Callee)}'");
+                }
                 break;
             case IdentifierExpr or MemberExpr:
                 CheckFnValue(expr);
                 if (expr is MemberExpr m) AnalyzeExpr(m.Target);
                 break;
-            case LambdaExpr lam: AnalyzeLambda(lam); break;
-            case UnaryExpr u: AnalyzeExpr(u.Operand); break;
+            case LambdaExpr lam:
+                // Its own context: the body runs later, outside every try around it; and until
+                // function types carry a set (T17, M5 S4) it throws nothing.
+                InContext(new Context([], "the lambda", canDeclare: false), () =>
+                {
+                    if (lam.Body is Block b) AnalyzeStmt(b);
+                    else if (lam.Body is Expr e) AnalyzeExpr(e);
+                });
+                break;
+            case TryExpr tried:
+            {
+                var frame = Open([]);
+                try { AnalyzeExpr(tried.Value); }
+                finally { Close(); }
+                if (!frame.Reached)
+                    _de.Report("LYR-SEM0139", Severity.Warning, tried.KeywordSpan,
+                        "nothing under this 'try' throws — the mark says a call may fail where none can");
+                break;
+            }
+            case UnaryExpr u: AnalyzeExpr(u.Operand); Operator(u); break;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner); break;
             case ResumeExpr re:
                 AnalyzeExpr(re.Coroutine);
-                if (_types.ThrownByPull(re) is { } resumed)
-                    CheckSite(ThrownOf(resumed), re.Span, "'resume'");
+                if (_types.ThrownByPull(re) is { } resumed) Site([resumed], re.Span, "'resume'");
                 break;
             case ThrowExpr te:
-                // A throw site like the statement: the position changes the type, not the fact.
                 AnalyzeExpr(te.Value);
-                var thrownByExpr = _types.TypeOf(te.Value);
-                if (Conformance.IsThrowable(thrownByExpr, _throwable, _binding))
-                    CheckSite(ThrownOf(thrownByExpr), te.Span, "'throw'");
+                Throw(te.Value, te.Span);
                 break;
             case PostfixExpr p: AnalyzeExpr(p.Operand); break;
-            case BinaryExpr b: AnalyzeExpr(b.Left); AnalyzeExpr(b.Right); break;
-            case AssignExpr a: AnalyzeExpr(a.Target); AnalyzeExpr(a.Value); break;
+            case BinaryExpr b: AnalyzeExpr(b.Left); AnalyzeExpr(b.Right); Operator(b); break;
+            case AssignExpr a: AnalyzeExpr(a.Target); AnalyzeExpr(a.Value); Operator(a); break;
             case RangeExpr r: AnalyzeExpr(r.Low); AnalyzeExpr(r.High); break;
             case SliceRangeExpr sr: if (sr.Low is not null) AnalyzeExpr(sr.Low); if (sr.High is not null) AnalyzeExpr(sr.High); break;
             case CastExpr c: AnalyzeExpr(c.Operand); break;
             case TypeTestExpr tt: AnalyzeExpr(tt.Operand); break;
-            case IndexExpr ix: AnalyzeExpr(ix.Target); AnalyzeExpr(ix.Index); break;
+            case IndexExpr ix: AnalyzeExpr(ix.Target); AnalyzeExpr(ix.Index); Operator(ix); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e); break;
             case StructInitExpr si: foreach (var f in si.Fields) AnalyzeExpr(f.Value); break;
@@ -220,93 +265,87 @@ internal sealed class ExceptionAnalyzer
         else if (callee is not IdentifierExpr) AnalyzeExpr(callee);
     }
 
-    // A lambda is its own function context, without a throws clause and without protection from
-    // trys at the definition site, because the body runs later.
-    private void AnalyzeLambda(LambdaExpr lam)
+    /// <summary>An operator that IS a call — <c>a + b</c> through <c>Add</c>, <c>x[k]</c> through
+    /// an index interface (04 D6) — throws what its method throws, and is marked like one.</summary>
+    private void Operator(Expr node)
     {
-        var (savedPermit, savedType) = (_permit, _permitted);
-        var savedStack = new List<CatchClause[]>(_tryStack);
-        (_permit, _permitted) = (Permit.None, null);
-        _tryStack.Clear();
-        if (lam.Body is Block b) AnalyzeStmt(b);
-        else if (lam.Body is Expr e) AnalyzeExpr(e);
-        _tryStack.Clear();
-        _tryStack.AddRange(savedStack);
-        (_permit, _permitted) = (savedPermit, savedType);
+        if (_types.OperatorCallOf(node) is { } call && _types.CallThrows(call) is { Length: > 0 } thrown)
+            Site(thrown, node.Span, $"the operator's '{CalleeName(call.Callee)}'");
     }
 
-    // --- checking throw sites ---
+    // --- sites ---
 
-    // The thrown type of a site: (any, null) is statically unknown — a typeless throws, a Throwable
-    // value, a type parameter; (false, sym) is a concrete symbol; null is poison or no site at all.
-    private (bool any, TypeSymbol? sym)? ThrownOf(LyrType t) => t switch
+    private void Throw(Expr value, Span span)
     {
-        ErrorType => null,
-        NamedRef nr when ReferenceEquals(nr.Symbol, _throwable) => (true, null),
-        NamedRef nr => (false, nr.Symbol),
-        GenericInstance gi => (false, gi.Definition),
-        _ => (true, null) // a type parameter with a Throwable constraint and the like
-    };
-
-    private (bool any, TypeSymbol? sym)? ThrowsOf(Expr callee)
-    {
-        if (_types.RefOf(callee) is not FunctionSymbol { Declaration: FunctionDecl decl } fn) return null;
-        if (decl.Throws is null) return null;
-
-        // A COROUTINE function's clause is not about its call. The call builds a suspended frame
-        // and runs no body, so it cannot throw what the clause names; the clause rode along here
-        // until 3.0 and made the demand look like it followed the local variable (#73). It belongs
-        // to the returned type now, and the pull is where it is asked for.
-        if (_types.TypeOf(callee) is FnType { Return: CoroutineOf }) return null;
-        if (decl.Throws.Type is null) return (true, null);
-        var sym = _types.RefOf(decl.Throws) as TypeSymbol;
-        if (sym is null || ReferenceEquals(sym, _throwable)) return (true, null);
-        return (false, sym);
+        var thrown = _types.TypeOf(value);
+        if (thrown is null || thrown.IsError) return;
+        // What is no Error was refused where it is thrown (SEM0030); covering it is no question.
+        if (_root is not null && !_covers(thrown, _root, _module)) return;
+        Site([thrown], span, "'throw'", needsMark: false);
     }
 
-    private void CheckSite((bool any, TypeSymbol? sym)? thrown, Span span, string what)
+    /// <summary>A throw site: marked — unless it is a <c>throw</c>, which is its own mark — and every
+    /// type it may throw covered by a clause around it or by the context's set.</summary>
+    private void Site(LyrType[] thrown, Span at, string what, bool needsMark = true)
     {
-        if (thrown is not { } th) return;
-        if (HandledByTry(th)) return;
-        if (PermittedByDeclaration(th)) return;
-        var name = th.sym?.Name ?? "Throwable";
-        _de.Report("LYR-SEM0034", Severity.Error, span,
-            $"{what} may throw '{name}', which nothing handles — declare 'throws' on the enclosing function or wrap it in try/catch");
+        if (thrown.Length == 0 || thrown.Any(t => t.IsError)) return;
+        if (needsMark && _context.Frames.Count == 0)
+        {
+            _de.Report("LYR-SEM0138", Severity.Error, at,
+                $"{what} throws {SetText(thrown)} — mark it 'try', so the propagation is seen where it happens");
+            return;
+        }
+        foreach (var frame in _context.Frames) frame.Reached = true;
+
+        foreach (var t in thrown)
+        {
+            if (Caught(t) || _context.Declared.Any(d => _covers(t, d, _module))) continue;
+            _de.Report("LYR-SEM0034", Severity.Error, at, _context.CanDeclare
+                ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' here and no 'throws' of "
+                  + $"{_context.Name} covers — catch it, or add it to the 'throws'"
+                : _context.Name == "the lambda"
+                    ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' in the lambda covers — "
+                      + "a lambda does not throw yet (its set is inferred from M5 S4 on): catch it inside"
+                    : $"{what} throws '{TypeFacts.Display(t)}', and {_context.Name} cannot throw — catch it there");
+        }
     }
 
-    private bool HandledByTry((bool any, TypeSymbol? sym) th)
+    /// <summary>Does a clause of an enclosing <c>try</c> block catch it — a catch-all, or a clause
+    /// whose type covers it?</summary>
+    private bool Caught(LyrType thrown)
     {
-        for (var i = _tryStack.Count - 1; i >= 0; i--)
-            foreach (var c in _tryStack[i])
-                if (CatchHandles(c, th))
-                    return true;
+        for (var i = _context.Frames.Count - 1; i >= 0; i--)
+            foreach (var clause in _context.Frames[i].Catches)
+            {
+                if (clause.BindingType is null) return true;
+                if (_types.CatchType(clause) is not { } caught || _covers(thrown, caught, _module)) return true;
+            }
         return false;
     }
 
-    private bool CatchHandles(CatchClause c, (bool any, TypeSymbol? sym) th)
+    private Frame Open(CatchClause[] catches)
     {
-        if (c.BindingType is null) return true; // catch-all
-        if (_types.RefOf(c.BindingType) is not TypeSymbol ct) return true; // unresolvable, so lenient
-        if (ReferenceEquals(ct, _throwable)) return true; // catch (e: Throwable) is a catch-all
-        if (th.any || th.sym is null) return false; // statically unknown: only a catch-all helps
-        return ReferenceEquals(th.sym, ct) || Conformance.Implements(th.sym, ct, _binding);
+        var frame = new Frame(catches);
+        _context.Frames.Add(frame);
+        return frame;
     }
 
-    private bool PermittedByDeclaration((bool any, TypeSymbol? sym) th) => _permit switch
-    {
-        Permit.Any => true,
-        Permit.Typed => !th.any && th.sym is not null && _permitted is not null
-            && (ReferenceEquals(th.sym, _permitted) || Conformance.Implements(th.sym, _permitted, _binding)),
-        _ => false
-    };
+    private void Close() => _context.Frames.RemoveAt(_context.Frames.Count - 1);
 
-    // --- a throws function as a value (SEM0037): FnType carries no throws information ---
+    private static Span KeywordOf(Span statement) =>
+        new(statement.File, statement.Start, Math.Min(statement.End, statement.Start + "try".Length));
+
+    private static string SetText(LyrType[] set) =>
+        set.Length == 1 ? $"'{TypeFacts.Display(set[0])}'" : $"[{string.Join(", ", set.Select(TypeFacts.Display))}]";
+
+    // --- a throwing function as a value (SEM0037): until function types carry a set (T17, M5 S4) ---
 
     private void CheckFnValue(Expr expr)
     {
-        if (_types.RefOf(expr) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } } fn)
+        if (_types.RefOf(expr) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } fn })
             _de.Report("LYR-SEM0037", Severity.Error, expr.Span,
-                $"'{fn.Name}' declares 'throws' and cannot be used as a value — function types carry no throws information; call it directly");
+                $"'{fn.Name}' declares 'throws' and cannot be used as a value — function types carry no "
+                + "thrown set yet (M5 S4); call it directly");
     }
 
     private static string CalleeName(Expr callee) => callee switch

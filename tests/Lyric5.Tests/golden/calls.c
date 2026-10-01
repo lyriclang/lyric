@@ -6,12 +6,19 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Color lyr_ty0_Color;
 typedef struct lyr_ty1_Point lyr_ty1_Point;
+typedef struct lyr_vt_ty2 lyr_vt_ty2;
+const char lyr_ifid_ty2[] = "Error";
 struct lyr_ty0_Color {
     int64_t f_v;
 };
 struct lyr_ty1_Point {
     int64_t f_x;
     int64_t f_y;
+};
+struct lyr_vt_ty2 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };

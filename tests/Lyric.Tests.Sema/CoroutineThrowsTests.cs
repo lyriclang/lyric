@@ -12,7 +12,8 @@ namespace Lyric.Tests.Sema;
 /// <para>Until 3.0 a coroutine function's <c>throws</c> was checked at its CALL — an event that
 /// runs no body and cannot throw. The demand therefore appeared to follow the local variable and
 /// vanished at the first field or optional, which is precisely the idiom coroutines exist for.
-/// It belongs to the type now, and the PULL is where it is asked for.</para>
+/// It belongs to the type now, and the PULL is where it is asked for — since Lyric 5 as the
+/// <c>try</c> mark every throwing call carries (design/v5/spec/05 E1, <c>LYR-SEM0138</c>).</para>
 /// </summary>
 public class CoroutineThrowsTests
 {
@@ -59,7 +60,7 @@ public class CoroutineThrowsTests
                 return 0;
             }
             """);
-        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code is "LYR-SEM0034" or "LYR-SEM0138");
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public class CoroutineThrowsTests
                 return resume c;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0138");
         Assert.Contains("'resume'", error.Message, StringComparison.Ordinal);
         Assert.Contains("Exception", error.Message, StringComparison.Ordinal);
     }
@@ -104,7 +105,7 @@ public class CoroutineThrowsTests
                 return resume c;
             }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");
     }
 
     [Fact]
@@ -124,7 +125,7 @@ public class CoroutineThrowsTests
                 return resume d.co!;
             }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");
     }
 
     [Fact]
@@ -139,7 +140,7 @@ public class CoroutineThrowsTests
                 return 0;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0138");
         Assert.Contains("'next()'", error.Message, StringComparison.Ordinal);
     }
 
@@ -204,7 +205,7 @@ public class CoroutineThrowsTests
                 return resume co!;
             }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");
     }
 
     [Fact]
@@ -243,7 +244,7 @@ public class CoroutineThrowsTests
                 return r.value;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0034");
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0138");
         Assert.Contains("call to 'risky'", error.Message, StringComparison.Ordinal);
     }
 }

@@ -864,7 +864,7 @@ internal sealed class FunctionLowerer
                     // nothing, so the boundary is a diagnostic instead.
                     case IrInterfaceType when symbol.Type is Sema.NamedRef nr
                         && ReferenceEquals(nr.Symbol,
-                            _typeTable.Compilation.Builtins.LookupLocal("Throwable")):
+                            _typeTable.Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error")):
                         caught = null;
                         break;
                     // ANY OTHER INTERFACE is the interface's own type id, and the unwinding asks
@@ -1762,6 +1762,8 @@ internal sealed class FunctionLowerer
         ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),
+        // 'try e' (05 E4): e's value; its throw sites get their error edges in M5 S1b.
+        TryExpr e => LowerExprOrVoid(e.Value),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),

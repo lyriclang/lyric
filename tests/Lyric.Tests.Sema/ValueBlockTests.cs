@@ -93,7 +93,7 @@ public class ValueBlockTests
     [Fact]
     public void A_throwing_tail_diverges_like_a_throwing_arm() =>
         Compiles("""
-            class E :: [Throwable] { fn message(): string { return "e"; } }
+            class E :: [Error] { fn message(): string { return "e"; } }
             fn f(b: bool): int throws E {
                 return match (b) { true => { 1 }, false => { let why = "no"; throw E { } } };
             }
