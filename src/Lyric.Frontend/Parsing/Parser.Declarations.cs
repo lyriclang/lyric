@@ -510,8 +510,8 @@ public sealed partial class Parser
 
             // The ',' separates members, and only a FIELD needs it: without the rule `a: int b: int`
             // would be a valid line. Everything else has already closed itself — a block body ends
-            // in '}', a bodiless method and a 'static let' end in ';'.
-            if (member is FunctionDecl or StaticBindingDecl)
+            // in '}', a bodiless method, a 'static let' and a 'type Item = …' end in ';'.
+            if (member is FunctionDecl or StaticBindingDecl or AssociatedTypeDecl)
                 _buffer.Match(TokenKind.Comma);
             else
                 _buffer.Expect(TokenKind.Comma, "LYR-PAR0029", "expected ',' between members");
@@ -522,6 +522,10 @@ public sealed partial class Parser
     private Decl ParseTypeMember()
     {
         var start = _buffer.Current.Span;
+
+        // 'type Item = int;' binds an associated type of a conformance (03 T6).
+        if (AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
+            return ParseAssociatedType();
 
         // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  [var] a field.
         // 'static' precedes 'mut', so the order is unambiguous; 'mut static fn' does not exist.
@@ -588,12 +592,13 @@ public sealed partial class Parser
         }
 
         var methods = new List<FunctionDecl>();
+        var boundTypes = new List<AssociatedTypeDecl>();
         if (_buffer.Match(TokenKind.Semicolon))
-            ParseMethodSequence(methods, allowStatic: true);
+            ParseMethodSequence(methods, allowStatic: true, types: boundTypes);
 
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close enum body");
         return new EnumDecl(isPublic, name.Name, generics, interfaces, variants.ToArray(), methods.ToArray(),
-            Span.Union(start, close.Span)) { NameSpan = name.Span };
+            Span.Union(start, close.Span)) { Types = boundTypes.ToArray(), NameSpan = name.Span };
     }
 
     private EnumVariant ParseEnumVariant()
@@ -645,10 +650,11 @@ public sealed partial class Parser
 
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
-        ParseMethodSequence(members, allowStatic: true); // a static member declares, through a constraint (03 T5)
+        var types = new List<AssociatedTypeDecl>();
+        ParseMethodSequence(members, allowStatic: true, types: types); // a static member declares, through a constraint (03 T5)
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
-            { NameSpan = name.Span };
+            { NameSpan = name.Span, Types = types.ToArray() };
     }
 
     // --- Extend (§3.6) ---
@@ -660,9 +666,10 @@ public sealed partial class Parser
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open extend body");
         var methods = new List<FunctionDecl>();
-        ParseMethodSequence(methods, allowStatic: true);
+        var boundTypes = new List<AssociatedTypeDecl>();
+        ParseMethodSequence(methods, allowStatic: true, types: boundTypes);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close extend body");
-        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span));
+        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span)) { Types = boundTypes.ToArray() };
     }
 
     /// <summary>
@@ -683,11 +690,19 @@ public sealed partial class Parser
     /// conforming type MUST implement what the interface requires, so a warning there would be
     /// one nobody can act on without breaking conformance, and an unactionable warning is the
     /// thing this project keeps refusing to ship.</para></param>
+    /// <param name="types">Where an associated type may stand (03 T6) — an interface's
+    /// declaration <c>type Item;</c>, a conformance block's binding <c>type Item = int;</c> —
+    /// the list it goes to.</param>
     private void ParseMethodSequence(List<FunctionDecl> methods, bool allowStatic,
-        bool allowAttributes = true)
+        bool allowAttributes = true, List<AssociatedTypeDecl>? types = null)
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
+            if (types is not null && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
+            {
+                types.Add(ParseAssociatedType());
+                continue;
+            }
             var attributes = AtAttributeStart ? ParseAttributeList() : [];
             if (attributes.Length > 0 && !allowAttributes)
             {
@@ -730,6 +745,18 @@ public sealed partial class Parser
             methods.Add(ParseFunctionDecl(isPublic, start, isStatic) with { Attributes = attributes });
             if (_buffer.Position == before) _buffer.Advance(); // force progress
         }
+    }
+
+    /// <summary><c>type Item;</c> or <c>type Item = T;</c> (03 T6): an associated type declared,
+    /// with its default, or bound.</summary>
+    private AssociatedTypeDecl ParseAssociatedType()
+    {
+        var start = _buffer.Advance().Span; // contextual 'type'
+        var name = ExpectNamed("LYR-PAR0026", "associated type name");
+        TypeNode? type = null;
+        if (_buffer.Match(TokenKind.Equal)) type = ParseType();
+        var semi = ExpectSemicolon();
+        return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span };
     }
 
     /// <summary>Recovery inside a member sequence: consumes up to the end of the member, so one

@@ -546,6 +546,18 @@ public class FormatterTests
     }
 
     [Fact]
+    public void An_associated_type_keeps_its_spelling()
+    {
+        var formatted = Format("interface C { type Item; type Out=Self; fn f(): Self.Item; }\n"
+            + "struct B :: [C] { type Item=int; v: int }\n"
+            + "fn s<T :: [C<Item=int>]>(c: T): int { return 0; }");
+        Assert.Contains("type Item;", formatted);
+        Assert.Contains("type Out = Self;", formatted);
+        Assert.Contains("type Item = int;", formatted);
+        Assert.Contains("C<Item = int>", formatted);
+    }
+
+    [Fact]
     public void A_delegated_conformance_keeps_its_by()
     {
         var formatted = Format("class Dog :: [Walker by legs,Named] { var legs: Legs }");

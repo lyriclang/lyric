@@ -167,7 +167,19 @@ public static class AstDumper
                 break;
             case NamedType n:
                 Line(sb, indent, $"NamedType {string.Join('.', n.Path)}", n.Span);
-                foreach (var a in n.TypeArguments) Write(a, indent + 1, sb);
+                for (var i = 0; i < n.TypeArguments.Length; i++)
+                {
+                    if (n.ArgumentNames is { } names && i < names.Length && names[i] is { } fixes)
+                    {
+                        Line(sb, indent + 1, $"Fixes {fixes}", n.TypeArguments[i].Span);
+                        Write(n.TypeArguments[i], indent + 2, sb);
+                    }
+                    else Write(n.TypeArguments[i], indent + 1, sb);
+                }
+                break;
+            case AssociatedTypeDecl n:
+                Line(sb, indent, $"AssociatedType {n.Name}", n.Span);
+                if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
             case ArrayType n:
                 Line(sb, indent, n.Length is { } len ? $"ArrayType [{len}]" : "ArrayType", n.Span);
@@ -263,12 +275,14 @@ public static class AstDumper
                 Line(sb, indent, $"Interface {n.Name}{Vis(n.IsPublic)}", n.Span);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
+                foreach (var t in n.Types) Write(t, indent + 1, sb);
                 foreach (var m in n.Members) Write(m, indent + 1, sb);
                 break;
             case ExtendDecl n:
                 Line(sb, indent, $"Extend{Vis(n.IsPublic)}", n.Span);
                 Write(n.Target, indent + 1, sb);            // the first child is the target type
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
+                foreach (var t in n.Types) Write(t, indent + 1, sb);
                 foreach (var m in n.Methods) Write(m, indent + 1, sb);
                 break;
             case GlobalBindingDecl n:

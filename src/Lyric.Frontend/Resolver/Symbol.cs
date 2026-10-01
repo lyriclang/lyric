@@ -92,6 +92,10 @@ public sealed class FunctionSymbol : Symbol
 /// TypeNodes; the sema resolves them.</summary>
 public sealed class GenericParamSymbol : Symbol
 {
+    /// <summary>The interface whose <c>Self</c> this is (03 T5), <c>null</c> for an ordinary
+    /// type parameter.</summary>
+    public TypeSymbol? SelfOf { get; set; }
+
     public TypeNode[] Constraints { get; }
 
     public GenericParamSymbol(string name, TypeNode[] constraints, Node? declaration) : base(name, declaration)
@@ -101,6 +105,19 @@ public sealed class GenericParamSymbol : Symbol
 public sealed class FieldSymbol : Symbol
 {
     public FieldSymbol(string name, Node? declaration) : base(name, declaration) { }
+}
+
+/// <summary>
+/// An associated type (design/v5/spec/03 T6). Declared on an interface, <c>type Item;</c>, it
+/// is a question every conformer answers: <see cref="Bindings"/> holds the answer per
+/// conforming type once the checker has read the conformance. Declared on a struct, class,
+/// enum or in a conformance block, <c>type Item = int;</c>, it is one conformer's answer.
+/// </summary>
+public sealed class AssociatedTypeSymbol : Symbol
+{
+    public AssociatedTypeSymbol(string name, Node? declaration) : base(name, declaration) { }
+
+    public Dictionary<TypeSymbol, Sema.LyrType> Bindings { get; } = new(ReferenceEqualityComparer.Instance);
 }
 
 public sealed class EnumVariantSymbol : Symbol

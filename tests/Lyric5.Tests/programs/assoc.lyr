@@ -1,0 +1,56 @@
+// Associated types (03 T6): declared in an interface, answered by the conformer, named through a constraint.
+// Expected stdout:
+//   first 41 x          'T.Item' through a constraint: int for IntBox, string for StrBox (answered in an extend block)
+//   fixed 42 7          'T :: [Container<Item = int>]' fixes the answer; the default 'type Out = Self'
+//   nested 3 5          a generic conformer answers with its parameter, 'type Item = T'
+import std.io { println };
+
+interface Container {
+    type Item;
+    fn first(): Self.Item;
+    fn count(): int;
+}
+interface Mapper {
+    type Out = Self;
+    fn mapped(): Self.Out;
+}
+
+struct IntBox :: [Container, Mapper] {
+    type Item = int;
+    v: int,
+    fn first(): int { return this.v; }
+    fn count(): int { return 1; }
+    fn mapped(): IntBox { return IntBox { v = this.v + 1 }; }
+}
+
+struct StrBox { s: string }
+extend StrBox :: [Container] {
+    type Item = string;
+    fn first(): string { return this.s; }
+    fn count(): int { return 1; }
+}
+
+struct Pair<T> :: [Container] {
+    type Item = T;
+    a: T,
+    b: T,
+    fn first(): T { return this.a; }
+    fn count(): int { return 2; }
+}
+
+fn firstOf<T :: [Container]>(c: T): T.Item { return c.first(); }
+fn sumFirst<T :: [Container<Item = int>]>(c: T): int { return c.first() + c.count(); }
+
+fn main(): int {
+    let a = IntBox { v = 41 };
+    let b = StrBox { s = "x" };
+    println(f"first {firstOf(a)} {firstOf(b)}");
+
+    let m = IntBox { v = 6 };
+    println(f"fixed {sumFirst(a)} {m.mapped().v}");
+
+    let p = Pair<int> { a = 3, b = 4 };
+    let n: int = firstOf(p);
+    println(f"nested {n} {sumFirst(p)}");
+    return 0;
+}

@@ -15,6 +15,11 @@ public sealed record NullableType(TypeNode Inner, Span Span) : TypeNode(Span);  
 public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Span) : TypeNode(Span)
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>Iterator&lt;Item = int&gt;</c> (design/v5/spec/03 T6): the associated type an
+    /// argument fixes, by argument index, <c>null</c> where the argument is positional; <c>null</c>
+    /// as a whole when none is named.</summary>
+    public string?[]? ArgumentNames { get; init; }
 }
 /// <summary><c>T[]</c>, the length a property of the value; or <c>T[N]</c> with a literal
 /// length, the inline array — a value of N elements (design/v5/spec/03 T13 A4).</summary>

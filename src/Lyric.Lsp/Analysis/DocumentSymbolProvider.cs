@@ -50,7 +50,7 @@ public static class DocumentSymbolProvider
         // INamedDecl. Handled first, because everything below reads a name.
         if (node is ExtendDecl extend)
             return Build(sources, TargetName(extend), SymbolKind.Namespace, extend.Span,
-                extend.Target.Span, Symbols(sources, extend.Methods, inTypeBody: true));
+                extend.Target.Span, Symbols(sources, extend.Types.Cast<Node>().Concat(extend.Methods), inTypeBody: true));
 
         // What a file OFFERS is what belongs in its outline. An import says what the file needs, a
         // parameter and a local exist inside one declaration and are not offered to anyone — and an
@@ -73,10 +73,11 @@ public static class DocumentSymbolProvider
     {
         StructDecl s => (SymbolKind.Struct, Symbols(sources, s.Members, inTypeBody: true)),
         ClassDecl c => (SymbolKind.Class, Symbols(sources, c.Members, inTypeBody: true)),
-        InterfaceDecl i => (SymbolKind.Interface, Symbols(sources, i.Members, inTypeBody: true)),
+        InterfaceDecl i => (SymbolKind.Interface,
+            Symbols(sources, i.Types.Cast<Node>().Concat(i.Members), inTypeBody: true)),
 
         EnumDecl e => (SymbolKind.Enum,
-            Symbols(sources, e.Variants.Cast<Node>().Concat(e.Methods), inTypeBody: true)),
+            Symbols(sources, e.Variants.Cast<Node>().Concat(e.Types).Concat(e.Methods), inTypeBody: true)),
 
         EnumVariant => (SymbolKind.EnumMember, null),
         FieldDecl => (SymbolKind.Field, null),
@@ -88,6 +89,10 @@ public static class DocumentSymbolProvider
         // CHOICE: the enum has no kind for an alias. 'Class' is wrong about what an alias is and
         // right about what it does — it puts a name on a type — and the alternatives say less.
         TypeAliasDecl => (SymbolKind.Class, null),
+
+        // An associated type (03 T6) is a type-level parameter of the conformance; the enum has
+        // exactly that word.
+        AssociatedTypeDecl => (SymbolKind.TypeParameter, null),
 
         // CHOICE: a function in a type body is a method, one at the top level is not.
         //

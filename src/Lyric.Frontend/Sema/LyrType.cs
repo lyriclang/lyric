@@ -44,7 +44,9 @@ public abstract record LyrType
         // and an opaque alias never equals its underlying — that is the point of it.
         (OpaqueRef x, OpaqueRef y) => ReferenceEquals(x.Symbol, y.Symbol),
         (TypeParamType x, TypeParamType y) => ReferenceEquals(x.Param, y.Param),
-        (GenericInstance x, GenericInstance y) => ReferenceEquals(x.Definition, y.Definition) && SameSequence(x.Arguments, y.Arguments),
+        (GenericInstance x, GenericInstance y) => ReferenceEquals(x.Definition, y.Definition) && SameSequence(x.Arguments, y.Arguments)
+                                                  && SameFixations(x.Fixations, y.Fixations),
+        (AssocOf x, AssocOf y) => Equal(x.Base, y.Base) && ReferenceEquals(x.Member, y.Member),
         (Optional x, Optional y) => Equal(x.Inner, y.Inner),
         (ArrayOf x, ArrayOf y) => Equal(x.Element, y.Element),
         (SliceOf x, SliceOf y) => Equal(x.Element, y.Element),
@@ -62,6 +64,18 @@ public abstract record LyrType
         (NeverType, NeverType) => true,
         _ => false
     };
+
+    private static bool SameFixations((AssociatedTypeSymbol Member, LyrType Type)[]? a, (AssociatedTypeSymbol Member, LyrType Type)[]? b)
+    {
+        if (a is null || a.Length == 0) return b is null || b.Length == 0;
+        if (b is null || a.Length != b.Length) return false;
+        foreach (var (member, type) in a)
+        {
+            var other = Array.FindIndex(b, f => ReferenceEquals(f.Member, member));
+            if (other < 0 || !Equal(type, b[other].Type)) return false;
+        }
+        return true;
+    }
 
     private static bool SameSequence(LyrType[] a, LyrType[] b)
     {
@@ -83,7 +97,18 @@ public sealed record NamedRef(TypeSymbol Symbol) : LyrType;          // a struct
 /// opaque value IS its underlying value, which is what lets it cross the native boundary.</summary>
 public sealed record OpaqueRef(TypeSymbol Symbol, LyrType Underlying) : LyrType;
 public sealed record TypeParamType(GenericParamSymbol Param) : LyrType; // T inside a generic definition
-public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments) : LyrType; // Stack<int>
+public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments) : LyrType // Stack<int>
+{
+    /// <summary><c>Iterator&lt;Item = int&gt;</c> (03 T6): the associated types this instance of an
+    /// interface fixes, <c>null</c> when none. Part of the type's identity.</summary>
+    public (AssociatedTypeSymbol Member, LyrType Type)[]? Fixations { get; init; }
+}
+
+/// <summary><c>T.Item</c> (03 T6): the associated type <see cref="Member"/> of whatever
+/// <see cref="Base"/> turns out to be — a type parameter until its binding is known, then the
+/// conformer's answer. <see cref="Base"/> is a type parameter or <c>Self</c>; a concrete base
+/// resolves to its binding and never stays here.</summary>
+public sealed record AssocOf(LyrType Base, AssociatedTypeSymbol Member) : LyrType;
 public sealed record Optional(LyrType Inner) : LyrType;              // ?T
 public sealed record ArrayOf(LyrType Element) : LyrType;             // T[]
 public sealed record SliceOf(LyrType Element) : LyrType;             // Slice<T>: a view of T[] (03 T13 A2)
