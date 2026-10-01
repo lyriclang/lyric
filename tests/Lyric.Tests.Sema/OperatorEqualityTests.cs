@@ -119,7 +119,7 @@ public class OperatorEqualityTests
                 return if (a == a) 1 else 0;
             }
             """,
-            ":: [Equatable<Point>]");
+            ":: [Equatable]");
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class OperatorEqualityTests
 
             fn main(): int { return if (same(1, 2)) 1 else 0; }
             """,
-            "Equatable<T>");
+            "Equatable");
     }
 
     [Fact]

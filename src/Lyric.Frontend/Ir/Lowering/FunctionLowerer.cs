@@ -1924,8 +1924,50 @@ internal sealed class FunctionLowerer
         return depth;
     }
 
+    /// <summary>The four orderings off a <c>?Ordering</c>: present and the right tag — read in
+    /// a branch, since the tag of an absent answer is nothing to read.</summary>
+    private TempId LowerOrderingAnswer(BinaryOp op, TempId answer, IrOptionalType answered, IrEnumType ordering, Span span)
+    {
+        var result = _slots.DeclareSynthetic("ordered", BoolType);
+        var present = _slots.NewTemp(BoolType);
+        _b.Emit(new OptIsSome(present, answer, span));
+        var some = _b.NewBlock();
+        var none = _b.NewBlock();
+        var merge = _b.NewBlock();
+        _b.Seal(new CondBranch(present, some, none, span));
+
+        _b.SwitchTo(none);
+        StoreValue(result, EmitConst(new BoolConst(false), BoolType, span), span);
+        _b.Seal(new Branch(merge, span));
+
+        _b.SwitchTo(some);
+        var inner = _slots.NewTemp(answered.Inner);
+        _b.Emit(new OptGet(inner, answer, answered.Inner, span));
+        var tag = TagOf(inner, span);
+        // '<' is Less, '>' is Greater; '<=' is anything but Greater, '>=' anything but Less.
+        var (variant, equal) = op switch
+        {
+            BinaryOp.Lt => ("Less", true),
+            BinaryOp.Gt => ("Greater", true),
+            BinaryOp.Le => ("Greater", false),
+            _ => ("Less", false),
+        };
+        var wanted = EmitConst(new IntConst((ulong)_typeTable.TagOf(ordering.Type, variant, span)), new IrScalarType(IrScalar.I64), span);
+        var holds = _slots.NewTemp(BoolType);
+        _b.Emit(new BinOp(holds, equal ? IrBinKind.Eq : IrBinKind.Ne, BoolType, tag, wanted, span));
+        StoreValue(result, holds, span);
+        _b.Seal(new Branch(merge, span));
+
+        _b.SwitchTo(merge);
+        return LoadValue(result, span);
+    }
+
     private TempId LowerUnary(UnaryExpr expr)
     {
+        // '-v' and '~v' on a conforming type ARE their calls (04 D6).
+        if (_types.OperatorCallOf(expr) is { } desugaredUnary)
+            return LowerCall(desugaredUnary) ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
+
         if (expr.Operator is UnaryOp.PreInc or UnaryOp.PreDec)
             return LowerIncDec(expr.Operand, expr.Operator is UnaryOp.PreInc,
                 yieldOldValue: false, expr.Span);
@@ -2017,10 +2059,17 @@ internal sealed class FunctionLowerer
             var value = LowerCall(desugared)
                         ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
 
+            // 'compare' answers a '?Ordering' (04 D6): '<' is '.Less', '<=' is not '.Greater', and
+            // so on; 'null' — the two are not ordered — makes every one of the four false.
+            if (expr.Operator is BinaryOp.Lt or BinaryOp.Le or BinaryOp.Gt or BinaryOp.Ge
+                && TypeOfExpr(desugared) is IrOptionalType { Inner: IrEnumType ordering } answered)
+                return LowerOrderingAnswer(expr.Operator, value, answered, ordering, expr.Span);
+
             switch (expr.Operator)
             {
                 // Equality and arithmetic ARE their calls; nothing follows.
-                case BinaryOp.Eq or BinaryOp.Add or BinaryOp.Sub or BinaryOp.Mul or BinaryOp.Div:
+                case BinaryOp.Eq or BinaryOp.Add or BinaryOp.Sub or BinaryOp.Mul or BinaryOp.Div or BinaryOp.Rem
+                    or BinaryOp.BitAnd or BinaryOp.BitOr or BinaryOp.BitXor or BinaryOp.Shl or BinaryOp.Shr:
                     return value;
 
                 case BinaryOp.Ne:

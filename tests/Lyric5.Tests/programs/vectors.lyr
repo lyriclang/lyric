@@ -1,0 +1,80 @@
+// The operator interfaces (04 D6): arithmetic, the heterogeneous conformance in a block with its
+// own 'Out', unary minus, '==' and the four orderings through 'Equatable'/'Ordered', a partial
+// order, '+=', the bit operators, and a generic sum over 'Add<Out = T>' reaching the scalars.
+// The plan's 'vectors' artefact.
+// Expected stdout:
+//   add 4 6 sub 2 2 mul 3 6 scaled 4.5 2.5      'a + b' is 'a.add(b)'; 'Mul<int>' own, 'Mul<float>' in a block answering 'type Out = float'
+//   neg -1 -2 eq true false lt true false le true   'Neg', 'Equatable', 'Ordered' by length, '<=' is "not Greater"
+//   sum 10 13 compound 7 (4, 6)                 'sum<T :: [Add<Out = T>]>' over ints and vectors; '+=' as 'a = a.add(b)'; Display in the f-string
+//   rem 1 bits 1 7 6 -3 8 2                     'Rem', 'BitAnd', 'BitOr', 'BitXor', 'BitNot', 'Shl', 'Shr'
+//   float false false partial                    'compare' answering null: every ordering is false
+import std.io { println };
+
+struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {
+    x: int,
+    y: int,
+    fn add(rhs: V): V { return V { x = this.x + rhs.x, y = this.y + rhs.y }; }
+    fn sub(rhs: V): V { return V { x = this.x - rhs.x, y = this.y - rhs.y }; }
+    fn mul(rhs: int): V { return V { x = this.x * rhs, y = this.y * rhs }; }
+    fn neg(): V { return V { x = -this.x, y = -this.y }; }
+    fn equals(o: V): bool { return this.x == o.x && this.y == o.y; }
+    fn compare(o: V): ?Ordering {
+        let a = this.x * this.x + this.y * this.y;
+        let b = o.x * o.x + o.y * o.y;
+        if (a < b) { return Ordering.Less; }
+        if (a > b) { return Ordering.Greater; }
+        return Ordering.Equal;
+    }
+    fn show(): string { return f"({this.x}, {this.y})"; }
+}
+
+extend V :: [Mul<float>] {
+    type Out = float;
+    fn mul(rhs: float): float { return (this.x as float) * rhs; }
+}
+
+struct Bits :: [Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+    n: int,
+    fn rem(rhs: Bits): Bits { return Bits { n = this.n % rhs.n }; }
+    fn bitAnd(rhs: Bits): Bits { return Bits { n = this.n & rhs.n }; }
+    fn bitOr(rhs: Bits): Bits { return Bits { n = this.n | rhs.n }; }
+    fn bitXor(rhs: Bits): Bits { return Bits { n = this.n ^ rhs.n }; }
+    fn bitNot(): Bits { return Bits { n = ~this.n }; }
+    fn shl(rhs: int): Bits { return Bits { n = this.n << rhs }; }
+    fn shr(rhs: int): Bits { return Bits { n = this.n >> rhs }; }
+}
+
+struct Partial :: [Equatable, Ordered] {
+    v: int,
+    fn equals(o: Partial): bool { return this.v == o.v; }
+    fn compare(o: Partial): ?Ordering { return null; }
+}
+
+fn sum<T :: [Add<Out = T>]>(a: T, b: T, c: T): T { return a + b + c; }
+
+fn sumTo(a: V, b: V): int {
+    var acc = a;
+    acc += b;
+    acc += V { x = 1, y = 0 };
+    return acc.x + acc.y - 4;
+}
+
+fn main(): int {
+    let a = V { x = 1, y = 2 };
+    let b = V { x = 3, y = 4 };
+    let s = a + b;
+    let d = b - a;
+    let m = a * 3;
+    println(f"add {s.x} {s.y} sub {d.x} {d.y} mul {m.x} {m.y} scaled {b * 1.5} {a * 2.5}");
+    let n = -a;
+    println(f"neg {n.x} {n.y} eq {a == V { x = 1, y = 2 }} {a == b} lt {a < b} {b < a} le {a <= a}");
+    let t = sum(a, b, a);
+    println(f"sum {sum(1, 2, 3) + 4} {t.x + t.y} compound {sumTo(a, b)} {a + b}");
+    let p = Bits { n = 5 };
+    let q = Bits { n = 3 };
+    println(f"rem {(Bits { n = 7 } % q).n} bits {(p & q).n} {(p | q).n} {(p ^ q).n} {(~Bits { n = 2 }).n} {(q << 1).n + (p << 1).n - 8} {(p >> 1).n}");
+    let x = Partial { v = 1 };
+    let y = Partial { v = 2 };
+    println(f"float {x < y} {x >= y} partial");
+    return 0;
+}

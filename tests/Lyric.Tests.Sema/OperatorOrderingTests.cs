@@ -86,7 +86,7 @@ public class OperatorOrderingTests
 
         var found = de.Diagnostics.FirstOrDefault(d => d.Code == "LYR-SEM0003");
         Assert.NotNull(found);
-        Assert.Contains(":: [Ordered<M>]", found.Message);
+        Assert.Contains(":: [Ordered]", found.Message);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class OperatorOrderingTests
             """);
 
         Assert.Contains(de.Diagnostics,
-            d => d.Code == "LYR-SEM0003" && d.Message.Contains("Ordered<T>"));
+            d => d.Code == "LYR-SEM0003" && d.Message.Contains("Ordered"));
     }
 
     [Fact]
