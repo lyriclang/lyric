@@ -18,6 +18,11 @@ public static class Intrinsics
         ["std.string.fromFloat"] = "lyr_str_from_float",
         ["std.string.fromChar"] = "lyr_str_from_char",
         ["std.core.panic"] = "lyr_panic_message",
+        // The catalogue (05 E8): 'assert' a check at the call, so its trace starts in the program;
+        // the two that never return are panics of their own codes.
+        ["std.core.assert"] = "LYR_ASSERT",
+        ["std.core.unreachable"] = "lyr_panic_unreachable",
+        ["std.core.todo"] = "lyr_panic_todo",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

@@ -73,7 +73,6 @@ public sealed class TypeChecker
     /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
     /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
     private readonly TypeSymbol? _closeable;
-    private readonly FunctionSymbol? _panic; // the builtin panic, returning never
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
@@ -110,7 +109,6 @@ public sealed class TypeChecker
         _de = de;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
-        _panic = comp.Builtins.LookupLocal("panic") as FunctionSymbol;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
         _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
@@ -133,14 +131,6 @@ public sealed class TypeChecker
         // from the stdlib.
         _indexable = comp.FindModule(["std", "collections"])?.Members
             .LookupLocal("Indexable") as TypeSymbol;
-
-        // `panic` exists TWICE: as a builtin in the root scope, so it is callable without an import,
-        // and as a native declaration in `std.core`, which gives it its signature and native binding.
-        // Both mean the same function, but only the builtin carried the `never` type — whoever wrote
-        // `import std.core { panic }` got a `void` back, and the flow analysis did not see the
-        // divergence. The place where `never` originates has to know both.
-        _stdPanic = comp.FindModule(["std", "core"])?.Members
-            .LookupLocal("panic") as FunctionSymbol;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -215,9 +205,6 @@ public sealed class TypeChecker
     /// 10 C7), under the same rules.</summary>
     private readonly TypeSymbol? _clone;
 
-    /// <summary>The native declaration from <c>std.core</c>. See the constructor.</summary>
-    private readonly FunctionSymbol? _stdPanic;
-
     /// <summary>The context type a value block's tail checks against (§3.1, §6.9): the match
     /// expression's context for a block arm, the lambda's return type for a block body. Set by
     /// the owner around <see cref="CheckBlock"/>, and only read by the tail itself.</summary>
@@ -227,12 +214,6 @@ public sealed class TypeChecker
     /// value goes nowhere, <c>try?</c> over a <c>void</c> call has nothing to make optional and
     /// only drops the error.</summary>
     private Expr? _statementValue;
-
-    /// <summary>Is <paramref name="f"/> the <c>panic</c> function, no matter which of the two names
-    /// reached it?</summary>
-    private bool IsPanic(FunctionSymbol f) =>
-        (_panic is not null && ReferenceEquals(f, _panic))
-        || (_stdPanic is not null && ReferenceEquals(f, _stdPanic));
 
     public TypeResult Check()
     {
@@ -1518,7 +1499,9 @@ public sealed class TypeChecker
         {
             CheckBlock(fn.Body, scope);
             if (!TypeFacts.IsVoid(_currentReturn) && _currentYield is null && !Flow.AlwaysReturns(fn.Body, _result))
-                _de.Report("LYR-SEM0017", Severity.Error, fn.Span, $"not all code paths of '{fn.Name}' return a value");
+                _de.Report("LYR-SEM0017", Severity.Error, fn.Span, _currentReturn is NeverType
+                    ? $"'{fn.Name}' returns 'never', and a path of it ends — end every path in a throw, a panic or a call that does not return"
+                    : $"not all code paths of '{fn.Name}' return a value");
         }
 
         _currentReturn = savedReturn;
@@ -1583,6 +1566,14 @@ public sealed class TypeChecker
                 // unified afterwards — there is nothing to check assignability against yet.
                 else if (_returnInference is { } inferred)
                     inferred.Add(r.Value is not null ? CheckExpr(r.Value, scope) : LyrType.Void);
+                // A function returning 'never' does not return (05 E12): a 'return' would — unless
+                // what it returns does not return either.
+                else if (_currentReturn is NeverType)
+                {
+                    if (r.Value is null || CheckExpr(r.Value, scope) is not NeverType)
+                        _de.Report("LYR-SEM0146", Severity.Error, r.Span,
+                            "a function returning 'never' does not return — end the path in a throw, a panic or a call that does not return");
+                }
                 else if (r.Value is not null) CheckAssignable(r.Value, CheckExpr(r.Value, scope, _currentReturn), _currentReturn, r.Span);
                 else if (!TypeFacts.IsVoid(_currentReturn) && !_currentReturn.IsError)
                     _de.Report("LYR-SEM0001", Severity.Error, r.Span, "return without a value in a non-void function");
@@ -2086,6 +2077,11 @@ public sealed class TypeChecker
         if (tried.Kind == TryKind.Force) return CheckExpr(tried.Value, scope, expected);
         var value = CheckExpr(tried.Value, scope, expected is Optional wanted ? wanted.Inner : null);
         if (value.IsError) return value;
+        // Over an operand that never gives a value the form would be worth '?never' — always null,
+        // and 'never' stands only as a return type (05 E12).
+        if (value is NeverType)
+            return Report(tried.KeywordSpan, "LYR-SEM0145",
+                "'try?' over an expression that never gives a value would be worth '?never' — and 'never' stands only as a return type");
         if (!TypeFacts.IsVoid(value)) return new Optional(value);
         // Nothing to make optional: as a statement it drops the error, and that is all it does.
         return ReferenceEquals(_statementValue, tried) ? value : Report(tried.KeywordSpan, "LYR-SEM0140",
@@ -2676,8 +2672,9 @@ public sealed class TypeChecker
     {
         var fn = (FunctionDecl)f.Declaration!;
         var ps = fn.Parameters.Select(p => ResolveType(p.Type, _comp.Builtins)).ToArray();
-        var ret = IsPanic(f) ? LyrType.Never // panic has the unnameable type never
-            : fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
+        // 'never' is a return type like any other (05 E12): 'panic', 'unreachable' and 'todo' say it
+        // in their declarations, and so may any function.
+        var ret = fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
         return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn) };
     }
 
@@ -3039,6 +3036,8 @@ public sealed class TypeChecker
     {
         var t = CheckExpr(u.Operand, scope);
         if (t.IsError) return LyrType.Error;
+        // An operand that gives no value leaves none to operate on (05 E12): neither does the expression.
+        if (t is NeverType) return LyrType.Never;
         switch (u.Operator)
         {
             case UnaryOp.Not:
@@ -3134,6 +3133,15 @@ public sealed class TypeChecker
         }
 
         if (l.IsError || r.IsError) return LyrType.Error;
+        // An operand that gives no value fits every type (05 E12): it takes the other one's, so
+        // 'ok || fail("…")' is a 'bool' and '1 + unreachable()' an 'int'. '??' has its own rule for
+        // a right side that gives none.
+        if (b.Operator is not BinaryOp.Coalesce)
+        {
+            if (l is NeverType && r is NeverType) return LyrType.Never;
+            if (l is NeverType) l = r;
+            else if (r is NeverType) r = l;
+        }
         return CheckBinaryTyped(b, l, r, scope);
     }
 
@@ -7809,8 +7817,9 @@ public sealed class TypeChecker
                     if (b.Tail is { } contextTail && !TypeFacts.IsVoid(contextRet)) // a void context discards the value
                         CheckAssignable(contextTail.Expr, _result.TypeOf(contextTail.Expr), contextRet, contextTail.Span);
                     if (!TypeFacts.IsVoid(contextRet) && !contextRet.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
-                        _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
-                            "a non-void block lambda must return or throw on every path");
+                        _de.Report("LYR-SEM0046", Severity.Error, lam.Span, contextRet is NeverType
+                            ? "a block lambda returning 'never' must end every path in a throw, a panic or a call that does not return"
+                            : "a non-void block lambda must return or throw on every path");
                 }
                 _tailExpected = savedTail;
                 break;

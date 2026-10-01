@@ -625,6 +625,8 @@ internal sealed class FunctionLowerer
                     LowerExprOrVoid(expr);
                     if (!_b.IsSealed) _b.Seal(new Return(null, expr.Span));
                 }
+                // A body that gives no value — '(n: int): int => unreachable()' — ends as it stands.
+                else if (Diverges(expr)) LowerDiverging(expr);
                 else
                 {
                     var value = LowerExprAs(expr, _returnType);
@@ -693,8 +695,22 @@ internal sealed class FunctionLowerer
         return null;
     }
 
-    /// <summary>true means control flow falls through, false means the block is sealed.</summary>
+    /// <summary>true means control flow falls through, false means the block is sealed. An expression
+    /// in the statement that gives no value (05 E12) ends the statement where it stands.</summary>
     private bool LowerStmt(Stmt stmt)
+    {
+        try { return LowerStmtCore(stmt); }
+        catch (Diverged) { return false; }
+    }
+
+    /// <summary>A value position met an expression that gives no value (05 E12) — a throw, a panic, a
+    /// call of a function that returns 'never' — which sealed its block: the rest of the enclosing
+    /// expression never runs, so its lowering stops, and the statement around it reports that control
+    /// flow ended (<see cref="LowerStmt"/>). A construct that branches before such an operand handles
+    /// it itself, as '??', 'if', 'match' and the short circuits do — its other path goes on.</summary>
+    private sealed class Diverged : Exception;
+
+    private bool LowerStmtCore(Stmt stmt)
     {
         switch (stmt)
         {
@@ -2002,7 +2018,16 @@ internal sealed class FunctionLowerer
     // ------------------------------------------------------------------ expressions
 
     private TempId LowerExpr(Expr expr) =>
-        LowerExprOrVoid(expr) ?? throw Bug($"expression at {expr.Span} produced no value");
+        LowerExprOrVoid(expr) ?? (Diverges(expr) ? Diverge(expr) : throw Bug($"expression at {expr.Span} produced no value"));
+
+    /// <summary>An expression of type 'never' where a value is wanted: its block ends with the
+    /// 'unreachable' its type promises — a call of a never-declared function is an ordinary call and
+    /// does not seal — and the enclosing expression stops (<see cref="Diverged"/>).</summary>
+    private TempId Diverge(Expr expr)
+    {
+        if (!_b.IsSealed) _b.Seal(new Unreachable(expr.Span));
+        throw new Diverged();
+    }
 
     /// <summary>Returns null only for a call to a void function, the one expression without a value.
     /// Otherwise always a temp.</summary>
@@ -2444,10 +2469,16 @@ internal sealed class FunctionLowerer
             ? new CondBranch(left, rhsBlock, mergeBlock, expr.Span)
             : new CondBranch(left, mergeBlock, rhsBlock, expr.Span));
 
+        // A right side that gives no value ('ok || fail("…")') seals its own block: the merge then
+        // has the short edge alone, and the slot holds the left side's value.
         _b.SwitchTo(rhsBlock);
-        var right = LowerExpr(expr.Right);
-        _b.Emit(new StoreLocal(slot, right, expr.Right.Span));
-        _b.Seal(new Branch(mergeBlock, expr.Right.Span));
+        if (Diverges(expr.Right)) LowerDiverging(expr.Right);
+        else
+        {
+            var right = LowerExpr(expr.Right);
+            _b.Emit(new StoreLocal(slot, right, expr.Right.Span));
+            _b.Seal(new Branch(mergeBlock, expr.Right.Span));
+        }
 
         _b.SwitchTo(mergeBlock);
         var dest = _slots.NewTemp(BoolType);
@@ -2460,6 +2491,21 @@ internal sealed class FunctionLowerer
     /// STATEMENT, no case distinction is needed here.</summary>
     private TempId LowerIfExpr(IfExpr expr)
     {
+        // Both branches give no value (05 E12): no slot and no merge — each branch ends its own
+        // block, and the expression ends where it stands.
+        if (Diverges(expr.Then) && Diverges(expr.Else))
+        {
+            var test = LowerExpr(expr.Condition);
+            var thenOnly = _b.NewBlock();
+            var elseOnly = _b.NewBlock();
+            _b.Seal(new CondBranch(test, thenOnly, elseOnly, expr.Span));
+            _b.SwitchTo(thenOnly);
+            LowerDiverging(expr.Then);
+            _b.SwitchTo(elseOnly);
+            LowerDiverging(expr.Else);
+            throw new Diverged();
+        }
+
         var type = TypeOfExpr(expr);
         var slot = _slots.DeclareSynthetic("if", type);
 
@@ -2490,9 +2536,6 @@ internal sealed class FunctionLowerer
             _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
             elseExit = _b.CurrentId;
         }
-
-        if (thenExit is null && elseExit is null)
-            throw NotSupported("an 'if' expression whose both branches diverge", expr.Span);
 
         var mergeBlock = _b.NewBlock();
         if (thenExit is { } t) _b.SealBlock(t, new Branch(mergeBlock, expr.Then.Span));
@@ -5434,7 +5477,7 @@ internal sealed class FunctionLowerer
         // as every other method. It stands in 'receiver', because the call 'e.damage(30)' does not have
         // it in the argument list.
         if (_imports.IsNative(symbol))
-            return LowerImportCall(_imports.Intern(symbol), expr.Arguments, expr.Span, receiver);
+            return LowerImportCall(_imports.Intern(symbol), WithDefaults(symbol, expr.Arguments), expr.Span, receiver);
 
         // 'panic' is a language builtin and therefore has no module it is declared in; the resolver puts
         // it into the root scope. It is bound like any other native, through its symbolic name.
@@ -5823,6 +5866,15 @@ internal sealed class FunctionLowerer
 
         return DeclaredTypes.Lower(node);
     }
+
+    /// <summary>A native's arguments with the defaults its declaration gives for those a call leaves
+    /// out (04 D5) — its own expressions, lowered at the call as every argument is: <c>assert(ok)</c>
+    /// passes the default message.</summary>
+    private static Expr[] WithDefaults(FunctionSymbol native, Expr[] given) =>
+        native.Declaration is FunctionDecl { Parameters: var declared } && given.Length < declared.Length
+        && declared.Skip(given.Length).All(p => p.Default is not null && !p.IsParams)
+            ? [.. given, .. declared.Skip(given.Length).Select(p => p.Default!)]
+            : given;
 
     private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span,
         TempId? receiver = null)

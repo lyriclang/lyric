@@ -178,9 +178,53 @@ public class ThrowExpressionTests
     [Fact]
     public void A_never_function_cannot_return()
     {
+        // Its own rule since 5 (05 E12, LYR-SEM0146) — no longer the generic "return without a value".
         var de = Check("""
             fn f(): never { return; }
             """);
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0001");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0146");
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0001");
     }
+
+    [Fact]
+    public void A_never_function_returns_only_what_does_not_return()
+    {
+        Assert.Contains(Check("fn f(): never { return 1; }").Diagnostics, d => d.Code == "LYR-SEM0146");
+        Compiles("fn g(): never { panic(\"x\"); }\nfn f(): never { return g(); }");
+    }
+
+    [Fact]
+    public void A_never_function_whose_path_ends_is_refused()
+    {
+        var de = Check("fn f(n: int): never { if (n > 0) { panic(\"x\"); } }");
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0017");
+        Assert.Contains("returns 'never'", error.Message, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------ positions (05 E12)
+
+    [Theory]
+    [InlineData("fn f(x: never) { }")]
+    [InlineData("fn f() { let x: never = panic(\"x\"); }")]
+    [InlineData("struct S { n: never }")]
+    [InlineData("fn f(xs: never[]) { }")]
+    [InlineData("fn f(): ?never { return null; }")]
+    [InlineData("struct Box<T> { v: T }\nfn f(b: Box<never>) { }")]
+    [InlineData("fn f(): int throws never { return 1; }")]
+    [InlineData("type Nothing = never;")]
+    [InlineData("fn f() { let g = (x: never) => 1; }")]
+    public void Never_stands_only_as_a_return_type(string source) =>
+        Assert.Contains(Check(source).Diagnostics, d => d.Code == "LYR-SEM0145");
+
+    [Fact]
+    public void Never_is_the_return_type_of_a_function_a_lambda_and_a_function_type() =>
+        Compiles("""
+            fn fail(m: string): never { panic(m); }
+            fn take(f: fn(string) -> never) { }
+            fn t() { take((m: string): never => panic(m)); take(fail); }
+            """);
+
+    [Fact]
+    public void A_try_question_over_a_never_operand_is_refused() =>
+        Assert.Contains(Check(Err + "fn f() { let v = try? throw Err { }; }").Diagnostics, d => d.Code == "LYR-SEM0145");
 }
