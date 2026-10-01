@@ -122,7 +122,8 @@ public class GenericExtendTests
 
     // ------------------------------------------------------------------ the target
 
+    // The array became a target with S7b (03 T7 X2; ConstructorExtendTests); a function type stays none.
     [Fact]
-    public void An_array_target_is_not_one_yet() =>
-        Rejected("extend<T> T[] { fn len(): int { return 0; } }\nfn f(): int { return 0; }", "LYR-SEM0047");
+    public void A_function_type_is_no_target() =>
+        Rejected("extend fn(int) -> int { fn len(): int { return 0; } }\nfn f(): int { return 0; }", "LYR-SEM0047");
 }

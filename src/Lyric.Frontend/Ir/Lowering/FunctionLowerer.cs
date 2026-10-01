@@ -139,7 +139,8 @@ internal sealed class FunctionLowerer
         GenericInstance? ownerInstance = null,
         TypeNode? receiverTypeNode = null,
         IrType? coroutineYield = null,
-        IrType? returnTypeOverride = null)
+        IrType? returnTypeOverride = null,
+        LyrType? receiverType = null)
     {
         _ownerInstance = ownerInstance;
         _instances = instances;
@@ -169,7 +170,7 @@ internal sealed class FunctionLowerer
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
         // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
         // same route with 'this'.
-        if (receiver is not null)
+        if (receiver is not null || receiverType is not null)
         {
             // An enum receiver is the enum type rather than one of its variants; which one is present is
             // decided by the 'match' in the body.
@@ -180,11 +181,15 @@ internal sealed class FunctionLowerer
             // that: 'extend int' and 'extend string' target builtins that have no layout entry, and every
             // case there would invent an object for them. A scalar as parameter 0 is nothing new — every
             // free function has that. This is why an inherent extension needs no boxing.
-            _thisType = receiverTypeNode is { } written
+            // A block on a built-in constructor (03 T7 X2) brings its receiver as a TYPE — 'T[]'
+            // at the block's parameters, substituted for this instance — where no symbol stands.
+            _thisType = receiverType is { } shape
+                ? _typeTable.Lower(SubstituteType(shape), SpanOfDecl(decl))
+                : receiverTypeNode is { } written
                 ? _typeTable.Lower(written)
                 : _ownerInstance is { } owner
                 ? _typeTable.InstanceType(owner, SpanOfDecl(decl))
-                : receiver.Kind switch
+                : receiver!.Kind switch
             {
                 TypeSymbolKind.Enum => _typeTable.EnumOf(receiver),
                 TypeSymbolKind.Interface => _typeTable.InterfaceOf(receiver),
@@ -4594,12 +4599,12 @@ internal sealed class FunctionLowerer
     /// requested for the receiver, a plain block's lowered as every extension is; the call is
     /// direct either way.</summary>
     private TempId? LowerBlockMethodCall(MemberExpr member, FunctionSymbol symbol, ExtensionBlock block,
-        GenericInstance receiver, CallExpr expr)
+        LyrType receiver, CallExpr expr)
     {
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
             throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
         FunctionId target;
-        if (block.Generics.Length == 0)
+        if (block.Generics.Length == 0 && !block.IsConstructorTarget && receiver is GenericInstance)
         {
             if (!TryResolveFunction(symbol, out target))
                 throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' was not lowered", expr.Span);
@@ -5013,6 +5018,15 @@ internal sealed class FunctionLowerer
                      && _typeTable.BlockOf(blockMember) is { Target: not null } ownerBlock
                      && SubstituteType(ReceiverType(member.Target)) is GenericInstance onInstance:
                 return LowerBlockMethodCall(member, blockMember, ownerBlock, onInstance, expr);
+
+            // A member of a block on a built-in constructor (03 T7 X2): 'xs.sum()' on a 'T[]',
+            // 'o.orElse(v)' on a '?T' — the shape binds the block's parameters.
+            case MemberExpr member
+                when _types.RefOf(member) is FunctionSymbol shapeMember
+                     && _typeTable.BlockOf(shapeMember) is { } shapeBlock
+                     && (shapeBlock.IsConstructorTarget || shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
+                     && SubstituteType(ReceiverType(member.Target)) is ArrayOf or SliceOf or InlineArrayOf or Optional or Sema.TupleOf:
+                return LowerBlockMethodCall(member, shapeMember, shapeBlock, SubstituteType(ReceiverType(member.Target)), expr);
 
             // A GENERIC interface member on an instance of a generic type:
             // 'ArrayIterator<int>.zip<string>()'. It is not a member of the instance at all — it is
@@ -5889,6 +5903,9 @@ internal sealed class FunctionLowerer
     {
         TypeParamType p when _substitution.TryGetValue(p.Param, out var bound) => bound,
         ArrayOf a => new ArrayOf(SubstituteType(a.Element)),
+        SliceOf s => new SliceOf(SubstituteType(s.Element)),
+        InlineArrayOf ia => new InlineArrayOf(SubstituteType(ia.Element), ia.Length),
+        RangeOf r => new RangeOf(SubstituteType(r.Element)),
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(

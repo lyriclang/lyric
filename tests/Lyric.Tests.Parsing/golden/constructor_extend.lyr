@@ -1,0 +1,3 @@
+extend<T> T[] { fn first(): T { return this[0]; } }
+extend<T> ?T { fn some(): bool { return this != null; } }
+extend<A, B> (A, B) { fn firstOf(): A { let (a, _) = this; return a; } }

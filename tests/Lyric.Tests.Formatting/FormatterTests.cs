@@ -546,6 +546,14 @@ public class FormatterTests
     }
 
     [Fact]
+    public void An_extend_on_a_shape_keeps_its_target()
+    {
+        var formatted = Format("extend<T>   T[] { fn first(): T { return this[0]; } }\nextend<T> ?T { fn some(): bool { return this != null; } }");
+        Assert.Contains("extend<T> T[] {", formatted);
+        Assert.Contains("extend<T> ?T {", formatted);
+    }
+
+    [Fact]
     public void A_generic_extend_keeps_its_parameters()
     {
         var formatted = Format("extend<T::[Display]>   List<T> :: [Display] { fn show(): string { return \"l\"; } }");

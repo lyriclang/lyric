@@ -356,6 +356,8 @@ public sealed class Resolver
             // A named target, plain or an instance ('List<T>', 'Box<int>' — 03 T7 X1); an array,
             // an optional or a tuple leaves Target null until S7b, and the sema says so.
             block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
+            // 'extend<T> T[]', 'extend<T> ?T', a tuple (03 T7 X2): a shape, no symbol.
+            block.IsConstructorTarget = block.Decl.Target is ArrayType or NullableType or AST.TupleType;
             // 'Self' in the block is the target (03 T5), known before the signatures bind — for a
             // plain target; an instance target is written out.
             if (block.Target is { } target && block.Decl.Target is NamedType { TypeArguments.Length: 0 })

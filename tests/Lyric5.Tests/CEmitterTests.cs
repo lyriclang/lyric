@@ -61,6 +61,7 @@ public class CEmitterTests
     [InlineData("shapes")]
     [InlineData("vectors")]
     [InlineData("extends")]
+    [InlineData("shapes_ext")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -102,6 +103,9 @@ public class CEmitterTests
 
     private const string ASSOC_EXPECTED =
         "first 41 x\nfixed 42 7\nnested 3 5\n";
+
+    private const string SHAPES_EXT_EXPECTED =
+        "sum 6 first 1 last 3\nopt 5 0 some true false\npair 3\nview 2 slice 20\n";
 
     private const string EXTENDS_EXPECTED =
         "first 1 a\nshow [1, 2] <a, b>\npair 3 x\nconcrete 7\n";
@@ -172,6 +176,7 @@ public class CEmitterTests
             data.Add("shapes", profile, 0, SHAPES_EXPECTED);
             data.Add("vectors", profile, 0, VECTORS_EXPECTED);
             data.Add("extends", profile, 0, EXTENDS_EXPECTED);
+            data.Add("shapes_ext", profile, 0, SHAPES_EXT_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
