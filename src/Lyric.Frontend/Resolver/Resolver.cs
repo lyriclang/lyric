@@ -85,6 +85,9 @@ public sealed class Resolver
                 $"'{fn.Name}' is already declared in this extend block",
                 PreviousDeclaration(methodScope, fn.Name));
         }
+        foreach (var t in ex.Types)
+            if (!methodScope.TryDeclare(new AssociatedTypeSymbol(t.Name, t)))
+                _de.Report("LYR-RES0001", Severity.Error, t.Span, $"'{t.Name}' is already declared in this extend block");
         _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()));
     }
 
@@ -101,6 +104,7 @@ public sealed class Resolver
             {
                 case FieldDecl f: DeclareMember(scope, new FieldSymbol(f.Name, f), f); break;
                 case FunctionDecl fn: DeclareMember(scope, Fn(fn), fn); break;
+                case AssociatedTypeDecl t: DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t); break;
 
                 // A 'static let' is a type-bound constant, held as a GlobalSymbol because that is
                 // what it is: an immutable binding without an instance, scoped to the type rather
@@ -121,6 +125,7 @@ public sealed class Resolver
         DeclareTop(module, ts, e);
         foreach (var v in e.Variants) DeclareMember(scope, new EnumVariantSymbol(v.Name, v), v);
         foreach (var fn in e.Methods) DeclareMember(scope, Fn(fn), fn);
+        foreach (var t in e.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t);
     }
 
     private void DeclareInterface(ModuleSymbol module, InterfaceDecl i)
@@ -132,9 +137,11 @@ public sealed class Resolver
         var self = new GenericParamSymbol("Self", [], i);
         scope.TryDeclare(self);
         var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.IsPublic), scope, i) { Generics = MakeGenerics(i.Generics), SelfParam = self };
+        self.SelfOf = ts;
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
         foreach (var fn in i.Members) DeclareMember(scope, Fn(fn), fn);
+        foreach (var t in i.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t);
     }
 
     private static FunctionSymbol Fn(FunctionDecl fn) =>
@@ -311,12 +318,14 @@ public sealed class Resolver
                     foreach (var f in v.StructFields ?? []) BindType(f.Type, es);
                 }
                 foreach (var m in e.Methods) BindFunctionTypes(m, es);
+                foreach (var t in e.Types) if (t.Type is not null) BindType(t.Type, es);
                 break;
             case InterfaceDecl i:
                 var isc = MemberScope(scope, i.Name);
                 BindGenerics(i.Generics, isc);
                 BindEach(i.Interfaces, isc);
                 foreach (var m in i.Members) BindFunctionTypes(m, isc);
+                foreach (var t in i.Types) if (t.Type is not null) BindType(t.Type, isc);
                 break;
             // ExtendDecl goes to ResolveExtensionTargets, which needs the block method scope for
             // generics.
@@ -347,6 +356,7 @@ public sealed class Resolver
 
             BindEach(block.Decl.Interfaces, scope);
             foreach (var m in block.Decl.Methods) BindFunctionTypes(m, scope);
+            foreach (var t in block.Decl.Types) if (t.Type is not null) BindType(t.Type, scope);
         }
     }
 
@@ -356,6 +366,7 @@ public sealed class Resolver
         {
             if (m is FieldDecl f) BindType(f.Type, scope);
             else if (m is FunctionDecl fn) BindFunctionTypes(fn, scope);
+            else if (m is AssociatedTypeDecl t && t.Type is not null) BindType(t.Type, scope);
         }
     }
 
@@ -433,6 +444,10 @@ public sealed class Resolver
     private Symbol? ResolveTypePath(string[] path, SymbolTable scope, FileId file)
     {
         var head = scope.Lookup(path[0]);
+        // 'T.Item', 'Self.Item', 'P.Item' (03 T6): the second segment names an associated type,
+        // which the sema reads off the head; the node is bound to the head.
+        if (path.Length == 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
+            return head;
         if (head is null) return BuiltinType(path[0]);
         if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0]);
 

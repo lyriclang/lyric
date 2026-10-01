@@ -233,16 +233,19 @@ public sealed class AstFormatter
         InterfaceDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.IsPublic), Doc.From($"interface {d.Name}"), GenericsDoc(d.Generics),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
-            d.Members, d.Span),
+            InOrder(d.Types, d.Members), d.Span),
         ExtendDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.IsPublic), Doc.From("extend "), TypeDoc(d.Target),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
-            d.Methods, d.Span),
+            InOrder(d.Types, d.Methods), d.Span),
         GlobalBindingDecl d => Doc.Of(Pub(d.IsPublic), StmtDoc(d.Binding)),
         StaticBindingDecl d => Doc.Of(Pub(d.IsPublic), Doc.From("static "), StmtDoc(d.Binding)),
         TypeAliasDecl d => Doc.Of(Pub(d.IsPublic),
             Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name} = "), TypeDoc(d.Aliased),
             Doc.From(";")),
+        // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6).
+        AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),
+            d.Type is { } bound ? Doc.Of(Doc.From(" = "), TypeDoc(bound)) : Doc.Nil, Doc.From(";")),
         FieldDecl d => FieldDoc(d),
         _ => throw new InternalCompilationException($"unreachable: unformatted {decl.GetType().Name}"),
     };
@@ -423,8 +426,9 @@ public sealed class AstFormatter
             Doc.From($"enum {decl.Name}"), GenericsDoc(decl.Generics),
             InterfaceListDoc(decl.Interfaces), Doc.Space);
 
+        var members = InOrder(decl.Types, decl.Methods);
         var closing = decl.Span.End - 1;
-        if (decl.Variants.Length == 0 && decl.Methods.Length == 0 && !AnyCommentBefore(closing))
+        if (decl.Variants.Length == 0 && members.Length == 0 && !AnyCommentBefore(closing))
             return Doc.Of(head, Doc.From("{ }"));
 
         return BracedDoc(head, empty: false, () =>
@@ -437,16 +441,16 @@ public sealed class AstFormatter
             var variantsEnd = decl.Variants.Length == 0
                 ? closing
                 : LineEndOf(decl.Variants[^1].Span.End);
-            if (decl.Methods.Length == 0) variantsEnd = closing;
+            if (members.Length == 0) variantsEnd = closing;
 
             parts.Add(SequenceDoc(decl.Variants, Variant, (_, _) => Air.User, variantsEnd));
 
-            if (decl.Methods.Length > 0)
+            if (members.Length > 0)
             {
                 parts.Add(Doc.NewLine);
                 parts.Add(Doc.NewLine);
                 _lastEnd = variantsEnd;
-                parts.Add(SequenceDoc(decl.Methods, FunctionDoc, MethodAir, closing));
+                parts.Add(SequenceDoc(members, DeclDoc, MemberAir, closing));
             }
 
             return new Doc.Concat(parts);
@@ -457,7 +461,7 @@ public sealed class AstFormatter
             {
                 var last = ++index == decl.Variants.Length;
                 return Doc.Of(VariantDoc(variant),
-                    Doc.From(last && decl.Methods.Length > 0 ? ";" : ","));
+                    Doc.From(last && members.Length > 0 ? ";" : ","));
             }
         });
     }
@@ -486,15 +490,16 @@ public sealed class AstFormatter
         return Doc.From(variant.Name);
     }
 
-    private static Air MethodAir(FunctionDecl previous, FunctionDecl next) =>
-        previous.Body is not null || next.Body is not null ? Air.Forced : Air.User;
+    /// <summary>A body holding methods and associated types — interface, extend and the enum's
+    /// second half share the shape. The two lists are parsed apart; the source order is theirs.</summary>
+    private static Decl[] InOrder(AssociatedTypeDecl[] types, FunctionDecl[] methods) =>
+        types.Length == 0 ? methods : types.Cast<Decl>().Concat(methods).OrderBy(m => m.Span.Start).ToArray();
 
-    /// <summary>A body holding methods only — interface and extend share the shape.</summary>
-    private Doc MethodBodyDoc(Doc head, FunctionDecl[] methods, Span whole)
+    private Doc MethodBodyDoc(Doc head, Decl[] members, Span whole)
     {
         var closing = whole.End - 1;
-        return BracedDoc(head, methods.Length == 0 && !AnyCommentBefore(closing),
-            () => SequenceDoc(methods, FunctionDoc, MethodAir, closing));
+        return BracedDoc(head, members.Length == 0 && !AnyCommentBefore(closing),
+            () => SequenceDoc(members, DeclDoc, MemberAir, closing));
     }
 
     // ------------------------------------------------------------------ statements
@@ -1069,7 +1074,7 @@ public sealed class AstFormatter
 
     private Doc TypeDoc(TypeNode type) => type switch
     {
-        NamedType n => Doc.Of(Doc.From(string.Join(".", n.Path)), TypeArgsDoc(n.TypeArguments)),
+        NamedType n => Doc.Of(Doc.From(string.Join(".", n.Path)), TypeArgsDoc(n.TypeArguments, n.ArgumentNames)),
         NullableType n => Doc.Of(Doc.From("?"), TypeDoc(n.Inner)),
         ThrowingType n => n.Thrown is { } thrown
             ? Doc.Of(TypeDoc(n.Inner), Doc.From(" throws "), TypeDoc(thrown))
@@ -1089,11 +1094,15 @@ public sealed class AstFormatter
         _ => throw new InternalCompilationException($"unreachable: unformatted {type.GetType().Name}"),
     };
 
-    private Doc TypeArgsDoc(TypeNode[] arguments) =>
+    /// <param name="names">The associated type an argument fixes, 'Iterator&lt;Item = int&gt;' (03 T6).</param>
+    private Doc TypeArgsDoc(TypeNode[] arguments, string?[]? names = null) =>
         arguments.Length == 0
             ? Doc.Nil
             : Doc.Of(Doc.From("<"),
-                Doc.Join(Doc.From(", "), arguments.Select(TypeDoc).ToArray()), Doc.From(">"));
+                Doc.Join(Doc.From(", "), arguments.Select((a, i) =>
+                    names is not null && i < names.Length && names[i] is { } fixes
+                        ? Doc.Of(Doc.From($"{fixes} = "), TypeDoc(a))
+                        : TypeDoc(a)).ToArray()), Doc.From(">"));
 
     private Doc Src(Span span) => Doc.From(_source.Substring(span.Start, span.Length));
 }

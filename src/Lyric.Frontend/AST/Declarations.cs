@@ -158,6 +158,9 @@ public sealed record EnumDecl(bool IsPublic, string Name, GenericParam[] Generic
 {
     public required Span NameSpan { get; init; }
 
+    /// <summary>The associated types the enum binds for its conformances (03 T6).</summary>
+    public AssociatedTypeDecl[] Types { get; init; } = [];
+
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
@@ -169,9 +172,27 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
 public sealed record InterfaceDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary>The associated types the interface declares, <c>type Item;</c> (design/v5/spec/03 T6).</summary>
+    public AssociatedTypeDecl[] Types { get; init; } = [];
 }
 
-public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span);
+public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
+{
+    /// <summary>The associated types a conformance block binds, <c>type Item = int;</c> (03 T6).</summary>
+    public AssociatedTypeDecl[] Types { get; init; } = [];
+}
+
+/// <summary>
+/// An associated type (design/v5/spec/03 T6): in an interface <c>type Item;</c> declares one,
+/// <c>type Item = Self;</c> with a default; in a struct, class, enum or conformance block
+/// <c>type Item = int;</c> binds it for that conformer. <see cref="Type"/> is the default or
+/// the binding, <c>null</c> for a bare declaration.
+/// </summary>
+public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) : Decl(Span), INamedDecl
+{
+    public required Span NameSpan { get; init; }
+}
 
 // --- global bindings and type aliases ---
 /// <inheritdoc cref="StaticBindingDecl"/>

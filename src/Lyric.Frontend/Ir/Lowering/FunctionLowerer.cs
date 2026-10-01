@@ -4542,6 +4542,31 @@ internal sealed class FunctionLowerer
             || method.Declaration is not FunctionDecl declaration
             || ConstraintNeedsTheInstance(member, owner))
         {
+            // The implementation stands in a conformance block, 'extend StrBox :: [Container]'
+            // (05 §6): the same direct call as on a builtin above. A member typed by an
+            // associated type (03 T6) has no slot to be lifted into, so the direct call is the
+            // only route; a GENERIC owner's block waits for the generic extends (T7).
+            if (concrete is NamedRef && !ConstraintNeedsTheInstance(member, owner)
+                && _typeTable.ExtensionMethod(owner, member.Member) is { } blockMethod
+                && blockMethod.Declaration is FunctionDecl blockDecl
+                && TryResolveFunction(blockMethod, out var blockTarget))
+            {
+                var passed = MaterializeArguments(blockDecl, ArgumentsOf(expr), member.Member, expr.Span);
+                var all = new TempId[passed.Length + 1];
+                all[0] = LowerExpr(member.Target);
+                passed.CopyTo(all, 1);
+                var resultType = TypeOfExpr(expr);
+                if (IsVoid(resultType))
+                {
+                    _b.Emit(new Call(null, blockTarget, all, expr.Span));
+                    return null;
+                }
+                var blockResult = _slots.NewTemp(resultType);
+                _b.Emit(new Call(blockResult, blockTarget, all, expr.Span));
+                _fresh.Add(blockResult);
+                return blockResult;
+            }
+
             if (ReceiverType(member.Target) is TypeParamType parameter)
                 foreach (var constraint in parameter.Param.Constraints)
                     if (_typeTable.ConstraintInterface(constraint) is { } constrained
@@ -5701,7 +5726,8 @@ internal sealed class FunctionLowerer
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)),
         CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },
         GenericInstance g => new GenericInstance(g.Definition,
-            g.Arguments.Select(SubstituteType).ToArray()),
+            g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations },
+        AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member),
         _ => type,
     };
 

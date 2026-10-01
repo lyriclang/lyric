@@ -240,6 +240,11 @@ public sealed class TypeChecker
         // everything it imports, so an initializer may read across an import it declared itself.
         foreach (var module in _comp.InitializationOrder()) ComputeGlobals(module);
 
+        // The associated types (03 T6) first: every conformance's answers are read before any
+        // signature that names 'T.Item' is substituted — a body may be checked before the type
+        // it instantiates is declared.
+        BindAssociatedTypes();
+
         // The same order for the declarations, and for a reason that took a bug to find: an
         // attribute's field DEFAULT is written in the module that declares the attribute and read
         // in every module that uses it. What it means — a name for a variant, a name for a
@@ -1009,6 +1014,9 @@ public sealed class TypeChecker
                         continue; // a default method is inherited
                     }
                     var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, SelfType(implementer)));
+                    // An associated type the conformer did not answer was reported where it
+                    // stands (SEM0128); the signature that reads it has nothing to compare.
+                    if (ContainsError(want)) continue;
 
                     // With several candidates the CONFORMANCE decides which one is meant, so a
                     // match anywhere in the list satisfies it. Only when none fits is there
@@ -3713,6 +3721,7 @@ public sealed class TypeChecker
     private static bool MentionsTypeParam(LyrType type) => type switch
     {
         TypeParamType => true,
+        AssocOf a => MentionsTypeParam(a.Base),
         Optional o => MentionsTypeParam(o.Inner),
         ArrayOf a => MentionsTypeParam(a.Element),
         SliceOf s => MentionsTypeParam(s.Element),
@@ -4038,11 +4047,15 @@ public sealed class TypeChecker
 
                 // Substitute the type arguments OF THE CONSTRAINT. 'T :: [Eq<T>]' means the 'T' in
                 // 'Eq<T>.eq(other: T)' is the 'T' of the calling function — two different symbols
-                // with the same name. 'Self' is the type parameter itself (03 T5).
+                // with the same name. 'Self' is the type parameter itself (03 T5), and an
+                // associated type the constraint fixes is that type (T6).
                 //
                 // Without the substitution the raw interface type comes back and 'a.eq(b)' fails
                 // with "cannot assign 'T' to 'T'".
-                return (Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp))), fn);
+                var signature = Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp)));
+                if (ResolveType(nt, _currentModule?.Members ?? _comp.Builtins) is GenericInstance { Fixations: { Length: > 0 } fixations })
+                    signature = ApplyFixations(signature, gp, fixations);
+                return (signature, fn);
             }
         }
         return (Report(span, "LYR-SEM0027",
@@ -4109,11 +4122,170 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
-            GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray()),
+            GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
+                { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
             CoroutineOf co => co with { Yield = Substitute(co.Yield, map) },
+            AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member),
             _ => type // primitive, NamedRef, error, null
         };
+    }
+
+    /// <summary>
+    /// <c>T.Item</c> once <c>T</c> is known (03 T6): the conformer's binding of the associated
+    /// type, read off the interface's declaration symbol, through the conformer's own type
+    /// arguments; still a type parameter, the question stays open as it is.
+    /// </summary>
+    internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member)
+    {
+        switch (@base)
+        {
+            case TypeParamType or AssocOf: return new AssocOf(@base, member);
+            case NamedRef nr when member.Bindings.TryGetValue(nr.Symbol, out var bound): return bound;
+            case GenericInstance gi when member.Bindings.TryGetValue(gi.Definition, out var bound):
+                return Substitute(bound, SubstMap(gi));
+            case ErrorType: return LyrType.Error;
+            default: return new AssocOf(@base, member);
+        }
+    }
+
+    /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
+    /// (<c>T :: [Iterator&lt;Item = int&gt;]</c>): <c>T.Item</c> is <c>int</c> wherever it stands.</summary>
+    private static LyrType ApplyFixations(LyrType type, GenericParamSymbol gp,
+        (AssociatedTypeSymbol Member, LyrType Type)[] fixations)
+    {
+        LyrType Fix(LyrType t) => t switch
+        {
+            AssocOf { Base: TypeParamType tp } a when ReferenceEquals(tp.Param, gp)
+                && Array.FindIndex(fixations, f => ReferenceEquals(f.Member, a.Member)) is var i && i >= 0 => fixations[i].Type,
+            Optional o => new Optional(Fix(o.Inner)),
+            ArrayOf ar => new ArrayOf(Fix(ar.Element)),
+            SliceOf s => new SliceOf(Fix(s.Element)),
+            InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
+            TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)),
+            GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations },
+            RangeOf r => new RangeOf(Fix(r.Element)),
+            CoroutineOf c => c with { Yield = Fix(c.Yield) },
+            _ => t,
+        };
+        return Fix(type);
+    }
+
+    /// <summary>
+    /// Every conformance's answers to the associated types of its interfaces (03 T6): a
+    /// binding in the type's body or in the conformance block, else the interface's default
+    /// with <c>Self</c> as the conformer, else refused (<c>LYR-SEM0128</c>). A binding no
+    /// interface of the type asks for is refused too (<c>LYR-SEM0129</c>).
+    /// </summary>
+    private void BindAssociatedTypes()
+    {
+        foreach (var module in _comp.Modules)
+        {
+            _currentModule = module;
+            foreach (var symbol in module.Members.Symbols)
+                if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts
+                    && DeclaredInModule(ts, module))
+                    BindAssociatedTypes(ts, DeclaredInterfaceNodes(ts), ts.Members, ts.Declaration?.Span ?? default);
+        }
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } target) continue;
+            _currentModule = block.Module;
+            BindAssociatedTypes(target, block.Decl.Interfaces, block.MethodScope, block.Decl.Span);
+        }
+        _currentModule = null;
+    }
+
+    private void BindAssociatedTypes(TypeSymbol ts, TypeNode[] entries, SymbolTable answers, Span at)
+    {
+        var asked = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in entries)
+        {
+            foreach (var (iface, subst) in ClosureOfNode(node))
+            {
+                foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
+                {
+                    asked.Add(member.Name);
+                    var answer = answers.LookupLocal(member.Name) is AssociatedTypeSymbol own
+                        && own.Declaration is AssociatedTypeDecl { Type: { } bound } ? (own, bound) : default;
+                    if (member.Bindings.TryGetValue(ts, out var earlier))
+                    {
+                        // One answer per type and interface (T6): a second conformance block
+                        // may repeat it, not change it. An answer per interface INSTANCE
+                        // ('Index<int>.Output' beside 'Index<string>.Output') is not written.
+                        if (answer.bound is { } again && !LyrType.Equal(earlier, ResolveType(again, answers)) && !earlier.IsError)
+                            _de.Report("LYR-SEM0129", Severity.Error, answer.own.Declaration?.Span ?? at,
+                                $"'{ts.Name}' already answers '{iface.Name}.{member.Name}' with '{TypeFacts.Display(earlier)}' — one answer per type");
+                        continue;
+                    }
+                    if (answer.bound is { } written)
+                    {
+                        member.Bindings[ts] = ResolveType(written, answers);
+                        continue;
+                    }
+                    if (member.Declaration is AssociatedTypeDecl { Type: { } fallback })
+                    {
+                        member.Bindings[ts] = Substitute(ResolveType(fallback, DeclarationScope(iface)),
+                            WithSelf(subst, iface, SelfType(ts)));
+                        continue;
+                    }
+                    _de.Report("LYR-SEM0128", Severity.Error, NodeSpan(node),
+                        $"'{ts.Name}' does not say what '{iface.Name}'s associated type '{member.Name}' is — write 'type {member.Name} = …;'");
+                    member.Bindings[ts] = LyrType.Error;
+                }
+            }
+        }
+        foreach (var own in answers.Symbols.OfType<AssociatedTypeSymbol>())
+            if (!asked.Contains(own.Name))
+                _de.Report("LYR-SEM0129", Severity.Error, own.Declaration?.Span ?? at,
+                    $"'type {own.Name}' answers no interface — none that '{ts.Name}' conforms to here declares an associated type '{own.Name}'");
+    }
+
+    /// <summary>An interface's associated type of that name, its parents' included.</summary>
+    private AssociatedTypeSymbol? FindAssociated(TypeSymbol iface, string name)
+    {
+        foreach (var part in Conformance.WithParents(iface, _binding))
+            if (part.Members.LookupLocal(name) is AssociatedTypeSymbol member) return member;
+        return null;
+    }
+
+    /// <summary>
+    /// <c>T.Item</c>, <c>Self.Item</c>, <c>P.Item</c> (03 T6): the associated type named off a
+    /// type parameter (through its constraints, or the interface it is the <c>Self</c> of), or
+    /// off a concrete type (its answer).
+    /// </summary>
+    private LyrType ResolveAssociated(Symbol head, string name, Span span)
+    {
+        if (head is ImportBindingSymbol ib) head = ib.Target;
+        switch (head)
+        {
+            case GenericParamSymbol gp:
+            {
+                IEnumerable<TypeSymbol> interfaces = gp.SelfOf is { } self
+                    ? Conformance.WithParents(self, _binding)
+                    : gp.Constraints.OfType<NamedType>().SelectMany(c => ClosureOfNode(c).Select(p => p.iface));
+                foreach (var iface in interfaces)
+                    if (iface.Members.LookupLocal(name) is AssociatedTypeSymbol member)
+                        return new AssocOf(new TypeParamType(gp), member);
+                return Report(span, "LYR-SEM0128",
+                    gp.SelfOf is { } owner
+                        ? $"'{owner.Name}' declares no associated type '{name}'"
+                        : $"no constraint of '{gp.Name}' declares an associated type '{name}' — constrain it by an interface that does");
+            }
+            case TypeSymbol { Kind: TypeSymbolKind.Interface } iface:
+                return Report(span, "LYR-SEM0128",
+                    $"'{iface.Name}.{name}' names the associated type of no type in particular — name the type parameter, 'T.{name}', or the conforming type");
+            case TypeSymbol ts:
+            {
+                foreach (var (iface, _) in InterfacesOf(ts))
+                    if (iface.Members.LookupLocal(name) is AssociatedTypeSymbol member)
+                        return ResolveAssociated(SelfType(ts), member);
+                return Report(span, "LYR-SEM0128", $"'{ts.Name}' has no associated type '{name}'");
+            }
+            default:
+                return Report(span, "LYR-SEM0011", $"unresolved type '{head.Name}.{name}'");
+        }
     }
 
     // --- generic call inference and constraint satisfaction ---
@@ -4235,6 +4407,7 @@ public sealed class TypeChecker
     private static bool HasOpenParam(LyrType t, Dictionary<GenericParamSymbol, LyrType> map) => t switch
     {
         TypeParamType tp => !map.ContainsKey(tp.Param),
+        AssocOf a => HasOpenParam(a.Base, map),
         Optional o => HasOpenParam(o.Inner, map),
         ArrayOf a => HasOpenParam(a.Element, map),
         SliceOf s => HasOpenParam(s.Element, map),
@@ -4280,6 +4453,7 @@ public sealed class TypeChecker
     /// </remarks>
     private static bool ContainsError(LyrType type) => type switch
     {
+        AssocOf a => ContainsError(a.Base),
         ErrorType => true,
         OpaqueRef oq => ContainsError(oq.Underlying),
         Optional o => ContainsError(o.Inner),
@@ -4423,7 +4597,22 @@ public sealed class TypeChecker
             // 'Self' on both sides is the conforming type (03 T5): 'Vec2 :: [Add]' is 'Add<Vec2>'
             // written short, and so is the constraint 'T :: [Add]' at 'T = Vec2'.
             var selfMap = self is null ? EmptySubst : SelfMap(p, self);
-            if (Matches(Substitute(inst, selfMap), ofInstance, Substitute(wanted, selfMap))) return true;
+            // The fixations are asked below, the arguments here: 'Iterator<Item = int>' names the
+            // same conformance as 'Iterator'.
+            var bare = wanted is GenericInstance { Fixations: not null } fixing
+                ? fixing.Definition.Generics.Length == 0 ? new NamedRef(fixing.Definition) : fixing with { Fixations = null }
+                : wanted;
+            if (!Matches(Substitute(inst, selfMap), ofInstance, Substitute(bare, selfMap))) continue;
+            // A fixation at the constraint, 'T :: [Iterator<Item = int>]' (03 T6), asks the
+            // conformer's answer to be that type.
+            if (wanted is GenericInstance { Fixations: { Length: > 0 } fixations } && self is not null && self is not TypeParamType)
+            {
+                var all = true;
+                foreach (var (member, fixedTo) in fixations)
+                    if (!LyrType.Equal(ResolveAssociated(self, member), Substitute(fixedTo, ofInstance))) { all = false; break; }
+                if (!all) continue;
+            }
+            return true;
         }
         return false;
     }
@@ -6733,6 +6922,7 @@ public sealed class TypeChecker
     private static bool ContainsTypeParam(LyrType t) => t switch
     {
         TypeParamType => true,
+        AssocOf a => ContainsTypeParam(a.Base),
         Optional o => ContainsTypeParam(o.Inner),
         ArrayOf a => ContainsTypeParam(a.Element),
         SliceOf s => ContainsTypeParam(s.Element),
@@ -7058,8 +7248,18 @@ public sealed class TypeChecker
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)
             {
+                // A value of it would need the associated type fixed, 'Iterator<Item = int>' (03
+                // T6, 04 D9); such values come with the iterators of M8a. Asked before 'Self',
+                // which 'Self.Item' mentions as well.
+                if (symbol is AssociatedTypeSymbol assoc)
+                { reason = $"it declares the associated type '{assoc.Name}', and a value of it would fix that type — not yet"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
+            }
+        foreach (var part in Conformance.WithParents(iface, _binding))
+            foreach (var symbol in part.Members.Symbols)
+            {
+                if (symbol is not FunctionSymbol fn) continue;
                 // D9 names generic members too; the 4.x standard library reaches 'Iterator<T>'
                 // values with a generic 'map' (05 §5.2a of the 4.x text, monomorphized and not
                 // overridable), and it compiles until M8a rewrites it. That clause waits there.
@@ -7074,6 +7274,7 @@ public sealed class TypeChecker
     private static bool MentionsParam(LyrType type, GenericParamSymbol param) => type switch
     {
         TypeParamType tp => ReferenceEquals(tp.Param, param),
+        AssocOf a => MentionsParam(a.Base, param),
         Optional o => MentionsParam(o.Inner, param),
         ArrayOf a => MentionsParam(a.Element, param),
         SliceOf s => MentionsParam(s.Element, param),
@@ -7174,6 +7375,15 @@ public sealed class TypeChecker
                 // ("what does this type name refer to") answered by one table, whoever asked it.
                 if (sym is not null && _binding.Resolve(n) is null) _binding.Bind(n, sym);
 
+                // 'T.Item' (03 T6): a two-segment path whose head is a type or a type parameter,
+                // not a module, names an associated type. The resolver bound such a node to its
+                // HEAD (a module path is bound to the type it reaches), and a signature is
+                // resolved against the builtins' scope, so the head is read off the binding when
+                // the scope does not have it.
+                if (n.Path.Length == 2 && n.TypeArguments.Length == 0
+                    && (scope.Lookup(n.Path[0]) ?? (sym?.Name == n.Path[0] ? sym : null)) is { } pathHead
+                    && (pathHead is ImportBindingSymbol { Target: not ModuleSymbol } or GenericParamSymbol or TypeSymbol))
+                    return ResolveAssociated(pathHead, n.Path[1], n.Span);
                 if (sym is ImportBindingSymbol ibt) sym = ibt.Target;
                 if (sym is null)
                     return Report(n.Span, "LYR-SEM0011", $"unresolved type '{string.Join('.', n.Path)}'");
@@ -7197,7 +7407,11 @@ public sealed class TypeChecker
                 }
                 if (sym is TypeSymbol { Kind: not (TypeSymbolKind.Builtin or TypeSymbolKind.Alias) } gts
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))
+                {
+                    // A non-generic interface fixed only, 'Iterator<Item = int>', is an instance
+                    // too: the fixation is part of the type (03 T6).
                     return MakeGenericInstance(gts, n, scope);
+                }
                 return SymbolToType(sym, scope, n.Span);
             case ThrowingType tt:
             {
@@ -7293,11 +7507,30 @@ public sealed class TypeChecker
     // through the conformance model.
     private LyrType MakeGenericInstance(TypeSymbol ts, NamedType n, SymbolTable scope)
     {
-        var args = FillDefaults(ts, n.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
+        // 'Iterator<Item = int>' (03 T6): a named argument fixes an associated type of an
+        // interface; the positional ones are the type arguments.
+        var positional = new List<LyrType>();
+        List<(AssociatedTypeSymbol, LyrType)>? fixations = null;
+        for (var i = 0; i < n.TypeArguments.Length; i++)
+        {
+            var resolved = ResolveType(n.TypeArguments[i], scope);
+            if (n.ArgumentNames is { } names && i < names.Length && names[i] is { } fixes)
+            {
+                if (ts.Kind == TypeSymbolKind.Interface && FindAssociated(ts, fixes) is { } member)
+                    (fixations ??= new()).Add((member, resolved));
+                else // the type is its own error: nothing further is asked of it
+                    return Report(n.TypeArguments[i].Span, "LYR-SEM0128",
+                        $"'{ts.Name}' declares no associated type '{fixes}' to fix");
+                continue;
+            }
+            positional.Add(resolved);
+        }
+        var args = FillDefaults(ts, positional.ToArray());
         if (ts.Generics.Length != args.Length)
             _de.Report("LYR-SEM0026", Severity.Error, n.Span,
                 $"generic type '{ts.Name}' expects {ts.Generics.Length} type argument(s), got {args.Length}");
-        return new GenericInstance(ts, args);
+        if (args.Length == 0 && fixations is null) return new NamedRef(ts);
+        return new GenericInstance(ts, args) { Fixations = fixations?.ToArray() };
     }
 
     /// <summary>

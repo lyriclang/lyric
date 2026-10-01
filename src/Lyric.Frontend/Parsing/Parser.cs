@@ -1203,13 +1203,14 @@ public sealed partial class Parser
                     nameSpan = seg.Span;
                 }
                 TypeNode[] args = [];
+                string?[]? names = null;
                 if (_buffer.Check(TokenKind.Less))
                 {
-                    args = ParseTypeArguments(out var closeSpan);
+                    args = ParseTypeArguments(out var closeSpan, out names);
                     end = closeSpan;
                 }
                 return new NamedType(path.ToArray(), args, Span.Union(cur.Span, end))
-                    { NameSpan = nameSpan };
+                    { NameSpan = nameSpan, ArgumentNames = names };
             }
             default:
                 _de.Report("LYR-PAR0011", Severity.Error, cur.Span, $"expected a type, got {cur.TokenKind}");
@@ -1278,11 +1279,28 @@ public sealed partial class Parser
         return new TupleType(elems.ToArray(), span) { Labels = labels.Any(l => l is not null) ? labels.ToArray() : null };
     }
 
-    private TypeNode[] ParseTypeArguments(out Span closeSpan)
+    private TypeNode[] ParseTypeArguments(out Span closeSpan) => ParseTypeArguments(out closeSpan, out _);
+
+    /// <param name="names">'Item = int' (03 T6): the associated type an argument fixes, by
+    /// index, <c>null</c> for a positional one; <c>null</c> as a whole when none is named.</param>
+    private TypeNode[] ParseTypeArguments(out Span closeSpan, out string?[]? names)
     {
         _buffer.Expect(TokenKind.Less, "LYR-PAR0009", "expected '<' to open type arguments");
         var args = new List<TypeNode>();
-        do { args.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+        List<string?>? written = null;
+        do
+        {
+            string? name = null;
+            if (_buffer.Check(TokenKind.Identifier) && _buffer.Peek(1).TokenKind == TokenKind.Equal)
+            {
+                name = _sm.Slice(_buffer.Advance().Span).ToString();
+                _buffer.Advance();
+            }
+            args.Add(ParseType());
+            if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
+            written?.Add(name);
+        } while (_buffer.Match(TokenKind.Comma));
+        names = written?.ToArray();
 
         // Nested generics: split '>>', '>=' and '>>=' into single '>' tokens.
         if (_buffer.Current.TokenKind is TokenKind.Shr or TokenKind.ShrEqual or TokenKind.GreaterEqual)

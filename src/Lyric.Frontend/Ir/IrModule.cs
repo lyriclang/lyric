@@ -168,7 +168,10 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
 
     public bool IsEnum => Variants.Length > 0;
 
-    public bool IsInterface => MethodSlots.Length > 0;
+    /// <summary>Declared with <c>interface</c>. A flag rather than "has slots": an interface
+    /// whose members are all generic, static or typed by an associated type (03 T6) has no
+    /// slot, and the empty <c>Any</c> (T10) has none either — both are interfaces still.</summary>
+    public bool IsInterface { get; init; }
 }
 
 /// <summary>

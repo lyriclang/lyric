@@ -671,7 +671,10 @@ internal sealed class TypeTable
                 SpanOf(symbol));
 
         var slots = SlotNames(symbol, decl);
-        if (slots.Length == 0)
+        // Members without a slot — generic, static, or typed by an associated type — leave the
+        // table with its descriptor only; such an interface is a constraint (04 D9) and its
+        // rows are never consulted. An interface declaring NOTHING has no business here.
+        if (slots.Length == 0 && decl.Members.Length == 0 && !Conformance.ParentsOf(symbol, _binding).Any())
             throw new UnsupportedConstructException(
                 $"interface '{symbol.Name}' declares no methods; an empty interface has nothing "
                 + "to dispatch on", SpanOf(symbol));
@@ -682,7 +685,7 @@ internal sealed class TypeTable
         // symbol. Otherwise 'Iterator<string>' would get the id of 'Iterator<int>'.
         if (symbol.Generics.Length == 0) _assigned[symbol] = id;
 
-        _defs.Add(new IrTypeDef(name, [], []) { MethodSlots = slots });
+        _defs.Add(new IrTypeDef(name, [], []) { MethodSlots = slots, IsInterface = true });
         return id;
     }
 
@@ -721,12 +724,29 @@ internal sealed class TypeTable
             // A STATIC member has no receiver to dispatch on (03 T5): it is reached through a
             // constraint, as the conformer's own static.
             if (member.IsStatic) continue;
+            // A member typed by an ASSOCIATED type (03 T6), 'fn first(): Self.Item', has one C
+            // signature per conformer: no slot can hold it. It is reached through a constraint
+            // only (04 D9); the value form comes with M8a.
+            if (member.Parameters.Any(p => MentionsAssociated(p.Type))
+                || (member.ReturnType is { } returns && MentionsAssociated(returns))) continue;
             if (!slots.Contains(member.Name))
                 slots.Add(member.Name);
         }
 
         return slots.ToArray();
     }
+
+    /// <summary>Does a written type reach an associated type, <c>Self.Item</c> (03 T6)?</summary>
+    private bool MentionsAssociated(TypeNode node) => node switch
+    {
+        NamedType { Path.Length: 2 } named when _binding.Resolve(named) is GenericParamSymbol { SelfOf: not null } => true,
+        NamedType named => named.TypeArguments.Any(MentionsAssociated),
+        ArrayType array => MentionsAssociated(array.Element),
+        NullableType option => MentionsAssociated(option.Inner),
+        AST.TupleType tuple => tuple.Elements.Any(MentionsAssociated),
+        FunctionType fn => fn.Parameters.Any(MentionsAssociated) || MentionsAssociated(fn.ReturnType),
+        _ => false,
+    };
 
     private TypeId InternVariant(string ownerName, EnumVariant variant)
     {
@@ -863,6 +883,12 @@ internal sealed class TypeTable
         TypeParamType p => throw new UnsupportedConstructException(
             $"type parameter '{p.Param.Name}' reached lowering unsubstituted", span),
 
+        // 'T.Item' with T known is the conformer's answer (03 T6); with T open it is the
+        // same gap as the parameter itself.
+        AssocOf { Base: not (TypeParamType or AssocOf) } a => Lower(TypeChecker.ResolveAssociated(a.Base, a.Member), span),
+        AssocOf a => throw new UnsupportedConstructException(
+            $"associated type '{TypeFacts.Display(a)}' reached lowering unsubstituted", span),
+
         _ => TypeLowering.Lower(type)
     };
 
@@ -918,6 +944,9 @@ internal sealed class TypeTable
 
         if (node is NamedType named)
         {
+            // 'T.Item' (03 T6) is the conformer's answer under the substitution of 'T'.
+            if (AssociatedOf(named) is { } associated) return Lower(associated, span);
+
             // A type parameter in the layout of an instance: 'v: T' in 'Box<int>' is an int. The question
             // has to come BEFORE the symbol resolution — 'T' is not a type one could find.
             if (named.TypeArguments.Length == 0 && _substitutions.Count > 0
@@ -1030,10 +1059,65 @@ internal sealed class TypeTable
         public void Dispose() => owner._substitutions.Pop();
     }
 
+    /// <summary>
+    /// A written <c>T.Item</c> or <c>Self.Item</c> (03 T6): the associated type's binding for
+    /// what the head is here — a type parameter through the substitution, the type itself in its
+    /// own body. <c>null</c> where the node is not such a path or the head is not known.
+    /// </summary>
+    private LyrType? AssociatedOf(NamedType named)
+    {
+        if (named.Path.Length != 2 || named.TypeArguments.Length != 0) return null;
+        var bound = _binding.Resolve(named);
+        if (bound is ImportBindingSymbol import) bound = import.Target;
+        LyrType head;
+        IEnumerable<TypeSymbol> interfaces;
+        switch (bound)
+        {
+            case GenericParamSymbol gp:
+                if (_substitutions.Count == 0 || !_substitutions.Peek().TryGetValue(gp.Name, out var bodyHead)) return null;
+                head = bodyHead;
+                interfaces = gp.SelfOf is { } self
+                    ? Conformance.WithParents(self, _binding)
+                    : gp.Constraints.SelectMany(c => Conformance.InterfaceOf(c, _binding) is { } i
+                        ? Conformance.WithParents(i, _binding) : Enumerable.Empty<TypeSymbol>());
+                break;
+            case TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum } ts:
+            {
+                if (ts.Generics.Length == 0) head = new NamedRef(ts);
+                else
+                {
+                    var args = new LyrType[ts.Generics.Length];
+                    for (var i = 0; i < args.Length; i++)
+                        if (_substitutions.Count == 0 || !_substitutions.Peek().TryGetValue(ts.Generics[i].Name, out args[i]!)) return null;
+                    head = new GenericInstance(ts, args);
+                }
+                var nodes = ts.Declaration switch
+                {
+                    StructDecl s => s.Interfaces,
+                    ClassDecl c => c.Interfaces,
+                    EnumDecl e => e.Interfaces,
+                    _ => [],
+                };
+                interfaces = nodes
+                    .Concat(Compilation.Extensions.Blocks.Where(b => ReferenceEquals(b.Target, ts)).SelectMany(b => b.Decl.Interfaces))
+                    .SelectMany(n => Conformance.InterfaceOf(n, _binding) is { } i
+                        ? Conformance.WithParents(i, _binding) : Enumerable.Empty<TypeSymbol>());
+                break;
+            }
+            default: return null;
+        }
+        foreach (var iface in interfaces)
+            if (iface.Members.LookupLocal(named.Path[1]) is AssociatedTypeSymbol member)
+                return TypeChecker.ResolveAssociated(head, member);
+        return null;
+    }
+
     private LyrType Resolve(TypeNode node, Core.Span span)
     {
         if (node is NamedType { TypeArguments.Length: 0 } named)
         {
+            if (AssociatedOf(named) is { } associated) return associated;
+
             if (_substitutions.Count > 0
                 && _substitutions.Peek().TryGetValue(named.Path[^1], out var substituted))
                 return substituted;

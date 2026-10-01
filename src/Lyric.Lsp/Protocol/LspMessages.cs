@@ -395,6 +395,7 @@ public enum SymbolKind
     Constant = 14,
     EnumMember = 22,
     Struct = 23,
+    TypeParameter = 26,
 }
 
 /// <summary>

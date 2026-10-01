@@ -162,7 +162,10 @@ public static class TypeFacts
             case NamedRef n: return n.Symbol.Name;
             case OpaqueRef o: return o.Symbol.Name;
             case TypeParamType tp: return tp.Param.Name;
-            case GenericInstance gi: return gi.Definition.Name + "<" + string.Join(", ", gi.Arguments.Select(Display)) + ">";
+            case GenericInstance gi:
+                var fixations = gi.Fixations is { Length: > 0 } fs ? fs.Select(f => $"{f.Member.Name} = {Display(f.Type)}") : [];
+                return gi.Definition.Name + "<" + string.Join(", ", gi.Arguments.Select(Display).Concat(fixations)) + ">";
+            case AssocOf a: return Display(a.Base) + "." + a.Member.Name;
             case Optional o: return "?" + Display(o.Inner);
             // A function type as an element type MUST be parenthesized: 'fn(int) -> void[]' would
             // otherwise read as a function returning 'void[]'. Without the parenthesis the sema

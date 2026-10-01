@@ -1,0 +1,4 @@
+interface Container { type Item; type Out = Self; fn first(): Self.Item; }
+struct B :: [Container] { type Item = int; v: int }
+extend B :: [Container] { type Out = B; }
+fn f<T :: [Container<Item = int, Out = B>]>(c: T): T.Item { return c.first(); }
