@@ -454,3 +454,185 @@ extend string :: [Equatable, Display, Add] {
     fn add(rhs: string): string { return this + rhs; }
 }
 
+// ---------------------------------------------------------------------------------------------
+// The synthesized conformances (design/v5/spec/04 D7): a conformance written without a body is
+// implemented from the fields — 'Debug' for every type that writes none. The scalars conform
+// below; the shapes a field may have render through the helpers at the end.
+// ---------------------------------------------------------------------------------------------
+
+/// The debug rendering of a value: `P { x = 1, y = "a" }`, `E.B(3)`. Every struct, class and enum
+/// has one, written or synthesized (04 D7); a string renders quoted.
+pub interface Debug {
+    fn debug(): string;
+}
+
+/// A copy of the value: value fields copied, reference fields cloned (04 D13). Synthesized for a
+/// conformance without a body.
+pub interface Clone {
+    fn clone(): Self;
+}
+
+/// The value a type starts from: `0`, `""`, `[]`, `null`, a field default. Synthesized field-wise.
+pub interface Default {
+    static fn default(): Self;
+}
+
+extend int :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): int { return this; }
+    static fn default(): int { return 0; }
+}
+
+extend int8 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): int8 { return this; }
+    static fn default(): int8 { return 0; }
+}
+
+extend int16 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): int16 { return this; }
+    static fn default(): int16 { return 0; }
+}
+
+extend int32 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): int32 { return this; }
+    static fn default(): int32 { return 0; }
+}
+
+extend uint :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): uint { return this; }
+    static fn default(): uint { return 0; }
+}
+
+extend uint8 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): uint8 { return this; }
+    static fn default(): uint8 { return 0; }
+}
+
+extend uint16 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): uint16 { return this; }
+    static fn default(): uint16 { return 0; }
+}
+
+extend uint32 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): uint32 { return this; }
+    static fn default(): uint32 { return 0; }
+}
+
+extend float :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): float { return this; }
+    static fn default(): float { return 0.0; }
+}
+
+extend float32 :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): float32 { return this; }
+    static fn default(): float32 { return 0.0; }
+}
+
+extend bool :: [Debug, Clone, Default] {
+    fn debug(): string { return f"{this}"; }
+    fn clone(): bool { return this; }
+    static fn default(): bool { return false; }
+}
+
+extend char :: [Debug, Clone] {
+    fn debug(): string { return f"'{this}'"; }
+    fn clone(): char { return this; }
+}
+
+extend string :: [Debug, Clone, Default] {
+    fn debug(): string { return "\"" + this + "\""; }
+    fn clone(): string { return this; }
+    static fn default(): string { return ""; }
+}
+
+/// The debug rendering of an array, element by element — the shape has no conformance of its
+/// own yet (05 §13.6), so a synthesized `debug()` reaches for this.
+pub fn debugArray<T :: [Debug]>(xs: T[]): string {
+    var out = "[";
+    for (i in 0..xs.length()) {
+        if (i > 0) { out = out + ", "; }
+        out = out + xs[i].debug();
+    }
+    return out + "]";
+}
+
+/// The same for a view.
+pub fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
+    var out = "[";
+    for (i in 0..xs.length()) {
+        if (i > 0) { out = out + ", "; }
+        out = out + xs[i].debug();
+    }
+    return out + "]";
+}
+
+/// The same for an optional: `null`, or the value.
+pub fn debugOptional<T :: [Debug]>(o: ?T): string {
+    if (o == null) { return "null"; }
+    return o.debug();
+}
+
+/// Equality of two arrays, element by element — a synthesized `equals` reaches for it.
+pub fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool {
+    if (a.length() != b.length()) { return false; }
+    for (i in 0..a.length()) {
+        if (!(a[i] == b[i])) { return false; }
+    }
+    return true;
+}
+
+/// The same for two views.
+pub fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
+    if (a.length() != b.length()) { return false; }
+    for (i in 0..a.length()) {
+        if (!(a[i] == b[i])) { return false; }
+    }
+    return true;
+}
+
+/// Equality of two optionals: both absent, or both present and equal (03 O6).
+pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
+    if (a == null) { return b == null; }
+    if (b == null) { return false; }
+    return a == b;
+}
+
+/// The hash of an array, element by element.
+pub fn hashArray<T :: [Hashable]>(xs: T[]): int {
+    var h = 19;
+    for (i in 0..xs.length()) { h = h *% 31 +% xs[i].hash(); }
+    return h;
+}
+
+/// The same for a view.
+pub fn hashSlice<T :: [Hashable]>(xs: Slice<T>): int {
+    var h = 19;
+    for (i in 0..xs.length()) { h = h *% 31 +% xs[i].hash(); }
+    return h;
+}
+
+/// The hash of an optional: a constant for `null`, the value's otherwise.
+pub fn hashOptional<T :: [Hashable]>(o: ?T): int {
+    if (o == null) { return 23; }
+    return o.hash();
+}
+
+/// A copy of an array with every element cloned — the clone of a reference field (04 D13).
+pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] {
+    return arrayOf(xs.length(), (i: int) => xs[i].clone());
+}
+
+/// The same for an optional.
+pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
+    if (o == null) { return null; }
+    return o.clone();
+}

@@ -17,6 +17,14 @@ public sealed class ExtensionRegistry
 
     public void Add(ExtensionBlock block) => _blocks.Add(block);
 
+    /// <summary>Takes a block back as if never declared: an implicit synthesis (04 D7 "Debug
+    /// bei Bedarf") whose body does not check. The index is rebuilt, so no lookup finds it.</summary>
+    public void Withdraw(ExtensionBlock block)
+    {
+        _blocks.Remove(block);
+        BuildIndex();
+    }
+
     /// <summary>Builds the lookup index after target resolution.</summary>
     public void BuildIndex()
     {
@@ -64,6 +72,10 @@ public sealed class ExtensionBlock
     /// <summary>The target is a built-in constructor — <c>T[]</c>, <c>?T</c>, a tuple (03 T7 X2):
     /// no symbol of its own, matched by shape.</summary>
     public bool IsConstructorTarget { get; set; }
+
+    /// <summary>Synthesized unasked — the <c>Debug</c> every type gets where it can (04 D7). The
+    /// sema checks it muted and withdraws it where the fields give no rendering.</summary>
+    public bool IsImplicit { get; init; }
 
     public ExtensionBlock(ExtendDecl decl, ModuleSymbol module, SymbolTable methodScope, FunctionSymbol[] methods)
     {

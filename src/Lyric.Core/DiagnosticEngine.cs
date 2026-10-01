@@ -32,7 +32,34 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
 
     public void Report(Diagnostic diagnostic)
     {
-        if (_muted > 0) return;
+        if (_muted > 0)
+        {
+            // A probe counts the errors of ITS level only: a speculative check nested inside it
+            // (overload resolution) refuses candidates on purpose, and those are not failures
+            // of what the probe asks about.
+            if (diagnostic.Severity == Severity.Error && _probe is { } probe && _muted == probe.Level) probe.Errors++;
+            return;
+        }
+        if (_sourceManager.OriginOf(diagnostic.Span.File) is { } origin)
+        {
+            // Nobody wrote a synthesized file, so a hint or warning about its style is nobody's
+            // to act on, and an error in it is the WRITTEN declaration's: a field whose type
+            // carries no Equatable, say. The error moves to the node that asked for the
+            // synthesis, named, and the line it stood on comes along so the field can be found.
+            if (diagnostic.Severity is not Severity.Error) return;
+            var line = _sourceManager.LocateStart(diagnostic.Span).Line;
+            var notes = new List<DiagnosticNote>
+            {
+                new($"synthesized as: {_sourceManager.GetLineText(diagnostic.Span.File, line).Trim()}")
+            };
+            if (diagnostic.Notes is { } more) notes.AddRange(more);
+            diagnostic = diagnostic with
+            {
+                Span = origin.At,
+                Message = $"{origin.Label}: {diagnostic.Message}",
+                Notes = notes,
+            };
+        }
         _diagnostics.Add(diagnostic);
     }
 
@@ -54,6 +81,35 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     {
         _muted++;
         return new MuteScope(this);
+    }
+
+    private ProbeScope? _probe;
+
+    /// <summary>
+    /// Mutes, and COUNTS the errors that would have been reported, for a check whose question is
+    /// "does this hold at all": an implicit synthesis (04 D7) is kept where its body checks and
+    /// withdrawn where it does not, and nobody is told either way. One probe at a time.
+    /// </summary>
+    public ProbeScope Probe()
+    {
+        if (_probe is not null) throw new InvalidOperationException("a probe is already open");
+        _muted++;
+        return _probe = new ProbeScope(this, _muted);
+    }
+
+    public sealed class ProbeScope(DiagnosticEngine owner, int level) : IDisposable
+    {
+        internal int Level { get; } = level;
+        public int Errors { get; internal set; }
+        private bool _done;
+
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            owner._muted--;
+            owner._probe = null;
+        }
     }
 
     private sealed class MuteScope(DiagnosticEngine owner) : IDisposable

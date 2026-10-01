@@ -4471,6 +4471,30 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
+        // A static of a generic 'extend' block (03 T7 X1): 'Box<int>.default()' from
+        // 'extend<T :: [Default]> Box<T>'. The block's parameters are bound by the named instance
+        // and the method is an instance of its own, as the instance form is — the sema already
+        // answered the call's type in the instance's terms.
+        if (method.Generics.Length == 0 && _typeTable.BlockOf(method) is { Target: not null, Generics.Length: > 0 } block)
+        {
+            var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, owner, map))
+                throw NotSupported($"'{TypeFacts.Display(owner)}' does not match the block's target", expr.Span);
+            var blockTarget = _instances.RequestExtension(method, declaration, block, map, owner, expr.Span);
+            var byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
+            var blockArgs = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span, byName);
+            var blockReturns = TypeOfExpr(expr);
+            if (IsVoid(blockReturns))
+            {
+                _b.Emit(new Call(null, blockTarget, blockArgs, expr.Span));
+                return null;
+            }
+            var blockDest = _slots.NewTemp(blockReturns);
+            _b.Emit(new Call(blockDest, blockTarget, blockArgs, expr.Span));
+            _fresh.Add(blockDest);
+            return blockDest;
+        }
+
         // Generic on both sides here too: 'Box<int>.make<string>()'. A static method carries no
         // receiver, which is the only difference -- the request says so by passing none.
         var methodArguments = method.Generics.Length > 0

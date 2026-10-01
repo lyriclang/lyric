@@ -256,6 +256,7 @@ public sealed class TypeChecker
         // signature that names 'T.Item' is substituted — a body may be checked before the type
         // it instantiates is declared.
         BindAssociatedTypes();
+        ProbeImplicitBlocks();
 
         // The same order for the declarations, and for a reason that took a bug to find: an
         // attribute's field DEFAULT is written in the module that declares the attribute and read
@@ -679,6 +680,55 @@ public sealed class TypeChecker
             ? new NamedRef(ts)
             : new GenericInstance(ts, Array.ConvertAll(ts.Generics, g => (LyrType)new TypeParamType(g)));
 
+    /// <summary>
+    /// The implicit synthesis — the <c>Debug</c> every type gets where it can (04 D7 "bei
+    /// Bedarf") — is checked MUTED before any body can bind to it, and a block whose body does
+    /// not check is withdrawn: the type then has no <c>debug()</c>, as a type with an interface
+    /// or a function among its fields has none to give, and nobody is told, because nobody
+    /// asked. To a fixpoint, since one type's rendering reads another's.
+    /// </summary>
+    private void ProbeImplicitBlocks()
+    {
+        bool withdrew;
+        do
+        {
+            withdrew = false;
+            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && b.Target is not null).ToArray())
+            {
+                _currentModule = block.Module;
+                int errors;
+                using (var probe = _de.Probe())
+                {
+                    CheckBlockBodies(block);
+                    errors = probe.Errors;
+                }
+                if (errors == 0) continue;
+                _comp.Extensions.Withdraw(block);
+                withdrew = true;
+            }
+        } while (withdrew);
+        _currentModule = null;
+    }
+
+    /// <summary>The body check of a block's methods: the outer scope is the block's method scope,
+    /// which carries cross-calls and the method generics; <c>this</c> is the target type — the
+    /// primitive for builtins, the reference otherwise, the instance with the block's own
+    /// parameters for <c>List&lt;T&gt;</c> and <c>Slice&lt;T&gt;</c> (03 T7 X1, X2).</summary>
+    private void CheckBlockBodies(ExtensionBlock block)
+    {
+        var thisType = block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
+            ? BlockTargetType(block)
+            : block.Target!.Kind == TypeSymbolKind.Builtin
+                ? TypeFacts.FromBuiltinName(block.Target.Name)
+                : new NamedRef(block.Target);
+        foreach (var fn in block.Decl.Methods)
+        {
+            CheckAttributes(fn.Attributes, AttributeTarget.Member,
+                targetIsGeneric: false, block.MethodScope, "a member");
+            CheckFunction(fn, block.MethodScope, thisType);
+        }
+    }
+
     // extend blocks: check the bodies, the orphan rule and interface conformance. Runs after all
     // types, so member lookup goes through the complete registry.
     private void CheckExtensionBlocks()
@@ -724,20 +774,8 @@ public sealed class TypeChecker
                 continue;
             }
 
-            // Body check: the outer scope is the block's method scope, which carries cross-calls and
-            // the method generics. `this` is the target type — the primitive for builtins, the
-            // reference otherwise.
-            var thisType = block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
-                ? BlockTargetType(block) // 'List<T>' with the block's own T, 'Slice<T>' too (03 T7 X1, X2)
-                : block.Target.Kind == TypeSymbolKind.Builtin
-                    ? TypeFacts.FromBuiltinName(block.Target.Name)
-                    : new NamedRef(block.Target);
-            foreach (var fn in block.Decl.Methods)
-            {
-                CheckAttributes(fn.Attributes, AttributeTarget.Member,
-                    targetIsGeneric: false, block.MethodScope, "a member");
-                CheckFunction(fn, block.MethodScope, thisType);
-            }
+            // Body check — an implicit block's was probed already, and what survived checks.
+            if (!block.IsImplicit) CheckBlockBodies(block);
 
             // No orphan rule (03 T7 X3): coherence is checked whole-program, and an extend may
             // stand in any module.
@@ -1196,7 +1234,8 @@ public sealed class TypeChecker
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
                         continue; // a default method is inherited
                     }
-                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, (self ?? SelfType(implementer))));
+                    var at = self ?? SelfType(implementer);
+                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, at));
                     // An associated type the conformer did not answer was reported where it
                     // stands (SEM0128); the signature that reads it has nothing to compare.
                     if (ContainsError(want)) continue;
@@ -1205,7 +1244,7 @@ public sealed class TypeChecker
                     // match anywhere in the list satisfies it. Only when none fits is there
                     // something to report, and then the single-candidate case reports as before:
                     // one name, one implementation, one reason it does not match.
-                    if (found.FirstOrDefault(candidate => SignatureMismatch(want, im, candidate) is null)
+                    if (found.FirstOrDefault(candidate => SignatureMismatch(want, im, candidate, at) is null)
                         is { } satisfying)
                     {
                         // The lowering builds one vtable row per instance and cannot tell two
@@ -1225,7 +1264,7 @@ public sealed class TypeChecker
                             found.Select(candidate => new DiagnosticNote(
                                 candidate.Declaration?.Span ?? default,
                                 $"this one is '{TypeFacts.Display(FnTypeOf(candidate))}'")).ToArray());
-                    else if (SignatureMismatch(want, im, impl) is { } reason)
+                    else if (SignatureMismatch(want, im, impl, at) is { } reason)
                         _de.Report("LYR-SEM0042", Severity.Error, impl.Declaration?.Span ?? NodeSpan(node),
                             $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {reason}");
                 }
@@ -1356,10 +1395,17 @@ public sealed class TypeChecker
         iface.Members.LookupLocal(name) as FunctionSymbol;
 
     // Signature comparison, invariant: arity, parameter types, return type, mut, and throws ⊆.
-    private string? SignatureMismatch(FnType want, FunctionDecl ifaceMethod, FunctionSymbol impl)
+    private string? SignatureMismatch(FnType want, FunctionDecl ifaceMethod, FunctionSymbol impl, LyrType? at = null)
     {
         var decl = (FunctionDecl)impl.Declaration!;
         var have = FnTypeOf(impl);
+        // A candidate from a GENERIC block speaks in that block's own parameters: 'Pair<T>' of
+        // 'extend<T :: [Equatable]> Pair<T>' is not the 'Pair<T>' of the site checking an
+        // implied parent from another block. Read at this site's target, where the block's
+        // parameters bind to ours (03 T7 X1).
+        if (at is not null && _comp.Extensions.BlockOf(impl) is { Generics.Length: > 0 } block
+            && BlockSubstitution(block, at) is { } map)
+            have = (FnType)Substitute(have, map);
         if (ifaceMethod.IsStatic != decl.IsStatic)
             return ifaceMethod.IsStatic ? "expected a static member" : "expected an instance member, found a static one";
         if (want.Parameters.Length != have.Parameters.Length)
@@ -2290,7 +2336,7 @@ public sealed class TypeChecker
             return FnTypeOf(matching[0]);
         }
 
-        var sym = scope.Lookup(id.Name) ?? CoreType(id.Name); // 'Ordering.Less': std.core's types, unasked (10 U-series)
+        var sym = scope.Lookup(id.Name) ?? CoreMember(id.Name); // 'Ordering.Less', 'debugArray(xs)': std.core, unasked (10 U-series)
         if (sym is null)
             return Report(id.Span, "LYR-SEM0002", $"unknown identifier '{id.Name}'",
                 NameSuggestion.Note(id.Name, NamesIn(scope, typesOnly: false)));
@@ -2373,8 +2419,11 @@ public sealed class TypeChecker
         switch (callee)
         {
             case IdentifierExpr id:
-                return scope.Overloads(id.Name)
-                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+            {
+                var set = scope.Overloads(id.Name);
+                if (set.Count == 0) set = CoreOverloads(id.Name);
+                return set.Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+            }
 
             // A STATIC method or an enum's, where the receiver NAMES the type rather than being
             // a value of it: 'Id.of(7)'. The members are the same table; only the way in differs,
@@ -2642,7 +2691,7 @@ public sealed class TypeChecker
         // VALUE it is refused (fn values are monomorphic, §8.1), as a callee the inference is
         // about to substitute it. The import shell stays the bound symbol, as CheckIdentifier
         // binds it, so unused-import accounting sees the same reference either way.
-        if (callee is IdentifierExpr gid && scope.Lookup(gid.Name) is { } found
+        if (callee is IdentifierExpr gid && (scope.Lookup(gid.Name) ?? CoreMember(gid.Name)) is { } found // 'debugArray(xs)': std.core, unasked
             && (found is ImportBindingSymbol ib ? ib.Target : found)
                 is FunctionSymbol { Generics.Length: > 0 } generic)
         {
@@ -5092,19 +5141,20 @@ public sealed class TypeChecker
     /// <summary>A block member's signature for the receiver at hand: a generic block's parameters
     /// bound by the receiver (03 T7 X1), its constraints checked — the member is not there where
     /// they fail (<c>LYR-SEM0134</c>).</summary>
-    private LyrType ExtensionSignature(FunctionSymbol ext, Span span)
+    private LyrType ExtensionSignature(FunctionSymbol ext, Span span, LyrType? receiver = null)
     {
         var signature = FnTypeOf(ext);
+        receiver ??= _memberReceiver; // a static member names its receiver: 'Box<int>.default()'
         if (_comp.Extensions.BlockOf(ext) is not { Decl.Target: NamedType { TypeArguments.Length: > 0 } } block
-            || _memberReceiver is null) return signature;
-        if (BlockSubstitution(block, _memberReceiver) is { } map) return Substitute(signature, map);
+            || receiver is null) return signature;
+        if (BlockSubstitution(block, receiver) is { } map) return Substitute(signature, map);
         // A block on one instance adds to that instance alone: elsewhere the member is simply
         // not there. A generic block's constraints failing is worth the sentence.
         if (block.Generics.Length == 0)
-            return Report(span, "LYR-SEM0012", $"'{TypeFacts.Display(_memberReceiver)}' has no member '{ext.Name}'");
+            return Report(span, "LYR-SEM0012", $"'{TypeFacts.Display(receiver)}' has no member '{ext.Name}'");
         return Report(span, "LYR-SEM0134",
             $"'{ext.Name}' is added to '{TypeFacts.Display(BlockTargetType(block))}' under the block's constraints, "
-            + $"which '{TypeFacts.Display(_memberReceiver)}' does not satisfy");
+            + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
     }
 
     private FunctionSymbol? ExtensionMember(TypeSymbol ts, string member, Span span)
@@ -5283,7 +5333,9 @@ public sealed class TypeChecker
             // and the lowering already emits one without a receiver.
             _ => ExtensionMember(ts, member, span) switch
             {
-                { IsStatic: true } ext => (Of(FnTypeOf(ext)), ext),
+                // A generic block's own parameters are bound by the named instance (03 T7 X1):
+                // 'Box<int>.default()' from 'extend<T :: [Default]> Box<T>' answers 'Box<int>'.
+                { IsStatic: true } ext => (Of(ExtensionSignature(ext, span, instance)), ext),
 
                 { } ext => (Report(span, "LYR-SEM0055",
                     $"'{ext.Name}' is an instance method and needs a receiver — " +
@@ -8023,6 +8075,20 @@ public sealed class TypeChecker
     /// <summary>A public type of <c>std.core</c>, visible without an import (10 U-series).</summary>
     private TypeSymbol? CoreType(string name) =>
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
+
+    /// <summary>A public type or function of <c>std.core</c>, visible without an import (10 U5: the
+    /// prelude carries what the language itself reaches for — the synthesized conformances do).</summary>
+    private Symbol? CoreMember(string name) =>
+        _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) switch
+        {
+            TypeSymbol { Visibility: Visibility.Public } type => type,
+            FunctionSymbol { Visibility: Visibility.Public } fn => fn,
+            _ => null,
+        };
+
+    /// <summary>The overloads of a name in <c>std.core</c>, where the scope has none.</summary>
+    private IReadOnlyList<FunctionSymbol> CoreOverloads(string name) =>
+        _comp.FindModule(["std", "core"])?.Members.OverloadsLocal(name).Where(f => f.Visibility == Visibility.Public).ToList() ?? [];
 
     /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
     private bool IsAny(LyrType type) =>

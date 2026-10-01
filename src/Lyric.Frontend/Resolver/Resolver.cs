@@ -1,4 +1,5 @@
 using Lyric.AST;
+using Lyric.Parsing;
 using Lyric.Core;
 
 namespace Lyric.Resolver;
@@ -18,11 +19,13 @@ public sealed class Resolver
     private readonly DiagnosticEngine _de;
     private readonly BindingResult _binding = new();
 
+    private readonly SourceManager _sm;
+
     public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de)
     {
         _comp = comp;
         _de = de;
-        _ = sm; // reserved for later source-related diagnostics
+        _sm = sm;
     }
 
     /// <summary>The "previous declaration" note for a duplicate, or none when the first claimant
@@ -47,8 +50,13 @@ public sealed class Resolver
 
     private void DeclareModule(ModuleSymbol module)
     {
-        foreach (var decl in _comp.AstOf(module).Declarations)
+        var declarations = _comp.AstOf(module).Declarations;
+        var coreHasDebug = _comp.Modules.Any(m => m.FullName == "std.core"
+            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Debug" }));
+        for (var k = 0; k < declarations.Length; k++)
         {
+            declarations[k] = Synthesize(module, declarations[k], coreHasDebug);
+            var decl = declarations[k];
             switch (decl)
             {
                 case StructDecl s: DeclareType(module, s.Name, TypeSymbolKind.Struct, Vis(s.IsPublic), s.Generics, s.Members, s); break;
@@ -70,10 +78,59 @@ public sealed class Resolver
         }
     }
 
+    /// <summary>
+    /// Conformance synthesis (04 D7) for one type declaration: every listed interface of the
+    /// family without its member written, and <c>Debug</c> unasked, become an extend block of
+    /// this module — written as source, parsed, declared like any block — and the listed node
+    /// leaves the type's own list (one conformance per type and interface, 03 T7 X3). The
+    /// declaration comes back without those nodes; the AST holds the result.
+    /// </summary>
+    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug)
+    {
+        string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
+        switch (decl)
+        {
+            case StructDecl s: (name, generics, interfaces, fields, variants, methods) = (s.Name, s.Generics, s.Interfaces, s.Members.OfType<FieldDecl>().ToArray(), null, s.Members.OfType<FunctionDecl>()); break;
+            case ClassDecl c: (name, generics, interfaces, fields, variants, methods) = (c.Name, c.Generics, c.Interfaces, c.Members.OfType<FieldDecl>().ToArray(), null, c.Members.OfType<FunctionDecl>()); break;
+            case EnumDecl e: (name, generics, interfaces, fields, variants, methods) = (e.Name, e.Generics, e.Interfaces, [], e.Variants, e.Methods); break;
+            default: return decl;
+        }
+        var requests = Synthesis.RequestsOf(interfaces, methods, coreHasDebug);
+        if (requests.Count == 0) return decl;
+
+        var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
+        foreach (var request in requests)
+        {
+            var text = Synthesis.Block(request.Interface, name, generics, fields, variants, _sm, out var refusal);
+            if (text is null)
+            {
+                _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,
+                    $"'{request.Interface}' is not synthesized for '{name}': {refusal} — write the member");
+                if (request.Node is not null) taken.Add(request.Node);
+                continue;
+            }
+            var id = _sm.AddSynthesized($"<synthesized {request.Interface} for {module.FullName}.{name}>", text,
+                request.Node?.Span ?? decl.Span, $"in the '{request.Interface}' synthesized for '{name}'");
+            var parsed = new Parser(_sm, id, _de).ParseModule();
+            foreach (var synthesized in parsed.Declarations)
+                if (synthesized is ExtendDecl block) DeclareExtend(module, block, implicitly: request.Node is null);
+            if (request.Node is not null) taken.Add(request.Node);
+        }
+        if (taken.Count == 0) return decl;
+        var kept = interfaces.Where(n => !taken.Contains(n)).ToArray();
+        return decl switch
+        {
+            StructDecl s => s with { Interfaces = kept },
+            ClassDecl c => c with { Interfaces = kept },
+            EnumDecl e => e with { Interfaces = kept },
+            _ => decl,
+        };
+    }
+
     // An extend block: its methods get their own FunctionSymbol in a block scope
     // (parent = module scope), so `T` and free names resolve. The target type is bound in pass 3.
     // No new top-level symbol; the methods live only in the ExtensionRegistry.
-    private void DeclareExtend(ModuleSymbol module, ExtendDecl ex)
+    private void DeclareExtend(ModuleSymbol module, ExtendDecl ex, bool implicitly = false)
     {
         var methodScope = new SymbolTable(module.Members);
         // The block's own parameters (03 T7 X1) stand in its scope, so the target and every
@@ -92,7 +149,7 @@ public sealed class Resolver
         foreach (var t in ex.Types)
             if (!methodScope.TryDeclare(new AssociatedTypeSymbol(t.Name, t)))
                 _de.Report("LYR-RES0001", Severity.Error, t.Span, $"'{t.Name}' is already declared in this extend block");
-        _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()) { Generics = blockGenerics });
+        _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()) { Generics = blockGenerics, IsImplicit = implicitly });
     }
 
     private void DeclareType(ModuleSymbol module, string name, TypeSymbolKind kind, Visibility vis, GenericParam[] generics, Decl[] members, Decl decl)
