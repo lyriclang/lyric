@@ -13,6 +13,8 @@ typedef struct lyr_vt_ty4 lyr_vt_ty4;
 const char lyr_ifid_ty4[] = "Any";
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
 const char lyr_ifid_ty5[] = "Named";
+typedef struct lyr_vt_ty6 lyr_vt_ty6;
+const char lyr_ifid_ty6[] = "Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -39,6 +41,11 @@ struct lyr_vt_ty4 {
 struct lyr_vt_ty5 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
+};
+struct lyr_vt_ty6 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 _Static_assert(sizeof(LyrIface) == 16, "layout of Shape[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };

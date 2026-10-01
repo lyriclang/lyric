@@ -6,6 +6,8 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Point lyr_ty0_Point;
 typedef struct lyr_ty1_Log lyr_ty1_Log;
+typedef struct lyr_vt_ty2 lyr_vt_ty2;
+const char lyr_ifid_ty2[] = "Error";
 struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
@@ -20,6 +22,11 @@ _Static_assert(offsetof(lyr_ty1_Log, f_lines) == 8, "layout of lyr_ty1_Log");
 _Static_assert(offsetof(lyr_ty1_Log, f_last) == 16, "layout of lyr_ty1_Log");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x4) };
 const LyrDesc lyr_desc_ty1_Log = { sizeof(lyr_ty1_Log), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Log", NULL };
+struct lyr_vt_ty2 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 _Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of main.Point[]");
 const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "main.Point[]", NULL };
 

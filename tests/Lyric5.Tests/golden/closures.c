@@ -24,6 +24,8 @@ typedef struct lyr_ty16_Acc lyr_ty16_Acc;
 typedef struct lyr_ty17__env_main_main_ lyr_ty17__env_main_main_;
 typedef struct lyr_ty18__env_main_Scale_scaled_ lyr_ty18__env_main_Scale_scaled_;
 typedef struct lyr_ty19__env_main_Pair_adder_ lyr_ty19__env_main_Pair_adder_;
+typedef struct lyr_vt_ty20 lyr_vt_ty20;
+const char lyr_ifid_ty20[] = "Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -160,6 +162,11 @@ struct lyr_ty19__env_main_Pair_adder_ {
 _Static_assert(sizeof(lyr_ty19__env_main_Pair_adder_) == 16, "layout of lyr_ty19__env_main_Pair_adder_");
 _Static_assert(offsetof(lyr_ty19__env_main_Pair_adder_, f_this) == 8, "layout of lyr_ty19__env_main_Pair_adder_");
 const LyrDesc lyr_desc_ty19__env_main_Pair_adder_ = { sizeof(lyr_ty19__env_main_Pair_adder_), 0, 0, 0, NULL, "<env:main.Pair.adder>", NULL };
+struct lyr_vt_ty20 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 typedef struct { void (*fn)(void *, lyr_ty0__tuple_); void *env; } lyr_fn_ty0_to_void;
 _Static_assert(sizeof(lyr_fn_ty0_to_void) == 16, "layout of lyr_fn_ty0_to_void");
 typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;

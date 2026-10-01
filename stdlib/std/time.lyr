@@ -97,7 +97,7 @@ pub struct Duration :: [Equatable<Duration>, Ordered<Duration>, Hashable<Duratio
 }
 
 /// A failed reading of a time text: what was handed in, and what broke.
-pub class TimeError :: [Throwable] {
+pub class TimeError :: [Error] {
     /// What went wrong, naming the field that broke.
     text: string,
 

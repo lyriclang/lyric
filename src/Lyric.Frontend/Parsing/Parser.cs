@@ -144,7 +144,9 @@ public sealed partial class Parser
 
     private Expr ParseExprInner(int minBp)
     {
-        var left = ParsePrefix();
+        // An operand at binding power 0 starts an expression — a binding's value, an argument, a
+        // return, the right of an '=' — which is where 'try' may stand.
+        var left = ParsePrefix(atStart: minBp == 0);
 
         while (true)
         {
@@ -214,9 +216,23 @@ public sealed partial class Parser
     // Prefix and postfix levels.
     // ---------------------------------------------------------------------
 
-    private Expr ParsePrefix()
+    private Expr ParsePrefix(bool atStart = false)
     {
         var op = _buffer.Current.TokenKind;
+        // 'try e' (design/v5/spec/05 E4, 08 Y4): the mark covers EVERYTHING to its right — 'try a +
+        // b' is 'try (a + b)' — so it stands at the start of the expression it covers. To the right
+        // of an operator it would cover another expression than it seems to (Swift refuses the
+        // same). 'try {' is the block form, which only a statement starts.
+        if (op is TokenKind.Try && _buffer.Peek(1).TokenKind is not TokenKind.LBrace)
+        {
+            var kw = _buffer.Advance();
+            if (!atStart)
+                _de.Report("LYR-PAR0050", Severity.Error, kw.Span,
+                    "'try' covers everything to its right, so it stands at the start of the expression "
+                    + "it covers — 'try a + b', not 'a + try b'");
+            var marked = atStart ? ParseExpr(0) : ParsePrefix();
+            return new TryExpr(marked, Span.Union(kw.Span, marked.Span)) { KeywordSpan = kw.Span };
+        }
         // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
         // is still the exclusive or, which the binary loop takes before this is asked.
         if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec or TokenKind.Caret)

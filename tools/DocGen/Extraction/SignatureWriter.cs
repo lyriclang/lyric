@@ -35,8 +35,10 @@ public static class SignatureWriter
 
         if (d.Throws is not null)
         {
+            // One type alone, several in brackets (the list rule, 08 D5/D6), none for the bare form.
             sb.Append(" throws");
-            if (d.Throws.Type is not null) sb.Append(' ').Append(Type(d.Throws.Type));
+            if (d.Throws.Types is [var only]) sb.Append(' ').Append(Type(only));
+            else if (d.Throws.Types.Length > 1) sb.Append(" [").Append(string.Join(", ", d.Throws.Types.Select(Type))).Append(']');
         }
 
         return sb.ToString();

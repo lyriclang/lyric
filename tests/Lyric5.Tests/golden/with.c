@@ -8,6 +8,8 @@ typedef struct lyr_ty0_Point lyr_ty0_Point;
 typedef struct lyr_ty1_Line lyr_ty1_Line;
 typedef struct lyr_ty2_Holder lyr_ty2_Holder;
 typedef struct lyr_ty3_Pair_int_ lyr_ty3_Pair_int_;
+typedef struct lyr_vt_ty4 lyr_vt_ty4;
+const char lyr_ifid_ty4[] = "Error";
 struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
@@ -27,6 +29,11 @@ const LyrDesc lyr_desc_ty2_Holder = { sizeof(lyr_ty2_Holder), 0, 0, 0, NULL, "ma
 struct lyr_ty3_Pair_int_ {
     int64_t f_first;
     LyrStr *f_second;
+};
+struct lyr_vt_ty4 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 
 /* string literals */

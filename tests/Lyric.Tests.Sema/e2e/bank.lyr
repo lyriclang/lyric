@@ -1,10 +1,10 @@
 // bank.lyr — complexity: advanced
-// Shows: class as a reference type, a Throwable type, `throws` in the signature,
+// Shows: class as a reference type, a Error type, `throws` in the signature,
 // throw/try/catch with a typed catch, the `new` factory convention, defer at the scope exit.
 
 import std.io.console { println, eprintln };
 
-pub class InsufficientFunds :: [Throwable] {
+pub class InsufficientFunds :: [Error] {
     requested: int,
     available: int,
 

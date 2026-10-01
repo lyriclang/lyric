@@ -8,6 +8,8 @@ typedef struct lyr_ty0__tuple_ lyr_ty0__tuple_;
 typedef struct lyr_ty1__tuple_ lyr_ty1__tuple_;
 typedef struct lyr_ty2__tuple_ lyr_ty2__tuple_;
 typedef struct lyr_ty3_Holder lyr_ty3_Holder;
+typedef struct lyr_vt_ty4 lyr_vt_ty4;
+const char lyr_ifid_ty4[] = "Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -27,6 +29,11 @@ struct lyr_ty3_Holder {
 _Static_assert(sizeof(lyr_ty3_Holder) == 24, "layout of lyr_ty3_Holder");
 _Static_assert(offsetof(lyr_ty3_Holder, f_pos) == 8, "layout of lyr_ty3_Holder");
 const LyrDesc lyr_desc_ty3_Holder = { sizeof(lyr_ty3_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
+struct lyr_vt_ty4 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 typedef struct { lyr_ty0__tuple_ value; uint8_t has; } lyr_opt_ty0;
 _Static_assert(sizeof(lyr_ty0__tuple_) == 16, "layout of <tuple>[]");
 const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0__tuple_), 0, NULL, "<tuple>[]", NULL };

@@ -119,10 +119,17 @@ public sealed record TupleOf(LyrType[] Elements) : LyrType
 {
     public string?[]? Labels { get; init; }
 }
-public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType;
+public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType
+{
+    /// <summary>What a call of this function may throw (design/v5/spec/05 E2): the declared set,
+    /// substituted with the function's instance (K5); empty when it throws nothing. Not yet part of
+    /// the type's identity — a function value of a throwing function is refused until function
+    /// types carry the set (T17, M5 S4).</summary>
+    public LyrType[] Throws { get; init; } = [];
+}
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type
 /// <param name="Throws">What a PULL of this coroutine may throw: null when it cannot, the
-/// builtin <c>Throwable</c> for a typeless <c>throws</c>, otherwise the declared type.
+/// <c>Error</c> of <c>std.core</c> for a typeless <c>throws</c>, otherwise the declared type.
 ///
 /// <para>Part of the TYPE since 3.0, and it has to be: the call of a coroutine function runs no
 /// body and cannot throw, so a check at the call is a check at the wrong event. Riding on the

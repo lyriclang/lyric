@@ -44,7 +44,7 @@ public class ThrowExpressionTests
 
     private const string Err =
         """
-        class Err :: [Throwable] {
+        class Err :: [Error] {
             fn message(): string { return "err"; }
         }
 

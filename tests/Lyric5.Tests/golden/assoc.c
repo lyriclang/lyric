@@ -7,6 +7,8 @@
 typedef struct lyr_ty0_IntBox lyr_ty0_IntBox;
 typedef struct lyr_ty1_StrBox lyr_ty1_StrBox;
 typedef struct lyr_ty2_Pair_int_ lyr_ty2_Pair_int_;
+typedef struct lyr_vt_ty3 lyr_vt_ty3;
+const char lyr_ifid_ty3[] = "Error";
 struct lyr_ty0_IntBox {
     int64_t f_v;
 };
@@ -16,6 +18,11 @@ struct lyr_ty1_StrBox {
 struct lyr_ty2_Pair_int_ {
     int64_t f_a;
     int64_t f_b;
+};
+struct lyr_vt_ty3 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 
 /* string literals */

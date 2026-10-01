@@ -9,6 +9,8 @@ typedef struct lyr_ty1_Team lyr_ty1_Team;
 typedef struct lyr_ty2_Shape lyr_ty2_Shape;
 typedef struct lyr_ty3_Point lyr_ty3_Point;
 typedef struct lyr_ty4_Counter lyr_ty4_Counter;
+typedef struct lyr_vt_ty5 lyr_vt_ty5;
+const char lyr_ifid_ty5[] = "Error";
 struct lyr_ty0_Account {
     LyrObj header;
     LyrStr *f_owner;
@@ -48,6 +50,11 @@ _Static_assert(offsetof(lyr_ty2_Shape, f_at) == 16, "layout of lyr_ty2_Shape");
 _Static_assert(offsetof(lyr_ty2_Shape, f_hits) == 32, "layout of lyr_ty2_Shape");
 static const uint64_t lyr_refmap_ty2[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_ty2_Shape = { sizeof(lyr_ty2_Shape), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.Shape", NULL };
+struct lyr_vt_ty5 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("alice");

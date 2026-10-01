@@ -69,13 +69,8 @@ public class LiteralEdgeTests
         Assert.Equal(2, de.Diagnostics.Count(d => d.Code == "LYR-SEM0010"));
     }
 
-    [Fact]
-    public void A_throws_clause_on_main_is_refused()
-    {
-        // The entry point declares nothing (§9.2) — the bare form is enough to trip the gate.
-        var de = Check("fn main(): int throws {\n    return 0;\n}\n");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0021");
-    }
+    // 'A_throws_clause_on_main_is_refused' retired with its rule (M5 S1a): 'main' may declare
+    // 'throws' (design/v5/spec/08 D18, 05 E6 O4) — ExceptionTests.Main_may_declare_throws pins it.
 
     // ─── context propagation (2.1) ─────────────────────────────────────────
 

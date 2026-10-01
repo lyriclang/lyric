@@ -4,8 +4,8 @@
 // the VM with a backtrace. The compiler binds the call without anyone importing 'std.core', the
 // same model as the f-string helpers in 'std.string'.
 
-/// What the language itself needs: aborting with a reason, the ready-made `Throwable`, and the
-/// interfaces the built-in types satisfy.
+/// What the language itself needs: aborting with a reason, the root `Error` with the ready-made
+/// `Exception`, and the interfaces the built-in types satisfy.
 ///
 /// `panic` and `coroutineEnded` are bound by the compiler, so nothing has to import this module to
 /// reach them.
@@ -67,15 +67,29 @@ pub fn unreachable(message: string): void {
     panic("unreachable: " + message);
 }
 
+// ---------------------------------------------------------------------------------- Error
+//
+// The root of everything thrown (Lyric 5, design/v5/spec/05 E6 O1), in place of the built-in
+// `Throwable` this library was written against: the compiler now asks for `std.core`'s `Error`.
+
+/// The root of everything thrown, caught and declared: a struct, a class or an enum that conforms.
+pub interface Error {
+    fn message(): string;
+
+    fn cause(): ?Error {
+        return null;
+    }
+}
+
 // ---------------------------------------------------------------------------------- Exception
 //
-// The ready-made `Throwable` for throwing a message.
+// The ready-made `Error` for throwing a message.
 //
-// The field is `text` and not `message`, because `Throwable` requires a METHOD `message()` and the
+// The field is `text` and not `message`, because `Error` requires a METHOD `message()` and the
 // two cannot share a name.
 
-/// The ready-made `Throwable` for throwing a message: `throw Exception { text = "…" };`.
-pub class Exception :: [Throwable] {
+/// The ready-made `Error` for throwing a message: `throw Exception { text = "…" };`.
+pub class Exception :: [Error] {
     /// What `message()` returns.
     text: string,
 

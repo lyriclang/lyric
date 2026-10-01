@@ -228,6 +228,7 @@ internal sealed class FlowAnalyzer
             case ResumeExpr re: AnalyzeExpr(re.Coroutine, assigned); return;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner, assigned); return;
             case ThrowExpr te: AnalyzeExpr(te.Value, assigned); return;
+            case TryExpr tr: AnalyzeExpr(tr.Value, assigned); return;
             case PostfixExpr p: AnalyzeExpr(p.Operand, assigned); return;
             case CallExpr c:
                 AnalyzeExpr(c.Callee, assigned);

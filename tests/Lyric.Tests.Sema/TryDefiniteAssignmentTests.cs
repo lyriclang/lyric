@@ -62,7 +62,7 @@ public class TryDefiniteAssignmentTests
     public void A_catch_that_throws_or_continues_leaves_too()
     {
         var de = Check(Head + """
-            class Fatal :: [Throwable] { fn message(): string { return "f"; } }
+            class Fatal :: [Error] { fn message(): string { return "f"; } }
             fn f(xs: string[]): int throws Fatal {
                 var total = 0;
                 for (s in xs) {

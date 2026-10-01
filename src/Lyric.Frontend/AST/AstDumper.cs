@@ -236,8 +236,8 @@ public static class AstDumper
                 if (n.Default is not null) Write(n.Default, indent + 1, sb);
                 break;
             case ThrowsClause n:
-                Line(sb, indent, n.Type is null ? "Throws (any)" : "Throws", n.Span);
-                if (n.Type is not null) Write(n.Type, indent + 1, sb);
+                Line(sb, indent, n.Types.Length == 0 ? "Throws (Error)" : "Throws", n.Span);
+                foreach (var thrown in n.Types) Write(thrown, indent + 1, sb);
                 break;
             case FunctionDecl n:
                 Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Extern is { } x ? $" extern \"{x.Abi}\"{(x.Symbol is null ? "" : $" = \"{x.Symbol}\"")}" : n.Body is null ? " (abstract)" : "")}", n.Span);
@@ -384,6 +384,10 @@ public static class AstDumper
                 break;
             case ThrowExpr n:
                 Line(sb, indent, "ThrowExpr", n.Span);
+                Write(n.Value, indent + 1, sb);
+                break;
+            case TryExpr n:
+                Line(sb, indent, "Try", n.Span);
                 Write(n.Value, indent + 1, sb);
                 break;
             case DeferStmt n:

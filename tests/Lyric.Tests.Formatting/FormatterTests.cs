@@ -794,4 +794,32 @@ public class FormatterTests
         Assert.Contains("@[\n", formatted, StringComparison.Ordinal);
         Assert.Contains("    Gamma(9),\n    Delta,\n]", formatted, StringComparison.Ordinal);
     }
+
+    // --- errors (design/v5/spec/08 D9, Y4) ---
+
+    [Fact]
+    public void A_throws_set_keeps_the_list_rule()
+    {
+        // One type alone, several in brackets, none for the bare form.
+        var formatted = Format("fn a(): int throws E { return 0; }\nfn b(): int throws [ A,B ] { return 0; }\nfn c(): int throws [E] { return 0; }\nfn d(): int throws { return 0; }\n")
+            .Replace("\r\n", "\n");
+        Assert.Contains("fn a(): int throws E {", formatted, StringComparison.Ordinal);
+        Assert.Contains("fn b(): int throws [A, B] {", formatted, StringComparison.Ordinal);
+        Assert.Contains("fn c(): int throws E {", formatted, StringComparison.Ordinal);
+        Assert.Contains("fn d(): int throws {", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Try_round_trips_with_what_it_covers()
+    {
+        var formatted = Format("fn g(): int throws E { let x = try  f()+1; try h(); return try f(); }").Replace("\r\n", "\n");
+        Assert.Contains("let x = try f() + 1;", formatted, StringComparison.Ordinal);
+        Assert.Contains("    try h();\n", formatted, StringComparison.Ordinal);
+        Assert.Contains("return try f();", formatted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_parenthesized_try_keeps_its_parentheses() =>
+        // '(try f()) + 1' marks the call alone; without the parentheses 'try' would cover the sum.
+        Assert.Contains("(try f()) + 1", Format("fn g(): int throws E { return (try f()) + 1; }"), StringComparison.Ordinal);
 }

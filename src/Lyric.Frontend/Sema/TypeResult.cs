@@ -128,6 +128,31 @@ public sealed class TypeResult
 
     public LyrType? ThrownByPull(Node pull) =>
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
+
+    // --- errors (design/v5/spec/05 E2) ---------------------------------------------------------
+
+    private readonly Dictionary<Node, LyrType[]> _declaredThrows = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<CallExpr, LyrType[]> _callThrows = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<CatchClause, LyrType> _catchTypes = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The thrown set a function declares, resolved — the bare <c>throws</c> as
+    /// <c>Error</c>; empty when it throws nothing. What its BODY may throw: for a coroutine
+    /// function that is what its pulls throw, not its call.</summary>
+    public void RecordDeclaredThrows(FunctionDecl fn, LyrType[] set) => _declaredThrows[fn] = set;
+
+    public LyrType[] DeclaredThrows(FunctionDecl fn) => _declaredThrows.GetValueOrDefault(fn) ?? [];
+
+    /// <summary>What a call may throw, in its instance's terms (K5) — the checker's settled callee,
+    /// overloads and generic substitution done. Recorded for throwing calls only.</summary>
+    public void RecordCallThrows(CallExpr call, LyrType[] set) => _callThrows[call] = set;
+
+    public LyrType[] CallThrows(CallExpr call) => _callThrows.GetValueOrDefault(call) ?? [];
+
+    /// <summary>The type a typed <c>catch</c> clause names, resolved.</summary>
+    public void RecordCatchType(CatchClause clause, LyrType type) => _catchTypes[clause] = type;
+
+    public LyrType? CatchType(CatchClause clause) => _catchTypes.GetValueOrDefault(clause);
+
     public Symbol? RefOf(Node node) => _refs.TryGetValue(node, out var s) ? s : null;
 
     /// <summary>

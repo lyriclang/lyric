@@ -16,6 +16,8 @@ typedef struct lyr_ty7_Holder lyr_ty7_Holder;
 typedef struct lyr_vt_ty8 lyr_vt_ty8;
 const char lyr_ifid_ty8[] = "Shape";
 typedef struct lyr_ty9_Square lyr_ty9_Square;
+typedef struct lyr_vt_ty10 lyr_vt_ty10;
+const char lyr_ifid_ty10[] = "Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     void (*s0)(LyrIface, int64_t);
@@ -64,6 +66,11 @@ struct lyr_vt_ty8 {
 };
 struct lyr_ty9_Square {
     int64_t f_side;
+};
+struct lyr_vt_ty10 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
 };
 _Static_assert(sizeof(LyrIface) == 16, "layout of Damageable[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };

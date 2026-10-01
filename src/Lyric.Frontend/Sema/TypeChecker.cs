@@ -65,7 +65,10 @@ public sealed class TypeChecker
     /// <c>Error</c> means "already reported", so something has to be reported here.</para>
     /// </summary>
     private bool _inGlobalInitializer;
-    private readonly TypeSymbol? _throwable; // the builtin Throwable interface
+    /// <summary>The root of everything thrown, caught and declared: <c>std.core</c>'s <c>Error</c>
+    /// (design/v5/spec/05 E6 O1). Null without a standard library, and throwability is then not
+    /// asked — a missing root must not cascade into every throw.</summary>
+    private readonly TypeSymbol? _error;
     private readonly FunctionSymbol? _panic; // the builtin panic, returning never
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
@@ -101,7 +104,7 @@ public sealed class TypeChecker
         _comp = comp;
         _binding = binding;
         _de = de;
-        _throwable = comp.Builtins.LookupLocal("Throwable") as TypeSymbol;
+        _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _panic = comp.Builtins.LookupLocal("panic") as FunctionSymbol;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
@@ -1422,26 +1425,13 @@ public sealed class TypeChecker
             return $"returns '{TypeFacts.Display(have.Return)}', expected '{TypeFacts.Display(want.Return)}'";
         if (ifaceMethod.IsMut != decl.IsMut)
             return decl.IsMut ? "must not be 'mut'" : "must be declared 'mut'";
-        if (!ThrowsSubset(decl.Throws, ifaceMethod.Throws))
-            return "throws more than the interface method allows";
+        // An implementation throws at most what the member allows (05 E2 K6): every type of its
+        // set covered by the member's, both read at the conformance instance.
+        if (have.Throws.FirstOrDefault(t => !want.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule))) is { } extra)
+            return want.Throws.Length == 0
+                ? $"throws '{TypeFacts.Display(extra)}', and the interface member throws nothing"
+                : $"throws '{TypeFacts.Display(extra)}', which the interface member's 'throws' does not cover";
         return null;
-    }
-
-    // May the implementation's throws clause sit under the interface's? nothing ⊆ typed ⊆ any.
-    private bool ThrowsSubset(ThrowsClause? impl, ThrowsClause? iface)
-    {
-        if (impl is null) return true;            // throws nothing, so always allowed
-        if (iface is null) return false;          // the interface forbids throwing, the implementation throws
-        if (iface.Type is null) return true;      // the interface allows any throwable
-        if (impl.Type is null) return false;      // the implementation is unrestricted, the interface narrow
-        var it = ResolveType(iface.Type, _currentModule?.Members ?? _comp.Builtins);
-        var pt = ResolveType(impl.Type, _currentModule?.Members ?? _comp.Builtins);
-        if (LyrType.Equal(it, pt)) return true;
-        // Both sides may be instances ('Box<int> :: [Src<int>]'); TypeFacts.SymbolOf answers the
-        // question for both forms.
-        return TypeFacts.SymbolOf(pt) is { } implementation
-               && TypeFacts.SymbolOf(it) is { } required
-               && Conformance.Implements(implementation, required, _binding);
     }
 
     private static Span NodeSpan(TypeNode n) => n.Span;
@@ -1589,10 +1579,7 @@ public sealed class TypeChecker
                 break;
             case ExprStmt es: CheckExpr(es.Expr, scope); break;
             case ThrowStmt t:
-                var thrown = CheckExpr(t.Value, scope);
-                if (!Conformance.IsThrowable(thrown, _throwable, _binding))
-                    _de.Report("LYR-SEM0030", Severity.Error, t.Span,
-                        $"cannot throw '{TypeFacts.Display(thrown)}' — only types implementing 'Throwable' can be thrown");
+                CheckThrown(CheckExpr(t.Value, scope), t.Span);
                 break;
             case YieldStmt y:
                 // Since 4.0 'yield' is legal in EVERY function (§10a): which chain it suspends
@@ -1831,16 +1818,90 @@ public sealed class TypeChecker
         return null;
     }
 
-    // throws clause: the declared type has to be throwable, and the resolved symbol is bound to the
-    // clause for the ExceptionAnalyzer.
+    /// <summary>
+    /// A <c>throws</c> clause (design/v5/spec/05 E2): a SET of types that conform to <c>Error</c>
+    /// (E3, <c>LYR-SEM0030</c>), each named once (K1, <c>LYR-SEM0137</c>); the bare form is
+    /// <c>Error</c> (K2). The resolved set is recorded for the exception analysis — not for a
+    /// coroutine function, whose clause describes the pulls of the coroutine it returns.
+    /// </summary>
     private void CheckThrowsClause(FunctionDecl fn, SymbolTable scope)
     {
-        if (fn.Throws?.Type is not { } tn) return;
-        var t = ResolveType(tn, scope);
-        if (!Conformance.IsThrowable(t, _throwable, _binding))
-            _de.Report("LYR-SEM0030", Severity.Error, fn.Throws.Span,
-                $"'{TypeFacts.Display(t)}' in 'throws' does not implement 'Throwable'");
-        if (TypeFacts.SymbolOf(t) is { } thrown) _result.BindRef(fn.Throws, thrown);
+        if (fn.Throws is not { } clause) return;
+        var seen = new List<(LyrType Type, Span Span)>();
+        foreach (var node in clause.Types)
+        {
+            var t = ResolveType(node, scope);
+            if (t.IsError) continue;
+            if (!IsThrowable(t))
+                _de.Report("LYR-SEM0030", Severity.Error, node.Span,
+                    $"'{TypeFacts.Display(t)}' in 'throws' does not conform to 'Error' — what is thrown is an 'Error'");
+            if (seen.FirstOrDefault(s => LyrType.Equal(s.Type, t)) is { Type: not null } first)
+                _de.Report("LYR-SEM0137", Severity.Error, node.Span,
+                    $"'{TypeFacts.Display(t)}' is named twice in 'throws' — a set names each type once",
+                    new DiagnosticNote(first.Span, "named first here"));
+            else seen.Add((t, node.Span));
+            if (TypeFacts.SymbolOf(t) is { } thrown) _result.BindRef(node, thrown);
+        }
+        _result.RecordDeclaredThrows(fn, ClauseSetOf(fn));
+    }
+
+    /// <summary>What a function's clause names, resolved — the bare form as <c>Error</c> (K2),
+    /// nothing without a clause. What its BODY may throw, a coroutine's included.</summary>
+    private LyrType[] ClauseSetOf(FunctionDecl fn)
+    {
+        if (fn.Throws is not { } clause) return [];
+        if (clause.Types.Length == 0) return _error is { } root ? [new NamedRef(root)] : [];
+        return clause.Types.Select(t => ResolveType(t, _comp.Builtins)).Where(t => !t.IsError).ToArray();
+    }
+
+    /// <summary>What a CALL of this function may throw: the clause's set — except for a coroutine
+    /// function, whose clause belongs to the coroutine it returns (<see cref="CoroutineThrowsOf"/>):
+    /// its call builds a frame and runs nothing.</summary>
+    private LyrType[] DeclaredThrowsOf(FunctionDecl fn) =>
+        fn.ReturnType is { } returned && ResolveType(returned, _comp.Builtins) is CoroutineOf ? [] : ClauseSetOf(fn);
+
+    /// <summary>What a <c>throw</c> throws conforms to <c>Error</c> (design/v5/spec/05 E3): a
+    /// struct, a class or an enum that conforms, an interface value of it or of a child of it, a
+    /// type parameter constrained to it.</summary>
+    private void CheckThrown(LyrType thrown, Span span)
+    {
+        if (!IsThrowable(thrown))
+            _de.Report("LYR-SEM0030", Severity.Error, span,
+                $"cannot throw '{TypeFacts.Display(thrown)}' — what is thrown conforms to 'Error'");
+    }
+
+    /// <summary>The root as a type, for the exception analysis.</summary>
+    internal LyrType? ErrorRoot => _error is null ? null : new NamedRef(_error);
+
+    private bool IsThrowable(LyrType t) =>
+        _error is null || ThrownCoveredBy(t, new NamedRef(_error), _currentModule);
+
+    /// <summary>The expression a <c>try</c> marks, the marks taken off: <c>try f();</c> is the
+    /// call statement it marks, as the statement rules see it.</summary>
+    internal static Expr Unmarked(Expr expr)
+    {
+        while (expr is TryExpr tried) expr = tried.Value;
+        return expr;
+    }
+
+    /// <summary>
+    /// Whether an element of a thrown set — a <c>throws</c> entry, a <c>catch</c> type — covers a
+    /// thrown type (design/v5/spec/05 E2 K5, K8): it IS that type, on the instance —
+    /// <c>Box&lt;int&gt;</c> is not <c>Box&lt;string&gt;</c> — or an interface the type conforms
+    /// to, <c>Error</c> covering everything thrown. Asked at <paramref name="at"/>, the module the
+    /// site stands in: a conformance from an extend block counts where it is seen. A shape — an
+    /// array, an optional, a function — conforms to nothing.
+    /// </summary>
+    internal bool ThrownCoveredBy(LyrType thrown, LyrType element, ModuleSymbol? at)
+    {
+        if (thrown.IsError || element.IsError || thrown is NeverType) return true;
+        if (LyrType.Equal(thrown, element)) return true;
+        if (thrown is not (NamedRef or GenericInstance or TypeParamType or PrimitiveType)) return false;
+        if (TypeFacts.SymbolOf(element) is not { Kind: TypeSymbolKind.Interface } iface) return false;
+        var saved = _currentModule;
+        _currentModule = at ?? saved;
+        try { return Satisfies(thrown, iface, element); }
+        finally { _currentModule = saved; }
     }
 
     private void CheckCatch(CatchClause clause, SymbolTable scope)
@@ -1850,13 +1911,14 @@ public sealed class TypeChecker
         if (clause.BindingType is not null)
         {
             bt = ResolveType(clause.BindingType, scope);
-            if (!Conformance.IsThrowable(bt, _throwable, _binding))
+            if (!bt.IsError && !IsThrowable(bt))
                 _de.Report("LYR-SEM0030", Severity.Error, clause.BindingType.Span,
-                    $"cannot catch '{TypeFacts.Display(bt)}' — only types implementing 'Throwable' can be caught");
+                    $"cannot catch '{TypeFacts.Display(bt)}' — what is caught conforms to 'Error'");
             if (TypeFacts.SymbolOf(bt) is { } caught)
-                _result.BindRef(clause.BindingType, caught); // for the ExceptionAnalyzer
+                _result.BindRef(clause.BindingType, caught); // for the lowering and the editor
+            _result.RecordCatchType(clause, bt);
         }
-        else bt = _throwable is not null ? new NamedRef(_throwable) : LyrType.Error; // a catch-all binds Throwable
+        else bt = _error is not null ? new NamedRef(_error) : LyrType.Error; // a catch-all binds the root
 
         // A clause with a NAME scopes it; a clause with a TYPE needs the symbol either way,
         // because the lowering reads the resolved catch type off it — 'catch (_: Boom)' used to
@@ -2271,12 +2333,12 @@ public sealed class TypeChecker
                 // The same rule as the statement (SEM0030); the difference is the type. 'never'
                 // fits anywhere (IsAssignable) and drops out of every unification, so
                 // 'x ?? throw e' is 'T' and a throwing arm leaves the other arms' type alone.
-                var thrownValue = CheckExpr(te.Value, scope);
-                if (!Conformance.IsThrowable(thrownValue, _throwable, _binding))
-                    _de.Report("LYR-SEM0030", Severity.Error, te.Span,
-                        $"cannot throw '{TypeFacts.Display(thrownValue)}' — only types implementing 'Throwable' can be thrown");
+                CheckThrown(CheckExpr(te.Value, scope), te.Span);
                 return LyrType.Never;
             }
+            // 'try e' (design/v5/spec/05 E4): the value and the type are e's; what the mark means —
+            // which sites it covers, where they propagate — is the exception analysis's question.
+            case TryExpr tried: return CheckExpr(tried.Value, scope, expected);
             // An attribute is not an expression: it describes the declaration it precedes and has
             // no value. Reporting that rather than silently yielding Error is the difference
             // between "does not work" and "does not work unnoticed".
@@ -2385,7 +2447,7 @@ public sealed class TypeChecker
         var ps = fn.Parameters.Select(p => ResolveType(p.Type, _comp.Builtins)).ToArray();
         var ret = IsPanic(f) ? LyrType.Never // panic has the unnameable type never
             : fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
-        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins));
+        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn) };
     }
 
     /// <summary>
@@ -2402,14 +2464,16 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
         fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null
-            ? co with { Throws = ThrownTypeOf(clause.Type, scope) }
+            // A coroutine's type carries one thrown type until area 6 gives it a set (M6): one
+            // named stays itself, several join to the root, as composed sets do (05 K7 Nachtrag).
+            ? co with { Throws = ThrownTypeOf(clause.Types is [var one] ? one : null, scope) }
             : declared;
 
-    /// <summary>What a <c>throws</c> names: the written type, or the builtin <c>Throwable</c> when
-    /// it names none — the same "anything" the typeless clause has always meant.</summary>
+    /// <summary>What a <c>throws</c> names: the written type, or <c>std.core</c>'s <c>Error</c>
+    /// when it names none — the "anything" the typeless clause means (05 E2 K2).</summary>
     private LyrType? ThrownTypeOf(TypeNode? written, SymbolTable scope) =>
         written is null
-            ? _throwable is { } any ? new NamedRef(any) : null
+            ? _error is { } any ? new NamedRef(any) : null
             : ResolveType(written, scope);
 
     /// <summary>
@@ -4162,6 +4226,10 @@ public sealed class TypeChecker
 
         CheckCallArgs(call, substituted, args, argTypes, decl);
 
+        // What this call may throw, in its instance's terms (05 E2 K5): the exception analysis
+        // asks whether it is marked and covered.
+        if (substituted.Throws.Length > 0) _result.RecordCallThrows(call, substituted.Throws);
+
         // If the receiver was optional the result is too, collapsed, because optionals do not nest.
         return optionalCall ? Optionalized(substituted.Return) : substituted.Return;
     }
@@ -4619,7 +4687,8 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Substitute(s.Element, map)),
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
-            FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map)),
+            FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
+                { Throws = f.Throws.Select(t => Substitute(t, map)).ToArray() },
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
                 { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
@@ -4674,7 +4743,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)),
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray() },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield) },
@@ -6361,7 +6430,7 @@ public sealed class TypeChecker
                         var tt = _result.TypeOf(tail.Expr);
                         if (!asExpression)
                         {
-                            if (tail.Expr is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
+                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
                                 _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
                                     "expression statement has no effect (only calls, assignments and resume are allowed)");
                             break;
@@ -7584,6 +7653,7 @@ public sealed class TypeChecker
                 case ResumeExpr re: WalkNode(re.Coroutine); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
+                case TryExpr tr: WalkNode(tr.Value); return;
                 case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;

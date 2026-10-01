@@ -29,7 +29,7 @@ pub enum IoErrorKind {
 /// The reason an I/O operation failed: which kind, on which path, and what the platform said.
 ///
 /// §9.0's answer to "why not?" — the silent forms (`text`, `writeText`, …) answer only whether.
-pub class IoError :: [Throwable] {
+pub class IoError :: [Error] {
     kind: IoErrorKind,
     path: string,
     detail: string,

@@ -20,7 +20,7 @@ import std.result { Result };
 
 /// Where and why a text was refused: the 0-based character offset of the refusal, and what the
 /// decoder expected there.
-pub class EncodingError :: [Throwable] {
+pub class EncodingError :: [Error] {
     offset: int,
     expected: string,
 

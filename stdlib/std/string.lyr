@@ -60,7 +60,7 @@ pub fn fromChars(chars: char[]): string;
 pub fn utf8Decode(bytes: uint8[]): ?string;
 
 /// Where a byte sequence stopped being UTF-8: the 0-based offset of the byte that broke it.
-pub class Utf8Error :: [Throwable] {
+pub class Utf8Error :: [Error] {
     offset: int,
 
     pub fn message(): string {
@@ -515,7 +515,7 @@ pub enum ParseErrorKind {
 ///
 /// The carrier-plus-kind shape of `std.io.error.IoError`: a class that throws, holding an enum
 /// that matches, so a kind can be added without breaking a `match` over the ones known.
-pub class ParseError :: [Throwable] {
+pub class ParseError :: [Error] {
     /// What went wrong.
     kind: ParseErrorKind,
     /// Where the reading stopped, in code points; the text's length for `Overflow` and `Empty`.

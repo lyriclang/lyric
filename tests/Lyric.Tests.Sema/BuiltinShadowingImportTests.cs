@@ -63,7 +63,7 @@ public class BuiltinShadowingImportTests
 
     /// <summary>
     /// The case that found it: a class whose <c>message()</c> returns <c>string</c> stopped
-    /// conforming to <c>Throwable</c>, reported as "returns '&lt;error&gt;'" at the conformance
+    /// conforming to <c>Error</c>, reported as "returns '&lt;error&gt;'" at the conformance
     /// rather than at the import.
     /// </summary>
     [Fact]
@@ -72,7 +72,7 @@ public class BuiltinShadowingImportTests
         var de = Check("""
             import std.string;
 
-            pub class Boom :: [Throwable] {
+            pub class Boom :: [Error] {
                 fn message(): string { return "boom"; }
             }
 

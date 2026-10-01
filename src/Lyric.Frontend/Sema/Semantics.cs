@@ -15,7 +15,8 @@ public static class Semantics
     public static TypeResult Analyze(Compilation compilation, BindingResult binding,
         DiagnosticEngine de, bool singleProgram = true)
     {
-        var types = new TypeChecker(compilation, binding, de).Check();
+        var checker = new TypeChecker(compilation, binding, de);
+        var types = checker.Check();
 
         // A NESTING BOUND STOPS THE WHOLE PIPELINE, not just the checker. Both walkers below
         // recurse over the same tree the checker gave up on, and 'SemaRules.WalkExpr' proved it:
@@ -24,7 +25,9 @@ public static class Semantics
         if (types.NestingExceeded) return types;
 
         new SemaRules(compilation, binding, types, de, singleProgram).Run();
-        new ExceptionAnalyzer(compilation, binding, types, de).Run(); // throws propagation
+        // Marked propagation and coverage (05 E1, E2); whether an element covers a thrown type is
+        // the checker's conformance question, asked where the site stands.
+        new ExceptionAnalyzer(compilation, types, de, checker.ThrownCoveredBy, checker.ErrorRoot).Run();
 
         // Warnings describe a program that compiles. Over a broken one the reference tables are
         // partial, and a warning computed from half a table is a guess with a confident tone.

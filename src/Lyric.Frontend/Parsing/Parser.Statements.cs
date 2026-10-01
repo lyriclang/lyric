@@ -39,7 +39,9 @@ public sealed partial class Parser
         TokenKind.Yield => ParseYield(),
         TokenKind.Defer => ParseDefer(),
         TokenKind.Throw => ParseThrow(),
-        TokenKind.Try => ParseTry(),
+        // 'try {' is the block form; 'try f();' is an expression statement whose expression is
+        // marked (design/v5/spec/05 E4).
+        TokenKind.Try when _buffer.Peek(1).TokenKind == TokenKind.LBrace => ParseTry(),
         TokenKind.Match => ParseMatchStmt(),
         _ => ParseExprStmt(),
     };

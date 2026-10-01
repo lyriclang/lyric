@@ -444,7 +444,7 @@ public class ParserTests
         Assert.Equal("T", Assert.Single(fn.Generics).Name);
         Assert.Equal("x", Assert.Single(fn.Parameters).Name);
         Assert.IsType<NamedType>(fn.ReturnType);
-        Assert.IsType<NamedType>(fn.Throws!.Type);
+        Assert.IsType<NamedType>(Assert.Single(fn.Throws!.Types));
     }
 
     [Fact]
@@ -454,11 +454,12 @@ public class ParserTests
     }
 
     [Fact]
-    public void Throws_without_type_is_any()
+    public void Throws_without_type_is_the_root()
     {
+        // The bare form names no type and means 'Error' (05 E2 K2): an empty list.
         var fn = Assert.IsType<FunctionDecl>(ParseModule("fn risky() throws { }").module.Declarations[0]);
         Assert.NotNull(fn.Throws);
-        Assert.Null(fn.Throws!.Type);   // 'throws' without a type
+        Assert.Empty(fn.Throws!.Types);
     }
 
     [Fact]

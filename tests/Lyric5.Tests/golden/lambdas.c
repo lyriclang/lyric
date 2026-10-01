@@ -10,6 +10,8 @@ typedef struct lyr_ty2__env_main_main_ lyr_ty2__env_main_main_;
 typedef struct lyr_ty3_Pt lyr_ty3_Pt;
 typedef struct lyr_ty4__env_main_main_ lyr_ty4__env_main_main_;
 typedef struct lyr_ty5__env_main_main_ lyr_ty5__env_main_main_;
+typedef struct lyr_vt_ty6 lyr_vt_ty6;
+const char lyr_ifid_ty6[] = "Error";
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -47,6 +49,11 @@ struct lyr_ty5__env_main_main_ {
 _Static_assert(sizeof(lyr_ty5__env_main_main_) == 24, "layout of lyr_ty5__env_main_main_");
 _Static_assert(offsetof(lyr_ty5__env_main_main_, f_this) == 8, "layout of lyr_ty5__env_main_main_");
 const LyrDesc lyr_desc_ty5__env_main_main_ = { sizeof(lyr_ty5__env_main_main_), 0, 0, 0, NULL, "<env:main.main>", NULL };
+struct lyr_vt_ty6 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 typedef struct { int64_t (*fn)(void *, int64_t); void *env; } lyr_fn_i64_to_i64;
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 typedef struct { int64_t (*fn)(void *); void *env; } lyr_fn_to_i64;

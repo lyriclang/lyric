@@ -91,7 +91,7 @@ public class ExtendConformanceTests
     public void Impl_throwing_more_than_interface_is_reported()
     {
         AssertCode(Diags("""
-            class Boom :: [Throwable] { fn message(): string { return "b"; } }
+            class Boom :: [Error] { fn message(): string { return "b"; } }
             interface Safe { fn run(): int; }
             struct S :: [Safe] { fn run(): int throws Boom { throw Boom { }; } }
             """), "LYR-SEM0042");
@@ -100,11 +100,15 @@ public class ExtendConformanceTests
     [Fact]
     public void Impl_throwing_subset_of_interface_is_clean()
     {
-        AssertClean(Diags("""
-            class Boom :: [Throwable] { fn message(): string { return "b"; } }
-            interface Risky { fn run(): int throws; }
-            struct S :: [Risky] { fn run(): int throws Boom { throw Boom { }; } }
-            """));
+        // The root lives in std.core (design/v5/spec/05 E6 O1): the bare 'throws' of the member is
+        // 'Error', and 'Boom' is one.
+        AssertClean(Check(
+            ("std.core", "module std.core;\npub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\n"),
+            ("main", """
+                class Boom :: [Error] { fn message(): string { return "b"; } }
+                interface Risky { fn run(): int throws; }
+                struct S :: [Risky] { fn run(): int throws Boom { throw Boom { }; } }
+                """)).de);
     }
 
     [Fact]

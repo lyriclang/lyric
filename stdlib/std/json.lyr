@@ -301,7 +301,7 @@ fn newlineIndent(sb: StringBuilder, indent: int, depth: int): void {
 
 /// Where and why a document was refused: the first place the parser could not continue, and
 /// what it expected there. `line` and `column` are 1-based and counted in code points.
-pub class JsonError :: [Throwable] {
+pub class JsonError :: [Error] {
     line: int,
     column: int,
     /// The 0-based code-point offset of the refusal — `line` and `column`, unfolded.

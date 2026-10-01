@@ -7,6 +7,8 @@
 typedef struct lyr_ty0_Node lyr_ty0_Node;
 typedef struct lyr_ty1_Point lyr_ty1_Point;
 typedef struct lyr_ty2_Box lyr_ty2_Box;
+typedef struct lyr_vt_ty3 lyr_vt_ty3;
+const char lyr_ifid_ty3[] = "Error";
 struct lyr_ty0_Node {
     LyrObj header;
     int64_t f_value;
@@ -32,6 +34,11 @@ _Static_assert(offsetof(lyr_ty2_Box, f_count) == 8, "layout of lyr_ty2_Box");
 _Static_assert(offsetof(lyr_ty2_Box, f_label) == 24, "layout of lyr_ty2_Box");
 static const uint64_t lyr_refmap_ty2[] = { UINT64_C(0x8) };
 const LyrDesc lyr_desc_ty2_Box = { sizeof(lyr_ty2_Box), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.Box", NULL };
+struct lyr_vt_ty3 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
 typedef struct { lyr_opt_i64 value; uint8_t has; } lyr_opt_opt_i64;
 typedef struct { lyr_ty1_Point value; uint8_t has; } lyr_opt_ty1;
 
