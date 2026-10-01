@@ -1,0 +1,15 @@
+// Measurement point 2, 'loops' (design/v5/spec/13): 200 million passes of a multiply, an add and
+// a remainder on 'int', every one overflow-checked (03 T2), in two counted loops. Prints one
+// checksum, the same in every language.
+import std.io { println };
+
+fn main(): int {
+    var acc = 0;
+    for (i in 0..20000) {
+        for (j in 0..10000) {
+            acc = (acc + i * j) % 1000000007;
+        }
+    }
+    println(f"{acc}");
+    return 0;
+}

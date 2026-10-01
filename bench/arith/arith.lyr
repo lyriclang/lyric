@@ -1,0 +1,29 @@
+// Measurement point 2, 'arith' (design/v5/spec/13): floating-point arithmetic — the points of
+// an 2000 × 2000 grid that stay inside the Mandelbrot set for 200 iterations. No fused
+// multiply-add anywhere (01 L10): every language computes the same bits. Prints the count.
+import std.io { println };
+
+fn main(): int {
+    let width = 2000;
+    let height = 2000;
+    let limit = 200;
+    var inside = 0;
+    for (py in 0..height) {
+        for (px in 0..width) {
+            let cx = -2.0 + (px as float) * (3.0 / (width as float));
+            let cy = -1.5 + (py as float) * (3.0 / (height as float));
+            var x = 0.0;
+            var y = 0.0;
+            var i = 0;
+            while (i < limit && x * x + y * y <= 4.0) {
+                let xt = x * x - y * y + cx;
+                y = 2.0 * x * y + cy;
+                x = xt;
+                i = i + 1;
+            }
+            if (i == limit) { inside = inside + 1; }
+        }
+    }
+    println(f"{inside}");
+    return 0;
+}

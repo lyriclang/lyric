@@ -1,0 +1,29 @@
+// Measurement point 2, 'structs' (design/v5/spec/13): 100 000 particles as an array of structs
+// — the elements inline, four floats each (02 M1, 03 T13) — stepped 2000 times in place through
+// the index. Prints the truncated sum of the positions.
+import std.io { println };
+
+struct Particle { var x: float, var y: float, var vx: float, var vy: float }
+
+fn main(): int {
+    let count = 100000;
+    let steps = 2000;
+    let dt = 0.01;
+    var ps = [Particle { x = 0.0, y = 0.0, vx = 1.0, vy = -0.5 }] * count;
+    for (i in 0..count) {
+        ps[i].x = i as float;
+        ps[i].y = (i as float) * 2.0;
+    }
+    for (s in 0..steps) {
+        for (i in 0..count) {
+            ps[i].x = ps[i].x + ps[i].vx * dt;
+            ps[i].y = ps[i].y + ps[i].vy * dt;
+            ps[i].vx = ps[i].vx - ps[i].y * 0.001 * dt;
+            ps[i].vy = ps[i].vy + ps[i].x * 0.001 * dt;
+        }
+    }
+    var sum = 0.0;
+    for (i in 0..count) { sum = sum + ps[i].x + ps[i].y; }
+    println(f"{sum as int}");
+    return 0;
+}
