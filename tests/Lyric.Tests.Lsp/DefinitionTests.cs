@@ -87,13 +87,13 @@ public sealed class DefinitionTests
     [Fact]
     public void A_call_jumps_to_the_OVERLOAD_it_means()
     {
-        // Since 3.0 the name is not the answer: the editor has to land on the function
-        // that will actually run, which is the one the arguments chose.
+        // The name is not the answer: the editor has to land on the function that will
+        // actually run, which is the one the argument COUNT chose (04 D4).
         JumpsToMarker(
             "fn show(n: int): int { return 1; }\n"
-            + "fn ^show(f: float): int { return 2; }\n"
+            + "fn ^show(a: int, b: int): int { return 2; }\n"
             + "fn main(): int {\n"
-            + "    return sh$ow(1.5);\n"
+            + "    return sh$ow(1, 2);\n"
             + "}\n");
     }
 

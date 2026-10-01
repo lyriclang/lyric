@@ -919,10 +919,16 @@ public sealed class AstFormatter
         var parenthesized = Doc.GroupOf(head, Doc.From("("),
             Doc.IndentOf(Doc.LineOrNothing,
                 Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                    arguments.Select(a => ExprDoc(a, Assign)).ToArray())),
+                    arguments.Select((a, i) => ArgumentDoc(call, a, i)).ToArray())),
             Doc.LineOrNothing, Doc.From(")"));
         return trailing is null ? parenthesized : Doc.Of(parenthesized, trailing);
     }
+
+    /// <summary>An argument as written: by name, <c>host: "h"</c>, or positional.</summary>
+    private Doc ArgumentDoc(CallExpr call, Expr argument, int index) =>
+        call.ArgumentNames is { } names && index < names.Length && names[index] is { } name
+            ? Doc.Of(Doc.From(name + ": "), ExprDoc(argument, Assign))
+            : ExprDoc(argument, Assign);
 
     private Doc ArrayDoc(ArrayLitExpr array)
     {

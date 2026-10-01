@@ -99,7 +99,15 @@ public static class AstDumper
             case CallExpr n:
                 Line(sb, indent, "Call", n.Span);
                 Write(n.Callee, indent + 1, sb);
-                foreach (var a in n.Arguments) Write(a, indent + 1, sb);
+                for (var i = 0; i < n.Arguments.Length; i++)
+                {
+                    if (n.ArgumentNames is { } names && i < names.Length && names[i] is { } name)
+                    {
+                        Line(sb, indent + 1, $"Named {name}", n.Arguments[i].Span);
+                        Write(n.Arguments[i], indent + 2, sb);
+                    }
+                    else Write(n.Arguments[i], indent + 1, sb);
+                }
                 break;
             case IndexExpr n:
                 Line(sb, indent, "Index", n.Span);

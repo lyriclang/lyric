@@ -172,7 +172,7 @@ public sealed class Resolver
     /// </summary>
     private static string OverloadHint(SymbolTable scope, Symbol sym) =>
         sym is FunctionSymbol || scope.LookupLocal(sym.Name) is FunctionSymbol
-            ? " — only two FUNCTIONS may share a name, told apart by their parameters"
+            ? " — only two FUNCTIONS may share a name, told apart by how many arguments they take"
             : "";
 
     // --- Pass 2: Imports ---

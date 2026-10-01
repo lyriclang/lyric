@@ -144,13 +144,8 @@ public sealed class SemaRules
                     _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span, "'params' requires an array type");
             }
 
-        var seenDefault = false;
-        foreach (var p in ps)
-        {
-            if (p.Default is not null) seenDefault = true;
-            else if (seenDefault && !p.IsParams)
-                _de.Report("LYR-SEM0025", Severity.Error, p.Span, $"required parameter '{p.Name}' follows a default parameter");
-        }
+        // A default may stand at any position (design/v5/spec/04 D5 F3): a call names what follows
+        // it. Lyric 4's LYR-SEM0025, "required parameter after a default parameter", is gone.
     }
 
     // --- the main contract ---

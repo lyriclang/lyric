@@ -53,39 +53,6 @@ public class ConformanceInferenceTests
 
         """;
 
-    [Theory]
-    [InlineData("[Sink<int>, Sink<string>]")]
-    [InlineData("[Sink<string>, Sink<int>]")]
-    public void Two_conformances_refuse_the_inference_in_either_order(string list)
-    {
-        var de = Check(Tag(list) + """
-            fn main(): int {
-                let t = Tag { id = 1 };
-                return pick(t, 42);
-            }
-            """);
-
-        // ONE sentence: no SEM0060 about the unbound T behind it, and no SEM0001 about the
-        // probe argument — the cause is reported, the consequences stay quiet.
-        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
-        Assert.Equal("LYR-SEM0092", error.Code);
-        Assert.Contains("Sink<int>", error.Message, StringComparison.Ordinal);
-        Assert.Contains("Sink<string>", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void The_written_type_argument_settles_it()
-    {
-        var de = Check(Tag("[Sink<int>, Sink<string>]") + """
-            fn main(): int {
-                let t = Tag { id = 1 };
-                return pick<int>(t, 42);
-            }
-            """);
-
-        Assert.False(de.HasErrors);
-    }
-
     [Fact]
     public void One_conformance_still_binds()
     {

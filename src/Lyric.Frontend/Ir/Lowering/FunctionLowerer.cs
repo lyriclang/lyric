@@ -1792,6 +1792,10 @@ internal sealed class FunctionLowerer
     {
         var symbol = _types.RefOf(expr) ?? throw Bug($"identifier '{expr.Name}' is unbound");
 
+        // A parameter of the CALLEE, named in a default that is being lowered at this call site
+        // (04 D5 F2): the argument materialized for it.
+        if (symbol is ParameterSymbol && _argumentOverrides.TryGetValue(symbol, out var passed)) return passed;
+
         // A module 'let' has no frame slot but a global one.
         if (TryLowerGlobalIdentifier(expr) is { } global) return global;
 
@@ -4166,7 +4170,7 @@ internal sealed class FunctionLowerer
         for (var i = 0; i < Math.Min(method.Generics.Length, typeArguments.Length); i++)
             mapping[method.Generics[i].Name] = typeArguments[i];
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+        var supplied = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span,
             mapping);
         var args = new TempId[supplied.Length + 1];
         args[0] = receiver;
@@ -4295,7 +4299,7 @@ internal sealed class FunctionLowerer
         // lowered to a bare scalar, and the store into the optional slot was caught a step later
         // as "store of t3 (i64) into l9 (?i64)" — malformed IR with no line to point at. The
         // interface path below has carried this mapping all along; this one had not.
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+        var supplied = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span,
             InstanceSubstitution(owner, method, methodArguments));
 
         // MaterializeArguments yields already lowered values including defaults and 'params'; the
@@ -4353,7 +4357,7 @@ internal sealed class FunctionLowerer
         // 'Box<?int>.of(3)' writes its parameter 'T', which is a '?int' here, and the 3 has to
         // be wrapped. A STATIC call needs it just as much — the receiver is absent, the type
         // arguments are not.
-        var args = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+        var args = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span,
             InstanceSubstitution(owner, method, methodArguments));
 
         var returns = method.Generics.Length > 0
@@ -4477,7 +4481,7 @@ internal sealed class FunctionLowerer
                 && TryResolveFunction(extension, out var extensionTarget))
             {
                 var self = LowerExpr(member.Target);
-                var passed = MaterializeArguments(extensionDecl, expr.Arguments, member.Member,
+                var passed = MaterializeArguments(extensionDecl, ArgumentsOf(expr), member.Member,
                     expr.Span);
                 var all = new TempId[passed.Length + 1];
                 all[0] = self;
@@ -4551,7 +4555,7 @@ internal sealed class FunctionLowerer
                 ? direct
                 : throw NotSupported($"'{owner.Name}.{member.Member}' was not lowered", expr.Span);
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, member.Member, expr.Span,
+        var supplied = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span,
             concrete is GenericInstance forArguments ? InstanceSubstitution(forArguments) : null);
 
         var args = new TempId[supplied.Length + 1];
@@ -4903,7 +4907,7 @@ internal sealed class FunctionLowerer
         var calleeSubstitution = symbol.Generics.Length > 0
             ? NamedSubstitutionFor(symbol, _types.TypeArgumentsOf(expr)) : null;
 
-        var supplied = MaterializeArguments(declaration, expr.Arguments, calleeName, expr.Span,
+        var supplied = MaterializeArguments(declaration, ArgumentsOf(expr), calleeName, expr.Span,
             calleeSubstitution);
 
         // The receiver comes first: the order is the IR's parameter convention and has to match the one
@@ -4936,7 +4940,18 @@ internal sealed class FunctionLowerer
     /// same choice as in C#. Otherwise it would have to be lowered in a context where the caller's
     /// arguments are not visible.</para>
     /// </summary>
-    private TempId[] MaterializeArguments(FunctionDecl callee, Expr[] provided, string name,
+    /// <summary>The arguments of a call in parameter order: as the sema arranged them when the call
+    /// names some (04 D5), as written otherwise.</summary>
+    private Expr?[] ArgumentsOf(CallExpr expr) => _types.ArrangedArgumentsOf(expr) ?? expr.Arguments;
+
+    /// <summary>The argument materialized for an earlier parameter of the call whose default is
+    /// being lowered (04 D5 F2): a default runs per call, in the callee's scope, and may read the
+    /// parameters before it — their symbols are the callee's, and here they mean the temps.</summary>
+    private readonly Dictionary<Symbol, TempId> _argumentOverrides = new(ReferenceEqualityComparer.Instance);
+
+    /// <param name="provided">In parameter order; a <c>null</c> is a parameter the call leaves to
+    /// its default.</param>
+    private TempId[] MaterializeArguments(FunctionDecl callee, Expr?[] provided, string name,
         Span span, IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {
         var parameters = callee.Parameters;
@@ -4954,15 +4969,22 @@ internal sealed class FunctionLowerer
                 return args;
             }
 
-            if (i < provided.Length)
+            if (i < provided.Length && provided[i] is { } given)
             {
-                args[i] = LowerArgument(provided[i], parameter, calleeSubstitution);
+                args[i] = LowerArgument(given, parameter, calleeSubstitution);
                 continue;
             }
 
             if (parameter.Default is { } fallback)
             {
-                args[i] = LowerArgument(fallback, parameter, calleeSubstitution);
+                // Per call, in the callee's scope: an earlier parameter the default names is the
+                // argument just materialized for it, for as long as this default is lowered.
+                var bound = new List<Symbol>();
+                for (var j = 0; j < i; j++)
+                    if (_types.RefOf(parameters[j]) is ParameterSymbol earlier && _argumentOverrides.TryAdd(earlier, args[j]))
+                        bound.Add(earlier);
+                try { args[i] = LowerArgument(fallback, parameter, calleeSubstitution); }
+                finally { foreach (var symbol in bound) _argumentOverrides.Remove(symbol); }
                 continue;
             }
 
@@ -4986,13 +5008,13 @@ internal sealed class FunctionLowerer
     /// delegate to another. Recognisable from the type of the single remaining argument — nothing more
     /// is needed, because an element never has the same type as the array taking it.</para>
     /// </summary>
-    private TempId CollectVariadic(Param parameter, Expr[] provided, int from, Span span)
+    private TempId CollectVariadic(Param parameter, Expr?[] provided, int from, Span span)
     {
         if (_typeTable.Lower(parameter.Type) is not IrArrayType array)
             throw NotSupported($"'params {parameter.Name}' whose type is not an array",
                 parameter.Span);
 
-        var rest = provided.Length > from ? provided[from..] : [];
+        var rest = provided.Length > from ? provided[from..].OfType<Expr>().ToArray() : [];
 
         if (rest.Length == 1 && IrType.Equal(TypeOfExpr(rest[0]), array))
             return LowerExpr(rest[0]);

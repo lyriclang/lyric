@@ -64,7 +64,13 @@ public sealed record CastExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Spa
 /// when none were written; the sema then infers them from the arguments. They are needed where
 /// the arguments give nothing: a factory <c>empty&lt;T&gt;(): List&lt;T&gt;</c> has none.</param>
 public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
-    TypeNode[]? TypeArguments = null) : Expr(Span);
+    TypeNode[]? TypeArguments = null) : Expr(Span)
+{
+    /// <summary>The name an argument was written with — <c>connect(host: "h")</c>, design/v5/spec/04
+    /// D5 — by argument index, <c>null</c> where the argument is positional; <c>null</c> as a whole
+    /// when no argument is named, which is nearly every call.</summary>
+    public string?[]? ArgumentNames { get; init; }
+}
 public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
 /// <remarks>IsOptional means '?.' rather than '.'.</remarks>
 public sealed record MemberExpr(Expr Target, string Member, bool IsOptional, Span Span) : Expr(Span)
