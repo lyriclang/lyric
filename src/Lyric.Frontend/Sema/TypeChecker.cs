@@ -215,6 +215,22 @@ public sealed class TypeChecker
     /// only drops the error.</summary>
     private Expr? _statementValue;
 
+    /// <summary>A loop around the statement being checked (05 E11): what a <c>break</c> or
+    /// <c>continue</c> finds — and for a <c>loop</c>, the values its breaks give and its plain
+    /// breaks.</summary>
+    private sealed class LoopContext(bool givesValue, string? label, LyrType? expected)
+    {
+        public bool GivesValue => givesValue;
+        public string? Label => label;
+        public LyrType? Expected => expected;
+        public List<LyrType> Values { get; } = new();
+        public List<Span> Plain { get; } = new();
+    }
+
+    /// <summary>The loops around the statement being checked, innermost last. A lambda starts with
+    /// none: its body is a function of its own (08 Y11 F5).</summary>
+    private List<LoopContext> _loops = new();
+
     public TypeResult Check()
     {
         try
@@ -1549,9 +1565,11 @@ public sealed class TypeChecker
             case DestructuringStmt d: CheckDestructuring(d, scope); break;
             case LetPatternStmt lp: CheckLetPattern(lp, scope); break;
             case IfStmt f: CheckIf(f, scope); break;
-            case WhileStmt w: CheckWhile(w, scope); break;
-            case DoWhileStmt d: CheckBlock(d.Body, scope); CheckCondition(d.Condition, scope); break;
-            case ForInStmt fo: CheckForIn(fo, scope); break;
+            case WhileStmt w: InLoop(new LoopContext(false, w.Label, null), () => CheckWhile(w, scope)); break;
+            case DoWhileStmt d:
+                InLoop(new LoopContext(false, d.Label, null), () => { CheckBlock(d.Body, scope); CheckCondition(d.Condition, scope); });
+                break;
+            case ForInStmt fo: InLoop(new LoopContext(false, fo.Label, null), () => CheckForIn(fo, scope)); break;
             case ReturnStmt r:
                 if (_currentYield is not null) // in a coroutine only a bare return is allowed, as an early end
                 {
@@ -1613,7 +1631,13 @@ public sealed class TypeChecker
                 CheckClauses(tr.Body, tr.Catches, scope, (clause, catchScope) => CheckBlock(clause.Body, catchScope));
                 break;
             case MatchStmt m: CheckMatch(m, m.Scrutinee, m.Arms, scope, asExpression: false); break;
-            // break, continue and error need no check.
+            case BreakStmt br: CheckBreak(br, scope); break;
+            case ContinueStmt co:
+                if (co.Label is null && _loops.Count == 0)
+                    _de.Report("LYR-SEM0147", Severity.Error, co.Span,
+                        "'continue' stands outside a loop — a lambda's body is no part of the loop around the lambda");
+                break;
+            // an error statement needs no check.
         }
     }
 
@@ -2242,6 +2266,77 @@ public sealed class TypeChecker
         EndScope(snapshot);
     }
 
+    private void InLoop(LoopContext loop, Action check)
+    {
+        _loops.Add(loop);
+        try { check(); }
+        finally { _loops.RemoveAt(_loops.Count - 1); }
+    }
+
+    /// <summary>The loop a jump leaves: the one its label names, or the innermost.</summary>
+    private LoopContext? TargetOf(string? label)
+    {
+        for (var i = _loops.Count - 1; i >= 0; i--)
+            if (label is null || _loops[i].Label == label) return _loops[i];
+        return null;
+    }
+
+    /// <summary>
+    /// <c>loop { … }</c> (05 E11): its type is what its breaks give — their values unified, or the
+    /// type its position expects, each checked against it; <c>void</c> when they give none;
+    /// <c>never</c> when no break leaves it. Some giving a value and some none is
+    /// <c>LYR-SEM0149</c>.
+    /// </summary>
+    private LyrType CheckLoop(LoopExpr loop, SymbolTable scope, LyrType? expected)
+    {
+        var wanted = expected is null || expected.IsError || expected is NeverType || TypeFacts.IsVoid(expected) ? null : expected;
+        var context = new LoopContext(givesValue: true, loop.Label, wanted);
+        InLoop(context, () => CheckBlock(loop.Body, scope));
+        if (context.Values.Count == 0) return context.Plain.Count == 0 ? LyrType.Never : LyrType.Void;
+        foreach (var plain in context.Plain)
+            _de.Report("LYR-SEM0149", Severity.Error, plain,
+                "this 'break' gives no value, and the loop's other breaks give one — a 'loop' gives a value through every 'break' or through none");
+        return wanted ?? UnifyArms(context.Values, loop.Span, "the values of this loop's breaks");
+    }
+
+    /// <summary>
+    /// <c>break</c> (05 E11, 08 S4): it leaves the loop its label names, or the innermost — of its
+    /// own function, a lambda's body being one (08 Y11 F5, <c>LYR-SEM0147</c>). A value leaves only a
+    /// <c>loop</c> (<c>LYR-SEM0148</c>), checked against what the loop's position expects.
+    /// </summary>
+    private void CheckBreak(BreakStmt br, SymbolTable scope)
+    {
+        // 'break outr;' where no loop is labeled so and nothing is named so: the parser took the name
+        // for a value, and the mistake is the label's.
+        if (br.Value is IdentifierExpr { Name: var name } lost && scope.Lookup(name) is null && CoreMember(name) is null)
+        {
+            _de.Report("LYR-SEM0101", Severity.Error, lost.Span,
+                $"no enclosing loop is labeled '{name}', and no value is named so");
+            return;
+        }
+        var target = TargetOf(br.Label);
+        if (target is null)
+        {
+            // A label no loop around carries is SemaRules' to report (LYR-SEM0101).
+            if (br.Label is null)
+                _de.Report("LYR-SEM0147", Severity.Error, br.Span,
+                    "'break' stands outside a loop — a lambda's body is no part of the loop around the lambda");
+            if (br.Value is not null) CheckExpr(br.Value, scope);
+            return;
+        }
+        if (br.Value is null) { target.Plain.Add(br.Span); return; }
+        if (!target.GivesValue)
+        {
+            CheckExpr(br.Value, scope);
+            _de.Report("LYR-SEM0148", Severity.Error, br.Value.Span,
+                "'break' gives a value only to a 'loop' — a 'while' or a 'for' may end without one");
+            return;
+        }
+        var value = CheckExpr(br.Value, scope, target.Expected);
+        if (target.Expected is { } wantedType) CheckAssignable(br.Value, value, wantedType, br.Value.Span);
+        target.Values.Add(value);
+    }
+
     private void Apply(Dictionary<Symbol, LyrType> facts)
     {
         foreach (var (sym, type) in facts) _narrowed[sym] = type;
@@ -2535,6 +2630,7 @@ public sealed class TypeChecker
             case StructInitExpr si: return CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope, expected);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
+            case LoopExpr loop: return CheckLoop(loop, scope, expected);
             case LetCondExpr lc:
                 // Reached only OUTSIDE an if/while head, where CheckIf/CheckWhile take it first.
                 _de.Report("LYR-SEM0098", Severity.Error, lc.Span,
@@ -7729,6 +7825,8 @@ public sealed class TypeChecker
         var savedYield = _currentYield;
         var savedReturn = _currentReturn;
         var savedInference = _returnInference;
+        var savedLoops = _loops;
+        _loops = new(); // its loops are its own (08 Y11 F5)
         _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
                               // (§10a) even when the lambda stands inside a coroutine body —
                               // which chain it meets is decided by who calls it, at runtime
@@ -7832,6 +7930,7 @@ public sealed class TypeChecker
         _currentReturn = savedReturn;
         _currentYield = savedYield;
         _returnInference = savedInference;
+        _loops = savedLoops;
 
         RecordCaptures(lam);
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body) };
@@ -7860,6 +7959,8 @@ public sealed class TypeChecker
         LetPatternStmt lp => lp.Else is not null && HasValueReturn(lp.Else),
         TryStmt t => HasValueReturn(t.Body) || t.Catches.Any(c => HasValueReturn(c.Body)),
         MatchStmt m => m.Arms.Any(a => a.Body is Block ab && HasValueReturn(ab)),
+        ExprStmt { Expr: LoopExpr l } => HasValueReturn(l.Body),
+        BindingStmt { Initializer: LoopExpr bl } => HasValueReturn(bl.Body),
         _ => false
     };
 
@@ -7911,6 +8012,7 @@ public sealed class TypeChecker
                 case DoWhileStmt d: WalkNode(d.Body); WalkNode(d.Condition); return;
                 case ForInStmt fo: WalkNode(fo.Iterable); WalkNode(fo.Body); return;
                 case ReturnStmt r: WalkNode(r.Value); return;
+                case BreakStmt br: WalkNode(br.Value); return;
                 case YieldStmt y: WalkNode(y.Value); return;
                 case ThrowStmt t: WalkNode(t.Value); return;
                 case DeferStmt de: WalkNode(de.Body); return;
@@ -7950,6 +8052,7 @@ public sealed class TypeChecker
                     foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkNode(h.Expr);
                     return;
                 case IfExpr iff: WalkNode(iff.Condition); WalkNode(iff.Then); WalkNode(iff.Else); return;
+                case LoopExpr lp: WalkNode(lp.Body); return;
             }
         }
 

@@ -551,6 +551,7 @@ internal sealed class WarningAnalyzer
             case ExprStmt es: WalkExpr(es.Expr); break;
             case TailExprStmt tail: WalkExpr(tail.Expr); break;
             case ReturnStmt { Value: { } v }: WalkExpr(v); break;
+            case BreakStmt { Value: { } bv }: WalkExpr(bv); break;
             case YieldStmt { Value: { } v }: WalkExpr(v); break;
             case ThrowStmt t: WalkExpr(t.Value); break;
             case DeferStmt de: WalkStmt(de.Body); break;
@@ -614,6 +615,7 @@ internal sealed class WarningAnalyzer
                 break;
             case LetCondExpr lc: WalkExpr(lc.Initializer); break;
             case IfExpr iff: WalkExpr(iff.Condition); WalkExpr(iff.Then); WalkExpr(iff.Else); break;
+            case LoopExpr loop: WalkBlock(loop.Body); break;
             case BinaryExpr bi: WalkExpr(bi.Left); WalkExpr(bi.Right); break;
             case UnaryExpr u:
                 if (u.Operator is UnaryOp.PreInc or UnaryOp.PreDec) MarkMutated(u.Operand);

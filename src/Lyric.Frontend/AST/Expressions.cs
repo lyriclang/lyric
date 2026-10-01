@@ -168,6 +168,17 @@ public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(
 public sealed record IfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
 public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Expr(Span);
 
+/// <summary><c>loop { … }</c> (design/v5/spec/05 E11, 08 S3/S4): the block again and again, left by
+/// a <c>break</c> — <c>break value</c> gives the loop its value — or by nothing at all, the loop
+/// then of type <c>never</c>. At the start of a statement it is one, with no <c>;</c> after its
+/// block; elsewhere an expression, <c>let found = loop { …; break x; };</c>. Labeled like the other
+/// loops, in either place: <c>let pair = outer: loop { … };</c>.</summary>
+public sealed record LoopExpr(Block Body, Span Span) : Expr(Span)
+{
+    public string? Label { get; init; }
+    public Span LabelSpan { get; init; }
+}
+
 // --- struct initializers: TypePath '{' field = expr, … '}' ---
 // Recognised in value position only, not at the start of an ExprStmt, where it would be ambiguous
 // with a block. The field separator is '='; ':' is reserved for types.

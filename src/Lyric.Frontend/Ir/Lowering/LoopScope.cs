@@ -27,6 +27,13 @@ internal sealed class LoopScope(BlockBuilder blocks)
     /// walking outward through the loop stack.</summary>
     public string? Label { get; init; }
 
+    /// <summary>For a <c>loop</c> that gives a value (05 E11): the synthetic local its breaks write
+    /// and its exit reads, and the value's type. Null for every other loop.</summary>
+    public LocalId? ValueSlot { get; init; }
+
+    /// <inheritdoc cref="ValueSlot"/>
+    public IrType? ValueType { get; init; }
+
     /// <summary>
     /// For <c>while</c> and <c>for-in</c>, where both blocks are ALWAYS reachable: the condition through
     /// the entry edge, the exit through its false edge. They also have to exist beforehand, because the

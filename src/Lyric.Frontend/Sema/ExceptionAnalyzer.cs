@@ -173,6 +173,7 @@ internal sealed class ExceptionAnalyzer
             case DoWhileStmt d: AnalyzeStmt(d.Body); AnalyzeExpr(d.Condition); break;
             case ForInStmt fo: AnalyzeExpr(fo.Iterable); AnalyzeStmt(fo.Body); break;
             case ReturnStmt r: if (r.Value is not null) AnalyzeExpr(r.Value); break;
+            case BreakStmt { Value: { } broken }: AnalyzeExpr(broken); break;
             case YieldStmt y: if (y.Value is not null) AnalyzeExpr(y.Value); break;
             case DeferStmt de: AnalyzeStmt(de.Body); break; // runs in the scope that registered it
             case ThrowStmt t:
@@ -283,6 +284,7 @@ internal sealed class ExceptionAnalyzer
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition); AnalyzeExpr(iff.Then); AnalyzeExpr(iff.Else);
                 break;
+            case LoopExpr loop: AnalyzeStmt(loop.Body); break;
             case MatchExpr ma:
                 AnalyzeExpr(ma.Scrutinee);
                 foreach (var arm in ma.Arms) AnalyzeArm(arm);

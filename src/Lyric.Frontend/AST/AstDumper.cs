@@ -364,6 +364,7 @@ public static class AstDumper
                 break;
             case BreakStmt n:
                 Line(sb, indent, n.Label is null ? "Break" : $"Break {n.Label}", n.Span);
+                if (n.Value is not null) Write(n.Value, indent + 1, sb);
                 break;
             case ContinueStmt n:
                 Line(sb, indent, n.Label is null ? "Continue" : $"Continue {n.Label}", n.Span);
@@ -425,6 +426,10 @@ public static class AstDumper
                 Line(sb, indent, "LetCond", n.Span);
                 Write(n.Pattern, indent + 1, sb);
                 Write(n.Initializer, indent + 1, sb);
+                break;
+            case LoopExpr n:
+                Line(sb, indent, n.Label is null ? "Loop" : $"Loop {n.Label}", n.Span);
+                Write(n.Body, indent + 1, sb);
                 break;
             case IfExpr n:
                 Line(sb, indent, "IfExpr", n.Span);

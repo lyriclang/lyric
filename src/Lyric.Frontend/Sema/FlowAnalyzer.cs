@@ -24,6 +24,34 @@ internal sealed class FlowAnalyzer
         _de = de;
     }
 
+    /// <summary>A loop around the statement being analyzed (05 E11): its label, the sets its
+    /// breaks carried out of it, and those its continues carried to its next pass.</summary>
+    private sealed class LoopFrame(string? label)
+    {
+        public string? Label => label;
+        public List<HashSet<Symbol>> Exits { get; } = new();
+        public List<HashSet<Symbol>> Continues { get; } = new();
+    }
+
+    /// <summary>The loops around the statement being analyzed, innermost last; a lambda's body
+    /// starts with none.</summary>
+    private List<LoopFrame> _loopFrames = new();
+
+    private HashSet<Symbol> InFrame(LoopFrame frame, Func<HashSet<Symbol>> body)
+    {
+        _loopFrames.Add(frame);
+        try { return body(); }
+        finally { _loopFrames.RemoveAt(_loopFrames.Count - 1); }
+    }
+
+    /// <summary>The loop a 'break' leaves: the one its label names, or the innermost.</summary>
+    private LoopFrame? TargetFrame(string? label)
+    {
+        for (var i = _loopFrames.Count - 1; i >= 0; i--)
+            if (label is null || _loopFrames[i].Label == label) return _loopFrames[i];
+        return null;
+    }
+
     public void Run()
     {
         foreach (var module in _comp.Modules)
@@ -125,18 +153,33 @@ internal sealed class FlowAnalyzer
                 return AnalyzeIf(f, assigned);
             case WhileStmt w:
                 AnalyzeExpr(w.Condition, assigned);
-                AnalyzeStatements(w.Body.Statements, Clone(assigned)); // the body may not run
+                InFrame(new LoopFrame(w.Label), () => AnalyzeStatements(w.Body.Statements, Clone(assigned))); // the body may not run
                 return assigned;
             case DoWhileStmt d:
-                var after = AnalyzeStatements(d.Body.Statements, Clone(assigned)); // the body runs at least once
-                AnalyzeExpr(d.Condition, after);
-                return after;
+            {
+                // The body runs at least once. The condition is reached from the body's end and from
+                // every 'continue'; the loop is left where it is false and by every 'break' (07 §1.5).
+                var frame = new LoopFrame(d.Label);
+                var end = InFrame(frame, () => AnalyzeStatements(d.Body.Statements, Clone(assigned)));
+                var atCondition = frame.Continues.Aggregate(end, Intersect);
+                AnalyzeExpr(d.Condition, atCondition);
+                return frame.Exits.Aggregate(atCondition, Intersect);
+            }
             case ForInStmt fo:
                 AnalyzeExpr(fo.Iterable, assigned);
                 var loopSet = Clone(assigned);
                 if (_types.RefOf(fo) is { } lv) loopSet.Add(lv);
                 if (fo.Pattern is not null) AddPatternBindings(fo.Pattern, loopSet);
-                AnalyzeStatements(fo.Body.Statements, loopSet);
+                InFrame(new LoopFrame(fo.Label), () => AnalyzeStatements(fo.Body.Statements, loopSet));
+                return assigned;
+            // What a break carries out of its loop: the set as it stands here (05 E11) — after a
+            // 'loop', what every one of its breaks saw.
+            case BreakStmt br:
+                if (br.Value is not null) AnalyzeExpr(br.Value, assigned);
+                TargetFrame(br.Label)?.Exits.Add(Clone(assigned));
+                return assigned;
+            case ContinueStmt co:
+                TargetFrame(co.Label)?.Continues.Add(Clone(assigned));
                 return assigned;
             case TryStmt tr:
             {
@@ -167,9 +210,13 @@ internal sealed class FlowAnalyzer
                     if (arm.Body is Block ab)
                     {
                         armSet = AnalyzeStatements(ab.Statements, armSet);
-                        exits = Flow.AlwaysReturns(ab, _types);
+                        exits = Flow.AlwaysExits(ab, _types);
                     }
-                    else if (arm.Body is Expr ae) AnalyzeExpr(ae, armSet);
+                    else if (arm.Body is Expr ae)
+                    {
+                        AnalyzeExpr(ae, armSet);
+                        exits = _types.TypeOf(ae) is NeverType; // '_ => panic("…")' completes no more than a block that throws
+                    }
                     if (!exits) merged = merged is null ? armSet : Intersect(merged, armSet);
                 }
                 // An exhaustive match runs exactly one arm, so whatever ALL continuing arms assign
@@ -178,7 +225,7 @@ internal sealed class FlowAnalyzer
                     return merged ?? assigned;
                 return assigned;
             }
-            default: // break, continue, error
+            default: // error
                 return assigned;
         }
     }
@@ -186,14 +233,16 @@ internal sealed class FlowAnalyzer
     private HashSet<Symbol> AnalyzeIf(IfStmt f, HashSet<Symbol> assigned)
     {
         AnalyzeExpr(f.Condition, assigned);
+        // A branch that does not complete — it returns, throws, jumps or gives 'never' — adds
+        // nothing to what follows: its jump carried its set where it went (07 §1.5).
         var thenSet = AnalyzeStatements(f.Then.Statements, Clone(assigned));
-        var thenExits = Flow.AlwaysReturns(f.Then, _types);
+        var thenExits = Flow.AlwaysExits(f.Then, _types);
 
         if (f.Else is null)
             return assigned; // without an else nothing is definitely new; the then branch may be skipped
 
         var elseSet = AnalyzeStmt(f.Else, Clone(assigned));
-        var elseExits = Flow.AlwaysReturns(f.Else, _types);
+        var elseExits = Flow.AlwaysExits(f.Else, _types);
 
         if (thenExits && elseExits) return assigned;          // unreachable afterwards
         if (thenExits) return elseSet;                        // the continuation follows else
@@ -279,6 +328,15 @@ internal sealed class FlowAnalyzer
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition, assigned); AnalyzeExpr(iff.Then, assigned); AnalyzeExpr(iff.Else, assigned);
                 return;
+            case LoopExpr loop:
+            {
+                // The body runs at least once, and only a break leaves (05 E11): what is assigned
+                // after the loop is what every break of it saw. No break: nothing follows it.
+                var frame = new LoopFrame(loop.Label);
+                var end = InFrame(frame, () => AnalyzeStatements(loop.Body.Statements, Clone(assigned)));
+                assigned.UnionWith(frame.Exits.Count == 0 ? end : frame.Exits.Aggregate(Intersect));
+                return;
+            }
             case LambdaExpr lam:
             {
                 // Captures have to be definitely assigned AT THE CREATION SITE: analyze the body
@@ -289,8 +347,12 @@ internal sealed class FlowAnalyzer
                     if (_types.RefOf(p) is { } ps) lamSet.Add(ps);
                     if (p.Pattern is not null) AddPatternBindings(p.Pattern, lamSet);
                 }
+                // Its loops are its own (08 Y11 F5).
+                var outerFrames = _loopFrames;
+                _loopFrames = new();
                 if (lam.Body is Block lb) AnalyzeStatements(lb.Statements, lamSet);
                 else if (lam.Body is Expr le) AnalyzeExpr(le, lamSet);
+                _loopFrames = outerFrames;
                 return;
             }
             case MatchExpr ma:

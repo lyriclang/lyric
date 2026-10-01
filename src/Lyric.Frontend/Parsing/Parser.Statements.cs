@@ -30,6 +30,9 @@ public sealed partial class Parser
         // 'using let f = …;' (08 Y5 S5): contextual, as nothing else starts with a name and 'let'.
         TokenKind.Identifier when AtContextual("using") && _buffer.Peek(1).TokenKind is TokenKind.Let or TokenKind.Var
             => ParseUsing(),
+        // 'loop { … }' (08 S3, 05 E11): contextual, as 'loop' before a brace starts nothing else. A
+        // statement here — no ';' after its block — and an expression anywhere else.
+        TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
         TokenKind.If => ParseIf(),
@@ -58,29 +61,71 @@ public sealed partial class Parser
         _buffer.Advance();               // ':'
         var label = _sm.Slice(nameTok.Span).ToString();
         var start = nameTok.Span;
-        switch (_buffer.Current.TokenKind)
+        // The label is in scope in the loop's body, where a 'break' reads the name as it (08 S4).
+        _loopLabels.Add(label);
+        try
         {
-            case TokenKind.While:
+            switch (_buffer.Current.TokenKind)
             {
-                var w = (WhileStmt)ParseWhile();
-                return w with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, w.Span) };
+                case TokenKind.While:
+                {
+                    var w = (WhileStmt)ParseWhile();
+                    return w with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, w.Span) };
+                }
+                case TokenKind.Do:
+                {
+                    var d = (DoWhileStmt)ParseDoWhile();
+                    return d with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, d.Span) };
+                }
+                case TokenKind.For:
+                {
+                    var f = (ForInStmt)ParseForIn();
+                    return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
+                }
+                case TokenKind.Identifier when IsLoopAhead(0):
+                    return LoopStatement(ParseLoop(label, nameTok.Span));
+                default:
+                    _de.Report("LYR-PAR0046", Severity.Error, nameTok.Span,
+                        $"a label names a loop: expected 'while', 'do', 'for' or 'loop' after '{label}:'");
+                    return ParseStmt();
             }
-            case TokenKind.Do:
-            {
-                var d = (DoWhileStmt)ParseDoWhile();
-                return d with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, d.Span) };
-            }
-            case TokenKind.For:
-            {
-                var f = (ForInStmt)ParseForIn();
-                return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
-            }
-            default:
-                _de.Report("LYR-PAR0046", Severity.Error, nameTok.Span,
-                    $"a label names a loop: expected 'while', 'do' or 'for' after '{label}:'");
-                return ParseStmt();
         }
+        finally { _loopLabels.RemoveAt(_loopLabels.Count - 1); }
     }
+
+    /// <summary>The labels of the loops around what is being parsed, innermost last: a name after
+    /// 'break' is a label exactly when one of them is it (08 S4).</summary>
+    private readonly List<string> _loopLabels = new();
+
+    /// <summary>A lambda's body: a function of its own, out of reach of the loops around the lambda
+    /// (08 Y11 F5) — their labels name nothing in it, and a name after 'break' there is a value.</summary>
+    private T OutsideLoops<T>(Func<T> parse)
+    {
+        var around = _loopLabels.ToArray();
+        _loopLabels.Clear();
+        try { return parse(); }
+        finally { _loopLabels.Clear(); _loopLabels.AddRange(around); }
+    }
+
+    /// <summary>Does 'loop' with its brace start <paramref name="at"/> tokens ahead?</summary>
+    private bool IsLoopAhead(int at)
+    {
+        var token = at == 0 ? _buffer.Current : _buffer.Peek(at);
+        return token.TokenKind == TokenKind.Identifier && _sm.Slice(token.Span).ToString() == "loop"
+               && _buffer.Peek(at + 1).TokenKind == TokenKind.LBrace;
+    }
+
+    /// <summary>'loop { … }' (05 E11): the block, again and again until a 'break' leaves it.</summary>
+    private LoopExpr ParseLoop(string? label, Span labelSpan)
+    {
+        var kw = _buffer.Advance(); // 'loop'
+        var body = ParseBlock();
+        return new LoopExpr(body, Span.Union(label is null ? kw.Span : labelSpan, body.Span))
+            { Label = label, LabelSpan = labelSpan };
+    }
+
+    /// <summary>A loop at the start of a statement is the statement, with no ';' after its block.</summary>
+    private static ExprStmt LoopStatement(LoopExpr loop) => new(loop, loop.Span);
 
     private Stmt ParseMatchStmt()
     {
@@ -340,9 +385,20 @@ public sealed partial class Parser
     private Stmt ParseBreak()
     {
         var kw = _buffer.Advance();
-        var (label, labelSpan) = ParseOptionalLabel();
+        // 'break', 'break outer', 'break value', 'break outer value' (08 S4): a name is the label
+        // when a loop around the 'break' carries it, and the value's beginning otherwise —
+        // 'break (x);' is a value whatever 'x' names.
+        string? label = null;
+        Span labelSpan = default;
+        if (_buffer.Check(TokenKind.Identifier) && _loopLabels.Contains(_sm.Slice(_buffer.Current.Span).ToString()))
+        {
+            var tok = _buffer.Advance();
+            label = _sm.Slice(tok.Span).ToString();
+            labelSpan = tok.Span;
+        }
+        var value = _buffer.Check(TokenKind.Semicolon) ? null : ParseExpr(0);
         var semi = ExpectSemicolon();
-        return new BreakStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
+        return new BreakStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan, Value = value };
     }
 
     private Stmt ParseContinue()

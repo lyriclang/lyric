@@ -855,6 +855,20 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_loop_keeps_its_label_and_its_break_values()
+    {
+        var formatted = Format("fn g() { let x = outer:loop{ loop { break outer  1; } }; loop { break; } }");
+        Assert.Contains("let x = outer: loop {", formatted, StringComparison.Ordinal);
+        Assert.Contains("break outer 1;", formatted, StringComparison.Ordinal);
+        // A loop at the start of a statement is the statement: no ';' after its block.
+        Assert.DoesNotContain("};", Format("fn g() { loop { break; } }"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_break_value_named_like_a_label_keeps_its_parentheses() =>
+        Assert.Contains("break (outer);", Format("fn g() { let outer = 1; let x = outer: loop { break (outer); }; }"), StringComparison.Ordinal);
+
+    [Fact]
     public void A_function_types_set_keeps_the_list_rule()
     {
         var formatted = Format("fn g(a: fn(int)->int throws E, b: fn()->void throws [ A,B ], c: fn()->void throws) { }");

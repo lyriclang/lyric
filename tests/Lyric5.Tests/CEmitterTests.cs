@@ -73,6 +73,7 @@ public class CEmitterTests
     [InlineData("defer_errors")]
     [InlineData("resources")]
     [InlineData("fn_throws")]
+    [InlineData("loops")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -211,6 +212,7 @@ public class CEmitterTests
             data.Add("defer_errors", profile, 0, DEFER_ERRORS_EXPECTED);
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
+            data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

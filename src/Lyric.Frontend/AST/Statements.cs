@@ -88,6 +88,10 @@ public sealed record BreakStmt(Span Span) : Stmt(Span)
 {
     public string? Label { get; init; }
     public Span LabelSpan { get; init; }
+
+    /// <summary><c>break value;</c> (design/v5/spec/05 E11): the value the loop it leaves gives —
+    /// only a <c>loop</c> takes one.</summary>
+    public Expr? Value { get; init; }
 }
 public sealed record ContinueStmt(Span Span) : Stmt(Span)
 {

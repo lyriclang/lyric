@@ -544,6 +544,19 @@ public sealed partial class Parser
                 return new ImplicitMemberExpr(text, span);
             }
             case TokenKind.Identifier:
+                // 'loop { … }' and 'outer: loop { … }' as an expression (05 E11, 08 S4):
+                // 'let found = loop { …; break x; };'. A call reads 'name:' as a named argument
+                // before it gets here, so the labeled form is free.
+                if (IsLoopAhead(0)) return ParseLoop(null, default);
+                if (_buffer.Peek(1).TokenKind == TokenKind.Colon && IsLoopAhead(2))
+                {
+                    var labelTok = _buffer.Advance();
+                    _buffer.Advance(); // ':'
+                    var labelText = _sm.Slice(labelTok.Span).ToString();
+                    _loopLabels.Add(labelText);
+                    try { return ParseLoop(labelText, labelTok.Span); }
+                    finally { _loopLabels.RemoveAt(_loopLabels.Count - 1); }
+                }
                 if (IsStructInitAhead()) return ParseStructInit();
                 if (IsTypePathAhead()) return ParseTypePath();
                 // 'x => …' — one parameter, no parentheses. Free: a name directly before '=>'
@@ -963,7 +976,7 @@ public sealed partial class Parser
 
         // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
         // its tail is the lambda's result, like 'return tail;' at its end.
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
+        Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0));
         return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span)) { Throws = throws };
     }
 
@@ -975,7 +988,7 @@ public sealed partial class Parser
         _buffer.Advance(); // '=>', checked by the caller
         var parameter = new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null, nameTok.Span)
             { NameSpan = nameTok.Span };
-        Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0);
+        Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0));
         return new LambdaExpr([parameter], null, body, Span.Union(nameTok.Span, body.Span))
             { Form = LambdaForm.Bare };
     }
@@ -1036,7 +1049,7 @@ public sealed partial class Parser
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
             _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012", $"expected '=>' after the parameters, got {_buffer.Current.TokenKind}");
-            var rest = ParseBlockRest(open, valueBlock: true);
+            var rest = OutsideLoops(() => ParseBlockRest(open, valueBlock: true));
             return new LambdaExpr(parameters.ToArray(), null, rest, Span.Union(open.Span, rest.Span)) { Form = LambdaForm.Trailing };
         }
         // 'it' is implicit: the source does not write it, so its name span is empty.
@@ -1046,12 +1059,12 @@ public sealed partial class Parser
         Node body;
         if (HoldsStatements())
         {
-            body = ParseBlock();
+            body = OutsideLoops(() => ParseBlock());
         }
         else
         {
             _buffer.Advance(); // '{'
-            var expr = ParseSubExpr();
+            var expr = OutsideLoops(() => ParseSubExpr());
             var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close the lambda body");
             body = expr;
             return new LambdaExpr([it], null, body, Span.Union(open.Span, close.Span)) { Form = LambdaForm.Trailing };
