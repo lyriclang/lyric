@@ -8,7 +8,7 @@ typedef struct lyr_ty0_P lyr_ty0_P;
 typedef struct lyr_ty1_V lyr_ty1_V;
 typedef struct lyr_ty2_Q lyr_ty2_Q;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Error";
+const char lyr_ifid_ty3[] = "std.core.Error";
 struct lyr_ty0_P {
     int64_t f_n;
 };

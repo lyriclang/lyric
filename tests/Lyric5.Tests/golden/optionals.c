@@ -8,7 +8,7 @@ typedef struct lyr_ty0_Node lyr_ty0_Node;
 typedef struct lyr_ty1_Point lyr_ty1_Point;
 typedef struct lyr_ty2_Box lyr_ty2_Box;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Error";
+const char lyr_ifid_ty3[] = "std.core.Error";
 struct lyr_ty0_Node {
     LyrObj header;
     int64_t f_value;

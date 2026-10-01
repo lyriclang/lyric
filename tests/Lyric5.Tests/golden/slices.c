@@ -7,7 +7,7 @@
 typedef struct lyr_ty0_Holder lyr_ty0_Holder;
 typedef struct lyr_ty1_Point lyr_ty1_Point;
 typedef struct lyr_vt_ty2 lyr_vt_ty2;
-const char lyr_ifid_ty2[] = "Error";
+const char lyr_ifid_ty2[] = "std.core.Error";
 typedef struct { int64_t *ptr; int64_t len; } lyr_slice_i64;
 _Static_assert(sizeof(lyr_slice_i64) == 16, "layout of lyr_slice_i64");
 struct lyr_ty0_Holder {

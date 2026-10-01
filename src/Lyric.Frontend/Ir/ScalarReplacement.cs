@@ -38,8 +38,6 @@ internal static class ScalarReplacement
     {
         foreach (var function in module.Functions)
         {
-            if (function.Handlers.Count > 0) continue;
-
             var any = false;
             for (var round = 0; round < MaxRounds; round++)
             {

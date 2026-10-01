@@ -74,6 +74,8 @@ public static class IrShape
         ResumePull r => new[] { r.Coroutine },
         YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
 
+        CurrentError or ClearError => Array.Empty<TempId>(),
+
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
 
@@ -84,7 +86,7 @@ public static class IrShape
         CondBranch c => new[] { c.Cond },
         Unreachable => Array.Empty<TempId>(),
         Throw t => new[] { t.Value },
-        EndFinally => Array.Empty<TempId>(),
+        ErrorBranch or Propagate => Array.Empty<TempId>(),
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };
@@ -139,6 +141,9 @@ public static class IrShape
         ResumePull r => r.Dest,
         YieldSuspend => null,
 
+        CurrentError e => e.Dest,
+        ClearError => null,
+
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
 
@@ -147,10 +152,11 @@ public static class IrShape
         Return => Array.Empty<BlockId>(),
         Branch b => new[] { b.Target },
         CondBranch c => new[] { c.IfTrue, c.IfFalse },
-        // Throw and EndFinally have no successors IN THE CFG: where execution continues is decided by
-        // the handler table, not by the block's control flow. The verifier therefore treats handler
-        // blocks separately as reachable.
-        Unreachable or Throw or EndFinally => Array.Empty<BlockId>(),
+        // The error edges are CFG edges (05, 01 L5): a throw goes to its landing, a call that may
+        // fail to its continuation or its landing; the error leaves the function by Propagate.
+        Throw t => new[] { t.Landing },
+        ErrorBranch e => new[] { e.Continue, e.OnError },
+        Unreachable or Propagate => Array.Empty<BlockId>(),
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };
@@ -224,6 +230,9 @@ public static class IrShape
             ResumePull r => r with { Dest = Opt(r.Dest), Coroutine = temp(r.Coroutine) },
             YieldSuspend y => y with { Value = Opt(y.Value) },
 
+            CurrentError e => e with { Dest = temp(e.Dest) },
+            ClearError => op,
+
             _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
         };
     }
@@ -238,8 +247,9 @@ public static class IrShape
         {
             Cond = temp(c.Cond), IfTrue = block(c.IfTrue), IfFalse = block(c.IfFalse),
         },
-        Throw t => t with { Value = temp(t.Value) },
-        Unreachable or EndFinally => terminator,
+        Throw t => t with { Value = temp(t.Value), Landing = block(t.Landing) },
+        ErrorBranch e => e with { OnError = block(e.OnError), Continue = block(e.Continue) },
+        Unreachable or Propagate => terminator,
         _ => throw new InternalCompilationException(
             $"ir: unhandled terminator {terminator.GetType().Name}")
     };

@@ -159,16 +159,6 @@ internal static class Reachability
                         // hit the methods of this type.
                         case MakeInterface iface: gehoben.Add(iface.Concrete.Value); break;
                     }
-
-                // The terminator sits BESIDE the instructions rather than inside them, and 'throw' is
-                // the SECOND way a type is lifted.
-                //
-                // For an untyped 'catch (e)' the VM builds the Throwable fat pointer itself; there is no
-                // 'mkiface' in the code. Without this case the analysis deletes the vtable methods of the
-                // thrown type, and the program searches at runtime for an implementation that no longer
-                // exists.
-                if (block.Terminator is Throw { Concrete: { } geworfen })
-                    gehoben.Add(geworfen.Value);
             }
         }
 

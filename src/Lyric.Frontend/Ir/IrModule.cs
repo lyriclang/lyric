@@ -34,35 +34,6 @@ public class IrBlock(BlockId Id, List<IrOp> Insts)
 /// "available on every path" and "the definition dominates the use".</item>
 /// </list>
 /// </summary>
-/// <summary>What a protected region does when something is thrown inside it.</summary>
-public enum IrHandlerKind
-{
-    /// <summary>Catches one type, or everything when <c>CatchType</c> is absent, and continues.</summary>
-    Catch,
-
-    /// <summary>Runs while unwinding and hands on afterwards; the carrier of <c>defer</c>.</summary>
-    Finally,
-}
-
-/// <summary>
-/// A protected region: the blocks <c>[Start, End)</c> are covered.
-///
-/// <para>BLOCK INDICES RATHER THAN BYTE RANGES, the same decision as for the jump targets: a range is
-/// checked with two comparisons against the block count, instead of verifying byte offsets against
-/// instruction boundaries.</para>
-///
-/// <para>THE CAUGHT VALUE GOES INTO <see cref="Slot"/>, NOT ONTO THE STACK. CIL pushes it onto the
-/// operand stack when entering the handler; that would not work here, because the stack is empty at
-/// every block boundary. Through a slot the invariant stays intact and the handler block starts like
-/// any other.</para>
-/// </summary>
-/// <param name="CatchType">The caught type, or <c>null</c> for a catch-all. Always <c>null</c> for
-/// <see cref="IrHandlerKind.Finally"/>.</param>
-/// <param name="Slot">Where the caught value goes. <c>null</c> for <c>finally</c> and for a
-/// <c>catch (_)</c> without a binding.</param>
-public record struct IrHandler(BlockId Start, BlockId End, IrHandlerKind Kind,
-    TypeId? CatchType, BlockId Handler, LocalId? Slot);
-
 public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrLocal> Locals, List<IrTemp> Temps, List<IrBlock> Blocks)
 {
     public string Name { get; init; } = Name;
@@ -81,13 +52,12 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     public List<IrTemp> Temps { get; init; } = Temps;
 
     /// <summary>
-    /// The protected regions of this function, INNERMOST FIRST.
-    ///
-    /// <para>The order is the contract: while unwinding, the runtime takes the first entry whose range
-    /// covers the fault site and whose type matches. For nested try blocks the list decides, not an
-    /// arithmetic over range sizes.</para>
+    /// Whether the function may throw (design/v5/spec/05 E2): it declares a non-empty set, so a
+    /// back end gives it the caller's error slot (01 L5 E1) and <see cref="Propagate"/> may end a
+    /// block. Where a throw or a failed call goes INSIDE the function is no table's business: the
+    /// edges are in the blocks (<see cref="Throw"/>, <see cref="ErrorBranch"/>).
     /// </summary>
-    public List<IrHandler> Handlers { get; init; } = new();
+    public bool Throws { get; init; }
 
     /// <summary>
     /// Whether parameter 0 is the receiver of a method of a VALUE, a struct or an enum:
@@ -134,6 +104,11 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// map is an implementation detail.</para>
     /// </summary>
     public string[] MethodSlots { get; init; } = [];
+
+    /// <summary>Per slot of an INTERFACE, whether its member declares <c>throws</c> (05 E2): the
+    /// slot's function then takes the caller's error slot, and so does every entry of every table
+    /// row for it — an implementation that throws nothing ignores it (K6).</summary>
+    public bool[] SlotThrows { get; init; } = [];
 
     /// <summary>
     /// The name of the <c>opaque type</c> a field was DECLARED with, in field order, empty where

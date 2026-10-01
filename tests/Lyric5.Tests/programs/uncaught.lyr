@@ -1,0 +1,22 @@
+// An error that escapes main (design/v5/spec/05 E6 O4): its message, its cause chain on the error
+// stream, exit 1.
+import std.io { println };
+
+interface IoError :: [Error] { }
+class Disk :: [IoError] { fn message(): string { return "disk"; } }
+class Wrap :: [Error] { what: string, inner: Error,
+    fn message(): string { return this.what; }
+    fn cause(): ?Error { return this.inner; }
+}
+
+fn read(): string throws Disk { throw Disk { }; }
+fn config(): string throws Wrap {
+    try { return read(); } catch (e: Disk) { throw Wrap { what = "config", inner = e }; }
+}
+
+fn main(): int throws Wrap {
+    println("before");
+    let s = try config();
+    println(s);
+    return 0;
+}

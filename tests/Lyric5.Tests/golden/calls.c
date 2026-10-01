@@ -7,7 +7,7 @@
 typedef struct lyr_ty0_Color lyr_ty0_Color;
 typedef struct lyr_ty1_Point lyr_ty1_Point;
 typedef struct lyr_vt_ty2 lyr_vt_ty2;
-const char lyr_ifid_ty2[] = "Error";
+const char lyr_ifid_ty2[] = "std.core.Error";
 struct lyr_ty0_Color {
     int64_t f_v;
 };

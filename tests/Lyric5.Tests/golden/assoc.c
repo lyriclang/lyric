@@ -8,7 +8,7 @@ typedef struct lyr_ty0_IntBox lyr_ty0_IntBox;
 typedef struct lyr_ty1_StrBox lyr_ty1_StrBox;
 typedef struct lyr_ty2_Pair_int_ lyr_ty2_Pair_int_;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Error";
+const char lyr_ifid_ty3[] = "std.core.Error";
 struct lyr_ty0_IntBox {
     int64_t f_v;
 };

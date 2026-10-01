@@ -10,7 +10,7 @@ typedef struct lyr_ty2_Shape lyr_ty2_Shape;
 typedef struct lyr_ty3_Point lyr_ty3_Point;
 typedef struct lyr_ty4_Counter lyr_ty4_Counter;
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
-const char lyr_ifid_ty5[] = "Error";
+const char lyr_ifid_ty5[] = "std.core.Error";
 struct lyr_ty0_Account {
     LyrObj header;
     LyrStr *f_owner;

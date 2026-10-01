@@ -142,6 +142,15 @@ public sealed class TypeResult
 
     public LyrType[] DeclaredThrows(FunctionDecl fn) => _declaredThrows.GetValueOrDefault(fn) ?? [];
 
+    private readonly HashSet<FunctionDecl> _throwsAtCall = new(ReferenceEqualityComparer.Instance);
+
+    public void RecordThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Add(fn);
+
+    /// <summary>Whether a CALL of the function may throw (05 E2): its set is non-empty and it is no
+    /// coroutine function, whose clause belongs to its pulls. What a back end gives the caller's
+    /// error slot.</summary>
+    public bool ThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Contains(fn);
+
     /// <summary>What a call may throw, in its instance's terms (K5) — the checker's settled callee,
     /// overloads and generic substitution done. Recorded for throwing calls only.</summary>
     public void RecordCallThrows(CallExpr call, LyrType[] set) => _callThrows[call] = set;

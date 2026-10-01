@@ -339,64 +339,9 @@ public static class IrVerifier
         public void Run()
         {
             if (!CheckTables()) return;
-            if (!CheckHandlers()) return;
             if (!CheckCfgShape()) return;
             ComputeReachabilityAndAvailability();
             CheckInstructions();
-        }
-
-        /// <summary>
-        /// The protected regions. Runs BEFORE the CFG check, because the reachability uses them as
-        /// roots; a range into nothing would miss there.
-        /// </summary>
-        private bool CheckHandlers()
-        {
-            var ok = true;
-            var count = _fn.Blocks.Count;
-
-            for (var i = 0; i < _fn.Handlers.Count; i++)
-            {
-                var h = _fn.Handlers[i];
-                var where = $"handler #{i}";
-
-                if (h.Start.Value < 0 || h.End.Value > count || h.Start.Value >= h.End.Value)
-                {
-                    Report($"{where}: protected range [{h.Start}, {h.End}) is not a valid " +
-                           $"block range (function has {count} block(s))");
-                    ok = false;
-                    continue;
-                }
-
-                if (h.Handler.Value < 0 || h.Handler.Value >= count)
-                {
-                    Report($"{where}: handler block {h.Handler} is out of range");
-                    ok = false;
-                    continue;
-                }
-
-                // A handler protecting itself would be an infinite loop while unwinding: its own throw
-                // would find it again.
-                if (h.Handler.Value >= h.Start.Value && h.Handler.Value < h.End.Value)
-                {
-                    Report($"{where}: handler block {h.Handler} lies inside its own protected " +
-                           $"range [{h.Start}, {h.End}) — unwinding would not terminate");
-                    ok = false;
-                }
-
-                if (h.Kind == IrHandlerKind.Finally && (h.CatchType is not null || h.Slot is not null))
-                {
-                    Report($"{where}: a finally region catches nothing and binds nothing");
-                    ok = false;
-                }
-
-                if (h.Slot is { } slot && (slot.Value < 0 || slot.Value >= _fn.Locals.Count))
-                {
-                    Report($"{where}: binds into slot {slot}, which is outside the local table");
-                    ok = false;
-                }
-            }
-
-            return ok;
         }
 
         // ------------------------------------------------------------------ phase 0: tables
@@ -604,16 +549,6 @@ public static class IrVerifier
             _reachable.Add(_fn.Entry);
             stack.Push((_fn.Entry, 0));
 
-            // Handler blocks are additional roots. They have no predecessor in the CFG: they are
-            // reached through the handler table while unwinding, not through a jump. Without anchoring
-            // them here the verifier reports every catch block as unreachable, and the rule
-            // "unreachable blocks are an error" would make exceptions impossible.
-            foreach (var handler in _fn.Handlers)
-            {
-                if (handler.Handler.Value < 0 || handler.Handler.Value >= _fn.Blocks.Count) continue;
-                if (_reachable.Add(handler.Handler)) stack.Push((handler.Handler, 0));
-            }
-
             while (stack.Count > 0)
             {
                 var (block, next) = stack.Pop();
@@ -810,6 +745,15 @@ public static class IrVerifier
                 case MakeCoroutine m: CheckMakeCoroutine(m, block, index); break;
                 case ResumePull r: CheckResumePull(r, block, index); break;
                 case YieldSuspend y: CheckYieldSuspend(y, block, index); break;
+                // The in-flight error is an Error interface value (05 E6 O1); taking it off is a
+                // statement about the function's state, with nothing to type.
+                case CurrentError e:
+                    if (e.Type is not IrInterfaceType)
+                        Report(block, index, $"curerr {e.Dest} is {Show(e.Type)}; the in-flight error is an interface value");
+                    RequireDestType(e.Dest, e.Type, "curerr", block, index);
+                    break;
+                case ClearError:
+                    break;
                 default:
                     throw new InternalCompilationException(
                         $"ir-verifier: unhandled op {op.GetType().Name}");
@@ -1757,16 +1701,22 @@ public static class IrVerifier
                         ReportTerm(block, $"condition {c.Cond} is {Show(TypeOf(c.Cond))}, must be bool");
                     break;
 
-                // Only Throwable types are throwable, which the sema checked. What remains here is the
-                // shape: a value that is an object at all. Throwing a scalar would be a lowering bug,
-                // not a user error.
-                case Throw t when TypeOf(t.Value) is not (IrRefType or IrInterfaceType):
+                // What is thrown conforms to Error, which the sema checked (05 E3); the lowering hands
+                // it over as the Error interface value — boxed or re-tabled. Anything else here is a
+                // lowering bug, not a user error.
+                case Throw t when TypeOf(t.Value) is not IrInterfaceType:
                     ReportTerm(block, $"throws {t.Value} ({Show(TypeOf(t.Value))}); " +
-                                      "only class and interface values are throwable");
+                                      "the thrown value travels as an interface value");
+                    break;
+
+                // The error leaves through the caller's slot, which only a throwing function has.
+                case Propagate when !_fn.Throws:
+                    ReportTerm(block, "propagates an error out of a function that throws nothing");
                     break;
 
                 case Throw:
-                case EndFinally:
+                case ErrorBranch:
+                case Propagate:
                 case Branch:
                 case Unreachable:
                     break; // no type conditions

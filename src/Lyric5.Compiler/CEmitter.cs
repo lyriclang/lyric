@@ -804,8 +804,9 @@ public sealed class CEmitter
         return _slots[iface] = sigs;
     }
 
-    private string SlotPointer((IrType[] Params, IrType Return) sig, string name) =>
-        $"{(IsVoid(sig.Return) ? "void" : CType(sig.Return))} (*{name})(LyrIface{string.Concat(sig.Params.Select(p => ", " + CType(p)))})";
+    private string SlotPointer((IrType[] Params, IrType Return) sig, string name, bool throws) =>
+        $"{(IsVoid(sig.Return) ? "void" : CType(sig.Return))} (*{name})(LyrIface{string.Concat(sig.Params.Select(p => ", " + CType(p)))}"
+        + $"{(throws ? ", LyrErr **" : "")})";
 
     /// <summary>The table's type: the concrete type's descriptor first, then one function
     /// pointer per slot, each taking the interface value — the same for a default, whose
@@ -820,7 +821,7 @@ public sealed class CEmitter
         }
         _out.AppendLine($"struct {VtType(index)} {{");
         _out.AppendLine("    const LyrDesc *desc;");
-        for (var k = 0; k < sigs.Length; k++) _out.AppendLine($"    {SlotPointer(sigs[k], $"s{k}")};");
+        for (var k = 0; k < sigs.Length; k++) _out.AppendLine($"    {SlotPointer(sigs[k], $"s{k}", SlotThrows(index, k))};");
         _out.AppendLine("};");
     }
 
@@ -885,14 +886,26 @@ public sealed class CEmitter
         for (var k = 0; k < sigs.Length; k++)
         {
             var f = _module.Functions[row.Methods[k].Value];
-            if (f.ParamCount > 0 && f.Locals[0].Type is IrInterfaceType) { entries.Add(FunctionName(f.Name)); continue; }
+            var throws = SlotThrows(iface, k);
+            // An implementation throws at most what its slot declares (05 K6): one that throws
+            // nothing ignores the slot's error parameter; the other way round the sema refused.
+            if (f.Throws && !throws)
+                throw new InvalidOperationException($"'{f.Name}' throws, and slot {k} of {Display(new IrInterfaceType(row.Interface))} does not");
+            if (f.ParamCount > 0 && f.Locals[0].Type is IrInterfaceType)
+            {
+                // A default: its receiver IS the interface value, its error slot the slot's own.
+                if (f.Throws != throws)
+                    throw new InvalidOperationException($"the default '{f.Name}' and its slot disagree about throwing");
+                entries.Add(FunctionName(f.Name));
+                continue;
+            }
             var (parameters, result) = sigs[k];
             var thunk = $"{VtName(concrete, iface)}_s{k}";
             var receiver = isClass ? $"({CType(new IrRefType(row.Type))})self.data"
                 : f.ReceiverByRef ? $"&(({BoxName(concrete)} *)self.data)->value"
                 : $"(({BoxName(concrete)} *)self.data)->value";
-            var call = $"{FunctionName(f.Name)}({receiver}{string.Concat(parameters.Select((_, j) => $", a{j}"))})";
-            text.AppendLine($"static {(IsVoid(result) ? "void" : CType(result))} {thunk}(LyrIface self{string.Concat(parameters.Select((p, j) => ", " + Declare(p, $"a{j}")))}) "
+            var call = $"{FunctionName(f.Name)}({receiver}{string.Concat(parameters.Select((_, j) => $", a{j}"))}{(f.Throws ? ", lyr_err" : "")})";
+            text.AppendLine($"static {(IsVoid(result) ? "void" : CType(result))} {thunk}(LyrIface self{string.Concat(parameters.Select((p, j) => ", " + Declare(p, $"a{j}")))}{(throws ? ", LyrErr **lyr_err" : "")}) "
                 + $"{{ {(IsVoid(result) ? call + ";" : "return " + call + ";")} }}");
             entries.Add(thunk);
         }
@@ -1057,13 +1070,34 @@ public sealed class CEmitter
 
     private string Signature(IrFunction function)
     {
-        var parameters = function.ParamCount == 0
-            ? "void"
-            : string.Join(", ", function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)));
+        var parameters = function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)).ToList();
+        // The caller's error slot (01 L5 E1), the last parameter: a throwing function's own keep
+        // their places, and a set slot is the status.
+        if (function.Throws) parameters.Add("LyrErr **lyr_err");
         // External linkage: an instance's unit calls the module's functions and the module the
         // instance's, and the names are unique by construction (01 C3, C4).
-        return $"{CType(function.ReturnType)} {FunctionName(function.Name)}({parameters})";
+        return $"{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
     }
+
+    /// <summary>Whether a function handles errors at all: the in-flight error local exists only
+    /// where something can set or read it.</summary>
+    private bool UsesErrors(IrFunction function) =>
+        function.Blocks.Any(b => b.Terminator is Throw or ErrorBranch or Propagate
+            || b.Insts.Any(op => op is CurrentError or ClearError
+                || op is Call c && _module.Functions[c.Target.Value].Throws
+                || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
+
+    /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot (05 E2).</summary>
+    private bool SlotThrows(int iface, int slot) =>
+        _module.Types[iface].SlotThrows is { } flags && slot < flags.Length && flags[slot];
+
+    /// <summary>The error slot as the last argument of a call of a throwing function.</summary>
+    private static string ErrorArgument(bool throws, int arguments) =>
+        !throws ? "" : arguments == 0 ? "&lyr_e" : ", &lyr_e";
+
+    /// <summary>A zero of the type as an expression, for the return that leaves with an error: the
+    /// caller reads its error slot and nothing else.</summary>
+    private string ZeroValue(IrType type) => Zero(type) == "{0}" ? $"({CType(type)}){{0}}" : Zero(type);
 
     /// <summary>
     /// The program's <c>main</c>: the runtime's <c>lyr_run_main</c> around the entry function,
@@ -1078,6 +1112,18 @@ public sealed class CEmitter
         text.AppendLine("/* the program */");
         // The globals are filled first (07 V5 G2), in declaration order, then the entry runs.
         var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
+        if (entry.Throws)
+        {
+            // An error that escapes main (05 E6 O4): its message and its causes on the error
+            // writer, and the exit code 1 — through Error's own table, which the runtime cannot name.
+            var (message, cause) = ErrorReport(text);
+            var call = $"{name}(&lyr_e)";
+            text.AppendLine($"static int64_t lyr_entry(void) {{ {init}LyrErr *lyr_e = NULL; "
+                + (IsVoid(entry.ReturnType) ? $"{call}; int64_t lyr_r = 0; " : $"int64_t lyr_r = {call}; ")
+                + $"if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, {message}, {cause}); return lyr_r; }}");
+            text.AppendLine($"int main(int argc, char **argv) {{ return lyr_run_main(argc, argv, lyr_entry); }}");
+            return text.ToString();
+        }
         if (IsVoid(entry.ReturnType) || init.Length > 0)
         {
             text.AppendLine(IsVoid(entry.ReturnType)
@@ -1087,6 +1133,27 @@ public sealed class CEmitter
         }
         text.AppendLine($"int main(int argc, char **argv) {{ return lyr_run_main(argc, argv, {name}); }}");
         return text.ToString();
+    }
+
+    /// <summary>
+    /// The two members of <c>Error</c> the report calls (05 E6 O1, O4): <c>message()</c> and
+    /// <c>cause()</c>, each through the value's own table. Where no type of the program conforms,
+    /// nothing can be thrown, and the report gets no members.
+    /// </summary>
+    private (string Message, string Cause) ErrorReport(StringBuilder text)
+    {
+        var index = Enumerable.Range(0, _module.Types.Count).FirstOrDefault(i =>
+            _module.Types[i].IsInterface && _module.Types[i].Name == "Error" && _module.Types[i].Module == "std.core", -1);
+        if (index < 0 || !_module.Impls.Any(r => r.Interface.Value == index)) return ("NULL", "NULL");
+        var slots = _module.Types[index].MethodSlots;
+        var message = Array.IndexOf(slots, "message");
+        var cause = Array.IndexOf(slots, "cause");
+        if (message < 0 || cause < 0) return ("NULL", "NULL");
+        var causeType = SlotSignatures(index)[cause].Return;
+        text.AppendLine($"static const LyrStr *lyr_error_message(LyrIface e) {{ return ((const {VtType(index)} *)e.vt)->s{message}(e); }}");
+        text.AppendLine($"static int lyr_error_cause(LyrIface e, LyrIface *next) {{ {CType(causeType)} c = ((const {VtType(index)} *)e.vt)->s{cause}(e); "
+            + "*next = c.value; return c.has; }");
+        return ("lyr_error_message", "lyr_error_cause");
     }
 
     // --- functions -------------------------------------------------------------------------------
@@ -1109,6 +1176,9 @@ public sealed class CEmitter
             _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
         foreach (var local in function.Locals.Skip(function.ParamCount))
             _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
+        // The in-flight error (01 L5 E1): what a throw sets, what a call that failed wrote, what a
+        // catch reads and clears.
+        if (UsesErrors(function)) _fn.AppendLine("    LyrErr *lyr_e = NULL;");
         foreach (var temp in function.Temps)
         {
             if (IsVoid(temp.Type)) continue;
@@ -1204,7 +1274,8 @@ public sealed class CEmitter
             ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
             : $"{Temp(l.Dest)} = {GlobalName(l.Global.Value)};",
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
-        Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)})"),
+        Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
+            + $"{ErrorArgument(_module.Functions[call.Target.Value].Throws, call.Args.Length)})"),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -1218,7 +1289,11 @@ public sealed class CEmitter
         MakeInterface m =>
             $"{{ {BoxName(m.Concrete.Value)} *lyr_box = lyr_alloc(&{BoxDesc(m.Concrete.Value)}); lyr_box->value = {Value(m.Value)}; "
             + $"{Temp(m.Dest)} = (LyrIface){{ lyr_box, &{VtName(m.Concrete.Value, m.Interface.Value)} }}; }}",
-        CallVirt c => Assign(c.Dest, $"((const {VtType(c.Interface.Value)} *){Temp(c.Args[0])}.vt)->s{c.Slot}({string.Join(", ", c.Args.Select(Value))})"),
+        CallVirt c => Assign(c.Dest, $"((const {VtType(c.Interface.Value)} *){Temp(c.Args[0])}.vt)->s{c.Slot}({string.Join(", ", c.Args.Select(Value))}"
+            + $"{ErrorArgument(SlotThrows(c.Interface.Value, c.Slot), c.Args.Length)})"),
+        // The in-flight error's value, and the clause that takes it (05 E4, E9).
+        CurrentError e => $"{Temp(e.Dest)} = lyr_e->value;",
+        ClearError => "lyr_e = NULL;",
         // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>
@@ -1520,6 +1595,13 @@ public sealed class CEmitter
         CondBranch c => $"if ({Temp(c.Cond)}) goto bb{c.IfTrue.Value}; else goto bb{c.IfFalse.Value};",
         // Reached only after a call that does not return; the verifier vouches for it.
         Unreachable => "__builtin_unreachable();",
+        // The error path (01 L5 E1-E3): a throw allocates the record and goes to its landing, a
+        // failed call goes there too, the bottom hands the error to the caller's slot.
+        Throw t => $"lyr_e = lyr_err_new({Value(t.Value)}); goto bb{t.Landing.Value};",
+        ErrorBranch e => $"if (LYR_UNLIKELY(lyr_e != NULL)) goto bb{e.OnError.Value}; goto bb{e.Continue.Value};",
+        Propagate => IsVoid(_function.ReturnType)
+            ? "*lyr_err = lyr_e; return;"
+            : $"*lyr_err = lyr_e; return {ZeroValue(_function.ReturnType)};",
         _ => throw new InvalidOperationException($"the C emitter has no case for {terminator.GetType().Name}; the gate let it through"),
     };
 }

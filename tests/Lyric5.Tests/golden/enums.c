@@ -20,7 +20,7 @@ typedef struct lyr_ty13_Shape_Tagged lyr_ty13_Shape_Tagged;
 typedef struct lyr_ty12_Point lyr_ty12_Point;
 typedef struct lyr_ty14_Scene lyr_ty14_Scene;
 typedef struct lyr_vt_ty15 lyr_vt_ty15;
-const char lyr_ifid_ty15[] = "Error";
+const char lyr_ifid_ty15[] = "std.core.Error";
 struct lyr_ty2_Tree_Leaf {
     int64_t f_0;
 };

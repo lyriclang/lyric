@@ -684,8 +684,27 @@ internal sealed class TypeTable
         // symbol. Otherwise 'Iterator<string>' would get the id of 'Iterator<int>'.
         if (symbol.Generics.Length == 0) _assigned[symbol] = id;
 
-        _defs.Add(new IrTypeDef(name, [], []) { MethodSlots = slots, IsInterface = true });
+        _defs.Add(new IrTypeDef(name, [], [])
+        {
+            MethodSlots = slots, IsInterface = true,
+            SlotThrows = slots.Select(slot => SlotThrows(symbol, decl, slot)).ToArray(),
+            // Where it is declared, as for a class: a back end finds std.core's Error by it (the
+            // report of an error escaping main, 05 E6 O4), not by a name a program may reuse.
+            Module = ModuleNameOf(symbol),
+        });
         return id;
+    }
+
+    /// <summary>Whether the member behind a slot declares <c>throws</c> (design/v5/spec/05 E2): its
+    /// own or a parent's, the one declaration a name has (<c>LYR-SEM0079</c>).</summary>
+    private bool SlotThrows(TypeSymbol symbol, InterfaceDecl decl, string slot)
+    {
+        if (decl.Members.FirstOrDefault(m => m.Name == slot && !m.IsStatic && m.Generics.Length == 0) is { } own)
+            return own.Throws is not null;
+        foreach (var parent in Conformance.ParentsOf(symbol, _binding))
+            if (parent.Declaration is InterfaceDecl parentDecl && SlotNames(parent, parentDecl).Contains(slot))
+                return SlotThrows(parent, parentDecl, slot);
+        return false;
     }
 
     /// <summary>

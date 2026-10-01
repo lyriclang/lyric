@@ -57,7 +57,6 @@ public static class SubsetGate
         private void Function(IrFunction function)
         {
             var at = FirstSpan(function);
-            if (function.Handlers.Count > 0) Refuse(at, "'try' and 'catch'", "M5");
             Type(function.ReturnType, at, "the return type");
             foreach (var local in function.Locals) Type(local.Type, at, $"the type of '{local.Name}'");
             foreach (var block in function.Blocks)
@@ -165,6 +164,8 @@ public static class SubsetGate
                     break;
                 case MakeInterface or CallVirt or TypeTest or Downcast:
                     break;
+                case CurrentError or ClearError:
+                    break;
                 case LoadGlobal or StoreGlobal:
                     break;
                 case MakeClosure m:
@@ -199,13 +200,8 @@ public static class SubsetGate
             switch (terminator)
             {
                 case null:
-                case Return or Branch or CondBranch or Unreachable:
-                    break;
-                case Throw:
-                    Refuse(terminator.Span, "'throw'", "M5");
-                    break;
-                case EndFinally:
-                    Refuse(terminator.Span, "'try' and 'finally'", "M5");
+                // The error path (05 E1-E4, 01 L5): explicit edges, native since M5 S1b.
+                case Return or Branch or CondBranch or Unreachable or Throw or ErrorBranch or Propagate:
                     break;
                 default:
                     Refuse(at, $"the terminator {terminator.GetType().Name}", "a later milestone");

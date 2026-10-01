@@ -9,7 +9,7 @@ namespace Lyric.Tests.Ir;
 
 /// <summary>
 /// The inliner, observed on real lowered code: the call disappears, the verifier stays silent,
-/// and the boundaries — handlers, recursion, size — hold. What inlined code COMPUTES is covered
+/// and the boundaries — an error path of the callee's own, recursion, size — hold. What inlined code COMPUTES is covered
 /// by the VM tests, which run the whole pipeline with the pass on.
 /// </summary>
 public class InlinerTests
@@ -126,33 +126,56 @@ public class InlinerTests
         Assert.Contains(Ops(Main(module)), op => op is Call);
     }
 
+    // 'A_caller_with_handlers_is_left_alone' and 'A_callee_with_handlers_is_not_spliced' retired
+    // with the handler tables (M5 S1b): the error path is explicit edges now (design/v5/spec/01
+    // L5), and a splice keeps them. What stays a call is a callee with an error path of its own.
+
     [Fact]
-    public void A_caller_with_handlers_is_left_alone()
+    public void A_caller_with_an_error_path_still_takes_a_splice()
     {
         var module = Optimized("""
             class Boom :: [Error] { fn message(): string { return "boom"; } }
 
-            fn risky(): int { return 1; }
+            fn risky(): int throws Boom { return 1; }
+            fn small(): int { return 2; }
 
             fn main(): int {
-                try { return risky(); }
-                catch (e: Boom) { return 0; }
+                try { return risky() + small(); }
+                catch (_: Boom) { return 0; }
             }
             """);
 
-        // Handler ranges are contiguous block ranges; spliced blocks would land outside them.
+        // 'small' is spliced; 'risky' throws and stays a call, its error edge after it.
+        Assert.Single(Ops(Main(module)).OfType<Call>());
+        Assert.Contains(Main(module).Blocks, b => b.Terminator is ErrorBranch);
+    }
+
+    [Fact]
+    public void A_throwing_callee_is_not_spliced()
+    {
+        var module = Optimized("""
+            class Boom :: [Error] { fn message(): string { return "boom"; } }
+
+            fn risky(): int throws Boom { return 1; }
+
+            fn main(): int throws Boom { return try risky(); }
+            """);
+
+        // Its bottom propagates into ITS caller's slot; spliced, it would mean another function's.
         Assert.Contains(Ops(Main(module)), op => op is Call);
     }
 
     [Fact]
-    public void A_callee_with_handlers_is_not_spliced()
+    public void A_callee_with_its_own_error_path_is_not_spliced()
     {
         var module = Optimized("""
             class Boom :: [Error] { fn message(): string { return "boom"; } }
 
+            fn risky(): int throws Boom { return 1; }
+
             fn guarded(): int {
-                try { return 1; }
-                catch (e: Boom) { return 0; }
+                try { return risky(); }
+                catch (_: Boom) { return 0; }
             }
 
             fn main(): int { return guarded(); }

@@ -1843,6 +1843,7 @@ public sealed class TypeChecker
             if (TypeFacts.SymbolOf(t) is { } thrown) _result.BindRef(node, thrown);
         }
         _result.RecordDeclaredThrows(fn, ClauseSetOf(fn));
+        if (DeclaredThrowsOf(fn).Length > 0) _result.RecordThrowsAtCall(fn);
     }
 
     /// <summary>What a function's clause names, resolved — the bare form as <c>Error</c> (K2),

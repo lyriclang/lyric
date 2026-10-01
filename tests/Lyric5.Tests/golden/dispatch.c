@@ -5,20 +5,20 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "Counter";
+const char lyr_ifid_ty0[] = "main.Counter";
 typedef struct lyr_ty1_Bag lyr_ty1_Bag;
 typedef struct lyr_ty2_Person lyr_ty2_Person;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "Greeter";
+const char lyr_ifid_ty3[] = "main.Greeter";
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "Waver";
+const char lyr_ifid_ty4[] = "main.Waver";
 typedef struct lyr_ty5_Dog lyr_ty5_Dog;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
-const char lyr_ifid_ty6[] = "Walker";
+const char lyr_ifid_ty6[] = "main.Walker";
 typedef struct lyr_ty7_Legs lyr_ty7_Legs;
 typedef struct lyr_ty8_Wheels lyr_ty8_Wheels;
 typedef struct lyr_vt_ty9 lyr_vt_ty9;
-const char lyr_ifid_ty9[] = "Error";
+const char lyr_ifid_ty9[] = "std.core.Error";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);

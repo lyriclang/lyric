@@ -65,6 +65,9 @@ public class CEmitterTests
     [InlineData("synth")]
     [InlineData("lambdas")]
     [InlineData("cloning")]
+    [InlineData("errors")]
+    [InlineData("error_paths")]
+    [InlineData("uncaught")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -196,6 +199,8 @@ public class CEmitterTests
             data.Add("cloning", profile, 0,
                 "opt true false true false true false\nmixed true false true\nstruct true false\n"
                 + "repeat 3 1 0 0 true\nnested 2 5 0\n");
+            data.Add("errors", profile, 0, ERRORS_EXPECTED);
+            data.Add("error_paths", profile, 0, ERROR_PATHS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -282,6 +287,31 @@ public class CEmitterTests
         Assert.StartsWith("collections ", lines[1]);
         var collections = int.Parse(lines[1]["collections ".Length..]);
         Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
+    }
+
+    private const string ERRORS_EXPECTED =
+        "defer 3\ndefer 2\ndefer 1\ndeep caught 7 at 3\niface caught disk\ndefer 3\nall caught parse\n"
+        + "data caught 1..9 got 12\ncause caught config / disk\norder: body\norder: inner defer\norder: clause\n"
+        + "rethrow inner saw parse\nrethrow outer got parse\nsister outer got disk\nclean 5 no error\n"
+        + "ret defer ran\nret 9\n";
+
+    private const string ERROR_PATHS_EXPECTED =
+        "slot: 7 then caught bad\nmethod: 3 then caught bad\ngeneric: 5 then caught Box\nchain: a b c caught\n"
+        + "loop: 1 2 skip 4 done\nlambda: caught inside 9\nnested: inner clause caught\nclausereturn defer\n"
+        + "clausereturn: 42\n";
+
+    /// <summary>An error that escapes main (design/v5/spec/05 E6 O4): the output up to the throw,
+    /// then on the error stream its message and each cause in the chain, and the exit code 1 — a
+    /// panic's is 101.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void An_error_escaping_main_reports_its_chain_and_exits_with_1(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("uncaught"), "uncaught", profile);
+        Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal("error: config\n  caused by: disk\n", result.Stderr.Replace("\r\n", "\n"));
     }
 
     [Theory]
