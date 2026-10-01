@@ -5,12 +5,16 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
+const char lyr_ifid_ty0[] = "Counter";
 typedef struct lyr_ty1_Bag lyr_ty1_Bag;
 typedef struct lyr_ty2_Person lyr_ty2_Person;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
+const char lyr_ifid_ty3[] = "Greeter";
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
+const char lyr_ifid_ty4[] = "Waver";
 typedef struct lyr_ty5_Dog lyr_ty5_Dog;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
+const char lyr_ifid_ty6[] = "Walker";
 typedef struct lyr_ty7_Legs lyr_ty7_Legs;
 typedef struct lyr_ty8_Wheels lyr_ty8_Wheels;
 struct lyr_vt_ty0 {
@@ -24,7 +28,8 @@ struct lyr_ty1_Bag {
 };
 _Static_assert(sizeof(lyr_ty1_Bag) == 16, "layout of lyr_ty1_Bag");
 _Static_assert(offsetof(lyr_ty1_Bag, f_n) == 8, "layout of lyr_ty1_Bag");
-const LyrDesc lyr_desc_ty1_Bag = { sizeof(lyr_ty1_Bag), 0, 0, 0, NULL, "main.Bag", NULL };
+extern const LyrItable lyr_itab_ty1[];
+const LyrDesc lyr_desc_ty1_Bag = { sizeof(lyr_ty1_Bag), 0, 0, 0, NULL, "main.Bag", lyr_itab_ty1 };
 struct lyr_ty2_Person {
     LyrStr *f_name;
 };
@@ -48,25 +53,29 @@ struct lyr_ty5_Dog {
 };
 _Static_assert(sizeof(lyr_ty5_Dog) == 24, "layout of lyr_ty5_Dog");
 _Static_assert(offsetof(lyr_ty5_Dog, f_legs) == 8, "layout of lyr_ty5_Dog");
+extern const LyrItable lyr_itab_ty5[];
 static const uint64_t lyr_refmap_ty5[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty5_Dog = { sizeof(lyr_ty5_Dog), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "main.Dog", NULL };
+const LyrDesc lyr_desc_ty5_Dog = { sizeof(lyr_ty5_Dog), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "main.Dog", lyr_itab_ty5 };
 struct lyr_ty7_Legs {
     LyrObj header;
     int64_t f_k;
 };
 _Static_assert(sizeof(lyr_ty7_Legs) == 16, "layout of lyr_ty7_Legs");
 _Static_assert(offsetof(lyr_ty7_Legs, f_k) == 8, "layout of lyr_ty7_Legs");
-const LyrDesc lyr_desc_ty7_Legs = { sizeof(lyr_ty7_Legs), 0, 0, 0, NULL, "main.Legs", NULL };
+extern const LyrItable lyr_itab_ty7[];
+const LyrDesc lyr_desc_ty7_Legs = { sizeof(lyr_ty7_Legs), 0, 0, 0, NULL, "main.Legs", lyr_itab_ty7 };
 struct lyr_ty8_Wheels {
     LyrObj header;
 };
 _Static_assert(sizeof(lyr_ty8_Wheels) == 8, "layout of lyr_ty8_Wheels");
-const LyrDesc lyr_desc_ty8_Wheels = { sizeof(lyr_ty8_Wheels), 0, 0, 0, NULL, "main.Wheels", NULL };
+extern const LyrItable lyr_itab_ty8[];
+const LyrDesc lyr_desc_ty8_Wheels = { sizeof(lyr_ty8_Wheels), 0, 0, 0, NULL, "main.Wheels", lyr_itab_ty8 };
 typedef struct { LyrObj header; lyr_ty2_Person value; } lyr_box_ty2_Person;
 _Static_assert(sizeof(lyr_box_ty2_Person) == 16, "layout of lyr_box_ty2_Person");
 _Static_assert(offsetof(lyr_box_ty2_Person, value) == 8, "layout of lyr_box_ty2_Person");
+extern const LyrItable lyr_itab_ty2[];
 static const uint64_t lyr_refmap_box2[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty2_Person = { sizeof(lyr_box_ty2_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box2, "box<main.Person>", NULL };
+const LyrDesc lyr_desc_box_ty2_Person = { sizeof(lyr_box_ty2_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box2, "box<main.Person>", lyr_itab_ty2 };
 
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("paths ");
@@ -112,6 +121,11 @@ const lyr_vt_ty6 lyr_vt_ty6_ty7 = { &lyr_desc_ty7_Legs, lyr_vt_ty6_ty7_s0, lyr_v
 static LyrStr * lyr_vt_ty6_ty8_s0(LyrIface self) { return lyr_main_Wheels_walk((lyr_ty8_Wheels *)self.data); }
 static int64_t lyr_vt_ty6_ty8_s1(LyrIface self) { return lyr_main_Wheels_speed((lyr_ty8_Wheels *)self.data); }
 const lyr_vt_ty6 lyr_vt_ty6_ty8 = { &lyr_desc_ty8_Wheels, lyr_vt_ty6_ty8_s0, lyr_vt_ty6_ty8_s1, lyr_main_Walker_pace };
+const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty2 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty2 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty5[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty5 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty7[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty7 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty8[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty8 } , { NULL, NULL } };
 
 #line 18 "programs/dispatch.lyr"
 int64_t lyr_main_viaTable(LyrIface l0_c) {
@@ -537,6 +551,7 @@ int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main)
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty5_Dog lyr_ty5_Dog;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
+extern const char lyr_ifid_ty6[];
 struct lyr_vt_ty6 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);

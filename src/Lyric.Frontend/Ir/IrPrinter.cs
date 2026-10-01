@@ -197,6 +197,8 @@ public static class IrPrinter
         MakeInterface m => $"{m.Dest}: {TypeStr(new IrInterfaceType(m.Interface))} = mkiface " +
                            $"{m.Value}, {m.Concrete}",
         CallVirt c => CallVirtStr(c),
+        TypeTest t => $"{t.Dest}: bool = typetest {t.Value}, {t.Target}",
+        Downcast d => $"{d.Dest}: {TypeStr(d.Result)} = downcast {d.Value}, {d.Target}",
         StructCopy c => $"{c.Dest}: {TypeStr(new IrStructType(c.Type))} = structcopy {c.Value}",
         LoadGlobal l => $"{l.Dest}: {TypeStr(l.Type)} = ldglobal {l.Global}",
         MakeClosure m => $"{m.Dest}: {TypeStr(m.Type)} = mkclosure {m.Target}" +

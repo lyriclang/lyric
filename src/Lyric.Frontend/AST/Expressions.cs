@@ -59,6 +59,10 @@ public sealed record RangeExpr(Expr Low, Expr High, bool IsInclusive, Span Span)
 public sealed record SliceRangeExpr(Expr? Low, Expr? High, bool IsInclusive, Span Span) : Expr(Span);
 public sealed record CastExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
 
+/// <summary><c>x is Circle</c> (design/v5/spec/03 T11): does the interface value hold a value
+/// of that type? In the branch the test guards, the name is that type (smart cast).</summary>
+public sealed record TypeTestExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
+
 // --- nodes produced by postfix ---
 /// <param name="TypeArguments">Explicitly written type arguments: <c>f&lt;int&gt;()</c>. Empty
 /// when none were written; the sema then infers them from the arguments. They are needed where

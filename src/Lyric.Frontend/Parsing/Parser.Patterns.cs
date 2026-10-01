@@ -56,7 +56,17 @@ public sealed partial class Parser
                 return new LiteralPattern(low, low.Span);
             }
             case TokenKind.Identifier:
-                if (AtContextual("_")) { _buffer.Advance(); return new WildcardPattern(cur.Span); }
+                if (AtContextual("_"))
+                {
+                    _buffer.Advance();
+                    // '_: Circle' (03 T11): the type is tested, nothing is bound.
+                    if (_buffer.Match(TokenKind.Colon))
+                    {
+                        var tested = ParseType();
+                        return new TypePattern(null, tested, Span.Union(cur.Span, tested.Span)) { NameSpan = cur.Span };
+                    }
+                    return new WildcardPattern(cur.Span);
+                }
                 return ParsePathPattern();
             // '.Red', '.Num(v)', '.Rect { w = 0, h }': the variant of the scrutinee's enum, the
             // enum unnamed (08 Y6).
@@ -131,7 +141,15 @@ public sealed partial class Parser
         // 'Signal.Red'; a name that spells a variant is refused by the sema). A qualified one,
         // and a name with a payload, is a variant.
         if (path.Count == 1 && !_buffer.Check(TokenKind.LParen) && !_buffer.Check(TokenKind.LBrace))
+        {
+            // 'c: Circle' (03 T11): the type pattern, the form of 'catch (e: T)'.
+            if (_buffer.Match(TokenKind.Colon))
+            {
+                var tested = ParseType();
+                return new TypePattern(path[0], tested, Span.Union(first.Span, tested.Span)) { NameSpan = first.Span };
+            }
             return new BindingPattern(path[0], first.Span);
+        }
         return FinishVariantPattern(path, first, last, implicitMember: false);
     }
 

@@ -799,6 +799,8 @@ public static class IrVerifier
                 case EnumTag t: CheckEnumTag(t, block, index); break;
                 case EnumAs a: CheckEnumAs(a, block, index); break;
                 case MakeInterface m: CheckMakeInterface(m, block, index); break;
+                case TypeTest t: CheckTypeTest(t, block, index); break;
+                case Downcast d: CheckDowncast(d, block, index); break;
                 case CallVirt c: CheckCallVirt(c, block, index); break;
                 case StructCopy c: CheckStructCopy(c, block, index); break;
                 case LoadGlobal l: CheckLoadGlobal(l, block, index); break;
@@ -1091,6 +1093,38 @@ public static class IrVerifier
     /// concrete type does not satisfy the interface at all, and the dispatch would run into nothing at
     /// the call, with an error that says nothing about the cause.</para>
     /// </summary>
+    private void CheckTypeTest(TypeTest t, BlockId block, int index)
+    {
+        RequireDestType(t.Dest, new IrScalarType(IrScalar.Bool), "typetest", block, index);
+        if (TypeOf(t.Value) is not IrInterfaceType)
+        {
+            Report(block, index, $"typetest expects an interface value, found {Show(TypeOf(t.Value))}");
+            return;
+        }
+        ResolveType(t.Target, "typetest", block, index);
+    }
+
+    private void CheckDowncast(Downcast d, BlockId block, int index)
+    {
+        RequireDestType(d.Dest, d.Result, "downcast", block, index);
+        if (TypeOf(d.Value) is not IrInterfaceType)
+        {
+            Report(block, index, $"downcast expects an interface value, found {Show(TypeOf(d.Value))}");
+            return;
+        }
+        var named = d.Result switch
+        {
+            IrRefType r => (TypeId?)r.Type,
+            IrStructType s => s.Type,
+            IrEnumType e => e.Type,
+            IrInterfaceType i => i.Type,
+            _ => null,
+        };
+        if (named is null || named.Value != d.Target)
+            Report(block, index, $"downcast declares target {d.Target} but its result type is {Show(d.Result)}");
+        ResolveType(d.Target, "downcast", block, index);
+    }
+
     private void CheckMakeInterface(MakeInterface m, BlockId block, int index)
     {
         var concrete = TypeOf(m.Value) switch

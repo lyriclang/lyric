@@ -161,7 +161,7 @@ public static class SubsetGate
                     break;
                 case NewVariant or EnumTag or EnumAs:
                     break;
-                case MakeInterface or CallVirt:
+                case MakeInterface or CallVirt or TypeTest or Downcast:
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;

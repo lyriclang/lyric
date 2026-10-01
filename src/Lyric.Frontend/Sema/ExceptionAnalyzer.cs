@@ -193,6 +193,7 @@ internal sealed class ExceptionAnalyzer
             case RangeExpr r: AnalyzeExpr(r.Low); AnalyzeExpr(r.High); break;
             case SliceRangeExpr sr: if (sr.Low is not null) AnalyzeExpr(sr.Low); if (sr.High is not null) AnalyzeExpr(sr.High); break;
             case CastExpr c: AnalyzeExpr(c.Operand); break;
+            case TypeTestExpr tt: AnalyzeExpr(tt.Operand); break;
             case IndexExpr ix: AnalyzeExpr(ix.Target); AnalyzeExpr(ix.Index); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e); break;

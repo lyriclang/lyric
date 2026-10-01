@@ -531,6 +531,7 @@ internal sealed class WarningAnalyzer
                 case IndexExpr ix: root = ix.Target; continue;
                 case PostfixExpr { Operator: PostfixOp.ForceUnwrap } fu: root = fu.Operand; continue;
                 case CastExpr cs: root = cs.Operand; continue;
+                case TypeTestExpr tt: root = tt.Operand; continue;
             }
             break;
         }
@@ -605,6 +606,7 @@ internal sealed class WarningAnalyzer
             case MemberExpr m: WalkExpr(m.Target); break;
             case IndexExpr ix: WalkExpr(ix.Target); WalkExpr(ix.Index); break;
             case CastExpr cs: WalkExpr(cs.Operand); break;
+            case TypeTestExpr tt: WalkExpr(tt.Operand); break;
             case RangeExpr r: WalkExpr(r.Low); WalkExpr(r.High); break;
             case SliceRangeExpr sr: WalkExpr(sr.Low); WalkExpr(sr.High); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkExpr(e); break;

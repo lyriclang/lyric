@@ -589,6 +589,12 @@ public sealed class CEmitter
         {
             tables.AppendLine("/* interface tables: the descriptor, then the implementation of every slot */");
             foreach (var row in _module.Impls) tables.Append(Table(row));
+            // The conformance lists (03 T11): per concrete type its rows — the interface's
+            // identity and the table — NULL-terminated, where the type's descriptor points.
+            foreach (var group in _module.Impls.GroupBy(r => r.Type.Value).OrderBy(g => g.Key))
+                tables.AppendLine($"const LyrItable lyr_itab_ty{group.Key}[] = {{ "
+                    + string.Join(", ", group.Select(r => $"{{ {IfaceId(r.Interface.Value)}, &{VtName(r.Type.Value, r.Interface.Value)} }}"))
+                    + " , { NULL, NULL } };");
         }
         else if (!_main)
         {
@@ -656,6 +662,9 @@ public sealed class CEmitter
             if (_module.Types[i].IsInterface)
             {
                 _out.AppendLine($"typedef struct {VtType(i)} {VtType(i)};");
+                _out.AppendLine(_main
+                    ? $"const char {IfaceId(i)}[] = \"{Qualified(_module.Types[i]).Replace("\\", "\\\\").Replace("\"", "\\\"")}\";"
+                    : $"extern const char {IfaceId(i)}[];");
                 continue;
             }
             var name = StructName(new TypeId(i));
@@ -738,6 +747,21 @@ public sealed class CEmitter
 
     private string VtName(int concrete, int iface) => $"lyr_vt_ty{iface}_ty{concrete}";
 
+    /// <summary>An interface's identity at runtime: the address of its name, defined once in the
+    /// module's unit (03 T11).</summary>
+    private string IfaceId(int iface) => $"lyr_ifid_ty{iface}";
+
+    /// <summary>The conformance list of a concrete type, or <c>NULL</c> where no row names it.</summary>
+    private string ItablesOf(int concrete) =>
+        _module.Impls.Any(r => r.Type.Value == concrete) ? $"lyr_itab_ty{concrete}" : "NULL";
+
+    /// <summary>The descriptor an interface value's table begins with (01 V7).</summary>
+    private string DescOfIface(TempId value) => $"(*(const LyrDesc *const *){Temp(value)}.vt)";
+
+    /// <summary>The descriptor a concrete type's values carry behind an interface: the class's own,
+    /// the box's for a struct or an enum.</summary>
+    private string DescOfConcrete(int type) => _module.Types[type].IsClass ? DescriptorName(new TypeId(type)) : BoxDesc(type);
+
     private string BoxName(int type) => $"lyr_box_ty{type}_" + Identifier(_module.Types[type].Name);
 
     private string BoxDesc(int type) => $"lyr_desc_box_ty{type}_" + Identifier(_module.Types[type].Name);
@@ -806,8 +830,10 @@ public sealed class CEmitter
     {
         bool IsValue(int type) => _module.Types[type].IsStruct || _module.Types[type].IsEnum;
         var lifted = ScopeOps().OfType<MakeInterface>().Select(m => m.Concrete.Value).Where(IsValue);
+        var tested = ScopeOps().Select(op => op switch { TypeTest t => t.Target.Value, Downcast d => d.Target.Value, _ => -1 })
+            .Where(t => t >= 0 && IsValue(t));
         var rows = _main ? _module.Impls.Select(r => r.Type.Value).Where(IsValue) : [];
-        return lifted.Concat(rows).Distinct().Order();
+        return lifted.Concat(tested).Concat(rows).Distinct().Order();
     }
 
     private void DefineBox(int type)
@@ -828,16 +854,18 @@ public sealed class CEmitter
         ReferenceWords(inner, 8, words, ref ambiguous);
         var text = $"box<{Qualified(def)}>".Replace("\\", "\\\\").Replace("\"", "\\\"");
         var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
+        var itables = ItablesOf(type);
+        if (itables != "NULL") _out.AppendLine($"extern const LyrItable {itables}[];");
         if (words.Count == 0)
         {
-            _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
+            _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", {itables} }};");
             return;
         }
         var map = new ulong[(total / 8 + 63) / 64];
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
         _out.AppendLine($"static const uint64_t lyr_refmap_box{type}[] = {{ {bits} }};");
-        _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_box{type}, \"{text}\", NULL }};");
+        _out.AppendLine($"const LyrDesc {BoxDesc(type)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_box{type}, \"{text}\", {itables} }};");
     }
 
     /// <summary>
@@ -910,6 +938,11 @@ public sealed class CEmitter
             foreach (var temp in function.Temps) Visit(temp.Type);
             Visit(function.ReturnType);
         }
+        // A test or a downcast names its target by id alone: a descriptor to declare.
+        foreach (var op in ScopeOps())
+            if (op is TypeTest tt) Add(tt.Target.Value);
+            else if (op is Downcast dc) Add(dc.Target.Value);
+
         return reached;
     }
 
@@ -996,9 +1029,11 @@ public sealed class CEmitter
         var qualified = def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name;
         var text = qualified.Replace("\\", "\\\\").Replace("\"", "\\\"");
         var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
+        var itables = ItablesOf(id.Value);
+        if (itables != "NULL") _out.AppendLine($"extern const LyrItable {itables}[];");
         if (words.Count == 0)
         {
-            _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", NULL }};");
+            _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {(ambiguous ? flags : "0")}, 0, 0, NULL, \"{text}\", {itables} }};");
             return;
         }
 
@@ -1006,7 +1041,7 @@ public sealed class CEmitter
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
         _out.AppendLine($"static const uint64_t lyr_refmap_ty{id.Value}[] = {{ {bits} }};");
-        _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", NULL }};");
+        _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", {itables} }};");
     }
 
     /// <summary>A parameter: a value, except the receiver of a struct method, which is the
@@ -1184,6 +1219,16 @@ public sealed class CEmitter
             $"{{ {BoxName(m.Concrete.Value)} *lyr_box = lyr_alloc(&{BoxDesc(m.Concrete.Value)}); lyr_box->value = {Value(m.Value)}; "
             + $"{Temp(m.Dest)} = (LyrIface){{ lyr_box, &{VtName(m.Concrete.Value, m.Interface.Value)} }}; }}",
         CallVirt c => Assign(c.Dest, $"((const {VtType(c.Interface.Value)} *){Temp(c.Args[0])}.vt)->s{c.Slot}({string.Join(", ", c.Args.Select(Value))})"),
+        // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
+        // list behind that descriptor for an interface.
+        TypeTest t when _module.Types[t.Target.Value].IsInterface =>
+            $"{Temp(t.Dest)} = (lyr_iface_find({DescOfIface(t.Value)}, {IfaceId(t.Target.Value)}) != NULL);",
+        TypeTest t => $"{Temp(t.Dest)} = ({DescOfIface(t.Value)} == &{DescOfConcrete(t.Target.Value)});",
+        Downcast d when _module.Types[d.Target.Value].IsInterface =>
+            $"{Temp(d.Dest)} = (LyrIface){{ {Temp(d.Value)}.data, lyr_iface_find({DescOfIface(d.Value)}, {IfaceId(d.Target.Value)}) }};",
+        Downcast d when _module.Types[d.Target.Value].IsClass =>
+            $"{Temp(d.Dest)} = ({CType(d.Result)}){Temp(d.Value)}.data;",
+        Downcast d => Assign(d.Dest, $"(({BoxName(d.Target.Value)} *){Temp(d.Value)}.data)->value"),
         // A function value (01 V8): the code and its environment, or a thunk and no environment.
         MakeClosure m => $"{Temp(m.Dest)} = ({CType(m.Type)}){{ {CodeOf(_module.Functions[m.Target.Value])}, {(m.Environment is { } e ? Temp(e) : "NULL")} }};",
         CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))})"),

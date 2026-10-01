@@ -670,14 +670,10 @@ internal sealed class TypeTable
                 $"interface '{symbol.Name}' has no declaration to read its methods from",
                 SpanOf(symbol));
 
+        // A table may hold its descriptor only: members without a slot — generic, static, or
+        // typed by an associated type — and the empty 'Any' (03 T10), whose values are told
+        // apart by 'is' alone (04 D9: the slotless rule falls).
         var slots = SlotNames(symbol, decl);
-        // Members without a slot — generic, static, or typed by an associated type — leave the
-        // table with its descriptor only; such an interface is a constraint (04 D9) and its
-        // rows are never consulted. An interface declaring NOTHING has no business here.
-        if (slots.Length == 0 && decl.Members.Length == 0 && !Conformance.ParentsOf(symbol, _binding).Any())
-            throw new UnsupportedConstructException(
-                $"interface '{symbol.Name}' declares no methods; an empty interface has nothing "
-                + "to dispatch on", SpanOf(symbol));
 
         var id = new TypeId(_defs.Count);
 

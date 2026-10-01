@@ -1009,7 +1009,10 @@ public static class ModuleLowerer
                 // Conformance may be declared OR come from an 'extend T :: [I]'. The vtable row is the
                 // same; which of the two established it is no longer distinguishable at runtime.
                 var viaExtension = ExtendBlocksFor(compilation, type, iface, binding);
-                if (!Conformance.Implements(type, iface, binding) && viaExtension.Count == 0)
+                // 'Any' (03 T10) is conformed to by every struct, class and enum, undeclared:
+                // its row is the descriptor alone.
+                var isAny = ReferenceEquals(iface, compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
+                if (!isAny && !Conformance.Implements(type, iface, binding) && viaExtension.Count == 0)
                     continue;
 
                 // SEVERAL conformances to one interface — 'Mul<Vec2, Vec2>' beside
