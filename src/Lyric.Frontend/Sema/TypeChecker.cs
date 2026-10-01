@@ -414,6 +414,14 @@ public sealed class TypeChecker
                 break;
             case InterfaceDecl i:
                 CheckInterfaceParents(i, module);
+                // An interface's members are public always (design/v5/spec/04 D14): a conformance
+                // is visible wherever the type and the interface are, and a member nobody could
+                // call through the interface would be no member of it. 'pub' says nothing here,
+                // and a word that says nothing is refused rather than ignored.
+                foreach (var member in i.Members)
+                    if (member.IsPublic)
+                        _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan,
+                            $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
                 if (module.Members.LookupLocal(i.Name) is TypeSymbol iface)
                     CheckOverloadSets(iface.Members, $"interface '{i.Name}'", inInterface: true);
                 CheckMethods(i.Name, i.Members, module);
