@@ -97,7 +97,8 @@ public partial class PanicTests
     [MemberData(nameof(NumericChecks))]
     public void A_failed_numeric_check_panics_with_its_code(string which, Profile profile, string firstLine)
     {
-        var result = RuntimeBuildTests.RunTest("numeric", profile, args: [which]);
+        // Its own binary: RuntimeProgramTests links and runs 'numeric' too, in parallel.
+        var result = RuntimeBuildTests.RunTest("numeric", profile, args: [which], binary: "numeric-panic");
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = Lines(result.Stderr);
         Assert.Equal(firstLine, lines[0]);
