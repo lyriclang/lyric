@@ -1,0 +1,5 @@
+Module [0..59)
+  Interface Shape pub sealed [0..59)
+    NamedType Display [31..38)
+    Fn area (abstract) [42..57)
+      NamedType int [53..56)

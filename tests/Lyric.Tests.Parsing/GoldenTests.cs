@@ -196,6 +196,7 @@ public class GoldenTests
     [InlineData("default_type_arg")] // interface Add<Rhs = Self> with a static member (03 T5, T18)
     [InlineData("assoc_type")]       // type Item; in an interface, type Item = int; in bodies, Container<Item = int> (03 T6)
     [InlineData("type_test")]        // 'x is T' at the comparison level, 'c: T' and '_: T' as patterns (03 T11)
+    [InlineData("sealed_interface")] // 'pub sealed interface' (04 D8)
     // Attributes.
     [InlineData("attr_decl")]         // on fn, struct, class and enum; args, stacking, dotted path
     [InlineData("attr_module")]       // before the module header

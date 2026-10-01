@@ -210,6 +210,15 @@ public sealed partial class Parser
 
         var isPublic = _buffer.Match(TokenKind.Pub);
 
+        // 'sealed' before 'interface' (04 D8): a contextual word, and nothing else's.
+        var isSealed = false;
+        if (AtContextual("sealed"))
+        {
+            var word = _buffer.Advance();
+            if (_buffer.Check(TokenKind.Interface)) isSealed = true;
+            else _de.Report("LYR-PAR0048", Severity.Error, word.Span, "'sealed' stands before 'interface' only");
+        }
+
         switch (_buffer.Current.TokenKind)
         {
             case TokenKind.Mut:
@@ -223,7 +232,7 @@ public sealed partial class Parser
                 return WithAttributes(ParseEnum(isPublic, start), attributes);
             case TokenKind.Interface:
                 RejectAttributes(attributes, "an interface");
-                return ParseInterface(isPublic, start);
+                return ParseInterface(isPublic, start, isSealed);
             case TokenKind.Extend:
                 RejectAttributes(attributes, "an extend block");
                 return ParseExtend(isPublic, start);
@@ -637,7 +646,7 @@ public sealed partial class Parser
 
     // --- Interfaces (§3.5) ---
 
-    private Decl ParseInterface(bool isPublic, Span start)
+    private Decl ParseInterface(bool isPublic, Span start, bool isSealed = false)
     {
         _buffer.Advance(); // 'interface'
         var name = ExpectNamed("LYR-PAR0026", "interface name");
@@ -654,7 +663,7 @@ public sealed partial class Parser
         ParseMethodSequence(members, allowStatic: true, types: types); // a static member declares, through a constraint (03 T5)
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
-            { NameSpan = name.Span, Types = types.ToArray() };
+            { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed };
     }
 
     // --- Extend (§3.6) ---
