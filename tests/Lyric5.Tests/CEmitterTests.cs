@@ -63,6 +63,8 @@ public class CEmitterTests
     [InlineData("extends")]
     [InlineData("shapes_ext")]
     [InlineData("synth")]
+    [InlineData("lambdas")]
+    [InlineData("cloning")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -190,6 +192,10 @@ public class CEmitterTests
             data.Add("extends", profile, 0, EXTENDS_EXPECTED);
             data.Add("shapes_ext", profile, 0, SHAPES_EXT_EXPECTED);
             data.Add("synth", profile, 0, SYNTH_EXPECTED);
+            data.Add("lambdas", profile, 0, "forms 12 6 500 7\nfold 10 24\neach 10\npairs 14 10\nbound 21 7\n");
+            data.Add("cloning", profile, 0,
+                "opt true false true false true false\nmixed true false true\nstruct true false\n"
+                + "repeat 3 1 0 0 true\nnested 2 5 0\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");

@@ -18,6 +18,14 @@ promise. This entry fills with the milestones.
 
 - **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
   design decided a hard cut with no 4.x warning stages toward 5.
+- **Interfaces and abstraction (M4** — `design/v5/spec/04`, spec chapter 05**):** interface
+  values as fat pointers with a table per conformance; one method set per type, overloading by
+  arity and arguments by name; `Self`, static members through a constraint, associated types;
+  `Any`, `is` and type patterns; `sealed`; the operator interfaces of `std.core` (`a + b` is
+  `a.add(b)`), `Equatable`/`Ordered`/`Hashable`/`Display`; generic extends with conditional
+  conformance and coherence, extends on `T[]`, `?T`, tuples and `Slice<T>`; **conformance
+  synthesis** — a conformance written without a body is implemented from the fields, and every
+  type that can have one has a `Debug`; `?T == ?T`; `[x] * n` clones objects into every slot.
 
 ---
 

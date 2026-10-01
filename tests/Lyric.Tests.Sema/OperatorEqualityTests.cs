@@ -133,18 +133,9 @@ public class OperatorEqualityTests
             "Equatable");
     }
 
-    [Fact]
-    public void Optionals_still_compare_only_against_null()
-    {
-        AssertRejects("""
-            fn main(): int {
-                let a: ?int = 1;
-                let b: ?int = 2;
-                return if (a == b) 1 else 0;
-            }
-            """,
-            "narrow");
-    }
+    // 'Optionals_still_compare_only_against_null' retired with its rule (M4 S9): two optionals
+    // compare through their values (design/v5/spec/03 O6) — OptionalEqualityAndRepeatTests pins
+    // it; the value's type without Equatable is the refusal that remains.
 
     [Fact]
     public void An_interface_value_does_not_compare()

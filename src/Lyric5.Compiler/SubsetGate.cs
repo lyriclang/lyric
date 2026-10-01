@@ -151,9 +151,11 @@ public static class SubsetGate
                     break;
                 // '[x] * n' clones every slot (10 C7): a value copies, a string is shared without
                 // anyone able to tell, a class or an array — held directly or inside the element
-                // — would be one object in every slot.
+                // — would be one object in every slot. The sema desugars that case to
+                // std.core's 'repeatArray' under 'Clone' (M4 S9); an instruction over objects
+                // here is one it missed.
                 case ArrayRepeat r when HoldsObject(r.Element):
-                    Refuse(op.Span, "'[x] * n' with an element that is or holds a class or an array, which needs 'Clone'", "M4");
+                    Refuse(op.Span, "'[x] * n' with an element that is or holds an object as an instruction — the sema desugars it through 'Clone'", "no milestone: a compiler bug");
                     break;
                 case ArrayRepeat:
                     break;

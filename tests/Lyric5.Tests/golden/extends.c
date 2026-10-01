@@ -329,26 +329,26 @@ bb0:;
     return t3;
 }
 
-#line 188 "stdlib5/std/core.lyr"
+#line 197 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this) {
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 188
+#line 197
     t0 = l0_this;
-#line 188
+#line 197
     t1 = lyr_str_from_int(t0);
-#line 188
+#line 197
     return t1;
 }
 
-#line 453 "stdlib5/std/core.lyr"
+#line 462 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 453
+#line 462
     t0 = l0_this;
-#line 453
+#line 462
     return t0;
 }
 

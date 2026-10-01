@@ -32,8 +32,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M1 | Runtime core in C (Boehm GC behind the allocation API) | M | **done** 2026-09-30 |
 | M2 | First native program (IR → C → `zig cc`) | L | **done** 2026-09-30 |
 | M3 | Value model and type system | XL | **done** 2026-10-01 |
-| M4 | Interfaces and abstraction | L | **next** |
-| M5 | Errors | M | — |
+| M4 | Interfaces and abstraction | L | **done** 2026-10-01 |
+| M5 | Errors | M | **next** |
 | M6 | Coroutines, scheduler, threads | XL | — |
 | M7 | Modules and packages | L | — |
 | M8a | std core | XL | — |
@@ -269,9 +269,63 @@ the checker binds the first argument), same-scope `let` shadowing in the 4.x fro
 second binding is accepted and calls resolve to the first), local `fn` / `inline fn` / the
 `it`-shadowing warning of 08 Y11, `?E == E` and the `[x] * n` gate wait for M4's synthesis.
 
-### M4 — Interfaces and abstraction
+### M4 — done (2026-10-01)
 
-Next. Plan first (13, M4), then slices.
+Merged as #198–#208 and #209 (S9), the spec side is lyric-spec#58–#62, #64–#70.
+
+The plan (13, M4): 04 complete — interface values as fat pointers with tables per row, boxing
+at the transition, generic extends on `T[]`/`?T`/interfaces, associated types, the operator
+interfaces (D6), `by`-delegation, overloading by arity, named arguments, `Display`/`Debug` in
+the compiler (D7), `Point(1, 2)`, `sealed`; the synthesis of `Equatable`/`Hashable`/`Clone`/
+`Default` provisionally in the compiler. Nine slices: S1 interface values, S2 calls, S3 the method
+set, S4/S4b `Self` and associated types, S5a/S5b `Any` and `sealed`, S6 the operator interfaces,
+S7a/S7b generic extends, S8 synthesis, S9 the close. Exit criteria:
+`interfaces/shapes/objects/vectors/closures/lambdas` run natively; conformance 04 (chapter 05).
+
+1. S1 `eadfb0c8`: an interface value as a fat pointer `{ object, table }` (01 V7), a table row
+   per (type, interface), a scalar or struct **boxed** at the transition and never anywhere
+   else; an interface's members public always.
+2. S2 `7af880d7`: overloading by arity (04 D2 R1), arguments by name, defaults filled per call;
+   a default cannot read `this`.
+3. S3 `6a6f91fe`: one method set per type (04 D2/D3) — a name is one function, two conformance
+   blocks implementing it scope it to the interface; the qualified call `Walker.walk(d)`;
+   delegation `:: [Walker by legs]` (D1).
+4. S4 `a21dd1ef`, S4b `d9bf7da1`: `Self` (03 T5), static members through a constraint
+   (`T.parse(s)`), default type arguments; associated types `type Item` with an answer per
+   (conformer, conformance instance), fixations `Container<Item = int>`, `Self.Out`.
+5. S5a `6b8c0895`, S5b `e74d856e`: `Any` in `std.core` (03 T10) — every struct, class and enum
+   is one undeclared —, `is` with narrowing, type patterns, the checked downcast; `sealed`
+   (04 D8) with the witness in the error, the child interface value as a parent value (D10).
+6. S6 `c9d53996`: the operator interfaces of `std.core` 5 (04 D6): `Add<Rhs = Self> { type
+   Out = Self; … }` and its siblings, `Equatable`, `Ordered :: [Equatable] { compare(o): ?Ordering }`,
+   `TotalOrder`, `Hashable`, `Display`; the scalars conform; one resolution by the right operand.
+7. S7a `b7ea9d9f`, S7b `7182438c`: generic extends `extend<T :: [Display]> List<T> :: [Display]`
+   (03 T7 X1) — conditional conformance, coherence per type and interface instance (X3/X4), no
+   orphan rule; the built-in constructors as targets (X2): `T[]`, `?T`, tuples, `Slice<T>`,
+   members only.
+8. S8 `fb8445fa`: conformance synthesis (04 D7, 05 §14) — the family written without a body
+   generated as source and compiled like a written block; generic types conditionally; a
+   written member replaces the synthesis; `Debug` unasked where the fields allow, probed
+   muted and withdrawn where they do not; diagnostics from synthesized text re-pointed at the
+   declaration with the synthesized line. `std.core` gains `Debug`, `Clone`, `Default`.
+9. S9: the M3 leftovers that waited for synthesis — `?T == ?T` through the value's equality
+   (03 O6), `[x] * n` over an object cloning every slot (10 C7) —, both desugared to a
+   `std.core` call; the `lambdas` program the plan names; this section.
+
+Conformance: 304 cases (03-types 149, 04-modules 4, 05-interfaces 98, 08-expressions 17,
+09-patterns 36), all `since: 5.0.0`, green in both profiles. Test suite: 3643 across the ten
+projects.
+
+Open from M4, collected for the 5.0 review (not in the plan): the conformance of a shape
+(`T[] :: [Display]`) and with it `Hashable` on `?T` and `Clone` on `int[]` wait for the
+collections (M8a); `@Shared` on a field (M9a); a `Default` of an enum has no variant to take;
+`Iterator<Item = int>` as a value form (M8a); `string`'s `Ordered`/`Hashable` with the string
+round (M8a); the operator desugars bind `equalOptionals`/`repeatArray` by name through the scope
+(M7 decides the qualified route); `T.Out` with two instances takes the first answer.
+
+### M5 — Errors
+
+Next. Plan first (13, M5), then slices.
 
 ## Design decisions
 
