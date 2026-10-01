@@ -211,6 +211,7 @@ public static class AstDumper
             case GenericParam n:
                 Line(sb, indent, $"Generic {n.Name}", n.Span);
                 foreach (var c in n.Constraints) Write(c, indent + 1, sb);
+                if (n.Default is { } fallback) { Line(sb, indent + 1, "Default", fallback.Span); Write(fallback, indent + 2, sb); }
                 break;
             case Param n:
                 Line(sb, indent, $"Param {n.Name}{(n.IsParams ? " (params)" : "")}", n.Span);

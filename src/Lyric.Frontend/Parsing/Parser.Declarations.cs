@@ -645,7 +645,7 @@ public sealed partial class Parser
 
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
-        ParseMethodSequence(members, allowStatic: false);
+        ParseMethodSequence(members, allowStatic: true); // a static member declares, through a constraint (03 T5)
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
             { NameSpan = name.Span };
@@ -815,8 +815,15 @@ public sealed partial class Parser
                 end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
                 constraints = cs.ToArray();
             }
+            // 'Rhs = Self': a default type argument (03 T18).
+            TypeNode? fallback = null;
+            if (_buffer.Match(TokenKind.Equal))
+            {
+                fallback = ParseType();
+                end = fallback.Span;
+            }
             parameters.Add(new GenericParam(_sm.Slice(nameTok.Span).ToString(), constraints,
-                Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span });
+                Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span, Default = fallback });
         } while (_buffer.Match(TokenKind.Comma));
         // A generic parameter list always closes with a plain '>', never a '>>'.
         _buffer.Expect(TokenKind.Greater, "LYR-PAR0009", "expected '>' to close type parameters");

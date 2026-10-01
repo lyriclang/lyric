@@ -93,6 +93,7 @@ public sealed class Resolver
         var scope = new SymbolTable(module.Members);
         var ts = new TypeSymbol(name, kind, vis, scope, decl) { Generics = MakeGenerics(generics) };
         DeclareGenerics(scope, ts.Generics);
+        scope.TryDeclare(new ImportBindingSymbol("Self", ts, decl)); // 'Self' is the type itself (03 T5)
         DeclareTop(module, ts, decl);
         foreach (var m in members)
         {
@@ -116,6 +117,7 @@ public sealed class Resolver
         var scope = new SymbolTable(module.Members);
         var ts = new TypeSymbol(e.Name, TypeSymbolKind.Enum, Vis(e.IsPublic), scope, e) { Generics = MakeGenerics(e.Generics) };
         DeclareGenerics(scope, ts.Generics);
+        scope.TryDeclare(new ImportBindingSymbol("Self", ts, e));
         DeclareTop(module, ts, e);
         foreach (var v in e.Variants) DeclareMember(scope, new EnumVariantSymbol(v.Name, v), v);
         foreach (var fn in e.Methods) DeclareMember(scope, Fn(fn), fn);
@@ -124,7 +126,12 @@ public sealed class Resolver
     private void DeclareInterface(ModuleSymbol module, InterfaceDecl i)
     {
         var scope = new SymbolTable(module.Members);
-        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.IsPublic), scope, i) { Generics = MakeGenerics(i.Generics) };
+        // 'Self' in an interface is the conforming type, a type parameter of the interface's own
+        // (03 T5): every use site binds it — the conformance to the implementer, the constraint
+        // to the type parameter.
+        var self = new GenericParamSymbol("Self", [], i);
+        scope.TryDeclare(self);
+        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.IsPublic), scope, i) { Generics = MakeGenerics(i.Generics), SelfParam = self };
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
         foreach (var fn in i.Members) DeclareMember(scope, Fn(fn), fn);
@@ -329,14 +336,17 @@ public sealed class Resolver
         {
             var scope = block.MethodScope;
             BindType(block.Decl.Target, scope);
-            BindEach(block.Decl.Interfaces, scope);
-            foreach (var m in block.Decl.Methods) BindFunctionTypes(m, scope);
 
             var sym = _binding.Resolve(block.Decl.Target);
             if (sym is ImportBindingSymbol ib) sym = ib.Target;
             // Only plain named targets are extendable, no Box<int> and no T[]; everything else leaves
             // Target null and the sema reports SEM0047.
             block.Target = block.Decl.Target is NamedType { TypeArguments.Length: 0 } ? sym as TypeSymbol : null;
+            // 'Self' in the block is the target (03 T5), known before the signatures bind.
+            if (block.Target is { } target) scope.TryDeclare(new ImportBindingSymbol("Self", target, block.Decl));
+
+            BindEach(block.Decl.Interfaces, scope);
+            foreach (var m in block.Decl.Methods) BindFunctionTypes(m, scope);
         }
     }
 
@@ -382,8 +392,13 @@ public sealed class Resolver
     private void BindGenerics(GenericParam[] generics, SymbolTable scope)
     {
         foreach (var g in generics)
+        {
             foreach (var c in g.Constraints)
                 BindType(c, scope);
+            // A default type argument (03 T18) binds in the declaration's scope, where 'Self' and
+            // the earlier parameters are.
+            if (g.Default is not null) BindType(g.Default, scope);
+        }
     }
 
     private void BindType(TypeNode type, SymbolTable scope)

@@ -718,6 +718,9 @@ internal sealed class TypeTable
             // monomorphization instead — which is what makes it unavailable through an interface
             // VALUE, the trade Rust makes for the same reason.
             if (member.Generics.Length > 0) continue;
+            // A STATIC member has no receiver to dispatch on (03 T5): it is reached through a
+            // constraint, as the conformer's own static.
+            if (member.IsStatic) continue;
             if (!slots.Contains(member.Name))
                 slots.Add(member.Name);
         }

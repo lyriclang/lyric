@@ -1,5 +1,6 @@
 Module main
   Struct Point
+    Import Self -> Struct Point
     Field x
     Field y
     Function distance

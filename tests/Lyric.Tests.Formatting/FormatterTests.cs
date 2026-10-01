@@ -539,6 +539,13 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_default_type_argument_keeps_its_spelling()
+    {
+        var formatted = Format("interface Add<Rhs=Self> { fn add(o: Rhs): Self; }");
+        Assert.Contains("interface Add<Rhs = Self>", formatted);
+    }
+
+    [Fact]
     public void A_delegated_conformance_keeps_its_by()
     {
         var formatted = Format("class Dog :: [Walker by legs,Named] { var legs: Legs }");

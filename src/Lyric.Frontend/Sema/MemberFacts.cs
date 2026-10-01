@@ -52,6 +52,7 @@ public static class MemberFacts
 
         foreach (var symbol in type.Members.Symbols)
         {
+            if (symbol is ImportBindingSymbol or GenericParamSymbol) continue; // 'Self', the type parameters: no members
             // A static member belongs to the type, and a field of the type is not reachable through
             // an instance in the other direction either — both are LYR-SEM0055 at the lookup.
             if (symbol is FunctionSymbol { IsStatic: true } or GlobalSymbol or EnumVariantSymbol) continue;
@@ -94,6 +95,7 @@ public static class MemberFacts
 
         foreach (var symbol in type.Members.Symbols)
         {
+            if (symbol is ImportBindingSymbol or GenericParamSymbol) continue; // 'Self', the type parameters: no members
             if (symbol is not (FunctionSymbol { IsStatic: true } or GlobalSymbol or EnumVariantSymbol))
                 continue;
             if (seen.Add(symbol.Name)) yield return new MemberCandidate(symbol, MemberSource.Own);
@@ -118,6 +120,8 @@ public static class MemberFacts
             // OFFERS, and offering it would put another module's names under this one's.
             if (symbol is ImportBindingSymbol) continue;
 
+            // 'Self' and the type's parameters live in the same scope and are no members.
+            if (symbol is ImportBindingSymbol or GenericParamSymbol) continue;
             if (own || Exported(symbol)) yield return symbol;
         }
     }
