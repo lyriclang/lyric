@@ -185,6 +185,10 @@ public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Inter
 {
     /// <summary>The associated types a conformance block binds, <c>type Item = int;</c> (03 T6).</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
+
+    /// <summary><c>extend&lt;T :: [Display]&gt; List&lt;T&gt; { … }</c> (03 T7 X1): the block's own type
+    /// parameters, bound by the receiver at every use.</summary>
+    public GenericParam[] Generics { get; init; } = [];
 }
 
 /// <summary>

@@ -146,6 +146,51 @@ public static class TypeFacts
     public static bool IsAny(LyrType type, params TypeSymbolKind[] kinds) =>
         KindOf(type) is { } actual && Array.IndexOf(kinds, actual) >= 0;
 
+    /// <summary>
+    /// Does <paramref name="actual"/> fit <paramref name="pattern"/>, a type with parameters in it
+    /// (a block's <c>List&lt;T&gt;</c>, 03 T7)? The parameters bind in <paramref name="map"/>, a
+    /// parameter met twice has to agree; everything else matches by equality.
+    /// </summary>
+    public static bool Match(LyrType pattern, LyrType actual, Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        switch (pattern)
+        {
+            case TypeParamType tp:
+                if (map.TryGetValue(tp.Param, out var bound)) return LyrType.Equal(bound, actual);
+                map[tp.Param] = actual;
+                return true;
+            case GenericInstance pg when actual is GenericInstance ag && ReferenceEquals(pg.Definition, ag.Definition)
+                && pg.Arguments.Length == ag.Arguments.Length:
+                for (var i = 0; i < pg.Arguments.Length; i++)
+                    if (!Match(pg.Arguments[i], ag.Arguments[i], map)) return false;
+                return true;
+            case ArrayOf pa when actual is ArrayOf aa: return Match(pa.Element, aa.Element, map);
+            case SliceOf ps when actual is SliceOf sa: return Match(ps.Element, sa.Element, map);
+            case Optional po when actual is Optional ao: return Match(po.Inner, ao.Inner, map);
+            case TupleOf pt when actual is TupleOf at && pt.Elements.Length == at.Elements.Length:
+                for (var i = 0; i < pt.Elements.Length; i++)
+                    if (!Match(pt.Elements[i], at.Elements[i], map)) return false;
+                return true;
+            default:
+                return LyrType.Equal(pattern, actual);
+        }
+    }
+
+    /// <summary>Could the two meet on one type — a parameter on either side stands for anything
+    /// (03 T7 X3, X4)?</summary>
+    public static bool Overlaps(LyrType a, LyrType b)
+    {
+        if (a is TypeParamType || b is TypeParamType) return true;
+        if (a is GenericInstance ga && b is GenericInstance gb)
+            return ReferenceEquals(ga.Definition, gb.Definition) && ga.Arguments.Length == gb.Arguments.Length
+                && ga.Arguments.Zip(gb.Arguments).All(p => Overlaps(p.First, p.Second));
+        if (a is ArrayOf xa && b is ArrayOf xb) return Overlaps(xa.Element, xb.Element);
+        if (a is Optional oa && b is Optional ob) return Overlaps(oa.Inner, ob.Inner);
+        if (a is TupleOf ta && b is TupleOf tb)
+            return ta.Elements.Length == tb.Elements.Length && ta.Elements.Zip(tb.Elements).All(p => Overlaps(p.First, p.Second));
+        return LyrType.Equal(a, b);
+    }
+
     public static string Display(LyrType t)
     {
         switch (t)

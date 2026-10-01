@@ -76,6 +76,10 @@ public sealed class Resolver
     private void DeclareExtend(ModuleSymbol module, ExtendDecl ex)
     {
         var methodScope = new SymbolTable(module.Members);
+        // The block's own parameters (03 T7 X1) stand in its scope, so the target and every
+        // signature may name them.
+        var blockGenerics = MakeGenerics(ex.Generics);
+        DeclareGenerics(methodScope, blockGenerics);
         var methods = new List<FunctionSymbol>();
         foreach (var fn in ex.Methods)
         {
@@ -88,7 +92,7 @@ public sealed class Resolver
         foreach (var t in ex.Types)
             if (!methodScope.TryDeclare(new AssociatedTypeSymbol(t.Name, t)))
                 _de.Report("LYR-RES0001", Severity.Error, t.Span, $"'{t.Name}' is already declared in this extend block");
-        _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()));
+        _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()) { Generics = blockGenerics });
     }
 
     private void DeclareType(ModuleSymbol module, string name, TypeSymbolKind kind, Visibility vis, GenericParam[] generics, Decl[] members, Decl decl)
@@ -344,15 +348,18 @@ public sealed class Resolver
         foreach (var block in _comp.Extensions.Blocks)
         {
             var scope = block.MethodScope;
+            BindGenerics(block.Decl.Generics, scope);
             BindType(block.Decl.Target, scope);
 
             var sym = _binding.Resolve(block.Decl.Target);
             if (sym is ImportBindingSymbol ib) sym = ib.Target;
-            // Only plain named targets are extendable, no Box<int> and no T[]; everything else leaves
-            // Target null and the sema reports SEM0047.
-            block.Target = block.Decl.Target is NamedType { TypeArguments.Length: 0 } ? sym as TypeSymbol : null;
-            // 'Self' in the block is the target (03 T5), known before the signatures bind.
-            if (block.Target is { } target) scope.TryDeclare(new ImportBindingSymbol("Self", target, block.Decl));
+            // A named target, plain or an instance ('List<T>', 'Box<int>' — 03 T7 X1); an array,
+            // an optional or a tuple leaves Target null until S7b, and the sema says so.
+            block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
+            // 'Self' in the block is the target (03 T5), known before the signatures bind — for a
+            // plain target; an instance target is written out.
+            if (block.Target is { } target && block.Decl.Target is NamedType { TypeArguments.Length: 0 })
+                scope.TryDeclare(new ImportBindingSymbol("Self", target, block.Decl));
 
             BindEach(block.Decl.Interfaces, scope);
             foreach (var m in block.Decl.Methods) BindFunctionTypes(m, scope);

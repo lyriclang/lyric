@@ -84,6 +84,9 @@ internal sealed class TypeTable
 
     /// <summary>An extension method of this name on this type, across all visible <c>extend</c> blocks.
     /// </summary>
+    /// <summary>The block a method was declared in, or <c>null</c> for an ordinary function.</summary>
+    public ExtensionBlock? BlockOf(FunctionSymbol method) => Compilation?.Extensions.BlockOf(method);
+
     public FunctionSymbol? ExtensionMethod(TypeSymbol target, string member)
     {
         if (Compilation is not { } comp) return null;

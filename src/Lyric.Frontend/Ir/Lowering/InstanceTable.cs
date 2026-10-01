@@ -194,6 +194,24 @@ internal sealed class InstanceTable
     /// parameters of its own, its <c>T</c> is that of <c>Box</c>. Hence a separate request rather than
     /// the same one as for generic functions.</para>
     /// </summary>
+    /// <summary>
+    /// A member of a generic <c>extend</c> block for one receiver (03 T7 X1): the block's
+    /// parameters as the receiver bound them, 'this' the receiver's instance. Keyed by the
+    /// receiver, as a method of a generic type is.
+    /// </summary>
+    public FunctionId RequestExtension(FunctionSymbol method, FunctionDecl decl, ExtensionBlock block,
+        Dictionary<GenericParamSymbol, LyrType> substitution, LyrType receiver, Core.Span span)
+    {
+        var name = Qualify(decl, $"<extend>.{TypeFacts.Display(receiver)}.{method.Name}");
+        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        Guard(name, span);
+        var id = _ids.Next();
+        _byKey[name] = id;
+        _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
+            substitution, receiver as GenericInstance));
+        return id;
+    }
+
     public FunctionId RequestMethod(FunctionSymbol method, FunctionDecl decl,
         GenericInstance owner, Core.Span span)
     {

@@ -692,9 +692,9 @@ public sealed class TypeChecker
                 // An unresolvable target, where RES0002 was already reported, against a resolved but
                 // non-extendable one — a generic instance, an array, a tuple, an alias. Only the
                 // latter reports SEM0047.
-                if (_binding.Resolve(block.Decl.Target) is not (null or ErrorSymbol))
+                if (block.Decl.Target is not NamedType || _binding.Resolve(block.Decl.Target) is not (null or ErrorSymbol))
                     _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
-                        "extend target must be a plain named type in v1 (no generic, array, tuple or function targets)");
+                        "an extend target is a named type (plain or an instance); an array, an optional, a tuple or a function type is not one yet");
                 continue; // without a target there is no useful body check
             }
 
@@ -714,7 +714,9 @@ public sealed class TypeChecker
             // reference otherwise.
             var thisType = block.Target.Kind == TypeSymbolKind.Builtin
                 ? TypeFacts.FromBuiltinName(block.Target.Name)
-                : new NamedRef(block.Target);
+                : block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
+                    ? BlockTargetType(block) // 'List<T>' with the block's own T (03 T7 X1)
+                    : new NamedRef(block.Target);
             foreach (var fn in block.Decl.Methods)
             {
                 CheckAttributes(fn.Attributes, AttributeTarget.Member,
@@ -724,8 +726,94 @@ public sealed class TypeChecker
 
             // No orphan rule (03 T7 X3): coherence is checked whole-program, and an extend may
             // stand in any module.
-            CheckTypeConformance(block.Target, block.Decl.Interfaces, block.Module, block.Target.Name);
+            CheckTypeConformance(block.Target, block.Decl.Interfaces, block.Module, block.Target.Name,
+                self: block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : null);
         }
+        CheckCoherence();
+    }
+
+    /// <summary>
+    /// Coherence (03 T7 X3, X4): one conformance per type instance and interface instance in the
+    /// whole program. A block that could meet another conformance on one instance — the type's
+    /// own declaration, another block, a generic block beside a concrete one — is refused where
+    /// it stands (<c>LYR-SEM0133</c>); no specialization.
+    /// </summary>
+    private void CheckCoherence()
+    {
+        // Per SITE — a type's own list, one block — the interfaces written DIRECTLY: a parent
+        // written out beside its child is one conformance (§1.3), and what a chain reaches is
+        // not written twice by being reached twice. Across sites the same direct interface on
+        // overlapping instances is the duplicate.
+        var seen = new List<(int Site, TypeSymbol Target, LyrType Instance, LyrType Iface)>();
+        var site = 0;
+        void Note(TypeSymbol target, LyrType instance, TypeNode node, LyrType self, SymbolTable scope)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } iface) return;
+            var ifaceInstance = Substitute(ResolveType(node, scope), SelfMap(iface, self));
+            foreach (var (priorSite, priorTarget, priorInstance, priorIface) in seen)
+                if (priorSite != site && ReferenceEquals(priorTarget, target) && TypeFacts.Overlaps(priorInstance, instance)
+                    && TypeFacts.Overlaps(priorIface, ifaceInstance))
+                {
+                    _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
+                        $"'{TypeFacts.Display(instance)}' conforms to '{TypeFacts.Display(ifaceInstance)}' twice — one conformance per type and interface, whole-program; no specialization");
+                    break;
+                }
+            seen.Add((site, target, instance, ifaceInstance));
+        }
+        foreach (var module in _comp.Modules)
+        {
+            _currentModule = module;
+            foreach (var symbol in module.Members.Symbols)
+                if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts && DeclaredInModule(ts, module))
+                {
+                    site++;
+                    foreach (var node in DeclaredInterfaceNodes(ts))
+                        Note(ts, SelfType(ts), node, SelfType(ts), DeclarationScope(ts));
+                }
+        }
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (block.Target is not { } target || block.Decl.Interfaces.Length == 0) continue;
+            _currentModule = block.Module;
+            site++;
+            var instance = block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : SelfType(target);
+            foreach (var node in block.Decl.Interfaces)
+                Note(target, instance, node, instance, block.MethodScope);
+        }
+        _currentModule = null;
+    }
+
+    /// <summary>The target of a block as a type, <c>List&lt;T&gt;</c> with the block's own
+    /// parameters (03 T7); resolved once.</summary>
+    private LyrType BlockTargetType(ExtensionBlock block) =>
+        block.TargetType ??= ResolveType(block.Decl.Target, block.MethodScope);
+
+    /// <summary>
+    /// What a generic block's parameters are for one receiver: the target matched against it, and
+    /// the block's constraints holding for what the match bound — <c>extend&lt;T :: [Display]&gt;
+    /// List&lt;T&gt;</c> applies to <c>List&lt;int&gt;</c> and not to <c>List&lt;Foo&gt;</c>.
+    /// <c>null</c> where it does not apply.
+    /// </summary>
+    private Dictionary<GenericParamSymbol, LyrType>? BlockSubstitution(ExtensionBlock block, LyrType receiver)
+    {
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        if (!TypeFacts.Match(BlockTargetType(block), receiver, map)) return null;
+        foreach (var g in block.Generics)
+        {
+            if (!map.TryGetValue(g, out var bound)) return null;
+            foreach (var c in g.Constraints)
+                if (ConstraintInterface(c) is { } ci
+                    && !Satisfies(bound, ci, Substitute(ResolveType(c, block.MethodScope), map)))
+                    return null;
+        }
+        return map;
+    }
+
+    private static Dictionary<GenericParamSymbol, LyrType> Merge(Dictionary<GenericParamSymbol, LyrType> a, Dictionary<GenericParamSymbol, LyrType> b)
+    {
+        var merged = new Dictionary<GenericParamSymbol, LyrType>(a, ReferenceEqualityComparer.Instance);
+        foreach (var (k, v) in b) merged[k] = v;
+        return merged;
     }
 
     /// <summary>Does the type conform to the interface — by its own list, or through an extend
@@ -942,8 +1030,10 @@ public sealed class TypeChecker
     /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>, 04 D1), by
     /// index: its members the type does not write itself are forwarded, and conformance is
     /// satisfied by that.</param>
+    /// <param name="self">What <c>Self</c> is for the conformer: the block's target instance for a
+    /// generic block (<c>List&lt;T&gt;</c> with the block's own T, 03 T7), else the type itself.</param>
     private void CheckTypeConformance(TypeSymbol implementer, TypeNode[] interfaces, ModuleSymbol module, string name,
-        string?[]? delegates = null)
+        string?[]? delegates = null, LyrType? self = null)
     {
         if (interfaces.Length == 0) return;
         RequireSealedInModule(interfaces, module, name);
@@ -1091,7 +1181,7 @@ public sealed class TypeChecker
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
                         continue; // a default method is inherited
                     }
-                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, SelfType(implementer)));
+                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, (self ?? SelfType(implementer))));
                     // An associated type the conformer did not answer was reported where it
                     // stands (SEM0128); the signature that reads it has nothing to compare.
                     if (ContainsError(want)) continue;
@@ -3118,8 +3208,14 @@ public sealed class TypeChecker
         {
             if (!ReferenceEquals(block.Target, ts)) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            var map = ofInstance;
+            if (block.Generics.Length > 0)
+            {
+                if (BlockSubstitution(block, Substitute(SelfType(ts), ofInstance)) is not { } blockMap) continue;
+                map = Merge(ofInstance, blockMap);
+            }
             foreach (var node in block.Decl.Interfaces)
-                foreach (var instance in InstancesOfNode(node, ts, iface, ofInstance))
+                foreach (var instance in InstancesOfNode(node, ts, iface, map))
                     yield return (instance, block);
         }
     }
@@ -4204,6 +4300,7 @@ public sealed class TypeChecker
     // come from its constraints.
     private LyrType? InstanceMemberOf(LyrType baseType, MemberExpr mem, Span span)
     {
+        _memberReceiver = baseType;
         switch (baseType)
         {
             case NamedRef nr:
@@ -4789,9 +4886,24 @@ public sealed class TypeChecker
         {
             if (!ReferenceEquals(block.Target, ts)) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (block.Decl.Target is not NamedType { TypeArguments.Length: > 0 })
+            {
+                foreach (var node in block.Decl.Interfaces)
+                    if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance, self))
+                        return true;
+                continue;
+            }
+            // A block on an INSTANCE (03 T7 X1) — 'List<int>', or 'List<T>' with the block's own
+            // parameters — reaches where its target matches the instance and its constraints hold
+            // for what the match bound; the lowering builds a row for exactly the instances
+            // proved here.
+            if (BlockSubstitution(block, self) is not { } blockMap) continue;
             foreach (var node in block.Decl.Interfaces)
-                if (NodeReaches(node, DeclarationScope(ts), iface, wanted, ofInstance, self))
+                if (NodeReaches(node, block.MethodScope, iface, wanted, blockMap, self))
+                {
+                    _result.RecordBlockConformance(self, iface, block);
                     return true;
+                }
         }
         return false;
     }
@@ -4906,7 +5018,7 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0074", Severity.Error, span,
                     $"'{member}' is a static extension and belongs to the type — "
                     + $"call '{ts.Name}.{member}(…)'; the instance form is an error since 2.0");
-            return (FnTypeOf(ext), ext);
+            return (ExtensionSignature(ext, span), ext);
         }
         if (DefaultMember(ts, member, span) is { } def) return def;
         if (DelegatedMember(ts, member) is { } forwarded) return forwarded;
@@ -4923,6 +5035,27 @@ public sealed class TypeChecker
     /// chooses among them by its arguments, and reports for itself when they do not separate.
     /// What stays ambiguous here is two extensions offering the same member with the SAME
     /// parameters — nothing could ever tell those apart (LYR-SEM0044).</para></summary>
+    /// <summary>The receiver a member is looked up on, for a generic block's signature.</summary>
+    private LyrType? _memberReceiver;
+
+    /// <summary>A block member's signature for the receiver at hand: a generic block's parameters
+    /// bound by the receiver (03 T7 X1), its constraints checked — the member is not there where
+    /// they fail (<c>LYR-SEM0134</c>).</summary>
+    private LyrType ExtensionSignature(FunctionSymbol ext, Span span)
+    {
+        var signature = FnTypeOf(ext);
+        if (_comp.Extensions.BlockOf(ext) is not { Decl.Target: NamedType { TypeArguments.Length: > 0 } } block
+            || _memberReceiver is null) return signature;
+        if (BlockSubstitution(block, _memberReceiver) is { } map) return Substitute(signature, map);
+        // A block on one instance adds to that instance alone: elsewhere the member is simply
+        // not there. A generic block's constraints failing is worth the sentence.
+        if (block.Generics.Length == 0)
+            return Report(span, "LYR-SEM0012", $"'{TypeFacts.Display(_memberReceiver)}' has no member '{ext.Name}'");
+        return Report(span, "LYR-SEM0134",
+            $"'{ext.Name}' is added to '{TypeFacts.Display(BlockTargetType(block))}' under the block's constraints, "
+            + $"which '{TypeFacts.Display(_memberReceiver)}' does not satisfy");
+    }
+
     private FunctionSymbol? ExtensionMember(TypeSymbol ts, string member, Span span)
     {
         List<ExtensionMethod> visible = new();

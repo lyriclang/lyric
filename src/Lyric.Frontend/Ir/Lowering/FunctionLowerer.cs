@@ -4590,6 +4590,43 @@ internal sealed class FunctionLowerer
         return false;
     }
 
+    /// <summary>A block member on an instance receiver (03 T7): a generic block's method is
+    /// requested for the receiver, a plain block's lowered as every extension is; the call is
+    /// direct either way.</summary>
+    private TempId? LowerBlockMethodCall(MemberExpr member, FunctionSymbol symbol, ExtensionBlock block,
+        GenericInstance receiver, CallExpr expr)
+    {
+        if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
+            throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
+        FunctionId target;
+        if (block.Generics.Length == 0)
+        {
+            if (!TryResolveFunction(symbol, out target))
+                throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' was not lowered", expr.Span);
+        }
+        else
+        {
+            var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
+                throw NotSupported($"'{TypeFacts.Display(receiver)}' does not match the block's target", expr.Span);
+            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span);
+        }
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span);
+        var all = new TempId[passed.Length + 1];
+        all[0] = LowerExpr(member.Target);
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, all, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     /// <summary>The static member the constraint promised, on the type the parameter stands for:
     /// the type's own, or a static of a visible extend block — a builtin's through its symbol.</summary>
     private TempId? LowerStaticConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
@@ -4968,6 +5005,14 @@ internal sealed class FunctionLowerer
                 receiver = LowerExpr(member.Target);
                 receiverOwner = named.Symbol;
                 break;
+
+            // A member of an 'extend' block on an instance of a generic type (03 T7 X1): the
+            // block's parameters bound by the receiver, the method an instance of its own.
+            case MemberExpr member
+                when _types.RefOf(member) is FunctionSymbol blockMember
+                     && _typeTable.BlockOf(blockMember) is { Target: not null } ownerBlock
+                     && SubstituteType(ReceiverType(member.Target)) is GenericInstance onInstance:
+                return LowerBlockMethodCall(member, blockMember, ownerBlock, onInstance, expr);
 
             // A GENERIC interface member on an instance of a generic type:
             // 'ArrayIterator<int>.zip<string>()'. It is not a member of the instance at all — it is

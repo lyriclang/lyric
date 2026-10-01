@@ -1,0 +1,50 @@
+// Generic extends (03 T7 X1): a block with its own parameters on a generic type, bound by the
+// receiver; conditional conformance with the block's constraints; a block on one instance.
+// Expected stdout:
+//   first 1 a          'extend<T> List<T>': 'first' and 'count' for every List
+//   show [1, 2] <a, b> 'extend<T :: [Display]> List<T> :: [Display]' reaches List<int>; Pair<string, string> through a two-parameter block, as a Display value
+//   pair 3 x
+//   concrete 7         'extend Box<int>' adds to that instance alone
+import std.io { println };
+
+struct Box<T> { v: T }
+struct Pair<A, B> { a: A, b: B }
+class List<T> { items: T[] }
+
+extend<T> List<T> {
+    fn first(): T { return this.items[0]; }
+    fn count(): int { return this.items.length(); }
+}
+
+extend<T :: [Display]> List<T> :: [Display] {
+    fn show(): string {
+        var out = "[";
+        for (i in 0..this.items.length()) {
+            if (i > 0) { out = out + ", "; }
+            out = out + this.items[i].show();
+        }
+        return out + "]";
+    }
+}
+
+extend<A :: [Display], B :: [Display]> Pair<A, B> :: [Display] {
+    fn show(): string { return f"<{this.a.show()}, {this.b.show()}>"; }
+}
+
+extend Box<int> {
+    fn doubled(): int { return this.v * 2; }
+}
+
+fn render(d: Display): string { return d.show(); }
+
+fn main(): int {
+    let ints = List<int> { items = [1, 2] };
+    let strs = List<string> { items = ["a", "b"] };
+    println(f"first {ints.first()} {strs.first()}");
+    println(f"show {ints.show()} {render(Pair<string, string> { a = "a", b = "b" })}");
+    let p = Pair<int, string> { a = 3, b = "x" };
+    println(f"pair {p.a} {p.b}");
+    let b = Box<int> { v = 3 };
+    println(f"concrete {b.doubled() + ints.count() - 1}");
+    return 0;
+}

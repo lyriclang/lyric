@@ -1009,6 +1009,13 @@ public static class ModuleLowerer
                 // Conformance may be declared OR come from an 'extend T :: [I]'. The vtable row is the
                 // same; which of the two established it is no longer distinguishable at runtime.
                 var viaExtension = ExtendBlocksFor(compilation, type, iface, binding);
+                // A GENERIC block gives the conformance where the sema proved it for this instance
+                // (03 T7 X1): its constraints may hold for one instance and not for another.
+                var ofInstance = typeTable.InstanceOf(typeId);
+                viaExtension = viaExtension
+                    .Where(b => b.Decl.Target is not NamedType { TypeArguments.Length: > 0 }
+                                || (ofInstance is not null && types.BlockConformanceRecorded(ofInstance, iface, b)))
+                    .ToList();
                 // 'Any' (03 T10) is conformed to by every struct, class and enum, undeclared:
                 // its row is the descriptor alone.
                 var isAny = ReferenceEquals(iface, compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
@@ -1072,7 +1079,7 @@ public static class ModuleLowerer
                                      : null)
                                  ?? ResolveInInstance(typeTable, typeId, slots[i], instances)
                                  ?? (ownDeclares ? Resolve(type, slots[i], ids) : null)
-                                 ?? ResolveInExtensions(viaExtension, slots[i], extensions)
+                                 ?? ResolveInExtensions(viaExtension, slots[i], extensions, typeTable, typeId, instances)
                                  ?? Conformance.WithParents(iface, binding)
                                      .Select(p => Resolve(p, slots[i], ids))
                                      .FirstOrDefault(f => f is not null)
@@ -1310,13 +1317,23 @@ public static class ModuleLowerer
     }
 
     private static FunctionId? ResolveInExtensions(List<ExtensionBlock> blocks, string method,
-        ExtensionTable extensions)
+        ExtensionTable extensions, TypeTable typeTable, TypeId typeId, InstanceTable instances)
     {
         foreach (var block in blocks)
         {
             if (block.MethodScope.LookupLocal(method) is not FunctionSymbol symbol) continue;
             if (symbol.Declaration is not FunctionDecl decl || decl.Body is null) continue;
             if (block.Target is not { } target) continue;
+
+            // A generic block's method for THIS instance (03 T7 X1): the block's parameters as the
+            // instance binds them.
+            if (block.Generics.Length > 0)
+            {
+                if (typeTable.InstanceOf(typeId) is not { } instance || block.TargetType is not { } pattern) continue;
+                var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+                if (!TypeFacts.Match(pattern, instance, map)) continue;
+                return instances.RequestExtension(symbol, decl, block, map, instance, default);
+            }
 
             // requests it if that has not happened yet: a vtable row is a use
             return extensions.Request(symbol, decl, block.Module, target,

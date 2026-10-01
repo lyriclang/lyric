@@ -81,12 +81,11 @@ public class AssociatedTypeTests
             "struct Stray { type Item = int; v: int }\nfn f(): int { return 0; }",
             "LYR-SEM0129"));
 
+    // Through S6 a second block could repeat the answer; coherence (03 T7 X3) refuses the second
+    // conformance itself, so the question of a second answer no longer arises.
     [Fact]
-    public void A_second_block_may_repeat_the_answer_not_change_it()
-    {
-        Allowed("extend IntBox :: [Container] { type Item = int; }\nfn f(): int { return 0; }");
-        Assert.Contains("already answers", Rejected("extend IntBox :: [Container] { type Item = string; }\nfn f(): int { return 0; }", "LYR-SEM0129"));
-    }
+    public void A_second_block_of_the_same_conformance_is_a_duplicate() =>
+        Rejected("extend IntBox :: [Container] { type Item = int; }\nfn f(): int { return 0; }", "LYR-SEM0133");
 
     [Fact]
     public void A_default_answers_where_the_conformer_says_nothing() =>

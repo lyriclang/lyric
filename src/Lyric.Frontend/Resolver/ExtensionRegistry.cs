@@ -21,8 +21,10 @@ public sealed class ExtensionRegistry
     public void BuildIndex()
     {
         _byTarget.Clear();
+        _blockOf.Clear();
         foreach (var b in _blocks)
         {
+            foreach (var m in b.Methods) _blockOf[m] = b;
             if (b.Target is null) continue;
             if (!_byTarget.TryGetValue(b.Target, out var list))
                 _byTarget[b.Target] = list = new();
@@ -35,6 +37,11 @@ public sealed class ExtensionRegistry
     /// (unfiltered; the caller checks visibility).</summary>
     public IReadOnlyList<ExtensionMethod> MethodsFor(TypeSymbol target) =>
         _byTarget.TryGetValue(target, out var list) ? list : [];
+
+    private readonly Dictionary<Symbol, ExtensionBlock> _blockOf = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The block a method was declared in.</summary>
+    public ExtensionBlock? BlockOf(Symbol method) => _blockOf.TryGetValue(method, out var block) ? block : null;
 }
 
 /// <summary>An `extend` block with its method symbols and its declaring module.
@@ -46,6 +53,13 @@ public sealed class ExtensionBlock
     public SymbolTable MethodScope { get; } // the FunctionSymbols of the extend methods, for the body check and cross-calls
     public FunctionSymbol[] Methods { get; }
     public TypeSymbol? Target { get; set; }
+
+    /// <summary>The block's own type parameters (03 T7 X1), declared in <see cref="MethodScope"/>.</summary>
+    public GenericParamSymbol[] Generics { get; init; } = [];
+
+    /// <summary>The target as a type, <c>List&lt;T&gt;</c> with the block's own parameters; resolved
+    /// by the sema on first use. <c>null</c> until then and for a plain target.</summary>
+    public Sema.LyrType? TargetType { get; set; }
 
     public ExtensionBlock(ExtendDecl decl, ModuleSymbol module, SymbolTable methodScope, FunctionSymbol[] methods)
     {

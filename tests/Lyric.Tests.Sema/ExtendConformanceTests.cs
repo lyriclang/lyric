@@ -325,11 +325,12 @@ public class ExtendConformanceTests
     // --- an unsupported extend target (SEM0047) ---
 
     [Fact]
-    public void Generic_extend_target_is_unsupported()
+    // A block on an instance is a target since S7a (03 T7 X1); the array stays refused until X2.
+    public void A_block_on_an_instance_is_a_target()
     {
-        AssertCode(Diags("""
+        Assert.DoesNotContain(Diags("""
             struct Box<T> { v: T }
             extend Box<int> { fn get(): int { return this.v; } }
-            """), "LYR-SEM0047");
+            """).Diagnostics, d => d.Code == "LYR-SEM0047");
     }
 }

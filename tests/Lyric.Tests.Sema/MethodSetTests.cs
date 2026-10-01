@@ -121,7 +121,7 @@ public class MethodSetTests
         Rejected("""
             interface Greeter { fn greet(): string; }
             struct Person :: [Greeter] { name: string, fn greet(): string { return "a"; } }
-            extend Person :: [Greeter] { fn greet(): string { return "b"; } }
+            extend Person { fn greet(): string { return "b"; } }
             fn main(): int { return 0; }
             """, "LYR-SEM0121");
 

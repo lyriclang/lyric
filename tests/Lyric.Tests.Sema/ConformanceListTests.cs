@@ -149,12 +149,11 @@ public class ConformanceListTests
         Assert.False(de.HasErrors);
     }
 
+    // Through S6 a repetition across declarations stood, for a downstream build's sake. Coherence
+    // (03 T7 X3) decides the other way: one conformance per type and interface, whole-program.
     [Fact]
-    public void A_conformance_repeated_across_declarations_is_not_refused()
+    public void A_conformance_repeated_across_declarations_is_refused()
     {
-        // The second declaration may stand in another module — a library adopting a conformance
-        // a downstream extend had added must not break the downstream build. Only ONE list
-        // repeating itself is an author's slip.
         var de = Check("""
             import std.core { Equatable };
 
@@ -172,7 +171,7 @@ public class ConformanceListTests
             }
             """);
 
-        Assert.False(de.HasErrors);
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0133");
     }
 
     // ------------------------------------------------------------------ @Deprecated on a member

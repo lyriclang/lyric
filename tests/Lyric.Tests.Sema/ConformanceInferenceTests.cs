@@ -73,12 +73,11 @@ public class ConformanceInferenceTests
         Assert.False(de.HasErrors);
     }
 
+    // Through S6 the extend could repeat the instance the class declares, and the walk read it
+    // as one. Coherence (03 T7 X3) now refuses the repetition where it stands.
     [Fact]
-    public void A_conformance_repeated_across_declarations_is_still_one()
+    public void A_conformance_repeated_across_declarations_is_a_duplicate()
     {
-        // The extend repeats the instance the class already declares. InterfacesOf deduplicates
-        // by instance across the whole walk, so this must NOT read as two conformances — the
-        // refusal is about a choice, and here there is none.
         var de = Check(Sink + """
             class Tag :: [Sink<int>] {
                 id: int,
@@ -95,6 +94,6 @@ public class ConformanceInferenceTests
             }
             """);
 
-        Assert.False(de.HasErrors);
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0133");
     }
 }
