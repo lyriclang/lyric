@@ -685,7 +685,7 @@ internal sealed class TypeTable
         // symbol. Otherwise 'Iterator<string>' would get the id of 'Iterator<int>'.
         if (symbol.Generics.Length == 0) _assigned[symbol] = id;
 
-        _defs.Add(new IrTypeDef(name, [], []) { MethodSlots = slots });
+        _defs.Add(new IrTypeDef(name, [], []) { MethodSlots = slots, IsInterface = true });
         return id;
     }
 
