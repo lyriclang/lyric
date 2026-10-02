@@ -276,13 +276,26 @@ internal sealed class FunctionLowerer
         _substitution = substitution ?? ModuleLowerer.NoSubstitution;
         _b = new BlockBuilder(_blocks);
 
-        // A lambda throws what its type says (05 E2 K3), in the enclosing instance's terms: a set
-        // naming the enclosing function's 'E' is empty where 'E = never' (K4).
-        _irThrows = _types.TypeOf(lambda) is FnType thrower && ThrownHere(thrower.Throws).Length > 0;
+        if (_types.IsGeneratorLambda(lambda) && _types.TypeOf(lambda) is FnType { Return: CoroutineOf made })
+        {
+            // A generator lambda (08 Y11 F5) is lowered as a coroutine's body: its yields suspend,
+            // its returns give the result, and it has the error slot — for what the coroutine's
+            // pulls throw, and for the Cancelled its yields throw at close (06 A5).
+            CoroutineType = (IrCoroutineType)LowerType(made, lambda.Span);
+            _coroutineYield = CoroutineType.Yield;
+            _returnType = CoroutineType.Result;
+            _irThrows = made.Throws is { } pulled && ThrownHere([pulled]).Length > 0 || CancelledClass() is not null;
+        }
+        else
+        {
+            // A lambda throws what its type says (05 E2 K3), in the enclosing instance's terms: a set
+            // naming the enclosing function's 'E' is empty where 'E = never' (K4).
+            _irThrows = _types.TypeOf(lambda) is FnType thrower && ThrownHere(thrower.Throws).Length > 0;
 
-        _returnType = _types.TypeOf(lambda) is FnType fn
-            ? LowerType(fn.Return, lambda.Span)
-            : throw Bug("lambda has no function type");
+            _returnType = _types.TypeOf(lambda) is FnType fn
+                ? LowerType(fn.Return, lambda.Span)
+                : throw Bug("lambda has no function type");
+        }
 
         // The environment is parameter 0, the same position 'this' occupies on a method. A closure call
         // is therefore an ordinary call, and the VM needs no second frame setup for 'callind'.
@@ -315,6 +328,7 @@ internal sealed class FunctionLowerer
             _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
             _lambdaParameterCount++;
         }
+        Parameters = _slots.Locals.ToArray();
     }
 
     /// <summary>The parameters the lambda really has — its declared ones minus a dropped
@@ -664,7 +678,7 @@ internal sealed class FunctionLowerer
             _lambdaParameterCount + (_envSlot is null ? 0 : 1),
             _slots.Locals, _slots.Temps, _blocks)
         {
-            Entry = new BlockId(0), Throws = _irThrows,
+            Entry = new BlockId(0), Throws = _irThrows, Cleanup = _cleanup,
         };
     }
 

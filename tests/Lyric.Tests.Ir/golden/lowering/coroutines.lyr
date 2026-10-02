@@ -1,6 +1,8 @@
 // Coroutines (06 N2): the factory makes the coroutine over its arguments, the body yields and
 // returns the result; a pull is 'next'; 'codone' and 'coresult' ask without pulling; a generic
-// coroutine is factory and body per instance. The throwing pull is ErrorPathTests'.
+// coroutine is factory and body per instance, and so is a generator lambda (08 F5) — its factory
+// the function value, its body taking the environment. A function that returns a coroutine
+// without yielding is an ordinary one (08 D11). The throwing pull is ErrorPathTests'.
 fn count(n: int): Coroutine<int, string> {
     var i = 0;
     while (i < n) {
@@ -18,7 +20,15 @@ fn repeat<T>(x: T): Coroutine<T> {
     yield x;
 }
 
+fn handOn(make: fn() -> Coroutine<int>): Coroutine<int> {
+    return make();
+}
+
 fn main(): int {
+    let step = 3;
+    let made = handOn(() => {
+        yield step;
+    });
     let c = count(2);
     var sum = 0;
     var v = c.next();
@@ -29,5 +39,6 @@ fn main(): int {
     let ticked = ticks().next();
     let seven = repeat(7).next() ?? 0;
     let ended = c.result() ?? "";
-    return if (c.isDone() && ticked && ended == "done") sum + seven else 0;
+    let three = made.next() ?? 0;
+    return if (c.isDone() && ticked && ended == "done") sum + seven + three else 0;
 }

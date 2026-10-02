@@ -135,6 +135,14 @@ public sealed class TypeResult
 
     public bool IsBodyYield(YieldStmt yield) => _bodyYields.Contains(yield);
 
+    /// <summary>The generator lambdas (08 Y11 F5): a lambda with a yield of its own, of type
+    /// <c>fn(…) -> Coroutine&lt;Y, R&gt;</c>, lowered as a coroutine's factory and body.</summary>
+    private readonly HashSet<LambdaExpr> _generatorLambdas = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Add(lambda);
+
+    public bool IsGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Contains(lambda);
+
     public LyrType? ThrownByPull(Node pull) =>
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
 

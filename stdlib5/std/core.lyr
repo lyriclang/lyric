@@ -694,3 +694,10 @@ pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
     if (o == null) { return null; }
     return o.clone();
 }
+
+/// `sequence { yield 1; yield 2; }` (design/v5/spec/08 Y11, 10 I7): the shortest way to write a
+/// generator inline. No syntax of its own: the trailing block is a generator lambda (08 F5), and
+/// this calls it — the coroutine it makes runs nothing until it is pulled.
+pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
+    return body();
+}
