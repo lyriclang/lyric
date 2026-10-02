@@ -5762,6 +5762,16 @@ internal sealed class FunctionLowerer
                 continue;
             }
 
+            // '@callerExpr(p)' (09 A11): where the call leaves this parameter out, the text it
+            // wrote for 'p' — what an assertion names (10 X1).
+            if (_types.CallerExprOf(parameter) is { } target && _types.SourceText is { } text
+                && Array.FindIndex(parameters, q => q.Name == target) is var written and >= 0
+                && written < provided.Length && provided[written] is { } argument)
+            {
+                args[i] = EmitConst(new StringConst(text(argument.Span)), new IrScalarType(IrScalar.String), span);
+                continue;
+            }
+
             if (parameter.Default is { } fallback)
             {
                 // Per call, in the callee's scope: an earlier parameter the default names is the

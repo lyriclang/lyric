@@ -26,5 +26,6 @@ pub import std.core {
     Default,
     Clone,
     Closeable,
-    Test
+    Test,
+    callerExpr
 };

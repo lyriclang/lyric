@@ -533,16 +533,9 @@ public sealed partial class Parser
             if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
             var start = _buffer.Current.Span;
 
-            // An attribute may not sit ON A PARAMETER. Without this case the parser would read
-            // '@noCapture' as a parameter name, then lose the body, and report a message about
-            // native declarations to someone writing an attribute.
-            while (_buffer.Check(TokenKind.AtIdentifier) || _buffer.Check(TokenKind.AtLBracket))
-            {
-                _de.Report("LYR-PAR0038", Severity.Error, _buffer.Current.Span,
-                    "an attribute cannot sit on a parameter — only a function, a struct, a class, "
-                    + "an enum or the module header carries one");
-                _buffer.Advance();
-            }
+            // '@callerExpr(actual)' (design/v5/spec/09 A11): which attribute a parameter takes is
+            // the checker's rule, as it is for a declaration's.
+            var attributes = ParseAttributeList();
 
             var isParams = _buffer.Match(TokenKind.Params);
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
@@ -550,7 +543,7 @@ public sealed partial class Parser
             var type = ParseType();
             Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
             parameters.Add(new Param(isParams, name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
-                { NameSpan = name.Span });
+                { NameSpan = name.Span, Attributes = attributes });
         } while (_buffer.Match(TokenKind.Comma));
         return parameters.ToArray();
     }

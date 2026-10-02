@@ -45,7 +45,7 @@ public class TestCommandTests
             + "@Test\nfn adds(): void {\n    assertEq(add(2, 2), 5);\n}\n\n@Test\nfn after(): void {\n}\n"));
         var (exit, output, error) = Run("test", "-C", dir);
         Assert.True(exit == 1, output + error);
-        Assert.Contains("FAIL  app.tests.wrong.adds\n      panic [LYR-RT0008]: got 4, expected 5\n", output);
+        Assert.Contains("FAIL  app.tests.wrong.adds\n      panic [LYR-RT0008]: add(2, 2) = 4, expected 5\n", output);
         Assert.Contains("ok    app.tests.wrong.after\n", output);
         Assert.EndsWith("5 tests: 4 passed, 1 failed, 0 skipped\n", output);
     }
@@ -115,6 +115,61 @@ public class TestCommandTests
         var (exit, _, error) = Run("test", "-C", dir);
         Assert.Equal(1, exit);
         Assert.Contains("error[LYR-RES0015]: the module 'app.tests.arith' lies under src/tests/ and under tests/", error);
+    }
+
+    [Fact]
+    public void An_assertion_names_the_expression_it_got()
+    {
+        var dir = App(("tests/named.lyr",
+            "import std.test { assertEq, assertTrue };\n\n"
+            + "@Test\nfn length(): void {\n    let xs = [1, 2];\n    assertEq(xs.length(), 3);\n}\n\n"
+            + "@Test\nfn literal(): void {\n    assertEq(2, 3, \"two is not three\");\n}\n\n"
+            + "@Test\nfn truth(): void {\n    let n = 4;\n    assertTrue(n < 3);\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "named");
+        Assert.True(exit == 1, output + error);
+        Assert.Contains("FAIL  app.tests.named.length\n      panic [LYR-RT0008]: xs.length() = 2, expected 3\n", output);
+        Assert.Contains("FAIL  app.tests.named.literal\n      panic [LYR-RT0008]: got 2, expected 3: two is not three\n", output);
+        Assert.Contains("FAIL  app.tests.named.truth\n      panic [LYR-RT0008]: n < 3 = false, expected true\n", output);
+    }
+
+    [Fact]
+    public void Subtests_are_reported_one_by_one_and_a_failed_one_fails_its_test()
+    {
+        var dir = App(("tests/table.lyr",
+            "import std.test { assertEq, subtest };\n\n"
+            + "@Test\nfn rows(): void {\n"
+            + "    subtest(\"one\") {\n        assertEq(1, 1);\n    }\n"
+            + "    subtest(\"two\") {\n        assertEq(2, 3);\n    }\n"
+            + "    subtest(\"three\") {\n        assertEq(3, 3);\n    }\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "table");
+        Assert.True(exit == 1, output + error);
+        Assert.StartsWith("ok    app.tests.table.rows/one\nFAIL  app.tests.table.rows/two\n      panic [LYR-RT0008]: got 2, expected 3\n", output);
+        Assert.Contains("ok    app.tests.table.rows/three\nFAIL  app.tests.table.rows\n      1 subtest failed\n", output);
+        Assert.EndsWith("1 test: 0 passed, 1 failed, 0 skipped\n", output);
+    }
+
+    [Fact]
+    public void An_error_or_a_panic_that_does_not_come_fails_the_assertion()
+    {
+        var dir = App(("tests/expects.lyr",
+            "import std.test { assertThrows, assertPanics };\n\n"
+            + "class Refusal :: [Error] {\n    fn message(): string { return \"no\"; }\n}\n\n"
+            + "@Test\nfn quiet(): void {\n    let _ = assertThrows(() => {\n        if (false) { throw Refusal { }; }\n    });\n}\n\n"
+            + "@Test\nfn calm(): void {\n    let _ = assertPanics(() => { });\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "expects");
+        Assert.True(exit == 1, output + error);
+        Assert.Contains("FAIL  app.tests.expects.quiet\n      panic [LYR-RT0008]: threw nothing, expected an error\n", output);
+        Assert.Contains("FAIL  app.tests.expects.calm\n      panic [LYR-RT0008]: ended, expected a panic\n", output);
+    }
+
+    [Fact]
+    public void A_test_that_outlives_its_time_ends_the_run()
+    {
+        var dir = App(("tests/slow.lyr",
+            "@Test { timeout = 1 }\nfn spins(): void {\n    var n = 0;\n    while (true) {\n        n = n +% 1;\n    }\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "slow");
+        Assert.True(exit == 1, output + error);
+        Assert.EndsWith("FAIL  app.tests.slow.spins\n      timed out after 1 s — the run ends here\n", output);
     }
 
     [Fact]

@@ -33,27 +33,18 @@ public class RejectedSyntaxTests
         Assert.Empty(Parse("@test\nfn f(): int { return 1; }"));
 
     /// <summary>
-    /// On a parameter it used to say <c>LYR-SEM0051</c> — "only standard-library modules may declare
-    /// native functions". The parser had lost the body.
+    /// On a parameter too, since Lyric 5's <c>@callerExpr</c> (design/v5/spec/09 A11): the parser
+    /// reads it, and which attribute may sit there is the checker's question. It used to say
+    /// <c>LYR-PAR0038</c>, and before that the parser lost the body.
     /// </summary>
     [Fact]
-    public void An_attribute_on_a_parameter_says_the_same_thing()
-    {
-        var diagnostics = Parse("fn nimm(@noCapture f: fn() -> int): int { return f(); }");
+    public void An_attribute_on_a_parameter_parses_and_keeps_the_body() =>
+        Assert.Empty(Parse("fn nimm(@noCapture f: fn() -> int): int { return f(); }"));
 
-        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0038");
-
-        // And the body is NOT lost in the process: no follow-up message about a missing declaration.
-        // Without this promise the new message would only be an additional one.
-        Assert.Single(diagnostics);
-    }
-
-    /// <summary>Several attributes on one parameter give several messages and no crash: the loop has to
-    /// terminate.</summary>
+    /// <summary>Several attributes on one parameter parse as a list, and the loop terminates.</summary>
     [Fact]
-    public void Several_attributes_on_one_parameter_each_get_a_diagnostic() =>
-        Assert.Equal(2, Parse("fn f(@a @b x: int): int { return x; }")
-            .Count(d => d.Code == "LYR-PAR0038"));
+    public void Several_attributes_on_one_parameter_parse() =>
+        Assert.Empty(Parse("fn f(@a @b x: int): int { return x; }"));
 
     // ------------------------------------------------------------------ interface inheritance
 

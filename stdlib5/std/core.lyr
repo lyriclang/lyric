@@ -122,11 +122,21 @@ pub interface OnType { }
 /// On a function.
 pub interface OnFunction { }
 
+/// On a parameter.
+pub interface OnParameter { }
+
 /// A test (10 B12 X2, 07 V4): `lyric test` runs every function marked so — no parameters, `void`,
-/// not private, throwing if it likes —, each in a task of its own. `skip` says why one is not run.
+/// not private, throwing if it likes —, each in a task of its own. `skip` says why one is not run,
+/// `timeout` how many seconds it may take: one that outlives them ends the run (X3).
 pub struct Test :: [OnFunction] {
     pub skip: string = "",
+    pub timeout: int = 60,
 }
+
+/// `@callerExpr(p)` on a `string` parameter with a default (09 A11): where a call leaves the
+/// parameter out, it gets the text the call wrote for `p` — `assertEq(xs.length(), 3)` hands
+/// `std.test` the words `xs.length()`. Named like the compiler instruction it is, not like a type.
+pub struct callerExpr :: [OnParameter] { }
 
 /// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).
 /// `close()` may throw: on a normal exit the error leaves like any other, while one is in flight

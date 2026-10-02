@@ -38,6 +38,9 @@ public sealed class Compilation
 
     public IReadOnlyList<ModuleSymbol> Modules => _modules;
     public SymbolTable Builtins => _builtins;
+
+    /// <summary>The source text a span covers: what <c>@callerExpr</c> hands a call's callee.</summary>
+    public string TextOf(Span span) => _sm.Slice(span).ToString();
     public ExtensionRegistry Extensions { get; } = new();
 
     /// <summary>
