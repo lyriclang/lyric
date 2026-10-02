@@ -1,7 +1,7 @@
 /// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S4: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
 /// as a task (T6); `spawn` and its `Task`, `TaskScope`, `spawnDetached`, `sleep`, `yieldNow`;
-/// cancellation (N9). `withTimeout` comes with S4, timers and channels with S5, threads with S6.
+/// cancellation and `withTimeout` (N9). Timers and channels come with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
@@ -68,6 +68,17 @@ pub class Task<T> {
         }
     }
 
+    /// Cancels the task and waits until it has ended, whatever the running task's mark says: what a
+    /// task does before it lets go of one it started (06 T5).
+    mut fn settle(): void {
+        if (this.done) { return; }
+        this.cancel();
+        let s = here();
+        while (!this.done) {
+            s.parkIn(this.waiters);
+        }
+    }
+
     /// The body has ended: its scope learns of it, and the tasks waiting for it are ready, in the
     /// order they came.
     mut fn finish(): void {
@@ -87,6 +98,35 @@ pub class Task<T> {
 /// its error — `E`, what the body throws, the handle's type carries.
 pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
     return launch(body);
+}
+
+/// What `withTimeout` throws when its time ran out before the body ended (06 N9 X4).
+pub class TimedOut :: [Error] {
+    fn message(): string { return "timed out"; }
+}
+
+/// Runs `body` as a task of its own and gives what it gives — unless `d` passes first: then the
+/// body is cancelled, and `TimedOut` is thrown once it has ended (06 N9 X4: a scope, a timer and a
+/// cancel). The body's own errors come out as they are. A cancel of the caller cancels the body
+/// too; whenever this returns, the body has ended.
+pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T throws [E, TimedOut, Cancelled] {
+    var late = false;
+    let work = spawn(body);
+    let timer = spawn(() => {
+        try sleep(d);
+        late = true;
+        work.cancel();
+    });
+    defer timer.cancel();
+    defer work.settle();
+    try {
+        return try work.await();
+    } catch (e: Cancelled) {
+        if (late) {
+            throw TimedOut { };
+        }
+        throw e;
+    }
 }
 
 /// The tasks a scope starts end before it does (06 T5): structured concurrency. A scope is

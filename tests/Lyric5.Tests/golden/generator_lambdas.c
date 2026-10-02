@@ -19,6 +19,7 @@ typedef struct lyr_ty10_Cancelled lyr_ty10_Cancelled;
 typedef struct lyr_ty11_Exception lyr_ty11_Exception;
 typedef struct lyr_ty12_Duration lyr_ty12_Duration;
 typedef struct lyr_ty13__env_std_task_spawnDetached_ lyr_ty13__env_std_task_spawnDetached_;
+typedef struct lyr_ty14_TimedOut lyr_ty14_TimedOut;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -160,6 +161,11 @@ _Static_assert(sizeof(lyr_ty13__env_std_task_spawnDetached_) == 24, "layout of l
 _Static_assert(offsetof(lyr_ty13__env_std_task_spawnDetached_, f_body) == 8, "layout of lyr_ty13__env_std_task_spawnDetached_");
 static const uint64_t lyr_refmap_ty13[] = { UINT64_C(0x4) };
 const LyrDesc lyr_desc_ty13__env_std_task_spawnDetached_ = { sizeof(lyr_ty13__env_std_task_spawnDetached_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty13, "<env:std.task.spawnDetached>", NULL };
+struct lyr_ty14_TimedOut {
+    LyrObj header;
+};
+_Static_assert(sizeof(lyr_ty14_TimedOut) == 8, "layout of lyr_ty14_TimedOut");
+const LyrDesc lyr_desc_ty14_TimedOut = { sizeof(lyr_ty14_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { LyrCoro * (*fn)(void *, LyrErr **); void *env; } lyr_fn_to_coro_i64_to_void;
 _Static_assert(sizeof(lyr_fn_to_coro_i64_to_void) == 16, "layout of lyr_fn_to_coro_i64_to_void");
