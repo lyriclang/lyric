@@ -40,8 +40,9 @@ public static class Program
     {
         output.WriteLine("usage: lyric5 <verb> [options]");
         output.WriteLine();
-        output.WriteLine("  build <file.lyr> [options]     compile the file to a binary under out/");
-        output.WriteLine("  run <file.lyr> [options] [-- args]");
+        output.WriteLine("  build [<file.lyr>] [options]   compile the package here (src/main.lyr), or the file,");
+        output.WriteLine("                                 to a binary under out/");
+        output.WriteLine("  run [<file.lyr>] [options] [-- args]");
         output.WriteLine("                                 build, then run the binary with the arguments");
         output.WriteLine("  version                        the toolchain and the C compiler it found");
         output.WriteLine("  help                           this");
@@ -50,6 +51,7 @@ public static class Program
         output.WriteLine("  --profile debug|release        the build profile (default: debug)");
         output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
         output.WriteLine("  --emit ir|c                    print the IR or the C instead of building");
+        output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
         output.WriteLine();
         output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
         return exit;
@@ -64,7 +66,7 @@ public static class Program
 
     // --- build and run -------------------------------------------------------------------------
 
-    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target"];
+    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C"];
 
     private static int Build(string[] args, bool run)
     {
@@ -92,13 +94,51 @@ public static class Program
             else if (file is null) file = arg;
             else return Unknown($"'{verb}' takes one file, got '{file}' and '{arg}'");
         }
-        if (file is null) return Unknown($"'{verb}' needs a file: lyric5 {verb} <file.lyr> (a project with lyric.toml comes with M7)");
-        if (!File.Exists(file))
+        // The package here or above, or the file named — a module of its package, or a package of
+        // its own (07 M7a; 11 C8).
+        // '-C <dir>' (11 C3): where the search for the package starts, and what a relative file is
+        // relative to — the process's own directory stays as it is.
+        var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
+        if (!Directory.Exists(baseDirectory))
         {
-            Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
+            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{baseDirectory}'");
             return 2;
         }
-        var project = Project.ForFile(file);
+        if (file is not null) file = Path.GetFullPath(file, baseDirectory);
+
+        Project project;
+        try
+        {
+            if (file is null)
+            {
+                if (Project.ForDirectory(baseDirectory) is not { } package)
+                {
+                    Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+                    Console.Error.WriteLine($"  = help: lyric5 {verb} <file.lyr> builds one file alone");
+                    return 2;
+                }
+                project = package;
+            }
+            else
+            {
+                if (!File.Exists(file))
+                {
+                    Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
+                    return 2;
+                }
+                project = Project.ForFile(file);
+            }
+        }
+        catch (ManifestException refused)
+        {
+            Console.Error.WriteLine(refused.Render());
+            return 1;
+        }
+        catch (InvalidOperationException library)
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0005]: {library.Message}");
+            return 2;
+        }
 
         if (values.TryGetValue("--emit", out var emit))
         {

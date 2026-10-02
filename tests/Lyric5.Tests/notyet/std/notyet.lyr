@@ -1,6 +1,6 @@
 /// A test-only module (Lyric5.Tests copies it beside the shipped stdlib5): a native the C emitter has
 /// no intrinsic for. Since M6 S2d it is the one refusal of the subset gate a program can still reach
 /// — until M8a brings natively backed modules of its own.
-module std.notyet;
+
 
 pub fn tick(): int;

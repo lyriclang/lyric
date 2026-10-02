@@ -177,6 +177,12 @@ public sealed class SemaRules
 
     private void CheckMain()
     {
+        if (_comp.NamesFromPaths && _comp.Entry is { } entry)
+        {
+            CheckEntry(entry);
+            return;
+        }
+
         var mains = _comp.Modules
             .SelectMany(m => _comp.AstOf(m).Declarations.OfType<FunctionDecl>())
             .Where(f => f.Name == "main")
@@ -191,6 +197,35 @@ public sealed class SemaRules
         // One 'main' per EXECUTABLE. A workspace compilation holds several programs side by side,
         // and there a second 'main' is the entry point of another script, not a duplicate.
         if (!_singleProgram) return;
+
+        for (var i = 1; i < mains.Count; i++)
+            _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");
+    }
+
+    /// <summary>
+    /// Lyric 5's entry (design/v5/spec/07 M7a, M7b; 08 D18): the program starts at the <c>main</c> of
+    /// its entry module, which is <c>fn main(): void</c> or <c>fn main(): int</c>, may declare
+    /// <c>throws</c>, and takes no parameters — the arguments come from the standard library. A
+    /// <c>main</c> in any other module is an ordinary function: a module may be a library and a
+    /// program at once, and only the module a build starts from makes its <c>main</c> the root. The
+    /// 4.x rule, one <c>main</c> per compilation, was the VM's (one entry per <c>.lyrbc</c>).
+    /// </summary>
+    private void CheckEntry(ModuleSymbol entry)
+    {
+        var ast = _comp.AstOf(entry);
+        var mains = ast.Declarations.OfType<FunctionDecl>().Where(f => f.Name == "main").ToList();
+        if (mains.Count == 0)
+        {
+            _de.Report("LYR-SEM0021", Severity.Error, new Span(ast.Span.File, 0, 0),
+                $"module '{entry.FullName}' has no 'main' to start the program from (07 M7a)");
+            return;
+        }
+
+        foreach (var main in mains)
+            if (main.Parameters.Length > 0 || !ValidMain(main))
+                _de.Report("LYR-SEM0021", Severity.Error, main.Span,
+                    "'main' is 'fn main(): void' or 'fn main(): int', and may declare 'throws'; it takes no "
+                    + "parameters — the arguments come from the standard library (07 M7b)");
 
         for (var i = 1; i < mains.Count; i++)
             _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");

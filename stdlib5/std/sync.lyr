@@ -1,6 +1,6 @@
 /// Synchronization between threads (design/v5/spec/06 G4, K6, N7; 10 Q10). M6 S6a: `Atomic<T>`.
 /// `Mutex`, `RwLock` and `Once` come with S6c.
-module std.sync;
+
 
 /// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`.
 /// Sealed: no other type becomes one.

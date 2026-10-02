@@ -6,7 +6,7 @@
 /// pool of them (G1, G2, T1, P5); `Mutex`, `RwLock` and `Once` (G4, K6); signals as a channel (K5,
 /// 10 Q9) — by the module cut `Thread` and `Pool` are `std.thread`'s, the locks `std.sync`'s and the
 /// signals `std.os`'s (10 Q9, Q10), here until M7 lets another module reach the scheduler.
-module std.task;
+
 
 import std.sync { Atomic };
 import std.time { Duration };

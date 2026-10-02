@@ -65,7 +65,8 @@ public class DriverTests
     {
         var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "ir");
         Assert.True(exit == 0, err);
-        Assert.Contains("fn main.main -> i64", output);
+        // A single file is a package of its own, named after the file (07 M1, 11 C8).
+        Assert.Contains("fn hello.main -> i64", output);
         Assert.Contains("callimport std.io.println", output);
         Assert.Contains("callimport std.string.concat", output);
     }
@@ -76,8 +77,8 @@ public class DriverTests
         var (exit, output, err) = Run("build", Program_("fib.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
         // External linkage (01 C3, C4): an instance's unit may call it.
-        Assert.Contains("\nint64_t lyr_main_fib(int64_t l0_n)", output);
-        Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }", output);
+        Assert.Contains("\nint64_t lyr_fib_fib(int64_t l0_n)", output);
+        Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_fib_main); }", output);
     }
 
     /// <summary>01 C3: the module's C is one unit, every generic instance another, named by its

@@ -27,8 +27,9 @@ public static class Pipeline
     /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after reporting.</summary>
     public static CompileResult? Compile(Project project, TextWriter error)
     {
-        var options = new CompilerOptions { StdlibRoot = StdlibRoot };
-        var result = SourceCompiler.Lower(project.Source, options);
+        // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
+        var options = new CompilerOptions { StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots };
+        var result = SourceCompiler.Lower(ScriptSource.FromDisk(project.Source, project.Module), options);
         if (!result.Render(error) || result.Ir is null) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
         result.Diagnostics.RenderText(error);
@@ -50,15 +51,14 @@ public static class Pipeline
         var project = request.Project;
         Directory.CreateDirectory(project.CacheDir);
 
-        // The C, keyed by the source, the toolchain and the compiler that emits it: the same
+        // The C, keyed by the sources, the toolchain and the compiler that emits it: the same
         // program emits the same C, so the front end runs only for a program that changed. The
         // module's unit is named by that key; a generic instance's unit by its own content (01 C3),
         // under 'units/', where nothing else changes — so its object survives every edit that
         // leaves the instance alone. The list of units is written last: its presence says the C is
         // complete.
-        var source = File.ReadAllText(project.Source);
-        var key = Key(source, request.ToolchainVersion, CEmitter.Version, CompilerIdentity);
-        var manifest = Path.Combine(project.CacheDir, $"{project.Name}-{key}.units");
+        var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity);
+        var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
         if (!File.Exists(manifest))
         {
             var result = Compile(project, error);
@@ -67,7 +67,7 @@ public static class Pipeline
             foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot))
             {
                 var path = unit.Instance is null
-                    ? Path.Combine(project.CacheDir, $"{project.Name}-{key}.c")
+                    ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.c")
                     : Path.Combine(project.CacheDir, "units", $"inst-{Key(unit.Text)}.c");
                 WriteOnce(path, unit.Text);
                 paths.Add(path);
@@ -101,6 +101,39 @@ public static class Pipeline
     private static readonly string CompilerIdentity = string.Join(",",
         typeof(SourceCompiler).Assembly.ManifestModule.ModuleVersionId,
         typeof(CEmitter).Assembly.ManifestModule.ModuleVersionId);
+
+    /// <summary>What the C depends on besides the compiler: the entry module, every source file of
+    /// the package — its manifest too — or the single file, and every file of the standard library,
+    /// each by its path and its content. Keyed by the entry file alone, a change to an imported
+    /// module — or to the standard library beside a toolchain whose version did not move — reused
+    /// the old C.</summary>
+    private static string SourcesKey(Project project)
+    {
+        var parts = new List<string> { project.Module };
+        if (project.Manifest is { } manifest)
+        {
+            parts.Add(File.ReadAllText(manifest.File));
+            AddTree(parts, manifest.SourceRoot);
+        }
+        else
+        {
+            parts.Add(File.ReadAllText(project.Source));
+        }
+        AddTree(parts, StdlibRoot);
+        return Key([.. parts]);
+    }
+
+    private static void AddTree(List<string> parts, string root)
+    {
+        if (!Directory.Exists(root)) return;
+        foreach (var file in Directory.EnumerateFiles(root, "*.lyr", SearchOption.AllDirectories)
+                     .Select(file => (Relative: Path.GetRelativePath(root, file).Replace('\\', '/'), Full: file))
+                     .OrderBy(file => file.Relative, StringComparer.Ordinal))
+        {
+            parts.Add(file.Relative);
+            parts.Add(File.ReadAllText(file.Full));
+        }
+    }
 
     /// <summary>A content-named file is written once: a second writer of the same path writes
     /// the same bytes, and the first to move wins.</summary>
