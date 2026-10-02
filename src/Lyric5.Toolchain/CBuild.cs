@@ -65,6 +65,12 @@ public sealed class CBuild
         // the standard (01 L10), and a fused result differs in the last bit from the two roundings
         // the source spells. Fast-math and contraction come back only by an explicit flag.
         var flags = new List<string> { "-std=c11", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off" };
+        // The compilation directory a debugger joins a relative path to is '.', not wherever the
+        // build happens to run (11 W2 P6). gcc has no flag for it; it maps the working directory
+        // like any other prefix — which puts the directory into its cache keys.
+        flags.Add(Compiler.Kind == CCompilerKind.Gcc
+            ? $"-fdebug-prefix-map={Path.TrimEndingDirectorySeparator(Environment.CurrentDirectory)}=."
+            : "-fdebug-compilation-dir=.");
         // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
         // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
         if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");
@@ -201,13 +207,29 @@ public sealed class CBuild
     /// (design/v5/spec/01 L11); the sanitizer runtime comes along in the sanitizer profiles. The
     /// runtime's backtraces need an unwinder — zig cc links a C program without one, so its own
     /// libunwind comes along on Linux; clang and gcc bring libgcc's; macOS has one in libSystem —
-    /// and on Windows DbgHelp, loaded by the runtime at the first trace, not imported. On a macOS host the debug information is gathered into a .dSYM
-    /// beside the executable when dsymutil is there: libbacktrace reads line tables only from one.
+    /// and on Windows DbgHelp, loaded by the runtime at the first trace, not imported. The same
+    /// inputs give the same image (11 W2 P6): a PE image's time stamps and PDB GUID come from its
+    /// own bytes, and a Mach-O image carries no debug map — on a macOS host its .dSYM does, beside
+    /// it, which is where libbacktrace reads line tables from (<see cref="Reproducible"/>).
     /// </summary>
     /// <param name="libraries">Libraries by name (<c>-l</c>), after every input that needs them.</param>
     public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
+        Link(inputs, output, libraries, debugMap: false);
+        if (Target.Os == TargetOs.Windows)
+        {
+            try { Reproducible.NormalizePe(output, Path.ChangeExtension(output, ".pdb")); }
+            catch (InvalidDataException failure) { throw new CBuildException($"{output}: {failure.Message}"); }
+        }
+        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(inputs, output, libraries);
+        return output;
+    }
+
+    /// <summary>One link. A Mach-O image keeps its debug map only when asked: <c>-S</c> leaves out
+    /// what would name every object by its path and time.</summary>
+    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap)
+    {
         var arguments = Driver();
         arguments.AddRange(Profile.Codegen);
         arguments.AddRange(Profile.Instrumentation);
@@ -220,6 +242,7 @@ public sealed class CBuild
             TargetOs.Windows => ["-Wl,--gc-sections"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
+        if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");
         if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");
         if (Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig) arguments.Add("-lunwind");
         var result = ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
@@ -227,16 +250,40 @@ public sealed class CBuild
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
-        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(output);
-        return output;
     }
 
-    /// <summary>Best effort: without dsymutil a backtrace still names functions, without lines.</summary>
-    private static void GatherDebugInfo(string executable)
+    /// <summary>
+    /// The .dSYM beside a macOS image, best effort: without dsymutil a backtrace still names
+    /// functions, without lines. dsymutil follows a debug map, which the image does not carry: a
+    /// second link has one, under the same name in a directory of its own, and its dSYM describes
+    /// the image when the two hold the same bytes at the same addresses. It then takes the image's
+    /// UUID, by which libbacktrace pairs the two.
+    /// </summary>
+    private void GatherDebugInfo(IReadOnlyList<string> inputs, string executable, IReadOnlyList<string>? libraries)
     {
         var dsymutil = CCompiler.FindOnPath("dsymutil");
         if (dsymutil is null) return;
-        ProcessRunner.Run(dsymutil, [executable], TimeSpan.FromMinutes(2));
+        var dsym = executable + ".dSYM";
+        if (Directory.Exists(dsym)) Directory.Delete(dsym, recursive: true);
+        var scratch = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(executable))!, $".debugmap-{Guid.NewGuid():N}");
+        var mapped = Path.Combine(scratch, Path.GetFileName(executable));
+        try
+        {
+            Directory.CreateDirectory(scratch);
+            Link(inputs, mapped, libraries, debugMap: true);
+            if (!Reproducible.SameSegments(mapped, executable)) return;
+            ProcessRunner.Run(dsymutil, [mapped, "-o", dsym], TimeSpan.FromMinutes(2));
+            var dwarf = Path.Combine(dsym, "Contents", "Resources", "DWARF", Path.GetFileName(executable));
+            if (File.Exists(dwarf) && Reproducible.MachOUuid(executable) is { } uuid) Reproducible.SetMachOUuid(dwarf, uuid);
+        }
+        catch (Exception failure) when (failure is CBuildException or TimeoutException or InvalidDataException)
+        {
+            // The image stands without a dSYM.
+        }
+        finally
+        {
+            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+        }
     }
 
     private string Command(IEnumerable<string> arguments) =>
