@@ -79,6 +79,7 @@ public class CEmitterTests
     [InlineData("generators_close")]
     [InlineData("generator_lambdas")]
     [InlineData("dynamic_yields")]
+    [InlineData("tasks")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -223,6 +224,8 @@ public class CEmitterTests
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
+            data.Add("durations", profile, 0,
+                "nanos 2000000000 1500000 -5000 60000000000 3600000000000 7\nread 1500 1 -1 0 3600000\n");
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -366,6 +369,8 @@ public class CEmitterTests
     [InlineData("yield_mismatch", Profile.Release, "panic [LYR-RT0014]: a yield of 'string' where the running coroutine yields 'int'", 6, "numbers__body__\\w+", 11)]
     [InlineData("yield_outside", Profile.Debug, "panic [LYR-RT0014]: a yield with no coroutine running — on the thread's own stack", 5, "main", 10)]
     [InlineData("yield_outside", Profile.Release, "panic [LYR-RT0014]: a yield with no coroutine running — on the thread's own stack", 5, "main", 10)]
+    [InlineData("yield_in_task", Profile.Debug, "panic [LYR-RT0014]: a yield of 'int' in a task, where no generator runs", 8, "main", 13)]
+    [InlineData("yield_in_task", Profile.Release, "panic [LYR-RT0014]: a yield of 'int' in a task, where no generator runs", 8, "main", 13)]
     public void A_yield_the_running_coroutine_cannot_take_panics_at_the_yield(string name, Profile profile, string first,
         int line, string caller, int callerLine)
     {
@@ -375,6 +380,53 @@ public class CEmitterTests
         Assert.Equal(first, lines[0]);
         Assert.Matches($@"^    at lyr_main_emit \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
         Assert.Matches($@"^    at lyr_main_{caller} \(.*programs[\\/]{name}\.lyr:{callerLine}\)$", lines[2]);
+    }
+
+    private const string TASKS_EXPECTED =
+        "ready a b c main\nturns a1 b1 a2 b2 a3 b3\nasleep 20 70 120\nzero z main\nchain 1 other 2 end\ndone\n";
+
+    /// <summary>
+    /// Tasks (design/v5/spec/06 N4-N9, T6; 10 §2): the program's lines are the order — ready
+    /// tasks in turn, sleepers by deadline, a zero sleep, a generator that sleeps inside main's
+    /// task — and a second, timed run shows the waits are real: main sleeps 280 ms in all, and the
+    /// program ends with main, long before its last detached task's 30 s.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void Tasks_take_turns_sleep_and_end_with_main(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("tasks"), "tasks", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("", result.Stderr);
+        Assert.Equal(TASKS_EXPECTED, result.Stdout.Replace("\r\n", "\n"));
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var again = ProcessRunner.Run(RuntimeBuildTests.EmittedBinary("tasks", profile), [], TimeSpan.FromMinutes(1));
+        watch.Stop();
+        Assert.Equal(TASKS_EXPECTED, again.Stdout.Replace("\r\n", "\n"));
+        Assert.InRange(watch.ElapsedMilliseconds, 280, 10000);
+    }
+
+    /// <summary>
+    /// A panic in a task (06 T4, before S4 isolates it): the program ends with 101, and the trace
+    /// runs from the panic through the task's body — the program's lambda, then std.task's wrapper
+    /// around it — and stops there: the thunk that makes the lambda a value is glue, and the
+    /// runtime's frame below the body is not the program's.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_panic_in_a_task_traces_through_its_body(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("task_panic"), "task_panic", profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("panic [LYR-RT0008]: boom", lines[0]);
+        Assert.Matches(@"^    at lyr_main_boom \(.*programs[\\/]task_panic\.lyr:7\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_main_main__lambda\d+__\w+ \(.*programs[\\/]task_panic\.lyr:11\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_std_task_spawnDetached__lambda\d+__\w+ \(.*task\.lyr:\d+\)$", lines[3]);
+        Assert.True(lines.Length == 4, $"stderr:\n{result.Stderr}");
     }
 
     private const string ERRORS_EXPECTED =

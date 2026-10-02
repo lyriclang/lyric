@@ -28,6 +28,7 @@ public class RuntimeProgramTests
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
             data.Add("poll_basic", profile, 0, "poll ok\n", []);
+            data.Add("task_main", profile, 7, "task ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }
@@ -59,6 +60,19 @@ public class RuntimeProgramTests
         var result = RuntimeBuildTests.RunTest("coro_park", profile, args: [which]);
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.StartsWith("panic [LYR-RT0014]: " + message, result.Stderr);
+        Assert.Equal("", result.Stdout);
+    }
+
+    /// <summary>A yield in a task, outside every generator (10 §1.13, 06 N3): there is nothing to
+    /// yield to — RT0014.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_yield_in_a_task_panics(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("task_main", profile, args: ["yield"]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.StartsWith("panic [LYR-RT0014]: a yield of 'int' in a task, where no generator runs", result.Stderr);
         Assert.Equal("", result.Stdout);
     }
 

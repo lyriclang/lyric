@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m6-s2d";
+    public const string Version = "m6-s3c";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -1312,7 +1312,8 @@ public sealed class CEmitter
     /// <summary>
     /// The program's <c>main</c>: the runtime's <c>lyr_run_main</c> around the entry function,
     /// whose value is the exit code masked to 0..255 by the runtime (11 C5); a <c>void</c> entry
-    /// exits with 0.
+    /// exits with 0. Where main is a task (06 T6), <c>lyr_run_main_task</c>, which runs the same
+    /// function as main's context under std.task's loop.
     /// </summary>
     private string Entry(IrFunction entry)
     {
@@ -1331,7 +1332,7 @@ public sealed class CEmitter
             text.AppendLine($"static int64_t lyr_entry(void) {{ {init}LyrErr *lyr_e = NULL; "
                 + (IsVoid(entry.ReturnType) ? $"{call}; int64_t lyr_r = 0; " : $"int64_t lyr_r = {call}; ")
                 + $"if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, {message}, {cause}); return lyr_r; }}");
-            text.AppendLine($"int main(int argc, char **argv) {{ return lyr_run_main(argc, argv, lyr_entry); }}");
+            text.AppendLine($"int main(int argc, char **argv) {{ return {RunMain("lyr_entry")}; }}");
             return text.ToString();
         }
         if (IsVoid(entry.ReturnType) || init.Length > 0)
@@ -1341,9 +1342,16 @@ public sealed class CEmitter
                 : $"static int64_t lyr_entry(void) {{ {init}return {name}(); }}");
             name = "lyr_entry";
         }
-        text.AppendLine($"int main(int argc, char **argv) {{ return lyr_run_main(argc, argv, {name}); }}");
+        text.AppendLine($"int main(int argc, char **argv) {{ return {RunMain(name)}; }}");
         return text.ToString();
     }
+
+    /// <summary>The runtime's start around the program's main function, as a task under std.task's
+    /// loop where the program waits (06 T6).</summary>
+    private string RunMain(string program) =>
+        _module.TaskMain is { } loop
+            ? $"lyr_run_main_task(argc, argv, {program}, {FunctionName(_module.Functions[loop.Value].Name)})"
+            : $"lyr_run_main(argc, argv, {program})";
 
     /// <summary>Whether an error can end the program: <c>main</c> throws (05 E6 O4), or a
     /// <c>try!</c> panics with an error's message (E4, E8). Asked of the whole module, so every

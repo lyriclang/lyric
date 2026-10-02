@@ -1,0 +1,14 @@
+// A yield in a task, outside every generator (design/v5/spec/10 §1.13, 06 N3): main is a task —
+// the program waits — and the helper's yield has no generator to go to. RT0014 at the yield in
+// 'emit', then main.
+import std.task { sleep, Cancelled };
+import std.time { Duration };
+
+fn emit(): void throws Cancelled {
+    yield 1;
+}
+
+fn main(): void throws Cancelled {
+    try sleep(Duration.ofNanos(1));
+    try emit();
+}

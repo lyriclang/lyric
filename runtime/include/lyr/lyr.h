@@ -13,5 +13,6 @@
 #include "lyr/coro.h"
 #include "lyr/time.h"
 #include "lyr/poll.h"
+#include "lyr/task.h"
 
 #endif

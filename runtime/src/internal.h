@@ -110,6 +110,7 @@ struct LyrCoro {
     const char *yield_key;         /* the yield type, for a dynamic yield (lyr_coro_set_yield_key) */
     struct LyrCoro *parked_top;    /* PARKED: the innermost coroutine of its chain, where it parked */
     int cleanup;                   /* its body has defers or usings (lyr_coro_set_cleanup) */
+    int task;                      /* a task's context (lyr/task.h): no generator, so no yield */
 };
 
 /* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */

@@ -23,6 +23,15 @@ public static class Intrinsics
         ["std.core.assert"] = "LYR_ASSERT",
         ["std.core.unreachable"] = "lyr_panic_unreachable",
         ["std.core.todo"] = "lyr_panic_todo",
+        // std.task's side of the scheduler (06 N6 S1; 13 §1.6-1.7): a task's context around a
+        // function value, which the macro passes as its code and environment; the thread's
+        // scheduler; the park; the poller; the monotonic clock.
+        ["std.task.startContext"] = "LYR_TASK_START",
+        ["std.task.park"] = "lyr_coro_park",
+        ["std.task.currentScheduler"] = "lyr_task_scheduler",
+        ["std.task.setCurrentScheduler"] = "lyr_task_set_scheduler",
+        ["std.task.waitOnPoller"] = "lyr_task_wait",
+        ["std.task.monotonicNanos"] = "lyr_clock_monotonic_ns",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

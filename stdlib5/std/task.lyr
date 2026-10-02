@@ -1,7 +1,10 @@
-/// Tasks and their cancellation (design/v5/spec/06 N4, N9; 10 Q10). M6 S2b seed: `Cancelled`, which
-/// a suspended `yield` throws when its coroutine is closed (06 A5); the scheduler, tasks, timers
-/// and channels come with S3–S5 and grow this module.
+/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3c: a scheduler for
+/// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
+/// as a task (T6); `sleep`, `yieldNow`, `spawnDetached`. `Task`, `spawn` and `await` come with S3d,
+/// `TaskScope` and cancellation with S4, timers and channels with S5, threads with S6.
 module std.task;
+
+import std.time { Duration };
 
 /// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a
 /// cancelled task will throw at its next wait (06 N9 X1): an `Error`, so cleanup can catch it —
@@ -9,3 +12,194 @@ module std.task;
 pub class Cancelled :: [Error] {
     fn message(): string { return "cancelled"; }
 }
+
+/// Parks the running task until `d` has passed, at least (06 K3), while the other tasks of its
+/// thread run. A sleep of zero or less lets the tasks that are ready run first. A wait: a
+/// cancelled task throws `Cancelled` here (06 N9 X1).
+pub fn sleep(d: Duration): void throws Cancelled {
+    here().sleep(d.nanos());
+}
+
+/// Lets the other ready tasks of the thread run first (06 N8): the running task goes behind them.
+/// A wait, so a point where a cancelled task throws `Cancelled` (06 N9 X2).
+pub fn yieldNow(): void throws Cancelled {
+    here().yieldNow();
+}
+
+/// Starts `body` as a task of the running thread, with no handle (06 T5): it runs once the tasks
+/// ready before it had their turn, and nobody waits for it — the program ends with `main`, done
+/// or not (T6). Only a cancellation may end it early: it handles every other error itself.
+pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
+    let run = () => {
+        try {
+            body();
+        } catch (_: Cancelled) {
+        }
+    };
+    here().ready(Context { body = startContext(run, 0) });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The scheduler (06 N6 S1, S6): one for each thread that runs tasks. It runs one task at a time
+// until that task waits (N8) — the ready ones in the order they became ready, the sleepers once
+// their deadline came, earliest first — and, with nothing ready, waits on the thread's poller
+// until the earliest deadline.
+// ---------------------------------------------------------------------------------------------
+
+/// A task's context as the scheduler holds it: the coroutine its body runs in (13 §1.6), and the
+/// links of the one place it waits in at a time — the ready queue, or the sleepers' heap.
+class Context {
+    body: Coroutine<void>,
+    /// The ready queue's link.
+    var next: ?Context = null,
+    /// A sleeper's deadline on the monotonic clock, and when it fell asleep: the tie-break.
+    var deadline: int = 0,
+    var order: int = 0,
+    /// The sleepers' heap is leftist: the children, and the length of the right spine.
+    var left: ?Context = null,
+    var right: ?Context = null,
+    var rank: int = 0,
+}
+
+class Scheduler {
+    var first: ?Context = null,
+    var last: ?Context = null,
+    var sleepers: ?Context = null,
+    var fallenAsleep: int = 0,
+    var running: ?Context = null,
+
+    /// `c` goes to the end of the ready queue.
+    mut fn ready(c: Context): void {
+        c.next = null;
+        if (let tail = this.last) {
+            tail.next = c;
+        } else {
+            this.first = c;
+        }
+        this.last = c;
+    }
+
+    mut fn takeReady(): ?Context {
+        let head = this.first;
+        if (head == null) { return null; }
+        this.first = head.next;
+        if (head.next == null) { this.last = null; }
+        head.next = null;
+        return head;
+    }
+
+    mut fn sleep(nanos: int): void {
+        let c = this.running ?? panic("a sleep where no task runs");
+        let now = monotonicNanos();
+        c.deadline = if (nanos > 9223372036854775807 - now) 9223372036854775807 else now + nanos;
+        c.order = this.fallenAsleep;
+        this.fallenAsleep += 1;
+        this.sleepers = merge(this.sleepers, c);
+        park();
+    }
+
+    mut fn yieldNow(): void {
+        this.ready(this.running ?? panic("a yield where no task runs"));
+        park();
+    }
+
+    /// The sleepers whose deadline came go to the ready queue, earliest first.
+    mut fn wake(now: int): void {
+        while (let top = this.sleepers) {
+            if (top.deadline > now) { return; }
+            this.sleepers = merge(top.left, top.right);
+            top.left = null;
+            top.right = null;
+            top.rank = 0;
+            this.ready(top);
+        }
+    }
+
+    /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
+    /// the earliest sleeper — without end where there is none, until another thread wakes it.
+    mut fn step(): void {
+        if (this.sleepers != null) { this.wake(monotonicNanos()); }
+        if (let c = this.takeReady()) {
+            this.running = c;
+            c.body.next();
+            this.running = null;
+            return;
+        }
+        let top = this.sleepers;
+        if (top == null) {
+            waitOnPoller(-1);
+            return;
+        }
+        let left = top.deadline - monotonicNanos();
+        waitOnPoller(if (left > 0) left else 0);
+    }
+}
+
+/// The running thread's scheduler: there is one wherever a task runs.
+fn here(): Scheduler {
+    return currentScheduler() ?? panic("a wait where no task runs");
+}
+
+/// The two heaps of sleepers as one: the earlier root on top, the other merged down its right
+/// spine, whose length stays logarithmic.
+fn merge(a: ?Context, b: ?Context): ?Context {
+    if (a == null) { return b; }
+    if (b == null) { return a; }
+    if (b.deadline < a.deadline || (b.deadline == a.deadline && b.order < a.order)) {
+        return meld(b, a);
+    }
+    return meld(a, b);
+}
+
+fn meld(top: Context, other: Context): Context {
+    top.right = merge(top.right, other);
+    let l = rankOf(top.left);
+    let r = rankOf(top.right);
+    if (l < r) {
+        let swap = top.left;
+        top.left = top.right;
+        top.right = swap;
+        top.rank = l + 1;
+    } else {
+        top.rank = r + 1;
+    }
+    return top;
+}
+
+fn rankOf(c: ?Context): int {
+    if (c == null) { return 0; }
+    return c.rank;
+}
+
+/// The program's scheduler loop where `main` is a task (06 T6), which the runtime calls with main's
+/// context: it runs until that context is done — the program ends with main, and what is still
+/// ready or asleep then never runs again.
+fn runMain(main: Coroutine<void>): void {
+    let s = Scheduler { };
+    setCurrentScheduler(s);
+    s.ready(Context { body = main });
+    while (!main.isDone()) {
+        s.step();
+    }
+    setCurrentScheduler(null);
+}
+
+// The runtime's side (13 §1.6, §1.7), the module's own.
+
+/// A task's context around `body` on a stack of its own — `stack` bytes, 0 for the default: a
+/// coroutine that yields nothing, whose body only ever parks.
+fn startContext(body: fn() -> void, stack: int): Coroutine<void>;
+
+/// Parks the running chain at the scheduler (13 §1.6 rule 7).
+fn park(): void;
+
+/// The running thread's scheduler, as `runMain` set it.
+fn currentScheduler(): ?Scheduler;
+fn setCurrentScheduler(s: ?Scheduler): void;
+
+/// Waits on the thread's poller (13 §1.7) for `nanos` at most, a negative one without end: true
+/// when woken.
+fn waitOnPoller(nanos: int): bool;
+
+/// The monotonic clock (13 §1.6 rule 8): nanoseconds.
+fn monotonicNanos(): int;

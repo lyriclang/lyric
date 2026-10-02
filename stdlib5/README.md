@@ -6,5 +6,6 @@ front-end tests still import (until M8a). The modules here are the ones the comp
 loaded for every program with a coroutine) and what the M2 programs need (`std.io`), declared as
 natively backed functions the C emitter maps to the runtime (`Lyric5.Compiler`, the intrinsic
 table). This is a provisional shape with a date: M8a rewrites `std` in Lyric (design/v5/spec/10),
-source-first, and the intrinsic table falls with it; `std.task` grows with M6 (the scheduler, tasks,
-channels).
+source-first, and the intrinsic table falls with it; `std.task` grows with M6 — its scheduler is
+Lyric already, over the runtime's park and poller (06 N6 S1) — and `std.time`, so far `Duration`
+for `sleep`, with M8b.

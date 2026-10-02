@@ -1,0 +1,12 @@
+// Duration (design/v5/spec/10 Q1; the M6 seed of std.time): whole nanoseconds, negative or not,
+// and readers that round toward zero. Expected stdout:
+//   nanos 2000000000 1500000 -5000 60000000000 3600000000000 7
+//   read 1500 1 -1 0 3600000
+import std.io { println };
+import std.time { Duration };
+
+fn main(): void {
+    let sum = Duration.ofMillis(1).nanos() + Duration.ofMicros(500).nanos();
+    println(f"nanos {Duration.ofSecs(2).nanos()} {sum} {Duration.ofMicros(-5).nanos()} {Duration.ofMinutes(1).nanos()} {Duration.ofHours(1).nanos()} {Duration.ofNanos(7).nanos()}");
+    println(f"read {Duration.ofMillis(1500).millis()} {Duration.ofMillis(1500).secs()} {Duration.ofMillis(-1500).secs()} {Duration.ofMicros(999).millis()} {Duration.ofHours(1).millis()}");
+}

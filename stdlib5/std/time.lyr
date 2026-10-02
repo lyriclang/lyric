@@ -1,0 +1,25 @@
+/// Time (design/v5/spec/10 Q1). M6 seed: `Duration`, which `std.task`'s `sleep` takes; `Instant`,
+/// `Monotonic`, the calendar and the formats come with M8b.
+module std.time;
+
+/// A span of time in whole nanoseconds, negative or not (10 Q1, N3). A constructor whose span does
+/// not fit — some 292 years either way — panics with an overflow (RT0002).
+pub struct Duration {
+    ns: int,
+
+    pub static fn ofNanos(n: int): Duration { return Duration { ns = n }; }
+    pub static fn ofMicros(n: int): Duration { return Duration { ns = n * 1000 }; }
+    pub static fn ofMillis(n: int): Duration { return Duration { ns = n * 1000000 }; }
+    pub static fn ofSecs(n: int): Duration { return Duration { ns = n * 1000000000 }; }
+    pub static fn ofMinutes(n: int): Duration { return Duration { ns = n * 60000000000 }; }
+    pub static fn ofHours(n: int): Duration { return Duration { ns = n * 3600000000000 }; }
+
+    /// The span in nanoseconds.
+    pub fn nanos(): int { return this.ns; }
+
+    /// The span in whole milliseconds, rounded toward zero.
+    pub fn millis(): int { return this.ns / 1000000; }
+
+    /// The span in whole seconds, rounded toward zero.
+    pub fn secs(): int { return this.ns / 1000000000; }
+}
