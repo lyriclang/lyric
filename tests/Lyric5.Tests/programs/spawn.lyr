@@ -1,0 +1,60 @@
+// spawn, Task, await (design/v5/spec/06 T1-T3; 05 E10; 10 §2): a handle carries the body's result
+// and the error it may end with. Expected stdout:
+//   started false                  a spawned task runs only once main waits
+//   void body                      a body that returns nothing (03 §9.1 rule 7)
+//   got 5 7 true 1 2 true          values, an error turned into null by try?, sleepers awaited
+//   waiters first second           the tasks awaiting one task run in the order they came
+//   typed 7 3                      a written 'Task<int> throws Oops', and a plain task in it
+import std.io { println };
+import std.task { spawn, spawnDetached, sleep, Task, Cancelled };
+import std.time { Duration };
+
+enum Oops :: [Error] { Bad; fn message(): string { return "oops"; } }
+
+var log = "";
+
+fn risky(fail: bool): int throws Oops {
+    if (fail) { throw Oops.Bad; }
+    return 7;
+}
+
+fn later(n: int, ms: int): int throws Cancelled {
+    try sleep(Duration.ofMillis(ms));
+    return n;
+}
+
+fn main(): void throws [Oops, Cancelled] {
+    let a = spawn(() => 5);
+    let b = spawn(() => try risky(false));
+    let c = spawn(() => try risky(true));
+    let d = spawn(() => { println("void body"); });
+    let slow = spawn(() => try later(1, 30));
+    let fast = spawn(() => try later(2, 10));
+    println(f"started {a.isDone()}");
+    let x = try a.await();
+    let y = try b.await();
+    let z = try? c.await();
+    try d.await();
+    let s = try slow.await();
+    let f = try fast.await();
+    println(f"got {x} {y} {z == null} {s} {f} {fast.isDone()}");
+
+    let shared = spawn(() => try later(3, 10));
+    spawnDetached(() => {
+        let v = try? shared.await();
+        log = log + " first";
+    });
+    spawnDetached(() => {
+        let v = try? shared.await();
+        log = log + " second";
+    });
+    try sleep(Duration.ofMillis(40));
+    println("waiters" + log);
+
+    let typed: Task<int> throws Oops = spawn(() => try risky(false));
+    let plain: Task<int> = spawn(() => 3);
+    let wider: Task<int> throws Oops = plain;
+    let t = try typed.await();
+    let w = try wider.await();
+    println(f"typed {t} {w}");
+}

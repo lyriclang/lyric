@@ -45,7 +45,9 @@ public abstract record LyrType
         (OpaqueRef x, OpaqueRef y) => ReferenceEquals(x.Symbol, y.Symbol),
         (TypeParamType x, TypeParamType y) => ReferenceEquals(x.Param, y.Param),
         (GenericInstance x, GenericInstance y) => ReferenceEquals(x.Definition, y.Definition) && SameSequence(x.Arguments, y.Arguments)
-                                                  && SameFixations(x.Fixations, y.Fixations),
+                                                  && SameFixations(x.Fixations, y.Fixations)
+                                                  && (x.Throws is null) == (y.Throws is null)
+                                                  && (x.Throws is null || Equal(x.Throws, y.Throws!)),
         (AssocOf x, AssocOf y) => Equal(x.Base, y.Base) && ReferenceEquals(x.Member, y.Member),
         (Optional x, Optional y) => Equal(x.Inner, y.Inner),
         (ArrayOf x, ArrayOf y) => Equal(x.Element, y.Element),
@@ -110,6 +112,11 @@ public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments)
     /// <summary><c>Iterator&lt;Item = int&gt;</c> (03 T6): the associated types this instance of an
     /// interface fixes, <c>null</c> when none. Part of the type's identity.</summary>
     public (AssociatedTypeSymbol Member, LyrType Type)[]? Fixations { get; init; }
+
+    /// <summary>A task's error (design/v5/spec/10 §2): <c>Task&lt;T&gt; throws E</c> — what its body
+    /// may end with, a thing of the type as on a coroutine (05 E10); <c>null</c> where it throws
+    /// nothing. std.task's <c>Task</c> alone carries one. Part of the type's identity.</summary>
+    public LyrType? Throws { get; init; }
 }
 
 /// <summary><c>T.Item</c> (03 T6): the associated type <see cref="Member"/> of whatever

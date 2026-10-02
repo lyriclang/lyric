@@ -1,7 +1,7 @@
-/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3c: a scheduler for
+/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
-/// as a task (T6); `sleep`, `yieldNow`, `spawnDetached`. `Task`, `spawn` and `await` come with S3d,
-/// `TaskScope` and cancellation with S4, timers and channels with S5, threads with S6.
+/// as a task (T6); `spawn` and its `Task`, `spawnDetached`, `sleep`, `yieldNow`. `TaskScope` and
+/// cancellation come with S4, timers and channels with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
@@ -24,6 +24,72 @@ pub fn sleep(d: Duration): void throws Cancelled {
 /// A wait, so a point where a cancelled task throws `Cancelled` (06 N9 X2).
 pub fn yieldNow(): void throws Cancelled {
     here().yieldNow();
+}
+
+/// A task's handle (06 T1-T3), which `spawn` gives: the body's result once it ended, or the error
+/// it ended with. Its type carries that error — `Task<T> throws E`, as a coroutine's carries what
+/// its pulls throw (05 E10) — and `await()` throws it.
+pub class Task<T> {
+    var done: bool = false,
+    var value: ?T = null,
+    var failure: ?Error = null,
+    /// The contexts parked in `await()` until the body ends, in the order they came.
+    var firstWaiting: ?Context = null,
+    var lastWaiting: ?Context = null,
+
+    /// Whether the body has ended, with its value or with an error (06 T3).
+    pub fn isDone(): bool {
+        return this.done;
+    }
+
+    /// The body's value once it has ended, or its error, thrown here (06 T2): the running task
+    /// waits until then. A wait, so it throws `Cancelled` as well (06 N9 X1); what it throws is
+    /// read off the handle's type at the call (10 §2), the declared `Error` stands for both.
+    pub mut fn await(): T throws Error {
+        while (!this.done) {
+            let me = here().running ?? panic("an await where no task runs");
+            me.next = null;
+            if (let tail = this.lastWaiting) {
+                tail.next = me;
+            } else {
+                this.firstWaiting = me;
+            }
+            this.lastWaiting = me;
+            park();
+        }
+        if (let e = this.failure) {
+            throw e;
+        }
+        return this.value!;
+    }
+
+    /// The body has ended: the tasks waiting for it are ready, in the order they came.
+    mut fn finish(): void {
+        this.done = true;
+        let s = here();
+        while (let c = this.firstWaiting) {
+            this.firstWaiting = c.next;
+            s.ready(c);
+        }
+        this.lastWaiting = null;
+    }
+}
+
+/// Starts `body` as a task of the running thread and gives its handle (06 T1): the task runs once
+/// the tasks ready before it had their turn, and `await()` on the handle gives its value or throws
+/// its error — `E`, what the body throws, the handle's type carries.
+pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+    let task = Task<T> { };
+    let run = () => {
+        try {
+            task.value = body();
+        } catch (e) {
+            task.failure = e;
+        }
+        task.finish();
+    };
+    here().ready(Context { body = startContext(run, 0) });
+    return task;
 }
 
 /// Starts `body` as a task of the running thread, with no handle (06 T5): it runs once the tasks

@@ -224,6 +224,8 @@ public class CEmitterTests
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
+            data.Add("spawn", profile, 0,
+                "started false\nvoid body\ngot 5 7 true 1 2 true\nwaiters first second\ntyped 7 3\n");
             data.Add("void_values", profile, 0,
                 "side\nagain\nagain\nbound\npassed\nwrapped\ntuple\n5 true true 1 true 2 1\n");
             data.Add("durations", profile, 0,

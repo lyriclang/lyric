@@ -221,7 +221,10 @@ public static class TypeFacts
             case TypeParamType tp: return tp.Param.Name;
             case GenericInstance gi:
                 var fixations = gi.Fixations is { Length: > 0 } fs ? fs.Select(f => $"{f.Member.Name} = {Display(f.Type)}") : [];
-                return gi.Definition.Name + "<" + string.Join(", ", gi.Arguments.Select(Display).Concat(fixations)) + ">";
+                return gi.Definition.Name + "<" + string.Join(", ", gi.Arguments.Select(Display).Concat(fixations)) + ">"
+                       + (gi.Throws is { } thrown
+                           ? " throws" + (thrown is NamedRef { Symbol.Name: "Error" } ? "" : " " + Display(thrown))
+                           : "");
             case AssocOf a: return Display(a.Base) + "." + a.Member.Name;
             case Optional o: return "?" + Display(o.Inner);
             // A function type as an element type MUST be parenthesized: 'fn(int) -> void[]' would
