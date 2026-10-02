@@ -1517,6 +1517,9 @@ public sealed class TypeChecker
                 continue;
             }
             entrySeen.Add((entry, NodeSpan(node)));
+            // A parent's associated type the interface's list fixes is the conformer's answer
+            // (05 §8 rule 7).
+            CheckFixedAnswers(node, direct, entry, self ?? SelfType(implementer), name);
 
             // The WithArg promise (3.9, §4.7): the parenthesized value fills the FIRST field,
             // and the type argument names its type. Checked at the entry that REACHES the
@@ -4158,7 +4161,7 @@ public sealed class TypeChecker
                     // stays 'T.Out' until the constraint fixes it ('Add<Out = T>').
                     var withSelf = WithSelf(subst, it, receiver);
                     var signature = Substitute(FnTypeOf(member), withSelf);
-                    if (ResolveType(nt, _currentModule?.Members ?? _comp.Builtins) is GenericInstance { Fixations: { Length: > 0 } fixations })
+                    if (FixationsOf(nt, tp.Param) is { Length: > 0 } fixations)
                         signature = ApplyFixations(signature, tp.Param, fixations);
                     yield return new ArithmeticCandidate(Substitute(operand, withSelf), signature, member);
                 }
@@ -5460,7 +5463,7 @@ public sealed class TypeChecker
                 // Without the substitution the raw interface type comes back and 'a.eq(b)' fails
                 // with "cannot assign 'T' to 'T'".
                 var signature = Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp)));
-                if (ResolveType(nt, _currentModule?.Members ?? _comp.Builtins) is GenericInstance { Fixations: { Length: > 0 } fixations })
+                if (FixationsOf(nt, gp) is { Length: > 0 } fixations)
                     signature = ApplyFixations(signature, gp, fixations);
                 return (signature, fn);
             }
@@ -5577,6 +5580,69 @@ public sealed class TypeChecker
         for (var i = 0; i < args.Length; i++)
             if (!map.TryGetValue(owner.Generics[i], out args[i]!)) return null;
         return new GenericInstance(owner, args);
+    }
+
+    /// <summary>
+    /// What a constraint fixes for its parameter (03 T6): the constraint's own fixations,
+    /// <c>T :: [Iterator&lt;Item = int&gt;]</c>, and those its interface's parents carry in their
+    /// lists, <c>interface Num :: [Add&lt;Out = Self&gt;]</c> (05 §8 rule 7) — every interface's
+    /// <c>Self</c> read as the parameter, so <c>x + x</c> under <c>T :: [Num]</c> is a <c>T</c>.
+    /// </summary>
+    private (AssociatedTypeSymbol Member, LyrType Type)[] FixationsOf(NamedType constraint, GenericParamSymbol gp)
+    {
+        if (Conformance.InterfaceOf(constraint, _binding) is not { } iface) return [];
+        var closure = InterfaceClosure(iface, ResolveType(constraint, _currentModule?.Members ?? _comp.Builtins)).ToList();
+        var selves = SelvesOf(closure, new TypeParamType(gp));
+        var all = new List<(AssociatedTypeSymbol, LyrType)>();
+        foreach (var (_, instance) in closure)
+            if (instance is GenericInstance { Fixations: { Length: > 0 } written })
+                foreach (var (member, type) in written)
+                    all.Add((member, Substitute(type, selves)));
+        return all.ToArray();
+    }
+
+    /// <summary>An interface instance without the fixations it carries: <c>Iterator&lt;Item =
+    /// int&gt;</c> names the conformance <c>Iterator</c> does, <c>Neg&lt;Out = Self&gt;</c> the one
+    /// <c>Neg</c> does — a fixation is asked apart (05 §8 rules 5, 7).</summary>
+    private static LyrType WithoutFixations(LyrType instance) =>
+        instance is GenericInstance { Fixations: not null } fixing
+            ? fixing.Definition.Generics.Length == 0 ? new NamedRef(fixing.Definition) : fixing with { Fixations = null }
+            : instance;
+
+    /// <summary>Every interface's <c>Self</c> along a closure, read as one conformer: a fixation
+    /// written in a parent list names the <c>Self</c> of the interface it stands in.</summary>
+    private static Dictionary<GenericParamSymbol, LyrType> SelvesOf(
+        IEnumerable<(TypeSymbol iface, LyrType instance)> closure, LyrType conformer)
+    {
+        var selves = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        foreach (var (iface, _) in closure)
+            if (iface.SelfParam is { } self) selves[self] = conformer;
+        return selves;
+    }
+
+    /// <summary>
+    /// A parent's associated type an interface's list fixes, <c>interface Num :: [Add&lt;Out =
+    /// Self&gt;]</c> (05 §8 rule 7), is what every conformer answers: another answer does not
+    /// conform (<c>LYR-SEM0042</c>), as a signature reading it would not. An answer missing
+    /// altogether is <c>LYR-SEM0128</c>'s, where it stands.
+    /// </summary>
+    private void CheckFixedAnswers(TypeNode node, TypeSymbol direct, LyrType entry, LyrType conformer, string name)
+    {
+        var closure = InterfaceClosure(direct, entry).ToList();
+        var selves = SelvesOf(closure, conformer);
+        foreach (var (iface, instance) in closure.Skip(1)) // the entry's own fixations constrain no parent
+        {
+            if (instance is not GenericInstance { Fixations: { Length: > 0 } written } fixing) continue;
+            foreach (var (member, type) in written)
+            {
+                var want = Substitute(type, selves);
+                var answer = ResolveAssociated(conformer, member, Substitute(WithoutFixations(fixing), selves));
+                if (answer is AssocOf || answer.IsError || want.IsError || LyrType.Equal(answer, want)) continue;
+                _de.Report("LYR-SEM0042", Severity.Error, NodeSpan(node),
+                    $"'{name}' answers '{iface.Name}.{member.Name}' with '{TypeFacts.Display(answer)}', and "
+                    + $"'{direct.Name}' fixes it to '{TypeFacts.Display(want)}'");
+            }
+        }
     }
 
     /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
@@ -6168,18 +6234,17 @@ public sealed class TypeChecker
             // written short, and so is the constraint 'T :: [Add]' at 'T = Vec2'.
             var selfMap = self is null ? EmptySubst : SelfMap(p, self);
             // The fixations are asked below, the arguments here: 'Iterator<Item = int>' names the
-            // same conformance as 'Iterator'.
-            var bare = wanted is GenericInstance { Fixations: not null } fixing
-                ? fixing.Definition.Generics.Length == 0 ? new NamedRef(fixing.Definition) : fixing with { Fixations = null }
-                : wanted;
-            if (!Matches(Substitute(inst, selfMap), ofInstance, Substitute(bare, selfMap))) continue;
+            // same conformance as 'Iterator' — on either side, a parent list's 'Neg<Out = Self>'
+            // as 'Neg' (05 §8 rule 7).
+            var declared = WithoutFixations(inst);
+            if (!Matches(Substitute(declared, selfMap), ofInstance, Substitute(WithoutFixations(wanted), selfMap))) continue;
             // A fixation at the constraint, 'T :: [Iterator<Item = int>]' (03 T6), asks the
             // conformer's answer to be that type.
             if (wanted is GenericInstance { Fixations: { Length: > 0 } fixations } && self is not null && self is not TypeParamType)
             {
                 var all = true;
                 foreach (var (member, fixedTo) in fixations)
-                    if (!LyrType.Equal(ResolveAssociated(self, member, Substitute(inst, selfMap)), Substitute(fixedTo, ofInstance))) { all = false; break; }
+                    if (!LyrType.Equal(ResolveAssociated(self, member, Substitute(declared, selfMap)), Substitute(fixedTo, ofInstance))) { all = false; break; }
                 if (!all) continue;
             }
             return true;
@@ -6473,8 +6538,9 @@ public sealed class TypeChecker
         {
             if (seenInstances is not null)
             {
-                if (seenInstances.Any(t => LyrType.Equal(t, inst))) continue;
-                seenInstances.Add(inst);
+                var key = WithoutFixations(inst);
+                if (seenInstances.Any(t => LyrType.Equal(t, key))) continue;
+                seenInstances.Add(key);
             }
             yield return (i, inst is GenericInstance gi ? SubstMap(gi) : EmptySubst);
         }
