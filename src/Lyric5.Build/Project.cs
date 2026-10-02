@@ -5,7 +5,7 @@ namespace Lyric5.Build;
 /// <summary>A package without <c>src/main.lyr</c> (11 P2): a library, which <c>build</c> checks
 /// (07 B6) and nothing runs.</summary>
 public sealed class LibraryException(Manifest manifest, PackageGraph graph)
-    : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr, so there is no program (11 P2)")
+    : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr and no [[bin]], so there is no program (11 P2)")
 {
     public Manifest Manifest { get; } = manifest;
     public PackageGraph Graph { get; } = graph;
@@ -35,17 +35,21 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// dependencies; <c>null</c> for a single file, which has std alone.</summary>
     public PackageGraph? Graph { get; init; }
 
+    /// <summary>The name a <c>[[bin]]</c> gives the program (11 W2 P2); <c>null</c> for every other.</summary>
+    public string? Binary { get; init; }
+
     public string OutDir => Path.Combine(Root, "out");
 
     public string CacheDir => Path.Combine(OutDir, "cache");
 
-    /// <summary>The binary: named after the package for its <c>src/main.lyr</c> (P2), after the
-    /// module's last segment for another module run as a program (07 M7a) — beside it, not over it.</summary>
+    /// <summary>The binary: named after the package for its <c>src/main.lyr</c>, as its <c>[[bin]]</c>
+    /// says for another program (P2), after the module's last segment for another module run as a
+    /// program (07 M7a) — beside it, not over it.</summary>
     public string Executable(BuildProfile profile, Target target) =>
         Path.Combine(OutDir, profile.Name, target.Triple, BinaryName + target.ExecutableSuffix);
 
     public string BinaryName =>
-        Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..];
+        Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
 
     /// <summary>Every package's source root by name, for the module loader — none for a single file,
     /// whose only module is its own.</summary>
@@ -79,19 +83,34 @@ public sealed record Project(string Source, string Name, string Module, string R
             : new Project(full, stem, stem, root, null);
     }
 
-    /// <summary>The package of a directory: the nearest manifest at or above it, built from its
-    /// <c>src/main.lyr</c> (P2). <c>null</c> where there is no manifest.</summary>
+    /// <summary>The programs of the package of a directory — the nearest manifest at or above it
+    /// —: its <c>src/main.lyr</c>, named after the package, then each <c>[[bin]]</c> (P2).
+    /// <c>null</c> where there is no manifest.</summary>
     /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <exception cref="LibraryException">The package has no program.</exception>
-    public static Project? ForDirectory(string directory, bool offline = false)
+    public static IReadOnlyList<Project>? ProgramsOf(string directory, bool offline = false)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
         var graph = Resolve(manifest, offline);
-        var entry = Path.Combine(manifest.SourceRoot, "main.lyr");
-        if (!File.Exists(entry)) throw new LibraryException(manifest, graph);
-        return new Project(entry, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest) { Graph = graph };
+        var programs = new List<Project>();
+        var main = Path.Combine(manifest.SourceRoot, "main.lyr");
+        if (File.Exists(main))
+            programs.Add(new Project(main, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest) { Graph = graph });
+        foreach (var binary in manifest.Binaries)
+        {
+            if (!File.Exists(binary.Entry))
+                throw new ManifestException("LYR-PKG0002", manifest.File, binary.Line, 1,
+                    $"[[bin]] '{binary.Name}' enters at '{Path.GetRelativePath(manifest.Root, binary.Entry).Replace('\\', '/')}', and there is no such file");
+            programs.Add(new Project(binary.Entry, manifest.Name, ModulePathOf(manifest, binary.Entry)!, manifest.Root, manifest)
+            {
+                Graph = graph,
+                Binary = binary.Name,
+            });
+        }
+        if (programs.Count == 0) throw new LibraryException(manifest, graph);
+        return programs;
     }
 
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its

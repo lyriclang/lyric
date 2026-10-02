@@ -30,6 +30,14 @@ public sealed record GitSource(string Url, GitRefKind Kind, string? Ref)
 
 public enum GitRefKind { Default, Tag, Branch, Rev }
 
+/// <summary>A program of the package besides its <c>src/main.lyr</c> (design/v5/spec/11 W2 P2):
+/// <c>[[bin]] name = "tool" entry = "src/tool.lyr"</c>.</summary>
+/// <param name="Entry">The entry module's file, absolute: a module of the package.</param>
+public sealed record Binary(string Name, string Entry, int Line);
+
+/// <summary>The least toolchain that builds the package (11 W2 P12; 07 V9).</summary>
+public sealed record ToolchainPin(SemVer Minimum, int Line);
+
 /// <summary>
 /// A package's manifest, <c>lyric.toml</c> (design/v5/spec/07 V7, 11 W2): read, never run (P1).
 /// <c>[package]</c> names the package — the first segment of its module paths (07 M1, M3) —, its
@@ -57,6 +65,12 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// named — the root manifest's alone count.</summary>
     public IReadOnlyDictionary<string, ProfileSpec> Profiles { get; init; } = new Dictionary<string, ProfileSpec>();
 
+    /// <summary><c>[[bin]]</c> (P2): the programs besides <c>src/main.lyr</c>.</summary>
+    public IReadOnlyList<Binary> Binaries { get; init; } = [];
+
+    /// <summary><c>toolchain</c> (P12): the least toolchain that builds the package; <c>null</c> for any.</summary>
+    public ToolchainPin? Toolchain { get; init; }
+
     /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies (P5).</summary>
     public string Root => Path.GetDirectoryName(File)!;
 
@@ -68,21 +82,13 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     /// <summary>The keys of <c>[package]</c> the toolchain reads, and the ones that describe the
     /// package and change no build — for <c>lyric metadata</c> (P10).</summary>
-    private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude"];
+    private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude", "toolchain"];
 
     private static readonly string[] DescriptiveStrings = ["description", "license", "repository"];
-
-    /// <summary>The keys of <c>[package]</c> with a meaning the plan gives them later: a pin that
-    /// is accepted and not enforced would be a promise the toolchain does not keep.</summary>
-    private static readonly Dictionary<string, string> LaterKeys = new(StringComparer.Ordinal)
-    {
-        ["toolchain"] = "M7 S6",
-    };
 
     /// <summary>The sections the plan gives a meaning to later, with the slice they come with.</summary>
     private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
     {
-        ["bin"] = "M7 S6",
         ["native"] = "M7 S6",
         ["lints"] = "M12",
         ["build-dependencies"] = "M7 S7",
@@ -110,7 +116,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
         foreach (var key in document.Keys)
         {
-            if (key is "package" or "dependencies" or "override" or "profile") continue;
+            if (key is "package" or "dependencies" or "override" or "profile" or "bin") continue;
             document.TryGet(key, out var section);
             var line = section switch
             {
@@ -128,10 +134,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         foreach (var key in package.Keys)
         {
             if (PackageKeys.Contains(key) || DescriptiveStrings.Contains(key) || key == "authors") continue;
-            throw LaterKeys.TryGetValue(key, out var when)
-                ? new ManifestException("LYR-PKG0003", file, package.Line, 1,
-                    $"[package] '{key}' comes with {when}: this toolchain does not read it yet")
-                : new ManifestException("LYR-PKG0003", file, package.Line, 1, $"[package] has no key '{key}'");
+            throw new ManifestException("LYR-PKG0003", file, package.Line, 1, $"[package] has no key '{key}'");
         }
         foreach (var key in DescriptiveStrings)
             if (package.TryGet(key, out var text) && text is not string)
@@ -166,7 +169,57 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Include = Patterns(package, "include", file),
             Exclude = Patterns(package, "exclude", file) ?? [],
             Profiles = global::Lyric5.Build.Profiles.Read(document, file),
+            Binaries = ReadBinaries(document, file, name),
+            Toolchain = ReadToolchain(package, file),
         };
+    }
+
+    /// <summary><c>toolchain = "5.1"</c> or <c>">=5.1"</c>: the least toolchain that builds the
+    /// package (11 W2 P12; 07 V9). A pin the toolchain did not check would be a promise it did not keep.</summary>
+    private static ToolchainPin? ReadToolchain(TomlTable package, string file)
+    {
+        if (!package.TryGet("toolchain", out var given)) return null;
+        if (given is not string required || ToolchainPattern().Match(required) is not { Success: true } match)
+            throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
+                $"toolchain {Describe(given)} is no toolchain requirement: \"5.1\" or \">=5.1\", the least toolchain that builds the package");
+        var patch = match.Groups[3].Success ? long.Parse(match.Groups[3].Value) : 0;
+        return new ToolchainPin(new SemVer(long.Parse(match.Groups[1].Value), long.Parse(match.Groups[2].Value), patch, null), package.Line);
+    }
+
+    /// <summary><c>[[bin]]</c>: each program a name and an entry — a module of the package, a
+    /// <c>.lyr</c> file under <c>src/</c> (11 W2 P2). One name per program: the package's own,
+    /// for <c>src/main.lyr</c>, included.</summary>
+    private static List<Binary> ReadBinaries(TomlTable document, string file, string package)
+    {
+        var binaries = new List<Binary>();
+        if (!document.TryGet("bin", out var found)) return binaries;
+        if (found is not TomlArray { OfTables: true } tables)
+            throw new ManifestException("LYR-PKG0002", file, 1, 1, "[[bin]] is an array of tables: [[bin]] name = \"tool\" entry = \"src/tool.lyr\"");
+        var root = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(file))!;
+        var source = System.IO.Path.Combine(root, "src");
+        foreach (TomlTable table in tables)
+        {
+            foreach (var key in table.Keys)
+                if (key is not ("name" or "entry"))
+                    throw new ManifestException("LYR-PKG0003", file, table.Line, 1, $"[[bin]] has no key '{key}'");
+            if (!table.TryGet("name", out var given) || given is not string name || !BinaryPattern().IsMatch(name))
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1,
+                    "[[bin]] needs a name: a lowercase letter, then letters, digits, '_' and '-'");
+            if (!table.TryGet("entry", out var at) || at is not string entry)
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"[[bin]] '{name}' needs an entry: entry = \"src/{name}.lyr\"");
+            var full = System.IO.Path.GetFullPath(entry, root);
+            var relative = System.IO.Path.GetRelativePath(source, full);
+            if (relative.StartsWith("..", StringComparison.Ordinal) || System.IO.Path.IsPathRooted(relative)
+                || !full.EndsWith(".lyr", StringComparison.Ordinal))
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1,
+                    $"[[bin]] '{name}' enters at '{entry}', which is no module of the package: a .lyr file under src/");
+            if (binaries.Any(b => b.Name == name)
+                || (name == package && System.IO.File.Exists(System.IO.Path.Combine(source, "main.lyr"))))
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1,
+                    $"two programs are named '{name}'" + (name == package ? $" — src/main.lyr is '{package}'s" : ""));
+            binaries.Add(new Binary(name, full, table.Line));
+        }
+        return binaries;
     }
 
     /// <summary><c>include</c> or <c>exclude</c>: patterns of the package's files (11 W2 P8).</summary>
@@ -298,6 +351,12 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     [GeneratedRegex("^[0-9a-f]{7,64}$")]
     private static partial Regex CommitPattern();
+
+    [GeneratedRegex("^[a-z][a-z0-9_-]*$")]
+    private static partial Regex BinaryPattern();
+
+    [GeneratedRegex(@"^(?:>=\s*)?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})(?:\.(0|[1-9][0-9]{0,8}))?$")]
+    private static partial Regex ToolchainPattern();
 }
 
 /// <summary>A manifest the toolchain refuses: its code (11 W6), file, line and column, and why —
