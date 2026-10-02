@@ -1,8 +1,9 @@
-/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S5: a scheduler for
-/// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
+/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S6: a scheduler for
+/// each thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
 /// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
-/// channels, `Select` and `Timer` (N5 K1-K3). Threads come with S6.
+/// channels, `Select` and `Timer` (N5 K1-K3); threads (G1, G2). Channels across threads come with
+/// S6b2.
 module std.task;
 
 import std.sync { Atomic };
@@ -59,16 +60,22 @@ pub class Task<T> {
     var context: ?Context = null,
     /// The tasks parked in `await()` until the body ends, in the order they came.
     waiters: Waiters = Waiters { },
+    /// Guards `done`, `context` and the waiters: a task is awaited and cancelled from any thread,
+    /// not only its own (06 G1). Its end publishes what the body left (N7 P1).
+    guard: SpinLock = SpinLock { },
 
     /// Whether the body has ended, with its value, with an error, or by a panic (06 T3).
     pub fn isDone(): bool {
-        return this.done;
+        this.guard.acquire();
+        let done = this.done;
+        this.guard.release();
+        return done;
     }
 
     /// Where the task stands (06 T3) — asked without waiting, and without panicking where the task
     /// did (T4: the supervisor's look).
     pub fn status(): TaskStatus<T> {
-        if (!this.done) {
+        if (!this.isDone()) {
             return TaskStatus.Running;
         }
         if (let p = this.crash) {
@@ -89,14 +96,22 @@ pub class Task<T> {
     pub mut fn await(): T throws Error {
         let me = here().running ?? panic("an await where no task runs");
         if (me.cancelled.load()) { throw Cancelled { }; }
+        this.guard.acquire();
         while (!this.done) {
             me.beginWait();
             this.waiters.add(me);
+            this.guard.release();
+            here().wakeIfCancelled(me);
             park();
             me.endWait();
+            this.guard.acquire();
             this.waiters.remove(me);
-            if (me.cancelled.load()) { throw Cancelled { }; }
+            if (me.cancelled.load()) {
+                this.guard.release();
+                throw Cancelled { };
+            }
         }
+        this.guard.release();
         if (let p = this.crash) {
             repanic(p.code, p.message, p.trace);
         }
@@ -109,7 +124,10 @@ pub class Task<T> {
     /// Cancels the task (06 N9 X1): its next wait throws `Cancelled` — at once, where it waits now
     /// — and so does every wait after it (X5). A task that has ended stays as it ended.
     pub fn cancel(): void {
-        if (let c = this.context) {
+        this.guard.acquire();
+        let context = this.context;
+        this.guard.release();
+        if (let c = context) {
             here().cancel(c);
         }
     }
@@ -117,12 +135,19 @@ pub class Task<T> {
     /// Cancels the task and waits until it has ended, whatever the running task's mark says: what a
     /// task does before it lets go of one it started (06 T5).
     mut fn settle(): void {
-        if (this.done) { return; }
         this.cancel();
-        let s = here();
+        let me = here().running ?? panic("a wait where no task runs");
+        this.guard.acquire();
         while (!this.done) {
-            s.parkIn(this.waiters);
+            me.beginWait();
+            this.waiters.add(me);
+            this.guard.release();
+            park();
+            me.endWait();
+            this.guard.acquire();
+            this.waiters.remove(me);
         }
+        this.guard.release();
     }
 
     /// The body ended by a panic (06 T4): the task is Panicked, and what it left waits for `await`.
@@ -134,14 +159,17 @@ pub class Task<T> {
     /// The body has ended: its scope learns of it, and the tasks waiting for it are ready, in the
     /// order they came.
     mut fn finish(): void {
-        this.done = true;
         if (let c = this.context) {
             if (let scope = c.scope) {
                 scope.ended(c, this.failure, this.crash);
             }
         }
+        let s = here();
+        this.guard.acquire();
+        this.done = true;
         this.context = null;
-        this.waiters.wakeAll(here());
+        this.waiters.wakeAll(s);
+        this.guard.release();
     }
 }
 
@@ -235,6 +263,7 @@ pub class Channel<T> {
         let w = Waiting<T> { context = me, value = value };
         me.beginWait();
         this.senders.add(w);
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         this.senders.remove(w);
@@ -255,6 +284,7 @@ pub class Channel<T> {
         let w = Waiting<T> { context = me };
         me.beginWait();
         this.receivers.add(w);
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         this.receivers.remove(w);
@@ -443,6 +473,7 @@ pub class Selection {
         if (this.timeoutNanos > 0) {
             s.fallAsleep(me, this.timeoutNanos);
         }
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         at = this.first;
@@ -668,6 +699,11 @@ pub class TaskScope :: [Closeable] {
 
 /// A task around `body`, ready to run, and its handle: what `spawn` and `TaskScope.spawn` share.
 fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
+    return launchOn(here(), body);
+}
+
+/// The same on the scheduler `s` — another thread's, for `Thread.spawn` (06 T1).
+fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E): Task<T> {
     let task = Task<T> { };
     let run = () => {
         try {
@@ -677,7 +713,6 @@ fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
         }
         task.finish();
     };
-    let s = here();
     let c = Context { body = startContext(run, 0), home = s };
     c.onPanic = (info: PanicInfo) => {
         task.panicked(info);
@@ -685,6 +720,30 @@ fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
     task.context = c;
     s.ready(c);
     return task;
+}
+
+/// Threads (06 G1, G2). Each runs a scheduler of its own, and a task never moves to another thread.
+/// Threads run at the same time: what they share, they share through a channel, an atomic or a
+/// lock (N7 P1) — anything else is a data race (G3).
+pub class Thread {
+    /// Starts a thread with a scheduler of its own (06 G2): `body` runs there as its first task,
+    /// whose handle this gives — `await()` waits for its end from any thread, and what it did
+    /// happens before (N7 P1). The thread ends with that task, as the program does with main (T6):
+    /// the tasks still ready or asleep there then never run again.
+    pub static fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        let s = Scheduler { };
+        let task = launchOn(s, body);
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!task.isDone()) {
+                s.step();
+            }
+            s.stopped();
+            setCurrentScheduler(null);
+        });
+        return task;
+    }
 }
 
 /// Starts `body` as a task of the running thread, with no handle (06 T5): it runs once the tasks
@@ -814,12 +873,49 @@ class Waiters {
     }
 }
 
+/// A lock for the short sections where threads meet — an inbox, a task's end: it spins while
+/// another thread holds it, and guards nothing that waits.
+class SpinLock {
+    held: Atomic<bool> = Atomic<bool>.new(false),
+
+    fn acquire(): void {
+        while (!this.held.compareAndSet(false, true)) {
+            spin();
+        }
+    }
+
+    fn release(): void {
+        this.held.store(false);
+    }
+}
+
 class Scheduler {
     var first: ?Context = null,
     var last: ?Context = null,
     var sleepers: ?Context = null,
     var fallenAsleep: int = 0,
     var running: ?Context = null,
+    /// The contexts of this thread that wakers on other threads readied (06 G1), which it moves to
+    /// its ready queue at its next turn. The lock guards them and the poller a waker wakes: the
+    /// thread's, as the runtime numbers it, from the thread's start to its end — 0 outside.
+    inboxLock: SpinLock = SpinLock { },
+    var inboxFirst: ?Context = null,
+    var inboxLast: ?Context = null,
+    var poller: int = 0,
+
+    /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
+    mut fn started(): void {
+        this.inboxLock.acquire();
+        this.poller = currentPoller();
+        this.inboxLock.release();
+    }
+
+    /// The thread ends: no waker wakes its poller from here on — it goes with the thread.
+    mut fn stopped(): void {
+        this.inboxLock.acquire();
+        this.poller = 0;
+        this.inboxLock.release();
+    }
 
     /// `c` goes to the end of the ready queue.
     mut fn ready(c: Context): void {
@@ -847,6 +943,7 @@ class Scheduler {
         if (c.cancelled.load()) { throw Cancelled { }; }
         c.beginWait();
         this.fallAsleep(c, nanos);
+        this.wakeIfCancelled(c);
         park();
         c.endWait();
         this.unsleep(c);
@@ -864,6 +961,16 @@ class Scheduler {
         if (let root = this.sleepers) { root.up = null; }
     }
 
+    /// A wait that began in a cancelled task ends at once (06 N9 X1): the cancel may have come from
+    /// another thread before the wait began, and found nothing to claim. Between a wait's beginning
+    /// and its park — the mark and the claim are atomic, so of the cancel and the wait one sees the
+    /// other.
+    mut fn wakeIfCancelled(c: Context): void {
+        if (c.cancelled.load()) {
+            this.wakeUp(c);
+        }
+    }
+
     /// Ends `c`'s wait, where it still waits and nothing ended it first — the claim — and readies
     /// it: true then.
     mut fn wakeUp(c: Context): bool {
@@ -872,10 +979,45 @@ class Scheduler {
         return true;
     }
 
-    /// `c`, whose wait a waker ended, goes to the ready queue of its own scheduler (06 G1).
+    /// `c`, whose wait a waker ended, goes to the ready queue of its own scheduler (06 G1) — through
+    /// that scheduler's inbox where the waker runs on another thread.
     mut fn post(c: Context): void {
         let home = c.home;
-        home.ready(c);
+        if (same(home, this)) {
+            home.ready(c);
+        } else {
+            home.handOver(c);
+        }
+    }
+
+    /// From a waker on another thread: `c` goes into the inbox, and the thread wakes for it.
+    mut fn handOver(c: Context): void {
+        this.inboxLock.acquire();
+        c.next = null;
+        if (let tail = this.inboxLast) {
+            tail.next = c;
+        } else {
+            this.inboxFirst = c;
+        }
+        this.inboxLast = c;
+        if (this.poller != 0) {
+            wakePoller(this.poller);
+        }
+        this.inboxLock.release();
+    }
+
+    /// The contexts that wakers on other threads readied go to the ready queue, in the order they
+    /// came.
+    mut fn takeInbox(): void {
+        this.inboxLock.acquire();
+        var at = this.inboxFirst;
+        this.inboxFirst = null;
+        this.inboxLast = null;
+        this.inboxLock.release();
+        while (let c = at) {
+            at = c.next;
+            this.ready(c);
+        }
     }
 
     mut fn yieldNow(): void throws Cancelled {
@@ -959,6 +1101,7 @@ class Scheduler {
     /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
+        this.takeInbox();
         if (this.sleepers != null) { this.wakeSleepers(monotonicNanos()); }
         if (let c = this.takeReady()) {
             this.running = c;
@@ -1042,10 +1185,12 @@ fn rankOf(c: ?Context): int {
 fn runMain(main: Coroutine<void>): void {
     let s = Scheduler { };
     setCurrentScheduler(s);
+    s.started();
     s.ready(Context { body = main, home = s });
     while (!main.isDone()) {
         s.step();
     }
+    s.stopped();
     setCurrentScheduler(null);
 }
 
@@ -1080,3 +1225,14 @@ fn waitOnPoller(nanos: int): bool;
 
 /// The monotonic clock (13 §1.6 rule 8): nanoseconds.
 fn monotonicNanos(): int;
+
+/// Starts a thread of the program that runs `body` on its own stack (06 G2).
+fn startThread(body: fn() -> void): void;
+
+/// The running thread's poller as the runtime numbers it, and the wake of a poller so numbered —
+/// from any thread, while its thread runs.
+fn currentPoller(): int;
+fn wakePoller(poller: int): void;
+
+/// A thread that spins on a lock lets another run.
+fn spin(): void;

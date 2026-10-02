@@ -42,6 +42,21 @@ struct LyrStr *lyr_task_panic_trace(LyrCoro *co);
 /* A panic again, with a report an earlier one left (06 T4: `await` of a panicked task). */
 LYR_NORETURN void lyr_task_repanic(struct LyrStr *code, struct LyrStr *message, struct LyrStr *trace);
 
+/* Starts a thread of the program (06 G2) that runs the function value `fn() -> void` given by its
+ * code and environment on its own stack — std.task's loop for the thread's scheduler: attached to
+ * the collector the while, and its poller freed at its end. A thread the system refuses is a
+ * panic (RT0015). Nobody joins it: std.task's handle says when it is done. */
+void lyr_thread_start(void (*code)(void *env, LyrErr **error), void *env);
+#define LYR_THREAD_START(body) lyr_thread_start((body).fn, (body).env)
+
+/* The calling thread's poller as a number a Lyric object holds, and the wake of a poller so held,
+ * from any thread — while its thread runs: std.task stops waking it before the thread ends. */
+int64_t lyr_task_poller(void);
+void lyr_task_wake(int64_t poller);
+
+/* A thread that spins on a lock lets another run: the lock's holder, perhaps. */
+void lyr_task_spin(void);
+
 /* The `main` of an emitted program whose main is a task (06 T6): start the runtime with its
  * defaults, make main's context — a coroutine around `program_main` on a stack of
  * LYR_MAIN_TASK_STACK — and hand it to `scheduler`, std.task's loop, which returns once that
