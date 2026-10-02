@@ -21,6 +21,9 @@ public sealed class Resolver
 
     private readonly SourceManager _sm;
 
+    /// <summary>The module whose declarations pass 3 binds: where a type path is named FROM.</summary>
+    private ModuleSymbol? _module;
+
     public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de)
     {
         _comp = comp;
@@ -59,18 +62,18 @@ public sealed class Resolver
             var decl = declarations[k];
             switch (decl)
             {
-                case StructDecl s: DeclareType(module, s.Name, TypeSymbolKind.Struct, Vis(s.IsPublic), s.Generics, s.Members, s); break;
-                case ClassDecl c: DeclareType(module, c.Name, TypeSymbolKind.Class, Vis(c.IsPublic), c.Generics, c.Members, c); break;
+                case StructDecl s: DeclareType(module, s.Name, TypeSymbolKind.Struct, Vis(s.Visibility), s.Generics, s.Members, s); break;
+                case ClassDecl c: DeclareType(module, c.Name, TypeSymbolKind.Class, Vis(c.Visibility), c.Generics, c.Members, c); break;
                 case EnumDecl e: DeclareEnum(module, e); break;
                 case InterfaceDecl i: DeclareInterface(module, i); break;
                 case TypeAliasDecl a:
-                    DeclareTop(module, new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.IsPublic), new SymbolTable(), a), a);
+                    DeclareTop(module, new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.Visibility), new SymbolTable(), a), a);
                     break;
                 case FunctionDecl fn:
                     DeclareTop(module, Fn(fn), fn);
                     break;
                 case GlobalBindingDecl g:
-                    DeclareTop(module, new GlobalSymbol(g.Binding.Name, Vis(g.IsPublic), g), g);
+                    DeclareTop(module, new GlobalSymbol(g.Binding.Name, Vis(g.Visibility), g), g);
                     break;
                 case ExtendDecl ex: DeclareExtend(module, ex); break;
                 // ImportDecl → Pass 2; ErrorDecl → skip
@@ -141,6 +144,7 @@ public sealed class Resolver
         foreach (var fn in ex.Methods)
         {
             var fsym = Fn(fn);
+            fsym.Home = module;
             if (methodScope.TryDeclare(fsym)) methods.Add(fsym);
             else _de.Report("LYR-RES0001", Severity.Error, fn.Span,
                 $"'{fn.Name}' is already declared in this extend block",
@@ -163,15 +167,15 @@ public sealed class Resolver
         {
             switch (m)
             {
-                case FieldDecl f: DeclareMember(scope, new FieldSymbol(f.Name, f), f); break;
-                case FunctionDecl fn: DeclareMember(scope, Fn(fn), fn); break;
-                case AssociatedTypeDecl t: DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t); break;
+                case FieldDecl f: DeclareMember(module, scope, new FieldSymbol(f.Name, f), f); break;
+                case FunctionDecl fn: DeclareMember(module, scope, Fn(fn), fn); break;
+                case AssociatedTypeDecl t: DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t), t); break;
 
                 // A 'static let' is a type-bound constant, held as a GlobalSymbol because that is
                 // what it is: an immutable binding without an instance, scoped to the type rather
                 // than to the module.
                 case StaticBindingDecl sb:
-                    DeclareMember(scope, new GlobalSymbol(sb.Binding.Name, Vis(sb.IsPublic), sb), sb);
+                    DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(sb.Visibility), sb), sb);
                     break;
             }
         }
@@ -180,13 +184,13 @@ public sealed class Resolver
     private void DeclareEnum(ModuleSymbol module, EnumDecl e)
     {
         var scope = new SymbolTable(module.Members);
-        var ts = new TypeSymbol(e.Name, TypeSymbolKind.Enum, Vis(e.IsPublic), scope, e) { Generics = MakeGenerics(e.Generics) };
+        var ts = new TypeSymbol(e.Name, TypeSymbolKind.Enum, Vis(e.Visibility), scope, e) { Generics = MakeGenerics(e.Generics) };
         DeclareGenerics(scope, ts.Generics);
         scope.TryDeclare(new ImportBindingSymbol("Self", ts, e));
         DeclareTop(module, ts, e);
-        foreach (var v in e.Variants) DeclareMember(scope, new EnumVariantSymbol(v.Name, v), v);
-        foreach (var fn in e.Methods) DeclareMember(scope, Fn(fn), fn);
-        foreach (var t in e.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t), t);
+        foreach (var v in e.Variants) DeclareMember(module, scope, new EnumVariantSymbol(v.Name, v), v);
+        foreach (var fn in e.Methods) DeclareMember(module, scope, Fn(fn), fn);
+        foreach (var t in e.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t), t);
     }
 
     private void DeclareInterface(ModuleSymbol module, InterfaceDecl i)
@@ -197,16 +201,16 @@ public sealed class Resolver
         // to the type parameter.
         var self = new GenericParamSymbol("Self", [], i);
         scope.TryDeclare(self);
-        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.IsPublic), scope, i) { Generics = MakeGenerics(i.Generics), SelfParam = self };
+        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.Visibility), scope, i) { Generics = MakeGenerics(i.Generics), SelfParam = self };
         self.SelfOf = ts;
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
-        foreach (var fn in i.Members) DeclareMember(scope, Fn(fn), fn);
-        foreach (var t in i.Types) DeclareMember(scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
+        foreach (var fn in i.Members) DeclareMember(module, scope, Fn(fn), fn);
+        foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
     }
 
-    private static FunctionSymbol Fn(FunctionDecl fn) =>
-        new(fn.Name, Vis(fn.IsPublic), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics) };
+    private FunctionSymbol Fn(FunctionDecl fn) =>
+        new(fn.Name, Vis(fn.Visibility), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics) };
 
     private static GenericParamSymbol[] MakeGenerics(GenericParam[] generics)
     {
@@ -226,14 +230,16 @@ public sealed class Resolver
 
     private void DeclareTop(ModuleSymbol module, Symbol sym, Node decl)
     {
+        sym.Home = module;
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, decl.Span,
                 $"'{sym.Name}' is already declared in this module{OverloadHint(module.Members, sym)}",
                 PreviousDeclaration(module.Members, sym.Name));
     }
 
-    private void DeclareMember(SymbolTable scope, Symbol sym, Node decl)
+    private void DeclareMember(ModuleSymbol module, SymbolTable scope, Symbol sym, Node decl)
     {
+        sym.Home = module;
         if (!scope.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, decl.Span,
                 $"'{sym.Name}' is already declared in this type{OverloadHint(scope, sym)}",
@@ -283,8 +289,9 @@ public sealed class Resolver
                 break;
             }
             case ImportSelective sel: // import a.b { x, y };
-                foreach (var name in sel.Names)
-                    foreach (var imported in ResolveSelective(name, target, imp))
+                for (var i = 0; i < sel.Names.Length; i++)
+                    foreach (var imported in ResolveSelective(module, sel.Names[i],
+                                 i < sel.NameSpans.Length ? sel.NameSpans[i] : imp.Span, target, imp))
                         DeclareImport(module, imported, imp);
                 break;
             case ImportAlias alias: // import a.b as C;
@@ -299,7 +306,8 @@ public sealed class Resolver
     /// imports what it means, and since 3.0 a name may mean more than one function. The set stays
     /// a set here, so the call site chooses among the same candidates it would have at home.
     /// </returns>
-    private IReadOnlyList<Symbol> ResolveSelective(string name, ModuleSymbol? target, ImportDecl imp)
+    private IReadOnlyList<Symbol> ResolveSelective(ModuleSymbol module, string name, Span at, ModuleSymbol? target,
+        ImportDecl imp)
     {
         if (target is null) return [new ExternalSymbol(name, imp.Path, imp)]; // extern/opak
 
@@ -309,7 +317,20 @@ public sealed class Resolver
             _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"module '{target.FullName}' has no exported '{name}'");
             return [new ErrorSymbol(name)];
         }
-        if (!IsPublic(found))
+
+        // Lyric 5 (07 V2 S1): the import asks the question every route asks. Of an overload set
+        // only the visible functions come along — a private overload beside a 'pub' one is not
+        // imported, and none visible is the one error. Bound all the same, as recovery.
+        if (_comp.Lyric5Modules)
+        {
+            var set = target.Members.OverloadsLocal(name);
+            var visible = set.Where(f => _comp.Visible(f, module)).ToArray();
+            if (visible.Length > 0 && visible.Length < set.Count)
+                return visible.Select(Symbol (fn) => new ImportBindingSymbol(name, fn, imp)).ToArray();
+            if (visible.Length == 0 && !_comp.Visible(found, module))
+                _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
+        }
+        else if (!IsPublic(found))
             _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"'{name}' is not public in '{target.FullName}'");
 
         var overloads = target.Members.OverloadsLocal(name);
@@ -323,6 +344,7 @@ public sealed class Resolver
 
     private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp)
     {
+        sym.Home = module;
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, imp.Span,
                 $"'{sym.Name}' is already declared in this module",
@@ -358,6 +380,7 @@ public sealed class Resolver
 
     private void BindTypeNames(ModuleSymbol module)
     {
+        _module = module;
         var scope = module.Members;
         foreach (var decl in _comp.AstOf(module).Declarations) BindDeclTypes(decl, scope);
     }
@@ -404,6 +427,7 @@ public sealed class Resolver
     {
         foreach (var block in _comp.Extensions.Blocks)
         {
+            _module = block.Module;
             var scope = block.MethodScope;
             BindGenerics(block.Decl.Generics, scope);
             BindType(block.Decl.Target, scope);
@@ -483,7 +507,7 @@ public sealed class Resolver
         switch (type)
         {
             case NamedType n:
-                var sym = ResolveTypePath(n.Path, scope, n.Span.File);
+                var sym = ResolveTypePath(n, scope);
                 if (sym is null)
                 {
                     _de.Report("LYR-RES0002", Severity.Error, n.Span, $"unresolved type '{string.Join('.', n.Path)}'");
@@ -508,8 +532,10 @@ public sealed class Resolver
         }
     }
 
-    private Symbol? ResolveTypePath(string[] path, SymbolTable scope, FileId file)
+    private Symbol? ResolveTypePath(NamedType node, SymbolTable scope)
     {
+        var path = node.Path;
+        var file = node.Span.File;
         var head = scope.Lookup(path[0]);
         // 'T.Item', 'Self.Item', 'P.Item' (03 T6): the second segment names an associated type,
         // which the sema reads off the head; the node is bound to the head.
@@ -527,6 +553,10 @@ public sealed class Resolver
                 case ImportBindingSymbol { Target: ModuleSymbol mod } qualifier:
                     var next = mod.Members.LookupLocal(path[i]);
                     if (next is null) return null;
+                    // A type named through a module is visible from here, or reported (07 V2 S1)
+                    // — and bound all the same, so its uses fail no second time.
+                    if (_module is { } from && !_comp.Visible(next, from))
+                        _de.Report("LYR-RES0009", Severity.Error, node.Span, _comp.Hidden(next));
                     // The qualifier is a mention of the import and the only one in this path;
                     // nothing else records it, because it has no node to be bound to.
                     _binding.MarkQualifier(file, qualifier);
@@ -569,7 +599,15 @@ public sealed class Resolver
 
     // --- Helpers ---
 
-    private static Visibility Vis(bool isPublic) => isPublic ? Visibility.Public : Visibility.Module;
+    /// <summary>The word as a visibility (07 V2): none means <c>internal</c> in Lyric 5, the
+    /// module's for the 4.x tools.</summary>
+    private Visibility Vis(VisibilityWord word) => word switch
+    {
+        VisibilityWord.Pub => Visibility.Public,
+        VisibilityWord.Internal => Visibility.Internal,
+        VisibilityWord.Private => Visibility.Private,
+        _ => _comp.Lyric5Modules ? Visibility.Internal : Visibility.Private,
+    };
 
     private static bool IsPublic(Symbol s) => s switch
     {

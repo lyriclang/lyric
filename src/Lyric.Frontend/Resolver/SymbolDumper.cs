@@ -61,7 +61,12 @@ public static class SymbolDumper
         _ => s.Name
     };
 
-    private static string Vis(Visibility v) => v == Visibility.Public ? " [pub]" : "";
+    private static string Vis(Visibility v) => v switch
+    {
+        Visibility.Public => " [pub]",
+        Visibility.Internal => " [internal]",
+        _ => "",
+    };
 
     private static void Line(StringBuilder sb, int indent, string text) =>
         sb.Append(' ', indent * 2).Append(text).Append('\n');
