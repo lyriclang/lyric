@@ -2,6 +2,15 @@ using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
 
+/// <summary>A package without <c>src/main.lyr</c> (11 P2): a library, which <c>build</c> checks
+/// (07 B6) and nothing runs.</summary>
+public sealed class LibraryException(Manifest manifest, PackageGraph graph)
+    : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr, so there is no program (11 P2)")
+{
+    public Manifest Manifest { get; } = manifest;
+    public PackageGraph Graph { get; } = graph;
+}
+
 /// <summary>
 /// What is being built and where its files go (design/v5/spec/07 V1, V7; 11 C8, P2, P4, P5).
 ///
@@ -22,6 +31,10 @@ namespace Lyric5.Build;
 /// <param name="Manifest">The package's manifest; <c>null</c> for a single file.</param>
 public sealed record Project(string Source, string Name, string Module, string Root, Manifest? Manifest)
 {
+    /// <summary>The packages the program is built from (07 V7): the package's own and its
+    /// dependencies; <c>null</c> for a single file, which has std alone.</summary>
+    public PackageGraph? Graph { get; init; }
+
     public string OutDir => Path.Combine(Root, "out");
 
     public string CacheDir => Path.Combine(OutDir, "cache");
@@ -34,10 +47,14 @@ public sealed record Project(string Source, string Name, string Module, string R
     public string BinaryName =>
         Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..];
 
-    /// <summary>The package's source roots by name, for the module loader — none for a single file,
+    /// <summary>Every package's source root by name, for the module loader — none for a single file,
     /// whose only module is its own.</summary>
     public IReadOnlyDictionary<string, string> PackageRoots =>
-        Manifest is { } m ? new Dictionary<string, string> { [m.Name] = m.SourceRoot } : new Dictionary<string, string>();
+        Graph?.SourceRoots ?? new Dictionary<string, string>();
+
+    /// <summary>What each package declares it imports from (07 P6).</summary>
+    public IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredDependencies =>
+        Graph?.Declared ?? new Dictionary<string, IReadOnlySet<string>>();
 
     /// <summary>The project a file belongs to: the package whose <c>src/</c> holds it — the file is
     /// its entry then —, else the file alone. A file beside a package's modules rather than among
@@ -57,24 +74,22 @@ public sealed record Project(string Source, string Name, string Module, string R
             return new Project(full, stem, stem, root, null);
         var manifest = Manifest.Read(manifestFile);
         return ModulePathOf(manifest, full) is { } module
-            ? new Project(full, manifest.Name, module, manifest.Root, manifest)
+            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = PackageGraph.Resolve(manifest) }
             : new Project(full, stem, stem, root, null);
     }
 
     /// <summary>The package of a directory: the nearest manifest at or above it, built from its
     /// <c>src/main.lyr</c> (P2). <c>null</c> where there is no manifest.</summary>
-    /// <exception cref="ManifestException">The manifest is refused.</exception>
-    /// <exception cref="InvalidOperationException">The package has no program.</exception>
+    /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
+    /// <exception cref="LibraryException">The package has no program.</exception>
     public static Project? ForDirectory(string directory)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
+        var graph = PackageGraph.Resolve(manifest);
         var entry = Path.Combine(manifest.SourceRoot, "main.lyr");
-        if (!File.Exists(entry))
-            throw new InvalidOperationException(
-                $"package '{manifest.Name}' has no program: its src/main.lyr is missing, so it is a library (11 P2), "
-                + "and building a library by itself comes with M7 S4");
-        return new Project(entry, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest);
+        if (!File.Exists(entry)) throw new LibraryException(manifest, graph);
+        return new Project(entry, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest) { Graph = graph };
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c> (07 M1), or <c>null</c>

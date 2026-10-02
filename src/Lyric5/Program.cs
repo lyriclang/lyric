@@ -134,8 +134,10 @@ public static class Program
             Console.Error.WriteLine(refused.Render());
             return 1;
         }
-        catch (InvalidOperationException library)
+        catch (LibraryException library)
         {
+            // 'build' checks a library (07 B6); there is nothing to run, and nothing to print.
+            if (!run && !values.ContainsKey("--emit")) return Pipeline.CheckLibrary(library, Console.Error);
             Console.Error.WriteLine($"error[LYR-CLI0005]: {library.Message}");
             return 2;
         }

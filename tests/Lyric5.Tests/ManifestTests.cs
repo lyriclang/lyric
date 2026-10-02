@@ -98,7 +98,7 @@ public class ManifestTests
     }
 
     [Theory]
-    [InlineData("[dependencies]\ngeo = { path = \"../geo\" }", "comes with M7 S4")]
+    [InlineData("[native]\nlibs = [\"z\"]", "comes with M7 S6")]
     [InlineData("[[bin]]\nname = \"tool\"", "comes with M7 S6")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]
     public void A_section_the_toolchain_does_not_read_is_refused(string section, string why)
@@ -108,6 +108,30 @@ public class ManifestTests
         Assert.Equal("LYR-PKG0003", e.Code);
         Assert.Contains(why, e.Message);
         Assert.Equal(5, e.Line);
+    }
+
+    [Fact]
+    public void A_dependency_is_a_path_relative_to_the_manifest()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\ngeo = { path = \"../geo\" }\n"));
+        var geo = Assert.Single(m.Dependencies);
+        Assert.Equal("geo", geo.Name);
+        Assert.Equal(Path.GetFullPath(Path.Combine(m.Root, "..", "geo")), geo.Root);
+        Assert.Equal(6, geo.Line);
+    }
+
+    [Theory]
+    [InlineData("geo = \"1.2\"", "LYR-PKG0003", "asks a registry for a version")]
+    [InlineData("geo = { git = \"https://example.org/geo\" }", "LYR-PKG0003", "'git' of 'geo' comes with M7 S5")]
+    [InlineData("geo = { path = 3 }", "LYR-PKG0002", "'geo' needs a path")]
+    [InlineData("Geo = { path = \"../geo\" }", "LYR-PKG0002", "'Geo' is no package name")]
+    [InlineData("geo = { path = \"../geo\", features = [] }", "LYR-PKG0003", "'geo' has no key 'features'")]
+    public void A_dependency_is_checked(string entry, string code, string why)
+    {
+        var e = Assert.Throws<ManifestException>(() =>
+            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\n" + entry + "\n")));
+        Assert.Equal(code, e.Code);
+        Assert.Contains(why, e.Message);
     }
 
     [Fact]

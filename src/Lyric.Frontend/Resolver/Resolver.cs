@@ -310,6 +310,15 @@ public sealed class Resolver
         if (target is null)
             _de.Report("LYR-RES0003", Severity.Error, imp.Span,
                 $"cannot find module '{string.Join('.', imp.Path)}'");
+        // A package imports what its manifest declares (07 P6) — not what those depend on.
+        else if (_comp.Lyric5Modules && _comp.PackageDependencies is { } declared)
+        {
+            var from = Compilation.PackageOf(module);
+            var to = Compilation.PackageOf(target);
+            if (from != to && to != "std" && !(declared.TryGetValue(from, out var own) && own.Contains(to)))
+                _de.Report("LYR-RES0014", Severity.Error, imp.Span,
+                    $"package '{to}' is no dependency of '{from}' — a package imports what its lyric.toml declares (07 P6)");
+        }
 
         switch (imp.Clause)
         {
