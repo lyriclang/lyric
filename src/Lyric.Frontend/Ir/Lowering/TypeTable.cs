@@ -575,7 +575,7 @@ internal sealed class TypeTable
                 // and is evaluated at the construction site, where the explicitly given values arise too.
                 // Nothing of it stands in the bytecode.
                 names[i] = fields[i].Name;
-                types[i] = Lower(fields[i].Type, fields[i].Span);
+                types[i] = ValueOf(Lower(fields[i].Type, fields[i].Span));
 
                 // Read AFTER the type lowered, which means the name is resolvable and this cannot
                 // be the first to report a broken one.
@@ -777,7 +777,7 @@ internal sealed class TypeTable
             for (var i = 0; i < tuple.Length; i++)
             {
                 names.Add(i.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                types.Add(Lower(tuple[i], tuple[i].Span));
+                types.Add(ValueOf(Lower(tuple[i], tuple[i].Span)));
             }
         else if (variant.StructFields is { } fields)
             foreach (var field in fields)
@@ -786,7 +786,7 @@ internal sealed class TypeTable
                     throw new UnsupportedConstructException(
                         "a field default", field.Span);
                 names.Add(field.Name);
-                types.Add(Lower(field.Type, field.Span));
+                types.Add(ValueOf(Lower(field.Type, field.Span)));
             }
 
         var id = new TypeId(_defs.Count);
@@ -843,6 +843,25 @@ internal sealed class TypeTable
             : null;
     }
 
+    /// <summary>
+    /// The unit: what holds a value of type <c>void</c> where a place must hold one
+    /// (design/v5/spec/03 §9.1) — a parameter, a local, a field, an element, the inside of an
+    /// optional, in an instance whose type argument is <c>void</c>. A value of type <c>void</c> is
+    /// nothing, so the unit is one byte that is always 0: a <c>bool</c>, which every back end
+    /// knows. A return keeps <c>void</c> — a function of type <c>fn() -> T</c> at <c>T = void</c>
+    /// returns nothing, as any other does — and so do a coroutine's yield and result.
+    /// </summary>
+    public static readonly IrType Unit = new IrScalarType(IrScalar.Bool);
+
+    /// <summary>A type as what holds a value of it: the <see cref="Unit"/> for <c>void</c>.</summary>
+    public IrType LowerValue(LyrType type, Core.Span span) => ValueOf(Lower(type, span));
+
+    /// <summary>A written type as what holds a value of it — a parameter's.</summary>
+    public IrType LowerValue(TypeNode node) => ValueOf(Lower(node));
+
+    private static IrType ValueOf(IrType lowered) =>
+        lowered is IrScalarType { Kind: IrScalar.Void } ? Unit : lowered;
+
     public IrType Lower(LyrType type, Core.Span span) => type switch
     {
         // Host type BEFORE the ordinary class: an empty class in a native module is a reference to a host
@@ -870,7 +889,7 @@ internal sealed class TypeTable
         // unlike every named type. Lowered recursively, because parameters and the return may themselves
         // be classes, enums or functions again.
         // A tuple: an object with one field per element.
-        Sema.TupleOf t => TupleOf(t.Elements.Select(e => Lower(e, span)).ToArray()),
+        Sema.TupleOf t => TupleOf(t.Elements.Select(e => LowerValue(e, span)).ToArray()),
 
         // An instance of a generic type: 'Box<int>' is a table entry of its own with its own layout.
         GenericInstance g => InstanceType(g, span),
@@ -879,17 +898,17 @@ internal sealed class TypeTable
         CoroutineOf c => new IrCoroutineType(Lower(c.Yield, span), Lower(c.Result, span)),
 
         FnType f => new IrFunctionType(
-            f.Parameters.Select(p => Lower(p, span)).ToArray(), Lower(f.Return, span)),
+            f.Parameters.Select(p => LowerValue(p, span)).ToArray(), Lower(f.Return, span)),
 
         // T[] is a reference type with the element type inline; it needs no table entry, because it has
         // no named layout.
-        ArrayOf a => new IrArrayType(Lower(a.Element, span)),
-        SliceOf s => new IrSliceType(Lower(s.Element, span)),
-        InlineArrayOf ia => new IrInlineArrayType(Lower(ia.Element, span), ia.Length),
+        ArrayOf a => new IrArrayType(LowerValue(a.Element, span)),
+        SliceOf s => new IrSliceType(LowerValue(s.Element, span)),
+        InlineArrayOf ia => new IrInlineArrayType(LowerValue(ia.Element, span), ia.Length),
 
         // ?T is not nestable. The sema already collapses '??T'; a boundary stands here all the same,
         // rather than a silent assumption.
-        Optional o => OptionalOf(Lower(o.Inner, span), span),
+        Optional o => OptionalOf(LowerValue(o.Inner, span), span),
 
         // A type parameter reaches this place only when the caller did not substitute it. That is a
         // lowering error rather than a language boundary, hence a message of its own instead of the
@@ -921,12 +940,12 @@ internal sealed class TypeTable
         // T[]. There is no size in the type: the length is a property of the value, and the
         // parser refuses a written one (LYR-PAR0043).
         if (node is ArrayType { Length: { } n } inline)
-            return new IrInlineArrayType(Lower(inline.Element, inline.Element.Span), n);
+            return new IrInlineArrayType(ValueOf(Lower(inline.Element, inline.Element.Span)), n);
         if (node is ArrayType array)
-            return new IrArrayType(Lower(array.Element, array.Element.Span));
+            return new IrArrayType(ValueOf(Lower(array.Element, array.Element.Span)));
 
         if (node is NullableType option)
-            return new IrOptionalType(Lower(option.Inner, option.Inner.Span));
+            return new IrOptionalType(ValueOf(Lower(option.Inner, option.Inner.Span)));
 
         // 'Coroutine<int> throws E' is the same coroutine at runtime. What may come out of a pull
         // is a question the compiler answers and the machine never asks: the frame, its state and
@@ -937,13 +956,13 @@ internal sealed class TypeTable
 
         // '(A, B)' — a tuple written as a field, parameter or return type.
         if (node is AST.TupleType written)
-            return TupleOf(written.Elements.Select(e => Lower(e, e.Span)).ToArray());
+            return TupleOf(written.Elements.Select(e => ValueOf(Lower(e, e.Span))).ToArray());
 
         // 'fn(A, B) -> R' — written in parameter and return positions. It needs no table entry: the type
         // carries its signature itself.
         if (node is FunctionType signature)
             return new IrFunctionType(
-                signature.Parameters.Select(p => Lower(p, p.Span)).ToArray(),
+                signature.Parameters.Select(p => ValueOf(Lower(p, p.Span))).ToArray(),
                 Lower(signature.ReturnType, signature.ReturnType.Span));
 
         if (node is NamedType named)

@@ -1,0 +1,55 @@
+// void as a type argument (design/v5/spec/03 §9.1 rule 7): a value of type void is nothing, and
+// it goes wherever one is expected. Expected stdout:
+//   side                          a lambda that returns nothing binds T = void; the instance stores it
+//   again                         and returns it
+//   again
+//   bound                         a call of nothing, bound, passed and wrapped like any value
+//   passed
+//   wrapped
+//   tuple                         as a tuple's element
+//   5 true true 1 true 2 1        what the places hold: the unit, present
+import std.io { println };
+
+class Cell<T> {
+    var value: ?T = null,
+    var count: int = 0,
+
+    mut fn put(v: T): void {
+        this.value = v;
+        this.count += 1;
+    }
+
+    fn take(): T {
+        return this.value!;
+    }
+}
+
+fn run<T>(body: fn() -> T): Cell<T> {
+    let c = Cell<T> { };
+    let r = body();
+    c.put(r);
+    return c;
+}
+
+fn twice<T>(body: fn() -> T): T {
+    body();
+    return body();
+}
+
+fn count(x: void): int {
+    return 1;
+}
+
+fn main(): void {
+    let a = run(() => 5);
+    let b = run(() => { println("side"); });
+    b.take();
+    twice(() => { println("again"); });
+
+    let _ = println("bound");
+    let n = count(println("passed"));
+    let o: ?void = println("wrapped");
+    let pairs = [(1, run(() => { println("tuple"); }))];
+    b.put(b.take());
+    println(f"{a.take()} {a.value != null} {b.value != null} {n} {o != null} {b.count} {pairs.length()}");
+}
