@@ -106,6 +106,8 @@ struct LyrCoro {
     uint64_t owner;                /* the thread it runs on, by the number of its coroutine state */
     int status;
     int foreign;                   /* foreign frames on its stack (01 K4) */
+    int closing;                   /* resumed by lyr_coro_close: the next yield returns to throw */
+    int cleanup;                   /* its body has defers or usings (lyr_coro_set_cleanup) */
 };
 
 /* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */

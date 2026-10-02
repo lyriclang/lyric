@@ -342,9 +342,14 @@ static int starts_with(const char *text, const char *prefix) {
     return text && strncmp(text, prefix, strlen(prefix)) == 0;
 }
 
+/* The runtime's own frames above the program's: the panic and crash machinery, the trace itself,
+ * and the coroutine primitives a pull, a yield or a close panics in (RT0014) — named one by one,
+ * since 'lyr_coro_main' is where a coroutine's frames END. */
 static int is_runtime_frame(const Frame *frame) {
     return starts_with(frame->function, "lyr_panic") || starts_with(frame->function, "lyr_crash") ||
-           starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new");
+           starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new") ||
+           starts_with(frame->function, "lyr_coro_resume") || starts_with(frame->function, "lyr_coro_yield") ||
+           starts_with(frame->function, "lyr_coro_close");
 }
 
 static int same_text(const char *a, const char *b) {
@@ -418,12 +423,12 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
     }
     /* The program's frames end at the runtime's entry — or at the emitted glue that calls main from
      * there, 'lyr_entry', whose line is whatever '#line' stood last — or, on a coroutine's stack,
-     * at the runtime's frame that runs its body. */
+     * at the emitted runner that calls the body ('lyr_corun'), or the runtime's frame below it. */
     int end = trace.count, reached_main = 0;
     for (int i = start; i < trace.count; i++) {
         const char *function = trace.frames[i].function;
         if (function && (strcmp(function, "lyr_run_main") == 0 || strcmp(function, "lyr_entry") == 0
-                         || strcmp(function, "lyr_coro_main") == 0)) {
+                         || strcmp(function, "lyr_coro_main") == 0 || starts_with(function, "lyr_corun"))) {
             end = i;
             reached_main = 1;
             break;

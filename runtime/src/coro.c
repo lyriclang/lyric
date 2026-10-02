@@ -8,6 +8,7 @@
 
 #include "lyr/coro.h"
 #include "lyr/gc.h"
+#include "lyr/init.h"
 #include "lyr/panic.h"
 #include "internal.h"
 
@@ -495,8 +496,16 @@ static void release_stack(LyrCoro *co) {
 }
 
 /* A suspended coroutine nothing references any more (06 A5): nothing on its stack runs again; the
- * stack goes. Called by the collector stage on any thread, at an allocation or a collection. */
+ * stack goes. Called by the collector stage on any thread, at an allocation or a collection. The
+ * debug profile says so where the body had cleanup that now never runs. */
 void lyr_coro_abandoned(LyrCoro *co) {
+#ifndef NDEBUG
+    if (co->cleanup) {
+        static const char line[] =
+            "warning: a coroutine was dropped while suspended without close(); its defers do not run\n";
+        lyr_write_stderr(line, sizeof line - 1);
+    }
+#endif
     release_stack(co);
 }
 
@@ -559,6 +568,7 @@ void lyr_coro_yield(void) {
     CoroThread *ts = this_thread();
     LyrCoro *co = ts->current;
     if (LYR_UNLIKELY(co == NULL)) lyr_panic(LYR_RT_COROUTINE, "a yield with no coroutine running — on the thread's own stack");
+    if (LYR_UNLIKELY(co->closing)) lyr_panic(LYR_RT_COROUTINE, "a coroutine yielded while it was being closed");
     co->status = LYR_CORO_SUSPENDED;
     ts->current = co->resumer_coro;
     LyrStackCtx *to = co->resumer;
@@ -572,6 +582,27 @@ void lyr_coro_yield_value(void *value) {
     ts->current->transfer = value;
     lyr_coro_yield();
 }
+
+void lyr_coro_close(LyrCoro *co) {
+    if (co->status == LYR_CORO_DONE) return;
+    if (LYR_UNLIKELY(co->status == LYR_CORO_RUNNING)) {
+        lyr_panic(LYR_RT_COROUTINE, "a coroutine closed while it runs — by itself, or while a coroutine it resumed runs");
+    }
+    if (co->mapping == NULL) {  /* never resumed: no frame holds anything to unwind */
+        co->status = LYR_CORO_DONE;
+        co->transfer = NULL;
+        return;
+    }
+    co->closing = 1;
+    lyr_coro_resume(co);
+}
+
+int lyr_coro_closing(void) {
+    CoroThread *ts = thread_state;
+    return ts != NULL && ts->current != NULL ? ts->current->closing : 0;
+}
+
+void lyr_coro_set_cleanup(LyrCoro *co) { co->cleanup = 1; }
 
 void *lyr_coro_transfer(const LyrCoro *co) { return co->transfer; }
 void lyr_coro_set_transfer(LyrCoro *co, void *value) { co->transfer = value; }
