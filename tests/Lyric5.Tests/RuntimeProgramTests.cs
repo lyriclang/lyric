@@ -27,6 +27,7 @@ public class RuntimeProgramTests
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
+            data.Add("poll_basic", profile, 0, "poll ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }
@@ -58,6 +59,20 @@ public class RuntimeProgramTests
         var result = RuntimeBuildTests.RunTest("coro_park", profile, args: [which]);
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.StartsWith("panic [LYR-RT0014]: " + message, result.Stderr);
+        Assert.Equal("", result.Stdout);
+    }
+
+    /// <summary>A poller the system refuses (06 N6 S2): with no descriptors left, a panic — RT0015.
+    /// Not on Windows, where a process cannot be denied the event a poller is.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_refused_poller_panics(Profile profile)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var result = RuntimeBuildTests.RunTest("poll_basic", profile, args: ["nofds"]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.StartsWith("panic [LYR-RT0015]: the system refused a poller: ", result.Stderr);
         Assert.Equal("", result.Stdout);
     }
 
