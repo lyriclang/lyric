@@ -1,10 +1,7 @@
-// A program the front end accepts and the subset gate refuses: a yield outside a coroutine's own
-// body — in a function a coroutine calls (06 §10a) — comes with M6 S2b.
-fn emit(n: int): void {
-    yield n;
-}
+// A program the front end accepts and the subset gate refuses: a native the C emitter has no
+// intrinsic for — std.notyet is a test-only module beside the shipped stdlib5 (M8a).
+import std.notyet { tick };
 
 fn main(): int {
-    emit(1);
-    return 0;
+    return tick();
 }

@@ -5,4 +5,9 @@
     <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
     <ProjectReference Include="..\..\src\Lyric5\Lyric5.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- A test-only module beside the shipped stdlib5: a native the C emitter has no intrinsic
+         for, the one refusal of the subset gate a program can still reach (M8a). -->
+    <None Update="notyet\std\notyet.lyr" Link="stdlib5\std\notyet.lyr" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

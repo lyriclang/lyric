@@ -136,7 +136,8 @@ internal sealed class ExceptionAnalyzer
                 InContext(new Context([], "a parameter's default", canDeclare: false), () => AnalyzeExpr(value));
 
         if (fn.Body is not { } body) return;
-        InContext(new Context(_types.DeclaredThrows(fn), $"'{fn.Name}'", canDeclare: true), () => AnalyzeStmt(body));
+        InContext(new Context(BodyCovers(_types.DeclaredThrows(fn), CoroutineShape.IsCoroutine(fn)), $"'{fn.Name}'", canDeclare: true),
+            () => AnalyzeStmt(body));
     }
 
     private void InContext(Context context, Action walk)
@@ -186,10 +187,15 @@ internal sealed class ExceptionAnalyzer
             case BreakStmt { Value: { } broken }: AnalyzeExpr(broken); break;
             case YieldStmt y:
                 if (y.Value is not null) AnalyzeExpr(y.Value);
-                // A yield of a coroutine's body throws 'Cancelled' where close() finds it suspended
-                // (06 A5): the trys around it are reached — a clause may catch it — and the body
-                // itself covers what none takes.
-                if (_cancelled is { } cancelled && _types.IsBodyYield(y)) Taken(cancelled);
+                // A yield throws 'Cancelled' where close() finds its coroutine suspended (06 A5).
+                // One of a coroutine's body reaches the trys around it — a clause may catch it — and
+                // the body covers what none takes. One outside a body (§10a) is a site like a
+                // throw: covered by a clause around it or by its function's set.
+                if (_cancelled is { } cancelled)
+                {
+                    if (_types.IsBodyYield(y)) Taken(cancelled);
+                    else Site([cancelled], y.Span, "'yield'", needsMark: false);
+                }
                 break;
             case DeferStmt de: AnalyzeStmt(de.Body); break; // runs in the scope that registered it
             case ThrowStmt t:
@@ -307,10 +313,17 @@ internal sealed class ExceptionAnalyzer
 
     private LyrType[] LambdaThrows(LambdaExpr lam) => _types.TypeOf(lam) switch
     {
-        FnType { Return: CoroutineOf made } when _types.IsGeneratorLambda(lam) => made.Throws is { } pulled ? [pulled] : [],
+        FnType { Return: CoroutineOf made } when _types.IsGeneratorLambda(lam) =>
+            BodyCovers(made.Throws is { } pulled ? [pulled] : [], coroutine: true),
         FnType { Throws: var lambdaSet } => lambdaSet,
         _ => [],
     };
+
+    /// <summary>What a function's body covers: its set — and in a coroutine's body the
+    /// <c>Cancelled</c> close() throws at its yields (06 A5), which the runner takes, so a call of a
+    /// helper that yields and passes it on (§10a) is covered as the body's own yields are.</summary>
+    private LyrType[] BodyCovers(LyrType[] declared, bool coroutine) =>
+        coroutine && _cancelled is { } cancelled ? [.. declared, cancelled] : declared;
 
     // Callee position: the function reference itself is legitimate; only its sub-expressions run.
     private void AnalyzeCallee(Expr callee)

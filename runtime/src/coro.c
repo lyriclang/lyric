@@ -604,6 +604,18 @@ int lyr_coro_closing(void) {
 
 void lyr_coro_set_cleanup(LyrCoro *co) { co->cleanup = 1; }
 
+void lyr_coro_yield_dynamic(void *value, const char *key) {
+    CoroThread *ts = this_thread();
+    LyrCoro *co = ts->current;
+    if (LYR_UNLIKELY(co == NULL)) lyr_panic(LYR_RT_COROUTINE, "a yield with no coroutine running — on the thread's own stack");
+    if (LYR_UNLIKELY(co->yield_key != NULL && strcmp(co->yield_key, key) != 0)) {
+        lyr_panic(LYR_RT_COROUTINE, "a yield of '%s' where the running coroutine yields '%s'", key, co->yield_key);
+    }
+    lyr_coro_yield_value(value);
+}
+
+void lyr_coro_set_yield_key(LyrCoro *co, const char *key) { co->yield_key = key; }
+
 void *lyr_coro_transfer(const LyrCoro *co) { return co->transfer; }
 void lyr_coro_set_transfer(LyrCoro *co, void *value) { co->transfer = value; }
 

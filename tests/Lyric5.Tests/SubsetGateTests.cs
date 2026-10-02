@@ -7,15 +7,15 @@ namespace Lyric5.Tests;
 /// <summary>
 /// The subset gate (M2 S1): what of the 4.x front end's IR the Lyric 5 compiler takes today, and
 /// what it refuses with the milestone that brings it. Programs compile against <c>stdlib5/</c>,
-/// the seed of the Lyric 5 standard library, never against the 4.x <c>stdlib/</c>.
+/// the seed of the Lyric 5 standard library, never against the 4.x <c>stdlib/</c> — the copy
+/// beside the tests, which carries the test-only <c>std.notyet</c>: since M6 S2d the gate takes
+/// every instruction, and a native without an intrinsic is the refusal left to show (M8a).
 /// </summary>
 public class SubsetGateTests
 {
-    private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
-
     private static CompileResult Lower(string source)
     {
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(Root, "stdlib5") };
+        var options = new CompilerOptions { StdlibRoot = Path.Combine(AppContext.BaseDirectory, "stdlib5") };
         return SourceCompiler.Lower(ScriptSource.FromBuffer("gate.lyr", source), options);
     }
 
@@ -64,7 +64,7 @@ public class SubsetGateTests
     // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
     // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]
-    [InlineData("fn emit(): void { yield 1; }\nfn main(): int { emit(); return 0; }", "a yield outside a coroutine's own body", "M6 S2b")]
+    [InlineData("import std.notyet { tick };\nfn main(): int { return tick(); }", "the native function 'std.notyet.tick'", "M8a")]
     public void A_construct_outside_the_core_names_its_milestone(string source, string what, string milestone)
     {
         var refusals = Refusals(source);

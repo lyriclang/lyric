@@ -2854,24 +2854,30 @@ internal sealed class FunctionLowerer
                 ? null
                 : (TempId?)LowerExprAs(stmt.Value, _coroutineYield!);
             _b.Emit(new YieldSuspend(value, _coroutineYield!, Dynamic: false, stmt.Span));
-            if (_types.IsBodyYield(stmt) && CancelledClass() is { } cancelled)
-            {
-                var closing = _slots.NewTemp(BoolType);
-                _b.Emit(new CoroutineClosing(closing, stmt.Span));
-                var unwind = _b.NewBlock();
-                var go = _b.NewBlock();
-                _b.Seal(new CondBranch(closing, unwind, go, stmt.Span));
-                _b.SwitchTo(unwind);
-                RaiseCancelled(cancelled, stmt.Span);
-                _b.SwitchTo(go);
-            }
+            UnwindAtClose(stmt.Span);
             return true;
         }
 
         var dynamicValue = stmt.Value is null ? null : (TempId?)LowerExpr(stmt.Value);
         var siteType = stmt.Value is null ? VoidType : TypeOfExpr(stmt.Value);
         _b.Emit(new YieldSuspend(dynamicValue, siteType, Dynamic: true, stmt.Span));
+        UnwindAtClose(stmt.Span);
         return true;
+    }
+
+    /// <summary>After a yield: where close() resumed the coroutine to be unwound (06 A5), the yield
+    /// throws <c>Cancelled</c>, and the error path runs the defers on the way out.</summary>
+    private void UnwindAtClose(Core.Span span)
+    {
+        if (CancelledClass() is not { } cancelled) return;
+        var closing = _slots.NewTemp(BoolType);
+        _b.Emit(new CoroutineClosing(closing, span));
+        var unwind = _b.NewBlock();
+        var go = _b.NewBlock();
+        _b.Seal(new CondBranch(closing, unwind, go, span));
+        _b.SwitchTo(unwind);
+        RaiseCancelled(cancelled, span);
+        _b.SwitchTo(go);
     }
 
     /// <summary>

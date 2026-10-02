@@ -107,6 +107,7 @@ struct LyrCoro {
     int status;
     int foreign;                   /* foreign frames on its stack (01 K4) */
     int closing;                   /* resumed by lyr_coro_close: the next yield returns to throw */
+    const char *yield_key;         /* the yield type, for a dynamic yield (lyr_coro_set_yield_key) */
     int cleanup;                   /* its body has defers or usings (lyr_coro_set_cleanup) */
 };
 

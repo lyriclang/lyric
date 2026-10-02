@@ -177,11 +177,8 @@ public static class SubsetGate
                     break;
                 case CallIndirect:
                     break;
-                // Generators (06 N2): a coroutine's own body yields; a yield anywhere else meets
-                // the running coroutine only at run time (§10a) and comes with S2b.
-                case YieldSuspend { Dynamic: true }:
-                    Refuse(op.Span, "a yield outside a coroutine's own body", "M6 S2b");
-                    break;
+                // Coroutines (06 N2): a yield of a body, and one outside it that meets the running
+                // coroutine at run time (§10a).
                 case MakeCoroutine or ResumePull or YieldSuspend or CoroutineDone or CoroutineResult
                     or CoroutineClosing or CoroutineClose:
                     break;

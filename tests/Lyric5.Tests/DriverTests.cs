@@ -121,7 +121,7 @@ public class DriverTests
         Assert.Equal(1, exit);
         Assert.Equal("", output);
         Assert.Contains("LYR-CG0001", err);
-        Assert.Contains("(M6 S2b)", err);
+        Assert.Contains("(M8a)", err);
     }
 
     [Fact]
