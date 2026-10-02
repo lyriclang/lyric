@@ -59,9 +59,14 @@ static void tsan_on_collection(GC_EventType event) {
 #ifdef LYR_TSAN
 #  define TSAN_PUBLISH() __tsan_release(&tsan_program_side)
 #  define TSAN_RECEIVE() __tsan_acquire(&tsan_collector_side)
+/* An explicit free hands a cell back without a collection: the allocation that gets it next sees
+ * what the freeing thread wrote, as after a collection — a root that one thread frees and another
+ * allocates again (a thread's start, M6 S6b). */
+#  define TSAN_RETURN() __tsan_release(&tsan_collector_side)
 #else
 #  define TSAN_PUBLISH() ((void)0)
 #  define TSAN_RECEIVE() ((void)0)
+#  define TSAN_RETURN() ((void)0)
 #endif
 
 /* Set by the collector when finalizers are ready; drained on the allocating thread. */
@@ -154,7 +159,9 @@ struct LyrRoot {
 };
 
 LyrRoot *lyr_root_new(void *object) {
+    TSAN_PUBLISH();
     LyrRoot *root = GC_MALLOC_UNCOLLECTABLE(sizeof *root);
+    TSAN_RECEIVE();
     if (LYR_UNLIKELY(root == NULL)) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory allocating a root");
     root->object = object;
     return root;
@@ -162,7 +169,10 @@ LyrRoot *lyr_root_new(void *object) {
 
 void *lyr_root_get(const LyrRoot *root) { return root->object; }
 void lyr_root_set(LyrRoot *root, void *object) { root->object = object; }
-void lyr_root_free(LyrRoot *root) { GC_FREE(root); }
+void lyr_root_free(LyrRoot *root) {
+    TSAN_RETURN();
+    GC_FREE(root);
+}
 
 void lyr_register_stack(void *low, void *high) { GC_add_roots(low, high); }
 void lyr_unregister_stack(void *low, void *high) { GC_remove_roots(low, high); }
