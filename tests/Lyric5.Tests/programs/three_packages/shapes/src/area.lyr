@@ -1,0 +1,9 @@
+/// The area of a rectangle of whole meters.
+pub fn rectangle(width: int, height: int): int {
+    return width * height;
+}
+
+/// The area of a square.
+pub fn square(side: int): int {
+    return rectangle(side, side);
+}

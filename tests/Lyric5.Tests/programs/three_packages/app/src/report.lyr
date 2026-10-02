@@ -1,0 +1,4 @@
+/// One line of the report: what, and how much.
+pub fn line(what: string, amount: int): string {
+    return f"{what}: {amount} cm2";
+}
