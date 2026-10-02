@@ -35,8 +35,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M4 | Interfaces and abstraction | L | **done** 2026-10-01 |
 | M5 | Errors | M | **done** 2026-10-02 |
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
-| M7 | Modules and packages | L | **next** |
-| M8a | std core | XL | — |
+| M7 | Modules and packages | L | **done** 2026-10-02 |
+| M8a | std core | XL | **next** |
 | M8b | std I/O and system | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
@@ -451,9 +451,64 @@ parameters (T12) would let a lock hand out a place instead of a guard; every `st
 carries the module's types and globals (type pruning); `thread.spawn` (T1) collides with
 `Thread.spawn` (SEM0085); the spin locks and the wake-all of the locks are unmeasured.
 
-### M7 — Modules and packages
+### M7 — done (2026-10-02)
 
-Next. Plan first (13, M7), then slices.
+Merged as #244–#260; the spec side is lyric-spec#105–#121.
+
+The plan (13, M7): 07 and W2 — visibility `private`/`internal`/`pub`, the module's name from its
+path, `pub import`, the prelude, editions, `lyric.toml`, path and git dependencies, MVS,
+`lyric.lock` with hashes, `[native]`, profiles, targets, the `out/` lock, the reproducibility
+test, `lyric metadata`, `lyric clean/add/update`, `build.lyr`. Exit criteria: a multi-package
+example with a git dependency builds offline; reproducible twice from two directories; a
+cross-build linux→windows.
+
+1. S1 (#244): the package core — `lyric.toml` read by a TOML subset of our own (`[package]` name,
+   version, edition), `src/main.lyr` the program, a module named by its path, the header refused,
+   a single file a package of its own with `std` alone; the C cache keyed by every source.
+2. S2a–S2c (#245–#248): visibility — three words, `internal` the default, one predicate on
+   every resolution route; fields, methods, extend blocks, interface helpers; a declaration no
+   more visible than the types it names (SEM0151), members no more than their type (SEM0152).
+3. S3a–S3b (#249–#250): `{ f as g }`, `pub import`, one unused-import rule; `std.prelude`, one
+   namespace per module, the builtin names. S3c (moving `Thread`, the locks and the signals out of
+   `std.task`) went to M8b: `std.task` ↔ `std.sync` is a cycle until `Atomic` moves down.
+4. S4 (#251): path dependencies, one package per name, `[override]`, imports only from what a
+   manifest declares (RES0014); a library builds as a check.
+5. S5a–S5b (#252–#253): git dependencies through the user's cache, `--offline`, the package
+   content (P8); minimal version selection over tags, `lyric.lock` with commits and `h1` hashes,
+   `lyric update`.
+6. S6a–S6e (#254–#258): profiles with `inherits` and their six fields (`overflowChecks = false`
+   is 03 T2's explicit switch), field flags, `LYRIC_PROFILE`; `[[bin]]` and `--bin`; the toolchain
+   pin; `out/.lock`, `lyric clean`, `lyric metadata`; `lyric add`/`remove`; `[native]` and
+   `extern "C"` for scalars (stage 1 — M14 completes the type table).
+7. S8a (#259): reproducibility — one package from two directories a second apart, the same
+   bytes in debug and release and for each operating system's format: `-ffile-prefix-map`, `.` as
+   the compilation directory, a generic instance's unit named apart from where it lies, a PE
+   image's stamps and PDB GUID from its own bytes, a Mach-O image without its debug map (the dSYM
+   beside it on a macOS host).
+8. S8b (#260): this section, the example, the init order across packages.
+
+The artifacts: `tests/Lyric5.Tests/programs/three_packages` — a program, a path dependency and one
+from git — built online once, then offline with the repository gone, then for the other
+operating system (`ExampleTests`); `ReproducibilityTests` for P6.
+
+Not done from the plan, decided on the way: `build.lyr` (BS1–BS6) waits for M8b — `std.build`
+works through `std.fs` and `std.process`, which come with it; S3c went to M8b as well. The
+editions exist as the field (`edition = "5"`, 07 V9) with the one edition there is.
+
+Conformance: 637 cases, all `since: 5.0.0`, green in both profiles — 03-types 151, 04-modules 59,
+05-interfaces 98, 06-errors 88, 07-statements 18, 08-expressions 17, 09-patterns 36,
+10-concurrency 137, 13-abi 3, 15-project 30. Test suite: 4395 across the ten projects.
+
+Open from M7, collected for the 5.0 review (the PR bodies say more): the root module of a
+package (`import geo` alone); package cycles; a git URL's identity as written; a package from git
+at its repository's root only (no monorepos); MVS counting every version read; `lyric update`
+raising no version and no `--locked`; `extern "C"`'s stage-1 types; the `lyric5` CLI codes beside
+the 4.x catalogue; reproducibility checked on one machine at a time (zig's own libunwind keeps
+the directory zig built it in; gcc maps the working directory, into its cache keys).
+
+### M8a — std core
+
+Next. Plan first (13, M8a), then slices.
 
 ## Design decisions
 

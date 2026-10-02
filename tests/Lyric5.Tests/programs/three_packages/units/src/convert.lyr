@@ -1,0 +1,4 @@
+/// Square meters in square centimeters.
+pub fn centimeters(squareMeters: int): int {
+    return squareMeters * 10000;
+}

@@ -47,6 +47,21 @@ promise. This entry fills with the milestones.
   `Pool`, channels and selects across threads, `Mutex`, `RwLock`, `Once`, and `std.sync`'s
   `Atomic<T>`; the system's signals as a channel — `signals(Signal.Interrupt)`. `main` is a task
   wherever a program waits.
+- **Modules and packages (M7** — `design/v5/spec/07`, `11` W2/W4, spec chapters 04, 13 §2, 14,
+  15**):** a package is `lyric.toml` and `src/`, a module is named by its path (`app.net.http`,
+  no header), `src/main.lyr` and every `[[bin]]` are its programs, a package without any a
+  library that `build` checks; `private`, `internal` (the default) and `pub` on every
+  declaration and member, checked on every way a name is reached, a declaration no more visible
+  than the types it names; `import m { f as g }`, `pub import`, and `std.prelude`'s names in every
+  module without an import; dependencies by directory or from git — a tag, a branch, a commit,
+  through the user's cache, `--offline` —, one package of each name, `[override]`, imports only
+  from what a manifest declares; minimal version selection over tags and `lyric.lock` with each
+  revision's commit and content hash, `lyric update`; profiles with `inherits` and the fields
+  `opt`, `debugInfo`, `lto`, `denyWarnings`, `overflowChecks`, `fastMath`, `LYRIC_PROFILE`; the
+  toolchain pin; `out/.lock`; `lyric clean`, `lyric metadata` (JSON), `lyric add`/`remove`;
+  `[native]` C sources and libraries with `extern "C"` for scalars; the same bytes wherever a
+  package lies and whenever it is built, on every platform — the PDB and the `.dSYM` beside the
+  binary.
 
 ---
 

@@ -1,0 +1,13 @@
+import std.io { println };
+import shapes.area { rectangle, square };
+import units.convert { centimeters };
+import app.report { line };
+
+/// The garden, measured in meters, reported in centimeters.
+fn main(): void {
+    let bed = rectangle(3, 4);
+    let path = square(2);
+    println(line("bed", centimeters(bed)));
+    println(line("path", centimeters(path)));
+    println(line("total", centimeters(bed + path)));
+}
