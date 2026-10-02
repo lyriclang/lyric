@@ -33,9 +33,10 @@ public class OutTests
         using (OutLock.Take(project.OutDir, TextWriter.Null))
         {
             build = Task.Run(() => Pipeline.Build(request, error));
-            Thread.Sleep(1500);
-            Assert.False(build.IsCompleted, "the build did not wait for the lock");
+            Assert.True(SpinWait.SpinUntil(() => Said().Contains("waiting for another build"), TimeSpan.FromMinutes(1)),
+                $"the build said nothing about the lock: {Said()}");
             Assert.Contains($"waiting for another build in {project.OutDir} to finish", Said());
+            Assert.False(build.IsCompleted, "the build did not wait for the lock");
         }
         Assert.True(build.Wait(TimeSpan.FromMinutes(2)), "the build did not finish once the lock was free");
         Assert.True(build.Result.Exit == 0, Said());

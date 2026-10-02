@@ -9,7 +9,7 @@ namespace Lyric5;
 /// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
 /// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
 /// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c>,
-/// <c>clean</c>, <c>metadata</c> (M7).
+/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7).
 /// </summary>
 public static class Program
 {
@@ -27,6 +27,8 @@ public static class Program
                 "update" => Update(args[1..]),
                 "clean" => Clean(args[1..]),
                 "metadata" => Metadata(args[1..]),
+                "add" => Add(args[1..]),
+                "remove" => Remove(args[1..]),
                 _ => Unknown($"unknown verb '{args[0]}'"),
             };
         }
@@ -50,6 +52,9 @@ public static class Program
         output.WriteLine("                                 build, then run the binary with the arguments");
         output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —");
         output.WriteLine("                                 and write lyric.lock (options: -C <dir>, --offline)");
+        output.WriteLine("  add <name> --path <dir> | --git <url> [--tag|--branch|--rev <r>]");
+        output.WriteLine("                                 write the dependency into lyric.toml (-C <dir>, --offline)");
+        output.WriteLine("  remove <name>                  take the dependency out of lyric.toml (-C <dir>, --offline)");
         output.WriteLine("  clean [-C <dir>]               remove the package's out/");
         output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
         output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
@@ -460,6 +465,120 @@ public static class Program
             Console.Error.WriteLine(manifest.Render());
             return manifest.Exit;
         }
+    }
+
+    // --- add and remove ------------------------------------------------------------------------
+
+    /// <summary>
+    /// <c>lyric add &lt;name&gt; --path &lt;dir&gt; | --git &lt;url&gt; [--tag|--branch|--rev &lt;r&gt;]</c>
+    /// (11 C2): the dependency written into <c>[dependencies]</c> as one line, every other line as it
+    /// was, and the graph read with it — a graph that refuses the dependency leaves the manifest as
+    /// it was. The path is written relative to the manifest.
+    /// </summary>
+    private static int Add(string[] args)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? name = null;
+        var offline = false;
+        string[] valued = ["--path", "--git", "--tag", "--branch", "--rev", "-C"];
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            var option = valued.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
+            if (arg == "--offline") offline = true;
+            else if (option is not null)
+            {
+                var given = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
+                if (given is null) return Unknown($"'{option}' needs a value");
+                values[option] = given;
+            }
+            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'add'");
+            else if (name is null) name = arg;
+            else return Unknown($"'add' takes one name, got '{name}' and '{arg}'");
+        }
+        if (name is null) return Unknown("'add' needs the dependency's name: lyric5 add geo --path ../geo");
+        var revisions = new[] { "--tag", "--branch", "--rev" }.Where(values.ContainsKey).ToList();
+        if (values.ContainsKey("--path") == values.ContainsKey("--git"))
+            return Unknown("'add' reads a dependency from a directory or from a repository: --path or --git, one of them");
+        if (revisions.Count > 0 && !values.ContainsKey("--git")) return Unknown($"'{revisions[0]}' names a revision of a repository: it goes with --git");
+        if (revisions.Count > 1) return Unknown($"'{revisions[0]}' and '{revisions[1]}': a dependency reads one revision");
+
+        var start = Path.GetFullPath(values.GetValueOrDefault("-C") ?? Directory.GetCurrentDirectory());
+        if (Project.FindManifest(start) is not { } file)
+        {
+            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            return 2;
+        }
+        var root = Path.GetDirectoryName(file)!;
+        string value;
+        if (values.TryGetValue("--path", out var path))
+        {
+            // Relative to where the command looks from (-C), as a file 'build' is given is.
+            var relative = Path.GetRelativePath(root, Path.GetFullPath(path, start)).Replace('\\', '/');
+            value = $"{{ path = {ManifestEdit.Quote(relative)} }}";
+        }
+        else
+        {
+            var revision = revisions.Count == 0 ? "" : $", {revisions[0][2..]} = {ManifestEdit.Quote(values[revisions[0]])}";
+            value = $"{{ git = {ManifestEdit.Quote(values["--git"])}{revision} }}";
+        }
+        return EditDependencies(file, offline, text => ManifestEdit.Add(text, name, value), $"added {name} = {value}");
+    }
+
+    /// <summary><c>lyric remove &lt;name&gt;</c> (11 C2): the dependency's line taken out of
+    /// <c>[dependencies]</c>, and the graph — the lock with it — read again.</summary>
+    private static int Remove(string[] args)
+    {
+        // The name, wherever it stands among the options.
+        var names = new List<string>();
+        var rest = new List<string>();
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "-C" && i + 1 < args.Length) { rest.Add(args[i]); rest.Add(args[++i]); }
+            else if (args[i].StartsWith('-')) rest.Add(args[i]);
+            else names.Add(args[i]);
+        }
+        if (names.Count != 1) return Unknown("'remove' takes the dependency's name, one: lyric5 remove geo");
+        var name = names[0];
+        if (PackageOptions("remove", [.. rest], ["--offline"], out var refused) is not { } options) return refused;
+        if (Project.FindManifest(options.Start) is not { } file)
+        {
+            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            return 2;
+        }
+        return EditDependencies(file, options.Flags.Contains("--offline"),
+            text => ManifestEdit.Remove(text, name)
+                    ?? throw new ArgumentException($"no dependency '{name}' in {file}"),
+            $"removed {name}");
+    }
+
+    /// <summary>The manifest edited, then read with its graph; what refuses the edit puts the
+    /// manifest back as it was.</summary>
+    private static int EditDependencies(string file, bool offline, Func<string, string> edit, string done)
+    {
+        var before = File.ReadAllText(file);
+        string after;
+        try { after = edit(before); }
+        catch (ArgumentException unknown) { return Unknown(unknown.Message); }
+        catch (InvalidOperationException other)
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0008]: {other.Message}");
+            return 2;
+        }
+        File.WriteAllText(file, after);
+        try
+        {
+            var graph = Project.Resolve(Manifest.Read(file), offline);
+            ToolchainCheck.Check(graph, DisplayVersion());
+        }
+        catch (ManifestException refused)
+        {
+            File.WriteAllText(file, before);
+            Console.Error.WriteLine(refused.Render());
+            return refused.Exit;
+        }
+        Console.Out.WriteLine(done);
+        return 0;
     }
 
     // --- version -------------------------------------------------------------------------------
