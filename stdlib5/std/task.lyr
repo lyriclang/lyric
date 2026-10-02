@@ -2,9 +2,10 @@
 /// each thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
 /// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
-/// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads; threads (G1,
-/// G2); `Mutex`, `RwLock` and `Once` (G4, K6) — `std.sync`'s by the module cut (10 Q10), here until
-/// M7 lets another module reach the scheduler.
+/// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads; threads and a
+/// pool of them (G1, G2, T1, P5); `Mutex`, `RwLock` and `Once` (G4, K6) — by the module cut
+/// `Thread` and `Pool` are `std.thread`'s and the locks `std.sync`'s (10 Q10), here until M7 lets
+/// another module reach the scheduler.
 module std.task;
 
 import std.sync { Atomic };
@@ -1040,11 +1041,12 @@ pub class TaskScope :: [Closeable] {
 
 /// A task around `body`, ready to run, and its handle: what `spawn` and `TaskScope.spawn` share.
 fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
-    return launchOn(here(), body);
+    return launchOn(here(), body, null);
 }
 
-/// The same on the scheduler `s` — another thread's, for `Thread.spawn` (06 T1).
-fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E): Task<T> {
+/// The same on the scheduler `s` — another thread's, for `Thread.spawn` and `Pool.spawn` (06 T1):
+/// readied through its inbox then. `ended` runs once the body has ended, however it ended.
+fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E, ended: ?fn() -> void): Task<T> {
     let task = Task<T> { };
     let run = () => {
         try {
@@ -1053,13 +1055,15 @@ fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E): Task<T> {
             task.failure = e;
         }
         task.finish();
+        if (let f = ended) { f(); }
     };
     let c = Context { body = startContext(run, 0), home = s };
     c.onPanic = (info: PanicInfo) => {
         task.panicked(info);
+        if (let f = ended) { f(); }
     };
     task.context = c;
-    s.ready(c);
+    here().post(c);
     return task;
 }
 
@@ -1073,7 +1077,7 @@ pub class Thread {
     /// the tasks still ready or asleep there then never run again.
     pub static fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
         let s = Scheduler { };
-        let task = launchOn(s, body);
+        let task = launchOn(s, body, null);
         startThread(() => {
             setCurrentScheduler(s);
             s.started();
@@ -1214,6 +1218,100 @@ class Waiters {
     }
 }
 
+/// A pool of threads (06 G2, T1, P5): `spawn` runs a task on one of them — each in turn — and gives
+/// its handle; `close()` waits until the tasks given to the pool have ended, then ends its threads.
+/// A pool is `Closeable`: `using let pool = Pool.new(4);`.
+pub class Pool :: [Closeable] {
+    workers: Worker,
+    size: int,
+    picks: Atomic<int> = Atomic<int>.new(0),
+    closed: Atomic<bool> = Atomic<bool>.new(false),
+
+    /// A pool of `threads` threads — one at least — each with a scheduler of its own.
+    pub static fn new(threads: int): Pool {
+        let n = if (threads > 0) threads else 1;
+        var head = Worker { scheduler = Scheduler { } };
+        head.start();
+        for (_ in 1..n) {
+            let w = Worker { scheduler = Scheduler { }, next = head };
+            w.start();
+            head = w;
+        }
+        return Pool { workers = head, size = n };
+    }
+
+    /// Runs `body` as a task on one of the pool's threads and gives its handle (06 T1): `await()`
+    /// waits for it from any thread. A closed pool takes no task: that is a panic.
+    pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        if (this.closed.load()) { panic("a task given to a closed pool"); }
+        let w = this.pick();
+        w.active.fetchAndAdd(1);
+        return launchOn(w.scheduler, body, () => {
+            w.active.fetchAndAdd(-1);
+        });
+    }
+
+    /// Waits until every task given to the pool has ended, then ends its threads. Closing a closed
+    /// pool waits for nothing. A wait: in a cancelled task it throws `Cancelled`.
+    pub fn close(): void throws Error {
+        this.closed.store(true);
+        var at: ?Worker = this.workers;
+        while (let w = at) {
+            w.close();
+            at = w.next;
+        }
+        at = this.workers;
+        while (let w = at) {
+            try w.finished.recv();
+            at = w.next;
+        }
+    }
+
+    /// The next thread in turn.
+    fn pick(): Worker {
+        var k = this.picks.fetchAndAdd(1) % this.size;
+        if (k < 0) { k = -k; }
+        var at: ?Worker = this.workers;
+        while (let w = at) {
+            if (k == 0) { return w; }
+            k -= 1;
+            at = w.next;
+        }
+        return this.workers;
+    }
+}
+
+/// A thread of a pool. It runs until the pool is closed and none of the pool's tasks on it is left;
+/// then its `finished` closes.
+class Worker {
+    scheduler: Scheduler,
+    active: Atomic<int> = Atomic<int>.new(0),
+    closing: Atomic<bool> = Atomic<bool>.new(false),
+    finished: Channel<void> = Channel<void>.new(),
+    var next: ?Worker = null,
+
+    fn start(): void {
+        let s = this.scheduler;
+        let w = this;
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!(w.closing.load() && w.active.load() == 0)) {
+                s.step();
+            }
+            w.finished.close();
+            s.stopped();
+            setCurrentScheduler(null);
+        });
+    }
+
+    /// The pool closes: the thread looks again, and ends once its tasks have.
+    fn close(): void {
+        this.closing.store(true);
+        this.scheduler.nudge();
+    }
+}
+
 /// A lock for the short sections where threads meet — an inbox, a task's end: it spins while
 /// another thread holds it, and guards nothing that waits.
 class SpinLock {
@@ -1248,6 +1346,15 @@ class Scheduler {
     mut fn started(): void {
         this.inboxLock.acquire();
         this.poller = currentPoller();
+        this.inboxLock.release();
+    }
+
+    /// Wakes the thread from its wait on the poller, to look at what another thread changed.
+    mut fn nudge(): void {
+        this.inboxLock.acquire();
+        if (this.poller != 0) {
+            wakePoller(this.poller);
+        }
         this.inboxLock.release();
     }
 
