@@ -1,0 +1,28 @@
+// Atomics (design/v5/spec/06 G4, K6; 10 §8). Expected stdout:
+//   0 / 5 / 5 7            load, store, exchange
+//   true 9 / false 9       compareAndSet: where the value is the expected one, and where not
+//   9 12 / 15              fetchAndAdd gives the value before, addAndFetch the one after
+//   true                   an Atomic<bool>
+//   -9223372036854775808   the sum wraps around, as +% does
+import std.io { println };
+import std.sync { Atomic };
+
+fn main(): void {
+    let n = Atomic<int>.new(0);
+    println(f"{n.load()}");
+    n.store(5);
+    println(f"{n.load()}");
+    let old = n.exchange(7);
+    println(f"{old} {n.load()}");
+    let ok = n.compareAndSet(7, 9);
+    println(f"{ok} {n.load()}");
+    let no = n.compareAndSet(7, 11);
+    println(f"{no} {n.load()}");
+    let before = n.fetchAndAdd(3);
+    println(f"{before} {n.load()}");
+    println(f"{n.addAndFetch(3)}");
+    let flag = Atomic<bool>.new(false);
+    println(f"{flag.compareAndSet(false, true) && flag.load()}");
+    let edge = Atomic<int>.new(9223372036854775807);
+    println(f"{edge.addAndFetch(1)}");
+}
