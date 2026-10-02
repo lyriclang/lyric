@@ -1,0 +1,65 @@
+// A thread pool (design/v5/spec/06 G2, T1, P5; 10 §11). Expected stdout:
+//   sum 500500                    a thousand tasks on four threads, their values through a channel
+//   doubled 42                    a task's handle, awaited on main
+//   failed: oops                  what a task throws, await throws
+//   close waited true             close waits for the tasks given to the pool
+//   spawn after close: panicked   a closed pool takes no task
+import std.io { println };
+import std.sync { Atomic };
+import std.task { spawn, sleep, yieldNow, Channel, Pool, TaskStatus };
+import std.time { Duration };
+
+class Oops :: [Error] {
+    fn message(): string { return "oops"; }
+}
+
+fn describe(s: TaskStatus<int>): string {
+    return match (s) {
+        TaskStatus.Panicked(_) => "panicked",
+        _ => "not panicked",
+    };
+}
+
+fn main(): void throws Error {
+    let pool = Pool.new(4);
+    let results = Channel<int>.new(16);
+    for (i in 1..1001) {
+        pool.spawn(() => {
+            try results.send(i);
+        });
+    }
+    var sum = 0;
+    for (_ in 0..1000) {
+        let v = try results.recv();
+        sum += v ?? 0;
+    }
+    println(f"sum {sum}");
+
+    let doubled = pool.spawn(() => 21 * 2);
+    let d = try doubled.await();
+    println(f"doubled {d}");
+
+    let bad = pool.spawn(() => {
+        throw Oops { };
+    });
+    try {
+        bad.await();
+    } catch (e: Oops) {
+        println(f"failed: {e.message()}");
+    }
+
+    let finished = Atomic<bool>.new(false);
+    pool.spawn(() => {
+        try sleep(Duration.ofMillis(30));
+        finished.store(true);
+    });
+    try pool.close();
+    println(f"close waited {finished.load()}");
+
+    let misuse = spawn(() => {
+        let t = pool.spawn(() => 1);
+        return try t.await();
+    });
+    try yieldNow();
+    println(f"spawn after close: {describe(misuse.status())}");
+}

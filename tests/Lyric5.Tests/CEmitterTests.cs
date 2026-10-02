@@ -228,6 +228,8 @@ public class CEmitterTests
             data.Add("channels", profile, 0,
                 "pong 10\npong 20\npong 30\nclosed true\ngot a\nc went in\ngot b c\nempty true\nsend on closed\n"
                 + "waiter cancelled true\n");
+            data.Add("pool", profile, 0,
+                "sum 500500\ndoubled 42\nfailed: oops\nclose waited true\nspawn after close: panicked\n");
             data.Add("locks", profile, 0,
                 "counted 4000\nin turn a1 a2 b1 b2\nguard after its body: panicked\nreaders at once 2\nwritten 9\n"
                 + "once ran 1\nattempts 2\n");

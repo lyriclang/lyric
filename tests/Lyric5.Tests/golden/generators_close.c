@@ -34,6 +34,9 @@ typedef struct lyr_ty24_Waiting_void_ lyr_ty24_Waiting_void_;
 typedef struct lyr_ty25__env_std_task_Timer_after_ lyr_ty25__env_std_task_Timer_after_;
 typedef struct lyr_ty26_Once lyr_ty26_Once;
 typedef struct lyr_ty27_LockState lyr_ty27_LockState;
+typedef struct lyr_ty28_Pool lyr_ty28_Pool;
+typedef struct lyr_ty29_Worker lyr_ty29_Worker;
+typedef struct lyr_ty30__env_std_task_Worker_start_ lyr_ty30__env_std_task_Worker_start_;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -367,6 +370,46 @@ _Static_assert(offsetof(lyr_ty27_LockState, f_done) == 40, "layout of lyr_ty27_L
 _Static_assert(offsetof(lyr_ty27_LockState, f_waiters) == 48, "layout of lyr_ty27_LockState");
 static const uint64_t lyr_refmap_ty27[] = { UINT64_C(0x42) };
 const LyrDesc lyr_desc_ty27_LockState = { sizeof(lyr_ty27_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty27, "std.task.LockState", NULL };
+struct lyr_ty28_Pool {
+    LyrObj header;
+    lyr_ty29_Worker *f_workers;
+    int64_t f_size;
+    lyr_ty2_Atomic_int_ *f_picks;
+    lyr_ty3_Atomic_bool_ *f_closed;
+};
+_Static_assert(sizeof(lyr_ty28_Pool) == 40, "layout of lyr_ty28_Pool");
+_Static_assert(offsetof(lyr_ty28_Pool, f_workers) == 8, "layout of lyr_ty28_Pool");
+_Static_assert(offsetof(lyr_ty28_Pool, f_size) == 16, "layout of lyr_ty28_Pool");
+_Static_assert(offsetof(lyr_ty28_Pool, f_picks) == 24, "layout of lyr_ty28_Pool");
+_Static_assert(offsetof(lyr_ty28_Pool, f_closed) == 32, "layout of lyr_ty28_Pool");
+static const uint64_t lyr_refmap_ty28[] = { UINT64_C(0x1a) };
+const LyrDesc lyr_desc_ty28_Pool = { sizeof(lyr_ty28_Pool), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty28, "std.task.Pool", NULL };
+struct lyr_ty29_Worker {
+    LyrObj header;
+    lyr_ty0_Scheduler *f_scheduler;
+    lyr_ty2_Atomic_int_ *f_active;
+    lyr_ty3_Atomic_bool_ *f_closing;
+    lyr_ty21_Channel_void_ *f_finished;
+    lyr_ty29_Worker *f_next;
+};
+_Static_assert(sizeof(lyr_ty29_Worker) == 48, "layout of lyr_ty29_Worker");
+_Static_assert(offsetof(lyr_ty29_Worker, f_scheduler) == 8, "layout of lyr_ty29_Worker");
+_Static_assert(offsetof(lyr_ty29_Worker, f_active) == 16, "layout of lyr_ty29_Worker");
+_Static_assert(offsetof(lyr_ty29_Worker, f_closing) == 24, "layout of lyr_ty29_Worker");
+_Static_assert(offsetof(lyr_ty29_Worker, f_finished) == 32, "layout of lyr_ty29_Worker");
+_Static_assert(offsetof(lyr_ty29_Worker, f_next) == 40, "layout of lyr_ty29_Worker");
+static const uint64_t lyr_refmap_ty29[] = { UINT64_C(0x3e) };
+const LyrDesc lyr_desc_ty29_Worker = { sizeof(lyr_ty29_Worker), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty29, "std.task.Worker", NULL };
+struct lyr_ty30__env_std_task_Worker_start_ {
+    LyrObj header;
+    lyr_ty0_Scheduler *f_s;
+    lyr_ty29_Worker *f_w;
+};
+_Static_assert(sizeof(lyr_ty30__env_std_task_Worker_start_) == 24, "layout of lyr_ty30__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty30__env_std_task_Worker_start_, f_s) == 8, "layout of lyr_ty30__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty30__env_std_task_Worker_start_, f_w) == 16, "layout of lyr_ty30__env_std_task_Worker_start_");
+static const uint64_t lyr_refmap_ty30[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty30__env_std_task_Worker_start_ = { sizeof(lyr_ty30__env_std_task_Worker_start_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty30, "<env:std.task.Worker.start>", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { LyrObj header; lyr_ty10_Oops value; } lyr_box_ty10_Oops;
 _Static_assert(sizeof(lyr_box_ty10_Oops) == 16, "layout of lyr_box_ty10_Oops");
@@ -942,13 +985,13 @@ bb0:;
     return *t0;
 }
 
-#line 17 "stdlib5/std/task.lyr"
+#line 18 "stdlib5/std/task.lyr"
 LyrStr * lyr_std_task_Cancelled_message(lyr_ty9_Cancelled *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 17
+#line 18
     t0 = (LyrStr *)&lyr_lit16;
-#line 17
+#line 18
     return t0;
 }
 
@@ -1177,16 +1220,16 @@ bb7:;
     return;
 }
 
-#line 1467 "stdlib5/std/task.lyr"
+#line 1574 "stdlib5/std/task.lyr"
 void lyr__globals__9ee5f9b5(void) {
     int64_t t0 = 0;
     lyr_ty2_Atomic_int_ *t1 = NULL;
 bb0:;
-#line 1467
+#line 1574
     t0 = (int64_t)INT64_C(0);
-#line 1467
+#line 1574
     t1 = lyr_std_sync_Atomic_int__new_67eb632f(t0);
-#line 1467
+#line 1574
     lyr_g0_channelIds = t1;
     return;
 }
