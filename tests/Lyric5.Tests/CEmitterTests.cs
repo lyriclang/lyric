@@ -74,6 +74,7 @@ public class CEmitterTests
     [InlineData("resources")]
     [InlineData("fn_throws")]
     [InlineData("loops")]
+    [InlineData("bank")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -213,6 +214,7 @@ public class CEmitterTests
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
+            data.Add("bank", profile, 0, BANK_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -317,6 +319,11 @@ public class CEmitterTests
         + "k none\nsaved\nsave failed: disk\nsum 84\ndefer in callee\nm 0\n";
 
     private const string FN_THROWS_EXPECTED = "1 2 4 4 3\n40\ncaught negative\n7\ntoo big\n";
+
+    // The M5 program (13, M5): an account's errors, a transfer that puts the money back, 'try?'.
+    private const string BANK_EXPECTED =
+        "refused 200 of 120: not enough funds: 200 requested, 120 available\nmoved 50 70\n"
+        + "transfer failed: the account of Ada is closed; back to 50\ntry? -1\nfinal 50 70\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

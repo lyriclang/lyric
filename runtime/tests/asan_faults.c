@@ -1,9 +1,12 @@
 /* The controls for the ASan profile: the runtime turns two ASan defaults off for the collector's
  * sake (gc_boehm.c), and UBSan is set not to recover (Target.cs); these faults show the profile
  * still catches what it is for. Chosen by the first argument; under ASan:
- *   overflow  a write one past a malloc block: "heap-buffer-overflow", exit 1
- *   signed    a signed int overflow in plain C: "runtime error: signed integer overflow", and the
- *             program ends there — exit not 0, "not reached" never printed
+ *   overflow     a write one past a malloc block: "heap-buffer-overflow", exit 1
+ *   signed       a signed int overflow in plain C: "runtime error: signed integer overflow", and
+ *                the program ends there — exit not 0, "not reached" never printed
+ *   unreachable  control reaching '__builtin_unreachable()' — the emitter's C for a block the
+ *                lowering sealed as unreachable: "runtime error: execution reached an
+ *                unreachable program point", and the program ends there
  * (Built in the other profiles, the faults go unnoticed; the program is only run under ASan.) */
 #include "lyr/lyr.h"
 
@@ -23,6 +26,8 @@ static int64_t program(void) {
     } else if (strcmp(which, "signed") == 0) {
         int sum = big + one;
         (void)sum;
+    } else if (strcmp(which, "unreachable") == 0) {
+        if (one) __builtin_unreachable();
     }
     lyr_println(lyr_str_from_cstr("not reached"));
     return 0;
