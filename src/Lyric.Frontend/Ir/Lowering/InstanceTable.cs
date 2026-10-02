@@ -208,10 +208,11 @@ internal sealed class InstanceTable
         var id = _ids.Next();
         _byKey[name] = id;
         // 'this' is the receiver: the instance for a named target, the shape itself for a
-        // built-in constructor (03 T7 X2), where no symbol stands.
+        // built-in constructor (03 T7 X2), where no symbol stands — and whatever a blanket block
+        // (04 D15) is reached on, an instance included, which no target symbol names.
         _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
             substitution, receiver as GenericInstance,
-            method.IsStatic || receiver is GenericInstance ? null : receiver));
+            method.IsStatic || (receiver is GenericInstance && block.Target is not null) ? null : receiver));
         return id;
     }
 

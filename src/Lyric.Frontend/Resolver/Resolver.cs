@@ -529,6 +529,10 @@ public sealed class Resolver
             block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
             // 'extend<T> T[]', 'extend<T> ?T', a tuple (03 T7 X2): a shape, no symbol.
             block.IsConstructorTarget = block.Decl.Target is ArrayType or NullableType or AST.TupleType;
+            // 'extend<T :: [I]> T' (04 D15): the target is the block's own parameter — a blanket
+            // block, which every type its constraints admit receives.
+            block.IsBlanketTarget = block.Decl.Target is NamedType { TypeArguments.Length: 0 }
+                && sym is GenericParamSymbol blanket && block.Generics.Contains(blanket);
             // 'Self' in the block is the target (03 T5), known before the signatures bind — for a
             // plain target; an instance target is written out.
             if (block.Target is { } target && block.Decl.Target is NamedType { TypeArguments.Length: 0 })

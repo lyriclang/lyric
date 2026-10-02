@@ -73,6 +73,10 @@ public sealed class ExtensionBlock
     /// no symbol of its own, matched by shape.</summary>
     public bool IsConstructorTarget { get; set; }
 
+    /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c> (04 D15): a
+    /// blanket block, matched by its constraints alone.</summary>
+    public bool IsBlanketTarget { get; set; }
+
     /// <summary>Synthesized unasked — the <c>Debug</c> every type gets where it can (04 D7). The
     /// sema checks it muted and withdraws it where the fields give no rendering.</summary>
     public bool IsImplicit { get; init; }
