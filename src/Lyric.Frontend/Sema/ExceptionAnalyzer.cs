@@ -110,7 +110,10 @@ internal sealed class ExceptionAnalyzer
             case ClassDecl c: AnalyzeMembers(c.Members); break;
             case EnumDecl e: foreach (var f in e.Methods) AnalyzeFunction(f); break;
             case InterfaceDecl i: foreach (var f in i.Members) AnalyzeFunction(f); break; // default bodies
-            case ExtendDecl x: foreach (var f in x.Methods) AnalyzeFunction(f); break;
+            case ExtendDecl x:
+                foreach (var f in x.Methods) AnalyzeFunction(f);
+                AnalyzeMembers(x.Statics);
+                break;
             case GlobalBindingDecl { Binding.Initializer: { } init }:
                 InContext(new Context([], "a global's initializer", canDeclare: false), () => AnalyzeExpr(init));
                 break;
@@ -125,6 +128,9 @@ internal sealed class ExceptionAnalyzer
                 case FunctionDecl f: AnalyzeFunction(f); break;
                 case FieldDecl { Default: { } value }:
                     InContext(new Context([], "a field's default", canDeclare: false), () => AnalyzeExpr(value));
+                    break;
+                case StaticBindingDecl { Binding.Initializer: { } init }:
+                    InContext(new Context([], "a constant's initializer", canDeclare: false), () => AnalyzeExpr(init));
                     break;
             }
     }

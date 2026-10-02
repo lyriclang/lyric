@@ -732,10 +732,11 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
         var types = new List<AssociatedTypeDecl>();
-        ParseMethodSequence(members, allowStatic: true, types: types); // a static member declares, through a constraint (03 T5)
+        var statics = new List<StaticBindingDecl>();
+        ParseMethodSequence(members, allowStatic: true, types: types, statics: statics); // a static member declares, through a constraint (03 T5)
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
-            { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed };
+            { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed, Statics = statics.ToArray() };
     }
 
     // --- Extend (§3.6) ---
@@ -750,9 +751,11 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open extend body");
         var methods = new List<FunctionDecl>();
         var boundTypes = new List<AssociatedTypeDecl>();
-        ParseMethodSequence(methods, allowStatic: true, types: boundTypes);
+        var statics = new List<StaticBindingDecl>();
+        ParseMethodSequence(methods, allowStatic: true, types: boundTypes, statics: statics);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close extend body");
-        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span)) { Types = boundTypes.ToArray(), Generics = generics };
+        return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span))
+            { Types = boundTypes.ToArray(), Generics = generics, Statics = statics.ToArray() };
     }
 
     /// <summary>
@@ -776,8 +779,10 @@ public sealed partial class Parser
     /// <param name="types">Where an associated type may stand (03 T6) — an interface's
     /// declaration <c>type Item;</c>, a conformance block's binding <c>type Item = int;</c> —
     /// the list it goes to.</param>
+    /// <param name="statics">Where a <c>static let</c> may stand — an interface's declaration
+    /// <c>static let zero: Self;</c> (03 T5), a block's constant (05 §6) — the list it goes to.</param>
     private void ParseMethodSequence(List<FunctionDecl> methods, bool allowStatic,
-        bool allowAttributes = true, List<AssociatedTypeDecl>? types = null)
+        bool allowAttributes = true, List<AssociatedTypeDecl>? types = null, List<StaticBindingDecl>? statics = null)
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
@@ -802,13 +807,20 @@ public sealed partial class Parser
             {
                 var kw = _buffer.Advance();
 
-                // 'static let' is a StaticBinding, and that is a member of a struct or class body
-                // only. Reported here rather than left to ParseFunctionDecl, which would fail on
-                // the missing 'fn' and report three times about something else.
+                // 'static let' is a StaticBinding: a member of a struct or a class body, an
+                // interface's declaration (03 T5), a block's constant (05 §6). Elsewhere it is
+                // reported here rather than left to ParseFunctionDecl, which would fail on the
+                // missing 'fn' and report three times about something else.
                 if (_buffer.Check(TokenKind.Let) || _buffer.Check(TokenKind.Var))
                 {
+                    if (statics is not null)
+                    {
+                        var binding = RequireNamedBinding(ParseBinding(), "static let");
+                        statics.Add(new StaticBindingDecl(isPublic, binding, Span.Union(start, binding.Span)) { Attributes = attributes });
+                        continue;
+                    }
                     _de.Report("LYR-PAR0040", Severity.Error, kw.Span,
-                        "a 'static let' is a member of a struct or class body only");
+                        "a 'static let' is a member of a struct, a class, an interface or an extend block");
                     SkipMember();
                     continue;
                 }

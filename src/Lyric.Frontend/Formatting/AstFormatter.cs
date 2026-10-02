@@ -233,11 +233,11 @@ public sealed class AstFormatter
         InterfaceDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From($"{(d.IsSealed ? "sealed " : "")}interface {d.Name}"), GenericsDoc(d.Generics),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
-            InOrder(d.Types, d.Members), d.Span),
+            InOrder(d.Types, d.Members, d.Statics), d.Span),
         ExtendDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
-            InOrder(d.Types, d.Methods), d.Span),
+            InOrder(d.Types, d.Methods, d.Statics), d.Span),
         GlobalBindingDecl d => Doc.Of(Pub(d.Visibility), StmtDoc(d.Binding)),
         StaticBindingDecl d => Doc.Of(Pub(d.Visibility), Doc.From("static "), StmtDoc(d.Binding)),
         TypeAliasDecl d => Doc.Of(Pub(d.Visibility),
@@ -497,8 +497,12 @@ public sealed class AstFormatter
 
     /// <summary>A body holding methods and associated types — interface, extend and the enum's
     /// second half share the shape. The two lists are parsed apart; the source order is theirs.</summary>
-    private static Decl[] InOrder(AssociatedTypeDecl[] types, FunctionDecl[] methods) =>
-        types.Length == 0 ? methods : types.Cast<Decl>().Concat(methods).OrderBy(m => m.Span.Start).ToArray();
+    /// <summary>A body's members as the source wrote them: the lists the parser keeps apart —
+    /// associated types, constants, methods — merged back by position.</summary>
+    private static Decl[] InOrder(AssociatedTypeDecl[] types, FunctionDecl[] methods, StaticBindingDecl[]? statics = null) =>
+        types.Length == 0 && (statics?.Length ?? 0) == 0
+            ? methods
+            : types.Cast<Decl>().Concat(statics ?? []).Concat(methods).OrderBy(m => m.Span.Start).ToArray();
 
     private Doc MethodBodyDoc(Doc head, Decl[] members, Span whole)
     {

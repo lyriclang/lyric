@@ -59,6 +59,28 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_constant_keeps_its_place_in_an_interface_and_a_block()
+    {
+        // The parser keeps an interface's and a block's constants in a list of their own
+        // (design/v5/spec/03 T5, 05 §6); the formatter writes them back where they stood.
+        Assert.Equal("""
+            interface Initial {
+                fn tag(): int;
+                static let initial: Self;
+            }
+
+            extend int :: [Initial] {
+                static let initial: int = 3;
+
+                fn tag(): int {
+                    return 1;
+                }
+            }
+
+            """, Format("interface Initial{fn tag():int;static let initial:Self;}extend int::[Initial]{static let initial:int=3;fn tag():int{return 1;}}"));
+    }
+
+    [Fact]
     public void A_parameter_keeps_its_place_mark_and_its_attribute()
     {
         // '&n: int' and '&n' at the call (design/v5/spec/03 T12) say what the call may write, and

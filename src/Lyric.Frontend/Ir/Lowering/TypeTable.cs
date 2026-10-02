@@ -87,6 +87,19 @@ internal sealed class TypeTable
     /// <summary>The block a method was declared in, or <c>null</c> for an ordinary function.</summary>
     public ExtensionBlock? BlockOf(FunctionSymbol method) => Compilation?.Extensions.BlockOf(method);
 
+    /// <summary>The constant of this name a type holds — in its body, or added by a non-generic
+    /// block (05 §6 rule 2) — or <c>null</c>.</summary>
+    public GlobalSymbol? StaticOf(TypeSymbol target, string member)
+    {
+        if (target.Members.LookupLocal(member) is GlobalSymbol own) return own;
+        if (Compilation is not { } comp) return null;
+        foreach (var block in comp.Extensions.Blocks)
+            if (ReferenceEquals(block.Target, target) && block.Decl.Generics.Length == 0
+                && block.MethodScope.LookupLocal(member) is GlobalSymbol added)
+                return added;
+        return null;
+    }
+
     public FunctionSymbol? ExtensionMethod(TypeSymbol target, string member)
     {
         if (Compilation is not { } comp) return null;
