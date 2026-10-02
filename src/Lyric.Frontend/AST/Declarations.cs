@@ -39,6 +39,19 @@ public sealed record AttributeNode(string[] Path, StructInitField[] Fields, Span
 
 public abstract record Decl(Span Span) : Node(Span);
 
+/// <summary>
+/// The visibility word written before a declaration (design/v5/spec/07 V2, 08 D3): <c>pub</c> —
+/// exported —, <c>internal</c> — the package's —, <c>private</c> — the module's —, or none. What
+/// none means is the reader's: Lyric 5 reads it as <c>internal</c>, the 4.x tools as the module's.
+/// </summary>
+public enum VisibilityWord
+{
+    None,
+    Private,
+    Internal,
+    Pub,
+}
+
 // --- imports ---
 public sealed record ImportDecl(string[] Path, ImportClause? Clause, Span Span) : Decl(Span);
 public abstract record ImportClause(Span Span) : Node(Span);
@@ -74,9 +87,11 @@ public sealed record ThrowsClause(TypeNode[] Types, Span Span) : Node(Span);
 /// <param name="IsStatic">A member without a receiver: no <c>this</c>, reachable only through
 /// the type. Always <c>false</c> at top level.</param>
 public sealed record FunctionDecl(
-    bool IsPublic, bool IsMut, bool IsStatic, string Name, GenericParam[] Generics, Param[] Parameters,
+    VisibilityWord Visibility, bool IsMut, bool IsStatic, string Name, GenericParam[] Generics, Param[] Parameters,
     TypeNode? ReturnType, ThrowsClause? Throws, Block? Body, Span Span) : Decl(Span), INamedDecl // Body == null means abstract or declared with ';'
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public required Span NameSpan { get; init; }
 
     /// <summary>Set on a top-level function, and (since 2.1) on a method of a struct, class,
@@ -109,8 +124,10 @@ public sealed record ExternSpec(string Abi, string? Symbol, Span Span) : Node(Sp
 /// <c>Type.NAME</c>; syntactically the same binding as a module <c>let</c>.</summary>
 /// <remarks>The name is the wrapped binding's. A symbol declares from THIS node rather than from the
 /// binding inside it, so the two spans have to be reachable from here as well.</remarks>
-public sealed record StaticBindingDecl(bool IsPublic, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl
+public sealed record StaticBindingDecl(VisibilityWord Visibility, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public string Name => Binding.Name;
 
     public Span NameSpan => Binding.NameSpan;
@@ -130,11 +147,17 @@ public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span S
     /// through a root that may be written. Without the word a field is fixed once its value is
     /// built — for a struct and for a class alike (M9).</summary>
     public bool IsVar { get; init; }
+
+    /// <summary><c>pub x: int</c>, <c>private var y: int</c> (design/v5/spec/07 V2 S0): a field
+    /// follows the rule of every member. A variant's fields have none of their own.</summary>
+    public VisibilityWord Visibility { get; init; }
 }
 
 // --- type declarations ---
-public sealed record StructDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
+public sealed record StructDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
     /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
     /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
@@ -145,8 +168,10 @@ public sealed record StructDecl(bool IsPublic, string Name, GenericParam[] Gener
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
-public sealed record ClassDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
+public sealed record ClassDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
     /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
     /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
@@ -157,8 +182,10 @@ public sealed record ClassDecl(bool IsPublic, string Name, GenericParam[] Generi
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
-public sealed record EnumDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, EnumVariant[] Variants, FunctionDecl[] Methods, Span Span) : Decl(Span), INamedDecl
+public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, EnumVariant[] Variants, FunctionDecl[] Methods, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public required Span NameSpan { get; init; }
 
     /// <summary>The associated types the enum binds for its conformances (03 T6).</summary>
@@ -172,8 +199,10 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
     public required Span NameSpan { get; init; }
 }
 
-public sealed record InterfaceDecl(bool IsPublic, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl
+public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public required Span NameSpan { get; init; }
 
     /// <summary>The associated types the interface declares, <c>type Item;</c> (design/v5/spec/03 T6).</summary>
@@ -184,8 +213,10 @@ public sealed record InterfaceDecl(bool IsPublic, string Name, GenericParam[] Ge
     public bool IsSealed { get; init; }
 }
 
-public sealed record ExtendDecl(bool IsPublic, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
+public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     /// <summary>The associated types a conformance block binds, <c>type Item = int;</c> (03 T6).</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
 
@@ -207,15 +238,19 @@ public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) 
 
 // --- global bindings and type aliases ---
 /// <inheritdoc cref="StaticBindingDecl"/>
-public sealed record GlobalBindingDecl(bool IsPublic, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' or 'var' (07 V5 G5)
+public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' or 'var' (07 V5 G5)
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public string Name => Binding.Name;
 
     public Span NameSpan => Binding.NameSpan;
 }
 
-public sealed record TypeAliasDecl(bool IsPublic, bool IsOpaque, string Name, TypeNode Aliased, Span Span) : Decl(Span), INamedDecl
+public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, string Name, TypeNode Aliased, Span Span) : Decl(Span), INamedDecl
 {
+    public bool IsPublic => Visibility == VisibilityWord.Pub;
+
     public required Span NameSpan { get; init; }
 }
 

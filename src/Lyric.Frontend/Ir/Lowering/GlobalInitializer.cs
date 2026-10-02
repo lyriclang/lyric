@@ -41,7 +41,7 @@ internal static class GlobalInitializer
             default);
 
         var decl = new FunctionDecl(
-            IsPublic: false, IsMut: false, IsStatic: false, Name: Name, Generics: [],
+            Visibility: VisibilityWord.None, IsMut: false, IsStatic: false, Name: Name, Generics: [],
             Parameters: [], ReturnType: null, Throws: null, Body: body, Span: default) { NameSpan = default };
 
         return new FunctionLowerer(decl, Name, types, functions, imports, typeTable,

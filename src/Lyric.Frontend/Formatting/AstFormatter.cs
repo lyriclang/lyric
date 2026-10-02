@@ -225,22 +225,22 @@ public sealed class AstFormatter
     {
         ImportDecl d => ImportDoc(d),
         FunctionDecl d => FunctionDoc(d),
-        StructDecl d => TypeBodyDoc(Attributes(d.Attributes), d.IsPublic, "struct", d.Name,
+        StructDecl d => TypeBodyDoc(Attributes(d.Attributes), d.Visibility, "struct", d.Name,
             d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
-        ClassDecl d => TypeBodyDoc(Attributes(d.Attributes), d.IsPublic, "class", d.Name,
+        ClassDecl d => TypeBodyDoc(Attributes(d.Attributes), d.Visibility, "class", d.Name,
             d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
         EnumDecl d => EnumDoc(d),
         InterfaceDecl d => MethodBodyDoc(
-            Doc.Of(Pub(d.IsPublic), Doc.From($"{(d.IsSealed ? "sealed " : "")}interface {d.Name}"), GenericsDoc(d.Generics),
+            Doc.Of(Pub(d.Visibility), Doc.From($"{(d.IsSealed ? "sealed " : "")}interface {d.Name}"), GenericsDoc(d.Generics),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
             InOrder(d.Types, d.Members), d.Span),
         ExtendDecl d => MethodBodyDoc(
-            Doc.Of(Pub(d.IsPublic), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
+            Doc.Of(Pub(d.Visibility), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
                 InterfaceListDoc(d.Interfaces), Doc.Space),
             InOrder(d.Types, d.Methods), d.Span),
-        GlobalBindingDecl d => Doc.Of(Pub(d.IsPublic), StmtDoc(d.Binding)),
-        StaticBindingDecl d => Doc.Of(Pub(d.IsPublic), Doc.From("static "), StmtDoc(d.Binding)),
-        TypeAliasDecl d => Doc.Of(Pub(d.IsPublic),
+        GlobalBindingDecl d => Doc.Of(Pub(d.Visibility), StmtDoc(d.Binding)),
+        StaticBindingDecl d => Doc.Of(Pub(d.Visibility), Doc.From("static "), StmtDoc(d.Binding)),
+        TypeAliasDecl d => Doc.Of(Pub(d.Visibility),
             Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name} = "), TypeDoc(d.Aliased),
             Doc.From(";")),
         // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6).
@@ -250,7 +250,13 @@ public sealed class AstFormatter
         _ => throw new InternalCompilationException($"unreachable: unformatted {decl.GetType().Name}"),
     };
 
-    private static Doc Pub(bool isPublic) => isPublic ? Doc.From("pub ") : Doc.Nil;
+    private static Doc Pub(VisibilityWord word) => word switch
+    {
+        VisibilityWord.Pub => Doc.From("pub "),
+        VisibilityWord.Internal => Doc.From("internal "),
+        VisibilityWord.Private => Doc.From("private "),
+        _ => Doc.Nil,
+    };
 
     private Doc ImportDoc(ImportDecl decl)
     {
@@ -311,7 +317,7 @@ public sealed class AstFormatter
         var head = new List<Doc>
         {
             Attributes(decl.Attributes),
-            Pub(decl.IsPublic),
+            Pub(decl.Visibility),
             decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
@@ -370,7 +376,7 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
-    private Doc TypeBodyDoc(Doc attributes, bool isPublic, string keyword, string name,
+    private Doc TypeBodyDoc(Doc attributes, VisibilityWord isPublic, string keyword, string name,
         GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole, string?[]? delegates = null)
     {
         var head = Doc.Of(attributes, Pub(isPublic), Doc.From($"{keyword} {name}"),
@@ -396,7 +402,7 @@ public sealed class AstFormatter
 
     private Doc FieldDoc(FieldDecl decl)
     {
-        var parts = new List<Doc> { Doc.From($"{(decl.IsVar ? "var " : "")}{decl.Name}: "), TypeDoc(decl.Type) };
+        var parts = new List<Doc> { Pub(decl.Visibility), Doc.From($"{(decl.IsVar ? "var " : "")}{decl.Name}: "), TypeDoc(decl.Type) };
         if (decl.Default is { } fallback)
         {
             parts.Add(Doc.From(" = "));
@@ -418,7 +424,7 @@ public sealed class AstFormatter
 
     private Doc EnumDoc(EnumDecl decl)
     {
-        var head = Doc.Of(Attributes(decl.Attributes), Pub(decl.IsPublic),
+        var head = Doc.Of(Attributes(decl.Attributes), Pub(decl.Visibility),
             Doc.From($"enum {decl.Name}"), GenericsDoc(decl.Generics),
             InterfaceListDoc(decl.Interfaces), Doc.Space);
 

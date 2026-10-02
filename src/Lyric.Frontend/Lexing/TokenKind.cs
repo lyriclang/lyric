@@ -22,6 +22,12 @@ public enum TokenKind
     As,
     Pub,
 
+    /// <summary>A declaration of its module alone (design/v5/spec/07 V2).</summary>
+    Private,
+
+    /// <summary>A declaration of its package — the default the word only says out loud (07 V2).</summary>
+    Internal,
+
     // Type declarations
     Struct,
     Class,
