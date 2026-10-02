@@ -50,23 +50,38 @@ public class ReproducibilityTests
         Thread.Sleep(TimeSpan.FromSeconds(1.1));
         var b = Built(second);
         Assert.True(a.AsSpan().SequenceEqual(b), $"the binaries differ: {a.Length} and {b.Length} bytes, first at byte {First(a, b)}");
-        foreach (var place in Places(first))
-            Assert.True(a.AsSpan().IndexOf(Encoding.UTF8.GetBytes(place)) < 0, $"the binary names {place}");
+        Assert.False(Names(a, first), $"the binary names {first}");
+        // The directory the build ran in, as a path under the toolchain's root is written ('lyric/…';
+        // the tests run inside the root): what a C compiler records as the compilation directory
+        // unless told otherwise. As it is, the directory may come with zig's libunwind on Linux,
+        // which zig built wherever it was first asked to — the C compiler's, not the build's. And
+        // where the checkout is named 'lyric', as in CI, that full path ends in the spelling looked
+        // for: a mention inside it does not count. In release the linker may then keep the
+        // spelling only as that full path's tail (it merges strings that end alike); the debug
+        // rows see it.
+        var cwd = Environment.CurrentDirectory;
+        var relative = Path.GetRelativePath(RuntimeArchive.SourceRoot()!, cwd);
+        if (relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+        {
+            var mapped = "lyric" + Path.DirectorySeparatorChar + relative;
+            Assert.False(Names(a, mapped, besides: cwd), $"the binary names {mapped}");
+        }
     }
 
-    /// <summary>
-    /// What a build must not write into a binary: where the package lies, and the directory the
-    /// build ran in — which a C compiler records as the compilation directory unless told
-    /// otherwise — as a path under the toolchain's root is written (<c>lyric/…</c>; the tests run
-    /// inside it). As it is, that directory may come with zig's libunwind on Linux, which zig
-    /// built wherever it was first asked to: that is the C compiler's, not the build's.
-    /// </summary>
-    private static IEnumerable<string> Places(string package)
+    /// <summary>Whether the binary holds <paramref name="text"/> — other than as the end of
+    /// <paramref name="besides"/>, when that ends with it.</summary>
+    private static bool Names(byte[] binary, string text, string? besides = null)
     {
-        yield return package;
-        var relative = Path.GetRelativePath(RuntimeArchive.SourceRoot()!, Environment.CurrentDirectory);
-        if (relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
-            yield return "lyric" + Path.DirectorySeparatorChar + relative;
+        var needle = Encoding.UTF8.GetBytes(text);
+        var whole = besides is not null && besides.EndsWith(text, StringComparison.Ordinal) ? Encoding.UTF8.GetBytes(besides) : null;
+        for (var at = binary.AsSpan().IndexOf(needle); at >= 0;)
+        {
+            var start = at + needle.Length - (whole?.Length ?? 0);
+            if (whole is null || start < 0 || !binary.AsSpan(start).StartsWith(whole)) return true;
+            var next = binary.AsSpan(at + 1).IndexOf(needle);
+            at = next < 0 ? -1 : at + 1 + next;
+        }
+        return false;
     }
 
     private static int First(byte[] a, byte[] b)
