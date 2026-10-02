@@ -114,6 +114,9 @@ internal sealed class InstanceTable
 
     public bool IsEmpty => _pending.Count == 0;
 
+    /// <summary>A type as an instance's name writes it: by the type, not by its name alone.</summary>
+    private string NameOf(LyrType type) => InstanceNames.Of(type, _compilation);
+
     /// <summary>
     /// Requests an instance and returns its id: a new one the first time, the same one afterwards.
     ///
@@ -139,10 +142,10 @@ internal sealed class InstanceTable
         // is in front of them.
         var name = owner is { } owning
             ? Qualify(owning.Definition.Declaration,
-                  $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(TypeFacts.Display))}>")
-              + $".{symbol.Name}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>"
+                  $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(NameOf))}>")
+              + $".{symbol.Name}<{string.Join(", ", typeArguments.Select(NameOf))}>"
             : Qualify(decl, baseName)
-              + $"<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
+              + $"<{string.Join(", ", typeArguments.Select(NameOf))}>";
         if (_byKey.TryGetValue(name, out var existing)) return existing;
 
         // A type parameter still open means the inference did not get through at the call site, and then
@@ -202,7 +205,7 @@ internal sealed class InstanceTable
     public FunctionId RequestExtension(FunctionSymbol method, FunctionDecl decl, ExtensionBlock block,
         Dictionary<GenericParamSymbol, LyrType> substitution, LyrType receiver, Core.Span span)
     {
-        var name = Qualify(decl, $"<extend>.{TypeFacts.Display(receiver)}.{method.Name}");
+        var name = Qualify(decl, $"<extend>.{NameOf(receiver)}.{method.Name}");
         if (_byKey.TryGetValue(name, out var existing)) return existing;
         Guard(name, span);
         var id = _ids.Next();
@@ -220,7 +223,7 @@ internal sealed class InstanceTable
         GenericInstance owner, Core.Span span)
     {
         var ownerName = Qualify(owner.Definition.Declaration,
-            $"{owner.Definition.Name}<{string.Join(", ", owner.Arguments.Select(TypeFacts.Display))}>");
+            $"{owner.Definition.Name}<{string.Join(", ", owner.Arguments.Select(NameOf))}>");
         var name = $"{ownerName}.{method.Name}";
         if (_byKey.TryGetValue(name, out var existing)) return existing;
 

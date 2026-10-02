@@ -10,7 +10,7 @@ typedef struct lyr_ty1_List_int_ lyr_ty1_List_int_;
 typedef struct lyr_ty2_List_string_ lyr_ty2_List_string_;
 typedef struct lyr_ty3_Pair_string__string_ lyr_ty3_Pair_string__string_;
 typedef struct lyr_ty4_Pair_int__string_ lyr_ty4_Pair_int__string_;
-typedef struct lyr_ty5_Box_int_ lyr_ty5_Box_int_;
+typedef struct lyr_ty5_main_Box_int_ lyr_ty5_main_Box_int_;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "std.core.Error";
 typedef struct lyr_ty7_Exception lyr_ty7_Exception;
@@ -42,7 +42,7 @@ struct lyr_ty4_Pair_int__string_ {
     int64_t f_a;
     LyrStr *f_b;
 };
-struct lyr_ty5_Box_int_ {
+struct lyr_ty5_main_Box_int_ {
     int64_t f_v;
 };
 struct lyr_vt_ty6 {
@@ -89,7 +89,7 @@ int64_t lyr_main_main(void);
 int64_t lyr_main__extend__List_int__first_deace72b(lyr_ty1_List_int_ *l0_this);
 LyrStr * lyr_main__extend__List_string__first_f1cb41fb(lyr_ty2_List_string_ *l0_this);
 LyrStr * lyr_main__extend__List_int__show_d20bf762(lyr_ty1_List_int_ *l0_this);
-int64_t lyr_main__extend__Box_doubled_0d9ddabe(lyr_ty5_Box_int_ *l0_this);
+int64_t lyr_main__extend__Box_doubled_0d9ddabe(lyr_ty5_main_Box_int_ *l0_this);
 int64_t lyr_main__extend__List_int__count_89e44bb6(lyr_ty1_List_int_ *l0_this);
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this);
 LyrStr * lyr_main__extend__Pair_string__string__show_2a5892e3(lyr_ty3_Pair_string__string_ *l0_this);
@@ -118,7 +118,7 @@ int64_t lyr_main_main(void) {
     lyr_ty1_List_int_ *l0_ints = NULL;
     lyr_ty2_List_string_ *l1_strs = NULL;
     lyr_ty4_Pair_int__string_ l2_p = {0};
-    lyr_ty5_Box_int_ l3_b = {0};
+    lyr_ty5_main_Box_int_ l3_b = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrArr *t2 = NULL;
@@ -167,11 +167,11 @@ int64_t lyr_main_main(void) {
     LyrStr *t41 = NULL;
     LyrStr *t42 = NULL;
     int64_t t43 = 0;
-    lyr_ty5_Box_int_ t44_s = {0};
-    lyr_ty5_Box_int_ *t44 = &t44_s;
+    lyr_ty5_main_Box_int_ t44_s = {0};
+    lyr_ty5_main_Box_int_ *t44 = &t44_s;
     LyrStr *t45 = NULL;
-    lyr_ty5_Box_int_ t46_s = {0};
-    lyr_ty5_Box_int_ *t46 = &t46_s;
+    lyr_ty5_main_Box_int_ t46_s = {0};
+    lyr_ty5_main_Box_int_ *t46 = &t46_s;
     int64_t t47 = 0;
     lyr_ty1_List_int_ *t48 = NULL;
     int64_t t49 = 0;
@@ -295,7 +295,7 @@ bb0:;
 #line 47
     t43 = (int64_t)INT64_C(3);
 #line 47
-    t44_s = (lyr_ty5_Box_int_){0}; t44 = &t44_s;
+    t44_s = (lyr_ty5_main_Box_int_){0}; t44 = &t44_s;
 #line 47
     t44->f_v = t43;
 #line 47
@@ -329,9 +329,9 @@ bb0:;
 }
 
 #line 35 "programs/extends.lyr"
-int64_t lyr_main__extend__Box_doubled_0d9ddabe(lyr_ty5_Box_int_ *l0_this) {
-    lyr_ty5_Box_int_ t0_s = {0};
-    lyr_ty5_Box_int_ *t0 = &t0_s;
+int64_t lyr_main__extend__Box_doubled_0d9ddabe(lyr_ty5_main_Box_int_ *l0_this) {
+    lyr_ty5_main_Box_int_ t0_s = {0};
+    lyr_ty5_main_Box_int_ *t0 = &t0_s;
     int64_t t1 = 0;
     int64_t t2 = 0;
     int64_t t3 = 0;

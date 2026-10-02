@@ -194,18 +194,29 @@ public static class TypeFacts
     }
 
     /// <summary>A coroutine's result type in its display: ', R' where it is not void.</summary>
-    private static string ResultText(CoroutineOf co) => IsVoid(co.Result) ? "" : ", " + Display(co.Result);
+    private static string ResultText(CoroutineOf co, Func<TypeSymbol, string> name) =>
+        IsVoid(co.Result) ? "" : ", " + Render(co.Result, name);
 
     /// <summary>A function type's set as written after its return type, in one order whatever the
     /// declaration's (05 E2 K1): the display names an instance, and two orders are one type.</summary>
-    private static string ThrownText(LyrType[] thrown) => thrown.Length switch
+    private static string ThrownText(LyrType[] thrown, Func<TypeSymbol, string> name) => thrown.Length switch
     {
         0 => "",
-        1 => " throws " + Display(thrown[0]),
-        _ => " throws [" + string.Join(", ", thrown.Select(Display).Order(StringComparer.Ordinal)) + "]",
+        1 => " throws " + Render(thrown[0], name),
+        _ => " throws [" + string.Join(", ", thrown.Select(t => Render(t, name)).Order(StringComparer.Ordinal)) + "]",
     };
 
-    public static string Display(LyrType t)
+    /// <summary>A type as the diagnostics write it: a named type by its name.</summary>
+    public static string Display(LyrType t) => Render(t, PlainName);
+
+    /// <summary>A type with <paramref name="name"/> writing each named type in it — the lowering's
+    /// key for an instance, where two modules declaring one name must not make one instance of two
+    /// types.</summary>
+    public static string Display(LyrType t, Func<TypeSymbol, string> name) => Render(t, name);
+
+    private static readonly Func<TypeSymbol, string> PlainName = symbol => symbol.Name;
+
+    private static string Render(LyrType t, Func<TypeSymbol, string> name)
     {
         switch (t)
         {
@@ -218,40 +229,40 @@ public static class TypeFacts
                 PrimitiveKind.Bool => "bool", PrimitiveKind.Char => "char", PrimitiveKind.String => "string", PrimitiveKind.Void => "void",
                 _ => "?"
             };
-            case NamedRef n: return n.Symbol.Name;
-            case OpaqueRef o: return o.Symbol.Name;
+            case NamedRef n: return name(n.Symbol);
+            case OpaqueRef o: return name(o.Symbol);
             case TypeParamType tp: return tp.Param.Name;
             case GenericInstance gi:
-                var fixations = gi.Fixations is { Length: > 0 } fs ? fs.Select(f => $"{f.Member.Name} = {Display(f.Type)}") : [];
-                return gi.Definition.Name + "<" + string.Join(", ", gi.Arguments.Select(Display).Concat(fixations)) + ">"
+                var fixations = gi.Fixations is { Length: > 0 } fs ? fs.Select(f => $"{f.Member.Name} = {Render(f.Type, name)}") : [];
+                return name(gi.Definition) + "<" + string.Join(", ", gi.Arguments.Select(a => Render(a, name)).Concat(fixations)) + ">"
                        + (gi.Throws is { } thrown
-                           ? " throws" + (thrown is NamedRef { Symbol.Name: "Error" } ? "" : " " + Display(thrown))
+                           ? " throws" + (thrown is NamedRef { Symbol.Name: "Error" } ? "" : " " + Render(thrown, name))
                            : "");
-            case AssocOf a: return Display(a.Base) + "." + a.Member.Name;
-            case Optional o: return "?" + Display(o.Inner);
+            case AssocOf a: return Render(a.Base, name) + "." + a.Member.Name;
+            case Optional o: return "?" + Render(o.Inner, name);
             // A function type as an element type MUST be parenthesized: 'fn(int) -> void[]' would
             // otherwise read as a function returning 'void[]'. Without the parenthesis the sema
             // reported "cannot assign 'fn(int) -> void[]' to '(fn(int) -> void)[]'" — two displays
             // for types that ARE different but looked the same.
             case ArrayOf { Element: FnType } fnArray:
-                return $"({Display(fnArray.Element)})[]";
-            case ArrayOf a: return Display(a.Element) + "[]";
-            case SliceOf s: return "Slice<" + Display(s.Element) + ">";
+                return $"({Render(fnArray.Element, name)})[]";
+            case ArrayOf a: return Render(a.Element, name) + "[]";
+            case SliceOf s: return "Slice<" + Render(s.Element, name) + ">";
             case InlineArrayOf ia:
-                return (ia.Element is Optional or FnType ? $"({Display(ia.Element)})" : Display(ia.Element)) + $"[{ia.Length}]";
+                return (ia.Element is Optional or FnType ? $"({Render(ia.Element, name)})" : Render(ia.Element, name)) + $"[{ia.Length}]";
             case TupleOf tu:
-                return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Display(e) : Display(e))) + ")";
+                return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Render(e, name) : Render(e, name))) + ")";
             case FnType f:
                 // A function type returned by one with a set reads parenthesized: the nearest
                 // function type takes a 'throws' (03 T17).
-                return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Display(p))) + ") -> "
-                       + (f.Return is FnType && f.Throws.Length > 0 ? $"({Display(f.Return)})" : Display(f.Return))
-                       + ThrownText(f.Throws);
-            case RangeOf r: return "range<" + Display(r.Element) + ">";
-            case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ResultText(co) + ">";
+                return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Render(p, name))) + ") -> "
+                       + (f.Return is FnType && f.Throws.Length > 0 ? $"({Render(f.Return, name)})" : Render(f.Return, name))
+                       + ThrownText(f.Throws, name);
+            case RangeOf r: return "range<" + Render(r.Element, name) + ">";
+            case CoroutineOf { Throws: null } co: return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + ">";
             case CoroutineOf co:
-                return "Coroutine<" + Display(co.Yield) + ResultText(co) + "> throws "
-                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : Display(co.Throws!));
+                return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + "> throws "
+                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : Render(co.Throws!, name));
             case NullType: return "null";
             case NeverType: return "never";
             case ErrorType: return "<error>";

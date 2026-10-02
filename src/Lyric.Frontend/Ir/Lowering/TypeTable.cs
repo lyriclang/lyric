@@ -462,8 +462,8 @@ internal sealed class TypeTable
                     $"generic type '{symbol.Name}' needs {symbol.Generics.Length} type "
                     + $"argument(s), got {typeArguments.Count}", SpanOf(symbol));
 
-            var instanceName =
-                $"{symbol.Name}<{string.Join(", ", typeArguments.Select(TypeFacts.Display))}>";
+            // By the types, not their names: 'Box<Cat>' of two modules' 'Cat's is two layouts.
+            var instanceName = InstanceNames.Of(new GenericInstance(symbol, typeArguments.ToArray()), Compilation);
             if (_instances.TryGetValue(instanceName, out var known)) return known;
 
             var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);

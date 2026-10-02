@@ -7287,7 +7287,12 @@ public sealed class TypeChecker
         // A public type of std.core is visible without an import (design/v5/spec/10 U-series), in
         // an initializer as in a type position: 'Exception { text = "…" }'. The scope wins.
         var cur = scope.Lookup(path[0]) ?? ImplicitType(span.File, path[0]);
-        if (cur is ImportBindingSymbol ib0) cur = ib0.Target;
+        if (cur is ImportBindingSymbol ib0)
+        {
+            // A mention of the import: 'a.Cat { … }' names the module as 'a.make()' does.
+            _binding.MarkQualifier(span.File, ib0);
+            cur = ib0.Target;
+        }
         TypeSymbol? owner = null;
         for (var i = 1; i < path.Length && cur is not null; i++)
         {
@@ -9485,8 +9490,11 @@ public sealed class TypeChecker
         // reaches.
         var head = scope.Lookup(path[0]) ?? (path.Length == 1 ? ImplicitType(span.File, path[0]) : null);
         if (head is null || path.Length == 1) return head;
-        for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod }; i++)
+        for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod } qualifier; i++)
         {
+            // The qualifier is a mention of the import, as in the resolver's walk: 'a.Cat { … }'
+            // and a body's 'let b: Box<a.Cat>' use 'import app.a' (SEM0072 said they did not).
+            _binding.MarkQualifier(span.File, qualifier);
             head = mod.Members.LookupLocal(path[i]);
             Reach(head, span);
         }
