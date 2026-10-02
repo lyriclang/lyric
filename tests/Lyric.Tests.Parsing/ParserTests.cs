@@ -420,6 +420,19 @@ public class ParserTests
         Assert.IsType<Block>(lambda.Body);
     }
 
+    // A block is a delimiter: its statements decide for themselves where a struct initializer may
+    // stand. A trailing lambda at the start of a statement kept the statement's ban on its whole
+    // body, so 'throw Oops { };' in it read 'Oops' as a value (M6 S5b).
+    [Fact]
+    public void A_struct_initializer_stands_in_a_trailing_lambda_of_a_statement()
+    {
+        var (stmt, de) = ParseStatement("xs.forEach { throw Oops { }; };");
+        Assert.Empty(de.Diagnostics);
+        var call = Assert.IsType<CallExpr>(Assert.IsType<ExprStmt>(stmt).Expr);
+        var body = Assert.IsType<Block>(Assert.IsType<LambdaExpr>(call.Arguments[^1]).Body);
+        Assert.IsType<StructInitExpr>(Assert.IsType<ThrowStmt>(Assert.Single(body.Statements)).Value);
+    }
+
     [Fact]
     public void Match_statement_parses_arms()
     {

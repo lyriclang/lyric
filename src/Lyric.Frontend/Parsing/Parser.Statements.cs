@@ -151,6 +151,11 @@ public sealed partial class Parser
         var stmts = new List<Stmt>();
         var savedTail = _allowTail;
         _allowTail = valueBlock;
+        // A block is a delimiter, as ParseSubExpr's are: its statements decide for themselves
+        // where a struct initializer may stand — also in a trailing lambda at the start of a
+        // statement, whose ban must not reach into the lambda's body.
+        var savedStructInit = _allowStructInit;
+        _allowStructInit = true;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
             var before = _buffer.Position;
@@ -160,6 +165,7 @@ public sealed partial class Parser
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close block");
         _allowTail = savedTail;
+        _allowStructInit = savedStructInit;
         return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
     }
 
