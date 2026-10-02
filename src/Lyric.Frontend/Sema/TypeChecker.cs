@@ -100,6 +100,10 @@ public sealed class TypeChecker
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
 
+    /// <summary>Non-null while a generator lambda without a coroutine context infers its yield type:
+    /// every yield of that lambda lands here instead of being checked (08 Y11 F5).</summary>
+    private List<LyrType>? _yieldInference;
+
     /// <summary>Non-null while a block lambda infers its return type: every <c>return</c> of that
     /// lambda lands here instead of being checked against a known type. Saved and restored on
     /// every lambda entry, so a nested lambda's returns never leak into the outer collection.</summary>
@@ -1513,11 +1517,13 @@ public sealed class TypeChecker
             }
         }
         _currentReturn = fn.ReturnType is not null ? ResolveType(fn.ReturnType, scope) : LyrType.Void;
-        // Coroutine: the body never produces the coroutine value, which the runtime builds at the
-        // call. Its 'return' gives the coroutine's result (06 A1), so coverage asks for one where
-        // the result is not void; the yield context comes besides.
-        _currentYield = _currentReturn is CoroutineOf co ? co.Yield : null;
-        var result = _currentReturn is CoroutineOf withResult ? withResult.Result : null;
+        // Coroutine — 'Coroutine<…>' and a yield of its own (08 D11): the body never produces the
+        // coroutine value, which the runtime builds at the call. Its 'return' gives the coroutine's
+        // result (06 A1), so coverage asks for one where the result is not void; the yield context
+        // comes besides. A function that returns a coroutine without yielding is an ordinary one.
+        var coroutine = _currentReturn is CoroutineOf co && CoroutineShape.IsCoroutine(fn) ? co : null;
+        _currentYield = coroutine?.Yield;
+        var result = coroutine?.Result;
         CheckThrowsClause(fn, scope);
 
         if (fn.Body is not null)
@@ -1633,12 +1639,18 @@ public sealed class TypeChecker
                 // checked where it happens, by panic. Inside a body the chain IS known, so the
                 // static check stays: the better error, kept, and the half of LYR-SEM0038 that
                 // survives the 4.0 narrowing.
-                var yv = y.Value is not null ? CheckExpr(y.Value, scope, _currentYield) : null;
+                var yv = y.Value is not null ? CheckExpr(y.Value, scope, _yieldInference is null ? _currentYield : null) : null;
                 if (_currentYield is null)
                     break;
                 // A yield of the body: where 'close()' finds the coroutine suspended, it throws
                 // 'Cancelled' (06 A5) — a site the exception analysis covers by the body itself.
                 _result.MarkBodyYield(y);
+                // A generator lambda without a coroutine context collects its yields: they give its 'Y'.
+                if (_yieldInference is { } yieldsSoFar)
+                {
+                    yieldsSoFar.Add(yv ?? LyrType.Void);
+                    break;
+                }
                 if (yv is null)
                 {
                     if (!TypeFacts.IsVoid(_currentYield) && !_currentYield.IsError)
@@ -1971,7 +1983,7 @@ public sealed class TypeChecker
     /// function, whose clause belongs to the coroutine it returns (<see cref="CoroutineThrowsOf"/>):
     /// its call builds a frame and runs nothing.</summary>
     private LyrType[] DeclaredThrowsOf(FunctionDecl fn) =>
-        fn.ReturnType is { } returned && ResolveType(returned, _comp.Builtins) is CoroutineOf ? [] : ClauseSetOf(fn);
+        CoroutineShape.IsCoroutine(fn) && ResolveType(fn.ReturnType!, _comp.Builtins) is CoroutineOf ? [] : ClauseSetOf(fn);
 
     /// <summary>What a <c>throw</c> throws conforms to <c>Error</c> (design/v5/spec/05 E3): a
     /// struct, a class or an enum that conforms, an interface value of it or of a child of it, a
@@ -2813,7 +2825,7 @@ public sealed class TypeChecker
     /// is not a coroutine function — it cannot yield — so its clause stays its own.</para>
     /// </summary>
     private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
-        fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null
+        fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null && CoroutineShape.IsCoroutine(fn)
             // A coroutine's type carries one thrown type until area 6 gives it a set (M6): one
             // named stays itself, several join to the root, as composed sets do (05 K7 Nachtrag).
             ? co with { Throws = ThrownTypeOf(clause.Types is [var one] ? one : null, scope) }
@@ -7885,6 +7897,21 @@ public sealed class TypeChecker
         }
 
         var contextRet = lam.ReturnType is not null ? ResolveType(lam.ReturnType, scope) : expFn?.Return;
+
+        // A yield of its own makes the lambda a GENERATOR (08 Y11 F5): 'fn(…) -> Coroutine<Y, R>'.
+        // Calling it builds the coroutine and throws nothing; what the body throws is the pulls'.
+        if (lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
+        {
+            var made = CheckGeneratorLambda(lam, generator, lambdaScope, scope, contextRet);
+            _currentReturn = savedReturn;
+            _currentYield = savedYield;
+            _returnInference = savedInference;
+            _loops = savedLoops;
+            RecordCaptures(lam);
+            _result.MarkGeneratorLambda(lam);
+            return new FnType(pTypes, made);
+        }
+
         // A context return with type parameters still UNBOUND (map(xs, (x) => …), where U is open) is
         // not checked against: the body's actual type binds U in phase C.
         var openGeneric = lam.ReturnType is null && contextRet is not null && ContainsTypeParam(contextRet);
@@ -7963,6 +7990,62 @@ public sealed class TypeChecker
 
         RecordCaptures(lam);
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body) };
+    }
+
+    /// <summary>
+    /// The body of a generator lambda (08 Y11 F5). Its yields give the coroutine's <c>Y</c> and its
+    /// returns <c>R</c>: checked against a context that says <c>Coroutine&lt;Y, R&gt;</c>; inferred
+    /// from the body where none does, or where the context's coroutine still names a type parameter
+    /// — <c>sequence&lt;T&gt;</c>'s argument — which the body then binds. What the body throws belongs
+    /// to the coroutine's pulls: the set the lambda writes, the context's, or what escapes the body,
+    /// but for the <c>Cancelled</c> its own yields throw at close.
+    /// </summary>
+    private CoroutineOf CheckGeneratorLambda(LambdaExpr lam, Block body, SymbolTable scope, SymbolTable outer, LyrType? contextRet)
+    {
+        var known = contextRet is CoroutineOf c && !ContainsTypeParam(c) ? c : null;
+        var savedYieldInference = _yieldInference;
+        var savedTail = _tailExpected;
+        var yields = known is null ? new List<LyrType>() : null;
+        var returns = known is null ? new List<LyrType>() : null;
+        _yieldInference = yields;
+        _returnInference = returns;
+        _currentYield = known?.Yield ?? LyrType.Error; // the yields of this body are its own
+        _currentReturn = known is not null ? known : LyrType.Error;
+        _tailExpected = known is not null && !TypeFacts.IsVoid(known.Result) ? known.Result : null;
+        CheckBlock(body, scope);
+        _yieldInference = savedYieldInference;
+        _tailExpected = savedTail;
+
+        LyrType yielded, result;
+        if (known is not null)
+        {
+            (yielded, result) = (known.Yield, known.Result);
+            if (body.Tail is { } tail && !TypeFacts.IsVoid(result))
+                CheckAssignable(tail.Expr, _result.TypeOf(tail.Expr), result, tail.Span);
+        }
+        else
+        {
+            yielded = UnifyArms(yields!, lam.Span, "the yields of this generator lambda");
+            if (body.Tail is { } tail) returns!.Add(_result.TypeOf(tail.Expr));
+            result = returns!.Count == 0 ? LyrType.Void : UnifyArms(returns, lam.Span, "the returns of this generator lambda");
+        }
+        if (!TypeFacts.IsVoid(result) && !result.IsError && body.Tail is null && !Flow.AlwaysReturns(body, _result))
+            _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
+                $"a generator lambda whose result is '{TypeFacts.Display(result)}' must return it on every path that ends its body");
+
+        LyrType? thrown;
+        if (lam.Throws is { } written)
+            thrown = ResolveThrownSet(written, outer) switch { [] => null, [var one] => one, _ => ErrorRoot };
+        else if (contextRet is CoroutineOf { Throws: { } expected } && !ContainsTypeParam(expected))
+            thrown = expected;
+        else
+            thrown = EscapingOf(body).Where(t => CancelledType is not { } cancelled || !LyrType.Equal(t, cancelled)).ToArray() switch
+            {
+                [] => null,
+                [var one] => one,
+                _ => ErrorRoot,
+            };
+        return new CoroutineOf(yielded, thrown) { Result = result };
     }
 
     /// <summary>What a lambda's body lets escape (05 E2 K3): the exception analysis's own walk, run

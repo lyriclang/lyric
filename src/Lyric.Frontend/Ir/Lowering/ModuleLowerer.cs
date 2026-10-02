@@ -1120,8 +1120,7 @@ public static class ModuleLowerer
     /// <c>Coroutine&lt;Y, R&gt;</c> is a built-in type rather than a library class (08 D11).
     /// </summary>
     internal static NamedType? CoroutineReturn(FunctionDecl decl) =>
-        decl.ReturnType is NamedType { TypeArguments.Length: 1 or 2 } named
-        && named.Path[^1] == "Coroutine"
+        decl.ReturnType is NamedType { TypeArguments.Length: 1 or 2 } named && CoroutineShape.IsCoroutine(decl)
             ? named
             : null;
 
