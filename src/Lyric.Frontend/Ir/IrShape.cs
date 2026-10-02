@@ -74,6 +74,8 @@ public static class IrShape
         ResumePull r => new[] { r.Coroutine },
         CoroutineDone d => new[] { d.Coroutine },
         CoroutineResult r => new[] { r.Coroutine },
+        CoroutineClosing => Array.Empty<TempId>(),
+        CoroutineClose c => new[] { c.Coroutine },
         YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
 
         CurrentError or ClearError or StashError or RestoreError or SuppressError => Array.Empty<TempId>(),
@@ -143,6 +145,8 @@ public static class IrShape
         ResumePull r => r.Dest,
         CoroutineDone d => d.Dest,
         CoroutineResult r => r.Dest,
+        CoroutineClosing c => c.Dest,
+        CoroutineClose => null,
         YieldSuspend => null,
 
         CurrentError e => e.Dest,
@@ -234,6 +238,8 @@ public static class IrShape
             ResumePull r => r with { Dest = temp(r.Dest), Coroutine = temp(r.Coroutine) },
             CoroutineDone d => d with { Dest = temp(d.Dest), Coroutine = temp(d.Coroutine) },
             CoroutineResult r => r with { Dest = temp(r.Dest), Coroutine = temp(r.Coroutine) },
+            CoroutineClosing c => c with { Dest = temp(c.Dest) },
+            CoroutineClose c => c with { Coroutine = temp(c.Coroutine) },
             YieldSuspend y => y with { Value = Opt(y.Value) },
 
             CurrentError e => e with { Dest = temp(e.Dest) },

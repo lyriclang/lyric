@@ -109,6 +109,8 @@ public class SanitizerTests
     /// </summary>
     [Theory]
     [InlineData("generators", 0)]
+    [InlineData("generators_close", 0)]
+    [InlineData("close_yield", 101)]
     public void A_coroutine_program_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);
 
     private static void RunEmittedClean(string name, int exit)

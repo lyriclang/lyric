@@ -873,6 +873,31 @@ public class VerifierTests
         new CoroutineResult(T(1), T(0), I64, Sp)), "coresult annotated i64, the coroutine returns void");
 
     [Fact]
+    public void Asking_whether_a_coroutine_is_closing_writes_a_bool() => AssertFinding(VoidFn(new List<IrLocal>(),
+        new List<IrTemp> { new(T(0), I64) },
+        new List<IrOp> { new CoroutineClosing(T(0), Sp) }), "coclosing declares type bool");
+
+    [Fact]
+    public void Closing_something_else_is_found() => AssertFinding(ModuleWithTypes(
+        new List<IrTypeDef> { new("Cancelled", [], []) { IsClass = true } },
+        Fn("main.f", VoidT, 0, new List<IrLocal>(), new List<IrTemp> { new(T(0), I64) },
+            new List<IrBlock>
+            {
+                Block(0, new List<IrOp> { new Const(T(0), I64, new IntConst(1), Sp), new CoroutineClose(T(0), Ty(0), Sp) },
+                    new Return(null, Sp)),
+            })), "coclose operand is i64");
+
+    [Fact]
+    public void A_close_that_drops_no_class_is_found() => AssertFinding(ModuleWithTypes(
+        new List<IrTypeDef> { TypeDef("Point", ("x", I64)) },
+        Fn("main.f", VoidT, 1, new List<IrLocal> { new(L(0), "co", IntCoroutine) }, new List<IrTemp> { new(T(0), IntCoroutine) },
+            new List<IrBlock>
+            {
+                Block(0, new List<IrOp> { new LoadLocal(T(0), L(0), IntCoroutine, Sp), new CoroutineClose(T(0), Ty(0), Sp) },
+                    new Return(null, Sp)),
+            })), "coclose drops ty0 (Point), which is no class");
+
+    [Fact]
     public void A_coroutine_over_a_body_that_returns_something_else_is_found()
     {
         var factory = Fn("main.gen", IntCoroutine, 0, new List<IrLocal>(), new List<IrTemp> { new(T(0), IntCoroutine) },

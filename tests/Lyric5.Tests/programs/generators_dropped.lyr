@@ -1,0 +1,47 @@
+// Coroutines dropped while suspended, without close() (design/v5/spec/06 A5): nothing of them runs
+// — not the defer of the hundred that have one — and the debug profile reports each of those when
+// the collector takes it; the thousand without cleanup go in silence. The churn makes the
+// collections that find them; the test runs this under a heap limit. Expected stdout:
+// "sum 654450" (0 + … + 999 = 499500, 0 + … + 99 = 4950, and 150000 odd numbers). Exit 0.
+import std.io { println };
+
+class Item { id: int }
+
+fn guarded(n: int): Coroutine<int> {
+    defer println("never printed");
+    yield n;
+    yield n + 1;
+}
+
+fn plain(n: int): Coroutine<int> {
+    yield n;
+    yield n + 1;
+}
+
+fn dropGuarded(n: int): int {
+    let g = guarded(n);
+    return g.next() ?? 0;
+}
+
+fn dropPlain(n: int): int {
+    let p = plain(n);
+    return p.next() ?? 0;
+}
+
+fn main(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 1000) {
+        sum = sum + dropPlain(i);
+        if (i < 100) { sum = sum + dropGuarded(i); }
+        i = i + 1;
+    }
+    var j = 0;
+    while (j < 300000) {
+        let item = Item { id = j };
+        sum = sum + item.id % 2;
+        j = j + 1;
+    }
+    println(f"sum {sum}");
+    return 0;
+}

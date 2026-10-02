@@ -1,0 +1,87 @@
+// close() natively (design/v5/spec/06 A5, M6 S2b): a suspended coroutine is unwound — its yield
+// throws Cancelled, the defers run on the way out — and is done; one never pulled runs nothing; a
+// body that catches Cancelled may still return a result; 'using' closes at the end of its scope;
+// an error other than Cancelled comes out of close(); closing a done coroutine does nothing.
+// Expected stdout:
+//   w: cleaned                       the defer of the suspended body, run by close()
+//   walk 0 1 done true next true     done afterwards: next() answers null
+//   fresh true                       never pulled: nothing ran, not even the defer
+//   careful: caught cancelled        the body caught it ...
+//   careful 1 stopped                ... and returned
+//   using 0
+//   u: cleaned                       'using' closed it at the end of its block
+//   close threw oops                 the body turned Cancelled into another error
+//   again true                       a second close of a done coroutine does nothing
+import std.io { println };
+import std.task { Cancelled };
+
+enum Oops :: [Error] { Bad; fn message(): string { return "oops"; } }
+
+fn walk(name: string): Coroutine<int> {
+    defer println(f"{name}: cleaned");
+    var i = 0;
+    while (true) {
+        yield i;
+        i += 1;
+    }
+}
+
+fn careful(): Coroutine<int, string> {
+    try {
+        yield 1;
+        yield 2;
+    } catch (_: Cancelled) {
+        println("careful: caught cancelled");
+        return "stopped";
+    }
+    return "ran out";
+}
+
+fn angry(): Coroutine<int> throws Oops {
+    try {
+        yield 1;
+    } catch (_: Cancelled) {
+        throw Oops.Bad;
+    }
+}
+
+fn main(): int {
+    let w = walk("w");
+    let a = w.next()!;
+    let b = w.next()!;
+    w.close();
+    let after = w.next();
+    println(f"walk {a} {b} done {w.isDone()} next {after == null}");
+
+    let fresh = walk("fresh");
+    fresh.close();
+    println(f"fresh {fresh.isDone()}");
+
+    let c = careful();
+    let c1 = c.next()!;
+    c.close();
+    let r = c.result() ?? "none";
+    println(f"careful {c1} {r}");
+
+    {
+        using let u = walk("u");
+        let u0 = u.next()!;
+        println(f"using {u0}");
+    }
+
+    let x = angry();
+    try {
+        let v = x.next() ?? 0;
+        x.close();
+        println(f"not reached {v}");
+    } catch (e: Oops) {
+        println(f"close threw {e.message()}");
+    }
+    try {
+        x.close();
+        println(f"again {x.isDone()}");
+    } catch (_: Oops) {
+        println("not reached either");
+    }
+    return 0;
+}

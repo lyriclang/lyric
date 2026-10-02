@@ -31,6 +31,11 @@ internal sealed class ExceptionAnalyzer
     private readonly DiagnosticEngine _de;
     private readonly Func<LyrType, LyrType, ModuleSymbol?, bool> _covers;
     private readonly LyrType? _root; // std.core's Error; null without a standard library
+    private readonly LyrType? _cancelled; // std.task's Cancelled; null without it
+
+    /// <summary>The <c>try</c> a <c>using let</c> writes around its own close: the parser's, so a
+    /// close that cannot throw is no mark the user could drop (no LYR-SEM0139).</summary>
+    private TryExpr? _closing;
 
     /// <summary>One function context: the set it may throw, how a message names it, whether it
     /// can declare at all, and the <c>try</c>s open in it, innermost last.</summary>
@@ -59,9 +64,10 @@ internal sealed class ExceptionAnalyzer
     private ModuleSymbol? _module;
 
     public ExceptionAnalyzer(Compilation comp, TypeResult types, DiagnosticEngine de,
-        Func<LyrType, LyrType, ModuleSymbol?, bool> covers, LyrType? root)
+        Func<LyrType, LyrType, ModuleSymbol?, bool> covers, LyrType? root, LyrType? cancelled = null)
     {
         _root = root;
+        _cancelled = cancelled;
         _comp = comp;
         _types = types;
         _de = de;
@@ -153,8 +159,12 @@ internal sealed class ExceptionAnalyzer
                 if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer);
                 // 'using let': the close it owes the scope, a site of the scope (05 E7 R4) — where
                 // the checker took it up: a binding that is no Closeable (SEM0143) owes nothing.
-                if (bd.Cleanup is { Body: ExprStmt { Expr: TryExpr { Value: { } close } } } && !_types.TypeOf(close).IsError)
+                if (bd.Cleanup is { Body: ExprStmt { Expr: TryExpr { Value: { } close } closing } } && !_types.TypeOf(close).IsError)
+                {
+                    _closing = closing;
                     AnalyzeStmt(bd.Cleanup);
+                    _closing = null;
+                }
                 break;
             // A destructuring binding REQUIRES its initializer, and that initializer is a call like
             // any other: missing here, a throwing one escaped the walk entirely.
@@ -174,7 +184,13 @@ internal sealed class ExceptionAnalyzer
             case ForInStmt fo: AnalyzeExpr(fo.Iterable); AnalyzeStmt(fo.Body); break;
             case ReturnStmt r: if (r.Value is not null) AnalyzeExpr(r.Value); break;
             case BreakStmt { Value: { } broken }: AnalyzeExpr(broken); break;
-            case YieldStmt y: if (y.Value is not null) AnalyzeExpr(y.Value); break;
+            case YieldStmt y:
+                if (y.Value is not null) AnalyzeExpr(y.Value);
+                // A yield of a coroutine's body throws 'Cancelled' where close() finds it suspended
+                // (06 A5): the trys around it are reached — a clause may catch it — and the body
+                // itself covers what none takes.
+                if (_cancelled is { } cancelled && _types.IsBodyYield(y)) Taken(cancelled);
+                break;
             case DeferStmt de: AnalyzeStmt(de.Body); break; // runs in the scope that registered it
             case ThrowStmt t:
                 AnalyzeExpr(t.Value);
@@ -248,7 +264,7 @@ internal sealed class ExceptionAnalyzer
                 var frame = Open(tried.Catches, takesAll: tried.Kind != TryKind.Propagate);
                 try { AnalyzeExpr(tried.Value); }
                 finally { Close(); }
-                if (!frame.Reached)
+                if (!frame.Reached && !ReferenceEquals(tried, _closing))
                     _de.Report("LYR-SEM0139", Severity.Warning, tried.KeywordSpan, tried.Catches.Length > 0
                         ? "nothing under this 'try' throws — its 'catch' clauses never run"
                         : $"nothing under this '{Spelled(tried.Kind)}' throws — the mark says a call may fail where none can");

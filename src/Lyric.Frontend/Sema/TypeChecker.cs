@@ -73,6 +73,12 @@ public sealed class TypeChecker
     /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
     /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
     private readonly TypeSymbol? _closeable;
+
+    /// <summary>What a coroutine's suspended <c>yield</c> throws when <c>close()</c> unwinds it:
+    /// <c>std.task</c>'s <c>Cancelled</c> (design/v5/spec/06 A5, 10 Q10), which the compilation
+    /// loads for a program with coroutines. Null without it — then a yield throws nothing and a
+    /// coroutine has no <c>close()</c>.</summary>
+    private readonly TypeSymbol? _cancelled;
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
@@ -109,6 +115,7 @@ public sealed class TypeChecker
         _de = de;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
+        _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
         _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
@@ -1629,6 +1636,9 @@ public sealed class TypeChecker
                 var yv = y.Value is not null ? CheckExpr(y.Value, scope, _currentYield) : null;
                 if (_currentYield is null)
                     break;
+                // A yield of the body: where 'close()' finds the coroutine suspended, it throws
+                // 'Cancelled' (06 A5) — a site the exception analysis covers by the body itself.
+                _result.MarkBodyYield(y);
                 if (yv is null)
                 {
                     if (!TypeFacts.IsVoid(_currentYield) && !_currentYield.IsError)
@@ -1683,7 +1693,9 @@ public sealed class TypeChecker
         // scope is checked as the defer it is — a site of this scope, the keyword its mark.
         if (bnd.Cleanup is { } cleanup && !type.IsError)
         {
-            if (_closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
+            // A coroutine is Closeable (10 I7) — by its built-in 'close()', not through a table.
+            if (type is CoroutineOf && _cancelled is not null
+                || _closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
                 CheckStmt(cleanup, scope);
             else
                 _de.Report("LYR-SEM0143", Severity.Error, cleanup.Span,
@@ -1974,6 +1986,9 @@ public sealed class TypeChecker
     /// <summary>The root as a type, for the exception analysis.</summary>
     internal LyrType? ErrorRoot => _error is null ? null : new NamedRef(_error);
 
+    /// <summary><c>std.task</c>'s <c>Cancelled</c>, what a yield of a body throws at close (06 A5).</summary>
+    internal LyrType? CancelledType => _cancelled is null ? null : new NamedRef(_cancelled);
+
     private bool IsThrowable(LyrType t) =>
         _error is null || ThrownCoveredBy(t, new NamedRef(_error), _currentModule);
 
@@ -2031,7 +2046,7 @@ public sealed class TypeChecker
     {
         LyrType[] escaping;
         using (_de.Mute())
-            escaping = new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot).Escaping(tried, _currentModule);
+            escaping = new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot, CancelledType).Escaping(tried, _currentModule);
         return escaping.Where(t => !above.Any(c => TakesWhole(c, t))).ToArray();
     }
 
@@ -4873,6 +4888,14 @@ public sealed class TypeChecker
         }
         if (baseType is CoroutineOf && mem.Member == "isDone")
             return new FnType([], LyrType.Bool);
+        // 'close()' unwinds a suspended coroutine (06 A5): its yield throws 'Cancelled', its
+        // defers run. What escapes the body besides that comes out here — the coroutine's own set,
+        // so 'close()' throws what a pull throws, smaller than Closeable's 'Error' (05 K6).
+        if (baseType is CoroutineOf closing && mem.Member == "close" && _cancelled is not null)
+        {
+            if (closing.Throws is { } thrown) _result.MarkThrowingPull(mem, thrown);
+            return new FnType([], LyrType.Void);
+        }
 
         if (InstanceMemberOf(baseType, mem, mem.Span) is { } mt)
             return mem.IsOptional ? Optionalized(mt) : mt;
@@ -7947,7 +7970,7 @@ public sealed class TypeChecker
     private LyrType[] EscapingOf(Node body)
     {
         using (_de.Mute())
-            return new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot).Escaping(body, _currentModule);
+            return new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot, CancelledType).Escaping(body, _currentModule);
     }
 
     // Does the block return a VALUE on any path (`return expr;`)? Descends through the statement

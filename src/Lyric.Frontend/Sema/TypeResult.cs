@@ -126,6 +126,15 @@ public sealed class TypeResult
 
     public void MarkThrowingPull(Node pull, LyrType thrown) => _throwingPulls[pull] = thrown;
 
+    /// <summary>The yields of coroutine bodies (06 A5): where <c>close()</c> finds the coroutine
+    /// suspended, such a yield throws <c>Cancelled</c>. Recorded by the checker, which knows whose
+    /// body a yield stands in — a lambda's yield in a body is the other, dynamic kind.</summary>
+    private readonly HashSet<YieldStmt> _bodyYields = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkBodyYield(YieldStmt yield) => _bodyYields.Add(yield);
+
+    public bool IsBodyYield(YieldStmt yield) => _bodyYields.Contains(yield);
+
     public LyrType? ThrownByPull(Node pull) =>
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
 

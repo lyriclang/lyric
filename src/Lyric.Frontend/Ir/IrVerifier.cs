@@ -749,6 +749,15 @@ public static class IrVerifier
                         Report(block, index, $"codone operand is {Show(TypeOf(d.Coroutine))}, expected a coroutine");
                     RequireDestType(d.Dest, new IrScalarType(IrScalar.Bool), "codone", block, index);
                     break;
+                case CoroutineClosing cc:
+                    RequireDestType(cc.Dest, new IrScalarType(IrScalar.Bool), "coclosing", block, index);
+                    break;
+                case CoroutineClose close:
+                    if (TypeOf(close.Coroutine) is not IrCoroutineType)
+                        Report(block, index, $"coclose operand is {Show(TypeOf(close.Coroutine))}, expected a coroutine");
+                    if (ResolveType(close.Cancelled, "coclose", block, index) is { IsClass: false } dropped)
+                        Report(block, index, $"coclose drops {close.Cancelled} ({dropped.Name}), which is no class");
+                    break;
                 case CoroutineResult cr:
                     if (TypeOf(cr.Coroutine) is not IrCoroutineType resulting)
                         Report(block, index, $"coresult operand is {Show(TypeOf(cr.Coroutine))}, expected a coroutine");
