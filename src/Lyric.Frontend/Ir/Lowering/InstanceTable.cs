@@ -163,8 +163,16 @@ internal sealed class InstanceTable
         // the T comes from the instance and the U from the call. A method's own parameter wins a
         // name collision, which is the scoping the source has.
         if (owner is { } instance)
+        {
             for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
                 substitution[instance.Definition.Generics[i]] = instance.Arguments[i];
+            // An interface's member for a value of the interface: 'Self' is the interface (04 D9).
+            if (instance.Definition.SelfParam is { } self) substitution[self] = instance;
+        }
+        // The same for a non-generic interface, which has no owner instance: a helper or a generic
+        // member reached through its value.
+        if (receiver is { Kind: TypeSymbolKind.Interface, SelfParam: { } ownSelf } && !substitution.ContainsKey(ownSelf))
+            substitution[ownSelf] = new NamedRef(receiver);
 
         for (var i = 0; i < symbol.Generics.Length; i++)
             substitution[symbol.Generics[i]] = typeArguments[i];
@@ -219,6 +227,25 @@ internal sealed class InstanceTable
         return id;
     }
 
+    /// <summary>
+    /// An interface's default for one conformer (04 D9): 'Self' the conformer, 'this' its value,
+    /// the call direct — one instance per default and conformer, as for a block's member. The
+    /// interface has no parameters of its own here; a generic one's defaults go through its value.
+    /// </summary>
+    public FunctionId RequestDefault(FunctionSymbol method, FunctionDecl decl, TypeSymbol iface,
+        LyrType conformer, Core.Span span)
+    {
+        var name = Qualify(decl, $"<default>.{iface.Name}.{NameOf(conformer)}.{method.Name}");
+        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        Guard(name, span);
+        var substitution = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        if (iface.SelfParam is { } self) substitution[self] = conformer;
+        var id = _ids.Next();
+        _byKey[name] = id;
+        _pending.Add(new Pending(decl, name, id, null, substitution, null, conformer));
+        return id;
+    }
+
     public FunctionId RequestMethod(FunctionSymbol method, FunctionDecl decl,
         GenericInstance owner, Core.Span span)
     {
@@ -231,6 +258,8 @@ internal sealed class InstanceTable
             ReferenceEqualityComparer.Instance);
         for (var i = 0; i < owner.Definition.Generics.Length && i < owner.Arguments.Length; i++)
             substitution[owner.Definition.Generics[i]] = owner.Arguments[i];
+        // An interface's member for a value of the interface: 'Self' is the interface (04 D9).
+        if (owner.Definition.SelfParam is { } self) substitution[self] = owner;
 
         Guard(name, span);
 

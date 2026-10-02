@@ -120,6 +120,7 @@ public sealed class TypeChecker
         _de = de;
         _result.SourceText = comp.TextOf;
         _result.ConformanceBlock = ConformanceBlockFor;
+        _result.ValueInterface = iface => ValueUsable(iface, out _);
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
@@ -647,8 +648,11 @@ public sealed class TypeChecker
     private void CheckMethods(string typeName, Decl[] members, ModuleSymbol module)
     {
         if (module.Members.LookupLocal(typeName) is not TypeSymbol ts) return;
-        var thisType = SelfType(ts);
         var isInterface = ts.Kind == TypeSymbolKind.Interface;
+        // 'this' in an interface's body is the conformer, 'Self' (03 T5): a default is generic over
+        // it and monomorphized per conformer (04 D9) — through a value of the interface, the
+        // interface is the conformer.
+        var thisType = isInterface && ts.SelfParam is { } selfParam ? new TypeParamType(selfParam) : SelfType(ts);
         foreach (var m in members)
         {
             // Member attributes (2.1): the list parses on struct/class members; only the
@@ -5441,6 +5445,12 @@ public sealed class TypeChecker
                 if (fn.IsStatic)
                     return (Report(span, "LYR-SEM0055",
                         $"'{member}' is a static member of '{it.Name}' — call it on the type parameter: '{gp.Name}.{member}(…)'"), fn);
+                // A private helper is its interface's defaults' alone (07 V2 S4) — through a
+                // constraint from elsewhere it is not there; the interface's own 'this.helper()'
+                // comes this way, 'this' being 'Self'.
+                if (fn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(it))
+                    return (Report(span, "LYR-RES0009",
+                        $"'{fn.Name}' is a helper of interface '{it.Name}' — only its defaults call it"), null);
 
                 // Substitute the type arguments OF THE CONSTRAINT. 'T :: [Eq<T>]' means the 'T' in
                 // 'Eq<T>.eq(other: T)' is the 'T' of the calling function — two different symbols
@@ -6573,7 +6583,9 @@ public sealed class TypeChecker
     /// <summary>Whether the body being checked is one of <paramref name="iface"/>'s own: its
     /// <c>this</c> is the interface.</summary>
     private bool Inside(TypeSymbol iface) =>
-        ReferenceEquals(TypeFacts.SymbolOf(_currentThis ?? LyrType.Error), iface);
+        _currentThis is TypeParamType { Param.SelfOf: { } own }
+            ? ReferenceEquals(own, iface)
+            : ReferenceEquals(TypeFacts.SymbolOf(_currentThis ?? LyrType.Error), iface);
 
     /// <summary>The first field of <paramref name="ts"/> the module being checked may not name;
     /// <c>null</c> when it may name them all.</summary>
@@ -9225,11 +9237,11 @@ public sealed class TypeChecker
 
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
         // stands here beside rather than inside SymbolOf.
+        // Through the constraint's chain: 'this' in a default is 'Self', and passes as its
+        // interface and as a parent of it, as an interface value does (04 D10).
         return from is TypeParamType parameter
                && parameter.Param.Constraints.Any(c =>
-                   Conformance.InterfaceOf(c, _binding) is { } it && ReferenceEquals(it, target)
-                   && Matches(ResolveType(c, _currentModule?.Members ?? _comp.Builtins),
-                       EmptySubst, to));
+                   NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, target, to, EmptySubst, parameter));
     }
 
     private static bool LiteralAdaptsTo(Expr expr, PrimitiveType target)
