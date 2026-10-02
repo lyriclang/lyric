@@ -56,11 +56,12 @@ public class RuntimeBuildTests
         RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), binary ?? name, profile, compiler, args);
 
     /// <summary>The emitter's units as a program: written into the cache, built and run like a
-    /// runtime test.</summary>
-    internal static ProcessRunner.Result RunEmitted(IReadOnlyList<CEmitter.Unit> units, string name, Profile profile, string[]? args = null) =>
+    /// runtime test — with zig, or the compiler a sanitizer profile needs.</summary>
+    internal static ProcessRunner.Result RunEmitted(IReadOnlyList<CEmitter.Unit> units, string name, Profile profile,
+        string[]? args = null, CCompiler? compiler = null) =>
         // Its own name in bin/: 'hello' is also a runtime test program, and two tests linking to
         // one path raced (seen on Windows).
-        RunC(WriteUnits(units, name), "emitted-" + name, profile, null, args);
+        RunC(WriteUnits(units, name), "emitted-" + name, profile, compiler, args);
 
     /// <summary>One file per unit under <c>emitted/&lt;name&gt;/</c>, the module's first.</summary>
     private static string[] WriteUnits(IReadOnlyList<CEmitter.Unit> units, string name)

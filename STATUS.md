@@ -33,8 +33,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M2 | First native program (IR → C → `zig cc`) | L | **done** 2026-09-30 |
 | M3 | Value model and type system | XL | **done** 2026-10-01 |
 | M4 | Interfaces and abstraction | L | **done** 2026-10-01 |
-| M5 | Errors | M | **next** |
-| M6 | Coroutines, scheduler, threads | XL | — |
+| M5 | Errors | M | **done** 2026-10-02 |
+| M6 | Coroutines, scheduler, threads | XL | **next** |
 | M7 | Modules and packages | L | — |
 | M8a | std core | XL | — |
 | M8b | std I/O and system | L | — |
@@ -323,9 +323,71 @@ collections (M8a); `@Shared` on a field (M9a); a `Default` of an enum has no var
 round (M8a); the operator desugars bind `equalOptionals`/`repeatArray` by name through the scope
 (M7 decides the qualified route); `T.Out` with two instances takes the first answer.
 
-### M5 — Errors
+### M5 — done (2026-10-02)
 
-Next. Plan first (13, M5), then slices.
+Merged as #210–#219 and #220 (S5), the spec side is lyric-spec#71–#80.
+
+The plan (13, M5): 05 with L5 — the hidden error slot (E1–E3), `throws` sets,
+`try`/`try?`/`try!`, `catch` by type and `in [A, B]`, the `Error` root and `Exception`, the
+`defer` cleanup chain (E4), `using let`/`Closeable` (the R series), `main throws`, panics (E5,
+101), the backtrace profile (E8), `never`. Eleven slices: S1a/S1b the error ABI from the front
+end to C, S2a/S2b the expression forms and the clauses, S3a–S3c the throwing `defer`, `using` and
+the trace, S4a–S4c function types with sets, `never` and `loop`, S5 the close. Exit criteria:
+`bank` and `errors` run natively; conformance 05 (chapter 06); a sanitizer run over the throw
+paths.
+
+1. S1a `efe5c92c`: `Error` in `std.core` as the root of everything thrown, caught and declared
+   (05 E6 O1); the `throws` SET — one type alone, several in brackets, bare `throws` meaning
+   `Error`; the `try` mark on every call of a throwing function (`LYR-SEM0138`), at the start of
+   what it covers (`LYR-PAR0050`); a thrown type covered by a clause or the function's set (K8).
+2. S1b `b06fa96a`: the error path natively — `Throw`, `ErrorBranch` and `Propagate` as explicit
+   edges of the IR, the 4.x handler tables retired; landings are defer chains ending in the
+   innermost `try`'s dispatch (one descriptor test per clause) or in the propagation; in C a
+   hidden `LyrErr **` last parameter and one branch per call; an error leaving `main` is
+   reported with its cause chain, exit 1.
+3. S2a `f51a88c1`: `try?` (an absent value, no flattening), `try!` (a panic, `LYR-RT0010`), and
+   `try e catch (…) v` as an expression with value-block clauses.
+4. S2b `7d3e2abc`: `catch (e in [A, B])`; a type caught once per `try` (C1), a clause no value
+   reaches refused (C2); the set a binding carries (K7) — precise rethrow, `match` exhaustive
+   over it. The conformance runner compares error codes exactly.
+5. S3a `72bb85be`: a `defer` that throws — the first error wins, the second is suppressed into
+   it (05 E7); `main`'s report lists what was suppressed.
+6. S3b `bd82bf8d`: `using let` over `Closeable` (R1–R6) and `Exception` as the ready-made error
+   (its field is `text`: `message` would collide with `Error.message()`).
+7. S3c `4b994488`: where an error was thrown, in the debug profile (01 E8), folded and cut like a
+   panic's trace; a rethrow of the clause's own binding keeps its record (05 E6 O3).
+8. S4a `7d6bf240`: the thrown set of a function type (03 T17, K3/K4/K6) — written, expected or
+   inferred for a lambda, `throws E` bound from the argument, a smaller set where a larger is
+   expected; every function value's code takes the error slot, so the coercion costs nothing.
+9. S4b `ae238e7a`: `never` only as the whole return type (`LYR-SEM0145`), a never function does
+   not return (`LYR-SEM0146`); `panic`, `assert`, `unreachable` and `todo` in `std.core`
+   (`LYR-RT0008`, `RT0011`–`RT0013`); a never value in any value position ends the statement
+   (it was an ICE).
+10. S4c `57a6374b`: `loop` with `break value` and labels (05 E11, 08 S3/S4) — `never` without a
+    break, `LYR-SEM0147`–`SEM0149`, a jump held to its own function; definite assignment follows
+    the jumps, which closed a 4.x hole: a `break` or `continue` in a `do` loop slipped past an
+    assignment. Spec chapter 07 gets its first section.
+11. S5: the `bank` program (after `examples/bank.lyr`: an account's errors, a transfer that puts
+    the money back, `try?`); the throw paths — thirteen programs, errors leaving `main` and a
+    `try!` included — under ASan and UBSan in the C toolchain job, where UBSan also holds every
+    `__builtin_unreachable()` the lowering sealed to never being reached (a planted one is the
+    control); this section.
+
+Conformance: 409 cases (03-types 149, 04-modules 4, 05-interfaces 98, 06-errors 87,
+07-statements 18, 08-expressions 17, 09-patterns 36), all `since: 5.0.0`, green in both
+profiles. Test suite: 3887 across the ten projects.
+
+Open from M5, collected for the 5.0 review (not in the plan): `e.suppressed()` and
+`e.backtrace()` in Lyric (the record is not reachable from a caught value); the error slot on
+every function value (one pointer per indirect call) to confirm; `?never` decided as an error
+even in a return position; `assert` evaluates its message eagerly until `inline` (M9);
+`std.core`'s higher-order functions pass no set yet (M8a); a block expression at the end of a
+value block — `if`, `match`, `loop` alike — is a statement, not the block's value; spec 07 past
+§1 and the grammar chapter are still to write.
+
+### M6 — Coroutines, scheduler, threads
+
+Next. Plan first (13, M6), then slices.
 
 ## Design decisions
 

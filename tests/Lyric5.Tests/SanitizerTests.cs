@@ -68,6 +68,36 @@ public class SanitizerTests
         RunClean(name, Profile.Tsan, args, exit);
 
     /// <summary>
+    /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
+    /// catches, runs a defer or a close on the error path, suppresses, rethrows, or lets an error
+    /// leave main — and UBSan's check of '__builtin_unreachable()' holds the blocks the lowering
+    /// sealed as unreachable to never being reached. An error escaping main exits 1, a 'try!' on
+    /// an error 101. Each under a name of its own, so the plain run of the same program in
+    /// <see cref="CEmitterTests"/> never shares its sources.
+    /// </summary>
+    [Theory]
+    [InlineData("errors", 0)]
+    [InlineData("error_paths", 0)]
+    [InlineData("try_forms", 0)]
+    [InlineData("catch_sets", 0)]
+    [InlineData("defer_errors", 0)]
+    [InlineData("resources", 0)]
+    [InlineData("fn_throws", 0)]
+    [InlineData("bank", 0)]
+    [InlineData("uncaught", 1)]
+    [InlineData("uncaught_suppressed", 1)]
+    [InlineData("rethrow", 1)]
+    [InlineData("deep_error", 1)]
+    [InlineData("forced", 101)]
+    public void A_program_that_throws_runs_clean_under_ASan_and_UBSan(string name, int exit)
+    {
+        if (!Applies) return;
+        var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC(name), name + "-asan", Profile.Asan, compiler: Clang());
+        Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
+        foreach (var report in Reports) Assert.DoesNotContain(report, result.Stderr);
+    }
+
+    /// <summary>
     /// The threads program under TSan, on request only (<c>LYRIC5_SANITIZERS=all</c>): on GitHub's
     /// Ubuntu runner (clang 18) the collector's stop-the-world signals now and then reach a thread
     /// only after its retry limit and it aborts ("Signals delivery fails constantly") — in 3 of 5
@@ -84,11 +114,13 @@ public class SanitizerTests
 
     /// <summary>
     /// The controls for the ASan profile: with the runtime's options and the collector linked in,
-    /// a heap overflow and a signed overflow still end the program with their report.
+    /// a heap overflow, a signed overflow and a reached '__builtin_unreachable()' still end the
+    /// program with their report — the last is what the throw-path run relies on.
     /// </summary>
     [Theory]
     [InlineData("overflow", "ERROR: AddressSanitizer: heap-buffer-overflow")]
     [InlineData("signed", "runtime error: signed integer overflow")]
+    [InlineData("unreachable", "runtime error: execution reached an unreachable program point")]
     public void A_fault_under_ASan_is_reported_and_ends_the_program(string which, string report)
     {
         if (!Applies) return;

@@ -26,6 +26,17 @@ promise. This entry fills with the milestones.
   conformance and coherence, extends on `T[]`, `?T`, tuples and `Slice<T>`; **conformance
   synthesis** — a conformance written without a body is implemented from the fields, and every
   type that can have one has a `Debug`; `?T == ?T`; `[x] * n` clones objects into every slot.
+- **Errors (M5** — `design/v5/spec/05`, spec chapter 06**):** `Error` as the root of everything
+  thrown; `throws` sets (`throws [A, B]`, bare `throws` meaning `Error`) declared and checked, the
+  `try` mark on every throwing call, each thrown type covered by a clause or the function's set;
+  `try?` (an absent value), `try!` (a panic) and `try … catch` as expressions; clauses by type,
+  by set (`catch (e in [A, B])`) and for everything, each type once, with precise rethrow;
+  `defer` and `using let` (`Closeable`) on every way out, a second error from a cleanup
+  suppressed into the first; an error leaving `main` prints its cause chain — in the debug
+  profile also where it was thrown — and exits 1; function types carry their set
+  (`fn() -> int throws E`); `never` as a return type, with `panic`, `assert`, `unreachable` and
+  `todo`; `loop` with `break value` and labels. An error costs one branch per call, no unwinding
+  tables.
 
 ---
 

@@ -1,0 +1,90 @@
+// bank — the M5 program (design/v5/spec/13, M5; after examples/bank.lyr): a class as a reference,
+// errors of its own with data, 'throws' sets, the 'try' mark, clauses by type and by set, a
+// precise rethrow that puts the money back first, 'try?', and a defer on the way out of main.
+import std.io { println };
+
+class InsufficientFunds :: [Error] {
+    requested: int,
+    available: int,
+
+    fn message(): string {
+        return f"not enough funds: {this.requested} requested, {this.available} available";
+    }
+}
+
+class AccountClosed :: [Error] {
+    owner: string,
+
+    fn message(): string { return f"the account of {this.owner} is closed"; }
+}
+
+class Account {
+    owner: string,
+    var balance: int = 0,
+    var open: bool = true,
+
+    // A factory: no language magic, a convention — 'Account.new(…)'.
+    static fn new(owner: string, opening: int): Account {
+        return Account { owner = owner, balance = opening };
+    }
+
+    mut fn deposit(amount: int): void throws AccountClosed {
+        if (!this.open) { throw AccountClosed { owner = this.owner }; }
+        this.balance += amount;
+    }
+
+    mut fn withdraw(amount: int): void throws [InsufficientFunds, AccountClosed] {
+        if (!this.open) { throw AccountClosed { owner = this.owner }; }
+        if (amount > this.balance) {
+            throw InsufficientFunds { requested = amount, available = this.balance };
+        }
+        this.balance -= amount;
+    }
+}
+
+// Withdraw, then deposit; a deposit that fails puts the money back before its error goes on.
+fn transfer(source: Account, target: Account, amount: int): void throws [InsufficientFunds, AccountClosed] {
+    try source.withdraw(amount);
+    try {
+        target.deposit(amount);
+    } catch (e: AccountClosed) {
+        source.balance += amount;
+        throw e;
+    }
+}
+
+fn balanceAfter(account: Account, amount: int): int throws [InsufficientFunds, AccountClosed] {
+    try account.withdraw(amount);
+    return account.balance;
+}
+
+fn main(): int {
+    let checking = Account.new("Ada", 100);
+    let savings = Account.new("Ada", 0);
+    defer println(f"final {checking.balance} {savings.balance}");
+
+    try {
+        checking.deposit(50);
+        checking.withdraw(30);
+        checking.withdraw(200);
+        println("not reached");
+    } catch (e: InsufficientFunds) {
+        println(f"refused {e.requested} of {e.available}: {e.message()}");
+    } catch (e: AccountClosed) {
+        println(f"closed: {e.message()}");
+    }
+
+    try {
+        transfer(checking, savings, 70);
+        println(f"moved {checking.balance} {savings.balance}");
+        savings.open = false;
+        transfer(checking, savings, 20);
+        println("not reached");
+    } catch (e in [InsufficientFunds, AccountClosed]) {
+        println(f"transfer failed: {e.message()}; back to {checking.balance}");
+    }
+
+    let left = (try? balanceAfter(checking, 500)) ?? -1;
+    println(f"try? {left}");
+    return 0;
+}
