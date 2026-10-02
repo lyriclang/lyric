@@ -59,6 +59,11 @@ public sealed class Compilation
     /// </summary>
     public bool Lyric5Modules { get; init; }
 
+    /// <summary>What each package of the program declares it imports from (07 P6): a module imports
+    /// from its own package, from <c>std</c>, and from these alone. <c>null</c> where no package
+    /// rules apply.</summary>
+    public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
+
     /// <summary>
     /// Whether <paramref name="symbol"/> may be named from <paramref name="from"/> (07 V2): a
     /// <c>pub</c> declaration everywhere, an <c>internal</c> one in its own package, a

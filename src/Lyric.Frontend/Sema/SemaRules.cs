@@ -349,9 +349,11 @@ public sealed class SemaRules
 
     private void CheckMain()
     {
-        if (_comp.Lyric5Modules && _comp.Entry is { } entry)
+        // Lyric 5: the entry module's 'main' alone has a contract (07 M7a); a library checked as a
+        // workspace has no entry, and its 'main's are ordinary functions.
+        if (_comp.Lyric5Modules)
         {
-            CheckEntry(entry);
+            if (_comp.Entry is { } entry) CheckEntry(entry);
             return;
         }
 

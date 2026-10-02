@@ -28,7 +28,11 @@ public static class Pipeline
     public static CompileResult? Compile(Project project, TextWriter error)
     {
         // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
-        var options = new CompilerOptions { StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots };
+        var options = new CompilerOptions
+        {
+            StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
+            PackageDependencies = project.DeclaredDependencies,
+        };
         var result = SourceCompiler.Lower(ScriptSource.FromDisk(project.Source, project.Module), options);
         if (!result.Render(error) || result.Ir is null) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
@@ -110,10 +114,15 @@ public static class Pipeline
     private static string SourcesKey(Project project)
     {
         var parts = new List<string> { project.Module };
-        if (project.Manifest is { } manifest)
+        if (project.Graph is { } graph)
         {
-            parts.Add(File.ReadAllText(manifest.File));
-            AddTree(parts, manifest.SourceRoot);
+            // Every package of the graph: a changed dependency builds anew as a changed module does.
+            foreach (var (name, manifest) in graph.Packages.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                parts.Add(name);
+                parts.Add(File.ReadAllText(manifest.File));
+                AddTree(parts, manifest.SourceRoot);
+            }
         }
         else
         {
@@ -121,6 +130,29 @@ public static class Pipeline
         }
         AddTree(parts, StdlibRoot);
         return Key([.. parts]);
+    }
+
+    /// <summary>
+    /// A library built by itself (design/v5/spec/07 B6): every module under its <c>src/</c> through
+    /// the front end and the lowering, one compilation — a check; there is no program to build. Exit
+    /// 0 when it holds, 1 after reporting.
+    /// </summary>
+    public static int CheckLibrary(LibraryException library, TextWriter error)
+    {
+        var manifest = library.Manifest;
+        var roots = Directory.Exists(manifest.SourceRoot)
+            ? Directory.EnumerateFiles(manifest.SourceRoot, "*.lyr", SearchOption.AllDirectories)
+                .Order(StringComparer.Ordinal)
+                .Select(file => ScriptSource.FromDisk(file, Project.ModulePathOf(manifest, file)!))
+                .ToList()
+            : [];
+        var options = new CompilerOptions
+        {
+            StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
+            PackageDependencies = library.Graph.Declared,
+        };
+        var result = SourceCompiler.CheckProject(roots, options);
+        return result.Render(error) ? 0 : 1;
     }
 
     private static void AddTree(List<string> parts, string root)

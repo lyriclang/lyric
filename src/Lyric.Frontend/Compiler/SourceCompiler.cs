@@ -77,6 +77,7 @@ public static class SourceCompiler
         var compilation = new Compilation(sources, diagnostics)
         {
             Lyric5Modules = options.PackageRoots is not null,
+            PackageDependencies = options.PackageDependencies,
             // The standard library is ordinary Lyric source and is loaded on demand.
             ModuleLoader = modulePath =>
             {
@@ -262,7 +263,12 @@ public static class SourceCompiler
         var loader = BuildModuleLoader(sources, diagnostics, options,
             roots.Count > 0 ? roots[0].BaseDirectory : Directory.GetCurrentDirectory());
 
-        var compilation = new Compilation(sources, diagnostics) { ModuleLoader = loader };
+        var compilation = new Compilation(sources, diagnostics)
+        {
+            ModuleLoader = loader,
+            Lyric5Modules = options.PackageRoots is not null,
+            PackageDependencies = options.PackageDependencies,
+        };
 
         Module? entry = null;
         foreach (var root in roots)
@@ -454,6 +460,10 @@ public sealed record CompilerOptions
     /// tools, the language server first, still read headers and leave this unset (until M13b).</para>
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageRoots { get; init; }
+
+    /// <summary>What each package declares it imports from (design/v5/spec/07 P6), by name;
+    /// <c>null</c> where no package rules apply.</summary>
+    public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
 
     /// <summary>
     /// Text to use instead of what lies on disk, by absolute file path. A module found at one of

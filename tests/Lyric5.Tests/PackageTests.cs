@@ -148,15 +148,6 @@ public class PackageTests
     }
 
     [Fact]
-    public void A_package_without_src_main_is_a_library()
-    {
-        var dir = Package(("lyric.toml", Manifest), ("src/util.lyr", Util));
-        var (exit, _, error) = Run("build", "-C", dir);
-        Assert.Equal(2, exit);
-        Assert.Contains("LYR-CLI0005", error);
-    }
-
-    [Fact]
     public void A_refused_manifest_is_exit_1()
     {
         var dir = Package(("lyric.toml", "[package]\nname = \"app\"\n"), ("src/main.lyr", Main_));
