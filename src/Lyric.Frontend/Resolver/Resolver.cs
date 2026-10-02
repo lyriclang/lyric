@@ -42,6 +42,7 @@ public sealed class Resolver
     {
         foreach (var module in _comp.Modules) DeclareModule(module);
         foreach (var module in _comp.Modules) ResolveImports(module);
+        if (_comp.Lyric5Modules) CheckOneNamespace();
         DetectImportCycles();
         foreach (var module in _comp.Modules) BindTypeNames(module);
         ResolveExtensionTargets();
@@ -248,6 +249,14 @@ public sealed class Resolver
     private void DeclareTop(ModuleSymbol module, Symbol sym, Node decl)
     {
         sym.Home = module;
+        // A builtin type's name is no declaration's (design/v5/spec/07 V6 K5): 'struct int' would
+        // make 'int' mean two things, one of them the language's own.
+        if (_comp.Lyric5Modules && _comp.Builtins.LookupLocal(sym.Name) is TypeSymbol)
+        {
+            _de.Report("LYR-RES0011", Severity.Error, decl.Span,
+                $"'{sym.Name}' is a builtin type — no declaration takes its name (07 K5)");
+            return;
+        }
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, decl.Span,
                 $"'{sym.Name}' is already declared in this module{OverloadHint(module.Members, sym)}",
@@ -388,6 +397,25 @@ public sealed class Resolver
             _de.Report("LYR-RES0001", Severity.Error, imp.Span,
                 $"'{sym.Name}' is already declared in this module",
                 PreviousDeclaration(module.Members, sym.Name));
+    }
+
+    /// <summary>
+    /// One namespace per module (design/v5/spec/07 V6 K1, K3): a name a module declares or imports
+    /// is not also the last segment of one of its submodules — 'app.net.http' would otherwise mean
+    /// the module and the member, and which one depended on the route. Asked of the modules the
+    /// program loads.
+    /// </summary>
+    private void CheckOneNamespace()
+    {
+        foreach (var module in _comp.Modules)
+            foreach (var symbol in module.Members.Symbols)
+            {
+                if (_comp.FindModule([.. module.Path, symbol.Name]) is not { } sub) continue;
+                if (symbol.Declaration is not { } declaration) continue;
+                _de.Report("LYR-RES0012", Severity.Error, declaration.Span,
+                    $"'{symbol.Name}' in module '{module.FullName}' is also the module '{sub.FullName}' — "
+                    + "one name has one meaning in a module (07 K1)");
+            }
     }
 
     private void DetectImportCycles()
@@ -580,8 +608,8 @@ public sealed class Resolver
         // which the sema reads off the head; the node is bound to the head.
         if (path.Length == 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
             return head;
-        if (head is null) return BuiltinType(path[0]);
-        if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0]);
+        if (head is null) return BuiltinType(path[0], file);
+        if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0], file);
 
         // Multi-segment paths navigate through imported modules only.
         for (var i = 1; i < path.Length; i++)
@@ -627,8 +655,13 @@ public sealed class Resolver
     /// confident tone. So the one diagnostic that explained the situation was withheld exactly
     /// when the situation bit. Fixing the resolution is what lets it be heard.</para>
     /// </summary>
-    private Symbol? BuiltinType(string name) =>
-        _comp.Builtins.LookupLocal(name) as TypeSymbol ?? CoreType(name);
+    private Symbol? BuiltinType(string name, FileId file) =>
+        _comp.Builtins.LookupLocal(name) as TypeSymbol ?? ImplicitType(name, file);
+
+    /// <summary>A type named without an import (07 V3 I8): the prelude's in a program's own code;
+    /// std.core's in what the compiler wrote, and for the 4.x tools.</summary>
+    private TypeSymbol? ImplicitType(string name, FileId file) =>
+        _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
     /// <summary>A public type of <c>std.core</c>, visible without an import (design/v5/spec/10
     /// U-series; 03 T10 for <c>Any</c>): the last answer for a bare type name, after the scope

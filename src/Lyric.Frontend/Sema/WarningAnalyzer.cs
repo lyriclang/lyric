@@ -75,6 +75,7 @@ internal sealed class WarningAnalyzer
         WarnUnusedImports();
         WarnBuiltinShadowingImports();
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
+        if (_comp.Lyric5Modules) WarnPreludeShadowing();
 
         CollectDeprecated();
         WarnDeprecatedUses();
@@ -116,6 +117,42 @@ internal sealed class WarningAnalyzer
                     _de.Report("LYR-SEM0152", Severity.Warning, nameSpan,
                         $"'{memberName}' is {Word(visibility)}, but its type '{name}' is {Word(type.Visibility)} — "
                         + "the member is exported only once the type is (07 V2 S3)");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// A name a program declares or imports that hides one of the prelude's (design/v5/spec/07 V3
+    /// I8, V6 K6): legal — the program's own wins in its module —, and said, because a reader of
+    /// 'assert(x)' takes it for the one every module has. The standard library, which declares
+    /// them, is not warned.
+    /// </summary>
+    private void WarnPreludeShadowing()
+    {
+        if (_comp.Prelude is not { } prelude) return;
+        var names = new HashSet<string>(prelude.Members.Symbols.Select(s => s.Name), StringComparer.Ordinal) { "panic", "same" };
+        foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsNative(module) || module.Path is ["std", ..]) continue;
+            foreach (var decl in _comp.AstOf(module).Declarations)
+            {
+                switch (decl)
+                {
+                    case INamedDecl named when decl is not ImportDecl && names.Contains(named.Name):
+                        _de.Report("LYR-SEM0153", Severity.Warning, named.NameSpan,
+                            $"'{named.Name}' hides the prelude's '{named.Name}' in this module (07 I8)");
+                        break;
+                    case ImportDecl { Clause: ImportSelective selective }:
+                        for (var i = 0; i < selective.Names.Length; i++)
+                            if (names.Contains(selective.BoundName(i)))
+                                _de.Report("LYR-SEM0153", Severity.Warning, selective.NameSpans[i],
+                                    $"'{selective.BoundName(i)}' hides the prelude's '{selective.BoundName(i)}' in this module (07 I8)");
+                        break;
+                    case ImportDecl { Clause: ImportAlias alias } when names.Contains(alias.Alias):
+                        _de.Report("LYR-SEM0153", Severity.Warning, alias.Span,
+                            $"'{alias.Alias}' hides the prelude's '{alias.Alias}' in this module (07 I8)");
+                        break;
                 }
             }
         }
