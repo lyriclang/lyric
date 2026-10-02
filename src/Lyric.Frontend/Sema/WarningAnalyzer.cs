@@ -74,10 +74,59 @@ internal sealed class WarningAnalyzer
         HintNeverReassigned();
         WarnUnusedImports();
         WarnBuiltinShadowingImports();
+        if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
 
         CollectDeprecated();
         WarnDeprecatedUses();
     }
+
+    /// <summary>
+    /// A member whose word says more than its type's (design/v5/spec/07 V2 S3): <c>pub x</c> in an
+    /// <c>internal struct</c>. Allowed — it is exported the day the type is — and said once, at
+    /// the member, since a reader of the line takes the word at its value.
+    /// </summary>
+    private void WarnMembersMoreVisibleThanTheirType()
+    {
+        foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsNative(module)) continue;
+            foreach (var decl in _comp.AstOf(module).Declarations)
+            {
+                (string? name, Decl[]? members) = decl switch
+                {
+                    StructDecl s => (s.Name, s.Members),
+                    ClassDecl c => (c.Name, c.Members),
+                    EnumDecl e => (e.Name, e.Methods.Cast<Decl>().ToArray()),
+                    _ => (null, null),
+                };
+                if (name is null || members is null || module.Members.LookupLocal(name) is not TypeSymbol type) continue;
+                foreach (var member in members)
+                {
+                    (string? memberName, Span nameSpan, Visibility visibility) = member switch
+                    {
+                        FieldDecl { Visibility: not VisibilityWord.None } f
+                            when type.Members.LookupLocal(f.Name) is FieldSymbol fs => (f.Name, f.NameSpan, fs.Visibility),
+                        FunctionDecl { Visibility: not VisibilityWord.None } f
+                            when type.Members.FunctionFor(f.Name, f) is { } fn => (f.Name, f.NameSpan, fn.Visibility),
+                        StaticBindingDecl { Visibility: not VisibilityWord.None } sb
+                            when type.Members.LookupLocal(sb.Name) is GlobalSymbol gs => (sb.Name, sb.NameSpan, gs.Visibility),
+                        _ => (null, default, Visibility.Private),
+                    };
+                    if (memberName is null || visibility <= type.Visibility) continue;
+                    _de.Report("LYR-SEM0152", Severity.Warning, nameSpan,
+                        $"'{memberName}' is {Word(visibility)}, but its type '{name}' is {Word(type.Visibility)} — "
+                        + "the member is exported only once the type is (07 V2 S3)");
+                }
+            }
+        }
+    }
+
+    private static string Word(Visibility v) => v switch
+    {
+        Visibility.Public => "pub",
+        Visibility.Internal => "internal",
+        _ => "private",
+    };
 
     /// <summary>
     /// An import that binds a name a BUILTIN TYPE carries: <c>import std.string;</c> binds
