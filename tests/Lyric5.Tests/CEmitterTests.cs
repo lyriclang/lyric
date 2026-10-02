@@ -225,6 +225,9 @@ public class CEmitterTests
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
             data.Add("same_names", profile, 0, "free\n1\nmethod\n2\nfree\n3\n");
+            data.Add("channels", profile, 0,
+                "pong 10\npong 20\npong 30\nclosed true\ngot a\nc went in\ngot b c\nempty true\nsend on closed\n"
+                + "waiter cancelled true\n");
             data.Add("timeout", profile, 0,
                 "slow 10 ends\nfast 10\nslow 30000 ends\ntimed out\nbody failed: oops\nquiet 7\n"
                 + "slow 20000 ends\ncaller cancelled\n");
