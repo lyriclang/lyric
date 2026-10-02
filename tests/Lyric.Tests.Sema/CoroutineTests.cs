@@ -8,10 +8,10 @@ using Xunit;
 namespace Lyric.Tests.Sema;
 
 /// <summary>
-/// Coroutine sema: Coroutine&lt;T&gt; as a type form, yield only in coroutines with a value type check
-/// (SEM0038), only a bare return (SEM0039), resume as a prefix expression with the yield type as its
-/// result (SEM0040), and return coverage suspended for coroutines. The full pipeline through
-/// Semantics.Analyze.
+/// Coroutine sema (design/v5/spec/06 N2, 08 D11): <c>Coroutine&lt;Y, R = void&gt;</c> as a type form,
+/// yield only in coroutines with a value type check (SEM0038), the body's 'return' as the
+/// coroutine's result — a bare one where the result is void (SEM0039) —, the pulls 'next()',
+/// 'result()' and 'isDone()'. The full pipeline through Semantics.Analyze.
 /// </summary>
 public class CoroutineTests
 {
@@ -29,6 +29,14 @@ public class CoroutineTests
         fn ticker(): Coroutine<void> {
             yield;
             yield;
+        }
+        fn summed(xs: int[]): Coroutine<int, int> {
+            var sum = 0;
+            for (x in xs) {
+                yield x;
+                sum += x;
+            }
+            return sum;
         }
         """;
 
@@ -81,7 +89,7 @@ public class CoroutineTests
     private static void AssertType(LyrType expected, LyrType actual) =>
         Assert.True(LyrType.Equal(expected, actual), $"expected '{TypeFacts.Display(expected)}', got '{TypeFacts.Display(actual)}'");
 
-    // --- Grundmuster ---
+    // --- the basic shape ---
 
     [Fact]
     public void Fibonacci_pattern_checks_clean()
@@ -98,35 +106,13 @@ public class CoroutineTests
     }
 
     [Fact]
-    public void Resume_yields_the_element_type()
-    {
-        var (t, de) = LastInit("fn u() { let co = fibonacci(); let v = resume co; }");
-        AssertClean(de);
-        AssertType(LyrType.Int, t);
-    }
-
-    [Fact]
-    public void Resume_composes_as_expression()
-    {
-        var (t, de) = LastInit("fn u() { let co = fibonacci(); let v = resume co + 1; }");
-        AssertClean(de);
-        AssertType(LyrType.Int, t); // (resume co) + 1
-    }
-
-    [Fact]
-    public void Resume_as_statement_is_allowed()
-    {
-        AssertClean(Diags("fn u() { let t = ticker(); resume t; }"));
-    }
-
-    [Fact]
-    public void Driving_loop_checks_clean()
+    public void A_driving_loop_checks_clean()
     {
         AssertClean(Diags("""
             fn u() {
                 let co = fibonacci();
                 for (i in 0..10) {
-                    let v = resume co;
+                    let v = co.next()!;
                 }
             }
             """));
@@ -137,9 +123,8 @@ public class CoroutineTests
     [Fact]
     public void Yield_outside_a_coroutine_body_is_legal_since_4_0()
     {
-        // §10a: which chain a yield suspends is a runtime fact, so the checker admits it in
-        // every function; a yield with no running resume is the VM's panic, not a diagnostic.
-        // The pin this replaces held the 3.x static rule.
+        // §10a: which coroutine a yield suspends is a runtime fact, so the checker admits it in
+        // every function; a yield with no running coroutine is a panic, not a diagnostic.
         Assert.DoesNotContain(Diags("fn u(): int { yield 1; return 0; }").Diagnostics,
             d => d.Code == "LYR-SEM0038");
     }
@@ -147,7 +132,7 @@ public class CoroutineTests
     [Fact]
     public void Yield_in_a_lambda_is_the_dynamic_kind()
     {
-        // Inside a coroutine body a lambda's yields are still the DYNAMIC kind — whose chain
+        // Inside a coroutine body a lambda's yields are still the DYNAMIC kind — whose coroutine
         // they meet is decided by who calls the lambda — so nothing is checked against the
         // enclosing coroutine's element type.
         Assert.DoesNotContain(
@@ -169,7 +154,7 @@ public class CoroutineTests
         Assert.Contains(Diags("fn co(): Coroutine<int> { yield; }").Diagnostics, d => d.Code == "LYR-SEM0038");
     }
 
-    // --- return rules (SEM0039) ---
+    // --- return: the coroutine's result (06 A1) ---
 
     [Fact]
     public void Bare_return_ends_a_coroutine_early()
@@ -187,27 +172,49 @@ public class CoroutineTests
     }
 
     [Fact]
-    public void Return_with_value_in_coroutine_is_reported()
+    public void A_value_returned_where_the_result_is_void_is_reported()
     {
         Assert.Contains(Diags("fn co(): Coroutine<int> { yield 1; return 5; }").Diagnostics,
             d => d.Code == "LYR-SEM0039");
     }
 
-    // --- resume rules (SEM0040) ---
-
     [Fact]
-    public void Resume_on_non_coroutine_is_reported()
+    public void A_coroutine_with_a_result_returns_it()
     {
-        Assert.Contains(Diags("fn u(n: int) { let v = resume n; }").Diagnostics, d => d.Code == "LYR-SEM0040");
+        AssertClean(Diags("fn u() { let s = summed([1, 2]); }"));
+        Assert.Contains(Diags("""fn co(): Coroutine<int, int> { yield 1; return "no"; }""").Diagnostics,
+            d => d.Code == "LYR-SEM0001");
     }
 
-    // --- the type form Coroutine<T> ---
+    [Fact]
+    public void A_coroutine_with_a_result_returns_it_on_every_path()
+    {
+        Assert.Contains(Diags("fn co(c: bool): Coroutine<int, int> { yield 1; if (c) { return 2; } }").Diagnostics,
+            d => d.Code == "LYR-SEM0017");
+        Assert.Contains(Diags("fn co(): Coroutine<int, int> { yield 1; return; }").Diagnostics,
+            d => d.Code == "LYR-SEM0001");
+        // A body that never ends needs no return.
+        AssertClean(Diags("fn co(): Coroutine<int, int> { while (true) { yield 1; } }"));
+    }
+
+    // --- the type form Coroutine<Y, R> ---
 
     [Fact]
-    public void Coroutine_needs_exactly_one_type_argument()
+    public void Coroutine_takes_one_or_two_type_arguments()
     {
         Assert.Contains(Diags("fn u(c: Coroutine) { }").Diagnostics, d => d.Code == "LYR-SEM0026");
-        Assert.Contains(Diags("fn u(c: Coroutine<int, int>) { }").Diagnostics, d => d.Code == "LYR-SEM0026");
+        Assert.Contains(Diags("fn u(c: Coroutine<int, int, int>) { }").Diagnostics, d => d.Code == "LYR-SEM0026");
+        AssertClean(Diags("fn u(c: Coroutine<int, string>) { }"));
+    }
+
+    [Fact]
+    public void A_result_type_is_part_of_the_type()
+    {
+        Assert.Contains(Diags("fn u() { let c: Coroutine<int> = summed([1]); }").Diagnostics,
+            d => d.Code == "LYR-SEM0001");
+        var (t, de) = LastInit("fn u() { let c = summed([1]); }");
+        AssertClean(de);
+        Assert.Equal("Coroutine<int, int>", TypeFacts.Display(t));
     }
 
     [Fact]
@@ -221,7 +228,7 @@ public class CoroutineTests
         AssertType(new CoroutineOf(LyrType.Int), t); // T = Coroutine<int>
     }
 
-    // --- next(): the safe pull (v2.2) ---
+    // --- the pulls: next(), result(), isDone() ---
 
     [Fact]
     public void Next_yields_the_optional_of_the_element_type()
@@ -240,19 +247,46 @@ public class CoroutineTests
     }
 
     [Fact]
-    public void Next_on_an_optional_yield_is_refused()
+    public void Next_on_an_optional_yield_answers_a_double_optional()
     {
-        // '?T' from next and a yielded null would be indistinguishable; SEM0080 names the way out.
-        Assert.Contains(Diags("""
+        // A yielded null and the end are two states (03 T4 O1): '??int'.
+        var (t, de) = LastInit("""
             fn maybe(): Coroutine<?int> { yield null; yield 1; }
             fn u() { let co = maybe(); let v = co.next(); }
-            """).Diagnostics, d => d.Code == "LYR-SEM0080");
+            """);
+        AssertClean(de);
+        AssertType(new Optional(new Optional(LyrType.Int)), t);
     }
 
     [Fact]
-    public void A_member_other_than_next_stays_unknown()
+    public void Result_answers_the_optional_of_the_result_type()
     {
-        Assert.Contains(Diags("fn u() { let co = fibonacci(); let v = co.isDone(); }").Diagnostics,
+        var (t, de) = LastInit("fn u() { let s = summed([1, 2]); let r = s.result(); }");
+        AssertClean(de);
+        AssertType(new Optional(LyrType.Int), t);
+        Assert.Contains(Diags("fn u() { let co = fibonacci(); let r = co.result(); }").Diagnostics,
             d => d.Code == "LYR-SEM0012");
+    }
+
+    [Fact]
+    public void IsDone_answers_bool()
+    {
+        var (t, de) = LastInit("fn u() { let co = fibonacci(); let done = co.isDone(); }");
+        AssertClean(de);
+        AssertType(LyrType.Bool, t);
+    }
+
+    [Fact]
+    public void Another_member_stays_unknown()
+    {
+        Assert.Contains(Diags("fn u() { let co = fibonacci(); let v = co.size(); }").Diagnostics,
+            d => d.Code == "LYR-SEM0012");
+    }
+
+    [Fact]
+    public void Resume_is_a_name_since_Lyric_5()
+    {
+        // Lyric 4's 'resume co' is 'co.next()!' (12 S04); the word is free.
+        AssertClean(Diags("fn u(): int { let resume = 1; return resume; }"));
     }
 }

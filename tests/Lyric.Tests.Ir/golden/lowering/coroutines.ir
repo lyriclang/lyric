@@ -1,0 +1,181 @@
+fn main.count -> coroutine<i64, string> {
+  params: 1
+  locals:
+    l0 n: i64
+  bb0:
+    t0: i64 = load l0
+    t1: coroutine<i64, string> = mkcoro f3, t0
+    ret t1
+}
+
+fn main.ticks -> coroutine<void, void> {
+  params: 0
+  locals:
+  bb0:
+    t0: coroutine<void, void> = mkcoro f4
+    ret t0
+}
+
+fn main.main -> i64 {
+  params: 0
+  locals:
+    l0 c: coroutine<i64, string>
+    l1 sum: i64
+    l2 v: ?i64
+    l3 ticked: bool
+    l4 seven: i64
+    l5 $coalesce0: i64
+    l6 ended: string
+    l7 $coalesce1: string
+    l8 $if2: i64
+    l9 $and3: bool
+    l10 $and4: bool
+  bb0:
+    t0: i64 = const 2
+    t1: coroutine<i64, string> = call main.count(t0)
+    store l0, t1
+    t2: i64 = const 0
+    store l1, t2
+    t3: coroutine<i64, string> = load l0
+    t4: ?i64 = next t3
+    store l2, t4
+    br bb1
+  bb1:
+    t5: ?i64 = load l2
+    t6: bool = optissome t5
+    condbr t6 -> bb2, bb3
+  bb2:
+    t7: i64 = load l1
+    t8: ?i64 = load l2
+    t9: i64 = optget t8
+    t10: i64 = add t7, t9
+    store l1, t10
+    t11: coroutine<i64, string> = load l0
+    t12: ?i64 = next t11
+    store l2, t12
+    br bb1
+  bb3:
+    t13: coroutine<void, void> = call main.ticks()
+    t14: bool = next t13
+    store l3, t14
+    t15: i64 = const 7
+    t16: coroutine<i64, void> = call main.repeat<int>(t15)
+    t17: ?i64 = next t16
+    t18: bool = optissome t17
+    condbr t18 -> bb4, bb5
+  bb4:
+    t19: i64 = optget t17
+    store l5, t19
+    br bb6
+  bb5:
+    t20: i64 = const 0
+    store l5, t20
+    br bb6
+  bb6:
+    t21: i64 = load l5
+    store l4, t21
+    t22: coroutine<i64, string> = load l0
+    t23: ?string = coresult t22
+    t24: bool = optissome t23
+    condbr t24 -> bb7, bb8
+  bb7:
+    t25: string = optget t23
+    store l7, t25
+    br bb9
+  bb8:
+    t26: string = const ""
+    store l7, t26
+    br bb9
+  bb9:
+    t27: string = load l7
+    store l6, t27
+    t28: coroutine<i64, string> = load l0
+    t29: bool = codone t28
+    store l10, t29
+    condbr t29 -> bb10, bb11
+  bb10:
+    t30: bool = load l3
+    store l10, t30
+    br bb11
+  bb11:
+    t31: bool = load l10
+    store l9, t31
+    condbr t31 -> bb12, bb13
+  bb12:
+    t32: string = load l6
+    t33: string = const "done"
+    t34: bool = eq t32, t33
+    store l9, t34
+    br bb13
+  bb13:
+    t35: bool = load l9
+    condbr t35 -> bb14, bb15
+  bb14:
+    t36: i64 = load l1
+    t37: i64 = load l4
+    t38: i64 = add t36, t37
+    store l8, t38
+    br bb16
+  bb15:
+    t39: i64 = const 0
+    store l8, t39
+    br bb16
+  bb16:
+    t40: i64 = load l8
+    ret t40
+}
+
+fn main.count.<body> -> string {
+  params: 1
+  locals:
+    l0 n: i64
+    l1 i: i64
+  bb0:
+    t0: i64 = const 0
+    store l1, t0
+    br bb1
+  bb1:
+    t1: i64 = load l1
+    t2: i64 = load l0
+    t3: bool = lt t1, t2
+    condbr t3 -> bb2, bb3
+  bb2:
+    t4: i64 = load l1
+    yield i64 t4
+    t5: i64 = load l1
+    t6: i64 = const 1
+    t7: i64 = add t5, t6
+    store l1, t7
+    br bb1
+  bb3:
+    t8: string = const "done"
+    ret t8
+}
+
+fn main.ticks.<body> -> void {
+  params: 0
+  locals:
+  bb0:
+    yield void
+    ret
+}
+
+fn main.repeat<int> -> coroutine<i64, void> {
+  params: 1
+  locals:
+    l0 x: i64
+  bb0:
+    t0: i64 = load l0
+    t1: coroutine<i64, void> = mkcoro f6, t0
+    ret t1
+}
+
+fn main.repeat<int>.<body> -> void {
+  params: 1
+  locals:
+    l0 x: i64
+  bb0:
+    t0: i64 = load l0
+    yield i64 t0
+    ret
+}

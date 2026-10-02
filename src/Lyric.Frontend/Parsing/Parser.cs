@@ -264,19 +264,13 @@ public sealed partial class Parser
             var operand = ParsePrefix();
             return new UnaryExpr(Operators.MapPrefix(op), operand, Span.Union(opTok.Span, operand.Span));
         }
-        if (op is TokenKind.Resume) // 'resume co': prefix like await, binds the postfix chain
-        {
-            var kw = _buffer.Advance();
-            var co = ParsePrefix();
-            return new ResumeExpr(co, Span.Union(kw.Span, co.Span));
-        }
         if (op is TokenKind.Throw) // 'x ?? throw e': a prefix, so 'throw e ?? f' is not 'throw (e ?? f)'
         {
             var kw = _buffer.Advance();
             var value = ParsePrefix();
             return new ThrowExpr(value, Span.Union(kw.Span, value.Span));
         }
-        // 'comptime e': contextual, like 'resume' in shape. It opens the prefix only when what
+        // 'comptime e': contextual, a prefix in shape. It opens the prefix only when what
         // follows can begin an expression, so an identifier 'comptime' before an operator, a
         // comma or a closing bracket is still the name.
         if (AtContextual("comptime") && BeginsExpression(_buffer.Peek(1).TokenKind))

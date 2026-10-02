@@ -321,10 +321,10 @@ public sealed class SemaRules
     private void CheckExprStmt(ExprStmt es)
     {
         // 'try f();' is the call it marks (05 E4).
-        var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ResumeExpr or ThrowExpr or LoopExpr
+        var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ThrowExpr or LoopExpr
             or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } or ErrorExpr;
         if (!ok)
-            _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls, assignments and resume are allowed)");
+            _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls and assignments are allowed)");
     }
 
     private void WalkExpr(Expr expr)
@@ -575,7 +575,6 @@ public sealed class SemaRules
     {
         UnaryExpr u => [u.Operand],
         PostfixExpr p => [p.Operand],
-        ResumeExpr re => [re.Coroutine],
         ComptimeExpr ct => [ct.Inner],
         ThrowExpr te => [te.Value],
         TryExpr tr => [tr.Value],

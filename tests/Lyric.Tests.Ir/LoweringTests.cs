@@ -94,6 +94,7 @@ public class LoweringTests
     [InlineData("enums")]           // variants, match, tag dispatch, pattern decomposition
     [InlineData("interfaces")]      // mkiface, callvirt, vtable rows, default against override
     [InlineData("structs")]         // structcopy at the binding points, a nested value type
+    [InlineData("coroutines")]      // factory and body, next with its error branch, a generic instance
     public void Golden_lowering_matches_snapshot(string name)
     {
         var dir = GoldenDir();

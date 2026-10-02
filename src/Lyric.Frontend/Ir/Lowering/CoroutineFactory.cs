@@ -1,16 +1,15 @@
-using Lyric.AST;
 using Lyric.Core;
 
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// Builds the FACTORY of a coroutine: the function that stands under the written name and yields
-/// the suspended chain.
+/// Builds the FACTORY of a coroutine: the function that stands under the written name and returns
+/// the coroutine, not started.
 ///
-/// <para>Since format 4.0 it is one instruction of substance: <c>mkcoro</c> captures the
-/// arguments — <c>this</c> first when the coroutine is a method — and builds the chain object,
-/// not-yet-started; the first pull hands them to the body's frame as its parameters. The
-/// state-machine era allocated a field object and closed a state machine over it here.</para>
+/// <para>One instruction of substance: <c>mkcoro</c> takes the arguments — <c>this</c> first when
+/// the coroutine is a method — and builds the coroutine over them; the first pull hands them to
+/// the body as its parameters (06 A1). The factory's parameters are the body's, read off its
+/// lowerer before the body runs, so the two cannot disagree — a generic instance's included.</para>
 ///
 /// <para>A file of its own rather than a mode in the FunctionLowerer, because the factory lowers no
 /// written code. It has no body, no expressions and no control flow; housing it in the big lowerer
@@ -18,9 +17,8 @@ namespace Lyric.Ir.Lowering;
 /// </summary>
 internal static class CoroutineFactory
 {
-    public static IrFunction Build(FunctionDecl decl, string name, IrType yieldType,
-        FunctionId body, IrType[] parameterTypes, bool hasReceiver, IrType? receiverType,
-        Span span)
+    public static IrFunction Build(string name, IrCoroutineType type, FunctionId body,
+        IReadOnlyList<IrLocal> parameters, Span span)
     {
         var slots = new SlotAllocator();
         var blocks = new List<IrBlock>();
@@ -28,36 +26,33 @@ internal static class CoroutineFactory
 
         // The factory's parameters are the coroutine's, in the same order, so a caller does nothing
         // different from any other function.
-        if (hasReceiver && receiverType is not null) slots.Declare("this", receiverType);
-        for (var i = 0; i < decl.Parameters.Length; i++)
-            slots.Declare(decl.Parameters[i].Name, parameterTypes[i]);
+        foreach (var parameter in parameters) slots.Declare(parameter.Name, parameter.Type);
 
-        var args = new List<TempId>();
-        var slot = 0;
-        if (hasReceiver && receiverType is not null)
+        var args = new TempId[parameters.Count];
+        for (var i = 0; i < parameters.Count; i++)
         {
-            var value = slots.NewTemp(receiverType);
-            builder.Emit(new LoadLocal(value, new LocalId(slot++), receiverType, span));
-            args.Add(value);
-        }
-        for (var i = 0; i < decl.Parameters.Length; i++, slot++)
-        {
-            var value = slots.NewTemp(parameterTypes[i]);
-            builder.Emit(new LoadLocal(value, new LocalId(slot), parameterTypes[i], span));
-            args.Add(value);
+            args[i] = slots.NewTemp(parameters[i].Type);
+            builder.Emit(new LoadLocal(args[i], new LocalId(i), parameters[i].Type, span));
         }
 
-        // The chain value keeps the coroutine signature the closure era gave it, so nothing about
-        // assignability, fields or the format's type tags moves with the mechanism.
-        var signature = TypeTable.CoroutineSignature(yieldType);
-        var chain = slots.NewTemp(signature);
-        builder.Emit(new MakeCoroutine(chain, body, args.ToArray(), signature, span));
-        builder.Seal(new Return(chain, span));
+        var coroutine = slots.NewTemp(type);
+        builder.Emit(new MakeCoroutine(coroutine, body, args, type, span));
+        builder.Seal(new Return(coroutine, span));
 
-        return new IrFunction(name, signature,
-            decl.Parameters.Length + (hasReceiver ? 1 : 0), slots.Locals, slots.Temps, blocks)
+        return new IrFunction(name, type, parameters.Count, slots.Locals, slots.Temps, blocks)
         {
             Entry = new BlockId(0),
         };
+    }
+
+    /// <summary>A coroutine function lowered where it is asked for — a generic instance, an
+    /// extension: the factory under the id the request gave it, the body behind it under a fresh
+    /// one. The written functions of a module go through the <see cref="CoroutineTable"/> instead,
+    /// which settles the body's id while pass 2 still adds functions in order.</summary>
+    public static (FunctionId Id, IrFunction Function)[] Split(FunctionLowerer body, string name, FunctionId id,
+        FunctionIds ids, Span span)
+    {
+        var bodyId = ids.Next();
+        return [(id, Build(name, body.CoroutineType!, bodyId, body.Parameters, span)), (bodyId, body.Run())];
     }
 }

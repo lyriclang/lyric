@@ -253,6 +253,15 @@ internal sealed class InstanceTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
+            // A generic coroutine is two functions per instance, as a written one is (06 N2): the
+            // factory under the instance's name, the body behind it in the instance's terms.
+            if (ModuleLowerer.CoroutineReturn(p.Decl) is not null)
+            {
+                lowered.AddRange(CoroutineFactory.Split(FunctionLowerer.ForCoroutineBody(p.Decl, $"{p.Name}.<body>",
+                    p.Receiver, types, functions, imports, typeTable, p.Substitution, globals, lambdas, this,
+                    p.Owner, receiverType: p.ReceiverType), p.Name, p.Id, _ids, p.Decl.Span));
+                continue;
+            }
             lowered.Add((p.Id, new FunctionLowerer(p.Decl, p.Name, types, functions, imports, typeTable,
                 p.Substitution, globals, lambdas, this, p.Receiver, p.Owner, receiverType: p.ReceiverType).Run()));
         }

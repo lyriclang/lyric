@@ -29,14 +29,14 @@ fn main(): int {
     // 0 + 1 + 2 + 3 + 4 = 10. Without preserved state it would be 0 five times.
     var i = 0;
     while (i < 5) {
-        sum = sum + resume c;
+        sum = sum + c.next()!;
         i += 1;
     }
     console.println(f"counter: {sum}");
 
     let t = three();
-    let a = resume t;
-    let b = resume t;
+    let a = t.next()!;
+    let b = t.next()!;
     console.println(f"three: {a}, {b}");
 
     // 10 + 10 + 20 = 40

@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 typedef struct LyrCoro LyrCoro;
+struct LyrErr;
 
 typedef enum LyrCoroStatus {
     LYR_CORO_SUSPENDED = 1,  /* not started, or stopped at a yield: a resume runs it */
@@ -39,6 +40,22 @@ void lyr_coro_resume(LyrCoro *co);
 /* Stops the running coroutine and goes back to its resumer; the next resume continues after this
  * call. With no coroutine running — on a thread's own stack — it panics (RT0014). */
 void lyr_coro_yield(void);
+
+/* A yield that hands over a value: its address, valid while the coroutine stays suspended — the
+ * value lives in the suspended frame — and read by the resumer through lyr_coro_transfer. NULL
+ * for a yield without one. */
+void lyr_coro_yield_value(void *value);
+
+/* What the coroutine's latest yield handed over; after its body returned, what the body left
+ * there (lyr_coro_set_transfer) — the result, or NULL. */
+void *lyr_coro_transfer(const LyrCoro *co);
+void lyr_coro_set_transfer(LyrCoro *co, void *value);
+
+/* The error a coroutine's body ended with (05 E10): set by the body's caller on the coroutine's
+ * stack, taken — once — by the resumer, who throws it on. A heap object the coroutine keeps
+ * alive until it is taken. */
+void lyr_coro_set_error(LyrCoro *co, struct LyrErr *error);
+struct LyrErr *lyr_coro_take_error(LyrCoro *co);
 
 LyrCoroStatus lyr_coro_status(const LyrCoro *co);
 void *lyr_coro_arg(const LyrCoro *co);

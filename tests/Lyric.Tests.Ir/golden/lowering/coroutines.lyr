@@ -1,0 +1,33 @@
+// Coroutines (06 N2): the factory makes the coroutine over its arguments, the body yields and
+// returns the result; a pull is 'next'; 'codone' and 'coresult' ask without pulling; a generic
+// coroutine is factory and body per instance. The throwing pull is ErrorPathTests'.
+fn count(n: int): Coroutine<int, string> {
+    var i = 0;
+    while (i < n) {
+        yield i;
+        i = i + 1;
+    }
+    return "done";
+}
+
+fn ticks(): Coroutine<void> {
+    yield;
+}
+
+fn repeat<T>(x: T): Coroutine<T> {
+    yield x;
+}
+
+fn main(): int {
+    let c = count(2);
+    var sum = 0;
+    var v = c.next();
+    while (v != null) {
+        sum = sum + v;
+        v = c.next();
+    }
+    let ticked = ticks().next();
+    let seven = repeat(7).next() ?? 0;
+    let ended = c.result() ?? "";
+    return if (c.isDone() && ticked && ended == "done") sum + seven else 0;
+}

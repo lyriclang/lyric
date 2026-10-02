@@ -64,16 +64,16 @@ public class CoroutineThrowsTests
     }
 
     [Fact]
-    public void A_resume_of_a_throwing_coroutine_demands_handling()
+    public void A_pull_of_a_throwing_coroutine_demands_handling()
     {
         var de = Check(Gen + """
             fn main(): int {
                 let c = gen();
-                return resume c;
+                return c.next()!;
             }
             """);
         var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0138");
-        Assert.Contains("'resume'", error.Message, StringComparison.Ordinal);
+        Assert.Contains("'next()'", error.Message, StringComparison.Ordinal);
         Assert.Contains("Exception", error.Message, StringComparison.Ordinal);
     }
 
@@ -84,7 +84,7 @@ public class CoroutineThrowsTests
             fn main(): int {
                 let c = gen();
                 try {
-                    return resume c;
+                    return c.next()!;
                 } catch (e: Exception) {
                     return 0;
                 }
@@ -102,7 +102,7 @@ public class CoroutineThrowsTests
                 var co: ?Coroutine<int> throws Exception = null;
                 co = gen();
                 let c = co!;
-                return resume c;
+                return c.next()!;
             }
             """);
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");
@@ -122,7 +122,7 @@ public class CoroutineThrowsTests
             fn main(): int {
                 let d = Driver { };
                 d.start();
-                return resume d.co!;
+                return d.co!.next()!;
             }
             """);
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");
@@ -151,7 +151,7 @@ public class CoroutineThrowsTests
             fn main(): int {
                 let c = plain();
                 let v = c.next();
-                return resume c;
+                return c.next()!;
             }
             """);
         Assert.False(de.HasErrors);
@@ -202,7 +202,7 @@ public class CoroutineThrowsTests
             fn main(): int {
                 var co: ?Coroutine<int> throws = null;
                 co = gen();
-                return resume co!;
+                return co!.next()!;
             }
             """);
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0138");

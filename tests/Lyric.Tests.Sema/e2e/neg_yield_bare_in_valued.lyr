@@ -7,5 +7,5 @@ fn counts(): Coroutine<int> {
 
 fn main(): int {
     let co = counts();
-    return resume co;
+    return co.next()!;
 }

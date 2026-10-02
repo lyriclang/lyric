@@ -7,7 +7,7 @@ namespace Lyric.Tests.Parsing;
 /// A keyword written where a NAME belongs. The parser recovers as it always did; what these tests
 /// pin is the sentence a reader needs, which used to be missing entirely.
 ///
-/// <para><c>keep.resume()</c> produced four errors, and every one of them named <c>Resume</c> as
+/// <para><c>keep.yield()</c> produced four errors, and every one of them named <c>Yield</c> as
 /// the token that stood where something else was expected — the way a parser talks about a typo.
 /// A reader checks the spelling first and only then suspects the word itself, which is two round
 /// trips for a fact the compiler knew before it started.</para>
@@ -34,13 +34,13 @@ public class ReservedWordNameTests
 
     [Fact]
     public void A_member_name_that_is_a_keyword_says_so() =>
-        AssertSaysKeyword(Parse("fn f(): int { keep.resume(); return 0; }"), "LYR-PAR0003",
-            "resume");
+        AssertSaysKeyword(Parse("fn f(): int { keep.yield(); return 0; }"), "LYR-PAR0003",
+            "yield");
 
     [Fact]
     public void A_binding_name_that_is_a_keyword_says_so() =>
-        AssertSaysKeyword(Parse("fn f(): int { let resume = 1; return resume; }"), "LYR-PAR0020",
-            "resume");
+        AssertSaysKeyword(Parse("fn f(): int { let yield = 1; return yield; }"), "LYR-PAR0020",
+            "yield");
 
     [Fact]
     public void A_type_path_segment_that_is_a_keyword_says_so() =>

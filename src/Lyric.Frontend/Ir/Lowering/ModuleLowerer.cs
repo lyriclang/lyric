@@ -355,17 +355,14 @@ public static class ModuleLowerer
             try
             {
                 // A coroutine becomes TWO functions: the factory carries the written name and
-                // yields the suspended chain, the body is registered and appended at the end.
-                if (CoroutineYield(decl) is { } yieldNode)
+                // returns the coroutine, the body is registered and appended at the end. '<'
+                // cannot occur in a Lyric identifier, so the body's name collides with nothing.
+                if (CoroutineReturn(decl) is not null)
                 {
-                    var yieldType = typeTable.Lower(yieldNode);
-                    var parameterTypes = decl.Parameters
-                        .Select(p => typeTable.Lower(p.Type)).ToArray();
-                    var receiverType = receiver is null ? null : typeTable.RefTo(receiver);
-
-                    var body = coroutines.Register(decl, name, yieldType, receiver);
-                    functions.Add(CoroutineFactory.Build(decl, name, yieldType, body,
-                        parameterTypes, receiver is not null, receiverType, decl.Span));
+                    var body = FunctionLowerer.ForCoroutineBody(decl, $"{name}.<body>", receiver, types, ids,
+                        imports, typeTable, NoSubstitution, globals, lambdas, instances, receiverTypeNode: extendTarget);
+                    functions.Add(CoroutineFactory.Build(name, body.CoroutineType!, coroutines.Register(body),
+                        body.Parameters, decl.Span));
                     continue;
                 }
 
@@ -417,8 +414,7 @@ public static class ModuleLowerer
             for (var round = 0; round < MaxLoweringRounds; round++)
             {
                 var before = deferred.Count;
-                deferred.AddRange(coroutines.LowerAll(types, ids, imports, typeTable, globals,
-                    lambdas, instances));
+                deferred.AddRange(coroutines.LowerAll());
                 deferred.AddRange(instances.LowerAll(types, ids, imports, typeTable, globals, lambdas));
                 deferred.AddRange(lambdas.LowerAll(types, ids, imports, typeTable, globals, instances));
                 deferred.AddRange(extensions.LowerAll(types, ids, imports, typeTable, globals,
@@ -1120,13 +1116,13 @@ public static class ModuleLowerer
     }
 
     /// <summary>
-    /// Is this a coroutine, and what does it yield? The type stands there syntactically:
-    /// <c>Coroutine&lt;T&gt;</c> is a built-in type rather than a library class.
+    /// Is this a coroutine function, and of which type? It stands there syntactically:
+    /// <c>Coroutine&lt;Y, R&gt;</c> is a built-in type rather than a library class (08 D11).
     /// </summary>
-    internal static TypeNode? CoroutineYield(FunctionDecl decl) =>
-        decl.ReturnType is NamedType { TypeArguments.Length: 1 } named
+    internal static NamedType? CoroutineReturn(FunctionDecl decl) =>
+        decl.ReturnType is NamedType { TypeArguments.Length: 1 or 2 } named
         && named.Path[^1] == "Coroutine"
-            ? named.TypeArguments[0]
+            ? named
             : null;
 
     /// <summary>The visible <c>extend T :: [I]</c> blocks that establish exactly this conformance. Empty
@@ -1294,8 +1290,7 @@ public static class ModuleLowerer
         for (var round = 0; round < MaxLoweringRounds; round++)
         {
             var before = late.Count;
-            late.AddRange(coroutines.LowerAll(types, ids, imports, typeTable, globals, lambdas,
-                instances));
+            late.AddRange(coroutines.LowerAll());
             late.AddRange(instances.LowerAll(types, ids, imports, typeTable, globals, lambdas));
             late.AddRange(extensions.LowerAll(types, ids, imports, typeTable, globals, lambdas,
                 instances));

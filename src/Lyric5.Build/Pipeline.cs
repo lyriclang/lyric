@@ -50,13 +50,14 @@ public static class Pipeline
         var project = request.Project;
         Directory.CreateDirectory(project.CacheDir);
 
-        // The C, keyed by the source, the toolchain and the emitter: the same program emits the
-        // same C, so the front end runs only for a program that changed. The module's unit is
-        // named by that key; a generic instance's unit by its own content (01 C3), under 'units/',
-        // where nothing else changes — so its object survives every edit that leaves the
-        // instance alone. The list of units is written last: its presence says the C is complete.
+        // The C, keyed by the source, the toolchain and the compiler that emits it: the same
+        // program emits the same C, so the front end runs only for a program that changed. The
+        // module's unit is named by that key; a generic instance's unit by its own content (01 C3),
+        // under 'units/', where nothing else changes — so its object survives every edit that
+        // leaves the instance alone. The list of units is written last: its presence says the C is
+        // complete.
         var source = File.ReadAllText(project.Source);
-        var key = Key(source, request.ToolchainVersion, CEmitter.Version);
+        var key = Key(source, request.ToolchainVersion, CEmitter.Version, CompilerIdentity);
         var manifest = Path.Combine(project.CacheDir, $"{project.Name}-{key}.units");
         if (!File.Exists(manifest))
         {
@@ -92,6 +93,14 @@ public static class Pipeline
             return (2, null);
         }
     }
+
+    /// <summary>The compiler, by the identity of its assemblies — the front end's and the
+    /// emitter's. A deterministic build gives the same bytes the same id, so a compiler that
+    /// changed keys new C even where no version string moved — a change to the lowering alone
+    /// once reused the old C — and an unchanged one finds what it emitted before.</summary>
+    private static readonly string CompilerIdentity = string.Join(",",
+        typeof(SourceCompiler).Assembly.ManifestModule.ModuleVersionId,
+        typeof(CEmitter).Assembly.ManifestModule.ModuleVersionId);
 
     /// <summary>A content-named file is written once: a second writer of the same path writes
     /// the same bytes, and the first to move wins.</summary>

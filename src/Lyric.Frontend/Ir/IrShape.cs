@@ -72,6 +72,8 @@ public static class IrShape
         // The body index stands in the instruction, like a closure's target.
         MakeCoroutine m => m.Args,
         ResumePull r => new[] { r.Coroutine },
+        CoroutineDone d => new[] { d.Coroutine },
+        CoroutineResult r => new[] { r.Coroutine },
         YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
 
         CurrentError or ClearError or StashError or RestoreError or SuppressError => Array.Empty<TempId>(),
@@ -139,6 +141,8 @@ public static class IrShape
 
         MakeCoroutine m => m.Dest,
         ResumePull r => r.Dest,
+        CoroutineDone d => d.Dest,
+        CoroutineResult r => r.Dest,
         YieldSuspend => null,
 
         CurrentError e => e.Dest,
@@ -227,7 +231,9 @@ public static class IrShape
             CallVirt c => c with { Dest = Opt(c.Dest), Args = All(c.Args) },
 
             MakeCoroutine m => m with { Dest = temp(m.Dest), Args = All(m.Args) },
-            ResumePull r => r with { Dest = Opt(r.Dest), Coroutine = temp(r.Coroutine) },
+            ResumePull r => r with { Dest = temp(r.Dest), Coroutine = temp(r.Coroutine) },
+            CoroutineDone d => d with { Dest = temp(d.Dest), Coroutine = temp(d.Coroutine) },
+            CoroutineResult r => r with { Dest = temp(r.Dest), Coroutine = temp(r.Coroutine) },
             YieldSuspend y => y with { Value = Opt(y.Value) },
 
             CurrentError e => e with { Dest = temp(e.Dest) },

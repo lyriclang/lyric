@@ -55,7 +55,6 @@ public enum TokenKind
     Continue,
     Return,
     Yield,
-    Resume,
     Defer,
 
     // Exceptions

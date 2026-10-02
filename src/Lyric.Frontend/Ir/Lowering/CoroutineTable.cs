@@ -1,24 +1,18 @@
-using Lyric.AST;
-using Lyric.Resolver;
-using Lyric.Sema;
-
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
 /// The body functions of a module's coroutines.
 ///
 /// <para>A written coroutine becomes TWO functions: the FACTORY keeps the regular
-/// <see cref="FunctionId"/>, so a caller writes an unchanged <c>call</c> and gets a state object back;
+/// <see cref="FunctionId"/>, so a caller writes an unchanged <c>call</c> and gets the coroutine back;
 /// the BODY is registered here and appended at the end, exactly like a lifted lambda and for the same
-/// reason — it arises only in pass 2, but its id has to be settled while the factory is
-/// lowered.</para>
+/// reason — it arises only in pass 2, but its id has to be settled while the factory is built.
+/// Registered as its lowerer, built already: the factory is made of what the lowerer knows before
+/// it runs.</para>
 /// </summary>
 internal sealed class CoroutineTable
 {
-    private readonly record struct Pending(
-        FunctionDecl Decl, string Name, FunctionId Id, IrType Yield, TypeSymbol? Receiver);
-
-    private readonly List<Pending> _pending = new();
+    private readonly List<(FunctionId Id, FunctionLowerer Body)> _pending = new();
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
     /// request a lambda, a lambda an instance — and without this mark everything would arise anew on
     /// every pass.</summary>
@@ -31,31 +25,19 @@ internal sealed class CoroutineTable
     public bool IsEmpty => _pending.Count == 0;
     public int Count => _pending.Count;
 
-    /// <summary>Registers a body and returns the id under which the factory later references it.
-    /// </summary>
-    public FunctionId Register(FunctionDecl decl, string name, IrType yield, TypeSymbol? receiver)
+    /// <summary>Registers a body and returns the id under which the factory references it.</summary>
+    public FunctionId Register(FunctionLowerer body)
     {
         var id = _ids.Next();
-
-        // '<' cannot occur in any Lyric identifier, so the name collides with nothing — the same
-        // convention as for '<globals>' and '<lambda0>'.
-        _pending.Add(new Pending(decl, $"{name}.<body>", id, yield, receiver));
+        _pending.Add((id, body));
         return id;
     }
 
-    public List<(FunctionId Id, IrFunction Function)> LowerAll(TypeResult types,
-        IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
-        TypeTable typeTable, GlobalTable globals, LambdaTable lambdas, InstanceTable instances)
+    public List<(FunctionId Id, IrFunction Function)> LowerAll()
     {
-        var lowered = new List<(FunctionId, IrFunction)>(_pending.Count);
-
+        var lowered = new List<(FunctionId, IrFunction)>(_pending.Count - _lowered);
         for (; _lowered < _pending.Count; _lowered++)
-        {
-            var p = _pending[_lowered];
-            lowered.Add((p.Id, FunctionLowerer.ForCoroutineBody(p.Decl, p.Name, p.Yield,
-                p.Receiver, types, functions, imports, typeTable, globals, lambdas, instances).Run()));
-        }
-
+            lowered.Add((_pending[_lowered].Id, _pending[_lowered].Body.Run()));
         return lowered;
     }
 }

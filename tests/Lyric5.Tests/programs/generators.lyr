@@ -1,0 +1,315 @@
+// Generators natively (design/v5/spec/06 N2, A1–A4; M6 S2a): a coroutine runs only when pulled
+// and keeps its locals across yields; 'next()' answers null once the body has returned, and the
+// body's return is 'result()'; one that yields nothing answers whether it stopped at a yield.
+// Arguments, a method's receiver and a generic instance; values that are references, structs,
+// enums and optionals ('??T'); a coroutine that pulls another; an error through the pull.
+// Expected stdout:
+//   counter 5 6 7          locals survive the yields
+//   made                   the call runs nothing ...
+//   started                ... the first pull starts the body
+//   lazy 1 false none      not done while suspended at a yield; no result yet
+//   then 2 true true end   the pull past the end: null, done, the result
+//   again true end         after the end: null again, the result stays
+//   ticks 3 false          'Coroutine<void>' pulls a bool
+//   walk 6 12              a struct per yield
+//   shapes 10              an enum per yield
+//   maybe 1 -1 3 true      a yielded null told apart from the end
+//   names ada,bob,cy,      a method of a class
+//   struct 2 3 4 0         a value's method, its receiver as at the call
+//   enum green again       an enum's method
+//   extend 3 2 1           a method of an 'extend' block
+//   repeat hi hi -         a generic instance, of a reference ...
+//   repeat 7 false         ... and of a scalar, suspended at its last yield
+//   doubled 30 3           a coroutine pulling another, and its result
+//   caught x after 2       the body's error comes out of the pull
+//   after true true none   after the error the coroutine is done, with no result
+//   clean 2 all            the same coroutine run to its end has one
+//   drain fin              a generic result, read in a generic function
+import std.io { println };
+
+fn counter(start: int): Coroutine<int> {
+    var n = start;
+    while (true) {
+        yield n;
+        n = n + 1;
+    }
+}
+
+fn lazy(): Coroutine<int, string> {
+    println("started");
+    yield 1;
+    yield 2;
+    return "end";
+}
+
+fn ticks(n: int): Coroutine<void> {
+    var i = 0;
+    while (i < n) {
+        yield;
+        i = i + 1;
+    }
+}
+
+struct Point { x: int, y: int }
+
+fn walk(): Coroutine<Point> {
+    var p = Point { x = 0, y = 0 };
+    var i = 0;
+    while (i < 3) {
+        p = Point { x = p.x + 1, y = p.y + 2 };
+        yield p;
+        i = i + 1;
+    }
+}
+
+enum Shape { Dot, Line(int), Rect(int, int) }
+
+fn area(s: Shape): int {
+    return match (s) {
+        .Dot => 0,
+        .Line(length) => length,
+        .Rect(w, h) => w * h,
+    };
+}
+
+fn shapes(): Coroutine<Shape> {
+    yield Shape.Dot;
+    yield Shape.Line(4);
+    yield Shape.Rect(2, 3);
+}
+
+fn maybe(): Coroutine<?int> {
+    yield 1;
+    yield null;
+    yield 3;
+}
+
+class Names {
+    items: string[],
+
+    fn each(): Coroutine<string> {
+        var i = 0;
+        while (i < this.items.length()) {
+            yield this.items[i];
+            i = i + 1;
+        }
+    }
+}
+
+// A value's method holds its receiver as it was at the call: a copy, since the caller's place may
+// be gone before the body runs. (What a 'mut fn' coroutine of a value should do is open.)
+struct Span2 {
+    lo: int,
+    hi: int,
+
+    fn each(): Coroutine<int> {
+        var i = this.lo;
+        while (i < this.hi) {
+            yield i;
+            i = i + 1;
+        }
+    }
+}
+
+enum Light { Red, Green;
+    fn cycle(): Coroutine<string> {
+        yield match (this) { .Red => "red", .Green => "green" };
+        yield "again";
+    }
+}
+
+extend int {
+    fn countdown(): Coroutine<int> {
+        var n = this;
+        while (n > 0) {
+            yield n;
+            n = n - 1;
+        }
+    }
+}
+
+fn repeat<T>(x: T, n: int): Coroutine<T> {
+    var i = 0;
+    while (i < n) {
+        yield x;
+        i = i + 1;
+    }
+}
+
+fn doubled(source: Coroutine<int>): Coroutine<int, int> {
+    var count = 0;
+    var v = source.next();
+    while (v != null) {
+        yield v * 2;
+        count = count + 1;
+        v = source.next();
+    }
+    return count;
+}
+
+enum ParseError :: [Error] { Bad(string);
+    fn message(): string { return "bad"; }
+}
+
+fn numbers(text: string[]): Coroutine<int, string> throws ParseError {
+    var i = 0;
+    while (i < text.length()) {
+        if (text[i] == "x") { throw ParseError.Bad(text[i]); }
+        yield i;
+        i = i + 1;
+    }
+    return "all";
+}
+
+fn finish<T>(x: T): Coroutine<int, T> {
+    yield 1;
+    return x;
+}
+
+fn drain<T>(c: Coroutine<int, T>): ?T {
+    while (c.next() != null) { }
+    return c.result();
+}
+
+fn main(): int {
+    let c = counter(5);
+    let c1 = c.next()!;
+    let c2 = c.next()!;
+    let c3 = c.next()!;
+    println(f"counter {c1} {c2} {c3}");
+
+    let l = lazy();
+    println("made");
+    let first = l.next()!;
+    let early = l.result() ?? "none";
+    println(f"lazy {first} {l.isDone()} {early}");
+    let second = l.next()!;
+    let third = l.next();
+    let late = l.result() ?? "none";
+    println(f"then {second} {third == null} {l.isDone()} {late}");
+    let again = l.next();
+    let kept = l.result() ?? "none";
+    println(f"again {again == null} {kept}");
+
+    let t = ticks(3);
+    var n = 0;
+    while (t.next()) { n = n + 1; }
+    println(f"ticks {n} {t.next()}");
+
+    let w = walk();
+    var sx = 0;
+    var sy = 0;
+    var p = w.next();
+    while (p != null) {
+        sx = sx + p.x;
+        sy = sy + p.y;
+        p = w.next();
+    }
+    println(f"walk {sx} {sy}");
+
+    let s = shapes();
+    var areas = 0;
+    var shape = s.next();
+    while (shape != null) {
+        areas = areas + area(shape);
+        shape = s.next();
+    }
+    println(f"shapes {areas}");
+
+    let m = maybe();
+    let m1 = m.next();
+    let m2 = m.next();
+    let m3 = m.next();
+    let m4 = m.next();
+    let v1 = m1! ?? -1;
+    let v2 = m2! ?? -1;
+    let v3 = m3! ?? -1;
+    println(f"maybe {v1} {v2} {v3} {m4 == null}");
+
+    let names = Names { items = ["ada", "bob", "cy"] };
+    let e = names.each();
+    var joined = "";
+    var name = e.next();
+    while (name != null) {
+        joined = joined + name + ",";
+        name = e.next();
+    }
+    println(f"names {joined}");
+
+    var span = Span2 { lo = 2, hi = 5 };
+    let each = span.each();
+    span = Span2 { lo = 0, hi = 0 };
+    var spanned = "";
+    var at = each.next();
+    while (at != null) {
+        spanned = spanned + f"{at} ";
+        at = each.next();
+    }
+    println(f"struct {spanned}{span.hi}");
+    let light = Light.Green.cycle();
+    let l1 = light.next() ?? "-";
+    let l2 = light.next() ?? "-";
+    println(f"enum {l1} {l2}");
+    let down = 3.countdown();
+    var counted = "";
+    var dn = down.next();
+    while (dn != null) {
+        counted = counted + f" {dn}";
+        dn = down.next();
+    }
+    println(f"extend{counted}");
+
+    let r = repeat("hi", 2);
+    let r1 = r.next() ?? "-";
+    let r2 = r.next() ?? "-";
+    let r3 = r.next() ?? "-";
+    println(f"repeat {r1} {r2} {r3}");
+    let ri = repeat(7, 1);
+    let ri1 = ri.next() ?? 0;
+    println(f"repeat {ri1} {ri.isDone()}");
+
+    let d = doubled(repeat(5, 3));
+    var total = 0;
+    var dv = d.next();
+    while (dv != null) {
+        total = total + dv;
+        dv = d.next();
+    }
+    let pulled = d.result() ?? -1;
+    println(f"doubled {total} {pulled}");
+
+    let nums = numbers(["a", "b", "x", "c"]);
+    var got = 0;
+    try {
+        var v = nums.next();
+        while (v != null) {
+            got = got + 1;
+            v = nums.next();
+        }
+        println("not reached");
+    } catch (err: ParseError) {
+        match (err) {
+            .Bad(what) => println(f"caught {what} after {got}"),
+        }
+    }
+    try {
+        let after = nums.next();
+        let lost = nums.result() ?? "none";
+        println(f"after {after == null} {nums.isDone()} {lost}");
+    } catch (_: ParseError) {
+        println("not reached either");
+    }
+    let clean = numbers(["a", "b"]);
+    try {
+        var pulls = 0;
+        while (clean.next() != null) { pulls = pulls + 1; }
+        let all = clean.result() ?? "none";
+        println(f"clean {pulls} {all}");
+    } catch (_: ParseError) {
+        println("not reached either");
+    }
+
+    let drained = drain(finish("fin")) ?? "-";
+    println(f"drain {drained}");
+    return 0;
+}

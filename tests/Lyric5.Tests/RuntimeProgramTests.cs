@@ -25,6 +25,7 @@ public class RuntimeProgramTests
             data.Add("threads", profile, 0, "threads ok\n", []);
             data.Add("coro_basic", profile, 0, "coro ok\n", []);
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
+            data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }

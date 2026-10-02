@@ -191,6 +191,9 @@ public static class TypeFacts
         return LyrType.Equal(a, b);
     }
 
+    /// <summary>A coroutine's result type in its display: ', R' where it is not void.</summary>
+    private static string ResultText(CoroutineOf co) => IsVoid(co.Result) ? "" : ", " + Display(co.Result);
+
     /// <summary>A function type's set as written after its return type, in one order whatever the
     /// declaration's (05 E2 K1): the display names an instance, and two orders are one type.</summary>
     private static string ThrownText(LyrType[] thrown) => thrown.Length switch
@@ -240,9 +243,9 @@ public static class TypeFacts
                        + (f.Return is FnType && f.Throws.Length > 0 ? $"({Display(f.Return)})" : Display(f.Return))
                        + ThrownText(f.Throws);
             case RangeOf r: return "range<" + Display(r.Element) + ">";
-            case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ">";
+            case CoroutineOf { Throws: null } co: return "Coroutine<" + Display(co.Yield) + ResultText(co) + ">";
             case CoroutineOf co:
-                return "Coroutine<" + Display(co.Yield) + "> throws "
+                return "Coroutine<" + Display(co.Yield) + ResultText(co) + "> throws "
                        + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : Display(co.Throws!));
             case NullType: return "null";
             case NeverType: return "never";

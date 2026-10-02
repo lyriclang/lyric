@@ -824,6 +824,64 @@ public class VerifierTests
         AssertFinding(module, "main.orphan");
     }
 
+    // ------------------------------------------------------------------ coroutines (06 N2)
+
+    private static readonly IrCoroutineType IntCoroutine = new(I64, VoidT);
+
+    /// <summary>A function over a coroutine of int: t0 is the coroutine, loaded from parameter 0,
+    /// and <paramref name="insts"/> follow.</summary>
+    private static IrModule OnCoroutine(List<IrTemp> temps, params IrOp[] insts) =>
+        Module(Fn("main.f", VoidT, 1, new List<IrLocal> { new(L(0), "co", IntCoroutine) },
+            new List<IrTemp> { new(T(0), IntCoroutine) }.Concat(temps).ToList(),
+            new List<IrBlock>
+            {
+                Block(0, new List<IrOp> { new LoadLocal(T(0), L(0), IntCoroutine, Sp) }.Concat(insts).ToList(),
+                    new Return(null, Sp)),
+            }));
+
+    [Fact]
+    public void A_pull_and_a_done_question_verify() => AssertClean(OnCoroutine(
+        new List<IrTemp> { new(T(1), new IrOptionalType(I64)), new(T(2), Bool) },
+        new ResumePull(T(1), T(0), I64, Sp),
+        new CoroutineDone(T(2), T(0), Sp)));
+
+    [Fact]
+    public void A_pull_written_as_the_bare_yield_type_is_found() => AssertFinding(OnCoroutine(
+        new List<IrTemp> { new(T(1), I64) },
+        new ResumePull(T(1), T(0), I64, Sp)), "next declares type ?i64");
+
+    [Fact]
+    public void A_pull_annotated_with_another_yield_type_is_found() => AssertFinding(OnCoroutine(
+        new List<IrTemp> { new(T(1), new IrOptionalType(Str)) },
+        new ResumePull(T(1), T(0), Str, Sp)), "next annotated string, the coroutine yields i64");
+
+    [Fact]
+    public void A_pull_of_something_else_is_found() => AssertFinding(VoidFn(new List<IrLocal>(),
+        new List<IrTemp> { new(T(0), I64), new(T(1), new IrOptionalType(I64)) },
+        new List<IrOp> { new Const(T(0), I64, new IntConst(1), Sp), new ResumePull(T(1), T(0), I64, Sp) }),
+        "next operand is i64");
+
+    [Fact]
+    public void Asking_something_else_whether_it_is_done_is_found() => AssertFinding(VoidFn(new List<IrLocal>(),
+        new List<IrTemp> { new(T(0), I64), new(T(1), Bool) },
+        new List<IrOp> { new Const(T(0), I64, new IntConst(1), Sp), new CoroutineDone(T(1), T(0), Sp) }),
+        "codone operand is i64");
+
+    [Fact]
+    public void A_result_annotated_with_another_type_is_found() => AssertFinding(OnCoroutine(
+        new List<IrTemp> { new(T(1), new IrOptionalType(I64)) },
+        new CoroutineResult(T(1), T(0), I64, Sp)), "coresult annotated i64, the coroutine returns void");
+
+    [Fact]
+    public void A_coroutine_over_a_body_that_returns_something_else_is_found()
+    {
+        var factory = Fn("main.gen", IntCoroutine, 0, new List<IrLocal>(), new List<IrTemp> { new(T(0), IntCoroutine) },
+            new List<IrBlock> { Block(0, new List<IrOp> { new MakeCoroutine(T(0), F(1), [], IntCoroutine, Sp) }, new Return(T(0), Sp)) });
+        var body = Fn("main.gen.<body>", I64, 0, new List<IrLocal>(), new List<IrTemp> { new(T(0), I64) },
+            new List<IrBlock> { Block(0, new List<IrOp> { new Const(T(0), I64, new IntConst(1), Sp) }, new Return(T(0), Sp)) });
+        AssertFinding(Module(factory, body), "mkcoro of coroutine<i64, void>, but body main.gen.<body> returns i64");
+    }
+
     /// <summary>
     /// The thrown message names WHICH run found it.
     ///

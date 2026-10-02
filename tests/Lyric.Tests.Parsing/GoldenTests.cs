@@ -144,7 +144,7 @@ public class GoldenTests
     [InlineData("loop_jumps")]        // break; continue;
     [InlineData("return_value")]      // return expr;
     [InlineData("return_void")]       // return;
-    [InlineData("yield_resume")]      // yield and resume, including resume with a value
+    [InlineData("yield_resume")]      // yield in both forms; 'resume' is a name since Lyric 5
     [InlineData("defer_block")]       // defer { ... }
     [InlineData("defer_expr")]        // defer expr;
     [InlineData("throw_stmt")]        // throw expr;

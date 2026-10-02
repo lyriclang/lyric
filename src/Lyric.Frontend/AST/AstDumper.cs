@@ -377,10 +377,6 @@ public static class AstDumper
                 Line(sb, indent, "Yield", n.Span);
                 if (n.Value is not null) Write(n.Value, indent + 1, sb);
                 break;
-            case ResumeExpr n:
-                Line(sb, indent, "Resume", n.Span);
-                Write(n.Coroutine, indent + 1, sb);
-                break;
             case ComptimeExpr n:
                 Line(sb, indent, "Comptime", n.Span);
                 Write(n.Inner, indent + 1, sb);

@@ -274,7 +274,6 @@ internal sealed class FlowAnalyzer
                 return;
             case BinaryExpr b: AnalyzeExpr(b.Left, assigned); AnalyzeExpr(b.Right, assigned); return;
             case UnaryExpr u: AnalyzeExpr(u.Operand, assigned); return;
-            case ResumeExpr re: AnalyzeExpr(re.Coroutine, assigned); return;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner, assigned); return;
             case ThrowExpr te: AnalyzeExpr(te.Value, assigned); return;
             // 'try?' may fail anywhere in its operand and go on with null: what the operand assigns

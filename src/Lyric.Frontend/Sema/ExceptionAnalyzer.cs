@@ -257,10 +257,6 @@ internal sealed class ExceptionAnalyzer
             }
             case UnaryExpr u: AnalyzeExpr(u.Operand); Operator(u); break;
             case ComptimeExpr ct: AnalyzeExpr(ct.Inner); break;
-            case ResumeExpr re:
-                AnalyzeExpr(re.Coroutine);
-                if (_types.ThrownByPull(re) is { } resumed) Site([resumed], re.Span, "'resume'");
-                break;
             case ThrowExpr te:
                 AnalyzeExpr(te.Value);
                 Throw(te.Value, te.Span);

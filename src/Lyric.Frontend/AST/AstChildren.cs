@@ -259,10 +259,6 @@ public static class AstChildren
                 yield return ct.Inner;
                 break;
 
-            case ResumeExpr r:
-                yield return r.Coroutine;
-                break;
-
             case ThrowExpr te:
                 yield return te.Value;
                 break;

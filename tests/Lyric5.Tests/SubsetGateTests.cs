@@ -64,12 +64,36 @@ public class SubsetGateTests
     // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
     // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]
-    [InlineData("fn gen(): Coroutine<int> { yield 1; }\nfn main(): int { let g = gen(); return 0; }", "coroutines", "M6")]
+    [InlineData("fn emit(): void { yield 1; }\nfn main(): int { emit(); return 0; }", "a yield outside a coroutine's own body", "M6 S2b")]
     public void A_construct_outside_the_core_names_its_milestone(string source, string what, string milestone)
     {
         var refusals = Refusals(source);
         Assert.NotEmpty(refusals);
         Assert.Contains(refusals, r => r.Contains(what) && r.EndsWith($"({milestone})"));
+    }
+
+    [Fact]
+    public void A_generator_passes()
+    {
+        var refusals = Refusals("""
+            fn count(n: int): Coroutine<int, string> throws Error {
+                var i = 0;
+                while (i < n) { yield i; i = i + 1; }
+                return "done";
+            }
+
+            fn main(): int {
+                let c = count(3);
+                try {
+                    let first = c.next() ?? -1;
+                    let ended = c.result() ?? "running";
+                    return if (c.isDone() && ended == "done") 0 else first;
+                } catch (_: Error) {
+                    return 1;
+                }
+            }
+            """);
+        Assert.Empty(refusals);
     }
 
     [Fact]

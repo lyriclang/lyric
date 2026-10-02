@@ -138,7 +138,7 @@ internal sealed class FunctionLowerer
         TypeSymbol? receiver = null,
         GenericInstance? ownerInstance = null,
         TypeNode? receiverTypeNode = null,
-        IrType? coroutineYield = null,
+        bool coroutineBody = false,
         IrType? returnTypeOverride = null,
         LyrType? receiverType = null)
     {
@@ -156,19 +156,26 @@ internal sealed class FunctionLowerer
         _substitution = substitution;
         _b = new BlockBuilder(_blocks);
 
-        // A coroutine BODY is an ordinary VOID function containing 'yield' ops (format 4.0):
-        // the yielded values travel through the suspension, never through 'ret', and both the
-        // bare 'return;' and the run-through are the chain's end. Everything else about it —
-        // parameters in slots, locals in slots, defers, lambdas — is the ordinary machinery,
-        // which is the point: a frame the interpreter can capture is a frame like any other.
-        _coroutineYield = coroutineYield;
-        // The caller's error slot (01 L5 E1): a function whose CALL may throw — a coroutine's
-        // clause belongs to its pulls, and its body is no call (05 E2, M6).
-        _irThrows = coroutineYield is null && types.ThrowsAtCall(decl) && ThrownHere(types.DeclaredThrows(decl)).Length > 0;
+        // A coroutine BODY is an ordinary function containing 'yield' ops: the yielded values
+        // travel through the suspension, never through 'ret', and what it returns is the
+        // coroutine's result (06 A1) — void for 'Coroutine<Y>'. Everything else about it —
+        // parameters, locals, defers, lambdas — is the ordinary machinery, which is the point:
+        // the frame lives on the coroutine's own stack like any other. Its coroutine is the
+        // written return type, in this instance's terms.
+        if (coroutineBody)
+        {
+            CoroutineType = LowerDeclaredReturnType() as IrCoroutineType
+                ?? throw Bug($"'{name}' is lowered as a coroutine body but returns no coroutine");
+            _coroutineYield = CoroutineType.Yield;
+        }
+        // The caller's error slot (01 L5 E1): a function whose CALL may throw — and a coroutine's
+        // body, whose error the runtime keeps for the pull that ran into it (05 E10, M6).
+        _irThrows = coroutineBody
+            ? ThrownHere(types.DeclaredThrows(decl)).Length > 0
+            : types.ThrowsAtCall(decl) && ThrownHere(types.DeclaredThrows(decl)).Length > 0;
         // A synthetic function — a comptime site's evaluator — has no written return type; the
         // sema type of its expression is handed in lowered instead.
-        _returnType = coroutineYield is not null ? VoidType
-            : returnTypeOverride ?? LowerDeclaredReturnType();
+        _returnType = CoroutineType?.Result ?? returnTypeOverride ?? LowerDeclaredReturnType();
 
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
         // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
@@ -221,6 +228,7 @@ internal sealed class FunctionLowerer
                 throw Bug($"parameter '{p.Name}' was not bound by the type checker");
             _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
         }
+        Parameters = _slots.Locals.ToArray();
     }
 
     /// <summary>
@@ -313,17 +321,28 @@ internal sealed class FunctionLowerer
     private int _lambdaParameterCount;
 
     /// <summary>
-    /// The lowerer for the BODY OF A COROUTINE (format 4.0): an ordinary void function whose
-    /// <c>yield</c> statements become suspension ops. Parameters and locals live in frame
-    /// SLOTS like anywhere else — the interpreter captures whole frames at a suspension, so
-    /// nothing has to move into an object to survive one.
+    /// The lowerer for the BODY OF A COROUTINE: an ordinary function whose <c>yield</c>
+    /// statements become suspension ops and whose return is the coroutine's result. Parameters
+    /// and locals live where they do in any function — the body runs on the coroutine's own
+    /// stack, so nothing has to move into an object to survive a suspension. Built before it
+    /// runs, it already knows what the factory is made of: its <see cref="CoroutineType"/> and
+    /// its <see cref="Parameters"/>, in the instance's terms for a generic one.
     /// </summary>
-    public static FunctionLowerer ForCoroutineBody(FunctionDecl decl, string name,
-        IrType yieldType, TypeSymbol? receiver, TypeResult types,
-        IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
-        TypeTable typeTable, GlobalTable globals, LambdaTable lambdas, InstanceTable instances) =>
-        new(decl, name, types, functions, imports, typeTable, ModuleLowerer.NoSubstitution,
-            globals, lambdas, instances, receiver, coroutineYield: yieldType);
+    public static FunctionLowerer ForCoroutineBody(FunctionDecl decl, string name, TypeSymbol? receiver,
+        TypeResult types, IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
+        TypeTable typeTable, IReadOnlyDictionary<GenericParamSymbol, LyrType> substitution,
+        GlobalTable globals, LambdaTable lambdas, InstanceTable instances,
+        GenericInstance? owner = null, TypeNode? receiverTypeNode = null, LyrType? receiverType = null) =>
+        new(decl, name, types, functions, imports, typeTable, substitution, globals, lambdas, instances,
+            receiver, owner, receiverTypeNode, coroutineBody: true, receiverType: receiverType);
+
+    /// <summary>The coroutine a body belongs to (<see cref="ForCoroutineBody"/>); null for any
+    /// other function.</summary>
+    public IrCoroutineType? CoroutineType { get; }
+
+    /// <summary>The parameters as the IR has them — the receiver first — known before the body is
+    /// lowered.</summary>
+    public IReadOnlyList<IrLocal> Parameters { get; } = [];
 
     /// <summary>The field index of the captured <c>this</c> in the environment, when captured.</summary>
     private readonly int? _capturedThisField;
@@ -2105,7 +2124,6 @@ internal sealed class FunctionLowerer
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
         RangeExpr e => LowerRangeValue(e),
-        ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),
         TryExpr e => LowerTryExpr(e),
@@ -2731,26 +2749,11 @@ internal sealed class FunctionLowerer
         return LowerExpr(expr.Inner);
     }
 
-    private TempId? LowerResume(ResumeExpr expr)
-    {
-        if (LowerType(_types.TypeOf(expr.Coroutine), expr.Span) is not IrFunctionType signature)
-            throw Bug("'resume' on a value that is not a coroutine");
-
-        // Lenient = false: exhaustion panics, the form the specification promises for 'resume'.
-        // A void chain's strict pull has no dest, the same shape as a void call.
-        var coroutine = LowerExpr(expr.Coroutine);
-        var dest = IsVoid(signature.Return) ? (TempId?)null : _slots.NewTemp(signature.Return);
-        _b.Emit(new ResumePull(dest, coroutine, Lenient: false, signature.Return, expr.Span));
-        if (dest is { } d) _fresh.Add(d);
-        return dest;
-    }
-
     /// <summary>
-    /// <c>co.next()</c> — the lenient pull, one instruction since format 4.0: the VM answers
-    /// <c>?T</c> directly, or — for a void chain — whether it advanced. The state-machine era
-    /// assembled the same contract from a flag parameter, the <c>coroutineIsDone</c> import and
-    /// three blocks of optional wrapping; the import stays a registry citizen for modules
-    /// compiled back then.
+    /// <c>co.next()</c> (06 N2 A2): one instruction — <c>?Y</c>, or for a coroutine that yields
+    /// nothing whether it stopped at a yield. A coroutine whose type throws throws through its
+    /// pulls (05 E10): the error its body ended with comes out here, on the error path like a
+    /// call's.
     /// </summary>
     private TempId LowerCoroutineNext(MemberExpr member, CoroutineOf type, Core.Span span)
     {
@@ -2758,7 +2761,27 @@ internal sealed class FunctionLowerer
         var coroutine = LowerExpr(member.Target);
         var result = IsVoid(yield) ? BoolType : new IrOptionalType(yield);
         var dest = _slots.NewTemp(result);
-        _b.Emit(new ResumePull(dest, coroutine, Lenient: true, yield, span));
+        var throws = _types.ThrownByPull(member) is { } pulled && ThrownHere([pulled]).Length > 0;
+        _b.Emit(new ResumePull(dest, coroutine, yield, span) { Throws = throws });
+        _fresh.Add(dest);
+        if (throws && !_b.IsSealed) ErrorEdge(span);
+        return dest;
+    }
+
+    /// <summary><c>co.result()</c> and <c>co.isDone()</c> (06 A2, A4): what the body returned —
+    /// <c>?R</c> — and whether it has ended, without pulling.</summary>
+    private TempId LowerCoroutineQuery(MemberExpr member, CoroutineOf type, Core.Span span)
+    {
+        var coroutine = LowerExpr(member.Target);
+        if (member.Member == "isDone")
+        {
+            var done = _slots.NewTemp(BoolType);
+            _b.Emit(new CoroutineDone(done, coroutine, span));
+            return done;
+        }
+        var result = LowerType(type.Result, span);
+        var dest = _slots.NewTemp(new IrOptionalType(result));
+        _b.Emit(new CoroutineResult(dest, coroutine, result, span));
         _fresh.Add(dest);
         return dest;
     }
@@ -2787,13 +2810,13 @@ internal sealed class FunctionLowerer
             var value = stmt.Value is null
                 ? null
                 : (TempId?)LowerExprAs(stmt.Value, _coroutineYield!);
-            _b.Emit(new YieldSuspend(value, _coroutineYield!, stmt.Span));
+            _b.Emit(new YieldSuspend(value, _coroutineYield!, Dynamic: false, stmt.Span));
             return true;
         }
 
         var dynamicValue = stmt.Value is null ? null : (TempId?)LowerExpr(stmt.Value);
         var siteType = stmt.Value is null ? VoidType : TypeOfExpr(stmt.Value);
-        _b.Emit(new YieldSuspend(dynamicValue, siteType, stmt.Span));
+        _b.Emit(new YieldSuspend(dynamicValue, siteType, Dynamic: true, stmt.Span));
         return true;
     }
 
@@ -5271,6 +5294,9 @@ internal sealed class FunctionLowerer
         if (expr.Callee is MemberExpr { Member: "next" } pull
             && SubstituteType(_types.TypeOf(pull.Target)) is CoroutineOf pulled)
             return LowerCoroutineNext(pull, pulled, expr.Span);
+        if (expr.Callee is MemberExpr { Member: "result" or "isDone" } asked
+            && SubstituteType(_types.TypeOf(asked.Target)) is CoroutineOf answering)
+            return LowerCoroutineQuery(asked, answering, expr.Span);
 
         // The receiver is parameter 0. For `p.get()` the 'p' therefore becomes the first argument; for
         // `P.new(…)` there is none and the call is an ordinary one. Both forms then run through the same
@@ -6331,7 +6357,12 @@ internal sealed class FunctionLowerer
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
             f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws) },
-        CoroutineOf c => c with { Yield = SubstituteType(c.Yield) },
+        CoroutineOf c => c with
+        {
+            Yield = SubstituteType(c.Yield),
+            Result = SubstituteType(c.Result),
+            Throws = c.Throws is { } thrown ? SubstituteType(thrown) : null,
+        },
         GenericInstance g => new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations },
         AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member),

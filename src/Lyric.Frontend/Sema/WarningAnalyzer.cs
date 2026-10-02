@@ -633,7 +633,6 @@ internal sealed class WarningAnalyzer
                 if (p.Operator is PostfixOp.Inc or PostfixOp.Dec) MarkMutated(p.Operand);
                 WalkExpr(p.Operand);
                 break;
-            case ResumeExpr re: WalkExpr(re.Coroutine); break;
             case ComptimeExpr ct: WalkExpr(ct.Inner); break;
             case ThrowExpr te: WalkExpr(te.Value); break;
             case TryExpr tr:

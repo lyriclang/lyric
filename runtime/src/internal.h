@@ -87,12 +87,16 @@ typedef struct LyrStackCtx {
     void *tsan_fiber;
 } LyrStackCtx;
 
-/* The coroutine object. The collector stage traces `arg` and `resumer_coro` and, while the stack
- * is mapped and stopped, every word of [ctx.sp, ctx.base). `status` is 0 only on a free list. */
+/* The coroutine object. The collector stage traces `arg`, `resumer_coro` and `error` and, while
+ * the stack is mapped and stopped, every word of [ctx.sp, ctx.base). `status` is 0 only on a free
+ * list. */
 struct LyrCoro {
     LyrObj header;
     void *arg;
     struct LyrCoro *resumer_coro;  /* the coroutine that resumed it; NULL: a thread's own stack */
+    struct LyrErr *error;          /* what the body ended with, until the resumer takes it */
+    void *transfer;                /* the latest yield's value, or the result: a pointer into the
+                                      suspended stack or into `arg` — never the only reference */
     LyrCoroBody body;
     LyrStackCtx *resumer;          /* where a yield goes */
     LyrStackCtx ctx;
