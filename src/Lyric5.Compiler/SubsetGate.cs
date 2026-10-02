@@ -136,7 +136,8 @@ public static class SubsetGate
                 case LoadLocal or StoreLocal or Call or StructCopy:
                     break;
                 case CallImport i:
-                    if (!Intrinsics.Contains(module.Imports[i.Target.Value].Name))
+                    if (!Intrinsics.Contains(module.Imports[i.Target.Value].Name)
+                        && !Compiler.Intrinsics.IsForeign(module.Imports[i.Target.Value].Name))
                         Refuse(op.Span, $"the native function '{module.Imports[i.Target.Value].Name}'", "M8a");
                     break;
                 case NewObject n:

@@ -107,9 +107,10 @@ public static class Pipeline
             // The program's units carry what the profile asks of the program alone (fast-math).
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
                 ExtraFlags: request.Profile.ProgramFlags)).ToList();
-            var objects = build.Compile(units);
+            var (native, libraries) = Native(project, request.Target);
+            var objects = build.Compile([.. units, .. native]);
             var executable = project.Executable(request.Profile, request.Target);
-            if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable);
+            if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable, libraries);
             return (0, executable);
         }
         catch (CBuildException failure)
@@ -117,6 +118,24 @@ public static class Pipeline
             error.WriteLine($"error[LYR-BLD0001]: {failure.Message}");
             return (2, null);
         }
+    }
+
+    /// <summary>The native parts of the program's packages (07 B5; 11 W2) for the target: their C
+    /// sources, each with its package's include directories, and their libraries, each once.</summary>
+    private static (List<CUnit> Units, List<string> Libraries) Native(Project project, Target target)
+    {
+        var units = new List<CUnit>();
+        var libraries = new List<string>();
+        if (project.Graph is not { } graph) return (units, libraries);
+        foreach (var manifest in graph.Packages.Values.OrderBy(m => m.Name, StringComparer.Ordinal))
+        {
+            var part = manifest.NativeOn(target.Os);
+            var include = part.Include.Select(directory => Path.Combine(manifest.Root, directory)).ToList();
+            units.AddRange(part.SourceFiles(manifest.Root).Select(file => new CUnit(file, [], include)));
+            foreach (var library in part.Libs)
+                if (!libraries.Contains(library)) libraries.Add(library);
+        }
+        return (units, libraries);
     }
 
     /// <summary>The compiler, by the identity of its assemblies — the front end's and the

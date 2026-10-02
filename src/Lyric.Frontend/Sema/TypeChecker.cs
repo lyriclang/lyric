@@ -531,10 +531,17 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
     {
-        if (spec.Abi != "dotnet")
+        // Lyric 5's one foreign boundary is C (design/v5/spec/11 W4); "dotnet" is the 4.x VM's.
+        var abi = _comp.Lyric5Modules ? "C" : "dotnet";
+        if (spec.Abi != abi)
         {
             _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
-                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"dotnet\"");
+                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"{abi}\"");
+            return;
+        }
+        if (abi == "C")
+        {
+            CheckCExtern(fn, spec, module);
             return;
         }
 
@@ -573,6 +580,49 @@ public sealed class TypeChecker
 
     private static bool CrossesHostBoundary(LyrType type, bool asReturn) =>
         type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
+
+    /// <summary>
+    /// <c>extern "C" fn add(a: int, b: int): int;</c> — stage 1 of the C ABI (design/v5/spec/11 W4,
+    /// M7): a C function the program calls by its symbol, the function's name unless
+    /// <c>= "symbol"</c> names another, with the scalars C has as they are — integers, floats,
+    /// <c>bool</c> — and <c>void</c> as a return. Strings, pointers, structs and callbacks are the
+    /// type table's of M14; until then the checker refuses what no stage-1 binding carries.
+    /// </summary>
+    private void CheckCExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
+    {
+        if (spec.Symbol is { } symbol && !CIdentifier.IsMatch(symbol))
+            _de.Report("LYR-SEM0099", Severity.Error, spec.Span, $"'{symbol}' is no C function's name");
+        if (fn.Generics.Length > 0)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Span,
+                $"'{fn.Name}' is extern and cannot have type parameters — a C function is one signature");
+        if (fn.Throws is not null)
+            _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span, $"'{fn.Name}' is a C function, and a C function throws nothing");
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            if (!CrossesC(type, asReturn: false))
+                _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
+                    $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
+                    + "cross into C in this stage — integers, floats and bool do");
+        }
+        if (fn.ReturnType is { } ret)
+        {
+            var type = ResolveType(ret, module.Members);
+            if (!CrossesC(type, asReturn: true))
+                _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
+                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not come back from C in this "
+                    + "stage — integers, floats, bool and void do");
+        }
+    }
+
+    private static bool CrossesC(LyrType type, bool asReturn) =>
+        type is PrimitiveType { Kind: var kind }
+        && (kind is PrimitiveKind.Int or PrimitiveKind.Uint or PrimitiveKind.Float or PrimitiveKind.Int8
+                or PrimitiveKind.Int16 or PrimitiveKind.Int32 or PrimitiveKind.Uint8 or PrimitiveKind.Uint16
+                or PrimitiveKind.Uint32 or PrimitiveKind.Float32 or PrimitiveKind.Bool
+            || (kind == PrimitiveKind.Void && asReturn));
+
+    private static readonly System.Text.RegularExpressions.Regex CIdentifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
 
     private void CheckMethods(string typeName, Decl[] members, ModuleSymbol module)
     {

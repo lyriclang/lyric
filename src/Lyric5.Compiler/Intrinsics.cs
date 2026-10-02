@@ -64,7 +64,12 @@ public static class Intrinsics
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>
     public static IReadOnlySet<string> Names { get; } = Runtime.Keys.ToHashSet(StringComparer.Ordinal);
 
-    /// <summary>The C call for a native function with the given argument expressions.</summary>
+    /// <summary>A C function the program declares (<c>extern "C"</c>, 11 W4): its import is named
+    /// <c>C:&lt;symbol&gt;</c>.</summary>
+    public static bool IsForeign(string name) => name.StartsWith("C:", StringComparison.Ordinal);
+
+    /// <summary>The C call for a native function with the given argument expressions: the runtime's
+    /// for the standard library's, the symbol itself for a C function the program declares.</summary>
     public static string Call(string name, string[] arguments) =>
-        $"{Runtime[name]}({string.Join(", ", arguments)})";
+        $"{(IsForeign(name) ? name[2..] : Runtime[name])}({string.Join(", ", arguments)})";
 }
