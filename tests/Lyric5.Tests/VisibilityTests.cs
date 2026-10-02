@@ -202,6 +202,65 @@ public class VisibilityTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
+    /// <summary>An interface's private helper (07 V2 S4): its defaults call it, on any value of
+    /// the interface; no conformer answers it, and a conformer's method of its name is the
+    /// conformer's own — the default still calls the helper.</summary>
+    private const string Greeter = """
+        interface Greeter {
+            fn name(): string;
+            fn greet(): string { return this.wrap(this.name()); }
+            private fn wrap(s: string): string { return f"<{s}>"; }
+        }
+        struct P :: [Greeter] {
+            n: string,
+            fn name(): string { return this.n; }
+            fn wrap(s: string): string { return f"[{s}]"; }
+        }
+        """;
+
+    [Fact]
+    public void An_interface_helper_is_its_defaults_and_no_conformers()
+    {
+        var main = "import std.io { println };\n" + Greeter + """
+
+            interface Box<T> {
+                fn get(): T;
+                fn show(): string { return this.tag(); }
+                private fn tag(): string { return "box"; }
+            }
+            struct IntBox :: [Box<int>] { v: int, fn get(): int { return this.v; } }
+
+            fn main(): void {
+                let p = P { n = "x" };
+                let g: Greeter = p;
+                println(f"{p.greet()} {g.greet()} {p.wrap("y")} {IntBox { v = 1 }.show()}");
+            }
+            """;
+        var dir = Package(("main.lyr", main));
+        Assert.Equal("<x> <x> [y] box\n", BuildAndRun(dir, "main", "build", Path.Combine(dir, "main.lyr")));
+    }
+
+    [Theory]
+    [InlineData("outside", "fn main(): void {\n    let g: Greeter = P { n = \"x\" };\n    let s = g.wrap(\"z\");\n}\n")]
+    [InlineData("a child interface's default", "interface Loud :: [Greeter] {\n    fn twice(): string { return this.wrap(\"b\"); }\n}\n\nfn main(): void {\n}\n")]
+    public void An_interface_helper_is_called_by_its_defaults_alone(string where, string rest)
+    {
+        var dir = Package(("main.lyr", Greeter + "\n" + rest));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 1, $"{where}: exit {exit}\n{error}");
+        Assert.Contains("error[LYR-RES0009]: 'wrap' is a helper of interface 'Greeter' — only its defaults call it", error);
+        Assert.True(error.Split("error[").Length == 2, $"{where}: one error —\n{error}");
+    }
+
+    [Fact]
+    public void A_private_requirement_has_no_body_to_help_with()
+    {
+        var dir = Package(("main.lyr", "interface I {\n    private fn f(): int;\n}\n\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-SEM0118]: 'private' on 'f' — a private member of an interface is a helper and has a body", error);
+    }
+
     [Fact]
     public void A_field_takes_a_word()
     {

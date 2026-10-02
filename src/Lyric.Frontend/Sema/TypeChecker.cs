@@ -473,10 +473,20 @@ public sealed class TypeChecker
                 // call through the interface would be no member of it. 'pub' says nothing here,
                 // and a word that says nothing is refused rather than ignored.
                 foreach (var member in i.Members)
-                    if (_comp.Lyric5Modules ? member.Visibility != VisibilityWord.None : member.IsPublic)
-                        _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan, _comp.Lyric5Modules
-                            ? $"'{Word(member.Visibility)}' on '{member.Name}' — an interface's members are as visible as the interface (07 V2 S4); drop it"
-                            : $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
+                {
+                    if (!_comp.Lyric5Modules)
+                    {
+                        if (member.IsPublic)
+                            _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan,
+                                $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
+                        continue;
+                    }
+                    // The one word an interface member takes: 'private' on a helper with a body.
+                    if (member.Visibility == VisibilityWord.None || member.IsPrivateHelper) continue;
+                    _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan, member.Visibility == VisibilityWord.Private
+                        ? $"'private' on '{member.Name}' — a private member of an interface is a helper and has a body; a requirement takes no word (07 V2 S4)"
+                        : $"'{Word(member.Visibility)}' on '{member.Name}' — an interface's members are as visible as the interface (07 V2 S4); drop it");
+                }
                 if (module.Members.LookupLocal(i.Name) is TypeSymbol iface)
                     CheckOverloadSets(iface.Members, $"interface '{i.Name}'", inInterface: true);
                 CheckMethods(i.Name, i.Members, module);
@@ -1284,6 +1294,10 @@ public sealed class TypeChecker
                     // U's that print identically, which is a confusing way to say what
                     // LYR-SEM0082 says plainly.
                     if (im.Generics.Length > 0) continue;
+                    // Nor is a PRIVATE helper (07 V2 S4): the interface's defaults call it, no
+                    // conformer answers it, and a method of its name in a conformer is the
+                    // conformer's own.
+                    if (im.IsPrivateHelper) continue;
 
                     var found = candidates.TryGetValue(im.Name, out var c) ? c : null;
                     if (found is null)
@@ -5725,6 +5739,17 @@ public sealed class TypeChecker
     // Member resolution: own members, then visible extensions, then interface default methods.
     private (LyrType, Symbol?) InstanceMember(TypeSymbol ts, string member, Span span)
     {
+        // A private helper of an interface (07 V2 S4) is its defaults' to call — on any value of
+        // the interface — and nobody else's, its own module's other code included.
+        if (ts.Kind == TypeSymbolKind.Interface
+            && ts.Members.LookupLocal(member) is FunctionSymbol { Declaration: FunctionDecl { IsPrivateHelper: true } } helper
+            && !Inside(ts))
+        {
+            _de.Report("LYR-RES0009", Severity.Error, span,
+                $"'{helper.Name}' is a helper of interface '{ts.Name}' — only its defaults call it");
+            return (FnTypeOf(helper), helper);
+        }
+
         if (ts.Members.LookupLocal(member) is { } found)
             return Reachable(ts.Members, member, found, span) switch
             {
@@ -5749,6 +5774,9 @@ public sealed class TypeChecker
             {
                 if (ReferenceEquals(parent, ts)) continue;
                 if (parent.Members.LookupLocal(member) is not FunctionSymbol pfn) continue;
+                if (pfn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(parent))
+                    _de.Report("LYR-RES0009", Severity.Error, span,
+                        $"'{pfn.Name}' is a helper of interface '{parent.Name}' — only its defaults call it");
                 var subst = inst is GenericInstance g ? SubstMap(g) : EmptySubst;
                 return (Substitute(FnTypeOf(pfn), subst), pfn);
             }
@@ -5856,6 +5884,7 @@ public sealed class TypeChecker
         {
             if (iface.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
             if (fn.Declaration is not FunctionDecl { Body: not null }) continue; // defaults only, not abstract ones
+            if (fn.Declaration is FunctionDecl { IsPrivateHelper: true }) continue; // the interface's own (07 V2 S4)
             var t = Substitute(FnTypeOf(fn), WithSelf(subst, iface, SelfType(ts)));
             if (found is null) found = (t, fn);
             else if (!ReferenceEquals(found.Value.sym, fn)) ambiguous = true;
@@ -6033,6 +6062,11 @@ public sealed class TypeChecker
             _ => (Report(span, "LYR-SEM0012", $"module '{mod.FullName}' has no member '{member}'"), null)
         };
     }
+
+    /// <summary>Whether the body being checked is one of <paramref name="iface"/>'s own: its
+    /// <c>this</c> is the interface.</summary>
+    private bool Inside(TypeSymbol iface) =>
+        ReferenceEquals(TypeFacts.SymbolOf(_currentThis ?? LyrType.Error), iface);
 
     /// <summary>The first field of <paramref name="ts"/> the module being checked may not name;
     /// <c>null</c> when it may name them all.</summary>

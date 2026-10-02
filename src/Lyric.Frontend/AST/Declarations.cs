@@ -92,6 +92,11 @@ public sealed record FunctionDecl(
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
+    /// <summary>On an interface member: <c>private fn</c> with a body (design/v5/spec/07 V2 S4) —
+    /// a helper the interface's defaults call. No requirement, no slot, and no conformer answers
+    /// or overrides it.</summary>
+    public bool IsPrivateHelper => Visibility == VisibilityWord.Private && Body is not null;
+
     public required Span NameSpan { get; init; }
 
     /// <summary>Set on a top-level function, and (since 2.1) on a method of a struct, class,
