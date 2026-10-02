@@ -250,8 +250,9 @@ internal sealed class ExceptionAnalyzer
                 break;
             case LambdaExpr lam:
                 // Its own context: the body runs later, outside every try around it, and throws what
-                // the lambda's type says (05 E2 K3).
-                InContext(new Context(_types.TypeOf(lam) is FnType { Throws: var lambdaSet } ? lambdaSet : [], "the lambda", canDeclare: false), () =>
+                // the lambda's type says (05 E2 K3) — a generator lambda's, what its coroutine's
+                // pulls throw (08 Y11 F5).
+                InContext(new Context(LambdaThrows(lam), "the lambda", canDeclare: false), () =>
                 {
                     if (lam.Body is Block b) AnalyzeStmt(b);
                     else if (lam.Body is Expr e) AnalyzeExpr(e);
@@ -303,6 +304,13 @@ internal sealed class ExceptionAnalyzer
                 break;
         }
     }
+
+    private LyrType[] LambdaThrows(LambdaExpr lam) => _types.TypeOf(lam) switch
+    {
+        FnType { Return: CoroutineOf made } when _types.IsGeneratorLambda(lam) => made.Throws is { } pulled ? [pulled] : [],
+        FnType { Throws: var lambdaSet } => lambdaSet,
+        _ => [],
+    };
 
     // Callee position: the function reference itself is legitimate; only its sub-expressions run.
     private void AnalyzeCallee(Expr callee)

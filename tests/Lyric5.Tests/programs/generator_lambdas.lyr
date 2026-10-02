@@ -1,0 +1,125 @@
+// Generator lambdas natively (design/v5/spec/08 Y11 F5, M6 S2c): a lambda with a yield of its own is
+// a generator — calling it makes a coroutine that runs nothing until it is pulled. It captures as
+// any lambda does, takes its yield and result types from its context or from its body, throws
+// through its pulls, and closes like any coroutine. 'sequence { … }' is an ordinary function over
+// one, as is any function that hands on a coroutine without yielding (08 D11). Expected stdout:
+//   seq 1 2 3 end              'sequence' with a trailing block
+//   captured 10 11 12          a capture, read across the yields
+//   counter 5 6 | 7 8          one generator lambda, two coroutines
+//   context true 4             the context's 'Coroutine<?int>' gives the yield type
+//   result sum 6               a returned value is the result
+//   lazy made | made pulled 1  nothing runs at the call; a captured variable written by the body
+//   caught bad                 the body's error comes out of the pull
+//   pulled 1
+//   closed cleaned             close() unwinds a lambda's body, its defer runs
+//   handed 1 2                 a function that returns a coroutine without yielding
+import std.io { println };
+
+enum Bad :: [Error] { It;
+    fn message(): string { return "bad"; }
+}
+
+fn take(c: Coroutine<int>, n: int): string {
+    var s = "";
+    var i = 0;
+    while (i < n) {
+        let v = c.next();
+        if (v == null) { return s + " end"; }
+        if (i > 0) { s = s + " "; }
+        s = s + f"{v}";
+        i = i + 1;
+    }
+    return s;
+}
+
+fn handOn(make: fn() -> Coroutine<int>): Coroutine<int> {
+    return make();
+}
+
+fn main(): int {
+    let s = sequence {
+        yield 1;
+        yield 2;
+        yield 3;
+    };
+    println(f"seq {take(s, 5)}");
+
+    let base = 10;
+    let up = sequence {
+        var i = 0;
+        while (true) {
+            yield base + i;
+            i += 1;
+        }
+    };
+    println(f"captured {take(up, 3)}");
+
+    let counter = (from: int) => {
+        var n = from;
+        while (true) {
+            yield n;
+            n += 1;
+        }
+    };
+    println(f"counter {take(counter(5), 2)} | {take(counter(7), 2)}");
+
+    let maybe: fn() -> Coroutine<?int> = () => {
+        yield null;
+        yield 4;
+    };
+    let m = maybe();
+    let m1 = m.next();
+    let m2 = m.next();
+    println(f"context {m1! == null} {m2! ?? -1}");
+
+    let summing = (xs: int[]) => {
+        var total = 0;
+        var i = 0;
+        while (i < xs.length()) {
+            total += xs[i];
+            yield total;
+            i += 1;
+        }
+        return f"sum {total}";
+    };
+    let g = summing([1, 2, 3]);
+    while (g.next() != null) { }
+    let r = g.result() ?? "none";
+    println(f"result {r}");
+
+    var log = "made";
+    let lazy = sequence {
+        log += " pulled";
+        yield 1;
+    };
+    let before = log;
+    let first = lazy.next() ?? 0;
+    println(f"lazy {before} | {log} {first}");
+
+    let risky = (fail: bool) => {
+        if (fail) { throw Bad.It; }
+        yield 1;
+    };
+    try {
+        let v = risky(true).next() ?? 0;
+        println(f"not reached {v}");
+    } catch (e: Bad) {
+        println(f"caught {e.message()}");
+    }
+
+    let guarded = sequence {
+        defer println("closed cleaned");
+        yield 1;
+        yield 2;
+    };
+    let gv = guarded.next() ?? 0;
+    println(f"pulled {gv}");
+    guarded.close();
+
+    let h = handOn(() => {
+        yield 1;
+        yield 2;
+    });
+    println(f"handed {take(h, 2)}");
+    return 0;
+}

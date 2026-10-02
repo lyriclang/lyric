@@ -176,7 +176,8 @@ public sealed class Compilation
         }
     }
 
-    /// <summary>Whether a module declares a coroutine or yields anywhere.</summary>
+    /// <summary>Whether a module yields anywhere: every coroutine does (08 D11) — a function that
+    /// only returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
     private static bool UsesCoroutines(Module ast)
     {
         var pending = new Stack<Node>();
@@ -184,7 +185,7 @@ public sealed class Compilation
         while (pending.Count > 0)
         {
             var node = pending.Pop();
-            if (node is YieldStmt || node is FunctionDecl { ReturnType: NamedType { Path: [.., "Coroutine"] } }) return true;
+            if (node is YieldStmt) return true;
             foreach (var child in AstChildren.Of(node)) pending.Push(child);
         }
         return false;

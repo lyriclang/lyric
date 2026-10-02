@@ -77,6 +77,7 @@ public class CEmitterTests
     [InlineData("bank")]
     [InlineData("generators")]
     [InlineData("generators_close")]
+    [InlineData("generator_lambdas")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -219,6 +220,7 @@ public class CEmitterTests
             data.Add("bank", profile, 0, BANK_EXPECTED);
             data.Add("generators", profile, 0, GENERATORS_EXPECTED);
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
+            data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -385,6 +387,11 @@ public class CEmitterTests
     private const string GENERATORS_CLOSE_EXPECTED =
         "w: cleaned\nwalk 0 1 done true next true\nfresh true\ncareful: caught cancelled\ncareful 1 stopped\n"
         + "using 0\nu: cleaned\nclose threw oops\nagain true\n";
+
+    // Generator lambdas and 'sequence' (08 Y11 F5, M6 S2c): the program's header says what each line shows.
+    private const string GENERATOR_LAMBDAS_EXPECTED =
+        "seq 1 2 3 end\ncaptured 10 11 12\ncounter 5 6 | 7 8\ncontext true 4\nresult sum 6\n"
+        + "lazy made | made pulled 1\ncaught bad\npulled 1\nclosed cleaned\nhanded 1 2\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

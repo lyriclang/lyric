@@ -104,10 +104,15 @@ internal sealed class LambdaTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
-            lowered.Add((p.Id, FunctionLowerer.ForLambda(
-                p.Lambda, p.Name, p.Captures, p.CapturesThis, p.EnvironmentType, p.Receiver,
+            // A generator lambda (08 Y11 F5) is a coroutine's factory — the function value — and its
+            // body behind it, which takes the environment and the parameters the factory was given.
+            var generator = types.IsGeneratorLambda(p.Lambda);
+            var lowerer = FunctionLowerer.ForLambda(
+                p.Lambda, generator ? $"{p.Name}.<body>" : p.Name, p.Captures, p.CapturesThis, p.EnvironmentType, p.Receiver,
                 types, functions, imports, typeTable, globals, this, instances,
-                p.Substitution).Run()));
+                p.Substitution);
+            if (generator) lowered.AddRange(CoroutineFactory.Split(lowerer, p.Name, p.Id, _ids, p.Lambda.Span));
+            else lowered.Add((p.Id, lowerer.Run()));
         }
 
         return lowered;

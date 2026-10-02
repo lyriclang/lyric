@@ -1007,8 +1007,10 @@ public sealed class CEmitter
             }
         }
 
+        // The error slot as any call passes it (SlotArgument): the body's own where it throws, none
+        // to write for a generator lambda's body that cannot — it takes one either way (03 T17).
         var arguments = parameters.Select((_, i) => body.ReceiverByRef && i == 0 ? $"&lyr_env->a{i}" : $"lyr_env->a{i}")
-            .Concat(body.Throws ? ["&lyr_e"] : []);
+            .Concat(body.Throws ? ["&lyr_e"] : TakesEnvironment(body) ? ["NULL"] : []);
         var call = $"{FunctionName(body.Name)}({string.Join(", ", arguments)})";
         var run = new StringBuilder($"static void {CoroutineRunner(index)}(void *lyr_arg) {{ ");
         run.Append(HasEnvironment(body, type) ? $"{env} *lyr_env = lyr_arg; " : "(void)lyr_arg; ");
