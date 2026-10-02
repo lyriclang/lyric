@@ -53,6 +53,10 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary><c>exclude</c> (P8): files taken out of what the package is made of.</summary>
     public IReadOnlyList<string> Exclude { get; init; } = [];
 
+    /// <summary><c>[profile.&lt;name&gt;]</c> (P3): the built-in profiles changed, the manifest's own
+    /// named — the root manifest's alone count.</summary>
+    public IReadOnlyDictionary<string, ProfileSpec> Profiles { get; init; } = new Dictionary<string, ProfileSpec>();
+
     /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies (P5).</summary>
     public string Root => Path.GetDirectoryName(File)!;
 
@@ -79,7 +83,6 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
     {
         ["bin"] = "M7 S6",
-        ["profile"] = "M7 S6",
         ["native"] = "M7 S6",
         ["lints"] = "M12",
         ["build-dependencies"] = "M7 S7",
@@ -107,7 +110,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
         foreach (var key in document.Keys)
         {
-            if (key is "package" or "dependencies" or "override") continue;
+            if (key is "package" or "dependencies" or "override" or "profile") continue;
             document.TryGet(key, out var section);
             var line = section switch
             {
@@ -162,6 +165,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Overrides = ReadDependencies(document, "override", file),
             Include = Patterns(package, "include", file),
             Exclude = Patterns(package, "exclude", file) ?? [],
+            Profiles = global::Lyric5.Build.Profiles.Read(document, file),
         };
     }
 

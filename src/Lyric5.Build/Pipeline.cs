@@ -4,13 +4,12 @@ using Lyric.Compiler;
 using Lyric.Ir;
 using Lyric5.Compiler;
 using Lyric5.Toolchain;
-using Profile = Lyric5.Toolchain.Profile;
 
 namespace Lyric5.Build;
 
 /// <summary>What a build is asked for: the project, the profile, the target, the C compiler, and
 /// the toolchain version every cache key carries.</summary>
-public sealed record BuildRequest(Project Project, Profile Profile, Target Target, CCompiler Compiler, string ToolchainVersion);
+public sealed record BuildRequest(Project Project, BuildProfile Profile, Target Target, CCompiler Compiler, string ToolchainVersion);
 
 /// <summary>
 /// From a <c>.lyr</c> to a binary (design/v5/spec/13, M2): the front end, the subset gate, the C
@@ -24,8 +23,9 @@ public static class Pipeline
     /// <summary>Where <c>lyric5</c> finds the seed of the Lyric 5 standard library: beside itself.</summary>
     public static string StdlibRoot => Path.Combine(AppContext.BaseDirectory, "stdlib5");
 
-    /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after reporting.</summary>
-    public static CompileResult? Compile(Project project, TextWriter error)
+    /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after
+    /// reporting. A profile that denies warnings (11 W2 P3) fails a compilation that warns.</summary>
+    public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null)
     {
         // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
         var options = new CompilerOptions
@@ -35,18 +35,32 @@ public static class Pipeline
         };
         var result = SourceCompiler.Lower(ScriptSource.FromDisk(project.Source, project.Module), options);
         if (!result.Render(error) || result.Ir is null) return null;
+        if (Denied(result, profile, error)) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
         result.Diagnostics.RenderText(error);
         return null;
     }
 
-    /// <summary><c>--emit ir</c> and <c>--emit c</c>: the text on <c>output</c>.</summary>
-    public static int Emit(Project project, string what, TextWriter output, TextWriter error)
+    /// <summary><c>--emit ir</c> and <c>--emit c</c>: the text on <c>output</c>, the C as the
+    /// profile has it emitted.</summary>
+    public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null)
     {
-        var result = Compile(project, error);
+        var result = Compile(project, error, profile);
         if (result is null) return 1;
-        output.Write(what == "ir" ? IrPrinter.Dump(result.Ir!) : CEmitter.Join(CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot)));
+        output.Write(what == "ir"
+            ? IrPrinter.Dump(result.Ir!)
+            : CEmitter.Join(CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, profile?.OverflowChecks ?? true)));
         return 0;
+    }
+
+    /// <summary>A compilation that warned, under a profile that denies warnings: the warnings stay
+    /// warnings, and one error says why the build failed (11 W2 P3).</summary>
+    private static bool Denied(CompileResult result, BuildProfile? profile, TextWriter error)
+    {
+        if (profile is not { DenyWarnings: true } || result.Diagnostics.WarningCount == 0) return false;
+        var count = result.Diagnostics.WarningCount;
+        error.WriteLine($"error[LYR-CLI0006]: {count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
+        return true;
     }
 
     /// <summary>The binary's path, or the exit code of the failure.</summary>
@@ -61,14 +75,17 @@ public static class Pipeline
         // under 'units/', where nothing else changes — so its object survives every edit that
         // leaves the instance alone. The list of units is written last: its presence says the C is
         // complete.
-        var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity);
+        // The C is the profile's too where the profile changes it: without overflow checks the
+        // arithmetic wraps (03 T2).
+        var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity,
+            request.Profile.OverflowChecks ? "checked" : "wrapping");
         var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
         if (!File.Exists(manifest))
         {
-            var result = Compile(project, error);
+            var result = Compile(project, error, request.Profile);
             if (result is null) return (1, null);
             var paths = new List<string>();
-            foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot))
+            foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, request.Profile.OverflowChecks))
             {
                 var path = unit.Instance is null
                     ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.c")
@@ -85,7 +102,9 @@ public static class Pipeline
             var archive = RuntimeArchive.For(request.Compiler, request.Target, request.Profile, request.ToolchainVersion);
             var build = new CBuild(request.Compiler, request.Target, request.Profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
-            var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)])).ToList();
+            // The program's units carry what the profile asks of the program alone (fast-math).
+            var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
+                ExtraFlags: request.Profile.ProgramFlags)).ToList();
             var objects = build.Compile(units);
             var executable = project.Executable(request.Profile, request.Target);
             if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable);
@@ -137,7 +156,7 @@ public static class Pipeline
     /// the front end and the lowering, one compilation — a check; there is no program to build. Exit
     /// 0 when it holds, 1 after reporting.
     /// </summary>
-    public static int CheckLibrary(LibraryException library, TextWriter error)
+    public static int CheckLibrary(LibraryException library, TextWriter error, BuildProfile? profile = null)
     {
         var manifest = library.Manifest;
         var roots = Directory.Exists(manifest.SourceRoot)
@@ -152,7 +171,7 @@ public static class Pipeline
             PackageDependencies = library.Graph.Declared,
         };
         var result = SourceCompiler.CheckProject(roots, options);
-        return result.Render(error) ? 0 : 1;
+        return result.Render(error) && !Denied(result, profile, error) ? 0 : 1;
     }
 
     private static void AddTree(List<string> parts, string root)

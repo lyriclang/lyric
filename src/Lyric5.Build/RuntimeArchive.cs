@@ -25,16 +25,17 @@ public static class RuntimeArchive
     /// <summary>
     /// The archive's path, building it when the cache has none. Keying every runtime unit hashes
     /// megabytes of collector source, so the answer is memoized under the toolchain version, the
-    /// compiler, the target, the profile and a stamp of the runtime's own files (their names,
+    /// compiler, the target, the profile and its flags, and a stamp of the runtime's own files (their names,
     /// sizes and times): a development tree that edits the runtime gets a new archive, a warm
     /// build of a program gets the path.
     /// </summary>
-    public static string For(CCompiler compiler, Target target, Profile profile, string toolchainVersion)
+    public static string For(CCompiler compiler, Target target, BuildProfile profile, string toolchainVersion)
     {
         var root = SourceRoot()
             ?? throw new CBuildException("this toolchain carries no runtime source (runtime/include/lyr not found above it)");
         var cache = CacheDir(toolchainVersion);
-        var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name()}|{SourceStamp(root)}";
+        // The flags, not the name alone: '--lto' on 'release' is another archive than 'release'.
+        var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}|{SourceStamp(root)}";
         string Build() => RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
         var archive = UserCache.Memo("runtime-archive", key, Build);
         // The memo may outlive the archive (a cleaned cache): then build again.

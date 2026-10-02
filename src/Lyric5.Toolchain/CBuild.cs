@@ -28,13 +28,13 @@ public sealed class CBuild
 
     public CCompiler Compiler { get; }
     public Target Target { get; }
-    public Profile Profile { get; }
+    public BuildProfile Profile { get; }
 
-    public CBuild(CCompiler compiler, Target target, Profile profile, string cacheDir)
+    public CBuild(CCompiler compiler, Target target, BuildProfile profile, string cacheDir)
     {
-        if (profile.RequiresClang() && compiler.Kind != CCompilerKind.Clang)
+        if (profile.RequiresClang && compiler.Kind != CCompilerKind.Clang)
         {
-            throw new CBuildException($"the {profile.Name()} profile needs clang; {compiler.Name} ships no sanitizer runtime for it");
+            throw new CBuildException($"the {profile.Name} profile needs clang; {compiler.Name} ships no sanitizer runtime for it");
         }
         if (!target.IsHost && !compiler.CanCrossCompile)
         {
@@ -43,7 +43,7 @@ public sealed class CBuild
         Compiler = compiler;
         Target = target;
         Profile = profile;
-        _cacheDir = Path.Combine(cacheDir, target.Triple, profile.Name());
+        _cacheDir = Path.Combine(cacheDir, target.Triple, profile.Name);
         Directory.CreateDirectory(_cacheDir);
     }
 
@@ -68,8 +68,8 @@ public sealed class CBuild
         // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
         // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
         if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");
-        flags.AddRange(Profile.Codegen());
-        if (unit.Instrument) flags.AddRange(Profile.Instrumentation());
+        flags.AddRange(Profile.Codegen);
+        if (unit.Instrument) flags.AddRange(Profile.Instrumentation);
         foreach (var define in unit.Defines) flags.Add("-D" + define);
         foreach (var include in unit.IncludeDirs) { flags.Add("-I"); flags.Add(include); }
         if (unit.ExtraFlags is not null) flags.AddRange(unit.ExtraFlags);
@@ -83,7 +83,7 @@ public sealed class CBuild
 
         Add(Compiler.Identity);
         Add(Target.Triple);
-        Add(Profile.Name());
+        Add(Profile.Name);
         foreach (var flag in FlagsFor(unit)) Add(flag);
         Add(Path.GetFileName(unit.Source));
         sha.AppendData(File.ReadAllBytes(unit.Source));
@@ -130,7 +130,7 @@ public sealed class CBuild
         if (result.ExitCode != 0)
         {
             File.Delete(partial);
-            throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name()}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
+            throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
         Publish(partial, target);
         return target;
@@ -208,8 +208,8 @@ public sealed class CBuild
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var arguments = Driver();
-        arguments.AddRange(Profile.Codegen());
-        arguments.AddRange(Profile.Instrumentation());
+        arguments.AddRange(Profile.Codegen);
+        arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
         arguments.AddRange(["-o", output]);
         arguments.AddRange(Target.Os switch
@@ -223,7 +223,7 @@ public sealed class CBuild
         var result = ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
         if (result.ExitCode != 0)
         {
-            throw new CBuildException($"linking {output} for {Target} ({Profile.Name()}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
+            throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
         if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(output);
         return output;
