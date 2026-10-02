@@ -46,6 +46,16 @@ void lyr_coro_yield(void);
  * for a yield without one. */
 void lyr_coro_yield_value(void *value);
 
+/* A yield outside a coroutine's own body (06 §10a, A8): its value meets the running coroutine's
+ * yield type only at run time, so the site names its type and the coroutine its own — a mismatch
+ * panics (RT0014), as does such a yield with no coroutine running. `key` is the type as Lyric
+ * writes it. */
+void lyr_coro_yield_dynamic(void *value, const char *key);
+
+/* The yield type a coroutine's pulls read, as Lyric writes it: what a dynamic yield is held to.
+ * Left unset, a coroutine takes what a dynamic yield hands it unchecked. */
+void lyr_coro_set_yield_key(LyrCoro *co, const char *key);
+
 /* What the coroutine's latest yield handed over; after its body returned, what the body left
  * there (lyr_coro_set_transfer) — the result, or NULL. */
 void *lyr_coro_transfer(const LyrCoro *co);
