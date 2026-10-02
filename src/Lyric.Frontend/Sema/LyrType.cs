@@ -57,7 +57,7 @@ public abstract record LyrType
         // The thrown set counts (03 T17): 'fn() -> int' and 'fn() -> int throws E' are two types —
         // a set, in any order (05 E2 K1).
         (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters)
-                                && SameSet(x.Throws, y.Throws),
+                                && SameSet(x.Throws, y.Throws) && FnType.SamePlaces(x, y),
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
         // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
         // the second would pass for the first and the demand would be lost again at the binding.
@@ -141,6 +141,22 @@ public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType
     /// type's identity as a set (03 T17); a value with a smaller set coerces to a type with a
     /// larger one (K6), never the reverse.</summary>
     public LyrType[] Throws { get; init; } = [];
+
+    /// <summary>Which parameters take a place (design/v5/spec/03 T12), by position; empty when
+    /// none does. Part of the type's identity (T17): <c>fn(&amp;int) -&gt; void</c> is not
+    /// <c>fn(int) -&gt; void</c>.</summary>
+    public bool[] Places { get; init; } = [];
+
+    /// <summary>Whether parameter <paramref name="i"/> takes a place.</summary>
+    public bool PlaceAt(int i) => i < Places.Length && Places[i];
+
+    /// <summary>Whether two function types mark the same parameters.</summary>
+    public static bool SamePlaces(FnType a, FnType b)
+    {
+        for (var i = 0; i < Math.Max(a.Parameters.Length, b.Parameters.Length); i++)
+            if (a.PlaceAt(i) != b.PlaceAt(i)) return false;
+        return true;
+    }
 }
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type
 /// <param name="Throws">What a PULL of this coroutine may throw: null when it cannot, the

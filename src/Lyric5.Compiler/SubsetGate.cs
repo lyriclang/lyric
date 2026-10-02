@@ -108,6 +108,9 @@ public static class SubsetGate
                     Type(c.Yield, span, where);
                     Type(c.Result, span, where);
                     break;
+                case IrPlaceType p:
+                    Type(p.Value, span, where);
+                    break;
                 case IrHostType:
                     Refuse(span, $"host types, {where}", "M14");
                     break;
@@ -172,6 +175,9 @@ public static class SubsetGate
                 case CurrentError or ClearError or StashError or RestoreError or SuppressError:
                     break;
                 case LoadGlobal or StoreGlobal:
+                    break;
+                // Places (03 T12): a place parameter's.
+                case AddrLocal or AddrField or AddrElem or AddrGlobal or LoadPlace or StorePlace:
                     break;
                 case MakeClosure m:
                     Type(m.Type, op.Span, "the function type");

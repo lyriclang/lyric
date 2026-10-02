@@ -60,10 +60,12 @@ namespace Lyric.Ir
                            && x.Parameters.Zip(y.Parameters).All(pair => Equal(pair.First, pair.Second));
                 case (IrCoroutineType x, IrCoroutineType y):
                     return Equal(x.Yield, y.Yield) && Equal(x.Result, y.Result);
+                case (IrPlaceType x, IrPlaceType y):
+                    return Equal(x.Value, y.Value);
                 case (IrScalarType or IrRefType or IrArrayType or IrSliceType or IrInlineArrayType or IrOptionalType or IrEnumType
-                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType,
+                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType or IrPlaceType,
                       IrScalarType or IrRefType or IrArrayType or IrSliceType or IrInlineArrayType or IrOptionalType or IrEnumType
-                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType):
+                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType or IrPlaceType):
                     return false; // different kinds: comparable, merely unequal
                 default:
                     throw new InternalCompilationException(
@@ -191,6 +193,14 @@ public sealed record IrFunctionType(IrType[] Parameters, IrType Return) : IrType
 /// what the body returns when it ends. Structural, like a function type: it has no declaration.
 /// </summary>
 public sealed record IrCoroutineType(IrType Yield, IrType Result) : IrType;
+
+/// <summary>
+/// The place of a value of <see cref="Value"/> (design/v5/spec/03 T12): what a place parameter
+/// holds — a pointer, in C — and what an <c>addr</c> instruction makes for the argument. No value
+/// of the program is one: a place stands in a parameter, in a function type's parameter, and in
+/// the temps between its address and the call.
+/// </summary>
+public sealed record IrPlaceType(IrType Value) : IrType;
 
 
 }

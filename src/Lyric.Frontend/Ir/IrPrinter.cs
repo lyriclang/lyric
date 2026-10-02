@@ -194,6 +194,12 @@ public static class IrPrinter
         CallIndirect c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "") +
                           $"callind {c.Callee}({string.Join(", ", c.Args)})" + (c.Throws ? " throws" : ""),
         StoreGlobal g => $"stglobal {g.Global}, {g.Value}",
+        AddrLocal a => $"{a.Dest}: {TypeStr(new IrPlaceType(a.Type))} = addr {a.Local}",
+        AddrField a => $"{a.Dest}: {TypeStr(new IrPlaceType(a.FieldType))} = addrfield {a.Object}, {a.Type}{a.Field}",
+        AddrElem a => $"{a.Dest}: {TypeStr(new IrPlaceType(a.Element))} = addrelem {a.Array}, {a.Index}",
+        AddrGlobal a => $"{a.Dest}: {TypeStr(new IrPlaceType(a.Type))} = addrglobal {a.Global}",
+        LoadPlace l => $"{l.Dest}: {TypeStr(l.Type)} = loadplace {l.Place}",
+        StorePlace s => $"storeplace {s.Place}, {s.Value}",
         MakeCoroutine m => $"{m.Dest}: {TypeStr(m.Type)} = mkcoro {m.Body}" +
                            (m.Args.Length > 0 ? $", {string.Join(", ", m.Args)}" : ""),
         ResumePull r => $"{r.Dest}: {(r.YieldType is IrScalarType { Kind: IrScalar.Void } ? "bool" : "?" + TypeStr(r.YieldType))} = next {r.Coroutine}"
@@ -275,6 +281,7 @@ public static class IrPrinter
         IrHostType h => $"host {h.Name}",
         IrFunctionType f => $"fn({string.Join(", ", f.Parameters.Select(TypeStr))}) -> {TypeStr(f.Return)}",
         IrCoroutineType c => $"coroutine<{TypeStr(c.Yield)}, {TypeStr(c.Result)}>",
+        IrPlaceType p => $"place {TypeStr(p.Value)}",
         _ => throw new InternalCompilationException($"ir-printer: type not printable: {t.GetType().Name}")
     };
 

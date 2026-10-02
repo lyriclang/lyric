@@ -108,6 +108,13 @@ internal sealed class FunctionLowerer
     /// </summary>
     private readonly Dictionary<LocalId, (TypeId Cell, IrType Value)> _cells = new();
 
+    /// <summary>
+    /// Slots holding the caller's PLACE rather than a value — a place parameter's (03 T12) — with
+    /// the type of the value at the place. Like a cell, known only to <see cref="LoadValue"/> and
+    /// <see cref="StoreValue"/>: the rest of the lowering reads and writes the name as any other.
+    /// </summary>
+    private readonly Dictionary<LocalId, IrType> _places = new();
+
     /// <summary>While lowering a lambda: which environment field holds which captured symbol. Empty
     /// outside a lambda.</summary>
     private readonly Dictionary<Symbol, int> _captureFields =
@@ -227,7 +234,11 @@ internal sealed class FunctionLowerer
 
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"parameter '{p.Name}' was not bound by the type checker");
-            _slots.DeclareFor(ps, LowerValueType(ps.Type, p.Span));
+            var valueType = LowerValueType(ps.Type, p.Span);
+            // '&n: int' (03 T12): the slot holds the caller's place, and the name is read and
+            // written through it.
+            if (ps.IsPlace) _places[_slots.DeclareFor(ps, new IrPlaceType(valueType))] = valueType;
+            else _slots.DeclareFor(ps, valueType);
         }
         Parameters = _slots.Locals.ToArray();
     }
@@ -557,6 +568,13 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId LoadValue(LocalId slot, Core.Span span)
     {
+        if (_places.TryGetValue(slot, out var held))
+        {
+            var read = _slots.NewTemp(held);
+            _b.Emit(new LoadPlace(read, PlaceIn(slot, span), held, span));
+            return read;
+        }
+
         if (!_cells.TryGetValue(slot, out var cell))
         {
             var plain = _slots.TypeOfLocal(slot);
@@ -576,6 +594,12 @@ internal sealed class FunctionLowerer
     /// <summary>Writes a named variable, into its slot or into its cell.</summary>
     private void StoreValue(LocalId slot, TempId value, Core.Span span)
     {
+        if (_places.ContainsKey(slot))
+        {
+            _b.Emit(new StorePlace(PlaceIn(slot, span), value, span));
+            return;
+        }
+
         if (!_cells.TryGetValue(slot, out var cell))
         {
             _b.Emit(new StoreLocal(slot, value, span));
@@ -590,7 +614,136 @@ internal sealed class FunctionLowerer
     /// <summary>The type of the VALUE in a slot, so for a cell its content rather than the cell. Every
     /// place that uses <c>TypeOfLocal</c> to type a value has to ask this question.</summary>
     private IrType ValueTypeOf(LocalId slot) =>
-        _cells.TryGetValue(slot, out var cell) ? cell.Value : _slots.TypeOfLocal(slot);
+        _places.TryGetValue(slot, out var held) ? held
+        : _cells.TryGetValue(slot, out var cell) ? cell.Value : _slots.TypeOfLocal(slot);
+
+    /// <summary>The place a place parameter's slot holds (03 T12).</summary>
+    private TempId PlaceIn(LocalId slot, Core.Span span)
+    {
+        var type = _slots.TypeOfLocal(slot);
+        var place = _slots.NewTemp(type);
+        _b.Emit(new LoadLocal(place, slot, type, span));
+        return place;
+    }
+
+    // ------------------------------------------------------------------ places
+
+    /// <summary>
+    /// The place a marked argument hands a place parameter (03 §2.3a): a variable — in its slot,
+    /// in the cell a closure shares, at module level, or the place the function holds itself,
+    /// handed on — the receiver of a <c>mut fn</c>, a field, an element. The sema proved it a
+    /// place the call may write; what is made here is its address, of the value's own type.
+    /// </summary>
+    private TempId LowerPlace(Expr operand)
+    {
+        var span = operand.Span;
+        TempId Address(IrType value, Func<TempId, IrOp> make)
+        {
+            var dest = _slots.NewTemp(new IrPlaceType(value));
+            _b.Emit(make(dest));
+            return dest;
+        }
+
+        switch (operand)
+        {
+            case IdentifierExpr name when GlobalOf(name) is { } global:
+            {
+                var (id, type) = _globals.Resolve(global, span);
+                return Address(type, dest => new AddrGlobal(dest, id, type, span));
+            }
+            case IdentifierExpr name when TryCapturedCell(name, out var shared, out var sharedType, out var sharedValue):
+                return Address(sharedValue, dest => new AddrField(dest, shared, sharedType, new FieldId(0), sharedValue, span));
+            case IdentifierExpr name:
+            {
+                var slot = ResolveLocalTarget(name, "a place argument");
+                if (_places.ContainsKey(slot)) return PlaceIn(slot, span);
+                if (_cells.TryGetValue(slot, out var cell))
+                {
+                    var holder = _slots.NewTemp(_slots.TypeOfLocal(slot));
+                    _b.Emit(new LoadLocal(holder, slot, _slots.TypeOfLocal(slot), span));
+                    return Address(cell.Value, dest => new AddrField(dest, holder, cell.Cell, new FieldId(0), cell.Value, span));
+                }
+                var type = _slots.TypeOfLocal(slot);
+                return Address(type, dest => new AddrLocal(dest, slot, type, span));
+            }
+            // 'normalize(&this)' in a 'mut fn' (03 T12): the receiver's place, which is the caller's.
+            case ThisExpr when _thisSlot is { } self && _thisType is { } selfType:
+                return Address(selfType, dest => new AddrLocal(dest, self, selfType, span));
+            case ThisExpr:
+                throw NotSupported("'&this' inside a lambda", span);
+            case MemberExpr member:
+            {
+                var (obj, type, field, fieldType) = ResolveFieldAccess(member);
+                return Address(fieldType, dest => new AddrField(dest, obj, type, field, fieldType, span));
+            }
+            case IndexExpr indexed:
+            {
+                var (array, index, element) = ResolveIndexAccess(indexed);
+                return Address(element, dest => new AddrElem(dest, array, index, element, span));
+            }
+            default:
+                throw Bug($"'&' of a {operand.GetType().Name} reached the lowering — the sema refuses what is no place");
+        }
+    }
+
+    /// <summary>
+    /// The place <c>++</c> and <c>--</c> read and write (03 §2.2): a variable — in its slot, its
+    /// cell, at module level, or through the place a place parameter holds — a field, an element of
+    /// an array. What leads to it is evaluated here, once, as for a compound assignment:
+    /// <c>next().n++</c> calls <c>next</c> once.
+    /// </summary>
+    private (IrType Type, Func<TempId> Load, Action<TempId> Store) AccessOf(Expr target, Span span)
+    {
+        switch (target)
+        {
+            case MemberExpr member:
+            {
+                var (obj, type, field, fieldType) = ResolveFieldAccess(member);
+                return (fieldType, () =>
+                {
+                    var loaded = _slots.NewTemp(fieldType);
+                    _b.Emit(new LoadField(loaded, obj, type, field, fieldType, span));
+                    return loaded;
+                }, value => _b.Emit(new StoreField(obj, type, field, value, span)));
+            }
+            case IndexExpr indexed when TypeOfExpr(indexed.Target) is IrArrayType or IrSliceType or IrInlineArrayType:
+            {
+                var (array, index, element) = ResolveIndexAccess(indexed);
+                return (element, () =>
+                {
+                    var loaded = _slots.NewTemp(element);
+                    _b.Emit(new LoadElem(loaded, array, index, element, span));
+                    return loaded;
+                }, value => _b.Emit(new StoreElem(array, index, value, span)));
+            }
+            // The read and the write with one index, which a container's get and set would each
+            // evaluate — the question a compound assignment on one leaves open as well.
+            case IndexExpr:
+                throw NotSupported("'++' or '--' on an element of a container (only of arrays)", target.Span);
+            case IdentifierExpr name when GlobalOf(name) is { } global:
+            {
+                var (id, type) = _globals.Resolve(global, span);
+                return (type, () =>
+                {
+                    var loaded = _slots.NewTemp(type);
+                    _b.Emit(new LoadGlobal(loaded, id, type, span));
+                    return loaded;
+                }, value => _b.Emit(new StoreGlobal(id, value, span)));
+            }
+            case IdentifierExpr when TryCapturedCell(target, out var cell, out var cellType, out var held):
+                return (held, () =>
+                {
+                    var loaded = _slots.NewTemp(held);
+                    _b.Emit(new LoadField(loaded, cell, cellType, new FieldId(0), held, span));
+                    return loaded;
+                }, value => _b.Emit(new StoreField(cell, cellType, new FieldId(0), value, span)));
+            default:
+            {
+                var slot = ResolveLocalTarget(target, "increment/decrement");
+                return (ValueTypeOf(slot), () => LoadValue(slot, span), value => StoreValue(slot, value, span));
+            }
+        }
+    }
 
     public IrFunction Run()
     {
@@ -2363,6 +2516,8 @@ internal sealed class FunctionLowerer
 
     private TempId LowerUnary(UnaryExpr expr)
     {
+        if (expr.Operator is UnaryOp.Place) return LowerPlace(expr.Operand);
+
         // '-v' and '~v' on a conforming type ARE their calls (04 D6).
         if (_types.OperatorCallOf(expr) is { } desugaredUnary)
             return LowerCall(desugaredUnary) ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
@@ -2410,17 +2565,14 @@ internal sealed class FunctionLowerer
     /// Both write the same store.</summary>
     private TempId LowerIncDec(Expr target, bool increment, bool yieldOldValue, Span span)
     {
-        var slot = ResolveLocalTarget(target, "increment/decrement");
-        var type = _slots.TypeOfLocal(slot);
-
-        var oldValue = _slots.NewTemp(type);
-        _b.Emit(new LoadLocal(oldValue, slot, type, span));
+        var (type, load, store) = AccessOf(target, span);
+        var oldValue = load();
 
         var one = EmitConst(OneFor(type, span), type, span);
         var newValue = _slots.NewTemp(type);
         _b.Emit(new BinOp(newValue, increment ? IrBinKind.Add : IrBinKind.Sub, type,
             oldValue, one, span));
-        _b.Emit(new StoreLocal(slot, newValue, span));
+        store(newValue);
 
         return yieldOldValue ? oldValue : newValue;
     }
@@ -3745,6 +3897,10 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId LowerExprAs(Expr expr, IrType expected)
     {
+        // A marked argument (03 §2.3a) is its place, whatever the path to the call wrote down as
+        // the parameter's type: the sema let the mark through to a place parameter only.
+        if (expr is UnaryExpr { Operator: UnaryOp.Place } mark) return LowerPlace(mark.Operand);
+
         if (expr is NullLiteralExpr)
         {
             if (expected is not IrOptionalType option)
@@ -4547,7 +4703,10 @@ internal sealed class FunctionLowerer
     {
         var symbol = _types.RefOf(expr);
         if (symbol is ImportBindingSymbol import) symbol = import.Target;
-        return symbol is GlobalSymbol global ? LowerGlobalRead(global, expr.Span) : null;
+        if (symbol is not GlobalSymbol global) return null;
+        // A module 'let' narrows like a local (03 §3.2): the read unwraps what the test proved.
+        var (_, type) = _globals.Resolve(global, expr.Span);
+        return Narrow(expr, LowerGlobalRead(global, expr.Span), type);
     }
 
     /// <summary>A global slot: a module <c>let</c> or a <c>static let</c>. Both are the same in the
@@ -6477,7 +6636,7 @@ internal sealed class FunctionLowerer
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
-            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws) },
+            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws), Places = f.Places },
         CoroutineOf c => c with
         {
             Yield = SubstituteType(c.Yield),

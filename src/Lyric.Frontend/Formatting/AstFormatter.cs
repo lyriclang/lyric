@@ -364,7 +364,10 @@ public sealed class AstFormatter
     private Doc ParamDoc(Param parameter)
     {
         var parts = new List<Doc>();
+        // '@callerExpr(actual)' (09 A11) stands before the name, on the parameter's line.
+        foreach (var attribute in parameter.Attributes) parts.Add(Doc.Of(AttributeDoc(attribute), Doc.Space));
         if (parameter.IsParams) parts.Add(Doc.From("params "));
+        if (parameter.IsPlace) parts.Add(Doc.From("&"));
         parts.Add(Doc.From($"{parameter.Name}: "));
         parts.Add(TypeDoc(parameter.Type));
         if (parameter.Default is { } fallback)
@@ -865,6 +868,7 @@ public sealed class AstFormatter
         UnaryOp.PreInc => "++",
         UnaryOp.PreDec => "--",
         UnaryOp.FromEnd => "^",
+        UnaryOp.Place => "&",
         _ => throw new InternalCompilationException($"unreachable: unexpected {op}"),
     };
 
@@ -1158,7 +1162,8 @@ public sealed class AstFormatter
             Doc.Join(Doc.From(", "), t.Elements.Select((e, i) => t.Labels?[i] is { } label
                 ? Doc.Of(Doc.From(label + ": "), TypeDoc(e)) : TypeDoc(e)).ToArray()), Doc.From(")")),
         FunctionType f => Doc.Of(Doc.From("fn("),
-            Doc.Join(Doc.From(", "), f.Parameters.Select(TypeDoc).ToArray()),
+            Doc.Join(Doc.From(", "), f.Parameters.Select((p, i) => i < f.Places.Length && f.Places[i]
+                ? Doc.Of(Doc.From("&"), TypeDoc(p)) : TypeDoc(p)).ToArray()),
             Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),
         _ => throw new InternalCompilationException($"unreachable: unformatted {type.GetType().Name}"),
     };

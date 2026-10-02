@@ -48,6 +48,10 @@ public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span) 
 public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span)
 {
     public ThrowsClause? Throws { get; init; }
+
+    /// <summary><c>fn(&amp;int) -&gt; void</c> (design/v5/spec/03 T12, T17): which parameters take a
+    /// place, by position; empty when none does.</summary>
+    public bool[] Places { get; init; } = [];
 }
 
 // Recovery placeholder, set when ParseType cannot continue, so later stages do not meet a null.

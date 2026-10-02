@@ -256,6 +256,16 @@ public sealed partial class Parser
             return new TryExpr(marked, Span.Union(kw.Span, end))
                 { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray() };
         }
+        // '&x' marks the argument of a place parameter (03 T12, 08 Y4) and stands nowhere else:
+        // there is no address as a value. ParseArguments takes the mark before it gets here; one
+        // that arrives is read past, so it gives one message and the rest still parses.
+        if (op is TokenKind.Amp)
+        {
+            var mark = _buffer.Advance();
+            _de.Report("LYR-PAR0054", Severity.Error, mark.Span,
+                "'&' marks the argument of a place parameter and stands nowhere else — there is no address as a value");
+            return ParsePrefix(atStart);
+        }
         // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
         // is still the exclusive or, which the binary loop takes before this is asked.
         if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec or TokenKind.Caret)
@@ -666,7 +676,14 @@ public sealed partial class Parser
                 name = _sm.Slice(_buffer.Advance().Span).ToString();
                 _buffer.Advance();
             }
-            args.Add(ParseSubExpr());
+            // '&x' (03 T12, 08 Y4): the place x for a place parameter. The mark covers the whole
+            // argument, as 'try' covers everything to its right; whether what it covers is a place
+            // is the checker's question.
+            var marked = _buffer.Check(TokenKind.Amp);
+            var markSpan = _buffer.Current.Span;
+            if (marked) _buffer.Advance();
+            var argument = ParseSubExpr();
+            args.Add(marked ? new UnaryExpr(UnaryOp.Place, argument, Span.Union(markSpan, argument.Span)) : argument);
             if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
             written?.Add(name);
             if (!_buffer.Match(TokenKind.Comma)) break;
@@ -1286,8 +1303,14 @@ public sealed partial class Parser
         var start = _buffer.Advance(); // 'fn'
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0008", "expected '(' after 'fn' in function type");
         var parameters = new List<TypeNode>();
+        // 'fn(&int) -> void' (03 T12, T17): the mark at the parameter's start, the type unmarked.
+        var places = new List<bool>();
         if (!_buffer.Check(TokenKind.RParen))
-            do { parameters.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+            do
+            {
+                places.Add(_buffer.Match(TokenKind.Amp));
+                parameters.Add(ParseType());
+            } while (_buffer.Match(TokenKind.Comma));
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {_buffer.Current.TokenKind}");
@@ -1297,7 +1320,8 @@ public sealed partial class Parser
         ThrowsClause? throws = null;
         if (AtContextual("throws")) throws = ParseTypeThrows(_buffer.Advance().Span);
         return new FunctionType(parameters.ToArray(), returnType,
-            Span.Union(start.Span, throws?.Span ?? returnType.Span)) { Throws = throws };
+            Span.Union(start.Span, throws?.Span ?? returnType.Span))
+            { Throws = throws, Places = places.Contains(true) ? places.ToArray() : [] };
     }
 
     /// <summary>

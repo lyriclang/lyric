@@ -196,6 +196,8 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.Bool } => "uint8_t",
         IrScalarType { Kind: IrScalar.String } => "LyrStr *",
         IrScalarType { Kind: IrScalar.Void } => "void",
+        // A place (03 T12) is the address of the value where it lies.
+        IrPlaceType p => CType(p.Value) + " *",
         _ => throw new InvalidOperationException($"the C emitter has no type for {type}; the gate let it through"),
     };
 
@@ -306,6 +308,7 @@ public sealed class CEmitter
         IrCoroutineType c => "coro_" + Mangle(c.Yield) + "_to_" + Mangle(c.Result),
         IrInterfaceType i => $"iface{i.Type.Value}",
         IrOptionalType o => "opt_" + Mangle(o.Inner),
+        IrPlaceType p => "place_" + Mangle(p.Value),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
     };
 
@@ -328,6 +331,7 @@ public sealed class CEmitter
         IrCoroutineType c => IsVoid(c.Result) ? $"Coroutine<{Display(c.Yield)}>" : $"Coroutine<{Display(c.Yield)}, {Display(c.Result)}>",
         IrInterfaceType i => Qualified(_module.Types[i.Type.Value]),
         IrOptionalType o => "?" + Display(o.Inner),
+        IrPlaceType p => "&" + Display(p.Value),
         _ => type.ToString() ?? "?",
     };
 
@@ -351,7 +355,7 @@ public sealed class CEmitter
     private static string Zero(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "NULL",
-        IrRefType or IrArrayType or IrCoroutineType => "NULL",
+        IrRefType or IrArrayType or IrCoroutineType or IrPlaceType => "NULL",
         _ when IsNiche(type) => "NULL",
         _ when IsAggregate(type) => "{0}",
         IrSliceType or IrFunctionType or IrInterfaceType => "{0}",
@@ -561,6 +565,7 @@ public sealed class CEmitter
             {
                 LoadGlobal l => l.Global.Value,
                 StoreGlobal s => s.Global.Value,
+                AddrGlobal a => a.Global.Value,
                 _ => -1,
             }).Where(i => i >= 0).Distinct().Order().ToList();
             if (touched.Count > 0)
@@ -687,7 +692,8 @@ public sealed class CEmitter
             .SelectMany(f => f.Locals.Select(l => l.Type).Concat(f.Temps.Select(t => t.Type)).Append(f.ReturnType))
             .Concat(indices.SelectMany(i => _module.Types[i].FieldTypes))
             .ToList();
-        var used = named.Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType or IrFunctionType).ToList();
+        var used = named.Select(t => t is IrPlaceType p ? p.Value : t)
+            .Where(t => (t is IrOptionalType && !IsNiche(t)) || t is IrSliceType or IrInlineArrayType or IrFunctionType).ToList();
         // Every element type an array is made of, the array's own element type included when it
         // is itself an array: each gets a descriptor, after the structs it may hold.
         var elements = new List<IrType>();
@@ -700,6 +706,7 @@ public sealed class CEmitter
             else if (type is IrInlineArrayType ia) Element(ia.Element);
             else if (type is IrFunctionType f) { foreach (var p in f.Parameters) Element(p); Element(f.Return); }
             else if (type is IrCoroutineType c) { Element(c.Yield); Element(c.Result); }
+            else if (type is IrPlaceType p) Element(p.Value);
         }
         foreach (var type in named) Element(type);
         if (indices.Count == 0 && used.Count == 0 && elements.Count == 0) return;
@@ -732,7 +739,8 @@ public sealed class CEmitter
         // returns '?Error' — and the inner request must then write it, before the table needs it.
         void Require(IrType type)
         {
-            if (type is IrStructType held) Define(held.Type.Value);
+            if (type is IrPlaceType place) Require(place.Value);
+            else if (type is IrStructType held) Define(held.Type.Value);
             else if (type is IrInterfaceType dyn) Define(dyn.Type.Value);
             else if (type is IrEnumType chosen) Define(chosen.Type.Value);
             else if (IsTagNiche(type)) Require(((IrOptionalType)type).Inner);
@@ -1147,6 +1155,7 @@ public sealed class CEmitter
                 case IrFunctionType f: foreach (var p in f.Parameters) Visit(p); Visit(f.Return); break;
                 case IrCoroutineType c: Visit(c.Yield); Visit(c.Result); break;
                 case IrInterfaceType i: Add(i.Type.Value); break;
+                case IrPlaceType p: Visit(p.Value); break;
             }
         }
         void Add(int index)
@@ -1543,6 +1552,19 @@ public sealed class CEmitter
             ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
             : $"{Temp(l.Dest)} = {GlobalName(l.Global.Value)};",
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
+        // Places (03 T12). The receiver of a struct method already is one.
+        AddrLocal a => IsReceiverPlace(a.Local)
+            ? $"{Temp(a.Dest)} = {LocalName(_function.Locals[a.Local.Value])};"
+            : $"{Temp(a.Dest)} = &{LocalName(_function.Locals[a.Local.Value])};",
+        AddrField a => $"{Temp(a.Dest)} = &{Temp(a.Object)}->{Field(a.Type, a.Field)};",
+        AddrElem a => $"LYR_CHECK_INDEX({Temp(a.Index)}, {Length(a.Array)}); "
+            + $"{Temp(a.Dest)} = &{Elements(a.Array, a.Element)}[{Temp(a.Index)}];",
+        AddrGlobal a => $"{Temp(a.Dest)} = &{GlobalName(a.Global.Value)};",
+        // A struct temp aliases the value where it lies, as it aliases a local.
+        LoadPlace l => IsAggregate(l.Type)
+            ? $"{Temp(l.Dest)} = {Temp(l.Place)};"
+            : $"{Temp(l.Dest)} = *{Temp(l.Place)};",
+        StorePlace s => StoreThrough(s),
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
             + $"{SlotArgument(_module.Functions[call.Target.Value], call.Args.Length)})"),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
@@ -1702,6 +1724,18 @@ public sealed class CEmitter
         if (IsReference(type)) return $"LYR_WRITE_BARRIER({place}, &{slot}, {Value(f.Value)});";
         if (HoldsReferences(type)) return $"LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {Value(f.Value)});";
         return $"{slot} = {Value(f.Value)};";
+    }
+
+    /// <summary>A write through a place (03 T12), through the barrier when the value is or holds a
+    /// reference: the place is the slot, wherever it lies — in an object, in a struct on the
+    /// stack, in a global — and the barrier takes it as it is (the note on <see cref="Store"/>).</summary>
+    private string StoreThrough(StorePlace s)
+    {
+        var place = Temp(s.Place);
+        var type = ((IrPlaceType)TypeOf(s.Place)).Value;
+        if (IsReference(type)) return $"LYR_WRITE_BARRIER({place}, {place}, {Value(s.Value)});";
+        if (HoldsReferences(type)) return $"LYR_WRITE_BARRIER_VALUE({place}, {place}, {Value(s.Value)});";
+        return $"*{place} = {Value(s.Value)};";
     }
 
     /// <summary>An element write, through the barrier when the element is or holds a reference,

@@ -95,6 +95,10 @@ public sealed record Param(bool IsParams, string Name, TypeNode Type, Expr? Defa
     /// <summary>What sits on the parameter: <c>@callerExpr(actual)</c> (design/v5/spec/09 A11) —
     /// the one attribute a parameter takes.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
+
+    /// <summary><c>&amp;x: T</c> (design/v5/spec/03 T12): the parameter takes a place of the
+    /// caller, which the function reads and writes, not a value.</summary>
+    public bool IsPlace { get; init; }
 }
 /// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c> (design/v5/spec/05 E2 K1,
 /// K2; 08 D9): a SET of thrown types, written in brackets from two on (the list rule, 08 D5/D6).

@@ -197,6 +197,18 @@ public class SuggestionAndNoteTests
     }
 
     [Fact]
+    public void A_var_handed_to_a_place_parameter_counts_as_mutation()
+    {
+        // '&x' hands x to a call that may write it (design/v5/spec/03 T12): 'let' would turn the
+        // program the hint advises into a refused one (LYR-SEM0156).
+        var de = Check(
+            "fn twice(&n: int): void {\n    n *= 2;\n}\n"
+            + "fn main(): int {\n    var x = 1;\n    twice(&x);\n    return x;\n}\n");
+        Assert.False(de.HasErrors);
+        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0075");
+    }
+
+    [Fact]
     public void An_unused_var_gets_the_unused_warning_and_no_hint()
     {
         var de = Check("fn main(): int {\n    var x = 1;\n    return 0;\n}\n");

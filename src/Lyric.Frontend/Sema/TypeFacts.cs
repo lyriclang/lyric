@@ -242,7 +242,7 @@ public static class TypeFacts
             case FnType f:
                 // A function type returned by one with a set reads parenthesized: the nearest
                 // function type takes a 'throws' (03 T17).
-                return "fn(" + string.Join(", ", f.Parameters.Select(Display)) + ") -> "
+                return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Display(p))) + ") -> "
                        + (f.Return is FnType && f.Throws.Length > 0 ? $"({Display(f.Return)})" : Display(f.Return))
                        + ThrownText(f.Throws);
             case RangeOf r: return "range<" + Display(r.Element) + ">";

@@ -124,6 +124,27 @@ public sealed record Downcast(TempId Dest, TempId Value, TypeId Target, IrType R
 // (newobj, a call result) does not need it, because it belongs to nobody yet.
 public sealed record StructCopy(TempId Dest, TempId Value, TypeId Type, Span Span) : IrOp(Span);
 
+// Places (design/v5/spec/03 T12): what a place parameter takes. Four instructions make one — of a
+// local, a field, an element, a global — and two go through one. The lowering makes a place for an
+// argument only, and goes through one only in the function that takes it: nothing stores a place
+// anywhere else, so a place never outlives the call it was made for.
+
+/// <summary>The place of a local, the frame slot itself. A local whose place is taken is no longer
+/// frame-private, and the passes that assume it — forwarding, scalarization — leave it alone.</summary>
+/// <param name="Type">The local's type, which the place holds; the dest is its place.</param>
+public sealed record AddrLocal(TempId Dest, LocalId Local, IrType Type, Span Span) : IrOp(Span);
+/// <summary>The place of a field — of an object, or of a struct a temp aliases.</summary>
+public sealed record AddrField(TempId Dest, TempId Object, TypeId Type, FieldId Field, IrType FieldType, Span Span) : IrOp(Span);
+/// <summary>The place of an element of an array, a view or an inline array, checked against the
+/// length where the program named the index.</summary>
+public sealed record AddrElem(TempId Dest, TempId Array, TempId Index, IrType Element, Span Span) : IrOp(Span);
+/// <summary>The place of a module-level binding.</summary>
+public sealed record AddrGlobal(TempId Dest, GlobalId Global, IrType Type, Span Span) : IrOp(Span);
+/// <summary>The value at a place. A struct temp aliases the place, as it aliases a local.</summary>
+public sealed record LoadPlace(TempId Dest, TempId Place, IrType Type, Span Span) : IrOp(Span);
+/// <summary>A write through a place: into the caller's variable, field or element.</summary>
+public sealed record StorePlace(TempId Place, TempId Value, Span Span) : IrOp(Span);
+
 // Globals. Like LoadLocal and StoreLocal, but module-wide instead of frame-wide, and written only
 // once, by the init function.
 public sealed record LoadGlobal(TempId Dest, GlobalId Global, IrType Type, Span Span) : IrOp(Span);

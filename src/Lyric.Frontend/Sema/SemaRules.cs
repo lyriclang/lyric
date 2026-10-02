@@ -531,7 +531,8 @@ public sealed class SemaRules
     {
         // 'try f();' is the call it marks (05 E4).
         var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ThrowExpr or LoopExpr
-            or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } or ErrorExpr;
+            or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec }
+            or UnaryExpr { Operator: UnaryOp.PreInc or UnaryOp.PreDec } or ErrorExpr;
         if (!ok)
             _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls and assignments are allowed)");
     }
@@ -563,6 +564,15 @@ public sealed class SemaRules
             case UnaryExpr { Operator: UnaryOp.PreInc or UnaryOp.PreDec } u:
                 CheckIncrementTarget(u.Operand);
                 WalkExpr(u.Operand);
+                return;
+
+            // '&x' hands the call a place it may write (03 §2.3a): the rule of a write. A mark the
+            // checker refused — no place parameter takes it — has the error type and one message.
+            case UnaryExpr { Operator: UnaryOp.Place } place:
+                if (!_types.TypeOf(place).IsError && WhyNotAPlaceArgument(place.Operand) is { } why)
+                    _de.Report("LYR-SEM0156", Severity.Error, place.Operand.Span,
+                        $"'&' hands the call a place it may write, and this is none — {why}");
+                WalkExpr(place.Operand);
                 return;
 
             // A lambda BODY is a body: the same rules hold inside it. Reached only through
@@ -642,6 +652,8 @@ public sealed class SemaRules
                 return referenced switch
                 {
                     LocalSymbol { IsMutable: true } => null,
+                    // '&n: int' (03 §2.3a): the name is the caller's place, written through.
+                    ParameterSymbol { IsPlace: true } => null,
                     ParameterSymbol => $"'{id.Name}' is a parameter, and a parameter is a 'let' binding; copy it into a 'var' to change it",
                     LocalSymbol => $"'{id.Name}' is bound with 'let'; declare it 'var' to write it",
                     // A module-level 'var' is written (07 V5 G5); a module-level 'let' is not.
@@ -708,6 +720,17 @@ public sealed class SemaRules
     }
 
     private const string NotMutReason = "'this' is written, and the method is not declared 'mut fn'";
+
+    /// <summary>
+    /// Whether an argument names a place a call may write through (03 §2.3a), as the reason it
+    /// does not: the rule of a write, narrower in one point. An element is a place in an array, a
+    /// view or an inline array; a container's element is what its <c>get</c> handed out, with no
+    /// place of its own to hand over.
+    /// </summary>
+    private string? WhyNotAPlaceArgument(Expr expr) =>
+        expr is IndexExpr ix && _types.TypeOf(ix.Target) is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType)
+            ? "an element of a container is a copy its 'get' hands out, with no place of its own"
+            : WhyNotWritable(expr);
 
     /// <summary>
     /// Whether the value an expression names may be changed IN PLACE — the base of a field write

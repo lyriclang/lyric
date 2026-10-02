@@ -46,6 +46,28 @@ public class RejectedSyntaxTests
     public void Several_attributes_on_one_parameter_parse() =>
         Assert.Empty(Parse("fn f(@a @b x: int): int { return x; }"));
 
+    // ------------------------------------------------------------------ places (03 T12)
+
+    /// <summary>The place mark at a parameter, in a function type and at an argument — the three
+    /// spellings of design/v5/spec/03 T12 — parses without a word.</summary>
+    [Fact]
+    public void The_place_mark_parses_where_it_stands() =>
+        Assert.Empty(Parse("fn f(&n: int, g: fn(&int, string) -> void): void { g(&n, \"x\"); f(&n, g); }"));
+
+    /// <summary>
+    /// Anywhere else it is <c>LYR-PAR0054</c>, once, and the expression it stood before still
+    /// parses: there is no address as a value (design/v5/spec/08 Y4). Between operands it stays
+    /// the bitwise and.
+    /// </summary>
+    [Fact]
+    public void The_place_mark_stands_at_an_argument_only()
+    {
+        var diagnostics = Parse("fn f(): void { var x = 1; let y = &x; let z = x & &x; }");
+
+        Assert.Equal(2, diagnostics.Count(d => d.Code == "LYR-PAR0054"));
+        Assert.Equal(2, diagnostics.Count);
+    }
+
     // ------------------------------------------------------------------ interface inheritance
 
     /// <summary>

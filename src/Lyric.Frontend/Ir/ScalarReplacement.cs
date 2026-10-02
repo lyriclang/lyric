@@ -97,10 +97,12 @@ internal static class ScalarReplacement
     /// reasoning is a loud test failure rather than a wrong value.</para>
     ///
     /// <para>Parameters are excluded — their store is the calling convention, invisible
-    /// here.</para>
+    /// here — and so is a local whose place is taken (03 T12): the call it was handed to writes
+    /// it, invisible here as well.</para>
     /// </summary>
     private static bool ForwardLocals(IrFunction function)
     {
+        var addressed = Addressed(function);
         var storeCount = new Dictionary<int, int>();
         var storedValue = new Dictionary<int, TempId>();
         foreach (var block in function.Blocks)
@@ -113,7 +115,7 @@ internal static class ScalarReplacement
 
         var forwardable = new HashSet<int>();
         foreach (var (local, count) in storeCount)
-            if (count == 1 && local >= function.ParamCount)
+            if (count == 1 && local >= function.ParamCount && !addressed.Contains(local))
                 forwardable.Add(local);
         if (forwardable.Count == 0) return false;
 
@@ -181,8 +183,14 @@ internal static class ScalarReplacement
         public bool Viable = true;
     }
 
+    /// <summary>The locals whose place an <c>addr</c> takes (03 T12): no longer frame-private,
+    /// since whoever holds the place reads and writes them.</summary>
+    private static HashSet<int> Addressed(IrFunction function) =>
+        function.Blocks.SelectMany(b => b.Insts).OfType<AddrLocal>().Select(a => a.Local.Value).ToHashSet();
+
     private static bool Scalarize(IrFunction function, IrModule module)
     {
+        var addressed = Addressed(function);
         // ---- gather: every temp's uses, every allocation, every local's stores and loads.
         var uses = new Dictionary<int, List<TempUse>>();
         void Note(TempId temp, Touch touch, IrInst op) =>
@@ -289,7 +297,7 @@ internal static class ScalarReplacement
 
             foreach (var (local, stores) in localStores)
             {
-                if (local < function.ParamCount) continue;
+                if (local < function.ParamCount || addressed.Contains(local)) continue;
 
                 TypeId? type = null;
                 var viable = true;

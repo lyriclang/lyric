@@ -61,6 +61,13 @@ public static class IrShape
         LoadGlobal => Array.Empty<TempId>(),
         StoreGlobal g => new[] { g.Value },
 
+        AddrLocal or AddrGlobal => Array.Empty<TempId>(),
+        AddrField a => new[] { a.Object },
+        AddrElem a => new[] { a.Array, a.Index },
+        LoadPlace l => new[] { l.Place },
+        // The place lies below the value, like the object at a field store.
+        StorePlace s => new[] { s.Place, s.Value },
+
         // The environment is the only operand; the function index stands in the instruction.
         MakeClosure m => m.Environment is { } env ? new[] { env } : Array.Empty<TempId>(),
         // The callee lies BEFORE the arguments, like the receiver at a callvirt.
@@ -137,6 +144,12 @@ public static class IrShape
 
         LoadGlobal l => l.Dest,
         StoreGlobal => null,
+        AddrLocal a => a.Dest,
+        AddrField a => a.Dest,
+        AddrElem a => a.Dest,
+        AddrGlobal a => a.Dest,
+        LoadPlace l => l.Dest,
+        StorePlace => null,
         MakeClosure m => m.Dest,
         CallIndirect c => c.Dest,
         CallVirt c => c.Dest,
@@ -226,6 +239,13 @@ public static class IrShape
 
             LoadGlobal l => l with { Dest = temp(l.Dest) },
             StoreGlobal g => g with { Value = temp(g.Value) },
+
+            AddrLocal a => a with { Dest = temp(a.Dest), Local = local(a.Local) },
+            AddrField a => a with { Dest = temp(a.Dest), Object = temp(a.Object) },
+            AddrElem a => a with { Dest = temp(a.Dest), Array = temp(a.Array), Index = temp(a.Index) },
+            AddrGlobal a => a with { Dest = temp(a.Dest) },
+            LoadPlace l => l with { Dest = temp(l.Dest), Place = temp(l.Place) },
+            StorePlace s => s with { Place = temp(s.Place), Value = temp(s.Value) },
 
             MakeClosure m => m with { Dest = temp(m.Dest), Environment = Opt(m.Environment) },
             CallIndirect c => c with
