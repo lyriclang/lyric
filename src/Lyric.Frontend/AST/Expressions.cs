@@ -37,9 +37,6 @@ public sealed record ThisExpr(Span Span) : Expr(Span);
 
 // --- operators ---
 public sealed record UnaryExpr(UnaryOp Operator, Expr Operand, Span Span) : Expr(Span);
-// 'resume co': a prefix expression at the unary level, yielding the value of the coroutine's next
-// yield. Send values do not exist.
-public sealed record ResumeExpr(Expr Coroutine, Span Span) : Expr(Span);
 /// <summary>
 /// <c>comptime e</c>: the value of <c>e</c>, computed by the compiler. Semantically the same
 /// value <c>e</c> has at run time — the prefix says WHEN it is computed and what <c>e</c> may

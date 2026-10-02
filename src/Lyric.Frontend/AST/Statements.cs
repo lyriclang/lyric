@@ -100,8 +100,7 @@ public sealed record ContinueStmt(Span Span) : Stmt(Span)
 }
 public sealed record ReturnStmt(Expr? Value, Span Span) : Stmt(Span);
 public sealed record YieldStmt(Expr? Value, Span Span) : Stmt(Span);
-// resume is an EXPRESSION (ResumeExpr in Expressions.cs); as a statement 'resume co;' runs through
-// ExprStmt. Send values ('resume co, v') are post-v1.
+// A coroutine is pulled with 'co.next()' (design/v5/spec/06 N2); Lyric 4's 'resume' is gone.
 
 // The body is a block or an ExprStmt.
 public sealed record DeferStmt(Stmt Body, Span Span) : Stmt(Span);

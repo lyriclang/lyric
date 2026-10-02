@@ -1507,17 +1507,21 @@ public sealed class TypeChecker
         }
         _currentReturn = fn.ReturnType is not null ? ResolveType(fn.ReturnType, scope) : LyrType.Void;
         // Coroutine: the body never produces the coroutine value, which the runtime builds at the
-        // call. Return coverage does not apply; the yield context does instead.
+        // call. Its 'return' gives the coroutine's result (06 A1), so coverage asks for one where
+        // the result is not void; the yield context comes besides.
         _currentYield = _currentReturn is CoroutineOf co ? co.Yield : null;
+        var result = _currentReturn is CoroutineOf withResult ? withResult.Result : null;
         CheckThrowsClause(fn, scope);
 
         if (fn.Body is not null)
         {
             CheckBlock(fn.Body, scope);
-            if (!TypeFacts.IsVoid(_currentReturn) && _currentYield is null && !Flow.AlwaysReturns(fn.Body, _result))
+            if (!TypeFacts.IsVoid(result ?? _currentReturn) && !Flow.AlwaysReturns(fn.Body, _result))
                 _de.Report("LYR-SEM0017", Severity.Error, fn.Span, _currentReturn is NeverType
                     ? $"'{fn.Name}' returns 'never', and a path of it ends — end every path in a throw, a panic or a call that does not return"
-                    : $"not all code paths of '{fn.Name}' return a value");
+                    : result is not null
+                        ? $"not all code paths of '{fn.Name}' return the coroutine's result, '{TypeFacts.Display(result)}'"
+                        : $"not all code paths of '{fn.Name}' return a value");
         }
 
         _currentReturn = savedReturn;
@@ -1571,14 +1575,22 @@ public sealed class TypeChecker
                 break;
             case ForInStmt fo: InLoop(new LoopContext(false, fo.Label, null), () => CheckForIn(fo, scope)); break;
             case ReturnStmt r:
-                if (_currentYield is not null) // in a coroutine only a bare return is allowed, as an early end
+                // In a coroutine 'return' ends the body with the coroutine's result (06 A1): a value
+                // where the type names one, 'Coroutine<Y, R>'; a bare 'return;' where it does not.
+                if (_currentYield is not null && _currentReturn is CoroutineOf ending)
                 {
-                    if (r.Value is not null)
+                    if (r.Value is not null && TypeFacts.IsVoid(ending.Result))
                     {
                         CheckExpr(r.Value, scope);
                         _de.Report("LYR-SEM0039", Severity.Error, r.Span,
-                            "a coroutine ends with a bare 'return;' — it cannot return a value");
+                            $"'{TypeFacts.Display(ending)}' returns nothing: its body ends with a bare 'return;' — "
+                            + "a coroutine that returns a value says what in its type, 'Coroutine<Y, R>'");
                     }
+                    else if (r.Value is not null)
+                        CheckAssignable(r.Value, CheckExpr(r.Value, scope, ending.Result), ending.Result, r.Span);
+                    else if (!TypeFacts.IsVoid(ending.Result) && !ending.Result.IsError)
+                        _de.Report("LYR-SEM0001", Severity.Error, r.Span,
+                            $"'return' without a value in a coroutine whose result is '{TypeFacts.Display(ending.Result)}'");
                 }
                 // A block lambda inferring its return type: the returns are COLLECTED here and
                 // unified afterwards — there is nothing to check assignability against yet.
@@ -2649,7 +2661,6 @@ public sealed class TypeChecker
                 return UnifyArms(armTypes, ma.Span);
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
-            case ResumeExpr re: return CheckResume(re, scope);
             case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
             case ThrowExpr te:
             {
@@ -4590,7 +4601,7 @@ public sealed class TypeChecker
         ArrayOf a => MentionsTypeParam(a.Element),
         SliceOf s => MentionsTypeParam(s.Element),
         InlineArrayOf ia => MentionsTypeParam(ia.Element),
-        CoroutineOf c => MentionsTypeParam(c.Yield),
+        CoroutineOf c => MentionsTypeParam(c.Yield) || MentionsTypeParam(c.Result),
         TupleOf t => t.Elements.Any(MentionsTypeParam),
         GenericInstance g => g.Arguments.Any(MentionsTypeParam),
         FnType f => f.Parameters.Any(MentionsTypeParam) || MentionsTypeParam(f.Return) || f.Throws.Any(MentionsTypeParam),
@@ -4839,25 +4850,29 @@ public sealed class TypeChecker
             return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
         }
 
-        // 'next' on a coroutine is built in the same way: the safe pull beside the panicking
-        // 'resume', same word and shape as Iterator<T>.next. '?T' answers value-or-done; a
-        // coroutine yielding void answers bool (advanced?), and one yielding an optional is
-        // refused — a null result would mean two different things there.
+        // A coroutine's members are built in (06 N2): 'next()' pulls — '?Y', the value it yielded
+        // or null once the body ended; 'bool' for a coroutine that yields nothing — and a yielded
+        // null of a 'Coroutine<?T>' is told apart from the end, '??T' (03 T4 O1); 'result()' is
+        // what the body returned, '?R', null until it ended; 'isDone()' asks without pulling.
         if (baseType is CoroutineOf co && mem.Member == "next")
         {
             // A PULL, so a throw site. 'next()' is lenient about EXHAUSTION — it answers null for
             // a finished coroutine — and says nothing about an exception from the body, which
             // passes straight through it.
             if (co.Throws is { } pulled) _result.MarkThrowingPull(mem, pulled);
-
-            if (co.Yield is Optional)
-                return Report(mem.Span, "LYR-SEM0080",
-                    $"'next()' on '{TypeFacts.Display(baseType)}' cannot tell an exhausted "
-                    + "coroutine from a yielded null; drive it with 'resume' and an explicit "
-                    + "protocol instead");
             return new FnType([],
                 TypeFacts.IsVoid(co.Yield) ? LyrType.Bool : new Optional(co.Yield));
         }
+        if (baseType is CoroutineOf finished && mem.Member == "result")
+        {
+            if (TypeFacts.IsVoid(finished.Result))
+                return Report(mem.MemberSpan, "LYR-SEM0012",
+                    $"'{TypeFacts.Display(baseType)}' returns nothing, so it has no 'result()' — "
+                    + "a coroutine that returns a value says what in its type, 'Coroutine<Y, R>'");
+            return new FnType([], new Optional(finished.Result));
+        }
+        if (baseType is CoroutineOf && mem.Member == "isDone")
+            return new FnType([], LyrType.Bool);
 
         if (InstanceMemberOf(baseType, mem, mem.Span) is { } mt)
             return mem.IsOptional ? Optionalized(mt) : mt;
@@ -5027,7 +5042,7 @@ public sealed class TypeChecker
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
                 { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
-            CoroutineOf co => co with { Yield = Substitute(co.Yield, map) },
+            CoroutineOf co => co with { Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map) },
             AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
             _ => type // primitive, NamedRef, error, null
         };
@@ -5081,7 +5096,7 @@ public sealed class TypeChecker
             FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray() },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations },
             RangeOf r => new RangeOf(Fix(r.Element)),
-            CoroutineOf c => c with { Yield = Fix(c.Yield) },
+            CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
             _ => t,
         };
         return Fix(type);
@@ -5252,7 +5267,10 @@ public sealed class TypeChecker
                         _ => ErrorRoot ?? LyrType.Error,
                     };
                 break;
-            case CoroutineOf pc when arg is CoroutineOf ac: UnifyInfer(pc.Yield, ac.Yield, map, argSpan); break;
+            case CoroutineOf pc when arg is CoroutineOf ac:
+                UnifyInfer(pc.Yield, ac.Yield, map, argSpan);
+                UnifyInfer(pc.Result, ac.Result, map, argSpan);
+                break;
 
             // 'Iterator<T>' against 'RangeIterator': the parameter is an instance of an INTERFACE and
             // the argument a type satisfying it. Structurally the two have nothing in common; the
@@ -5341,7 +5359,7 @@ public sealed class TypeChecker
                     || f.Throws.Any(t => HasOpenParam(t, map)),
         GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
         RangeOf r => HasOpenParam(r.Element, map),
-        CoroutineOf c => HasOpenParam(c.Yield, map),
+        CoroutineOf c => HasOpenParam(c.Yield, map) || HasOpenParam(c.Result, map),
         _ => false,
     };
 
@@ -5365,7 +5383,7 @@ public sealed class TypeChecker
                 break;
             case GenericInstance g: foreach (var a in g.Arguments) BindOpenParamsToError(a, map); break;
             case RangeOf r: BindOpenParamsToError(r.Element, map); break;
-            case CoroutineOf c: BindOpenParamsToError(c.Yield, map); break;
+            case CoroutineOf c: BindOpenParamsToError(c.Yield, map); BindOpenParamsToError(c.Result, map); break;
         }
     }
 
@@ -5390,7 +5408,7 @@ public sealed class TypeChecker
         FnType f => f.Parameters.Any(ContainsError) || ContainsError(f.Return) || f.Throws.Any(ContainsError),
         GenericInstance g => g.Arguments.Any(ContainsError),
         RangeOf r => ContainsError(r.Element),
-        CoroutineOf c => ContainsError(c.Yield),
+        CoroutineOf c => ContainsError(c.Yield) || ContainsError(c.Result),
         _ => false,
     };
 
@@ -6779,9 +6797,9 @@ public sealed class TypeChecker
                         var tt = _result.TypeOf(tail.Expr);
                         if (!asExpression)
                         {
-                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ResumeExpr or ThrowExpr or ErrorExpr))
+                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ThrowExpr or ErrorExpr))
                                 _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
-                                    "expression statement has no effect (only calls, assignments and resume are allowed)");
+                                    "expression statement has no effect (only calls and assignments are allowed)");
                             break;
                         }
                         if (expected is not null && !expected.IsError)
@@ -7782,18 +7800,6 @@ public sealed class TypeChecker
         return type;
     }
 
-    private LyrType CheckResume(ResumeExpr re, SymbolTable scope)
-    {
-        var t = CheckExpr(re.Coroutine, scope);
-        if (t is CoroutineOf { Throws: { } thrown }) _result.MarkThrowingPull(re, thrown);
-        return t switch
-        {
-            CoroutineOf co => co.Yield,
-            ErrorType => LyrType.Error,
-            _ => Report(re.Span, "LYR-SEM0040", $"'resume' needs a Coroutine<T>, got '{TypeFacts.Display(t)}'")
-        };
-    }
-
     // A lambda with bidirectional inference: unannotated parameters take the context FnType, and the
     // return context — an annotation before the context — types the body. Block lambdas yield values
     // through 'return' only; without an annotation or a context the type is inferred from the body's
@@ -7976,7 +7982,7 @@ public sealed class TypeChecker
         FnType f => ContainsTypeParam(f.Return) || f.Parameters.Any(ContainsTypeParam) || f.Throws.Any(ContainsTypeParam),
         GenericInstance gi => gi.Arguments.Any(ContainsTypeParam),
         RangeOf r => ContainsTypeParam(r.Element),
-        CoroutineOf c => ContainsTypeParam(c.Yield),
+        CoroutineOf c => ContainsTypeParam(c.Yield) || ContainsTypeParam(c.Result),
         _ => false
     };
 
@@ -8039,7 +8045,6 @@ public sealed class TypeChecker
                 case CallExpr call: WalkNode(call.Callee); foreach (var a in call.Arguments) WalkNode(a); return;
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
-                case ResumeExpr re: WalkNode(re.Coroutine); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
                 case TryExpr tr: WalkNode(tr.Value); foreach (var c in tr.Catches) WalkNode(c.Body); return;
@@ -8258,7 +8263,7 @@ public sealed class TypeChecker
         // the hole this rule exists for and stays refused — a throwing coroutine in a plain slot
         // is exactly how the demand used to disappear (#73).
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
-            return LyrType.Equal(given.Yield, wanted.Yield);
+            return LyrType.Equal(given.Yield, wanted.Yield) && LyrType.Equal(given.Result, wanted.Result);
 
         // A function value that throws less fits where one may throw more (05 E2 K6): the same
         // parameters and return — no variance (03 T17) — and its set covered by the target's. Free
@@ -8358,7 +8363,7 @@ public sealed class TypeChecker
                     || f.Throws.Any(t => MentionsParam(t, param)),
         GenericInstance g => g.Arguments.Any(a => MentionsParam(a, param)),
         RangeOf r => MentionsParam(r.Element, param),
-        CoroutineOf c => MentionsParam(c.Yield, param),
+        CoroutineOf c => MentionsParam(c.Yield, param) || MentionsParam(c.Result, param),
         _ => false,
     };
 
@@ -8473,12 +8478,13 @@ public sealed class TypeChecker
                             $"'Slice' expects exactly 1 type argument, got {n.TypeArguments.Length}");
                     return new SliceOf(ResolveType(n.TypeArguments[0], scope));
                 }
-                if (ReferenceEquals(sym, _coroutine)) // Coroutine<T> becomes the internal CoroutineOf
+                if (ReferenceEquals(sym, _coroutine)) // Coroutine<Y, R = void> becomes the internal CoroutineOf
                 {
-                    if (n.TypeArguments.Length != 1)
+                    if (n.TypeArguments.Length is not (1 or 2))
                         return Report(n.Span, "LYR-SEM0026",
-                            $"'Coroutine' expects exactly 1 type argument, got {n.TypeArguments.Length}");
-                    return new CoroutineOf(ResolveType(n.TypeArguments[0], scope));
+                            $"'Coroutine' expects 1 or 2 type arguments — what it yields, and what it returns — got {n.TypeArguments.Length}");
+                    return new CoroutineOf(ResolveType(n.TypeArguments[0], scope))
+                        { Result = n.TypeArguments.Length == 2 ? ResolveType(n.TypeArguments[1], scope) : LyrType.Void };
                 }
                 if (sym is TypeSymbol { Kind: not (TypeSymbolKind.Builtin or TypeSymbolKind.Alias) } gts
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))

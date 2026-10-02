@@ -390,7 +390,6 @@ public class LexerTests
     [InlineData("continue",  TokenKind.Continue)]
     [InlineData("return",    TokenKind.Return)]
     [InlineData("yield",     TokenKind.Yield)]
-    [InlineData("resume",    TokenKind.Resume)]
     [InlineData("defer",     TokenKind.Defer)]
     [InlineData("try",       TokenKind.Try)]
     [InlineData("catch",     TokenKind.Catch)]

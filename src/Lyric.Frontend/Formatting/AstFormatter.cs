@@ -770,7 +770,7 @@ public sealed class AstFormatter
     private static int LevelOf(Expr expr) => expr switch
     {
         BinaryExpr b => BinaryInfo(b.Operator).Level,
-        UnaryExpr or ResumeExpr or ComptimeExpr or ThrowExpr => Prefix,
+        UnaryExpr or ComptimeExpr or ThrowExpr => Prefix,
         PostfixExpr or CallExpr or IndexExpr or MemberExpr => Postfix,
         CastExpr => CastLevel,
         TypeTestExpr => BinaryInfo(BinaryOp.Lt).Level,
@@ -805,7 +805,6 @@ public sealed class AstFormatter
         TypePathExpr t => Doc.Of(Doc.From(string.Join(".", t.Path)), TypeArgsDoc(t.TypeArguments)),
 
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
-        ResumeExpr r => Doc.Of(Doc.From("resume "), ExprDoc(r.Coroutine, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
         ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
         TryExpr t => TryExprDoc(t),

@@ -2105,7 +2105,6 @@ internal sealed class FunctionLowerer
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
         RangeExpr e => LowerRangeValue(e),
-        ResumeExpr e => LowerResume(e),
         ComptimeExpr e => LowerComptime(e),
         ThrowExpr e => LowerThrowExpr(e),
         TryExpr e => LowerTryExpr(e),
@@ -2729,20 +2728,6 @@ internal sealed class FunctionLowerer
         }
 
         return LowerExpr(expr.Inner);
-    }
-
-    private TempId? LowerResume(ResumeExpr expr)
-    {
-        if (LowerType(_types.TypeOf(expr.Coroutine), expr.Span) is not IrFunctionType signature)
-            throw Bug("'resume' on a value that is not a coroutine");
-
-        // Lenient = false: exhaustion panics, the form the specification promises for 'resume'.
-        // A void chain's strict pull has no dest, the same shape as a void call.
-        var coroutine = LowerExpr(expr.Coroutine);
-        var dest = IsVoid(signature.Return) ? (TempId?)null : _slots.NewTemp(signature.Return);
-        _b.Emit(new ResumePull(dest, coroutine, Lenient: false, signature.Return, expr.Span));
-        if (dest is { } d) _fresh.Add(d);
-        return dest;
     }
 
     /// <summary>

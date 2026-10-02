@@ -105,7 +105,6 @@ public sealed class Lexer
         { "continue", TokenKind.Continue },
         { "return", TokenKind.Return },
         { "yield", TokenKind.Yield },
-        { "resume", TokenKind.Resume },
         { "defer", TokenKind.Defer },
 
         { "try", TokenKind.Try },

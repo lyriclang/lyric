@@ -59,7 +59,7 @@ public abstract record LyrType
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
         // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
         // the second would pass for the first and the demand would be lost again at the binding.
-        (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield)
+        (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield) && Equal(x.Result, y.Result)
                                           && (x.Throws is null) == (y.Throws is null)
                                           && (x.Throws is null || Equal(x.Throws, y.Throws!)),
         (ErrorType, ErrorType) => true,
@@ -143,7 +143,12 @@ public sealed record RangeOf(LyrType Element) : LyrType;             // the inte
 /// body and cannot throw, so a check at the call is a check at the wrong event. Riding on the
 /// local instead — which is what it did until 3.0 — meant the demand vanished at the first field
 /// or optional, and a coroutine held in a field is the idiom this exists for.</para></param>
-public sealed record CoroutineOf(LyrType Yield, LyrType? Throws = null) : LyrType;
+public sealed record CoroutineOf(LyrType Yield, LyrType? Throws = null) : LyrType
+{
+    /// <summary>What the body returns when it ends (06 A1): <c>Coroutine&lt;Y, R&gt;</c>, read by
+    /// <c>result()</c>; <c>void</c> for <c>Coroutine&lt;Y&gt;</c>.</summary>
+    public LyrType Result { get; init; } = LyrType.Void;
+}
 /// <summary>
 /// The recovery sentinel. It means "a diagnostic has already been reported here" — not "unknown",
 /// not "not computed yet", not "do not care".

@@ -548,6 +548,24 @@ void lyr_coro_yield(void) {
     transfer(&co->ctx, to, 0);
 }
 
+void lyr_coro_yield_value(void *value) {
+    CoroThread *ts = this_thread();
+    if (LYR_UNLIKELY(ts->current == NULL)) lyr_panic(LYR_RT_COROUTINE, "a yield with no coroutine running — on the thread's own stack");
+    ts->current->transfer = value;
+    lyr_coro_yield();
+}
+
+void *lyr_coro_transfer(const LyrCoro *co) { return co->transfer; }
+void lyr_coro_set_transfer(LyrCoro *co, void *value) { co->transfer = value; }
+
+void lyr_coro_set_error(LyrCoro *co, struct LyrErr *error) { LYR_WRITE_BARRIER(co, &co->error, error); }
+
+struct LyrErr *lyr_coro_take_error(LyrCoro *co) {
+    struct LyrErr *error = co->error;
+    LYR_WRITE_BARRIER(co, &co->error, (struct LyrErr *)NULL);
+    return error;
+}
+
 LyrCoroStatus lyr_coro_status(const LyrCoro *co) { return (LyrCoroStatus)co->status; }
 
 void *lyr_coro_arg(const LyrCoro *co) { return co->arg; }
