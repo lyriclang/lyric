@@ -1809,9 +1809,10 @@ public static class IrVerifier
             {
                 Kind: IrScalar.Bool or IrScalar.Char or IrScalar.String
             }
-            // Identity: 'same(a, b)' compares two references (design/v5/spec/02 M10). '==' never
-            // reaches here for them — the sema sends it through 'Equatable'.
-            || type is IrRefType or IrArrayType;
+            // Identity: 'same(a, b)' compares two references (design/v5/spec/02 M10) — objects,
+            // arrays, coroutines (03 §2.6). '==' never reaches here for them — the sema sends it
+            // through 'Equatable'.
+            || type is IrRefType or IrArrayType or IrCoroutineType;
 
         private static bool IsBitwiseOrShift(IrBinKind kind) => kind is
             IrBinKind.Shl or IrBinKind.Shr or
