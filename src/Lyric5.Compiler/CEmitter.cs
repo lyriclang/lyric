@@ -64,10 +64,15 @@ public sealed class CEmitter
     private readonly bool _main;
     private readonly List<int> _scope;
 
-    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot, string? instance)
+    /// <summary>Whether <c>+ - *</c> and negation panic on overflow (03 T2) — or wrap, where a
+    /// profile says so (11 W2 P3).</summary>
+    private readonly bool _overflowChecks;
+
+    private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot, string? instance, bool overflowChecks)
     {
         _module = module;
         _sources = sources;
+        _overflowChecks = overflowChecks;
         _stdlibRoot = stdlibRoot is null ? null : Path.GetFullPath(stdlibRoot).TrimEnd('/', '\\');
         _instance = instance;
         _main = instance is null;
@@ -93,13 +98,15 @@ public sealed class CEmitter
     /// under it is named in <c>#line</c> relative to the directory's parent (<c>stdlib5/std/core.lyr</c>),
     /// so the emitted C is the same on every machine — a golden compares it byte for byte, and
     /// the build cache keys on it.</param>
-    public static IReadOnlyList<Unit> Emit(IrModule module, SourceManager sources, string? stdlibRoot = null)
+    /// <param name="overflowChecks">Whether integer overflow panics (03 T2), as every profile has
+    /// it unless it says otherwise (11 W2 P3): without, <c>+ - *</c> and negation wrap.</param>
+    public static IReadOnlyList<Unit> Emit(IrModule module, SourceManager sources, string? stdlibRoot = null, bool overflowChecks = true)
     {
-        var units = new List<Unit> { new(null, new CEmitter(module, sources, stdlibRoot, null).Text()) };
+        var units = new List<Unit> { new(null, new CEmitter(module, sources, stdlibRoot, null, overflowChecks).Text()) };
         var instances = module.Functions.Select(f => InstanceOf(f.Name)).OfType<string>()
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
         foreach (var instance in instances)
-            units.Add(new Unit(instance, new CEmitter(module, sources, stdlibRoot, instance).Text()));
+            units.Add(new Unit(instance, new CEmitter(module, sources, stdlibRoot, instance, overflowChecks).Text()));
         return units;
     }
 
@@ -1783,6 +1790,9 @@ public sealed class CEmitter
             };
         return b.Kind switch
         {
+            IrBinKind.Add when !_overflowChecks => $"LYR_WRAP_ADD({CType(type)}, {Shape(type).Unsigned}, {lhs}, {rhs})",
+            IrBinKind.Sub when !_overflowChecks => $"LYR_WRAP_SUB({CType(type)}, {Shape(type).Unsigned}, {lhs}, {rhs})",
+            IrBinKind.Mul when !_overflowChecks => $"LYR_WRAP_MUL({CType(type)}, {Shape(type).Unsigned}, {lhs}, {rhs})",
             IrBinKind.Add => $"LYR_CHECKED_ADD({lhs}, {rhs})",
             IrBinKind.Sub => $"LYR_CHECKED_SUB({lhs}, {rhs})",
             IrBinKind.Mul => $"LYR_CHECKED_MUL({lhs}, {rhs})",
@@ -1819,6 +1829,7 @@ public sealed class CEmitter
             // -MIN does not fit: the same check as a subtraction from zero. A float negates its
             // sign bit, -0.0 included, which a subtraction from zero would not give.
             IrUnKind.Neg when IsFloat(u.Type) => $"(-{operand})",
+            IrUnKind.Neg when !_overflowChecks => $"LYR_WRAP_SUB({type}, {Shape(u.Type).Unsigned}, ({type})0, {operand})",
             IrUnKind.Neg => $"LYR_CHECKED_SUB(({type})0, {operand})",
             IrUnKind.Not => $"(uint8_t)!{operand}",
             IrUnKind.BitNot => $"({type})~{operand}",

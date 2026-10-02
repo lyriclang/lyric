@@ -41,8 +41,8 @@ public sealed record Project(string Source, string Name, string Module, string R
 
     /// <summary>The binary: named after the package for its <c>src/main.lyr</c> (P2), after the
     /// module's last segment for another module run as a program (07 M7a) — beside it, not over it.</summary>
-    public string Executable(Profile profile, Target target) =>
-        Path.Combine(OutDir, profile.Name(), target.Triple, BinaryName + target.ExecutableSuffix);
+    public string Executable(BuildProfile profile, Target target) =>
+        Path.Combine(OutDir, profile.Name, target.Triple, BinaryName + target.ExecutableSuffix);
 
     public string BinaryName =>
         Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..];

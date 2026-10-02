@@ -102,6 +102,6 @@ public static class RuntimeLayout
     public static string BuildArchive(CBuild build, string root, string outputDir)
     {
         var objects = build.Compile(Units(root, build.Target));
-        return build.Archive(objects, Path.Combine(outputDir, build.Target.Triple, build.Profile.Name(), "liblyr.a"));
+        return build.Archive(objects, Path.Combine(outputDir, build.Target.Triple, build.Profile.Name, "liblyr.a"));
     }
 }

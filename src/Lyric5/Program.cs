@@ -51,7 +51,11 @@ public static class Program
         output.WriteLine("  help                           this");
         output.WriteLine();
         output.WriteLine("options of build and run:");
-        output.WriteLine("  --profile debug|release        the build profile (default: debug)");
+        output.WriteLine("  --profile <name>               the build profile: debug, release, asan, tsan, or one of the");
+        output.WriteLine("                                 manifest's (default: LYRIC_PROFILE, else debug)");
+        output.WriteLine("  --opt <0-3>, --[no-]lto, --[no-]debug-info, --[no-]deny-warnings,");
+        output.WriteLine("  --[no-]overflow-checks, --[no-]fast-math");
+        output.WriteLine("                                 a field of the profile, for this build");
         output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
         output.WriteLine("  --emit ir|c                    print the IR or the C instead of building");
         output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
@@ -70,10 +74,22 @@ public static class Program
 
     // --- build and run -------------------------------------------------------------------------
 
-    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C"];
+    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt"];
+
+    /// <summary>The profile's fields a flag sets for one build, <c>--x</c> on and <c>--no-x</c> off:
+    /// the field flag over the profile (11 C4, W2 P3).</summary>
+    private static readonly (string Flag, Func<BuildProfile, bool, BuildProfile> Set)[] FieldFlags =
+    [
+        ("lto", (p, on) => p with { Lto = on }),
+        ("debug-info", (p, on) => p with { DebugInfo = on }),
+        ("deny-warnings", (p, on) => p with { DenyWarnings = on }),
+        ("overflow-checks", (p, on) => p with { OverflowChecks = on }),
+        ("fast-math", (p, on) => p with { FastMath = on }),
+    ];
 
     /// <summary>The options without a value.</summary>
-    private static readonly string[] Flags = ["--offline"];
+    private static readonly string[] Flags =
+        ["--offline", .. FieldFlags.SelectMany(f => new[] { "--" + f.Flag, "--no-" + f.Flag })];
 
     private static int Build(string[] args, bool run)
     {
@@ -122,6 +138,7 @@ public static class Program
         var offline = flags.Contains("--offline");
 
         Project project;
+        LibraryException? library = null;
         try
         {
             if (file is null)
@@ -149,31 +166,46 @@ public static class Program
             Console.Error.WriteLine(refused.Render());
             return refused.Exit;
         }
-        catch (LibraryException library)
+        catch (LibraryException refused)
         {
-            // 'build' checks a library (07 B6); there is nothing to run, and nothing to print.
-            if (!run && !values.ContainsKey("--emit")) return Pipeline.CheckLibrary(library, Console.Error);
-            Console.Error.WriteLine($"error[LYR-CLI0005]: {library.Message}");
-            return 2;
+            // 'build' checks a library (07 B6) — under its profile, below —; there is nothing to
+            // run, and nothing to print.
+            if (run || values.ContainsKey("--emit"))
+            {
+                Console.Error.WriteLine($"error[LYR-CLI0005]: {refused.Message}");
+                return 2;
+            }
+            library = refused;
+            project = null!;
         }
+
+        // The profile (11 W2 P3): '--profile', else LYRIC_PROFILE, else debug — built in, or the
+        // root manifest's; a field flag changes a field for this build alone.
+        var profileName = values.GetValueOrDefault("--profile")
+                          ?? (Environment.GetEnvironmentVariable("LYRIC_PROFILE") is { Length: > 0 } fromEnvironment ? fromEnvironment : "debug");
+        BuildProfile profile;
+        try { profile = Profiles.Resolve(library?.Manifest ?? project.Manifest, profileName); }
+        catch (ArgumentException unknown) { return Unknown(unknown.Message); }
+        if (values.TryGetValue("--opt", out var opt))
+        {
+            if (opt is not ("0" or "1" or "2" or "3")) return Unknown($"'--opt' is a level from 0 to 3, not '{opt}'");
+            profile = profile with { Opt = opt[0] - '0' };
+        }
+        foreach (var (field, set) in FieldFlags)
+        {
+            bool on = flags.Contains("--" + field), off = flags.Contains("--no-" + field);
+            if (on && off) return Unknown($"'--{field}' and '--no-{field}' ask for opposite things");
+            if (on || off) profile = set(profile, on);
+        }
+
+        if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile);
 
         if (values.TryGetValue("--emit", out var emit))
         {
             if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
             if (run) return Unknown("'--emit' prints instead of building; use 'build'");
-            return Pipeline.Emit(project, emit, Console.Out, Console.Error);
+            return Pipeline.Emit(project, emit, Console.Out, Console.Error, profile);
         }
-
-        var profileName = values.GetValueOrDefault("--profile", "debug");
-        Profile? profile = profileName switch
-        {
-            "debug" => Profile.Debug,
-            "release" => Profile.Release,
-            "asan" => Profile.Asan,
-            "tsan" => Profile.Tsan,
-            _ => null,
-        };
-        if (profile is null) return Unknown($"unknown profile '{profileName}': debug, release, asan, tsan");
 
         Target target;
         try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
@@ -182,16 +214,16 @@ public static class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
 
-        var compiler = profile.Value.RequiresClang() ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
+        var compiler = profile.RequiresClang ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
         if (compiler is null)
         {
-            Console.Error.WriteLine(profile.Value.RequiresClang()
-                ? $"error[LYR-CLI0002]: the {profile.Value.Name()} profile needs clang (01 C7), and none was found"
+            Console.Error.WriteLine(profile.RequiresClang
+                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang (01 C7), and none was found"
                 : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
             return 2;
         }
 
-        var (exit, executable) = Pipeline.Build(new BuildRequest(project, profile.Value, target, compiler, DisplayVersion()), Console.Error);
+        var (exit, executable) = Pipeline.Build(new BuildRequest(project, profile, target, compiler, DisplayVersion()), Console.Error);
         if (exit != 0 || executable is null) return exit;
         if (!run) return 0;
         if (!target.IsHost)

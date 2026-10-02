@@ -61,7 +61,8 @@ public sealed record Target(string Triple, string Arch, TargetOs Os)
     public override string ToString() => Triple;
 }
 
-/// <summary>The four build shapes of design/v5/spec/01 C7 and L12.</summary>
+/// <summary>The four build shapes of design/v5/spec/01 C7 and L12: the built-in profiles, and the
+/// base every profile of a manifest comes from (<see cref="BuildProfile"/>).</summary>
 public enum Profile { Debug, Release, Asan, Tsan }
 
 public static class ProfileFlags
