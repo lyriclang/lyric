@@ -76,6 +76,7 @@ public static class SourceCompiler
 
         var compilation = new Compilation(sources, diagnostics)
         {
+            NamesFromPaths = options.PackageRoots is not null,
             // The standard library is ordinary Lyric source and is loaded on demand.
             ModuleLoader = modulePath =>
             {
@@ -90,7 +91,7 @@ public static class SourceCompiler
                 return result;
             },
         };
-        compilation.AddModule(entry, source.ModuleName, documentation: parsedEntry.Documentation);
+        compilation.Entry = compilation.AddModule(entry, source.ModuleName, documentation: parsedEntry.Documentation);
 
         report?.BeginPhase(Phase.Load);
         var resolveStarted = Stopwatch.GetTimestamp();
@@ -172,9 +173,25 @@ public static class SourceCompiler
             entry => StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay),
             StringComparer.Ordinal);
 
+        // Packages (07 M1): the name in front, the file under the source root without it, its name
+        // exactly as the module path writes it on every platform (M6).
+        var packages = options.PackageRoots?.ToDictionary(
+            entry => entry.Key,
+            entry => (Root: entry.Value,
+                Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
+            StringComparer.Ordinal);
+
         var loader = (string[] modulePath) =>
         {
             if (modulePath is ["std", ..]) return fromStdlib(modulePath);
+
+            if (packages is not null)
+            {
+                return modulePath.Length > 1 && packages.TryGetValue(modulePath[0], out var package)
+                       && NamedExactly(package.Root, modulePath[1..])
+                    ? package.Load(modulePath[1..])
+                    : null;
+            }
 
             if (nativeRoots is not null && modulePath.Length > 0
                 && nativeRoots.TryGetValue(modulePath[0], out var native))
@@ -273,6 +290,29 @@ public static class SourceCompiler
         if (ir is null) return new CompileResult(sources, diagnostics, null, model);
 
         return new CompileResult(sources, diagnostics, ir, model);
+    }
+
+    /// <summary>
+    /// Whether the file of a module path is named exactly as the path writes it (07 M6): on a file
+    /// system that ignores case, <c>import app.Util</c> would otherwise read <c>util.lyr</c> on one
+    /// machine and nothing on the next. Segment by segment, by the names the directories list.
+    /// </summary>
+    private static bool NamedExactly(string root, string[] path)
+    {
+        var directory = root;
+        for (var i = 0; i < path.Length; i++)
+        {
+            var name = i == path.Length - 1 ? path[i] + ".lyr" : path[i];
+            if (!Directory.Exists(directory)) return false;
+            var found = Directory.EnumerateFileSystemEntries(directory, name, new EnumerationOptions
+            {
+                MatchCasing = MatchCasing.CaseInsensitive,
+                RecurseSubdirectories = false,
+            }).Select(Path.GetFileName).ToList();
+            if (found.Count > 0 && !found.Contains(name, StringComparer.Ordinal)) return false;
+            directory = Path.Combine(directory, name);
+        }
+        return true;
     }
 
     private static string ModuleCount(List<string> loaded) =>
@@ -393,6 +433,19 @@ public sealed record CompilerOptions
     /// <see cref="SourceRoot"/>, as a native segment is.</para>
     /// </summary>
     public IReadOnlyDictionary<string, string>? DependencyRoots { get; init; }
+
+    /// <summary>
+    /// Lyric 5's packages (design/v5/spec/07 M1, M2; 11 C8), by name, each naming its source root:
+    /// <c>["app"] = "…/app/src"</c> makes <c>import app.net.http</c> read
+    /// <c>…/app/src/net/http.lyr</c> — the package's name is the first segment of every module
+    /// path, its files lie under the root without it.
+    ///
+    /// <para>Set, it is the whole of what a program reaches besides <c>std</c>: there is no lookup
+    /// beside the entry file, and a single file — given none — imports only <c>std</c>. Every module
+    /// is named by its path then, and a <c>module</c> header is refused (LYR-RES0008). The 4.x
+    /// tools, the language server first, still read headers and leave this unset (until M13b).</para>
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? PackageRoots { get; init; }
 
     /// <summary>
     /// Text to use instead of what lies on disk, by absolute file path. A module found at one of

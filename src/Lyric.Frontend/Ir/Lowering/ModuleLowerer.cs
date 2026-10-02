@@ -207,8 +207,10 @@ public static class ModuleLowerer
                     exportRoots.Add(id);
 
                 // The entry contract: exactly one 'main' per executable. The sema checked that it is
-                // unique; here it is only recorded.
+                // unique; here it is only recorded — the entry module's, where the compilation knows
+                // one (design/v5/spec/07 M7a: a 'main' elsewhere is an ordinary function).
                 if (function.Name != "main") continue;
+                if (compilation.Entry is { } home && !ReferenceEquals(module, home)) continue;
 
                 if (function.Parameters.Length == 0) { entry = id; continue; }
 

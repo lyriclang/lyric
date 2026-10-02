@@ -50,6 +50,21 @@ public sealed class Compilation
     public Func<string[], LoadedModule?>? ModuleLoader { get; set; }
 
     /// <summary>
+    /// Lyric 5's rule (design/v5/spec/07 M1, M2): a module is named by its path alone, and a
+    /// <c>module</c> header is refused (LYR-RES0008) — it said again what the path says, or
+    /// something else. Off for the 4.x tools that still read headers, the language server first
+    /// (until M13b).
+    /// </summary>
+    public bool NamesFromPaths { get; init; }
+
+    /// <summary>
+    /// The module the program starts in: its <c>main</c> is the program's root (design/v5/spec/07
+    /// M7a), and a <c>main</c> anywhere else is an ordinary function. <c>null</c> for a workspace,
+    /// which holds several programs side by side.
+    /// </summary>
+    public ModuleSymbol? Entry { get; set; }
+
+    /// <summary>
     /// The documentation of every module in this compilation, gathered as they are added.
     ///
     /// <para>Here rather than beside the syntax because a doc block is written per file and asked
@@ -102,8 +117,12 @@ public sealed class Compilation
     public ModuleSymbol AddModule(Module ast, string? name = null, bool isNative = false,
         DocumentationTable? documentation = null)
     {
+        if (NamesFromPaths && ast.Header is { } header)
+            _de.Report("LYR-RES0008", Severity.Error, header.Span,
+                "a module is named by its path: the 'module' header is gone (07 M2)");
+
         var path = name is not null ? name.Split('.')
-                 : ast.Header is not null ? ast.Header.Segments
+                 : ast.Header is not null && !NamesFromPaths ? ast.Header.Segments
                  : ["main"];
 
         // Two files claiming one module name: everything downstream assumes a name means ONE
@@ -208,7 +227,7 @@ public sealed class Compilation
                 // module registers under the name its header claims, the import that pulled it in
                 // still finds nothing, and the message says "cannot find" about a file that was
                 // just read — and a second importer loads it a second time.
-                if (loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
+                if (!NamesFromPaths && loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
                     _de.Report("LYR-RES0006", Severity.Error, header.Span,
                         $"this file was loaded as '{name}' but declares module "
                         + $"'{string.Join('.', header.Segments)}'");

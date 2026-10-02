@@ -1,6 +1,6 @@
 /// The string helpers the compiler itself calls (design/v5/spec/10 S-series): f-strings and `+`
 /// on strings lower to these by name. M2 seed, natively backed; M8a brings the module in Lyric.
-module std.string;
+
 
 pub fn concat(a: string, b: string): string;
 pub fn fromInt(value: int): string;
