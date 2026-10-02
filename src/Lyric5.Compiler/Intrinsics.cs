@@ -39,6 +39,12 @@ public static class Intrinsics
         ["std.task.panicMessage"] = "lyr_task_panic_message",
         ["std.task.panicTrace"] = "lyr_task_panic_trace",
         ["std.task.repanic"] = "lyr_task_repanic",
+        // Threads (06 G1, G2): a thread around a function value; the thread's poller as a number
+        // another thread wakes; the pause of a spinning lock.
+        ["std.task.startThread"] = "LYR_THREAD_START",
+        ["std.task.currentPoller"] = "lyr_task_poller",
+        ["std.task.wakePoller"] = "lyr_task_wake",
+        ["std.task.spin"] = "lyr_task_spin",
         // std.sync's atomics (06 G4, K6; N7 P2): the C11 builtins on an Atomic's field, as macros
         // that serve every T.
         ["std.sync.atomicLoad"] = "LYR_ATOMIC_LOAD",

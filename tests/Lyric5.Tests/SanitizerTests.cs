@@ -128,6 +128,7 @@ public class SanitizerTests
     [InlineData("channels", 0)]
     [InlineData("select", 0)]
     [InlineData("atomics", 0)]
+    [InlineData("threads", 0)]
     [InlineData("task_status", 101)]
     [InlineData("scope_panic", 101)]
     [InlineData("detached_panic", 101)]
@@ -137,10 +138,11 @@ public class SanitizerTests
     [InlineData("close_yield", 101)]
     public void A_coroutine_program_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);
 
-    private static void RunEmittedClean(string name, int exit)
+    private static void RunEmittedClean(string name, int exit, Profile profile = Profile.Asan)
     {
         if (!Applies) return;
-        var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC(name), name + "-asan", Profile.Asan, compiler: Clang());
+        var suffix = profile == Profile.Tsan ? "-tsan" : "-asan";
+        var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC(name), name + suffix, profile, compiler: Clang());
         Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
         foreach (var report in Reports) Assert.DoesNotContain(report, result.Stderr);
     }
@@ -151,7 +153,8 @@ public class SanitizerTests
     /// only after its retry limit and it aborts ("Signals delivery fails constantly") — in 3 of 5
     /// runs, with and without the kernel preparation. Locally (clang 22) 96 stressed runs passed.
     /// The mechanism is not found; it goes with the signal-based stop of stage 1 (M11 stops at
-    /// safepoints). Until then this run is local: STATUS keeps the thread open.
+    /// safepoints). Until then this run is local: STATUS keeps the thread open. The emitted
+    /// program with Lyric's own threads (M6 S6b) runs here too, for the same reason.
     /// </summary>
     [Fact]
     public void The_threads_program_runs_clean_under_TSan_where_asked_for()
@@ -161,6 +164,7 @@ public class SanitizerTests
         RunClean("coro_threads", Profile.Tsan, [], 0);
         RunClean("coro_storm", Profile.Tsan, [], 0);
         RunClean("poll_basic", Profile.Tsan, [], 0);
+        RunEmittedClean("threads", 0, Profile.Tsan);
     }
 
     /// <summary>

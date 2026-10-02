@@ -1,0 +1,73 @@
+// Threads (design/v5/spec/06 G1, G2, N7; 10 §9). Expected stdout:
+//   21                   a thread's first task, awaited on the main thread
+//   worker ran 3 tasks   a thread's scheduler runs the tasks started there
+//   failed: oops         what the body throws, await throws
+//   cancelled            a cancel from another thread ends a wait there
+//   atomic 4000          four threads count on one atomic
+//   chained 6            a thread awaits a thread
+import std.io { println };
+import std.sync { Atomic };
+import std.task { spawn, sleep, Thread, Cancelled };
+import std.time { Duration };
+
+class Oops :: [Error] {
+    fn message(): string { return "oops"; }
+}
+
+fn count(total: Atomic<int>): void {
+    for (_ in 0..1000) {
+        total.fetchAndAdd(1);
+    }
+}
+
+fn main(): void throws Error {
+    let product = Thread.spawn(() => 3 * 7);
+    let p = try product.await();
+    println(f"{p}");
+
+    let worker = Thread.spawn(() => {
+        let a = spawn(() => 1);
+        let b = spawn(() => 1);
+        let c = spawn(() => 1);
+        let x = try a.await();
+        let y = try b.await();
+        let z = try c.await();
+        return x + y + z;
+    });
+    let ran = try worker.await();
+    println(f"worker ran {ran} tasks");
+
+    let failing = Thread.spawn(() => { throw Oops { }; });
+    try {
+        failing.await();
+    } catch (e: Oops) {
+        println(f"failed: {e.message()}");
+    }
+
+    let sleeper = Thread.spawn(() => { try sleep(Duration.ofSecs(60)); });
+    try sleep(Duration.ofMillis(10));
+    sleeper.cancel();
+    try {
+        sleeper.await();
+    } catch (_: Cancelled) {
+        println("cancelled");
+    }
+
+    let total = Atomic<int>.new(0);
+    let t1 = Thread.spawn(() => count(total));
+    let t2 = Thread.spawn(() => count(total));
+    let t3 = Thread.spawn(() => count(total));
+    let t4 = Thread.spawn(() => count(total));
+    try t1.await();
+    try t2.await();
+    try t3.await();
+    try t4.await();
+    println(f"atomic {total.load()}");
+
+    let outer = Thread.spawn(() => {
+        let inner = Thread.spawn(() => 2 * 3);
+        return try inner.await();
+    });
+    let chained = try outer.await();
+    println(f"chained {chained}");
+}
