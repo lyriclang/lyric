@@ -45,6 +45,13 @@ public static class Intrinsics
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         ["std.task.spin"] = "lyr_task_spin",
+        // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
+        // handler on or off, the watcher's poller, the caught ones.
+        ["std.task.signalNumber"] = "lyr_signal_number",
+        ["std.task.signalKind"] = "lyr_signal_kind",
+        ["std.task.catchSignal"] = "lyr_signal_catch",
+        ["std.task.attachSignals"] = "lyr_signal_attach",
+        ["std.task.takeSignals"] = "lyr_signal_take",
         // std.sync's atomics (06 G4, K6; N7 P2): the C11 builtins on an Atomic's field, as macros
         // that serve every T.
         ["std.sync.atomicLoad"] = "LYR_ATOMIC_LOAD",

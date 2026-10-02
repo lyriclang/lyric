@@ -67,6 +67,9 @@ void lyr_crash_install(void);
 void lyr_crash_thread_start(void);
 void lyr_crash_thread_end(void);
 
+/* init.c — whether the runtime may catch signals: started, and with its handlers (lyr/signal.h). */
+int lyr_signals_allowed(void);
+
 /* crash.c — the address range whose fault is a stack overflow, for the stack the thread runs on:
  * a coroutine switch swaps it (nothing on Windows, where the system tells an overflow apart). */
 void lyr_crash_get_guard(uintptr_t *low, uintptr_t *high);

@@ -15,5 +15,6 @@
 #include "lyr/poll.h"
 #include "lyr/task.h"
 #include "lyr/atomic.h"
+#include "lyr/signal.h"
 
 #endif

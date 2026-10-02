@@ -3,9 +3,9 @@
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
 /// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
 /// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads; threads and a
-/// pool of them (G1, G2, T1, P5); `Mutex`, `RwLock` and `Once` (G4, K6) — by the module cut
-/// `Thread` and `Pool` are `std.thread`'s and the locks `std.sync`'s (10 Q10), here until M7 lets
-/// another module reach the scheduler.
+/// pool of them (G1, G2, T1, P5); `Mutex`, `RwLock` and `Once` (G4, K6); signals as a channel (K5,
+/// 10 Q9) — by the module cut `Thread` and `Pool` are `std.thread`'s, the locks `std.sync`'s and the
+/// signals `std.os`'s (10 Q9, Q10), here until M7 lets another module reach the scheduler.
 module std.task;
 
 import std.sync { Atomic };
@@ -343,6 +343,33 @@ pub class Channel<T> {
             s.wakeUp(w.context);
         }
         this.guard.release();
+    }
+
+    /// `value` into the channel where that needs no wait — to a task waiting to receive, or into the
+    /// buffer while it has room: 1 then; 0 where it would have to wait, and the value is dropped; -1
+    /// for a closed channel.
+    mut fn offer(s: Scheduler, value: T): int {
+        this.guard.acquire();
+        if (this.closed) {
+            this.guard.release();
+            return -1;
+        }
+        while (let r = this.receivers.take()) {
+            if (r.context.claim()) {
+                r.value = value;
+                r.settled = true;
+                this.guard.release();
+                s.post(r.context);
+                return 1;
+            }
+        }
+        if (this.buffered < this.capacity) {
+            this.push(value);
+            this.guard.release();
+            return 1;
+        }
+        this.guard.release();
+        return 0;
     }
 
     /// A value at once, taken out — from the buffer, which a task waiting to send then refills, or
@@ -938,6 +965,164 @@ class LockState {
     }
 }
 
+/// A signal of the system (10 Q9, 06 K5), by an abstract name: Windows knows `Interrupt` (Ctrl+C,
+/// Ctrl+Break) and `Terminate` (its console closes) only. `Other(n)` is the system's number `n`.
+pub enum Signal {
+    Interrupt,
+    Terminate,
+    Hangup,
+    Quit,
+    User1,
+    User2,
+    WindowChange,
+    Other(int),
+}
+
+/// A channel the given signals come in on (10 Q9, 06 K5): from here on they no longer do what the
+/// system does with them — end the program, mostly — but arrive here. Each comes to every channel
+/// that asked for it. A signal is no counter: two that come before the first went out may arrive as
+/// one, and one that finds the channel's buffer full — sixteen — is lost for it. Closing the channel
+/// ends the subscription with the next signal that would come; a signal no channel asks for any more
+/// is the system's again. KILL, STOP and the faults never come.
+pub fn signals(params wanted: Signal[]): Channel<Signal> {
+    let channel = Channel<Signal>.new(16);
+    var mask = 0;
+    for (i in 0..wanted.length()) {
+        let n = numberOf(wanted[i]);
+        if (n >= 1 && n <= 63) {
+            mask = mask | (1 << (n - 1));
+        }
+    }
+    if (mask != 0) {
+        signalHub.subscribe(channel, mask);
+    }
+    return channel;
+}
+
+/// A channel's subscription to signals: the bits of their numbers.
+class Subscription {
+    channel: Channel<Signal>,
+    mask: int,
+    var next: ?Subscription = null,
+}
+
+/// The subscriptions to signals and their watcher: a thread whose one task hands each caught signal
+/// to the channels that asked for it — the runtime's handler never runs Lyric code (lyr/signal.h).
+class SignalHub {
+    guard: SpinLock = SpinLock { },
+    var first: ?Subscription = null,
+    var caught: int = 0,
+    var watching: bool = false,
+
+    /// `channel` gets the signals of `mask` from here on; the first subscription starts the watcher.
+    mut fn subscribe(channel: Channel<Signal>, mask: int): void {
+        this.guard.acquire();
+        this.first = Subscription { channel = channel, mask = mask, next = this.first };
+        let added = mask & ~this.caught;
+        this.caught = this.caught | mask;
+        let start = !this.watching;
+        this.watching = true;
+        this.guard.release();
+        catchAll(added, true);
+        if (start) {
+            Thread.spawn(() => {
+                signalHub.watch();
+            });
+        }
+    }
+
+    /// The watcher's loop: what was caught goes out, then it waits for more.
+    mut fn watch(): void {
+        attachSignals();
+        let s = here();
+        while (true) {
+            let caught = takeSignals();
+            if (caught == 0) {
+                s.awaitPoller();
+            } else {
+                this.deliver(s, caught);
+            }
+        }
+    }
+
+    /// Each signal of `caught` to every channel that asked for it, where it has room; a closed
+    /// channel's subscription ends, and a signal no channel asks for any more is the system's again.
+    mut fn deliver(s: Scheduler, caught: int): void {
+        this.guard.acquire();
+        var before: ?Subscription = null;
+        var at = this.first;
+        var still = 0;
+        while (let sub = at) {
+            at = sub.next;
+            var open = true;
+            var bits = caught & sub.mask;
+            var n = 1;
+            while (bits != 0 && open) {
+                if ((bits & 1) != 0) {
+                    open = sub.channel.offer(s, signalOf(n)) >= 0;
+                }
+                bits = bits >> 1;
+                n += 1;
+            }
+            if (open) {
+                still = still | sub.mask;
+                before = sub;
+            } else if (let b = before) {
+                b.next = sub.next;
+            } else {
+                this.first = sub.next;
+            }
+        }
+        let dropped = this.caught & ~still;
+        this.caught = still;
+        this.guard.release();
+        catchAll(dropped, false);
+    }
+}
+
+let signalHub = SignalHub { };
+
+/// The handler on, or off, for each signal of `mask`.
+fn catchAll(mask: int, on: bool): void {
+    var bits = mask;
+    var n = 1;
+    while (bits != 0) {
+        if ((bits & 1) != 0) {
+            catchSignal(n, on);
+        }
+        bits = bits >> 1;
+        n += 1;
+    }
+}
+
+/// The system's number of a signal; -1 where it has none.
+fn numberOf(signal: Signal): int {
+    return match (signal) {
+        Signal.Interrupt => signalNumber(0),
+        Signal.Terminate => signalNumber(1),
+        Signal.Hangup => signalNumber(2),
+        Signal.Quit => signalNumber(3),
+        Signal.User1 => signalNumber(4),
+        Signal.User2 => signalNumber(5),
+        Signal.WindowChange => signalNumber(6),
+        Signal.Other(n) => n,
+    };
+}
+
+/// The signal of the system's number.
+fn signalOf(number: int): Signal {
+    return match (signalKind(number)) {
+        0 => Signal.Interrupt,
+        1 => Signal.Terminate,
+        2 => Signal.Hangup,
+        3 => Signal.Quit,
+        4 => Signal.User1,
+        5 => Signal.User2,
+        6 => Signal.WindowChange,
+        _ => Signal.Other(number),
+    };
+}
+
 /// The tasks a scope starts end before it does (06 T5): structured concurrency. A scope is
 /// `Closeable` — `using let scope = TaskScope.new();` — and its `close()` waits until every task it
 /// started has ended. The first of them that fails cancels the others (N9 X3), and `close()`
@@ -1341,12 +1526,32 @@ class Scheduler {
     var inboxFirst: ?Context = null,
     var inboxLast: ?Context = null,
     var poller: int = 0,
+    /// The signals' watcher where it waits for the poller to wake (lyr/signal.h).
+    var pollerWaiter: ?Context = null,
 
     /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
     mut fn started(): void {
         this.inboxLock.acquire();
         this.poller = currentPoller();
         this.inboxLock.release();
+    }
+
+    /// The running task — the signals' watcher — waits until the thread's poller wakes: a caught
+    /// signal wakes it.
+    mut fn awaitPoller(): void {
+        let me = this.running ?? panic("a wait where no task runs");
+        me.beginWait();
+        this.pollerWaiter = me;
+        park();
+        me.endWait();
+    }
+
+    /// The poller woke the thread: a task waiting for that runs again.
+    mut fn pollerWoke(): void {
+        if (let w = this.pollerWaiter) {
+            this.pollerWaiter = null;
+            this.wakeUp(w);
+        }
     }
 
     /// Wakes the thread from its wait on the poller, to look at what another thread changed.
@@ -1563,10 +1768,12 @@ class Scheduler {
         let top = this.sleepers;
         if (top == null) {
             waitOnPoller(-1);
+            this.pollerWoke();
             return;
         }
         let left = top.deadline - monotonicNanos();
         waitOnPoller(if (left > 0) left else 0);
+        this.pollerWoke();
     }
 }
 
@@ -1687,3 +1894,12 @@ fn wakePoller(poller: int): void;
 
 /// A thread that spins on a lock lets another run.
 fn spin(): void;
+
+/// Signals (lyr/signal.h): the system's number of an abstract signal and back — -1 where it has
+/// none —; the handler on or off — false where the runtime may not catch it —; this thread as the
+/// watcher, whose poller a caught signal wakes; the caught ones as a mask, taken.
+fn signalNumber(kind: int): int;
+fn signalKind(number: int): int;
+fn catchSignal(number: int, on: bool): bool;
+fn attachSignals(): void;
+fn takeSignals(): int;
