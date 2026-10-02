@@ -228,6 +228,9 @@ public class CEmitterTests
             data.Add("channels", profile, 0,
                 "pong 10\npong 20\npong 30\nclosed true\ngot a\nc went in\ngot b c\nempty true\nsend on closed\n"
                 + "waiter cancelled true\n");
+            data.Add("select", profile, 0,
+                "a got 1\nd got 42\ntimed out\nnothing at once\ntimer fired true\ne closed true\nk gave 3\nk gave -1\n"
+                + "cancelled\nx got 1\ny still had 2\nbody threw\ng got 5\nh got 7\n");
             data.Add("timeout", profile, 0,
                 "slow 10 ends\nfast 10\nslow 30000 ends\ntimed out\nbody failed: oops\nquiet 7\n"
                 + "slow 20000 ends\ncaller cancelled\n");

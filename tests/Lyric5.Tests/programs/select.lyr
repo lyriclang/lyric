@@ -1,0 +1,89 @@
+// Select and timers (design/v5/spec/06 N5 K2-K3; 10 §7). Expected stdout:
+//   a got 1                       both have a value at once: the first case added runs
+//   d got 42                      none has one: the first channel to get one runs its case
+//   timed out / nothing at once   the timeout, and a timeout of zero
+//   timer fired true              Timer.after is a channel that closes once its time came
+//   e closed true                 a channel that closes while the select waits: its body gets null
+//   k gave 3 / k gave -1          a closed channel still gives what it holds, then null
+//   cancelled                     a cancel ends the wait
+//   x got 1 / y still had 2       only the case that runs receives
+//   body threw                    what the body throws comes out of run()
+//   g got 5 / h got 7             a select that got a value in time leaves the sleepers' heap
+import std.io { println };
+import std.task { spawn, spawnDetached, sleep, yieldNow, Channel, Select, Timer, Cancelled };
+import std.time { Duration };
+
+class Oops :: [Error] {
+    fn message(): string { return "oops"; }
+}
+
+fn main(): void throws Error {
+    let a = Channel<int>.new(1);
+    let b = Channel<string>.new(1);
+    try b.send("b0");
+    try a.send(1);
+    try Select.on(a) { println(f"a got {it!}"); }.on(b) { println(f"b got {it!}"); }.run();
+
+    let c = Channel<int>.new();
+    let d = Channel<int>.new();
+    let sender = spawn(() => { try d.send(42); });
+    try Select.on(c) { println(f"c got {it!}"); }.on(d) { println(f"d got {it!}"); }.run();
+    try sender.await();
+
+    try Select.on(c) { println("c?"); }.timeout(Duration.ofMillis(20)) { println("timed out"); }.run();
+    try Select.on(c) { println("c?"); }.timeout(Duration.ofMillis(0)) { println("nothing at once"); }.run();
+
+    let t = Timer.after(Duration.ofMillis(10));
+    try Select.on(c) { println("c?"); }.on(t) { println(f"timer fired {it == null}"); }.run();
+
+    let e = Channel<int>.new();
+    spawnDetached(() => { e.close(); });
+    try Select.on(e) { println(f"e closed {it == null}"); }.run();
+
+    let k = Channel<int>.new(1);
+    try k.send(3);
+    k.close();
+    try Select.on(k) { println(f"k gave {it ?? -1}"); }.run();
+    try Select.on(k) { println(f"k gave {it ?? -1}"); }.run();
+
+    let w = spawn(() => { try Select.on(c) { println("c?"); }.run(); });
+    try yieldNow();
+    w.cancel();
+    try {
+        w.await();
+    } catch (_: Cancelled) {
+        println("cancelled");
+    }
+
+    let x = Channel<int>.new();
+    let y = Channel<int>.new();
+    let both = spawn(() => {
+        try x.send(1);
+        try y.send(2);
+    });
+    try Select.on(x) { println(f"x got {it!}"); }.on(y) { println(f"y got {it!}"); }.run();
+    let later = try y.recv();
+    println(f"y still had {later!}");
+    try both.await();
+
+    let f = Channel<int>.new(1);
+    try f.send(9);
+    try {
+        Select.on(f) { throw Oops { }; }.run();
+    } catch (_: Oops) {
+        println("body threw");
+    }
+
+    let g = Channel<int>.new();
+    let h = Channel<int>.new();
+    let quick = spawn(() => { try g.send(5); });
+    try Select.on(g) { println(f"g got {it!}"); }.timeout(Duration.ofMillis(30)) { println("g timed out"); }.run();
+    try quick.await();
+    let slow = spawn(() => {
+        try sleep(Duration.ofMillis(80));
+        try h.send(7);
+    });
+    let v = try h.recv();
+    println(f"h got {v ?? -1}");
+    try slow.await();
+}
