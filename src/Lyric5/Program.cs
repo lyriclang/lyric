@@ -52,6 +52,7 @@ public static class Program
         output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
         output.WriteLine("  --emit ir|c                    print the IR or the C instead of building");
         output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
+        output.WriteLine("  --offline                      fetch nothing: packages from git come from the cache");
         output.WriteLine();
         output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
         return exit;
@@ -68,11 +69,15 @@ public static class Program
 
     private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C"];
 
+    /// <summary>The options without a value.</summary>
+    private static readonly string[] Flags = ["--offline"];
+
     private static int Build(string[] args, bool run)
     {
         var verb = run ? "run" : "build";
         string? file = null;
         var values = new Dictionary<string, string>();
+        var flags = new HashSet<string>(StringComparer.Ordinal);
         var programArgs = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
@@ -82,6 +87,11 @@ public static class Program
                 if (!run) return Unknown("'--' separates the program's arguments, which only 'run' passes on");
                 programArgs.AddRange(args[(i + 1)..]);
                 break;
+            }
+            if (Flags.Contains(arg))
+            {
+                flags.Add(arg);
+                continue;
             }
             var option = ValueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
             if (option is not null)
@@ -105,13 +115,15 @@ public static class Program
             return 2;
         }
         if (file is not null) file = Path.GetFullPath(file, baseDirectory);
+        // '--offline' (11 W2 P9): what is read from git comes from the user's cache, nothing is fetched.
+        var offline = flags.Contains("--offline");
 
         Project project;
         try
         {
             if (file is null)
             {
-                if (Project.ForDirectory(baseDirectory) is not { } package)
+                if (Project.ForDirectory(baseDirectory, offline) is not { } package)
                 {
                     Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
                     Console.Error.WriteLine($"  = help: lyric5 {verb} <file.lyr> builds one file alone");
@@ -126,13 +138,13 @@ public static class Program
                     Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
                     return 2;
                 }
-                project = Project.ForFile(file);
+                project = Project.ForFile(file, offline);
             }
         }
         catch (ManifestException refused)
         {
             Console.Error.WriteLine(refused.Render());
-            return 1;
+            return refused.Exit;
         }
         catch (LibraryException library)
         {

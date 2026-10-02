@@ -89,7 +89,8 @@ public class ManifestTests
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nauthors = \"me\"", "LYR-PKG0002", "'authors' is an array of strings")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nauthors = [\"me\", 7]", "LYR-PKG0002", "'authors' is an array of strings")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\ntoolchain = \">=5.1\"", "LYR-PKG0003", "'toolchain' comes with M7 S6")]
-    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ninclude = [\"src\"]", "LYR-PKG0003", "'include' comes with M7 S5")]
+    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ninclude = \"src\"", "LYR-PKG0002", "'include' is an array of patterns")]
+    [InlineData("name = \"app\"\nversion = \"0.1.0\"\nexclude = [\"../notes\"]", "LYR-PKG0002", "'../notes' is no pattern of the package's files")]
     public void A_package_table_is_checked(string body, string code, string why)
     {
         var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write("[package]\n" + body + "\n")));
@@ -116,14 +117,61 @@ public class ManifestTests
         var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\ngeo = { path = \"../geo\" }\n"));
         var geo = Assert.Single(m.Dependencies);
         Assert.Equal("geo", geo.Name);
-        Assert.Equal(Path.GetFullPath(Path.Combine(m.Root, "..", "geo")), geo.Root);
+        Assert.Equal(Path.GetFullPath(Path.Combine(m.Root, "..", "geo")), geo.Path);
+        Assert.Null(geo.Git);
         Assert.Equal(6, geo.Line);
+    }
+
+    [Fact]
+    public void A_git_dependency_names_a_repository_and_a_revision()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\n"
+            + "geo = { git = \"https://example.org/geo.git\", tag = \"v1.2.0\" }\n"
+            + "units = { git = \"git@example.org:units.git\", branch = \"release/1\" }\n"
+            + "io = { git = \"file:///srv/io\", rev = \"0123abc\" }\n"
+            + "fmt = { git = \"ssh://example.org/fmt\" }\n"));
+        Assert.Equal(
+            [new GitSource("https://example.org/geo.git", GitRefKind.Tag, "v1.2.0"),
+             new GitSource("git@example.org:units.git", GitRefKind.Branch, "release/1"),
+             new GitSource("file:///srv/io", GitRefKind.Rev, "0123abc"),
+             new GitSource("ssh://example.org/fmt", GitRefKind.Default, null)],
+            m.Dependencies.Select(d => d.Git));
+        Assert.All(m.Dependencies, d => Assert.Null(d.Path));
+    }
+
+    [Fact]
+    public void An_override_reads_a_directory()
+    {
+        var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write(
+            "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[override]\ngeo = { git = \"https://example.org/geo\" }\n")));
+        Assert.Equal("LYR-PKG0003", e.Code);
+        Assert.Contains("an override reads a directory (07 P7)", e.Message);
+    }
+
+    [Fact]
+    public void Include_and_exclude_name_the_package_content()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\ninclude = [\"src/\", \"assets/**\"]\nexclude = [\"src/draft.lyr\"]\n"));
+        Assert.Equal(["src/", "assets/**"], m.Include);
+        Assert.Equal(["src/draft.lyr"], m.Exclude);
+        var plain = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n"));
+        Assert.Null(plain.Include);
+        Assert.Empty(plain.Exclude);
     }
 
     [Theory]
     [InlineData("geo = \"1.2\"", "LYR-PKG0003", "asks a registry for a version")]
-    [InlineData("geo = { git = \"https://example.org/geo\" }", "LYR-PKG0003", "'git' of 'geo' comes with M7 S5")]
-    [InlineData("geo = { path = 3 }", "LYR-PKG0002", "'geo' needs a path")]
+    [InlineData("geo = { path = 3 }", "LYR-PKG0002", "'path' of 'geo' is a string, not the number 3")]
+    [InlineData("geo = { git = 7 }", "LYR-PKG0002", "'git' of 'geo' is a string, not the number 7")]
+    [InlineData("geo = { git = \"https://example.org/geo\", path = \"../geo\" }", "LYR-PKG0002", "'geo' names a directory and a repository")]
+    [InlineData("geo = { tag = \"v1\" }", "LYR-PKG0002", "'geo' needs a path or a git repository")]
+    [InlineData("geo = { path = \"../geo\", tag = \"v1\" }", "LYR-PKG0002", "'tag' of 'geo' names a revision of a repository")]
+    [InlineData("geo = { git = \"ftp://example.org/geo\" }", "LYR-PKG0002", "'ftp://example.org/geo' is no git repository")]
+    [InlineData("geo = { git = \"--upload-pack=touch\" }", "LYR-PKG0002", "is no git repository")]
+    [InlineData("geo = { git = \"https://example.org/geo\", tag = \"v1\", branch = \"main\" }", "LYR-PKG0002", "'geo' names a tag and a branch: one revision")]
+    [InlineData("geo = { git = \"https://example.org/geo\", rev = \"main\" }", "LYR-PKG0002", "'main' is no commit")]
+    [InlineData("geo = { git = \"https://example.org/geo\", tag = \"-x\" }", "LYR-PKG0002", "'-x' is no tag name")]
+    [InlineData("geo = { git = \"https://example.org/geo\", branch = \"a..b\" }", "LYR-PKG0002", "'a..b' is no branch name")]
     [InlineData("Geo = { path = \"../geo\" }", "LYR-PKG0002", "'Geo' is no package name")]
     [InlineData("geo = { path = \"../geo\", features = [] }", "LYR-PKG0003", "'geo' has no key 'features'")]
     public void A_dependency_is_checked(string entry, string code, string why)

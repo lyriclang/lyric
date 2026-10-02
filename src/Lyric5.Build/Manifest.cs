@@ -2,11 +2,33 @@ using System.Text.RegularExpressions;
 
 namespace Lyric5.Build;
 
-/// <summary>A package a manifest depends on (design/v5/spec/11 W2 P2, 07 V7): read from a
-/// directory — the git form comes with M7 S5, a registry's version is no part of 5.0 (07 P8).</summary>
-/// <param name="Root">The package's directory, absolute: where its <c>lyric.toml</c> is.</param>
+/// <summary>A package a manifest depends on (design/v5/spec/11 W2 P2, P9; 07 V7): read from a
+/// directory or from a git repository — a registry's version is no part of 5.0 (07 P8).</summary>
+/// <param name="Path">The package's directory, absolute, for <c>{ path = "…" }</c>.</param>
+/// <param name="Git">The repository and its revision, for <c>{ git = "…" }</c>.</param>
 /// <param name="Line">The line it is written on, for what is refused about it.</param>
-public sealed record Dependency(string Name, string Root, int Line);
+public sealed record Dependency(string Name, string? Path, GitSource? Git, int Line)
+{
+    /// <summary>Where the package is read from, as a message says it.</summary>
+    public string Describe() => Git?.ToString() ?? $"'{Path}'";
+}
+
+/// <summary>A git repository and the revision of it a dependency reads (11 W2 P9): a tag, a
+/// branch, a commit — or, none named, the branch the repository's <c>HEAD</c> names.</summary>
+public sealed record GitSource(string Url, GitRefKind Kind, string? Ref)
+{
+    public string Revision => Kind switch
+    {
+        GitRefKind.Tag => $"tag '{Ref}'",
+        GitRefKind.Branch => $"branch '{Ref}'",
+        GitRefKind.Rev => $"commit '{Ref}'",
+        _ => "its default branch",
+    };
+
+    public override string ToString() => $"{Url} at {Revision}";
+}
+
+public enum GitRefKind { Default, Tag, Branch, Rev }
 
 /// <summary>
 /// A package's manifest, <c>lyric.toml</c> (design/v5/spec/07 V7, 11 W2): read, never run (P1).
@@ -24,6 +46,13 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// wherever it is asked for — the root manifest's alone count.</summary>
     public IReadOnlyList<Dependency> Overrides { get; init; } = [];
 
+    /// <summary><c>include</c> (11 W2 P8): the files the package is made of, instead of the
+    /// default; <c>null</c> where the default holds.</summary>
+    public IReadOnlyList<string>? Include { get; init; }
+
+    /// <summary><c>exclude</c> (P8): files taken out of what the package is made of.</summary>
+    public IReadOnlyList<string> Exclude { get; init; } = [];
+
     /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies (P5).</summary>
     public string Root => Path.GetDirectoryName(File)!;
 
@@ -33,9 +62,9 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary>The editions this toolchain knows (07 V9).</summary>
     private static readonly string[] Editions = ["5"];
 
-    /// <summary>The keys of <c>[package]</c> M7 S1 reads, and the ones that describe the package
-    /// and change no build — for <c>lyric metadata</c> (P10).</summary>
-    private static readonly string[] PackageKeys = ["name", "version", "edition"];
+    /// <summary>The keys of <c>[package]</c> the toolchain reads, and the ones that describe the
+    /// package and change no build — for <c>lyric metadata</c> (P10).</summary>
+    private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude"];
 
     private static readonly string[] DescriptiveStrings = ["description", "license", "repository"];
 
@@ -44,8 +73,6 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static readonly Dictionary<string, string> LaterKeys = new(StringComparer.Ordinal)
     {
         ["toolchain"] = "M7 S6",
-        ["include"] = "M7 S5",
-        ["exclude"] = "M7 S5",
     };
 
     /// <summary>The sections the plan gives a meaning to later, with the slice they come with.</summary>
@@ -61,12 +88,17 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     /// <summary>Reads and checks <paramref name="file"/>.</summary>
     /// <exception cref="ManifestException">The manifest is not TOML, or not a manifest.</exception>
-    public static Manifest Read(string file)
+    public static Manifest Read(string file) => Parse(System.IO.File.ReadAllText(file), file);
+
+    /// <summary>Checks <paramref name="source"/> as the manifest at <paramref name="file"/> — where
+    /// its paths are relative to and its diagnostics point.</summary>
+    /// <exception cref="ManifestException">The manifest is not TOML, or not a manifest.</exception>
+    public static Manifest Parse(string source, string file)
     {
         TomlTable document;
         try
         {
-            document = Toml.Parse(System.IO.File.ReadAllText(file));
+            document = Toml.Parse(source);
         }
         catch (TomlException e)
         {
@@ -128,10 +160,33 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         {
             Dependencies = ReadDependencies(document, "dependencies", file),
             Overrides = ReadDependencies(document, "override", file),
+            Include = Patterns(package, "include", file),
+            Exclude = Patterns(package, "exclude", file) ?? [],
         };
     }
 
-    /// <summary><c>name = { path = "…" }</c>, the path relative to the manifest's directory.</summary>
+    /// <summary><c>include</c> or <c>exclude</c>: patterns of the package's files (11 W2 P8).</summary>
+    private static List<string>? Patterns(TomlTable package, string key, string file)
+    {
+        if (!package.TryGet(key, out var value)) return null;
+        if (value is not TomlArray list || list.Any(p => p is not string))
+            throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"'{key}' is an array of patterns");
+        var patterns = list.Cast<string>().ToList();
+        foreach (var pattern in patterns)
+            if (!PackageContent.IsPattern(pattern))
+                throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
+                    $"'{pattern}' is no pattern of the package's files: relative to its root, '/' between directories, no '.' or '..'");
+        return patterns;
+    }
+
+    /// <summary>The keys of a dependency's table: where it is read from, and the revision of a
+    /// repository — one of them.</summary>
+    private static readonly string[] DependencyKeys = ["path", "git", "tag", "branch", "rev"];
+
+    private static readonly string[] Revisions = ["tag", "branch", "rev"];
+
+    /// <summary><c>name = { path = "…" }</c>, the path relative to the manifest's directory, or
+    /// <c>name = { git = "…", tag | branch | rev = "…" }</c>. An override reads a directory (07 P7).</summary>
     private static List<Dependency> ReadDependencies(TomlTable document, string section, string file)
     {
         var dependencies = new List<Dependency>();
@@ -147,19 +202,60 @@ public sealed partial record Manifest(string File, string Name, string Version, 
                 throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' is no package name");
             if (value is string)
                 throw new ManifestException("LYR-PKG0003", file, line, 1,
-                    $"'{name}' asks a registry for a version, and there is none in 5.0 (07 P8) — give its directory: {name} = {{ path = \"…\" }}");
+                    $"'{name}' asks a registry for a version, and there is none in 5.0 (07 P8) — give its directory or its repository: {name} = {{ path = \"…\" }}");
             if (value is not TomlTable spec)
-                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' is written {name} = {{ path = \"…\" }}");
+                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' is written {name} = {{ path = \"…\" }} or {name} = {{ git = \"…\" }}");
             foreach (var key in spec.Keys)
-                if (key != "path")
-                    throw new ManifestException("LYR-PKG0003", file, line, 1, key is "git" or "tag" or "rev" or "branch"
-                        ? $"'{key}' of '{name}' comes with M7 S5: this toolchain reads a path"
-                        : $"'{name}' has no key '{key}'");
-            if (!spec.TryGet("path", out var path) || path is not string relative)
-                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' needs a path: {name} = {{ path = \"…\" }}");
-            dependencies.Add(new Dependency(name, System.IO.Path.GetFullPath(relative, root), line));
+            {
+                if (!DependencyKeys.Contains(key))
+                    throw new ManifestException("LYR-PKG0003", file, line, 1, $"'{name}' has no key '{key}'");
+                spec.TryGet(key, out var given);
+                if (given is not string)
+                    throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{key}' of '{name}' is a string, not {Describe(given)}");
+            }
+            var hasPath = spec.TryGet("path", out var path);
+            var hasGit = spec.TryGet("git", out var url);
+            var revisions = Revisions.Where(spec.Contains).ToList();
+            if (hasPath && hasGit)
+                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' names a directory and a repository: one of them");
+            if (hasPath)
+            {
+                if (revisions.Count > 0)
+                    throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{revisions[0]}' of '{name}' names a revision of a repository, and '{name}' is a directory");
+                dependencies.Add(new Dependency(name, System.IO.Path.GetFullPath((string)path, root), null, line));
+                continue;
+            }
+            if (!hasGit)
+                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' needs a path or a git repository: {name} = {{ path = \"…\" }}");
+            if (section == "override")
+                throw new ManifestException("LYR-PKG0003", file, line, 1, $"an override reads a directory (07 P7): {name} = {{ path = \"…\" }}");
+            dependencies.Add(new Dependency(name, null, GitForm(name, (string)url, spec, revisions, file, line), line));
         }
         return dependencies;
+    }
+
+    /// <summary>The git form: a URL git reads, and at most one revision of the repository.</summary>
+    private static GitSource GitForm(string name, string url, TomlTable spec, List<string> revisions, string file, int line)
+    {
+        if (!GitUrlPattern().IsMatch(url))
+            throw new ManifestException("LYR-PKG0002", file, line, 1,
+                $"'{url}' is no git repository: https://, http://, ssh://, git://, file:// or user@host:path");
+        if (revisions.Count > 1)
+            throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' names a {revisions[0]} and a {revisions[1]}: one revision");
+        if (revisions.Count == 0) return new GitSource(url, GitRefKind.Default, null);
+        spec.TryGet(revisions[0], out var given);
+        var revision = (string)given;
+        var (kind, valid) = revisions[0] switch
+        {
+            "tag" => (GitRefKind.Tag, RefNamePattern().IsMatch(revision)),
+            "branch" => (GitRefKind.Branch, RefNamePattern().IsMatch(revision)),
+            _ => (GitRefKind.Rev, CommitPattern().IsMatch(revision)),
+        };
+        if (!valid)
+            throw new ManifestException("LYR-PKG0002", file, line, 1, kind == GitRefKind.Rev
+                ? $"'{revision}' is no commit: 7 to 64 hexadecimal digits"
+                : $"'{revision}' is no {revisions[0]} name");
+        return new GitSource(url, kind, revision);
     }
 
     private static string RequiredString(TomlTable table, string key, string file)
@@ -185,12 +281,28 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     [GeneratedRegex(@"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$")]
     private static partial Regex SemVerPattern();
+
+    /// <summary>What git reads as a repository's address — a URL of its transports, or the scp
+    /// form; never an option ('-…') or a transport that runs a command.</summary>
+    [GeneratedRegex(@"^(?:(?:https?|ssh|git|file)://[^\s]+|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+)$")]
+    private static partial Regex GitUrlPattern();
+
+    /// <summary>A tag's or a branch's name as a manifest may write it: no option, no space, no
+    /// revision syntax.</summary>
+    [GeneratedRegex(@"^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9._/+-]*$")]
+    private static partial Regex RefNamePattern();
+
+    [GeneratedRegex("^[0-9a-f]{7,64}$")]
+    private static partial Regex CommitPattern();
 }
 
-/// <summary>A manifest the toolchain refuses: its code (11 W6), file, line and column, and why.</summary>
-public sealed class ManifestException(string code, string file, int line, int column, string message) : Exception(message)
+/// <summary>A manifest the toolchain refuses: its code (11 W6), file, line and column, and why —
+/// exit 1; a package from git that cannot be reached is the environment's failure, exit 2 (11 C5).</summary>
+public sealed class ManifestException(string code, string file, int line, int column, string message, int exit = 1)
+    : Exception(message)
 {
     public string Code { get; } = code;
+    public int Exit { get; } = exit;
     public string File { get; } = file;
     public int Line { get; } = line;
     public int Column { get; } = column;
