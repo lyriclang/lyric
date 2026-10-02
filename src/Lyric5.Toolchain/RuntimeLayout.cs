@@ -62,6 +62,8 @@ public static class RuntimeLayout
 
     public static IReadOnlyList<CUnit> Units(string root, Target target)
     {
+        // Where the toolchain lies is no part of what it builds (11 W2 P6).
+        var map = $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(Path.GetFullPath(root))}=lyric";
         var bdwgc = BdwgcDir(root);
         var bdwgcInclude = Path.Combine(bdwgc, "include");
         var units = new List<CUnit>
@@ -72,7 +74,7 @@ public static class RuntimeLayout
             // instrumented, it switches to its TSan mode, whose mutex is a place where TSan does
             // NOT deliver the collector's stop signal — measured, 31 of 32 stressed runs aborted.
             new(Path.Combine(bdwgc, "extra", "gc.c"), CollectorDefines(target), [bdwgcInclude],
-                Instrument: false, ExtraFlags: ["-w", "-std=gnu11"]),
+                Instrument: false, ExtraFlags: ["-w", "-std=gnu11", map]),
         };
 
         // Third-party as well, and uninstrumented for the same reason as the collector: its readers
@@ -81,7 +83,7 @@ public static class RuntimeLayout
         foreach (var file in LibbacktraceSources(target))
         {
             units.Add(new CUnit(Path.Combine(libbacktrace, file), [], [BacktraceConfigDir(root), libbacktrace],
-                Instrument: false, ExtraFlags: ["-w", "-std=gnu11"]));
+                Instrument: false, ExtraFlags: ["-w", "-std=gnu11", map]));
         }
 
         var own = Path.Combine(root, "runtime", "src");
@@ -89,7 +91,7 @@ public static class RuntimeLayout
         foreach (var source in Directory.EnumerateFiles(own, "*.c").Order(StringComparer.Ordinal))
         {
             units.Add(new CUnit(source, runtimeDefines, [IncludeDir(root), bdwgcInclude, libbacktrace],
-                ExtraFlags: ["-Wall", "-Wextra"]));
+                ExtraFlags: ["-Wall", "-Wextra", map]));
         }
         return units;
     }
