@@ -32,6 +32,13 @@ public static class Intrinsics
         ["std.task.setCurrentScheduler"] = "lyr_task_set_scheduler",
         ["std.task.waitOnPoller"] = "lyr_task_wait",
         ["std.task.monotonicNanos"] = "lyr_clock_monotonic_ns",
+        // A task's panic (05 E8, 06 T4): the scheduler's resume, which keeps a panic the
+        // context's; the report it left; the panic again where an await meets it.
+        ["std.task.resumeContext"] = "lyr_task_resume",
+        ["std.task.panicCode"] = "lyr_task_panic_code",
+        ["std.task.panicMessage"] = "lyr_task_panic_message",
+        ["std.task.panicTrace"] = "lyr_task_panic_trace",
+        ["std.task.repanic"] = "lyr_task_repanic",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

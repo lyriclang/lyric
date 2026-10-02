@@ -59,6 +59,8 @@ public class SanitizerTests
         { "coro_threads", [], 0 },
         { "poll_basic", [], 0 },
         { "task_main", [], 7 },
+        { "coro_panic", [], 0 },
+        { "coro_panic", ["main"], 101 },
         { "coro_storm", [], 0 },
     };
 
@@ -70,6 +72,7 @@ public class SanitizerTests
         { "coro_basic", [], 0 },
         { "coro_park", [], 0 },
         { "task_main", [], 7 },
+        { "coro_panic", [], 0 },
         { "coro_gc", [], 0 },
     };
 
@@ -122,6 +125,9 @@ public class SanitizerTests
     [InlineData("cancel", 0)]
     [InlineData("scopes", 0)]
     [InlineData("timeout", 0)]
+    [InlineData("task_status", 101)]
+    [InlineData("scope_panic", 101)]
+    [InlineData("detached_panic", 101)]
     [InlineData("task_panic", 101)]
     [InlineData("yield_in_task", 101)]
     [InlineData("yield_mismatch", 101)]

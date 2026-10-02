@@ -1,0 +1,13 @@
+// A panic in a detached task (design/v5/spec/06 T4; 10 §5 rule 4): nobody can look at it, so it
+// ends the program. Expected stdout "before", then "panic [LYR-RT0008]: lost", and exit 101.
+import std.io { println };
+import std.task { spawnDetached, yieldNow, Cancelled };
+
+fn main(): void throws Cancelled {
+    spawnDetached(() => {
+        panic("lost");
+    });
+    println("before");
+    try yieldNow();
+    println("never");
+}

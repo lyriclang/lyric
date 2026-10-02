@@ -10,6 +10,7 @@
 #include "lyr/gc.h"
 #include "lyr/init.h"
 #include "lyr/panic.h"
+#include "lyr/string.h"
 #include "internal.h"
 
 #include <stdatomic.h>
@@ -540,14 +541,29 @@ LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t s
 
 static void resume_parked(CoroThread *ts, LyrCoro *co);
 
+/* Back from a resume: the coroutine yielded or parked — or its body returned, or it panicked, and
+ * its stack goes. */
+static void came_back(LyrCoro *co) {
+    if (co->status == LYR_CORO_DONE || co->status == LYR_CORO_PANICKED) {
+        lyr_gc_unwatch_coro(co);
+        release_stack(co);
+    }
+}
+
 void lyr_coro_resume(LyrCoro *co) {
+    if (LYR_UNLIKELY(lyr_coro_resume_quiet(co) == LYR_CORO_PANICKED)) lyr_coro_repanic(co);
+}
+
+int lyr_coro_resume_quiet(LyrCoro *co) {
     CoroThread *ts = this_thread();
     if (co->status == LYR_CORO_PARKED) {
         resume_parked(ts, co);
-        return;
+        return co->status;
     }
     if (LYR_UNLIKELY(co->status != LYR_CORO_SUSPENDED)) {
-        if (co->status == LYR_CORO_DONE) lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed after its body returned");
+        if (co->status == LYR_CORO_DONE || co->status == LYR_CORO_PANICKED) {
+            lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed after its body returned");
+        }
         lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed while it runs — by itself, or while a coroutine it resumed runs");
     }
     if (co->mapping == NULL) {
@@ -563,11 +579,8 @@ void lyr_coro_resume(LyrCoro *co) {
     co->status = LYR_CORO_RUNNING;
     ts->current = co;
     transfer(from, &co->ctx, 0);
-    /* Back here: the coroutine yielded, or its body returned and its stack can go. */
-    if (co->status == LYR_CORO_DONE) {
-        lyr_gc_unwatch_coro(co);
-        release_stack(co);
-    }
+    came_back(co);
+    return co->status;
 }
 
 /* A parked chain continues where it parked (06 N3): the outermost coroutine runs again for whoever
@@ -584,10 +597,42 @@ static void resume_parked(CoroThread *ts, LyrCoro *co) {
     LYR_WRITE_BARRIER(co, &co->parked_top, (LyrCoro *)NULL);
     ts->current = top;
     transfer(from, &top->ctx, 0);
-    if (co->status == LYR_CORO_DONE) {
-        lyr_gc_unwatch_coro(co);
-        release_stack(co);
+    came_back(co);
+}
+
+/* --- panics (05 E8) ------------------------------------------------------------------------------ */
+
+void lyr_coro_panic_leave(const char *code, const char *message, const char *trace) {
+    CoroThread *ts = thread_state;
+    LyrCoro *co = ts != NULL ? ts->current : NULL;
+    if (co == NULL || co->foreign > 0) return;
+    enum { FRAMES = 32 * 1024 };
+    char *frames = NULL;
+    if (trace == NULL) {
+        frames = malloc(FRAMES);
+        if (frames == NULL) return;
+        lyr_trace_format(frames, FRAMES, NULL);
+        trace = frames;
     }
+    LyrStr *kept_code = lyr_str_from_cstr(code);
+    LyrStr *kept_message = lyr_str_from_cstr(message);
+    LyrStr *kept_trace = lyr_str_from_cstr(trace);
+    free(frames);
+    LYR_WRITE_BARRIER(co, &co->panic_code, kept_code);
+    LYR_WRITE_BARRIER(co, &co->panic_message, kept_message);
+    LYR_WRITE_BARRIER(co, &co->panic_trace, kept_trace);
+    /* As a body that returned, except that nothing more of it runs: its resumer goes on. */
+    co->status = LYR_CORO_PANICKED;
+    ts->current = co->resumer_coro;
+    LyrStackCtx *to = co->resumer;
+    LYR_WRITE_BARRIER(co, &co->resumer_coro, (LyrCoro *)NULL);
+    transfer(&co->ctx, to, 1);
+    __builtin_trap();  /* nothing resumes a coroutine that panicked */
+}
+
+void lyr_coro_repanic(LyrCoro *co) {
+    lyr_panic_again((const char *)co->panic_code->bytes, (const char *)co->panic_message->bytes,
+                    (const char *)co->panic_trace->bytes);
 }
 
 void lyr_coro_park(void) {
@@ -624,7 +669,7 @@ void lyr_coro_yield_value(void *value) {
 }
 
 void lyr_coro_close(LyrCoro *co) {
-    if (co->status == LYR_CORO_DONE) return;
+    if (co->status == LYR_CORO_DONE || co->status == LYR_CORO_PANICKED) return;
     if (LYR_UNLIKELY(co->status == LYR_CORO_PARKED)) {
         lyr_panic(LYR_RT_COROUTINE, "a coroutine closed while it is parked — a parked task is cancelled, not closed");
     }

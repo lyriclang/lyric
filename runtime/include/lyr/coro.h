@@ -17,6 +17,7 @@ typedef enum LyrCoroStatus {
     LYR_CORO_RUNNING = 2,    /* running, or waiting for a coroutine it resumed */
     LYR_CORO_DONE = 3,       /* its body returned */
     LYR_CORO_PARKED = 4,     /* a coroutine of its chain parked: a resume continues that one */
+    LYR_CORO_PANICKED = 5,   /* its body panicked (05 E8): it left its stack, keeping the report */
 } LyrCoroStatus;
 
 /* A coroutine's body, run on the coroutine's stack at its first resume; returning ends it. */
@@ -35,7 +36,8 @@ LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t s
 
 /* Runs `co` until it yields or its body returns, then comes back. Resuming a coroutine that runs
  * — itself, or one a coroutine already waits for — or one that is done, or one that belongs to
- * another thread, panics (RT0014). */
+ * another thread, panics (RT0014). A panic in `co` leaves it (05 E8) and comes out of this
+ * resume: the resumer panics again, with the same report. */
 void lyr_coro_resume(LyrCoro *co);
 
 /* Stops the running coroutine and goes back to its resumer; the next resume continues after this

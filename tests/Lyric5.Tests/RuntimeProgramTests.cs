@@ -29,6 +29,7 @@ public class RuntimeProgramTests
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
             data.Add("poll_basic", profile, 0, "poll ok\n", []);
             data.Add("task_main", profile, 7, "task ok\n", []);
+            data.Add("coro_panic", profile, 0, "coro panic ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }
@@ -73,6 +74,23 @@ public class RuntimeProgramTests
         var result = RuntimeBuildTests.RunTest("task_main", profile, args: ["yield"]);
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.StartsWith("panic [LYR-RT0014]: a yield of 'int' in a task, where no generator runs", result.Stderr);
+        Assert.Equal("", result.Stdout);
+    }
+
+    /// <summary>A panic with nowhere to leave to (05 E8): from a coroutine on the thread's own stack
+    /// it ends the process with the first report, the frames where it happened; with a foreign
+    /// frame on the coroutine's stack it ends the process at once, even under the quiet resume.</summary>
+    [Theory]
+    [InlineData("main", Profile.Debug, "panic [LYR-RT0008]: boom 7")]
+    [InlineData("main", Profile.Release, "panic [LYR-RT0008]: boom 7")]
+    [InlineData("foreign", Profile.Debug, "panic [LYR-RT0008]: through C")]
+    public void A_panic_with_nowhere_to_go_ends_the_process(string which, Profile profile, string first)
+    {
+        var result = RuntimeBuildTests.RunTest("coro_panic", profile, args: [which]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(first, lines[0]);
+        if (which == "main") Assert.StartsWith("    at explode", lines[1]);
         Assert.Equal("", result.Stdout);
     }
 

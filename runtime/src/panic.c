@@ -43,7 +43,9 @@ LYR_NORETURN static void lyr_panic_wait(void) {
     }
 }
 
-void lyr_panic_report(const char *code, const char *message, const LyrFault *fault, int in_handler) {
+/* The report and the end: the frames given, or those of where the panic stands. */
+LYR_NORETURN static void report_and_end(const char *code, const char *message, const LyrFault *fault, int in_handler,
+                                        const char *trace) {
     if (this_thread_panicking) {
         char line[1200];
         int n = snprintf(line, sizeof line, "panic while panicking [%s]: %s\n", code, message);
@@ -56,7 +58,13 @@ void lyr_panic_report(const char *code, const char *message, const LyrFault *fau
     snprintf(message_copy, sizeof message_copy, "%s", message);
     int n = snprintf(report, sizeof report, "panic [%s]: %s\n", code, message_copy);
     size_t header = n < 0 ? 0 : (size_t)n < sizeof report ? (size_t)n : sizeof report - 1;
-    size_t frames = lyr_trace_format(report + header, sizeof report - header, fault);
+    size_t frames;
+    if (trace != NULL) {
+        int m = snprintf(report + header, sizeof report - header, "%s", trace);
+        frames = m < 0 ? 0 : (size_t)m < sizeof report - header ? (size_t)m : sizeof report - header - 1;
+    } else {
+        frames = lyr_trace_format(report + header, sizeof report - header, fault);
+    }
     lyr_write_stderr(report, header + frames);
 
     LyrPanicHook given = atomic_load(&hook);
@@ -70,13 +78,25 @@ void lyr_panic_report(const char *code, const char *message, const LyrFault *fau
     exit(101);
 }
 
+void lyr_panic_report(const char *code, const char *message, const LyrFault *fault, int in_handler) {
+    report_and_end(code, message, fault, in_handler, NULL);
+}
+
 void lyr_panic(const char *code, const char *format, ...) {
     char message[1024];
     va_list args;
     va_start(args, format);
     vsnprintf(message, sizeof message, format, args);
     va_end(args);
+    /* A panic leaves the coroutine it happens in (05 E8), and its resumer takes it from there. Out
+     * of memory is the process's: allocating the report would only fail again. */
+    if (strcmp(code, LYR_RT_OUT_OF_MEMORY) != 0) lyr_coro_panic_leave(code, message, NULL);
     lyr_panic_report(code, message, NULL, 0);
+}
+
+void lyr_panic_again(const char *code, const char *message, const char *trace) {
+    lyr_coro_panic_leave(code, message, trace);
+    report_and_end(code, message, NULL, 0, trace);
 }
 
 void lyr_panic_index(int64_t index, int64_t length) {

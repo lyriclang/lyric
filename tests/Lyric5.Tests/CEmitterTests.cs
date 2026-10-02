@@ -424,7 +424,31 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A panic in a task (06 T4, before S4 isolates it): the program ends with 101, and the trace
+    /// A panic in a task that nobody takes (05 E8; 06 T4; 10 §5): an await of the panicked task, the
+    /// close of its scope, a detached task — the panic comes out again with the first report, the
+    /// frames where it happened, and the program ends with 101. Until then it ended its task only.
+    /// </summary>
+    [Theory]
+    [InlineData("task_status", Profile.Debug, "running\npanicked LYR-RT0008 boom\ndone 5\ncancelled\nawaiting the panicked one\n", "panic [LYR-RT0008]: boom")]
+    [InlineData("task_status", Profile.Release, "running\npanicked LYR-RT0008 boom\ndone 5\ncancelled\nawaiting the panicked one\n", "panic [LYR-RT0008]: boom")]
+    [InlineData("scope_panic", Profile.Debug, "start\nsibling stops\n", "panic [LYR-RT0008]: in scope")]
+    [InlineData("scope_panic", Profile.Release, "start\nsibling stops\n", "panic [LYR-RT0008]: in scope")]
+    [InlineData("detached_panic", Profile.Debug, "before\n", "panic [LYR-RT0008]: lost")]
+    [InlineData("detached_panic", Profile.Release, "before\n", "panic [LYR-RT0008]: lost")]
+    public void A_task_panic_comes_out_where_nobody_takes_it(string name, Profile profile, string stdout, string first)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(first, lines[0]);
+        Assert.Matches($@"^    at lyr_main_\w+ \(.*programs[\\/]{name}\.lyr:\d+\)$", lines[1]);
+        if (name == "task_status")
+            Assert.Matches(@"^    at lyr_main_explode \(.*programs[\\/]task_status\.lyr:11\)$", lines[1]);
+    }
+
+    /// <summary>
+    /// A panic in a detached task (06 T4, 10 §5 rule 4): the program ends with 101, and the trace
     /// runs from the panic through the task's body — the program's lambda, then std.task's wrapper
     /// around it — and stops there: the thunk that makes the lambda a value is glue, and the
     /// runtime's frame below the body is not the program's.

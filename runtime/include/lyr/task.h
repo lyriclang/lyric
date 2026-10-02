@@ -28,6 +28,20 @@ void lyr_task_set_scheduler(void *scheduler);
  * 1 when woken. */
 uint8_t lyr_task_wait(int64_t timeout_ns);
 
+/* The scheduler's resume of a task's context (06 T4): it runs until it parks, ends or panics — and
+ * a panic stays the context's, for the scheduler to settle, instead of passing on (05 E8). 0: it
+ * parked; 1: its body returned; 2: it panicked. */
+uint8_t lyr_task_resume(LyrCoro *co);
+
+/* The report a panicked context left: its code, its message, its frames as the report writes them;
+ * NULL where it did not panic. */
+struct LyrStr *lyr_task_panic_code(LyrCoro *co);
+struct LyrStr *lyr_task_panic_message(LyrCoro *co);
+struct LyrStr *lyr_task_panic_trace(LyrCoro *co);
+
+/* A panic again, with a report an earlier one left (06 T4: `await` of a panicked task). */
+LYR_NORETURN void lyr_task_repanic(struct LyrStr *code, struct LyrStr *message, struct LyrStr *trace);
+
 /* The `main` of an emitted program whose main is a task (06 T6): start the runtime with its
  * defaults, make main's context — a coroutine around `program_main` on a stack of
  * LYR_MAIN_TASK_STACK — and hand it to `scheduler`, std.task's loop, which returns once that

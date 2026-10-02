@@ -1,0 +1,24 @@
+// A panic in a task of a scope (design/v5/spec/06 T4, T5; 10 §5 rule 3): it cancels the scope's
+// other tasks, and close() panics again with it once they have ended. Expected stdout "start" and
+// "sibling stops", then the report "panic [LYR-RT0008]: in scope", and exit 101.
+import std.io { println };
+import std.task { sleep, TaskScope };
+import std.time { Duration };
+
+fn scoped(): void throws Error {
+    using let scope = TaskScope.new();
+    scope.spawn(() => {
+        defer println("sibling stops");
+        try sleep(Duration.ofSecs(30));
+    });
+    scope.spawn(() => {
+        try sleep(Duration.ofMillis(5));
+        panic("in scope");
+    });
+}
+
+fn main(): void throws Error {
+    println("start");
+    try scoped();
+    println("never");
+}
