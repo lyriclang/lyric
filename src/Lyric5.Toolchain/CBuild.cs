@@ -204,13 +204,15 @@ public sealed class CBuild
     /// and on Windows DbgHelp, loaded by the runtime at the first trace, not imported. On a macOS host the debug information is gathered into a .dSYM
     /// beside the executable when dsymutil is there: libbacktrace reads line tables only from one.
     /// </summary>
-    public string LinkExecutable(IReadOnlyList<string> inputs, string output)
+    /// <param name="libraries">Libraries by name (<c>-l</c>), after every input that needs them.</param>
+    public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var arguments = Driver();
         arguments.AddRange(Profile.Codegen);
         arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
+        foreach (var library in libraries ?? []) arguments.Add("-l" + library);
         arguments.AddRange(["-o", output]);
         arguments.AddRange(Target.Os switch
         {

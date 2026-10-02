@@ -71,6 +71,17 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary><c>toolchain</c> (P12): the least toolchain that builds the package; <c>null</c> for any.</summary>
     public ToolchainPin? Toolchain { get; init; }
 
+    /// <summary><c>[native]</c> (07 B5): the native part every target gets.</summary>
+    public NativePart Native { get; init; } = NativePart.None;
+
+    /// <summary><c>[native.linux]</c> and its siblings: what one operating system gets on top.</summary>
+    public IReadOnlyDictionary<Lyric5.Toolchain.TargetOs, NativePart> NativePerSystem { get; init; } =
+        new Dictionary<Lyric5.Toolchain.TargetOs, NativePart>();
+
+    /// <summary>The native part a build for <paramref name="os"/> compiles and links.</summary>
+    public NativePart NativeOn(Lyric5.Toolchain.TargetOs os) =>
+        NativePerSystem.TryGetValue(os, out var more) ? Native.With(more) : Native;
+
     /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies (P5).</summary>
     public string Root => Path.GetDirectoryName(File)!;
 
@@ -89,7 +100,6 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary>The sections the plan gives a meaning to later, with the slice they come with.</summary>
     private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
     {
-        ["native"] = "M7 S6",
         ["lints"] = "M12",
         ["build-dependencies"] = "M7 S7",
         ["trust"] = "M7 S7",
@@ -116,7 +126,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
         foreach (var key in document.Keys)
         {
-            if (key is "package" or "dependencies" or "override" or "profile" or "bin") continue;
+            if (key is "package" or "dependencies" or "override" or "profile" or "bin" or "native") continue;
             document.TryGet(key, out var section);
             var line = section switch
             {
@@ -162,8 +172,11 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             edition = e;
         }
 
+        var (native, nativePerSystem) = NativePart.Read(document, file);
         return new Manifest(Path.GetFullPath(file), name, version, edition)
         {
+            Native = native,
+            NativePerSystem = nativePerSystem,
             Dependencies = ReadDependencies(document, "dependencies", file),
             Overrides = ReadDependencies(document, "override", file),
             Include = Patterns(package, "include", file),

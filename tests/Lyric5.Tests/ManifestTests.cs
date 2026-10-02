@@ -99,7 +99,7 @@ public class ManifestTests
     }
 
     [Theory]
-    [InlineData("[native]\nlibs = [\"z\"]", "comes with M7 S6")]
+    [InlineData("[build-dependencies]\ngen = { path = \"gen\" }", "comes with M7 S7")]
     [InlineData("[lints]\ndeny = []", "comes with M12")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]
     public void A_section_the_toolchain_does_not_read_is_refused(string section, string why)

@@ -533,6 +533,16 @@ public sealed class CEmitter
         _out.AppendLine("#include <math.h>");
         _out.AppendLine();
 
+        // The C functions the program declares (extern "C", 11 W4): a prototype each, in the
+        // platform's C ABI; the linker finds the symbol in the native part (07 B5) or a library.
+        var foreign = _module.Imports.Where(i => Intrinsics.IsForeign(i.Name)).ToList();
+        foreach (var import in foreign)
+        {
+            var parameters = import.ParamTypes.Length == 0 ? "void" : string.Join(", ", import.ParamTypes.Select(CType));
+            _out.AppendLine($"extern {CType(import.ReturnType)} {import.Name[2..]}({parameters});");
+        }
+        if (foreign.Count > 0) _out.AppendLine();
+
         Structs();
 
         // The module's globals (07 V5): variables of the module's unit, filled by the initializer
