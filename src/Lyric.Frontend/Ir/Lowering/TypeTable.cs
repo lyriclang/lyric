@@ -122,6 +122,12 @@ internal sealed class TypeTable
     /// every extend block, parents included — that declares <paramref name="member"/> itself, or
     /// <c>null</c>: the sema bound a call to an interface's member on a concrete receiver (the
     /// qualified form, a delegated member), and the call goes through that interface's table.</summary>
+    /// <summary>The interface that declares <paramref name="member"/> among its own members;
+    /// <c>null</c> for a member of anything else.</summary>
+    public static TypeSymbol? InterfaceOwning(FunctionSymbol member) =>
+        member.Home?.Members.Symbols.OfType<TypeSymbol>()
+            .FirstOrDefault(t => t.Kind == TypeSymbolKind.Interface && t.Members.Symbols.Contains(member));
+
     public TypeSymbol? InterfaceDeclaring(TypeSymbol concrete, FunctionSymbol member)
     {
         IEnumerable<TypeSymbol> declared = Conformance.DeclaredInterfaces(concrete, _binding);

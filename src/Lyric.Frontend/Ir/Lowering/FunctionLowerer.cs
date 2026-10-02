@@ -5058,6 +5058,11 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
+        // An interface's default on the instance: the default's instance for it (04 D9). As a
+        // method of the type it was lowered with the interface's 'this' and failed the verifier.
+        if (DirectDefault(member) is { } onInstance)
+            return LowerDefaultCall(member, onInstance, owner, expr);
+
         // A GENERIC METHOD ON A GENERIC TYPE takes its T from the instance and its U from the
         // call, and needs BOTH bound. RequestMethod knows only the first, so 'Result<T,E>.map<U>'
         // ended at "a non-primitive field type" — a sentence about a field, reported at a method's
@@ -5330,17 +5335,63 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>The member a call names, where it is the default of a non-generic interface and
+    /// generic itself in nothing — what <see cref="LowerDefaultCall"/> instantiates per conformer.
+    /// <c>null</c> for anything else: an own member, an abstract one, a generic one.</summary>
+    private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? DirectDefault(MemberExpr member) =>
+        _types.RefOf(member) is FunctionSymbol { Generics.Length: 0, IsStatic: false } promised
+        && promised.Declaration is FunctionDecl { Body: not null } decl
+        && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 } iface
+            ? (promised, decl, iface)
+            : null;
+
+    /// <summary>
+    /// An interface's default called on a conformer (04 D9): the default's instance for the
+    /// conformer's type, 'Self' that type, the receiver passed as it is — a struct, an instance, a
+    /// builtin, a shape alike, no value of the interface made, which a scalar or a constraint-only
+    /// interface has none of.
+    /// </summary>
+    private TempId? LowerDefaultCall(MemberExpr member, (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface) found,
+        LyrType conformer, CallExpr expr)
+    {
+        var target = _instances.RequestDefault(found.Default, found.Decl, found.Iface, conformer, expr.Span);
+        var passed = MaterializeArguments(found.Decl, ArgumentsOf(expr), member.Member, expr.Span,
+            new Dictionary<string, LyrType>(StringComparer.Ordinal) { ["Self"] = conformer });
+        var all = new TempId[passed.Length + 1];
+        all[0] = LowerExpr(member.Target);
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, all, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
+        // An interface's private helper (07 V2 S4) is never overridden: a conformer's method of its
+        // name is the conformer's own, which the defaults do not call — the helper's instance for
+        // the type, as a default's is.
+        if (DirectDefault(member) is { } helper && helper.Decl.IsPrivateHelper)
+            return LowerDefaultCall(member, helper, concrete, expr);
+
         // The implementation stands in a shape's block or a blanket block (05 §13 rules 6, 8),
         // where no symbol of the type holds the conformance: the sema says which block gives it at
         // this instance, and the call is the block method's instance for the type.
         if (_types.RefOf(member) is FunctionSymbol promised
             && _types.ConformanceBlock?.Invoke(concrete, promised) is { } through)
         {
-            if (through.Method is not { } implementation)
-                throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the interface's default, through the block that gives the conformance", expr.Span);
-            return LowerBlockMethodCall(member, implementation, through.Block, concrete, expr);
+            if (through.Method is { } implementation)
+                return LowerBlockMethodCall(member, implementation, through.Block, concrete, expr);
+            // The block leaves the member to the interface's default: its instance for the type.
+            return DirectDefault(member) is { } viaBlock
+                ? LowerDefaultCall(member, viaBlock, concrete, expr)
+                : throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the default of a generic interface, through the block that gives the conformance", expr.Span);
         }
 
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
@@ -5374,6 +5425,11 @@ internal sealed class FunctionLowerer
                 _fresh.Add(result);
                 return result;
             }
+
+            // The interface's default, 'render(42)' reaching a member 'extend int :: [Display]'
+            // leaves to it: the default's instance for the builtin (04 D9) — no boxing either.
+            if (DirectDefault(member) is { } onBuiltin)
+                return LowerDefaultCall(member, onBuiltin, concrete, expr);
 
             throw NotSupported($"call to '{member.Member}' on '{TypeFacts.Display(concrete)}'",
                 expr.Span);
@@ -5417,6 +5473,11 @@ internal sealed class FunctionLowerer
                 _fresh.Add(blockResult);
                 return blockResult;
             }
+
+            // The interface's default, for the type (04 D9): its instance, direct. Several
+            // conformances to one interface go by the instance, through the table below.
+            if (!ConstraintNeedsTheInstance(member, owner) && DirectDefault(member) is { } ofType)
+                return LowerDefaultCall(member, ofType, concrete, expr);
 
             if (ReceiverType(member.Target) is TypeParamType parameter)
                 foreach (var constraint in parameter.Param.Constraints)
@@ -5684,6 +5745,10 @@ internal sealed class FunctionLowerer
                      && !BoundToExtension(member)
                      && _typeTable.InterfaceDeclaring(concrete, promised) is { } declaring:
             {
+                // A default, reached plainly or written 'Walker.walk(d)': its instance for the
+                // type (04 D9), direct — a constraint-only interface has no value to go through.
+                if (DirectDefault(member) is { } declared)
+                    return LowerDefaultCall(member, declared, SubstituteType(ReceiverType(member.Target)), expr);
                 var into = _typeTable.InterfaceAsDeclared(concrete, declaring, expr.Span);
                 return LowerVirtualCall(member, declaring, expr, into.Type,
                     LowerExprAs(member.Target, into));
@@ -5706,6 +5771,10 @@ internal sealed class FunctionLowerer
                      && !BoundToExtension(member)
                      && _typeTable.InterfaceProviding(concrete, member.Member) is { } provider:
             {
+                // The default's instance for the type (04 D9), direct; a generic interface's goes
+                // through its value below.
+                if (DirectDefault(member) is { } onConcrete)
+                    return LowerDefaultCall(member, onConcrete, SubstituteType(ReceiverType(member.Target)), expr);
                 // As the concrete type DECLARES it: 'Iterator<int>', not 'Iterator'. A generic
                 // interface has no entry of its own, and lifting into the definition is what a
                 // default of one used to die on.
@@ -5779,6 +5848,12 @@ internal sealed class FunctionLowerer
             // A scalar as parameter 0 needs nothing new: no boxing, no fat pointer, no dispatch. Which
             // function runs is statically settled — that is the whole difference between an inherent
             // extension and one through an interface.
+            // An interface's default on a builtin, '3.greet()' with 'extend int :: [Named]': its
+            // instance for the builtin (04 D9), direct — a scalar has no value of the interface.
+            case MemberExpr member
+                when ReceiverType(member.Target) is PrimitiveType onBuiltin && DirectDefault(member) is { } builtinDefault:
+                return LowerDefaultCall(member, builtinDefault, onBuiltin, expr);
+
             case MemberExpr member
                 when ReceiverType(member.Target) is PrimitiveType
                      && _types.RefOf(member) is FunctionSymbol:

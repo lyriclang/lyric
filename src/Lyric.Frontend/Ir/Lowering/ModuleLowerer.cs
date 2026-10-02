@@ -56,6 +56,14 @@ public static class ModuleLowerer
     /// feeding each other forever.</summary>
     private const int MaxLoweringRounds = 100;
 
+    /// <summary>A pass-1 function's substitution: none — but an interface's member, whose 'Self'
+    /// is the interface here: the default as a value of the interface reaches it, through the
+    /// table (04 D9). Its instances per conformer bind 'Self' to the conformer.</summary>
+    private static Dictionary<GenericParamSymbol, LyrType> SelfSubstitution(TypeSymbol? receiver) =>
+        receiver is { Kind: TypeSymbolKind.Interface, SelfParam: { } self }
+            ? new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [self] = new NamedRef(receiver) }
+            : NoSubstitution;
+
     internal static readonly Dictionary<GenericParamSymbol, LyrType> NoSubstitution =
         new(ReferenceEqualityComparer.Instance);
 
@@ -251,6 +259,10 @@ public static class ModuleLowerer
                 };
                 if (typeName is null || members is null) continue;
                 if (module.Members.LookupLocal(typeName) is not TypeSymbol type) continue;
+                // A constraint-only interface (04 D9) has no table, and its defaults exist only as
+                // instances per conformer; lowered once with 'Self' the interface, one naming 'Self'
+                // beyond 'this' would not even lower.
+                if (type.Kind == TypeSymbolKind.Interface && types.ValueInterface?.Invoke(type) == false) continue;
 
                 foreach (var member in members)
                 {
@@ -362,14 +374,14 @@ public static class ModuleLowerer
                 if (CoroutineReturn(decl) is not null)
                 {
                     var body = FunctionLowerer.ForCoroutineBody(decl, $"{name}.<body>", receiver, types, ids,
-                        imports, typeTable, NoSubstitution, globals, lambdas, instances, receiverTypeNode: extendTarget);
+                        imports, typeTable, SelfSubstitution(receiver), globals, lambdas, instances, receiverTypeNode: extendTarget);
                     functions.Add(CoroutineFactory.Build(name, body.CoroutineType!, coroutines.Register(body),
                         body.Parameters, decl.Span));
                     continue;
                 }
 
                 functions.Add(new FunctionLowerer(decl, name, types, ids, imports, typeTable,
-                    NoSubstitution, globals, lambdas, instances, receiver,
+                    SelfSubstitution(receiver), globals, lambdas, instances, receiver,
                     receiverTypeNode: extendTarget,
                     returnTypeOverride: comptimeReturns.GetValueOrDefault(decl)).Run());
             }

@@ -208,11 +208,20 @@ public sealed class Resolver
         var scope = new SymbolTable(module.Members);
         // 'Self' in an interface is the conforming type, a type parameter of the interface's own
         // (03 T5): every use site binds it — the conformance to the implementer, the constraint
-        // to the type parameter.
-        var self = new GenericParamSymbol("Self", [], i);
+        // to the type parameter. In the interface's own bodies it is constrained by the interface
+        // itself, so a default reaches its members as through any constraint and is monomorphized
+        // per conformer (04 D9). The constraint stands in no source: the node is made, and bound,
+        // here.
+        var generics = MakeGenerics(i.Generics);
+        var itself = new NamedType([i.Name],
+            Array.ConvertAll(generics, g => (TypeNode)new NamedType([g.Name], [], i.NameSpan) { NameSpan = i.NameSpan }),
+            i.NameSpan) { NameSpan = i.NameSpan };
+        var self = new GenericParamSymbol("Self", [itself], i);
         scope.TryDeclare(self);
-        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.Visibility), scope, i) { Generics = MakeGenerics(i.Generics), SelfParam = self };
+        var ts = new TypeSymbol(i.Name, TypeSymbolKind.Interface, Vis(i.Visibility), scope, i) { Generics = generics, SelfParam = self };
         self.SelfOf = ts;
+        _binding.Bind(itself, ts);
+        for (var k = 0; k < generics.Length; k++) _binding.Bind(itself.TypeArguments[k], generics[k]);
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
         // An interface's members are as visible as the interface (07 V2 S4) — a word of their

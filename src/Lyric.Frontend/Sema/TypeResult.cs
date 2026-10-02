@@ -68,6 +68,10 @@ public sealed class TypeResult
     /// member's name — the sema's answer at the instance the lowering reached.</summary>
     public Func<LyrType, FunctionSymbol, (ExtensionBlock Block, FunctionSymbol? Method)?>? ConformanceBlock { get; internal set; }
 
+    /// <summary>Whether an interface can be the type of a value (04 D9) — only such a one has a
+    /// table, and only its defaults are lowered once for it.</summary>
+    public Func<TypeSymbol, bool>? ValueInterface { get; internal set; }
+
     /// <summary>
     /// Which function satisfied which conformance: keyed by (implementing type, interface,
     /// member), holding one entry per INSTANCE.
