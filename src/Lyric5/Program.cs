@@ -8,7 +8,8 @@ namespace Lyric5;
 /// The Lyric 5 driver: one binary with verbs (design/v5/spec/11 C1–C3), strict about what it
 /// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
 /// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
-/// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c> (M7).
+/// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c>,
+/// <c>clean</c>, <c>metadata</c> (M7).
 /// </summary>
 public static class Program
 {
@@ -24,6 +25,8 @@ public static class Program
                 "build" => Build(args[1..], run: false),
                 "run" => Build(args[1..], run: true),
                 "update" => Update(args[1..]),
+                "clean" => Clean(args[1..]),
+                "metadata" => Metadata(args[1..]),
                 _ => Unknown($"unknown verb '{args[0]}'"),
             };
         }
@@ -47,6 +50,9 @@ public static class Program
         output.WriteLine("                                 build, then run the binary with the arguments");
         output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —");
         output.WriteLine("                                 and write lyric.lock (options: -C <dir>, --offline)");
+        output.WriteLine("  clean [-C <dir>]               remove the package's out/");
+        output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
+        output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
         output.WriteLine("  version                        the toolchain and the C compiler it found");
         output.WriteLine("  help                           this");
         output.WriteLine();
@@ -352,6 +358,108 @@ public static class Program
             changed = true;
         }
         if (!changed) Console.Out.WriteLine(after.Count == 0 ? "no package is read from git" : "lyric.lock is up to date");
+    }
+
+    // --- clean and metadata ------------------------------------------------------------------
+
+    /// <summary>The options of a verb about the package of a directory: <c>-C</c> and the flags it
+    /// takes. <c>null</c> after refusing a word, with the exit code in <paramref name="exit"/>.</summary>
+    private static (string Start, HashSet<string> Flags)? PackageOptions(string verb, string[] args, string[] flags, out int exit)
+    {
+        exit = 0;
+        string? directory = null;
+        var given = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (flags.Contains(arg)) given.Add(arg);
+            else if (arg == "-C" || arg.StartsWith("-C=", StringComparison.Ordinal))
+            {
+                directory = arg == "-C" ? (i + 1 < args.Length ? args[++i] : null) : arg[3..];
+                if (directory is null) { exit = Unknown("'-C' needs a value"); return null; }
+            }
+            else { exit = Unknown($"unknown option '{arg}' for '{verb}'"); return null; }
+        }
+        var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
+        if (!Directory.Exists(start))
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{start}'");
+            exit = 2;
+            return null;
+        }
+        return (start, given);
+    }
+
+    /// <summary><c>lyric clean</c> (11 W2 P5): the package's <c>out/</c> removed — after the build
+    /// that writes into it, if one does, is done.</summary>
+    private static int Clean(string[] args)
+    {
+        if (PackageOptions("clean", args, [], out var refused) is not { } options) return refused;
+        if (Project.FindManifest(options.Start) is not { } file)
+        {
+            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            return 2;
+        }
+        var outDir = Path.Combine(Path.GetDirectoryName(file)!, "out");
+        if (!Directory.Exists(outDir))
+        {
+            Console.Out.WriteLine("nothing to clean");
+            return 0;
+        }
+        using (OutLock.Take(outDir, Console.Error))
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(outDir))
+            {
+                if (Path.GetFileName(entry) == ".lock") continue;
+                if (Directory.Exists(entry)) DeleteTree(entry);
+                else File.Delete(entry);
+            }
+        }
+        DeleteTree(outDir);
+        Console.Out.WriteLine($"removed {outDir}");
+        return 0;
+    }
+
+    /// <summary>Read-only files too: a cache can hold them.</summary>
+    private static void DeleteTree(string directory)
+    {
+        foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(directory, recursive: true);
+    }
+
+    /// <summary><c>lyric metadata</c> (11 W2 P10): the package as one JSON object on standard
+    /// output — <c>--json</c> names the one form there is.</summary>
+    private static int Metadata(string[] args)
+    {
+        if (PackageOptions("metadata", args, ["--offline", "--json"], out var refused) is not { } options) return refused;
+        if (Project.FindManifest(options.Start) is null)
+        {
+            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            return 2;
+        }
+        try
+        {
+            IReadOnlyList<Project> programs;
+            PackageGraph graph;
+            try
+            {
+                programs = Project.ProgramsOf(options.Start, options.Flags.Contains("--offline"))!;
+                graph = programs[0].Graph!;
+            }
+            catch (LibraryException library)
+            {
+                programs = [];
+                graph = library.Graph;
+            }
+            Console.Out.WriteLine(global::Lyric5.Build.Metadata.Json(graph, programs, DisplayVersion()));
+            return 0;
+        }
+        catch (ManifestException manifest)
+        {
+            Console.Error.WriteLine(manifest.Render());
+            return manifest.Exit;
+        }
     }
 
     // --- version -------------------------------------------------------------------------------

@@ -67,6 +67,8 @@ public static class Pipeline
     public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error)
     {
         var project = request.Project;
+        // One build at a time writes into out/ (11 W2 P5); a second one waits here.
+        using var held = OutLock.Take(project.OutDir, error);
         Directory.CreateDirectory(project.CacheDir);
 
         // The C, keyed by the sources, the toolchain and the compiler that emits it: the same
