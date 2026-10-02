@@ -473,9 +473,10 @@ public sealed class TypeChecker
                 // call through the interface would be no member of it. 'pub' says nothing here,
                 // and a word that says nothing is refused rather than ignored.
                 foreach (var member in i.Members)
-                    if (member.IsPublic)
-                        _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan,
-                            $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
+                    if (_comp.Lyric5Modules ? member.Visibility != VisibilityWord.None : member.IsPublic)
+                        _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan, _comp.Lyric5Modules
+                            ? $"'{Word(member.Visibility)}' on '{member.Name}' — an interface's members are as visible as the interface (07 V2 S4); drop it"
+                            : $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
                 if (module.Members.LookupLocal(i.Name) is TypeSymbol iface)
                     CheckOverloadSets(iface.Members, $"interface '{i.Name}'", inInterface: true);
                 CheckMethods(i.Name, i.Members, module);
@@ -764,6 +765,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             _currentModule = block.Module;
+            CheckConformanceWords(block);
 
             if (block.IsConstructorTarget)
             {
@@ -812,6 +814,37 @@ public sealed class TypeChecker
         }
         CheckCoherence();
     }
+
+    /// <summary>
+    /// A conformance is global (design/v5/spec/07 V2 S5): visible wherever its type and its
+    /// interface are, its methods with it — no word narrows it, on the block or on a method in it
+    /// (<c>LYR-SEM0150</c>). Two package-private <c>Hashable</c> conformances would be two hash
+    /// functions for one <c>Set&lt;Foo&gt;</c>. An inherent block's word is its methods' default and
+    /// stays.
+    /// </summary>
+    private void CheckConformanceWords(ExtensionBlock block)
+    {
+        if (!_comp.Lyric5Modules || block.Decl.Interfaces.Length == 0) return;
+        if (block.Decl.Visibility != VisibilityWord.None)
+        {
+            var start = block.Decl.Span.Start;
+            _de.Report("LYR-SEM0150", Severity.Error,
+                new Span(block.Decl.Span.File, start, start + Word(block.Decl.Visibility).Length),
+                $"a conformance is as visible as its type and its interface — '{Word(block.Decl.Visibility)}' narrows nothing here; drop it");
+        }
+        foreach (var fn in block.Decl.Methods)
+            if (fn.Visibility != VisibilityWord.None)
+                _de.Report("LYR-SEM0150", Severity.Error, fn.NameSpan,
+                    $"'{Word(fn.Visibility)}' on '{fn.Name}' — a conformance's methods are as visible as the conformance; drop it");
+    }
+
+    private static string Word(VisibilityWord word) => word switch
+    {
+        VisibilityWord.Pub => "pub",
+        VisibilityWord.Internal => "internal",
+        VisibilityWord.Private => "private",
+        _ => "",
+    };
 
     /// <summary>
     /// Coherence (03 T7 X3, X4): one conformance per type instance and interface instance in the
@@ -2862,7 +2895,7 @@ public sealed class TypeChecker
             // a value of it: 'Id.of(7)'. The members are the same table; only the way in differs,
             // and reading the receiver's type as a value type finds nothing here.
             case MemberExpr mem when ReceiverTypeOf(mem) is NonValueType { Symbol: TypeSymbol named }:
-                return named.Members.OverloadsLocal(mem.Member)
+                return named.Members.OverloadsLocal(mem.Member).Where(MayName)
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
 
             // A MODULE-qualified name ('net.localPort', alias or dotted path): the module's
@@ -2880,7 +2913,7 @@ public sealed class TypeChecker
             // member is looked up: own members first, then the visible extensions.
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
             {
-                var found = ts.Members.OverloadsLocal(mem.Member)
+                var found = ts.Members.OverloadsLocal(mem.Member).Where(MayName)
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
                 // Members of several CONFORMANCE blocks are scoped to their interfaces (04 D3),
                 // not a set to choose from: the lookup refused the unqualified call already.
@@ -2889,6 +2922,7 @@ public sealed class TypeChecker
                 foreach (var ext in _comp.Extensions.MethodsFor(ts))
                     if (ext.Symbol.Name == mem.Member
                         && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
+                        && MayName(ext.Symbol)
                         && !(blocks > 1 && ext.InConformanceBlock)
                         && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
                         found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
@@ -5672,11 +5706,27 @@ public sealed class TypeChecker
         return sym is ImportBindingSymbol ib ? ib.Target : sym;
     }
 
+    /// <summary>Whether the module being checked may name this member (07 V2) — for the sets a
+    /// call chooses from, where what may not be named is not there.</summary>
+    private bool MayName(Symbol symbol) => _currentModule is null || _comp.Visible(symbol, _currentModule);
+
+    /// <summary>The member a lookup answers from here: of an overload set the first function this
+    /// module may name, so a hidden overload beside a visible one is not there; a name with
+    /// nothing visible is reported (07 V2 S1) and answered all the same.</summary>
+    private Symbol Reachable(SymbolTable members, string name, Symbol found, Span span)
+    {
+        if (MayName(found)) return found;
+        if (found is FunctionSymbol && members.OverloadsLocal(name).FirstOrDefault(MayName) is { } visible)
+            return visible;
+        Reach(found, span);
+        return found;
+    }
+
     // Member resolution: own members, then visible extensions, then interface default methods.
     private (LyrType, Symbol?) InstanceMember(TypeSymbol ts, string member, Span span)
     {
-        if (ts.Members.LookupLocal(member) is { } own)
-            return own switch
+        if (ts.Members.LookupLocal(member) is { } found)
+            return Reachable(ts.Members, member, found, span) switch
             {
                 FieldSymbol fs => (FieldType(fs), fs),
 
@@ -5714,7 +5764,11 @@ public sealed class TypeChecker
                     + $"call '{ts.Name}.{member}(…)'; the instance form is an error since 2.0");
             return (ExtensionSignature(ext, span), ext);
         }
-        if (DefaultMember(ts, member, span) is { } def) return def;
+        if (DefaultMember(ts, member, span) is { } def)
+        {
+            Reach(def.Item2, span); // an interface's default, as visible as the interface
+            return def;
+        }
         if (DelegatedMember(ts, member) is { } forwarded) return forwarded;
         return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'",
             NameSuggestion.Note(member, MemberFacts
@@ -5758,6 +5812,8 @@ public sealed class TypeChecker
         {
             if (ext.Symbol.Name != member) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
+            // A method its module keeps to itself is not there for this one (07 V2 S5).
+            if (!MayName(ext.Symbol)) continue;
             if (!visible.Any(f => ReferenceEquals(f.Symbol, ext.Symbol))) visible.Add(ext);
         }
 
@@ -5908,7 +5964,8 @@ public sealed class TypeChecker
         var subst = instance is null ? EmptySubst : SubstMap(instance);
         LyrType Of(LyrType t) => instance is null ? t : Substitute(t, subst);
 
-        return ts.Members.LookupLocal(member) switch
+        var own = ts.Members.LookupLocal(member);
+        return (own is null ? null : Reachable(ts.Members, member, own, span)) switch
         {
             // Without 'static' the method needs a receiver; otherwise the lowering would produce a
             // field access without an object.
@@ -5976,6 +6033,11 @@ public sealed class TypeChecker
             _ => (Report(span, "LYR-SEM0012", $"module '{mod.FullName}' has no member '{member}'"), null)
         };
     }
+
+    /// <summary>The first field of <paramref name="ts"/> the module being checked may not name;
+    /// <c>null</c> when it may name them all.</summary>
+    private FieldSymbol? HiddenField(TypeSymbol ts) =>
+        _currentModule is null ? null : ts.Members.Symbols.OfType<FieldSymbol>().FirstOrDefault(f => !MayName(f));
 
     /// <summary>
     /// Whether a name another module declares may be named from the module being checked (design/
@@ -6270,6 +6332,12 @@ public sealed class TypeChecker
                     : target is TupleOf ? "a tuple, which has no fields to name" : "no struct"));
         }
 
+        // A copy with fields replaced is a construction (02 W3): where the initializer may not
+        // stand, neither may 'with' — the copy would hand out what the factory keeps.
+        if (TypeFacts.SymbolOf(target) is { } copied && HiddenField(copied) is { } hidden)
+            _de.Report("LYR-RES0009", Severity.Error, w.Span,
+                $"'{copied.Name}' cannot be copied with 'with' here: {_comp.Hidden(hidden)}");
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in w.Fields)
         {
@@ -6350,6 +6418,14 @@ public sealed class TypeChecker
         // 'Point { … }' refers to Point. Safe to record only now that no consumer reads this table
         // to decide what KIND of receiver an expression is.
         _result.BindRef(si, ts);
+
+        // A type with a field this module may not name is built where it may: by its factory, in
+        // a module that names all of it (design/v5/spec/04 D11, 07 V2 S0) — what a reader cannot
+        // see is an invariant it cannot keep. Rust and Swift draw the same line. One error; the
+        // fields check on as usual.
+        if (HiddenField(ts) is { } hidden)
+            _de.Report("LYR-RES0009", Severity.Error, si.Span,
+                $"'{ts.Name}' cannot be built here: {_comp.Hidden(hidden)} — its factory builds it");
 
         // A HOST type cannot be constructed. It has no layout this module knows: the host creates it
         // and the script passes it on. Without this diagnostic it is a compiler crash — the lowering
@@ -7586,6 +7662,7 @@ public sealed class TypeChecker
         {
             if (def.Members.LookupLocal(fp.Name) is FieldSymbol fs)
             {
+                Reach(fs, fp.Span); // a field named in a pattern is named (07 V2 S0)
                 BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope, mutable);
             }
             else

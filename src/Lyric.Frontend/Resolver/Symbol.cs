@@ -115,7 +115,12 @@ public sealed class GenericParamSymbol : Symbol
 
 public sealed class FieldSymbol : Symbol
 {
-    public FieldSymbol(string name, Node? declaration) : base(name, declaration) { }
+    /// <summary>The field's word (design/v5/spec/07 V2 S0): a field follows the rule of every
+    /// member.</summary>
+    public Visibility Visibility { get; }
+
+    public FieldSymbol(string name, Node? declaration, Visibility visibility) : base(name, declaration)
+        => Visibility = visibility;
 }
 
 /// <summary>

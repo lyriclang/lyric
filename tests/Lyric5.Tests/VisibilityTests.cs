@@ -107,6 +107,101 @@ public class VisibilityTests
         Assert.Contains($"error[LYR-PAR0053]: {why}", error);
     }
 
+    /// <summary>The members of a type follow the same words (07 V2 S0, S5): a field, a method, a
+    /// static; an extend block's word is its methods' default; a conformance is as visible as its
+    /// type and interface.</summary>
+    private const string Members = """
+        pub struct Point { pub x: int, y: int, private z: int }
+        pub fn origin(): Point { return Point { x = 0, y = 0, z = 0 }; }
+        pub struct Open { pub a: int, b: int }
+        pub fn open(): Open { return Open { a = 1, b = 2 }; }
+        pub fn doubled(): int { return open().twice(); }
+        pub class Box {
+            pub var v: int,
+            private secret: int,
+            private fn hide(): int { return 1; }
+            pub fn show(): int { return this.hide() + 1; }
+        }
+        pub fn box(): Box { return Box { v = 1, secret = 2 }; }
+        pub struct Counter {
+            n: int,
+            static fn make(): Counter { return Counter { n = 0 }; }
+            private static fn hidden(): Counter { return Counter { n = 1 }; }
+        }
+        private extend Open { fn twice(): int { return this.a * 2; } }
+        extend Open { fn thrice(): int { return this.a * 3; } }
+        pub interface Shape { fn area(): int; }
+        extend Open :: [Shape] { fn area(): int { return this.a; } }
+        """;
+
+    [Theory]
+    [InlineData("a field read", "let n = util.origin().z;", "'z' is private to module 'app.util'")]
+    [InlineData("an initializer", "let p = util.Point { x = 1, y = 2, z = 3 };",
+        "'Point' cannot be built here: 'z' is private to module 'app.util' — its factory builds it")]
+    [InlineData("a copy with 'with'", "let p = util.origin() with { x = 5 };",
+        "'Point' cannot be copied with 'with' here: 'z' is private to module 'app.util'")]
+    [InlineData("a method", "let n = util.box().hide();", "'hide' is private to module 'app.util'")]
+    [InlineData("a field of a class", "let n = util.box().secret;", "'secret' is private to module 'app.util'")]
+    [InlineData("a static", "let c = util.Counter.hidden();", "'hidden' is private to module 'app.util'")]
+    [InlineData("a field in a pattern", "match (util.origin()) {\n        util.Point { z } => {}\n    }",
+        "'z' is private to module 'app.util'")]
+    public void A_hidden_member_is_refused_on_every_route(string route, string statement, string why)
+    {
+        var main = $"import app.util;\n\nfn main(): void {{\n    {statement}\n}}\n";
+        var dir = Package(("lyric.toml", AppManifest), ("src/util.lyr", Members), ("src/main.lyr", main));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.True(exit == 1, $"{route}: exit {exit}\n{error}");
+        Assert.Contains($"error[LYR-RES0009]: {why}", error);
+        Assert.True(error.Split("error[").Length == 2, $"{route}: one error, no cascade —\n{error}");
+    }
+
+    [Fact]
+    public void What_a_member_word_allows_is_reached()
+    {
+        var main = """
+            import std.io { println };
+            import app.util;
+
+            fn main(): void {
+                let b = util.box();
+                b.v = 7;
+                let o = util.open();
+                println(f"{util.origin().x} {util.origin().y} {b.v} {b.show()} {o.thrice()} {o.area()} {util.doubled()} {util.Counter.make().n}");
+            }
+            """;
+        var dir = Package(("lyric.toml", AppManifest), ("src/util.lyr", Members), ("src/main.lyr", main));
+        Assert.Equal("0 0 7 2 3 1 2 0\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>A method its block keeps to its module is not there for another — the way a hidden
+    /// overload is not (07 V2 S5).</summary>
+    [Fact]
+    public void A_private_extension_method_is_not_there()
+    {
+        var main = "import app.util;\n\nfn main(): void {\n    let n = util.open().twice();\n}\n";
+        var dir = Package(("lyric.toml", AppManifest), ("src/util.lyr", Members), ("src/main.lyr", main));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-SEM0012]: 'Open' has no member 'twice'", error);
+    }
+
+    [Theory]
+    [InlineData("pub interface I {\n    pub fn f(): int;\n}\n",
+        "LYR-SEM0118", "'pub' on 'f' — an interface's members are as visible as the interface")]
+    [InlineData("pub interface I {\n    internal fn f(): int;\n}\n",
+        "LYR-SEM0118", "'internal' on 'f' — an interface's members are as visible as the interface")]
+    [InlineData("pub interface I {\n    fn f(): int;\n}\n\nstruct S {\n    n: int,\n}\n\npub extend S :: [I] {\n    fn f(): int {\n        return 1;\n    }\n}\n",
+        "LYR-SEM0150", "a conformance is as visible as its type and its interface — 'pub' narrows nothing here")]
+    [InlineData("pub interface I {\n    fn f(): int;\n}\n\nstruct S {\n    n: int,\n}\n\nextend S :: [I] {\n    private fn f(): int {\n        return 1;\n    }\n}\n",
+        "LYR-SEM0150", "'private' on 'f' — a conformance's methods are as visible as the conformance")]
+    public void A_word_that_narrows_nothing_is_refused(string declarations, string code, string why)
+    {
+        var dir = Package(("main.lyr", declarations + "\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}]: {why}", error);
+    }
+
     [Fact]
     public void A_field_takes_a_word()
     {

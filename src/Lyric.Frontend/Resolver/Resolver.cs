@@ -70,7 +70,7 @@ public sealed class Resolver
                     DeclareTop(module, new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.Visibility), new SymbolTable(), a), a);
                     break;
                 case FunctionDecl fn:
-                    DeclareTop(module, Fn(fn), fn);
+                    DeclareTop(module, Fn(fn, fn.Visibility), fn);
                     break;
                 case GlobalBindingDecl g:
                     DeclareTop(module, new GlobalSymbol(g.Binding.Name, Vis(g.Visibility), g), g);
@@ -143,7 +143,7 @@ public sealed class Resolver
         var methods = new List<FunctionSymbol>();
         foreach (var fn in ex.Methods)
         {
-            var fsym = Fn(fn);
+            var fsym = Fn(fn, ExtensionWord(ex, fn));
             fsym.Home = module;
             if (methodScope.TryDeclare(fsym)) methods.Add(fsym);
             else _de.Report("LYR-RES0001", Severity.Error, fn.Span,
@@ -167,8 +167,8 @@ public sealed class Resolver
         {
             switch (m)
             {
-                case FieldDecl f: DeclareMember(module, scope, new FieldSymbol(f.Name, f), f); break;
-                case FunctionDecl fn: DeclareMember(module, scope, Fn(fn), fn); break;
+                case FieldDecl f: DeclareMember(module, scope, new FieldSymbol(f.Name, f, Vis(f.Visibility)), f); break;
+                case FunctionDecl fn: DeclareMember(module, scope, Fn(fn, fn.Visibility), fn); break;
                 case AssociatedTypeDecl t: DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t), t); break;
 
                 // A 'static let' is a type-bound constant, held as a GlobalSymbol because that is
@@ -189,7 +189,7 @@ public sealed class Resolver
         scope.TryDeclare(new ImportBindingSymbol("Self", ts, e));
         DeclareTop(module, ts, e);
         foreach (var v in e.Variants) DeclareMember(module, scope, new EnumVariantSymbol(v.Name, v), v);
-        foreach (var fn in e.Methods) DeclareMember(module, scope, Fn(fn), fn);
+        foreach (var fn in e.Methods) DeclareMember(module, scope, Fn(fn, fn.Visibility), fn);
         foreach (var t in e.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t), t);
     }
 
@@ -205,12 +205,27 @@ public sealed class Resolver
         self.SelfOf = ts;
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
-        foreach (var fn in i.Members) DeclareMember(module, scope, Fn(fn), fn);
+        // An interface's members are as visible as the interface (07 V2 S4) — a word of their
+        // own is refused by the sema, and not read here.
+        foreach (var fn in i.Members)
+            DeclareMember(module, scope, Fn(fn, _comp.Lyric5Modules ? i.Visibility : fn.Visibility), fn);
         foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
     }
 
-    private FunctionSymbol Fn(FunctionDecl fn) =>
-        new(fn.Name, Vis(fn.Visibility), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics) };
+    private FunctionSymbol Fn(FunctionDecl fn, VisibilityWord word) =>
+        new(fn.Name, Vis(word), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics) };
+
+    /// <summary>
+    /// The word a method of an <c>extend</c> block has (07 V2 S5): in a conformance block, none
+    /// that narrows the conformance — it is visible wherever its type and its interface are, its
+    /// methods with it; in an inherent block its own, else the block's, which is the default of
+    /// the methods in it (<c>private extend Foo { … }</c>). The 4.x tools read the method's.
+    /// </summary>
+    private VisibilityWord ExtensionWord(ExtendDecl block, FunctionDecl fn) =>
+        !_comp.Lyric5Modules ? fn.Visibility
+        : block.Interfaces.Length > 0 ? VisibilityWord.Pub
+        : fn.Visibility != VisibilityWord.None ? fn.Visibility
+        : block.Visibility;
 
     private static GenericParamSymbol[] MakeGenerics(GenericParam[] generics)
     {
