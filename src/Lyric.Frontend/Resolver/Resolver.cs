@@ -206,9 +206,11 @@ public sealed class Resolver
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
         // An interface's members are as visible as the interface (07 V2 S4) — a word of their
-        // own is refused by the sema, and not read here.
+        // own is refused by the sema, and not read here — but for a private helper, which is
+        // its module's: the interface's defaults call it, nothing else does.
         foreach (var fn in i.Members)
-            DeclareMember(module, scope, Fn(fn, _comp.Lyric5Modules ? i.Visibility : fn.Visibility), fn);
+            DeclareMember(module, scope,
+                Fn(fn, !_comp.Lyric5Modules || fn.IsPrivateHelper ? fn.Visibility : i.Visibility), fn);
         foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
     }
 

@@ -5877,8 +5877,11 @@ internal sealed class FunctionLowerer
         // because such a member may not be overridden (LYR-SEM0082), so the default IS the
         // implementation for every receiver. Both routes here end up in the same place: a
         // constrained receiver arrives lifted, an interface value arrives as itself.
+        //
+        // A PRIVATE helper (07 V2 S4) takes the same route for the same reason: it has no slot,
+        // because no conformer may stand in for it.
         if (iface.Members.LookupLocal(member.Member) is FunctionSymbol generic
-            && generic.Generics.Length > 0)
+            && (generic.Generics.Length > 0 || generic.Declaration is FunctionDecl { IsPrivateHelper: true }))
             return LowerGenericInterfaceMethod(member, expr, iface, generic, interfaceId,
                 receiver ?? LowerExprAs(member.Target, new IrInterfaceType(interfaceId)));
 

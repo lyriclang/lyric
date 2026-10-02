@@ -742,6 +742,9 @@ internal sealed class TypeTable
             // A STATIC member has no receiver to dispatch on (03 T5): it is reached through a
             // constraint, as the conformer's own static.
             if (member.IsStatic) continue;
+            // A PRIVATE helper (07 V2 S4) is never overridden: its interface's defaults call it
+            // directly, and a slot would let a conformer's method of its name stand in.
+            if (member.IsPrivateHelper) continue;
             // A member typed by an ASSOCIATED type (03 T6), 'fn first(): Self.Item', has one C
             // signature per conformer: no slot can hold it. It is reached through a constraint
             // only (04 D9); the value form comes with M8a.
