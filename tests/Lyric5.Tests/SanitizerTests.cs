@@ -57,6 +57,7 @@ public class SanitizerTests
         { "coro_pace", [], 0 },
         { "coro_park", [], 0 },
         { "coro_threads", [], 0 },
+        { "poll_basic", [], 0 },
         { "coro_storm", [], 0 },
     };
 
@@ -141,6 +142,7 @@ public class SanitizerTests
         RunClean("threads", Profile.Tsan, [], 0);
         RunClean("coro_threads", Profile.Tsan, [], 0);
         RunClean("coro_storm", Profile.Tsan, [], 0);
+        RunClean("poll_basic", Profile.Tsan, [], 0);
     }
 
     /// <summary>

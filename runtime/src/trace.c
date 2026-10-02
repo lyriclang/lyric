@@ -343,13 +343,13 @@ static int starts_with(const char *text, const char *prefix) {
 }
 
 /* The runtime's own frames above the program's: the panic and crash machinery, the trace itself,
- * and the coroutine primitives a pull, a yield or a close panics in (RT0014) — named one by one,
- * since 'lyr_coro_main' is where a coroutine's frames END. */
+ * the coroutine primitives a pull, a yield or a close panics in (RT0014) — named one by one,
+ * since 'lyr_coro_main' is where a coroutine's frames END — and the poller (RT0015). */
 static int is_runtime_frame(const Frame *frame) {
     return starts_with(frame->function, "lyr_panic") || starts_with(frame->function, "lyr_crash") ||
            starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new") ||
            starts_with(frame->function, "lyr_coro_resume") || starts_with(frame->function, "lyr_coro_yield") ||
-           starts_with(frame->function, "lyr_coro_close");
+           starts_with(frame->function, "lyr_coro_close") || starts_with(frame->function, "lyr_poller");
 }
 
 static int same_text(const char *a, const char *b) {
