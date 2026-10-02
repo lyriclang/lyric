@@ -62,6 +62,10 @@ void lyr_poller_wake(LyrPoller *poller) {
     SetEvent(poller->wake);
 }
 
+static void lyr_poller_close(LyrPoller *poller) {
+    CloseHandle(poller->wake);
+}
+
 #elif defined(__linux__)
 #  include <errno.h>
 #  include <limits.h>
@@ -110,11 +114,17 @@ void lyr_poller_wake(LyrPoller *poller) {
     while (write(poller->wake, &one, sizeof one) < 0 && errno == EINTR) {}
 }
 
+static void lyr_poller_close(LyrPoller *poller) {
+    close(poller->wake);
+    close(poller->epoll);
+}
+
 #else
 #  include <errno.h>
 #  include <sys/types.h>
 #  include <sys/event.h>
 #  include <sys/time.h>
+#  include <unistd.h>
 
 struct LyrPoller {
     int queue;
@@ -162,6 +172,10 @@ void lyr_poller_wake(LyrPoller *poller) {
     EV_SET(&event, WAKE_IDENT, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
     while (kevent(poller->queue, &event, 1, NULL, 0, NULL) < 0 && errno == EINTR) {}
 }
+
+static void lyr_poller_close(LyrPoller *poller) {
+    close(poller->queue);
+}
 #endif
 
 static _Thread_local LyrPoller *this_poller;
@@ -169,4 +183,11 @@ static _Thread_local LyrPoller *this_poller;
 LyrPoller *lyr_poller_current(void) {
     if (this_poller == NULL) this_poller = lyr_poller_open();
     return this_poller;
+}
+
+void lyr_poller_release(void) {
+    if (this_poller == NULL) return;
+    lyr_poller_close(this_poller);
+    free(this_poller);
+    this_poller = NULL;
 }

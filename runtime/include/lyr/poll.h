@@ -20,4 +20,8 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns);
 /* Wakes the poller's thread from its wait, or from its next one; from any thread. */
 void lyr_poller_wake(LyrPoller *poller);
 
+/* Frees the calling thread's poller, at the thread's end: no thread may wake it after. A later
+ * lyr_poller_current makes a new one. */
+void lyr_poller_release(void);
+
 #endif
