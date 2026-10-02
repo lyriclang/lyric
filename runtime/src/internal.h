@@ -111,12 +111,29 @@ struct LyrCoro {
     struct LyrCoro *parked_top;    /* PARKED: the innermost coroutine of its chain, where it parked */
     int cleanup;                   /* its body has defers or usings (lyr_coro_set_cleanup) */
     int task;                      /* a task's context (lyr/task.h): no generator, so no yield */
+    struct LyrStr *panic_code;     /* PANICKED: the report it left — code, message, frames */
+    struct LyrStr *panic_message;
+    struct LyrStr *panic_trace;
 };
 
 /* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */
 void lyr_coro_abandoned(LyrCoro *co);
 /* coro.c — a thread leaving the runtime drops its coroutine state. */
 void lyr_coro_thread_end(void);
+
+/* coro.c — a panic leaves the coroutine that runs (05 E8): its resumer finds it PANICKED with the
+ * report — `trace`, or the frames of where it stands when NULL. Returns only where there is
+ * nowhere to leave to: on a thread's own stack, or with foreign frames on the coroutine's stack. */
+void lyr_coro_panic_leave(const char *code, const char *message, const char *trace);
+
+/* coro.c — resumes `co` and answers its status after: a panic of it stays its own, not passed on. */
+int lyr_coro_resume_quiet(LyrCoro *co);
+
+/* coro.c — the panic `co` left, again, in the running code: what a resumer does with it. */
+LYR_NORETURN void lyr_coro_repanic(LyrCoro *co);
+
+/* panic.c — a panic with the report an earlier one left: its code, message and frames. */
+LYR_NORETURN void lyr_panic_again(const char *code, const char *message, const char *trace);
 
 /* gc_boehm.c — what coroutines need of the collector stage. */
 LyrCoro *lyr_gc_alloc_coro(void);                /* zeroed, of the kind that traces its stack */

@@ -1,7 +1,8 @@
 /// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S4: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
-/// as a task (T6); `spawn` and its `Task`, `TaskScope`, `spawnDetached`, `sleep`, `yieldNow`;
-/// cancellation and `withTimeout` (N9). Timers and channels come with S5, threads with S6.
+/// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
+/// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4).
+/// Timers and channels come with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
@@ -26,6 +27,24 @@ pub fn yieldNow(): void throws Cancelled {
     try here().yieldNow();
 }
 
+/// What a panic in a task left (06 T3-T4, 05 E8): its code, its message, and the frames where it
+/// happened, as the report writes them.
+pub class PanicInfo {
+    code: string,
+    message: string,
+    trace: string,
+}
+
+/// Where a task stands (06 T3): still running; ended with its value, with an error, with
+/// `Cancelled`; or ended by a panic.
+pub enum TaskStatus<T> {
+    Running,
+    Done(T),
+    Failed(Error),
+    Cancelled,
+    Panicked(PanicInfo),
+}
+
 /// A task's handle (06 T1-T3), which `spawn` gives: the body's result once it ended, or the error
 /// it ended with. Its type carries that error — `Task<T> throws E`, as a coroutine's carries what
 /// its pulls throw (05 E10) — and `await()` throws it.
@@ -33,14 +52,34 @@ pub class Task<T> {
     var done: bool = false,
     var value: ?T = null,
     var failure: ?Error = null,
+    /// What a panic of the body left (06 T4).
+    var crash: ?PanicInfo = null,
     /// The context the body runs in, until it ends.
     var context: ?Context = null,
     /// The tasks parked in `await()` until the body ends, in the order they came.
     waiters: Waiters = Waiters { },
 
-    /// Whether the body has ended, with its value or with an error (06 T3).
+    /// Whether the body has ended, with its value, with an error, or by a panic (06 T3).
     pub fn isDone(): bool {
         return this.done;
+    }
+
+    /// Where the task stands (06 T3) — asked without waiting, and without panicking where the task
+    /// did (T4: the supervisor's look).
+    pub fn status(): TaskStatus<T> {
+        if (!this.done) {
+            return TaskStatus.Running;
+        }
+        if (let p = this.crash) {
+            return TaskStatus.Panicked(p);
+        }
+        if (let e = this.failure) {
+            if (e is Cancelled) {
+                return TaskStatus.Cancelled;
+            }
+            return TaskStatus.Failed(e);
+        }
+        return TaskStatus.Done(this.value!);
     }
 
     /// The body's value once it has ended, or its error, thrown here (06 T2): the running task
@@ -53,6 +92,9 @@ pub class Task<T> {
             this.waiters.add(me);
             park();
             if (me.cancelled) { throw Cancelled { }; }
+        }
+        if (let p = this.crash) {
+            repanic(p.code, p.message, p.trace);
         }
         if (let e = this.failure) {
             throw e;
@@ -79,13 +121,19 @@ pub class Task<T> {
         }
     }
 
+    /// The body ended by a panic (06 T4): the task is Panicked, and what it left waits for `await`.
+    mut fn panicked(info: PanicInfo): void {
+        this.crash = info;
+        this.finish();
+    }
+
     /// The body has ended: its scope learns of it, and the tasks waiting for it are ready, in the
     /// order they came.
     mut fn finish(): void {
         this.done = true;
         if (let c = this.context) {
             if (let scope = c.scope) {
-                scope.ended(c, this.failure);
+                scope.ended(c, this.failure, this.crash);
             }
         }
         this.context = null;
@@ -133,13 +181,14 @@ pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T th
 /// `Closeable` — `using let scope = TaskScope.new();` — and its `close()` waits until every task it
 /// started has ended. The first of them that fails cancels the others (N9 X3), and `close()`
 /// throws that error once they have all ended; a task that ends with `Cancelled` is no failure of
-/// the scope. A task waiting in `close()` that is cancelled cancels the scope's tasks and still
-/// waits for them.
+/// the scope. A task that panics does the same, and `close()` panics again with it (T4). A task
+/// waiting in `close()` that is cancelled cancels the scope's tasks and still waits for them.
 pub class TaskScope :: [Closeable] {
     var firstChild: ?Context = null,
     var lastChild: ?Context = null,
     var open: int = 0,
     var failure: ?Error = null,
+    var crash: ?PanicInfo = null,
     /// The task waiting in `close()`.
     closing: Waiters = Waiters { },
 
@@ -187,14 +236,17 @@ pub class TaskScope :: [Closeable] {
             }
             s.parkIn(this.closing);
         }
+        if (let p = this.crash) {
+            repanic(p.code, p.message, p.trace);
+        }
         if (let e = this.failure) {
             throw e;
         }
     }
 
-    /// A task of the scope ended, with `failure` or without: the first failure — `Cancelled` is
-    /// none — cancels the others, and the last task to end wakes `close()`.
-    mut fn ended(c: Context, failure: ?Error): void {
+    /// A task of the scope ended, with `failure` or a panic or neither: the first failure —
+    /// `Cancelled` is none — or panic cancels the others, and the last task to end wakes `close()`.
+    mut fn ended(c: Context, failure: ?Error, crash: ?PanicInfo): void {
         if (let p = c.prevChild) {
             p.nextChild = c.nextChild;
         } else {
@@ -209,8 +261,13 @@ pub class TaskScope :: [Closeable] {
         c.nextChild = null;
         c.scope = null;
         this.open -= 1;
-        if (let e = failure) {
-            if (this.failure == null && !(e is Cancelled)) {
+        if (let p = crash) {
+            if (this.crash == null && this.failure == null) {
+                this.crash = p;
+                this.cancel();
+            }
+        } else if (let e = failure) {
+            if (this.crash == null && this.failure == null && !(e is Cancelled)) {
                 this.failure = e;
                 this.cancel();
             }
@@ -233,6 +290,9 @@ fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
         task.finish();
     };
     let c = Context { body = startContext(run, 0) };
+    c.onPanic = (info: PanicInfo) => {
+        task.panicked(info);
+    };
     task.context = c;
     here().ready(c);
     return task;
@@ -281,6 +341,9 @@ class Context {
     var rank: int = 0,
     /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`.
     var cancelled: bool = false,
+    /// What becomes of a panic of it (06 T4): its handle's — a context without one, main's or a
+    /// detached task's, ends the process with the panic.
+    var onPanic: ?fn(PanicInfo) -> void = null,
     /// The scope its task belongs to (06 T5), and the links of that scope's list of tasks.
     var scope: ?TaskScope = null,
     var nextChild: ?Context = null,
@@ -433,14 +496,32 @@ class Scheduler {
         c.asleep = false;
     }
 
+    /// A context ended by a panic (05 E8, 06 T4): its task becomes Panicked, and one without a
+    /// handle — main's, a detached task's — ends the process with the panic.
+    mut fn panicked(c: Context): void {
+        let info = PanicInfo {
+            code = panicCode(c.body) ?? "",
+            message = panicMessage(c.body) ?? "",
+            trace = panicTrace(c.body) ?? "",
+        };
+        if (let handler = c.onPanic) {
+            handler(info);
+        } else {
+            repanic(info.code, info.message, info.trace);
+        }
+    }
+
     /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
         if (this.sleepers != null) { this.wake(monotonicNanos()); }
         if (let c = this.takeReady()) {
             this.running = c;
-            c.body.next();
+            let state = resumeContext(c.body);
             this.running = null;
+            if (state == 2) {
+                this.panicked(c);
+            }
             return;
         }
         let top = this.sleepers;
@@ -531,6 +612,18 @@ fn startContext(body: fn() -> void, stack: int): Coroutine<void>;
 
 /// Parks the running chain at the scheduler (13 §1.6 rule 7).
 fn park(): void;
+
+/// Resumes a task's context until it parks (0), its body returns (1) or it panics (2): a panic
+/// stays the context's, for the scheduler to settle (13 §1.6 rule 10).
+fn resumeContext(c: Coroutine<void>): int;
+
+/// The report a panicked context left; null where it did not panic.
+fn panicCode(c: Coroutine<void>): ?string;
+fn panicMessage(c: Coroutine<void>): ?string;
+fn panicTrace(c: Coroutine<void>): ?string;
+
+/// A panic again, with a report an earlier one left: its code, its message, its frames.
+fn repanic(code: string, message: string, trace: string): never;
 
 /// The running thread's scheduler, as `runMain` set it.
 fn currentScheduler(): ?Scheduler;

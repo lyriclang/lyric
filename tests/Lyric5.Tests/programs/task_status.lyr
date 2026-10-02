@@ -1,0 +1,46 @@
+// Task states and panics (design/v5/spec/06 T3, T4; 05 E8; 10 §5). A panic in a spawned task ends
+// that task — no defer of it runs — and the program goes on; status() tells. Awaiting the panicked
+// task panics again with its report, the frames where it happened. Expected stdout: running,
+// panicked LYR-RT0008 boom, done 5, cancelled, awaiting the panicked one — a line each; then the
+// report "panic [LYR-RT0008]: boom" with explode's frame first, and exit 101.
+import std.io { println };
+import std.task { spawn, sleep, yieldNow, TaskStatus };
+import std.time { Duration };
+
+fn explode(): int {
+    panic("boom");
+}
+
+fn describe(s: TaskStatus<int>): string {
+    return match (s) {
+        TaskStatus.Running => "running",
+        TaskStatus.Done(v) => f"done {v}",
+        TaskStatus.Failed(e) => "failed " + e.message(),
+        TaskStatus.Cancelled => "cancelled",
+        TaskStatus.Panicked(p) => "panicked " + p.code + " " + p.message,
+    };
+}
+
+fn main(): void throws Error {
+    let bad = spawn(() => {
+        defer println("never deferred");
+        return explode();
+    });
+    println(describe(bad.status()));
+    try yieldNow();
+    println(describe(bad.status()));
+    let good = spawn(() => 5);
+    let v = try good.await();
+    println(describe(good.status()));
+    let c = spawn(() => {
+        try sleep(Duration.ofSecs(30));
+        return 1;
+    });
+    try yieldNow();
+    c.cancel();
+    let r = try? c.await();
+    println(describe(c.status()));
+    println("awaiting the panicked one");
+    let x = try bad.await();
+    println(f"never {x} {v} {r ?? 0}");
+}

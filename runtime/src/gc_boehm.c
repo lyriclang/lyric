@@ -267,6 +267,9 @@ static LYR_NO_SANITIZE struct GC_ms_entry *mark_coroutine(GC_word *addr, struct 
     top = GC_MARK_AND_PUSH(co->resumer_coro, top, limit, (void **)&co->resumer_coro);
     top = GC_MARK_AND_PUSH(co->error, top, limit, (void **)&co->error);
     top = GC_MARK_AND_PUSH(co->parked_top, top, limit, (void **)&co->parked_top);
+    top = GC_MARK_AND_PUSH(co->panic_code, top, limit, (void **)&co->panic_code);
+    top = GC_MARK_AND_PUSH(co->panic_message, top, limit, (void **)&co->panic_message);
+    top = GC_MARK_AND_PUSH(co->panic_trace, top, limit, (void **)&co->panic_trace);
     if (co->mapping != NULL && !co->ctx.on_cpu) {
         for (void **word = co->ctx.sp; word < (void **)co->ctx.base; word++) {
             top = GC_MARK_AND_PUSH(*word, top, limit, word);

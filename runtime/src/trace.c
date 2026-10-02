@@ -350,7 +350,8 @@ static int is_runtime_frame(const Frame *frame) {
            starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new") ||
            starts_with(frame->function, "lyr_coro_resume") || starts_with(frame->function, "lyr_coro_yield") ||
            starts_with(frame->function, "lyr_coro_close") || starts_with(frame->function, "lyr_poller") ||
-           starts_with(frame->function, "lyr_task_wait") || starts_with(frame->function, "lyr_task_start");
+           starts_with(frame->function, "lyr_task_wait") || starts_with(frame->function, "lyr_task_start") ||
+           starts_with(frame->function, "lyr_coro_panic") || starts_with(frame->function, "lyr_coro_repanic");
 }
 
 static int same_text(const char *a, const char *b) {

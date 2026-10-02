@@ -45,6 +45,19 @@ uint8_t lyr_task_wait(int64_t timeout_ns) {
     return (uint8_t)lyr_poller_wait(lyr_poller_current(), timeout_ns);
 }
 
+uint8_t lyr_task_resume(LyrCoro *co) {
+    int status = lyr_coro_resume_quiet(co);
+    return (uint8_t)(status == LYR_CORO_PANICKED ? 2 : status == LYR_CORO_DONE ? 1 : 0);
+}
+
+LyrStr *lyr_task_panic_code(LyrCoro *co) { return co->panic_code; }
+LyrStr *lyr_task_panic_message(LyrCoro *co) { return co->panic_message; }
+LyrStr *lyr_task_panic_trace(LyrCoro *co) { return co->panic_trace; }
+
+void lyr_task_repanic(LyrStr *code, LyrStr *message, LyrStr *trace) {
+    lyr_panic_again((const char *)code->bytes, (const char *)message->bytes, (const char *)trace->bytes);
+}
+
 /* main's context keeps its function and, once it returned, its value. */
 typedef struct MainTask {
     int64_t (*program_main)(void);
