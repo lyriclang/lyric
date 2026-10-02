@@ -1,0 +1,34 @@
+// Ctrl+C shuts the program down (design/v5/spec/06 K5; 10 Q9, §12) — the plan's M6 example. A
+// worker runs until the program is told to stop; User1 only asks how it goes. The test sends User1
+// twice, then Interrupt, each once the line before it came. Expected stdout: ready, got User1,
+// got User1, interrupted: shutting down, worker stopped, done — and exit 0.
+import std.io { println };
+import std.task { spawn, sleep, Select, Signal, signals, Cancelled };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    let user = signals(Signal.User1);
+    let stop = signals(Signal.Interrupt, Signal.Terminate);
+    let worker = spawn(() => {
+        try {
+            while (true) {
+                sleep(Duration.ofMillis(5));
+            }
+        } catch (_: Cancelled) {
+            println("worker stopped");
+        }
+    });
+    println("ready");
+    var running = true;
+    while (running) {
+        try Select.on(user) {
+            println("got User1");
+        }.on(stop) {
+            println("interrupted: shutting down");
+            running = false;
+        }.run();
+    }
+    worker.cancel();
+    try worker.await();
+    println("done");
+}

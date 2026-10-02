@@ -14,27 +14,46 @@ typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "std.core.Error";
 typedef struct lyr_ty7_Waiters lyr_ty7_Waiters;
 typedef struct lyr_ty8_SpinLock lyr_ty8_SpinLock;
-typedef struct lyr_ty9_Duration lyr_ty9_Duration;
-typedef struct lyr_ty10_Exception lyr_ty10_Exception;
-typedef struct lyr_ty11__env_std_task_spawnDetached_ lyr_ty11__env_std_task_spawnDetached_;
-typedef struct lyr_ty12_Cancelled lyr_ty12_Cancelled;
-typedef struct lyr_ty13_TimedOut lyr_ty13_TimedOut;
-typedef struct lyr_ty14_ChannelClosed lyr_ty14_ChannelClosed;
-typedef struct lyr_ty15_Selection lyr_ty15_Selection;
-typedef struct lyr_ty16_CaseNode lyr_ty16_CaseNode;
-typedef struct lyr_vt_ty17 lyr_vt_ty17;
-const char lyr_ifid_ty17[] = "std.task.SelectCase";
-typedef struct lyr_ty18_GuardNode lyr_ty18_GuardNode;
-typedef struct lyr_ty19_Channel_void_ lyr_ty19_Channel_void_;
-typedef struct lyr_ty20_Item_void_ lyr_ty20_Item_void_;
-typedef struct lyr_ty21_WaitQueue_void_ lyr_ty21_WaitQueue_void_;
-typedef struct lyr_ty22_Waiting_void_ lyr_ty22_Waiting_void_;
-typedef struct lyr_ty23__env_std_task_Timer_after_ lyr_ty23__env_std_task_Timer_after_;
-typedef struct lyr_ty24_Once lyr_ty24_Once;
-typedef struct lyr_ty25_LockState lyr_ty25_LockState;
-typedef struct lyr_ty26_Pool lyr_ty26_Pool;
-typedef struct lyr_ty27_Worker lyr_ty27_Worker;
-typedef struct lyr_ty28__env_std_task_Worker_start_ lyr_ty28__env_std_task_Worker_start_;
+typedef struct lyr_ty9_SignalHub lyr_ty9_SignalHub;
+typedef struct lyr_ty10_Subscription lyr_ty10_Subscription;
+typedef struct lyr_ty11_Channel_Signal_ lyr_ty11_Channel_Signal_;
+typedef struct lyr_ty12_Item_Signal_ lyr_ty12_Item_Signal_;
+typedef struct lyr_ty13_Signal lyr_ty13_Signal;
+typedef struct lyr_ty14_Signal_Interrupt lyr_ty14_Signal_Interrupt;
+typedef struct lyr_ty15_Signal_Terminate lyr_ty15_Signal_Terminate;
+typedef struct lyr_ty16_Signal_Hangup lyr_ty16_Signal_Hangup;
+typedef struct lyr_ty17_Signal_Quit lyr_ty17_Signal_Quit;
+typedef struct lyr_ty18_Signal_User1 lyr_ty18_Signal_User1;
+typedef struct lyr_ty19_Signal_User2 lyr_ty19_Signal_User2;
+typedef struct lyr_ty20_Signal_WindowChange lyr_ty20_Signal_WindowChange;
+typedef struct lyr_ty21_Signal_Other lyr_ty21_Signal_Other;
+typedef struct lyr_ty22_WaitQueue_Signal_ lyr_ty22_WaitQueue_Signal_;
+typedef struct lyr_ty23_Waiting_Signal_ lyr_ty23_Waiting_Signal_;
+typedef struct lyr_ty24_Duration lyr_ty24_Duration;
+typedef struct lyr_ty25_Exception lyr_ty25_Exception;
+typedef struct lyr_ty26__env_std_task_spawnDetached_ lyr_ty26__env_std_task_spawnDetached_;
+typedef struct lyr_ty27_Cancelled lyr_ty27_Cancelled;
+typedef struct lyr_ty28_TimedOut lyr_ty28_TimedOut;
+typedef struct lyr_ty29_ChannelClosed lyr_ty29_ChannelClosed;
+typedef struct lyr_ty30_Selection lyr_ty30_Selection;
+typedef struct lyr_ty31_CaseNode lyr_ty31_CaseNode;
+typedef struct lyr_vt_ty32 lyr_vt_ty32;
+const char lyr_ifid_ty32[] = "std.task.SelectCase";
+typedef struct lyr_ty33_GuardNode lyr_ty33_GuardNode;
+typedef struct lyr_ty34_Channel_void_ lyr_ty34_Channel_void_;
+typedef struct lyr_ty35_Item_void_ lyr_ty35_Item_void_;
+typedef struct lyr_ty36_WaitQueue_void_ lyr_ty36_WaitQueue_void_;
+typedef struct lyr_ty37_Waiting_void_ lyr_ty37_Waiting_void_;
+typedef struct lyr_ty38__env_std_task_Timer_after_ lyr_ty38__env_std_task_Timer_after_;
+typedef struct lyr_ty39_Once lyr_ty39_Once;
+typedef struct lyr_ty40_LockState lyr_ty40_LockState;
+typedef struct lyr_ty41_Task_void_ lyr_ty41_Task_void_;
+typedef struct lyr_ty42_Pool lyr_ty42_Pool;
+typedef struct lyr_ty43_Worker lyr_ty43_Worker;
+typedef struct lyr_ty44__env_std_task_Worker_start_ lyr_ty44__env_std_task_Worker_start_;
+typedef struct lyr_ty45__env_std_task_spawn_void__never__ lyr_ty45__env_std_task_spawn_void__never__;
+typedef struct lyr_ty46__env_std_task_launchOn_void__never__ lyr_ty46__env_std_task_launchOn_void__never__;
+typedef struct lyr_ty47__env_std_task_launchOn_void__never__ lyr_ty47__env_std_task_launchOn_void__never__;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -46,8 +65,9 @@ struct lyr_ty0_Scheduler {
     lyr_ty1_Context *f_inboxFirst;
     lyr_ty1_Context *f_inboxLast;
     int64_t f_poller;
+    lyr_ty1_Context *f_pollerWaiter;
 };
-_Static_assert(sizeof(lyr_ty0_Scheduler) == 80, "layout of lyr_ty0_Scheduler");
+_Static_assert(sizeof(lyr_ty0_Scheduler) == 88, "layout of lyr_ty0_Scheduler");
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_first) == 8, "layout of lyr_ty0_Scheduler");
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_last) == 16, "layout of lyr_ty0_Scheduler");
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_sleepers) == 24, "layout of lyr_ty0_Scheduler");
@@ -57,7 +77,8 @@ _Static_assert(offsetof(lyr_ty0_Scheduler, f_inboxLock) == 48, "layout of lyr_ty
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_inboxFirst) == 56, "layout of lyr_ty0_Scheduler");
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_inboxLast) == 64, "layout of lyr_ty0_Scheduler");
 _Static_assert(offsetof(lyr_ty0_Scheduler, f_poller) == 72, "layout of lyr_ty0_Scheduler");
-static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x1ee) };
+_Static_assert(offsetof(lyr_ty0_Scheduler, f_pollerWaiter) == 80, "layout of lyr_ty0_Scheduler");
+static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x5ee) };
 const LyrDesc lyr_desc_ty0_Scheduler = { sizeof(lyr_ty0_Scheduler), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "std.task.Scheduler", NULL };
 typedef struct { void (*fn)(void *, lyr_ty4_PanicInfo *, LyrErr **); void *env; } lyr_fn_ref4_to_void;
 _Static_assert(sizeof(lyr_fn_ref4_to_void) == 16, "layout of lyr_fn_ref4_to_void");
@@ -176,63 +197,177 @@ _Static_assert(sizeof(lyr_ty8_SpinLock) == 16, "layout of lyr_ty8_SpinLock");
 _Static_assert(offsetof(lyr_ty8_SpinLock, f_held) == 8, "layout of lyr_ty8_SpinLock");
 static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_ty8_SpinLock = { sizeof(lyr_ty8_SpinLock), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.task.SpinLock", NULL };
-struct lyr_ty9_Duration {
+struct lyr_ty9_SignalHub {
+    LyrObj header;
+    lyr_ty8_SpinLock *f_guard;
+    lyr_ty10_Subscription *f_first;
+    int64_t f_caught;
+    uint8_t f_watching;
+};
+_Static_assert(sizeof(lyr_ty9_SignalHub) == 40, "layout of lyr_ty9_SignalHub");
+_Static_assert(offsetof(lyr_ty9_SignalHub, f_guard) == 8, "layout of lyr_ty9_SignalHub");
+_Static_assert(offsetof(lyr_ty9_SignalHub, f_first) == 16, "layout of lyr_ty9_SignalHub");
+_Static_assert(offsetof(lyr_ty9_SignalHub, f_caught) == 24, "layout of lyr_ty9_SignalHub");
+_Static_assert(offsetof(lyr_ty9_SignalHub, f_watching) == 32, "layout of lyr_ty9_SignalHub");
+static const uint64_t lyr_refmap_ty9[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty9_SignalHub = { sizeof(lyr_ty9_SignalHub), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty9, "std.task.SignalHub", NULL };
+struct lyr_ty10_Subscription {
+    LyrObj header;
+    lyr_ty11_Channel_Signal_ *f_channel;
+    int64_t f_mask;
+    lyr_ty10_Subscription *f_next;
+};
+_Static_assert(sizeof(lyr_ty10_Subscription) == 32, "layout of lyr_ty10_Subscription");
+_Static_assert(offsetof(lyr_ty10_Subscription, f_channel) == 8, "layout of lyr_ty10_Subscription");
+_Static_assert(offsetof(lyr_ty10_Subscription, f_mask) == 16, "layout of lyr_ty10_Subscription");
+_Static_assert(offsetof(lyr_ty10_Subscription, f_next) == 24, "layout of lyr_ty10_Subscription");
+static const uint64_t lyr_refmap_ty10[] = { UINT64_C(0xa) };
+const LyrDesc lyr_desc_ty10_Subscription = { sizeof(lyr_ty10_Subscription), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty10, "std.task.Subscription", NULL };
+struct lyr_ty11_Channel_Signal_ {
+    LyrObj header;
+    int64_t f_capacity;
+    int64_t f_id;
+    lyr_ty8_SpinLock *f_guard;
+    int64_t f_buffered;
+    lyr_ty12_Item_Signal_ *f_first;
+    lyr_ty12_Item_Signal_ *f_last;
+    uint8_t f_closed;
+    lyr_ty22_WaitQueue_Signal_ *f_senders;
+    lyr_ty22_WaitQueue_Signal_ *f_receivers;
+};
+_Static_assert(sizeof(lyr_ty11_Channel_Signal_) == 80, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_capacity) == 8, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_id) == 16, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_guard) == 24, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_buffered) == 32, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_first) == 40, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_last) == 48, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_closed) == 56, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_senders) == 64, "layout of lyr_ty11_Channel_Signal_");
+_Static_assert(offsetof(lyr_ty11_Channel_Signal_, f_receivers) == 72, "layout of lyr_ty11_Channel_Signal_");
+static const uint64_t lyr_refmap_ty11[] = { UINT64_C(0x368) };
+const LyrDesc lyr_desc_ty11_Channel_Signal_ = { sizeof(lyr_ty11_Channel_Signal_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty11, "std.task.Channel<Signal>", NULL };
+struct lyr_ty14_Signal_Interrupt {
+    uint8_t lyr_unit;
+};
+struct lyr_ty15_Signal_Terminate {
+    uint8_t lyr_unit;
+};
+struct lyr_ty16_Signal_Hangup {
+    uint8_t lyr_unit;
+};
+struct lyr_ty17_Signal_Quit {
+    uint8_t lyr_unit;
+};
+struct lyr_ty18_Signal_User1 {
+    uint8_t lyr_unit;
+};
+struct lyr_ty19_Signal_User2 {
+    uint8_t lyr_unit;
+};
+struct lyr_ty20_Signal_WindowChange {
+    uint8_t lyr_unit;
+};
+struct lyr_ty21_Signal_Other {
+    int64_t f_0;
+};
+struct lyr_ty13_Signal { uint32_t tag; union { lyr_ty21_Signal_Other v7; } as; };
+_Static_assert(sizeof(lyr_ty13_Signal) == 16, "layout of lyr_ty13_Signal");
+struct lyr_ty12_Item_Signal_ {
+    LyrObj header;
+    lyr_ty13_Signal f_value;
+    lyr_ty12_Item_Signal_ *f_next;
+};
+_Static_assert(sizeof(lyr_ty12_Item_Signal_) == 32, "layout of lyr_ty12_Item_Signal_");
+_Static_assert(offsetof(lyr_ty12_Item_Signal_, f_value) == 8, "layout of lyr_ty12_Item_Signal_");
+_Static_assert(offsetof(lyr_ty12_Item_Signal_, f_next) == 24, "layout of lyr_ty12_Item_Signal_");
+static const uint64_t lyr_refmap_ty12[] = { UINT64_C(0x8) };
+const LyrDesc lyr_desc_ty12_Item_Signal_ = { sizeof(lyr_ty12_Item_Signal_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty12, "std.task.Item<Signal>", NULL };
+struct lyr_ty22_WaitQueue_Signal_ {
+    LyrObj header;
+    lyr_ty23_Waiting_Signal_ *f_first;
+    lyr_ty23_Waiting_Signal_ *f_last;
+};
+_Static_assert(sizeof(lyr_ty22_WaitQueue_Signal_) == 24, "layout of lyr_ty22_WaitQueue_Signal_");
+_Static_assert(offsetof(lyr_ty22_WaitQueue_Signal_, f_first) == 8, "layout of lyr_ty22_WaitQueue_Signal_");
+_Static_assert(offsetof(lyr_ty22_WaitQueue_Signal_, f_last) == 16, "layout of lyr_ty22_WaitQueue_Signal_");
+static const uint64_t lyr_refmap_ty22[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty22_WaitQueue_Signal_ = { sizeof(lyr_ty22_WaitQueue_Signal_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty22, "std.task.WaitQueue<Signal>", NULL };
+struct lyr_ty23_Waiting_Signal_ {
+    LyrObj header;
+    lyr_ty1_Context *f_context;
+    lyr_ty13_Signal f_value;
+    uint8_t f_settled;
+    uint8_t f_queued;
+    lyr_ty23_Waiting_Signal_ *f_next;
+    lyr_ty23_Waiting_Signal_ *f_prev;
+};
+_Static_assert(sizeof(lyr_ty23_Waiting_Signal_) == 56, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_context) == 8, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_value) == 16, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_settled) == 32, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_queued) == 33, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_next) == 40, "layout of lyr_ty23_Waiting_Signal_");
+_Static_assert(offsetof(lyr_ty23_Waiting_Signal_, f_prev) == 48, "layout of lyr_ty23_Waiting_Signal_");
+static const uint64_t lyr_refmap_ty23[] = { UINT64_C(0x62) };
+const LyrDesc lyr_desc_ty23_Waiting_Signal_ = { sizeof(lyr_ty23_Waiting_Signal_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty23, "std.task.Waiting<Signal>", NULL };
+struct lyr_ty24_Duration {
     int64_t f_ns;
 };
-struct lyr_ty10_Exception {
+struct lyr_ty25_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface6 f_inner;
 };
-_Static_assert(sizeof(lyr_ty10_Exception) == 40, "layout of lyr_ty10_Exception");
-_Static_assert(offsetof(lyr_ty10_Exception, f_text) == 8, "layout of lyr_ty10_Exception");
-_Static_assert(offsetof(lyr_ty10_Exception, f_inner) == 16, "layout of lyr_ty10_Exception");
-static const uint64_t lyr_refmap_ty10[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty10_Exception = { sizeof(lyr_ty10_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty10, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty25_Exception) == 40, "layout of lyr_ty25_Exception");
+_Static_assert(offsetof(lyr_ty25_Exception, f_text) == 8, "layout of lyr_ty25_Exception");
+_Static_assert(offsetof(lyr_ty25_Exception, f_inner) == 16, "layout of lyr_ty25_Exception");
+static const uint64_t lyr_refmap_ty25[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty25_Exception = { sizeof(lyr_ty25_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty25, "std.core.Exception", NULL };
 typedef struct { void (*fn)(void *, LyrErr **); void *env; } lyr_fn_to_void;
 _Static_assert(sizeof(lyr_fn_to_void) == 16, "layout of lyr_fn_to_void");
-struct lyr_ty11__env_std_task_spawnDetached_ {
+struct lyr_ty26__env_std_task_spawnDetached_ {
     LyrObj header;
     lyr_fn_to_void f_body;
 };
-_Static_assert(sizeof(lyr_ty11__env_std_task_spawnDetached_) == 24, "layout of lyr_ty11__env_std_task_spawnDetached_");
-_Static_assert(offsetof(lyr_ty11__env_std_task_spawnDetached_, f_body) == 8, "layout of lyr_ty11__env_std_task_spawnDetached_");
-static const uint64_t lyr_refmap_ty11[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty11__env_std_task_spawnDetached_ = { sizeof(lyr_ty11__env_std_task_spawnDetached_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty11, "<env:std.task.spawnDetached>", NULL };
-struct lyr_ty12_Cancelled {
+_Static_assert(sizeof(lyr_ty26__env_std_task_spawnDetached_) == 24, "layout of lyr_ty26__env_std_task_spawnDetached_");
+_Static_assert(offsetof(lyr_ty26__env_std_task_spawnDetached_, f_body) == 8, "layout of lyr_ty26__env_std_task_spawnDetached_");
+static const uint64_t lyr_refmap_ty26[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty26__env_std_task_spawnDetached_ = { sizeof(lyr_ty26__env_std_task_spawnDetached_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty26, "<env:std.task.spawnDetached>", NULL };
+struct lyr_ty27_Cancelled {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty12_Cancelled) == 8, "layout of lyr_ty12_Cancelled");
-extern const LyrItable lyr_itab_ty12[];
-const LyrDesc lyr_desc_ty12_Cancelled = { sizeof(lyr_ty12_Cancelled), 0, 0, 0, NULL, "std.task.Cancelled", lyr_itab_ty12 };
-struct lyr_ty13_TimedOut {
+_Static_assert(sizeof(lyr_ty27_Cancelled) == 8, "layout of lyr_ty27_Cancelled");
+extern const LyrItable lyr_itab_ty27[];
+const LyrDesc lyr_desc_ty27_Cancelled = { sizeof(lyr_ty27_Cancelled), 0, 0, 0, NULL, "std.task.Cancelled", lyr_itab_ty27 };
+struct lyr_ty28_TimedOut {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty13_TimedOut) == 8, "layout of lyr_ty13_TimedOut");
-const LyrDesc lyr_desc_ty13_TimedOut = { sizeof(lyr_ty13_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
-struct lyr_ty14_ChannelClosed {
+_Static_assert(sizeof(lyr_ty28_TimedOut) == 8, "layout of lyr_ty28_TimedOut");
+const LyrDesc lyr_desc_ty28_TimedOut = { sizeof(lyr_ty28_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
+struct lyr_ty29_ChannelClosed {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty14_ChannelClosed) == 8, "layout of lyr_ty14_ChannelClosed");
-const LyrDesc lyr_desc_ty14_ChannelClosed = { sizeof(lyr_ty14_ChannelClosed), 0, 0, 0, NULL, "std.task.ChannelClosed", NULL };
+_Static_assert(sizeof(lyr_ty29_ChannelClosed) == 8, "layout of lyr_ty29_ChannelClosed");
+const LyrDesc lyr_desc_ty29_ChannelClosed = { sizeof(lyr_ty29_ChannelClosed), 0, 0, 0, NULL, "std.task.ChannelClosed", NULL };
 typedef struct { lyr_fn_to_void value; uint8_t has; } lyr_opt_fn_to_void;
-struct lyr_ty15_Selection {
+struct lyr_ty30_Selection {
     LyrObj header;
-    lyr_ty16_CaseNode *f_first;
-    lyr_ty16_CaseNode *f_last;
-    lyr_ty18_GuardNode *f_guards;
+    lyr_ty31_CaseNode *f_first;
+    lyr_ty31_CaseNode *f_last;
+    lyr_ty33_GuardNode *f_guards;
     int64_t f_timeoutNanos;
     lyr_opt_fn_to_void f_onTimeout;
 };
-_Static_assert(sizeof(lyr_ty15_Selection) == 64, "layout of lyr_ty15_Selection");
-_Static_assert(offsetof(lyr_ty15_Selection, f_first) == 8, "layout of lyr_ty15_Selection");
-_Static_assert(offsetof(lyr_ty15_Selection, f_last) == 16, "layout of lyr_ty15_Selection");
-_Static_assert(offsetof(lyr_ty15_Selection, f_guards) == 24, "layout of lyr_ty15_Selection");
-_Static_assert(offsetof(lyr_ty15_Selection, f_timeoutNanos) == 32, "layout of lyr_ty15_Selection");
-_Static_assert(offsetof(lyr_ty15_Selection, f_onTimeout) == 40, "layout of lyr_ty15_Selection");
-static const uint64_t lyr_refmap_ty15[] = { UINT64_C(0x4e) };
-const LyrDesc lyr_desc_ty15_Selection = { sizeof(lyr_ty15_Selection), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty15, "std.task.Selection", NULL };
-struct lyr_vt_ty17 {
+_Static_assert(sizeof(lyr_ty30_Selection) == 64, "layout of lyr_ty30_Selection");
+_Static_assert(offsetof(lyr_ty30_Selection, f_first) == 8, "layout of lyr_ty30_Selection");
+_Static_assert(offsetof(lyr_ty30_Selection, f_last) == 16, "layout of lyr_ty30_Selection");
+_Static_assert(offsetof(lyr_ty30_Selection, f_guards) == 24, "layout of lyr_ty30_Selection");
+_Static_assert(offsetof(lyr_ty30_Selection, f_timeoutNanos) == 32, "layout of lyr_ty30_Selection");
+_Static_assert(offsetof(lyr_ty30_Selection, f_onTimeout) == 40, "layout of lyr_ty30_Selection");
+static const uint64_t lyr_refmap_ty30[] = { UINT64_C(0x4e) };
+const LyrDesc lyr_desc_ty30_Selection = { sizeof(lyr_ty30_Selection), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty30, "std.task.Selection", NULL };
+struct lyr_vt_ty32 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
@@ -242,110 +377,110 @@ struct lyr_vt_ty17 {
     void (*s5)(LyrIface);
     void (*s6)(LyrIface, LyrErr **);
 };
-struct lyr_ty16_CaseNode {
+struct lyr_ty31_CaseNode {
     LyrObj header;
     LyrIface f_entry;
-    lyr_ty16_CaseNode *f_next;
+    lyr_ty31_CaseNode *f_next;
 };
-_Static_assert(sizeof(lyr_ty16_CaseNode) == 32, "layout of lyr_ty16_CaseNode");
-_Static_assert(offsetof(lyr_ty16_CaseNode, f_entry) == 8, "layout of lyr_ty16_CaseNode");
-_Static_assert(offsetof(lyr_ty16_CaseNode, f_next) == 24, "layout of lyr_ty16_CaseNode");
-static const uint64_t lyr_refmap_ty16[] = { UINT64_C(0xa) };
-const LyrDesc lyr_desc_ty16_CaseNode = { sizeof(lyr_ty16_CaseNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty16, "std.task.CaseNode", NULL };
-struct lyr_ty18_GuardNode {
+_Static_assert(sizeof(lyr_ty31_CaseNode) == 32, "layout of lyr_ty31_CaseNode");
+_Static_assert(offsetof(lyr_ty31_CaseNode, f_entry) == 8, "layout of lyr_ty31_CaseNode");
+_Static_assert(offsetof(lyr_ty31_CaseNode, f_next) == 24, "layout of lyr_ty31_CaseNode");
+static const uint64_t lyr_refmap_ty31[] = { UINT64_C(0xa) };
+const LyrDesc lyr_desc_ty31_CaseNode = { sizeof(lyr_ty31_CaseNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty31, "std.task.CaseNode", NULL };
+struct lyr_ty33_GuardNode {
     LyrObj header;
     int64_t f_id;
     lyr_ty8_SpinLock *f_guard;
-    lyr_ty18_GuardNode *f_next;
+    lyr_ty33_GuardNode *f_next;
 };
-_Static_assert(sizeof(lyr_ty18_GuardNode) == 32, "layout of lyr_ty18_GuardNode");
-_Static_assert(offsetof(lyr_ty18_GuardNode, f_id) == 8, "layout of lyr_ty18_GuardNode");
-_Static_assert(offsetof(lyr_ty18_GuardNode, f_guard) == 16, "layout of lyr_ty18_GuardNode");
-_Static_assert(offsetof(lyr_ty18_GuardNode, f_next) == 24, "layout of lyr_ty18_GuardNode");
-static const uint64_t lyr_refmap_ty18[] = { UINT64_C(0xc) };
-const LyrDesc lyr_desc_ty18_GuardNode = { sizeof(lyr_ty18_GuardNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty18, "std.task.GuardNode", NULL };
-struct lyr_ty19_Channel_void_ {
+_Static_assert(sizeof(lyr_ty33_GuardNode) == 32, "layout of lyr_ty33_GuardNode");
+_Static_assert(offsetof(lyr_ty33_GuardNode, f_id) == 8, "layout of lyr_ty33_GuardNode");
+_Static_assert(offsetof(lyr_ty33_GuardNode, f_guard) == 16, "layout of lyr_ty33_GuardNode");
+_Static_assert(offsetof(lyr_ty33_GuardNode, f_next) == 24, "layout of lyr_ty33_GuardNode");
+static const uint64_t lyr_refmap_ty33[] = { UINT64_C(0xc) };
+const LyrDesc lyr_desc_ty33_GuardNode = { sizeof(lyr_ty33_GuardNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty33, "std.task.GuardNode", NULL };
+struct lyr_ty34_Channel_void_ {
     LyrObj header;
     int64_t f_capacity;
     int64_t f_id;
     lyr_ty8_SpinLock *f_guard;
     int64_t f_buffered;
-    lyr_ty20_Item_void_ *f_first;
-    lyr_ty20_Item_void_ *f_last;
+    lyr_ty35_Item_void_ *f_first;
+    lyr_ty35_Item_void_ *f_last;
     uint8_t f_closed;
-    lyr_ty21_WaitQueue_void_ *f_senders;
-    lyr_ty21_WaitQueue_void_ *f_receivers;
+    lyr_ty36_WaitQueue_void_ *f_senders;
+    lyr_ty36_WaitQueue_void_ *f_receivers;
 };
-_Static_assert(sizeof(lyr_ty19_Channel_void_) == 80, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_capacity) == 8, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_id) == 16, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_guard) == 24, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_buffered) == 32, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_first) == 40, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_last) == 48, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_closed) == 56, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_senders) == 64, "layout of lyr_ty19_Channel_void_");
-_Static_assert(offsetof(lyr_ty19_Channel_void_, f_receivers) == 72, "layout of lyr_ty19_Channel_void_");
-static const uint64_t lyr_refmap_ty19[] = { UINT64_C(0x368) };
-const LyrDesc lyr_desc_ty19_Channel_void_ = { sizeof(lyr_ty19_Channel_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty19, "std.task.Channel<void>", NULL };
-struct lyr_ty20_Item_void_ {
+_Static_assert(sizeof(lyr_ty34_Channel_void_) == 80, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_capacity) == 8, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_id) == 16, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_guard) == 24, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_buffered) == 32, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_first) == 40, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_last) == 48, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_closed) == 56, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_senders) == 64, "layout of lyr_ty34_Channel_void_");
+_Static_assert(offsetof(lyr_ty34_Channel_void_, f_receivers) == 72, "layout of lyr_ty34_Channel_void_");
+static const uint64_t lyr_refmap_ty34[] = { UINT64_C(0x368) };
+const LyrDesc lyr_desc_ty34_Channel_void_ = { sizeof(lyr_ty34_Channel_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty34, "std.task.Channel<void>", NULL };
+struct lyr_ty35_Item_void_ {
     LyrObj header;
     uint8_t f_value;
-    lyr_ty20_Item_void_ *f_next;
+    lyr_ty35_Item_void_ *f_next;
 };
-_Static_assert(sizeof(lyr_ty20_Item_void_) == 24, "layout of lyr_ty20_Item_void_");
-_Static_assert(offsetof(lyr_ty20_Item_void_, f_value) == 8, "layout of lyr_ty20_Item_void_");
-_Static_assert(offsetof(lyr_ty20_Item_void_, f_next) == 16, "layout of lyr_ty20_Item_void_");
-static const uint64_t lyr_refmap_ty20[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty20_Item_void_ = { sizeof(lyr_ty20_Item_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty20, "std.task.Item<void>", NULL };
-struct lyr_ty21_WaitQueue_void_ {
+_Static_assert(sizeof(lyr_ty35_Item_void_) == 24, "layout of lyr_ty35_Item_void_");
+_Static_assert(offsetof(lyr_ty35_Item_void_, f_value) == 8, "layout of lyr_ty35_Item_void_");
+_Static_assert(offsetof(lyr_ty35_Item_void_, f_next) == 16, "layout of lyr_ty35_Item_void_");
+static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty35_Item_void_ = { sizeof(lyr_ty35_Item_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "std.task.Item<void>", NULL };
+struct lyr_ty36_WaitQueue_void_ {
     LyrObj header;
-    lyr_ty22_Waiting_void_ *f_first;
-    lyr_ty22_Waiting_void_ *f_last;
+    lyr_ty37_Waiting_void_ *f_first;
+    lyr_ty37_Waiting_void_ *f_last;
 };
-_Static_assert(sizeof(lyr_ty21_WaitQueue_void_) == 24, "layout of lyr_ty21_WaitQueue_void_");
-_Static_assert(offsetof(lyr_ty21_WaitQueue_void_, f_first) == 8, "layout of lyr_ty21_WaitQueue_void_");
-_Static_assert(offsetof(lyr_ty21_WaitQueue_void_, f_last) == 16, "layout of lyr_ty21_WaitQueue_void_");
-static const uint64_t lyr_refmap_ty21[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty21_WaitQueue_void_ = { sizeof(lyr_ty21_WaitQueue_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty21, "std.task.WaitQueue<void>", NULL };
+_Static_assert(sizeof(lyr_ty36_WaitQueue_void_) == 24, "layout of lyr_ty36_WaitQueue_void_");
+_Static_assert(offsetof(lyr_ty36_WaitQueue_void_, f_first) == 8, "layout of lyr_ty36_WaitQueue_void_");
+_Static_assert(offsetof(lyr_ty36_WaitQueue_void_, f_last) == 16, "layout of lyr_ty36_WaitQueue_void_");
+static const uint64_t lyr_refmap_ty36[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty36_WaitQueue_void_ = { sizeof(lyr_ty36_WaitQueue_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty36, "std.task.WaitQueue<void>", NULL };
 typedef struct { uint8_t value; uint8_t has; } lyr_opt_bool;
-struct lyr_ty22_Waiting_void_ {
+struct lyr_ty37_Waiting_void_ {
     LyrObj header;
     lyr_ty1_Context *f_context;
     lyr_opt_bool f_value;
     uint8_t f_settled;
     uint8_t f_queued;
-    lyr_ty22_Waiting_void_ *f_next;
-    lyr_ty22_Waiting_void_ *f_prev;
+    lyr_ty37_Waiting_void_ *f_next;
+    lyr_ty37_Waiting_void_ *f_prev;
 };
-_Static_assert(sizeof(lyr_ty22_Waiting_void_) == 40, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_context) == 8, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_value) == 16, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_settled) == 18, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_queued) == 19, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_next) == 24, "layout of lyr_ty22_Waiting_void_");
-_Static_assert(offsetof(lyr_ty22_Waiting_void_, f_prev) == 32, "layout of lyr_ty22_Waiting_void_");
-static const uint64_t lyr_refmap_ty22[] = { UINT64_C(0x1a) };
-const LyrDesc lyr_desc_ty22_Waiting_void_ = { sizeof(lyr_ty22_Waiting_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty22, "std.task.Waiting<void>", NULL };
-struct lyr_ty23__env_std_task_Timer_after_ {
+_Static_assert(sizeof(lyr_ty37_Waiting_void_) == 40, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_context) == 8, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_value) == 16, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_settled) == 18, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_queued) == 19, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_next) == 24, "layout of lyr_ty37_Waiting_void_");
+_Static_assert(offsetof(lyr_ty37_Waiting_void_, f_prev) == 32, "layout of lyr_ty37_Waiting_void_");
+static const uint64_t lyr_refmap_ty37[] = { UINT64_C(0x1a) };
+const LyrDesc lyr_desc_ty37_Waiting_void_ = { sizeof(lyr_ty37_Waiting_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty37, "std.task.Waiting<void>", NULL };
+struct lyr_ty38__env_std_task_Timer_after_ {
     LyrObj header;
-    lyr_ty9_Duration f_d;
-    lyr_ty19_Channel_void_ *f_ch;
+    lyr_ty24_Duration f_d;
+    lyr_ty34_Channel_void_ *f_ch;
 };
-_Static_assert(sizeof(lyr_ty23__env_std_task_Timer_after_) == 24, "layout of lyr_ty23__env_std_task_Timer_after_");
-_Static_assert(offsetof(lyr_ty23__env_std_task_Timer_after_, f_d) == 8, "layout of lyr_ty23__env_std_task_Timer_after_");
-_Static_assert(offsetof(lyr_ty23__env_std_task_Timer_after_, f_ch) == 16, "layout of lyr_ty23__env_std_task_Timer_after_");
-static const uint64_t lyr_refmap_ty23[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty23__env_std_task_Timer_after_ = { sizeof(lyr_ty23__env_std_task_Timer_after_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty23, "<env:std.task.Timer.after>", NULL };
-struct lyr_ty24_Once {
+_Static_assert(sizeof(lyr_ty38__env_std_task_Timer_after_) == 24, "layout of lyr_ty38__env_std_task_Timer_after_");
+_Static_assert(offsetof(lyr_ty38__env_std_task_Timer_after_, f_d) == 8, "layout of lyr_ty38__env_std_task_Timer_after_");
+_Static_assert(offsetof(lyr_ty38__env_std_task_Timer_after_, f_ch) == 16, "layout of lyr_ty38__env_std_task_Timer_after_");
+static const uint64_t lyr_refmap_ty38[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty38__env_std_task_Timer_after_ = { sizeof(lyr_ty38__env_std_task_Timer_after_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty38, "<env:std.task.Timer.after>", NULL };
+struct lyr_ty39_Once {
     LyrObj header;
-    lyr_ty25_LockState *f_state;
+    lyr_ty40_LockState *f_state;
 };
-_Static_assert(sizeof(lyr_ty24_Once) == 16, "layout of lyr_ty24_Once");
-_Static_assert(offsetof(lyr_ty24_Once, f_state) == 8, "layout of lyr_ty24_Once");
-static const uint64_t lyr_refmap_ty24[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty24_Once = { sizeof(lyr_ty24_Once), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty24, "std.task.Once", NULL };
-struct lyr_ty25_LockState {
+_Static_assert(sizeof(lyr_ty39_Once) == 16, "layout of lyr_ty39_Once");
+_Static_assert(offsetof(lyr_ty39_Once, f_state) == 8, "layout of lyr_ty39_Once");
+static const uint64_t lyr_refmap_ty39[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty39_Once = { sizeof(lyr_ty39_Once), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty39, "std.task.Once", NULL };
+struct lyr_ty40_LockState {
     LyrObj header;
     lyr_ty8_SpinLock *f_guard;
     uint8_t f_alone;
@@ -354,60 +489,113 @@ struct lyr_ty25_LockState {
     uint8_t f_done;
     lyr_ty7_Waiters *f_waiters;
 };
-_Static_assert(sizeof(lyr_ty25_LockState) == 56, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_guard) == 8, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_alone) == 16, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_readers) == 24, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_writersWaiting) == 32, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_done) == 40, "layout of lyr_ty25_LockState");
-_Static_assert(offsetof(lyr_ty25_LockState, f_waiters) == 48, "layout of lyr_ty25_LockState");
-static const uint64_t lyr_refmap_ty25[] = { UINT64_C(0x42) };
-const LyrDesc lyr_desc_ty25_LockState = { sizeof(lyr_ty25_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty25, "std.task.LockState", NULL };
-struct lyr_ty26_Pool {
+_Static_assert(sizeof(lyr_ty40_LockState) == 56, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_guard) == 8, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_alone) == 16, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_readers) == 24, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_writersWaiting) == 32, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_done) == 40, "layout of lyr_ty40_LockState");
+_Static_assert(offsetof(lyr_ty40_LockState, f_waiters) == 48, "layout of lyr_ty40_LockState");
+static const uint64_t lyr_refmap_ty40[] = { UINT64_C(0x42) };
+const LyrDesc lyr_desc_ty40_LockState = { sizeof(lyr_ty40_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty40, "std.task.LockState", NULL };
+struct lyr_ty41_Task_void_ {
     LyrObj header;
-    lyr_ty27_Worker *f_workers;
+    uint8_t f_done;
+    lyr_opt_bool f_value;
+    lyr_opt_iface6 f_failure;
+    lyr_ty4_PanicInfo *f_crash;
+    lyr_ty1_Context *f_context;
+    lyr_ty7_Waiters *f_waiters;
+    lyr_ty8_SpinLock *f_guard;
+};
+_Static_assert(sizeof(lyr_ty41_Task_void_) == 72, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_done) == 8, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_value) == 9, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_failure) == 16, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_crash) == 40, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_context) == 48, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_waiters) == 56, "layout of lyr_ty41_Task_void_");
+_Static_assert(offsetof(lyr_ty41_Task_void_, f_guard) == 64, "layout of lyr_ty41_Task_void_");
+static const uint64_t lyr_refmap_ty41[] = { UINT64_C(0x1e4) };
+const LyrDesc lyr_desc_ty41_Task_void_ = { sizeof(lyr_ty41_Task_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty41, "std.task.Task<void>", NULL };
+struct lyr_ty42_Pool {
+    LyrObj header;
+    lyr_ty43_Worker *f_workers;
     int64_t f_size;
     lyr_ty2_Atomic_int_ *f_picks;
     lyr_ty3_Atomic_bool_ *f_closed;
 };
-_Static_assert(sizeof(lyr_ty26_Pool) == 40, "layout of lyr_ty26_Pool");
-_Static_assert(offsetof(lyr_ty26_Pool, f_workers) == 8, "layout of lyr_ty26_Pool");
-_Static_assert(offsetof(lyr_ty26_Pool, f_size) == 16, "layout of lyr_ty26_Pool");
-_Static_assert(offsetof(lyr_ty26_Pool, f_picks) == 24, "layout of lyr_ty26_Pool");
-_Static_assert(offsetof(lyr_ty26_Pool, f_closed) == 32, "layout of lyr_ty26_Pool");
-static const uint64_t lyr_refmap_ty26[] = { UINT64_C(0x1a) };
-const LyrDesc lyr_desc_ty26_Pool = { sizeof(lyr_ty26_Pool), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty26, "std.task.Pool", NULL };
-struct lyr_ty27_Worker {
+_Static_assert(sizeof(lyr_ty42_Pool) == 40, "layout of lyr_ty42_Pool");
+_Static_assert(offsetof(lyr_ty42_Pool, f_workers) == 8, "layout of lyr_ty42_Pool");
+_Static_assert(offsetof(lyr_ty42_Pool, f_size) == 16, "layout of lyr_ty42_Pool");
+_Static_assert(offsetof(lyr_ty42_Pool, f_picks) == 24, "layout of lyr_ty42_Pool");
+_Static_assert(offsetof(lyr_ty42_Pool, f_closed) == 32, "layout of lyr_ty42_Pool");
+static const uint64_t lyr_refmap_ty42[] = { UINT64_C(0x1a) };
+const LyrDesc lyr_desc_ty42_Pool = { sizeof(lyr_ty42_Pool), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty42, "std.task.Pool", NULL };
+struct lyr_ty43_Worker {
     LyrObj header;
     lyr_ty0_Scheduler *f_scheduler;
     lyr_ty2_Atomic_int_ *f_active;
     lyr_ty3_Atomic_bool_ *f_closing;
-    lyr_ty19_Channel_void_ *f_finished;
-    lyr_ty27_Worker *f_next;
+    lyr_ty34_Channel_void_ *f_finished;
+    lyr_ty43_Worker *f_next;
 };
-_Static_assert(sizeof(lyr_ty27_Worker) == 48, "layout of lyr_ty27_Worker");
-_Static_assert(offsetof(lyr_ty27_Worker, f_scheduler) == 8, "layout of lyr_ty27_Worker");
-_Static_assert(offsetof(lyr_ty27_Worker, f_active) == 16, "layout of lyr_ty27_Worker");
-_Static_assert(offsetof(lyr_ty27_Worker, f_closing) == 24, "layout of lyr_ty27_Worker");
-_Static_assert(offsetof(lyr_ty27_Worker, f_finished) == 32, "layout of lyr_ty27_Worker");
-_Static_assert(offsetof(lyr_ty27_Worker, f_next) == 40, "layout of lyr_ty27_Worker");
-static const uint64_t lyr_refmap_ty27[] = { UINT64_C(0x3e) };
-const LyrDesc lyr_desc_ty27_Worker = { sizeof(lyr_ty27_Worker), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty27, "std.task.Worker", NULL };
-struct lyr_ty28__env_std_task_Worker_start_ {
+_Static_assert(sizeof(lyr_ty43_Worker) == 48, "layout of lyr_ty43_Worker");
+_Static_assert(offsetof(lyr_ty43_Worker, f_scheduler) == 8, "layout of lyr_ty43_Worker");
+_Static_assert(offsetof(lyr_ty43_Worker, f_active) == 16, "layout of lyr_ty43_Worker");
+_Static_assert(offsetof(lyr_ty43_Worker, f_closing) == 24, "layout of lyr_ty43_Worker");
+_Static_assert(offsetof(lyr_ty43_Worker, f_finished) == 32, "layout of lyr_ty43_Worker");
+_Static_assert(offsetof(lyr_ty43_Worker, f_next) == 40, "layout of lyr_ty43_Worker");
+static const uint64_t lyr_refmap_ty43[] = { UINT64_C(0x3e) };
+const LyrDesc lyr_desc_ty43_Worker = { sizeof(lyr_ty43_Worker), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty43, "std.task.Worker", NULL };
+struct lyr_ty44__env_std_task_Worker_start_ {
     LyrObj header;
     lyr_ty0_Scheduler *f_s;
-    lyr_ty27_Worker *f_w;
+    lyr_ty43_Worker *f_w;
 };
-_Static_assert(sizeof(lyr_ty28__env_std_task_Worker_start_) == 24, "layout of lyr_ty28__env_std_task_Worker_start_");
-_Static_assert(offsetof(lyr_ty28__env_std_task_Worker_start_, f_s) == 8, "layout of lyr_ty28__env_std_task_Worker_start_");
-_Static_assert(offsetof(lyr_ty28__env_std_task_Worker_start_, f_w) == 16, "layout of lyr_ty28__env_std_task_Worker_start_");
-static const uint64_t lyr_refmap_ty28[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty28__env_std_task_Worker_start_ = { sizeof(lyr_ty28__env_std_task_Worker_start_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty28, "<env:std.task.Worker.start>", NULL };
+_Static_assert(sizeof(lyr_ty44__env_std_task_Worker_start_) == 24, "layout of lyr_ty44__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty44__env_std_task_Worker_start_, f_s) == 8, "layout of lyr_ty44__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty44__env_std_task_Worker_start_, f_w) == 16, "layout of lyr_ty44__env_std_task_Worker_start_");
+static const uint64_t lyr_refmap_ty44[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty44__env_std_task_Worker_start_ = { sizeof(lyr_ty44__env_std_task_Worker_start_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty44, "<env:std.task.Worker.start>", NULL };
+struct lyr_ty45__env_std_task_spawn_void__never__ {
+    LyrObj header;
+    lyr_ty0_Scheduler *f_s;
+    lyr_ty41_Task_void_ *f_task;
+};
+_Static_assert(sizeof(lyr_ty45__env_std_task_spawn_void__never__) == 24, "layout of lyr_ty45__env_std_task_spawn_void__never__");
+_Static_assert(offsetof(lyr_ty45__env_std_task_spawn_void__never__, f_s) == 8, "layout of lyr_ty45__env_std_task_spawn_void__never__");
+_Static_assert(offsetof(lyr_ty45__env_std_task_spawn_void__never__, f_task) == 16, "layout of lyr_ty45__env_std_task_spawn_void__never__");
+static const uint64_t lyr_refmap_ty45[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty45__env_std_task_spawn_void__never__ = { sizeof(lyr_ty45__env_std_task_spawn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty45, "<env:std.task.spawn<void, never>>", NULL };
+struct lyr_ty46__env_std_task_launchOn_void__never__ {
+    LyrObj header;
+    lyr_ty41_Task_void_ *f_task;
+    lyr_fn_to_void f_body;
+    lyr_opt_fn_to_void f_ended;
+};
+_Static_assert(sizeof(lyr_ty46__env_std_task_launchOn_void__never__) == 56, "layout of lyr_ty46__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty46__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty46__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty46__env_std_task_launchOn_void__never__, f_body) == 16, "layout of lyr_ty46__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty46__env_std_task_launchOn_void__never__, f_ended) == 32, "layout of lyr_ty46__env_std_task_launchOn_void__never__");
+static const uint64_t lyr_refmap_ty46[] = { UINT64_C(0x2a) };
+const LyrDesc lyr_desc_ty46__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty46__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty46, "<env:std.task.launchOn<void, never>>", NULL };
+struct lyr_ty47__env_std_task_launchOn_void__never__ {
+    LyrObj header;
+    lyr_ty41_Task_void_ *f_task;
+    lyr_opt_fn_to_void f_ended;
+};
+_Static_assert(sizeof(lyr_ty47__env_std_task_launchOn_void__never__) == 40, "layout of lyr_ty47__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty47__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty47__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty47__env_std_task_launchOn_void__never__, f_ended) == 16, "layout of lyr_ty47__env_std_task_launchOn_void__never__");
+static const uint64_t lyr_refmap_ty47[] = { UINT64_C(0xa) };
+const LyrDesc lyr_desc_ty47__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty47__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty47, "<env:std.task.launchOn<void, never>>", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 
 /* module-level bindings */
-lyr_ty2_Atomic_int_ *lyr_g0_channelIds = NULL;
-LyrStr *lyr_g1_log = NULL;
+lyr_ty9_SignalHub *lyr_g0_signalHub = NULL;
+lyr_ty2_Atomic_int_ *lyr_g1_channelIds = NULL;
+LyrStr *lyr_g2_log = NULL;
 
 /* string literals */
 static const LyrStaticStr(1) lyr_lit0 = LYR_STR_INIT("");
@@ -440,7 +628,7 @@ void lyr_main_flush(LyrStr *l0_title);
 LyrCoro * lyr_main_numbers(void);
 void lyr_main_main(LyrErr **lyr_err);
 lyr_opt_iface6 lyr_std_core_Error_cause(LyrIface l0_this);
-void lyr_std_task_sleep(lyr_ty9_Duration l0_d, LyrErr **lyr_err);
+void lyr_std_task_sleep(lyr_ty24_Duration l0_d, LyrErr **lyr_err);
 void lyr_std_task_yieldNow(LyrErr **lyr_err);
 void lyr_std_task_spawnDetached(lyr_fn_to_void l0_body);
 lyr_ty0_Scheduler * lyr_std_task_here(void);
@@ -449,13 +637,14 @@ lyr_ty1_Context * lyr_std_task_meld(lyr_ty1_Context *l0_top, lyr_ty1_Context *l1
 void lyr_std_task_fixRanks(lyr_ty1_Context *l0_from);
 int64_t lyr_std_task_rankOf(lyr_ty1_Context *l0_c);
 void lyr_std_task_runMain(LyrCoro *l0_main);
-LyrStr * lyr_std_task_Cancelled_message(lyr_ty12_Cancelled *l0_this);
+LyrStr * lyr_std_task_Cancelled_message(lyr_ty27_Cancelled *l0_this);
 void lyr_std_task_Context_beginWait(lyr_ty1_Context *l0_this);
 uint8_t lyr_std_task_Context_claim(lyr_ty1_Context *l0_this);
 void lyr_std_task_Context_endWait(lyr_ty1_Context *l0_this);
 void lyr_std_task_SpinLock_acquire(lyr_ty8_SpinLock *l0_this);
 void lyr_std_task_SpinLock_release(lyr_ty8_SpinLock *l0_this);
 void lyr_std_task_Scheduler_started(lyr_ty0_Scheduler *l0_this);
+void lyr_std_task_Scheduler_pollerWoke(lyr_ty0_Scheduler *l0_this);
 void lyr_std_task_Scheduler_stopped(lyr_ty0_Scheduler *l0_this);
 void lyr_std_task_Scheduler_ready(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c);
 lyr_ty1_Context * lyr_std_task_Scheduler_takeReady(lyr_ty0_Scheduler *l0_this);
@@ -471,10 +660,10 @@ void lyr_std_task_Scheduler_wakeSleepers(lyr_ty0_Scheduler *l0_this, int64_t l1_
 void lyr_std_task_Scheduler_unsleep(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c);
 void lyr_std_task_Scheduler_panicked(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c);
 void lyr_std_task_Scheduler_step(lyr_ty0_Scheduler *l0_this);
-lyr_ty9_Duration lyr_std_time_Duration_ofNanos(int64_t l0_n);
-lyr_ty9_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n);
-lyr_ty9_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n);
-int64_t lyr_std_time_Duration_nanos(lyr_ty9_Duration *l0_this);
+lyr_ty24_Duration lyr_std_time_Duration_ofNanos(int64_t l0_n);
+lyr_ty24_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n);
+lyr_ty24_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n);
+int64_t lyr_std_time_Duration_nanos(lyr_ty24_Duration *l0_this);
 void lyr_main_numbers__body__38e43ecc(LyrErr **lyr_err);
 void lyr_main_main__lambda0__1de246d4(LyrErr **lyr_err);
 void lyr_main_main__lambda1__1fe48891(LyrErr **lyr_err);
@@ -512,12 +701,12 @@ static void lyr_thunk_main_main__lambda10__e3b420f3(void *lyr_env, LyrErr **lyr_
 
 /* coroutines: the environment a body starts from, and the body as the runtime runs it */
 static const LyrDesc lyr_desc_coro_i64_to_void = { 0, 0, 0, 0, NULL, "Coroutine<int>", NULL };
-static void lyr_corun40(void *lyr_arg) { (void)lyr_arg; LyrErr *lyr_e = NULL; lyr_main_numbers__body__38e43ecc(&lyr_e); LyrCoro *lyr_co = lyr_coro_current(); if (LYR_UNLIKELY(lyr_e != NULL)) { lyr_coro_set_error(lyr_co, lyr_e); lyr_coro_set_transfer(lyr_co, NULL); return; } lyr_coro_set_transfer(lyr_co, NULL); }
+static void lyr_corun41(void *lyr_arg) { (void)lyr_arg; LyrErr *lyr_e = NULL; lyr_main_numbers__body__38e43ecc(&lyr_e); LyrCoro *lyr_co = lyr_coro_current(); if (LYR_UNLIKELY(lyr_e != NULL)) { lyr_coro_set_error(lyr_co, lyr_e); lyr_coro_set_transfer(lyr_co, NULL); return; } lyr_coro_set_transfer(lyr_co, NULL); }
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty6_ty12_s0(LyrIface self) { return lyr_std_task_Cancelled_message((lyr_ty12_Cancelled *)self.data); }
-const lyr_vt_ty6 lyr_vt_ty6_ty12 = { &lyr_desc_ty12_Cancelled, lyr_vt_ty6_ty12_s0, lyr_std_core_Error_cause };
-const LyrItable lyr_itab_ty12[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty12 } , { NULL, NULL } };
+static LyrStr * lyr_vt_ty6_ty27_s0(LyrIface self) { return lyr_std_task_Cancelled_message((lyr_ty27_Cancelled *)self.data); }
+const lyr_vt_ty6 lyr_vt_ty6_ty27 = { &lyr_desc_ty27_Cancelled, lyr_vt_ty6_ty27_s0, lyr_std_core_Error_cause };
+const LyrItable lyr_itab_ty27[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty27 } , { NULL, NULL } };
 
 /* the members of Error the runtime reports through */
 const LyrStr *lyr_error_message(LyrIface e) { return ((const lyr_vt_ty6 *)e.vt)->s0(e); }
@@ -538,7 +727,7 @@ void lyr_main_note(LyrStr *l0_s) {
     LyrStr *t9 = NULL;
 bb0:;
 #line 17
-    t0 = lyr_g1_log;
+    t0 = lyr_g2_log;
 #line 17
     t1 = (LyrStr *)&lyr_lit0;
 #line 17
@@ -554,7 +743,7 @@ bb1:;
     goto bb3;
 bb2:;
 #line 17
-    t4 = lyr_g1_log;
+    t4 = lyr_g2_log;
 #line 17
     t5 = (LyrStr *)&lyr_lit1;
 #line 17
@@ -571,7 +760,7 @@ bb3:;
 #line 17
     t9 = l1__if0;
 #line 17
-    lyr_g1_log = t9;
+    lyr_g2_log = t9;
 #line 16
     return;
 }
@@ -592,7 +781,7 @@ bb0:;
 #line 21
     t2 = lyr_str_concat(t0, t1);
 #line 21
-    t3 = lyr_g1_log;
+    t3 = lyr_g2_log;
 #line 21
     t4 = lyr_str_concat(t2, t3);
 #line 21
@@ -600,7 +789,7 @@ bb0:;
 #line 22
     t5 = (LyrStr *)&lyr_lit0;
 #line 22
-    lyr_g1_log = t5;
+    lyr_g2_log = t5;
 #line 20
     return;
 }
@@ -610,7 +799,7 @@ LyrCoro * lyr_main_numbers(void) {
     LyrCoro *t0 = NULL;
 bb0:;
 #line 25
-    t0 = lyr_coro_new(&lyr_desc_coro_i64_to_void, lyr_corun40, NULL, 0);
+    t0 = lyr_coro_new(&lyr_desc_coro_i64_to_void, lyr_corun41, NULL, 0);
 #line 25
     return t0;
 }
@@ -628,20 +817,20 @@ void lyr_main_main(LyrErr **lyr_err) {
     lyr_fn_to_void t5 = {0};
     lyr_fn_to_void t6 = {0};
     int64_t t7 = 0;
-    lyr_ty9_Duration t8_s = {0};
-    lyr_ty9_Duration *t8 = &t8_s;
+    lyr_ty24_Duration t8_s = {0};
+    lyr_ty24_Duration *t8 = &t8_s;
     LyrStr *t9 = NULL;
     lyr_fn_to_void t10 = {0};
     lyr_fn_to_void t11 = {0};
     lyr_fn_to_void t12 = {0};
     int64_t t13 = 0;
-    lyr_ty9_Duration t14_s = {0};
-    lyr_ty9_Duration *t14 = &t14_s;
+    lyr_ty24_Duration t14_s = {0};
+    lyr_ty24_Duration *t14 = &t14_s;
     LyrStr *t15 = NULL;
     lyr_fn_to_void t16 = {0};
     int64_t t17 = 0;
-    lyr_ty9_Duration t18_s = {0};
-    lyr_ty9_Duration *t18 = &t18_s;
+    lyr_ty24_Duration t18_s = {0};
+    lyr_ty24_Duration *t18 = &t18_s;
     LyrStr *t19 = NULL;
     LyrStr *t20 = NULL;
     lyr_fn_to_void t21 = {0};
@@ -821,11 +1010,11 @@ bb0:;
 }
 
 #line 25 "stdlib5/std/task.lyr"
-void lyr_std_task_sleep(lyr_ty9_Duration l0_d, LyrErr **lyr_err) {
+void lyr_std_task_sleep(lyr_ty24_Duration l0_d, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty0_Scheduler *t0 = NULL;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     int64_t t2 = 0;
 bb0:;
 #line 25
@@ -865,12 +1054,12 @@ bb2:;
     return;
 }
 
-#line 1098 "stdlib5/std/task.lyr"
+#line 1283 "stdlib5/std/task.lyr"
 void lyr_std_task_spawnDetached(lyr_fn_to_void l0_body) {
     lyr_fn_to_void l1_run = {0};
     lyr_ty0_Scheduler *l2_s = NULL;
     lyr_fn_to_void t0 = {0};
-    lyr_ty11__env_std_task_spawnDetached_ *t1 = NULL;
+    lyr_ty26__env_std_task_spawnDetached_ *t1 = NULL;
     lyr_fn_to_void t2 = {0};
     lyr_ty0_Scheduler *t3 = NULL;
     lyr_ty0_Scheduler *t4 = NULL;
@@ -901,119 +1090,119 @@ void lyr_std_task_spawnDetached(lyr_fn_to_void l0_body) {
     lyr_ty1_Context *t28 = NULL;
     lyr_ty1_Context *t29 = NULL;
 bb0:;
-#line 1098
+#line 1283
     t0 = l0_body;
-#line 1098
-    t1 = (lyr_ty11__env_std_task_spawnDetached_ *)lyr_alloc(&lyr_desc_ty11__env_std_task_spawnDetached_);
-#line 1098
+#line 1283
+    t1 = (lyr_ty26__env_std_task_spawnDetached_ *)lyr_alloc(&lyr_desc_ty26__env_std_task_spawnDetached_);
+#line 1283
     LYR_WRITE_BARRIER_VALUE(t1, &t1->f_body, t0);
-#line 1098
+#line 1283
     t2 = (lyr_fn_to_void){ lyr_std_task_spawnDetached__lambda11__30483b1d, t1 };
-#line 1098
+#line 1283
     l1_run = t2;
-#line 1104
+#line 1289
     t3 = lyr_std_task_here();
-#line 1104
+#line 1289
     l2_s = t3;
-#line 1105
+#line 1290
     t4 = l2_s;
-#line 1105
+#line 1290
     t5 = l1_run;
-#line 1105
+#line 1290
     t6 = (int64_t)INT64_C(0);
-#line 1105
+#line 1290
     t7 = LYR_TASK_START(t5, t6);
-#line 1105
+#line 1290
     t8 = l2_s;
-#line 1128
+#line 1313
     t9 = NULL;
-#line 1129
+#line 1314
     t10 = NULL;
-#line 1132
+#line 1317
     t11 = (int64_t)INT64_C(0);
-#line 1132
+#line 1317
     t12 = lyr_std_sync_Atomic_int__new_67eb632f(t11);
-#line 1134
+#line 1319
     t13 = 0;
-#line 1135
+#line 1320
     t14 = NULL;
-#line 1136
+#line 1321
     t15 = NULL;
-#line 1139
+#line 1324
     t16 = 0;
-#line 1140
+#line 1325
     t17 = (int64_t)INT64_C(0);
-#line 1141
+#line 1326
     t18 = (int64_t)INT64_C(0);
-#line 1144
+#line 1329
     t19 = NULL;
-#line 1145
+#line 1330
     t20 = NULL;
-#line 1146
+#line 1331
     t21 = NULL;
-#line 1147
+#line 1332
     t22 = (int64_t)INT64_C(0);
-#line 1150
+#line 1335
     t23 = 0;
-#line 1150
+#line 1335
     t24 = lyr_std_sync_Atomic_bool__new_3915f520(t23);
-#line 1153
+#line 1338
     t25_s = (lyr_opt_fn_ref4_to_void){0}; t25 = &t25_s;
-#line 1155
+#line 1340
     t26 = NULL;
-#line 1156
+#line 1341
     t27 = NULL;
-#line 1157
+#line 1342
     t28 = NULL;
-#line 1105
+#line 1290
     t29 = (lyr_ty1_Context *)lyr_alloc(&lyr_desc_ty1_Context);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_body, t7);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_home, t8);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_next, t9);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_prev, t10);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_state, t12);
-#line 1105
+#line 1290
     t29->f_listed = t13;
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_listNext, t14);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_listPrev, t15);
-#line 1105
+#line 1290
     t29->f_asleep = t16;
-#line 1105
+#line 1290
     t29->f_deadline = t17;
-#line 1105
+#line 1290
     t29->f_order = t18;
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_left, t19);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_right, t20);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_up, t21);
-#line 1105
+#line 1290
     t29->f_rank = t22;
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_cancelled, t24);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER_VALUE(t29, &t29->f_onPanic, *t25);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_scope, t26);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_nextChild, t27);
-#line 1105
+#line 1290
     LYR_WRITE_BARRIER(t29, &t29->f_prevChild, t28);
-#line 1105
+#line 1290
     lyr_std_task_Scheduler_ready(t4, t29);
-#line 1097
+#line 1282
     return;
 }
 
-#line 1578 "stdlib5/std/task.lyr"
+#line 1785 "stdlib5/std/task.lyr"
 lyr_ty0_Scheduler * lyr_std_task_here(void) {
     lyr_ty0_Scheduler *l0__coalesce0 = NULL;
     lyr_ty0_Scheduler *t0 = NULL;
@@ -1022,34 +1211,34 @@ lyr_ty0_Scheduler * lyr_std_task_here(void) {
     LyrStr *t3 = NULL;
     lyr_ty0_Scheduler *t4 = NULL;
 bb0:;
-#line 1578
+#line 1785
     t0 = lyr_task_scheduler();
-#line 1578
+#line 1785
     t1 = (uint8_t)(t0 != NULL);
-#line 1578
+#line 1785
     if (t1) goto bb1; else goto bb2;
 bb1:;
-#line 1578
+#line 1785
     t2 = t0;
-#line 1578
+#line 1785
     l0__coalesce0 = t2;
-#line 1578
+#line 1785
     goto bb3;
 bb2:;
-#line 1578
+#line 1785
     t3 = (LyrStr *)&lyr_lit10;
-#line 1578
+#line 1785
     lyr_panic_message(t3);
-#line 1578
+#line 1785
     __builtin_unreachable();
 bb3:;
-#line 1578
+#line 1785
     t4 = l0__coalesce0;
-#line 1578
+#line 1785
     return t4;
 }
 
-#line 1584 "stdlib5/std/task.lyr"
+#line 1791 "stdlib5/std/task.lyr"
 lyr_ty1_Context * lyr_std_task_merge(lyr_ty1_Context *l0_a, lyr_ty1_Context *l1_b) {
     uint8_t l2__or0 = 0;
     uint8_t l3__and1 = 0;
@@ -1099,139 +1288,139 @@ lyr_ty1_Context * lyr_std_task_merge(lyr_ty1_Context *l0_a, lyr_ty1_Context *l1_
     lyr_ty1_Context *t43 = NULL;
     lyr_ty1_Context *t44 = NULL;
 bb0:;
-#line 1584
+#line 1791
     t0 = l0_a;
-#line 1584
+#line 1791
     t1 = (uint8_t)(t0 != NULL);
-#line 1584
+#line 1791
     t2 = (uint8_t)!t1;
-#line 1584
+#line 1791
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1584
+#line 1791
     t3 = l1_b;
-#line 1584
+#line 1791
     return t3;
 bb2:;
-#line 1585
+#line 1792
     t4 = l1_b;
-#line 1585
+#line 1792
     t5 = (uint8_t)(t4 != NULL);
-#line 1585
+#line 1792
     t6 = (uint8_t)!t5;
-#line 1585
+#line 1792
     if (t6) goto bb3; else goto bb4;
 bb3:;
-#line 1585
+#line 1792
     t7 = l0_a;
-#line 1585
+#line 1792
     t8 = t7;
-#line 1585
+#line 1792
     t9 = t8;
-#line 1585
+#line 1792
     return t9;
 bb4:;
-#line 1586
+#line 1793
     t10 = l1_b;
-#line 1586
+#line 1793
     t11 = t10;
-#line 1586
+#line 1793
     t12 = t11->f_deadline;
-#line 1586
+#line 1793
     t13 = l0_a;
-#line 1586
+#line 1793
     t14 = t13;
-#line 1586
+#line 1793
     t15 = t14->f_deadline;
-#line 1586
+#line 1793
     t16 = (uint8_t)(t12 < t15);
-#line 1586
+#line 1793
     l2__or0 = t16;
-#line 1586
+#line 1793
     if (t16) goto bb6; else goto bb5;
 bb5:;
-#line 1586
+#line 1793
     t17 = l1_b;
-#line 1586
+#line 1793
     t18 = t17;
-#line 1586
+#line 1793
     t19 = t18->f_deadline;
-#line 1586
+#line 1793
     t20 = l0_a;
-#line 1586
+#line 1793
     t21 = t20;
-#line 1586
+#line 1793
     t22 = t21->f_deadline;
-#line 1586
+#line 1793
     t23 = (uint8_t)(t19 == t22);
-#line 1586
+#line 1793
     l3__and1 = t23;
-#line 1586
+#line 1793
     if (t23) goto bb7; else goto bb8;
 bb6:;
-#line 1586
+#line 1793
     t32 = l2__or0;
-#line 1586
+#line 1793
     if (t32) goto bb9; else goto bb10;
 bb7:;
-#line 1586
+#line 1793
     t24 = l1_b;
-#line 1586
+#line 1793
     t25 = t24;
-#line 1586
+#line 1793
     t26 = t25->f_order;
-#line 1586
+#line 1793
     t27 = l0_a;
-#line 1586
+#line 1793
     t28 = t27;
-#line 1586
+#line 1793
     t29 = t28->f_order;
-#line 1586
+#line 1793
     t30 = (uint8_t)(t26 < t29);
-#line 1586
+#line 1793
     l3__and1 = t30;
-#line 1586
+#line 1793
     goto bb8;
 bb8:;
-#line 1586
+#line 1793
     t31 = l3__and1;
-#line 1586
+#line 1793
     l2__or0 = t31;
-#line 1586
+#line 1793
     goto bb6;
 bb9:;
-#line 1587
+#line 1794
     t33 = l1_b;
-#line 1587
+#line 1794
     t34 = t33;
-#line 1587
+#line 1794
     t35 = l0_a;
-#line 1587
+#line 1794
     t36 = t35;
-#line 1587
+#line 1794
     t37 = lyr_std_task_meld(t34, t36);
-#line 1587
+#line 1794
     t38 = t37;
-#line 1587
+#line 1794
     return t38;
 bb10:;
-#line 1589
+#line 1796
     t39 = l0_a;
-#line 1589
+#line 1796
     t40 = t39;
-#line 1589
+#line 1796
     t41 = l1_b;
-#line 1589
+#line 1796
     t42 = t41;
-#line 1589
+#line 1796
     t43 = lyr_std_task_meld(t40, t42);
-#line 1589
+#line 1796
     t44 = t43;
-#line 1589
+#line 1796
     return t44;
 }
 
-#line 1593 "stdlib5/std/task.lyr"
+#line 1800 "stdlib5/std/task.lyr"
 lyr_ty1_Context * lyr_std_task_meld(lyr_ty1_Context *l0_top, lyr_ty1_Context *l1_other) {
     lyr_ty1_Context *l2_below = NULL;
     lyr_ty1_Context *l3_b = NULL;
@@ -1277,130 +1466,130 @@ lyr_ty1_Context * lyr_std_task_meld(lyr_ty1_Context *l0_top, lyr_ty1_Context *l1
     int64_t t36 = 0;
     lyr_ty1_Context *t37 = NULL;
 bb0:;
-#line 1593
+#line 1800
     t0 = l0_top;
-#line 1593
+#line 1800
     t1 = t0->f_right;
-#line 1593
+#line 1800
     t2 = l1_other;
-#line 1593
+#line 1800
     t3 = t2;
-#line 1593
+#line 1800
     t4 = lyr_std_task_merge(t1, t3);
-#line 1593
+#line 1800
     l2_below = t4;
-#line 1594
+#line 1801
     t5 = l2_below;
-#line 1594
+#line 1801
     t6 = (uint8_t)(t5 != NULL);
-#line 1594
+#line 1801
     if (t6) goto bb1; else goto bb2;
 bb1:;
-#line 1594
+#line 1801
     t7 = t5;
-#line 1594
+#line 1801
     l3_b = t7;
-#line 1594
+#line 1801
     goto bb3;
 bb2:;
-#line 1594
+#line 1801
     goto bb4;
 bb3:;
-#line 1594
+#line 1801
     t8 = l3_b;
-#line 1594
+#line 1801
     t9 = l0_top;
-#line 1594
+#line 1801
     t10 = t9;
-#line 1594
+#line 1801
     LYR_WRITE_BARRIER(t8, &t8->f_up, t10);
-#line 1594
+#line 1801
     goto bb4;
 bb4:;
-#line 1595
+#line 1802
     t11 = l0_top;
-#line 1595
+#line 1802
     t12 = l2_below;
-#line 1595
+#line 1802
     LYR_WRITE_BARRIER(t11, &t11->f_right, t12);
-#line 1596
+#line 1803
     t13 = l0_top;
-#line 1596
+#line 1803
     t14 = t13->f_left;
-#line 1596
+#line 1803
     t15 = lyr_std_task_rankOf(t14);
-#line 1596
+#line 1803
     l4_l = t15;
-#line 1597
+#line 1804
     t16 = l0_top;
-#line 1597
+#line 1804
     t17 = t16->f_right;
-#line 1597
+#line 1804
     t18 = lyr_std_task_rankOf(t17);
-#line 1597
+#line 1804
     l5_r = t18;
-#line 1598
+#line 1805
     t19 = l4_l;
-#line 1598
+#line 1805
     t20 = l5_r;
-#line 1598
+#line 1805
     t21 = (uint8_t)(t19 < t20);
-#line 1598
+#line 1805
     if (t21) goto bb5; else goto bb6;
 bb5:;
-#line 1599
+#line 1806
     t22 = l0_top;
-#line 1599
+#line 1806
     t23 = t22->f_left;
-#line 1599
+#line 1806
     l6_swap = t23;
-#line 1600
+#line 1807
     t24 = l0_top;
-#line 1600
+#line 1807
     t25 = l0_top;
-#line 1600
+#line 1807
     t26 = t25->f_right;
-#line 1600
+#line 1807
     LYR_WRITE_BARRIER(t24, &t24->f_left, t26);
-#line 1601
+#line 1808
     t27 = l0_top;
-#line 1601
+#line 1808
     t28 = l6_swap;
-#line 1601
+#line 1808
     LYR_WRITE_BARRIER(t27, &t27->f_right, t28);
-#line 1602
+#line 1809
     t29 = l0_top;
-#line 1602
+#line 1809
     t30 = l4_l;
-#line 1602
+#line 1809
     t31 = (int64_t)INT64_C(1);
-#line 1602
+#line 1809
     t32 = LYR_CHECKED_ADD(t30, t31);
-#line 1602
+#line 1809
     t29->f_rank = t32;
-#line 1598
+#line 1805
     goto bb7;
 bb6:;
-#line 1604
+#line 1811
     t33 = l0_top;
-#line 1604
+#line 1811
     t34 = l5_r;
-#line 1604
+#line 1811
     t35 = (int64_t)INT64_C(1);
-#line 1604
+#line 1811
     t36 = LYR_CHECKED_ADD(t34, t35);
-#line 1604
+#line 1811
     t33->f_rank = t36;
-#line 1603
+#line 1810
     goto bb7;
 bb7:;
-#line 1606
+#line 1813
     t37 = l0_top;
-#line 1606
+#line 1813
     return t37;
 }
 
-#line 1612 "stdlib5/std/task.lyr"
+#line 1819 "stdlib5/std/task.lyr"
 void lyr_std_task_fixRanks(lyr_ty1_Context *l0_from) {
     lyr_ty1_Context *l1_at = NULL;
     lyr_ty1_Context *l2_n = NULL;
@@ -1447,142 +1636,142 @@ void lyr_std_task_fixRanks(lyr_ty1_Context *l0_from) {
     lyr_ty1_Context *t35 = NULL;
     lyr_ty1_Context *t36 = NULL;
 bb0:;
-#line 1612
+#line 1819
     t0 = l0_from;
-#line 1612
+#line 1819
     t1 = t0;
-#line 1612
+#line 1819
     l1_at = t1;
-#line 1613
+#line 1820
     goto bb1;
 bb1:;
-#line 1613
+#line 1820
     t2 = l1_at;
-#line 1613
+#line 1820
     t3 = (uint8_t)(t2 != NULL);
-#line 1613
+#line 1820
     if (t3) goto bb2; else goto bb3;
 bb2:;
-#line 1613
+#line 1820
     t4 = t2;
-#line 1613
+#line 1820
     l2_n = t4;
-#line 1613
+#line 1820
     goto bb4;
 bb3:;
-#line 1611
+#line 1818
     return;
 bb4:;
-#line 1614
+#line 1821
     t5 = l2_n;
-#line 1614
+#line 1821
     t6 = t5->f_left;
-#line 1614
+#line 1821
     t7 = lyr_std_task_rankOf(t6);
-#line 1614
+#line 1821
     l3_l = t7;
-#line 1615
+#line 1822
     t8 = l2_n;
-#line 1615
+#line 1822
     t9 = t8->f_right;
-#line 1615
+#line 1822
     t10 = lyr_std_task_rankOf(t9);
-#line 1615
+#line 1822
     l4_r = t10;
-#line 1616
+#line 1823
     t11 = l3_l;
-#line 1616
+#line 1823
     t12 = l4_r;
-#line 1616
+#line 1823
     t13 = (uint8_t)(t11 < t12);
-#line 1616
+#line 1823
     if (t13) goto bb5; else goto bb6;
 bb5:;
-#line 1617
+#line 1824
     t14 = l2_n;
-#line 1617
+#line 1824
     t15 = t14->f_left;
-#line 1617
+#line 1824
     l5_swap = t15;
-#line 1618
+#line 1825
     t16 = l2_n;
-#line 1618
+#line 1825
     t17 = l2_n;
-#line 1618
+#line 1825
     t18 = t17->f_right;
-#line 1618
+#line 1825
     LYR_WRITE_BARRIER(t16, &t16->f_left, t18);
-#line 1619
+#line 1826
     t19 = l2_n;
-#line 1619
+#line 1826
     t20 = l5_swap;
-#line 1619
+#line 1826
     LYR_WRITE_BARRIER(t19, &t19->f_right, t20);
-#line 1616
+#line 1823
     goto bb6;
 bb6:;
-#line 1621
+#line 1828
     t21 = l3_l;
-#line 1621
+#line 1828
     t22 = l4_r;
-#line 1621
+#line 1828
     t23 = (uint8_t)(t21 < t22);
-#line 1621
+#line 1828
     if (t23) goto bb7; else goto bb8;
 bb7:;
-#line 1621
+#line 1828
     t24 = l3_l;
-#line 1621
+#line 1828
     l7__if0 = t24;
-#line 1621
+#line 1828
     goto bb9;
 bb8:;
-#line 1621
+#line 1828
     t25 = l4_r;
-#line 1621
+#line 1828
     l7__if0 = t25;
-#line 1621
+#line 1828
     goto bb9;
 bb9:;
-#line 1621
+#line 1828
     t26 = l7__if0;
-#line 1621
+#line 1828
     t27 = (int64_t)INT64_C(1);
-#line 1621
+#line 1828
     t28 = LYR_CHECKED_ADD(t26, t27);
-#line 1621
+#line 1828
     l6_rank = t28;
-#line 1622
+#line 1829
     t29 = l6_rank;
-#line 1622
+#line 1829
     t30 = l2_n;
-#line 1622
+#line 1829
     t31 = t30->f_rank;
-#line 1622
+#line 1829
     t32 = (uint8_t)(t29 == t31);
-#line 1622
+#line 1829
     if (t32) goto bb10; else goto bb11;
 bb10:;
-#line 1622
+#line 1829
     return;
 bb11:;
-#line 1623
+#line 1830
     t33 = l2_n;
-#line 1623
+#line 1830
     t34 = l6_rank;
-#line 1623
+#line 1830
     t33->f_rank = t34;
-#line 1624
+#line 1831
     t35 = l2_n;
-#line 1624
+#line 1831
     t36 = t35->f_up;
-#line 1624
+#line 1831
     l1_at = t36;
-#line 1613
+#line 1820
     goto bb1;
 }
 
-#line 1629 "stdlib5/std/task.lyr"
+#line 1836 "stdlib5/std/task.lyr"
 int64_t lyr_std_task_rankOf(lyr_ty1_Context *l0_c) {
     lyr_ty1_Context *t0 = NULL;
     uint8_t t1 = 0;
@@ -1592,31 +1781,31 @@ int64_t lyr_std_task_rankOf(lyr_ty1_Context *l0_c) {
     lyr_ty1_Context *t5 = NULL;
     int64_t t6 = 0;
 bb0:;
-#line 1629
+#line 1836
     t0 = l0_c;
-#line 1629
+#line 1836
     t1 = (uint8_t)(t0 != NULL);
-#line 1629
+#line 1836
     t2 = (uint8_t)!t1;
-#line 1629
+#line 1836
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1629
+#line 1836
     t3 = (int64_t)INT64_C(0);
-#line 1629
+#line 1836
     return t3;
 bb2:;
-#line 1630
+#line 1837
     t4 = l0_c;
-#line 1630
+#line 1837
     t5 = t4;
-#line 1630
+#line 1837
     t6 = t5->f_rank;
-#line 1630
+#line 1837
     return t6;
 }
 
-#line 1332 "stdlib5/std/task.lyr"
+#line 1517 "stdlib5/std/task.lyr"
 void lyr_std_task_runMain(LyrCoro *l0_main) {
     lyr_ty0_Scheduler *l1_s = NULL;
     lyr_ty1_Context *t0 = NULL;
@@ -1630,221 +1819,226 @@ void lyr_std_task_runMain(LyrCoro *l0_main) {
     lyr_ty1_Context *t8 = NULL;
     lyr_ty1_Context *t9 = NULL;
     int64_t t10 = 0;
-    lyr_ty0_Scheduler *t11 = NULL;
+    lyr_ty1_Context *t11 = NULL;
     lyr_ty0_Scheduler *t12 = NULL;
     lyr_ty0_Scheduler *t13 = NULL;
     lyr_ty0_Scheduler *t14 = NULL;
     lyr_ty0_Scheduler *t15 = NULL;
-    LyrCoro *t16 = NULL;
-    lyr_ty0_Scheduler *t17 = NULL;
-    lyr_ty1_Context *t18 = NULL;
+    lyr_ty0_Scheduler *t16 = NULL;
+    LyrCoro *t17 = NULL;
+    lyr_ty0_Scheduler *t18 = NULL;
     lyr_ty1_Context *t19 = NULL;
-    int64_t t20 = 0;
-    lyr_ty2_Atomic_int_ *t21 = NULL;
-    uint8_t t22 = 0;
-    lyr_ty1_Context *t23 = NULL;
+    lyr_ty1_Context *t20 = NULL;
+    int64_t t21 = 0;
+    lyr_ty2_Atomic_int_ *t22 = NULL;
+    uint8_t t23 = 0;
     lyr_ty1_Context *t24 = NULL;
-    uint8_t t25 = 0;
-    int64_t t26 = 0;
+    lyr_ty1_Context *t25 = NULL;
+    uint8_t t26 = 0;
     int64_t t27 = 0;
-    lyr_ty1_Context *t28 = NULL;
+    int64_t t28 = 0;
     lyr_ty1_Context *t29 = NULL;
     lyr_ty1_Context *t30 = NULL;
-    int64_t t31 = 0;
-    uint8_t t32 = 0;
-    lyr_ty3_Atomic_bool_ *t33 = NULL;
-    lyr_opt_fn_ref4_to_void t34_s = {0};
-    lyr_opt_fn_ref4_to_void *t34 = &t34_s;
-    lyr_ty5_TaskScope *t35 = NULL;
-    lyr_ty1_Context *t36 = NULL;
+    lyr_ty1_Context *t31 = NULL;
+    int64_t t32 = 0;
+    uint8_t t33 = 0;
+    lyr_ty3_Atomic_bool_ *t34 = NULL;
+    lyr_opt_fn_ref4_to_void t35_s = {0};
+    lyr_opt_fn_ref4_to_void *t35 = &t35_s;
+    lyr_ty5_TaskScope *t36 = NULL;
     lyr_ty1_Context *t37 = NULL;
     lyr_ty1_Context *t38 = NULL;
-    LyrCoro *t39 = NULL;
-    uint8_t t40 = 0;
+    lyr_ty1_Context *t39 = NULL;
+    LyrCoro *t40 = NULL;
     uint8_t t41 = 0;
-    lyr_ty0_Scheduler *t42 = NULL;
+    uint8_t t42 = 0;
     lyr_ty0_Scheduler *t43 = NULL;
     lyr_ty0_Scheduler *t44 = NULL;
+    lyr_ty0_Scheduler *t45 = NULL;
 bb0:;
-#line 1332
+#line 1517
     t0 = NULL;
-#line 1333
+#line 1518
     t1 = NULL;
-#line 1334
+#line 1519
     t2 = NULL;
-#line 1335
+#line 1520
     t3 = (int64_t)INT64_C(0);
-#line 1336
+#line 1521
     t4 = NULL;
-#line 1318
+#line 1503
     t5 = 0;
-#line 1318
+#line 1503
     t6 = lyr_std_sync_Atomic_bool__new_3915f520(t5);
-#line 1340
+#line 1525
     t7 = (lyr_ty8_SpinLock *)lyr_alloc(&lyr_desc_ty8_SpinLock);
-#line 1340
+#line 1525
     LYR_WRITE_BARRIER(t7, &t7->f_held, t6);
-#line 1341
+#line 1526
     t8 = NULL;
-#line 1342
+#line 1527
     t9 = NULL;
-#line 1343
+#line 1528
     t10 = (int64_t)INT64_C(0);
-#line 1637
-    t11 = (lyr_ty0_Scheduler *)lyr_alloc(&lyr_desc_ty0_Scheduler);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_first, t0);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_last, t1);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_sleepers, t2);
-#line 1637
-    t11->f_fallenAsleep = t3;
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_running, t4);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_inboxLock, t7);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_inboxFirst, t8);
-#line 1637
-    LYR_WRITE_BARRIER(t11, &t11->f_inboxLast, t9);
-#line 1637
-    t11->f_poller = t10;
-#line 1637
-    l1_s = t11;
-#line 1638
-    t12 = l1_s;
-#line 1638
-    t13 = t12;
-#line 1638
-    lyr_task_set_scheduler(t13);
-#line 1639
-    t14 = l1_s;
-#line 1639
-    lyr_std_task_Scheduler_started(t14);
-#line 1640
+#line 1530
+    t11 = NULL;
+#line 1844
+    t12 = (lyr_ty0_Scheduler *)lyr_alloc(&lyr_desc_ty0_Scheduler);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_first, t0);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_last, t1);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_sleepers, t2);
+#line 1844
+    t12->f_fallenAsleep = t3;
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_running, t4);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_inboxLock, t7);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_inboxFirst, t8);
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_inboxLast, t9);
+#line 1844
+    t12->f_poller = t10;
+#line 1844
+    LYR_WRITE_BARRIER(t12, &t12->f_pollerWaiter, t11);
+#line 1844
+    l1_s = t12;
+#line 1845
+    t13 = l1_s;
+#line 1845
+    t14 = t13;
+#line 1845
+    lyr_task_set_scheduler(t14);
+#line 1846
     t15 = l1_s;
-#line 1640
-    t16 = l0_main;
-#line 1640
-    t17 = l1_s;
-#line 1128
-    t18 = NULL;
-#line 1129
+#line 1846
+    lyr_std_task_Scheduler_started(t15);
+#line 1847
+    t16 = l1_s;
+#line 1847
+    t17 = l0_main;
+#line 1847
+    t18 = l1_s;
+#line 1313
     t19 = NULL;
-#line 1132
-    t20 = (int64_t)INT64_C(0);
-#line 1132
-    t21 = lyr_std_sync_Atomic_int__new_67eb632f(t20);
-#line 1134
-    t22 = 0;
-#line 1135
-    t23 = NULL;
-#line 1136
+#line 1314
+    t20 = NULL;
+#line 1317
+    t21 = (int64_t)INT64_C(0);
+#line 1317
+    t22 = lyr_std_sync_Atomic_int__new_67eb632f(t21);
+#line 1319
+    t23 = 0;
+#line 1320
     t24 = NULL;
-#line 1139
-    t25 = 0;
-#line 1140
-    t26 = (int64_t)INT64_C(0);
-#line 1141
+#line 1321
+    t25 = NULL;
+#line 1324
+    t26 = 0;
+#line 1325
     t27 = (int64_t)INT64_C(0);
-#line 1144
-    t28 = NULL;
-#line 1145
+#line 1326
+    t28 = (int64_t)INT64_C(0);
+#line 1329
     t29 = NULL;
-#line 1146
+#line 1330
     t30 = NULL;
-#line 1147
-    t31 = (int64_t)INT64_C(0);
-#line 1150
-    t32 = 0;
-#line 1150
-    t33 = lyr_std_sync_Atomic_bool__new_3915f520(t32);
-#line 1153
-    t34_s = (lyr_opt_fn_ref4_to_void){0}; t34 = &t34_s;
-#line 1155
-    t35 = NULL;
-#line 1156
+#line 1331
+    t31 = NULL;
+#line 1332
+    t32 = (int64_t)INT64_C(0);
+#line 1335
+    t33 = 0;
+#line 1335
+    t34 = lyr_std_sync_Atomic_bool__new_3915f520(t33);
+#line 1338
+    t35_s = (lyr_opt_fn_ref4_to_void){0}; t35 = &t35_s;
+#line 1340
     t36 = NULL;
-#line 1157
+#line 1341
     t37 = NULL;
-#line 1640
-    t38 = (lyr_ty1_Context *)lyr_alloc(&lyr_desc_ty1_Context);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_body, t16);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_home, t17);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_next, t18);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_prev, t19);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_state, t21);
-#line 1640
-    t38->f_listed = t22;
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_listNext, t23);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_listPrev, t24);
-#line 1640
-    t38->f_asleep = t25;
-#line 1640
-    t38->f_deadline = t26;
-#line 1640
-    t38->f_order = t27;
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_left, t28);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_right, t29);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_up, t30);
-#line 1640
-    t38->f_rank = t31;
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_cancelled, t33);
-#line 1640
-    LYR_WRITE_BARRIER_VALUE(t38, &t38->f_onPanic, *t34);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_scope, t35);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_nextChild, t36);
-#line 1640
-    LYR_WRITE_BARRIER(t38, &t38->f_prevChild, t37);
-#line 1640
-    lyr_std_task_Scheduler_ready(t15, t38);
-#line 1641
+#line 1342
+    t38 = NULL;
+#line 1847
+    t39 = (lyr_ty1_Context *)lyr_alloc(&lyr_desc_ty1_Context);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_body, t17);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_home, t18);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_next, t19);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_prev, t20);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_state, t22);
+#line 1847
+    t39->f_listed = t23;
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_listNext, t24);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_listPrev, t25);
+#line 1847
+    t39->f_asleep = t26;
+#line 1847
+    t39->f_deadline = t27;
+#line 1847
+    t39->f_order = t28;
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_left, t29);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_right, t30);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_up, t31);
+#line 1847
+    t39->f_rank = t32;
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_cancelled, t34);
+#line 1847
+    LYR_WRITE_BARRIER_VALUE(t39, &t39->f_onPanic, *t35);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_scope, t36);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_nextChild, t37);
+#line 1847
+    LYR_WRITE_BARRIER(t39, &t39->f_prevChild, t38);
+#line 1847
+    lyr_std_task_Scheduler_ready(t16, t39);
+#line 1848
     goto bb1;
 bb1:;
-#line 1641
-    t39 = l0_main;
-#line 1641
-    t40 = (uint8_t)(lyr_coro_status(t39) == LYR_CORO_DONE);
-#line 1641
-    t41 = (uint8_t)!t40;
-#line 1641
-    if (t41) goto bb2; else goto bb3;
+#line 1848
+    t40 = l0_main;
+#line 1848
+    t41 = (uint8_t)(lyr_coro_status(t40) == LYR_CORO_DONE);
+#line 1848
+    t42 = (uint8_t)!t41;
+#line 1848
+    if (t42) goto bb2; else goto bb3;
 bb2:;
-#line 1642
-    t42 = l1_s;
-#line 1642
-    lyr_std_task_Scheduler_step(t42);
-#line 1641
+#line 1849
+    t43 = l1_s;
+#line 1849
+    lyr_std_task_Scheduler_step(t43);
+#line 1848
     goto bb1;
 bb3:;
-#line 1644
-    t43 = l1_s;
-#line 1644
-    lyr_std_task_Scheduler_stopped(t43);
-#line 1645
-    t44 = NULL;
-#line 1645
-    lyr_task_set_scheduler(t44);
-#line 1636
+#line 1851
+    t44 = l1_s;
+#line 1851
+    lyr_std_task_Scheduler_stopped(t44);
+#line 1852
+    t45 = NULL;
+#line 1852
+    lyr_task_set_scheduler(t45);
+#line 1843
     return;
 }
 
 #line 18 "stdlib5/std/task.lyr"
-LyrStr * lyr_std_task_Cancelled_message(lyr_ty12_Cancelled *l0_this) {
+LyrStr * lyr_std_task_Cancelled_message(lyr_ty27_Cancelled *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 18
@@ -1853,25 +2047,25 @@ bb0:;
     return t0;
 }
 
-#line 1161 "stdlib5/std/task.lyr"
+#line 1346 "stdlib5/std/task.lyr"
 void lyr_std_task_Context_beginWait(lyr_ty1_Context *l0_this) {
     lyr_ty1_Context *t0 = NULL;
     lyr_ty2_Atomic_int_ *t1 = NULL;
     int64_t t2 = 0;
 bb0:;
-#line 1161
+#line 1346
     t0 = l0_this;
-#line 1161
+#line 1346
     t1 = t0->f_state;
-#line 1161
+#line 1346
     t2 = (int64_t)INT64_C(1);
-#line 1161
+#line 1346
     lyr_std_sync_Atomic_int__store_ec031608(t1, t2);
-#line 1160
+#line 1345
     return;
 }
 
-#line 1167 "stdlib5/std/task.lyr"
+#line 1352 "stdlib5/std/task.lyr"
 uint8_t lyr_std_task_Context_claim(lyr_ty1_Context *l0_this) {
     lyr_ty1_Context *t0 = NULL;
     lyr_ty2_Atomic_int_ *t1 = NULL;
@@ -1879,39 +2073,39 @@ uint8_t lyr_std_task_Context_claim(lyr_ty1_Context *l0_this) {
     int64_t t3 = 0;
     uint8_t t4 = 0;
 bb0:;
-#line 1167
+#line 1352
     t0 = l0_this;
-#line 1167
+#line 1352
     t1 = t0->f_state;
-#line 1167
+#line 1352
     t2 = (int64_t)INT64_C(1);
-#line 1167
+#line 1352
     t3 = (int64_t)INT64_C(2);
-#line 1167
+#line 1352
     t4 = lyr_std_sync_Atomic_int__compareAndSet_863a25cd(t1, t2, t3);
-#line 1167
+#line 1352
     return t4;
 }
 
-#line 1172 "stdlib5/std/task.lyr"
+#line 1357 "stdlib5/std/task.lyr"
 void lyr_std_task_Context_endWait(lyr_ty1_Context *l0_this) {
     lyr_ty1_Context *t0 = NULL;
     lyr_ty2_Atomic_int_ *t1 = NULL;
     int64_t t2 = 0;
 bb0:;
-#line 1172
+#line 1357
     t0 = l0_this;
-#line 1172
+#line 1357
     t1 = t0->f_state;
-#line 1172
+#line 1357
     t2 = (int64_t)INT64_C(0);
-#line 1172
+#line 1357
     lyr_std_sync_Atomic_int__store_ec031608(t1, t2);
-#line 1171
+#line 1356
     return;
 }
 
-#line 1321 "stdlib5/std/task.lyr"
+#line 1506 "stdlib5/std/task.lyr"
 void lyr_std_task_SpinLock_acquire(lyr_ty8_SpinLock *l0_this) {
     lyr_ty8_SpinLock *t0 = NULL;
     lyr_ty3_Atomic_bool_ *t1 = NULL;
@@ -1920,52 +2114,52 @@ void lyr_std_task_SpinLock_acquire(lyr_ty8_SpinLock *l0_this) {
     uint8_t t4 = 0;
     uint8_t t5 = 0;
 bb0:;
-#line 1321
+#line 1506
     goto bb1;
 bb1:;
-#line 1321
+#line 1506
     t0 = l0_this;
-#line 1321
+#line 1506
     t1 = t0->f_held;
-#line 1321
+#line 1506
     t2 = 0;
-#line 1321
+#line 1506
     t3 = 1;
-#line 1321
+#line 1506
     t4 = lyr_std_sync_Atomic_bool__compareAndSet_fb00c5b6(t1, t2, t3);
-#line 1321
+#line 1506
     t5 = (uint8_t)!t4;
-#line 1321
+#line 1506
     if (t5) goto bb2; else goto bb3;
 bb2:;
-#line 1322
+#line 1507
     lyr_task_spin();
-#line 1321
+#line 1506
     goto bb1;
 bb3:;
-#line 1320
+#line 1505
     return;
 }
 
-#line 1327 "stdlib5/std/task.lyr"
+#line 1512 "stdlib5/std/task.lyr"
 void lyr_std_task_SpinLock_release(lyr_ty8_SpinLock *l0_this) {
     lyr_ty8_SpinLock *t0 = NULL;
     lyr_ty3_Atomic_bool_ *t1 = NULL;
     uint8_t t2 = 0;
 bb0:;
-#line 1327
+#line 1512
     t0 = l0_this;
-#line 1327
+#line 1512
     t1 = t0->f_held;
-#line 1327
+#line 1512
     t2 = 0;
-#line 1327
+#line 1512
     lyr_std_sync_Atomic_bool__store_1ce39387(t1, t2);
-#line 1326
+#line 1511
     return;
 }
 
-#line 1347 "stdlib5/std/task.lyr"
+#line 1534 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_started(lyr_ty0_Scheduler *l0_this) {
     lyr_ty0_Scheduler *t0 = NULL;
     lyr_ty8_SpinLock *t1 = NULL;
@@ -1974,29 +2168,80 @@ void lyr_std_task_Scheduler_started(lyr_ty0_Scheduler *l0_this) {
     lyr_ty0_Scheduler *t4 = NULL;
     lyr_ty8_SpinLock *t5 = NULL;
 bb0:;
-#line 1347
+#line 1534
     t0 = l0_this;
-#line 1347
+#line 1534
     t1 = t0->f_inboxLock;
-#line 1347
+#line 1534
     lyr_std_task_SpinLock_acquire(t1);
-#line 1348
+#line 1535
     t2 = l0_this;
-#line 1348
+#line 1535
     t3 = lyr_task_poller();
-#line 1348
+#line 1535
     t2->f_poller = t3;
-#line 1349
+#line 1536
     t4 = l0_this;
-#line 1349
+#line 1536
     t5 = t4->f_inboxLock;
-#line 1349
+#line 1536
     lyr_std_task_SpinLock_release(t5);
-#line 1346
+#line 1533
     return;
 }
 
-#line 1363 "stdlib5/std/task.lyr"
+#line 1551 "stdlib5/std/task.lyr"
+void lyr_std_task_Scheduler_pollerWoke(lyr_ty0_Scheduler *l0_this) {
+    lyr_ty1_Context *l1_w = NULL;
+    lyr_ty0_Scheduler *t0 = NULL;
+    lyr_ty1_Context *t1 = NULL;
+    uint8_t t2 = 0;
+    lyr_ty1_Context *t3 = NULL;
+    lyr_ty0_Scheduler *t4 = NULL;
+    lyr_ty1_Context *t5 = NULL;
+    lyr_ty0_Scheduler *t6 = NULL;
+    lyr_ty1_Context *t7 = NULL;
+    uint8_t t8 = 0;
+bb0:;
+#line 1551
+    t0 = l0_this;
+#line 1551
+    t1 = t0->f_pollerWaiter;
+#line 1551
+    t2 = (uint8_t)(t1 != NULL);
+#line 1551
+    if (t2) goto bb1; else goto bb2;
+bb1:;
+#line 1551
+    t3 = t1;
+#line 1551
+    l1_w = t3;
+#line 1551
+    goto bb3;
+bb2:;
+#line 1551
+    goto bb4;
+bb3:;
+#line 1552
+    t4 = l0_this;
+#line 1552
+    t5 = NULL;
+#line 1552
+    LYR_WRITE_BARRIER(t4, &t4->f_pollerWaiter, t5);
+#line 1553
+    t6 = l0_this;
+#line 1553
+    t7 = l1_w;
+#line 1553
+    t8 = lyr_std_task_Scheduler_wakeUp(t6, t7);
+#line 1551
+    goto bb4;
+bb4:;
+#line 1550
+    return;
+}
+
+#line 1568 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_stopped(lyr_ty0_Scheduler *l0_this) {
     lyr_ty0_Scheduler *t0 = NULL;
     lyr_ty8_SpinLock *t1 = NULL;
@@ -2005,29 +2250,29 @@ void lyr_std_task_Scheduler_stopped(lyr_ty0_Scheduler *l0_this) {
     lyr_ty0_Scheduler *t4 = NULL;
     lyr_ty8_SpinLock *t5 = NULL;
 bb0:;
-#line 1363
+#line 1568
     t0 = l0_this;
-#line 1363
+#line 1568
     t1 = t0->f_inboxLock;
-#line 1363
+#line 1568
     lyr_std_task_SpinLock_acquire(t1);
-#line 1364
+#line 1569
     t2 = l0_this;
-#line 1364
+#line 1569
     t3 = (int64_t)INT64_C(0);
-#line 1364
+#line 1569
     t2->f_poller = t3;
-#line 1365
+#line 1570
     t4 = l0_this;
-#line 1365
+#line 1570
     t5 = t4->f_inboxLock;
-#line 1365
+#line 1570
     lyr_std_task_SpinLock_release(t5);
-#line 1362
+#line 1567
     return;
 }
 
-#line 1370 "stdlib5/std/task.lyr"
+#line 1575 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_ready(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty1_Context *l2_tail = NULL;
     lyr_ty1_Context *t0 = NULL;
@@ -2048,69 +2293,69 @@ void lyr_std_task_Scheduler_ready(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l
     lyr_ty1_Context *t15 = NULL;
     lyr_ty1_Context *t16 = NULL;
 bb0:;
-#line 1370
+#line 1575
     t0 = l1_c;
-#line 1370
+#line 1575
     t1 = NULL;
-#line 1370
+#line 1575
     LYR_WRITE_BARRIER(t0, &t0->f_next, t1);
-#line 1371
+#line 1576
     t2 = l1_c;
-#line 1371
+#line 1576
     t3 = NULL;
-#line 1371
+#line 1576
     LYR_WRITE_BARRIER(t2, &t2->f_prev, t3);
-#line 1372
+#line 1577
     t4 = l0_this;
-#line 1372
+#line 1577
     t5 = t4->f_last;
-#line 1372
+#line 1577
     t6 = (uint8_t)(t5 != NULL);
-#line 1372
+#line 1577
     if (t6) goto bb1; else goto bb2;
 bb1:;
-#line 1372
+#line 1577
     t7 = t5;
-#line 1372
+#line 1577
     l2_tail = t7;
-#line 1372
+#line 1577
     goto bb3;
 bb2:;
-#line 1375
+#line 1580
     t11 = l0_this;
-#line 1375
+#line 1580
     t12 = l1_c;
-#line 1375
+#line 1580
     t13 = t12;
-#line 1375
+#line 1580
     LYR_WRITE_BARRIER(t11, &t11->f_first, t13);
-#line 1372
+#line 1577
     goto bb4;
 bb3:;
-#line 1373
+#line 1578
     t8 = l2_tail;
-#line 1373
+#line 1578
     t9 = l1_c;
-#line 1373
+#line 1578
     t10 = t9;
-#line 1373
+#line 1578
     LYR_WRITE_BARRIER(t8, &t8->f_next, t10);
-#line 1372
+#line 1577
     goto bb4;
 bb4:;
-#line 1377
+#line 1582
     t14 = l0_this;
-#line 1377
+#line 1582
     t15 = l1_c;
-#line 1377
+#line 1582
     t16 = t15;
-#line 1377
+#line 1582
     LYR_WRITE_BARRIER(t14, &t14->f_last, t16);
-#line 1369
+#line 1574
     return;
 }
 
-#line 1381 "stdlib5/std/task.lyr"
+#line 1586 "stdlib5/std/task.lyr"
 lyr_ty1_Context * lyr_std_task_Scheduler_takeReady(lyr_ty0_Scheduler *l0_this) {
     lyr_ty1_Context *l1_head = NULL;
     lyr_ty0_Scheduler *t0 = NULL;
@@ -2137,77 +2382,77 @@ lyr_ty1_Context * lyr_std_task_Scheduler_takeReady(lyr_ty0_Scheduler *l0_this) {
     lyr_ty1_Context *t21 = NULL;
     lyr_ty1_Context *t22 = NULL;
 bb0:;
-#line 1381
+#line 1586
     t0 = l0_this;
-#line 1381
+#line 1586
     t1 = t0->f_first;
-#line 1381
+#line 1586
     l1_head = t1;
-#line 1382
+#line 1587
     t2 = l1_head;
-#line 1382
+#line 1587
     t3 = (uint8_t)(t2 != NULL);
-#line 1382
+#line 1587
     t4 = (uint8_t)!t3;
-#line 1382
+#line 1587
     if (t4) goto bb1; else goto bb2;
 bb1:;
-#line 1382
+#line 1587
     t5 = NULL;
-#line 1382
+#line 1587
     return t5;
 bb2:;
-#line 1383
+#line 1588
     t6 = l0_this;
-#line 1383
+#line 1588
     t7 = l1_head;
-#line 1383
+#line 1588
     t8 = t7;
-#line 1383
+#line 1588
     t9 = t8->f_next;
-#line 1383
+#line 1588
     LYR_WRITE_BARRIER(t6, &t6->f_first, t9);
-#line 1384
+#line 1589
     t10 = l1_head;
-#line 1384
+#line 1589
     t11 = t10;
-#line 1384
+#line 1589
     t12 = t11->f_next;
-#line 1384
+#line 1589
     t13 = (uint8_t)(t12 != NULL);
-#line 1384
+#line 1589
     t14 = (uint8_t)!t13;
-#line 1384
+#line 1589
     if (t14) goto bb3; else goto bb4;
 bb3:;
-#line 1384
+#line 1589
     t15 = l0_this;
-#line 1384
+#line 1589
     t16 = NULL;
-#line 1384
+#line 1589
     LYR_WRITE_BARRIER(t15, &t15->f_last, t16);
-#line 1384
+#line 1589
     goto bb4;
 bb4:;
-#line 1385
+#line 1590
     t17 = l1_head;
-#line 1385
+#line 1590
     t18 = t17;
-#line 1385
+#line 1590
     t19 = NULL;
-#line 1385
+#line 1590
     LYR_WRITE_BARRIER(t18, &t18->f_next, t19);
-#line 1386
+#line 1591
     t20 = l1_head;
-#line 1386
+#line 1591
     t21 = t20;
-#line 1386
+#line 1591
     t22 = t21;
-#line 1386
+#line 1591
     return t22;
 }
 
-#line 1390 "stdlib5/std/task.lyr"
+#line 1595 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_sleep(lyr_ty0_Scheduler *l0_this, int64_t l1_nanos, LyrErr **lyr_err) {
     lyr_ty1_Context *l2_c = NULL;
     lyr_ty1_Context *l3__coalesce0 = NULL;
@@ -2221,7 +2466,7 @@ void lyr_std_task_Scheduler_sleep(lyr_ty0_Scheduler *l0_this, int64_t l1_nanos, 
     lyr_ty1_Context *t6 = NULL;
     lyr_ty3_Atomic_bool_ *t7 = NULL;
     uint8_t t8 = 0;
-    lyr_ty12_Cancelled *t9 = NULL;
+    lyr_ty27_Cancelled *t9 = NULL;
     LyrIface t10 = {0};
     lyr_ty1_Context *t11 = NULL;
     lyr_ty0_Scheduler *t12 = NULL;
@@ -2235,106 +2480,106 @@ void lyr_std_task_Scheduler_sleep(lyr_ty0_Scheduler *l0_this, int64_t l1_nanos, 
     lyr_ty1_Context *t20 = NULL;
     lyr_ty3_Atomic_bool_ *t21 = NULL;
     uint8_t t22 = 0;
-    lyr_ty12_Cancelled *t23 = NULL;
+    lyr_ty27_Cancelled *t23 = NULL;
     LyrIface t24 = {0};
 bb0:;
-#line 1390
+#line 1595
     t0 = l0_this;
-#line 1390
+#line 1595
     t1 = t0->f_running;
-#line 1390
+#line 1595
     t2 = (uint8_t)(t1 != NULL);
-#line 1390
+#line 1595
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1390
+#line 1595
     t3 = t1;
-#line 1390
+#line 1595
     l3__coalesce0 = t3;
-#line 1390
+#line 1595
     goto bb3;
 bb2:;
-#line 1390
+#line 1595
     t4 = (LyrStr *)&lyr_lit12;
-#line 1390
+#line 1595
     lyr_panic_message(t4);
-#line 1390
+#line 1595
     __builtin_unreachable();
 bb3:;
-#line 1390
+#line 1595
     t5 = l3__coalesce0;
-#line 1390
+#line 1595
     l2_c = t5;
-#line 1391
+#line 1596
     t6 = l2_c;
-#line 1391
+#line 1596
     t7 = t6->f_cancelled;
-#line 1391
+#line 1596
     t8 = lyr_std_sync_Atomic_bool__load_d6fd6e16(t7);
-#line 1391
+#line 1596
     if (t8) goto bb4; else goto bb5;
 bb4:;
-#line 1391
-    t9 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
-#line 1391
-    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty12 };
-#line 1391
+#line 1596
+    t9 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
+#line 1596
+    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty27 };
+#line 1596
     lyr_e = lyr_err_new(t10); goto bb6;
 bb5:;
-#line 1392
+#line 1597
     t11 = l2_c;
-#line 1392
+#line 1597
     lyr_std_task_Context_beginWait(t11);
-#line 1393
+#line 1598
     t12 = l0_this;
-#line 1393
+#line 1598
     t13 = l2_c;
-#line 1393
+#line 1598
     t14 = l1_nanos;
-#line 1393
+#line 1598
     lyr_std_task_Scheduler_fallAsleep(t12, t13, t14);
-#line 1394
+#line 1599
     t15 = l0_this;
-#line 1394
+#line 1599
     t16 = l2_c;
-#line 1394
+#line 1599
     lyr_std_task_Scheduler_wakeIfCancelled(t15, t16);
-#line 1395
+#line 1600
     lyr_coro_park();
-#line 1396
+#line 1601
     t17 = l2_c;
-#line 1396
+#line 1601
     lyr_std_task_Context_endWait(t17);
-#line 1397
+#line 1602
     t18 = l0_this;
-#line 1397
+#line 1602
     t19 = l2_c;
-#line 1397
+#line 1602
     lyr_std_task_Scheduler_unsleep(t18, t19);
-#line 1398
+#line 1603
     t20 = l2_c;
-#line 1398
+#line 1603
     t21 = t20->f_cancelled;
-#line 1398
+#line 1603
     t22 = lyr_std_sync_Atomic_bool__load_d6fd6e16(t21);
-#line 1398
+#line 1603
     if (t22) goto bb7; else goto bb8;
 bb6:;
-#line 1391
+#line 1596
     *lyr_err = lyr_e; return;
 bb7:;
-#line 1398
-    t23 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
-#line 1398
-    t24 = (LyrIface){ t23, &lyr_vt_ty6_ty12 };
-#line 1398
+#line 1603
+    t23 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
+#line 1603
+    t24 = (LyrIface){ t23, &lyr_vt_ty6_ty27 };
+#line 1603
     lyr_e = lyr_err_new(t24); goto bb6;
 bb8:;
-#line 1389
+#line 1594
     return;
 }
 
-#line 1403 "stdlib5/std/task.lyr"
+#line 1608 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_fallAsleep(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c, int64_t l2_nanos) {
     int64_t l3_now = 0;
     int64_t l4__if0 = 0;
@@ -2373,118 +2618,118 @@ void lyr_std_task_Scheduler_fallAsleep(lyr_ty0_Scheduler *l0_this, lyr_ty1_Conte
     lyr_ty1_Context *t31 = NULL;
     lyr_ty1_Context *t32 = NULL;
 bb0:;
-#line 1403
+#line 1608
     t0 = lyr_clock_monotonic_ns();
-#line 1403
+#line 1608
     l3_now = t0;
-#line 1404
+#line 1609
     t1 = l1_c;
-#line 1404
+#line 1609
     t2 = l2_nanos;
-#line 1404
+#line 1609
     t3 = (int64_t)INT64_C(9223372036854775807);
-#line 1404
+#line 1609
     t4 = l3_now;
-#line 1404
+#line 1609
     t5 = LYR_CHECKED_SUB(t3, t4);
-#line 1404
+#line 1609
     t6 = (uint8_t)(t2 > t5);
-#line 1404
+#line 1609
     if (t6) goto bb1; else goto bb2;
 bb1:;
-#line 1404
+#line 1609
     t7 = (int64_t)INT64_C(9223372036854775807);
-#line 1404
+#line 1609
     l4__if0 = t7;
-#line 1404
+#line 1609
     goto bb3;
 bb2:;
-#line 1404
+#line 1609
     t8 = l3_now;
-#line 1404
+#line 1609
     t9 = l2_nanos;
-#line 1404
+#line 1609
     t10 = LYR_CHECKED_ADD(t8, t9);
-#line 1404
+#line 1609
     l4__if0 = t10;
-#line 1404
+#line 1609
     goto bb3;
 bb3:;
-#line 1404
+#line 1609
     t11 = l4__if0;
-#line 1404
+#line 1609
     t1->f_deadline = t11;
-#line 1405
+#line 1610
     t12 = l1_c;
-#line 1405
+#line 1610
     t13 = l0_this;
-#line 1405
+#line 1610
     t14 = t13->f_fallenAsleep;
-#line 1405
+#line 1610
     t12->f_order = t14;
-#line 1406
+#line 1611
     t15 = l0_this;
-#line 1406
+#line 1611
     t16 = t15->f_fallenAsleep;
-#line 1406
+#line 1611
     t17 = (int64_t)INT64_C(1);
-#line 1406
+#line 1611
     t18 = LYR_CHECKED_ADD(t16, t17);
-#line 1406
+#line 1611
     t15->f_fallenAsleep = t18;
-#line 1407
+#line 1612
     t19 = l1_c;
-#line 1407
+#line 1612
     t20 = 1;
-#line 1407
+#line 1612
     t19->f_asleep = t20;
-#line 1408
+#line 1613
     t21 = l0_this;
-#line 1408
+#line 1613
     t22 = l0_this;
-#line 1408
+#line 1613
     t23 = t22->f_sleepers;
-#line 1408
+#line 1613
     t24 = l1_c;
-#line 1408
+#line 1613
     t25 = t24;
-#line 1408
+#line 1613
     t26 = lyr_std_task_merge(t23, t25);
-#line 1408
+#line 1613
     LYR_WRITE_BARRIER(t21, &t21->f_sleepers, t26);
-#line 1409
+#line 1614
     t27 = l0_this;
-#line 1409
+#line 1614
     t28 = t27->f_sleepers;
-#line 1409
+#line 1614
     t29 = (uint8_t)(t28 != NULL);
-#line 1409
+#line 1614
     if (t29) goto bb4; else goto bb5;
 bb4:;
-#line 1409
+#line 1614
     t30 = t28;
-#line 1409
+#line 1614
     l5_root = t30;
-#line 1409
+#line 1614
     goto bb6;
 bb5:;
-#line 1409
+#line 1614
     goto bb7;
 bb6:;
-#line 1409
+#line 1614
     t31 = l5_root;
-#line 1409
+#line 1614
     t32 = NULL;
-#line 1409
+#line 1614
     LYR_WRITE_BARRIER(t31, &t31->f_up, t32);
-#line 1409
+#line 1614
     goto bb7;
 bb7:;
-#line 1402
+#line 1607
     return;
 }
 
-#line 1417 "stdlib5/std/task.lyr"
+#line 1622 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_wakeIfCancelled(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty1_Context *t0 = NULL;
     lyr_ty3_Atomic_bool_ *t1 = NULL;
@@ -2493,29 +2738,29 @@ void lyr_std_task_Scheduler_wakeIfCancelled(lyr_ty0_Scheduler *l0_this, lyr_ty1_
     lyr_ty1_Context *t4 = NULL;
     uint8_t t5 = 0;
 bb0:;
-#line 1417
+#line 1622
     t0 = l1_c;
-#line 1417
+#line 1622
     t1 = t0->f_cancelled;
-#line 1417
+#line 1622
     t2 = lyr_std_sync_Atomic_bool__load_d6fd6e16(t1);
-#line 1417
+#line 1622
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1418
+#line 1623
     t3 = l0_this;
-#line 1418
+#line 1623
     t4 = l1_c;
-#line 1418
+#line 1623
     t5 = lyr_std_task_Scheduler_wakeUp(t3, t4);
-#line 1417
+#line 1622
     goto bb2;
 bb2:;
-#line 1416
+#line 1621
     return;
 }
 
-#line 1425 "stdlib5/std/task.lyr"
+#line 1630 "stdlib5/std/task.lyr"
 uint8_t lyr_std_task_Scheduler_wakeUp(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty1_Context *t0 = NULL;
     uint8_t t1 = 0;
@@ -2525,33 +2770,33 @@ uint8_t lyr_std_task_Scheduler_wakeUp(lyr_ty0_Scheduler *l0_this, lyr_ty1_Contex
     lyr_ty1_Context *t5 = NULL;
     uint8_t t6 = 0;
 bb0:;
-#line 1425
+#line 1630
     t0 = l1_c;
-#line 1425
+#line 1630
     t1 = lyr_std_task_Context_claim(t0);
-#line 1425
+#line 1630
     t2 = (uint8_t)!t1;
-#line 1425
+#line 1630
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1425
+#line 1630
     t3 = 0;
-#line 1425
+#line 1630
     return t3;
 bb2:;
-#line 1426
+#line 1631
     t4 = l0_this;
-#line 1426
+#line 1631
     t5 = l1_c;
-#line 1426
+#line 1631
     lyr_std_task_Scheduler_post(t4, t5);
-#line 1427
+#line 1632
     t6 = 1;
-#line 1427
+#line 1632
     return t6;
 }
 
-#line 1433 "stdlib5/std/task.lyr"
+#line 1638 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_post(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty0_Scheduler *l2_home = NULL;
     lyr_ty1_Context *t0 = NULL;
@@ -2564,44 +2809,44 @@ void lyr_std_task_Scheduler_post(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1
     lyr_ty0_Scheduler *t7 = NULL;
     lyr_ty1_Context *t8 = NULL;
 bb0:;
-#line 1433
+#line 1638
     t0 = l1_c;
-#line 1433
+#line 1638
     t1 = t0->f_home;
-#line 1433
+#line 1638
     l2_home = t1;
-#line 1434
+#line 1639
     t2 = l2_home;
-#line 1434
+#line 1639
     t3 = l0_this;
-#line 1434
+#line 1639
     t4 = (uint8_t)(t2 == t3);
-#line 1434
+#line 1639
     if (t4) goto bb1; else goto bb2;
 bb1:;
-#line 1435
+#line 1640
     t5 = l2_home;
-#line 1435
+#line 1640
     t6 = l1_c;
-#line 1435
+#line 1640
     lyr_std_task_Scheduler_ready(t5, t6);
-#line 1434
+#line 1639
     goto bb3;
 bb2:;
-#line 1437
+#line 1642
     t7 = l2_home;
-#line 1437
+#line 1642
     t8 = l1_c;
-#line 1437
+#line 1642
     lyr_std_task_Scheduler_handOver(t7, t8);
-#line 1436
+#line 1641
     goto bb3;
 bb3:;
-#line 1432
+#line 1637
     return;
 }
 
-#line 1443 "stdlib5/std/task.lyr"
+#line 1648 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_handOver(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty1_Context *l2_tail = NULL;
     lyr_ty0_Scheduler *t0 = NULL;
@@ -2630,95 +2875,95 @@ void lyr_std_task_Scheduler_handOver(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context
     lyr_ty0_Scheduler *t23 = NULL;
     lyr_ty8_SpinLock *t24 = NULL;
 bb0:;
-#line 1443
+#line 1648
     t0 = l0_this;
-#line 1443
+#line 1648
     t1 = t0->f_inboxLock;
-#line 1443
+#line 1648
     lyr_std_task_SpinLock_acquire(t1);
-#line 1444
+#line 1649
     t2 = l1_c;
-#line 1444
+#line 1649
     t3 = NULL;
-#line 1444
+#line 1649
     LYR_WRITE_BARRIER(t2, &t2->f_next, t3);
-#line 1445
+#line 1650
     t4 = l0_this;
-#line 1445
+#line 1650
     t5 = t4->f_inboxLast;
-#line 1445
+#line 1650
     t6 = (uint8_t)(t5 != NULL);
-#line 1445
+#line 1650
     if (t6) goto bb1; else goto bb2;
 bb1:;
-#line 1445
+#line 1650
     t7 = t5;
-#line 1445
+#line 1650
     l2_tail = t7;
-#line 1445
+#line 1650
     goto bb3;
 bb2:;
-#line 1448
+#line 1653
     t11 = l0_this;
-#line 1448
+#line 1653
     t12 = l1_c;
-#line 1448
+#line 1653
     t13 = t12;
-#line 1448
+#line 1653
     LYR_WRITE_BARRIER(t11, &t11->f_inboxFirst, t13);
-#line 1445
+#line 1650
     goto bb4;
 bb3:;
-#line 1446
+#line 1651
     t8 = l2_tail;
-#line 1446
+#line 1651
     t9 = l1_c;
-#line 1446
+#line 1651
     t10 = t9;
-#line 1446
+#line 1651
     LYR_WRITE_BARRIER(t8, &t8->f_next, t10);
-#line 1445
+#line 1650
     goto bb4;
 bb4:;
-#line 1450
+#line 1655
     t14 = l0_this;
-#line 1450
+#line 1655
     t15 = l1_c;
-#line 1450
+#line 1655
     t16 = t15;
-#line 1450
+#line 1655
     LYR_WRITE_BARRIER(t14, &t14->f_inboxLast, t16);
-#line 1451
+#line 1656
     t17 = l0_this;
-#line 1451
+#line 1656
     t18 = t17->f_poller;
-#line 1451
+#line 1656
     t19 = (int64_t)INT64_C(0);
-#line 1451
+#line 1656
     t20 = (uint8_t)(t18 != t19);
-#line 1451
+#line 1656
     if (t20) goto bb5; else goto bb6;
 bb5:;
-#line 1452
+#line 1657
     t21 = l0_this;
-#line 1452
+#line 1657
     t22 = t21->f_poller;
-#line 1452
+#line 1657
     lyr_task_wake(t22);
-#line 1451
+#line 1656
     goto bb6;
 bb6:;
-#line 1454
+#line 1659
     t23 = l0_this;
-#line 1454
+#line 1659
     t24 = t23->f_inboxLock;
-#line 1454
+#line 1659
     lyr_std_task_SpinLock_release(t24);
-#line 1442
+#line 1647
     return;
 }
 
-#line 1460 "stdlib5/std/task.lyr"
+#line 1665 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_takeInbox(lyr_ty0_Scheduler *l0_this) {
     lyr_ty1_Context *l1_at = NULL;
     lyr_ty1_Context *l2_c = NULL;
@@ -2740,73 +2985,73 @@ void lyr_std_task_Scheduler_takeInbox(lyr_ty0_Scheduler *l0_this) {
     lyr_ty0_Scheduler *t15 = NULL;
     lyr_ty1_Context *t16 = NULL;
 bb0:;
-#line 1460
+#line 1665
     t0 = l0_this;
-#line 1460
+#line 1665
     t1 = t0->f_inboxLock;
-#line 1460
+#line 1665
     lyr_std_task_SpinLock_acquire(t1);
-#line 1461
+#line 1666
     t2 = l0_this;
-#line 1461
+#line 1666
     t3 = t2->f_inboxFirst;
-#line 1461
+#line 1666
     l1_at = t3;
-#line 1462
+#line 1667
     t4 = l0_this;
-#line 1462
+#line 1667
     t5 = NULL;
-#line 1462
+#line 1667
     LYR_WRITE_BARRIER(t4, &t4->f_inboxFirst, t5);
-#line 1463
+#line 1668
     t6 = l0_this;
-#line 1463
+#line 1668
     t7 = NULL;
-#line 1463
+#line 1668
     LYR_WRITE_BARRIER(t6, &t6->f_inboxLast, t7);
-#line 1464
+#line 1669
     t8 = l0_this;
-#line 1464
+#line 1669
     t9 = t8->f_inboxLock;
-#line 1464
+#line 1669
     lyr_std_task_SpinLock_release(t9);
-#line 1465
+#line 1670
     goto bb1;
 bb1:;
-#line 1465
+#line 1670
     t10 = l1_at;
-#line 1465
+#line 1670
     t11 = (uint8_t)(t10 != NULL);
-#line 1465
+#line 1670
     if (t11) goto bb2; else goto bb3;
 bb2:;
-#line 1465
+#line 1670
     t12 = t10;
-#line 1465
+#line 1670
     l2_c = t12;
-#line 1465
+#line 1670
     goto bb4;
 bb3:;
-#line 1459
+#line 1664
     return;
 bb4:;
-#line 1466
+#line 1671
     t13 = l2_c;
-#line 1466
+#line 1671
     t14 = t13->f_next;
-#line 1466
+#line 1671
     l1_at = t14;
-#line 1467
+#line 1672
     t15 = l0_this;
-#line 1467
+#line 1672
     t16 = l2_c;
-#line 1467
+#line 1672
     lyr_std_task_Scheduler_ready(t15, t16);
-#line 1465
+#line 1670
     goto bb1;
 }
 
-#line 1472 "stdlib5/std/task.lyr"
+#line 1677 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_yieldNow(lyr_ty0_Scheduler *l0_this, LyrErr **lyr_err) {
     lyr_ty1_Context *l1_c = NULL;
     lyr_ty1_Context *l2__coalesce0 = NULL;
@@ -2820,91 +3065,91 @@ void lyr_std_task_Scheduler_yieldNow(lyr_ty0_Scheduler *l0_this, LyrErr **lyr_er
     lyr_ty1_Context *t6 = NULL;
     lyr_ty3_Atomic_bool_ *t7 = NULL;
     uint8_t t8 = 0;
-    lyr_ty12_Cancelled *t9 = NULL;
+    lyr_ty27_Cancelled *t9 = NULL;
     LyrIface t10 = {0};
     lyr_ty0_Scheduler *t11 = NULL;
     lyr_ty1_Context *t12 = NULL;
     lyr_ty1_Context *t13 = NULL;
     lyr_ty3_Atomic_bool_ *t14 = NULL;
     uint8_t t15 = 0;
-    lyr_ty12_Cancelled *t16 = NULL;
+    lyr_ty27_Cancelled *t16 = NULL;
     LyrIface t17 = {0};
 bb0:;
-#line 1472
+#line 1677
     t0 = l0_this;
-#line 1472
+#line 1677
     t1 = t0->f_running;
-#line 1472
+#line 1677
     t2 = (uint8_t)(t1 != NULL);
-#line 1472
+#line 1677
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1472
+#line 1677
     t3 = t1;
-#line 1472
+#line 1677
     l2__coalesce0 = t3;
-#line 1472
+#line 1677
     goto bb3;
 bb2:;
-#line 1472
+#line 1677
     t4 = (LyrStr *)&lyr_lit13;
-#line 1472
+#line 1677
     lyr_panic_message(t4);
-#line 1472
+#line 1677
     __builtin_unreachable();
 bb3:;
-#line 1472
+#line 1677
     t5 = l2__coalesce0;
-#line 1472
+#line 1677
     l1_c = t5;
-#line 1473
+#line 1678
     t6 = l1_c;
-#line 1473
+#line 1678
     t7 = t6->f_cancelled;
-#line 1473
+#line 1678
     t8 = lyr_std_sync_Atomic_bool__load_d6fd6e16(t7);
-#line 1473
+#line 1678
     if (t8) goto bb4; else goto bb5;
 bb4:;
-#line 1473
-    t9 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
-#line 1473
-    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty12 };
-#line 1473
+#line 1678
+    t9 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
+#line 1678
+    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty27 };
+#line 1678
     lyr_e = lyr_err_new(t10); goto bb6;
 bb5:;
-#line 1474
+#line 1679
     t11 = l0_this;
-#line 1474
+#line 1679
     t12 = l1_c;
-#line 1474
+#line 1679
     lyr_std_task_Scheduler_ready(t11, t12);
-#line 1475
+#line 1680
     lyr_coro_park();
-#line 1476
+#line 1681
     t13 = l1_c;
-#line 1476
+#line 1681
     t14 = t13->f_cancelled;
-#line 1476
+#line 1681
     t15 = lyr_std_sync_Atomic_bool__load_d6fd6e16(t14);
-#line 1476
+#line 1681
     if (t15) goto bb7; else goto bb8;
 bb6:;
-#line 1473
+#line 1678
     *lyr_err = lyr_e; return;
 bb7:;
-#line 1476
-    t16 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
-#line 1476
-    t17 = (LyrIface){ t16, &lyr_vt_ty6_ty12 };
-#line 1476
+#line 1681
+    t16 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
+#line 1681
+    t17 = (LyrIface){ t16, &lyr_vt_ty6_ty27 };
+#line 1681
     lyr_e = lyr_err_new(t17); goto bb6;
 bb8:;
-#line 1471
+#line 1676
     return;
 }
 
-#line 1499 "stdlib5/std/task.lyr"
+#line 1704 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_wakeSleepers(lyr_ty0_Scheduler *l0_this, int64_t l1_now) {
     lyr_ty1_Context *l2_top = NULL;
     lyr_ty0_Scheduler *t0 = NULL;
@@ -2921,59 +3166,59 @@ void lyr_std_task_Scheduler_wakeSleepers(lyr_ty0_Scheduler *l0_this, int64_t l1_
     lyr_ty1_Context *t11 = NULL;
     uint8_t t12 = 0;
 bb0:;
-#line 1499
+#line 1704
     goto bb1;
 bb1:;
-#line 1499
+#line 1704
     t0 = l0_this;
-#line 1499
+#line 1704
     t1 = t0->f_sleepers;
-#line 1499
+#line 1704
     t2 = (uint8_t)(t1 != NULL);
-#line 1499
+#line 1704
     if (t2) goto bb2; else goto bb3;
 bb2:;
-#line 1499
+#line 1704
     t3 = t1;
-#line 1499
+#line 1704
     l2_top = t3;
-#line 1499
+#line 1704
     goto bb4;
 bb3:;
-#line 1498
+#line 1703
     return;
 bb4:;
-#line 1500
+#line 1705
     t4 = l2_top;
-#line 1500
+#line 1705
     t5 = t4->f_deadline;
-#line 1500
+#line 1705
     t6 = l1_now;
-#line 1500
+#line 1705
     t7 = (uint8_t)(t5 > t6);
-#line 1500
+#line 1705
     if (t7) goto bb5; else goto bb6;
 bb5:;
-#line 1500
+#line 1705
     return;
 bb6:;
-#line 1501
+#line 1706
     t8 = l0_this;
-#line 1501
+#line 1706
     t9 = l2_top;
-#line 1501
+#line 1706
     lyr_std_task_Scheduler_unsleep(t8, t9);
-#line 1502
+#line 1707
     t10 = l0_this;
-#line 1502
+#line 1707
     t11 = l2_top;
-#line 1502
+#line 1707
     t12 = lyr_std_task_Scheduler_wakeUp(t10, t11);
-#line 1499
+#line 1704
     goto bb1;
 }
 
-#line 1509 "stdlib5/std/task.lyr"
+#line 1714 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_unsleep(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty1_Context *l2_merged = NULL;
     lyr_ty1_Context *l3_parent = NULL;
@@ -3025,182 +3270,182 @@ void lyr_std_task_Scheduler_unsleep(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context 
     lyr_ty1_Context *t42 = NULL;
     uint8_t t43 = 0;
 bb0:;
-#line 1509
+#line 1714
     t0 = l1_c;
-#line 1509
+#line 1714
     t1 = t0->f_asleep;
-#line 1509
+#line 1714
     t2 = (uint8_t)!t1;
-#line 1509
+#line 1714
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 1509
+#line 1714
     return;
 bb2:;
-#line 1510
+#line 1715
     t3 = l1_c;
-#line 1510
+#line 1715
     t4 = t3->f_left;
-#line 1510
+#line 1715
     t5 = l1_c;
-#line 1510
+#line 1715
     t6 = t5->f_right;
-#line 1510
+#line 1715
     t7 = lyr_std_task_merge(t4, t6);
-#line 1510
+#line 1715
     l2_merged = t7;
-#line 1511
+#line 1716
     t8 = l1_c;
-#line 1511
+#line 1716
     t9 = t8->f_up;
-#line 1511
+#line 1716
     l3_parent = t9;
-#line 1512
+#line 1717
     t10 = l2_merged;
-#line 1512
+#line 1717
     t11 = (uint8_t)(t10 != NULL);
-#line 1512
+#line 1717
     if (t11) goto bb3; else goto bb4;
 bb3:;
-#line 1512
+#line 1717
     t12 = t10;
-#line 1512
+#line 1717
     l4_m = t12;
-#line 1512
+#line 1717
     goto bb5;
 bb4:;
-#line 1512
+#line 1717
     goto bb6;
 bb5:;
-#line 1512
+#line 1717
     t13 = l4_m;
-#line 1512
+#line 1717
     t14 = l3_parent;
-#line 1512
+#line 1717
     LYR_WRITE_BARRIER(t13, &t13->f_up, t14);
-#line 1512
+#line 1717
     goto bb6;
 bb6:;
-#line 1513
+#line 1718
     t15 = l3_parent;
-#line 1513
+#line 1718
     t16 = (uint8_t)(t15 != NULL);
-#line 1513
+#line 1718
     if (t16) goto bb7; else goto bb8;
 bb7:;
-#line 1513
+#line 1718
     t17 = t15;
-#line 1513
+#line 1718
     l5_p = t17;
-#line 1513
+#line 1718
     goto bb9;
 bb8:;
-#line 1525
+#line 1730
     t32 = l0_this;
-#line 1525
+#line 1730
     t33 = l2_merged;
-#line 1525
+#line 1730
     LYR_WRITE_BARRIER(t32, &t32->f_sleepers, t33);
-#line 1513
+#line 1718
     goto bb17;
 bb9:;
-#line 1514
+#line 1719
     t18 = l5_p;
-#line 1514
+#line 1719
     t19 = t18->f_left;
-#line 1514
+#line 1719
     t20 = (uint8_t)(t19 != NULL);
-#line 1514
+#line 1719
     if (t20) goto bb10; else goto bb11;
 bb10:;
-#line 1514
+#line 1719
     t21 = t19;
-#line 1514
+#line 1719
     l6_l = t21;
-#line 1514
+#line 1719
     goto bb12;
 bb11:;
-#line 1521
+#line 1726
     t29 = l5_p;
-#line 1521
+#line 1726
     t30 = l2_merged;
-#line 1521
+#line 1726
     LYR_WRITE_BARRIER(t29, &t29->f_right, t30);
-#line 1514
+#line 1719
     goto bb16;
 bb12:;
-#line 1515
+#line 1720
     t22 = l6_l;
-#line 1515
+#line 1720
     t23 = l1_c;
-#line 1515
+#line 1720
     t24 = (uint8_t)(t22 == t23);
-#line 1515
+#line 1720
     if (t24) goto bb13; else goto bb14;
 bb13:;
-#line 1516
+#line 1721
     t25 = l5_p;
-#line 1516
+#line 1721
     t26 = l2_merged;
-#line 1516
+#line 1721
     LYR_WRITE_BARRIER(t25, &t25->f_left, t26);
-#line 1515
+#line 1720
     goto bb15;
 bb14:;
-#line 1518
+#line 1723
     t27 = l5_p;
-#line 1518
+#line 1723
     t28 = l2_merged;
-#line 1518
+#line 1723
     LYR_WRITE_BARRIER(t27, &t27->f_right, t28);
-#line 1517
+#line 1722
     goto bb15;
 bb15:;
-#line 1514
+#line 1719
     goto bb16;
 bb16:;
-#line 1523
+#line 1728
     t31 = l5_p;
-#line 1523
+#line 1728
     lyr_std_task_fixRanks(t31);
-#line 1513
+#line 1718
     goto bb17;
 bb17:;
-#line 1527
+#line 1732
     t34 = l1_c;
-#line 1527
+#line 1732
     t35 = NULL;
-#line 1527
+#line 1732
     LYR_WRITE_BARRIER(t34, &t34->f_left, t35);
-#line 1528
+#line 1733
     t36 = l1_c;
-#line 1528
+#line 1733
     t37 = NULL;
-#line 1528
+#line 1733
     LYR_WRITE_BARRIER(t36, &t36->f_right, t37);
-#line 1529
+#line 1734
     t38 = l1_c;
-#line 1529
+#line 1734
     t39 = NULL;
-#line 1529
+#line 1734
     LYR_WRITE_BARRIER(t38, &t38->f_up, t39);
-#line 1530
+#line 1735
     t40 = l1_c;
-#line 1530
+#line 1735
     t41 = (int64_t)INT64_C(0);
-#line 1530
+#line 1735
     t40->f_rank = t41;
-#line 1531
+#line 1736
     t42 = l1_c;
-#line 1531
+#line 1736
     t43 = 0;
-#line 1531
+#line 1736
     t42->f_asleep = t43;
-#line 1508
+#line 1713
     return;
 }
 
-#line 1538 "stdlib5/std/task.lyr"
+#line 1743 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_panicked(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context *l1_c) {
     lyr_ty4_PanicInfo *l2_info = NULL;
     LyrStr *l3__coalesce0 = NULL;
@@ -3243,144 +3488,144 @@ void lyr_std_task_Scheduler_panicked(lyr_ty0_Scheduler *l0_this, lyr_ty1_Context
     lyr_ty4_PanicInfo *t32 = NULL;
     LyrStr *t33 = NULL;
 bb0:;
-#line 1538
+#line 1743
     t0 = l1_c;
-#line 1538
+#line 1743
     t1 = t0->f_body;
-#line 1538
+#line 1743
     t2 = lyr_task_panic_code(t1);
-#line 1538
+#line 1743
     t3 = (uint8_t)(t2 != NULL);
-#line 1538
+#line 1743
     if (t3) goto bb1; else goto bb2;
 bb1:;
-#line 1538
+#line 1743
     t4 = t2;
-#line 1538
+#line 1743
     l3__coalesce0 = t4;
-#line 1538
+#line 1743
     goto bb3;
 bb2:;
-#line 1538
+#line 1743
     t5 = (LyrStr *)&lyr_lit0;
-#line 1538
+#line 1743
     l3__coalesce0 = t5;
-#line 1538
+#line 1743
     goto bb3;
 bb3:;
-#line 1538
+#line 1743
     t6 = l3__coalesce0;
-#line 1539
+#line 1744
     t7 = l1_c;
-#line 1539
+#line 1744
     t8 = t7->f_body;
-#line 1539
+#line 1744
     t9 = lyr_task_panic_message(t8);
-#line 1539
+#line 1744
     t10 = (uint8_t)(t9 != NULL);
-#line 1539
+#line 1744
     if (t10) goto bb4; else goto bb5;
 bb4:;
-#line 1539
+#line 1744
     t11 = t9;
-#line 1539
+#line 1744
     l4__coalesce1 = t11;
-#line 1539
+#line 1744
     goto bb6;
 bb5:;
-#line 1539
+#line 1744
     t12 = (LyrStr *)&lyr_lit0;
-#line 1539
+#line 1744
     l4__coalesce1 = t12;
-#line 1539
+#line 1744
     goto bb6;
 bb6:;
-#line 1539
+#line 1744
     t13 = l4__coalesce1;
-#line 1540
+#line 1745
     t14 = l1_c;
-#line 1540
+#line 1745
     t15 = t14->f_body;
-#line 1540
+#line 1745
     t16 = lyr_task_panic_trace(t15);
-#line 1540
+#line 1745
     t17 = (uint8_t)(t16 != NULL);
-#line 1540
+#line 1745
     if (t17) goto bb7; else goto bb8;
 bb7:;
-#line 1540
+#line 1745
     t18 = t16;
-#line 1540
+#line 1745
     l5__coalesce2 = t18;
-#line 1540
+#line 1745
     goto bb9;
 bb8:;
-#line 1540
+#line 1745
     t19 = (LyrStr *)&lyr_lit0;
-#line 1540
+#line 1745
     l5__coalesce2 = t19;
-#line 1540
+#line 1745
     goto bb9;
 bb9:;
-#line 1540
+#line 1745
     t20 = l5__coalesce2;
-#line 1537
+#line 1742
     t21 = (lyr_ty4_PanicInfo *)lyr_alloc(&lyr_desc_ty4_PanicInfo);
-#line 1537
+#line 1742
     LYR_WRITE_BARRIER(t21, &t21->f_code, t6);
-#line 1537
+#line 1742
     LYR_WRITE_BARRIER(t21, &t21->f_message, t13);
-#line 1537
+#line 1742
     LYR_WRITE_BARRIER(t21, &t21->f_trace, t20);
-#line 1537
+#line 1742
     l2_info = t21;
-#line 1542
+#line 1747
     t22 = l1_c;
-#line 1542
+#line 1747
     t23 = &t22->f_onPanic;
-#line 1542
+#line 1747
     t24 = t23->has;
-#line 1542
+#line 1747
     if (t24) goto bb10; else goto bb11;
 bb10:;
-#line 1542
+#line 1747
     t25 = t23->value;
-#line 1542
+#line 1747
     l6_handler = t25;
-#line 1542
+#line 1747
     goto bb12;
 bb11:;
-#line 1545
+#line 1750
     t28 = l2_info;
-#line 1545
+#line 1750
     t29 = t28->f_code;
-#line 1545
+#line 1750
     t30 = l2_info;
-#line 1545
+#line 1750
     t31 = t30->f_message;
-#line 1545
+#line 1750
     t32 = l2_info;
-#line 1545
+#line 1750
     t33 = t32->f_trace;
-#line 1545
+#line 1750
     lyr_task_repanic(t29, t31, t33);
-#line 1545
+#line 1750
     __builtin_unreachable();
 bb12:;
-#line 1543
+#line 1748
     t26 = l6_handler;
-#line 1543
+#line 1748
     t27 = l2_info;
-#line 1543
+#line 1748
     t26.fn(t26.env, t27, NULL);
-#line 1542
+#line 1747
     goto bb13;
 bb13:;
-#line 1536
+#line 1741
     return;
 }
 
-#line 1552 "stdlib5/std/task.lyr"
+#line 1757 "stdlib5/std/task.lyr"
 void lyr_std_task_Scheduler_step(lyr_ty0_Scheduler *l0_this) {
     lyr_ty1_Context *l1_c = NULL;
     int64_t l2_state = 0;
@@ -3417,178 +3662,188 @@ void lyr_std_task_Scheduler_step(lyr_ty0_Scheduler *l0_this) {
     uint8_t t27 = 0;
     int64_t t28 = 0;
     uint8_t t29 = 0;
-    lyr_ty1_Context *t30 = NULL;
+    lyr_ty0_Scheduler *t30 = NULL;
     lyr_ty1_Context *t31 = NULL;
-    int64_t t32 = 0;
+    lyr_ty1_Context *t32 = NULL;
     int64_t t33 = 0;
     int64_t t34 = 0;
     int64_t t35 = 0;
     int64_t t36 = 0;
-    uint8_t t37 = 0;
-    int64_t t38 = 0;
+    int64_t t37 = 0;
+    uint8_t t38 = 0;
     int64_t t39 = 0;
     int64_t t40 = 0;
-    uint8_t t41 = 0;
+    int64_t t41 = 0;
+    uint8_t t42 = 0;
+    lyr_ty0_Scheduler *t43 = NULL;
 bb0:;
-#line 1552
+#line 1757
     t0 = l0_this;
-#line 1552
+#line 1757
     lyr_std_task_Scheduler_takeInbox(t0);
-#line 1553
+#line 1758
     t1 = l0_this;
-#line 1553
+#line 1758
     t2 = t1->f_sleepers;
-#line 1553
+#line 1758
     t3 = (uint8_t)(t2 != NULL);
-#line 1553
+#line 1758
     if (t3) goto bb1; else goto bb2;
 bb1:;
-#line 1553
+#line 1758
     t4 = l0_this;
-#line 1553
+#line 1758
     t5 = lyr_clock_monotonic_ns();
-#line 1553
+#line 1758
     lyr_std_task_Scheduler_wakeSleepers(t4, t5);
-#line 1553
+#line 1758
     goto bb2;
 bb2:;
-#line 1554
+#line 1759
     t6 = l0_this;
-#line 1554
+#line 1759
     t7 = lyr_std_task_Scheduler_takeReady(t6);
-#line 1554
+#line 1759
     t8 = (uint8_t)(t7 != NULL);
-#line 1554
+#line 1759
     if (t8) goto bb3; else goto bb4;
 bb3:;
-#line 1554
+#line 1759
     t9 = t7;
-#line 1554
+#line 1759
     l1_c = t9;
-#line 1554
+#line 1759
     goto bb5;
 bb4:;
-#line 1554
+#line 1759
     goto bb8;
 bb5:;
-#line 1555
+#line 1760
     t10 = l0_this;
-#line 1555
+#line 1760
     t11 = l1_c;
-#line 1555
+#line 1760
     t12 = t11;
-#line 1555
+#line 1760
     LYR_WRITE_BARRIER(t10, &t10->f_running, t12);
-#line 1556
+#line 1761
     t13 = l1_c;
-#line 1556
+#line 1761
     t14 = t13->f_body;
-#line 1556
+#line 1761
     t15 = lyr_task_resume(t14);
-#line 1556
+#line 1761
     l2_state = t15;
-#line 1557
+#line 1762
     t16 = l0_this;
-#line 1557
+#line 1762
     t17 = NULL;
-#line 1557
+#line 1762
     LYR_WRITE_BARRIER(t16, &t16->f_running, t17);
-#line 1558
+#line 1763
     t18 = l2_state;
-#line 1558
+#line 1763
     t19 = (int64_t)INT64_C(2);
-#line 1558
+#line 1763
     t20 = (uint8_t)(t18 == t19);
-#line 1558
+#line 1763
     if (t20) goto bb6; else goto bb7;
 bb6:;
-#line 1559
+#line 1764
     t21 = l0_this;
-#line 1559
+#line 1764
     t22 = l1_c;
-#line 1559
+#line 1764
     lyr_std_task_Scheduler_panicked(t21, t22);
-#line 1558
+#line 1763
     goto bb7;
 bb7:;
-#line 1561
+#line 1766
     return;
 bb8:;
-#line 1563
+#line 1768
     t23 = l0_this;
-#line 1563
+#line 1768
     t24 = t23->f_sleepers;
-#line 1563
+#line 1768
     l3_top = t24;
-#line 1564
+#line 1769
     t25 = l3_top;
-#line 1564
+#line 1769
     t26 = (uint8_t)(t25 != NULL);
-#line 1564
+#line 1769
     t27 = (uint8_t)!t26;
-#line 1564
+#line 1769
     if (t27) goto bb9; else goto bb10;
 bb9:;
-#line 1565
+#line 1770
     t28 = (int64_t)INT64_C(-1);
-#line 1565
+#line 1770
     t29 = lyr_task_wait(t28);
-#line 1566
+#line 1771
+    t30 = l0_this;
+#line 1771
+    lyr_std_task_Scheduler_pollerWoke(t30);
+#line 1772
     return;
 bb10:;
-#line 1568
-    t30 = l3_top;
-#line 1568
-    t31 = t30;
-#line 1568
-    t32 = t31->f_deadline;
-#line 1568
-    t33 = lyr_clock_monotonic_ns();
-#line 1568
-    t34 = LYR_CHECKED_SUB(t32, t33);
-#line 1568
-    l4_left = t34;
-#line 1569
-    t35 = l4_left;
-#line 1569
-    t36 = (int64_t)INT64_C(0);
-#line 1569
-    t37 = (uint8_t)(t35 > t36);
-#line 1569
-    if (t37) goto bb11; else goto bb12;
+#line 1774
+    t31 = l3_top;
+#line 1774
+    t32 = t31;
+#line 1774
+    t33 = t32->f_deadline;
+#line 1774
+    t34 = lyr_clock_monotonic_ns();
+#line 1774
+    t35 = LYR_CHECKED_SUB(t33, t34);
+#line 1774
+    l4_left = t35;
+#line 1775
+    t36 = l4_left;
+#line 1775
+    t37 = (int64_t)INT64_C(0);
+#line 1775
+    t38 = (uint8_t)(t36 > t37);
+#line 1775
+    if (t38) goto bb11; else goto bb12;
 bb11:;
-#line 1569
-    t38 = l4_left;
-#line 1569
-    l5__if0 = t38;
-#line 1569
+#line 1775
+    t39 = l4_left;
+#line 1775
+    l5__if0 = t39;
+#line 1775
     goto bb13;
 bb12:;
-#line 1569
-    t39 = (int64_t)INT64_C(0);
-#line 1569
-    l5__if0 = t39;
-#line 1569
+#line 1775
+    t40 = (int64_t)INT64_C(0);
+#line 1775
+    l5__if0 = t40;
+#line 1775
     goto bb13;
 bb13:;
-#line 1569
-    t40 = l5__if0;
-#line 1569
-    t41 = lyr_task_wait(t40);
-#line 1551
+#line 1775
+    t41 = l5__if0;
+#line 1775
+    t42 = lyr_task_wait(t41);
+#line 1776
+    t43 = l0_this;
+#line 1776
+    lyr_std_task_Scheduler_pollerWoke(t43);
+#line 1756
     return;
 }
 
 #line 10 "stdlib5/std/time.lyr"
-lyr_ty9_Duration lyr_std_time_Duration_ofNanos(int64_t l0_n) {
+lyr_ty24_Duration lyr_std_time_Duration_ofNanos(int64_t l0_n) {
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
 bb0:;
 #line 10
     t0 = l0_n;
 #line 10
-    t1_s = (lyr_ty9_Duration){0}; t1 = &t1_s;
+    t1_s = (lyr_ty24_Duration){0}; t1 = &t1_s;
 #line 10
     t1->f_ns = t0;
 #line 10
@@ -3596,12 +3851,12 @@ bb0:;
 }
 
 #line 12 "stdlib5/std/time.lyr"
-lyr_ty9_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n) {
+lyr_ty24_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
-    lyr_ty9_Duration t3_s = {0};
-    lyr_ty9_Duration *t3 = &t3_s;
+    lyr_ty24_Duration t3_s = {0};
+    lyr_ty24_Duration *t3 = &t3_s;
 bb0:;
 #line 12
     t0 = l0_n;
@@ -3610,7 +3865,7 @@ bb0:;
 #line 12
     t2 = LYR_CHECKED_MUL(t0, t1);
 #line 12
-    t3_s = (lyr_ty9_Duration){0}; t3 = &t3_s;
+    t3_s = (lyr_ty24_Duration){0}; t3 = &t3_s;
 #line 12
     t3->f_ns = t2;
 #line 12
@@ -3618,12 +3873,12 @@ bb0:;
 }
 
 #line 13 "stdlib5/std/time.lyr"
-lyr_ty9_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n) {
+lyr_ty24_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
-    lyr_ty9_Duration t3_s = {0};
-    lyr_ty9_Duration *t3 = &t3_s;
+    lyr_ty24_Duration t3_s = {0};
+    lyr_ty24_Duration *t3 = &t3_s;
 bb0:;
 #line 13
     t0 = l0_n;
@@ -3632,7 +3887,7 @@ bb0:;
 #line 13
     t2 = LYR_CHECKED_MUL(t0, t1);
 #line 13
-    t3_s = (lyr_ty9_Duration){0}; t3 = &t3_s;
+    t3_s = (lyr_ty24_Duration){0}; t3 = &t3_s;
 #line 13
     t3->f_ns = t2;
 #line 13
@@ -3640,9 +3895,9 @@ bb0:;
 }
 
 #line 18 "stdlib5/std/time.lyr"
-int64_t lyr_std_time_Duration_nanos(lyr_ty9_Duration *l0_this) {
-    lyr_ty9_Duration t0_s = {0};
-    lyr_ty9_Duration *t0 = &t0_s;
+int64_t lyr_std_time_Duration_nanos(lyr_ty24_Duration *l0_this) {
+    lyr_ty24_Duration t0_s = {0};
+    lyr_ty24_Duration *t0 = &t0_s;
     int64_t t1 = 0;
 bb0:;
 #line 18
@@ -3658,14 +3913,14 @@ void lyr_main_numbers__body__38e43ecc(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     uint8_t t1 = 0;
-    lyr_ty12_Cancelled *t2 = NULL;
+    lyr_ty27_Cancelled *t2 = NULL;
     LyrIface t3 = {0};
     int64_t t4 = 0;
-    lyr_ty9_Duration t5_s = {0};
-    lyr_ty9_Duration *t5 = &t5_s;
+    lyr_ty24_Duration t5_s = {0};
+    lyr_ty24_Duration *t5 = &t5_s;
     int64_t t6 = 0;
     uint8_t t7 = 0;
-    lyr_ty12_Cancelled *t8 = NULL;
+    lyr_ty27_Cancelled *t8 = NULL;
     LyrIface t9 = {0};
 bb0:;
 #line 26
@@ -3678,9 +3933,9 @@ bb0:;
     if (t1) goto bb1; else goto bb2;
 bb1:;
 #line 26
-    t2 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
+    t2 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
 #line 26
-    t3 = (LyrIface){ t2, &lyr_vt_ty6_ty12 };
+    t3 = (LyrIface){ t2, &lyr_vt_ty6_ty27 };
 #line 26
     lyr_e = lyr_err_new(t3); goto bb3;
 bb2:;
@@ -3706,9 +3961,9 @@ bb4:;
     if (t7) goto bb5; else goto bb6;
 bb5:;
 #line 28
-    t8 = (lyr_ty12_Cancelled *)lyr_alloc(&lyr_desc_ty12_Cancelled);
+    t8 = (lyr_ty27_Cancelled *)lyr_alloc(&lyr_desc_ty27_Cancelled);
 #line 28
-    t9 = (LyrIface){ t8, &lyr_vt_ty6_ty12 };
+    t9 = (LyrIface){ t8, &lyr_vt_ty6_ty27 };
 #line 28
     lyr_e = lyr_err_new(t9); goto bb3;
 bb6:;
@@ -3910,8 +4165,8 @@ bb6:;
 void lyr_main_main__lambda5__9fdac4b5(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     LyrStr *t2 = NULL;
 bb0:;
 #line 55
@@ -3938,8 +4193,8 @@ bb2:;
 void lyr_main_main__lambda6__1dd33c4a(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     LyrStr *t2 = NULL;
 bb0:;
 #line 59
@@ -3966,8 +4221,8 @@ bb2:;
 void lyr_main_main__lambda7__9fd64787(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     LyrStr *t2 = NULL;
 bb0:;
 #line 63
@@ -4006,8 +4261,8 @@ bb0:;
 void lyr_main_main__lambda9__9ff8d9c9(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     LyrStr *t2 = NULL;
 bb0:;
 #line 75
@@ -4034,8 +4289,8 @@ bb2:;
 void lyr_main_main__lambda10__e3b420f3(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
-    lyr_ty9_Duration t1_s = {0};
-    lyr_ty9_Duration *t1 = &t1_s;
+    lyr_ty24_Duration t1_s = {0};
+    lyr_ty24_Duration *t1 = &t1_s;
     LyrStr *t2 = NULL;
 bb0:;
 #line 86
@@ -4058,66 +4313,99 @@ bb2:;
     return;
 }
 
-#line 1100 "stdlib5/std/task.lyr"
+#line 1285 "stdlib5/std/task.lyr"
 void lyr_std_task_spawnDetached__lambda11__30483b1d(void *lyr_env, LyrErr **lyr_err) {
-    lyr_ty11__env_std_task_spawnDetached_ *l0__env_ = (lyr_ty11__env_std_task_spawnDetached_ *)lyr_env;
+    lyr_ty26__env_std_task_spawnDetached_ *l0__env_ = (lyr_ty26__env_std_task_spawnDetached_ *)lyr_env;
     (void)lyr_err;
     LyrErr *lyr_e = NULL;
-    lyr_ty11__env_std_task_spawnDetached_ *t0 = NULL;
+    lyr_ty26__env_std_task_spawnDetached_ *t0 = NULL;
     lyr_fn_to_void t1 = {0};
     LyrIface t2 = {0};
     uint8_t t3 = 0;
 bb0:;
-#line 1100
+#line 1285
     t0 = l0__env_;
-#line 1100
+#line 1285
     t1 = t0->f_body;
-#line 1100
+#line 1285
     t1.fn(t1.env, &lyr_e);
-#line 1100
+#line 1285
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
-#line 1099
+#line 1284
     t2 = lyr_e->value;
-#line 1101
-    t3 = ((*(const LyrDesc *const *)t2.vt) == &lyr_desc_ty12_Cancelled);
-#line 1101
+#line 1286
+    t3 = ((*(const LyrDesc *const *)t2.vt) == &lyr_desc_ty27_Cancelled);
+#line 1286
     if (t3) goto bb3; else goto bb4;
 bb2:;
-#line 1099
+#line 1284
     goto bb6;
 bb3:;
-#line 1101
+#line 1286
     lyr_e = NULL;
-#line 1099
+#line 1284
     goto bb6;
 bb4:;
-#line 1099
+#line 1284
     goto bb5;
 bb5:;
-#line 1099
+#line 1284
     __builtin_unreachable();
 bb6:;
-#line 1098
+#line 1283
     return;
 }
 
-#line 1574 "stdlib5/std/task.lyr"
+#line 1503 "stdlib5/std/task.lyr"
 void lyr__globals__9ee5f9b5(void) {
-    int64_t t0 = 0;
-    lyr_ty2_Atomic_int_ *t1 = NULL;
-    LyrStr *t2 = NULL;
+    uint8_t t0 = 0;
+    lyr_ty3_Atomic_bool_ *t1 = NULL;
+    lyr_ty8_SpinLock *t2 = NULL;
+    lyr_ty10_Subscription *t3 = NULL;
+    int64_t t4 = 0;
+    uint8_t t5 = 0;
+    lyr_ty9_SignalHub *t6 = NULL;
+    int64_t t7 = 0;
+    lyr_ty2_Atomic_int_ *t8 = NULL;
+    LyrStr *t9 = NULL;
 bb0:;
-#line 1574
-    t0 = (int64_t)INT64_C(0);
-#line 1574
-    t1 = lyr_std_sync_Atomic_int__new_67eb632f(t0);
-#line 1574
-    lyr_g0_channelIds = t1;
+#line 1503
+    t0 = 0;
+#line 1503
+    t1 = lyr_std_sync_Atomic_bool__new_3915f520(t0);
+#line 1012
+    t2 = (lyr_ty8_SpinLock *)lyr_alloc(&lyr_desc_ty8_SpinLock);
+#line 1012
+    LYR_WRITE_BARRIER(t2, &t2->f_held, t1);
+#line 1013
+    t3 = NULL;
+#line 1014
+    t4 = (int64_t)INT64_C(0);
+#line 1015
+    t5 = 0;
+#line 1083
+    t6 = (lyr_ty9_SignalHub *)lyr_alloc(&lyr_desc_ty9_SignalHub);
+#line 1083
+    LYR_WRITE_BARRIER(t6, &t6->f_guard, t2);
+#line 1083
+    LYR_WRITE_BARRIER(t6, &t6->f_first, t3);
+#line 1083
+    t6->f_caught = t4;
+#line 1083
+    t6->f_watching = t5;
+#line 1083
+    lyr_g0_signalHub = t6;
+#line 1781
+    t7 = (int64_t)INT64_C(0);
+#line 1781
+    t8 = lyr_std_sync_Atomic_int__new_67eb632f(t7);
+#line 1781
+    lyr_g1_channelIds = t8;
 #line 14 "programs/tasks.lyr"
-    t2 = (LyrStr *)&lyr_lit0;
+    t9 = (LyrStr *)&lyr_lit0;
 #line 14
-    lyr_g1_log = t2;
+    lyr_g2_log = t9;
     return;
 }
 

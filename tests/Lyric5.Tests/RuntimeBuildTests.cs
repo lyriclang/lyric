@@ -63,6 +63,11 @@ public class RuntimeBuildTests
         // one path raced (seen on Windows).
         RunC(WriteUnits(units, name), "emitted-" + name, profile, compiler, args);
 
+    /// <summary>The emitter's units built as <see cref="RunEmitted"/> builds them, and not run: the
+    /// program's path, for a test that drives it itself — sends it signals (M6 S7).</summary>
+    internal static string BuildEmitted(IReadOnlyList<CEmitter.Unit> units, string name, Profile profile) =>
+        BuildC(WriteUnits(units, name), "emitted-" + name, profile, null);
+
     /// <summary>Where <see cref="RunEmitted"/> put the program: to run it again, timed.</summary>
     internal static string EmittedBinary(string name, Profile profile) =>
         Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), "emitted-" + name + Target.Host.ExecutableSuffix);
@@ -96,6 +101,10 @@ public class RuntimeBuildTests
         RunC([source], name, profile, compiler, args, defines, beside);
 
     private static ProcessRunner.Result RunC(string[] sources, string name, Profile profile, CCompiler? compiler, string[]? args,
+        string[]? defines = null, string? beside = null) =>
+        ProcessRunner.Run(BuildC(sources, name, profile, compiler, defines, beside), args ?? [], TimeSpan.FromMinutes(2));
+
+    private static string BuildC(string[] sources, string name, Profile profile, CCompiler? compiler,
         string[]? defines = null, string? beside = null)
     {
         var build = new CBuild(compiler ?? Zig(), Target.Host, profile, Cache);
@@ -104,8 +113,7 @@ public class RuntimeBuildTests
         var units = sources.Select(source => new CUnit(source, defines ?? [], includes)).ToList();
         if (beside is not null) units.Add(new CUnit(beside, [], includes));
         var objects = build.Compile(units);
-        var exe = build.LinkExecutable([.. objects, archive],
+        return build.LinkExecutable([.. objects, archive],
             Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), name + Target.Host.ExecutableSuffix));
-        return ProcessRunner.Run(exe, args ?? [], TimeSpan.FromMinutes(2));
     }
 }
