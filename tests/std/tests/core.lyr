@@ -1,0 +1,53 @@
+// std.core: what the language binds without an import, and the helpers synthesized members call.
+import std.test { assertEq, assertTrue, assertFalse };
+import std.core { arrayOf, repeatArray, debugArray, debugOptional, equalArrays, equalOptionals, hashArray, cloneArray };
+
+@Test
+fn arrayOfMakesEachElementFromItsIndex(): void {
+    let xs = arrayOf(4, (i: int) => i * i);
+    assertEq(xs.length(), 4);
+    assertEq(xs[0], 0);
+    assertEq(xs[3], 9);
+}
+
+@Test
+fn arrayOfZeroIsEmpty(): void {
+    assertEq(arrayOf(0, (i: int) => i).length(), 0);
+}
+
+@Test
+fn equalArraysComparesElementByElement(): void {
+    assertTrue(equalArrays([1, 2, 3], [1, 2, 3]));
+    assertFalse(equalArrays([1, 2, 3], [1, 2]));
+    assertFalse(equalArrays([1, 2, 3], [1, 2, 4]));
+}
+
+@Test
+fn equalOptionalsHoldsForBothAbsent(): void {
+    let none: ?int = null;
+    let five: ?int = 5;
+    assertTrue(equalOptionals(none, none));
+    assertFalse(equalOptionals(none, five));
+    assertTrue(equalOptionals(five, five));
+}
+
+@Test
+fn debugWritesStringsQuoted(): void {
+    assertEq(debugArray(["a", "b"]), "[\"a\", \"b\"]");
+    assertEq(debugArray([1, 2]), "[1, 2]");
+    let none: ?int = null;
+    assertEq(debugOptional(none), "null");
+}
+
+@Test
+fn equalArraysHashEqual(): void {
+    assertEq(hashArray([1, 2, 3]), hashArray([1, 2, 3]));
+}
+
+@Test
+fn aRepeatedArrayClonesEachSlot(): void {
+    let xs = repeatArray(["a", "b"], 2);
+    assertEq(xs.length(), 4);
+    assertEq(xs[2], "a");
+    assertEq(cloneArray(xs).length(), 4);
+}

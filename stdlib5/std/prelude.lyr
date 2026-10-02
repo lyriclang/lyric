@@ -25,5 +25,6 @@ pub import std.core {
     Debug,
     Default,
     Clone,
-    Closeable
+    Closeable,
+    Test
 };

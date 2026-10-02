@@ -32,8 +32,12 @@ public static class Pipeline
         {
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
             PackageDependencies = project.DeclaredDependencies,
+            PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
         };
-        var result = SourceCompiler.Lower(ScriptSource.FromDisk(project.Source, project.Module), options);
+        var source = project.EntryText is { } text
+            ? ScriptSource.FromText(project.Module, text)
+            : ScriptSource.FromDisk(project.Source, project.Module);
+        var result = SourceCompiler.Lower(source, options);
         if (!result.Render(error) || result.Ir is null) return null;
         if (Denied(result, profile, error)) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
@@ -209,6 +213,13 @@ public static class Pipeline
         else
         {
             parts.Add(File.ReadAllText(project.Source));
+        }
+        // The test program: what the toolchain wrote, and the package's tests/ it reads.
+        if (project.EntryText is { } text) parts.Add(text);
+        if (project.TestRoot is { } tests)
+        {
+            parts.Add("tests/");
+            AddTree(parts, tests);
         }
         AddTree(parts, StdlibRoot);
         return Key([.. parts]);

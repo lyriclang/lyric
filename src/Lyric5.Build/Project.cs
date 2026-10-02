@@ -38,15 +38,25 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <summary>The name a <c>[[bin]]</c> gives the program (11 W2 P2); <c>null</c> for every other.</summary>
     public string? Binary { get; init; }
 
+    /// <summary>The package's <c>tests/</c> (07 V4), where the program is <c>lyric test</c>'s;
+    /// <c>null</c> for every other.</summary>
+    public string? TestRoot { get; init; }
+
+    /// <summary>The entry module's text where the toolchain writes it — the test program —;
+    /// <c>null</c> where <see cref="Source"/> holds it.</summary>
+    public string? EntryText { get; init; }
+
     public string OutDir => Path.Combine(Root, "out");
 
     public string CacheDir => Path.Combine(OutDir, "cache");
 
     /// <summary>The binary: named after the package for its <c>src/main.lyr</c>, as its <c>[[bin]]</c>
     /// says for another program (P2), after the module's last segment for another module run as a
-    /// program (07 M7a) — beside it, not over it.</summary>
-    public string Executable(BuildProfile profile, Target target) =>
-        Path.Combine(OutDir, profile.Name, target.Triple, BinaryName + target.ExecutableSuffix);
+    /// program (07 M7a) — beside it, not over it; the test program's under <c>test/</c>, where no
+    /// program's name can reach it.</summary>
+    public string Executable(BuildProfile profile, Target target) => TestRoot is null
+        ? Path.Combine(OutDir, profile.Name, target.Triple, BinaryName + target.ExecutableSuffix)
+        : Path.Combine(OutDir, profile.Name, target.Triple, "test", BinaryName + target.ExecutableSuffix);
 
     public string BinaryName =>
         Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
@@ -111,6 +121,24 @@ public sealed record Project(string Source, string Name, string Module, string R
         }
         if (programs.Count == 0) throw new LibraryException(manifest, graph);
         return programs;
+    }
+
+    /// <summary>The test program of the package of a directory — the nearest manifest at or above
+    /// it — (07 V4): named after the package, its entry the module <c>lyric test</c> writes. A
+    /// library has one as well. <c>null</c> where there is no manifest.</summary>
+    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
+    /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
+    public static Project? TestsOf(string directory, bool offline = false)
+    {
+        if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
+        var manifest = Manifest.Read(manifestFile);
+        return new Project(Path.Combine(manifest.Root, "tests", TestRun.DriverModule + ".lyr"), manifest.Name,
+            $"{manifest.Name}.{TestRun.DriverModule}", manifest.Root, manifest)
+        {
+            Graph = Resolve(manifest, offline),
+            Binary = manifest.Name,
+            TestRoot = Path.Combine(manifest.Root, "tests"),
+        };
     }
 
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its

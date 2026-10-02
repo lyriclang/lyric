@@ -1,0 +1,4 @@
+[package]
+name = "stdtests"
+version = "0.1.0"
+description = "The standard library's own tests, which lyric test runs (design/v5/spec/13 M8a)"

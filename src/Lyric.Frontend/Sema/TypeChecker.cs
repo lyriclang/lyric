@@ -434,8 +434,9 @@ public sealed class TypeChecker
         switch (decl)
         {
             case FunctionDecl fn:
-                CheckAttributes(fn.Attributes, AttributeTarget.Function, fn.Generics.Length > 0,
+                var fnAttributes = CheckAttributes(fn.Attributes, AttributeTarget.Function, fn.Generics.Length > 0,
                     module.Members, "a function");
+                if (fnAttributes.Exists(IsCanonicalTest)) CheckTest(fn, module);
                 RequireBody(fn, module);
                 CheckFunction(fn, module.Members, thisType: null);
                 break;
@@ -6184,11 +6185,11 @@ public sealed class TypeChecker
     /// emitted row carries EVERY field, a field the use does not write needs a literal default.
     /// </para>
     /// </summary>
-    private void CheckAttributes(AttributeNode[] attributes, AttributeTarget target,
+    /// <returns>The attributes' types, each once: what a declaration's own rules ask after
+    /// (<see cref="CheckTest"/>).</returns>
+    private List<TypeSymbol> CheckAttributes(AttributeNode[] attributes, AttributeTarget target,
         bool targetIsGeneric, SymbolTable scope, string targetDescription)
     {
-        if (attributes.Length == 0) return;
-
         // Duplicates by resolved symbol, not by written path: two spellings of one type are still
         // one metadata row too many.
         var seen = new List<TypeSymbol>();
@@ -6202,6 +6203,26 @@ public sealed class TypeChecker
             else
                 seen.Add(ts);
         }
+        return seen;
+    }
+
+    /// <summary>
+    /// A function marked <c>@Test</c> (design/v5/spec/10 B12 X2, 09 A11): <c>lyric test</c> calls
+    /// it from a module of its own and with nothing, so it takes no parameters, returns nothing
+    /// and is not private. It may throw — an error that leaves it fails the test. A generic one is
+    /// refused already, as every attribute on a generic declaration is (SEM0067).
+    /// </summary>
+    private void CheckTest(FunctionDecl fn, ModuleSymbol module)
+    {
+        string? fault = null;
+        if (fn.Parameters.Length > 0)
+            fault = "takes no parameters — `lyric test` calls it with none";
+        else if (module.Members.FunctionFor(fn.Name, fn) is { } symbol && !LyrType.Equal(FnTypeOf(symbol).Return, LyrType.Void))
+            fault = "returns nothing — `lyric test` has no use for a value";
+        else if (fn.Visibility == VisibilityWord.Private)
+            fault = "is not private — `lyric test` calls it from a module of its own";
+        if (fault is not null)
+            _de.Report("LYR-SEM0154", Severity.Error, fn.NameSpan, $"a test {fault}");
     }
 
     /// <returns>The resolved attribute type, or <c>null</c> when the name resolved to nothing an
@@ -9058,6 +9079,11 @@ public sealed class TypeChecker
     /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
     private bool IsAny(LyrType type) =>
         TypeFacts.SymbolOf(type) is { } ts && ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
+
+    /// <summary>Whether this is THE <c>Test</c> attribute of <c>std.core</c> (09 A3): by identity —
+    /// a <c>Test</c> struct of a program's own is data, not a test.</summary>
+    private bool IsCanonicalTest(TypeSymbol ts) =>
+        ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Test"));
 
     /// <summary>Whether this is THE <c>Deprecated</c> struct of <c>std.core</c> — by identity,
     /// the same rule the WarningAnalyzer applies when it reads the attribute.</summary>
