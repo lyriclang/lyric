@@ -81,6 +81,19 @@ public static class IrVerifier
             findings.Add($"global initializer {init} is out of range " +
                          $"(module has {module.Functions.Count} function(s))");
 
+        // The scheduler loop the runtime hands main's context to (06 T6): a C function pointer of
+        // one shape, 'void (*)(LyrCoro *)' — a coroutine of nothing in, nothing out, no error slot.
+        if (module.TaskMain is { } loop)
+        {
+            if (loop.Value < 0 || loop.Value >= module.Functions.Count)
+                findings.Add($"task main {loop} is out of range (module has {module.Functions.Count} function(s))");
+            else if (module.Functions[loop.Value] is var function
+                     && (function.ParamCount != 1 || function.Throws
+                         || function.Locals[0].Type is not IrCoroutineType { Yield: IrScalarType { Kind: IrScalar.Void }, Result: IrScalarType { Kind: IrScalar.Void } }
+                         || function.ReturnType is not IrScalarType { Kind: IrScalar.Void }))
+                findings.Add($"task main {function.Name} is not 'fn(coroutine<void, void>): void' without throws");
+        }
+
         // Globals without an initializer would be uninitialized slots, and every value in Lyric has
         // one. Either both exist or neither does.
         if (module.Globals.Count > 0 && module.GlobalInit is null)

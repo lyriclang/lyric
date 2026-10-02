@@ -651,6 +651,7 @@ void lyr_coro_yield_dynamic(void *value, const char *key) {
     CoroThread *ts = this_thread();
     LyrCoro *co = ts->current;
     if (LYR_UNLIKELY(co == NULL)) lyr_panic(LYR_RT_COROUTINE, "a yield with no coroutine running — on the thread's own stack");
+    if (LYR_UNLIKELY(co->task)) lyr_panic(LYR_RT_COROUTINE, "a yield of '%s' in a task, where no generator runs", key);
     if (LYR_UNLIKELY(co->yield_key != NULL && strcmp(co->yield_key, key) != 0)) {
         lyr_panic(LYR_RT_COROUTINE, "a yield of '%s' where the running coroutine yields '%s'", key, co->yield_key);
     }

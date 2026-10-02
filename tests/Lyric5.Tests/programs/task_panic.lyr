@@ -1,0 +1,13 @@
+// A panic in a task (design/v5/spec/06 T4, before S4 isolates it): the program ends, with a
+// trace from the panic through the task's body — the lambda, then std.task's wrapper around it —
+// and no further: no thunk, no runtime frame. Exit 101.
+import std.task { spawnDetached, yieldNow, Cancelled };
+
+fn boom(): void {
+    panic("boom");
+}
+
+fn main(): void throws Cancelled {
+    spawnDetached(() => { boom(); });
+    try yieldNow();
+}

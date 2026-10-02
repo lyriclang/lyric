@@ -224,6 +224,16 @@ public class IrModule(List<IrFunction> Functions)
     /// </summary>
     public FunctionId? GlobalInit { get; set; }
 
+    /// <summary>
+    /// std.task's scheduler loop where <c>main</c> is a task (design/v5/spec/06 T6), or <c>null</c>.
+    ///
+    /// <para>Set when what the program reaches asks for its thread's scheduler — it waits somewhere:
+    /// then the runtime hands main's context to this function, which runs until that context is
+    /// done, instead of calling the entry on the thread's own stack. A program that never waits
+    /// cannot tell the two apart.</para>
+    /// </summary>
+    public FunctionId? TaskMain { get; set; }
+
     /// <summary>The vtable rows. They land as the Impls section in the bytecode; the runtime builds its
     /// dispatch table from them at load time, so <c>callvirt</c> is a lookup rather than a
     /// search.</summary>

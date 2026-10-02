@@ -1,0 +1,90 @@
+// Tasks (design/v5/spec/06 N4-N9, T5, T6; 10 §2): main is a task where the program waits.
+// Expected stdout:
+//   ready a b c main            detached tasks run in the order they became ready, main behind them
+//   turns a1 b1 a2 b2 a3 b3     yieldNow takes turns
+//   asleep 20 70 120            sleepers wake by their deadlines, not in the order they fell asleep
+//   zero z main                 a sleep of zero lets the ready tasks run first
+//   chain 1 other 2 end         a generator in main sleeps between its yields: main's task parks
+//   done                        and a task still asleep never runs again: the program ends with main
+// Exit 0, after 280 ms of sleeping in main and long before the last task's 30 s.
+import std.io { println };
+import std.task { sleep, yieldNow, spawnDetached, Cancelled };
+import std.time { Duration };
+
+var log = "";
+
+fn note(s: string): void {
+    log = if (log == "") s else log + " " + s;
+}
+
+fn flush(title: string): void {
+    println(title + " " + log);
+    log = "";
+}
+
+fn numbers(): Coroutine<int> {
+    yield 1;
+    try sleep(Duration.ofMillis(30));
+    yield 2;
+}
+
+fn main(): void throws Cancelled {
+    spawnDetached(() => { note("a"); });
+    spawnDetached(() => { note("b"); });
+    spawnDetached(() => { note("c"); });
+    try yieldNow();
+    note("main");
+    flush("ready");
+
+    spawnDetached(() => {
+        for (i in 1..4) {
+            note(f"a{i}");
+            try yieldNow();
+        }
+    });
+    spawnDetached(() => {
+        for (i in 1..4) {
+            note(f"b{i}");
+            try yieldNow();
+        }
+    });
+    try sleep(Duration.ofMillis(50));
+    flush("turns");
+
+    spawnDetached(() => {
+        try sleep(Duration.ofMillis(120));
+        note("120");
+    });
+    spawnDetached(() => {
+        try sleep(Duration.ofMillis(20));
+        note("20");
+    });
+    spawnDetached(() => {
+        try sleep(Duration.ofMillis(70));
+        note("70");
+    });
+    try sleep(Duration.ofMillis(200));
+    flush("asleep");
+
+    spawnDetached(() => { note("z"); });
+    try sleep(Duration.ofNanos(0));
+    note("main");
+    flush("zero");
+
+    spawnDetached(() => {
+        try sleep(Duration.ofMillis(10));
+        note("other");
+    });
+    let gen = numbers();
+    while (let n = gen.next()) {
+        note(f"{n}");
+    }
+    note("end");
+    flush("chain");
+
+    spawnDetached(() => {
+        try sleep(Duration.ofSecs(30));
+        println("never");
+    });
+    println("done");
+}

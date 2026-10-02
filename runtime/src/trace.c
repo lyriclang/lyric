@@ -349,7 +349,8 @@ static int is_runtime_frame(const Frame *frame) {
     return starts_with(frame->function, "lyr_panic") || starts_with(frame->function, "lyr_crash") ||
            starts_with(frame->function, "lyr_trace") || starts_with(frame->function, "lyr_err_new") ||
            starts_with(frame->function, "lyr_coro_resume") || starts_with(frame->function, "lyr_coro_yield") ||
-           starts_with(frame->function, "lyr_coro_close") || starts_with(frame->function, "lyr_poller");
+           starts_with(frame->function, "lyr_coro_close") || starts_with(frame->function, "lyr_poller") ||
+           starts_with(frame->function, "lyr_task_wait") || starts_with(frame->function, "lyr_task_start");
 }
 
 static int same_text(const char *a, const char *b) {
@@ -423,12 +424,14 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
     }
     /* The program's frames end at the runtime's entry — or at the emitted glue that calls main from
      * there, 'lyr_entry', whose line is whatever '#line' stood last — or, on a coroutine's stack,
-     * at the emitted runner that calls the body ('lyr_corun'), or the runtime's frame below it. */
+     * at the emitted runner that calls the body ('lyr_corun'), at a task's body or main's as a
+     * task ('lyr_task_run', 'lyr_task_main'), or the runtime's frame below them. */
     int end = trace.count, reached_main = 0;
     for (int i = start; i < trace.count; i++) {
         const char *function = trace.frames[i].function;
         if (function && (strcmp(function, "lyr_run_main") == 0 || strcmp(function, "lyr_entry") == 0
-                         || strcmp(function, "lyr_coro_main") == 0 || starts_with(function, "lyr_corun"))) {
+                         || strcmp(function, "lyr_coro_main") == 0 || starts_with(function, "lyr_corun")
+                         || strcmp(function, "lyr_task_run") == 0 || strcmp(function, "lyr_task_main") == 0)) {
             end = i;
             reached_main = 1;
             break;
@@ -439,6 +442,9 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
     int repeats = 0;
     for (int i = start; i < end && used + 1 < capacity; i++) {
         const Frame *frame = &trace.frames[i];
+        /* The emitted thunk that makes a function without an environment a function value (01 V8):
+         * glue, at a line of the C file — the frames around it are the program's. */
+        if (frame->function && starts_with(frame->function, "lyr_thunk_")) continue;
         /* A recursion — a stack overflow's usual cause — shows its frame once, and a count. */
         if (i > start && same_place(frame, &trace.frames[i - 1])) {
             repeats++;

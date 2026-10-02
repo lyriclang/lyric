@@ -174,7 +174,7 @@ public static class ModuleLowerer
                         var returned = NativeStructParameter(module, returnNode, typeTable, binding);
                         var wireReturn = returned is { } r
                             ? new IrScalarType(IrScalar.Void)
-                            : DeclaredTypes.Lower(returnNode, host);
+                            : NativeType(returnNode, host, typeTable, function);
                         if (returned is { } outParam)
                             flattened = [.. flattened, outParam.Declared];
 
@@ -544,6 +544,15 @@ public static class ModuleLowerer
         };
         if (failed) return null;
 
+        // main is a task where the program waits (06 T6): when what it reaches asks for its
+        // thread's scheduler, std.task's loop runs main's context. A program that never waits runs
+        // main on the thread's own stack, and cannot tell.
+        if (entry is not null
+            && compilation.FindModule(["std", "task"])?.Members.LookupLocal("runMain") is FunctionSymbol loop
+            && ids.TryGetValue(loop, out var loopId)
+            && Reachability.CallsImport(result, "std.task.currentScheduler"))
+            result.TaskMain = loopId;
+
         var verifies = verify ?? VerifyByDefault;
         if (timings is not null) timings.Verified = verifies;
 
@@ -712,13 +721,33 @@ public static class ModuleLowerer
             }
             else
             {
-                var lowered = DeclaredTypes.Lower(node, host);
+                var lowered = NativeType(node, host, typeTable, function);
                 shape[i] = new ImportParam(lowered, null, []);
                 flattened.Add(lowered);
             }
         }
 
         return (flattened.ToArray(), shape);
+    }
+
+    /// <summary>
+    /// A type in a native's signature: what a host binds by layout — a primitive, an optional, a
+    /// host type, an array of primitives — as <see cref="DeclaredTypes"/> has it. Beyond that, for
+    /// the standard library's own natives only, what the runtime holds without knowing a layout
+    /// (design/v5/spec/06 N6 S1, 13 §1.6): a reference — an object, a coroutine — or a function
+    /// value, whose two words the runtime's ABI fixes (01 V8). An 'extern' keeps the host's set.
+    /// </summary>
+    private static IrType NativeType(TypeNode? node, Func<TypeNode, string?> host, TypeTable typeTable,
+        FunctionDecl function)
+    {
+        try
+        {
+            return DeclaredTypes.Lower(node, host);
+        }
+        catch (UnsupportedConstructException) when (function.Extern is null && node is not null)
+        {
+            return typeTable.Lower(node);
+        }
     }
 
     /// <summary>An initializer with nothing to initialize: the carrier for injected buffer

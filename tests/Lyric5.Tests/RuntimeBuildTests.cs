@@ -63,6 +63,10 @@ public class RuntimeBuildTests
         // one path raced (seen on Windows).
         RunC(WriteUnits(units, name), "emitted-" + name, profile, compiler, args);
 
+    /// <summary>Where <see cref="RunEmitted"/> put the program: to run it again, timed.</summary>
+    internal static string EmittedBinary(string name, Profile profile) =>
+        Path.Combine(Cache, "bin", Target.Host.Triple, profile.Name(), "emitted-" + name + Target.Host.ExecutableSuffix);
+
     /// <summary>One file per unit under <c>emitted/&lt;name&gt;/</c>, the module's first.</summary>
     private static string[] WriteUnits(IReadOnlyList<CEmitter.Unit> units, string name)
     {

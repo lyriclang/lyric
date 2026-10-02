@@ -58,6 +58,7 @@ public class SanitizerTests
         { "coro_park", [], 0 },
         { "coro_threads", [], 0 },
         { "poll_basic", [], 0 },
+        { "task_main", [], 7 },
         { "coro_storm", [], 0 },
     };
 
@@ -68,6 +69,7 @@ public class SanitizerTests
         // A coroutine is a fiber to TSan; the collections between the switches order them.
         { "coro_basic", [], 0 },
         { "coro_park", [], 0 },
+        { "task_main", [], 7 },
         { "coro_gc", [], 0 },
     };
 
@@ -115,6 +117,9 @@ public class SanitizerTests
     [InlineData("generators_close", 0)]
     [InlineData("generator_lambdas", 0)]
     [InlineData("dynamic_yields", 0)]
+    [InlineData("tasks", 0)]
+    [InlineData("task_panic", 101)]
+    [InlineData("yield_in_task", 101)]
     [InlineData("yield_mismatch", 101)]
     [InlineData("close_yield", 101)]
     public void A_coroutine_program_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);

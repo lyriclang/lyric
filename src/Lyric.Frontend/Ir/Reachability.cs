@@ -71,6 +71,8 @@ internal static class Reachability
             module.EntryFunction = new FunctionId(neueId[start.Value]);
         if (module.GlobalInit is { } init && neueId.TryGetValue(init.Value, out var initNeu))
             module.GlobalInit = new FunctionId(initNeu);
+        if (module.TaskMain is { } loop)
+            module.TaskMain = new FunctionId(neueId[loop.Value]);
         for (var i = 0; i < module.ExportRoots.Count; i++)
             module.ExportRoots[i] = new FunctionId(neueId[module.ExportRoots[i].Value]);
 
@@ -97,6 +99,19 @@ internal static class Reachability
         module.Impls.AddRange(impls);
     }
 
+    /// <summary>Whether a function reachable from the roots calls the native of that name.</summary>
+    public static bool CallsImport(IrModule module, string name)
+    {
+        var target = module.Imports.FindIndex(import => import.Name == name);
+        if (target < 0) return false;
+        foreach (var function in Collect(module))
+            foreach (var block in module.Functions[function].Blocks)
+                foreach (var op in block.Insts)
+                    if (op is CallImport call && call.Target.Value == target)
+                        return true;
+        return false;
+    }
+
     /// <summary>
     /// Collects transitively what is reachable from the roots.
     /// </summary>
@@ -121,6 +136,7 @@ internal static class Reachability
 
         Wurzel(module.EntryFunction);
         Wurzel(module.GlobalInit);
+        Wurzel(module.TaskMain);
         foreach (var export in module.ExportRoots) Wurzel(export);
 
         // An attributed function is a root: the row in section 11 is a promise to the host that
