@@ -2396,7 +2396,7 @@ public sealed class TypeChecker
     {
         // 'break outr;' where no loop is labeled so and nothing is named so: the parser took the name
         // for a value, and the mistake is the label's.
-        if (br.Value is IdentifierExpr { Name: var name } lost && scope.Lookup(name) is null && CoreMember(name) is null)
+        if (br.Value is IdentifierExpr { Name: var name } lost && scope.Lookup(name) is null && ImplicitMember(lost, name) is null)
         {
             _de.Report("LYR-SEM0101", Severity.Error, lost.Span,
                 $"no enclosing loop is labeled '{name}', and no value is named so");
@@ -2813,7 +2813,7 @@ public sealed class TypeChecker
             return FnTypeOf(matching[0]);
         }
 
-        var sym = scope.Lookup(id.Name) ?? CoreMember(id.Name); // 'Ordering.Less', 'debugArray(xs)': std.core, unasked (10 U-series)
+        var sym = NameOf(id, scope); // 'Ordering.Less' through the prelude; 'debugArray(xs)', the compiler's, through std.core
         if (sym is null)
             return Report(id.Span, "LYR-SEM0002", $"unknown identifier '{id.Name}'",
                 NameSuggestion.Note(id.Name, NamesIn(scope, typesOnly: false)));
@@ -2900,8 +2900,10 @@ public sealed class TypeChecker
         {
             case IdentifierExpr id:
             {
-                var set = scope.Overloads(id.Name);
-                if (set.Count == 0) set = CoreOverloads(id.Name);
+                // A desugared operator calls std.core's helper whatever the scope holds.
+                var set = _compilerWritten.Contains(id) && CoreOverloads(id.Name) is { Count: > 0 } helpers
+                    ? helpers : scope.Overloads(id.Name);
+                if (set.Count == 0) set = ImplicitOverloads(id, id.Name);
                 return set.Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
             }
 
@@ -3173,7 +3175,7 @@ public sealed class TypeChecker
         // VALUE it is refused (fn values are monomorphic, §8.1), as a callee the inference is
         // about to substitute it. The import shell stays the bound symbol, as CheckIdentifier
         // binds it, so unused-import accounting sees the same reference either way.
-        if (callee is IdentifierExpr gid && (scope.Lookup(gid.Name) ?? CoreMember(gid.Name)) is { } found // 'debugArray(xs)': std.core, unasked
+        if (callee is IdentifierExpr gid && NameOf(gid, scope) is { } found // 'debugArray(xs)': the compiler's, std.core
             && (found is ImportBindingSymbol ib ? ib.Target : found)
                 is FunctionSymbol { Generics.Length: > 0 } generic)
         {
@@ -3557,7 +3559,9 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType DesugarToFreeCall(BinaryExpr b, string function, SymbolTable scope, params Expr[] args)
     {
-        var call = new CallExpr(new IdentifierExpr(function, b.Span), args, b.Span);
+        var helper = new IdentifierExpr(function, b.Span);
+        _compilerWritten.Add(helper); // std.core's helper, not a name of the program's that happens to match
+        var call = new CallExpr(helper, args, b.Span);
         var type = CheckExpr(call, scope);
         if (type.IsError) return LyrType.Error;
         _result.DesugarOperator(b, call);
@@ -6765,8 +6769,7 @@ public sealed class TypeChecker
     {
         // A public type of std.core is visible without an import (design/v5/spec/10 U-series), in
         // an initializer as in a type position: 'Exception { text = "…" }'. The scope wins.
-        var cur = scope.Lookup(path[0])
-            ?? (_comp.FindModule(["std", "core"])?.Members.LookupLocal(path[0]) is TypeSymbol { Visibility: Visibility.Public } core ? core : null);
+        var cur = scope.Lookup(path[0]) ?? ImplicitType(span.File, path[0]);
         if (cur is ImportBindingSymbol ib0) cur = ib0.Target;
         TypeSymbol? owner = null;
         for (var i = 1; i < path.Length && cur is not null; i++)
@@ -8932,7 +8935,7 @@ public sealed class TypeChecker
         // A public type of 'std.core' is visible without an import (10 U-series): the last
         // answer, after the scope — the resolver's rule, repeated for the names only the sema
         // reaches.
-        var head = scope.Lookup(path[0]) ?? (path.Length == 1 ? CoreType(path[0]) : null);
+        var head = scope.Lookup(path[0]) ?? (path.Length == 1 ? ImplicitType(span.File, path[0]) : null);
         if (head is null || path.Length == 1) return head;
         for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod }; i++)
         {
@@ -8952,6 +8955,37 @@ public sealed class TypeChecker
 
     private static LyrType FloatSuffixType(FloatSuffix s) =>
         new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float);
+
+    /// <summary>
+    /// The calls the compiler writes itself — a desugared operator's helper (03 O6) —, by node:
+    /// they name std.core's helper first, whatever the program's scope holds, and std.core rather
+    /// than the prelude.
+    /// </summary>
+    private readonly HashSet<Node> _compilerWritten = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Whether <paramref name="at"/> is code the compiler wrote: a desugared call, or a
+    /// synthesized conformance (04 D7).</summary>
+    private bool WrittenByCompiler(Node at) => _compilerWritten.Contains(at) || _comp.IsSynthesized(at.Span.File);
+
+    /// <summary>What a bare name means: for a call the compiler wrote, std.core's helper first;
+    /// else the scope, then what is named without an import.</summary>
+    private Symbol? NameOf(IdentifierExpr id, SymbolTable scope) =>
+        _compilerWritten.Contains(id)
+            ? CoreMember(id.Name) ?? scope.Lookup(id.Name)
+            : scope.Lookup(id.Name) ?? ImplicitMember(id, id.Name);
+
+    /// <summary>A name not in scope (design/v5/spec/07 V3 I8): the prelude's in a program's own
+    /// code, std.core's in what the compiler wrote — and for the 4.x tools, as before.</summary>
+    private Symbol? ImplicitMember(Node at, string name) =>
+        _comp.Lyric5Modules && !WrittenByCompiler(at)
+            ? _comp.PreludeMember(name) is (TypeSymbol or FunctionSymbol) and var passed ? passed : null
+            : CoreMember(name);
+
+    private IReadOnlyList<FunctionSymbol> ImplicitOverloads(Node at, string name) =>
+        _comp.Lyric5Modules && !WrittenByCompiler(at) ? _comp.PreludeOverloads(name) : CoreOverloads(name);
+
+    private TypeSymbol? ImplicitType(FileId file, string name) =>
+        _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
     /// <summary>A public type of <c>std.core</c>, visible without an import (10 U-series).</summary>
     private TypeSymbol? CoreType(string name) =>

@@ -93,6 +93,12 @@ public static class SourceCompiler
         };
         compilation.Entry = compilation.AddModule(entry, source.ModuleName, documentation: parsedEntry.Documentation);
 
+        // 'std' is the standard library's name (design/v5/spec/07 D1): a single file named std.lyr
+        // would claim it — a package cannot, its manifest refuses the name.
+        if (options.PackageRoots is not null && source.ModuleName is "std")
+            diagnostics.Report("LYR-RES0013", Severity.Error, new Span(id, 0, 0),
+                "'std' is the standard library's name — a single file named std.lyr would claim it; rename the file");
+
         report?.BeginPhase(Phase.Load);
         var resolveStarted = Stopwatch.GetTimestamp();
         var binding = compilation.Resolve();

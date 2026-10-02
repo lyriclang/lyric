@@ -90,6 +90,27 @@ public sealed class Compilation
         _ => symbol.Home is null || VisibilityOf(symbol) == Visibility.Public,
     };
 
+    /// <summary>Whether <paramref name="file"/> is text the compiler wrote — a synthesized
+    /// conformance (04 D7) — rather than a program's own.</summary>
+    public bool IsSynthesized(FileId file) => _sm.OriginOf(file) is not null;
+
+    /// <summary>The prelude (design/v5/spec/07 V3 I8, 10 B2): <c>std.prelude</c>, whose names every
+    /// module of a program names without an import; <c>null</c> without a standard library.</summary>
+    public ModuleSymbol? Prelude => FindModule(["std", "prelude"]);
+
+    /// <summary>What the prelude passes on under <paramref name="name"/> — what it stands for, not
+    /// the binding; <c>null</c> where the prelude has no such name.</summary>
+    public Symbol? PreludeMember(string name)
+    {
+        var found = Prelude?.Members.LookupLocal(name);
+        while (found is ImportBindingSymbol binding) found = binding.Target;
+        return found;
+    }
+
+    /// <summary>The functions the prelude passes on under <paramref name="name"/>.</summary>
+    public IReadOnlyList<FunctionSymbol> PreludeOverloads(string name) =>
+        Prelude?.Members.OverloadsLocal(name) ?? [];
+
     /// <summary>Why <paramref name="symbol"/> is not visible elsewhere, for the diagnostic.</summary>
     public string Hidden(Symbol symbol) =>
         symbol is ImportBindingSymbol or ExternalSymbol
@@ -217,7 +238,7 @@ public sealed class Compilation
     /// </summary>
     private static readonly string[][] WellKnownModules =
         [["std", "string"], ["std", "core"], ["std", "iter"], ["std", "fmt"],
-            ["std", "collections"]];
+            ["std", "collections"], ["std", "prelude"]];
 
     /// <summary>
     /// The home of <c>Cancelled</c> (design/v5/spec/10 Q10), what a coroutine's yield throws when
