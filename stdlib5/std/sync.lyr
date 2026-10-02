@@ -1,0 +1,63 @@
+/// Synchronization between threads (design/v5/spec/06 G4, K6, N7; 10 Q10). M6 S6a: `Atomic<T>`.
+/// `Mutex`, `RwLock` and `Once` come with S6c.
+module std.sync;
+
+/// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`.
+/// Sealed: no other type becomes one.
+pub sealed interface AtomicValue { }
+
+extend int :: [AtomicValue] { }
+extend bool :: [AtomicValue] { }
+
+/// A value that every thread reads and writes in one step (06 G4, K6). Each operation is
+/// sequentially consistent (N7 P2) and orders the reads and writes around it (P4): what a thread
+/// did before a store, a thread that loads what it stored sees (P1).
+pub class Atomic<T :: [AtomicValue]> {
+    var value: T,
+
+    /// An atomic that holds `value`.
+    pub static fn new(value: T): Atomic<T> {
+        return Atomic<T> { value = value };
+    }
+
+    /// The value.
+    pub fn load(): T {
+        return atomicLoad(this);
+    }
+
+    /// Sets the value.
+    pub fn store(value: T): void {
+        atomicStore(this, value);
+    }
+
+    /// Sets the value and gives the one it replaced.
+    pub fn exchange(value: T): T {
+        return atomicExchange(this, value);
+    }
+
+    /// Sets the value to `desired` where it is `expected`, in one step: true then — false, and
+    /// nothing changed, where it was another.
+    pub fn compareAndSet(expected: T, desired: T): bool {
+        return atomicCompareAndSet(this, expected, desired);
+    }
+}
+
+extend Atomic<int> {
+    /// Adds `n` and gives the value before. It wraps around, as `+%` does.
+    pub fn fetchAndAdd(n: int): int {
+        return atomicFetchAndAdd(this, n);
+    }
+
+    /// Adds `n` and gives the value after. It wraps around, as `+%` does.
+    pub fn addAndFetch(n: int): int {
+        return atomicFetchAndAdd(this, n) +% n;
+    }
+}
+
+// The runtime's side (lyr/atomic.h): the C11 builtins on an atomic's `value`.
+
+fn atomicLoad<T :: [AtomicValue]>(a: Atomic<T>): T;
+fn atomicStore<T :: [AtomicValue]>(a: Atomic<T>, value: T): void;
+fn atomicExchange<T :: [AtomicValue]>(a: Atomic<T>, value: T): T;
+fn atomicCompareAndSet<T :: [AtomicValue]>(a: Atomic<T>, expected: T, desired: T): bool;
+fn atomicFetchAndAdd(a: Atomic<int>, n: int): int;

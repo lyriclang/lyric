@@ -5,6 +5,7 @@
 /// channels, `Select` and `Timer` (N5 K1-K3). Threads come with S6.
 module std.task;
 
+import std.sync { Atomic };
 import std.time { Duration };
 
 /// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a wait
@@ -87,11 +88,14 @@ pub class Task<T> {
     /// throws is read off the handle's type at the call (10 §2), the declared `Error` stands for it.
     pub mut fn await(): T throws Error {
         let me = here().running ?? panic("an await where no task runs");
-        if (me.cancelled) { throw Cancelled { }; }
+        if (me.cancelled.load()) { throw Cancelled { }; }
         while (!this.done) {
+            me.beginWait();
             this.waiters.add(me);
             park();
-            if (me.cancelled) { throw Cancelled { }; }
+            me.endWait();
+            this.waiters.remove(me);
+            if (me.cancelled.load()) { throw Cancelled { }; }
         }
         if (let p = this.crash) {
             repanic(p.code, p.message, p.trace);
@@ -214,26 +218,28 @@ pub class Channel<T> {
     pub mut fn send(value: T): void throws [ChannelClosed, Cancelled] {
         let s = here();
         let me = s.running ?? panic("a send where no task runs");
-        if (me.cancelled) { throw Cancelled { }; }
+        if (me.cancelled.load()) { throw Cancelled { }; }
         if (this.closed) { throw ChannelClosed { }; }
-        if (let r = this.receivers.take()) {
-            r.value = value;
-            r.settled = true;
-            s.release(r.context);
-            return;
+        while (let r = this.receivers.take()) {
+            if (r.context.claim()) {
+                r.value = value;
+                r.settled = true;
+                s.post(r.context);
+                return;
+            }
         }
         if (this.buffered < this.capacity) {
             this.push(value);
             return;
         }
         let w = Waiting<T> { context = me, value = value };
+        me.beginWait();
         this.senders.add(w);
-        me.unwait = () => {
-            this.senders.remove(w);
-        };
         park();
+        me.endWait();
+        this.senders.remove(w);
         if (w.settled) { return; }
-        if (me.cancelled) { throw Cancelled { }; }
+        if (me.cancelled.load()) { throw Cancelled { }; }
         throw ChannelClosed { };
     }
 
@@ -243,32 +249,17 @@ pub class Channel<T> {
     pub mut fn recv(): ?T throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a receive where no task runs");
-        if (me.cancelled) { throw Cancelled { }; }
-        if (let item = this.first) {
-            this.first = item.next;
-            if (item.next == null) { this.last = null; }
-            this.buffered -= 1;
-            if (let w = this.senders.take()) {
-                this.push(w.value!);
-                w.settled = true;
-                s.release(w.context);
-            }
-            return item.value;
-        }
-        if (let w = this.senders.take()) {
-            w.settled = true;
-            s.release(w.context);
-            return w.value;
-        }
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (let item = this.takeNow(s)) { return item.value; }
         if (this.closed) { return null; }
         let w = Waiting<T> { context = me };
+        me.beginWait();
         this.receivers.add(w);
-        me.unwait = () => {
-            this.receivers.remove(w);
-        };
         park();
+        me.endWait();
+        this.receivers.remove(w);
         if (w.settled) { return w.value; }
-        if (me.cancelled) { throw Cancelled { }; }
+        if (me.cancelled.load()) { throw Cancelled { }; }
         return null;
     }
 
@@ -279,17 +270,39 @@ pub class Channel<T> {
         this.closed = true;
         let s = here();
         while (let r = this.receivers.take()) {
-            s.release(r.context);
+            s.wakeUp(r.context);
         }
         while (let w = this.senders.take()) {
-            s.release(w.context);
+            s.wakeUp(w.context);
         }
     }
 
-    /// A receive would not wait: a value is buffered, or a task waits to send one, or the channel
-    /// is closed.
-    fn receivable(): bool {
-        return this.first != null || this.senders.first != null || this.closed;
+    /// A value at once, taken out — from the buffer, which a task waiting to send then refills, or
+    /// from such a task itself; null where a receive would wait, or find the channel closed and
+    /// empty. It never waits. A waiting sender that another waker ended meanwhile is passed over.
+    mut fn takeNow(s: Scheduler): ?Item<T> {
+        if (let item = this.first) {
+            this.first = item.next;
+            if (item.next == null) { this.last = null; }
+            this.buffered -= 1;
+            while (let w = this.senders.take()) {
+                if (w.context.claim()) {
+                    this.push(w.value!);
+                    w.settled = true;
+                    s.post(w.context);
+                    break;
+                }
+            }
+            return item;
+        }
+        while (let w = this.senders.take()) {
+            if (w.context.claim()) {
+                w.settled = true;
+                s.post(w.context);
+                return Item<T> { value = w.value! };
+            }
+        }
+        return null;
     }
 
     mut fn push(value: T): void {
@@ -321,8 +334,8 @@ class Waiting<T> {
     var prev: ?Waiting<T> = null,
 }
 
-/// The tasks waiting on one side of a channel, in the order they came. The waiter's `unwait` takes
-/// it out again (see `Context.unwait`).
+/// The tasks waiting on one side of a channel, in the order they came. A waker takes the first out;
+/// a task whose wait something else ended takes itself out once it runs again.
 class WaitQueue<T> {
     var first: ?Waiting<T> = null,
     var last: ?Waiting<T> = null,
@@ -414,13 +427,14 @@ pub class Selection {
     pub mut fn run(): void throws Error {
         let s = here();
         let me = s.running ?? panic("a select where no task runs");
-        if (me.cancelled) { throw Cancelled { }; }
-        let fired = try this.fireReady();
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        let fired = try this.fireReady(s);
         if (fired) { return; }
         if (this.timeoutNanos == 0) {
             try this.timedOut();
             return;
         }
+        me.beginWait();
         var at = this.first;
         while (let n = at) {
             n.entry.enlist(me);
@@ -429,15 +443,14 @@ pub class Selection {
         if (this.timeoutNanos > 0) {
             s.fallAsleep(me, this.timeoutNanos);
         }
-        me.unwait = () => {
-            var each = this.first;
-            while (let n = each) {
-                n.entry.withdraw();
-                each = n.next;
-            }
-            s.unsleep(me);
-        };
         park();
+        me.endWait();
+        at = this.first;
+        while (let n = at) {
+            n.entry.withdraw();
+            at = n.next;
+        }
+        s.unsleep(me);
         // What woke it: a value for one case, a cancel, a channel that closed — or the timer.
         at = this.first;
         while (let n = at) {
@@ -447,20 +460,18 @@ pub class Selection {
             }
             at = n.next;
         }
-        if (me.cancelled) { throw Cancelled { }; }
-        let closed = try this.fireReady();
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        let closed = try this.fireReady(s);
         if (closed) { return; }
         try this.timedOut();
     }
 
     /// The first case that can go on at once runs: true then, false where none can.
-    mut fn fireReady(): bool throws Error {
+    mut fn fireReady(s: Scheduler): bool throws Error {
         var at = this.first;
         while (let n = at) {
-            if (n.entry.ready()) {
-                try n.entry.fire();
-                return true;
-            }
+            let fired = try n.entry.tryFire(s);
+            if (fired) { return true; }
             at = n.next;
         }
         return false;
@@ -481,10 +492,9 @@ class CaseNode {
 
 /// One case of a select, whatever the element type of its channel: a receive from that channel.
 interface SelectCase {
-    /// A receive would not wait: a value is there, or the channel is closed.
-    fn ready(): bool;
-    /// Receives at once and runs the body with what came.
-    mut fn fire(): void throws Error;
+    /// Where a receive would not wait — a value is there, or the channel is closed — receives at
+    /// once and runs the body with what came: true then; false where it would wait.
+    mut fn tryFire(s: Scheduler): bool throws Error;
     /// `c` waits on the channel for a value, as one of the select's waits.
     mut fn enlist(c: Context): void;
     /// It waits there no more.
@@ -500,14 +510,17 @@ class Case<T> :: [SelectCase] {
     body: fn(?T) -> void throws Error,
     var waiting: ?Waiting<T> = null,
 
-    fn ready(): bool {
-        return this.channel.receivable();
-    }
-
-    mut fn fire(): void throws Error {
-        let v = try this.channel.recv();
+    mut fn tryFire(s: Scheduler): bool throws Error {
         let f = this.body;
-        try f(v);
+        if (let item = this.channel.takeNow(s)) {
+            try f(item.value);
+            return true;
+        }
+        if (this.channel.closed) {
+            try f(null);
+            return true;
+        }
+        return false;
     }
 
     mut fn enlist(c: Context): void {
@@ -606,7 +619,7 @@ pub class TaskScope :: [Closeable] {
         let s = here();
         let me = s.running ?? panic("a scope closed where no task runs");
         while (this.open > 0) {
-            if (me.cancelled) {
+            if (me.cancelled.load()) {
                 this.cancel();
             }
             s.parkIn(this.closing);
@@ -664,12 +677,13 @@ fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
         }
         task.finish();
     };
-    let c = Context { body = startContext(run, 0) };
+    let s = here();
+    let c = Context { body = startContext(run, 0), home = s };
     c.onPanic = (info: PanicInfo) => {
         task.panicked(info);
     };
     task.context = c;
-    here().ready(c);
+    s.ready(c);
     return task;
 }
 
@@ -683,7 +697,8 @@ pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
         } catch (_: Cancelled) {
         }
     };
-    here().ready(Context { body = startContext(run, 0) });
+    let s = here();
+    s.ready(Context { body = startContext(run, 0), home = s });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -693,31 +708,42 @@ pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
 // until the earliest deadline.
 // ---------------------------------------------------------------------------------------------
 
-/// A task's context as the scheduler holds it: the coroutine its body runs in (13 §1.6), and the
-/// links of the places it waits in — the ready queue or the waiting list of a task it awaits, and
-/// the sleepers' heap; a channel's queue holds a `Waiting` of its own.
+/// A task's context as the scheduler holds it: the coroutine its body runs in (13 §1.6), the
+/// scheduler of its thread, which it never leaves (06 G1), and the links of the places it waits in
+/// — the waiting list of a task or a scope, the sleepers' heap; a channel's queue holds a `Waiting`
+/// of its own.
+///
+/// A wait (06 N8) begins before the context goes into any of its places and parks it. Whatever ends
+/// the wait — a value, a close, its deadline, a cancel — first claims the context: of all that would,
+/// one does, and readies it; the others leave it be. Running again, the context leaves the places it
+/// still is in itself.
 class Context {
     body: Coroutine<void>,
-    /// The links of the ready queue, or of the waiting list it is in.
+    home: Scheduler,
+    /// The links of the ready queue.
     var next: ?Context = null,
     var prev: ?Context = null,
-    /// While it waits, what takes it out of every place it waits in — the sleepers' heap, a task's
-    /// waiting list, a channel's queues: a select waits in several at once. Whatever wakes it calls
-    /// this first (`Scheduler.release`), a cancel too (06 N9 X1).
-    var unwait: ?fn() -> void = null,
+    /// 0 running or ready; 1 waiting — any waker may claim it —; 2 claimed. Atomic, for wakers on
+    /// other threads.
+    state: Atomic<int> = Atomic<int>.new(0),
+    /// The links of the waiting list it is in, a task's or a scope's.
+    var listed: bool = false,
+    var listNext: ?Context = null,
+    var listPrev: ?Context = null,
     /// In the sleepers' heap: its deadline on the monotonic clock, and when it fell asleep — the
     /// tie-break.
     var asleep: bool = false,
     var deadline: int = 0,
     var order: int = 0,
-    /// The heap is leftist: the children, the parent — a cancel takes a sleeper out from where it
-    /// is — and the length of the right spine.
+    /// The heap is leftist: the children, the parent — a sleeper leaves from where it is — and the
+    /// length of the right spine.
     var left: ?Context = null,
     var right: ?Context = null,
     var up: ?Context = null,
     var rank: int = 0,
-    /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`.
-    var cancelled: bool = false,
+    /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`. Atomic: a cancel may come
+    /// from another thread.
+    cancelled: Atomic<bool> = Atomic<bool>.new(false),
     /// What becomes of a panic of it (06 T4): its handle's — a context without one, main's or a
     /// detached task's, ends the process with the panic.
     var onPanic: ?fn(PanicInfo) -> void = null,
@@ -725,47 +751,65 @@ class Context {
     var scope: ?TaskScope = null,
     var nextChild: ?Context = null,
     var prevChild: ?Context = null,
+
+    /// A wait begins: from here a waker may claim it — before it goes into any place a waker looks.
+    fn beginWait(): void {
+        this.state.store(1);
+    }
+
+    /// A waker ends its wait: true for the first, which readies it; false for every other, and
+    /// where it does not wait.
+    fn claim(): bool {
+        return this.state.compareAndSet(1, 2);
+    }
+
+    /// It runs again after a wait; the places it waited in it leaves next.
+    fn endWait(): void {
+        this.state.store(0);
+    }
 }
 
-/// The tasks waiting for one task to end, in the order they came; a cancel takes one out.
+/// The tasks waiting for one task to end, or for a scope's tasks, in the order they came. A task
+/// takes itself out once its wait ended.
 class Waiters {
     var first: ?Context = null,
     var last: ?Context = null,
 
     mut fn add(c: Context): void {
-        c.prev = this.last;
-        c.next = null;
+        c.listPrev = this.last;
+        c.listNext = null;
         if (let tail = this.last) {
-            tail.next = c;
+            tail.listNext = c;
         } else {
             this.first = c;
         }
         this.last = c;
-        c.unwait = () => {
-            this.remove(c);
-        };
+        c.listed = true;
     }
 
+    /// Takes `c` out — nothing where it is not in.
     mut fn remove(c: Context): void {
-        if (let p = c.prev) {
-            p.next = c.next;
+        if (!c.listed) { return; }
+        c.listed = false;
+        if (let p = c.listPrev) {
+            p.listNext = c.listNext;
         } else {
-            this.first = c.next;
+            this.first = c.listNext;
         }
-        if (let n = c.next) {
-            n.prev = c.prev;
+        if (let n = c.listNext) {
+            n.listPrev = c.listPrev;
         } else {
-            this.last = c.prev;
+            this.last = c.listPrev;
         }
-        c.prev = null;
-        c.next = null;
-        c.unwait = null;
+        c.listPrev = null;
+        c.listNext = null;
     }
 
+    /// Ends the wait of each, in the order they came.
     mut fn wakeAll(s: Scheduler): void {
         while (let c = this.first) {
             this.remove(c);
-            s.ready(c);
+            s.wakeUp(c);
         }
     }
 }
@@ -800,13 +844,13 @@ class Scheduler {
 
     mut fn sleep(nanos: int): void throws Cancelled {
         let c = this.running ?? panic("a sleep where no task runs");
-        if (c.cancelled) { throw Cancelled { }; }
+        if (c.cancelled.load()) { throw Cancelled { }; }
+        c.beginWait();
         this.fallAsleep(c, nanos);
-        c.unwait = () => {
-            this.unsleep(c);
-        };
         park();
-        if (c.cancelled) { throw Cancelled { }; }
+        c.endWait();
+        this.unsleep(c);
+        if (c.cancelled.load()) { throw Cancelled { }; }
     }
 
     /// `c` goes into the sleepers' heap, to wake once `nanos` have passed.
@@ -820,45 +864,52 @@ class Scheduler {
         if (let root = this.sleepers) { root.up = null; }
     }
 
-    /// `c` waits no more — anywhere: what woke it was one of its waits — and is ready.
-    mut fn release(c: Context): void {
-        if (let unwait = c.unwait) {
-            c.unwait = null;
-            unwait();
-        }
-        this.ready(c);
+    /// Ends `c`'s wait, where it still waits and nothing ended it first — the claim — and readies
+    /// it: true then.
+    mut fn wakeUp(c: Context): bool {
+        if (!c.claim()) { return false; }
+        this.post(c);
+        return true;
+    }
+
+    /// `c`, whose wait a waker ended, goes to the ready queue of its own scheduler (06 G1).
+    mut fn post(c: Context): void {
+        let home = c.home;
+        home.ready(c);
     }
 
     mut fn yieldNow(): void throws Cancelled {
         let c = this.running ?? panic("a yield where no task runs");
-        if (c.cancelled) { throw Cancelled { }; }
+        if (c.cancelled.load()) { throw Cancelled { }; }
         this.ready(c);
         park();
-        if (c.cancelled) { throw Cancelled { }; }
+        if (c.cancelled.load()) { throw Cancelled { }; }
     }
 
-    /// The running context waits in `list` until it is woken from there — a wait that ignores the
-    /// mark: its caller decides what a cancel means to it.
+    /// The running context waits in `list` until it is woken — a wait that ignores the mark: its
+    /// caller decides what a cancel means to it.
     mut fn parkIn(list: Waiters): void {
-        list.add(this.running ?? panic("a wait where no task runs"));
+        let me = this.running ?? panic("a wait where no task runs");
+        me.beginWait();
+        list.add(me);
         park();
+        me.endWait();
+        list.remove(me);
     }
 
     /// Cancels a context (06 N9 X1): the mark, and the end of the wait it is in now, if any.
     mut fn cancel(c: Context): void {
-        c.cancelled = true;
-        if (c.unwait != null) {
-            this.release(c);
-        }
+        c.cancelled.store(true);
+        this.wakeUp(c);
     }
 
-    /// The sleepers whose deadline came go to the ready queue, earliest first — out of their other
-    /// waits too: a select's.
-    mut fn wake(now: int): void {
+    /// The sleepers whose deadline came are woken, earliest first; one that another waker claimed
+    /// meanwhile only leaves the heap.
+    mut fn wakeSleepers(now: int): void {
         while (let top = this.sleepers) {
             if (top.deadline > now) { return; }
             this.unsleep(top);
-            this.release(top);
+            this.wakeUp(top);
         }
     }
 
@@ -908,7 +959,7 @@ class Scheduler {
     /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
-        if (this.sleepers != null) { this.wake(monotonicNanos()); }
+        if (this.sleepers != null) { this.wakeSleepers(monotonicNanos()); }
         if (let c = this.takeReady()) {
             this.running = c;
             let state = resumeContext(c.body);
@@ -991,7 +1042,7 @@ fn rankOf(c: ?Context): int {
 fn runMain(main: Coroutine<void>): void {
     let s = Scheduler { };
     setCurrentScheduler(s);
-    s.ready(Context { body = main });
+    s.ready(Context { body = main, home = s });
     while (!main.isDone()) {
         s.step();
     }

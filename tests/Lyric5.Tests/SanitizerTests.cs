@@ -127,6 +127,7 @@ public class SanitizerTests
     [InlineData("timeout", 0)]
     [InlineData("channels", 0)]
     [InlineData("select", 0)]
+    [InlineData("atomics", 0)]
     [InlineData("task_status", 101)]
     [InlineData("scope_panic", 101)]
     [InlineData("detached_panic", 101)]

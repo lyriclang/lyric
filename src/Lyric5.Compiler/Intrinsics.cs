@@ -39,6 +39,13 @@ public static class Intrinsics
         ["std.task.panicMessage"] = "lyr_task_panic_message",
         ["std.task.panicTrace"] = "lyr_task_panic_trace",
         ["std.task.repanic"] = "lyr_task_repanic",
+        // std.sync's atomics (06 G4, K6; N7 P2): the C11 builtins on an Atomic's field, as macros
+        // that serve every T.
+        ["std.sync.atomicLoad"] = "LYR_ATOMIC_LOAD",
+        ["std.sync.atomicStore"] = "LYR_ATOMIC_STORE",
+        ["std.sync.atomicExchange"] = "LYR_ATOMIC_EXCHANGE",
+        ["std.sync.atomicCompareAndSet"] = "LYR_ATOMIC_CAS",
+        ["std.sync.atomicFetchAndAdd"] = "LYR_ATOMIC_FETCH_ADD",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

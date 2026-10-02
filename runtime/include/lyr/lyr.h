@@ -14,5 +14,6 @@
 #include "lyr/time.h"
 #include "lyr/poll.h"
 #include "lyr/task.h"
+#include "lyr/atomic.h"
 
 #endif
