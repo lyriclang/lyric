@@ -59,6 +59,18 @@ public static class Intrinsics
         ["std.sync.atomicExchange"] = "LYR_ATOMIC_EXCHANGE",
         ["std.sync.atomicCompareAndSet"] = "LYR_ATOMIC_CAS",
         ["std.sync.atomicFetchAndAdd"] = "LYR_ATOMIC_FETCH_ADD",
+        // std.core's numbers (10 B5): whether + - * leave the type, the bit counts and the
+        // rotation, as macros that serve every integer width.
+        ["std.core.addOverflows"] = "LYR_ADD_OVERFLOWS",
+        ["std.core.subOverflows"] = "LYR_SUB_OVERFLOWS",
+        ["std.core.mulOverflows"] = "LYR_MUL_OVERFLOWS",
+        ["std.core.addWrapping"] = "LYR_ADD_WRAPPING",
+        ["std.core.subWrapping"] = "LYR_SUB_WRAPPING",
+        ["std.core.mulWrapping"] = "LYR_MUL_WRAPPING",
+        ["std.core.countLeadingZeros"] = "LYR_CLZ",
+        ["std.core.countTrailingZeros"] = "LYR_CTZ",
+        ["std.core.countOnes"] = "LYR_POPCOUNT",
+        ["std.core.rotateBitsLeft"] = "LYR_ROTL",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

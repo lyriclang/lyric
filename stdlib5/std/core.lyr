@@ -691,7 +691,143 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
     static let max: Self;
     static let bitWidth: int;
     static let isSigned: bool;
+
+    /// The sum, or `null` where it does not fit the type.
+    fn checkedAdd(o: Self): ?Self {
+        return if (addOverflows(this, o)) null else addWrapping(this, o);
+    }
+
+    /// The difference, or `null` where it does not fit.
+    fn checkedSub(o: Self): ?Self {
+        return if (subOverflows(this, o)) null else subWrapping(this, o);
+    }
+
+    /// The product, or `null` where it does not fit.
+    fn checkedMul(o: Self): ?Self {
+        return if (mulOverflows(this, o)) null else mulWrapping(this, o);
+    }
+
+    /// The quotient, or `null` for a zero divisor and for `min / -1`, which does not fit.
+    fn checkedDiv(o: Self): ?Self {
+        if (o == Self.zero || (Self.isSigned && this == Self.min && o == Self.zero - Self.one)) {
+            return null;
+        }
+        return this / o;
+    }
+
+    /// The remainder, or `null` for a zero divisor; a remainder by `-1` is `0`.
+    fn checkedRem(o: Self): ?Self {
+        if (o == Self.zero) {
+            return null;
+        }
+        if (Self.isSigned && o == Self.zero - Self.one) {
+            return Self.zero;
+        }
+        return this % o;
+    }
+
+    /// The sum, held at `min` or `max` where it does not fit.
+    fn saturatingAdd(o: Self): Self {
+        return this.checkedAdd(o) ?? (if (o < Self.zero) Self.min else Self.max);
+    }
+
+    /// The difference, held at `min` or `max` where it does not fit.
+    fn saturatingSub(o: Self): Self {
+        return this.checkedSub(o) ?? (if (o < Self.zero) Self.max else Self.min);
+    }
+
+    /// The product, held at `min` or `max` by the sign it would have.
+    fn saturatingMul(o: Self): Self {
+        return this.checkedMul(o) ?? (if ((this < Self.zero) != (o < Self.zero)) Self.min else Self.max);
+    }
+
+    /// The sum modulo 2^bitWidth, as `+%` on the type (08 Y4).
+    fn wrappingAdd(o: Self): Self {
+        return addWrapping(this, o);
+    }
+
+    /// The difference modulo 2^bitWidth, as `-%`.
+    fn wrappingSub(o: Self): Self {
+        return subWrapping(this, o);
+    }
+
+    /// The product modulo 2^bitWidth, as `*%`.
+    fn wrappingMul(o: Self): Self {
+        return mulWrapping(this, o);
+    }
+
+    /// The quotient, where `min / -1` wraps to `min`; a zero divisor panics as `/` does.
+    fn wrappingDiv(o: Self): Self {
+        if (Self.isSigned && this == Self.min && o == Self.zero - Self.one) {
+            return Self.min;
+        }
+        return this / o;
+    }
+
+    /// The remainder, where a remainder by `-1` is `0`; a zero divisor panics as `%` does.
+    fn wrappingRem(o: Self): Self {
+        if (Self.isSigned && o == Self.zero - Self.one) {
+            return Self.zero;
+        }
+        return this % o;
+    }
+
+    /// `this` to the `n`th power, by squaring; an overflow is one of `*` (03 T2).
+    fn pow(n: uint): Self {
+        var result = Self.one;
+        var base = this;
+        var k = n;
+        while (k > 0) {
+            if (k % 2 == 1) {
+                result = result * base;
+            }
+            k = k / 2;
+            if (k > 0) {
+                base = base * base;
+            }
+        }
+        return result;
+    }
+
+    /// The zero bits above the highest one bit; `bitWidth` for zero.
+    fn leadingZeros(): int {
+        return countLeadingZeros(this);
+    }
+
+    /// The zero bits below the lowest one bit; `bitWidth` for zero.
+    fn trailingZeros(): int {
+        return countTrailingZeros(this);
+    }
+
+    /// The one bits.
+    fn popCount(): int {
+        return countOnes(this);
+    }
+
+    /// The bits rotated left by `n`, modulo `bitWidth`; a negative `n` rotates right.
+    fn rotateLeft(n: int): Self {
+        return rotateBitsLeft(this, n);
+    }
+
+    /// The bits rotated right by `n`, modulo `bitWidth`; a negative `n` rotates left.
+    fn rotateRight(n: int): Self {
+        return rotateBitsLeft(this, -(n % Self.bitWidth));
+    }
 }
+
+// The natives the defaults stand on (10 B5): one each, generic, a C builtin serving every
+// integer width — whether + - * leave the type and the result wrapped to it (what `+%` gives a
+// builtin, 08 Y4), the bit counts, the rotation.
+fn addOverflows<T>(a: T, b: T): bool;
+fn subOverflows<T>(a: T, b: T): bool;
+fn mulOverflows<T>(a: T, b: T): bool;
+fn addWrapping<T>(a: T, b: T): T;
+fn subWrapping<T>(a: T, b: T): T;
+fn mulWrapping<T>(a: T, b: T): T;
+fn countLeadingZeros<T>(x: T): int;
+fn countTrailingZeros<T>(x: T): int;
+fn countOnes<T>(x: T): int;
+fn rotateBitsLeft<T>(x: T, n: int): T;
 
 extend int :: [Num, Signed, Integer] {
     static let zero: int = 0;
