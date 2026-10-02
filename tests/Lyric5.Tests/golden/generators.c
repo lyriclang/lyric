@@ -42,6 +42,8 @@ typedef struct lyr_ty32_Item_void_ lyr_ty32_Item_void_;
 typedef struct lyr_ty33_WaitQueue_void_ lyr_ty33_WaitQueue_void_;
 typedef struct lyr_ty34_Waiting_void_ lyr_ty34_Waiting_void_;
 typedef struct lyr_ty35__env_std_task_Timer_after_ lyr_ty35__env_std_task_Timer_after_;
+typedef struct lyr_ty36_Once lyr_ty36_Once;
+typedef struct lyr_ty37_LockState lyr_ty37_LockState;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -385,6 +387,32 @@ _Static_assert(offsetof(lyr_ty35__env_std_task_Timer_after_, f_d) == 8, "layout 
 _Static_assert(offsetof(lyr_ty35__env_std_task_Timer_after_, f_ch) == 16, "layout of lyr_ty35__env_std_task_Timer_after_");
 static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4) };
 const LyrDesc lyr_desc_ty35__env_std_task_Timer_after_ = { sizeof(lyr_ty35__env_std_task_Timer_after_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "<env:std.task.Timer.after>", NULL };
+struct lyr_ty36_Once {
+    LyrObj header;
+    lyr_ty37_LockState *f_state;
+};
+_Static_assert(sizeof(lyr_ty36_Once) == 16, "layout of lyr_ty36_Once");
+_Static_assert(offsetof(lyr_ty36_Once, f_state) == 8, "layout of lyr_ty36_Once");
+static const uint64_t lyr_refmap_ty36[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty36_Once = { sizeof(lyr_ty36_Once), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty36, "std.task.Once", NULL };
+struct lyr_ty37_LockState {
+    LyrObj header;
+    lyr_ty8_SpinLock *f_guard;
+    uint8_t f_alone;
+    int64_t f_readers;
+    int64_t f_writersWaiting;
+    uint8_t f_done;
+    lyr_ty7_Waiters *f_waiters;
+};
+_Static_assert(sizeof(lyr_ty37_LockState) == 56, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_guard) == 8, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_alone) == 16, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_readers) == 24, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_writersWaiting) == 32, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_done) == 40, "layout of lyr_ty37_LockState");
+_Static_assert(offsetof(lyr_ty37_LockState, f_waiters) == 48, "layout of lyr_ty37_LockState");
+static const uint64_t lyr_refmap_ty37[] = { UINT64_C(0x42) };
+const LyrDesc lyr_desc_ty37_LockState = { sizeof(lyr_ty37_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty37, "std.task.LockState", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { lyr_ty9_Point value; uint8_t has; } lyr_opt_ty9;
 typedef struct { lyr_opt_i64 value; uint8_t has; } lyr_opt_opt_i64;
@@ -2964,13 +2992,13 @@ bb0:;
     return *t0;
 }
 
-#line 16 "stdlib5/std/task.lyr"
+#line 17 "stdlib5/std/task.lyr"
 LyrStr * lyr_std_task_Cancelled_message(lyr_ty24_Cancelled *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 16
+#line 17
     t0 = (LyrStr *)&lyr_lit37;
-#line 16
+#line 17
     return t0;
 }
 
@@ -3900,16 +3928,16 @@ bb8:;
     return;
 }
 
-#line 1249 "stdlib5/std/task.lyr"
+#line 1467 "stdlib5/std/task.lyr"
 void lyr__globals__9ee5f9b5(void) {
     int64_t t0 = 0;
     lyr_ty2_Atomic_int_ *t1 = NULL;
 bb0:;
-#line 1249
+#line 1467
     t0 = (int64_t)INT64_C(0);
-#line 1249
+#line 1467
     t1 = lyr_std_sync_Atomic_int__new_67eb632f(t0);
-#line 1249
+#line 1467
     lyr_g0_channelIds = t1;
     return;
 }
