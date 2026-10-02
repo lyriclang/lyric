@@ -176,4 +176,50 @@ public class ScalarReplacementTests
         Assert.Contains(Ops(Main(module)), op => op is Call);
         Assert.Contains(Ops(Main(module)), op => op is NewObject);
     }
+
+    // ------------------------------------------------------------------ a taken place (03 T12)
+
+    [Fact]
+    public void A_local_whose_place_is_taken_is_not_forwarded()
+    {
+        // 'increment(&x)' writes x through its place: the one store before the call is not what
+        // the read after it sees, so the read stays a load of x.
+        var module = Optimized("""
+            fn increment(&n: int): void {
+                n = n + 1;
+            }
+
+            fn main(): int {
+                var x = 1;
+                increment(&x);
+                return x;
+            }
+            """);
+
+        var main = Main(module);
+        Assert.Contains(Ops(main), op => op is AddrLocal);
+        Assert.Contains(Ops(main), op => op is LoadLocal l && main.Locals[l.Local.Value].Name == "x");
+    }
+
+    [Fact]
+    public void A_struct_whose_place_is_taken_keeps_its_object()
+    {
+        // The local is written through its place, invisible to the field traffic: dissolving it
+        // into field locals would leave the place pointing at a local nobody reads.
+        var module = Optimized("""
+            struct Vec2 { var x: float, y: float }
+
+            fn shift(&p: Vec2): void {
+                p.x = p.x + 1.0;
+            }
+
+            fn main(): int {
+                var v = Vec2 { x = 1.0, y = 2.0 };
+                shift(&v);
+                return if (v.x > 1.5) 0 else 1;
+            }
+            """);
+
+        Assert.Contains(Ops(Main(module)), op => op is NewObject);
+    }
 }

@@ -1540,6 +1540,10 @@ public sealed class TypeChecker
         for (var i = 0; i < want.Parameters.Length; i++)
             if (!LyrType.Equal(want.Parameters[i], have.Parameters[i]))
                 return $"parameter {i + 1} is '{TypeFacts.Display(have.Parameters[i])}', expected '{TypeFacts.Display(want.Parameters[i])}'";
+            else if (want.PlaceAt(i) != have.PlaceAt(i))
+                return want.PlaceAt(i)
+                    ? $"parameter {i + 1} takes a value, and the interface member's takes a place ('&')"
+                    : $"parameter {i + 1} takes a place ('&'), and the interface member's takes a value";
         if (!LyrType.Equal(want.Return, have.Return))
             return $"returns '{TypeFacts.Display(have.Return)}', expected '{TypeFacts.Display(want.Return)}'";
         if (ifaceMethod.IsMut != decl.IsMut)
@@ -1600,11 +1604,17 @@ public sealed class TypeChecker
         foreach (var p in fn.Parameters)
         {
             var pt = ResolveType(p.Type, scope);
-            var ps = new ParameterSymbol(p.Name, pt, p);
+            var ps = new ParameterSymbol(p.Name, pt, p) { IsPlace = p.IsPlace };
             if (!scope.TryDeclare(ps))
                 ReportDuplicateParameter(p.Name, p.Span,
                     Array.Find(fn.Parameters, q => q.Name == p.Name && !ReferenceEquals(q, p))?.Span);
             _result.BindRef(p, ps); // for definite-assignment analysis
+            // A place comes from the caller (03 §2.3a): a default and a 'params' array are values
+            // the call makes, no place anyone holds.
+            if (p.IsPlace && (p.Default is not null || p.IsParams))
+                _de.Report("LYR-SEM0156", Severity.Error, p.Span, p.IsParams
+                    ? $"'{p.Name}' takes a place, and 'params' collects values into an array the call makes — no place of the caller's"
+                    : $"'{p.Name}' takes a place, and a default is a value the call makes — no place of the caller's");
             if (p.Attributes.Length > 0) CheckParameterAttributes(fn, p, pt, outerScope);
             if (p.Default is not null)
             {
@@ -1624,6 +1634,11 @@ public sealed class TypeChecker
         // result (06 A1), so coverage asks for one where the result is not void; the yield context
         // comes besides. A function that returns a coroutine without yielding is an ordinary one.
         var coroutine = _currentReturn is CoroutineOf co && CoroutineShape.IsCoroutine(fn) ? co : null;
+        // Its body runs after the call has returned, when the caller's place may be gone (03 §2.3a).
+        if (coroutine is not null && fn.Parameters.FirstOrDefault(p => p.IsPlace) is { } held)
+            _de.Report("LYR-SEM0158", Severity.Error, held.Span,
+                $"'{held.Name}' takes a place, and '{fn.Name}' is a coroutine: its body runs after the call "
+                + "has returned, when the place may be gone");
         _currentYield = coroutine?.Yield;
         var result = coroutine?.Result;
         CheckThrowsClause(fn, scope);
@@ -2590,7 +2605,7 @@ public sealed class TypeChecker
         // level, which was the whole story while optionals did not nest.
         if (cond is BinaryExpr { Operator: BinaryOp.Ne or BinaryOp.Eq } b
             && NullCompared(b) is { } id
-            && _result.RefOf(id) is { } sym2
+            && _result.RefOf(id) is { } sym2 && Narrowable(sym2)
             && (_result.TypeOf(id) is Optional tested ? tested : DeclaredType(sym2) as Optional) is { } opt)
         {
             (b.Operator == BinaryOp.Ne ? then : els)[sym2] = opt.Inner;
@@ -2599,10 +2614,30 @@ public sealed class TypeChecker
         // 'x is Circle' (03 T11): in the branch the test guards, 'x' is a 'Circle' — the smart
         // cast, the same mechanism as the null test. Nothing is known in the other branch.
         if (cond is TypeTestExpr { Operand: IdentifierExpr tid } test
-            && _result.RefOf(tid) is { } tsym && _typeTests.TryGetValue(test, out var tested2))
+            && _result.RefOf(tid) is { } tsym && Narrowable(tsym) && _typeTests.TryGetValue(test, out var tested2))
             then[tsym] = tested2;
 
         return (then, els);
+    }
+
+    /// <summary>
+    /// Whether a test may narrow the name (03 §3.2): not a module-level <c>var</c> and not a place
+    /// parameter. What they hold may be written by a call — a place also through another name —
+    /// while the test holds, and a narrowing promises every read in its region. <c>if (let v =
+    /// x)</c> reads one once. A module-level <c>let</c> narrows: nothing writes it.
+    /// </summary>
+    private static bool Narrowable(Symbol symbol) =>
+        (symbol is ImportBindingSymbol import ? import.Target : symbol)
+            is not (ParameterSymbol { IsPlace: true } or GlobalSymbol { Declaration: GlobalBindingDecl { Binding.IsMutable: true } });
+
+    /// <summary><c>&amp;x</c> at a place parameter (03 §2.3a): the place <c>x</c>, of its own type.
+    /// Whether it is a place the call may write is the rule of a write, checked with the others in
+    /// the walk after this one (SemaRules); that the type is the parameter's exactly, the call's.</summary>
+    private LyrType CheckPlaceArgument(UnaryExpr mark, SymbolTable scope)
+    {
+        var type = CheckExpr(mark.Operand, scope);
+        _result.SetType(mark, type);
+        return type;
     }
 
     private static IdentifierExpr? NullCompared(BinaryExpr b) => b switch
@@ -2911,8 +2946,12 @@ public sealed class TypeChecker
         // 'never' is a return type like any other (05 E12): 'panic', 'unreachable' and 'todo' say it
         // in their declarations, and so may any function.
         var ret = fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
-        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn) };
+        return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn), Places = PlacesOf(fn) };
     }
+
+    /// <summary>Which of a declaration's parameters take a place (03 T12); empty when none does.</summary>
+    private static bool[] PlacesOf(FunctionDecl fn) =>
+        fn.Parameters.Any(p => p.IsPlace) ? fn.Parameters.Select(p => p.IsPlace).ToArray() : [];
 
     /// <summary>
     /// Where a coroutine function's <c>throws</c> clause belongs: on the COROUTINE it returns.
@@ -3292,6 +3331,9 @@ public sealed class TypeChecker
             case UnaryOp.FromEnd: // as an index it never reaches here: CheckIndexValue takes it
                 return Report(u.Span, "LYR-SEM0114",
                     "'^n' counts from the end inside '[…]' only — as the index, or as a bound of its range");
+            case UnaryOp.Place: // at a place parameter it never reaches here: CheckPlaceArgument takes it
+                return Report(u.Span, "LYR-SEM0157",
+                    "'&' hands a place to a place parameter, and this argument's parameter takes a value");
             default: // PreInc and PreDec
                 if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "++/--", t);
                 return t;
@@ -4620,7 +4662,9 @@ public sealed class TypeChecker
         // something the inference is supposed to determine from this very argument.
         for (var i = 0; i < args.Length; i++)
             if (args[i] is { } given && given is not LambdaExpr)
-                argTypes[i] = CheckExpr(given, scope, ConcreteExpectation(fn, decl, i, given));
+                argTypes[i] = given is UnaryExpr { Operator: UnaryOp.Place } mark && fn.PlaceAt(i)
+                    ? CheckPlaceArgument(mark, scope)
+                    : CheckExpr(given, scope, ConcreteExpectation(fn, decl, i, given));
 
         // Phase B: type arguments from the eagerly typed arguments.
         Dictionary<GenericParamSymbol, LyrType>? map = null;
@@ -4812,7 +4856,25 @@ public sealed class TypeChecker
                 $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}");
 
         for (var i = 0; i < args.Length && i < fixedCount && i < fn.Parameters.Length; i++)
-            if (args[i] is { } a) CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span);
+        {
+            if (args[i] is not { } a) continue;
+            // A place parameter's argument is marked (03 §2.3a); a value parameter's mark was
+            // refused where it was checked.
+            if (!fn.PlaceAt(i)) { CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span); continue; }
+            if (a is not UnaryExpr { Operator: UnaryOp.Place })
+            {
+                _de.Report("LYR-SEM0157", Severity.Error, a.Span,
+                    $"parameter {(ps is not null ? $"'{ps[i].Name}'" : (i + 1).ToString())} takes a place: hand it one with '&', "
+                    + "so the call shows what it may write");
+                continue;
+            }
+            // Nothing widens and nothing is wrapped: the callee writes the parameter's type into
+            // the caller's place.
+            if (!argTypes[i]!.IsError && !fn.Parameters[i].IsError && !LyrType.Equal(argTypes[i]!, fn.Parameters[i]))
+                _de.Report("LYR-SEM0001", Severity.Error, a.Span,
+                    $"a place of '{TypeFacts.Display(argTypes[i]!)}' is no place of '{TypeFacts.Display(fn.Parameters[i])}' — "
+                    + "a place parameter takes its type exactly, nothing widens into it");
+        }
 
         if (variadic && fn.Parameters[^1] is ArrayOf elem)
         {
@@ -5193,7 +5255,7 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))) },
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places },
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
             {
                 Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray(),
@@ -5252,7 +5314,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray() },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray(), Places = f.Places },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -8357,7 +8419,15 @@ public sealed class TypeChecker
                 case IdentifierExpr id:
                     if (_result.RefOf(id) is { } sym && sym is LocalSymbol or ParameterSymbol
                         && !DeclaredInside(sym) && seen.Add(sym))
-                        captured.Add(sym);
+                    {
+                        // A place is the call's, and ends with it (03 §2.3a): nothing outlives the
+                        // call to hold it.
+                        if (sym is ParameterSymbol { IsPlace: true })
+                            _de.Report("LYR-SEM0158", Severity.Error, id.Span,
+                                $"'{id.Name}' is a place parameter, and no lambda captures one — the place is the call's "
+                                + "and ends with it; read it into a local first");
+                        else captured.Add(sym);
+                    }
                     return;
                 case LambdaExpr inner: // nested: the span test sorts out inner declarations
                     WalkNode(inner.Body);
@@ -8662,6 +8732,7 @@ public sealed class TypeChecker
         given.Parameters.Length == wanted.Parameters.Length
         && given.Parameters.Zip(wanted.Parameters).All(p => LyrType.Equal(p.First, p.Second))
         && LyrType.Equal(given.Return, wanted.Return)
+        && FnType.SamePlaces(given, wanted)
         && given.Throws.All(t => wanted.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule)));
 
     /// <summary>
@@ -8882,7 +8953,7 @@ public sealed class TypeChecker
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray()) { Labels = t.Labels };
             case FunctionType f:
                 return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope))
-                    { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [] };
+                    { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [], Places = f.Places };
             default: return LyrType.Error; // ErrorType
         }
     }

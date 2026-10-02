@@ -538,12 +538,14 @@ public sealed partial class Parser
             var attributes = ParseAttributeList();
 
             var isParams = _buffer.Match(TokenKind.Params);
+            // '&x: T' (design/v5/spec/03 T12): the mark at the parameter, never at the type.
+            var isPlace = _buffer.Match(TokenKind.Amp);
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
             _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after parameter name");
             var type = ParseType();
             Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
             parameters.Add(new Param(isParams, name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
-                { NameSpan = name.Span, Attributes = attributes });
+                { NameSpan = name.Span, Attributes = attributes, IsPlace = isPlace });
         } while (_buffer.Match(TokenKind.Comma));
         return parameters.ToArray();
     }

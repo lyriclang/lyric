@@ -707,7 +707,8 @@ internal sealed class WarningAnalyzer
             case LoopExpr loop: WalkBlock(loop.Body); break;
             case BinaryExpr bi: WalkExpr(bi.Left); WalkExpr(bi.Right); break;
             case UnaryExpr u:
-                if (u.Operator is UnaryOp.PreInc or UnaryOp.PreDec) MarkMutated(u.Operand);
+                // '&x' hands x to a call that may write it (03 §2.3a).
+                if (u.Operator is UnaryOp.PreInc or UnaryOp.PreDec or UnaryOp.Place) MarkMutated(u.Operand);
                 if (u is { Operator: UnaryOp.Neg, Operand: IntLiteralExpr negLit })
                 {
                     CheckLiteralInRange(negLit, negative: true);

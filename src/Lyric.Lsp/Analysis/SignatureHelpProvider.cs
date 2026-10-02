@@ -112,7 +112,7 @@ public static class SignatureHelpProvider
     {
         if (model.Types.TypeOf(call.Callee) is not FnType fn) return null;
 
-        var label = $"fn({string.Join(", ", fn.Parameters.Select(TypeFacts.Display))})"
+        var label = $"fn({string.Join(", ", fn.Parameters.Select((p, i) => (fn.PlaceAt(i) ? "&" : "") + TypeFacts.Display(p)))})"
             + $" -> {TypeFacts.Display(fn.Return)}";
 
         return new SignatureInformation { Label = label, Parameters = [] };

@@ -109,7 +109,7 @@ public static class HoverProvider
         // true; showing it half-substituted would not be.
         FunctionSymbol function => type is FnType fn
             ? $"fn {function.Name}{Generics(function.Generics)}"
-              + $"({string.Join(", ", fn.Parameters.Select(TypeFacts.Display))})"
+              + $"({string.Join(", ", fn.Parameters.Select((p, i) => (fn.PlaceAt(i) ? "&" : "") + TypeFacts.Display(p)))})"
               + $" -> {TypeFacts.Display(fn.Return)}"
             : $"fn {function.Name}{Generics(function.Generics)}",
 

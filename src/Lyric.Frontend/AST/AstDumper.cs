@@ -233,7 +233,7 @@ public static class AstDumper
                 if (n.Default is { } fallback) { Line(sb, indent + 1, "Default", fallback.Span); Write(fallback, indent + 2, sb); }
                 break;
             case Param n:
-                Line(sb, indent, $"Param {n.Name}{(n.IsParams ? " (params)" : "")}", n.Span);
+                Line(sb, indent, $"Param {n.Name}{(n.IsParams ? " (params)" : "")}{(n.IsPlace ? " (place)" : "")}", n.Span);
                 Write(n.Type, indent + 1, sb);
                 if (n.Default is not null) Write(n.Default, indent + 1, sb);
                 break;

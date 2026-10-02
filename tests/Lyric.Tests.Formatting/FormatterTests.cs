@@ -59,6 +59,21 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_parameter_keeps_its_place_mark_and_its_attribute()
+    {
+        // '&n: int' and '&n' at the call (design/v5/spec/03 T12) say what the call may write, and
+        // '@callerExpr(n)' (09 A11) what an assertion names: a formatter that dropped either would
+        // change the program. The attribute was dropped from M8a S1b until this test.
+        Assert.Equal("""
+            fn check(&n: int, @callerExpr(n) written: string = ""): void {
+                let f: fn(&int) -> void = bump;
+                f(&n);
+            }
+
+            """, Format("fn check(&n:int,@callerExpr(n) written:string=\"\"):void{let f:fn(&int)->void=bump;f(&n);}"));
+    }
+
+    [Fact]
     public void A_nested_optional_type_is_written_without_a_gap()
     {
         // '??T' is a type (design/v5/spec/03 T4 O1). The lexer hands '??' over as one token, the

@@ -753,6 +753,12 @@ public static class IrVerifier
                 case StructCopy c: CheckStructCopy(c, block, index); break;
                 case LoadGlobal l: CheckLoadGlobal(l, block, index); break;
                 case StoreGlobal g: CheckStoreGlobal(g, block, index); break;
+                case AddrLocal a: CheckAddrLocal(a, block, index); break;
+                case AddrField a: CheckAddrField(a, block, index); break;
+                case AddrElem a: CheckAddrElem(a, block, index); break;
+                case AddrGlobal a: CheckAddrGlobal(a, block, index); break;
+                case LoadPlace l: CheckLoadPlace(l, block, index); break;
+                case StorePlace s: CheckStorePlace(s, block, index); break;
                 case MakeClosure m: CheckMakeClosure(m, block, index); break;
                 case CallIndirect c: CheckCallIndirect(c, block, index); break;
                 case MakeCoroutine m: CheckMakeCoroutine(m, block, index); break;
@@ -1366,6 +1372,82 @@ public static class IrVerifier
                                  $"but {g.Value} is {Show(actual)}");
     }
 
+    // ------------------------------------------------------------------ places (03 T12)
+    //
+    // Each 'addr' holds the place of what it names, of exactly its type; a load through a place
+    // yields that type and a store takes it. Where a place may be MADE — an argument only — is the
+    // lowering's discipline, and the passes lean on it; the verifier checks the types.
+
+    private void CheckAddrLocal(AddrLocal a, BlockId block, int index)
+    {
+        if (LocalTypeOf(a.Local) is not { } localType)
+        {
+            Report(block, index, $"addr of unknown local {a.Local}");
+            return;
+        }
+        if (!IrType.Equal(a.Type, localType))
+            Report(block, index, $"addr declares type {Show(a.Type)} but {a.Local} is {Show(localType)}");
+        else
+            RequireDestType(a.Dest, new IrPlaceType(localType), "addr", block, index);
+    }
+
+    private void CheckAddrField(AddrField a, BlockId block, int index)
+    {
+        if (ResolveType(a.Type, "addrfield", block, index) is not { } def) return;
+        if (ResolveField(def, a.Type, a.Field, "addrfield", block, index) is not { } declared) return;
+        if (!RequireObject(a.Object, a.Type, "addrfield", block, index)) return;
+        if (!IrType.Equal(a.FieldType, declared))
+            Report(block, index, $"addrfield of {a.Type}{a.Field} is declared {Show(declared)} " +
+                                 $"but the instruction says {Show(a.FieldType)}");
+        else
+            RequireDestType(a.Dest, new IrPlaceType(declared), "addrfield", block, index);
+    }
+
+    private void CheckAddrElem(AddrElem a, BlockId block, int index)
+    {
+        if (RequireArray(a.Array, "addrelem", block, index) is not { } element) return;
+        RequireIndex(a.Index, "addrelem", block, index);
+        if (!IrType.Equal(a.Element, element))
+            Report(block, index, $"addrelem holds {Show(element)} but the instruction says {Show(a.Element)}");
+        else
+            RequireDestType(a.Dest, new IrPlaceType(element), "addrelem", block, index);
+    }
+
+    private void CheckAddrGlobal(AddrGlobal a, BlockId block, int index)
+    {
+        if (ResolveGlobal(a.Global, "addrglobal", block, index) is not { } global) return;
+        if (!IrType.Equal(a.Type, global.Type))
+            Report(block, index, $"addrglobal of {a.Global} is declared {Show(global.Type)} " +
+                                 $"but the instruction says {Show(a.Type)}");
+        else
+            RequireDestType(a.Dest, new IrPlaceType(global.Type), "addrglobal", block, index);
+    }
+
+    private void CheckLoadPlace(LoadPlace l, BlockId block, int index)
+    {
+        if (TypeOf(l.Place) is not IrPlaceType place)
+        {
+            Report(block, index, $"loadplace reads through {l.Place}, which is {Show(TypeOf(l.Place))}, no place");
+            return;
+        }
+        if (!IrType.Equal(place.Value, l.Type))
+            Report(block, index, $"loadplace of a place of {Show(place.Value)} says {Show(l.Type)}");
+        else
+            RequireDestType(l.Dest, place.Value, "loadplace", block, index);
+    }
+
+    private void CheckStorePlace(StorePlace s, BlockId block, int index)
+    {
+        if (TypeOf(s.Place) is not IrPlaceType place)
+        {
+            Report(block, index, $"storeplace writes through {s.Place}, which is {Show(TypeOf(s.Place))}, no place");
+            return;
+        }
+        if (!IrType.Equal(place.Value, TypeOf(s.Value)))
+            Report(block, index, $"storeplace into a place of {Show(place.Value)} takes {s.Value}, " +
+                                 $"which is {Show(TypeOf(s.Value))}");
+    }
+
     private IrGlobal? ResolveGlobal(GlobalId id, string what, BlockId block, int index)
     {
         if (id.Value >= 0 && id.Value < _module.Globals.Count) return _module.Globals[id.Value];
@@ -1901,6 +1983,7 @@ public static class IrVerifier
             IrInterfaceType i => $"dyn {i.Type}",
             IrStructType v => $"val {v.Type}",
             IrCoroutineType c => $"coroutine<{Show(c.Yield)}, {Show(c.Result)}>",
+            IrPlaceType p => $"place {Show(p.Value)}",
             _ => type.ToString() ?? type.GetType().Name
         };
 

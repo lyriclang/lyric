@@ -21,6 +21,9 @@ namespace Lyric.AST
         /// <summary><c>^n</c>: the index <c>n</c> from the end, inside <c>[…]</c> only
         /// (design/v5/spec/03 T14 N6) — sugar for <c>length() - n</c> of the indexed value.</summary>
         FromEnd,
+        /// <summary><c>&amp;x</c>: the place <c>x</c>, handed to a place parameter (design/v5/spec/03
+        /// T12, 08 Y4). The parser builds it at the start of an argument and nowhere else.</summary>
+        Place,
     }
 
     public enum PostfixOp

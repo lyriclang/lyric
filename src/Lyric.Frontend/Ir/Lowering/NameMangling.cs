@@ -83,7 +83,8 @@ internal static class NameMangling
         ArrayType array => Written(array.Element) + "[]",
         TupleType tuple => "(" + string.Join(", ", tuple.Elements.Select(Written)) + ")",
         ThrowingType throwing => Written(throwing.Inner) + " throws",
-        FunctionType fn => "fn(" + string.Join(", ", fn.Parameters.Select(Written)) + ") -> "
+        FunctionType fn => "fn(" + string.Join(", ", fn.Parameters.Select((p, i) =>
+                               (i < fn.Places.Length && fn.Places[i] ? "&" : "") + Written(p))) + ") -> "
                            + Written(fn.ReturnType)
                            + (fn.Throws is { } thrown ? " throws " + string.Join(", ", thrown.Types.Select(Written)) : ""),
         _ => "?",

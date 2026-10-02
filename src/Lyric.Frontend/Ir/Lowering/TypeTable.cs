@@ -901,7 +901,8 @@ internal sealed class TypeTable
         CoroutineOf c => new IrCoroutineType(Lower(c.Yield, span), Lower(c.Result, span)),
 
         FnType f => new IrFunctionType(
-            f.Parameters.Select(p => LowerValue(p, span)).ToArray(), Lower(f.Return, span)),
+            f.Parameters.Select((p, i) => f.PlaceAt(i) ? new IrPlaceType(LowerValue(p, span)) : LowerValue(p, span)).ToArray(),
+            Lower(f.Return, span)),
 
         // T[] is a reference type with the element type inline; it needs no table entry, because it has
         // no named layout.
@@ -965,7 +966,8 @@ internal sealed class TypeTable
         // carries its signature itself.
         if (node is FunctionType signature)
             return new IrFunctionType(
-                signature.Parameters.Select(p => ValueOf(Lower(p, p.Span))).ToArray(),
+                signature.Parameters.Select((p, i) => i < signature.Places.Length && signature.Places[i]
+                    ? new IrPlaceType(ValueOf(Lower(p, p.Span))) : ValueOf(Lower(p, p.Span))).ToArray(),
                 Lower(signature.ReturnType, signature.ReturnType.Span));
 
         if (node is NamedType named)
@@ -1205,6 +1207,7 @@ internal sealed class TypeTable
             return new FnType(fn.Parameters.Select(p => Resolve(p, span)).ToArray(),
                 Resolve(fn.ReturnType, span))
             {
+                Places = fn.Places,
                 Throws = fn.Throws is not { } thrown ? []
                     : thrown.Types.Length > 0 ? TypeChecker.ThrownAfter(thrown.Types.Select(t => Resolve(t, span)))
                     : Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error") is TypeSymbol root ? [new NamedRef(root)] : [],
