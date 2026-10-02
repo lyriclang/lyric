@@ -60,8 +60,9 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// its entry then —, else the file alone. A file beside a package's modules rather than among
     /// them — a script next to <c>src/</c> — is a single file whose <c>out/</c> still lies by the
     /// manifest; the manifest is read only for a module of the package.</summary>
+    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The package's manifest is refused.</exception>
-    public static Project ForFile(string path)
+    public static Project ForFile(string path, bool offline = false)
     {
         var full = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(full)!;
@@ -74,19 +75,20 @@ public sealed record Project(string Source, string Name, string Module, string R
             return new Project(full, stem, stem, root, null);
         var manifest = Manifest.Read(manifestFile);
         return ModulePathOf(manifest, full) is { } module
-            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = PackageGraph.Resolve(manifest) }
+            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline)) }
             : new Project(full, stem, stem, root, null);
     }
 
     /// <summary>The package of a directory: the nearest manifest at or above it, built from its
     /// <c>src/main.lyr</c> (P2). <c>null</c> where there is no manifest.</summary>
+    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <exception cref="LibraryException">The package has no program.</exception>
-    public static Project? ForDirectory(string directory)
+    public static Project? ForDirectory(string directory, bool offline = false)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
-        var graph = PackageGraph.Resolve(manifest);
+        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline));
         var entry = Path.Combine(manifest.SourceRoot, "main.lyr");
         if (!File.Exists(entry)) throw new LibraryException(manifest, graph);
         return new Project(entry, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest) { Graph = graph };
