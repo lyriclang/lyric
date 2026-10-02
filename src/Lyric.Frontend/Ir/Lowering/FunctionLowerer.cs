@@ -227,7 +227,7 @@ internal sealed class FunctionLowerer
 
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"parameter '{p.Name}' was not bound by the type checker");
-            _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
+            _slots.DeclareFor(ps, LowerValueType(ps.Type, p.Span));
         }
         Parameters = _slots.Locals.ToArray();
     }
@@ -325,7 +325,7 @@ internal sealed class FunctionLowerer
             if (p.Implicit && _types.RefOf(p) is null) continue;
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"lambda parameter '{p.Name}' was not bound by the type checker");
-            _slots.DeclareFor(ps, LowerType(ps.Type, p.Span));
+            _slots.DeclareFor(ps, LowerValueType(ps.Type, p.Span));
             _lambdaParameterCount++;
         }
         Parameters = _slots.Locals.ToArray();
@@ -1376,7 +1376,7 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(binding) is not LocalSymbol local)
             throw Bug($"binding '{binding.Name}' was not bound by the type checker");
 
-        var type = LowerType(local.Type, binding.Span);
+        var type = LowerValueType(local.Type, binding.Span);
 
         // A captured 'var' lives in a cell, so the slot holds the cell, and it has to exist BEFORE anyone
         // writes into it. Hence the newobj here rather than at the first assignment: a 'var n: int;'
@@ -1441,6 +1441,15 @@ internal sealed class FunctionLowerer
         // 'return match (…) { … }' whose every arm leaves: the sema typed the value 'never', so
         // there is nothing to return — the arms already did. Lowered for its effect, sealed by it.
         if (stmt.Value is { } diverging && Diverges(diverging)) { LowerDiverging(diverging); return false; }
+
+        // A value of type 'void' returned where the function returns nothing — an instance at
+        // 'T = void' (03 §9.1): the expression runs for its effect, and the return carries nothing.
+        if (stmt.Value is { } nothing && IsVoid(_returnType))
+        {
+            LowerExprOrVoid(nothing);
+            if (!_b.IsSealed && EmitLeavingDefers(_defers.Count)) _b.Seal(new Return(null, stmt.Span));
+            return false;
+        }
 
         // The return value is evaluated BEFORE the defer bodies: a 'defer' must not change the value a
         // 'return' has already determined. Go behaves the same way.
@@ -3746,6 +3755,15 @@ internal sealed class FunctionLowerer
             return none;
         }
 
+        // A value of type 'void' where a place must hold one (03 §9.1) — passed, stored, wrapped:
+        // a place that holds one gives its unit; a call of a function that returns nothing runs for
+        // its effect and gives the unit; then it coerces as any value does, into '?void' say.
+        if (!IsVoid(expected) && SubstituteType(_types.TypeOf(expr)) is PrimitiveType { Kind: PrimitiveKind.Void })
+        {
+            var unit = LowerExprOrVoid(expr) ?? EmitConst(new BoolConst(false), TypeTable.Unit, expr.Span);
+            return Coerce(unit, TypeTable.Unit, expected, expr.Span);
+        }
+
         return Coerce(LowerExpr(expr), TypeOfExpr(expr), expected, expr.Span);
     }
 
@@ -5817,7 +5835,7 @@ internal sealed class FunctionLowerer
             // diagnosing.
             using (calleeSubstitution is null
                        ? null : _typeTable.PushSubstitution(calleeSubstitution))
-                expected = _typeTable.Lower(parameter.Type);
+                expected = _typeTable.LowerValue(parameter.Type);
         }
         catch (UnsupportedConstructException)
         {
@@ -6347,6 +6365,12 @@ internal sealed class FunctionLowerer
     /// array untranslatable while the same expression worked inside a function. The difference is now the
     /// substitution alone.</para>
     /// </summary>
+    /// <summary>The type of a place that holds a value of the type — a parameter, a local: the
+    /// <see cref="TypeTable.Unit"/> for <c>void</c>, which an instance binds a type parameter to
+    /// (03 §9.1).</summary>
+    private IrType LowerValueType(LyrType type, Span span) =>
+        SubstituteType(type) is PrimitiveType { Kind: PrimitiveKind.Void } ? TypeTable.Unit : LowerType(type, span);
+
     private IrType LowerType(LyrType type, Span span)
     {
         // Substitute first, then map. Recursively, so 'Box<T>', '?T' and 'T[]' see the instance's
