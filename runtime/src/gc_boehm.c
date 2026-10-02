@@ -6,11 +6,22 @@
 #include "internal.h"
 
 #include <gc.h>
+#include <gc_mark.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#else
+#  include <sched.h>
+#endif
+
 static int initialized;
+
+static void init_coroutine_kind(void);
+static void GC_CALLBACK on_collection_event(GC_EventType event);
 
 /* Under ASan (the asan profile, 01 C7) two of its defaults fight a conservative collector: fake
  * stacks move locals into memory the collector's stack scan never sees, so live objects would be
@@ -81,9 +92,8 @@ void lyr_gc_init(void) {
      * that notices them), never inside the collector. */
     GC_set_finalize_on_demand(1);
     GC_set_finalizer_notifier(notify_callbacks);
-#ifdef LYR_TSAN
-    GC_set_on_collection_event(tsan_on_collection);
-#endif
+    GC_set_on_collection_event(on_collection_event);
+    init_coroutine_kind();
     initialized = 1;
 }
 
@@ -234,8 +244,164 @@ int lyr_thread_attach(void) {
 
 void lyr_thread_detach(void) {
     TSAN_PUBLISH();  /* the thread's last writes, for the collection that recycles them */
+    lyr_coro_thread_end();
     lyr_crash_thread_end();
     GC_unregister_my_thread();
+}
+
+/* --- coroutines (01 L4, 06 A5) ------------------------------------------------------------------ */
+
+/* A coroutine object is of a kind of its own. Its mark procedure traces its argument and its
+ * resumer and, while its stack is mapped and stopped, every word of that stack from the saved
+ * stack pointer up, conservatively, as a thread's stack is scanned: what a suspended coroutine's
+ * frames hold lives as long as the coroutine, and an abandoned one dies with everything only its
+ * stack held. Not instrumented: it reads frames that are not its own, redzones included. */
+static unsigned coroutine_kind;
+
+static LYR_NO_SANITIZE struct GC_ms_entry *mark_coroutine(GC_word *addr, struct GC_ms_entry *top,
+                                                          struct GC_ms_entry *limit, GC_word env) {
+    (void)env;
+    LyrCoro *co = (LyrCoro *)addr;
+    if (co->status == 0) return top;  /* on a free list: cleared but for its first word */
+    top = GC_MARK_AND_PUSH(co->arg, top, limit, &co->arg);
+    top = GC_MARK_AND_PUSH(co->resumer_coro, top, limit, (void **)&co->resumer_coro);
+    if (co->mapping != NULL && !co->ctx.on_cpu) {
+        for (void **word = co->ctx.sp; word < (void **)co->ctx.base; word++) {
+            top = GC_MARK_AND_PUSH(*word, top, limit, word);
+        }
+    }
+    return top;
+}
+
+static void init_coroutine_kind(void) {
+    coroutine_kind = GC_new_kind(GC_new_free_list(), GC_MAKE_PROC(GC_new_proc(mark_coroutine), 0), 0, 1);
+}
+
+LyrCoro *lyr_gc_alloc_coro(void) {
+    if (LYR_UNLIKELY(atomic_load_explicit(&callbacks_pending, memory_order_relaxed))) run_callbacks();
+    TSAN_PUBLISH();
+    LyrCoro *co = GC_generic_malloc(sizeof(LyrCoro), (int)coroutine_kind);
+    TSAN_RECEIVE();
+    if (LYR_UNLIKELY(co == NULL)) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory allocating a coroutine");
+    return co;
+}
+
+static void GC_CALLBACK coroutine_died(void *object, void *data) {
+    (void)data;
+    lyr_coro_abandoned(object);
+}
+
+void lyr_gc_watch_coro(LyrCoro *co) { GC_register_finalizer_no_order(co, coroutine_died, NULL, NULL, NULL); }
+void lyr_gc_unwatch_coro(LyrCoro *co) { GC_register_finalizer_no_order(co, NULL, NULL, NULL, NULL); }
+
+void *lyr_gc_thread_stack(void **base) {
+    struct GC_stack_base bottom;
+    memset(&bottom, 0, sizeof bottom);
+    void *handle = GC_get_my_stackbottom(&bottom);
+    *base = bottom.mem_base;
+    return handle;
+}
+
+/* A thread's own stack while a coroutine runs on the thread: no longer what the collector scans
+ * as the thread's stack, so a root of its own, from where it stopped up. Registered under the
+ * collector's lock, read with the world stopped. */
+static LyrStackCtx **thread_stacks;
+static size_t thread_stack_count, thread_stack_capacity;
+static int pushing_thread_stacks;
+static GC_push_other_roots_proc next_push_other_roots;
+
+static LYR_NO_SANITIZE void GC_CALLBACK push_stopped_thread_stacks(void) {
+    for (size_t i = 0; i < thread_stack_count; i++) {
+        LyrStackCtx *own = thread_stacks[i];
+        if (!own->on_cpu) GC_push_all_eager(own->sp, own->base);
+    }
+    if (next_push_other_roots) next_push_other_roots();
+}
+
+static void *GC_CALLBACK add_thread_stack(void *own) {
+    if (thread_stack_count == thread_stack_capacity) {
+        size_t capacity = thread_stack_capacity ? thread_stack_capacity * 2 : 8;
+        LyrStackCtx **grown = realloc(thread_stacks, capacity * sizeof *grown);
+        if (grown == NULL) return NULL;
+        thread_stacks = grown;
+        thread_stack_capacity = capacity;
+    }
+    if (!pushing_thread_stacks) {
+        next_push_other_roots = GC_get_push_other_roots();
+        GC_set_push_other_roots(push_stopped_thread_stacks);
+        pushing_thread_stacks = 1;
+    }
+    thread_stacks[thread_stack_count++] = own;
+    return own;
+}
+
+void lyr_gc_add_thread_stack(LyrStackCtx *own) {
+    if (GC_call_with_alloc_lock(add_thread_stack, own) == NULL) {
+        lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory registering a thread's stack");
+    }
+}
+
+static void *GC_CALLBACK remove_thread_stack(void *own) {
+    for (size_t i = 0; i < thread_stack_count; i++) {
+        if (thread_stacks[i] == own) {
+            thread_stacks[i] = thread_stacks[--thread_stack_count];
+            break;
+        }
+    }
+    return NULL;
+}
+
+void lyr_gc_remove_thread_stack(LyrStackCtx *own) { GC_call_with_alloc_lock(remove_thread_stack, own); }
+
+/* A switch moves the thread from one stack to another, and with it what the collector must scan as
+ * the thread's stack: from the stack pointer up to that stack's bottom. Between the move of the
+ * bottom and the move of the stack pointer the two disagree, so the world must not stop there.
+ * A switch is a reader of a lock of the runtime's own and a collection its writer, taken before
+ * the world stops and given back once it runs again: switches on different threads never wait
+ * for one another, a collection waits only for the switches under way, and a switch waits only
+ * while a collection runs. Inside, the bottom moves through the thread's handle, without the
+ * collector's lock, which the collector — its only reader — cannot hold then. No mutex is held
+ * across the switch: the thread arrives on another stack, which a sanitizer would take for
+ * another thread. */
+static atomic_int switches_under_way;
+static atomic_int world_stopping;
+
+static void relax(unsigned *spins) {
+    if (++*spins < 64) return;
+#ifdef _WIN32
+    SwitchToThread();
+#else
+    sched_yield();
+#endif
+}
+
+void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to) {
+    unsigned spins = 0;
+    for (;;) {
+        atomic_fetch_add(&switches_under_way, 1);
+        if (!atomic_load(&world_stopping)) break;
+        atomic_fetch_sub(&switches_under_way, 1);
+        while (atomic_load(&world_stopping)) relax(&spins);
+    }
+    struct GC_stack_base bottom;
+    memset(&bottom, 0, sizeof bottom);
+    bottom.mem_base = to->base;
+    GC_set_stackbottom(gc_handle, &bottom);
+}
+
+void lyr_gc_switch_end(void) { atomic_fetch_sub(&switches_under_way, 1); }
+
+static void GC_CALLBACK on_collection_event(GC_EventType event) {
+    if (event == GC_EVENT_PRE_STOP_WORLD) {
+        atomic_store(&world_stopping, 1);
+        unsigned spins = 0;
+        while (atomic_load(&switches_under_way) != 0) relax(&spins);
+    } else if (event == GC_EVENT_POST_START_WORLD) {
+        atomic_store(&world_stopping, 0);
+    }
+#ifdef LYR_TSAN
+    tsan_on_collection(event);
+#endif
 }
 
 /* --- collection -------------------------------------------------------------------------------- */

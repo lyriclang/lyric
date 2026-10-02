@@ -23,8 +23,42 @@ public class RuntimeProgramTests
             data.Add("roots", profile, 0, "roots ok\n", []);
             data.Add("weak", profile, 0, "weak ok\n", []);
             data.Add("threads", profile, 0, "threads ok\n", []);
+            data.Add("coro_basic", profile, 0, "coro ok\n", []);
+            data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
+            data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
+            data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }
         return data;
+    }
+
+    /// <summary>A coroutine resumed while it runs or after it ended, and a yield on a thread's own
+    /// stack (design/v5/spec/06 A8): a panic, RT0014.</summary>
+    [Theory]
+    [InlineData("self", Profile.Debug)]
+    [InlineData("done", Profile.Debug)]
+    [InlineData("outside", Profile.Debug)]
+    [InlineData("self", Profile.Release)]
+    public void A_coroutine_misused_panics(string which, Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("coro_basic", profile, args: [which]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.StartsWith("panic [LYR-RT0014]: ", result.Stderr);
+        Assert.Equal("", result.Stdout);
+    }
+
+    /// <summary>A coroutine's stack overflow (01 S3, K1): its guard page makes it a panic with the
+    /// coroutine's frames. POSIX only: on Windows the exception dispatch has no stack to run on
+    /// below a coroutine's guard page (STATUS keeps it open).</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_coroutine_that_overflows_its_stack_panics(Profile profile)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var result = RuntimeBuildTests.RunTest("coro_overflow", profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.StartsWith("panic [LYR-RT0006]: stack overflow", result.Stderr);
+        Assert.Equal("", result.Stdout);
     }
 
     [Theory]

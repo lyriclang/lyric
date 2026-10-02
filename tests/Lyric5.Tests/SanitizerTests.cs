@@ -49,12 +49,22 @@ public class SanitizerTests
         { "panic_index", [], 101 },
         { "panic_hook", [], 101 },
         { "heap_limit", [], 101 },
+        // Coroutines (M6): ASan follows every switch between stacks, and a stack released while
+        // frames on it never returned is unpoisoned before its next use.
+        { "coro_basic", [], 0 },
+        { "coro_basic", ["self"], 101 },
+        { "coro_gc", [], 0 },
+        { "coro_threads", [], 0 },
+        { "coro_storm", [], 0 },
     };
 
     public static TheoryData<string, string[], int> TsanPrograms() => new()
     {
         { "weak", [], 0 },
         { "gc_smoke", [], 0 },
+        // A coroutine is a fiber to TSan; the collections between the switches order them.
+        { "coro_basic", [], 0 },
+        { "coro_gc", [], 0 },
     };
 
     [Theory]
@@ -110,6 +120,8 @@ public class SanitizerTests
     {
         if (Asked != "all") return;
         RunClean("threads", Profile.Tsan, [], 0);
+        RunClean("coro_threads", Profile.Tsan, [], 0);
+        RunClean("coro_storm", Profile.Tsan, [], 0);
     }
 
     /// <summary>

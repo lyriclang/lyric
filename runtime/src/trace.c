@@ -417,11 +417,13 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
         }
     }
     /* The program's frames end at the runtime's entry — or at the emitted glue that calls main from
-     * there, 'lyr_entry', whose line is whatever '#line' stood last. */
+     * there, 'lyr_entry', whose line is whatever '#line' stood last — or, on a coroutine's stack,
+     * at the runtime's frame that runs its body. */
     int end = trace.count, reached_main = 0;
     for (int i = start; i < trace.count; i++) {
         const char *function = trace.frames[i].function;
-        if (function && (strcmp(function, "lyr_run_main") == 0 || strcmp(function, "lyr_entry") == 0)) {
+        if (function && (strcmp(function, "lyr_run_main") == 0 || strcmp(function, "lyr_entry") == 0
+                         || strcmp(function, "lyr_coro_main") == 0)) {
             end = i;
             reached_main = 1;
             break;

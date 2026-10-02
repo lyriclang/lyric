@@ -10,5 +10,6 @@
 #include "lyr/array.h"
 #include "lyr/init.h"
 #include "lyr/error.h"
+#include "lyr/coro.h"
 
 #endif
