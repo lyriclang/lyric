@@ -941,6 +941,21 @@ public sealed class TypeChecker
                 continue;
             }
 
+            if (block.IsBlanketTarget)
+            {
+                // A blanket block (04 D15): its members reach every type its constraints admit,
+                // 'this' the parameter. A conformance through it is not written yet.
+                if (block.Decl.Interfaces.Length > 0)
+                    _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Interfaces[0].Span,
+                        $"a conformance of every '{TypeFacts.Display(BlockTargetType(block))}' is not written yet — a blanket block adds members only");
+                foreach (var fn in block.Decl.Methods)
+                {
+                    CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
+                    CheckFunction(fn, block.MethodScope, BlockTargetType(block));
+                }
+                continue;
+            }
+
             if (block.Target is null)
             {
                 // An unresolvable target, where RES0002 was already reported, against a resolved but
@@ -1143,6 +1158,12 @@ public sealed class TypeChecker
                 ext.InConformanceBlock ? $"the conformance block of '{ts.Name}'" : $"an extension of '{ts.Name}'"));
             blockOf[ext.Symbol] = ext.Block;
         }
+        // A blanket block's members reach the type where its constraints admit it (04 D15):
+        // one function of a name holds there as for any extension.
+        foreach (var block in _comp.Extensions.Blocks)
+            if (block.IsBlanketTarget && BlockSubstitution(block, SelfType(ts)) is not null)
+                foreach (var m in block.Methods)
+                    entries.Add((m.Name, Provenance.Inherent, m, m.Declaration?.Span ?? default, "a blanket extension"));
         // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
         // they are the ordinary defaults, and only the abstract members go to the field.
         foreach (var (iface, _) in InterfacesOf(ts))
@@ -5277,6 +5298,30 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>
+    /// A member a blanket block adds (04 D15, R4): <c>extend&lt;T :: [I]&gt; T { … }</c> reaches every
+    /// type that satisfies its constraints, a type parameter whose constraints imply them included —
+    /// the receiver binds <c>T</c>. Asked after every other source of members. A shape conforms to
+    /// nothing yet (05 §13 rule 6), so none receives one.
+    /// </summary>
+    private (LyrType, Symbol?)? BlanketMember(LyrType receiver, string member, Span span)
+    {
+        if (receiver is not (NamedRef or GenericInstance or TypeParamType)
+            && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null))
+            return null;
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!block.IsBlanketTarget) continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (block.MethodScope.LookupLocal(member) is not FunctionSymbol found || !MayName(found)) continue;
+            if (BlockSubstitution(block, receiver) is not { } map) continue;
+            if (found.IsStatic)
+                return (Report(span, "LYR-SEM0074", $"'{member}' is a static extension and belongs to the type — the instance form is an error"), found);
+            return (Substitute(FnTypeOf(found), map), found);
+        }
+        return null;
+    }
+
     // The builtin TypeSymbol for a primitive type, used for extension lookup on string, int and so on.
     private TypeSymbol? BuiltinSymbol(PrimitiveType p) =>
         _comp.Builtins.LookupLocal(TypeFacts.Display(p)) as TypeSymbol;
@@ -5311,6 +5356,8 @@ public sealed class TypeChecker
                 return (signature, fn);
             }
         }
+        // A blanket block whose constraints the parameter's imply (04 R4).
+        if (BlanketMember(new TypeParamType(gp), member, span) is { } blanket) return blanket;
         return (Report(span, "LYR-SEM0027",
             $"type parameter '{gp.Name}' has no member '{member}' (no constraint provides it)"), null);
     }
@@ -6040,6 +6087,9 @@ public sealed class TypeChecker
             return def;
         }
         if (DelegatedMember(ts, member) is { } forwarded) return forwarded;
+        // A blanket block's member (04 D15), asked last: the receiver binds its parameter.
+        var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
+        if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
         return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'",
             NameSuggestion.Note(member, MemberFacts
                 .OfInstance(_comp, _binding, ts, _currentModule)

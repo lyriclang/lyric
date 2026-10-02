@@ -5584,6 +5584,13 @@ internal sealed class FunctionLowerer
 
         switch (expr.Callee)
         {
+            // A member of a blanket block (04 D15): 'extend<T :: [I]> T' — the receiver binds the
+            // block's parameter, and the method is an instance of its own, as on any generic block.
+            case MemberExpr member
+                when _types.RefOf(member) is FunctionSymbol blanketMember
+                     && _typeTable.BlockOf(blanketMember) is { IsBlanketTarget: true } blanket:
+                return LowerBlockMethodCall(member, blanketMember, blanket, SubstituteType(ReceiverType(member.Target)), expr);
+
             // Shape.Circle(2.0) and Opt<int>.Some(5) are tuple variants. Not a call but a construction,
             // and that holds regardless of how the target is written. The case therefore stands BEFORE
             // the static call: 'Opt<int>.Some' looks like a static method on an instance and is not.
