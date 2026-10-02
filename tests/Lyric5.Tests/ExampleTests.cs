@@ -56,7 +56,9 @@ public class ExampleTests
         var (crossed, _, error) = Run("build", "-C", app, "--offline", "--target", other.Triple);
         Assert.True(crossed == 0, error);
         var binary = File.ReadAllBytes(Path.Combine(app, "out", "debug", other.Triple, "app" + other.ExecutableSuffix));
-        Assert.Equal(other.Os == TargetOs.Windows ? "MZ"u8.ToArray() : "\x7fELF"u8.ToArray(), binary[..(other.Os == TargetOs.Windows ? 2 : 4)]);
+        // "MZ", and 0x7F "ELF" — byte by byte: C#'s \x takes up to four hex digits, and E is one.
+        byte[] magic = other.Os == TargetOs.Windows ? [0x4D, 0x5A] : [0x7F, 0x45, 0x4C, 0x46];
+        Assert.Equal(magic, binary[..magic.Length]);
     }
 
     /// <summary>Module globals are made eagerly at the start, a module's imports first (07 G2) —
