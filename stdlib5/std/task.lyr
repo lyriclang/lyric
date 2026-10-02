@@ -1,0 +1,11 @@
+/// Tasks and their cancellation (design/v5/spec/06 N4, N9; 10 Q10). M6 S2b seed: `Cancelled`, which
+/// a suspended `yield` throws when its coroutine is closed (06 A5); the scheduler, tasks, timers
+/// and channels come with S3–S5 and grow this module.
+module std.task;
+
+/// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a
+/// cancelled task will throw at its next wait (06 N9 X1): an `Error`, so cleanup can catch it —
+/// though a coroutine that catches it may not yield again.
+pub class Cancelled :: [Error] {
+    fn message(): string { return "cancelled"; }
+}

@@ -200,6 +200,8 @@ public static class IrPrinter
                         + (r.Throws ? " throws" : ""),
         CoroutineDone d => $"{d.Dest}: bool = codone {d.Coroutine}",
         CoroutineResult r => $"{r.Dest}: ?{TypeStr(r.ResultType)} = coresult {r.Coroutine}",
+        CoroutineClosing c => $"{c.Dest}: bool = coclosing",
+        CoroutineClose c => $"coclose {c.Coroutine}, drops {c.Cancelled}" + (c.Throws ? " throws" : ""),
         YieldSuspend y => $"yield{(y.Dynamic ? ".dynamic" : "")} {TypeStr(y.YieldType)}" +
                           (y.Value is { } v ? $" {v}" : ""),
         CurrentError e => $"{e.Dest}: {TypeStr(e.Type)} = curerr",

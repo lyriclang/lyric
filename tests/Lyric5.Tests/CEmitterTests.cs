@@ -76,6 +76,7 @@ public class CEmitterTests
     [InlineData("loops")]
     [InlineData("bank")]
     [InlineData("generators")]
+    [InlineData("generators_close")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -217,6 +218,7 @@ public class CEmitterTests
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
             data.Add("bank", profile, 0, BANK_EXPECTED);
             data.Add("generators", profile, 0, GENERATORS_EXPECTED);
+            data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -307,6 +309,49 @@ public class CEmitterTests
         Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
     }
 
+    /// <summary>
+    /// Coroutines dropped while suspended, without close() (design/v5/spec/06 A5): nothing of them
+    /// runs, and the debug profile reports each one with cleanup when the collector takes it —
+    /// the ones without cleanup go in silence, so at most the hundred guarded ones are reported, and
+    /// a stale stack word may keep a few. The release profile reports nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_coroutine_dropped_with_cleanup_is_reported_in_debug(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC("generators_dropped"), "generators_dropped", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("sum 654450", lines[0]);
+        Assert.DoesNotContain("never printed", result.Stdout);
+        var warnings = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Count(line => line == "warning: a coroutine was dropped while suspended without close(); its defers do not run");
+        if (profile == Profile.Release) Assert.Equal(0, warnings);
+        else Assert.InRange(warnings, 1, 100);
+    }
+
+    /// <summary>
+    /// What close() finds misused (design/v5/spec/06 A5, A8): a yield while the coroutine is unwound,
+    /// a coroutine that closes itself — RT0014, with a trace that starts in the coroutine's body at
+    /// the line that did it and ends there: the runtime's primitives above it and the emitted runner
+    /// below it are not the program's frames.
+    /// </summary>
+    [Theory]
+    [InlineData("close_yield", Profile.Debug, "panic [LYR-RT0014]: a coroutine yielded while it was being closed", 8)]
+    [InlineData("close_yield", Profile.Release, "panic [LYR-RT0014]: a coroutine yielded while it was being closed", 8)]
+    [InlineData("close_self", Profile.Debug, "panic [LYR-RT0014]: a coroutine closed while it runs — by itself, or while a coroutine it resumed runs", 5)]
+    [InlineData("close_self", Profile.Release, "panic [LYR-RT0014]: a coroutine closed while it runs — by itself, or while a coroutine it resumed runs", 5)]
+    public void A_misused_close_panics_in_the_coroutines_body(string name, Profile profile, string first, int line)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(first, lines[0]);
+        Assert.Matches($@"^    at lyr_main_\w+__body__\w+ \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
+        Assert.True(lines.Length == 2, $"stderr:\n{result.Stderr}");
+    }
+
     private const string ERRORS_EXPECTED =
         "defer 3\ndefer 2\ndefer 1\ndeep caught 7 at 3\niface caught disk\ndefer 3\nall caught parse\n"
         + "data caught 1..9 got 12\ncause caught config / disk\norder: body\norder: inner defer\norder: clause\n"
@@ -335,6 +380,11 @@ public class CEmitterTests
         + "walk 6 12\nshapes 10\nmaybe 1 -1 3 true\nnames ada,bob,cy,\nstruct 2 3 4 0\nenum green again\n"
         + "extend 3 2 1\nrepeat hi hi -\nrepeat 7 false\n"
         + "doubled 30 3\ncaught x after 2\nafter true true none\nclean 2 all\ndrain fin\n";
+
+    // close() (06 A5, M6 S2b): the program's header says what each line shows.
+    private const string GENERATORS_CLOSE_EXPECTED =
+        "w: cleaned\nwalk 0 1 done true next true\nfresh true\ncareful: caught cancelled\ncareful 1 stopped\n"
+        + "using 0\nu: cleaned\nclose threw oops\nagain true\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

@@ -1,0 +1,14 @@
+// A coroutine that closes itself while it runs (06 A5, A8): a panic, LYR-RT0014, at the close.
+class Holder { var co: ?Coroutine<int> }
+
+fn selfish(h: Holder): Coroutine<int> {
+    h.co!.close();
+    yield 1;
+}
+
+fn main(): int {
+    let h = Holder { co = null };
+    let c = selfish(h);
+    h.co = c;
+    return c.next() ?? 0;
+}

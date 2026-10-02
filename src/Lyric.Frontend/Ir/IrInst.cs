@@ -188,6 +188,22 @@ public sealed record CoroutineDone(TempId Dest, TempId Coroutine, Span Span) : I
 /// has ended, and after an error.</summary>
 public sealed record CoroutineResult(TempId Dest, TempId Coroutine, IrType ResultType, Span Span) : IrOp(Span);
 
+/// <summary>Right after a yield of a coroutine's body: whether <c>close()</c> resumed it to be
+/// unwound (06 A5) — then the body throws <c>Cancelled</c> where it stands.</summary>
+public sealed record CoroutineClosing(TempId Dest, Span Span) : IrOp(Span);
+
+/// <summary><c>co.close()</c> (06 A5, 01 K7a): a coroutine suspended at a yield is resumed to be
+/// unwound; one that is done or never ran ends without running. The <c>Cancelled</c> its body
+/// ends with is the close's own and is dropped; any other error goes to the <c>ErrorBranch</c>
+/// that follows when the coroutine's type throws.</summary>
+/// <param name="Cancelled">std.task's <c>Cancelled</c>: what the close drops.</param>
+public sealed record CoroutineClose(TempId Coroutine, TypeId Cancelled, Span Span) : IrOp(Span)
+{
+    /// <summary>Whether the coroutine's type throws: an error other than the close's own may
+    /// come out, and an error branch follows.</summary>
+    public bool Throws { get; init; }
+}
+
 /// <param name="Value">What the pull receives, or <c>null</c> for a void chain's bare
 /// <c>yield;</c>.</param>
 /// <param name="YieldType">The static type of <see cref="Value"/> at the yield site. Through

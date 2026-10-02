@@ -57,6 +57,22 @@ void lyr_coro_set_transfer(LyrCoro *co, void *value);
 void lyr_coro_set_error(LyrCoro *co, struct LyrErr *error);
 struct LyrErr *lyr_coro_take_error(LyrCoro *co);
 
+/* Closes a coroutine (06 A5, 01 K7a). One that is done, or was never resumed, ends without
+ * running anything. One suspended at a yield is resumed to be unwound: the yield asks
+ * lyr_coro_closing(), finds it set and throws, the body's defers run on the way out, and the body
+ * ends — the error it ends with is left as at any end (lyr_coro_take_error). A yield while the
+ * coroutine is being closed panics, as does closing one that runs (RT0014). Done afterwards. */
+void lyr_coro_close(LyrCoro *co);
+
+/* Whether the running coroutine was resumed to be closed: what compiled code asks right after a
+ * yield returns. 0 on a thread's own stack. */
+int lyr_coro_closing(void);
+
+/* Marks a coroutine whose body has cleanup — a defer or a using — that only running it to its
+ * end or closing it does. Dropped while suspended, such a coroutine is reported on the error
+ * stream in the debug profile (06 A5: the collector's net); nothing of it runs either way. */
+void lyr_coro_set_cleanup(LyrCoro *co);
+
 LyrCoroStatus lyr_coro_status(const LyrCoro *co);
 void *lyr_coro_arg(const LyrCoro *co);
 

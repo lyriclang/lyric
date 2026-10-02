@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m6-s2a";
+    public const string Version = "m6-s2b";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -1036,10 +1036,31 @@ public sealed class CEmitter
     {
         var body = _module.Functions[m.Body.Value];
         var create = $"{Temp(m.Dest)} = lyr_coro_new(&{CoroutineDesc(m.Type)}, {CoroutineRunner(m.Body.Value)}, ";
-        if (!HasEnvironment(body, m.Type)) return create + "NULL, 0);";
+        if (!HasEnvironment(body, m.Type)) return create + "NULL, 0);" + Cleanup(m);
         var env = CoroutineEnv(m.Body.Value);
         var stores = string.Concat(m.Args.Select((a, i) => " " + StoreInto("lyr_ce", $"lyr_ce->a{i}", body.Locals[i].Type, Value(a))));
-        return $"{{ {env} *lyr_ce = lyr_alloc(&{env}_desc);{stores} {create}lyr_ce, 0); }}";
+        return $"{{ {env} *lyr_ce = lyr_alloc(&{env}_desc);{stores} {create}lyr_ce, 0); }}" + Cleanup(m);
+    }
+
+    /// <summary>A body with cleanup marks its coroutine, so the debug profile can report it dropped
+    /// without <c>close()</c> (06 A5).</summary>
+    private string Cleanup(MakeCoroutine m) =>
+        _module.Functions[m.Body.Value].Cleanup ? $" lyr_coro_set_cleanup({Temp(m.Dest)});" : "";
+
+    /// <summary>
+    /// <c>co.close()</c> (06 A5): the runtime unwinds a suspended coroutine; the error its body
+    /// ended with is taken, and the <c>Cancelled</c> the close itself threw — told by its
+    /// descriptor — is dropped. Anything else goes on to the error branch where the coroutine's type
+    /// throws; where it does not, nothing else can come.
+    /// </summary>
+    private string Close(CoroutineClose c)
+    {
+        var co = Temp(c.Coroutine);
+        var cancelled = $"&{DescriptorName(c.Cancelled)}";
+        return c.Throws
+            ? $"lyr_coro_close({co}); lyr_e = lyr_coro_take_error({co}); "
+              + $"if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == {cancelled}) lyr_e = NULL;"
+            : $"lyr_coro_close({co}); (void)lyr_coro_take_error({co});";
     }
 
     /// <summary>
@@ -1113,10 +1134,12 @@ public sealed class CEmitter
             foreach (var temp in function.Temps) Visit(temp.Type);
             Visit(function.ReturnType);
         }
-        // A test or a downcast names its target by id alone: a descriptor to declare.
+        // A test or a downcast names its target by id alone: a descriptor to declare — as does a
+        // close, the Cancelled it drops.
         foreach (var op in ScopeOps())
             if (op is TypeTest tt) Add(tt.Target.Value);
             else if (op is Downcast dc) Add(dc.Target.Value);
+            else if (op is CoroutineClose cc) Add(cc.Cancelled.Value);
 
         return reached;
     }
@@ -1250,6 +1273,7 @@ public sealed class CEmitter
                 || op is Call c && _module.Functions[c.Target.Value].Throws
                 || op is CallIndirect { Throws: true }
                 || op is ResumePull { Throws: true }
+                || op is CoroutineClose { Throws: true }
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
 
     /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot (05 E2).</summary>
@@ -1565,6 +1589,8 @@ public sealed class CEmitter
         YieldSuspend { Value: { } y } => $"lyr_coro_yield_value({(IsAggregate(TypeOf(y)) ? Temp(y) : "&" + Temp(y))});",
         YieldSuspend => "lyr_coro_yield_value(NULL);",
         CoroutineDone d => $"{Temp(d.Dest)} = (uint8_t)(lyr_coro_status({Temp(d.Coroutine)}) == LYR_CORO_DONE);",
+        CoroutineClosing c => $"{Temp(c.Dest)} = (uint8_t)lyr_coro_closing();",
+        CoroutineClose c => Close(c),
         CoroutineResult r => $"if (lyr_coro_status({Temp(r.Coroutine)}) == LYR_CORO_DONE && lyr_coro_transfer({Temp(r.Coroutine)}) != NULL) {{ "
             + $"{Some(r.Dest, $"*({CType(r.ResultType)} *)lyr_coro_transfer({Temp(r.Coroutine)})")} }} else {{ {None(r.Dest)} }}",
         _ => throw new InvalidOperationException($"the C emitter has no case for {op.GetType().Name}; the gate let it through"),

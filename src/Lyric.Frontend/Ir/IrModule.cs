@@ -69,6 +69,11 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     /// </summary>
     public bool ReceiverByRef { get; init; }
 
+    /// <summary>Whether a <c>defer</c> or a <c>using</c> registers in the function — for a
+    /// coroutine's body, the cleanup that only running it to its end or <c>close()</c> runs, which
+    /// the debug profile reports when the coroutine is dropped without either (06 A5).</summary>
+    public bool Cleanup { get; init; }
+
     public List<IrBlock> Blocks { get; init; } = Blocks;
     public BlockId Entry { get; set; }
 }

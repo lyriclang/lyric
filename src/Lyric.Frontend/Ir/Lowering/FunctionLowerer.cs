@@ -170,8 +170,9 @@ internal sealed class FunctionLowerer
         }
         // The caller's error slot (01 L5 E1): a function whose CALL may throw — and a coroutine's
         // body, whose error the runtime keeps for the pull that ran into it (05 E10, M6).
+        // A body has it also for the 'Cancelled' its yields throw when close() unwinds it (06 A5).
         _irThrows = coroutineBody
-            ? ThrownHere(types.DeclaredThrows(decl)).Length > 0
+            ? ThrownHere(types.DeclaredThrows(decl)).Length > 0 || CancelledClass() is not null
             : types.ThrowsAtCall(decl) && ThrownHere(types.DeclaredThrows(decl)).Length > 0;
         // A synthetic function — a comptime site's evaluator — has no written return type; the
         // sema type of its expression is handed in lowered instead.
@@ -605,6 +606,7 @@ internal sealed class FunctionLowerer
         {
             Entry = new BlockId(0), Throws = _irThrows,
             ReceiverByRef = _thisSlot is not null && _thisType is IrStructType or IrEnumType,
+            Cleanup = _cleanup,
         };
     }
 
@@ -764,7 +766,7 @@ internal sealed class FunctionLowerer
             case TryStmt s: return LowerTry(s);
             case ThrowStmt s: return LowerThrow(s);
             // 'defer' only registers; LowerScope places the bodies at the exits.
-            case DeferStmt s: _defers.Peek().Add(s); return true;
+            case DeferStmt s: _defers.Peek().Add(s); _cleanup = true; return true;
             case YieldStmt s: return LowerYield(s);
             case ErrorStmt s: throw Bug($"error statement reached lowering at {s.Span}");
 
@@ -784,6 +786,10 @@ internal sealed class FunctionLowerer
     /// duplication per exit.</para>
     /// </summary>
     private readonly Stack<List<DeferStmt>> _defers = new();
+
+    /// <summary>Whether a defer — a <c>using</c>'s close among them — registers anywhere in the
+    /// function: for a coroutine's body, what dropping it without <c>close()</c> skips (06 A5).</summary>
+    private bool _cleanup;
 
     // --- the error path (design/v5/spec/05 E1-E4, E9; 01 L5) ----------------------------------
     //
@@ -2768,6 +2774,37 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>
+    /// <c>co.close()</c> (06 A5): the runtime resumes a suspended coroutine to be unwound, and the
+    /// <c>Cancelled</c> its body ends with is dropped; what else escapes the body comes out here, on
+    /// the error path like a pull's.
+    /// </summary>
+    private void LowerCoroutineClose(MemberExpr member, Core.Span span)
+    {
+        var coroutine = LowerExpr(member.Target);
+        var cancelled = CancelledClass() ?? throw Bug("'close()' of a coroutine checked without std.task's Cancelled");
+        var throws = _types.ThrownByPull(member) is { } thrown && ThrownHere([thrown]).Length > 0;
+        _b.Emit(new CoroutineClose(coroutine, ((IrRefType)_typeTable.RefTo(cancelled)).Type, span) { Throws = throws });
+        if (throws && !_b.IsSealed) ErrorEdge(span);
+    }
+
+    /// <summary>std.task's <c>Cancelled</c>, when the compilation has it (06 A5).</summary>
+    private TypeSymbol? CancelledClass() =>
+        _typeTable.Compilation.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") is TypeSymbol { Kind: TypeSymbolKind.Class } cancelled
+            ? cancelled : null;
+
+    /// <summary>'throw Cancelled {}' at a yield that close() resumed: a new object, as the Error it
+    /// is thrown as, to the landing of the yield's scope.</summary>
+    private void RaiseCancelled(TypeSymbol cancelled, Core.Span span)
+    {
+        _errorSites++;
+        var type = _typeTable.RefTo(cancelled);
+        var made = _slots.NewTemp(type);
+        _b.Emit(new NewObject(made, ((IrRefType)type).Type, type, span));
+        var value = Coerce(made, type, ErrorType(span), span);
+        _b.Seal(new Throw(value, ErrorLanding(span), span));
+    }
+
     /// <summary><c>co.result()</c> and <c>co.isDone()</c> (06 A2, A4): what the body returned —
     /// <c>?R</c> — and whether it has ended, without pulling.</summary>
     private TempId LowerCoroutineQuery(MemberExpr member, CoroutineOf type, Core.Span span)
@@ -2787,30 +2824,33 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>yield x</c> — the point where the coroutine stops and later starts again.
-    ///
-    /// <para>Three steps: write the re-entry point into the state object, return the value, and remember
-    /// the block AFTER it as a target. What stands after it runs only at the next <c>resume</c>, which is
-    /// why the body of a coroutine is no longer one continuous control flow but a set of entry
-    /// points.</para>
-    ///
-    /// <para>The re-entry point is written BEFORE leaving rather than after: there is no after. A
-    /// <c>ret</c> ends the frame; the object is the only thing that remains.</para>
+    /// <c>yield</c> (06 N2): one op, and control CONTINUES at the next instruction when the
+    /// coroutine is pulled again — the suspension is the runtime's business, not the CFG's.
+    /// Inside a coroutine body the value is checked against the yield type here, statically;
+    /// outside it (§10a) the value is typed as what it is, and the running coroutine meets it at
+    /// run time. A yield of the body is where <c>close()</c> finds the coroutine suspended
+    /// (06 A5): resumed to be unwound, it throws <c>Cancelled</c> there, and the error path runs
+    /// the defers on the way out of the body.
     /// </summary>
     private bool LowerYield(YieldStmt stmt)
     {
-        // One op, and control CONTINUES at the next instruction when the chain is resumed — the
-        // suspension is the interpreter's business, not the CFG's. Inside a coroutine body the
-        // chain is known, so the value is checked against its element type here, statically;
-        // outside (§10a, 4.0) the value is typed as what the expression IS — there is no
-        // context — and the annotation the op carries is what rule 3 compares against the
-        // running chain at the suspension itself.
         if (InCoroutine)
         {
             var value = stmt.Value is null
                 ? null
                 : (TempId?)LowerExprAs(stmt.Value, _coroutineYield!);
             _b.Emit(new YieldSuspend(value, _coroutineYield!, Dynamic: false, stmt.Span));
+            if (_types.IsBodyYield(stmt) && CancelledClass() is { } cancelled)
+            {
+                var closing = _slots.NewTemp(BoolType);
+                _b.Emit(new CoroutineClosing(closing, stmt.Span));
+                var unwind = _b.NewBlock();
+                var go = _b.NewBlock();
+                _b.Seal(new CondBranch(closing, unwind, go, stmt.Span));
+                _b.SwitchTo(unwind);
+                RaiseCancelled(cancelled, stmt.Span);
+                _b.SwitchTo(go);
+            }
             return true;
         }
 
@@ -5297,6 +5337,12 @@ internal sealed class FunctionLowerer
         if (expr.Callee is MemberExpr { Member: "result" or "isDone" } asked
             && SubstituteType(_types.TypeOf(asked.Target)) is CoroutineOf answering)
             return LowerCoroutineQuery(asked, answering, expr.Span);
+        if (expr.Callee is MemberExpr { Member: "close" } closed
+            && SubstituteType(_types.TypeOf(closed.Target)) is CoroutineOf)
+        {
+            LowerCoroutineClose(closed, expr.Span);
+            return null;
+        }
 
         // The receiver is parameter 0. For `p.get()` the 'p' therefore becomes the first argument; for
         // `P.new(…)` there is none and the call is an ordinary one. Both forms then run through the same

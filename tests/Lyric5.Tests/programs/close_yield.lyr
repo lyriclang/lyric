@@ -1,0 +1,16 @@
+// A coroutine that yields while close() unwinds it (06 A5): a panic, LYR-RT0014, at the yield.
+import std.task { Cancelled };
+
+fn stubborn(): Coroutine<int> {
+    try {
+        yield 1;
+    } catch (_: Cancelled) { }
+    yield 2;
+}
+
+fn main(): int {
+    let s = stubborn();
+    let v = s.next() ?? 0;
+    s.close();
+    return v;
+}

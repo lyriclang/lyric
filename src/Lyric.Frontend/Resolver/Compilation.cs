@@ -146,6 +146,13 @@ public sealed class Compilation
         [["std", "string"], ["std", "core"], ["std", "iter"], ["std", "fmt"],
             ["std", "collections"]];
 
+    /// <summary>
+    /// The home of <c>Cancelled</c> (design/v5/spec/10 Q10), what a coroutine's yield throws when
+    /// <c>close()</c> unwinds it (06 A5): a program with a coroutine needs it whether or not it
+    /// imports the module. Loaded only then — it is the scheduler's home and grows with it.
+    /// </summary>
+    private static readonly string[] CancelledHome = ["std", "task"];
+
     private void LoadImportedModules()
     {
         if (ModuleLoader is null) return;
@@ -158,7 +165,35 @@ public sealed class Compilation
                 wellKnown.Documentation);
         }
 
-        for (var i = 0; i < _modules.Count; i++)
+        LoadImports(0);
+
+        if (FindModule(CancelledHome) is null && _modules.Any(m => UsesCoroutines(AstOf(m)))
+            && ModuleLoader(CancelledHome) is { } task)
+        {
+            var from = _modules.Count;
+            AddModule(task.Ast, string.Join('.', CancelledHome), task.IsNative, task.Documentation);
+            LoadImports(from);
+        }
+    }
+
+    /// <summary>Whether a module declares a coroutine or yields anywhere.</summary>
+    private static bool UsesCoroutines(Module ast)
+    {
+        var pending = new Stack<Node>();
+        pending.Push(ast);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            if (node is YieldStmt || node is FunctionDecl { ReturnType: NamedType { Path: [.., "Coroutine"] } }) return true;
+            foreach (var child in AstChildren.Of(node)) pending.Push(child);
+        }
+        return false;
+    }
+
+    /// <summary>What the modules from <paramref name="from"/> on import, transitively.</summary>
+    private void LoadImports(int from)
+    {
+        for (var i = from; i < _modules.Count; i++)
         {
             foreach (var decl in AstOf(_modules[i]).Declarations)
             {

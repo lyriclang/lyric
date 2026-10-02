@@ -182,7 +182,8 @@ public static class SubsetGate
                 case YieldSuspend { Dynamic: true }:
                     Refuse(op.Span, "a yield outside a coroutine's own body", "M6 S2b");
                     break;
-                case MakeCoroutine or ResumePull or YieldSuspend or CoroutineDone or CoroutineResult:
+                case MakeCoroutine or ResumePull or YieldSuspend or CoroutineDone or CoroutineResult
+                    or CoroutineClosing or CoroutineClose:
                     break;
                 default:
                     Refuse(op.Span, $"the instruction {op.GetType().Name}", "a later milestone");
