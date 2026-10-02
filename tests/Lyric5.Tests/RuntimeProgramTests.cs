@@ -26,6 +26,7 @@ public class RuntimeProgramTests
             data.Add("coro_basic", profile, 0, "coro ok\n", []);
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
+            data.Add("coro_park", profile, 0, "coro park ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
         }
@@ -44,6 +45,19 @@ public class RuntimeProgramTests
         var result = RuntimeBuildTests.RunTest("coro_basic", profile, args: [which]);
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.StartsWith("panic [LYR-RT0014]: ", result.Stderr);
+        Assert.Equal("", result.Stdout);
+    }
+
+    /// <summary>Parking misused (06 N3): with no coroutine running, or closing a parked one — RT0014.</summary>
+    [Theory]
+    [InlineData("outside", Profile.Debug, "a park with no coroutine running")]
+    [InlineData("closed", Profile.Debug, "a coroutine closed while it is parked")]
+    [InlineData("outside", Profile.Release, "a park with no coroutine running")]
+    public void Parking_misused_panics(string which, Profile profile, string message)
+    {
+        var result = RuntimeBuildTests.RunTest("coro_park", profile, args: [which]);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.StartsWith("panic [LYR-RT0014]: " + message, result.Stderr);
         Assert.Equal("", result.Stdout);
     }
 

@@ -845,6 +845,12 @@ public class VerifierTests
         new ResumePull(T(1), T(0), I64, Sp),
         new CoroutineDone(T(2), T(0), Sp)));
 
+    /// <summary>'same(a, b)' on two coroutines (03 §2.6): a coroutine is a reference, with identity.</summary>
+    [Fact]
+    public void The_identity_of_coroutines_verifies() => AssertClean(OnCoroutine(
+        new List<IrTemp> { new(T(1), Bool) },
+        new BinOp(T(1), IrBinKind.Eq, Bool, T(0), T(0), Sp)));
+
     [Fact]
     public void A_pull_written_as_the_bare_yield_type_is_found() => AssertFinding(OnCoroutine(
         new List<IrTemp> { new(T(1), I64) },
