@@ -14,8 +14,11 @@ enum { N = 1000 };
 typedef struct Box { LyrObj header; int64_t value; } Box;
 static const LyrDesc box_desc = { .size = sizeof(Box), .name = "test.Box" };
 
-static int deaths;
+/* Deaths are counted per part: an object of the first part that a stale word kept alive may die
+ * during the second, and its callback must not count against the second part's claim. */
+static int deaths, ranged_deaths;
 static void count_death(void *context) { (void)context; deaths++; }
+static void count_ranged_death(void *context) { (void)context; ranged_deaths++; }
 
 static LyrRoot *roots[N];
 static LyrWeak *weaks[N];
@@ -34,7 +37,7 @@ NOINLINE static void make_ranged(void **range) {
         Box *box = lyr_alloc(&box_desc);
         box->value = i;
         range[i] = box;
-        weaks[i] = lyr_weak_new(box, count_death, NULL);
+        weaks[i] = lyr_weak_new(box, count_ranged_death, NULL);
     }
 }
 
@@ -69,18 +72,18 @@ static int64_t program(void) {
     CHECK(alive() <= 50);
 
     /* registered ranges */
-    deaths = 0;
     void **range = calloc(N, sizeof(void *));
     lyr_register_stack(range, range + N);
     make_ranged(range);
     wipe_stack();
     lyr_gc_collect();
-    CHECK(alive() == N && deaths == 0);
+    CHECK(alive() == N);
+    CHECK(ranged_deaths == 0);
 
     lyr_unregister_stack(range, range + N);
     wipe_stack();
     lyr_gc_collect();
-    CHECK(deaths >= 950);
+    CHECK(ranged_deaths >= 950);
     free(range);
 
     lyr_println(lyr_str_from_cstr("roots ok"));
