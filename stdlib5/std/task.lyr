@@ -101,6 +101,7 @@ pub class Task<T> {
             me.beginWait();
             this.waiters.add(me);
             this.guard.release();
+            here().wakeIfCancelled(me);
             park();
             me.endWait();
             this.guard.acquire();
@@ -262,6 +263,7 @@ pub class Channel<T> {
         let w = Waiting<T> { context = me, value = value };
         me.beginWait();
         this.senders.add(w);
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         this.senders.remove(w);
@@ -282,6 +284,7 @@ pub class Channel<T> {
         let w = Waiting<T> { context = me };
         me.beginWait();
         this.receivers.add(w);
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         this.receivers.remove(w);
@@ -470,6 +473,7 @@ pub class Selection {
         if (this.timeoutNanos > 0) {
             s.fallAsleep(me, this.timeoutNanos);
         }
+        s.wakeIfCancelled(me);
         park();
         me.endWait();
         at = this.first;
@@ -939,6 +943,7 @@ class Scheduler {
         if (c.cancelled.load()) { throw Cancelled { }; }
         c.beginWait();
         this.fallAsleep(c, nanos);
+        this.wakeIfCancelled(c);
         park();
         c.endWait();
         this.unsleep(c);
@@ -954,6 +959,16 @@ class Scheduler {
         c.asleep = true;
         this.sleepers = merge(this.sleepers, c);
         if (let root = this.sleepers) { root.up = null; }
+    }
+
+    /// A wait that began in a cancelled task ends at once (06 N9 X1): the cancel may have come from
+    /// another thread before the wait began, and found nothing to claim. Between a wait's beginning
+    /// and its park — the mark and the claim are atomic, so of the cancel and the wait one sees the
+    /// other.
+    mut fn wakeIfCancelled(c: Context): void {
+        if (c.cancelled.load()) {
+            this.wakeUp(c);
+        }
     }
 
     /// Ends `c`'s wait, where it still waits and nothing ended it first — the claim — and readies
