@@ -6005,7 +6005,10 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A written type of a native's signature, lowered with the call's type arguments put
-    /// in for the declaration's own parameter names.</summary>
+    /// in for the declaration's own parameter names. Past what a host binds by layout, a generic
+    /// native — only the standard library declares one — takes what its non-generic natives take
+    /// (ModuleLowerer.NativeType): a type the runtime holds without knowing its layout, an object
+    /// such as <c>Atomic&lt;T&gt;</c>, lowered through the table under the same substitution.</summary>
     private IrType LowerDeclaredUnder(TypeNode node, Dictionary<string, LyrType> mapping, Span span)
     {
         if (node is NamedType { Path: [var only], TypeArguments.Length: 0 }
@@ -6018,7 +6021,15 @@ internal sealed class FunctionLowerer
         if (node is NullableType option)
             return new IrOptionalType(LowerDeclaredUnder(option.Inner, mapping, span));
 
-        return DeclaredTypes.Lower(node);
+        try
+        {
+            return DeclaredTypes.Lower(node);
+        }
+        catch (UnsupportedConstructException)
+        {
+            using (_typeTable.PushSubstitution(mapping))
+                return _typeTable.Lower(node);
+        }
     }
 
     /// <summary>A native's arguments with the defaults its declaration gives for those a call leaves
