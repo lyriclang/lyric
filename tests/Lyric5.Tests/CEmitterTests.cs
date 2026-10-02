@@ -228,6 +228,9 @@ public class CEmitterTests
             data.Add("channels", profile, 0,
                 "pong 10\npong 20\npong 30\nclosed true\ngot a\nc went in\ngot b c\nempty true\nsend on closed\n"
                 + "waiter cancelled true\n");
+            data.Add("thread_channels", profile, 0,
+                "pong 10\npong 20\npong 30\nclosed true\nsum 20100\ncount 200\nseen 5\nfirst 1\ntimed out\n"
+                + "closed elsewhere true\n");
             data.Add("threads", profile, 0,
                 "21\nworker ran 3 tasks\nfailed: oops\ncancelled\natomic 4000\nchained 6\n");
             data.Add("atomics", profile, 0,

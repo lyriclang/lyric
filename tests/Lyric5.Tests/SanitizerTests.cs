@@ -129,6 +129,7 @@ public class SanitizerTests
     [InlineData("select", 0)]
     [InlineData("atomics", 0)]
     [InlineData("threads", 0)]
+    [InlineData("thread_channels", 0)]
     [InlineData("task_status", 101)]
     [InlineData("scope_panic", 101)]
     [InlineData("detached_panic", 101)]
@@ -165,6 +166,7 @@ public class SanitizerTests
         RunClean("coro_storm", Profile.Tsan, [], 0);
         RunClean("poll_basic", Profile.Tsan, [], 0);
         RunEmittedClean("threads", 0, Profile.Tsan);
+        RunEmittedClean("thread_channels", 0, Profile.Tsan);
     }
 
     /// <summary>

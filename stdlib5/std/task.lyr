@@ -2,8 +2,8 @@
 /// each thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
 /// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
-/// channels, `Select` and `Timer` (N5 K1-K3); threads (G1, G2). Channels across threads come with
-/// S6b2.
+/// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads; threads (G1,
+/// G2).
 module std.task;
 
 import std.sync { Atomic };
@@ -217,10 +217,17 @@ pub class ChannelClosed :: [Error] {
 /// A channel (06 N5 K1): values go in with `send` and come out with `recv`, in the order they went
 /// in. Unbuffered — a capacity of 0 — a send waits until a receiver takes the value; buffered, it
 /// waits only while the buffer is full. `close()` ends it: what is buffered can still be received,
-/// then `recv` answers null; a send throws `ChannelClosed`. Within one thread (S5); across threads
-/// with S6 (N7 P1).
+/// then `recv` answers null; a send throws `ChannelClosed`. Within a thread and across threads: a
+/// send happens before the receive that gets its value (N7 P1).
+///
+/// The guard holds while the channel's state changes, and never while anything waits or a body runs.
+/// The locks of this module are taken in one order — channels by their ids, then a task's guard or
+/// a scheduler's inbox — so no two threads wait on each other's.
 pub class Channel<T> {
     capacity: int,
+    /// Its place in the order of channel locks (a select takes several).
+    id: int,
+    guard: SpinLock,
     var buffered: int = 0,
     var first: ?Item<T> = null,
     var last: ?Item<T> = null,
@@ -234,6 +241,8 @@ pub class Channel<T> {
     pub static fn new(capacity: int = 0): Channel<T> {
         return Channel<T> {
             capacity = if (capacity > 0) capacity else 0,
+            id = channelIds.addAndFetch(1),
+            guard = SpinLock { },
             senders = WaitQueue<T> { },
             receivers = WaitQueue<T> { },
         };
@@ -247,27 +256,37 @@ pub class Channel<T> {
         let s = here();
         let me = s.running ?? panic("a send where no task runs");
         if (me.cancelled.load()) { throw Cancelled { }; }
-        if (this.closed) { throw ChannelClosed { }; }
+        this.guard.acquire();
+        if (this.closed) {
+            this.guard.release();
+            throw ChannelClosed { };
+        }
         while (let r = this.receivers.take()) {
             if (r.context.claim()) {
                 r.value = value;
                 r.settled = true;
+                this.guard.release();
                 s.post(r.context);
                 return;
             }
         }
         if (this.buffered < this.capacity) {
             this.push(value);
+            this.guard.release();
             return;
         }
         let w = Waiting<T> { context = me, value = value };
         me.beginWait();
         this.senders.add(w);
+        this.guard.release();
         s.wakeIfCancelled(me);
         park();
         me.endWait();
+        this.guard.acquire();
         this.senders.remove(w);
-        if (w.settled) { return; }
+        let settled = w.settled;
+        this.guard.release();
+        if (settled) { return; }
         if (me.cancelled.load()) { throw Cancelled { }; }
         throw ChannelClosed { };
     }
@@ -279,16 +298,28 @@ pub class Channel<T> {
         let s = here();
         let me = s.running ?? panic("a receive where no task runs");
         if (me.cancelled.load()) { throw Cancelled { }; }
-        if (let item = this.takeNow(s)) { return item.value; }
-        if (this.closed) { return null; }
+        this.guard.acquire();
+        if (let item = this.takeNow(s)) {
+            this.guard.release();
+            return item.value;
+        }
+        if (this.closed) {
+            this.guard.release();
+            return null;
+        }
         let w = Waiting<T> { context = me };
         me.beginWait();
         this.receivers.add(w);
+        this.guard.release();
         s.wakeIfCancelled(me);
         park();
         me.endWait();
+        this.guard.acquire();
         this.receivers.remove(w);
-        if (w.settled) { return w.value; }
+        let settled = w.settled;
+        let value = w.value;
+        this.guard.release();
+        if (settled) { return value; }
         if (me.cancelled.load()) { throw Cancelled { }; }
         return null;
     }
@@ -296,20 +327,26 @@ pub class Channel<T> {
     /// Closes the channel (06 K1): the tasks waiting to receive get null, those waiting to send throw
     /// `ChannelClosed`; what is buffered can still be received. Closing a closed channel does nothing.
     pub mut fn close(): void {
-        if (this.closed) { return; }
-        this.closed = true;
         let s = here();
+        this.guard.acquire();
+        if (this.closed) {
+            this.guard.release();
+            return;
+        }
+        this.closed = true;
         while (let r = this.receivers.take()) {
             s.wakeUp(r.context);
         }
         while (let w = this.senders.take()) {
             s.wakeUp(w.context);
         }
+        this.guard.release();
     }
 
     /// A value at once, taken out — from the buffer, which a task waiting to send then refills, or
     /// from such a task itself; null where a receive would wait, or find the channel closed and
     /// empty. It never waits. A waiting sender that another waker ended meanwhile is passed over.
+    /// Under the guard.
     mut fn takeNow(s: Scheduler): ?Item<T> {
         if (let item = this.first) {
             this.first = item.next;
@@ -424,6 +461,9 @@ pub class Select {
 pub class Selection {
     var first: ?CaseNode = null,
     var last: ?CaseNode = null,
+    /// The guards of its channels, each once, in the order of the channels' ids: a select looks at
+    /// all of them in one step. Made at the first run after a case was added.
+    var guards: ?GuardNode = null,
     /// The timeout's nanoseconds — 0 for at once, -1 for none.
     var timeoutNanos: int = -1,
     var onTimeout: ?fn() -> void throws Error = null,
@@ -438,6 +478,7 @@ pub class Selection {
             this.first = node;
         }
         this.last = node;
+        this.guards = null;
         return this;
     }
 
@@ -458,9 +499,17 @@ pub class Selection {
         let s = here();
         let me = s.running ?? panic("a select where no task runs");
         if (me.cancelled.load()) { throw Cancelled { }; }
-        let fired = try this.fireReady(s);
-        if (fired) { return; }
+        if (this.guards == null) {
+            this.guards = this.orderGuards();
+        }
+        this.lockAll();
+        if (let ready = this.takeReady(s)) {
+            this.unlockAll();
+            try ready.entry.finish();
+            return;
+        }
         if (this.timeoutNanos == 0) {
+            this.unlockAll();
             try this.timedOut();
             return;
         }
@@ -470,42 +519,95 @@ pub class Selection {
             n.entry.enlist(me);
             at = n.next;
         }
+        this.unlockAll();
         if (this.timeoutNanos > 0) {
             s.fallAsleep(me, this.timeoutNanos);
         }
         s.wakeIfCancelled(me);
         park();
         me.endWait();
+        s.unsleep(me);
+        // What woke it: a value for one case; else a cancel; else a channel that closed or now has
+        // a value — or the timer.
+        this.lockAll();
+        var chosen: ?CaseNode = null;
         at = this.first;
         while (let n = at) {
             n.entry.withdraw();
-            at = n.next;
-        }
-        s.unsleep(me);
-        // What woke it: a value for one case, a cancel, a channel that closed — or the timer.
-        at = this.first;
-        while (let n = at) {
-            if (n.entry.settled()) {
-                try n.entry.finish();
-                return;
+            if (chosen == null && n.entry.settled()) {
+                chosen = n;
             }
             at = n.next;
         }
+        if (chosen == null && !me.cancelled.load()) {
+            chosen = this.takeReady(s);
+        }
+        this.unlockAll();
+        if (let n = chosen) {
+            try n.entry.finish();
+            return;
+        }
         if (me.cancelled.load()) { throw Cancelled { }; }
-        let closed = try this.fireReady(s);
-        if (closed) { return; }
         try this.timedOut();
     }
 
-    /// The first case that can go on at once runs: true then, false where none can.
-    mut fn fireReady(s: Scheduler): bool throws Error {
+    /// The first case, in the order they were added, that can go on at once — what it receives
+    /// taken already; null where none can. Under the guards.
+    mut fn takeReady(s: Scheduler): ?CaseNode {
         var at = this.first;
         while (let n = at) {
-            let fired = try n.entry.tryFire(s);
-            if (fired) { return true; }
+            if (n.entry.takeReady(s)) {
+                return n;
+            }
             at = n.next;
         }
-        return false;
+        return null;
+    }
+
+    /// The guards of the channels, each once, sorted by the channels' ids.
+    fn orderGuards(): ?GuardNode {
+        var sorted: ?GuardNode = null;
+        var at = this.first;
+        while (let n = at) {
+            let id = n.entry.channelId();
+            var before: ?GuardNode = null;
+            var after = sorted;
+            while (let g = after) {
+                if (g.id >= id) { break; }
+                before = g;
+                after = g.next;
+            }
+            var known = false;
+            if (let g = after) {
+                known = g.id == id;
+            }
+            if (!known) {
+                let node = GuardNode { id = id, guard = n.entry.channelGuard(), next = after };
+                if (let b = before) {
+                    b.next = node;
+                } else {
+                    sorted = node;
+                }
+            }
+            at = n.next;
+        }
+        return sorted;
+    }
+
+    fn lockAll(): void {
+        var at = this.guards;
+        while (let g = at) {
+            g.guard.acquire();
+            at = g.next;
+        }
+    }
+
+    fn unlockAll(): void {
+        var at = this.guards;
+        while (let g = at) {
+            g.guard.release();
+            at = g.next;
+        }
     }
 
     fn timedOut(): void throws Error {
@@ -521,18 +623,29 @@ class CaseNode {
     var next: ?CaseNode = null,
 }
 
+/// A channel's guard in a select's list of them, sorted by the channel's id.
+class GuardNode {
+    id: int,
+    guard: SpinLock,
+    var next: ?GuardNode = null,
+}
+
 /// One case of a select, whatever the element type of its channel: a receive from that channel.
 interface SelectCase {
+    /// The channel's place in the order of locks, and its guard.
+    fn channelId(): int;
+    fn channelGuard(): SpinLock;
     /// Where a receive would not wait — a value is there, or the channel is closed — receives at
-    /// once and runs the body with what came: true then; false where it would wait.
-    mut fn tryFire(s: Scheduler): bool throws Error;
-    /// `c` waits on the channel for a value, as one of the select's waits.
+    /// once and keeps what came for `finish()`: true then; false where it would wait. Under the
+    /// channel's guard.
+    mut fn takeReady(s: Scheduler): bool;
+    /// `c` waits on the channel for a value, as one of the select's waits. Under the guard.
     mut fn enlist(c: Context): void;
-    /// It waits there no more.
+    /// It waits there no more. Under the guard.
     mut fn withdraw(): void;
-    /// A value came to it while it waited.
-    fn settled(): bool;
-    /// Runs the body with the value that came.
+    /// A value came to it while it waited, which it keeps for `finish()`. Under the guard.
+    mut fn settled(): bool;
+    /// Runs the body with what the case received — the value, or null for a closed channel.
     fn finish(): void throws Error;
 }
 
@@ -540,15 +653,24 @@ class Case<T> :: [SelectCase] {
     channel: Channel<T>,
     body: fn(?T) -> void throws Error,
     var waiting: ?Waiting<T> = null,
+    /// What the case received, for its body.
+    var received: ?T = null,
 
-    mut fn tryFire(s: Scheduler): bool throws Error {
-        let f = this.body;
+    fn channelId(): int {
+        return this.channel.id;
+    }
+
+    fn channelGuard(): SpinLock {
+        return this.channel.guard;
+    }
+
+    mut fn takeReady(s: Scheduler): bool {
         if (let item = this.channel.takeNow(s)) {
-            try f(item.value);
+            this.received = item.value;
             return true;
         }
         if (this.channel.closed) {
-            try f(null);
+            this.received = null;
             return true;
         }
         return false;
@@ -566,18 +688,19 @@ class Case<T> :: [SelectCase] {
         }
     }
 
-    fn settled(): bool {
+    mut fn settled(): bool {
         if (let w = this.waiting) {
-            return w.settled;
+            if (w.settled) {
+                this.received = w.value;
+                return true;
+            }
         }
         return false;
     }
 
     fn finish(): void throws Error {
         let f = this.body;
-        if (let w = this.waiting) {
-            try f(w.value);
-        }
+        try f(this.received);
     }
 }
 
@@ -1121,6 +1244,9 @@ class Scheduler {
         waitOnPoller(if (left > 0) left else 0);
     }
 }
+
+/// The ids of the channels, in the order they were made: the order of their locks.
+let channelIds = Atomic<int>.new(0);
 
 /// The running thread's scheduler: there is one wherever a task runs.
 fn here(): Scheduler {
