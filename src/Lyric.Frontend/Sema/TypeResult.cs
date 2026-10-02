@@ -50,6 +50,19 @@ public sealed class TypeResult
 
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
 
+    /// <summary>The parameters <c>@callerExpr</c> sits on (design/v5/spec/09 A11), each with the
+    /// parameter whose argument's text it gives, and where that text comes from.</summary>
+    private readonly Dictionary<Param, string> _callerExpr = new(ReferenceEqualityComparer.Instance);
+
+    public void BindCallerExpr(Param parameter, string target) => _callerExpr[parameter] = target;
+
+    /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
+    /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
+    public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);
+
+    /// <summary>The source text of a span — what a call wrote —, for the lowering.</summary>
+    public Func<Lyric.Core.Span, string>? SourceText { get; internal set; }
+
     /// <summary>
     /// Which function satisfied which conformance: keyed by (implementing type, interface,
     /// member), holding one entry per INSTANCE.

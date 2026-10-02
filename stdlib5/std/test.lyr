@@ -2,24 +2,51 @@
 /// hands a package's tests to. A test is a function marked `@Test` — no parameters, `void`,
 /// throwing if it likes — in a module of the package or under its `tests/` (07 V4). An assertion
 /// that does not hold panics with what it got against what was expected, each as `Debug` writes
-/// it (X1), the actual value first (N13).
+/// it, and names the expression it got it from (X1): `xs.length() = 2, expected 3`. The actual
+/// value comes first (N13).
 
 import std.io { println };
-import std.task { spawn, TaskStatus };
+import std.task { spawn, sleep, Thread, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
+import std.sync { Atomic };
+import std.time { Duration };
 
 /// One test as `lyric test` hands it to `run`: its name — the module's path and the function's —,
-/// its body, and why it is skipped, if it is (`@Test { skip = "…" }`).
+/// its body, why it is skipped, if it is, and how many seconds it may take
+/// (`@Test { skip = "…", timeout = 10 }`).
 pub struct TestCase {
     pub name: string,
     pub body: fn() -> void throws Error,
     pub skip: string = "",
+    pub timeout: int = 60,
 }
+
+/// Ends the process at once — no handler runs, nothing is left to flush: the runtime writes
+/// unbuffered. The watchdog's way out of a test that does not stop.
+extern "C" fn _exit(status: int32): void;
+
+/// The running test, for the watchdog on a thread of its own (X3): which, and until when it may
+/// run — 0 while none does.
+class Watch {
+    current: Atomic<int> = Atomic<int>.new(-1),
+    deadline: Atomic<int> = Atomic<int>.new(0),
+}
+
+/// What the running test's subtests left (X2): the name they are reported under, and how many
+/// failed.
+class Subtests {
+    var parent: string = "",
+    var failed: int = 0,
+}
+
+let watch = Watch { };
+let subtests = Subtests { };
 
 /// Runs the tests one after another, each in a task of its own (X3): a panic or an error that
 /// leaves a test fails it, and the run goes on. A line for each test once it has ended — what it
-/// printed comes before —, then the count. The answer is the program's exit: 0 when no test
-/// failed, 1 when one did (11 C5).
+/// printed comes before —, then the count. A test that outlives its time ends the run, as a
+/// failure. The answer is the program's exit: 0 when no test failed, 1 when one did (11 C5).
 pub fn run(cases: TestCase[]): int {
+    let _ = Thread.spawn(() => try guard(cases));
     var passed = 0;
     var failed = 0;
     var skipped = 0;
@@ -30,30 +57,22 @@ pub fn run(cases: TestCase[]): int {
             skipped += 1;
             continue;
         }
-        var task = spawn(c.body);
-        task.join();
-        match (task.status()) {
-            TaskStatus.Done(_) => {
-                println(f"ok    {c.name}");
-                passed += 1;
-            }
-            TaskStatus.Failed(e) => {
+        subtests.parent = c.name;
+        subtests.failed = 0;
+        watch.current.store(i);
+        watch.deadline.store(if (c.timeout > 0) monotonicNanos() + c.timeout * 1000000000 else 0);
+        let held = outcome(c.name, c.body);
+        watch.deadline.store(0);
+        if (held && subtests.failed == 0) {
+            println(f"ok    {c.name}");
+            passed += 1;
+        } else {
+            if (held) {
+                let noun = if (subtests.failed == 1) "subtest" else "subtests";
                 println(f"FAIL  {c.name}");
-                println(f"      error: {e.message()}");
-                failed += 1;
+                println(f"      {subtests.failed} {noun} failed");
             }
-            TaskStatus.Panicked(p) => {
-                println(f"FAIL  {c.name}");
-                println(f"      panic [{p.code}]: {p.message}");
-                if (p.trace != "") { println(p.trace); }
-                failed += 1;
-            }
-            TaskStatus.Cancelled => {
-                println(f"FAIL  {c.name}");
-                println("      cancelled");
-                failed += 1;
-            }
-            TaskStatus.Running => unreachable("a joined task has ended"),
+            failed += 1;
         }
     }
     let count = passed + failed + skipped;
@@ -62,75 +81,165 @@ pub fn run(cases: TestCase[]): int {
     return if (failed > 0) 1 else 0;
 }
 
-/// Fails the test unless `actual` equals `expected`: `got 2, expected 3`, then `message` where
-/// one is given.
-pub fn assertEq<T :: [Equatable, Debug]>(actual: T, expected: T, message: string = ""): void {
+/// Runs `body` in a task of its own; where it does not hold, writes `FAIL` with the panic or the
+/// error below it. Whether it held.
+fn outcome(name: string, body: fn() -> void throws Error): bool {
+    var task = spawn(body);
+    task.join();
+    var held = false;
+    match (task.status()) {
+        TaskStatus.Done(_) => {
+            held = true;
+        }
+        TaskStatus.Failed(e) => {
+            println(f"FAIL  {name}");
+            println(f"      error: {e.message()}");
+        }
+        TaskStatus.Panicked(p) => {
+            println(f"FAIL  {name}");
+            println(f"      panic [{p.code}]: {p.message}");
+            if (p.trace != "") { println(p.trace); }
+        }
+        TaskStatus.Cancelled => {
+            println(f"FAIL  {name}");
+            println("      cancelled");
+        }
+        TaskStatus.Running => unreachable("a joined task has ended"),
+    }
+    return held;
+}
+
+/// The watchdog (X3): on a thread of its own, it looks every tenth of a second whether the running
+/// test has outlived its time. One that has ends the run — it cannot be stopped from outside: a
+/// task gives way only where it waits.
+fn guard(cases: TestCase[]): void throws Cancelled {
+    while (true) {
+        try sleep(Duration.ofMillis(100));
+        let deadline = watch.deadline.load();
+        if (deadline > 0 && monotonicNanos() > deadline) {
+            let c = cases[watch.current.load()];
+            println(f"FAIL  {c.name}");
+            println(f"      timed out after {c.timeout} s — the run ends here");
+            _exit(1);
+        }
+    }
+}
+
+/// A part of the running test, reported under its own name — `parent/name` — and run in a task of
+/// its own, so the test goes on after one fails (X2): a table-driven test, a row each. A failed
+/// one fails the test.
+pub fn subtest(name: string, body: fn() -> void throws Error): void {
+    let full = subtests.parent + "/" + name;
+    if (outcome(full, body)) {
+        println(f"ok    {full}");
+    } else {
+        subtests.failed += 1;
+    }
+}
+
+/// Fails the test unless `f` throws, and gives what it threw — of the type `f` says it throws —,
+/// for the test to look at (X1).
+pub fn assertThrows<E :: [Error]>(f: fn() -> void throws E, message: string = ""): E {
+    try {
+        try f();
+    } catch (e: E) {
+        return e;
+    }
+    fail(because("threw nothing, expected an error", message));
+}
+
+/// Fails the test unless `f` panics, run in a task of its own (06 T4), and gives what the panic
+/// left.
+pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicInfo {
+    var task = spawn(f);
+    task.join();
+    return match (task.status()) {
+        TaskStatus.Panicked(p) => p,
+        TaskStatus.Failed(e) => fail(because("threw " + e.message() + ", expected a panic", message)),
+        _ => fail(because("ended, expected a panic", message)),
+    };
+}
+
+/// Fails the test unless `actual` equals `expected`: `xs.length() = 2, expected 3` — the
+/// expression the call wrote for `actual`, where it is not the value itself —, then `message`.
+pub fn assertEq<T :: [Equatable, Debug]>(actual: T, expected: T, message: string = "",
+    @callerExpr(actual) written: string = ""): void {
     if (!(actual == expected)) {
-        fail(because(f"got {actual.debug()}, expected {expected.debug()}", message));
+        fail(because(got(written, actual.debug()) + ", expected " + expected.debug(), message));
     }
 }
 
 /// Fails the test where `actual` equals `unexpected` — the assertion for "it changed", where
 /// `assertEq` says "it is".
-pub fn assertNotEq<T :: [Equatable, Debug]>(actual: T, unexpected: T, message: string = ""): void {
+pub fn assertNotEq<T :: [Equatable, Debug]>(actual: T, unexpected: T, message: string = "",
+    @callerExpr(actual) written: string = ""): void {
     if (actual == unexpected) {
-        fail(because(f"got {actual.debug()}, expected anything else", message));
+        fail(because(got(written, actual.debug()) + ", expected anything else", message));
     }
 }
 
 /// Fails the test unless `condition` holds.
-pub fn assertTrue(condition: bool, message: string = ""): void {
+pub fn assertTrue(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void {
     if (!condition) {
-        fail(because("got false, expected true", message));
+        fail(because(got(written, "false") + ", expected true", message));
     }
 }
 
 /// Fails the test where `condition` holds.
-pub fn assertFalse(condition: bool, message: string = ""): void {
+pub fn assertFalse(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void {
     if (condition) {
-        fail(because("got true, expected false", message));
+        fail(because(got(written, "true") + ", expected false", message));
     }
 }
 
 /// Fails the test where `value` is present.
-pub fn assertNull<T :: [Debug]>(value: ?T, message: string = ""): void {
+pub fn assertNull<T :: [Debug]>(value: ?T, message: string = "", @callerExpr(value) written: string = ""): void {
     if (let v = value) {
-        fail(because(f"got {v.debug()}, expected null", message));
+        fail(because(got(written, v.debug()) + ", expected null", message));
     }
 }
 
 /// Fails the test where `value` is absent; the value otherwise, for the test to go on with.
-pub fn assertNotNull<T>(value: ?T, message: string = ""): T {
-    return value ?? fail(because("got null, expected a value", message));
+pub fn assertNotNull<T>(value: ?T, message: string = "", @callerExpr(value) written: string = ""): T {
+    return value ?? fail(because(got(written, "null") + ", expected a value", message));
 }
 
 /// Fails the test unless `actual` lies within `tolerance` of `expected` — the comparison
 /// `assertEq` cannot make for floating point, where `0.1 + 0.2` is not `0.3`. NaN on either side
 /// fails: it is close to nothing.
-pub fn assertClose(actual: float, expected: float, tolerance: float, message: string = ""): void {
+pub fn assertClose(actual: float, expected: float, tolerance: float, message: string = "",
+    @callerExpr(actual) written: string = ""): void {
     let gap = if (actual > expected) actual - expected else expected - actual;
     if (!(gap <= tolerance)) {
-        fail(because(f"got {actual}, expected {expected} within {tolerance}", message));
+        fail(because(got(written, f"{actual}") + f", expected {expected} within {tolerance}", message));
     }
 }
 
 /// Fails the test unless `actual` is less than `bound`.
-pub fn assertLess<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = ""): void {
+pub fn assertLess<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = "",
+    @callerExpr(actual) written: string = ""): void {
     if (!(actual < bound)) {
-        fail(because(f"got {actual.debug()}, expected less than {bound.debug()}", message));
+        fail(because(got(written, actual.debug()) + ", expected less than " + bound.debug(), message));
     }
 }
 
 /// Fails the test unless `actual` is greater than `bound`.
-pub fn assertGreater<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = ""): void {
+pub fn assertGreater<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = "",
+    @callerExpr(actual) written: string = ""): void {
     if (!(actual > bound)) {
-        fail(because(f"got {actual.debug()}, expected greater than {bound.debug()}", message));
+        fail(because(got(written, actual.debug()) + ", expected greater than " + bound.debug(), message));
     }
 }
 
 /// Fails the test outright, with `message` — for a branch a test must not reach.
 pub fn fail(message: string): never {
     panic(message);
+}
+
+/// What an assertion got: `xs.length() = 2` where the call wrote an expression, `got 2` where it
+/// wrote the value itself, or where no call's text reached it.
+fn got(written: string, value: string): string {
+    return if (written == "" || written == value) "got " + value else written + " = " + value;
 }
 
 /// What an assertion found, and the test's own words after it where it gave some.

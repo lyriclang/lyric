@@ -1,6 +1,6 @@
 // std.test: the assertions hold where what they check does. What a failed one reports is
 // TestCommandTests' (tests/Lyric5.Tests), which runs lyric test over failing tests.
-import std.test { assertEq, assertNotEq, assertTrue, assertFalse, assertNull, assertNotNull, assertClose, assertLess, assertGreater };
+import std.test { assertEq, assertNotEq, assertTrue, assertFalse, assertNull, assertNotNull, assertClose, assertLess, assertGreater, assertThrows, assertPanics, subtest };
 
 @Test
 fn equalityAndItsNegation(): void {
@@ -37,4 +37,33 @@ fn order(): void {
 @Test
 fn aTestMayThrowAndNotThrow(): void throws Error {
     assertTrue(true, "a throwing test that throws nothing passes");
+}
+
+class Refusal :: [Error] {
+    fn message(): string { return "no"; }
+}
+
+@Test
+fn assertThrowsGivesWhatWasThrown(): void {
+    let e = assertThrows(() => { throw Refusal { }; });
+    assertEq(e.message(), "no");
+}
+
+@Test
+fn assertPanicsGivesWhatThePanicLeft(): void {
+    let p = assertPanics(() => { panic("boom"); });
+    assertEq(p.message, "boom");
+    assertEq(p.code, "LYR-RT0008");
+}
+
+@Test
+fn subtestsRunEachInTurn(): void {
+    var seen = 0;
+    for (i in 1..4) {
+        subtest(f"row {i}") {
+            assertTrue(i > 0);
+            seen += i;
+        }
+    }
+    assertEq(seen, 6);
 }

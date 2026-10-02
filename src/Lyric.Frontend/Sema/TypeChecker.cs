@@ -118,6 +118,7 @@ public sealed class TypeChecker
         _comp = comp;
         _binding = binding;
         _de = de;
+        _result.SourceText = comp.TextOf;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
@@ -1604,6 +1605,7 @@ public sealed class TypeChecker
                 ReportDuplicateParameter(p.Name, p.Span,
                     Array.Find(fn.Parameters, q => q.Name == p.Name && !ReferenceEquals(q, p))?.Span);
             _result.BindRef(p, ps); // for definite-assignment analysis
+            if (p.Attributes.Length > 0) CheckParameterAttributes(fn, p, pt, outerScope);
             if (p.Default is not null)
             {
                 CheckAssignable(p.Default, CheckExpr(p.Default, scope, pt), pt, p.Span);
@@ -9079,6 +9081,43 @@ public sealed class TypeChecker
     /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
     private bool IsAny(LyrType type) =>
         TypeFacts.SymbolOf(type) is { } ts && ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
+
+    /// <summary>
+    /// What sits on a parameter (design/v5/spec/09 A11): <c>@callerExpr(p)</c> alone, by its
+    /// identity — where a call leaves this parameter out, it gets the text the call wrote for
+    /// <c>p</c>, another parameter of the function. So this one is a <c>string</c>, and has a default
+    /// for the call that writes it itself.
+    /// </summary>
+    private void CheckParameterAttributes(FunctionDecl fn, Param p, LyrType type, SymbolTable scope)
+    {
+        foreach (var attribute in p.Attributes)
+        {
+            var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
+            var written = string.Join('.', attribute.Path);
+            if (sym is not TypeSymbol ts || !ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("callerExpr")))
+            {
+                _de.Report(sym is null ? "LYR-SEM0011" : "LYR-SEM0065", Severity.Error, attribute.PathSpan,
+                    sym is null
+                        ? $"unknown type '{written}'"
+                        : $"'@{written}' cannot sit on a parameter — '@callerExpr' alone does");
+                continue;
+            }
+            _result.BindRef(attribute, ts);
+            string? fault = null;
+            if (attribute.Positional is not IdentifierExpr { Name: var target } || attribute.Fields.Length > 0)
+                fault = "names the parameter whose argument it writes: '@callerExpr(actual)'";
+            else if (target == p.Name || !fn.Parameters.Any(q => q.Name == target))
+                fault = $"names no other parameter of '{fn.Name}': '{target}'";
+            else if (!LyrType.Equal(type, LyrType.String))
+                fault = "sits on a 'string' parameter: what it gives is text";
+            else if (p.Default is null)
+                fault = "sits on a parameter with a default, which a call that writes the argument keeps";
+            else
+                _result.BindCallerExpr(p, target);
+            if (fault is not null)
+                _de.Report("LYR-SEM0155", Severity.Error, attribute.Span, $"'@callerExpr' {fault}");
+        }
+    }
 
     /// <summary>Whether this is THE <c>Test</c> attribute of <c>std.core</c> (09 A3): by identity —
     /// a <c>Test</c> struct of a program's own is data, not a test.</summary>
