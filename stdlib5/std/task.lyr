@@ -1,7 +1,7 @@
 /// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S4: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
-/// as a task (T6); `spawn` and its `Task`, `spawnDetached`, `sleep`, `yieldNow`; cancellation (N9).
-/// `TaskScope` and `withTimeout` come with S4, timers and channels with S5, threads with S6.
+/// as a task (T6); `spawn` and its `Task`, `TaskScope`, `spawnDetached`, `sleep`, `yieldNow`;
+/// cancellation (N9). `withTimeout` comes with S4, timers and channels with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
@@ -68,9 +68,15 @@ pub class Task<T> {
         }
     }
 
-    /// The body has ended: the tasks waiting for it are ready, in the order they came.
+    /// The body has ended: its scope learns of it, and the tasks waiting for it are ready, in the
+    /// order they came.
     mut fn finish(): void {
         this.done = true;
+        if (let c = this.context) {
+            if (let scope = c.scope) {
+                scope.ended(c, this.failure);
+            }
+        }
         this.context = null;
         this.waiters.wakeAll(here());
     }
@@ -80,6 +86,103 @@ pub class Task<T> {
 /// the tasks ready before it had their turn, and `await()` on the handle gives its value or throws
 /// its error — `E`, what the body throws, the handle's type carries.
 pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+    return launch(body);
+}
+
+/// The tasks a scope starts end before it does (06 T5): structured concurrency. A scope is
+/// `Closeable` — `using let scope = TaskScope.new();` — and its `close()` waits until every task it
+/// started has ended. The first of them that fails cancels the others (N9 X3), and `close()`
+/// throws that error once they have all ended; a task that ends with `Cancelled` is no failure of
+/// the scope. A task waiting in `close()` that is cancelled cancels the scope's tasks and still
+/// waits for them.
+pub class TaskScope :: [Closeable] {
+    var firstChild: ?Context = null,
+    var lastChild: ?Context = null,
+    var open: int = 0,
+    var failure: ?Error = null,
+    /// The task waiting in `close()`.
+    closing: Waiters = Waiters { },
+
+    /// A scope with no tasks yet.
+    pub static fn new(): TaskScope {
+        return TaskScope { };
+    }
+
+    /// `spawn` (06 T1), the task belonging to this scope: `close()` waits for it, and a failure of
+    /// it cancels the other tasks of the scope.
+    pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        let task = launch(body);
+        if (let c = task.context) {
+            c.scope = this;
+            c.prevChild = this.lastChild;
+            c.nextChild = null;
+            if (let tail = this.lastChild) {
+                tail.nextChild = c;
+            } else {
+                this.firstChild = c;
+            }
+            this.lastChild = c;
+            this.open += 1;
+        }
+        return task;
+    }
+
+    /// Cancels every task of the scope that has not ended (06 N9 X3).
+    pub fn cancel(): void {
+        let s = here();
+        var at = this.firstChild;
+        while (let c = at) {
+            at = c.nextChild;
+            s.cancel(c);
+        }
+    }
+
+    /// Waits until every task of the scope has ended, then throws the first failure, if any (06 T5).
+    pub fn close(): void throws Error {
+        let s = here();
+        let me = s.running ?? panic("a scope closed where no task runs");
+        while (this.open > 0) {
+            if (me.cancelled) {
+                this.cancel();
+            }
+            s.parkIn(this.closing);
+        }
+        if (let e = this.failure) {
+            throw e;
+        }
+    }
+
+    /// A task of the scope ended, with `failure` or without: the first failure — `Cancelled` is
+    /// none — cancels the others, and the last task to end wakes `close()`.
+    mut fn ended(c: Context, failure: ?Error): void {
+        if (let p = c.prevChild) {
+            p.nextChild = c.nextChild;
+        } else {
+            this.firstChild = c.nextChild;
+        }
+        if (let n = c.nextChild) {
+            n.prevChild = c.prevChild;
+        } else {
+            this.lastChild = c.prevChild;
+        }
+        c.prevChild = null;
+        c.nextChild = null;
+        c.scope = null;
+        this.open -= 1;
+        if (let e = failure) {
+            if (this.failure == null && !(e is Cancelled)) {
+                this.failure = e;
+                this.cancel();
+            }
+        }
+        if (this.open == 0) {
+            this.closing.wakeAll(here());
+        }
+    }
+}
+
+/// A task around `body`, ready to run, and its handle: what `spawn` and `TaskScope.spawn` share.
+fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
     let task = Task<T> { };
     let run = () => {
         try {
@@ -138,6 +241,10 @@ class Context {
     var rank: int = 0,
     /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`.
     var cancelled: bool = false,
+    /// The scope its task belongs to (06 T5), and the links of that scope's list of tasks.
+    var scope: ?TaskScope = null,
+    var nextChild: ?Context = null,
+    var prevChild: ?Context = null,
 }
 
 /// The tasks waiting for one task to end, in the order they came; a cancel takes one out.
@@ -229,6 +336,13 @@ class Scheduler {
         this.ready(c);
         park();
         if (c.cancelled) { throw Cancelled { }; }
+    }
+
+    /// The running context waits in `list` until it is woken from there — a wait that ignores the
+    /// mark: its caller decides what a cancel means to it.
+    mut fn parkIn(list: Waiters): void {
+        list.add(this.running ?? panic("a wait where no task runs"));
+        park();
     }
 
     /// Cancels a context (06 N9 X1): the mark, and the end of the wait it is in now, if any.

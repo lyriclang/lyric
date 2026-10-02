@@ -1,0 +1,91 @@
+// Task scopes (design/v5/spec/06 T5, N9 X3; 10 §4). Expected stdout:
+//   spawned / a / b / after waits             close() waits for every task of the scope
+//   slow cleans up / scope failed: oops       the first failure cancels the others, close() throws it
+//   c1 stops / c2 stops / after cancels       scope.cancel() cancels them all; Cancelled is no failure
+//   u / after one cancelled                   a task cancelled on its own is no failure either
+//   grandchild stops / owner cancelled        a task cancelled in close() takes the scope's tasks along
+import std.io { println };
+import std.task { spawn, sleep, yieldNow, TaskScope, Cancelled };
+import std.time { Duration };
+
+enum Oops :: [Error] {
+    Bad;
+    fn message(): string { return "oops"; }
+}
+
+fn work(name: string, ms: int): void throws Cancelled {
+    try sleep(Duration.ofMillis(ms));
+    println(name);
+}
+
+fn failing(): void throws [Oops, Cancelled] {
+    try sleep(Duration.ofMillis(5));
+    throw Oops.Bad;
+}
+
+fn waits(): void throws Error {
+    using let scope = TaskScope.new();
+    scope.spawn(() => try work("b", 20));
+    scope.spawn(() => try work("a", 10));
+    println("spawned");
+}
+
+fn fails(): void throws Error {
+    using let scope = TaskScope.new();
+    scope.spawn(() => {
+        defer println("slow cleans up");
+        try work("slow", 30000);
+    });
+    scope.spawn(() => try failing());
+}
+
+fn cancels(): void throws Error {
+    using let scope = TaskScope.new();
+    scope.spawn(() => {
+        defer println("c1 stops");
+        try work("c1", 30000);
+    });
+    scope.spawn(() => {
+        defer println("c2 stops");
+        try work("c2", 30000);
+    });
+    try yieldNow();
+    scope.cancel();
+}
+
+fn oneCancelled(): void throws Error {
+    using let scope = TaskScope.new();
+    let t = scope.spawn(() => try work("never", 30000));
+    scope.spawn(() => try work("u", 5));
+    try yieldNow();
+    t.cancel();
+}
+
+fn main(): void throws Error {
+    try waits();
+    println("after waits");
+    try {
+        fails();
+    } catch (e: Oops) {
+        println("scope failed: " + e.message());
+    }
+    try cancels();
+    println("after cancels");
+    try oneCancelled();
+    println("after one cancelled");
+    let owner = spawn(() => {
+        using let scope = TaskScope.new();
+        scope.spawn(() => {
+            defer println("grandchild stops");
+            try work("grandchild", 30000);
+        });
+        try sleep(Duration.ofSecs(30));
+    });
+    try yieldNow();
+    owner.cancel();
+    try {
+        owner.await();
+    } catch (_: Cancelled) {
+        println("owner cancelled");
+    }
+}

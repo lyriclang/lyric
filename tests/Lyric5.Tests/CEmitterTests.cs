@@ -224,6 +224,10 @@ public class CEmitterTests
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
+            data.Add("same_names", profile, 0, "free\n1\nmethod\n2\nfree\n3\n");
+            data.Add("scopes", profile, 0,
+                "spawned\na\nb\nafter waits\nslow cleans up\nscope failed: oops\nc1 stops\nc2 stops\n"
+                + "after cancels\nu\nafter one cancelled\ngrandchild stops\nowner cancelled\n");
             data.Add("cancel", profile, 0,
                 "sleeper cleans up\nsleeper cancelled true\nbusy 42\nstubborn caught\nstubborn cancelled again\n"
                 + "waiter true long 5\nended 3 3\ntick 1\nticks ends\npulled to the end true\ngenerator task cancelled\n"
