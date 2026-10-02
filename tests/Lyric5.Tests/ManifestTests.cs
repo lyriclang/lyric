@@ -88,7 +88,7 @@ public class ManifestTests
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\ndescription = 7", "LYR-PKG0002", "'description' is a string, not the number 7")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nauthors = \"me\"", "LYR-PKG0002", "'authors' is an array of strings")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nauthors = [\"me\", 7]", "LYR-PKG0002", "'authors' is an array of strings")]
-    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ntoolchain = \">=5.1\"", "LYR-PKG0003", "'toolchain' comes with M7 S6")]
+    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ntoolchain = \"~5.1\"", "LYR-PKG0002", "is no toolchain requirement")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\ninclude = \"src\"", "LYR-PKG0002", "'include' is an array of patterns")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nexclude = [\"../notes\"]", "LYR-PKG0002", "'../notes' is no pattern of the package's files")]
     public void A_package_table_is_checked(string body, string code, string why)
@@ -100,7 +100,7 @@ public class ManifestTests
 
     [Theory]
     [InlineData("[native]\nlibs = [\"z\"]", "comes with M7 S6")]
-    [InlineData("[[bin]]\nname = \"tool\"", "comes with M7 S6")]
+    [InlineData("[lints]\ndeny = []", "comes with M12")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]
     public void A_section_the_toolchain_does_not_read_is_refused(string section, string why)
     {

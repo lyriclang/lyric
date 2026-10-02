@@ -41,8 +41,8 @@ public static class Program
     {
         output.WriteLine("usage: lyric5 <verb> [options]");
         output.WriteLine();
-        output.WriteLine("  build [<file.lyr>] [options]   compile the package here (src/main.lyr), or the file,");
-        output.WriteLine("                                 to a binary under out/");
+        output.WriteLine("  build [<file.lyr>] [options]   compile the package here — its src/main.lyr and its [[bin]]");
+        output.WriteLine("                                 programs —, or the file, to binaries under out/");
         output.WriteLine("  run [<file.lyr>] [options] [-- args]");
         output.WriteLine("                                 build, then run the binary with the arguments");
         output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —");
@@ -59,6 +59,7 @@ public static class Program
         output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
         output.WriteLine("  --emit ir|c                    print the IR or the C instead of building");
         output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
+        output.WriteLine("  --bin <name>                   the package's program to build, run or print");
         output.WriteLine("  --offline                      fetch nothing: packages from git come from the cache");
         output.WriteLine();
         output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
@@ -74,7 +75,7 @@ public static class Program
 
     // --- build and run -------------------------------------------------------------------------
 
-    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt"];
+    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt", "--bin"];
 
     /// <summary>The profile's fields a flag sets for one build, <c>--x</c> on and <c>--no-x</c> off:
     /// the field flag over the profile (11 C4, W2 P3).</summary>
@@ -137,28 +138,30 @@ public static class Program
         // '--offline' (11 W2 P9): what is read from git comes from the user's cache, nothing is fetched.
         var offline = flags.Contains("--offline");
 
-        Project project;
+        // The programs this command is about: a package's every one (P2), or the file's.
+        List<Project> programs;
         LibraryException? library = null;
         try
         {
             if (file is null)
             {
-                if (Project.ForDirectory(baseDirectory, offline) is not { } package)
+                if (Project.ProgramsOf(baseDirectory, offline) is not { } package)
                 {
                     Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
                     Console.Error.WriteLine($"  = help: lyric5 {verb} <file.lyr> builds one file alone");
                     return 2;
                 }
-                project = package;
+                programs = [.. package];
             }
             else
             {
+                if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; a file is a program by itself");
                 if (!File.Exists(file))
                 {
                     Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
                     return 2;
                 }
-                project = Project.ForFile(file, offline);
+                programs = [Project.ForFile(file, offline)];
             }
         }
         catch (ManifestException refused)
@@ -176,7 +179,40 @@ public static class Program
                 return 2;
             }
             library = refused;
-            project = null!;
+            programs = [];
+        }
+
+        // The toolchain the packages ask for (11 W2 P12): one below it refuses them.
+        try { ToolchainCheck.Check(library?.Graph ?? programs[0].Graph, DisplayVersion()); }
+        catch (ManifestException refused)
+        {
+            Console.Error.WriteLine(refused.Render());
+            return refused.Exit;
+        }
+
+        // Which program (P2; 11 C8): '--bin' names one; 'run' and '--emit' take the package's
+        // src/main.lyr — or its only program —; 'build' builds every one.
+        if (library is null && file is null)
+        {
+            if (values.TryGetValue("--bin", out var bin))
+            {
+                var named = programs.FirstOrDefault(p => p.BinaryName == bin);
+                if (named is null)
+                    return Unknown($"no program '{bin}' in package '{programs[0].Name}': {string.Join(", ", programs.Select(p => p.BinaryName))}");
+                programs = [named];
+            }
+            else if (run || values.ContainsKey("--emit"))
+            {
+                var main = programs.FirstOrDefault(p => p.Binary is null) ?? (programs.Count == 1 ? programs[0] : null);
+                if (main is null)
+                {
+                    Console.Error.WriteLine($"error[LYR-CLI0007]: package '{programs[0].Name}' has several programs and no src/main.lyr: "
+                                            + string.Join(", ", programs.Select(p => p.BinaryName)));
+                    Console.Error.WriteLine($"  = help: --bin <name> names the one to {(run ? "run" : "print")}");
+                    return 2;
+                }
+                programs = [main];
+            }
         }
 
         // The profile (11 W2 P3): '--profile', else LYRIC_PROFILE, else debug — built in, or the
@@ -184,7 +220,7 @@ public static class Program
         var profileName = values.GetValueOrDefault("--profile")
                           ?? (Environment.GetEnvironmentVariable("LYRIC_PROFILE") is { Length: > 0 } fromEnvironment ? fromEnvironment : "debug");
         BuildProfile profile;
-        try { profile = Profiles.Resolve(library?.Manifest ?? project.Manifest, profileName); }
+        try { profile = Profiles.Resolve(library?.Manifest ?? programs[0].Manifest, profileName); }
         catch (ArgumentException unknown) { return Unknown(unknown.Message); }
         if (values.TryGetValue("--opt", out var opt))
         {
@@ -204,7 +240,7 @@ public static class Program
         {
             if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
             if (run) return Unknown("'--emit' prints instead of building; use 'build'");
-            return Pipeline.Emit(project, emit, Console.Out, Console.Error, profile);
+            return Pipeline.Emit(programs[0], emit, Console.Out, Console.Error, profile);
         }
 
         Target target;
@@ -223,15 +259,20 @@ public static class Program
             return 2;
         }
 
-        var (exit, executable) = Pipeline.Build(new BuildRequest(project, profile, target, compiler, DisplayVersion()), Console.Error);
-        if (exit != 0 || executable is null) return exit;
+        string? executable = null;
+        foreach (var program in programs)
+        {
+            var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, DisplayVersion()), Console.Error);
+            if (exit != 0 || built is null) return exit;
+            executable = built;
+        }
         if (!run) return 0;
         if (!target.IsHost)
         {
             Console.Error.WriteLine($"error[LYR-CLI0003]: '{target.Triple}' is not this machine; the binary is at {executable}");
             return 2;
         }
-        return ProcessRunner.RunInherited(executable, programArgs);
+        return ProcessRunner.RunInherited(executable!, programArgs);
     }
 
     // --- update --------------------------------------------------------------------------------
@@ -276,6 +317,7 @@ public static class Program
             var before = LockFile.Read(LockFile.For(manifest));
             bool Named(string name) => names.Count == 0 || names.Contains(name);
             var graph = Project.Resolve(manifest, offline, refresh: Named, keep: entry => !Named(entry.Name));
+            ToolchainCheck.Check(graph, DisplayVersion());
             var unknown = names.Where(n => graph.Locked.All(entry => entry.Name != n)).ToList();
             if (unknown.Count > 0)
                 return Unknown($"no package '{unknown[0]}' is read from git here"
