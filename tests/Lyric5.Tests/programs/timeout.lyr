@@ -1,0 +1,49 @@
+// withTimeout (design/v5/spec/06 N9 X4; 10 §3 rule 4). Expected stdout:
+//   slow 10 ends / fast 10              the body ends in time: its value
+//   slow 30000 ends / timed out         its time runs out: the body is cancelled, then TimedOut
+//   body failed: oops                   the body's own error comes out as it is
+//   quiet 7                             a body that throws nothing
+//   slow 20000 ends / caller cancelled  a cancelled caller cancels the body and waits for it
+import std.io { println };
+import std.task { spawn, withTimeout, TimedOut, sleep, yieldNow, Cancelled };
+import std.time { Duration };
+
+enum Oops :: [Error] {
+    Bad;
+    fn message(): string { return "oops"; }
+}
+
+fn slow(ms: int): int throws Cancelled {
+    defer println(f"slow {ms} ends");
+    try sleep(Duration.ofMillis(ms));
+    return ms;
+}
+
+fn main(): void throws Error {
+    let fast = try withTimeout(Duration.ofMillis(200), () => try slow(10));
+    println(f"fast {fast}");
+    try {
+        let v = withTimeout(Duration.ofMillis(20), () => try slow(30000));
+        println(f"never {v}");
+    } catch (_: TimedOut) {
+        println("timed out");
+    }
+    try {
+        withTimeout(Duration.ofMillis(200), () => { throw Oops.Bad; });
+    } catch (e: Oops) {
+        println("body failed: " + e.message());
+    }
+    let quiet = try withTimeout(Duration.ofMillis(200), () => 7);
+    println(f"quiet {quiet}");
+    let caller = spawn(() => {
+        let v = try withTimeout(Duration.ofSecs(30), () => try slow(20000));
+        println(f"caller got {v}");
+    });
+    try yieldNow();
+    caller.cancel();
+    try {
+        caller.await();
+    } catch (_: Cancelled) {
+        println("caller cancelled");
+    }
+}

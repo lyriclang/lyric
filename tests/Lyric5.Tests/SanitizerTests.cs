@@ -121,6 +121,7 @@ public class SanitizerTests
     [InlineData("spawn", 0)]
     [InlineData("cancel", 0)]
     [InlineData("scopes", 0)]
+    [InlineData("timeout", 0)]
     [InlineData("task_panic", 101)]
     [InlineData("yield_in_task", 101)]
     [InlineData("yield_mismatch", 101)]

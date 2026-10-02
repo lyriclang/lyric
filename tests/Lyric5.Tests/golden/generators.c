@@ -26,6 +26,7 @@ typedef struct lyr_ty17_Exception lyr_ty17_Exception;
 typedef struct lyr_ty18_Duration lyr_ty18_Duration;
 typedef struct lyr_ty19__env_std_task_spawnDetached_ lyr_ty19__env_std_task_spawnDetached_;
 typedef struct lyr_ty20_Cancelled lyr_ty20_Cancelled;
+typedef struct lyr_ty21_TimedOut lyr_ty21_TimedOut;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -180,6 +181,11 @@ struct lyr_ty20_Cancelled {
 _Static_assert(sizeof(lyr_ty20_Cancelled) == 8, "layout of lyr_ty20_Cancelled");
 extern const LyrItable lyr_itab_ty20[];
 const LyrDesc lyr_desc_ty20_Cancelled = { sizeof(lyr_ty20_Cancelled), 0, 0, 0, NULL, "std.task.Cancelled", lyr_itab_ty20 };
+struct lyr_ty21_TimedOut {
+    LyrObj header;
+};
+_Static_assert(sizeof(lyr_ty21_TimedOut) == 8, "layout of lyr_ty21_TimedOut");
+const LyrDesc lyr_desc_ty21_TimedOut = { sizeof(lyr_ty21_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { lyr_ty5_Point value; uint8_t has; } lyr_opt_ty5;
 typedef struct { lyr_opt_i64 value; uint8_t has; } lyr_opt_opt_i64;
