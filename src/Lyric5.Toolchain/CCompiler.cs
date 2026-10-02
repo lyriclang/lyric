@@ -134,6 +134,29 @@ public static class ProcessRunner
         return process.ExitCode;
     }
 
+    /// <summary>Runs a program and passes on what it writes as it writes it, line by line —
+    /// to writers rather than to the console, so a caller that redirects the console gets it —;
+    /// answers its exit code. <c>lyric test</c>'s program (10 B12).</summary>
+    public static int Stream(string file, IEnumerable<string> arguments, TextWriter output, TextWriter error)
+    {
+        var info = new ProcessStartInfo(file)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (var argument in arguments) info.ArgumentList.Add(argument);
+        using var process = new Process { StartInfo = info };
+        var gate = new object();
+        process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (gate) output.WriteLine(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (gate) error.WriteLine(e.Data); };
+        if (!process.Start()) throw new InvalidOperationException($"could not start {file}");
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+        return process.ExitCode;
+    }
+
     public static Result? TryRun(string file, IEnumerable<string> arguments, TimeSpan timeout)
     {
         try { return Run(file, arguments, timeout); }

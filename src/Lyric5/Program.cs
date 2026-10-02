@@ -9,7 +9,7 @@ namespace Lyric5;
 /// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
 /// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
 /// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c>,
-/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7).
+/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7), <c>test</c> (M8a).
 /// </summary>
 public static class Program
 {
@@ -24,6 +24,7 @@ public static class Program
                 "--help" or "-h" or "help" => Usage(Console.Out, 0),
                 "build" => Build(args[1..], run: false),
                 "run" => Build(args[1..], run: true),
+                "test" => Test(args[1..]),
                 "update" => Update(args[1..]),
                 "clean" => Clean(args[1..]),
                 "metadata" => Metadata(args[1..]),
@@ -55,6 +56,8 @@ public static class Program
         output.WriteLine("  add <name> --path <dir> | --git <url> [--tag|--branch|--rev <r>]");
         output.WriteLine("                                 write the dependency into lyric.toml (-C <dir>, --offline)");
         output.WriteLine("  remove <name>                  take the dependency out of lyric.toml (-C <dir>, --offline)");
+        output.WriteLine("  test [options] [-f <text>]     build the package's tests and run them, each in a task of");
+        output.WriteLine("                                 its own — those whose name holds <text>, with -f");
         output.WriteLine("  clean [-C <dir>]               remove the package's out/");
         output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
         output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
@@ -226,24 +229,7 @@ public static class Program
             }
         }
 
-        // The profile (11 W2 P3): '--profile', else LYRIC_PROFILE, else debug — built in, or the
-        // root manifest's; a field flag changes a field for this build alone.
-        var profileName = values.GetValueOrDefault("--profile")
-                          ?? (Environment.GetEnvironmentVariable("LYRIC_PROFILE") is { Length: > 0 } fromEnvironment ? fromEnvironment : "debug");
-        BuildProfile profile;
-        try { profile = Profiles.Resolve(library?.Manifest ?? programs[0].Manifest, profileName); }
-        catch (ArgumentException unknown) { return Unknown(unknown.Message); }
-        if (values.TryGetValue("--opt", out var opt))
-        {
-            if (opt is not ("0" or "1" or "2" or "3")) return Unknown($"'--opt' is a level from 0 to 3, not '{opt}'");
-            profile = profile with { Opt = opt[0] - '0' };
-        }
-        foreach (var (field, set) in FieldFlags)
-        {
-            bool on = flags.Contains("--" + field), off = flags.Contains("--no-" + field);
-            if (on && off) return Unknown($"'--{field}' and '--no-{field}' ask for opposite things");
-            if (on || off) profile = set(profile, on);
-        }
+        if (ProfileOf(values, flags, library?.Manifest ?? programs[0].Manifest) is not { } profile) return 2;
 
         if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile);
 
@@ -261,14 +247,7 @@ public static class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
 
-        var compiler = profile.RequiresClang ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
-        if (compiler is null)
-        {
-            Console.Error.WriteLine(profile.RequiresClang
-                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang (01 C7), and none was found"
-                : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
-            return 2;
-        }
+        if (CompilerFor(profile) is not { } compiler) return 2;
 
         string? executable = null;
         foreach (var program in programs)
@@ -284,6 +263,113 @@ public static class Program
             return 2;
         }
         return ProcessRunner.RunInherited(executable!, programArgs);
+    }
+
+    /// <summary>The profile (11 W2 P3): '--profile', else LYRIC_PROFILE, else debug — built in, or
+    /// the root manifest's; a field flag changes a field for this build alone. <c>null</c> after
+    /// reporting a command line that asks for none.</summary>
+    private static BuildProfile? ProfileOf(Dictionary<string, string> values, HashSet<string> flags, Manifest? manifest)
+    {
+        var profileName = values.GetValueOrDefault("--profile")
+                          ?? (Environment.GetEnvironmentVariable("LYRIC_PROFILE") is { Length: > 0 } fromEnvironment ? fromEnvironment : "debug");
+        BuildProfile profile;
+        try { profile = Profiles.Resolve(manifest, profileName); }
+        catch (ArgumentException unknown)
+        {
+            Unknown(unknown.Message);
+            return null;
+        }
+        if (values.TryGetValue("--opt", out var opt))
+        {
+            if (opt is not ("0" or "1" or "2" or "3"))
+            {
+                Unknown($"'--opt' is a level from 0 to 3, not '{opt}'");
+                return null;
+            }
+            profile = profile with { Opt = opt[0] - '0' };
+        }
+        foreach (var (field, set) in FieldFlags)
+        {
+            bool on = flags.Contains("--" + field), off = flags.Contains("--no-" + field);
+            if (on && off)
+            {
+                Unknown($"'--{field}' and '--no-{field}' ask for opposite things");
+                return null;
+            }
+            if (on || off) profile = set(profile, on);
+        }
+        return profile;
+    }
+
+    /// <summary>The C compiler a profile builds with (01 C7, C8); <c>null</c> after reporting that
+    /// there is none.</summary>
+    private static CCompiler? CompilerFor(BuildProfile profile)
+    {
+        var compiler = profile.RequiresClang ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
+        if (compiler is null)
+            Console.Error.WriteLine(profile.RequiresClang
+                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang (01 C7), and none was found"
+                : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
+        return compiler;
+    }
+
+    // --- test ----------------------------------------------------------------------------------
+
+    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "-f", "--filter"];
+
+    /// <summary>
+    /// <c>lyric test</c> (design/v5/spec/10 B12, 11 C2): the package's tests — every function it
+    /// marks <c>@Test</c>, under <c>src/</c> and under <c>tests/</c> — built into one program for
+    /// this machine and run, one after another, each in a task of its own; the program's exit is
+    /// the command's (C5): 0 when every test held, 1 when one failed or the program was refused.
+    /// </summary>
+    private static int Test(string[] args)
+    {
+        var values = new Dictionary<string, string>();
+        var flags = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (Flags.Contains(arg))
+            {
+                flags.Add(arg);
+                continue;
+            }
+            var option = TestValueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
+            if (option is null)
+                return Unknown(arg.StartsWith('-') ? $"unknown option '{arg}' for 'test'" : $"'test' runs a package's tests and takes no file, got '{arg}'");
+            string? value = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
+            if (value is null) return Unknown($"'{option}' needs a value");
+            values[option == "--filter" ? "-f" : option] = value;
+        }
+        var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
+        if (!Directory.Exists(baseDirectory))
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{baseDirectory}'");
+            return 2;
+        }
+
+        Project project;
+        try
+        {
+            if (Project.TestsOf(baseDirectory, flags.Contains("--offline")) is not { } found)
+            {
+                Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+                Console.Error.WriteLine("  = help: lyric5 test runs a package's tests");
+                return 2;
+            }
+            project = found;
+            ToolchainCheck.Check(project.Graph, DisplayVersion());
+        }
+        catch (ManifestException refused)
+        {
+            Console.Error.WriteLine(refused.Render());
+            return refused.Exit;
+        }
+
+        if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
+        if (CompilerFor(profile) is not { } compiler) return 2;
+        return TestRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error);
     }
 
     // --- update --------------------------------------------------------------------------------

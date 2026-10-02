@@ -106,6 +106,28 @@ pub class Exception :: [Error] {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Attributes (design/v5/spec/09 A1–A3, A11). An attribute is a struct that says where it may sit —
+// one of the markers below —, and a use writes its fields: `@Test { skip = "needs a network" }`.
+// The compiler reads the ones of the closed list by their identity — `std.core.Test`, not any
+// `Test` (A3). The rest of the list and of the markers comes with M9a.
+// ---------------------------------------------------------------------------------------------
+
+/// Where an attribute may sit: at a module's head.
+pub interface OnModule { }
+
+/// On a struct, a class or an enum.
+pub interface OnType { }
+
+/// On a function.
+pub interface OnFunction { }
+
+/// A test (10 B12 X2, 07 V4): `lyric test` runs every function marked so — no parameters, `void`,
+/// not private, throwing if it likes —, each in a task of its own. `skip` says why one is not run.
+pub struct Test :: [OnFunction] {
+    pub skip: string = "",
+}
+
 /// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).
 /// `close()` may throw: on a normal exit the error leaves like any other, while one is in flight
 /// it is appended to it as suppressed.

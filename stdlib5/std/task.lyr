@@ -138,6 +138,13 @@ pub class Task<T> {
     /// task does before it lets go of one it started (06 T5).
     mut fn settle(): void {
         this.cancel();
+        this.join();
+    }
+
+    /// Waits until the body has ended, however it ended and whatever the running task's mark says,
+    /// without taking on its error or its panic (06 T4): the supervisor's wait — `std.test`'s —,
+    /// after which `status()` tells.
+    mut fn join(): void {
         let me = here().running ?? panic("a wait where no task runs");
         this.guard.acquire();
         while (!this.done) {

@@ -1,0 +1,40 @@
+// std.test: the assertions hold where what they check does. What a failed one reports is
+// TestCommandTests' (tests/Lyric5.Tests), which runs lyric test over failing tests.
+import std.test { assertEq, assertNotEq, assertTrue, assertFalse, assertNull, assertNotNull, assertClose, assertLess, assertGreater };
+
+@Test
+fn equalityAndItsNegation(): void {
+    assertEq(2 + 2, 4);
+    assertEq("lyric", "lyric");
+    assertNotEq("a", "b");
+}
+
+@Test
+fn truth(): void {
+    assertTrue(1 < 2);
+    assertFalse(2 < 1);
+}
+
+@Test
+fn presence(): void {
+    let absent: ?int = null;
+    assertNull(absent);
+    let present: ?int = 5;
+    assertEq(assertNotNull(present), 5);
+}
+
+@Test
+fn closeness(): void {
+    assertClose(0.1 + 0.2, 0.3, 0.000001);
+}
+
+@Test
+fn order(): void {
+    assertLess(1, 2);
+    assertGreater('b', 'a');
+}
+
+@Test
+fn aTestMayThrowAndNotThrow(): void throws Error {
+    assertTrue(true, "a throwing test that throws nothing passes");
+}

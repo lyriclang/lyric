@@ -189,6 +189,12 @@ public static class SourceCompiler
             entry => (Root: entry.Value,
                 Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
             StringComparer.Ordinal);
+        // A package's tests/ (07 V4): 'app.tests.x' is tests/x.lyr — under 'lyric test' alone.
+        var tests = options.PackageTestRoots?.ToDictionary(
+            entry => entry.Key,
+            entry => (Root: entry.Value,
+                Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
+            StringComparer.Ordinal);
 
         var loader = (string[] modulePath) =>
         {
@@ -196,6 +202,11 @@ public static class SourceCompiler
 
             if (packages is not null)
             {
+                // 'lyric test' refuses a module that lies under both before it compiles (RES0015).
+                if (modulePath is [var owner, "tests", _, ..] && tests is not null
+                    && tests.TryGetValue(owner, out var testRoot) && NamedExactly(testRoot.Root, modulePath[2..])
+                    && File.Exists(Path.Combine([testRoot.Root, .. modulePath[2..^1], modulePath[^1] + ".lyr"])))
+                    return testRoot.Load(modulePath[2..]);
                 return modulePath.Length > 1 && packages.TryGetValue(modulePath[0], out var package)
                        && NamedExactly(package.Root, modulePath[1..])
                     ? package.Load(modulePath[1..])
@@ -464,6 +475,13 @@ public sealed record CompilerOptions
     /// <summary>What each package declares it imports from (design/v5/spec/07 P6), by name;
     /// <c>null</c> where no package rules apply.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
+
+    /// <summary>
+    /// A package's <c>tests/</c> (design/v5/spec/07 V4), by the package's name: its files are
+    /// modules of the package, <c>tests/math.lyr</c> in <c>app</c> is <c>app.tests.math</c>. Only
+    /// <c>lyric test</c> names them; a build of a program reaches no test.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? PackageTestRoots { get; init; }
 
     /// <summary>
     /// Text to use instead of what lies on disk, by absolute file path. A module found at one of

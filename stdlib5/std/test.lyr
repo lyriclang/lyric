@@ -1,0 +1,139 @@
+/// Tests (design/v5/spec/10 B12): the assertions a test fails by, and the runner `lyric test`
+/// hands a package's tests to. A test is a function marked `@Test` — no parameters, `void`,
+/// throwing if it likes — in a module of the package or under its `tests/` (07 V4). An assertion
+/// that does not hold panics with what it got against what was expected, each as `Debug` writes
+/// it (X1), the actual value first (N13).
+
+import std.io { println };
+import std.task { spawn, TaskStatus };
+
+/// One test as `lyric test` hands it to `run`: its name — the module's path and the function's —,
+/// its body, and why it is skipped, if it is (`@Test { skip = "…" }`).
+pub struct TestCase {
+    pub name: string,
+    pub body: fn() -> void throws Error,
+    pub skip: string = "",
+}
+
+/// Runs the tests one after another, each in a task of its own (X3): a panic or an error that
+/// leaves a test fails it, and the run goes on. A line for each test once it has ended — what it
+/// printed comes before —, then the count. The answer is the program's exit: 0 when no test
+/// failed, 1 when one did (11 C5).
+pub fn run(cases: TestCase[]): int {
+    var passed = 0;
+    var failed = 0;
+    var skipped = 0;
+    for (i in 0..cases.length()) {
+        let c = cases[i];
+        if (c.skip != "") {
+            println(f"skip  {c.name}: {c.skip}");
+            skipped += 1;
+            continue;
+        }
+        var task = spawn(c.body);
+        task.join();
+        match (task.status()) {
+            TaskStatus.Done(_) => {
+                println(f"ok    {c.name}");
+                passed += 1;
+            }
+            TaskStatus.Failed(e) => {
+                println(f"FAIL  {c.name}");
+                println(f"      error: {e.message()}");
+                failed += 1;
+            }
+            TaskStatus.Panicked(p) => {
+                println(f"FAIL  {c.name}");
+                println(f"      panic [{p.code}]: {p.message}");
+                if (p.trace != "") { println(p.trace); }
+                failed += 1;
+            }
+            TaskStatus.Cancelled => {
+                println(f"FAIL  {c.name}");
+                println("      cancelled");
+                failed += 1;
+            }
+            TaskStatus.Running => unreachable("a joined task has ended"),
+        }
+    }
+    let count = passed + failed + skipped;
+    let noun = if (count == 1) "test" else "tests";
+    println(f"\n{count} {noun}: {passed} passed, {failed} failed, {skipped} skipped");
+    return if (failed > 0) 1 else 0;
+}
+
+/// Fails the test unless `actual` equals `expected`: `got 2, expected 3`, then `message` where
+/// one is given.
+pub fn assertEq<T :: [Equatable, Debug]>(actual: T, expected: T, message: string = ""): void {
+    if (!(actual == expected)) {
+        fail(because(f"got {actual.debug()}, expected {expected.debug()}", message));
+    }
+}
+
+/// Fails the test where `actual` equals `unexpected` — the assertion for "it changed", where
+/// `assertEq` says "it is".
+pub fn assertNotEq<T :: [Equatable, Debug]>(actual: T, unexpected: T, message: string = ""): void {
+    if (actual == unexpected) {
+        fail(because(f"got {actual.debug()}, expected anything else", message));
+    }
+}
+
+/// Fails the test unless `condition` holds.
+pub fn assertTrue(condition: bool, message: string = ""): void {
+    if (!condition) {
+        fail(because("got false, expected true", message));
+    }
+}
+
+/// Fails the test where `condition` holds.
+pub fn assertFalse(condition: bool, message: string = ""): void {
+    if (condition) {
+        fail(because("got true, expected false", message));
+    }
+}
+
+/// Fails the test where `value` is present.
+pub fn assertNull<T :: [Debug]>(value: ?T, message: string = ""): void {
+    if (let v = value) {
+        fail(because(f"got {v.debug()}, expected null", message));
+    }
+}
+
+/// Fails the test where `value` is absent; the value otherwise, for the test to go on with.
+pub fn assertNotNull<T>(value: ?T, message: string = ""): T {
+    return value ?? fail(because("got null, expected a value", message));
+}
+
+/// Fails the test unless `actual` lies within `tolerance` of `expected` — the comparison
+/// `assertEq` cannot make for floating point, where `0.1 + 0.2` is not `0.3`. NaN on either side
+/// fails: it is close to nothing.
+pub fn assertClose(actual: float, expected: float, tolerance: float, message: string = ""): void {
+    let gap = if (actual > expected) actual - expected else expected - actual;
+    if (!(gap <= tolerance)) {
+        fail(because(f"got {actual}, expected {expected} within {tolerance}", message));
+    }
+}
+
+/// Fails the test unless `actual` is less than `bound`.
+pub fn assertLess<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = ""): void {
+    if (!(actual < bound)) {
+        fail(because(f"got {actual.debug()}, expected less than {bound.debug()}", message));
+    }
+}
+
+/// Fails the test unless `actual` is greater than `bound`.
+pub fn assertGreater<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = ""): void {
+    if (!(actual > bound)) {
+        fail(because(f"got {actual.debug()}, expected greater than {bound.debug()}", message));
+    }
+}
+
+/// Fails the test outright, with `message` — for a branch a test must not reach.
+pub fn fail(message: string): never {
+    panic(message);
+}
+
+/// What an assertion found, and the test's own words after it where it gave some.
+fn because(found: string, message: string): string {
+    return if (message == "") found else found + ": " + message;
+}
