@@ -96,7 +96,8 @@ public sealed class Compilation
         TypeSymbol t => t.Visibility,
         FunctionSymbol f => f.Visibility,
         GlobalSymbol g => g.Visibility,
-        _ => Visibility.Public,
+        FieldSymbol f => f.Visibility,
+        _ => Visibility.Public, // a variant is as visible as its enum, which the route named
     };
 
     /// <summary>

@@ -34,9 +34,9 @@ pub fn yieldNow(): void throws Cancelled {
 /// What a panic in a task left (06 T3-T4, 05 E8): its code, its message, and the frames where it
 /// happened, as the report writes them.
 pub class PanicInfo {
-    code: string,
-    message: string,
-    trace: string,
+    pub code: string,
+    pub message: string,
+    pub trace: string,
 }
 
 /// Where a task stands (06 T3): still running; ended with its value, with an error, with
