@@ -15,6 +15,9 @@
 //   shapes 10              an enum per yield
 //   maybe 1 -1 3 true      a yielded null told apart from the end
 //   names ada,bob,cy,      a method of a class
+//   struct 2 3 4 0         a value's method, its receiver as at the call
+//   enum green again       an enum's method
+//   extend 3 2 1           a method of an 'extend' block
 //   repeat hi hi -         a generic instance, of a reference ...
 //   repeat 7 false         ... and of a scalar, suspended at its last yield
 //   doubled 30 3           a coroutine pulling another, and its result
@@ -89,6 +92,38 @@ class Names {
         while (i < this.items.length()) {
             yield this.items[i];
             i = i + 1;
+        }
+    }
+}
+
+// A value's method holds its receiver as it was at the call: a copy, since the caller's place may
+// be gone before the body runs. (What a 'mut fn' coroutine of a value should do is open.)
+struct Span2 {
+    lo: int,
+    hi: int,
+
+    fn each(): Coroutine<int> {
+        var i = this.lo;
+        while (i < this.hi) {
+            yield i;
+            i = i + 1;
+        }
+    }
+}
+
+enum Light { Red, Green;
+    fn cycle(): Coroutine<string> {
+        yield match (this) { .Red => "red", .Green => "green" };
+        yield "again";
+    }
+}
+
+extend int {
+    fn countdown(): Coroutine<int> {
+        var n = this;
+        while (n > 0) {
+            yield n;
+            n = n - 1;
         }
     }
 }
@@ -200,6 +235,29 @@ fn main(): int {
         name = e.next();
     }
     println(f"names {joined}");
+
+    var span = Span2 { lo = 2, hi = 5 };
+    let each = span.each();
+    span = Span2 { lo = 0, hi = 0 };
+    var spanned = "";
+    var at = each.next();
+    while (at != null) {
+        spanned = spanned + f"{at} ";
+        at = each.next();
+    }
+    println(f"struct {spanned}{span.hi}");
+    let light = Light.Green.cycle();
+    let l1 = light.next() ?? "-";
+    let l2 = light.next() ?? "-";
+    println(f"enum {l1} {l2}");
+    let down = 3.countdown();
+    var counted = "";
+    var dn = down.next();
+    while (dn != null) {
+        counted = counted + f" {dn}";
+        dn = down.next();
+    }
+    println(f"extend{counted}");
 
     let r = repeat("hi", 2);
     let r1 = r.next() ?? "-";

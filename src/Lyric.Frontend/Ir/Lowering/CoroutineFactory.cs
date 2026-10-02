@@ -44,4 +44,15 @@ internal static class CoroutineFactory
             Entry = new BlockId(0),
         };
     }
+
+    /// <summary>A coroutine function lowered where it is asked for — a generic instance, an
+    /// extension: the factory under the id the request gave it, the body behind it under a fresh
+    /// one. The written functions of a module go through the <see cref="CoroutineTable"/> instead,
+    /// which settles the body's id while pass 2 still adds functions in order.</summary>
+    public static (FunctionId Id, IrFunction Function)[] Split(FunctionLowerer body, string name, FunctionId id,
+        FunctionIds ids, Span span)
+    {
+        var bodyId = ids.Next();
+        return [(id, Build(name, body.CoroutineType!, bodyId, body.Parameters, span)), (bodyId, body.Run())];
+    }
 }

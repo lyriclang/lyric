@@ -332,7 +332,8 @@ public class CEmitterTests
     // Generators (06 N2, M6 S2a): the program's header says what each line shows.
     private const string GENERATORS_EXPECTED =
         "counter 5 6 7\nmade\nstarted\nlazy 1 false none\nthen 2 true true end\nagain true end\nticks 3 false\n"
-        + "walk 6 12\nshapes 10\nmaybe 1 -1 3 true\nnames ada,bob,cy,\nrepeat hi hi -\nrepeat 7 false\n"
+        + "walk 6 12\nshapes 10\nmaybe 1 -1 3 true\nnames ada,bob,cy,\nstruct 2 3 4 0\nenum green again\n"
+        + "extend 3 2 1\nrepeat hi hi -\nrepeat 7 false\n"
         + "doubled 30 3\ncaught x after 2\nafter true true none\nclean 2 all\ndrain fin\n";
 
     private const string RESOURCES_EXPECTED =

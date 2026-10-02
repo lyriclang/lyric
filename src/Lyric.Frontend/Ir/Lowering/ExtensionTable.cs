@@ -134,6 +134,14 @@ internal sealed class ExtensionTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
+            // A coroutine in an 'extend' block is factory and body, as a written one is (06 N2).
+            if (ModuleLowerer.CoroutineReturn(p.Decl) is not null)
+            {
+                lowered.AddRange(CoroutineFactory.Split(FunctionLowerer.ForCoroutineBody(p.Decl, $"{p.Name}.<body>",
+                    p.Receiver, types, functions, imports, typeTable, ModuleLowerer.NoSubstitution, globals, lambdas,
+                    instances, receiverTypeNode: p.ReceiverTypeNode), p.Name, p.Id, _ids, p.Decl.Span));
+                continue;
+            }
             lowered.Add((p.Id, new FunctionLowerer(p.Decl, p.Name, types, functions, imports,
                 typeTable, ModuleLowerer.NoSubstitution, globals, lambdas, instances, p.Receiver,
                 receiverTypeNode: p.ReceiverTypeNode).Run()));
