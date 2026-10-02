@@ -34,8 +34,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M3 | Value model and type system | XL | **done** 2026-10-01 |
 | M4 | Interfaces and abstraction | L | **done** 2026-10-01 |
 | M5 | Errors | M | **done** 2026-10-02 |
-| M6 | Coroutines, scheduler, threads | XL | **next** |
-| M7 | Modules and packages | L | — |
+| M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
+| M7 | Modules and packages | L | **next** |
 | M8a | std core | XL | — |
 | M8b | std I/O and system | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
@@ -385,9 +385,75 @@ even in a return position; `assert` evaluates its message eagerly until `inline`
 value block — `if`, `match`, `loop` alike — is a statement, not the block's value; spec 07 past
 §1 and the grammar chapter are still to write.
 
-### M6 — Coroutines, scheduler, threads
+### M6 — done (2026-10-02)
 
-Next. Plan first (13, M6), then slices.
+Merged as #221–#242 and #243 (S8); the spec side is lyric-spec#81–#104.
+
+The plan (13, M6): L4 and 06 — stackful coroutines (the switch per ABI, stacks with guard pages,
+the foreign-frame count), `park`/`unpark`, a scheduler per thread, the poller in C, `spawn`/
+`Task`/`TaskScope`/`spawnDetached`, `Channel`/`Select`/`Timer`/`sleep`/`timeout`, `Cancelled`,
+threads with `Mutex`/`RwLock`/`Once`/`Atomic`, generators as iterators, signals as a channel.
+Twenty-four slices. Exit criteria: `generator.lyr`, a channel ping-pong, a thread-pool test, a
+Ctrl+C shutdown example; conformance 06 (spec chapter 10); the TSan profile green.
+
+1. S1 `faf3284b`: stackful coroutines in the runtime (01 L4): the switch in assembly per ABI,
+   stacks with guard pages from a pool, the foreign-frame count, a suspended coroutine's stack
+   scanned as its own kind of object (a dropped one dies with it), the switch under Boehm as a
+   reader of a two-atomic lock whose writer is a collection.
+2. S2a–S2d (`39a11f25`, `9a541b10`, `16de95ee`, `150d8a48`): generators natively —
+   `Coroutine<Y, R>` with `next()`, `result()`, `isDone()`; `close()` throwing `Cancelled` at the
+   suspended `yield` (06 A5) and `using` on a coroutine; generator lambdas and `sequence { }`; a
+   function is a coroutine by its type and a `yield` of its own (08 D11); a `yield` in a function
+   a coroutine calls, checked at run time against the yield type. S2e (spec only): a coroutine
+   has identity.
+3. S3a–S3e (`3cd5599f`, `931735b7`, `dced5e2b`, `4876f356`, `4f31b0bd`): `park` and the monotonic
+   clock; a poller per thread (epoll + eventfd, kqueue, an event on Windows); the scheduler in
+   Lyric (06 N6 S1) with `main` a task where the program waits, `sleep`, `yieldNow`,
+   `spawnDetached`; `void` as a type argument; `spawn` and `Task<T> throws E` with `await()`.
+4. S4a–S4d (`c36f7622`, `5b853c57`, `fae91a66`, `ac34abf9`): cooperative cancellation — every wait
+   of a cancelled task throws `Cancelled` (06 N9); `TaskScope` (T5); `withTimeout`/`TimedOut`; a
+   panic leaves its coroutine (05 E8): a task's panic ends the task, `status()` shows `Panicked`,
+   `await()` panics again.
+5. S5a–S5b (`ef92a32c`, `c588b62e`): `Channel<T>` with `send`/`recv`/`close`; `Select.on(c) { … }`
+   with trailing lambdas, `timeout(d) { … }`, `Timer.after(d)`. Found and fixed on the way: a
+   trailing lambda at the start of a statement kept the statement's ban on struct initializers
+   for its whole body (`241f6651`).
+6. S6a–S6d (`f1759dae`, `784bf296`, `72e834ca`, `a0576993`, `cd3559eb`, `0c4acb7c`, `96f23793`):
+   `std.sync.Atomic<T>` over the C11 builtins; a wait protocol for threads — a waker claims the
+   context with a compare-and-set and posts it to its own scheduler, the woken context leaves its
+   places itself; `Thread.spawn` with an inbox per scheduler; channels and select across threads
+   (a lock per channel, a select locking its channels in id order); `Mutex`, `RwLock`, `Once`;
+   `Pool`. Found and fixed: a cancel from another thread could be lost between a wait's check and
+   its beginning; TSan's model of the collector missed an explicit free (`50c7e50b`).
+7. S7 (`08958aac`, `4ce61814`): signals as a channel (10 Q9) — the handler marks and wakes a
+   watcher thread through a self-pipe, never Lyric code; `signals(Signal.Interrupt, …)`.
+8. S8: this section.
+
+The artifacts: `generators`, `channels` and `thread_channels`, `pool`, `shutdown` (driven by
+`SignalTests` with `kill -USR1`/`-INT`) in `tests/Lyric5.Tests/programs`. Every threaded program
+runs clean under TSan locally (`LYRIC5_SANITIZERS=all`), stressed; in CI the threaded runs stay
+out, as with M1's open thread below, and the single-threaded ones are in.
+
+Not done from the plan, decided on the way: generators as iterators (I7: `for (x in co)`,
+`Coroutine :: [Iterator]`) move to M8a, where `for` learns every iterable at once (S2e); the
+Windows poller has no sockets until M8b (AFD — downloading wepoll waits for the maintainer's
+word). `Thread`, `Pool`, the locks and the signals live in `std.task` until M7 lets `std.thread`,
+`std.sync` and `std.os` reach the scheduler.
+
+Conformance: 549 cases (03-types 151, 04-modules 4, 05-interfaces 98, 06-errors 88,
+07-statements 18, 08-expressions 17, 09-patterns 36, 10-concurrency 137), all `since: 5.0.0`,
+green in both profiles. Test suite: 4060 across the ten projects.
+
+Open from M6, collected for the 5.0 review (not in the plan): the select is biased to its first
+case — a closed channel in front starves the rest (Go picks at random); a task that panics inside
+a lock's body leaves the lock held (Rust poisons); unsubscribing from signals is lazy; `inout`
+parameters (T12) would let a lock hand out a place instead of a guard; every `std.task` program
+carries the module's types and globals (type pruning); `thread.spawn` (T1) collides with
+`Thread.spawn` (SEM0085); the spin locks and the wake-all of the locks are unmeasured.
+
+### M7 — Modules and packages
+
+Next. Plan first (13, M7), then slices.
 
 ## Design decisions
 
@@ -398,10 +464,12 @@ here restates them. Changing a decision reopens its document (CONTRIBUTING, rule
 ### Working mode
 
 Claude plans **and** implements; the maintainer reviews (in force since the scope check of
-2026-08-02, confirmed for Lyric 5). A milestone runs autonomously slice by slice with commit and
-push per slice and one PR at the end; Claude also merges, tags and releases. Anything that acts
-outside the repository — creating repositories, publishing releases, deleting published things —
-is laid out first and done on the maintainer's word.
+2026-08-02, confirmed for Lyric 5). Every slice is a PR of its own — the spec PR merged first —,
+merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
+and the last push toward 5.0 waits for the maintainer's review of the points collected on the
+way. Claude also merges, tags and releases. Anything that acts outside the repository — creating
+repositories, publishing releases, deleting published things — is laid out first and done on the
+maintainer's word.
 
 ### Environment
 

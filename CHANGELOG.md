@@ -37,6 +37,16 @@ promise. This entry fills with the milestones.
   (`fn() -> int throws E`); `never` as a return type, with `panic`, `assert`, `unreachable` and
   `todo`; `loop` with `break value` and labels. An error costs one branch per call, no unwinding
   tables.
+- **Coroutines, tasks and threads (M6** — `design/v5/spec/06`, spec chapter 10**):** stackful
+  coroutines — generators with `yield`, `next()`, `result()`, `close()` and `using`, generator
+  lambdas and `sequence { }`, a `yield` in any function a coroutine calls; tasks in `std.task` —
+  `spawn` with a `Task<T> throws E` handle, `await()`, `status()`, `cancel()` (cooperative: every
+  wait of a cancelled task throws `Cancelled`), `TaskScope`, `withTimeout`, `spawnDetached`,
+  `sleep`, `yieldNow`; a task's panic ends the task, not the program; `Channel<T>`,
+  `Select.on(c) { … }.timeout(d) { … }.run()` and `Timer.after(d)`; threads — `Thread.spawn`,
+  `Pool`, channels and selects across threads, `Mutex`, `RwLock`, `Once`, and `std.sync`'s
+  `Atomic<T>`; the system's signals as a channel — `signals(Signal.Interrupt)`. `main` is a task
+  wherever a program waits.
 
 ---
 
