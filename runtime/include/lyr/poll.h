@@ -24,4 +24,10 @@ void lyr_poller_wake(LyrPoller *poller);
  * lyr_poller_current makes a new one. */
 void lyr_poller_release(void);
 
+#ifndef _WIN32
+/* A descriptor whose readiness to read wakes the poller as a wake does, and which the poller drains
+ * then — the pipe of the signals' watcher (lyr/signal.h). One per poller. */
+void lyr_poller_watch(LyrPoller *poller, int fd);
+#endif
+
 #endif

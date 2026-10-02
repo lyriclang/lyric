@@ -36,6 +36,8 @@ void lyr_shutdown(void) {
     started = 0;
 }
 
+int lyr_signals_allowed(void) { return started && config.install_signal_handlers; }
+
 int lyr_argc(void) { return config.argc; }
 char **lyr_argv(void) { return config.argv; }
 

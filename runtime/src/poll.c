@@ -20,6 +20,15 @@ static int passed(int64_t deadline) {
     return deadline >= 0 && lyr_clock_monotonic_ns() >= deadline;
 }
 
+#ifndef _WIN32
+#  include <unistd.h>
+/* Reads a watched descriptor empty: it is non-blocking, so the reads stop where nothing is left. */
+static void drain(int fd) {
+    char bytes[64];
+    while (read(fd, bytes, sizeof bytes) > 0) {}
+}
+#endif
+
 #if defined(_WIN32) || defined(__linux__)
 /* What is left until a deadline in whole milliseconds, at most `cap`: rounded up, so that the
  * waits that count in milliseconds never end early. */
@@ -76,6 +85,7 @@ static void lyr_poller_close(LyrPoller *poller) {
 struct LyrPoller {
     int epoll;
     int wake;
+    int watched;  /* a descriptor whose readiness wakes it too, or -1 */
 };
 
 static LyrPoller *lyr_poller_open(void) {
@@ -83,6 +93,7 @@ static LyrPoller *lyr_poller_open(void) {
     if (poller == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory making a poller");
     poller->epoll = epoll_create1(EPOLL_CLOEXEC);
     if (poller->epoll < 0) lyr_panic(LYR_RT_SYSTEM, "the system refused a poller: %s", strerror(errno));
+    poller->watched = -1;
     poller->wake = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (poller->wake < 0) lyr_panic(LYR_RT_SYSTEM, "the system refused a poller its wakeup: %s", strerror(errno));
     struct epoll_event event = { .events = EPOLLIN, .data.fd = poller->wake };
@@ -100,10 +111,15 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
         int ready = epoll_wait(poller->epoll, events, 4, ms);
         if (ready < 0 && errno != EINTR) lyr_panic(LYR_RT_SYSTEM, "a poller's wait failed: %s", strerror(errno));
         for (int i = 0; i < ready; i++) {
-            if (events[i].data.fd != poller->wake) continue;
-            uint64_t count;  /* one read takes every wake since the last */
-            while (read(poller->wake, &count, sizeof count) < 0 && errno == EINTR) {}
-            return 1;
+            if (events[i].data.fd == poller->wake) {
+                uint64_t count;  /* one read takes every wake since the last */
+                while (read(poller->wake, &count, sizeof count) < 0 && errno == EINTR) {}
+                return 1;
+            }
+            if (events[i].data.fd == poller->watched) {
+                drain(poller->watched);
+                return 1;
+            }
         }
         if (passed(deadline)) return 0;
     }
@@ -119,6 +135,14 @@ static void lyr_poller_close(LyrPoller *poller) {
     close(poller->epoll);
 }
 
+void lyr_poller_watch(LyrPoller *poller, int fd) {
+    struct epoll_event event = { .events = EPOLLIN, .data.fd = fd };
+    if (epoll_ctl(poller->epoll, EPOLL_CTL_ADD, fd, &event) != 0) {
+        lyr_panic(LYR_RT_SYSTEM, "the system refused a poller a descriptor to watch: %s", strerror(errno));
+    }
+    poller->watched = fd;
+}
+
 #else
 #  include <errno.h>
 #  include <sys/types.h>
@@ -128,6 +152,7 @@ static void lyr_poller_close(LyrPoller *poller) {
 
 struct LyrPoller {
     int queue;
+    int watched;  /* a descriptor whose readiness wakes it too, or -1 */
 };
 
 enum { WAKE_IDENT = 1 };
@@ -135,6 +160,7 @@ enum { WAKE_IDENT = 1 };
 static LyrPoller *lyr_poller_open(void) {
     LyrPoller *poller = calloc(1, sizeof *poller);
     if (poller == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory making a poller");
+    poller->watched = -1;
     poller->queue = kqueue();
     if (poller->queue < 0) lyr_panic(LYR_RT_SYSTEM, "the system refused a poller: %s", strerror(errno));
     struct kevent event;
@@ -162,6 +188,10 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
         if (ready < 0 && errno != EINTR) lyr_panic(LYR_RT_SYSTEM, "a poller's wait failed: %s", strerror(errno));
         for (int i = 0; i < ready; i++) {
             if (events[i].filter == EVFILT_USER && events[i].ident == WAKE_IDENT) return 1;
+            if (events[i].filter == EVFILT_READ && (int)events[i].ident == poller->watched) {
+                drain(poller->watched);
+                return 1;
+            }
         }
         if (passed(deadline)) return 0;
     }
@@ -175,6 +205,15 @@ void lyr_poller_wake(LyrPoller *poller) {
 
 static void lyr_poller_close(LyrPoller *poller) {
     close(poller->queue);
+}
+
+void lyr_poller_watch(LyrPoller *poller, int fd) {
+    struct kevent event;
+    EV_SET(&event, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    if (kevent(poller->queue, &event, 1, NULL, 0, NULL) != 0) {
+        lyr_panic(LYR_RT_SYSTEM, "the system refused a poller a descriptor to watch: %s", strerror(errno));
+    }
+    poller->watched = fd;
 }
 #endif
 
