@@ -166,17 +166,27 @@ public sealed record CallIndirect(TempId? Dest, TempId Callee, TempId[] Args,
 /// <param name="Args">The captured arguments — <c>this</c> first when the coroutine is a
 /// method — which the first resume hands to the body's frame as its parameters.</param>
 public sealed record MakeCoroutine(TempId Dest, FunctionId Body, TempId[] Args,
-    IrFunctionType Type, Span Span) : IrOp(Span);
+    IrCoroutineType Type, Span Span) : IrOp(Span);
 
-/// <param name="Lenient">The pull form: <c>false</c> is <c>resume</c> — exhaustion panics —
-/// and <c>true</c> is <c>next()</c>, which writes <c>?T</c> (or, for a void chain, whether it
-/// advanced). The whole 2.2 contract in one instruction; the state-machine era assembled it
-/// from a flag parameter, a native import and three blocks of wrapping.</param>
-/// <param name="YieldType">What the chain yields — the type <c>Dest</c> is written as before
-/// any lenient wrapping, and a copy for the printer like <see cref="CallIndirect.ReturnType"/>.
-/// </param>
-public sealed record ResumePull(TempId? Dest, TempId Coroutine, bool Lenient,
-    IrType YieldType, Span Span) : IrOp(Span);
+/// <summary><c>co.next()</c> (06 N2 A2): runs the coroutine to its next yield and writes
+/// <c>?Y</c> — the value, or null once the body has ended — or, for a coroutine that yields
+/// nothing, whether it stopped at a yield. A coroutine whose type throws ends with its body's
+/// error on this pull, which an <c>ErrorBranch</c> after it takes like a call's.</summary>
+/// <param name="YieldType">What the coroutine yields — a copy for the printer like
+/// <see cref="CallIndirect.ReturnType"/>.</param>
+public sealed record ResumePull(TempId Dest, TempId Coroutine, IrType YieldType, Span Span) : IrOp(Span)
+{
+    /// <summary>Whether the coroutine's type throws (05 E10): the pull takes the error the body
+    /// ended with, and an error branch follows it.</summary>
+    public bool Throws { get; init; }
+}
+
+/// <summary><c>co.isDone()</c>: whether the body has ended, without pulling.</summary>
+public sealed record CoroutineDone(TempId Dest, TempId Coroutine, Span Span) : IrOp(Span);
+
+/// <summary><c>co.result()</c> (06 A2): <c>?R</c> — what the body returned, null until it
+/// has ended, and after an error.</summary>
+public sealed record CoroutineResult(TempId Dest, TempId Coroutine, IrType ResultType, Span Span) : IrOp(Span);
 
 /// <param name="Value">What the pull receives, or <c>null</c> for a void chain's bare
 /// <c>yield;</c>.</param>
@@ -186,7 +196,10 @@ public sealed record ResumePull(TempId? Dest, TempId Coroutine, bool Lenient,
 /// compares it against the RUNNING chain's element type at the suspension itself.</param>
 /// <remarks>An op, not a terminator: when the chain is resumed, execution continues at the
 /// next instruction — the suspension is the interpreter's business, not the CFG's.</remarks>
-public sealed record YieldSuspend(TempId? Value, IrType YieldType, Span Span) : IrOp(Span);
+/// <param name="Dynamic">A yield outside a coroutine's own body — in a function or a lambda the
+/// coroutine calls (§10a): its value meets the running coroutine's yield type only at run
+/// time.</param>
+public sealed record YieldSuspend(TempId? Value, IrType YieldType, bool Dynamic, Span Span) : IrOp(Span);
 
 //Ir Terminator
 public sealed record Return(TempId? Value, Span Span) : IrTerminator(Span); // Value == null means a void return

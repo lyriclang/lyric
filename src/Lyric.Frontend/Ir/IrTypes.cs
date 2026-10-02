@@ -58,10 +58,12 @@ namespace Lyric.Ir
                     return x.Parameters.Length == y.Parameters.Length
                            && Equal(x.Return, y.Return)
                            && x.Parameters.Zip(y.Parameters).All(pair => Equal(pair.First, pair.Second));
+                case (IrCoroutineType x, IrCoroutineType y):
+                    return Equal(x.Yield, y.Yield) && Equal(x.Result, y.Result);
                 case (IrScalarType or IrRefType or IrArrayType or IrSliceType or IrInlineArrayType or IrOptionalType or IrEnumType
-                          or IrInterfaceType or IrStructType or IrFunctionType,
+                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType,
                       IrScalarType or IrRefType or IrArrayType or IrSliceType or IrInlineArrayType or IrOptionalType or IrEnumType
-                          or IrInterfaceType or IrStructType or IrFunctionType):
+                          or IrInterfaceType or IrStructType or IrFunctionType or IrCoroutineType):
                     return false; // different kinds: comparable, merely unequal
                 default:
                     throw new InternalCompilationException(
@@ -182,6 +184,13 @@ public sealed record IrHostType(string Name) : IrType;
 /// is possible only through a named type.</para>
 /// </summary>
 public sealed record IrFunctionType(IrType[] Parameters, IrType Return) : IrType;
+
+/// <summary>
+/// A coroutine (design/v5/spec/06 N2): a reference to the runtime's coroutine object, which runs
+/// its body on a stack of its own. <see cref="Yield"/> is what a pull hands over, <see cref="Result"/>
+/// what the body returns when it ends. Structural, like a function type: it has no declaration.
+/// </summary>
+public sealed record IrCoroutineType(IrType Yield, IrType Result) : IrType;
 
 
 }

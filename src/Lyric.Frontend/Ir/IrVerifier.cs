@@ -744,6 +744,18 @@ public static class IrVerifier
                 case CallIndirect c: CheckCallIndirect(c, block, index); break;
                 case MakeCoroutine m: CheckMakeCoroutine(m, block, index); break;
                 case ResumePull r: CheckResumePull(r, block, index); break;
+                case CoroutineDone d:
+                    if (TypeOf(d.Coroutine) is not IrCoroutineType)
+                        Report(block, index, $"codone operand is {Show(TypeOf(d.Coroutine))}, expected a coroutine");
+                    RequireDestType(d.Dest, new IrScalarType(IrScalar.Bool), "codone", block, index);
+                    break;
+                case CoroutineResult cr:
+                    if (TypeOf(cr.Coroutine) is not IrCoroutineType resulting)
+                        Report(block, index, $"coresult operand is {Show(TypeOf(cr.Coroutine))}, expected a coroutine");
+                    else if (!IrType.Equal(resulting.Result, cr.ResultType))
+                        Report(block, index, $"coresult annotated {Show(cr.ResultType)}, the coroutine returns {Show(resulting.Result)}");
+                    RequireDestType(cr.Dest, new IrOptionalType(cr.ResultType), "coresult", block, index);
+                    break;
                 case YieldSuspend y: CheckYieldSuspend(y, block, index); break;
                 // The in-flight error is an Error interface value (05 E6 O1); taking it off is a
                 // statement about the function's state, with nothing to type.
@@ -1201,9 +1213,11 @@ public static class IrVerifier
             return;
         }
 
-        // The captured arguments become the body frame's parameters at the first pull, so they
-        // must fit the body the way call arguments fit a callee.
+        // The captured arguments become the body's parameters at the first pull, so they must fit
+        // the body the way call arguments fit a callee; what the body returns is the result.
         var body = _module.Functions[m.Body.Value];
+        if (!IrType.Equal(body.ReturnType, m.Type.Result))
+            Report(block, index, $"mkcoro of {Show(m.Type)}, but body {body.Name} returns {Show(body.ReturnType)}");
         if (m.Args.Length != body.ParamCount)
         {
             Report(block, index, $"mkcoro captures {N(m.Args.Length)} arg(s), " +
@@ -1225,20 +1239,17 @@ public static class IrVerifier
 
     private void CheckResumePull(ResumePull r, BlockId block, int index)
     {
-        // A chain value carries the coroutine signature — a function type, like the closure the
-        // state-machine era used, so no second value form exists for it.
-        if (TypeOf(r.Coroutine) is not IrFunctionType)
+        if (TypeOf(r.Coroutine) is not IrCoroutineType pulled)
         {
             Report(block, index,
-                $"resume operand is {Show(TypeOf(r.Coroutine))}, expected a coroutine value");
+                $"next operand is {Show(TypeOf(r.Coroutine))}, expected a coroutine value");
             return;
         }
+        if (!IrType.Equal(pulled.Yield, r.YieldType))
+            Report(block, index, $"next annotated {Show(r.YieldType)}, the coroutine yields {Show(pulled.Yield)}");
 
-        if (r.Dest is not { } dest) return;
-        var expected = r.Lenient
-            ? IsVoid(r.YieldType) ? new IrScalarType(IrScalar.Bool) : new IrOptionalType(r.YieldType)
-            : r.YieldType;
-        RequireDestType(dest, expected, "resume", block, index);
+        IrType expected = IsVoid(r.YieldType) ? new IrScalarType(IrScalar.Bool) : new IrOptionalType(r.YieldType);
+        RequireDestType(r.Dest, expected, "next", block, index);
     }
 
     private void CheckYieldSuspend(YieldSuspend y, BlockId block, int index)
@@ -1864,8 +1875,9 @@ public static class IrVerifier
             IrInlineArrayType ia => $"{Show(ia.Element)}[{ia.Length}]",
             IrOptionalType o => $"?{Show(o.Inner)}",
             IrEnumType e => $"enum {e.Type}",
-        IrInterfaceType i => $"dyn {i.Type}",
-        IrStructType v => $"val {v.Type}",
+            IrInterfaceType i => $"dyn {i.Type}",
+            IrStructType v => $"val {v.Type}",
+            IrCoroutineType c => $"coroutine<{Show(c.Yield)}, {Show(c.Result)}>",
             _ => type.ToString() ?? type.GetType().Name
         };
 

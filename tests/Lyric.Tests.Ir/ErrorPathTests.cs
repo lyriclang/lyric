@@ -357,6 +357,36 @@ public class ErrorPathTests
         Assert.Single(Terminators(f).OfType<Throw>());
     }
 
+    // --- coroutines (05 E10; 06 N2) ---
+
+    [Fact]
+    public void A_pull_of_a_throwing_coroutine_takes_its_error_and_branches()
+    {
+        var module = Lowered("""
+            fn gen(): Coroutine<int> throws Boom { yield try risky(); }
+            fn main(): int throws Boom { let c = gen(); return try c.next() ?? 0; }
+            """);
+        var main = Fn(module, "main");
+        Assert.True(Assert.Single(Ops(main).OfType<ResumePull>()).Throws);
+        Assert.Single(Terminators(main).OfType<ErrorBranch>());
+        // The body has the caller's slot for its error, which the runtime keeps for the pull; the
+        // factory builds the coroutine and throws nothing.
+        Assert.True(module.Functions.Single(f => f.Name == "main.gen.<body>").Throws);
+        Assert.False(Fn(module, "gen").Throws);
+    }
+
+    [Fact]
+    public void A_pull_of_a_coroutine_that_cannot_throw_has_no_edge()
+    {
+        var module = Lowered("""
+            fn gen(): Coroutine<int> { yield 1; }
+            fn main(): int { let c = gen(); return c.next() ?? 0; }
+            """);
+        var main = Fn(module, "main");
+        Assert.False(Assert.Single(Ops(main).OfType<ResumePull>()).Throws);
+        Assert.Empty(Terminators(main).OfType<ErrorBranch>());
+    }
+
     // --- function values that throw (03 T17; 05 E2 K3, K4) ---
 
     [Fact]

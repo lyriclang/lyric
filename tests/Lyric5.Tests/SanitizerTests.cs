@@ -54,6 +54,7 @@ public class SanitizerTests
         { "coro_basic", [], 0 },
         { "coro_basic", ["self"], 101 },
         { "coro_gc", [], 0 },
+        { "coro_pace", [], 0 },
         { "coro_threads", [], 0 },
         { "coro_storm", [], 0 },
     };
@@ -99,7 +100,18 @@ public class SanitizerTests
     [InlineData("rethrow", 1)]
     [InlineData("deep_error", 1)]
     [InlineData("forced", 101)]
-    public void A_program_that_throws_runs_clean_under_ASan_and_UBSan(string name, int exit)
+    public void A_program_that_throws_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);
+
+    /// <summary>
+    /// Generators under ASan and UBSan (M6 S2a): every pull switches stacks, a yield hands the
+    /// puller an address in the suspended frame, a result and an error cross from the coroutine's
+    /// stack to the puller's, and the dropped coroutines go with their stacks.
+    /// </summary>
+    [Theory]
+    [InlineData("generators", 0)]
+    public void A_coroutine_program_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);
+
+    private static void RunEmittedClean(string name, int exit)
     {
         if (!Applies) return;
         var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC(name), name + "-asan", Profile.Asan, compiler: Clang());

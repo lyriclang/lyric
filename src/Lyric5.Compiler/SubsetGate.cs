@@ -104,6 +104,10 @@ public static class SubsetGate
                     foreach (var p in f.Parameters) Type(p, span, where);
                     Type(f.Return, span, where);
                     break;
+                case IrCoroutineType c:
+                    Type(c.Yield, span, where);
+                    Type(c.Result, span, where);
+                    break;
                 case IrHostType:
                     Refuse(span, $"host types, {where}", "M14");
                     break;
@@ -173,8 +177,12 @@ public static class SubsetGate
                     break;
                 case CallIndirect:
                     break;
-                case MakeCoroutine or ResumePull or YieldSuspend:
-                    Refuse(op.Span, "coroutines", "M6");
+                // Generators (06 N2): a coroutine's own body yields; a yield anywhere else meets
+                // the running coroutine only at run time (§10a) and comes with S2b.
+                case YieldSuspend { Dynamic: true }:
+                    Refuse(op.Span, "a yield outside a coroutine's own body", "M6 S2b");
+                    break;
+                case MakeCoroutine or ResumePull or YieldSuspend or CoroutineDone or CoroutineResult:
                     break;
                 default:
                     Refuse(op.Span, $"the instruction {op.GetType().Name}", "a later milestone");
@@ -186,7 +194,7 @@ public static class SubsetGate
         /// identity — a class or an array; a string has none to observe.</summary>
         private bool HoldsObject(IrType type) => type switch
         {
-            IrRefType or IrArrayType => true,
+            IrRefType or IrArrayType or IrCoroutineType => true,
             IrOptionalType o => HoldsObject(o.Inner),
             IrInlineArrayType ia => HoldsObject(ia.Element),
             IrStructType s => module.Types[s.Type.Value].FieldTypes.Any(HoldsObject),

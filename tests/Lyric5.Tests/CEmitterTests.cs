@@ -75,6 +75,7 @@ public class CEmitterTests
     [InlineData("fn_throws")]
     [InlineData("loops")]
     [InlineData("bank")]
+    [InlineData("generators")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -215,6 +216,7 @@ public class CEmitterTests
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
             data.Add("bank", profile, 0, BANK_EXPECTED);
+            data.Add("generators", profile, 0, GENERATORS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -292,6 +294,8 @@ public class CEmitterTests
     [InlineData("arrays_gc", Profile.Release, "kept 499500 item-999999 tag-999999 500")]
     [InlineData("globals_gc", Profile.Debug, "kept 499500 item-999999 anchor")]
     [InlineData("globals_gc", Profile.Release, "kept 499500 item-999999 anchor")]
+    [InlineData("generators_gc", Profile.Debug, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
+    [InlineData("generators_gc", Profile.Release, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
@@ -324,6 +328,12 @@ public class CEmitterTests
     private const string BANK_EXPECTED =
         "refused 200 of 120: not enough funds: 200 requested, 120 available\nmoved 50 70\n"
         + "transfer failed: the account of Ada is closed; back to 50\ntry? -1\nfinal 50 70\n";
+
+    // Generators (06 N2, M6 S2a): the program's header says what each line shows.
+    private const string GENERATORS_EXPECTED =
+        "counter 5 6 7\nmade\nstarted\nlazy 1 false none\nthen 2 true true end\nagain true end\nticks 3 false\n"
+        + "walk 6 12\nshapes 10\nmaybe 1 -1 3 true\nnames ada,bob,cy,\nrepeat hi hi -\nrepeat 7 false\n"
+        + "doubled 30 3\ncaught x after 2\nafter true true none\nclean 2 all\ndrain fin\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

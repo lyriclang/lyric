@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m4-s1";
+    public const string Version = "m6-s2a";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -171,6 +171,7 @@ public sealed class CEmitter
         IrSliceType s => SliceName(s),
         IrInlineArrayType ia => InlineName(ia),
         IrFunctionType f => FnName(f),
+        IrCoroutineType => "LyrCoro *",
         IrInterfaceType => "LyrIface",
         IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
@@ -225,13 +226,13 @@ public sealed class CEmitter
     private static bool IsString(IrType type) => type is IrScalarType { Kind: IrScalar.String };
 
     /// <summary>
-    /// An optional in the niche (01 V5): around a reference — a class value or a string — the
-    /// pointer itself says whether there is a value, and the optional costs nothing. Around an
-    /// optional there is no niche left: <c>??Node</c> tells "absent" from "present and null",
-    /// and needs its flag.
+    /// An optional in the niche (01 V5): around a reference — a class value, a string, a
+    /// coroutine — the pointer itself says whether there is a value, and the optional costs
+    /// nothing. Around an optional there is no niche left: <c>??Node</c> tells "absent" from
+    /// "present and null", and needs its flag.
     /// </summary>
     private static bool IsNiche(IrType type) =>
-        type is IrOptionalType { Inner: IrRefType or IrArrayType or IrScalarType { Kind: IrScalar.String } };
+        type is IrOptionalType { Inner: IrRefType or IrArrayType or IrCoroutineType or IrScalarType { Kind: IrScalar.String } };
 
     /// <summary>
     /// A type C holds by value as an aggregate: a struct, and an optional outside the niche.
@@ -295,6 +296,7 @@ public sealed class CEmitter
         IrSliceType s => "slice_" + Mangle(s.Element),
         IrInlineArrayType ia => $"inl{ia.Length}_" + Mangle(ia.Element),
         IrFunctionType f => "fn" + string.Concat(f.Parameters.Select(p => "_" + Mangle(p))) + "_to_" + Mangle(f.Return),
+        IrCoroutineType c => "coro_" + Mangle(c.Yield) + "_to_" + Mangle(c.Result),
         IrInterfaceType i => $"iface{i.Type.Value}",
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
@@ -316,6 +318,7 @@ public sealed class CEmitter
         IrSliceType s => $"Slice<{Display(s.Element)}>",
         IrInlineArrayType ia => $"{Display(ia.Element)}[{ia.Length}]",
         IrFunctionType f => $"fn({string.Join(", ", f.Parameters.Select(Display))}) -> {Display(f.Return)}",
+        IrCoroutineType c => IsVoid(c.Result) ? $"Coroutine<{Display(c.Yield)}>" : $"Coroutine<{Display(c.Yield)}, {Display(c.Result)}>",
         IrInterfaceType i => Qualified(_module.Types[i.Type.Value]),
         IrOptionalType o => "?" + Display(o.Inner),
         _ => type.ToString() ?? "?",
@@ -341,7 +344,7 @@ public sealed class CEmitter
     private static string Zero(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "NULL",
-        IrRefType or IrArrayType => "NULL",
+        IrRefType or IrArrayType or IrCoroutineType => "NULL",
         _ when IsNiche(type) => "NULL",
         _ when IsAggregate(type) => "{0}",
         IrSliceType or IrFunctionType or IrInterfaceType => "{0}",
@@ -364,7 +367,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.I16 or IrScalar.U16 } => (2, 2),
         IrScalarType { Kind: IrScalar.I32 or IrScalar.U32 or IrScalar.F32 or IrScalar.Char } => (4, 4),
         IrScalarType { Kind: IrScalar.I64 or IrScalar.U64 or IrScalar.F64 or IrScalar.String } => (8, 8),
-        IrRefType or IrArrayType => (8, 8),
+        IrRefType or IrArrayType or IrCoroutineType => (8, 8),
         IrSliceType or IrFunctionType or IrInterfaceType => (16, 8),
         IrInlineArrayType ia => (LayoutOf(ia.Element).Size * ia.Length, LayoutOf(ia.Element).Align),
         IrOptionalType o when IsNiche(o) => (8, 8),
@@ -429,10 +432,11 @@ public sealed class CEmitter
         return ((size + 1 + align - 1) / align * align, align);
     }
 
-    /// <summary>A reference: one pointer-sized word the collector follows. An optional in the
-    /// niche is one, null when absent.</summary>
+    /// <summary>A reference: one pointer-sized word the collector follows — a coroutine's among
+    /// them, whose object keeps its stack and its environment. An optional in the niche is one,
+    /// null when absent.</summary>
     private static bool IsReference(IrType type) =>
-        type is IrRefType or IrArrayType or IrScalarType { Kind: IrScalar.String } || IsNiche(type);
+        type is IrRefType or IrArrayType or IrCoroutineType or IrScalarType { Kind: IrScalar.String } || IsNiche(type);
 
     /// <summary>Whether a value of the type holds a reference anywhere: itself, or in a struct
     /// or an optional it holds by value.</summary>
@@ -588,6 +592,21 @@ public sealed class CEmitter
             }
         }
 
+        // A coroutine (06 N2) starts from an environment — the arguments it was called with and the
+        // place its body leaves the result, on the heap, where the coroutine keeps it alive — and
+        // runs a C body around the IR one: the call, then the result or the error left on the
+        // coroutine for the pull that ran into the end (05 E10). Static, in every unit that makes
+        // one, as the thunks are.
+        var started = ScopeOps().OfType<MakeCoroutine>().DistinctBy(m => m.Body.Value).OrderBy(m => m.Body.Value).ToList();
+        if (started.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* coroutines: the environment a body starts from, and the body as the runtime runs it */");
+            foreach (var type in started.Select(m => m.Type).DistinctBy(t => Mangle(t)))
+                prototypes.AppendLine($"static const LyrDesc {CoroutineDesc(type)} = {{ 0, 0, 0, 0, NULL, \"{Display(type).Replace("\\", "\\\\").Replace("\"", "\\\"")}\", NULL }};");
+            foreach (var made in started) prototypes.Append(CoroutineBody(made.Body.Value, made.Type));
+        }
+
         // The interface tables (01 V7): one per (type, interface) row, defined in the module's
         // unit with the thunks they point at, declared in an instance's unit that lifts a value.
         var tables = new StringBuilder();
@@ -663,6 +682,7 @@ public sealed class CEmitter
             else if (type is IrSliceType s) Element(s.Element);
             else if (type is IrInlineArrayType ia) Element(ia.Element);
             else if (type is IrFunctionType f) { foreach (var p in f.Parameters) Element(p); Element(f.Return); }
+            else if (type is IrCoroutineType c) { Element(c.Yield); Element(c.Result); }
         }
         foreach (var type in named) Element(type);
         if (indices.Count == 0 && used.Count == 0 && elements.Count == 0) return;
@@ -933,6 +953,128 @@ public sealed class CEmitter
         return text.ToString();
     }
 
+    // --- coroutines (06 N2) ------------------------------------------------------------------------
+
+    /// <summary>The descriptor of a coroutine type: the object is the runtime's, traced by its own
+    /// kind, so the descriptor names the type and describes nothing.</summary>
+    private static string CoroutineDesc(IrCoroutineType type) => "lyr_desc_" + Mangle(type);
+
+    private static string CoroutineEnv(int body) => $"lyr_coenv{body}";
+
+    private static string CoroutineRunner(int body) => $"lyr_corun{body}";
+
+    /// <summary>Whether a body needs an environment: it takes arguments, or leaves a result.</summary>
+    private static bool HasEnvironment(IrFunction body, IrCoroutineType type) => body.ParamCount > 0 || !IsVoid(type.Result);
+
+    /// <summary>
+    /// What a coroutine's body needs beside its IR function: the environment — a heap object of
+    /// the arguments, <c>a0</c>…, and the result, laid out and described like a class — and the
+    /// runner the runtime calls on the coroutine's stack. The runner calls the body with the
+    /// arguments (the receiver of a value's method as the place in the environment, 02 M5), then
+    /// leaves on the coroutine what the pull that ran into the end reads: the result's address,
+    /// or the error and no result (05 E10).
+    /// </summary>
+    private string CoroutineBody(int index, IrCoroutineType type)
+    {
+        var body = _module.Functions[index];
+        var text = new StringBuilder();
+        var parameters = body.Locals.Take(body.ParamCount).Select(l => l.Type).ToList();
+        var returns = !IsVoid(type.Result);
+        var env = CoroutineEnv(index);
+        if (HasEnvironment(body, type))
+        {
+            var fields = returns ? parameters.Append(type.Result).ToList() : parameters;
+            var names = parameters.Select((_, i) => $"a{i}").Concat(returns ? ["result"] : []).ToList();
+            text.AppendLine($"typedef struct {{ LyrObj header;{string.Concat(fields.Select((f, i) => $" {Declare(f, names[i])};"))} }} {env};");
+            var (offsets, total) = Fields(fields, 8);
+            text.AppendLine($"_Static_assert(sizeof({env}) == {total.Size}, \"layout of {env}\");");
+            for (var i = 0; i < offsets.Length; i++)
+                text.AppendLine($"_Static_assert(offsetof({env}, {names[i]}) == {offsets[i]}, \"layout of {env}\");");
+            var words = new List<int>();
+            var ambiguous = false;
+            for (var i = 0; i < fields.Count; i++) ReferenceWords(fields[i], offsets[i], words, ref ambiguous);
+            var name = body.Name.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : words.Count > 0 ? "LYR_DESC_HAS_REFS" : "0";
+            if (words.Count == 0)
+                text.AppendLine($"static const LyrDesc {env}_desc = {{ sizeof({env}), {flags}, 0, 0, NULL, \"{name}\", NULL }};");
+            else
+            {
+                var map = new ulong[(total.Size / 8 + 63) / 64];
+                foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
+                var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
+                text.AppendLine($"static const uint64_t {env}_refmap[] = {{ {bits} }};");
+                text.AppendLine($"static const LyrDesc {env}_desc = {{ sizeof({env}), {flags}, 0, {map.Length}, {env}_refmap, \"{name}\", NULL }};");
+            }
+        }
+
+        var arguments = parameters.Select((_, i) => body.ReceiverByRef && i == 0 ? $"&lyr_env->a{i}" : $"lyr_env->a{i}")
+            .Concat(body.Throws ? ["&lyr_e"] : []);
+        var call = $"{FunctionName(body.Name)}({string.Join(", ", arguments)})";
+        var run = new StringBuilder($"static void {CoroutineRunner(index)}(void *lyr_arg) {{ ");
+        run.Append(HasEnvironment(body, type) ? $"{env} *lyr_env = lyr_arg; " : "(void)lyr_arg; ");
+        if (body.Throws) run.Append("LyrErr *lyr_e = NULL; ");
+        run.Append(returns ? $"{Declare(type.Result, "lyr_r")} = {call}; " : $"{call}; ");
+        run.Append("LyrCoro *lyr_co = lyr_coro_current(); ");
+        if (body.Throws)
+            run.Append("if (LYR_UNLIKELY(lyr_e != NULL)) { lyr_coro_set_error(lyr_co, lyr_e); lyr_coro_set_transfer(lyr_co, NULL); return; } ");
+        run.Append(returns
+            ? $"{StoreInto("lyr_env", "lyr_env->result", type.Result, "lyr_r")} lyr_coro_set_transfer(lyr_co, &lyr_env->result); }}"
+            : "lyr_coro_set_transfer(lyr_co, NULL); }");
+        text.AppendLine(run.ToString());
+        return text.ToString();
+    }
+
+    /// <summary>A store into a slot of a fresh object, through the barrier as a field write goes.</summary>
+    private string StoreInto(string place, string slot, IrType type, string value) =>
+        IsReference(type) ? $"LYR_WRITE_BARRIER({place}, &{slot}, {value});"
+        : HoldsReferences(type) ? $"LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {value});"
+        : $"{slot} = {value};";
+
+    /// <summary>A coroutine over its environment (06 A1): the arguments stored, then the runtime's
+    /// object — not started; nothing of the body runs before the first pull.</summary>
+    private string StartCoroutine(MakeCoroutine m)
+    {
+        var body = _module.Functions[m.Body.Value];
+        var create = $"{Temp(m.Dest)} = lyr_coro_new(&{CoroutineDesc(m.Type)}, {CoroutineRunner(m.Body.Value)}, ";
+        if (!HasEnvironment(body, m.Type)) return create + "NULL, 0);";
+        var env = CoroutineEnv(m.Body.Value);
+        var stores = string.Concat(m.Args.Select((a, i) => " " + StoreInto("lyr_ce", $"lyr_ce->a{i}", body.Locals[i].Type, Value(a))));
+        return $"{{ {env} *lyr_ce = lyr_alloc(&{env}_desc);{stores} {create}lyr_ce, 0); }}";
+    }
+
+    /// <summary>
+    /// <c>co.next()</c> (06 N2 A2): a coroutine that is not done runs to its next yield or past its
+    /// end — one that runs, or belongs to another thread, the runtime refuses (RT0014). Done, it
+    /// answers null — false where it yields nothing — and a coroutine whose type throws hands over
+    /// the error its body ended with, once, to the error branch that follows (05 E10). Else the
+    /// value is copied out of the suspended frame, where the yield left its address.
+    /// </summary>
+    private string Pull(ResumePull r)
+    {
+        var co = Temp(r.Coroutine);
+        var run = $"if (lyr_coro_status({co}) != LYR_CORO_DONE) lyr_coro_resume({co}); ";
+        var error = r.Throws ? $"lyr_e = lyr_coro_take_error({co});" : "";
+        if (IsVoid(r.YieldType))
+            return run + $"{Temp(r.Dest)} = (uint8_t)(lyr_coro_status({co}) != LYR_CORO_DONE);"
+                   + (r.Throws ? $" if (!{Temp(r.Dest)}) {error}" : "");
+        return run + $"if (lyr_coro_status({co}) == LYR_CORO_DONE) {{ {(r.Throws ? error + " " : "")}{None(r.Dest)} }} "
+               + $"else {{ {Some(r.Dest, $"*({CType(r.YieldType)} *)lyr_coro_transfer({co})")} }}";
+    }
+
+    /// <summary>An optional temp made absent: the niche's null, the tag no variant has, or the
+    /// flag clear.</summary>
+    private string None(TempId dest) =>
+        IsTagNiche(TypeOf(dest)) ? $"{Storage(dest)} = ({CType(TypeOf(dest))}){{ .tag = LYR_ENUM_NONE }}; {Temp(dest)} = &{Storage(dest)};"
+        : IsNiche(TypeOf(dest)) ? $"{Temp(dest)} = NULL;"
+        : $"{Storage(dest)} = ({CType(TypeOf(dest))}){{0}}; {Temp(dest)} = &{Storage(dest)};";
+
+    /// <summary>An optional temp made present with <paramref name="value"/>, a C expression of
+    /// the inner type.</summary>
+    private string Some(TempId dest, string value) =>
+        IsTagNiche(TypeOf(dest)) ? $"{Storage(dest)} = {value}; {Temp(dest)} = &{Storage(dest)};"
+        : IsNiche(TypeOf(dest)) ? $"{Temp(dest)} = {value};"
+        : $"{Storage(dest)} = ({CType(TypeOf(dest))}){{ .value = {value}, .has = 1 }}; {Temp(dest)} = &{Storage(dest)};";
+
     /// <summary>The composite types an instance unit's functions reach: named by a local, a temp
     /// or a return, or held by one of those through any field, at any depth. A variant brings
     /// its enum, an enum its variants.</summary>
@@ -951,6 +1093,7 @@ public sealed class CEmitter
                 case IrSliceType sl: Visit(sl.Element); break;
                 case IrInlineArrayType ia: Visit(ia.Element); break;
                 case IrFunctionType f: foreach (var p in f.Parameters) Visit(p); Visit(f.Return); break;
+                case IrCoroutineType c: Visit(c.Yield); Visit(c.Result); break;
                 case IrInterfaceType i: Add(i.Type.Value); break;
             }
         }
@@ -1106,6 +1249,7 @@ public sealed class CEmitter
             || b.Insts.Any(op => op is CurrentError or ClearError or StashError or RestoreError or SuppressError
                 || op is Call c && _module.Functions[c.Target.Value].Throws
                 || op is CallIndirect { Throws: true }
+                || op is ResumePull { Throws: true }
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
 
     /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot (05 E2).</summary>
@@ -1384,16 +1528,8 @@ public sealed class CEmitter
             ? $"{Temp(f.Dest)} = &{Temp(f.Object)}->{Field(f.Type, f.Field)};"
             : $"{Temp(f.Dest)} = {Temp(f.Object)}->{Field(f.Type, f.Field)};",
         StoreField f => Store(f),
-        OptNone n when IsTagNiche(TypeOf(n.Dest)) =>
-            $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{ .tag = LYR_ENUM_NONE }}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
-        OptNone n => IsNiche(TypeOf(n.Dest))
-            ? $"{Temp(n.Dest)} = NULL;"
-            : $"{Storage(n.Dest)} = ({CType(TypeOf(n.Dest))}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
-        OptSome s when IsTagNiche(TypeOf(s.Dest)) =>
-            $"{Storage(s.Dest)} = {Value(s.Value)}; {Temp(s.Dest)} = &{Storage(s.Dest)};",
-        OptSome s => IsNiche(TypeOf(s.Dest))
-            ? $"{Temp(s.Dest)} = {Temp(s.Value)};"
-            : $"{Storage(s.Dest)} = ({CType(TypeOf(s.Dest))}){{ .value = {Value(s.Value)}, .has = 1 }}; {Temp(s.Dest)} = &{Storage(s.Dest)};",
+        OptNone n => None(n.Dest),
+        OptSome s => Some(s.Dest, Value(s.Value)),
         OptIsSome i when IsTagNiche(TypeOf(i.Option)) =>
             $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)}->tag != LYR_ENUM_NONE);",
         OptIsSome i => IsNiche(TypeOf(i.Option))
@@ -1421,6 +1557,16 @@ public sealed class CEmitter
         EnumAs a => _module.Types[a.Variant.Value].FieldTypes.Length > 1
             ? $"{Temp(a.Dest)} = &{Temp(a.Value)}->as.v{_variants[a.Variant.Value].Tag};"
             : $"{Temp(a.Dest)} = ({StructName(a.Variant)} *)(void *){Temp(a.Value)};",
+        // A coroutine (06 N2): made over its environment, pulled, asked whether it is done and
+        // what its body returned. A yield hands the resumer the value's address in the frame —
+        // a temp's own, or the storage an aggregate temp points at.
+        MakeCoroutine m => StartCoroutine(m),
+        ResumePull r => Pull(r),
+        YieldSuspend { Value: { } y } => $"lyr_coro_yield_value({(IsAggregate(TypeOf(y)) ? Temp(y) : "&" + Temp(y))});",
+        YieldSuspend => "lyr_coro_yield_value(NULL);",
+        CoroutineDone d => $"{Temp(d.Dest)} = (uint8_t)(lyr_coro_status({Temp(d.Coroutine)}) == LYR_CORO_DONE);",
+        CoroutineResult r => $"if (lyr_coro_status({Temp(r.Coroutine)}) == LYR_CORO_DONE && lyr_coro_transfer({Temp(r.Coroutine)}) != NULL) {{ "
+            + $"{Some(r.Dest, $"*({CType(r.ResultType)} *)lyr_coro_transfer({Temp(r.Coroutine)})")} }} else {{ {None(r.Dest)} }}",
         _ => throw new InvalidOperationException($"the C emitter has no case for {op.GetType().Name}; the gate let it through"),
     };
 

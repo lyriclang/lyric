@@ -1,10 +1,10 @@
-// A program the front end accepts and the subset gate refuses: coroutines come with M6.
-fn count(): Coroutine<int> {
-    var i = 0;
-    while (true) { yield i; i = i + 1; }
+// A program the front end accepts and the subset gate refuses: a yield outside a coroutine's own
+// body — in a function a coroutine calls (06 §10a) — comes with M6 S2b.
+fn emit(n: int): void {
+    yield n;
 }
 
 fn main(): int {
-    let c = count();
+    emit(1);
     return 0;
 }

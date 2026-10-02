@@ -196,9 +196,11 @@ public static class IrPrinter
         StoreGlobal g => $"stglobal {g.Global}, {g.Value}",
         MakeCoroutine m => $"{m.Dest}: {TypeStr(m.Type)} = mkcoro {m.Body}" +
                            (m.Args.Length > 0 ? $", {string.Join(", ", m.Args)}" : ""),
-        ResumePull r => (r.Dest is { } rd ? $"{rd}: {TypeStr(r.YieldType)} = " : "") +
-                        $"resume{(r.Lenient ? ".lenient" : "")} {r.Coroutine}",
-        YieldSuspend y => $"yield {TypeStr(y.YieldType)}" +
+        ResumePull r => $"{r.Dest}: {(r.YieldType is IrScalarType { Kind: IrScalar.Void } ? "bool" : "?" + TypeStr(r.YieldType))} = next {r.Coroutine}"
+                        + (r.Throws ? " throws" : ""),
+        CoroutineDone d => $"{d.Dest}: bool = codone {d.Coroutine}",
+        CoroutineResult r => $"{r.Dest}: ?{TypeStr(r.ResultType)} = coresult {r.Coroutine}",
+        YieldSuspend y => $"yield{(y.Dynamic ? ".dynamic" : "")} {TypeStr(y.YieldType)}" +
                           (y.Value is { } v ? $" {v}" : ""),
         CurrentError e => $"{e.Dest}: {TypeStr(e.Type)} = curerr",
         ClearError => "clearerr",
@@ -270,6 +272,7 @@ public static class IrPrinter
         IrStructType v => $"val {v.Type}",
         IrHostType h => $"host {h.Name}",
         IrFunctionType f => $"fn({string.Join(", ", f.Parameters.Select(TypeStr))}) -> {TypeStr(f.Return)}",
+        IrCoroutineType c => $"coroutine<{TypeStr(c.Yield)}, {TypeStr(c.Result)}>",
         _ => throw new InternalCompilationException($"ir-printer: type not printable: {t.GetType().Name}")
     };
 

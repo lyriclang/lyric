@@ -1,0 +1,41 @@
+// Coroutines and the collector natively (design/v5/spec/06 A5; 01 L1): an object referenced only
+// from a suspended coroutine's frame survives every collection the churn forces, and two hundred
+// thousand coroutines started, suspended and dropped are collected with their stacks — the test
+// runs this under a heap limit far below what they allocate. One in a thousand is kept a while,
+// the last of them pulled again at the end. Expected stdout:
+// "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000". Exit 0.
+import std.io { println };
+
+class Item { id: int, label: string }
+
+fn holder(id: int): Coroutine<string, int> {
+    let item = Item { id = id, label = f"item-{id}" };
+    var pulls = 0;
+    while (pulls < 3) {
+        yield f"{item.label}:{pulls}";
+        pulls = pulls + 1;
+    }
+    return item.id;
+}
+
+fn main(): int {
+    let first = holder(7);
+    let a = first.next() ?? "-";
+    var kept = holder(999);
+    var started = 0;
+    var i = 0;
+    while (i < 200000) {
+        let g = holder(i);
+        let label = g.next() ?? "";
+        if (label != "") { started = started + 1; }
+        if (i % 1000 == 999) { kept = g; }
+        i = i + 1;
+    }
+    let b = first.next() ?? "-";
+    let k = kept.next() ?? "-";
+    let c = first.next() ?? "-";
+    let end = first.next();
+    let r = first.result() ?? -1;
+    println(f"kept {a} {b} {c} {end == null} {r} {k} {started}");
+    return if (r == 7) 0 else 1;
+}
