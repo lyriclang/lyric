@@ -11,5 +11,6 @@
 #include "lyr/init.h"
 #include "lyr/error.h"
 #include "lyr/coro.h"
+#include "lyr/time.h"
 
 #endif

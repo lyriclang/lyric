@@ -16,6 +16,7 @@ typedef enum LyrCoroStatus {
     LYR_CORO_SUSPENDED = 1,  /* not started, or stopped at a yield: a resume runs it */
     LYR_CORO_RUNNING = 2,    /* running, or waiting for a coroutine it resumed */
     LYR_CORO_DONE = 3,       /* its body returned */
+    LYR_CORO_PARKED = 4,     /* a coroutine of its chain parked: a resume continues that one */
 } LyrCoroStatus;
 
 /* A coroutine's body, run on the coroutine's stack at its first resume; returning ends it. */
@@ -66,6 +67,14 @@ void lyr_coro_set_transfer(LyrCoro *co, void *value);
  * alive until it is taken. */
 void lyr_coro_set_error(LyrCoro *co, struct LyrErr *error);
 struct LyrErr *lyr_coro_take_error(LyrCoro *co);
+
+/* Parks the running chain at the scheduler (06 N3): the innermost running coroutine stops where it
+ * stands, and the outermost one of its chain — the one resumed from the thread's own stack, where
+ * the scheduler runs — gives control back there, PARKED, as if it had yielded. The coroutines in
+ * between keep waiting for the ones they resumed: the chain stays intact. A later lyr_coro_resume
+ * of the outermost one continues the innermost where it parked. Parking with no coroutine running
+ * panics (RT0014), as does closing a parked coroutine (cancellation is the scheduler's, M6 S4). */
+void lyr_coro_park(void);
 
 /* Closes a coroutine (06 A5, 01 K7a). One that is done, or was never resumed, ends without
  * running anything. One suspended at a yield is resumed to be unwound: the yield asks

@@ -538,8 +538,14 @@ LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t s
     return co;
 }
 
+static void resume_parked(CoroThread *ts, LyrCoro *co);
+
 void lyr_coro_resume(LyrCoro *co) {
     CoroThread *ts = this_thread();
+    if (co->status == LYR_CORO_PARKED) {
+        resume_parked(ts, co);
+        return;
+    }
     if (LYR_UNLIKELY(co->status != LYR_CORO_SUSPENDED)) {
         if (co->status == LYR_CORO_DONE) lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed after its body returned");
         lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed while it runs — by itself, or while a coroutine it resumed runs");
@@ -564,6 +570,40 @@ void lyr_coro_resume(LyrCoro *co) {
     }
 }
 
+/* A parked chain continues where it parked (06 N3): the outermost coroutine runs again for whoever
+ * resumed it now, and control goes to the innermost one, whose resumers still wait in their resumes. */
+static void resume_parked(CoroThread *ts, LyrCoro *co) {
+    if (LYR_UNLIKELY(co->owner != ts->id)) {
+        lyr_panic(LYR_RT_COROUTINE, "a coroutine resumed on a thread other than the one it runs on");
+    }
+    LyrStackCtx *from = ts->current != NULL ? &ts->current->ctx : &ts->own;
+    co->resumer = from;
+    LYR_WRITE_BARRIER(co, &co->resumer_coro, ts->current);
+    co->status = LYR_CORO_RUNNING;
+    LyrCoro *top = co->parked_top;
+    LYR_WRITE_BARRIER(co, &co->parked_top, (LyrCoro *)NULL);
+    ts->current = top;
+    transfer(from, &top->ctx, 0);
+    if (co->status == LYR_CORO_DONE) {
+        lyr_gc_unwatch_coro(co);
+        release_stack(co);
+    }
+}
+
+void lyr_coro_park(void) {
+    CoroThread *ts = this_thread();
+    LyrCoro *top = ts->current;
+    if (LYR_UNLIKELY(top == NULL)) lyr_panic(LYR_RT_COROUTINE, "a park with no coroutine running — on the thread's own stack");
+    LyrCoro *root = top;
+    while (root->resumer_coro != NULL) root = root->resumer_coro;
+    root->status = LYR_CORO_PARKED;
+    LYR_WRITE_BARRIER(root, &root->parked_top, top);
+    ts->current = NULL;
+    LyrStackCtx *to = root->resumer;
+    LYR_WRITE_BARRIER(root, &root->resumer_coro, (LyrCoro *)NULL);
+    transfer(&top->ctx, to, 0);
+}
+
 void lyr_coro_yield(void) {
     CoroThread *ts = this_thread();
     LyrCoro *co = ts->current;
@@ -585,6 +625,9 @@ void lyr_coro_yield_value(void *value) {
 
 void lyr_coro_close(LyrCoro *co) {
     if (co->status == LYR_CORO_DONE) return;
+    if (LYR_UNLIKELY(co->status == LYR_CORO_PARKED)) {
+        lyr_panic(LYR_RT_COROUTINE, "a coroutine closed while it is parked — a parked task is cancelled, not closed");
+    }
     if (LYR_UNLIKELY(co->status == LYR_CORO_RUNNING)) {
         lyr_panic(LYR_RT_COROUTINE, "a coroutine closed while it runs — by itself, or while a coroutine it resumed runs");
     }

@@ -55,6 +55,7 @@ public class SanitizerTests
         { "coro_basic", ["self"], 101 },
         { "coro_gc", [], 0 },
         { "coro_pace", [], 0 },
+        { "coro_park", [], 0 },
         { "coro_threads", [], 0 },
         { "coro_storm", [], 0 },
     };
@@ -65,6 +66,7 @@ public class SanitizerTests
         { "gc_smoke", [], 0 },
         // A coroutine is a fiber to TSan; the collections between the switches order them.
         { "coro_basic", [], 0 },
+        { "coro_park", [], 0 },
         { "coro_gc", [], 0 },
     };
 
