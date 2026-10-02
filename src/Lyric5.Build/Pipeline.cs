@@ -91,7 +91,7 @@ public static class Pipeline
             {
                 var path = unit.Instance is null
                     ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.c")
-                    : Path.Combine(project.CacheDir, "units", $"inst-{Key(unit.Text)}.c");
+                    : Path.Combine(project.CacheDir, "units", $"inst-{Key(Placeless(project, unit.Text))}.c");
                 WriteOnce(path, unit.Text);
                 paths.Add(path);
             }
@@ -104,10 +104,12 @@ public static class Pipeline
             var archive = RuntimeArchive.For(request.Compiler, request.Target, request.Profile, request.ToolchainVersion);
             var build = new CBuild(request.Compiler, request.Target, request.Profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
-            // The program's units carry what the profile asks of the program alone (fast-math).
+            // The program's units carry what the profile asks of the program alone (fast-math), and
+            // every unit names its paths by the packages' names, not by where they lie.
+            var paths = PathMaps(project, runtimeRoot);
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
-                ExtraFlags: request.Profile.ProgramFlags)).ToList();
-            var (native, libraries) = Native(project, request.Target);
+                ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
+            var (native, libraries) = Native(project, request.Target, paths);
             var objects = build.Compile([.. units, .. native]);
             var executable = project.Executable(request.Profile, request.Target);
             if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable, libraries);
@@ -122,7 +124,7 @@ public static class Pipeline
 
     /// <summary>The native parts of the program's packages (07 B5; 11 W2) for the target: their C
     /// sources, each with its package's include directories, and their libraries, each once.</summary>
-    private static (List<CUnit> Units, List<string> Libraries) Native(Project project, Target target)
+    private static (List<CUnit> Units, List<string> Libraries) Native(Project project, Target target, IReadOnlyList<string> paths)
     {
         var units = new List<CUnit>();
         var libraries = new List<string>();
@@ -131,11 +133,51 @@ public static class Pipeline
         {
             var part = manifest.NativeOn(target.Os);
             var include = part.Include.Select(directory => Path.Combine(manifest.Root, directory)).ToList();
-            units.AddRange(part.SourceFiles(manifest.Root).Select(file => new CUnit(file, [], include)));
+            units.AddRange(part.SourceFiles(manifest.Root).Select(file => new CUnit(file, [], include, ExtraFlags: paths)));
             foreach (var library in part.Libs)
                 if (!libraries.Contains(library)) libraries.Add(library);
         }
         return (units, libraries);
+    }
+
+    /// <summary>
+    /// The same bytes from wherever the package lies (11 W2 P6, Go's <c>-trimpath</c>): each path a
+    /// binary would carry — a <c>#line</c>'s file, the C file's own, the runtime's headers — written
+    /// as the package's name or <c>lyric</c> instead (<c>-ffile-prefix-map</c>). The project's root
+    /// first, then each package outside it: a prefix inside another would be mapped twice.
+    /// </summary>
+    private static List<string> PathMaps(Project project, string runtimeRoot) =>
+        [.. Places(project).Append((From: runtimeRoot, To: "lyric"))
+            .Select(m => $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(m.From)}={m.To}")];
+
+    /// <summary>Where the program's packages lie, and the name each is written as: the project's
+    /// root first, then each package outside it.</summary>
+    private static List<(string From, string To)> Places(Project project)
+    {
+        var places = new List<(string From, string To)> { (project.Root, project.Name) };
+        if (project.Graph is { } graph)
+            foreach (var (name, manifest) in graph.Packages.OrderBy(p => p.Key, StringComparer.Ordinal))
+                if (!places.Any(m => Inside(manifest.Root, m.From))) places.Add((manifest.Root, name));
+        return places;
+    }
+
+    /// <summary>A unit's text with the packages' places written as their names — as its #line
+    /// directives spell them, backslashes doubled — for a name that does not depend on where the
+    /// program lies (P6).</summary>
+    private static string Placeless(Project project, string text)
+    {
+        foreach (var (from, to) in Places(project))
+        {
+            var root = Path.TrimEndingDirectorySeparator(from);
+            text = text.Replace(root.Replace("\\", "\\\\"), to, StringComparison.Ordinal).Replace(root, to, StringComparison.Ordinal);
+        }
+        return text;
+    }
+
+    private static bool Inside(string path, string directory)
+    {
+        var relative = Path.GetRelativePath(directory, path);
+        return relative == "." || (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative));
     }
 
     /// <summary>The compiler, by the identity of its assemblies — the front end's and the

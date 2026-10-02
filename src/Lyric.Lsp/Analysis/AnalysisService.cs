@@ -172,13 +172,21 @@ public sealed class AnalysisService : IDisposable
     private CancellationTokenSource Swap(string key)
     {
         var source = new CancellationTokenSource();
-        if (_pending.TryRemove(key, out var previous))
-        {
-            previous.Cancel();
-            previous.Dispose();
-        }
+        if (_pending.TryRemove(key, out var previous)) Retire(previous);
         _pending[key] = source;
         return source;
+    }
+
+    /// <summary>
+    /// Cancels and disposes a source that left <see cref="_pending"/>. Its run may have finished
+    /// and disposed it meanwhile (<see cref="Release"/>): then there is nothing left to cancel — and
+    /// <c>Cancel</c> on a disposed source throws, which once took <see cref="Dispose"/> down.
+    /// </summary>
+    private static void Retire(CancellationTokenSource source)
+    {
+        try { source.Cancel(); }
+        catch (ObjectDisposedException) { /* its run is already past the finish line */ }
+        source.Dispose();
     }
 
     private async Task RunAsync(OpenDocument document, CancellationTokenSource source)
@@ -607,11 +615,7 @@ public sealed class AnalysisService : IDisposable
     /// </summary>
     public async Task CloseAsync(OpenDocument document, CancellationToken cancellationToken)
     {
-        if (_pending.TryRemove(document.Path, out var pending))
-        {
-            pending.Cancel();
-            pending.Dispose();
-        }
+        if (_pending.TryRemove(document.Path, out var pending)) Retire(pending);
 
         var project = await ProjectForAsync(document.Path).ConfigureAwait(false);
         if (project is not null && IsUnder(document.Path, project.SourceRoot))
@@ -774,11 +778,7 @@ public sealed class AnalysisService : IDisposable
     public void Dispose()
     {
         _disposed = true;
-        foreach (var pending in _pending.Values)
-        {
-            pending.Cancel();
-            pending.Dispose();
-        }
+        foreach (var pending in _pending.Values) Retire(pending);
         _pending.Clear();
 
         foreach (var running in _running.Values)
