@@ -63,6 +63,11 @@ public sealed class TypeResult
     /// <summary>The source text of a span — what a call wrote —, for the lowering.</summary>
     public Func<Lyric.Core.Span, string>? SourceText { get; internal set; }
 
+    /// <summary>The block a call through a constraint reaches on a concrete type where no symbol
+    /// of the type holds the conformance (05 §13 rules 6, 8), with the block's method of the
+    /// member's name — the sema's answer at the instance the lowering reached.</summary>
+    public Func<LyrType, FunctionSymbol, (ExtensionBlock Block, FunctionSymbol? Method)?>? ConformanceBlock { get; internal set; }
+
     /// <summary>
     /// Which function satisfied which conformance: keyed by (implementing type, interface,
     /// member), holding one entry per INSTANCE.

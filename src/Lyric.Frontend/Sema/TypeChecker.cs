@@ -119,6 +119,7 @@ public sealed class TypeChecker
         _binding = binding;
         _de = de;
         _result.SourceText = comp.TextOf;
+        _result.ConformanceBlock = ConformanceBlockFor;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
@@ -928,11 +929,8 @@ public sealed class TypeChecker
             if (block.IsConstructorTarget)
             {
                 // A built-in constructor as the target (03 T7 X2): 'this' is the shape at the
-                // block's parameters. Its conformance — a table row for an array — is not written
-                // yet; the members are.
-                if (block.Decl.Interfaces.Length > 0)
-                    _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Interfaces[0].Span,
-                        $"a conformance of '{TypeFacts.Display(BlockTargetType(block))}' is not written yet — a block on a built-in constructor adds members only");
+                // block's parameters, and a conformance it names is checked there (05 §13 rule 6).
+                CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
                 {
                     CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
@@ -944,10 +942,8 @@ public sealed class TypeChecker
             if (block.IsBlanketTarget)
             {
                 // A blanket block (04 D15): its members reach every type its constraints admit,
-                // 'this' the parameter. A conformance through it is not written yet.
-                if (block.Decl.Interfaces.Length > 0)
-                    _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Interfaces[0].Span,
-                        $"a conformance of every '{TypeFacts.Display(BlockTargetType(block))}' is not written yet — a blanket block adds members only");
+                // 'this' the parameter; a conformance it names, every such type (05 §13 rule 8).
+                CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
                 {
                     CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
@@ -1060,14 +1056,107 @@ public sealed class TypeChecker
         }
         foreach (var block in _comp.Extensions.Blocks)
         {
-            if (block.Target is not { } target || block.Decl.Interfaces.Length == 0) continue;
+            // A view's block is a shape's, compared below with the others.
+            if (block.Target is not { } target || block.Decl.Interfaces.Length == 0 || IsShapeBlock(block)) continue;
             _currentModule = block.Module;
             site++;
             var instance = block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : SelfType(target);
             foreach (var node in block.Decl.Interfaces)
                 Note(target, instance, node, instance, block.MethodScope);
         }
+
+        // The blocks no target symbol stands for (05 §13 rules 6, 8) implement every interface of
+        // their chains with methods of their own, so two of them meeting on one type are two
+        // implementations, and the lowering asks for one by the interface alone: compared over
+        // the chains, by interface rather than instance. A blanket block excludes a type's own
+        // conformance where it reaches the type (X4), and another blanket block or a shape's
+        // block anywhere, even where no type could meet both; a shape's block, another block on
+        // an overlapping shape.
+        var blockSites = new List<(ExtensionBlock Block, LyrType Target, List<TypeSymbol> Chain)>();
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (block.Decl.Interfaces.Length == 0 || !(block.IsBlanketTarget || IsShapeBlock(block))) continue;
+            _currentModule = block.Module;
+            var target = BlockTargetType(block);
+            var chain = new List<TypeSymbol>();
+            foreach (var node in block.Decl.Interfaces)
+            {
+                if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
+                var reached = Conformance.WithParents(iface, _binding).ToList();
+                TypeSymbol? SharedWith(IEnumerable<TypeSymbol> other) =>
+                    other.FirstOrDefault(p => reached.Any(r => ReferenceEquals(r, p)));
+                string? clash = null;
+                if (block.IsBlanketTarget)
+                    foreach (var (_, _, instance, priorIface) in seen)
+                        if (TypeFacts.SymbolOf(priorIface) is { } written
+                            && SharedWith(Conformance.WithParents(written, _binding)) is { } shared
+                            && BlockSubstitution(block, instance) is not null)
+                        { clash = $"'{TypeFacts.Display(instance)}' conforms to '{shared.Name}' on its own, and this block gives it to every type its constraints admit"; break; }
+                if (clash is null)
+                    foreach (var (prior, priorTarget, priorChain) in blockSites)
+                        if ((block.IsBlanketTarget || prior.IsBlanketTarget || TypeFacts.Overlaps(priorTarget, target))
+                            && SharedWith(priorChain) is { } shared)
+                        { clash = $"another block gives '{shared.Name}' to '{TypeFacts.Display(priorTarget)}'"; break; }
+                if (clash is not null)
+                    _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
+                        $"{clash} — one conformance per type and interface, whole-program; no specialization");
+                chain.AddRange(reached);
+            }
+            blockSites.Add((block, target, chain));
+        }
         _currentModule = null;
+    }
+
+    /// <summary>
+    /// A conformance a shape's block or a blanket block gives (05 §13 rules 6, 8): every abstract
+    /// member of the interfaces' chains implemented in the block itself, with the signature the
+    /// interface writes at the block's target, 'Self' read as the target. Such a block is generic
+    /// and so answers no constant (05 §6 rule 2).
+    /// </summary>
+    private void CheckBlockConformance(ExtensionBlock block)
+    {
+        if (block.Decl.Interfaces.Length == 0) return;
+        var self = BlockTargetType(block);
+        var name = TypeFacts.Display(self);
+        var seen = new List<LyrType>();
+        foreach (var node in block.Decl.Interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } direct)
+            {
+                _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                    $"only an interface can stand in the conformance list of the block on '{name}'");
+                continue;
+            }
+            foreach (var (iface, instance) in InterfaceClosure(direct, ResolveType(node, block.MethodScope)))
+            {
+                if (seen.Any(t => LyrType.Equal(t, instance))) continue;
+                seen.Add(instance);
+                if (iface.Declaration is not InterfaceDecl idecl) continue;
+                var subst = instance is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+                var implied = ReferenceEquals(iface, direct) ? "" : $" (implied by '{direct.Name}')";
+                foreach (var im in idecl.Members)
+                {
+                    if (im.Generics.Length > 0 || im.IsPrivateHelper) continue;
+                    if (block.MethodScope.LookupLocal(im.Name) is not FunctionSymbol found)
+                    {
+                        if (im.Body is null)
+                            _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
+                                $"the block on '{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
+                                new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                        continue;
+                    }
+                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, self));
+                    if (ContainsError(want)) continue;
+                    if (SignatureMismatch(want, im, found, self) is { } reason)
+                        _de.Report("LYR-SEM0042", Severity.Error, found.Declaration?.Span ?? NodeSpan(node),
+                            $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {reason}");
+                }
+                foreach (var st in idecl.Statics)
+                    _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
+                        $"the block on '{name}' cannot answer the static '{st.Binding.Name}' of interface '{iface.Name}'{implied} — "
+                        + "a generic block holds no constant");
+            }
+        }
     }
 
     /// <summary>The target of a block as a type, <c>List&lt;T&gt;</c> with the block's own
@@ -1161,7 +1250,11 @@ public sealed class TypeChecker
         // A blanket block's members reach the type where its constraints admit it (04 D15):
         // one function of a name holds there as for any extension.
         foreach (var block in _comp.Extensions.Blocks)
-            if (block.IsBlanketTarget && BlockSubstitution(block, SelfType(ts)) is not null)
+            if (block.IsBlanketTarget && BlockSubstitution(block, SelfType(ts)) is not null
+                // A conformance it gives that the type declares itself is the coherence check's
+                // (SEM0133), not a second report about its methods.
+                && !block.Decl.Interfaces.Any(node => Conformance.InterfaceOf(node, _binding) is { } given
+                    && DeclaredInterfaceNodes(ts).Any(own => ReferenceEquals(Conformance.InterfaceOf(own, _binding), given))))
                 foreach (var m in block.Methods)
                     entries.Add((m.Name, Provenance.Inherent, m, m.Declaration?.Span ?? default, "a blanket extension"));
         // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
@@ -5295,6 +5388,12 @@ public sealed class TypeChecker
             return Report(span, "LYR-SEM0134",
                 $"'{mem.Member}' is added to '{TypeFacts.Display(BlockTargetType(failed))}' under the block's constraints, "
                 + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
+        // A blanket member, where the shape satisfies the block's constraints (05 §13 rule 7).
+        if (BlanketMember(receiver, mem.Member, span) is { } blanket && blanket.Item2 is { } blanketSymbol)
+        {
+            _result.BindRef(mem, blanketSymbol);
+            return blanket.Item1;
+        }
         return null;
     }
 
@@ -5306,7 +5405,7 @@ public sealed class TypeChecker
     /// </summary>
     private (LyrType, Symbol?)? BlanketMember(LyrType receiver, string member, Span span)
     {
-        if (receiver is not (NamedRef or GenericInstance or TypeParamType)
+        if (receiver is not (NamedRef or GenericInstance or TypeParamType) && !IsShape(receiver)
             && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null))
             return null;
         foreach (var block in _comp.Extensions.Blocks)
@@ -5867,7 +5966,8 @@ public sealed class TypeChecker
                               || ImplementsWithExtensions(gi.Definition, iface, wanted, SubstMap(gi)),
 
         TypeParamType tp => tp.Param.Constraints.Any(c =>
-            NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst, tp)),
+            NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, iface, wanted, EmptySubst, tp))
+            || BlockConforms(tp, iface, wanted, shapes: false),
 
         PrimitiveType prim when BuiltinSymbol(prim) is { } builtin =>
             ImplementsWithExtensions(builtin, iface, wanted, EmptySubst),
@@ -5875,6 +5975,10 @@ public sealed class TypeChecker
         // 'never' has no value and so every conformance vacuously: 'E = never', what a set of
         // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
         NeverType => true,
+
+        // A shape conforms through a block that names the interface, and no other way (05 §13
+        // rule 6): what passed every constraint here before failed in the lowering.
+        ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf => BlockConforms(arg, iface, wanted, shapes: true),
 
         // An OPAQUE alias satisfies nothing: it has no conformance list, and falling into the
         // permissive default below would let 'Map<Entity, V>' compile against members the type
@@ -5936,7 +6040,109 @@ public sealed class TypeChecker
                     return true;
                 }
         }
+        return BlockConforms(self, iface, wanted, shapes: false);
+    }
+
+    private static bool IsShape(LyrType type) => type is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf;
+
+    /// <summary>Does the type conform to the interface through a shape's block or a blanket block
+    /// alone (05 §13 rules 6, 8)? A shape conforms no other way; a named type might by its own
+    /// list or a block on it, which a value can be made through.</summary>
+    private bool OnlyThroughABlock(LyrType from, TypeSymbol iface, LyrType wanted)
+    {
+        if (IsShape(from)) return Satisfies(from, iface, wanted);
+        if (from is not (NamedRef or GenericInstance or PrimitiveType)) return false;
+        bool direct;
+        _withoutBlocks = true;
+        try { direct = Satisfies(from, iface, wanted); }
+        finally { _withoutBlocks = false; }
+        return !direct && Satisfies(from, iface, wanted);
+    }
+
+    /// <summary>Set while asking whether a type conforms without a shape's or a blanket block.</summary>
+    private bool _withoutBlocks;
+
+    /// <summary>The blocks being asked whether they reach a type, so a blanket conformance that
+    /// needs itself (<c>extend&lt;T :: [J]&gt; T :: [J]</c>, or two that need each other) answers no
+    /// rather than asking forever.</summary>
+    private readonly HashSet<(ExtensionBlock Block, string Type)> _blockProbes = new();
+
+    /// <summary>
+    /// A conformance a block gives where no symbol stands for the target (05 §13 rules 6, 8): a
+    /// blanket block, reaching every type its constraints admit, and — for a shape — a block on
+    /// its constructor. The match binds the block's parameters, the constraints hold for them, and
+    /// the lowering builds on what is recorded here.
+    /// </summary>
+    private bool BlockConforms(LyrType type, TypeSymbol iface, LyrType wanted, bool shapes)
+    {
+        if (_withoutBlocks) return false;
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (block.Decl.Interfaces.Length == 0) continue;
+            if (!(block.IsBlanketTarget || (shapes && IsShapeBlock(block))))
+                continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            var probe = (block, TypeFacts.Display(type));
+            if (!_blockProbes.Add(probe)) continue;
+            try
+            {
+                if (BlockSubstitution(block, type) is not { } map) continue;
+                foreach (var node in block.Decl.Interfaces)
+                    if (NodeReaches(node, block.MethodScope, iface, wanted, map, type))
+                    {
+                        _result.RecordBlockConformance(type, iface, block);
+                        return true;
+                    }
+            }
+            finally { _blockProbes.Remove(probe); }
+        }
         return false;
+    }
+
+    /// <summary>A block on a shape: a built-in constructor (03 T7 X2), or the builtin
+    /// <c>Slice</c> a view maps to.</summary>
+    private bool IsShapeBlock(ExtensionBlock block) =>
+        block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice));
+
+    /// <summary>
+    /// For the lowering: the block a call through a constraint reaches on a concrete type where
+    /// no symbol of the type holds the conformance (05 §13 rules 6, 8) — a shape's block or a
+    /// blanket block, as <see cref="BlockConforms"/> finds it: matching the type, its constraints
+    /// holding there, its chain declaring <paramref name="promised"/>. With the block's method of
+    /// that name, <c>null</c> where the interface's default stands in for it. <c>null</c>
+    /// altogether where the type conforms on its own — its list, a block on it —, which
+    /// <see cref="Satisfies"/> asks first as well. Asked again rather than read from a record:
+    /// a generic body records its parameters, not what an instance made of them.
+    /// </summary>
+    private (ExtensionBlock Block, FunctionSymbol? Method)? ConformanceBlockFor(LyrType concrete, FunctionSymbol promised)
+    {
+        var saved = _currentModule;
+        _currentModule = null;
+        try
+        {
+            foreach (var block in _comp.Extensions.Blocks)
+            {
+                if (block.Decl.Interfaces.Length == 0 || !(block.IsBlanketTarget || (IsShape(concrete) && IsShapeBlock(block))))
+                    continue;
+                if (BlockSubstitution(block, concrete) is not { } map) continue;
+                foreach (var node in block.Decl.Interfaces)
+                {
+                    if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
+                    foreach (var (iface, instance) in InterfaceClosure(direct, ResolveType(node, block.MethodScope)))
+                    {
+                        if (!ReferenceEquals(iface.Members.LookupLocal(promised.Name), promised)) continue;
+                        var given = Substitute(Substitute(instance, SelfMap(iface, concrete)), map);
+                        bool own;
+                        _withoutBlocks = true;
+                        try { own = Satisfies(concrete, iface, given); }
+                        finally { _withoutBlocks = false; }
+                        return own ? null : (block, block.MethodScope.LookupLocal(promised.Name) as FunctionSymbol);
+                    }
+                }
+            }
+            return null;
+        }
+        finally { _currentModule = saved; }
     }
 
     // Does this conformance node reach 'iface' — directly or through a parent — with matching
@@ -8708,15 +8914,35 @@ public sealed class TypeChecker
 
     private void CheckAssignable(Expr expr, LyrType from, LyrType to, Span span)
     {
+        // An optional of an interface made here is made the way the interface is, the value
+        // lifted and then wrapped: '?Greeter' from a 'Cat' asks what 'Greeter' from a 'Cat'
+        // asks. 'null' makes no value of it, and an optional source is not wrapped here — '?Dog'
+        // to '?Walker' is no conversion at all.
+        var liftedTo = to;
+        while (liftedTo is Optional { Inner: var inner } && from is not (NullType or Optional))
+            liftedTo = inner;
         // A value of an interface arises here (04 D9): an interface a table cannot serve — a
         // member naming 'Self' beyond the receiver, a static, a generic one — is a constraint
         // and no type for a value; said where the value would come to be.
-        if (TypeFacts.KindOf(to) == TypeSymbolKind.Interface && !LyrType.Equal(from, to) && !from.IsError
-            && TypeFacts.SymbolOf(to) is { } boxedInto && !ValueUsable(boxedInto, out var why))
+        if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
+            && TypeFacts.SymbolOf(liftedTo) is { } boxedInto && !ValueUsable(boxedInto, out var why))
         {
             _de.Report("LYR-SEM0126", Severity.Error, span,
                 $"'{boxedInto.Name}' is usable as a constraint only, not as the type of a value — {why}; "
                 + $"write 'fn f<T :: [{boxedInto.Name}]>(…)'");
+            return;
+        }
+        // A value of an interface through a shape's block or a blanket conformance (05 §13
+        // rules 6, 8): such a value needs a table for the shape, or one per type the block
+        // reaches — not written yet; a constraint reaches the conformance.
+        if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
+            && TypeFacts.SymbolOf(liftedTo) is { } through && OnlyThroughABlock(from, through, liftedTo))
+        {
+            _de.Report("LYR-SEM0047", Severity.Error, span,
+                $"'{TypeFacts.Display(from)}' is a '{through.Name}' through "
+                + (IsShape(from) ? "the block on its shape" : "a blanket block")
+                + $", and a value of '{through.Name}' made that way is not written yet — reach it through a constraint, "
+                + $"'fn f<T :: [{through.Name}]>(…)'");
             return;
         }
         if (AdaptEmptyArray(expr, to)) return;

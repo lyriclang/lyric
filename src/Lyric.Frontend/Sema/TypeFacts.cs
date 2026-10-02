@@ -185,6 +185,8 @@ public static class TypeFacts
             return ReferenceEquals(ga.Definition, gb.Definition) && ga.Arguments.Length == gb.Arguments.Length
                 && ga.Arguments.Zip(gb.Arguments).All(p => Overlaps(p.First, p.Second));
         if (a is ArrayOf xa && b is ArrayOf xb) return Overlaps(xa.Element, xb.Element);
+        if (a is SliceOf sa && b is SliceOf sb) return Overlaps(sa.Element, sb.Element);
+        if (a is InlineArrayOf ia && b is InlineArrayOf ib) return ia.Length == ib.Length && Overlaps(ia.Element, ib.Element);
         if (a is Optional oa && b is Optional ob) return Overlaps(oa.Inner, ob.Inner);
         if (a is TupleOf ta && b is TupleOf tb)
             return ta.Elements.Length == tb.Elements.Length && ta.Elements.Zip(tb.Elements).All(p => Overlaps(p.First, p.Second));
