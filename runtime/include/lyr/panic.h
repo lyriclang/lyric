@@ -19,6 +19,8 @@
 #define LYR_RT_ASSERT           "LYR-RT0011"  /* `assert(condition, message)` with a false condition (05 E8) */
 #define LYR_RT_UNREACHABLE      "LYR-RT0012"  /* `unreachable(message)` reached (05 E8, E12) */
 #define LYR_RT_TODO             "LYR-RT0013"  /* `todo(message)` reached (05 E8, 10 prelude) */
+#define LYR_RT_COROUTINE        "LYR-RT0014"  /* a coroutine resumed while it runs, after it ended or on another
+                                                 thread; a yield with none running (06 A8) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))

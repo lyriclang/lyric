@@ -3,10 +3,26 @@
 #ifndef LYR_INTERNAL_H
 #define LYR_INTERNAL_H
 
+#include "lyr/coro.h"
 #include "lyr/panic.h"
+#include "lyr/types.h"
 
 #include <stddef.h>
 #include <stdint.h>
+
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(_WIN32)
+#  define LYR_HIDDEN __attribute__((visibility("hidden")))
+#else
+#  define LYR_HIDDEN
+#endif
+
+/* For code that reads memory that is not its own on purpose — another stack's frames, redzones
+ * included — the way the conservative collector does. */
+#if defined(__clang__) || defined(__GNUC__)
+#  define LYR_NO_SANITIZE __attribute__((no_sanitize("address", "thread")))
+#else
+#  define LYR_NO_SANITIZE
+#endif
 
 /* Where a fault happened, from the signal's or the exception's context: the faulting instruction,
  * and — where the platform's unwinder cannot step out of a signal handler (macOS) — the frame
@@ -50,5 +66,57 @@ LYR_NORETURN void lyr_panic_report(const char *code, const char *message, const 
 void lyr_crash_install(void);
 void lyr_crash_thread_start(void);
 void lyr_crash_thread_end(void);
+
+/* crash.c — the address range whose fault is a stack overflow, for the stack the thread runs on:
+ * a coroutine switch swaps it (nothing on Windows, where the system tells an overflow apart). */
+void lyr_crash_get_guard(uintptr_t *low, uintptr_t *high);
+void lyr_crash_set_guard(uintptr_t low, uintptr_t high);
+
+/* coro.c — a stack that can stop: a thread's own, or a coroutine's. While another stack runs on
+ * the thread, `sp` is where this one's registers lie, and the collector scans [sp, base) — a
+ * coroutine's as part of the coroutine object, a thread's own as a root. */
+typedef struct LyrStackCtx {
+    void *sp;
+    void *base;                       /* the cold end, the highest address */
+    void *low;                        /* the lowest usable address, above the guard page */
+    int on_cpu;                       /* the thread runs on this stack now */
+    uintptr_t guard_low, guard_high;  /* a fault in this range is a stack overflow */
+    void *asan_fake;                  /* ASan's handle on the stack's fake frames across a switch */
+    const void *asan_bottom;          /* the bounds ASan is told when the thread switches to it */
+    size_t asan_size;
+    void *tsan_fiber;
+} LyrStackCtx;
+
+/* The coroutine object. The collector stage traces `arg` and `resumer_coro` and, while the stack
+ * is mapped and stopped, every word of [ctx.sp, ctx.base). `status` is 0 only on a free list. */
+struct LyrCoro {
+    LyrObj header;
+    void *arg;
+    struct LyrCoro *resumer_coro;  /* the coroutine that resumed it; NULL: a thread's own stack */
+    LyrCoroBody body;
+    LyrStackCtx *resumer;          /* where a yield goes */
+    LyrStackCtx ctx;
+    void *mapping;                 /* the stack's mapping, its guard page first; NULL: none */
+    size_t mapping_size;
+    size_t stack_size;             /* usable bytes */
+    uint64_t owner;                /* the thread it runs on, by the number of its coroutine state */
+    int status;
+    int foreign;                   /* foreign frames on its stack (01 K4) */
+};
+
+/* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */
+void lyr_coro_abandoned(LyrCoro *co);
+/* coro.c — a thread leaving the runtime drops its coroutine state. */
+void lyr_coro_thread_end(void);
+
+/* gc_boehm.c — what coroutines need of the collector stage. */
+LyrCoro *lyr_gc_alloc_coro(void);                /* zeroed, of the kind that traces its stack */
+void lyr_gc_watch_coro(LyrCoro *co);             /* lyr_coro_abandoned when it dies */
+void lyr_gc_unwatch_coro(LyrCoro *co);
+void *lyr_gc_thread_stack(void **base);          /* the calling thread's handle, and its stack bottom */
+void lyr_gc_add_thread_stack(LyrStackCtx *own);  /* a root while a coroutine runs on its thread */
+void lyr_gc_remove_thread_stack(LyrStackCtx *own);
+void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to); /* no world stop until the end; the bottom moves */
+void lyr_gc_switch_end(void);                    /* on the stack that runs now: the world may stop again */
 
 #endif

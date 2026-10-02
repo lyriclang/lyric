@@ -1,0 +1,59 @@
+/* Stackful coroutines (design/v5/spec/01 L4): asymmetric and cooperative, each on a stack of its
+ * own. The runtime gives the primitives only (K7) — create, resume, yield, status, the running
+ * coroutine; generators are the compiler's, schedulers, tasks and channels Lyric's (06 N3–N6).
+ * A coroutine runs on the thread that first resumed it, and only there (06 G1). */
+#ifndef LYR_CORO_H
+#define LYR_CORO_H
+
+#include "lyr/types.h"
+
+#include <stddef.h>
+
+typedef struct LyrCoro LyrCoro;
+
+typedef enum LyrCoroStatus {
+    LYR_CORO_SUSPENDED = 1,  /* not started, or stopped at a yield: a resume runs it */
+    LYR_CORO_RUNNING = 2,    /* running, or waiting for a coroutine it resumed */
+    LYR_CORO_DONE = 3,       /* its body returned */
+} LyrCoroStatus;
+
+/* A coroutine's body, run on the coroutine's stack at its first resume; returning ends it. */
+typedef void (*LyrCoroBody)(void *arg);
+
+/* The default stack reservation (01 K1). */
+enum { LYR_CORO_STACK_DEFAULT = 256 * 1024 };
+
+/* A coroutine around `body`, not started. `desc` is its type's descriptor — the coroutine is a
+ * heap object like any other; `arg` is handed to the body and kept alive by the coroutine, the
+ * place compiled code keeps what crosses a yield. `stack_size` 0 is the default; the stack is
+ * reserved at the first resume and committed page by page as the body reaches it. Unreachable
+ * while suspended, a coroutine is collected with its stack, and nothing on that stack runs
+ * (06 A5). Never NULL: exhaustion panics. */
+LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t stack_size);
+
+/* Runs `co` until it yields or its body returns, then comes back. Resuming a coroutine that runs
+ * — itself, or one a coroutine already waits for — or one that is done, or one that belongs to
+ * another thread, panics (RT0014). */
+void lyr_coro_resume(LyrCoro *co);
+
+/* Stops the running coroutine and goes back to its resumer; the next resume continues after this
+ * call. With no coroutine running — on a thread's own stack — it panics (RT0014). */
+void lyr_coro_yield(void);
+
+LyrCoroStatus lyr_coro_status(const LyrCoro *co);
+void *lyr_coro_arg(const LyrCoro *co);
+
+/* The coroutine running on the calling thread; NULL on the thread's own stack. */
+LyrCoro *lyr_coro_current(void);
+
+/* Foreign frames (01 K4): C code that may call back into Lyric — and so may yield with its frames
+ * on a coroutine's stack — brackets itself with these. A cancellation asks the count before it
+ * unwinds a stack: C frames cannot be unwound. On a thread's own stack they do nothing. */
+void lyr_coro_enter_foreign(void);
+void lyr_coro_leave_foreign(void);
+int lyr_coro_foreign_depth(const LyrCoro *co);
+
+/* Coroutine stacks in use — started and not yet released. For tests and hosts. */
+size_t lyr_coro_stacks(void);
+
+#endif

@@ -86,6 +86,16 @@ void lyr_crash_thread_start(void) {
     alt_stack = memory;
 }
 
+void lyr_crash_get_guard(uintptr_t *low, uintptr_t *high) {
+    *low = guard_low;
+    *high = guard_high;
+}
+
+void lyr_crash_set_guard(uintptr_t low, uintptr_t high) {
+    guard_low = low;
+    guard_high = high;
+}
+
 void lyr_crash_thread_end(void) {
     if (alt_stack == NULL) return;
     stack_t off = { .ss_sp = NULL, .ss_size = 0, .ss_flags = SS_DISABLE };
@@ -198,6 +208,9 @@ void lyr_crash_thread_start(void) {
 }
 
 void lyr_crash_thread_end(void) {}
+
+void lyr_crash_get_guard(uintptr_t *low, uintptr_t *high) { *low = *high = 0; }
+void lyr_crash_set_guard(uintptr_t low, uintptr_t high) { (void)low; (void)high; }
 
 static LONG WINAPI lyr_crash_on_exception(EXCEPTION_POINTERS *pointers) {
     EXCEPTION_RECORD *record = pointers->ExceptionRecord;
