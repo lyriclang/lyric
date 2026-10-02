@@ -34,6 +34,9 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     /// ones read on the way — with its commit and content hash: the lock's entries (07 P5).</summary>
     public IReadOnlyList<Locked> Locked { get; init; } = [];
 
+    /// <summary>The revision each package read from git is, by name — the chosen one.</summary>
+    public IReadOnlyDictionary<string, Locked> Revisions { get; init; } = new Dictionary<string, Locked>();
+
     /// <summary>One source of a package, as read: where from, and what was found there.</summary>
     private sealed record Node(Dependency At, Manifest Manifest, Locked? Revision);
 
@@ -81,11 +84,16 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
         }
 
         // One package of each name: the one source, or the greatest version asked for.
-        var packages = read.ToDictionary(r => r.Key,
-            r => r.Value.MaxBy(n => n.At.Git is { Kind: GitRefKind.Tag } g ? SemVer.OfTag(g.Ref!) : null)!.Manifest,
+        var chosen = read.ToDictionary(r => r.Key,
+            r => r.Value.MaxBy(n => n.At.Git is { Kind: GitRefKind.Tag } g ? SemVer.OfTag(g.Ref!) : null)!,
             StringComparer.Ordinal);
         var revisions = read.Values.SelectMany(nodes => nodes).Select(n => n.Revision).OfType<Locked>();
-        return new PackageGraph(root, packages) { Locked = LockFile.Sorted(revisions).ToList() };
+        return new PackageGraph(root, chosen.ToDictionary(c => c.Key, c => c.Value.Manifest, StringComparer.Ordinal))
+        {
+            Locked = LockFile.Sorted(revisions).ToList(),
+            Revisions = chosen.Where(c => c.Value.Revision is not null)
+                .ToDictionary(c => c.Key, c => c.Value.Revision!, StringComparer.Ordinal),
+        };
     }
 
     /// <summary>The package <paramref name="at"/> names, from its directory or its revision.</summary>
