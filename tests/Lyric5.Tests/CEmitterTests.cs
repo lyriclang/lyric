@@ -78,6 +78,7 @@ public class CEmitterTests
     [InlineData("generators")]
     [InlineData("generators_close")]
     [InlineData("generator_lambdas")]
+    [InlineData("dynamic_yields")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -221,6 +222,7 @@ public class CEmitterTests
             data.Add("generators", profile, 0, GENERATORS_EXPECTED);
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
+            data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
@@ -354,6 +356,27 @@ public class CEmitterTests
         Assert.True(lines.Length == 2, $"stderr:\n{result.Stderr}");
     }
 
+    /// <summary>
+    /// A yield outside a coroutine's body that the running coroutine cannot take (design/v5/spec/06
+    /// §10a, A8): a value of another type than the coroutine yields, or no coroutine at all — RT0014,
+    /// with the trace starting at the yield in the helper, then its caller.
+    /// </summary>
+    [Theory]
+    [InlineData("yield_mismatch", Profile.Debug, "panic [LYR-RT0014]: a yield of 'string' where the running coroutine yields 'int'", 6, "numbers__body__\\w+", 11)]
+    [InlineData("yield_mismatch", Profile.Release, "panic [LYR-RT0014]: a yield of 'string' where the running coroutine yields 'int'", 6, "numbers__body__\\w+", 11)]
+    [InlineData("yield_outside", Profile.Debug, "panic [LYR-RT0014]: a yield with no coroutine running — on the thread's own stack", 5, "main", 10)]
+    [InlineData("yield_outside", Profile.Release, "panic [LYR-RT0014]: a yield with no coroutine running — on the thread's own stack", 5, "main", 10)]
+    public void A_yield_the_running_coroutine_cannot_take_panics_at_the_yield(string name, Profile profile, string first,
+        int line, string caller, int callerLine)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, profile);
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(first, lines[0]);
+        Assert.Matches($@"^    at lyr_main_emit \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
+        Assert.Matches($@"^    at lyr_main_{caller} \(.*programs[\\/]{name}\.lyr:{callerLine}\)$", lines[2]);
+    }
+
     private const string ERRORS_EXPECTED =
         "defer 3\ndefer 2\ndefer 1\ndeep caught 7 at 3\niface caught disk\ndefer 3\nall caught parse\n"
         + "data caught 1..9 got 12\ncause caught config / disk\norder: body\norder: inner defer\norder: clause\n"
@@ -392,6 +415,11 @@ public class CEmitterTests
     private const string GENERATOR_LAMBDAS_EXPECTED =
         "seq 1 2 3 end\ncaptured 10 11 12\ncounter 5 6 | 7 8\ncontext true 4\nresult sum 6\n"
         + "lazy made | made pulled 1\ncaught bad\npulled 1\nclosed cleaned\nhanded 1 2\n";
+
+    // Yields outside a coroutine's body (06 §10a, M6 S2d): the program's header says what each line shows.
+    private const string DYNAMIC_YIELDS_EXPECTED =
+        "pairs 0 1 10 2 20\nnested a b !\nouter 0 1\nclosed helper cleaned\nbody cleaned\ncaught in helper\n"
+        + "patient 0 1 done true\n";
 
     private const string RESOURCES_EXPECTED =
         "body\nclose b\ndefer between\nclose a\nwork\nclose x\ncaught close x failed\nclose y\ncaught body failed\n"

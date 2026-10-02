@@ -1,0 +1,15 @@
+// A yield where no coroutine runs (06 §10a, A8): a panic, LYR-RT0014, at the yield.
+import std.task { Cancelled };
+
+fn emit(): void throws Cancelled {
+    yield 1;
+}
+
+fn main(): int {
+    try {
+        emit();
+    } catch (_: Cancelled) {
+        return 1;
+    }
+    return 0;
+}

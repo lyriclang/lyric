@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m6-s2b";
+    public const string Version = "m6-s2d";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -1047,7 +1047,19 @@ public sealed class CEmitter
     /// <summary>A body with cleanup marks its coroutine, so the debug profile can report it dropped
     /// without <c>close()</c> (06 A5).</summary>
     private string Cleanup(MakeCoroutine m) =>
-        _module.Functions[m.Body.Value].Cleanup ? $" lyr_coro_set_cleanup({Temp(m.Dest)});" : "";
+        (_module.Functions[m.Body.Value].Cleanup ? $" lyr_coro_set_cleanup({Temp(m.Dest)});" : "")
+        + (YieldsDynamically ? $" lyr_coro_set_yield_key({Temp(m.Dest)}, \"{YieldKey(m.Type.Yield)}\");" : "");
+
+    /// <summary>Whether a yield outside a coroutine's own body stands anywhere in the program
+    /// (06 §10a): then every coroutine records its yield type, for such a yield to be held to.</summary>
+    private bool YieldsDynamically => _yieldsDynamically ??=
+        _module.Functions.Any(f => f.Blocks.Any(b => b.Insts.Any(op => op is YieldSuspend { Dynamic: true })));
+
+    private bool? _yieldsDynamically;
+
+    /// <summary>A yield type as Lyric writes it, in a C string: what a dynamic yield and the running
+    /// coroutine compare, and what the panic names when they differ.</summary>
+    private string YieldKey(IrType type) => Display(type).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     /// <summary>
     /// <c>co.close()</c> (06 A5): the runtime unwinds a suspended coroutine; the error its body
@@ -1588,6 +1600,9 @@ public sealed class CEmitter
         // a temp's own, or the storage an aggregate temp points at.
         MakeCoroutine m => StartCoroutine(m),
         ResumePull r => Pull(r),
+        YieldSuspend { Dynamic: true, Value: { } y } d =>
+            $"lyr_coro_yield_dynamic({(IsAggregate(TypeOf(y)) ? Temp(y) : "&" + Temp(y))}, \"{YieldKey(d.YieldType)}\");",
+        YieldSuspend { Dynamic: true } d => $"lyr_coro_yield_dynamic(NULL, \"{YieldKey(d.YieldType)}\");",
         YieldSuspend { Value: { } y } => $"lyr_coro_yield_value({(IsAggregate(TypeOf(y)) ? Temp(y) : "&" + Temp(y))});",
         YieldSuspend => "lyr_coro_yield_value(NULL);",
         CoroutineDone d => $"{Temp(d.Dest)} = (uint8_t)(lyr_coro_status({Temp(d.Coroutine)}) == LYR_CORO_DONE);",

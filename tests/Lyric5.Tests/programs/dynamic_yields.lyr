@@ -1,0 +1,106 @@
+// Yields outside a coroutine's own body natively (design/v5/spec/06 §10a, A8; M6 S2d): a function a
+// coroutine calls yields into the running coroutine, whoever called it, and its value meets the
+// coroutine's yield type at run time. Such a yield throws Cancelled at close as a body's does, so
+// the function covers it — 'throws Cancelled', or a clause of its own. Expected stdout:
+//   pairs 0 1 10 2 20          a helper yields twice per call
+//   nested a b !               helpers calling helpers
+//   outer 0 1
+//   closed helper cleaned      close() while suspended in a helper: the helper's defer ...
+//   body cleaned               ... then the body's, on the way out
+//   caught in helper           a helper that catches Cancelled itself
+//   patient 0 1 done true      ... and the body ends normally
+import std.io { println };
+import std.task { Cancelled };
+
+fn pair(x: int): void throws Cancelled {
+    yield x;
+    yield x * 10;
+}
+
+fn pairs(): Coroutine<int> {
+    yield 0;
+    try pair(1);
+    try pair(2);
+}
+
+fn letter(s: string): void throws Cancelled {
+    yield s;
+}
+
+fn letters(xs: string[]): void throws Cancelled {
+    var i = 0;
+    while (i < xs.length()) {
+        try letter(xs[i]);
+        i += 1;
+    }
+}
+
+fn word(): Coroutine<string> {
+    try letters(["a", "b"]);
+    yield "!";
+}
+
+fn guarded(): void throws Cancelled {
+    defer println("closed helper cleaned");
+    yield 1;
+    yield 2;
+}
+
+fn outer(): Coroutine<int> {
+    defer println("body cleaned");
+    yield 0;
+    try guarded();
+}
+
+fn tolerant(): void {
+    try {
+        yield 1;
+    } catch (_: Cancelled) {
+        println("caught in helper");
+    }
+}
+
+fn patient(): Coroutine<int> {
+    yield 0;
+    tolerant();
+}
+
+fn collect(c: Coroutine<int>): string {
+    var s = "";
+    var v = c.next();
+    while (v != null) {
+        if (s != "") { s = s + " "; }
+        s = s + f"{v}";
+        v = c.next();
+    }
+    return s;
+}
+
+fn collectWords(c: Coroutine<string>): string {
+    var s = "";
+    var v = c.next();
+    while (v != null) {
+        if (s != "") { s = s + " "; }
+        s = s + v;
+        v = c.next();
+    }
+    return s;
+}
+
+fn main(): int {
+    println(f"pairs {collect(pairs())}");
+    println(f"nested {collectWords(word())}");
+
+    let o = outer();
+    let o0 = o.next() ?? -1;
+    let o1 = o.next() ?? -1;
+    println(f"outer {o0} {o1}");
+    o.close();
+
+    let t = patient();
+    let t0 = t.next() ?? -1;
+    let t1 = t.next() ?? -1;
+    t.close();
+    println(f"patient {t0} {t1} done {t.isDone()}");
+    return 0;
+}

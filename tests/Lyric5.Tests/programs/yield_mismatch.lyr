@@ -1,0 +1,19 @@
+// A yield outside a coroutine's body whose value is not the running coroutine's yield type
+// (06 §10a, A8): a panic, LYR-RT0014, at the yield.
+import std.task { Cancelled };
+
+fn emit(): void throws Cancelled {
+    yield "text";
+}
+
+fn numbers(): Coroutine<int> {
+    yield 1;
+    try emit();
+}
+
+fn main(): int {
+    let n = numbers();
+    let a = n.next() ?? 0;
+    let b = n.next() ?? 0;
+    return a + b;
+}
