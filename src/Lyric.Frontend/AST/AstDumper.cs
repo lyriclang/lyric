@@ -218,11 +218,11 @@ public static class AstDumper
                 if (n.Positional is not null) Write(n.Positional, indent + 1, sb);
                 break;
             case ImportDecl n:
-                Line(sb, indent, $"Import {string.Join('.', n.Path)}", n.Span);
+                Line(sb, indent, $"Import {string.Join('.', n.Path)}{(n.IsPublic ? " pub" : "")}", n.Span);
                 if (n.Clause is not null) Write(n.Clause, indent + 1, sb);
                 break;
             case ImportSelective n:
-                Line(sb, indent, $"Selective {string.Join(", ", n.Names)}", n.Span);
+                Line(sb, indent, $"Selective {string.Join(", ", n.Names.Select((name, i) => n.BoundName(i) == name ? name : $"{name} as {n.BoundName(i)}"))}", n.Span);
                 break;
             case ImportAlias n:
                 Line(sb, indent, $"Alias {n.Alias}", n.Span);

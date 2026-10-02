@@ -70,6 +70,7 @@ public sealed class Compilation
     public bool Visible(Symbol symbol, ModuleSymbol from)
     {
         if (!Lyric5Modules || symbol.Home is not { } home || ReferenceEquals(home, from)) return true;
+        if (symbol is ImportBindingSymbol { Reexported: true }) return true; // passed on (I4)
         if (symbol is ImportBindingSymbol or ExternalSymbol) return false;
         return VisibilityOf(symbol) switch
         {
@@ -78,6 +79,16 @@ public sealed class Compilation
             _ => false,
         };
     }
+
+    /// <summary>Whether <paramref name="symbol"/> may be passed on by a <c>pub import</c> (07 V3 I4):
+    /// a module, a <c>pub</c> declaration, or what another <c>pub import</c> passed on.</summary>
+    public bool Exported(Symbol symbol) => symbol switch
+    {
+        ModuleSymbol => true,
+        ImportBindingSymbol binding => binding.Reexported,
+        ExternalSymbol => true, // unresolved: reported where it is not found
+        _ => symbol.Home is null || VisibilityOf(symbol) == Visibility.Public,
+    };
 
     /// <summary>Why <paramref name="symbol"/> is not visible elsewhere, for the diagnostic.</summary>
     public string Hidden(Symbol symbol) =>

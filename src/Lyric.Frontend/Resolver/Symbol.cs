@@ -195,6 +195,10 @@ public sealed class ImportBindingSymbol : Symbol
     {
         Target = target;
     }
+
+    /// <summary>Bound by a <c>pub import</c> (design/v5/spec/07 V3 I4): visible as a 'pub'
+    /// declaration of its module, where every other import is its module's own.</summary>
+    public bool Reexported { get; set; }
 }
 
 /// <summary>An import from a module outside the compilation.

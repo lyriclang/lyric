@@ -6031,6 +6031,12 @@ public sealed class TypeChecker
     private (LyrType, Symbol?) MemberOfModule(ModuleSymbol mod, string member, Span span)
     {
         var found = mod.Members.LookupLocal(member);
+        // What another module passes on with 'pub import' (07 V3 I4) stands for what it imported.
+        while (found is ImportBindingSymbol { Reexported: true } passedOn)
+        {
+            if (passedOn.Target is ModuleSymbol inner) return (new NonValueType(inner, "module"), inner);
+            found = passedOn.Target;
+        }
         if (_comp.Lyric5Modules && _currentModule is { } from && found is not null && !_comp.Visible(found, from))
         {
             // Of an overload set the first VISIBLE function answers, so the call's selection
