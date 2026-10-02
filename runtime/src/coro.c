@@ -284,6 +284,23 @@ static void unlock_pool(void) { atomic_flag_clear_explicit(&pool_lock, memory_or
 
 static size_t mapping_bytes(size_t stack_size) { return stack_size + page_bytes(); }
 
+/* The collector paces itself by its own heap and sees nothing of these stacks: a program that
+ * starts coroutines and drops them while it keeps a large heap would pile their stacks up between
+ * two collections — some four thousand at 64 MiB alive, measured, and in proportion to the heap.
+ * So the stacks pace a collection of their own, which takes the dropped ones with it (06 A5): when
+ * those in use reach twice what the last one left, and at least STACKS_PACED. */
+enum { STACKS_PACED = 1024 };
+static atomic_size_t collect_at = STACKS_PACED;
+
+static void pace_stacks(void) {
+    if (atomic_load_explicit(&stacks_in_use, memory_order_relaxed) < atomic_load_explicit(&collect_at, memory_order_relaxed)) {
+        return;
+    }
+    lyr_gc_collect();
+    size_t left = atomic_load_explicit(&stacks_in_use, memory_order_relaxed);
+    atomic_store_explicit(&collect_at, left < STACKS_PACED / 2 ? (size_t)STACKS_PACED : left * 2, memory_order_relaxed);
+}
+
 /* --- the threads' coroutine state ---------------------------------------------------------------- */
 
 /* Per thread, created at the first resume on it: the thread's own stack, as a stack that stops
@@ -420,6 +437,7 @@ static void *initial_frame(LyrCoro *co, void *mapping, char *top) {
 
 /* The stack for a coroutine's first resume, from the pool or newly mapped. */
 static void acquire_stack(LyrCoro *co) {
+    pace_stacks();
     size_t mapping_size = mapping_bytes(co->stack_size);
     void *mapping = NULL;
     if (co->stack_size == LYR_CORO_STACK_DEFAULT) {
