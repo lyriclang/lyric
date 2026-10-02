@@ -1,0 +1,108 @@
+// Cancellation (design/v5/spec/06 N9 X1-X5; 10 §3). Expected stdout:
+//   sleeper cleans up            a cancel ends a sleep at once; the task's defer runs
+//   sleeper cancelled true       and its await throws Cancelled
+//   busy 42                      a task that never waits is not cancelled
+//   stubborn caught              a task that catches Cancelled
+//   stubborn cancelled again     gets it again at its next wait
+//   waiter true long 5           a cancel ends an await; the awaited task goes on
+//   ended 3 3                    a task that has ended stays as it ended
+//   tick 1                       a wait inside a generator throws there:
+//   ticks ends                   the generator unwinds and ends,
+//   pulled to the end true       its pull says so,
+//   generator task cancelled     and the task's next wait throws
+//   woke 20 40 1 41 ... 19 59    sixty sleepers, every third cancelled from wherever it is in the
+//                                heap: the others wake by deadline, ties in the order they slept
+import std.io { println };
+import std.task { spawn, sleep, yieldNow, Cancelled };
+import std.time { Duration };
+
+var woke = "";
+
+fn ticks(): Coroutine<int> {
+    defer println("ticks ends");
+    yield 1;
+    try sleep(Duration.ofSecs(30));
+    yield 2;
+}
+
+fn main(): void throws Cancelled {
+    let sleeper = spawn(() => {
+        defer println("sleeper cleans up");
+        try sleep(Duration.ofSecs(30));
+        println("sleeper woke");
+    });
+    try yieldNow();
+    sleeper.cancel();
+    try {
+        sleeper.await();
+    } catch (_: Cancelled) {
+        println(f"sleeper cancelled {sleeper.isDone()}");
+    }
+
+    let busy = spawn(() => 41 + 1);
+    busy.cancel();
+    let b = try busy.await();
+    println(f"busy {b}");
+
+    let stubborn = spawn(() => {
+        try {
+            try sleep(Duration.ofSecs(30));
+        } catch (_: Cancelled) {
+            println("stubborn caught");
+        }
+        try sleep(Duration.ofMillis(1));
+        println("never");
+    });
+    try yieldNow();
+    stubborn.cancel();
+    try {
+        stubborn.await();
+    } catch (_: Cancelled) {
+        println("stubborn cancelled again");
+    }
+
+    let long = spawn(() => {
+        try sleep(Duration.ofMillis(20));
+        return 5;
+    });
+    let waiter = spawn(() => try long.await());
+    try yieldNow();
+    waiter.cancel();
+    let w = try? waiter.await();
+    let l = try long.await();
+    println(f"waiter {w == null} long {l}");
+
+    let ended = spawn(() => 3);
+    let e = try ended.await();
+    ended.cancel();
+    let again = try ended.await();
+    println(f"ended {e} {again}");
+
+    let puller = spawn(() => {
+        let g = ticks();
+        while (let n = g.next()) {
+            println(f"tick {n}");
+        }
+        println(f"pulled to the end {g.isDone()}");
+        try sleep(Duration.ofMillis(1));
+        println("never");
+    });
+    try yieldNow();
+    puller.cancel();
+    try {
+        puller.await();
+    } catch (_: Cancelled) {
+        println("generator task cancelled");
+    }
+
+    let hs = arrayOf(60, (i) => spawn(() => {
+        try sleep(Duration.ofMillis((i % 20) * 10));
+        woke = woke + f" {i}";
+    }));
+    try yieldNow();
+    for (i in 0..60) {
+        if (i % 3 == 0) { hs[i].cancel(); }
+    }
+    try sleep(Duration.ofMillis(300));
+    println("woke" + woke);
+}
