@@ -127,8 +127,10 @@ public static class SourceCompiler
         report?.BeginPhase(Phase.Lower);
         var timings = new LoweringTimings();
         var lowering = Stopwatch.StartNew();
+        // A Lyric 5 program roots in its entry's 'main' (design/v5/spec/07 B6, 01 L11): a 'pub'
+        // function nothing reaches is no part of the binary. The 4.x tools keep a library's roots.
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: options.Optimize, libraryRoots: true, passes: options.Passes,
+            optimize: options.Optimize, libraryRoots: !compilation.Lyric5Modules, passes: options.Passes,
             comptime: comptime, timings: timings);
         var lowered = lowering.Elapsed;
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));

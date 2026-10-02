@@ -261,6 +261,62 @@ public class VisibilityTests
         Assert.Contains("error[LYR-SEM0118]: 'private' on 'f' — a private member of an interface is a helper and has a body", error);
     }
 
+    /// <summary>A declaration is no more visible than the types it names (07 V2 S2, Swift's general
+    /// form): what another module could reach but not use is refused where it is declared.</summary>
+    [Theory]
+    [InlineData("a pub result", "pub fn make(): Secret {\n    return Secret { n = 1 };\n}\n", "'make' is pub, but it names 'Secret', which is private")]
+    [InlineData("an internal parameter", "fn take(s: Secret): int {\n    return s.n;\n}\n", "'take' is internal, but it names 'Secret', which is private")]
+    [InlineData("a pub field", "pub struct P {\n    pub s: Secret,\n}\n", "'P.s' is pub, but it names 'Secret', which is private")]
+    [InlineData("an internal field", "struct Q {\n    x: Secret,\n}\n", "'Q.x' is internal, but it names 'Secret', which is private")]
+    [InlineData("an alias", "pub type Alias = Secret;\n", "'Alias' is pub, but it names 'Secret', which is private")]
+    [InlineData("a payload", "pub enum E {\n    A(Secret),\n    B,\n}\n", "'E.A' is pub, but it names 'Secret', which is private")]
+    [InlineData("an inferred binding", "pub let g = Secret { n = 3 };\n", "'g' is pub, but it names 'Secret', which is private")]
+    [InlineData("an interface member", "pub interface I {\n    fn f(): Secret;\n}\n", "'I.f' is pub, but it names 'Secret', which is private")]
+    [InlineData("a constraint", "private interface Hid {\n    fn h(): int;\n}\n\npub fn g<T :: [Hid]>(x: T): int {\n    return x.h();\n}\n", "'g' is pub, but it names 'Hid', which is private")]
+    public void A_declaration_names_no_less_visible_type(string what, string declarations, string why)
+    {
+        var dir = Package(("main.lyr", "private struct Secret {\n    n: int,\n}\n\n" + declarations + "\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 1, $"{what}: exit {exit}\n{error}");
+        Assert.Contains($"error[LYR-SEM0151]: {why}", error);
+        Assert.True(error.Split("error[").Length == 2, $"{what}: one error —\n{error}");
+    }
+
+    /// <summary>A private declaration names private types freely, and a member without a word
+    /// follows its type — no warning for what nobody wrote (07 V2 S3).</summary>
+    [Fact]
+    public void A_private_declaration_names_private_types()
+    {
+        var text = "private struct Secret {\n    n: int,\n}\n\nprivate fn ok(s: Secret): int {\n    return s.n;\n}\n\nfn main(): int {\n    return ok(Secret { n = 2 });\n}\n";
+        var dir = Package(("main.lyr", text));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.DoesNotContain("LYR-SEM015", error);
+    }
+
+    /// <summary>A member whose written word is wider than its type's is allowed and said (07 V2
+    /// S3): it is exported only once the type is.</summary>
+    [Fact]
+    public void A_member_wider_than_its_type_warns()
+    {
+        var dir = Package(("main.lyr", "struct Wide {\n    pub x: int,\n}\n\nfn main(): int {\n    let w = Wide { x = 1 };\n    return w.x;\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.Contains("warning[LYR-SEM0152]: 'x' is pub, but its type 'Wide' is internal — the member is exported only once the type is", error);
+    }
+
+    /// <summary>A program roots in its entry's main (07 B6): a 'pub' function nothing reaches is
+    /// no part of it — the 4.x tools kept every 'pub' function as a library's root.</summary>
+    [Fact]
+    public void A_program_roots_in_its_main()
+    {
+        var dir = Package(("roots.lyr", "pub fn unused(): int {\n    return 1;\n}\n\npub fn used(): int {\n    return 2;\n}\n\nfn main(): int {\n    return used();\n}\n"));
+        var (exit, output, error) = Run("build", Path.Combine(dir, "roots.lyr"), "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.Contains("fn roots.used", output);
+        Assert.DoesNotContain("fn roots.unused", output);
+    }
+
     [Fact]
     public void A_field_takes_a_word()
     {

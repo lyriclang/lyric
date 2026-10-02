@@ -48,7 +48,179 @@ public sealed class SemaRules
                 CheckNeverPositions(decl, null);
             }
         CheckMain();
+        if (_comp.Lyric5Modules) CheckSurfaces();
     }
+
+    // --- the surface rule ---
+
+    /// <summary>
+    /// A declaration is no more visible than the types it names (design/v5/spec/07 V2 S2, in
+    /// Swift's general form): a <c>pub fn</c> whose result is an <c>internal</c> type hands out what
+    /// no other package can name, an <c>internal</c> one taking a <c>private</c> type does the same
+    /// inside its package (<c>LYR-SEM0151</c>). Read are the signatures — parameters, result,
+    /// thrown types, constraints —, a field's type, an alias's, a variant's payload, a binding's
+    /// written or inferred type, a type's constraints and an interface's parents. A member counts
+    /// as its own word narrowed to its type's. A conformance's methods answer to their interface,
+    /// whose own declaration is checked.
+    /// </summary>
+    private void CheckSurfaces()
+    {
+        foreach (var module in _comp.Modules)
+        {
+            _surfaceModule = module;
+            foreach (var decl in _comp.AstOf(module).Declarations)
+                switch (decl)
+                {
+                    case FunctionDecl fn when module.Members.FunctionFor(fn.Name, fn) is { } f:
+                        Signature(fn, f.Visibility);
+                        break;
+                    case GlobalBindingDecl g when module.Members.LookupLocal(g.Name) is GlobalSymbol gs:
+                        BindingType(g.Binding, gs, gs.Visibility);
+                        break;
+                    case TypeAliasDecl a when module.Members.LookupLocal(a.Name) is TypeSymbol alias:
+                        Names(a.Aliased, alias.Visibility, $"'{a.Name}'");
+                        break;
+                    case StructDecl s when module.Members.LookupLocal(s.Name) is TypeSymbol st:
+                        TypeSurface(st, s.Generics, [], s.Members);
+                        break;
+                    case ClassDecl c when module.Members.LookupLocal(c.Name) is TypeSymbol ct:
+                        TypeSurface(ct, c.Generics, [], c.Members);
+                        break;
+                    case EnumDecl e when module.Members.LookupLocal(e.Name) is TypeSymbol et:
+                        TypeSurface(et, e.Generics, [], e.Methods);
+                        foreach (var v in e.Variants)
+                        {
+                            foreach (var t in v.TupleFields ?? []) Names(t, et.Visibility, $"'{e.Name}.{v.Name}'");
+                            foreach (var f in v.StructFields ?? []) Names(f.Type, et.Visibility, $"'{e.Name}.{v.Name}'");
+                        }
+                        break;
+                    case InterfaceDecl i when module.Members.LookupLocal(i.Name) is TypeSymbol it:
+                        TypeSurface(it, i.Generics, i.Interfaces, i.Members.Where(m => !m.IsPrivateHelper));
+                        break;
+                    // An inherent block's methods, narrowed to their target; a conformance's are
+                    // its interface's.
+                    case ExtendDecl { Interfaces.Length: 0 } x
+                        when _comp.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, x)) is { } block:
+                        foreach (var m in block.Methods)
+                            if (m.Declaration is FunctionDecl md)
+                                Signature(md, Narrow(m.Visibility, block.Target?.Visibility ?? Visibility.Public));
+                        break;
+                }
+        }
+    }
+
+    /// <summary>The module whose declarations the surface rule reads.</summary>
+    private ModuleSymbol? _surfaceModule;
+
+    /// <summary>Whether a type in a declaration's surface is narrower than the declaration — one
+    /// the declaring module may name at all; a hidden one was refused where it is named.</summary>
+    private bool Narrower(TypeSymbol type, Visibility level) =>
+        type.Home is not null && type.Visibility < level
+        && (_surfaceModule is null || _comp.Visible(type, _surfaceModule));
+
+    /// <summary>A type's own surface: its constraints and, for an interface, its parents at the
+    /// type's word; its members at their own, narrowed to it.</summary>
+    private void TypeSurface(TypeSymbol type, GenericParam[] generics, TypeNode[] parents, IEnumerable<Decl> members)
+    {
+        foreach (var g in generics)
+            foreach (var c in g.Constraints) Names(c, type.Visibility, $"'{type.Name}'");
+        foreach (var p in parents) Names(p, type.Visibility, $"'{type.Name}'");
+        foreach (var member in members)
+            switch (member)
+            {
+                case FieldDecl f when type.Members.LookupLocal(f.Name) is FieldSymbol fs:
+                    Names(f.Type, Narrow(fs.Visibility, type.Visibility), $"'{type.Name}.{f.Name}'");
+                    break;
+                case FunctionDecl fn when type.Members.FunctionFor(fn.Name, fn) is { } f:
+                    Signature(fn, Narrow(f.Visibility, type.Visibility), type.Name);
+                    break;
+                case StaticBindingDecl sb when type.Members.LookupLocal(sb.Name) is GlobalSymbol gs:
+                    BindingType(sb.Binding, gs, Narrow(gs.Visibility, type.Visibility), type.Name);
+                    break;
+            }
+    }
+
+    private void Signature(FunctionDecl fn, Visibility level, string? owner = null)
+    {
+        var what = owner is null ? $"'{fn.Name}'" : $"'{owner}.{fn.Name}'";
+        foreach (var p in fn.Parameters) Names(p.Type, level, what);
+        if (fn.ReturnType is { } ret) Names(ret, level, what);
+        foreach (var thrown in fn.Throws?.Types ?? []) Names(thrown, level, what);
+        foreach (var g in fn.Generics)
+            foreach (var c in g.Constraints) Names(c, level, what);
+    }
+
+    /// <summary>A binding's type as written, or as the checker inferred it where none is.</summary>
+    private void BindingType(BindingStmt binding, GlobalSymbol symbol, Visibility level, string? owner = null)
+    {
+        var what = owner is null ? $"'{binding.Name}'" : $"'{owner}.{binding.Name}'";
+        if (binding.Type is { } written)
+        {
+            Names(written, level, what);
+            return;
+        }
+        if (Narrower(_types.TypeOfGlobal(symbol), level) is { } hidden)
+            Refuse(binding.NameSpan, what, level, hidden);
+    }
+
+    /// <summary>Every type a written type names, at the level of the declaration it stands in.</summary>
+    private void Names(TypeNode node, Visibility level, string what)
+    {
+        switch (node)
+        {
+            case NamedType n:
+                var symbol = _binding.Resolve(n);
+                if (symbol is ImportBindingSymbol { Target: var target }) symbol = target;
+                if (symbol is TypeSymbol type && Narrower(type, level))
+                    Refuse(n.Span, what, level, type);
+                foreach (var a in n.TypeArguments) Names(a, level, what);
+                break;
+            case NullableType o: Names(o.Inner, level, what); break;
+            case ThrowingType t:
+                Names(t.Inner, level, what);
+                if (t.Thrown is { } written) Names(written, level, what);
+                break;
+            case ArrayType a: Names(a.Element, level, what); break;
+            case TupleType t: foreach (var e in t.Elements) Names(e, level, what); break;
+            case FunctionType f:
+                foreach (var p in f.Parameters) Names(p, level, what);
+                Names(f.ReturnType, level, what);
+                foreach (var set in f.Throws?.Types ?? []) Names(set, level, what);
+                break;
+        }
+    }
+
+    /// <summary>The first type an inferred type names that is less visible than <paramref name="level"/>.</summary>
+    private TypeSymbol? Narrower(LyrType type, Visibility level) => type switch
+    {
+        NamedRef { Symbol: var s } when Narrower(s, level) => s,
+        OpaqueRef { Symbol: var s } when Narrower(s, level) => s,
+        GenericInstance g => Narrower(g.Definition, level)
+            ? g.Definition : g.Arguments.Select(a => Narrower(a, level)).FirstOrDefault(s => s is not null),
+        Optional o => Narrower(o.Inner, level),
+        ArrayOf a => Narrower(a.Element, level),
+        SliceOf a => Narrower(a.Element, level),
+        InlineArrayOf a => Narrower(a.Element, level),
+        TupleOf t => t.Elements.Select(e => Narrower(e, level)).FirstOrDefault(s => s is not null),
+        FnType f => f.Parameters.Append(f.Return).Concat(f.Throws).Select(e => Narrower(e, level))
+            .FirstOrDefault(s => s is not null),
+        CoroutineOf c => Narrower(c.Yield, level),
+        _ => null,
+    };
+
+    private void Refuse(Span at, string what, Visibility level, TypeSymbol type) =>
+        _de.Report("LYR-SEM0151", Severity.Error, at,
+            $"{what} is {Word(level)}, but it names '{type.Name}', which is {Word(type.Visibility)} — "
+            + "a declaration is no more visible than the types it names (07 V2 S2)");
+
+    private static Visibility Narrow(Visibility own, Visibility owner) => own < owner ? own : owner;
+
+    private static string Word(Visibility v) => v switch
+    {
+        Visibility.Public => "pub",
+        Visibility.Internal => "internal",
+        _ => "private",
+    };
 
     /// <summary>
     /// <c>never</c> stands only as a return type (design/v5/spec/05 E12): the whole return type of a
