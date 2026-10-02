@@ -5332,6 +5332,17 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
+        // The implementation stands in a shape's block or a blanket block (05 §13 rules 6, 8),
+        // where no symbol of the type holds the conformance: the sema says which block gives it at
+        // this instance, and the call is the block method's instance for the type.
+        if (_types.RefOf(member) is FunctionSymbol promised
+            && _types.ConformanceBlock?.Invoke(concrete, promised) is { } through)
+        {
+            if (through.Method is not { } implementation)
+                throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the interface's default, through the block that gives the conformance", expr.Span);
+            return LowerBlockMethodCall(member, implementation, through.Block, concrete, expr);
+        }
+
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
         // no symbol in SymbolOf, and that stays so, because on it hangs the boundary that a scalar does
         // not fit into an interface slot, which would need boxing. It does not get in the way here: the

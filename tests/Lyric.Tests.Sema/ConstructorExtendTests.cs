@@ -85,8 +85,17 @@ public class ConstructorExtendTests
         Allowed("fn f(v: Slice<int>): int { return v.head(); }");
 
     [Fact]
-    public void A_conformance_of_a_shape_is_not_written_yet() =>
-        Rejected("extend<T :: [Display]> T[] :: [Display] { fn show(): string { return \"xs\"; } }\nfn f(): int { return 0; }", "LYR-SEM0047");
+    public void A_shape_conforms_through_its_block() =>
+        Allowed("interface Describe { fn describe(): string; }\n"
+            + "extend<T> T[] :: [Describe] { fn describe(): string { return \"xs\"; } }\n"
+            + "fn tell<T :: [Describe]>(x: T): string { return x.describe(); }\n"
+            + "fn f(): string { return tell([1, 2]); }");
+
+    [Fact]
+    public void A_value_is_not_made_from_a_shape_yet() =>
+        Rejected("interface Describe { fn describe(): string; }\n"
+            + "extend<T> T[] :: [Describe] { fn describe(): string { return \"xs\"; } }\n"
+            + "fn f(): int { let d: Describe = [1, 2]; return 0; }", "LYR-SEM0047");
 
     [Fact]
     public void A_function_type_is_no_target() =>
