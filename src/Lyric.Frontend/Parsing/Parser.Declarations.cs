@@ -208,7 +208,7 @@ public sealed partial class Parser
             return ParseImport();
         }
 
-        var isPublic = _buffer.Match(TokenKind.Pub);
+        var isPublic = ParseVisibility();
 
         // 'sealed' before 'interface' (04 D8): a contextual word, and nothing else's.
         var isSealed = false;
@@ -279,6 +279,30 @@ public sealed partial class Parser
         }
     }
 
+    /// <summary>
+    /// The visibility word before a declaration, a member or a field (design/v5/spec/07 V2, 08 D3):
+    /// <c>pub</c>, <c>internal</c>, <c>private</c>, or none. One word: a second is reported and
+    /// read past, the first one standing.
+    /// </summary>
+    private VisibilityWord ParseVisibility()
+    {
+        var word = WordOf(_buffer.Current.TokenKind);
+        if (word == VisibilityWord.None) return word;
+        _buffer.Advance();
+        while (WordOf(_buffer.Current.TokenKind) != VisibilityWord.None)
+            _de.Report("LYR-PAR0053", Severity.Error, _buffer.Advance().Span,
+                "a declaration takes one visibility word — 'pub', 'internal' or 'private'");
+        return word;
+    }
+
+    private static VisibilityWord WordOf(TokenKind kind) => kind switch
+    {
+        TokenKind.Pub => VisibilityWord.Pub,
+        TokenKind.Internal => VisibilityWord.Internal,
+        TokenKind.Private => VisibilityWord.Private,
+        _ => VisibilityWord.None,
+    };
+
     /// <summary>An attribute may precede a function, a struct, a class, an enum or the module
     /// header. Everywhere else the list is reported and dropped; the declaration itself parses
     /// on unharmed.</summary>
@@ -316,7 +340,7 @@ public sealed partial class Parser
         while (!_buffer.AtEnd)
         {
             if (_buffer.Current.TokenKind is TokenKind.Module or TokenKind.Import or TokenKind.Pub
-                or TokenKind.Fn or TokenKind.Mut or TokenKind.Struct or TokenKind.Class or TokenKind.Enum
+                or TokenKind.Internal or TokenKind.Private or TokenKind.Fn or TokenKind.Mut or TokenKind.Struct or TokenKind.Class or TokenKind.Enum
                 or TokenKind.Interface or TokenKind.Extend or TokenKind.Let or TokenKind.Var
                 or TokenKind.AtIdentifier)
                 break;
@@ -379,7 +403,7 @@ public sealed partial class Parser
     /// what that binder looks up, defaulting to the function's own name. Whether the ABI is one
     /// this compiler knows, and whether the signature can cross it, is the checker's question.
     /// </summary>
-    private Decl ParseExternDecl(bool isPublic, Span start)
+    private Decl ParseExternDecl(VisibilityWord isPublic, Span start)
     {
         var kw = _buffer.Advance(); // 'extern'
         var abiTok = _buffer.Advance(); // the string literal the caller peeked
@@ -388,7 +412,7 @@ public sealed partial class Parser
         return ParseFunctionDecl(isPublic, start, spec: spec);
     }
 
-    private FunctionDecl ParseFunctionDecl(bool isPublic, Span start, bool isStatic = false,
+    private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,
         ExternSpec? spec = null)
     {
         var isMut = _buffer.Match(TokenKind.Mut);
@@ -519,7 +543,7 @@ public sealed partial class Parser
 
     // --- Structs / Classes (§3.2/§3.3) ---
 
-    private Decl ParseStructOrClass(bool isPublic, Span start, bool isClass)
+    private Decl ParseStructOrClass(VisibilityWord isPublic, Span start, bool isClass)
     {
         _buffer.Advance(); // 'struct' / 'class'
         var name = ExpectNamed("LYR-PAR0026", isClass ? "class name" : "struct name");
@@ -573,14 +597,11 @@ public sealed partial class Parser
         if (AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
             return ParseAssociatedType();
 
-        // Member forms: [pub] [static] [mut] fn …  |  [pub] static let …  |  [var] a field.
-        // 'static' precedes 'mut', so the order is unambiguous; 'mut static fn' does not exist.
-        // The sema rejects the combination anyway: a static member has no receiver for 'mut' to
-        // apply to.
-        var isPublic = _buffer.Check(TokenKind.Pub)
-                       && _buffer.Peek(1).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static
-            ? _buffer.Match(TokenKind.Pub)
-            : false;
+        // Member forms: [word] [static] [mut] fn …  |  [word] static let …  |  [word] [var] a
+        // field — the word one of 'pub', 'internal', 'private' (07 V2 S0). 'static' precedes
+        // 'mut', so the order is unambiguous; 'mut static fn' does not exist. The sema rejects
+        // the combination anyway: a static member has no receiver for 'mut' to apply to.
+        var isPublic = ParseVisibility();
 
         if (_buffer.Check(TokenKind.Static))
         {
@@ -600,27 +621,27 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Var))
         {
             _buffer.Advance();
-            return ParseField(start, isVar: true);
+            return ParseField(start, isVar: true, isPublic);
         }
 
-        return ParseField();
+        return ParseField(start, isVar: false, isPublic);
     }
 
-    private FieldDecl ParseField() => ParseField(_buffer.Current.Span, isVar: false);
+    private FieldDecl ParseField() => ParseField(_buffer.Current.Span, isVar: false, VisibilityWord.None);
 
-    private FieldDecl ParseField(Span start, bool isVar)
+    private FieldDecl ParseField(Span start, bool isVar, VisibilityWord visibility)
     {
         var name = ExpectNamed("LYR-PAR0026", "field name");
         _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after field name");
         var type = ParseType();
         Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
         return new FieldDecl(name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
-            { NameSpan = name.Span, IsVar = isVar };
+            { NameSpan = name.Span, IsVar = isVar, Visibility = visibility };
     }
 
     // --- Enums (§3.4) ---
 
-    private Decl ParseEnum(bool isPublic, Span start)
+    private Decl ParseEnum(VisibilityWord isPublic, Span start)
     {
         _buffer.Advance(); // 'enum'
         var name = ExpectNamed("LYR-PAR0026", "enum name");
@@ -649,6 +670,11 @@ public sealed partial class Parser
 
     private EnumVariant ParseEnumVariant()
     {
+        // A variant is as visible as its enum (07 V2 S0): the word belongs before 'enum'.
+        if (WordOf(_buffer.Current.TokenKind) != VisibilityWord.None)
+            _de.Report("LYR-PAR0053", Severity.Error, _buffer.Advance().Span,
+                "a variant is as visible as its enum — the word stands before 'enum'");
+
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
             $"expected enum variant name, got {_buffer.Current.TokenKind}");
         var name = _sm.Slice(nameTok.Span).ToString();
@@ -683,7 +709,7 @@ public sealed partial class Parser
 
     // --- Interfaces (§3.5) ---
 
-    private Decl ParseInterface(bool isPublic, Span start, bool isSealed = false)
+    private Decl ParseInterface(VisibilityWord isPublic, Span start, bool isSealed = false)
     {
         _buffer.Advance(); // 'interface'
         var name = ExpectNamed("LYR-PAR0026", "interface name");
@@ -705,7 +731,7 @@ public sealed partial class Parser
 
     // --- Extend (§3.6) ---
 
-    private Decl ParseExtend(bool isPublic, Span start)
+    private Decl ParseExtend(VisibilityWord isPublic, Span start)
     {
         _buffer.Advance(); // 'extend'
         // 'extend<T :: [C]> Target' (03 T7): the block's parameters before the target.
@@ -723,8 +749,8 @@ public sealed partial class Parser
     /// <summary>
     /// A sequence of FunctionDecl without separators (interface, extend and enum methods).
     ///
-    /// <para>The modifier order is the one of FunctionDecl: 'pub' and 'static' are read here, 'mut'
-    /// and 'fn' by ParseFunctionDecl.</para>
+    /// <para>The modifier order is the one of FunctionDecl: the visibility word and 'static' are
+    /// read here, 'mut' and 'fn' by ParseFunctionDecl.</para>
     /// </summary>
     /// <param name="allowStatic">False in an interface body, where a member is dispatched on a
     /// receiver and a static one has none.</param>
@@ -760,9 +786,7 @@ public sealed partial class Parser
 
             var before = _buffer.Position;
             var start = _buffer.Current.Span;
-            var isPublic = _buffer.Check(TokenKind.Pub)
-                           && _buffer.Peek(1).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static
-                           && _buffer.Match(TokenKind.Pub);
+            var isPublic = ParseVisibility();
 
             var isStatic = false;
             if (_buffer.Check(TokenKind.Static))
@@ -837,7 +861,7 @@ public sealed partial class Parser
     /// <summary>A module-level <c>let</c> or <c>var</c> (design/v5/spec/07 V5 G2, G5): filled
     /// eagerly at program start in declaration order; a <c>var</c> is written like a local one.
     /// Lyric 4 allowed <c>let</c> only.</summary>
-    private Decl ParseGlobalBinding(bool isPublic, Span start)
+    private Decl ParseGlobalBinding(VisibilityWord isPublic, Span start)
     {
         var binding = RequireNamedBinding(ParseBinding(), "a module-level binding");
         return new GlobalBindingDecl(isPublic, binding, Span.Union(start, binding.Span));
@@ -859,7 +883,7 @@ public sealed partial class Parser
             { NameSpan = parsed.Span with { End = parsed.Span.Start } };
     }
 
-    private Decl ParseTypeAlias(bool isPublic, bool isOpaque, Span start)
+    private Decl ParseTypeAlias(VisibilityWord isPublic, bool isOpaque, Span start)
     {
         _buffer.Advance(); // contextual 'type'
         var name = ExpectNamed("LYR-PAR0026", "type alias name");

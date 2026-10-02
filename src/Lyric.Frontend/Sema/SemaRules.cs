@@ -177,7 +177,7 @@ public sealed class SemaRules
 
     private void CheckMain()
     {
-        if (_comp.NamesFromPaths && _comp.Entry is { } entry)
+        if (_comp.Lyric5Modules && _comp.Entry is { } entry)
         {
             CheckEntry(entry);
             return;

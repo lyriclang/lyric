@@ -2871,8 +2871,9 @@ public sealed class TypeChecker
             // style. Only public members take part from the outside, as for the single lookup.
             case MemberExpr mem when ModuleReceiverOf(mem.Target, scope) is { } mod:
                 return mod.Members.OverloadsLocal(mem.Member)
-                    .Where(f => f.Visibility == Visibility.Public
-                        || ReferenceEquals(mod, _currentModule))
+                    .Where(f => _comp.Lyric5Modules
+                        ? _currentModule is null || _comp.Visible(f, _currentModule)
+                        : f.Visibility == Visibility.Public || ReferenceEquals(mod, _currentModule))
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
 
             // A method or an extension. Both scopes contribute, because both are searched when a
@@ -4422,6 +4423,8 @@ public sealed class TypeChecker
                 .FirstOrDefault() is { IsStatic: false, Generics.Length: 0 } promised
             && named.Generics.Length == 0)
         {
+            // Through a module ('shapes.Walker.describe(x)'), the interface is named from here.
+            if (qualified.Target is MemberExpr) Reach(named, qualified.Target.Span);
             if (call.Arguments.Length == 0)
                 return Report(call.Span, "LYR-SEM0014",
                     $"'{named.Name}.{qualified.Member}' takes the receiver as its first argument");
@@ -5939,8 +5942,27 @@ public sealed class TypeChecker
         };
     }
 
-    private (LyrType, Symbol?) MemberOfModule(ModuleSymbol mod, string member, Span span) =>
-        mod.Members.LookupLocal(member) switch
+    private (LyrType, Symbol?) MemberOfModule(ModuleSymbol mod, string member, Span span)
+    {
+        var found = mod.Members.LookupLocal(member);
+        if (_comp.Lyric5Modules && _currentModule is { } from && found is not null && !_comp.Visible(found, from))
+        {
+            // Of an overload set the first VISIBLE function answers, so the call's selection
+            // starts from what this module may name (07 V2 S1); none visible is the one error.
+            if (found is FunctionSymbol
+                && mod.Members.OverloadsLocal(member).FirstOrDefault(f => _comp.Visible(f, from)) is { } visible)
+                found = visible;
+            else
+            {
+                Reach(found, span);
+                // An import of that module is reported as its own and followed all the same.
+                if (found is ImportBindingSymbol { Target: var target })
+                    return target is ModuleSymbol inner ? (new NonValueType(inner, "module"), inner) : MemberOf(target);
+            }
+        }
+        return MemberOf(found);
+
+        (LyrType, Symbol?) MemberOf(Symbol? symbol) => symbol switch
         {
             FunctionSymbol fn => (FnTypeOf(fn), fn),
             GlobalSymbol g => (TypeOfGlobalReference(g, span), g),
@@ -5953,6 +5975,19 @@ public sealed class TypeChecker
             TypeSymbol tsym => (new NonValueType(tsym, "type"), tsym),
             _ => (Report(span, "LYR-SEM0012", $"module '{mod.FullName}' has no member '{member}'"), null)
         };
+    }
+
+    /// <summary>
+    /// Whether a name another module declares may be named from the module being checked (design/
+    /// v5/spec/07 V2 S1) — the question every route through a module path asks, answered by
+    /// <see cref="Compilation.Visible"/>; reported at <paramref name="span"/> where it may not. The
+    /// caller binds the symbol all the same, so a hidden name fails with one message, not a cascade.
+    /// </summary>
+    private void Reach(Symbol? symbol, Span span)
+    {
+        if (symbol is null || _currentModule is null || _comp.Visible(symbol, _currentModule)) return;
+        _de.Report("LYR-RES0009", Severity.Error, span, _comp.Hidden(symbol));
+    }
 
     /// <param name="instance">The instance in <c>Opt&lt;int&gt;.Some(5)</c>. It is the RESULT TYPE of
     /// the construction, which the substitution cannot supply, because what stands here is the bare
@@ -6019,7 +6054,7 @@ public sealed class TypeChecker
     private TypeSymbol? CheckAttribute(AttributeNode attribute, AttributeTarget target,
         bool targetIsGeneric, SymbolTable scope, string targetDescription)
     {
-        var (sym, _) = ResolveInitPath(attribute.Path, scope);
+        var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
         var written = string.Join('.', attribute.Path);
         if (sym is null)
         {
@@ -6289,7 +6324,7 @@ public sealed class TypeChecker
                       : $"this position expects '{TypeFacts.Display(expected)}', which is not an enum"));
         }
 
-        var (sym, owner) = ResolveInitPath(si.Path, scope);
+        var (sym, owner) = ResolveInitPath(si.Path, scope, si.Span);
 
         // An enum struct variant: qualified (Shape.Triangle { … }) or contextual (Triangle { … } in a
         // position with an expected enum type).
@@ -6505,7 +6540,7 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CheckTypePath(TypePathExpr tp, SymbolTable scope, LyrType? expected)
     {
-        var (sym, _) = ResolveInitPath(tp.Path, scope);
+        var (sym, _) = ResolveInitPath(tp.Path, scope, tp.Span);
         if (sym is FunctionSymbol fs) return CheckInstantiatedFunction(tp, fs, scope, expected);
         if (sym is not TypeSymbol ts)
         {
@@ -6610,7 +6645,7 @@ public sealed class TypeChecker
     private static bool IsPlaceholder(TypeNode node) =>
         node is NamedType { Path: ["_"], TypeArguments.Length: 0 };
 
-    private (Symbol? sym, TypeSymbol? owner) ResolveInitPath(string[] path, SymbolTable scope)
+    private (Symbol? sym, TypeSymbol? owner) ResolveInitPath(string[] path, SymbolTable scope, Span span)
     {
         // A public type of std.core is visible without an import (design/v5/spec/10 U-series), in
         // an initializer as in a type position: 'Exception { text = "…" }'. The scope wins.
@@ -6621,12 +6656,14 @@ public sealed class TypeChecker
         for (var i = 1; i < path.Length && cur is not null; i++)
         {
             owner = cur as TypeSymbol;
+            var throughModule = cur is ModuleSymbol;
             cur = cur switch
             {
                 ModuleSymbol mod => mod.Members.LookupLocal(path[i]),
                 TypeSymbol t => t.Members.LookupLocal(path[i]),
                 _ => null
             };
+            if (throughModule) Reach(cur, span);
             if (cur is ImportBindingSymbol ib) cur = ib.Target;
         }
         return (cur, cur is EnumVariantSymbol ? owner : null);
@@ -7499,7 +7536,7 @@ public sealed class TypeChecker
         {
             // A qualified path (Shape.Circle) has to point at EXACTLY this enum.
             if (v.Path.Length > 1
-                && !ReferenceEquals(ResolveNamePath(v.Path, v.Path.Length - 1, scope), enumTs))
+                && !ReferenceEquals(ResolveNamePath(v.Path, v.Path.Length - 1, scope, v.Span), enumTs))
             {
                 Report(v.Span, "LYR-SEM0029",
                     $"pattern path '{string.Join('.', v.Path[..^1])}' does not refer to matched enum '{enumTs.Name}'");
@@ -7531,7 +7568,7 @@ public sealed class TypeChecker
             BindPoison(v, scope);
             return;
         }
-        if (!ReferenceEquals(ResolveNamePath(v.Path, v.Path.Length, scope), def))
+        if (!ReferenceEquals(ResolveNamePath(v.Path, v.Path.Length, scope, v.Span), def))
         {
             Report(v.Span, "LYR-SEM0029",
                 $"pattern names '{string.Join('.', v.Path)}', but the matched value is '{TypeFacts.Display(scrutinee)}'");
@@ -7737,14 +7774,16 @@ public sealed class TypeChecker
         _ => (null, EmptySubst)
     };
 
-    // Resolves the first count segments of a pattern path through the scope: modules and imports.
-    private static Symbol? ResolveNamePath(string[] path, int count, SymbolTable scope)
+    // Resolves the first count segments of a pattern path through the scope: modules and imports;
+    // what a module step names is visible from here, or reported (07 V2 S1).
+    private Symbol? ResolveNamePath(string[] path, int count, SymbolTable scope, Span span)
     {
         var cur = scope.Lookup(path[0]);
         if (cur is ImportBindingSymbol ib0) cur = ib0.Target;
         for (var i = 1; i < count && cur is not null; i++)
         {
             cur = cur is ModuleSymbol mod ? mod.Members.LookupLocal(path[i]) : null;
+            Reach(cur, span);
             if (cur is ImportBindingSymbol ib) cur = ib.Target;
         }
         return cur;
@@ -8573,7 +8612,7 @@ public sealed class TypeChecker
                     return Report(n.Span, "LYR-SEM0117",
                         "'_' stands for a type argument the call infers; here nothing infers it — "
                         + "write the type, or omit the annotation");
-                var sym = _binding.Resolve(n) ?? ResolveTypePath(n.Path, scope);
+                var sym = _binding.Resolve(n) ?? ResolveTypePath(n.Path, scope, n.Span);
 
                 // Recorded in the SAME table the resolver writes into. The resolver binds the type
                 // names it walks — those in declarations — while the ones inside a function body
@@ -8771,7 +8810,7 @@ public sealed class TypeChecker
     }
 
     // Compact path resolution for body types, which the resolver has not bound.
-    private Symbol? ResolveTypePath(string[] path, SymbolTable scope)
+    private Symbol? ResolveTypePath(string[] path, SymbolTable scope, Span span)
     {
         // A public type of 'std.core' is visible without an import (10 U-series): the last
         // answer, after the scope — the resolver's rule, repeated for the names only the sema
@@ -8779,7 +8818,10 @@ public sealed class TypeChecker
         var head = scope.Lookup(path[0]) ?? (path.Length == 1 ? CoreType(path[0]) : null);
         if (head is null || path.Length == 1) return head;
         for (var i = 1; i < path.Length && head is ImportBindingSymbol { Target: ModuleSymbol mod }; i++)
+        {
             head = mod.Members.LookupLocal(path[i]);
+            Reach(head, span);
+        }
         return head;
     }
 

@@ -331,7 +331,7 @@ public static class ModuleLowerer
             {
                 var site = types.ComptimeSites[i];
                 var name = ComptimeTable.FunctionName(i);
-                var decl = new FunctionDecl(IsPublic: true, IsMut: false, IsStatic: false, Name: name,
+                var decl = new FunctionDecl(Visibility: VisibilityWord.Pub, IsMut: false, IsStatic: false, Name: name,
                     Generics: [], Parameters: [], ReturnType: null, Throws: null,
                     Body: new Block([new ReturnStmt(site.Inner, site.Span)], site.Span), Span: site.Span)
                     { NameSpan = site.Span };

@@ -50,12 +50,54 @@ public sealed class Compilation
     public Func<string[], LoadedModule?>? ModuleLoader { get; set; }
 
     /// <summary>
-    /// Lyric 5's rule (design/v5/spec/07 M1, M2): a module is named by its path alone, and a
-    /// <c>module</c> header is refused (LYR-RES0008) — it said again what the path says, or
-    /// something else. Off for the 4.x tools that still read headers, the language server first
-    /// (until M13b).
+    /// Lyric 5's module rules (design/v5/spec/07): a module is named by its path alone and a
+    /// <c>module</c> header is refused (LYR-RES0008, M1, M2) — it said again what the path says,
+    /// or something else; the entry module's <c>main</c> starts the program (M7a); a name is
+    /// visible by its word — <c>private</c>, <c>internal</c>, the default, or <c>pub</c> — at every
+    /// route that reaches it (V2). Off for the 4.x tools that still read headers, the language
+    /// server first (until M13b).
     /// </summary>
-    public bool NamesFromPaths { get; init; }
+    public bool Lyric5Modules { get; init; }
+
+    /// <summary>
+    /// Whether <paramref name="symbol"/> may be named from <paramref name="from"/> (07 V2): a
+    /// <c>pub</c> declaration everywhere, an <c>internal</c> one in its own package, a
+    /// <c>private</c> one in its own module, and an import only in the module that wrote it (I4).
+    /// THE check of every route a name takes out of its module — import, qualified path, type,
+    /// initializer, pattern — so a route cannot forget it. Always true for the 4.x tools, whose
+    /// one check was the selective import's.
+    /// </summary>
+    public bool Visible(Symbol symbol, ModuleSymbol from)
+    {
+        if (!Lyric5Modules || symbol.Home is not { } home || ReferenceEquals(home, from)) return true;
+        if (symbol is ImportBindingSymbol or ExternalSymbol) return false;
+        return VisibilityOf(symbol) switch
+        {
+            Visibility.Public => true,
+            Visibility.Internal => PackageOf(home) == PackageOf(from),
+            _ => false,
+        };
+    }
+
+    /// <summary>Why <paramref name="symbol"/> is not visible elsewhere, for the diagnostic.</summary>
+    public string Hidden(Symbol symbol) =>
+        symbol is ImportBindingSymbol or ExternalSymbol
+            ? $"'{symbol.Name}' is an import of module '{symbol.Home?.FullName}', and an import is its module's own"
+            : VisibilityOf(symbol) == Visibility.Internal
+                ? $"'{symbol.Name}' is internal to package '{(symbol.Home is { } home ? PackageOf(home) : "?")}'"
+                : $"'{symbol.Name}' is private to module '{symbol.Home?.FullName}'";
+
+    /// <summary>A package is named by the first segment of its modules' paths (07 M1); a single
+    /// file is a package of its own, <c>std</c> is one.</summary>
+    public static string PackageOf(ModuleSymbol module) => module.Path.Length > 0 ? module.Path[0] : "";
+
+    private static Visibility VisibilityOf(Symbol symbol) => symbol switch
+    {
+        TypeSymbol t => t.Visibility,
+        FunctionSymbol f => f.Visibility,
+        GlobalSymbol g => g.Visibility,
+        _ => Visibility.Public,
+    };
 
     /// <summary>
     /// The module the program starts in: its <c>main</c> is the program's root (design/v5/spec/07
@@ -117,12 +159,12 @@ public sealed class Compilation
     public ModuleSymbol AddModule(Module ast, string? name = null, bool isNative = false,
         DocumentationTable? documentation = null)
     {
-        if (NamesFromPaths && ast.Header is { } header)
+        if (Lyric5Modules && ast.Header is { } header)
             _de.Report("LYR-RES0008", Severity.Error, header.Span,
                 "a module is named by its path: the 'module' header is gone (07 M2)");
 
         var path = name is not null ? name.Split('.')
-                 : ast.Header is not null && !NamesFromPaths ? ast.Header.Segments
+                 : ast.Header is not null && !Lyric5Modules ? ast.Header.Segments
                  : ["main"];
 
         // Two files claiming one module name: everything downstream assumes a name means ONE
@@ -227,7 +269,7 @@ public sealed class Compilation
                 // module registers under the name its header claims, the import that pulled it in
                 // still finds nothing, and the message says "cannot find" about a file that was
                 // just read — and a second importer loads it a second time.
-                if (!NamesFromPaths && loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
+                if (!Lyric5Modules && loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
                     _de.Report("LYR-RES0006", Severity.Error, header.Span,
                         $"this file was loaded as '{name}' but declares module "
                         + $"'{string.Join('.', header.Segments)}'");

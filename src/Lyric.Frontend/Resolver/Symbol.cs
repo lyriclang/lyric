@@ -6,10 +6,16 @@ namespace Lyric.Resolver;
 // built up in stages: declared first, enriched with type information later. Hence mutable classes
 // rather than records.
 
+/// <summary>
+/// Who may name a declaration (design/v5/spec/07 V2): its module, its package, everyone. What a
+/// declaration without a word gets is the reader's rule — <see cref="Internal"/> in Lyric 5,
+/// <see cref="Private"/> for the 4.x tools, whose unmarked names were their module's.
+/// </summary>
 public enum Visibility
 {
-    Module, // Default: modul-privat
-    Public  // 'pub'
+    Private,  // 'private': the declaring module's
+    Internal, // 'internal': the declaring package's
+    Public,   // 'pub': exported
 }
 
 public enum TypeSymbolKind
@@ -27,6 +33,11 @@ public abstract class Symbol
         Name = name;
         Declaration = declaration;
     }
+
+    /// <summary>The module that declares it — a top-level name, a member, a method of an
+    /// <c>extend</c> block, or an import, whose module is the one importing. <c>null</c> for a
+    /// builtin, a local, a type parameter and what the compiler makes up.</summary>
+    public ModuleSymbol? Home { get; set; }
 }
 
 /// <summary>A module (one file). Members holds its top-level symbols.</summary>

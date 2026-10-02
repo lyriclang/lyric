@@ -78,6 +78,8 @@ public sealed class Lexer
         { "import", TokenKind.Import },
         { "as", TokenKind.As },
         { "pub", TokenKind.Pub },
+        { "private", TokenKind.Private },
+        { "internal", TokenKind.Internal },
 
         { "struct", TokenKind.Struct },
         { "class", TokenKind.Class },

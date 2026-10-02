@@ -76,7 +76,7 @@ public static class SourceCompiler
 
         var compilation = new Compilation(sources, diagnostics)
         {
-            NamesFromPaths = options.PackageRoots is not null,
+            Lyric5Modules = options.PackageRoots is not null,
             // The standard library is ordinary Lyric source and is loaded on demand.
             ModuleLoader = modulePath =>
             {

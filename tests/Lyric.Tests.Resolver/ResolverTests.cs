@@ -69,13 +69,18 @@ public class ResolverTests
         Assert.Equal(2, comp.Modules[0].Members.OverloadsLocal("f").Count);
     }
 
+    /// <summary>The word as written; no word is the module's for the 4.x tools this compilation
+    /// stands for (Lyric 5 reads it as 'internal', design/v5/spec/07 V2).</summary>
     [Fact]
     public void Visibility_is_captured()
     {
-        var (comp, _, _) = Resolve(("m", "pub fn a(): int { return 0; } fn b(): int { return 0; }"));
+        var (comp, _, _) = Resolve(("m", "pub fn a(): int { return 0; } fn b(): int { return 0; } "
+                                         + "internal fn c(): int { return 0; } private fn d(): int { return 0; }"));
         var m = comp.Modules[0];
         Assert.Equal(Visibility.Public, ((FunctionSymbol)m.Members.LookupLocal("a")!).Visibility);
-        Assert.Equal(Visibility.Module, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
+        Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
+        Assert.Equal(Visibility.Internal, ((FunctionSymbol)m.Members.LookupLocal("c")!).Visibility);
+        Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("d")!).Visibility);
     }
 
     // --- type name binding through the BindingResult ---

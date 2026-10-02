@@ -47,7 +47,7 @@ public static class BuiltinTypes
     private static FunctionSymbol CreatePanic()
     {
         var decl = new FunctionDecl(
-            IsPublic: true, IsMut: false, IsStatic: false, Name: "panic", Generics: [],
+            Visibility: VisibilityWord.Pub, IsMut: false, IsStatic: false, Name: "panic", Generics: [],
             Parameters: [new Param(IsParams: false, Name: "message",
                 Type: new NamedType(["string"], [], default) { NameSpan = default },
                 Default: null, Span: default)
@@ -68,7 +68,7 @@ public static class BuiltinTypes
             Type: new NamedType(["T"], [], default) { NameSpan = default }, Default: null, Span: default)
             { NameSpan = default };
         var decl = new FunctionDecl(
-            IsPublic: true, IsMut: false, IsStatic: false, Name: "same",
+            Visibility: VisibilityWord.Pub, IsMut: false, IsStatic: false, Name: "same",
             Generics: [new GenericParam("T", [], default) { NameSpan = default }],
             Parameters: [Parameter("a"), Parameter("b")],
             ReturnType: new NamedType(["bool"], [], default) { NameSpan = default },

@@ -1,4 +1,5 @@
 using Lyric5.Build;
+using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
 
@@ -173,51 +174,5 @@ public class PackageTests
         Assert.Equal("answer 42\n", BuildAndRun(dir, "app", "build", "-C", dir));
         File.WriteAllText(Path.Combine(dir, "src", "util.lyr"), Util.Replace("42", "43"));
         Assert.Equal("answer 43\n", BuildAndRun(dir, "app", "build", "-C", dir));
-    }
-
-    /// <summary>Builds through <c>Main</c>, then runs the binary — <c>run</c> would hand the
-    /// program the console itself, past the test's capture.</summary>
-    private static string BuildAndRun(string dir, string binary, params string[] args)
-    {
-        var (exit, _, error) = Run(args);
-        Assert.True(exit == 0, error);
-        var host = Lyric5.Toolchain.Target.Host;
-        var exe = System.IO.Path.Combine(dir, "out", "debug", host.Triple, binary + host.ExecutableSuffix);
-        Assert.True(File.Exists(exe), $"no binary {exe}");
-        var ran = Lyric5.Toolchain.ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
-        Assert.True(ran.ExitCode == 0, ran.Stderr);
-        return ran.Stdout.Replace("\r\n", "\n");
-    }
-
-    private static string Package(params (string Path, string Text)[] files)
-    {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "lyric5-package-" + Guid.NewGuid().ToString("N"));
-        foreach (var (path, text) in files)
-        {
-            var full = System.IO.Path.Combine(dir, path);
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(full)!);
-            File.WriteAllText(full, text);
-        }
-        return dir;
-    }
-
-    private static (int Exit, string Out, string Err) Run(params string[] args)
-    {
-        var savedOut = Console.Out;
-        var savedErr = Console.Error;
-        var output = new StringWriter();
-        var error = new StringWriter();
-        Console.SetOut(output);
-        Console.SetError(error);
-        try
-        {
-            var exit = Program.Main(args);
-            return (exit, output.ToString().Replace("\r\n", "\n"), error.ToString().Replace("\r\n", "\n"));
-        }
-        finally
-        {
-            Console.SetOut(savedOut);
-            Console.SetError(savedErr);
-        }
     }
 }

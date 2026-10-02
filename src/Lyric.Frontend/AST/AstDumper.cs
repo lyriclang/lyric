@@ -242,7 +242,7 @@ public static class AstDumper
                 foreach (var thrown in n.Types) Write(thrown, indent + 1, sb);
                 break;
             case FunctionDecl n:
-                Line(sb, indent, $"Fn {n.Name}{Vis(n.IsPublic)}{(n.IsMut ? " mut" : "")}{(n.Extern is { } x ? $" extern \"{x.Abi}\"{(x.Symbol is null ? "" : $" = \"{x.Symbol}\"")}" : n.Body is null ? " (abstract)" : "")}", n.Span);
+                Line(sb, indent, $"Fn {n.Name}{Vis(n.Visibility)}{(n.IsMut ? " mut" : "")}{(n.Extern is { } x ? $" extern \"{x.Abi}\"{(x.Symbol is null ? "" : $" = \"{x.Symbol}\"")}" : n.Body is null ? " (abstract)" : "")}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var p in n.Parameters) Write(p, indent + 1, sb);
@@ -251,22 +251,22 @@ public static class AstDumper
                 if (n.Body is not null) Write(n.Body, indent + 1, sb);
                 break;
             case FieldDecl n:
-                Line(sb, indent, $"Field {n.Name}{(n.IsVar ? " var" : "")}", n.Span);
+                Line(sb, indent, $"Field {n.Name}{Vis(n.Visibility)}{(n.IsVar ? " var" : "")}", n.Span);
                 Write(n.Type, indent + 1, sb);
                 if (n.Default is not null) Write(n.Default, indent + 1, sb);
                 break;
             case StructDecl n:
-                Line(sb, indent, $"Struct {n.Name}{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Struct {n.Name}{Vis(n.Visibility)}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb, n.Delegates);
                 break;
             case ClassDecl n:
-                Line(sb, indent, $"Class {n.Name}{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Class {n.Name}{Vis(n.Visibility)}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 WriteTypeDeclChildren(n.Generics, n.Interfaces, n.Members, indent, sb, n.Delegates);
                 break;
             case EnumDecl n:
-                Line(sb, indent, $"Enum {n.Name}{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Enum {n.Name}{Vis(n.Visibility)}", n.Span);
                 foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
@@ -279,14 +279,14 @@ public static class AstDumper
                 foreach (var f in n.StructFields ?? []) Write(f, indent + 1, sb);
                 break;
             case InterfaceDecl n:
-                Line(sb, indent, $"Interface {n.Name}{Vis(n.IsPublic)}{(n.IsSealed ? " sealed" : "")}", n.Span);
+                Line(sb, indent, $"Interface {n.Name}{Vis(n.Visibility)}{(n.IsSealed ? " sealed" : "")}", n.Span);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
                 foreach (var t in n.Types) Write(t, indent + 1, sb);
                 foreach (var m in n.Members) Write(m, indent + 1, sb);
                 break;
             case ExtendDecl n:
-                Line(sb, indent, $"Extend{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Extend{Vis(n.Visibility)}", n.Span);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 Write(n.Target, indent + 1, sb);            // then the target type
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
@@ -294,12 +294,12 @@ public static class AstDumper
                 foreach (var m in n.Methods) Write(m, indent + 1, sb);
                 break;
             case GlobalBindingDecl n:
-                Line(sb, indent, $"Global{Vis(n.IsPublic)}", n.Span);
+                Line(sb, indent, $"Global{Vis(n.Visibility)}", n.Span);
                 Write(n.Binding, indent + 1, sb);
                 break;
             case TypeAliasDecl n:
                 Line(sb, indent,
-                    $"TypeAlias {n.Name}{(n.IsOpaque ? " opaque" : "")}{Vis(n.IsPublic)}", n.Span);
+                    $"TypeAlias {n.Name}{(n.IsOpaque ? " opaque" : "")}{Vis(n.Visibility)}", n.Span);
                 Write(n.Aliased, indent + 1, sb);
                 break;
             case ErrorDecl n:
@@ -309,7 +309,7 @@ public static class AstDumper
             // A type-bound constant. It stands in the body of a type but contains an ordinary
             // BindingStmt, hence here rather than with the statements.
             case StaticBindingDecl n:
-                Line(sb, indent, $"StaticLet{(n.IsPublic ? " pub" : "")}", n.Span);
+                Line(sb, indent, $"StaticLet{Vis(n.Visibility)}", n.Span);
                 Write(n.Binding, indent + 1, sb);
                 break;
 
@@ -552,7 +552,13 @@ public static class AstDumper
         foreach (var m in members) Write(m, indent + 1, sb);
     }
 
-    private static string Vis(bool isPublic) => isPublic ? " pub" : "";
+    private static string Vis(VisibilityWord word) => word switch
+    {
+        VisibilityWord.Pub => " pub",
+        VisibilityWord.Internal => " internal",
+        VisibilityWord.Private => " private",
+        _ => "",
+    };
 
     private static void Line(StringBuilder sb, int indent, string text, Span span)
     {
