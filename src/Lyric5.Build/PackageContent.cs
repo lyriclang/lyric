@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -36,6 +37,19 @@ public static class PackageContent
             if (regex.IsMatch(path.AsSpan(0, end))) return true;
         }
         return false;
+    }
+
+    /// <summary>The hash of the files under <paramref name="root"/> (07 P5), as Go hashes a module
+    /// ("h1"): SHA-256 over one line per file — the file's SHA-256 in hex, two spaces, its path
+    /// with '/' between directories — sorted by path, written <c>h1:</c> and base64.</summary>
+    public static string Hash(string root)
+    {
+        var lines = new StringBuilder();
+        foreach (var (path, full) in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                     .Select(full => (Path.GetRelativePath(root, full).Replace('\\', '/'), full))
+                     .OrderBy(file => file.Item1, StringComparer.Ordinal))
+            lines.Append(Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(full)))).Append("  ").Append(path).Append('\n');
+        return "h1:" + Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(lines.ToString())));
     }
 
     /// <summary>A pattern a manifest may write: relative to the package's root, '/' between

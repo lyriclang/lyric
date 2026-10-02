@@ -8,7 +8,7 @@ namespace Lyric5;
 /// The Lyric 5 driver: one binary with verbs (design/v5/spec/11 C1–C3), strict about what it
 /// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
 /// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
-/// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2).
+/// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c> (M7).
 /// </summary>
 public static class Program
 {
@@ -23,6 +23,7 @@ public static class Program
                 "--help" or "-h" or "help" => Usage(Console.Out, 0),
                 "build" => Build(args[1..], run: false),
                 "run" => Build(args[1..], run: true),
+                "update" => Update(args[1..]),
                 _ => Unknown($"unknown verb '{args[0]}'"),
             };
         }
@@ -44,6 +45,8 @@ public static class Program
         output.WriteLine("                                 to a binary under out/");
         output.WriteLine("  run [<file.lyr>] [options] [-- args]");
         output.WriteLine("                                 build, then run the binary with the arguments");
+        output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —");
+        output.WriteLine("                                 and write lyric.lock (options: -C <dir>, --offline)");
         output.WriteLine("  version                        the toolchain and the C compiler it found");
         output.WriteLine("  help                           this");
         output.WriteLine();
@@ -197,6 +200,84 @@ public static class Program
             return 2;
         }
         return ProcessRunner.RunInherited(executable, programArgs);
+    }
+
+    // --- update --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// <c>lyric update [&lt;package&gt;…]</c> (design/v5/spec/07 P4, P5): the packages from git
+    /// read anew — every one, or those named; the others stay at their locked commits — and
+    /// <c>lyric.lock</c> written. A branch moves to its head, a moved tag to its commit; a version
+    /// moves only with the manifests that ask for it.
+    /// </summary>
+    private static int Update(string[] args)
+    {
+        var names = new List<string>();
+        string? directory = null;
+        var offline = false;
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg == "--offline") offline = true;
+            else if (arg == "-C" || arg.StartsWith("-C=", StringComparison.Ordinal))
+            {
+                directory = arg == "-C" ? (i + 1 < args.Length ? args[++i] : null) : arg[3..];
+                if (directory is null) return Unknown("'-C' needs a value");
+            }
+            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'update'");
+            else names.Add(arg);
+        }
+        var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
+        if (!Directory.Exists(start))
+        {
+            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{start}'");
+            return 2;
+        }
+        if (Project.FindManifest(start) is not { } file)
+        {
+            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            return 2;
+        }
+        try
+        {
+            var manifest = Manifest.Read(file);
+            var before = LockFile.Read(LockFile.For(manifest));
+            bool Named(string name) => names.Count == 0 || names.Contains(name);
+            var graph = Project.Resolve(manifest, offline, refresh: Named, keep: entry => !Named(entry.Name));
+            var unknown = names.Where(n => graph.Locked.All(entry => entry.Name != n)).ToList();
+            if (unknown.Count > 0)
+                return Unknown($"no package '{unknown[0]}' is read from git here"
+                               + (graph.Locked.Count > 0 ? $": {string.Join(", ", graph.Locked.Select(e => e.Name).Distinct())}" : ""));
+            Report(before, graph.Locked);
+            return 0;
+        }
+        catch (ManifestException refused)
+        {
+            Console.Error.WriteLine(refused.Render());
+            return refused.Exit;
+        }
+    }
+
+    /// <summary>What the update changed in the lock, a line per revision of a repository.</summary>
+    private static void Report(IReadOnlyList<Locked> before, IReadOnlyList<Locked> after)
+    {
+        var old = before.ToDictionary(e => (e.Name, e.Git));
+        var changed = false;
+        foreach (var entry in after)
+        {
+            if (!old.Remove((entry.Name, entry.Git), out var was))
+                Console.Out.WriteLine($"  added    {entry.Name} {entry.Version} ({entry.Git}) {entry.Commit[..12]}");
+            else if (was.Commit != entry.Commit)
+                Console.Out.WriteLine($"  updated  {entry.Name} {entry.Version} ({entry.Git}) {was.Commit[..12]} -> {entry.Commit[..12]}");
+            else continue;
+            changed = true;
+        }
+        foreach (var gone in LockFile.Sorted(old.Values))
+        {
+            Console.Out.WriteLine($"  removed  {gone.Name} {gone.Version} ({gone.Git})");
+            changed = true;
+        }
+        if (!changed) Console.Out.WriteLine(after.Count == 0 ? "no package is read from git" : "lyric.lock is up to date");
     }
 
     // --- version -------------------------------------------------------------------------------

@@ -75,7 +75,7 @@ public sealed record Project(string Source, string Name, string Module, string R
             return new Project(full, stem, stem, root, null);
         var manifest = Manifest.Read(manifestFile);
         return ModulePathOf(manifest, full) is { } module
-            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline)) }
+            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = Resolve(manifest, offline) }
             : new Project(full, stem, stem, root, null);
     }
 
@@ -88,10 +88,23 @@ public sealed record Project(string Source, string Name, string Module, string R
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
-        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline));
+        var graph = Resolve(manifest, offline);
         var entry = Path.Combine(manifest.SourceRoot, "main.lyr");
         if (!File.Exists(entry)) throw new LibraryException(manifest, graph);
         return new Project(entry, manifest.Name, $"{manifest.Name}.main", manifest.Root, manifest) { Graph = graph };
+    }
+
+    /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
+    /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read (07 P5).</summary>
+    /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
+    public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
+        Func<Locked, bool>? keep = null)
+    {
+        var lockFile = LockFile.For(manifest);
+        var locked = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline, refresh), locked);
+        LockFile.Write(lockFile, graph.Locked);
+        return graph;
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c> (07 M1), or <c>null</c>
@@ -113,7 +126,7 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>The nearest <c>lyric.toml</c> at or above <paramref name="start"/>.</summary>
-    private static string? FindManifest(string start)
+    public static string? FindManifest(string start)
     {
         for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {

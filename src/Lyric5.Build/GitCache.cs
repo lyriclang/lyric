@@ -10,17 +10,23 @@ namespace Lyric5.Build;
 /// Where the packages read from git are kept (design/v5/spec/11 W2 P9; 07 P10): in the user's
 /// cache, not the project — <c>git/db/</c> a bare copy of each repository, <c>git/checkouts/</c>
 /// each revision's package content (W2 P8), written once and then only read, by every project
-/// that asks for it. Offline, the cache answers alone: nothing is fetched.
+/// that asks for it. Offline, the cache answers alone: nothing is fetched. A repository is
+/// fetched at most once by one resolution.
 /// </summary>
 /// <param name="root">The cache's directory.</param>
 /// <param name="offline">Whether fetching is forbidden (<c>--offline</c>).</param>
-public sealed partial class GitCache(string root, bool offline)
+/// <param name="refresh">The packages whose repositories are fetched before anything is read of
+/// them — <c>lyric update</c>'s: a moved tag moves too.</param>
+public sealed partial class GitCache(string root, bool offline, Func<string, bool>? refresh = null)
 {
+    private readonly HashSet<string> _fetched = new(StringComparer.Ordinal);
+
     private static readonly TimeSpan FetchTime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan LocalTime = TimeSpan.FromMinutes(1);
 
     /// <summary>The user's: <c>git/</c> in the user cache — <c>~/.cache/lyric/git</c> on Linux.</summary>
-    public static GitCache ForUser(bool offline) => new(Path.Combine(UserCache.Root, "git"), offline);
+    public static GitCache ForUser(bool offline, Func<string, bool>? refresh = null) =>
+        new(Path.Combine(UserCache.Root, "git"), offline, refresh);
 
     /// <summary>The name the cache keeps a repository under: its own name, to be read, and a hash
     /// of its URL, to be unique.</summary>
@@ -34,20 +40,50 @@ public sealed partial class GitCache(string root, bool offline)
     }
 
     /// <summary>The directory holding the package <paramref name="dependency"/> reads from git, at
-    /// the revision it names — fetched first when the cache does not hold it.</summary>
+    /// the revision it names — at the commit <paramref name="locked"/> holds, when the lock holds
+    /// one (07 P5) —, the commit, and the hash of the package's content. What the cache does not
+    /// hold is fetched first.</summary>
     /// <param name="declaring">The manifest naming the dependency, for what is refused.</param>
     /// <exception cref="ManifestException">The repository cannot be reached, or offline the cache
     /// does not hold the revision (<c>LYR-PKG0007</c>); the repository has no such revision, or no
-    /// package at its root (<c>LYR-PKG0006</c>).</exception>
-    public string Checkout(Dependency dependency, string declaring)
+    /// package at its root (<c>LYR-PKG0006</c>); the locked commit is not there, or its content is
+    /// not what the lock holds (<c>LYR-PKG0008</c>).</exception>
+    public (string Directory, string Commit, string Hash) Checkout(Dependency dependency, string declaring, Locked? locked = null)
     {
         var id = Id(dependency.Git!.Url);
         var db = Path.Combine(root, "db", id);
-        var commit = Resolve(dependency, db, declaring);
+        var commit = locked is null ? Resolve(dependency, db, declaring) : Locate(dependency, db, locked.Commit, declaring);
         var checkout = Path.Combine(root, "checkouts", id, commit);
         if (!Directory.Exists(checkout)) Export(dependency, db, commit, checkout, declaring);
-        return checkout;
+        var hash = PackageContent.Hash(checkout);
+        if (locked is null || hash == locked.Hash) return (checkout, commit, hash);
+        // The checkout is the cache's, written from the commit: written anew, it is the commit's
+        // content — if that is still not what the lock holds, the lock is wrong, or the repository.
+        DeleteTree(checkout);
+        Export(dependency, db, commit, checkout, declaring);
+        hash = PackageContent.Hash(checkout);
+        if (hash == locked.Hash) return (checkout, commit, hash);
+        throw new ManifestException("LYR-PKG0008", declaring, dependency.Line, 1,
+            $"the content of '{dependency.Name}' at commit {commit[..12]} of {dependency.Git!.Url} is not what {LockFile.FileName} "
+            + $"holds — 'lyric update {dependency.Name}' resolves it anew");
     }
+
+    /// <summary>The commit the lock holds, from the cache; fetched when the cache lacks it.</summary>
+    private string Locate(Dependency dependency, string db, string commit, string declaring)
+    {
+        if (Has(dependency, db, commit, declaring)) return commit;
+        if (offline) throw NotCached(dependency, declaring);
+        if (Directory.Exists(db)) Fetch(dependency, db, declaring);
+        else Clone(dependency, db, declaring);
+        if (Has(dependency, db, commit, declaring)) return commit;
+        throw new ManifestException("LYR-PKG0008", declaring, dependency.Line, 1,
+            $"{LockFile.FileName} holds commit {commit[..12]} of {dependency.Git!.Url} for '{dependency.Name}', which the "
+            + $"repository does not have — 'lyric update {dependency.Name}' resolves it anew");
+    }
+
+    private static bool Has(Dependency dependency, string db, string commit, string declaring) =>
+        Directory.Exists(db)
+        && Invoke(dependency, declaring, ["--git-dir", db, "rev-parse", "--verify", "--quiet", commit + "^{commit}"], LocalTime).Exit == 0;
 
     /// <summary>The commit the revision names. A tag or a commit the cache holds is not fetched
     /// again; a branch — or no revision, the default branch — moves, and is fetched whenever
@@ -62,7 +98,7 @@ public sealed partial class GitCache(string root, bool offline)
             Clone(dependency, db, declaring);
             fetched = true;
         }
-        if (!fetched && !offline && git.Kind is GitRefKind.Branch or GitRefKind.Default)
+        if (!fetched && !offline && (git.Kind is GitRefKind.Branch or GitRefKind.Default || refresh?.Invoke(dependency.Name) == true))
         {
             Fetch(dependency, db, declaring);
             fetched = true;
@@ -85,8 +121,9 @@ public sealed partial class GitCache(string root, bool offline)
             $"'{dependency.Name}' is read from {dependency.Git}, which the cache does not hold, and --offline fetches nothing",
             exit: 2);
 
-    private static void Clone(Dependency dependency, string db, string declaring)
+    private void Clone(Dependency dependency, string db, string declaring)
     {
+        _fetched.Add(db);
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
         var partial = $"{db}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         Run(dependency, declaring, ["clone", "--bare", "--quiet", "--", dependency.Git!.Url, partial], FetchTime);
@@ -94,10 +131,14 @@ public sealed partial class GitCache(string root, bool offline)
         catch (IOException) when (Directory.Exists(db)) { DeleteTree(partial); }
     }
 
-    /// <summary>Every branch and tag as the repository has them now; a moved tag moves here too.</summary>
-    private static void Fetch(Dependency dependency, string db, string declaring) =>
+    /// <summary>Every branch and tag as the repository has them now; a moved tag moves here too.
+    /// Once per repository and resolution.</summary>
+    private void Fetch(Dependency dependency, string db, string declaring)
+    {
+        if (!_fetched.Add(db)) return;
         Run(dependency, declaring, ["--git-dir", db, "fetch", "--quiet", "--force", "--", dependency.Git!.Url,
             "+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"], FetchTime);
+    }
 
     private static string? RevParse(Dependency dependency, string db, string declaring)
     {

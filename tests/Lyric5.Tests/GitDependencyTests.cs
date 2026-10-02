@@ -44,16 +44,13 @@ public class GitDependencyTests
         Assert.Equal("12\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A branch moves: each build that may fetch reads its head anew (until the lock
-    /// file, M7 S5b, pins it).</summary>
+    /// <summary>A branch is read at its head — where the lock then holds it (LockTests).</summary>
     [Fact]
     public void A_branch_is_read_at_its_head()
     {
         using var repo = Geo(out _, out _);
         var dir = App($"geo = {{ git = \"{repo.Url}\", branch = \"main\" }}");
         Assert.Equal("13\n", BuildAndRun(dir, "app", "build", "-C", dir));
-        repo.Commit(("lyric.toml", Manifest("geo")), ("src/shapes.lyr", Shapes("w * h + 2")));
-        Assert.Equal("14\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
     [Fact]
@@ -245,7 +242,7 @@ internal sealed class TestRepo : IDisposable
 
     public void Tag(string name) => Git("tag", name);
 
-    private string Git(params string[] args)
+    public string Git(params string[] args)
     {
         var result = ProcessRunner.Run("git", ["-C", Dir, .. args], TimeSpan.FromMinutes(1), environment: Isolated);
         Assert.True(result.ExitCode == 0, $"git {string.Join(' ', args)}: {result.Stderr}");
