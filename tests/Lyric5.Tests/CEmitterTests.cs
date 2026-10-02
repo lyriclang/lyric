@@ -224,6 +224,10 @@ public class CEmitterTests
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
             data.Add("generator_lambdas", profile, 0, GENERATOR_LAMBDAS_EXPECTED);
             data.Add("dynamic_yields", profile, 0, DYNAMIC_YIELDS_EXPECTED);
+            data.Add("cancel", profile, 0,
+                "sleeper cleans up\nsleeper cancelled true\nbusy 42\nstubborn caught\nstubborn cancelled again\n"
+                + "waiter true long 5\nended 3 3\ntick 1\nticks ends\npulled to the end true\ngenerator task cancelled\n"
+                + "woke 20 40 1 41 2 22 23 43 4 44 5 25 26 46 7 47 8 28 29 49 10 50 11 31 32 52 13 53 14 34 35 55 16 56 17 37 38 58 19 59\n");
             data.Add("spawn", profile, 0,
                 "started false\nvoid body\ngot 5 7 true 1 2 true\nwaiters first second\ntyped 7 3\n");
             data.Add("void_values", profile, 0,

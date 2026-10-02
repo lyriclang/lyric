@@ -1,29 +1,29 @@
-/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3: a scheduler for
+/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S4: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
-/// as a task (T6); `spawn` and its `Task`, `spawnDetached`, `sleep`, `yieldNow`. `TaskScope` and
-/// cancellation come with S4, timers and channels with S5, threads with S6.
+/// as a task (T6); `spawn` and its `Task`, `spawnDetached`, `sleep`, `yieldNow`; cancellation (N9).
+/// `TaskScope` and `withTimeout` come with S4, timers and channels with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
 
-/// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a
-/// cancelled task will throw at its next wait (06 N9 X1): an `Error`, so cleanup can catch it —
-/// though a coroutine that catches it may not yield again.
+/// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a wait
+/// throws in a cancelled task (06 N9 X1): an `Error`, so cleanup can catch it — though a coroutine
+/// that catches it may not yield again, and a task that waits again gets it again (X5).
 pub class Cancelled :: [Error] {
     fn message(): string { return "cancelled"; }
 }
 
 /// Parks the running task until `d` has passed, at least (06 K3), while the other tasks of its
-/// thread run. A sleep of zero or less lets the tasks that are ready run first. A wait: a
-/// cancelled task throws `Cancelled` here (06 N9 X1).
+/// thread run. A sleep of zero or less lets the tasks that are ready run first. A wait: in a
+/// cancelled task it throws `Cancelled` (06 N9 X1), and a cancel ends it early.
 pub fn sleep(d: Duration): void throws Cancelled {
-    here().sleep(d.nanos());
+    try here().sleep(d.nanos());
 }
 
 /// Lets the other ready tasks of the thread run first (06 N8): the running task goes behind them.
 /// A wait, so a point where a cancelled task throws `Cancelled` (06 N9 X2).
 pub fn yieldNow(): void throws Cancelled {
-    here().yieldNow();
+    try here().yieldNow();
 }
 
 /// A task's handle (06 T1-T3), which `spawn` gives: the body's result once it ended, or the error
@@ -33,9 +33,10 @@ pub class Task<T> {
     var done: bool = false,
     var value: ?T = null,
     var failure: ?Error = null,
-    /// The contexts parked in `await()` until the body ends, in the order they came.
-    var firstWaiting: ?Context = null,
-    var lastWaiting: ?Context = null,
+    /// The context the body runs in, until it ends.
+    var context: ?Context = null,
+    /// The tasks parked in `await()` until the body ends, in the order they came.
+    waiters: Waiters = Waiters { },
 
     /// Whether the body has ended, with its value or with an error (06 T3).
     pub fn isDone(): bool {
@@ -43,19 +44,15 @@ pub class Task<T> {
     }
 
     /// The body's value once it has ended, or its error, thrown here (06 T2): the running task
-    /// waits until then. A wait, so it throws `Cancelled` as well (06 N9 X1); what it throws is
-    /// read off the handle's type at the call (10 §2), the declared `Error` stands for both.
+    /// waits until then. A wait, so it throws `Cancelled` in a cancelled task (06 N9 X1); what it
+    /// throws is read off the handle's type at the call (10 §2), the declared `Error` stands for it.
     pub mut fn await(): T throws Error {
+        let me = here().running ?? panic("an await where no task runs");
+        if (me.cancelled) { throw Cancelled { }; }
         while (!this.done) {
-            let me = here().running ?? panic("an await where no task runs");
-            me.next = null;
-            if (let tail = this.lastWaiting) {
-                tail.next = me;
-            } else {
-                this.firstWaiting = me;
-            }
-            this.lastWaiting = me;
+            this.waiters.add(me);
             park();
+            if (me.cancelled) { throw Cancelled { }; }
         }
         if (let e = this.failure) {
             throw e;
@@ -63,15 +60,19 @@ pub class Task<T> {
         return this.value!;
     }
 
+    /// Cancels the task (06 N9 X1): its next wait throws `Cancelled` — at once, where it waits now
+    /// — and so does every wait after it (X5). A task that has ended stays as it ended.
+    pub fn cancel(): void {
+        if (let c = this.context) {
+            here().cancel(c);
+        }
+    }
+
     /// The body has ended: the tasks waiting for it are ready, in the order they came.
     mut fn finish(): void {
         this.done = true;
-        let s = here();
-        while (let c = this.firstWaiting) {
-            this.firstWaiting = c.next;
-            s.ready(c);
-        }
-        this.lastWaiting = null;
+        this.context = null;
+        this.waiters.wakeAll(here());
     }
 }
 
@@ -88,7 +89,9 @@ pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
         }
         task.finish();
     };
-    here().ready(Context { body = startContext(run, 0) });
+    let c = Context { body = startContext(run, 0) };
+    task.context = c;
+    here().ready(c);
     return task;
 }
 
@@ -113,18 +116,69 @@ pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
 // ---------------------------------------------------------------------------------------------
 
 /// A task's context as the scheduler holds it: the coroutine its body runs in (13 §1.6), and the
-/// links of the one place it waits in at a time — the ready queue, or the sleepers' heap.
+/// links of the one place it waits in at a time — the ready queue, the waiting list of a task it
+/// awaits, or the sleepers' heap.
 class Context {
     body: Coroutine<void>,
-    /// The ready queue's link.
+    /// The links of the ready queue, or of the waiting list it is in.
     var next: ?Context = null,
-    /// A sleeper's deadline on the monotonic clock, and when it fell asleep: the tie-break.
+    var prev: ?Context = null,
+    /// The waiting list of the task it awaits, while it does.
+    var waitingOn: ?Waiters = null,
+    /// In the sleepers' heap: its deadline on the monotonic clock, and when it fell asleep — the
+    /// tie-break.
+    var asleep: bool = false,
     var deadline: int = 0,
     var order: int = 0,
-    /// The sleepers' heap is leftist: the children, and the length of the right spine.
+    /// The heap is leftist: the children, the parent — a cancel takes a sleeper out from where it
+    /// is — and the length of the right spine.
     var left: ?Context = null,
     var right: ?Context = null,
+    var up: ?Context = null,
     var rank: int = 0,
+    /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`.
+    var cancelled: bool = false,
+}
+
+/// The tasks waiting for one task to end, in the order they came; a cancel takes one out.
+class Waiters {
+    var first: ?Context = null,
+    var last: ?Context = null,
+
+    mut fn add(c: Context): void {
+        c.prev = this.last;
+        c.next = null;
+        if (let tail = this.last) {
+            tail.next = c;
+        } else {
+            this.first = c;
+        }
+        this.last = c;
+        c.waitingOn = this;
+    }
+
+    mut fn remove(c: Context): void {
+        if (let p = c.prev) {
+            p.next = c.next;
+        } else {
+            this.first = c.next;
+        }
+        if (let n = c.next) {
+            n.prev = c.prev;
+        } else {
+            this.last = c.prev;
+        }
+        c.prev = null;
+        c.next = null;
+        c.waitingOn = null;
+    }
+
+    mut fn wakeAll(s: Scheduler): void {
+        while (let c = this.first) {
+            this.remove(c);
+            s.ready(c);
+        }
+    }
 }
 
 class Scheduler {
@@ -137,6 +191,7 @@ class Scheduler {
     /// `c` goes to the end of the ready queue.
     mut fn ready(c: Context): void {
         c.next = null;
+        c.prev = null;
         if (let tail = this.last) {
             tail.next = c;
         } else {
@@ -154,31 +209,74 @@ class Scheduler {
         return head;
     }
 
-    mut fn sleep(nanos: int): void {
+    mut fn sleep(nanos: int): void throws Cancelled {
         let c = this.running ?? panic("a sleep where no task runs");
+        if (c.cancelled) { throw Cancelled { }; }
         let now = monotonicNanos();
         c.deadline = if (nanos > 9223372036854775807 - now) 9223372036854775807 else now + nanos;
         c.order = this.fallenAsleep;
         this.fallenAsleep += 1;
+        c.asleep = true;
         this.sleepers = merge(this.sleepers, c);
+        if (let root = this.sleepers) { root.up = null; }
         park();
+        if (c.cancelled) { throw Cancelled { }; }
     }
 
-    mut fn yieldNow(): void {
-        this.ready(this.running ?? panic("a yield where no task runs"));
+    mut fn yieldNow(): void throws Cancelled {
+        let c = this.running ?? panic("a yield where no task runs");
+        if (c.cancelled) { throw Cancelled { }; }
+        this.ready(c);
         park();
+        if (c.cancelled) { throw Cancelled { }; }
+    }
+
+    /// Cancels a context (06 N9 X1): the mark, and the end of the wait it is in now, if any.
+    mut fn cancel(c: Context): void {
+        c.cancelled = true;
+        if (c.asleep) {
+            this.unsleep(c);
+            this.ready(c);
+        } else if (let list = c.waitingOn) {
+            list.remove(c);
+            this.ready(c);
+        }
     }
 
     /// The sleepers whose deadline came go to the ready queue, earliest first.
     mut fn wake(now: int): void {
         while (let top = this.sleepers) {
             if (top.deadline > now) { return; }
-            this.sleepers = merge(top.left, top.right);
-            top.left = null;
-            top.right = null;
-            top.rank = 0;
+            this.unsleep(top);
             this.ready(top);
         }
+    }
+
+    /// Takes a sleeper out of the heap, wherever it is: its children merged in its place, and the
+    /// ranks above it set right again.
+    mut fn unsleep(c: Context): void {
+        let merged = merge(c.left, c.right);
+        let parent = c.up;
+        if (let m = merged) { m.up = parent; }
+        if (let p = parent) {
+            if (let l = p.left) {
+                if (same(l, c)) {
+                    p.left = merged;
+                } else {
+                    p.right = merged;
+                }
+            } else {
+                p.right = merged;
+            }
+            fixRanks(p);
+        } else {
+            this.sleepers = merged;
+        }
+        c.left = null;
+        c.right = null;
+        c.up = null;
+        c.rank = 0;
+        c.asleep = false;
     }
 
     /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
@@ -207,7 +305,7 @@ fn here(): Scheduler {
 }
 
 /// The two heaps of sleepers as one: the earlier root on top, the other merged down its right
-/// spine, whose length stays logarithmic.
+/// spine, whose length stays logarithmic. The caller sets the result's parent.
 fn merge(a: ?Context, b: ?Context): ?Context {
     if (a == null) { return b; }
     if (b == null) { return a; }
@@ -218,7 +316,9 @@ fn merge(a: ?Context, b: ?Context): ?Context {
 }
 
 fn meld(top: Context, other: Context): Context {
-    top.right = merge(top.right, other);
+    let below = merge(top.right, other);
+    if (let b = below) { b.up = top; }
+    top.right = below;
     let l = rankOf(top.left);
     let r = rankOf(top.right);
     if (l < r) {
@@ -230,6 +330,25 @@ fn meld(top: Context, other: Context): Context {
         top.rank = r + 1;
     }
     return top;
+}
+
+/// After a heap changed below `from`: each node up the path keeps its children leftist and its
+/// rank right, until a rank stays as it was.
+fn fixRanks(from: Context): void {
+    var at: ?Context = from;
+    while (let n = at) {
+        let l = rankOf(n.left);
+        let r = rankOf(n.right);
+        if (l < r) {
+            let swap = n.left;
+            n.left = n.right;
+            n.right = swap;
+        }
+        let rank = (if (l < r) l else r) + 1;
+        if (rank == n.rank) { return; }
+        n.rank = rank;
+        at = n.up;
+    }
 }
 
 fn rankOf(c: ?Context): int {
