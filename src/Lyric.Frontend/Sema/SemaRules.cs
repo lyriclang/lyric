@@ -95,7 +95,7 @@ public sealed class SemaRules
                         }
                         break;
                     case InterfaceDecl i when module.Members.LookupLocal(i.Name) is TypeSymbol it:
-                        TypeSurface(it, i.Generics, i.Interfaces, i.Members.Where(m => !m.IsPrivateHelper));
+                        TypeSurface(it, i.Generics, i.Interfaces, i.Members.Where(m => !m.IsPrivateHelper).Cast<Decl>().Concat(i.Statics));
                         break;
                     // An inherent block's methods, narrowed to their target; a conformance's are
                     // its interface's.
@@ -104,6 +104,9 @@ public sealed class SemaRules
                         foreach (var m in block.Methods)
                             if (m.Declaration is FunctionDecl md)
                                 Signature(md, Narrow(m.Visibility, block.Target?.Visibility ?? Visibility.Public));
+                        foreach (var sb in x.Statics)
+                            if (block.MethodScope.LookupLocal(sb.Name) is GlobalSymbol gs)
+                                BindingType(sb.Binding, gs, Narrow(gs.Visibility, block.Target?.Visibility ?? Visibility.Public), block.Target?.Name);
                         break;
                 }
         }

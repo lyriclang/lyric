@@ -154,6 +154,15 @@ public sealed class Resolver
         foreach (var t in ex.Types)
             if (!methodScope.TryDeclare(new AssociatedTypeSymbol(t.Name, t)))
                 _de.Report("LYR-RES0001", Severity.Error, t.Span, $"'{t.Name}' is already declared in this extend block");
+        // A block's constants (05 §6), as visible as its methods would be.
+        foreach (var sb in ex.Statics)
+        {
+            var constant = new GlobalSymbol(sb.Binding.Name, Vis(ExtensionWord(ex, sb.Visibility)), sb) { Home = module };
+            if (!methodScope.TryDeclare(constant))
+                _de.Report("LYR-RES0001", Severity.Error, sb.Span,
+                    $"'{sb.Binding.Name}' is already declared in this extend block",
+                    PreviousDeclaration(methodScope, sb.Binding.Name));
+        }
         _comp.Extensions.Add(new ExtensionBlock(ex, module, methodScope, methods.ToArray()) { Generics = blockGenerics, IsImplicit = implicitly });
     }
 
@@ -213,6 +222,9 @@ public sealed class Resolver
             DeclareMember(module, scope,
                 Fn(fn, !_comp.Lyric5Modules || fn.IsPrivateHelper ? fn.Visibility : i.Visibility), fn);
         foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
+        // Its constants (03 T5) as visible as the interface, like its members.
+        foreach (var sb in i.Statics)
+            DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(_comp.Lyric5Modules ? i.Visibility : sb.Visibility), sb), sb);
     }
 
     private FunctionSymbol Fn(FunctionDecl fn, VisibilityWord word) =>
@@ -224,10 +236,12 @@ public sealed class Resolver
     /// methods with it; in an inherent block its own, else the block's, which is the default of
     /// the methods in it (<c>private extend Foo { … }</c>). The 4.x tools read the method's.
     /// </summary>
-    private VisibilityWord ExtensionWord(ExtendDecl block, FunctionDecl fn) =>
-        !_comp.Lyric5Modules ? fn.Visibility
+    private VisibilityWord ExtensionWord(ExtendDecl block, FunctionDecl fn) => ExtensionWord(block, fn.Visibility);
+
+    private VisibilityWord ExtensionWord(ExtendDecl block, VisibilityWord written) =>
+        !_comp.Lyric5Modules ? written
         : block.Interfaces.Length > 0 ? VisibilityWord.Pub
-        : fn.Visibility != VisibilityWord.None ? fn.Visibility
+        : written != VisibilityWord.None ? written
         : block.Visibility;
 
     private static GenericParamSymbol[] MakeGenerics(GenericParam[] generics)

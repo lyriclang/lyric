@@ -62,6 +62,15 @@ internal sealed class GlobalTable
                     case ClassDecl or StructDecl or EnumDecl:
                         CollectStatics(decl, module, types, typeTable);
                         break;
+
+                    // A block's constant (05 §6 rule 2) is its type's, at the block's place. A
+                    // generic block holds none; the sema refused it.
+                    case ExtendDecl { Generics.Length: 0 } ext
+                        when compilation.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, ext)) is { Target: { } target } block:
+                        foreach (var sb in ext.Statics)
+                            if (block.MethodScope.LookupLocal(sb.Binding.Name) is GlobalSymbol constant)
+                                Add(constant, sb.Binding, module, $"{target.Name}.{constant.Name}", types, typeTable);
+                        break;
                 }
             }
         }

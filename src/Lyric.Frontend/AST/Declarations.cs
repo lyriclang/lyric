@@ -237,6 +237,10 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
     /// <summary><c>sealed interface Shape</c> (04 D8): every conformer stands in the declaring
     /// module, and a match of type patterns over it is exhaustive without <c>_</c>.</summary>
     public bool IsSealed { get; init; }
+
+    /// <summary>The constants it declares, <c>static let zero: Self;</c> (design/v5/spec/03 T5):
+    /// every conformer answers them with a <c>static let</c> of its own.</summary>
+    public StaticBindingDecl[] Statics { get; init; } = [];
 }
 
 public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
@@ -249,6 +253,10 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
     /// <summary><c>extend&lt;T :: [Display]&gt; List&lt;T&gt; { … }</c> (03 T7 X1): the block's own type
     /// parameters, bound by the receiver at every use.</summary>
     public GenericParam[] Generics { get; init; } = [];
+
+    /// <summary>The constants the block adds to its type, <c>static let answer: int = 42;</c> — or
+    /// answers for its interfaces (05 §6, §7).</summary>
+    public StaticBindingDecl[] Statics { get; init; } = [];
 }
 
 /// <summary>

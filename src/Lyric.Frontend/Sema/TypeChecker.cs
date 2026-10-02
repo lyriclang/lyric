@@ -305,6 +305,7 @@ public sealed class TypeChecker
         }
         CheckExtensionBlocks(); // extend bodies, conformance
         CheckMethodSets();      // one name, one function per type (04 D2, D3)
+        CheckStaticSets();      // one constant of a name per type (05 §6)
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
         return _result;
@@ -321,6 +322,22 @@ public sealed class TypeChecker
         _currentModule = module;
         foreach (var decl in _comp.AstOf(module).Declarations)
         {
+            // A 'static let' is the same mechanism under a type's name (04 §1 rule 2), initialized
+            // at its declaration's place: typed here, before any body reads it — a function may
+            // stand before the type whose constant it reads.
+            switch (decl)
+            {
+                case StructDecl or ClassDecl when module.Members.LookupLocal(((INamedDecl)decl).Name) is TypeSymbol owner:
+                    foreach (var sb in (decl is StructDecl s ? s.Members : ((ClassDecl)decl).Members).OfType<StaticBindingDecl>())
+                        CheckStaticBinding(sb, owner.Members);
+                    continue;
+                case InterfaceDecl i when module.Members.LookupLocal(i.Name) is TypeSymbol iface:
+                    foreach (var sb in i.Statics) CheckInterfaceStatic(sb, iface);
+                    continue;
+                case ExtendDecl x when _comp.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, x)) is { } block:
+                    foreach (var sb in x.Statics) CheckBlockStatic(sb, block);
+                    continue;
+            }
             if (decl is not GlobalBindingDecl g) continue;
             var declared = g.Binding.Type is not null ? ResolveType(g.Binding.Type, module.Members) : null;
             LyrType type;
@@ -646,11 +663,8 @@ public sealed class TypeChecker
             CheckAttributes(memberAttributes, AttributeTarget.Member,
                 targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
 
-            if (m is StaticBindingDecl sb)
-            {
-                CheckStaticBinding(sb, ts);
-                continue;
-            }
+            // Typed and checked with the module's bindings (ComputeGlobals).
+            if (m is StaticBindingDecl) continue;
 
             // A field default is an EXPRESSION and has to be checked like any other. Without this
             // visit its type never reaches the side table, the lowering reads an ErrorType at the
@@ -710,20 +724,20 @@ public sealed class TypeChecker
                 $"'{fn.Name}' is static and cannot be 'mut' — a static member has no receiver");
     }
 
-    /// <summary>A <c>static let</c> constant. Its initializer is checked in the type scope but
-    /// without <c>this</c>: there is no instance it could refer to.</summary>
-    private void CheckStaticBinding(StaticBindingDecl sb, TypeSymbol ts)
+    /// <summary>A <c>static let</c> constant. Its initializer is checked in the scope it stands in —
+    /// the type's, a block's — but without <c>this</c>: there is no instance it could refer to.</summary>
+    private void CheckStaticBinding(StaticBindingDecl sb, SymbolTable scope)
     {
         var outerThis = _currentThis;
         _currentThis = null;
 
-        var declared = sb.Binding.Type is { } t ? ResolveType(t, ts.Members) : null;
+        var declared = sb.Binding.Type is { } t ? ResolveType(t, scope) : null;
 
         // As with a module 'let': inside an initializer a global that has not been computed yet is an
         // error, not an unknown type.
         _inGlobalInitializer = true;
         var quiet = _de.ErrorCount;
-        var init = sb.Binding.Initializer is { } e ? CheckExpr(e, ts.Members, declared) : null;
+        var init = sb.Binding.Initializer is { } e ? CheckExpr(e, scope, declared) : null;
         quiet = _de.ErrorCount - quiet;
         _inGlobalInitializer = false;
 
@@ -740,13 +754,95 @@ public sealed class TypeChecker
         else if (declared is not null && init is not null)
             CheckAssignable(sb.Binding.Initializer!, init, declared, sb.Span);
 
-        if (ts.Members.LookupLocal(sb.Binding.Name) is GlobalSymbol gs)
+        if (scope.LookupLocal(sb.Binding.Name) is GlobalSymbol gs)
         {
             _globals[gs] = declared ?? init ?? LyrType.Error;
             _result.BindGlobal(gs, _globals[gs]);   // for the lowering
         }
 
         _currentThis = outerThis;
+    }
+
+    /// <summary>An interface's constant (05 §7 rule 2): a declaration — a type, read with
+    /// <c>Self</c> as the conformer — that every conforming type answers with a <c>static let</c>
+    /// of its own. A value here would be nobody's.</summary>
+    private void CheckInterfaceStatic(StaticBindingDecl sb, TypeSymbol iface)
+    {
+        if (sb.Binding.Initializer is not null)
+            _de.Report("LYR-SEM0127", Severity.Error, sb.Span,
+                $"'{sb.Binding.Name}' is a static member of an interface and declares only — every conforming "
+                + $"type answers it with a 'static let' of its own, reached as 'T.{sb.Binding.Name}'; drop the value");
+        var type = sb.Binding.Type is { } written
+            ? ResolveType(written, iface.Members)
+            : Report(sb.Span, "LYR-SEM0010", $"'{sb.Binding.Name}' needs a type — the one its conformers answer with");
+        if (iface.Members.LookupLocal(sb.Binding.Name) is GlobalSymbol gs)
+        {
+            _globals[gs] = type;
+            _result.BindGlobal(gs, type);
+        }
+    }
+
+    /// <summary>A block's constant (05 §6 rule 2): the type's, checked as one in its body is. A
+    /// generic block's would be one per instance, which is not decided.</summary>
+    private void CheckBlockStatic(StaticBindingDecl sb, ExtensionBlock block)
+    {
+        if (block.Decl.Generics.Length > 0)
+        {
+            _de.Report("LYR-SEM0159", Severity.Error, sb.Span,
+                $"'{sb.Binding.Name}' stands in a generic block, and its value would be one per instance of "
+                + "the block's parameters — not decided; declare the constant on a concrete type");
+            if (block.MethodScope.LookupLocal(sb.Binding.Name) is GlobalSymbol refused) _globals[refused] = LyrType.Error;
+            return;
+        }
+        CheckStaticBinding(sb, block.MethodScope);
+    }
+
+    /// <summary>A constant's type, as its declaration's check settled it.</summary>
+    private LyrType GlobalTypeOf(GlobalSymbol constant) =>
+        _globals.TryGetValue(constant, out var type) ? type : LyrType.Error;
+
+    /// <summary>The constant of this name a type holds — in its body, or added by a block
+    /// (05 §6 rule 2); a generic block holds none. <paramref name="seen"/> asks the blocks the
+    /// current module sees, the way a member lookup does; a conformance asks all of them.</summary>
+    private GlobalSymbol? StaticOf(TypeSymbol type, string name, bool seen = false)
+    {
+        if (type.Members.LookupLocal(name) is GlobalSymbol own) return own;
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!ReferenceEquals(block.Target, type) || block.Decl.Generics.Length > 0) continue;
+            if (seen && _currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (block.MethodScope.LookupLocal(name) is GlobalSymbol added) return added;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// One constant of a name per type (05 §6 rule 2, as 04 D2 has it for functions): a block's
+    /// may not repeat one the type's body or another block declares, nor a member of another
+    /// kind — <c>T.name</c> would have two answers (<c>LYR-SEM0121</c>).
+    /// </summary>
+    private void CheckStaticSets()
+    {
+        var all = _comp.Extensions.Blocks;
+        for (var i = 0; i < all.Count; i++)
+        {
+            if (all[i].Target is not { } target) continue;
+            foreach (var sb in all[i].Decl.Statics)
+            {
+                // The type's own member of the name, a method of another block, or a constant an
+                // earlier block declares: 'T.name' would have two answers.
+                var name = sb.Binding.Name;
+                Span? other = target.Members.LookupLocal(name) is { } member ? member.Declaration?.Span ?? default : null;
+                for (var j = 0; j < all.Count && other is null; j++)
+                    if (j != i && ReferenceEquals(all[j].Target, target)
+                        && all[j].MethodScope.LookupLocal(name) is { } clash && (clash is not GlobalSymbol || j < i))
+                        other = clash.Declaration?.Span ?? default;
+                if (other is { } where)
+                    _de.Report("LYR-SEM0121", Severity.Error, sb.Span,
+                        $"'{name}' is a member of '{target.Name}' already, and a type holds one member of a name — rename the constant",
+                        new DiagnosticNote(where, $"'{name}' is declared here"));
+            }
+        }
     }
 
     private void CheckEnumMethods(EnumDecl e, ModuleSymbol module)
@@ -1394,6 +1490,27 @@ public sealed class TypeChecker
                     else if (SignatureMismatch(want, im, impl, at) is { } reason)
                         _de.Report("LYR-SEM0042", Severity.Error, impl.Declaration?.Span ?? NodeSpan(node),
                             $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {reason}");
+                }
+
+                // Its constants (05 §7 rule 2): answered in the type's body or in a block, with the
+                // type the interface writes, 'Self' read as the conformer.
+                foreach (var st in idecl.Statics)
+                {
+                    if (iface.Members.LookupLocal(st.Binding.Name) is not GlobalSymbol promised) continue;
+                    if (StaticOf(implementer, st.Binding.Name) is not { } answer)
+                    {
+                        _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
+                            $"'{name}' does not answer the static '{st.Binding.Name}' of interface '{iface.Name}'{implied} — "
+                            + $"declare 'static let {st.Binding.Name}' on it",
+                            new DiagnosticNote(st.Span, $"'{st.Binding.Name}' is declared here"));
+                        continue;
+                    }
+                    var wanted = Substitute(GlobalTypeOf(promised), WithSelf(subst, iface, self ?? SelfType(implementer)));
+                    var answered = GlobalTypeOf(answer);
+                    if (!ContainsError(wanted) && !answered.IsError && !LyrType.Equal(wanted, answered))
+                        _de.Report("LYR-SEM0042", Severity.Error, answer.Declaration?.Span ?? NodeSpan(node),
+                            $"'{name}.{st.Binding.Name}' does not match interface '{iface.Name}'{implied}: it is "
+                            + $"'{TypeFacts.Display(answered)}', expected '{TypeFacts.Display(wanted)}'");
                 }
             }
         }
@@ -5173,6 +5290,9 @@ public sealed class TypeChecker
             if (c is not NamedType nt) continue;
             foreach (var (it, subst) in ClosureOfNode(nt))
             {
+                if (it.Members.LookupLocal(member) is GlobalSymbol)
+                    return (Report(span, "LYR-SEM0055",
+                        $"'{member}' is a static member of '{it.Name}' — read it on the type parameter: '{gp.Name}.{member}'"), null);
                 if (it.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
                 if (fn.IsStatic)
                     return (Report(span, "LYR-SEM0055",
@@ -5205,6 +5325,9 @@ public sealed class TypeChecker
             if (c is not NamedType nt) continue;
             foreach (var (it, subst) in ClosureOfNode(nt))
             {
+                // 'T.zero' (05 §7 rule 2): the conformer's constant, read where T is known.
+                if (it.Members.LookupLocal(member) is GlobalSymbol constant)
+                    return (Substitute(GlobalTypeOf(constant), WithSelf(subst, it, new TypeParamType(gp))), constant);
                 if (it.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
                 if (!fn.IsStatic)
                     return (Report(span, "LYR-SEM0055",
@@ -6127,6 +6250,9 @@ public sealed class TypeChecker
 
             FieldSymbol => (Report(span, "LYR-SEM0055",
                 $"'{member}' is a field of '{ts.Name}' and belongs to an instance, not to the type"), null),
+
+            // A block's constant (05 §6 rule 2), under the type's name.
+            _ when StaticOf(ts, member, seen: true) is { } added => (Of(TypeOfGlobalReference(added, span)), added),
 
             // The same fallback the instance path has: an extension block may add a static member,
             // and the lowering already emits one without a receiver.
@@ -8761,6 +8887,8 @@ public sealed class TypeChecker
                 // which 'Self.Item' mentions as well.
                 if (symbol is AssociatedTypeSymbol assoc)
                 { reason = $"it declares the associated type '{assoc.Name}', and a value of it would fix that type — not yet"; return false; }
+                if (symbol is GlobalSymbol constant)
+                { reason = $"it declares the static member '{constant.Name}'"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
             }

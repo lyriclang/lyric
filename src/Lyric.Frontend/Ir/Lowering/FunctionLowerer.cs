@@ -4802,6 +4802,20 @@ internal sealed class FunctionLowerer
 
     private TempId LowerFieldRead(MemberExpr expr)
     {
+        // 'T.zero' (05 §7 rule 2): the interface's constant through a constraint. Under this
+        // instance's substitution T is a type, and the read is that type's own constant.
+        if (_types.RefOf(expr) is GlobalSymbol
+            && (_types.RefOf(expr.Target) as GenericParamSymbol
+                ?? (_types.TypeOf(expr.Target) as NonValueType)?.Symbol as GenericParamSymbol) is { } parameter
+            && _substitution.TryGetValue(parameter, out var boundTo))
+        {
+            var owner = TypeFacts.SymbolOf(boundTo) ?? _typeTable.BuiltinSymbolOf(boundTo);
+            return LowerGlobalRead(
+                (owner is null ? null : _typeTable.StaticOf(owner, expr.Member))
+                ?? throw NotSupported($"the constant '{expr.Member}' of '{TypeFacts.Display(boundTo)}' through a constraint", expr.Span),
+                expr.Span);
+        }
+
         // 'P.ZERO' is not a field read but a constant read: a 'static let' is a global slot rather than
         // an object slot.
         if (_types.RefOf(expr) is GlobalSymbol constant) return LowerGlobalRead(constant, expr.Span);

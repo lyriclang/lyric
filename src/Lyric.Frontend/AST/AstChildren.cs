@@ -114,6 +114,7 @@ public static class AstChildren
             case InterfaceDecl i:
                 foreach (var t in i.Types) yield return t;
                 foreach (var g in i.Generics) yield return g;
+                foreach (var s in i.Statics) yield return s;
                 foreach (var m in i.Members) yield return m;
                 break;
 
@@ -122,6 +123,7 @@ public static class AstChildren
                 foreach (var t in e.Types) yield return t;
                 yield return e.Target;
                 foreach (var i in e.Interfaces) yield return i;
+                foreach (var s in e.Statics) yield return s;
                 foreach (var m in e.Methods) yield return m;
                 break;
 

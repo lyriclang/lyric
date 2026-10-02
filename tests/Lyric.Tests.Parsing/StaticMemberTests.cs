@@ -102,17 +102,37 @@ public class StaticMemberTests
         Assert.Equal([true, false], members.Select(m => m.IsStatic));
     }
 
+    [Fact]
+    public void An_interface_declares_a_constant()
+    {
+        // 03 T5: 'static let zero: Self;' declares, every conformer answers. Whether a value
+        // stands there is the checker's question (LYR-SEM0127), as for a static fn's body.
+        var (module, de) = Parse("interface I { static let zero: Self; fn tag(): int; }");
+        Assert.False(de.HasErrors);
+        var iface = Assert.IsType<InterfaceDecl>(module.Declarations[0]);
+        Assert.Equal(["zero"], iface.Statics.Select(s => s.Name));
+        Assert.Equal(["tag"], iface.Members.Select(m => m.Name));
+    }
+
+    [Fact]
+    public void A_block_adds_a_constant()
+    {
+        // 05 §6: the block's constant is its type's — 'int.answer'.
+        var (module, de) = Parse("extend int { static let answer: int = 42; fn twice(): int { return this * 2; } }");
+        Assert.False(de.HasErrors);
+        var block = Assert.IsType<ExtendDecl>(module.Declarations[0]);
+        Assert.Equal(["answer"], block.Statics.Select(s => s.Name));
+        Assert.Equal(["twice"], block.Methods.Select(m => m.Name));
+    }
+
     // ------------------------------------------------------------------ rejected
 
-    [Theory]
-    [InlineData("enum E { A; static let x: int = 1; }")]
-    [InlineData("interface I { static let x: int = 1; }")]
-    [InlineData("extend int { static let x: int = 1; }")]
-    public void A_static_binding_belongs_to_a_struct_or_class_body_only(string source)
+    [Fact]
+    public void A_static_binding_does_not_belong_to_an_enum_body()
     {
         // It used to fall into ParseFunctionDecl, which failed on the missing 'fn' and reported
         // through the rest of the file — 21 messages for one cause in the enum case.
-        var (_, de) = Parse(source);
+        var (_, de) = Parse("enum E { A; static let x: int = 1; }");
         Assert.Equal(["LYR-PAR0040"], Codes(de));
     }
 
