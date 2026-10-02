@@ -3,7 +3,8 @@
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
 /// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
 /// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads; threads (G1,
-/// G2).
+/// G2); `Mutex`, `RwLock` and `Once` (G4, K6) — `std.sync`'s by the module cut (10 Q10), here until
+/// M7 lets another module reach the scheduler.
 module std.task;
 
 import std.sync { Atomic };
@@ -716,6 +717,223 @@ pub class Timer {
             ch.close();
         });
         return ch;
+    }
+}
+
+/// A value that one task at a time holds (06 G4, K6): `lock` gives it to its body only, through a
+/// guard — Rust's discipline, without its compiler. A task that finds it held waits, parked, while
+/// the other tasks of its thread run; across threads, and on one thread wherever a body waits.
+pub class Mutex<T> {
+    slot: Slot<T>,
+    state: LockState,
+
+    /// A mutex that holds `value`.
+    pub static fn new(value: T): Mutex<T> {
+        return Mutex<T> { slot = Slot<T> { value = value }, state = LockState { } };
+    }
+
+    /// Runs `body` while the running task holds the mutex, and gives what it gives: the task waits
+    /// until no other holds it. The body reaches the value through its guard, which works only
+    /// until the body ends. A wait: in a cancelled task it throws `Cancelled` (N9 X1).
+    pub fn lock<R, E :: [Error]>(body: fn(LockGuard<T>) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireAlone(false);
+        let guard = LockGuard<T> { slot = this.slot };
+        defer {
+            guard.valid = false;
+            this.state.releaseAlone();
+        }
+        return try body(guard);
+    }
+}
+
+/// A value that readers share and a writer holds alone (06 K6). A writer that waits goes first:
+/// readers that come after it wait for it.
+pub class RwLock<T> {
+    slot: Slot<T>,
+    state: LockState,
+
+    /// A lock that holds `value`.
+    pub static fn new(value: T): RwLock<T> {
+        return RwLock<T> { slot = Slot<T> { value = value }, state = LockState { } };
+    }
+
+    /// Runs `body` with the value while no writer holds the lock — other readers may — and gives
+    /// what it gives. A wait: in a cancelled task it throws `Cancelled`.
+    pub fn read<R, E :: [Error]>(body: fn(T) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireShared();
+        defer this.state.releaseShared();
+        return try body(this.slot.value);
+    }
+
+    /// Runs `body` while the running task alone holds the lock — no reader, no other writer — and
+    /// gives what it gives; the body reaches the value through its guard. A wait, as `read` is.
+    pub fn write<R, E :: [Error]>(body: fn(LockGuard<T>) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireAlone(true);
+        let guard = LockGuard<T> { slot = this.slot };
+        defer {
+            guard.valid = false;
+            this.state.releaseAlone();
+        }
+        return try body(guard);
+    }
+}
+
+/// Work done once (06 N10): the first `run` does it, every later one returns at once, and one that
+/// comes while it runs waits until it has ended.
+pub class Once {
+    state: LockState,
+
+    /// Work not done yet.
+    pub static fn new(): Once {
+        return Once { state = LockState { } };
+    }
+
+    /// Runs `body` where it has not run to its end yet — and not where another task runs it now:
+    /// then it waits for that one. Where `body` throws, the error comes out here, and the next `run`
+    /// runs it again. A wait: in a cancelled task it throws `Cancelled`.
+    pub fn run<E :: [Error]>(body: fn() -> void throws E): void throws [E, Cancelled] {
+        let first = try this.state.beginOnce();
+        if (!first) { return; }
+        var done = false;
+        defer {
+            this.state.endOnce(done);
+        }
+        try body();
+        done = true;
+    }
+}
+
+/// The value a lock gives its body (06 G4): `get()` reads it, `set(v)` replaces it — while the body
+/// runs; after, both panic.
+pub class LockGuard<T> {
+    slot: Slot<T>,
+    var valid: bool = true,
+
+    /// The value.
+    pub fn get(): T {
+        if (!this.valid) { panic("a lock's guard used after its body ended"); }
+        return this.slot.value;
+    }
+
+    /// Replaces the value.
+    pub fn set(value: T): void {
+        if (!this.valid) { panic("a lock's guard used after its body ended"); }
+        this.slot.value = value;
+    }
+}
+
+/// A lock's value, where its guard reaches it.
+class Slot<T> {
+    var value: T,
+}
+
+/// What a lock knows of its holders — a mutex's, a reader-writer lock's, a once's — behind a spin
+/// lock: whether one holds it alone, how many share it, how many writers wait, whether the work of
+/// a once is done; and the tasks that wait, each of which every change wakes to look again.
+class LockState {
+    guard: SpinLock = SpinLock { },
+    var alone: bool = false,
+    var readers: int = 0,
+    var writersWaiting: int = 0,
+    var done: bool = false,
+    waiters: Waiters = Waiters { },
+
+    /// The running task holds the lock alone, once no other holds it at all; a writer (`counting`)
+    /// counts itself as waiting the while, which holds back readers that come after it.
+    mut fn acquireAlone(counting: bool): void throws Cancelled {
+        let s = here();
+        let me = s.running ?? panic("a lock where no task runs");
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        this.guard.acquire();
+        if (counting) { this.writersWaiting += 1; }
+        while (this.alone || this.readers > 0) {
+            if (!this.awaitChange(s, me)) {
+                if (counting) {
+                    this.writersWaiting -= 1;
+                    this.waiters.wakeAll(s);
+                }
+                this.guard.release();
+                throw Cancelled { };
+            }
+        }
+        if (counting) { this.writersWaiting -= 1; }
+        this.alone = true;
+        this.guard.release();
+    }
+
+    /// The running task shares the lock, once nobody holds it alone and no writer waits.
+    mut fn acquireShared(): void throws Cancelled {
+        let s = here();
+        let me = s.running ?? panic("a lock where no task runs");
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        this.guard.acquire();
+        while (this.alone || this.writersWaiting > 0) {
+            if (!this.awaitChange(s, me)) {
+                this.guard.release();
+                throw Cancelled { };
+            }
+        }
+        this.readers += 1;
+        this.guard.release();
+    }
+
+    mut fn releaseAlone(): void {
+        let s = here();
+        this.guard.acquire();
+        this.alone = false;
+        this.waiters.wakeAll(s);
+        this.guard.release();
+    }
+
+    mut fn releaseShared(): void {
+        let s = here();
+        this.guard.acquire();
+        this.readers -= 1;
+        if (this.readers == 0) {
+            this.waiters.wakeAll(s);
+        }
+        this.guard.release();
+    }
+
+    /// A once's start: true for the task that does the work now, false where it is done — one that
+    /// comes while another does it waits.
+    mut fn beginOnce(): bool throws Cancelled {
+        let s = here();
+        let me = s.running ?? panic("a once where no task runs");
+        if (me.cancelled.load()) { throw Cancelled { }; }
+        this.guard.acquire();
+        while (this.alone) {
+            if (!this.awaitChange(s, me)) {
+                this.guard.release();
+                throw Cancelled { };
+            }
+        }
+        let first = !this.done;
+        if (first) { this.alone = true; }
+        this.guard.release();
+        return first;
+    }
+
+    mut fn endOnce(done: bool): void {
+        let s = here();
+        this.guard.acquire();
+        this.alone = false;
+        this.done = done;
+        this.waiters.wakeAll(s);
+        this.guard.release();
+    }
+
+    /// One wait for a change, the guard held before and after: false where the task was cancelled.
+    mut fn awaitChange(s: Scheduler, me: Context): bool {
+        me.beginWait();
+        this.waiters.add(me);
+        this.guard.release();
+        s.wakeIfCancelled(me);
+        park();
+        me.endWait();
+        this.guard.acquire();
+        this.waiters.remove(me);
+        return !me.cancelled.load();
     }
 }
 

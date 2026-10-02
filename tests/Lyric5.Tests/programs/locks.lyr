@@ -1,0 +1,120 @@
+// Locks (design/v5/spec/06 G4, K6, N10; 10 §10). Expected stdout:
+//   counted 4000                      four threads add under one mutex
+//   in turn a1 a2 b1 b2               a body that waits keeps the mutex: the other task waits for it
+//   guard after its body: panicked    a guard used after its body ended panics
+//   readers at once 2                 readers share the lock
+//   written 9                         a writer replaces the value
+//   once ran 1                        four threads, one run
+//   attempts 2                        a run that threw leaves the work to the next call
+import std.io { println };
+import std.sync { Atomic };
+import std.task { spawn, sleep, yieldNow, Thread, Mutex, RwLock, Once, LockGuard, TaskStatus };
+import std.time { Duration };
+
+class Oops :: [Error] {
+    fn message(): string { return "oops"; }
+}
+
+fn add(m: Mutex<int>): void throws Error {
+    for (_ in 0..1000) {
+        try m.lock { it.set(it.get() + 1) };
+    }
+}
+
+fn describe(s: TaskStatus<int>): string {
+    return match (s) {
+        TaskStatus.Panicked(_) => "panicked",
+        _ => "not panicked",
+    };
+}
+
+fn main(): void throws Error {
+    let m = Mutex<int>.new(0);
+    let t1 = Thread.spawn(() => try add(m));
+    let t2 = Thread.spawn(() => try add(m));
+    let t3 = Thread.spawn(() => try add(m));
+    let t4 = Thread.spawn(() => try add(m));
+    try t1.await();
+    try t2.await();
+    try t3.await();
+    try t4.await();
+    let total = try m.lock { it.get() };
+    println(f"counted {total}");
+
+    let order = Mutex<string>.new("");
+    let a = spawn(() => {
+        try order.lock {
+            it.set(it.get() + "a1 ");
+            try sleep(Duration.ofMillis(5));
+            it.set(it.get() + "a2 ");
+        };
+    });
+    let b = spawn(() => {
+        try order.lock {
+            it.set(it.get() + "b1 ");
+            try yieldNow();
+            it.set(it.get() + "b2");
+        };
+    });
+    try a.await();
+    try b.await();
+    let log = try order.lock { it.get() };
+    println(f"in turn {log}");
+
+    var leaked: ?LockGuard<int> = null;
+    try m.lock { leaked = it; };
+    let misuse = spawn(() => leaked!.get());
+    try yieldNow();
+    println(f"guard after its body: {describe(misuse.status())}");
+
+    let rw = RwLock<int>.new(1);
+    var inside = 0;
+    var most = 0;
+    let r1 = spawn(() => {
+        try rw.read {
+            inside += 1;
+            most = if (inside > most) inside else most;
+            try yieldNow();
+            inside -= 1;
+        };
+    });
+    let r2 = spawn(() => {
+        try rw.read {
+            inside += 1;
+            most = if (inside > most) inside else most;
+            try yieldNow();
+            inside -= 1;
+        };
+    });
+    try r1.await();
+    try r2.await();
+    println(f"readers at once {most}");
+    try rw.write { it.set(9) };
+    let written = try rw.read { it };
+    println(f"written {written}");
+
+    let once = Once.new();
+    let runs = Atomic<int>.new(0);
+    let o1 = Thread.spawn(() => try once.run { runs.fetchAndAdd(1); });
+    let o2 = Thread.spawn(() => try once.run { runs.fetchAndAdd(1); });
+    let o3 = Thread.spawn(() => try once.run { runs.fetchAndAdd(1); });
+    let o4 = Thread.spawn(() => try once.run { runs.fetchAndAdd(1); });
+    try o1.await();
+    try o2.await();
+    try o3.await();
+    try o4.await();
+    println(f"once ran {runs.load()}");
+
+    let flaky = Once.new();
+    var attempts = 0;
+    try {
+        flaky.run {
+            attempts += 1;
+            throw Oops { };
+        };
+    } catch (_: Oops) {
+    }
+    try flaky.run { attempts += 1; };
+    try flaky.run { attempts += 1; };
+    println(f"attempts {attempts}");
+}
