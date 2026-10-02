@@ -79,6 +79,7 @@ public sealed class TypeChecker
     /// loads for a program with coroutines. Null without it — then a yield throws nothing and a
     /// coroutine has no <c>close()</c>.</summary>
     private readonly TypeSymbol? _cancelled;
+    private readonly TypeSymbol? _task;  // std.task's Task: besides a coroutine, the type that carries an error (10 §2)
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
@@ -120,6 +121,7 @@ public sealed class TypeChecker
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
+        _task = comp.FindModule(["std", "task"])?.Members.LookupLocal("Task") as TypeSymbol is { Kind: TypeSymbolKind.Class } task ? task : null;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
         _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
@@ -4600,12 +4602,22 @@ public sealed class TypeChecker
         CheckCallArgs(call, substituted, args, argTypes, decl);
 
         // What this call may throw, in its instance's terms (05 E2 K5): the exception analysis
-        // asks whether it is marked and covered.
-        if (substituted.Throws.Length > 0) _result.RecordCallThrows(call, substituted.Throws);
+        // asks whether it is marked and covered. 'task.await()' throws what the task's type says
+        // and, as every wait, 'Cancelled' (10 §2) — the handle's error is a thing of its type.
+        var thrownHere = AwaitedTask(call) is { } awaited && CancelledType is { } stopped
+            ? ThrownAfter(awaited.Throws is { } failure ? [failure, stopped] : [stopped])
+            : substituted.Throws;
+        if (thrownHere.Length > 0) _result.RecordCallThrows(call, thrownHere);
 
         // If the receiver was optional the result is too, collapsed, because optionals do not nest.
         return optionalCall ? Optionalized(substituted.Return) : substituted.Return;
     }
+
+    /// <summary>The task a call awaits — <c>t.await()</c> on a <c>Task</c> of std.task — or null.</summary>
+    private GenericInstance? AwaitedTask(CallExpr call) =>
+        _task is not null && call.Callee is MemberExpr { Member: "await", IsOptional: false } member
+        && _result.TypeOf(member.Target) is GenericInstance handle && ReferenceEquals(handle.Definition, _task)
+            ? handle : null;
 
     /// <summary>
     /// The declared type of parameter <paramref name="i"/>, but only when it names no type parameter
@@ -5075,7 +5087,11 @@ public sealed class TypeChecker
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
                 { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))) },
             GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
-                { Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray() },
+            {
+                Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray(),
+                // 'Task<T> throws E' at 'E = never' throws nothing (05 E2 K4).
+                Throws = gi.Throws is { } thrown && Substitute(thrown, map) is not NeverType and var bound ? bound : null,
+            },
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
             CoroutineOf co => co with { Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map) },
             AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
@@ -5129,7 +5145,7 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
             FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray() },
-            GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations },
+            GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
             _ => t,
@@ -8371,6 +8387,10 @@ public sealed class TypeChecker
         if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
             return LyrType.Equal(given.Yield, wanted.Yield) && LyrType.Equal(given.Result, wanted.Result);
 
+        // A task that cannot throw fits where one that may is expected (10 §2), for the same reason.
+        if (to is GenericInstance { Throws: not null } wantedTask && from is GenericInstance { Throws: null } givenTask)
+            return LyrType.Equal(givenTask, wantedTask with { Throws = null });
+
         // A function value that throws less fits where one may throw more (05 E2 K6): the same
         // parameters and return — no variance (03 T17) — and its set covered by the target's. Free
         // at run time, since every function value takes the error slot; never the way back, which
@@ -8605,16 +8625,21 @@ public sealed class TypeChecker
                 var carried = ResolveType(tt.Inner, scope);
                 if (carried.IsError) return carried;
 
-                // Only a coroutine. Everything else runs at its CALL, and a function's own
-                // 'throws' already says so there; a type-level one would be a second spelling for
-                // the same fact — and on a value that never runs anything, no spelling at all.
+                // A task carries the error its body may end with (05 E10, 10 §2), as a coroutine
+                // carries what its pulls throw.
+                if (carried is GenericInstance { Definition: var held } handle && _task is not null && ReferenceEquals(held, _task))
+                    return handle with { Throws = ThrownTypeOf(tt.Thrown, scope) };
+
+                // Only a coroutine and a task. Everything else runs at its CALL, and a function's
+                // own 'throws' already says so there; a type-level one would be a second spelling
+                // for the same fact — and on a value that never runs anything, no spelling at all.
                 // Once per node: a parameter or field type is resolved both while its declaration
                 // is checked and again through the function type at every call, and the reader
                 // does not need the same sentence twice.
                 if (carried is not CoroutineOf co)
                     return _reportedThrows.Add(tt) ? Report(tt.Span, "LYR-SEM0084",
-                        $"'throws' belongs to a coroutine type, and '{TypeFacts.Display(carried)}' "
-                        + "is not one — a call declares what it throws in its own signature")
+                        $"'throws' belongs to a coroutine or a task type, and '{TypeFacts.Display(carried)}' "
+                        + "is neither — a call declares what it throws in its own signature")
                         : LyrType.Error;
 
                 return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };

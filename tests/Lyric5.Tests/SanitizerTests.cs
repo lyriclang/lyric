@@ -118,6 +118,7 @@ public class SanitizerTests
     [InlineData("generator_lambdas", 0)]
     [InlineData("dynamic_yields", 0)]
     [InlineData("tasks", 0)]
+    [InlineData("spawn", 0)]
     [InlineData("task_panic", 101)]
     [InlineData("yield_in_task", 101)]
     [InlineData("yield_mismatch", 101)]
