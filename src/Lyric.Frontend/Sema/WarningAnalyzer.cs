@@ -152,7 +152,7 @@ internal sealed class WarningAnalyzer
                         break;
                     case ImportSelective selective:
                         for (var i = 0; i < selective.Names.Length; i++)
-                            WarnIfShadowsBuiltin(selective.Names[i], selective.NameSpans[i]);
+                            WarnIfShadowsBuiltin(selective.BoundName(i), selective.NameSpans[i]);
                         break;
                 }
             }
@@ -477,16 +477,19 @@ internal sealed class WarningAnalyzer
 
             foreach (var decl in ast.Declarations)
             {
-                if (decl is not ImportDecl { Clause: { } clause }) continue;
-                switch (clause)
+                if (decl is not ImportDecl { IsPublic: false } import) continue;
+                switch (import.Clause)
                 {
                     case ImportSelective selective:
                         for (var i = 0; i < selective.Names.Length; i++)
-                            WarnIfUnusedImport(module, selective.Names[i],
+                            WarnIfUnusedImport(module, selective.BoundName(i),
                                 selective.NameSpans[i], inFile);
                         break;
                     case ImportAlias alias:
                         WarnIfUnusedImport(module, alias.Alias, alias.Span, inFile);
+                        break;
+                    case null when _comp.Lyric5Modules && import.Path.Length > 0:
+                        WarnIfUnusedImport(module, import.Path[^1], import.Span, inFile);
                         break;
                 }
             }

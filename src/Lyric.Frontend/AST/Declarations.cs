@@ -53,7 +53,12 @@ public enum VisibilityWord
 }
 
 // --- imports ---
-public sealed record ImportDecl(string[] Path, ImportClause? Clause, Span Span) : Decl(Span);
+public sealed record ImportDecl(string[] Path, ImportClause? Clause, Span Span) : Decl(Span)
+{
+    /// <summary><c>pub import</c> (design/v5/spec/07 V3 I4): what it binds the module passes on —
+    /// a re-export. Without the word an import is its module's own.</summary>
+    public bool IsPublic { get; init; }
+}
 public abstract record ImportClause(Span Span) : Node(Span);
 /// <remarks><c>import a.b { x, y }</c>. <see cref="NameSpans"/> is parallel to
 /// <see cref="Names"/>: the clause is the one place an imported name stands that no use-site table
@@ -61,6 +66,14 @@ public abstract record ImportClause(Span Span) : Node(Span);
 public sealed record ImportSelective(string[] Names, Span Span) : ImportClause(Span)
 {
     public required Span[] NameSpans { get; init; }
+
+    /// <summary><c>{ f as g }</c> (design/v5/spec/07 V3 I2): the name each item is bound under,
+    /// by index — <c>null</c> where it keeps its own, and <c>null</c> as a whole when none is
+    /// renamed.</summary>
+    public string?[]? Renames { get; init; }
+
+    /// <summary>The name item <paramref name="i"/> is bound under in the importing module.</summary>
+    public string BoundName(int i) => Renames is { } renames && i < renames.Length && renames[i] is { } alias ? alias : Names[i];
 }
 public sealed record ImportAlias(string Alias, Span Span) : ImportClause(Span);       // import a.b as C
 

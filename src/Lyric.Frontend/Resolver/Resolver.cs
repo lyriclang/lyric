@@ -275,8 +275,15 @@ public sealed class Resolver
 
     // --- Pass 2: Imports ---
 
+    private readonly HashSet<ModuleSymbol> _importsResolved = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Binds a module's imports, once. A selective import asks for its target's first —
+    /// the names a <c>pub import</c> passes on (07 V3 I4) are members only once they are bound.
+    /// A module marks itself before its imports, so a cycle stops here; it is reported as one
+    /// (LYR-RES0005).</summary>
     private void ResolveImports(ModuleSymbol module)
     {
+        if (!_importsResolved.Add(module)) return;
         foreach (var decl in _comp.AstOf(module).Declarations)
             if (decl is ImportDecl imp)
                 ResolveImport(module, imp);
@@ -305,9 +312,10 @@ public sealed class Resolver
                     : new ExternalSymbol(name, imp.Path, imp), imp);
                 break;
             }
-            case ImportSelective sel: // import a.b { x, y };
+            case ImportSelective sel: // import a.b { x, y as z };
+                if (target is not null) ResolveImports(target);
                 for (var i = 0; i < sel.Names.Length; i++)
-                    foreach (var imported in ResolveSelective(module, sel.Names[i],
+                    foreach (var imported in ResolveSelective(module, sel.Names[i], sel.BoundName(i),
                                  i < sel.NameSpans.Length ? sel.NameSpans[i] : imp.Span, target, imp))
                         DeclareImport(module, imported, imp);
                 break;
@@ -323,10 +331,10 @@ public sealed class Resolver
     /// imports what it means, and since 3.0 a name may mean more than one function. The set stays
     /// a set here, so the call site chooses among the same candidates it would have at home.
     /// </returns>
-    private IReadOnlyList<Symbol> ResolveSelective(ModuleSymbol module, string name, Span at, ModuleSymbol? target,
-        ImportDecl imp)
+    private IReadOnlyList<Symbol> ResolveSelective(ModuleSymbol module, string name, string bound, Span at,
+        ModuleSymbol? target, ImportDecl imp)
     {
-        if (target is null) return [new ExternalSymbol(name, imp.Path, imp)]; // extern/opak
+        if (target is null) return [new ExternalSymbol(bound, imp.Path, imp)]; // extern/opak
 
         var found = target.Members.LookupLocal(name);
         if (found is null)
@@ -343,25 +351,39 @@ public sealed class Resolver
             var set = target.Members.OverloadsLocal(name);
             var visible = set.Where(f => _comp.Visible(f, module)).ToArray();
             if (visible.Length > 0 && visible.Length < set.Count)
-                return visible.Select(Symbol (fn) => new ImportBindingSymbol(name, fn, imp)).ToArray();
+                return visible.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
             if (visible.Length == 0 && !_comp.Visible(found, module))
                 _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
+            // A re-export passes on what is 'pub' and nothing narrower (07 V3 I4): what the
+            // module may name itself is not therefore every package's.
+            else if (imp.IsPublic && !_comp.Exported(found))
+                _de.Report("LYR-RES0010", Severity.Error, at,
+                    $"'{name}' is not pub, and 'pub import' passes on what is pub — mark it 'pub' where it is declared");
         }
         else if (!IsPublic(found))
             _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"'{name}' is not public in '{target.FullName}'");
 
         var overloads = target.Members.OverloadsLocal(name);
         if (overloads.Count < 2)
-            return [new ImportBindingSymbol(name, found, imp)]; // recovery: bind even when not public
+            return [new ImportBindingSymbol(bound, PassedOn(found), imp)]; // recovery: bind even when not public
 
         // A non-public member of the set is reported once, above, and imported all the same: the
         // recovery is the same one a single import gets.
-        return overloads.Select(Symbol (fn) => new ImportBindingSymbol(name, fn, imp)).ToArray();
+        return overloads.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
+    }
+
+    /// <summary>What a name a <c>pub import</c> passed on stands for (07 V3 I4), through every
+    /// re-export; anything else is itself.</summary>
+    private static Symbol PassedOn(Symbol symbol)
+    {
+        while (symbol is ImportBindingSymbol { Reexported: true } binding) symbol = binding.Target;
+        return symbol;
     }
 
     private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp)
     {
         sym.Home = module;
+        if (sym is ImportBindingSymbol binding) binding.Reexported = imp.IsPublic && _comp.Lyric5Modules;
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, imp.Span,
                 $"'{sym.Name}' is already declared in this module",

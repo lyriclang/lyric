@@ -260,16 +260,16 @@ public sealed class AstFormatter
 
     private Doc ImportDoc(ImportDecl decl)
     {
-        var path = string.Join(".", decl.Path);
+        var path = (decl.IsPublic ? "pub " : "") + "import " + string.Join(".", decl.Path);
         return decl.Clause switch
         {
-            null => Doc.From($"import {path};"),
-            ImportAlias a => Doc.From($"import {path} as {a.Alias};"),
+            null => Doc.From($"{path};"),
+            ImportAlias a => Doc.From($"{path} as {a.Alias};"),
             ImportSelective s => Doc.GroupOf(
-                Doc.From($"import {path} {{"),
+                Doc.From($"{path} {{"),
                 Doc.IndentOf(Doc.LineOrSpace,
                     Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                        s.Names.Select(Doc.From).ToArray()),
+                        s.Names.Select((name, i) => Doc.From(s.BoundName(i) == name ? name : $"{name} as {s.BoundName(i)}")).ToArray()),
                     Doc.WhenBroken(Doc.From(","))),
                 Doc.LineOrSpace, Doc.From("};")),
             _ => throw new InternalCompilationException("unreachable: unknown import clause"),

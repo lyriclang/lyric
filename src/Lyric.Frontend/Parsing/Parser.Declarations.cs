@@ -205,10 +205,21 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Import))
         {
             RejectAttributes(attributes, "an import");
-            return ParseImport();
+            return ParseImport(VisibilityWord.None, start);
         }
 
         var isPublic = ParseVisibility();
+
+        // 'pub import' passes on what it binds (07 V3 I4); an import is otherwise its module's own,
+        // and no other word says anything about it.
+        if (_buffer.Check(TokenKind.Import))
+        {
+            RejectAttributes(attributes, "an import");
+            if (isPublic is not VisibilityWord.Pub)
+                _de.Report("LYR-PAR0053", Severity.Error, start,
+                    "an import is its module's own — 'pub import' passes it on, and no other word goes here");
+            return ParseImport(isPublic, start);
+        }
 
         // 'sealed' before 'interface' (04 D8): a contextual word, and nothing else's.
         var isSealed = false;
@@ -352,15 +363,15 @@ public sealed partial class Parser
 
     // --- imports ---
 
-    private Decl ParseImport()
+    private Decl ParseImport(VisibilityWord word, Span start)
     {
-        var kw = _buffer.Advance(); // 'import'
+        _buffer.Advance(); // 'import'
         var path = ParseDottedName();
         ImportClause? clause = null;
         if (_buffer.Check(TokenKind.LBrace)) clause = ParseSelectiveImport();
         else if (_buffer.Check(TokenKind.As)) clause = ParseAliasImport();
         var semi = ExpectSemicolon();
-        return new ImportDecl(path, clause, Span.Union(kw.Span, semi.Span));
+        return new ImportDecl(path, clause, Span.Union(start, semi.Span)) { IsPublic = word == VisibilityWord.Pub };
     }
 
     private ImportClause ParseSelectiveImport()
@@ -368,11 +379,14 @@ public sealed partial class Parser
         var open = _buffer.Advance(); // '{'
         var names = new List<string>();
         var spans = new List<Span>();
+        var renames = new List<string?>();
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
             var (name, span) = ExpectNamed("LYR-PAR0026", "import item");
             names.Add(name);
             spans.Add(span);
+            // '{ f as g }' (07 V3 I2): bound here under the second name.
+            renames.Add(_buffer.Match(TokenKind.As) ? ExpectNamed("LYR-PAR0026", "name after 'as'").Name : null);
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close import list");
@@ -384,7 +398,7 @@ public sealed partial class Parser
                 "expected at least one import item — for the whole module, drop the braces");
 
         return new ImportSelective(names.ToArray(), Span.Union(open.Span, close.Span))
-            { NameSpans = spans.ToArray() };
+            { NameSpans = spans.ToArray(), Renames = renames.Any(r => r is not null) ? renames.ToArray() : null };
     }
 
     private ImportClause ParseAliasImport()
