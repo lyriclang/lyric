@@ -1,0 +1,59 @@
+// Channels (design/v5/spec/06 N5 K1; 10 §6). Expected stdout:
+//   pong 10 / pong 20 / pong 30 / closed true   an unbuffered ping-pong; closing ends the loop
+//   got a / c went in / got b c                 a full buffer makes the sender wait; order holds
+//   empty true / send on closed                 a closed, empty channel answers null; a send throws
+//   waiter cancelled true                       a cancel ends a wait in recv
+import std.io { println };
+import std.task { spawn, spawnDetached, yieldNow, Channel, ChannelClosed };
+
+fn main(): void throws Error {
+    let ping = Channel<int>.new();
+    let pong = Channel<int>.new();
+    spawnDetached(() => {
+        try {
+            while (let n = ping.recv()) {
+                pong.send(n * 10);
+            }
+            pong.close();
+        } catch (_: ChannelClosed) {
+        }
+    });
+    for (i in 1..4) {
+        try ping.send(i);
+        let r = try pong.recv();
+        println(f"pong {r ?? -1}");
+    }
+    ping.close();
+    let end = try pong.recv();
+    println(f"closed {end == null}");
+
+    let buf = Channel<string>.new(2);
+    try buf.send("a");
+    try buf.send("b");
+    let full = spawn(() => {
+        try buf.send("c");
+        println("c went in");
+    });
+    try yieldNow();
+    let first = try buf.recv();
+    println("got " + (first ?? "?"));
+    try full.await();
+    let second = try buf.recv();
+    let third = try buf.recv();
+    println("got " + (second ?? "?") + " " + (third ?? "?"));
+    buf.close();
+    let drained = try buf.recv();
+    println(f"empty {drained == null}");
+    try {
+        buf.send("d");
+    } catch (_: ChannelClosed) {
+        println("send on closed");
+    }
+
+    let idle = Channel<int>.new();
+    let waiter = spawn(() => try idle.recv());
+    try yieldNow();
+    waiter.cancel();
+    let w = try? waiter.await();
+    println(f"waiter cancelled {w == null}");
+}

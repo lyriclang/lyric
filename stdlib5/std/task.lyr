@@ -1,8 +1,8 @@
 /// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S4: a scheduler for
 /// the thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
 /// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
-/// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4).
-/// Timers and channels come with S5, threads with S6.
+/// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
+/// channels (N5 K1). `Select` and timers come with S5, threads with S6.
 module std.task;
 
 import std.time { Duration };
@@ -177,6 +177,181 @@ pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T th
     }
 }
 
+/// What `send` throws on a closed channel (06 K1).
+pub class ChannelClosed :: [Error] {
+    fn message(): string { return "channel closed"; }
+}
+
+/// A channel (06 N5 K1): values go in with `send` and come out with `recv`, in the order they went
+/// in. Unbuffered — a capacity of 0 — a send waits until a receiver takes the value; buffered, it
+/// waits only while the buffer is full. `close()` ends it: what is buffered can still be received,
+/// then `recv` answers null; a send throws `ChannelClosed`. Within one thread (S5); across threads
+/// with S6 (N7 P1).
+pub class Channel<T> {
+    capacity: int,
+    var buffered: int = 0,
+    var first: ?Item<T> = null,
+    var last: ?Item<T> = null,
+    var closed: bool = false,
+    /// The tasks waiting to send, each with its value, and those waiting to receive.
+    senders: WaitQueue<T>,
+    receivers: WaitQueue<T>,
+
+    /// A channel that holds up to `capacity` values no task has received yet; 0 — the default —
+    /// holds none: a send meets a receive.
+    pub static fn new(capacity: int = 0): Channel<T> {
+        return Channel<T> {
+            capacity = if (capacity > 0) capacity else 0,
+            senders = WaitQueue<T> { },
+            receivers = WaitQueue<T> { },
+        };
+    }
+
+    /// Puts `value` into the channel (06 K1): to a task waiting to receive, into the buffer while
+    /// there is room — else the running task waits until a receiver takes it. On a closed channel,
+    /// and when the channel closes while it waits, it throws `ChannelClosed`. A wait: a cancelled
+    /// task throws `Cancelled` (N9 X1).
+    pub mut fn send(value: T): void throws [ChannelClosed, Cancelled] {
+        let s = here();
+        let me = s.running ?? panic("a send where no task runs");
+        if (me.cancelled) { throw Cancelled { }; }
+        if (this.closed) { throw ChannelClosed { }; }
+        if (let r = this.receivers.take()) {
+            r.value = value;
+            r.settled = true;
+            s.ready(r.context);
+            return;
+        }
+        if (this.buffered < this.capacity) {
+            this.push(value);
+            return;
+        }
+        let w = Waiting<T> { context = me, value = value };
+        this.senders.add(w);
+        park();
+        if (w.settled) { return; }
+        if (me.cancelled) { throw Cancelled { }; }
+        throw ChannelClosed { };
+    }
+
+    /// The next value of the channel (06 K1): from the buffer, or from a task waiting to send —
+    /// else the running task waits for one. Null once the channel is closed and empty. A wait: a
+    /// cancelled task throws `Cancelled` (N9 X1).
+    pub mut fn recv(): ?T throws Cancelled {
+        let s = here();
+        let me = s.running ?? panic("a receive where no task runs");
+        if (me.cancelled) { throw Cancelled { }; }
+        if (let item = this.first) {
+            this.first = item.next;
+            if (item.next == null) { this.last = null; }
+            this.buffered -= 1;
+            if (let w = this.senders.take()) {
+                this.push(w.value!);
+                w.settled = true;
+                s.ready(w.context);
+            }
+            return item.value;
+        }
+        if (let w = this.senders.take()) {
+            w.settled = true;
+            s.ready(w.context);
+            return w.value;
+        }
+        if (this.closed) { return null; }
+        let w = Waiting<T> { context = me };
+        this.receivers.add(w);
+        park();
+        if (w.settled) { return w.value; }
+        if (me.cancelled) { throw Cancelled { }; }
+        return null;
+    }
+
+    /// Closes the channel (06 K1): the tasks waiting to receive get null, those waiting to send throw
+    /// `ChannelClosed`; what is buffered can still be received. Closing a closed channel does nothing.
+    pub mut fn close(): void {
+        if (this.closed) { return; }
+        this.closed = true;
+        let s = here();
+        while (let r = this.receivers.take()) {
+            s.ready(r.context);
+        }
+        while (let w = this.senders.take()) {
+            s.ready(w.context);
+        }
+    }
+
+    mut fn push(value: T): void {
+        let item = Item<T> { value = value };
+        if (let tail = this.last) {
+            tail.next = item;
+        } else {
+            this.first = item;
+        }
+        this.last = item;
+        this.buffered += 1;
+    }
+}
+
+/// A buffered value of a channel.
+class Item<T> {
+    value: T,
+    var next: ?Item<T> = null,
+}
+
+/// A task waiting on a channel: to send `value`, or to receive one into it. `settled` once the value
+/// went over.
+class Waiting<T> {
+    context: Context,
+    var value: ?T = null,
+    var settled: bool = false,
+    var next: ?Waiting<T> = null,
+    var prev: ?Waiting<T> = null,
+}
+
+/// The tasks waiting on one side of a channel, in the order they came; a cancel takes one out.
+class WaitQueue<T> {
+    var first: ?Waiting<T> = null,
+    var last: ?Waiting<T> = null,
+
+    mut fn add(w: Waiting<T>): void {
+        w.prev = this.last;
+        w.next = null;
+        if (let tail = this.last) {
+            tail.next = w;
+        } else {
+            this.first = w;
+        }
+        this.last = w;
+        w.context.unwait = () => {
+            this.remove(w);
+        };
+    }
+
+    mut fn remove(w: Waiting<T>): void {
+        if (let p = w.prev) {
+            p.next = w.next;
+        } else {
+            this.first = w.next;
+        }
+        if (let n = w.next) {
+            n.prev = w.prev;
+        } else {
+            this.last = w.prev;
+        }
+        w.prev = null;
+        w.next = null;
+        w.context.unwait = null;
+    }
+
+    /// The first task waiting, taken out — or null.
+    mut fn take(): ?Waiting<T> {
+        let w = this.first;
+        if (w == null) { return null; }
+        this.remove(w);
+        return w;
+    }
+}
+
 /// The tasks a scope starts end before it does (06 T5): structured concurrency. A scope is
 /// `Closeable` — `using let scope = TaskScope.new();` — and its `close()` waits until every task it
 /// started has ended. The first of them that fails cancels the others (N9 X3), and `close()`
@@ -326,8 +501,9 @@ class Context {
     /// The links of the ready queue, or of the waiting list it is in.
     var next: ?Context = null,
     var prev: ?Context = null,
-    /// The waiting list of the task it awaits, while it does.
-    var waitingOn: ?Waiters = null,
+    /// What takes it out of the place it waits in — a task's waiting list, a channel's queue —
+    /// while it waits there: a cancel calls it (06 N9 X1). The sleepers' heap is the scheduler's own.
+    var unwait: ?fn() -> void = null,
     /// In the sleepers' heap: its deadline on the monotonic clock, and when it fell asleep — the
     /// tie-break.
     var asleep: bool = false,
@@ -364,7 +540,9 @@ class Waiters {
             this.first = c;
         }
         this.last = c;
-        c.waitingOn = this;
+        c.unwait = () => {
+            this.remove(c);
+        };
     }
 
     mut fn remove(c: Context): void {
@@ -380,7 +558,7 @@ class Waiters {
         }
         c.prev = null;
         c.next = null;
-        c.waitingOn = null;
+        c.unwait = null;
     }
 
     mut fn wakeAll(s: Scheduler): void {
@@ -454,8 +632,8 @@ class Scheduler {
         if (c.asleep) {
             this.unsleep(c);
             this.ready(c);
-        } else if (let list = c.waitingOn) {
-            list.remove(c);
+        } else if (let unwait = c.unwait) {
+            unwait();
             this.ready(c);
         }
     }
