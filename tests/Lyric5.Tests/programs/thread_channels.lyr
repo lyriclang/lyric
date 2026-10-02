@@ -1,0 +1,88 @@
+// Channels across threads (design/v5/spec/06 N5 K1-K2, N7 P1; 10 §6, §7, §9). Expected stdout:
+//   pong 10 / pong 20 / pong 30 / closed true   an unbuffered ping-pong between two threads
+//   sum 20100 / count 200                       four producers on threads of their own, one consumer
+//   seen 5                                      a send happens before the receive that gets it
+//   first 1                                     a select on channels another thread feeds
+//   timed out                                   its timeout while no thread sends
+//   closed elsewhere true                       a close on another thread wakes a receiver
+import std.io { println };
+import std.task { sleep, Thread, Channel, ChannelClosed, Select };
+import std.time { Duration };
+
+fn produce(numbers: Channel<int>, from: int): void throws Error {
+    let end = from + 50;
+    for (i in from..end) {
+        try numbers.send(i);
+    }
+}
+
+fn main(): void throws Error {
+    let ping = Channel<int>.new();
+    let pong = Channel<int>.new();
+    let echo = Thread.spawn(() => {
+        try {
+            while (let n = ping.recv()) {
+                pong.send(n * 10);
+            }
+            pong.close();
+        } catch (_: ChannelClosed) {
+        }
+    });
+    for (i in 1..4) {
+        try ping.send(i);
+        let r = try pong.recv();
+        println(f"pong {r ?? -1}");
+    }
+    ping.close();
+    let end = try pong.recv();
+    println(f"closed {end == null}");
+    try echo.await();
+
+    let numbers = Channel<int>.new(8);
+    let p1 = Thread.spawn(() => try produce(numbers, 1));
+    let p2 = Thread.spawn(() => try produce(numbers, 51));
+    let p3 = Thread.spawn(() => try produce(numbers, 101));
+    let p4 = Thread.spawn(() => try produce(numbers, 151));
+    var sum = 0;
+    var count = 0;
+    while (count < 200) {
+        let v = try numbers.recv();
+        sum += v ?? 0;
+        count += 1;
+    }
+    try p1.await();
+    try p2.await();
+    try p3.await();
+    try p4.await();
+    println(f"sum {sum}");
+    println(f"count {count}");
+
+    var seen = 0;
+    let signal = Channel<bool>.new();
+    let writer = Thread.spawn(() => {
+        seen = 5;
+        try signal.send(true);
+    });
+    try signal.recv();
+    println(f"seen {seen}");
+    try writer.await();
+
+    let a = Channel<int>.new();
+    let b = Channel<int>.new();
+    let feeder = Thread.spawn(() => {
+        try a.send(1);
+    });
+    try Select.on(a) { println(f"first {it!}"); }.on(b) { println(f"second {it!}"); }.run();
+    try feeder.await();
+
+    try Select.on(b) { println("a value"); }.timeout(Duration.ofMillis(20)) { println("timed out"); }.run();
+
+    let quiet = Channel<int>.new();
+    let closer = Thread.spawn(() => {
+        try sleep(Duration.ofMillis(10));
+        quiet.close();
+    });
+    let got = try quiet.recv();
+    println(f"closed elsewhere {got == null}");
+    try closer.await();
+}
