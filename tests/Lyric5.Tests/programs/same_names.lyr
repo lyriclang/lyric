@@ -1,0 +1,26 @@
+// A generic method of a plain class and a free generic function of the same name and module are
+// two functions — the instance's name carries the class — and each call reaches its own, with the
+// same type arguments. Expected stdout, a line each: free 1 method 2 free 3.
+import std.io { println };
+
+class Holder {
+    fn pick<T>(x: T): T {
+        println("method");
+        return x;
+    }
+}
+
+fn pick<T>(x: T): T {
+    println("free");
+    return x;
+}
+
+fn main(): int {
+    let a = pick(1);
+    println(f"{a}");
+    let b = Holder { }.pick(2);
+    println(f"{b}");
+    let c = pick(3);
+    println(f"{c}");
+    return 0;
+}

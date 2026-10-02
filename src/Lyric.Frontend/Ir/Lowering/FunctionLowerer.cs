@@ -5669,7 +5669,14 @@ internal sealed class FunctionLowerer
             // The frontend was happy -- 'check' passes -- and the module the writer produced was
             // then refused by its own reader with "block at 0 ends with 1 value(s) on the stack".
             // Only 'check --emit' or a real build ever asked.
-            target = _instances.Request(symbol, generic, calleeName, receiverOwner,
+            //
+            // And its class goes into the instance's name: 'TaskScope.spawn<int, Oops>' and a free
+            // 'spawn<int, Oops>' of the same module are two functions. Under the bare name they
+            // were one key, and the free function's call landed on the method, one argument short.
+            var instanceName = receiverOwner is { } holder && !calleeName.StartsWith(holder.Name + ".", StringComparison.Ordinal)
+                ? $"{holder.Name}.{calleeName}"
+                : calleeName;
+            target = _instances.Request(symbol, generic, instanceName, receiverOwner,
                 typeArguments, _typeTable, expr.Span);
         }
         else if (!TryResolveFunction(symbol, out target))
