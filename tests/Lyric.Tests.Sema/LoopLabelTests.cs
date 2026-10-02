@@ -11,7 +11,8 @@ namespace Lyric.Tests.Sema;
 /// <c>continue outer</c> name it back. A label is no symbol — it shares nothing with the value
 /// namespace and is scoped to its loop's body. Three diagnostics guard the form: a label nothing
 /// jumps to (a warning), a label repeating an enclosing one (ambiguous, refused), and a jump to a
-/// label no enclosing loop carries.
+/// label no enclosing loop carries. And <c>loop</c> (design/v5/spec/05 E11): the value its breaks
+/// give, never without one, the jumps held to a loop of their own function.
 /// </summary>
 public class LoopLabelTests
 {
@@ -162,4 +163,72 @@ public class LoopLabelTests
             """);
         Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
     }
+
+    // ------------------------------------------------------------------ loop (05 E11)
+
+    [Fact]
+    public void A_loop_gives_what_its_breaks_give()
+    {
+        var de = Check("""
+            fn f(xs: int[]): int {
+                var i = 0;
+                let found: int = loop {
+                    if (xs[i] > 2) { break xs[i]; }
+                    i += 1;
+                };
+                return found;
+            }
+            """);
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
+    }
+
+    [Fact]
+    public void An_endless_loop_needs_no_return() =>
+        Assert.False(Check("fn f(): int { loop { } }").HasErrors);
+
+    [Fact]
+    public void A_loop_nothing_leaves_is_never_and_fits_where_any_type_is_expected() =>
+        Assert.False(Check("fn f(): int { let n: int = loop { }; }").HasErrors);
+
+    [Theory]
+    [InlineData("fn f() { break; }", "LYR-SEM0147")]
+    [InlineData("fn f() { continue; }", "LYR-SEM0147")]
+    [InlineData("fn f() { while (true) { let g = () => { break; }; } }", "LYR-SEM0147")]
+    [InlineData("fn f() { while (true) { break 1; } }", "LYR-SEM0148")]
+    [InlineData("fn f() { for (i in 0..3) { break i; } }", "LYR-SEM0148")]
+    [InlineData("fn f(c: bool): int { return loop { if (c) { break; } break 1; }; }", "LYR-SEM0149")]
+    public void A_jump_is_held_to_a_loop_of_its_own_function(string source, string code) =>
+        Assert.Contains(Check(source).Diagnostics, d => d.Code == code);
+
+    [Fact]
+    public void A_label_around_a_lambda_is_out_of_its_reach() =>
+        Assert.Contains(Check("fn f() { outer: while (true) { let g = () => { break outer; }; } }").Diagnostics,
+            d => d.Code == "LYR-SEM0101");
+
+    [Fact]
+    public void A_variable_assigned_before_every_break_is_assigned_after_the_loop()
+    {
+        Assert.False(Check("fn f(): int { var x: int; loop { x = 1; break; } return x; }").HasErrors);
+        Assert.Contains(Check("fn f(c: bool): int { var x: int; loop { if (c) { break; } x = 1; break; } return x; }").Diagnostics,
+            d => d.Code == "LYR-SEM0018");
+    }
+
+    // A branch that jumps adds nothing to what follows the 'if' — the continuation follows the
+    // other; a 'do' loop reaches its condition from every 'continue' and is left by every 'break'.
+    [Theory]
+    [InlineData("fn f(c: bool): int { var x: int; var i = 0; while (i < 3) { if (c) { x = i; } else { break; } i = x + 1; } return i; }")]
+    [InlineData("fn f(c: bool): int { var x: int; loop { if (c) { continue; } else { x = 1; } return x; } }")]
+    [InlineData("fn f(c: bool, d: bool): int { var x: int; do { x = 1; if (c) { break; } } while (d); return x; }")]
+    [InlineData("fn f(k: int): int { var x: int; match (k) { 1 => { x = 1; } _ => panic(\"no\"), } return x; }")]
+    public void A_variable_assigned_on_every_way_on_is_assigned(string source)
+    {
+        var de = Check(source);
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("fn f(c: bool, d: bool): int { var x: int; do { if (c) { break; } x = 1; } while (d); return x; }")]
+    [InlineData("fn f(c: bool): int { var x: int; do { if (c) { continue; } x = 1; } while (x < 3); return 0; }")]
+    public void A_jump_in_a_do_loop_is_a_way_past_the_assignment(string source) =>
+        Assert.Contains(Check(source).Diagnostics, d => d.Code == "LYR-SEM0018");
 }

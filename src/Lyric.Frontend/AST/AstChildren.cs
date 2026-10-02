@@ -189,7 +189,9 @@ public static class AstChildren
                 yield return f.Body;
                 break;
 
-            case BreakStmt:
+            case BreakStmt br:
+                if (br.Value is not null) yield return br.Value;
+                break;
             case ContinueStmt:
                 break;
 
@@ -360,6 +362,9 @@ public static class AstChildren
                 yield return i.Condition;
                 yield return i.Then;
                 yield return i.Else;
+                break;
+            case LoopExpr l:
+                yield return l.Body;
                 break;
 
             case MatchExpr m:

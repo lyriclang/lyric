@@ -1413,6 +1413,10 @@ internal sealed class FunctionLowerer
     private bool LowerBreak(BreakStmt stmt)
     {
         var loop = TargetLoop(stmt.Label, "break", stmt.Span);
+        // A value goes into the loop's slot first, as a 'return' takes its value before the defers
+        // run (05 E11).
+        if (stmt.Value is { } value && loop.ValueSlot is { } slot)
+            _b.Emit(new StoreLocal(slot, LowerExprAs(value, loop.ValueType!), value.Span));
         // A break leaves every scope between it and the loop it names — their defers run first,
         // innermost first, down to the depth the target loop was entered at (§7.5).
         if (EmitLeavingDefers(_defers.Count - loop.DeferDepth)) _b.Seal(new Branch(loop.BreakTarget, stmt.Span));
@@ -1910,6 +1914,38 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
+    /// <c>loop { … }</c> (05 E11): the body, and back to its start. Only a <c>break</c> leaves — with
+    /// a value through a synthetic local the exit reads. The exit exists once a break was lowered
+    /// (<see cref="LoopScope"/>): a loop nothing leaves has none, and nothing after it runs — its
+    /// type is 'never', or its breaks stood only where no path goes.
+    /// </summary>
+    private TempId? LowerLoop(LoopExpr loop)
+    {
+        var valueType = _types.TypeOf(loop) is NeverType ? null : TypeOfExpr(loop);
+        LocalId? slot = valueType is not null && !IsVoid(valueType) ? _slots.DeclareSynthetic("loop", valueType) : null;
+
+        var head = _b.NewBlock();
+        _b.Seal(new Branch(head, loop.Span));
+        _b.SwitchTo(head);
+        var scope = new LoopScope(_b, head)
+            { DeferDepth = _defers.Count, Label = loop.Label, ValueSlot = slot, ValueType = valueType };
+        _loops.Push(scope);
+        try { if (LowerScope(loop.Body)) _b.Seal(new Branch(head, loop.Body.Span)); }
+        finally { _loops.Pop(); }
+
+        if (!scope.BreakRequested)
+        {
+            if (slot is not null) throw new Diverged(); // where a value was wanted, the statement ends
+            return null;
+        }
+        _b.SwitchTo(scope.BreakTarget);
+        if (slot is not { } kept) return null;
+        var dest = _slots.NewTemp(valueType!);
+        _b.Emit(new LoadLocal(dest, kept, valueType!, loop.Span));
+        return dest;
+    }
+
+    /// <summary>
     /// <c>while (let P = e) { … }</c>: the initializer is evaluated and the pattern tried before
     /// every iteration; a miss leaves the loop. The exit block arises on demand — from the
     /// pattern's failure path or from a <c>break</c> — so an irrefutable pattern without a break
@@ -2050,6 +2086,7 @@ internal sealed class FunctionLowerer
         TypeTestExpr typeTest => LowerTypeTest(typeTest),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
+        LoopExpr e => LowerLoop(e),
 
         InterpolatedStringExpr e => LowerInterpolatedString(e),
 

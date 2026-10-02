@@ -503,6 +503,34 @@ public sealed class AstFormatter
     /// <summary>The label before a loop, 'outer: ', or nothing.</summary>
     private static Doc LabelDoc(string? label) => Doc.From(label is null ? "" : label + ": ");
 
+    /// <summary>The labels of the loops around what is being formatted, innermost last: a 'break'
+    /// value that is a bare name of one is parenthesized, or it would read back as the label.</summary>
+    private readonly List<string> _loopLabels = new();
+
+    /// <summary>A loop body formatted with its label in scope.</summary>
+    private Doc Labeled(string? label, Func<Doc> body)
+    {
+        if (label is null) return body();
+        _loopLabels.Add(label);
+        try { return body(); }
+        finally { _loopLabels.RemoveAt(_loopLabels.Count - 1); }
+    }
+
+    /// <summary>'break', its label, its value (05 E11, 08 S4).</summary>
+    private Doc BreakDoc(BreakStmt b)
+    {
+        var parts = new List<Doc> { Doc.From(b.Label is null ? "break" : $"break {b.Label}") };
+        if (b.Value is { } value)
+        {
+            parts.Add(Doc.Space);
+            parts.Add(value is IdentifierExpr { Name: var name } && _loopLabels.Contains(name)
+                ? Doc.Of(Doc.From("("), ExprDoc(value, Assign), Doc.From(")"))
+                : ExprDoc(value, Assign));
+        }
+        parts.Add(Doc.From(";"));
+        return new Doc.Concat(parts);
+    }
+
     private Doc StmtDoc(Stmt stmt) => stmt switch
     {
         Block b => BlockDoc(b),
@@ -511,15 +539,15 @@ public sealed class AstFormatter
         LetPatternStmt lp => LetPatternDoc(lp),
         IfStmt s => IfStmtDoc(s),
         WhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("while ("), ExprDoc(s.Condition, Assign),
-            Doc.From(") "), BlockDoc(s.Body)),
-        DoWhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("do "), BlockDoc(s.Body),
+            Doc.From(") "), Labeled(s.Label, () => BlockDoc(s.Body))),
+        DoWhileStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("do "), Labeled(s.Label, () => BlockDoc(s.Body)),
             Doc.From(" while ("), ExprDoc(s.Condition, Assign), Doc.From(");")),
         // Both halves: the head may be a PATTERN ('for ((k, v) in …)') and the loop may carry a
         // LABEL. Written as one, neither is lost when the other is present.
         ForInStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("for ("),
             s.Pattern is { } loopPattern ? PatternDoc(loopPattern) : Doc.From(s.Variable),
-            Doc.From(" in "), ExprDoc(s.Iterable, Assign), Doc.From(") "), BlockDoc(s.Body)),
-        BreakStmt b => Doc.From(b.Label is null ? "break;" : $"break {b.Label};"),
+            Doc.From(" in "), ExprDoc(s.Iterable, Assign), Doc.From(") "), Labeled(s.Label, () => BlockDoc(s.Body))),
+        BreakStmt b => BreakDoc(b),
         ContinueStmt c => Doc.From(c.Label is null ? "continue;" : $"continue {c.Label};"),
         ReturnStmt s => s.Value is null
             ? Doc.From("return;")
@@ -532,6 +560,8 @@ public sealed class AstFormatter
         MatchStmt s => MatchDoc(s.Scrutinee, s.Arms, s.Span),
         TryStmt s => TryDoc(s),
         ExprStmt { Expr: CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } } s => ExprDoc(s.Expr, Assign),
+        // A loop is a statement of its own: no ';' after its block.
+        ExprStmt { Expr: LoopExpr } s => ExprDoc(s.Expr, Assign),
         ExprStmt s => Doc.Of(ExprDoc(s.Expr, Assign), Doc.From(";")),
         TailExprStmt t => ExprDoc(t.Expr, Assign), // the tail: no ';', that is what makes it one
         _ => throw new InternalCompilationException($"unreachable: unformatted {stmt.GetType().Name}"),
@@ -804,6 +834,7 @@ public sealed class AstFormatter
             Doc.LineOrNothing, Doc.From(")")),
 
         LambdaExpr l => LambdaDoc(l),
+        LoopExpr l => Doc.Of(LabelDoc(l.Label), Doc.From("loop "), Labeled(l.Label, () => BlockDoc(l.Body))),
         IfExpr i => Doc.GroupOf(Doc.From("if ("), ExprDoc(i.Condition, Assign), Doc.From(") "),
             ExprDoc(i.Then, Assign), Doc.LineOrSpace, Doc.From("else "), ExprDoc(i.Else, Assign)),
         MatchExpr m => MatchDoc(m.Scrutinee, m.Arms, m.Span),

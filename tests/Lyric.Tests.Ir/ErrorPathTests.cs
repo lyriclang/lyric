@@ -466,4 +466,30 @@ public class ErrorPathTests
         Assert.Equal(2, Terminators(f).Count(t => t is Unreachable));
         Assert.DoesNotContain(Terminators(f), t => t is Return);
     }
+
+    // --- loop (05 E11) ---
+
+    [Fact]
+    public void A_loop_nothing_leaves_has_no_exit()
+    {
+        var module = Lowered("""
+            fn spin(): int { loop { note(); } }
+            fn main(): int { return spin(); }
+            """);
+        var spin = Fn(module, "spin");
+        Assert.DoesNotContain(Terminators(spin), t => t is Return);
+        Assert.Contains(Terminators(spin), t => t is Branch);
+    }
+
+    [Fact]
+    public void A_loops_value_waits_in_a_slot_for_its_exit()
+    {
+        var module = Lowered("""
+            fn pick(n: int): int { var i = 0; let v = loop { if (i == n) { break i * 2; } i = i + 1; }; return v; }
+            fn main(): int { return pick(3); }
+            """);
+        var pick = Fn(module, "pick");
+        Assert.Contains(pick.Locals, l => l.Name.Contains("loop", StringComparison.Ordinal));
+        Assert.Single(Terminators(pick).OfType<Return>());
+    }
 }

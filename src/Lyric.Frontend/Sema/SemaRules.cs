@@ -249,7 +249,10 @@ public sealed class SemaRules
                 WalkExpr(fo.Iterable);
                 WalkLoopBody(fo.Body, fo.Label, fo.LabelSpan);
                 break;
-            case BreakStmt br when br.Label is { } target: ResolveLabel(target, br.LabelSpan, "break"); break;
+            case BreakStmt br:
+                if (br.Label is { } breakLabel) ResolveLabel(breakLabel, br.LabelSpan, "break");
+                if (br.Value is not null) WalkExpr(br.Value);
+                break;
             case ContinueStmt co when co.Label is { } target: ResolveLabel(target, co.LabelSpan, "continue"); break;
             case ReturnStmt r: if (r.Value is not null) WalkExpr(r.Value); break;
             case ThrowStmt t: WalkExpr(t.Value); break;
@@ -318,7 +321,7 @@ public sealed class SemaRules
     private void CheckExprStmt(ExprStmt es)
     {
         // 'try f();' is the call it marks (05 E4).
-        var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ResumeExpr or ThrowExpr
+        var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ResumeExpr or ThrowExpr or LoopExpr
             or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } or ErrorExpr;
         if (!ok)
             _de.Report("LYR-SEM0022", Severity.Error, es.Span, "expression statement has no effect (only calls, assignments and resume are allowed)");
@@ -357,8 +360,19 @@ public sealed class SemaRules
             // 'Children', it was never walked at all, and an assignment to a captured 'let' went
             // to the lowering, which has no diagnostic for it and threw.
             case LambdaExpr lambda:
+            {
+                // Its own loops only (08 Y11 F5): a label around the lambda is out of its reach.
+                var outer = _labels.ToList();
+                _labels.Clear();
                 if (lambda.Body is Block block) WalkStmt(block);
                 else if (lambda.Body is Expr body) WalkExpr(body);
+                _labels.Clear();
+                _labels.AddRange(outer);
+                return;
+            }
+
+            case LoopExpr loop:
+                WalkLoopBody(loop.Body, loop.Label, loop.LabelSpan);
                 return;
 
             // The BLOCK arms of a match expression, for the same reason: 'Children' collects the

@@ -51,6 +51,68 @@ public class ParserTests
         Assert.Null(Assert.IsType<ContinueStmt>(stmt).Label);
     }
 
+    // --- loop (05 E11, 08 S3/S4) ---
+
+    [Fact]
+    public void A_loop_at_the_start_of_a_statement_is_one()
+    {
+        var (stmt, de) = ParseStatement("loop { break; }");
+        Assert.False(de.HasErrors);
+        var loop = Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(stmt).Expr);
+        Assert.IsType<BreakStmt>(Assert.Single(loop.Body.Statements));
+    }
+
+    [Fact]
+    public void A_loop_is_an_expression_elsewhere_and_may_be_labeled_there()
+    {
+        var (expr, de) = Parse("outer: loop { loop { break outer 1; } }");
+        Assert.False(de.HasErrors);
+        var loop = Assert.IsType<LoopExpr>(expr);
+        Assert.Equal("outer", loop.Label);
+        var inner = Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(Assert.Single(loop.Body.Statements)).Expr);
+        var jump = Assert.IsType<BreakStmt>(Assert.Single(inner.Body.Statements));
+        Assert.Equal("outer", jump.Label);
+        Assert.IsType<IntLiteralExpr>(jump.Value);
+    }
+
+    [Fact]
+    public void A_name_after_break_is_a_label_only_where_a_loop_around_carries_it()
+    {
+        var (stmt, de) = ParseStatement("outer: loop { break x; break outer; break (outer); }");
+        Assert.False(de.HasErrors);
+        var body = Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(stmt).Expr).Body.Statements;
+        var value = Assert.IsType<BreakStmt>(body[0]);
+        Assert.Null(value.Label);
+        Assert.Equal("x", Assert.IsType<IdentifierExpr>(value.Value).Name);
+        var label = Assert.IsType<BreakStmt>(body[1]);
+        Assert.Equal("outer", label.Label);
+        Assert.Null(label.Value);
+        var parenthesized = Assert.IsType<BreakStmt>(body[2]);
+        Assert.Null(parenthesized.Label);
+        Assert.NotNull(parenthesized.Value);
+    }
+
+    [Fact]
+    public void A_lambdas_body_sees_no_label_of_the_loops_around_it()
+    {
+        var (stmt, de) = ParseStatement("outer: loop { let g = () => { loop { break outer; } }; }");
+        Assert.False(de.HasErrors);
+        var binding = Assert.IsType<BindingStmt>(Assert.Single(Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(stmt).Expr).Body.Statements));
+        var lambda = Assert.IsType<LambdaExpr>(binding.Initializer);
+        var inner = Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(Assert.Single(Assert.IsType<Block>(lambda.Body).Statements)).Expr);
+        var jump = Assert.IsType<BreakStmt>(Assert.Single(inner.Body.Statements));
+        Assert.Null(jump.Label);
+        Assert.Equal("outer", Assert.IsType<IdentifierExpr>(jump.Value).Name);
+    }
+
+    [Fact]
+    public void Loop_is_a_word_only_before_its_brace()
+    {
+        var (expr, de) = Parse("loop + 1");
+        Assert.False(de.HasErrors);
+        Assert.IsType<BinaryExpr>(expr);
+    }
+
     // --- throw as a prefix expression ---
 
     /// <summary>'throw' binds like a prefix operator: 'x ?? throw e' is the coalesce with a throw on
