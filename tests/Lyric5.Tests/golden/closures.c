@@ -43,11 +43,10 @@ typedef struct lyr_vt_ty34 lyr_vt_ty34;
 const char lyr_ifid_ty34[] = "std.core.Hasher";
 typedef struct lyr_ty35_Split lyr_ty35_Split;
 typedef struct lyr_ty36_Lines lyr_ty36_Lines;
-typedef struct lyr_ty37__env_std_core_StringBuilder_reserve_ lyr_ty37__env_std_core_StringBuilder_reserve_;
-typedef struct lyr_ty38_Sip lyr_ty38_Sip;
-typedef struct lyr_ty39_DefaultHasher lyr_ty39_DefaultHasher;
-typedef struct lyr_ty40_FixedHasher lyr_ty40_FixedHasher;
-typedef struct lyr_ty41_Fnv1a64 lyr_ty41_Fnv1a64;
+typedef struct lyr_ty37_Sip lyr_ty37_Sip;
+typedef struct lyr_ty38_DefaultHasher lyr_ty38_DefaultHasher;
+typedef struct lyr_ty39_FixedHasher lyr_ty39_FixedHasher;
+typedef struct lyr_ty40_Fnv1a64 lyr_ty40_Fnv1a64;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -267,17 +266,7 @@ struct lyr_ty36_Lines {
     LyrStr *f_s;
     int64_t f_at;
 };
-struct lyr_ty37__env_std_core_StringBuilder_reserve_ {
-    LyrObj header;
-    int64_t f_kept;
-    LyrArr *f_old;
-};
-_Static_assert(sizeof(lyr_ty37__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty37__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty37__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
-static const uint64_t lyr_refmap_ty37[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty37__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty37__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty37, "<env:std.core.StringBuilder.reserve>", NULL };
-struct lyr_ty38_Sip {
+struct lyr_ty37_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -286,13 +275,13 @@ struct lyr_ty38_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty39_DefaultHasher {
-    lyr_ty38_Sip f_state;
+struct lyr_ty38_DefaultHasher {
+    lyr_ty37_Sip f_state;
 };
-struct lyr_ty40_FixedHasher {
-    lyr_ty38_Sip f_state;
+struct lyr_ty39_FixedHasher {
+    lyr_ty37_Sip f_state;
 };
-struct lyr_ty41_Fnv1a64 {
+struct lyr_ty40_Fnv1a64 {
     uint64_t f_state;
 };
 typedef struct { void (*fn)(void *, lyr_ty0__tuple_, LyrErr **); void *env; } lyr_fn_ty0_to_void;

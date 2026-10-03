@@ -23,11 +23,10 @@ typedef struct lyr_vt_ty14 lyr_vt_ty14;
 const char lyr_ifid_ty14[] = "std.core.Hasher";
 typedef struct lyr_ty15_Split lyr_ty15_Split;
 typedef struct lyr_ty16_Lines lyr_ty16_Lines;
-typedef struct lyr_ty17__env_std_core_StringBuilder_reserve_ lyr_ty17__env_std_core_StringBuilder_reserve_;
-typedef struct lyr_ty18_Sip lyr_ty18_Sip;
-typedef struct lyr_ty19_DefaultHasher lyr_ty19_DefaultHasher;
-typedef struct lyr_ty20_FixedHasher lyr_ty20_FixedHasher;
-typedef struct lyr_ty21_Fnv1a64 lyr_ty21_Fnv1a64;
+typedef struct lyr_ty17_Sip lyr_ty17_Sip;
+typedef struct lyr_ty18_DefaultHasher lyr_ty18_DefaultHasher;
+typedef struct lyr_ty19_FixedHasher lyr_ty19_FixedHasher;
+typedef struct lyr_ty20_Fnv1a64 lyr_ty20_Fnv1a64;
 struct lyr_ty2_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -111,17 +110,7 @@ struct lyr_ty16_Lines {
     LyrStr *f_s;
     int64_t f_at;
 };
-struct lyr_ty17__env_std_core_StringBuilder_reserve_ {
-    LyrObj header;
-    int64_t f_kept;
-    LyrArr *f_old;
-};
-_Static_assert(sizeof(lyr_ty17__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty17__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty17__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty17__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty17__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty17__env_std_core_StringBuilder_reserve_");
-static const uint64_t lyr_refmap_ty17[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty17__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty17__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty17, "<env:std.core.StringBuilder.reserve>", NULL };
-struct lyr_ty18_Sip {
+struct lyr_ty17_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -130,13 +119,13 @@ struct lyr_ty18_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty19_DefaultHasher {
-    lyr_ty18_Sip f_state;
+struct lyr_ty18_DefaultHasher {
+    lyr_ty17_Sip f_state;
 };
-struct lyr_ty20_FixedHasher {
-    lyr_ty18_Sip f_state;
+struct lyr_ty19_FixedHasher {
+    lyr_ty17_Sip f_state;
 };
-struct lyr_ty21_Fnv1a64 {
+struct lyr_ty20_Fnv1a64 {
     uint64_t f_state;
 };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");

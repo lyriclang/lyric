@@ -222,6 +222,17 @@ LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form) {
     return text;
 }
 
+void lyr_bytes_put_str(LyrArr *bytes, int64_t at, const LyrStr *s) {
+    if (at < 0 || at > bytes->len - s->len) lyr_panic_range(at, at + s->len, bytes->len);
+    memcpy(bytes->data + at, s->bytes, (size_t)s->len);
+}
+
+void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count) {
+    int64_t room = into->len < from->len ? into->len : from->len;
+    if (count < 0 || count > room) lyr_panic_range(0, count, room);
+    memmove(into->data, from->data, (size_t)count);
+}
+
 /* The text strtod reads: the string's own bytes (NUL-terminated, 11 X3) when it has no '_', else
  * a copy without them — on the stack while it fits, on the heap beyond. */
 static const char *float_text(const LyrStr *text, char *buffer, size_t size, char **owned) {

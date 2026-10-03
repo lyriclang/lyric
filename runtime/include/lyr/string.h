@@ -48,6 +48,11 @@ LyrStr *lyr_str_from_char(uint32_t value);
  * 2 the same in upper case (`%.*E`) — rounded to nearest on the exact binary value. `nan` (`NAN`),
  * `inf` and `-inf` keep their words. */
 LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form);
+/* A byte array's bulk copies, for std.core's StringBuilder: a string's bytes into `bytes` from
+ * `at` on, and the first `count` bytes of one array into another — memcpy, the ranges checked as
+ * an index is. */
+void lyr_bytes_put_str(LyrArr *bytes, int64_t at, const LyrStr *s);
+void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count);
 
 /* The float a text names, the nearest one (10 B5 Z6): a text whose form std.core checked — sign,
  * digits, '.', exponent, `inf`, `nan` — with the '_' between digits skipped; strtod and strtof round

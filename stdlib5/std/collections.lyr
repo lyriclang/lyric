@@ -438,8 +438,11 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             var hits = (x -% lowBits) & ~x & highBits;
             while (hits != 0) {
                 let slot = g * 8 + hits.trailingZeros() / 8;
-                if (this.slotKeys[slot] == k) {
-                    return slot;
+                // unwrapped: the key's own equality, not the optionals' (measurement point 3)
+                if (let key = this.slotKeys[slot]) {
+                    if (key == k) {
+                        return slot;
+                    }
                 }
                 hits = hits & (hits -% 1);
             }
