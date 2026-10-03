@@ -83,6 +83,37 @@ fn anIteratorIsIterableAsItself(): void {
 }
 
 @Test
+fn anArrayIsWalkedFromBothEnds(): void {
+    let xs = [1, 2, 3];
+    var it = xs.iter();
+    let (all, most) = it.sizeHint();
+    assertEq(all, 3);
+    assertEq(most ?? -1, 3);
+    assertEq(it.nextBack() ?? -1, 3);
+    assertEq(it.next() ?? -1, 1);
+    let (left, _) = it.sizeHint();
+    assertEq(left, 1);
+    assertEq(it.next() ?? -1, 2);
+    assertNull(it.next());
+    assertNull(it.nextBack());
+    let (none, _) = it.sizeHint();
+    assertEq(none, 0);
+}
+
+@Test
+fn anArrayAndAViewAreIterable(): void {
+    let xs = [5, 6, 7, 8];
+    assertEq(first(xs) ?? -1, 5);
+    assertEq(first(xs[2..]) ?? -1, 7);
+    let empty: int[] = [];
+    assertNull(first(empty));
+    var it = xs[1..3].iter();
+    assertEq(it.nextBack() ?? -1, 7);
+    assertEq(it.nextBack() ?? -1, 6);
+    assertNull(it.nextBack());
+}
+
+@Test
 fn forWalksARangeAndAnIterator(): void {
     var seen = "";
     for (i in 2..5) { seen = seen + f"{i}"; }

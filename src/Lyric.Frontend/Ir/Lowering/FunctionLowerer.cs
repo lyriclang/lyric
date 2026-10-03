@@ -1717,6 +1717,9 @@ internal sealed class FunctionLowerer
         if (_types.ForInOf(stmt) is { } protocol)
             return LowerForInProtocol(stmt, protocol, loopVar);
 
+        if (_types.IsIndexed(stmt))
+            return LowerIndexed(stmt, loopVar);
+
         var (iterator, iteratorType, owner, yieldOverride) = BuildIterator(stmt);
         var elementType = LowerType(loopVar.Type, stmt.Span);
         // What the iterator PRODUCES: the range adapters carry i64/u64 regardless of the
@@ -1778,6 +1781,72 @@ internal sealed class FunctionLowerer
         // once, with the last iteration's values (the 2.0.1 bug).
         if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
         _loops.Pop();
+
+        _b.SwitchTo(exitBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>for (x in xs)</c> over an array, a view or an inline array in Lyric 5 (design/v5/spec/10
+    /// B6 I10, COL-09 B): the index loop. The sequence is evaluated once into a hidden slot — an
+    /// inline array copied there, as a binding copies it —, its length read once, and the element
+    /// at the index read at every pass: a write to a later element of an array is seen. No
+    /// iterator and no optional per element, so an element that is itself optional walks.
+    /// </summary>
+    private bool LowerIndexed(ForInStmt stmt, LocalSymbol loopVar)
+    {
+        var span = stmt.Span;
+        var i64 = new IrScalarType(IrScalar.I64);
+        var sequenceType = TypeOfExpr(stmt.Iterable);
+        var element = ElementOf(sequenceType)
+                      ?? throw Bug($"an index loop over a '{TypeFacts.Display(_types.TypeOf(stmt.Iterable))}'");
+        var sequence = _slots.DeclareSynthetic("each", sequenceType);
+        _b.Emit(new StoreLocal(sequence, LowerExprAs(stmt.Iterable, sequenceType), span));
+        var whole = _slots.NewTemp(sequenceType);
+        _b.Emit(new LoadLocal(whole, sequence, sequenceType, span));
+        var length = _slots.NewTemp(i64);
+        _b.Emit(new ArrayLen(length, whole, span));
+        var count = _slots.DeclareSynthetic("count", i64);
+        _b.Emit(new StoreLocal(count, length, span));
+        var index = _slots.DeclareSynthetic("index", i64);
+        _b.Emit(new StoreLocal(index, IntConstant(0, span), span));
+
+        var condBlock = _b.NewBlock();
+        _b.Seal(new Branch(condBlock, span));
+        _b.SwitchTo(condBlock);
+        var at = _slots.NewTemp(i64);
+        _b.Emit(new LoadLocal(at, index, i64, span));
+        var bound = _slots.NewTemp(i64);
+        _b.Emit(new LoadLocal(bound, count, i64, span));
+        var goesOn = _slots.NewTemp(BoolType);
+        _b.Emit(new BinOp(goesOn, IrBinKind.Lt, BoolType, at, bound, span));
+        var bodyBlock = _b.NewBlock();
+        var stepBlock = _b.NewBlock();
+        var exitBlock = _b.NewBlock();
+        _b.Seal(new CondBranch(goesOn, bodyBlock, exitBlock, span));
+
+        _b.SwitchTo(bodyBlock);
+        var current = _slots.NewTemp(sequenceType);
+        _b.Emit(new LoadLocal(current, sequence, sequenceType, span));
+        var value = _slots.NewTemp(element);
+        _b.Emit(new LoadElem(value, current, at, element, span));
+        var variable = _slots.DeclareFor(loopVar, element);
+        _b.Emit(new StoreLocal(variable, value, span));
+        if (stmt.Pattern is { } pattern)
+            LowerPattern(pattern, value, element,
+                () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
+
+        _loops.Push(new LoopScope(_b, stepBlock, exitBlock) { DeferDepth = _defers.Count, Label = stmt.Label });
+        if (LowerScope(stmt.Body)) _b.Seal(new Branch(stepBlock, stmt.Body.Span));
+        _loops.Pop();
+
+        _b.SwitchTo(stepBlock);
+        var again = _slots.NewTemp(i64);
+        _b.Emit(new LoadLocal(again, index, i64, span));
+        var next = _slots.NewTemp(i64);
+        _b.Emit(new BinOp(next, IrBinKind.Add, i64, again, IntConstant(1, span), span));
+        _b.Emit(new StoreLocal(index, next, span));
+        _b.Seal(new Branch(condBlock, span));
 
         _b.SwitchTo(exitBlock);
         return true;

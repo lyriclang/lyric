@@ -1614,6 +1614,57 @@ extend<T :: [Integer]> Range<T> :: [Iterator, DoubleEnded] {
     }
 }
 
+/// The iterator of an array or a view (10 B6 I10): its elements from the front and from the
+/// back, through a view of them — nothing is copied, and a write to a later element is seen.
+pub struct SliceIter<T> {
+    items: Slice<T>,
+    var front: int,
+    var back: int,
+}
+
+extend<T> SliceIter<T> :: [Iterator, DoubleEnded] {
+    type Item = T;
+
+    mut fn next(): ?T {
+        if (this.front >= this.back) {
+            return null;
+        }
+        this.front = this.front + 1;
+        return this.items[this.front - 1];
+    }
+
+    mut fn nextBack(): ?T {
+        if (this.front >= this.back) {
+            return null;
+        }
+        this.back = this.back - 1;
+        return this.items[this.back];
+    }
+
+    /// Exactly the elements left.
+    fn sizeHint(): (int, ?int) {
+        let left = this.back - this.front;
+        let most: ?int = left;
+        return (left, most);
+    }
+}
+
+extend<T> T[] :: [Iterable] {
+    type Iter = SliceIter<T>;
+
+    fn iter(): SliceIter<T> {
+        return SliceIter<T> { items = this, front = 0, back = this.length() };
+    }
+}
+
+extend<T> Slice<T> :: [Iterable] {
+    type Iter = SliceIter<T>;
+
+    fn iter(): SliceIter<T> {
+        return SliceIter<T> { items = this, front = 0, back = this.length() };
+    }
+}
+
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
 // before `start` where that value is the type's `max` (`min` from the back), so neither bound
 // leaves the type.

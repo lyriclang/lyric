@@ -300,6 +300,14 @@ public sealed class TypeResult
 
     public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
 
+    /// <summary>A <c>for</c> over an array, a view or an inline array in Lyric 5: the index loop
+    /// (design/v5/spec/10 B6 I10).</summary>
+    private readonly HashSet<ForInStmt> _indexed = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkIndexed(ForInStmt loop) => _indexed.Add(loop);
+
+    public bool IsIndexed(ForInStmt loop) => _indexed.Contains(loop);
+
     public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
 
     /// <summary>

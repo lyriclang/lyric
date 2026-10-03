@@ -2145,14 +2145,19 @@ public sealed class TypeChecker
         // compiler walks itself goes through the protocol.
         var protocol = _coreIterable is not null
                        && !(fo.Iterable is RangeExpr && iterType is RangeOf)
-                       && iterType is not (ArrayOf or SliceOf or ErrorType)
+                       && iterType is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType)
                        && iterType is not PrimitiveType { Kind: PrimitiveKind.String };
+        // An array, a view, an inline array: the index loop (10 B6 I10, COL-09 B), no iterator.
+        var indexed = _coreIterable is not null && iterType is ArrayOf or SliceOf or InlineArrayOf;
+        if (indexed) _result.MarkIndexed(fo);
         var elem = protocol ? CheckForInProtocol(fo, iterType, scope) : iterType switch
         {
             // The three built-in forms. They have no declaration a conformance could hang on, so the
             // compiler builds an adapter from std.iter for them. Semantically the same protocol; only
             // the way it is obtained differs.
             ArrayOf a => a.Element,
+            SliceOf s => s.Element,
+            InlineArrayOf ia => ia.Element,
             RangeOf r => r.Element,
             PrimitiveType { Kind: PrimitiveKind.String } => LyrType.Char,
 
@@ -2178,7 +2183,7 @@ public sealed class TypeChecker
         // '??i64' in the IR, which crashed the verifier in debug and, in release, wrote a module
         // the loader refuses. 'check' answered 'ok' either way. Lyric 5's protocol has '??T' (10
         // B6 I1): 'next()' answers '??T' for an Item '?T', and the loop gets the inner level.
-        if (elem is Optional && !protocol)
+        if (elem is Optional && !protocol && !indexed)
             _de.Report("LYR-SEM0091", Severity.Error, fo.Iterable.Span,
                 $"iterating this yields '{TypeFacts.Display(elem)}', and an iterator already "
                 + "answers null to mean the end — an optional element cannot be told apart from it",
@@ -2188,7 +2193,7 @@ public sealed class TypeChecker
         if (protocol && !elem.IsError) NoteWalk(fo, iterType);
 
         var loopScope = new SymbolTable(scope);
-        var loopVar = new LocalSymbol(fo.Variable, elem is Optional && !protocol ? LyrType.Error : elem,
+        var loopVar = new LocalSymbol(fo.Variable, elem is Optional && !protocol && !indexed ? LyrType.Error : elem,
             false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
@@ -5896,10 +5901,12 @@ public sealed class TypeChecker
         {
             // A built-in conforms through its block alone ('extend int :: [Add]'): its answers
             // hang on the builtin's symbol, found by the type's name.
-            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target)
+            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target
+                || IsShapeBlock(block))
             {
-                // A blanket or shape block answers for every type it reaches (05 §13 rules 6, 8).
-                if (block.Decl.Interfaces.Length > 0 && (block.IsBlanketTarget || block.IsConstructorTarget))
+                // A blanket or shape block answers for every type it reaches (05 §13 rules 6, 8) —
+                // a view's too, whose 'Slice' symbol no question about a 'Slice<int>' asks.
+                if (block.Decl.Interfaces.Length > 0 && (block.IsBlanketTarget || IsShapeBlock(block)))
                 {
                     _currentModule = block.Module;
                     BindBlockAnswers(block);
