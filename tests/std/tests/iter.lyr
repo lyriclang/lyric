@@ -1,6 +1,6 @@
 // std.core's iteration protocol (design/v5/spec/10 B6): ranges from both ends, the size hint, an
 // iterator iterable as itself.
-import std.test { assertEq, assertNull };
+import std.test { assertEq, assertNull, assertTrue };
 
 struct Countdown :: [Iterator] {
     type Item = int;
@@ -203,6 +203,50 @@ fn chainWalksOneThenTheOther(): void {
     assertEq(text((0..2).chain(5..7)), "0156");
     assertEq(text((0..0).chain(3..4)), "3");
     assertEq(text([1, 2].iter().chain([3].iter())), "123");
+}
+
+@Test
+fn countFoldReduce(): void {
+    assertEq((0..5).count(), 5);
+    assertEq((0..0).count(), 0);
+    assertEq((1..5).fold(0, (acc, v) => acc + v), 10);
+    assertEq((1..4).map((v) => f"{v}").fold("", (acc, s) => acc + s), "123");
+    assertEq((1..5).reduce((a, b) => a * b) ?? -1, 24);
+    assertNull((0..0).reduce((a, b) => a + b));
+}
+
+@Test
+fn firstLastNth(): void {
+    assertEq((3..9).first() ?? -1, 3);
+    assertEq((3..9).last() ?? -1, 8);
+    assertEq((3..9).nth(2) ?? -1, 5);
+    assertNull((3..9).nth(6));
+    assertNull((3..9).nth(-1));
+    assertNull((0..0).first());
+    assertNull((0..0).last());
+}
+
+@Test
+fn predicatesStopEarly(): void {
+    let c = Counting { n = 0, pulls = 0 };
+    assertTrue(c.any((v) => v == 3));
+    assertEq(c.pulls, 3);
+    assertTrue((1..5).all((v) => v > 0));
+    assertTrue((0..0).all((v) => v > 99));
+    assertTrue((1..5).none((v) => v > 9));
+    assertEq((1..9).find((v) => v * v > 10) ?? -1, 4);
+    assertEq((1..9).position((v) => v == 4) ?? -1, 3);
+    assertNull((1..9).position((v) => v == 40));
+}
+
+@Test
+fn forEachAndToArray(): void {
+    let c = Counting { n = 0, pulls = 0 };
+    (0..4).forEach((v) => { c.pulls = c.pulls + v; });
+    assertEq(c.pulls, 6);
+    let xs = (2..5).toArray();
+    assertEq(xs.length(), 3);
+    assertEq(xs[2], 4);
 }
 
 @Test
