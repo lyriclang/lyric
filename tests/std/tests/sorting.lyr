@@ -1,0 +1,130 @@
+// std.core's sort family (design/v5/spec/10 C10): stable sorts keep equal elements in order, the
+// unstable one sorts in place; on arrays and on views.
+import std.core { arrayOf };
+import std.test { assertEq, assertTrue };
+
+struct Tagged {
+    key: int,
+    at: int,
+}
+
+/// A fixed pseudo-random sequence (a linear congruential generator), duplicates included.
+fn scrambled(n: int, spread: int): int[] {
+    var state = 12345;
+    var xs: int[] = [0] * n;
+    var i = 0;
+    while (i < n) {
+        state = (state * 1103515245 + 12345) % 2147483648;
+        xs[i] = state % spread;
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn isSorted(xs: int[]): bool {
+    var i = 1;
+    while (i < xs.length()) {
+        if (xs[i - 1] > xs[i]) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn total(xs: int[]): int {
+    var s = 0;
+    for (x in xs) {
+        s = s + x * 31 + 7;
+    }
+    return s;
+}
+
+@Test
+fn sortOrdersAscending(): void {
+    let xs = [5, 2, 9, 1, 5, 6];
+    xs.sort();
+    assertEq(xs.join(","), "1,2,5,5,6,9");
+    let none: int[] = [];
+    none.sort();
+    assertEq(none.length(), 0);
+    let one = [3];
+    one.sort();
+    assertEq(one[0], 3);
+}
+
+@Test
+fn sortAcrossTheMergePasses(): void {
+    for (n in [17, 100, 1000, 1024]) {
+        let xs = scrambled(n, 50);
+        let before = total(xs);
+        xs.sort();
+        assertTrue(isSorted(xs));
+        assertEq(total(xs), before);
+    }
+}
+
+@Test
+fn sortKeepsEqualKeysInOrder(): void {
+    var items: Tagged[] = [];
+    var i = 0;
+    while (i < 40) {
+        items = items + [Tagged { key = (i * 7) % 5, at = i }];
+        i = i + 1;
+    }
+    items.sortByKey((t) => t.key);
+    var j = 1;
+    while (j < items.length()) {
+        let a = items[j - 1];
+        let b = items[j];
+        assertTrue(a.key < b.key || (a.key == b.key && a.at < b.at));
+        j = j + 1;
+    }
+    assertEq(items[0].at, 0);
+    assertEq(items[1].at, 5);
+    assertEq(items[39].at, 37);
+}
+
+@Test
+fn sortByTakesTheComparison(): void {
+    let xs = [3, 1, 2];
+    xs.sortBy((a, b) => b.totalCompare(a));
+    assertEq(xs.join(","), "3,2,1");
+}
+
+@Test
+fn aViewSortsItsPart(): void {
+    let xs = [9, 8, 7, 6, 5, 4];
+    xs[1..4].sort();
+    assertEq(xs.join(","), "9,6,7,8,5,4");
+    xs[3..].sortUnstable();
+    assertEq(xs.join(","), "9,6,7,4,5,8");
+}
+
+@Test
+fn sortUnstableSortsInPlace(): void {
+    for (n in [0, 1, 2, 16, 17, 100, 1000, 5000]) {
+        let xs = scrambled(n, 1000);
+        let ys = scrambled(n, 1000);
+        xs.sortUnstable();
+        ys.sort();
+        assertEq(xs.join(","), ys.join(","));
+    }
+}
+
+@Test
+fn sortUnstableTakesDuplicatesAndOrderedInput(): void {
+    let same = [4] * 300;
+    same.sortUnstable();
+    assertTrue(isSorted(same));
+    let few = scrambled(2000, 3);
+    few.sortUnstable();
+    assertTrue(isSorted(few));
+    let up = arrayOf(500, (i) => i);
+    up.sortUnstable();
+    assertTrue(isSorted(up));
+    let down = arrayOf(500, (i) => 500 - i);
+    down.sortUnstable();
+    assertTrue(isSorted(down));
+    assertEq(down[0], 1);
+}

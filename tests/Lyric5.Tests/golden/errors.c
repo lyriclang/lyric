@@ -19,7 +19,11 @@ typedef struct lyr_ty9_ParseErrorKind lyr_ty9_ParseErrorKind;
 typedef struct lyr_ty10_ParseErrorKind_Empty lyr_ty10_ParseErrorKind_Empty;
 typedef struct lyr_ty11_ParseErrorKind_Invalid lyr_ty11_ParseErrorKind_Invalid;
 typedef struct lyr_ty12_ParseErrorKind_Overflow lyr_ty12_ParseErrorKind_Overflow;
-typedef struct lyr_ty13_Exception lyr_ty13_Exception;
+typedef struct lyr_ty13_Ordering lyr_ty13_Ordering;
+typedef struct lyr_ty14_Ordering_Less lyr_ty14_Ordering_Less;
+typedef struct lyr_ty15_Ordering_Equal lyr_ty15_Ordering_Equal;
+typedef struct lyr_ty16_Ordering_Greater lyr_ty16_Ordering_Greater;
+typedef struct lyr_ty17_Exception lyr_ty17_Exception;
 struct lyr_ty1_ParseError_Empty {
     uint8_t lyr_unit;
 };
@@ -76,16 +80,27 @@ _Static_assert(sizeof(lyr_ty9_ParseErrorKind) == 4, "layout of lyr_ty9_ParseErro
 struct lyr_ty8_ParseError {
     lyr_ty9_ParseErrorKind f_kind;
 };
-struct lyr_ty13_Exception {
+struct lyr_ty14_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty15_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty16_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty13_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty13_Ordering) == 4, "layout of lyr_ty13_Ordering");
+struct lyr_ty17_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface3 f_inner;
 };
-_Static_assert(sizeof(lyr_ty13_Exception) == 40, "layout of lyr_ty13_Exception");
-_Static_assert(offsetof(lyr_ty13_Exception, f_text) == 8, "layout of lyr_ty13_Exception");
-_Static_assert(offsetof(lyr_ty13_Exception, f_inner) == 16, "layout of lyr_ty13_Exception");
-static const uint64_t lyr_refmap_ty13[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty13_Exception = { sizeof(lyr_ty13_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty13, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty17_Exception) == 40, "layout of lyr_ty17_Exception");
+_Static_assert(offsetof(lyr_ty17_Exception, f_text) == 8, "layout of lyr_ty17_Exception");
+_Static_assert(offsetof(lyr_ty17_Exception, f_inner) == 16, "layout of lyr_ty17_Exception");
+static const uint64_t lyr_refmap_ty17[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty17_Exception = { sizeof(lyr_ty17_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty17, "std.core.Exception", NULL };
 typedef struct { LyrObj header; lyr_ty0_ParseError value; } lyr_box_ty0_ParseError;
 _Static_assert(sizeof(lyr_box_ty0_ParseError) == 32, "layout of lyr_box_ty0_ParseError");
 _Static_assert(offsetof(lyr_box_ty0_ParseError, value) == 8, "layout of lyr_box_ty0_ParseError");

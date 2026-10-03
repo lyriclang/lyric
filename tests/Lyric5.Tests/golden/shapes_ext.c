@@ -12,7 +12,11 @@ typedef struct lyr_ty4_ParseErrorKind_Invalid lyr_ty4_ParseErrorKind_Invalid;
 typedef struct lyr_ty5_ParseErrorKind_Overflow lyr_ty5_ParseErrorKind_Overflow;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
 const char lyr_ifid_ty6[] = "std.core.Error";
-typedef struct lyr_ty7_Exception lyr_ty7_Exception;
+typedef struct lyr_ty7_Ordering lyr_ty7_Ordering;
+typedef struct lyr_ty8_Ordering_Less lyr_ty8_Ordering_Less;
+typedef struct lyr_ty9_Ordering_Equal lyr_ty9_Ordering_Equal;
+typedef struct lyr_ty10_Ordering_Greater lyr_ty10_Ordering_Greater;
+typedef struct lyr_ty11_Exception lyr_ty11_Exception;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     LyrStr *f_1;
@@ -36,17 +40,28 @@ struct lyr_vt_ty6 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+struct lyr_ty8_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty9_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty10_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty7_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty7_Ordering) == 4, "layout of lyr_ty7_Ordering");
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface6;
-struct lyr_ty7_Exception {
+struct lyr_ty11_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface6 f_inner;
 };
-_Static_assert(sizeof(lyr_ty7_Exception) == 40, "layout of lyr_ty7_Exception");
-_Static_assert(offsetof(lyr_ty7_Exception, f_text) == 8, "layout of lyr_ty7_Exception");
-_Static_assert(offsetof(lyr_ty7_Exception, f_inner) == 16, "layout of lyr_ty7_Exception");
-static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty7_Exception = { sizeof(lyr_ty7_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty11_Exception) == 40, "layout of lyr_ty11_Exception");
+_Static_assert(offsetof(lyr_ty11_Exception, f_text) == 8, "layout of lyr_ty11_Exception");
+_Static_assert(offsetof(lyr_ty11_Exception, f_inner) == 16, "layout of lyr_ty11_Exception");
+static const uint64_t lyr_refmap_ty11[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty11_Exception = { sizeof(lyr_ty11_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty11, "std.core.Exception", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 typedef struct { int64_t *ptr; int64_t len; } lyr_slice_i64;
 _Static_assert(sizeof(lyr_slice_i64) == 16, "layout of lyr_slice_i64");

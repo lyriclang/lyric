@@ -35,30 +35,34 @@ typedef struct lyr_ty26_ParseErrorKind lyr_ty26_ParseErrorKind;
 typedef struct lyr_ty27_ParseErrorKind_Empty lyr_ty27_ParseErrorKind_Empty;
 typedef struct lyr_ty28_ParseErrorKind_Invalid lyr_ty28_ParseErrorKind_Invalid;
 typedef struct lyr_ty29_ParseErrorKind_Overflow lyr_ty29_ParseErrorKind_Overflow;
-typedef struct lyr_ty30_Exception lyr_ty30_Exception;
-typedef struct lyr_ty31__env_std_task_spawnDetached_ lyr_ty31__env_std_task_spawnDetached_;
-typedef struct lyr_ty32_Cancelled lyr_ty32_Cancelled;
-typedef struct lyr_ty33_TimedOut lyr_ty33_TimedOut;
-typedef struct lyr_ty34_ChannelClosed lyr_ty34_ChannelClosed;
-typedef struct lyr_ty35_Selection lyr_ty35_Selection;
-typedef struct lyr_ty36_CaseNode lyr_ty36_CaseNode;
-typedef struct lyr_vt_ty37 lyr_vt_ty37;
-const char lyr_ifid_ty37[] = "std.task.SelectCase";
-typedef struct lyr_ty38_GuardNode lyr_ty38_GuardNode;
-typedef struct lyr_ty39_Channel_void_ lyr_ty39_Channel_void_;
-typedef struct lyr_ty40_Item_void_ lyr_ty40_Item_void_;
-typedef struct lyr_ty41_WaitQueue_void_ lyr_ty41_WaitQueue_void_;
-typedef struct lyr_ty42_Waiting_void_ lyr_ty42_Waiting_void_;
-typedef struct lyr_ty43__env_std_task_Timer_after_ lyr_ty43__env_std_task_Timer_after_;
-typedef struct lyr_ty44_Once lyr_ty44_Once;
-typedef struct lyr_ty45_LockState lyr_ty45_LockState;
-typedef struct lyr_ty46_Task_void_ lyr_ty46_Task_void_;
-typedef struct lyr_ty47_Pool lyr_ty47_Pool;
-typedef struct lyr_ty48_Worker lyr_ty48_Worker;
-typedef struct lyr_ty49__env_std_task_Worker_start_ lyr_ty49__env_std_task_Worker_start_;
-typedef struct lyr_ty50__env_std_task_spawn_void__never__ lyr_ty50__env_std_task_spawn_void__never__;
-typedef struct lyr_ty51__env_std_task_launchOn_void__never__ lyr_ty51__env_std_task_launchOn_void__never__;
-typedef struct lyr_ty52__env_std_task_launchOn_void__never__ lyr_ty52__env_std_task_launchOn_void__never__;
+typedef struct lyr_ty30_Ordering lyr_ty30_Ordering;
+typedef struct lyr_ty31_Ordering_Less lyr_ty31_Ordering_Less;
+typedef struct lyr_ty32_Ordering_Equal lyr_ty32_Ordering_Equal;
+typedef struct lyr_ty33_Ordering_Greater lyr_ty33_Ordering_Greater;
+typedef struct lyr_ty34_Exception lyr_ty34_Exception;
+typedef struct lyr_ty35__env_std_task_spawnDetached_ lyr_ty35__env_std_task_spawnDetached_;
+typedef struct lyr_ty36_Cancelled lyr_ty36_Cancelled;
+typedef struct lyr_ty37_TimedOut lyr_ty37_TimedOut;
+typedef struct lyr_ty38_ChannelClosed lyr_ty38_ChannelClosed;
+typedef struct lyr_ty39_Selection lyr_ty39_Selection;
+typedef struct lyr_ty40_CaseNode lyr_ty40_CaseNode;
+typedef struct lyr_vt_ty41 lyr_vt_ty41;
+const char lyr_ifid_ty41[] = "std.task.SelectCase";
+typedef struct lyr_ty42_GuardNode lyr_ty42_GuardNode;
+typedef struct lyr_ty43_Channel_void_ lyr_ty43_Channel_void_;
+typedef struct lyr_ty44_Item_void_ lyr_ty44_Item_void_;
+typedef struct lyr_ty45_WaitQueue_void_ lyr_ty45_WaitQueue_void_;
+typedef struct lyr_ty46_Waiting_void_ lyr_ty46_Waiting_void_;
+typedef struct lyr_ty47__env_std_task_Timer_after_ lyr_ty47__env_std_task_Timer_after_;
+typedef struct lyr_ty48_Once lyr_ty48_Once;
+typedef struct lyr_ty49_LockState lyr_ty49_LockState;
+typedef struct lyr_ty50_Task_void_ lyr_ty50_Task_void_;
+typedef struct lyr_ty51_Pool lyr_ty51_Pool;
+typedef struct lyr_ty52_Worker lyr_ty52_Worker;
+typedef struct lyr_ty53__env_std_task_Worker_start_ lyr_ty53__env_std_task_Worker_start_;
+typedef struct lyr_ty54__env_std_task_spawn_void__never__ lyr_ty54__env_std_task_spawn_void__never__;
+typedef struct lyr_ty55__env_std_task_launchOn_void__never__ lyr_ty55__env_std_task_launchOn_void__never__;
+typedef struct lyr_ty56__env_std_task_launchOn_void__never__ lyr_ty56__env_std_task_launchOn_void__never__;
 struct lyr_ty0_Scheduler {
     LyrObj header;
     lyr_ty1_Context *f_first;
@@ -333,60 +337,71 @@ _Static_assert(sizeof(lyr_ty26_ParseErrorKind) == 4, "layout of lyr_ty26_ParseEr
 struct lyr_ty25_ParseError {
     lyr_ty26_ParseErrorKind f_kind;
 };
-struct lyr_ty30_Exception {
+struct lyr_ty31_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty32_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty33_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty30_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty30_Ordering) == 4, "layout of lyr_ty30_Ordering");
+struct lyr_ty34_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface6 f_inner;
 };
-_Static_assert(sizeof(lyr_ty30_Exception) == 40, "layout of lyr_ty30_Exception");
-_Static_assert(offsetof(lyr_ty30_Exception, f_text) == 8, "layout of lyr_ty30_Exception");
-_Static_assert(offsetof(lyr_ty30_Exception, f_inner) == 16, "layout of lyr_ty30_Exception");
-static const uint64_t lyr_refmap_ty30[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty30_Exception = { sizeof(lyr_ty30_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty30, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty34_Exception) == 40, "layout of lyr_ty34_Exception");
+_Static_assert(offsetof(lyr_ty34_Exception, f_text) == 8, "layout of lyr_ty34_Exception");
+_Static_assert(offsetof(lyr_ty34_Exception, f_inner) == 16, "layout of lyr_ty34_Exception");
+static const uint64_t lyr_refmap_ty34[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty34_Exception = { sizeof(lyr_ty34_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty34, "std.core.Exception", NULL };
 typedef struct { void (*fn)(void *, LyrErr **); void *env; } lyr_fn_to_void;
 _Static_assert(sizeof(lyr_fn_to_void) == 16, "layout of lyr_fn_to_void");
-struct lyr_ty31__env_std_task_spawnDetached_ {
+struct lyr_ty35__env_std_task_spawnDetached_ {
     LyrObj header;
     lyr_fn_to_void f_body;
 };
-_Static_assert(sizeof(lyr_ty31__env_std_task_spawnDetached_) == 24, "layout of lyr_ty31__env_std_task_spawnDetached_");
-_Static_assert(offsetof(lyr_ty31__env_std_task_spawnDetached_, f_body) == 8, "layout of lyr_ty31__env_std_task_spawnDetached_");
-static const uint64_t lyr_refmap_ty31[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty31__env_std_task_spawnDetached_ = { sizeof(lyr_ty31__env_std_task_spawnDetached_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty31, "<env:std.task.spawnDetached>", NULL };
-struct lyr_ty32_Cancelled {
+_Static_assert(sizeof(lyr_ty35__env_std_task_spawnDetached_) == 24, "layout of lyr_ty35__env_std_task_spawnDetached_");
+_Static_assert(offsetof(lyr_ty35__env_std_task_spawnDetached_, f_body) == 8, "layout of lyr_ty35__env_std_task_spawnDetached_");
+static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty35__env_std_task_spawnDetached_ = { sizeof(lyr_ty35__env_std_task_spawnDetached_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "<env:std.task.spawnDetached>", NULL };
+struct lyr_ty36_Cancelled {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty32_Cancelled) == 8, "layout of lyr_ty32_Cancelled");
-extern const LyrItable lyr_itab_ty32[];
-const LyrDesc lyr_desc_ty32_Cancelled = { sizeof(lyr_ty32_Cancelled), 0, 0, 0, NULL, "std.task.Cancelled", lyr_itab_ty32 };
-struct lyr_ty33_TimedOut {
+_Static_assert(sizeof(lyr_ty36_Cancelled) == 8, "layout of lyr_ty36_Cancelled");
+extern const LyrItable lyr_itab_ty36[];
+const LyrDesc lyr_desc_ty36_Cancelled = { sizeof(lyr_ty36_Cancelled), 0, 0, 0, NULL, "std.task.Cancelled", lyr_itab_ty36 };
+struct lyr_ty37_TimedOut {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty33_TimedOut) == 8, "layout of lyr_ty33_TimedOut");
-const LyrDesc lyr_desc_ty33_TimedOut = { sizeof(lyr_ty33_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
-struct lyr_ty34_ChannelClosed {
+_Static_assert(sizeof(lyr_ty37_TimedOut) == 8, "layout of lyr_ty37_TimedOut");
+const LyrDesc lyr_desc_ty37_TimedOut = { sizeof(lyr_ty37_TimedOut), 0, 0, 0, NULL, "std.task.TimedOut", NULL };
+struct lyr_ty38_ChannelClosed {
     LyrObj header;
 };
-_Static_assert(sizeof(lyr_ty34_ChannelClosed) == 8, "layout of lyr_ty34_ChannelClosed");
-const LyrDesc lyr_desc_ty34_ChannelClosed = { sizeof(lyr_ty34_ChannelClosed), 0, 0, 0, NULL, "std.task.ChannelClosed", NULL };
+_Static_assert(sizeof(lyr_ty38_ChannelClosed) == 8, "layout of lyr_ty38_ChannelClosed");
+const LyrDesc lyr_desc_ty38_ChannelClosed = { sizeof(lyr_ty38_ChannelClosed), 0, 0, 0, NULL, "std.task.ChannelClosed", NULL };
 typedef struct { lyr_fn_to_void value; uint8_t has; } lyr_opt_fn_to_void;
-struct lyr_ty35_Selection {
+struct lyr_ty39_Selection {
     LyrObj header;
-    lyr_ty36_CaseNode *f_first;
-    lyr_ty36_CaseNode *f_last;
-    lyr_ty38_GuardNode *f_guards;
+    lyr_ty40_CaseNode *f_first;
+    lyr_ty40_CaseNode *f_last;
+    lyr_ty42_GuardNode *f_guards;
     int64_t f_timeoutNanos;
     lyr_opt_fn_to_void f_onTimeout;
 };
-_Static_assert(sizeof(lyr_ty35_Selection) == 64, "layout of lyr_ty35_Selection");
-_Static_assert(offsetof(lyr_ty35_Selection, f_first) == 8, "layout of lyr_ty35_Selection");
-_Static_assert(offsetof(lyr_ty35_Selection, f_last) == 16, "layout of lyr_ty35_Selection");
-_Static_assert(offsetof(lyr_ty35_Selection, f_guards) == 24, "layout of lyr_ty35_Selection");
-_Static_assert(offsetof(lyr_ty35_Selection, f_timeoutNanos) == 32, "layout of lyr_ty35_Selection");
-_Static_assert(offsetof(lyr_ty35_Selection, f_onTimeout) == 40, "layout of lyr_ty35_Selection");
-static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4e) };
-const LyrDesc lyr_desc_ty35_Selection = { sizeof(lyr_ty35_Selection), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "std.task.Selection", NULL };
-struct lyr_vt_ty37 {
+_Static_assert(sizeof(lyr_ty39_Selection) == 64, "layout of lyr_ty39_Selection");
+_Static_assert(offsetof(lyr_ty39_Selection, f_first) == 8, "layout of lyr_ty39_Selection");
+_Static_assert(offsetof(lyr_ty39_Selection, f_last) == 16, "layout of lyr_ty39_Selection");
+_Static_assert(offsetof(lyr_ty39_Selection, f_guards) == 24, "layout of lyr_ty39_Selection");
+_Static_assert(offsetof(lyr_ty39_Selection, f_timeoutNanos) == 32, "layout of lyr_ty39_Selection");
+_Static_assert(offsetof(lyr_ty39_Selection, f_onTimeout) == 40, "layout of lyr_ty39_Selection");
+static const uint64_t lyr_refmap_ty39[] = { UINT64_C(0x4e) };
+const LyrDesc lyr_desc_ty39_Selection = { sizeof(lyr_ty39_Selection), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty39, "std.task.Selection", NULL };
+struct lyr_vt_ty41 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
@@ -396,110 +411,110 @@ struct lyr_vt_ty37 {
     void (*s5)(LyrIface);
     void (*s6)(LyrIface, LyrErr **);
 };
-struct lyr_ty36_CaseNode {
+struct lyr_ty40_CaseNode {
     LyrObj header;
     LyrIface f_entry;
-    lyr_ty36_CaseNode *f_next;
+    lyr_ty40_CaseNode *f_next;
 };
-_Static_assert(sizeof(lyr_ty36_CaseNode) == 32, "layout of lyr_ty36_CaseNode");
-_Static_assert(offsetof(lyr_ty36_CaseNode, f_entry) == 8, "layout of lyr_ty36_CaseNode");
-_Static_assert(offsetof(lyr_ty36_CaseNode, f_next) == 24, "layout of lyr_ty36_CaseNode");
-static const uint64_t lyr_refmap_ty36[] = { UINT64_C(0xa) };
-const LyrDesc lyr_desc_ty36_CaseNode = { sizeof(lyr_ty36_CaseNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty36, "std.task.CaseNode", NULL };
-struct lyr_ty38_GuardNode {
+_Static_assert(sizeof(lyr_ty40_CaseNode) == 32, "layout of lyr_ty40_CaseNode");
+_Static_assert(offsetof(lyr_ty40_CaseNode, f_entry) == 8, "layout of lyr_ty40_CaseNode");
+_Static_assert(offsetof(lyr_ty40_CaseNode, f_next) == 24, "layout of lyr_ty40_CaseNode");
+static const uint64_t lyr_refmap_ty40[] = { UINT64_C(0xa) };
+const LyrDesc lyr_desc_ty40_CaseNode = { sizeof(lyr_ty40_CaseNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty40, "std.task.CaseNode", NULL };
+struct lyr_ty42_GuardNode {
     LyrObj header;
     int64_t f_id;
     lyr_ty8_SpinLock *f_guard;
-    lyr_ty38_GuardNode *f_next;
+    lyr_ty42_GuardNode *f_next;
 };
-_Static_assert(sizeof(lyr_ty38_GuardNode) == 32, "layout of lyr_ty38_GuardNode");
-_Static_assert(offsetof(lyr_ty38_GuardNode, f_id) == 8, "layout of lyr_ty38_GuardNode");
-_Static_assert(offsetof(lyr_ty38_GuardNode, f_guard) == 16, "layout of lyr_ty38_GuardNode");
-_Static_assert(offsetof(lyr_ty38_GuardNode, f_next) == 24, "layout of lyr_ty38_GuardNode");
-static const uint64_t lyr_refmap_ty38[] = { UINT64_C(0xc) };
-const LyrDesc lyr_desc_ty38_GuardNode = { sizeof(lyr_ty38_GuardNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty38, "std.task.GuardNode", NULL };
-struct lyr_ty39_Channel_void_ {
+_Static_assert(sizeof(lyr_ty42_GuardNode) == 32, "layout of lyr_ty42_GuardNode");
+_Static_assert(offsetof(lyr_ty42_GuardNode, f_id) == 8, "layout of lyr_ty42_GuardNode");
+_Static_assert(offsetof(lyr_ty42_GuardNode, f_guard) == 16, "layout of lyr_ty42_GuardNode");
+_Static_assert(offsetof(lyr_ty42_GuardNode, f_next) == 24, "layout of lyr_ty42_GuardNode");
+static const uint64_t lyr_refmap_ty42[] = { UINT64_C(0xc) };
+const LyrDesc lyr_desc_ty42_GuardNode = { sizeof(lyr_ty42_GuardNode), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty42, "std.task.GuardNode", NULL };
+struct lyr_ty43_Channel_void_ {
     LyrObj header;
     int64_t f_capacity;
     int64_t f_id;
     lyr_ty8_SpinLock *f_guard;
     int64_t f_buffered;
-    lyr_ty40_Item_void_ *f_first;
-    lyr_ty40_Item_void_ *f_last;
+    lyr_ty44_Item_void_ *f_first;
+    lyr_ty44_Item_void_ *f_last;
     uint8_t f_closed;
-    lyr_ty41_WaitQueue_void_ *f_senders;
-    lyr_ty41_WaitQueue_void_ *f_receivers;
+    lyr_ty45_WaitQueue_void_ *f_senders;
+    lyr_ty45_WaitQueue_void_ *f_receivers;
 };
-_Static_assert(sizeof(lyr_ty39_Channel_void_) == 80, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_capacity) == 8, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_id) == 16, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_guard) == 24, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_buffered) == 32, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_first) == 40, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_last) == 48, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_closed) == 56, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_senders) == 64, "layout of lyr_ty39_Channel_void_");
-_Static_assert(offsetof(lyr_ty39_Channel_void_, f_receivers) == 72, "layout of lyr_ty39_Channel_void_");
-static const uint64_t lyr_refmap_ty39[] = { UINT64_C(0x368) };
-const LyrDesc lyr_desc_ty39_Channel_void_ = { sizeof(lyr_ty39_Channel_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty39, "std.task.Channel<void>", NULL };
-struct lyr_ty40_Item_void_ {
+_Static_assert(sizeof(lyr_ty43_Channel_void_) == 80, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_capacity) == 8, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_id) == 16, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_guard) == 24, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_buffered) == 32, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_first) == 40, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_last) == 48, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_closed) == 56, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_senders) == 64, "layout of lyr_ty43_Channel_void_");
+_Static_assert(offsetof(lyr_ty43_Channel_void_, f_receivers) == 72, "layout of lyr_ty43_Channel_void_");
+static const uint64_t lyr_refmap_ty43[] = { UINT64_C(0x368) };
+const LyrDesc lyr_desc_ty43_Channel_void_ = { sizeof(lyr_ty43_Channel_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty43, "std.task.Channel<void>", NULL };
+struct lyr_ty44_Item_void_ {
     LyrObj header;
     uint8_t f_value;
-    lyr_ty40_Item_void_ *f_next;
+    lyr_ty44_Item_void_ *f_next;
 };
-_Static_assert(sizeof(lyr_ty40_Item_void_) == 24, "layout of lyr_ty40_Item_void_");
-_Static_assert(offsetof(lyr_ty40_Item_void_, f_value) == 8, "layout of lyr_ty40_Item_void_");
-_Static_assert(offsetof(lyr_ty40_Item_void_, f_next) == 16, "layout of lyr_ty40_Item_void_");
-static const uint64_t lyr_refmap_ty40[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty40_Item_void_ = { sizeof(lyr_ty40_Item_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty40, "std.task.Item<void>", NULL };
-struct lyr_ty41_WaitQueue_void_ {
+_Static_assert(sizeof(lyr_ty44_Item_void_) == 24, "layout of lyr_ty44_Item_void_");
+_Static_assert(offsetof(lyr_ty44_Item_void_, f_value) == 8, "layout of lyr_ty44_Item_void_");
+_Static_assert(offsetof(lyr_ty44_Item_void_, f_next) == 16, "layout of lyr_ty44_Item_void_");
+static const uint64_t lyr_refmap_ty44[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty44_Item_void_ = { sizeof(lyr_ty44_Item_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty44, "std.task.Item<void>", NULL };
+struct lyr_ty45_WaitQueue_void_ {
     LyrObj header;
-    lyr_ty42_Waiting_void_ *f_first;
-    lyr_ty42_Waiting_void_ *f_last;
+    lyr_ty46_Waiting_void_ *f_first;
+    lyr_ty46_Waiting_void_ *f_last;
 };
-_Static_assert(sizeof(lyr_ty41_WaitQueue_void_) == 24, "layout of lyr_ty41_WaitQueue_void_");
-_Static_assert(offsetof(lyr_ty41_WaitQueue_void_, f_first) == 8, "layout of lyr_ty41_WaitQueue_void_");
-_Static_assert(offsetof(lyr_ty41_WaitQueue_void_, f_last) == 16, "layout of lyr_ty41_WaitQueue_void_");
-static const uint64_t lyr_refmap_ty41[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty41_WaitQueue_void_ = { sizeof(lyr_ty41_WaitQueue_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty41, "std.task.WaitQueue<void>", NULL };
+_Static_assert(sizeof(lyr_ty45_WaitQueue_void_) == 24, "layout of lyr_ty45_WaitQueue_void_");
+_Static_assert(offsetof(lyr_ty45_WaitQueue_void_, f_first) == 8, "layout of lyr_ty45_WaitQueue_void_");
+_Static_assert(offsetof(lyr_ty45_WaitQueue_void_, f_last) == 16, "layout of lyr_ty45_WaitQueue_void_");
+static const uint64_t lyr_refmap_ty45[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty45_WaitQueue_void_ = { sizeof(lyr_ty45_WaitQueue_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty45, "std.task.WaitQueue<void>", NULL };
 typedef struct { uint8_t value; uint8_t has; } lyr_opt_bool;
-struct lyr_ty42_Waiting_void_ {
+struct lyr_ty46_Waiting_void_ {
     LyrObj header;
     lyr_ty1_Context *f_context;
     lyr_opt_bool f_value;
     uint8_t f_settled;
     uint8_t f_queued;
-    lyr_ty42_Waiting_void_ *f_next;
-    lyr_ty42_Waiting_void_ *f_prev;
+    lyr_ty46_Waiting_void_ *f_next;
+    lyr_ty46_Waiting_void_ *f_prev;
 };
-_Static_assert(sizeof(lyr_ty42_Waiting_void_) == 40, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_context) == 8, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_value) == 16, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_settled) == 18, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_queued) == 19, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_next) == 24, "layout of lyr_ty42_Waiting_void_");
-_Static_assert(offsetof(lyr_ty42_Waiting_void_, f_prev) == 32, "layout of lyr_ty42_Waiting_void_");
-static const uint64_t lyr_refmap_ty42[] = { UINT64_C(0x1a) };
-const LyrDesc lyr_desc_ty42_Waiting_void_ = { sizeof(lyr_ty42_Waiting_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty42, "std.task.Waiting<void>", NULL };
-struct lyr_ty43__env_std_task_Timer_after_ {
+_Static_assert(sizeof(lyr_ty46_Waiting_void_) == 40, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_context) == 8, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_value) == 16, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_settled) == 18, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_queued) == 19, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_next) == 24, "layout of lyr_ty46_Waiting_void_");
+_Static_assert(offsetof(lyr_ty46_Waiting_void_, f_prev) == 32, "layout of lyr_ty46_Waiting_void_");
+static const uint64_t lyr_refmap_ty46[] = { UINT64_C(0x1a) };
+const LyrDesc lyr_desc_ty46_Waiting_void_ = { sizeof(lyr_ty46_Waiting_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty46, "std.task.Waiting<void>", NULL };
+struct lyr_ty47__env_std_task_Timer_after_ {
     LyrObj header;
     lyr_ty24_Duration f_d;
-    lyr_ty39_Channel_void_ *f_ch;
+    lyr_ty43_Channel_void_ *f_ch;
 };
-_Static_assert(sizeof(lyr_ty43__env_std_task_Timer_after_) == 24, "layout of lyr_ty43__env_std_task_Timer_after_");
-_Static_assert(offsetof(lyr_ty43__env_std_task_Timer_after_, f_d) == 8, "layout of lyr_ty43__env_std_task_Timer_after_");
-_Static_assert(offsetof(lyr_ty43__env_std_task_Timer_after_, f_ch) == 16, "layout of lyr_ty43__env_std_task_Timer_after_");
-static const uint64_t lyr_refmap_ty43[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty43__env_std_task_Timer_after_ = { sizeof(lyr_ty43__env_std_task_Timer_after_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty43, "<env:std.task.Timer.after>", NULL };
-struct lyr_ty44_Once {
+_Static_assert(sizeof(lyr_ty47__env_std_task_Timer_after_) == 24, "layout of lyr_ty47__env_std_task_Timer_after_");
+_Static_assert(offsetof(lyr_ty47__env_std_task_Timer_after_, f_d) == 8, "layout of lyr_ty47__env_std_task_Timer_after_");
+_Static_assert(offsetof(lyr_ty47__env_std_task_Timer_after_, f_ch) == 16, "layout of lyr_ty47__env_std_task_Timer_after_");
+static const uint64_t lyr_refmap_ty47[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty47__env_std_task_Timer_after_ = { sizeof(lyr_ty47__env_std_task_Timer_after_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty47, "<env:std.task.Timer.after>", NULL };
+struct lyr_ty48_Once {
     LyrObj header;
-    lyr_ty45_LockState *f_state;
+    lyr_ty49_LockState *f_state;
 };
-_Static_assert(sizeof(lyr_ty44_Once) == 16, "layout of lyr_ty44_Once");
-_Static_assert(offsetof(lyr_ty44_Once, f_state) == 8, "layout of lyr_ty44_Once");
-static const uint64_t lyr_refmap_ty44[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty44_Once = { sizeof(lyr_ty44_Once), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty44, "std.task.Once", NULL };
-struct lyr_ty45_LockState {
+_Static_assert(sizeof(lyr_ty48_Once) == 16, "layout of lyr_ty48_Once");
+_Static_assert(offsetof(lyr_ty48_Once, f_state) == 8, "layout of lyr_ty48_Once");
+static const uint64_t lyr_refmap_ty48[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty48_Once = { sizeof(lyr_ty48_Once), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty48, "std.task.Once", NULL };
+struct lyr_ty49_LockState {
     LyrObj header;
     lyr_ty8_SpinLock *f_guard;
     uint8_t f_alone;
@@ -508,16 +523,16 @@ struct lyr_ty45_LockState {
     uint8_t f_done;
     lyr_ty7_Waiters *f_waiters;
 };
-_Static_assert(sizeof(lyr_ty45_LockState) == 56, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_guard) == 8, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_alone) == 16, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_readers) == 24, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_writersWaiting) == 32, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_done) == 40, "layout of lyr_ty45_LockState");
-_Static_assert(offsetof(lyr_ty45_LockState, f_waiters) == 48, "layout of lyr_ty45_LockState");
-static const uint64_t lyr_refmap_ty45[] = { UINT64_C(0x42) };
-const LyrDesc lyr_desc_ty45_LockState = { sizeof(lyr_ty45_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty45, "std.task.LockState", NULL };
-struct lyr_ty46_Task_void_ {
+_Static_assert(sizeof(lyr_ty49_LockState) == 56, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_guard) == 8, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_alone) == 16, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_readers) == 24, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_writersWaiting) == 32, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_done) == 40, "layout of lyr_ty49_LockState");
+_Static_assert(offsetof(lyr_ty49_LockState, f_waiters) == 48, "layout of lyr_ty49_LockState");
+static const uint64_t lyr_refmap_ty49[] = { UINT64_C(0x42) };
+const LyrDesc lyr_desc_ty49_LockState = { sizeof(lyr_ty49_LockState), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty49, "std.task.LockState", NULL };
+struct lyr_ty50_Task_void_ {
     LyrObj header;
     uint8_t f_done;
     lyr_opt_bool f_value;
@@ -527,88 +542,88 @@ struct lyr_ty46_Task_void_ {
     lyr_ty7_Waiters *f_waiters;
     lyr_ty8_SpinLock *f_guard;
 };
-_Static_assert(sizeof(lyr_ty46_Task_void_) == 72, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_done) == 8, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_value) == 9, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_failure) == 16, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_crash) == 40, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_context) == 48, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_waiters) == 56, "layout of lyr_ty46_Task_void_");
-_Static_assert(offsetof(lyr_ty46_Task_void_, f_guard) == 64, "layout of lyr_ty46_Task_void_");
-static const uint64_t lyr_refmap_ty46[] = { UINT64_C(0x1e4) };
-const LyrDesc lyr_desc_ty46_Task_void_ = { sizeof(lyr_ty46_Task_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty46, "std.task.Task<void>", NULL };
-struct lyr_ty47_Pool {
+_Static_assert(sizeof(lyr_ty50_Task_void_) == 72, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_done) == 8, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_value) == 9, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_failure) == 16, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_crash) == 40, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_context) == 48, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_waiters) == 56, "layout of lyr_ty50_Task_void_");
+_Static_assert(offsetof(lyr_ty50_Task_void_, f_guard) == 64, "layout of lyr_ty50_Task_void_");
+static const uint64_t lyr_refmap_ty50[] = { UINT64_C(0x1e4) };
+const LyrDesc lyr_desc_ty50_Task_void_ = { sizeof(lyr_ty50_Task_void_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty50, "std.task.Task<void>", NULL };
+struct lyr_ty51_Pool {
     LyrObj header;
-    lyr_ty48_Worker *f_workers;
+    lyr_ty52_Worker *f_workers;
     int64_t f_size;
     lyr_ty2_Atomic_int_ *f_picks;
     lyr_ty3_Atomic_bool_ *f_closed;
 };
-_Static_assert(sizeof(lyr_ty47_Pool) == 40, "layout of lyr_ty47_Pool");
-_Static_assert(offsetof(lyr_ty47_Pool, f_workers) == 8, "layout of lyr_ty47_Pool");
-_Static_assert(offsetof(lyr_ty47_Pool, f_size) == 16, "layout of lyr_ty47_Pool");
-_Static_assert(offsetof(lyr_ty47_Pool, f_picks) == 24, "layout of lyr_ty47_Pool");
-_Static_assert(offsetof(lyr_ty47_Pool, f_closed) == 32, "layout of lyr_ty47_Pool");
-static const uint64_t lyr_refmap_ty47[] = { UINT64_C(0x1a) };
-const LyrDesc lyr_desc_ty47_Pool = { sizeof(lyr_ty47_Pool), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty47, "std.task.Pool", NULL };
-struct lyr_ty48_Worker {
+_Static_assert(sizeof(lyr_ty51_Pool) == 40, "layout of lyr_ty51_Pool");
+_Static_assert(offsetof(lyr_ty51_Pool, f_workers) == 8, "layout of lyr_ty51_Pool");
+_Static_assert(offsetof(lyr_ty51_Pool, f_size) == 16, "layout of lyr_ty51_Pool");
+_Static_assert(offsetof(lyr_ty51_Pool, f_picks) == 24, "layout of lyr_ty51_Pool");
+_Static_assert(offsetof(lyr_ty51_Pool, f_closed) == 32, "layout of lyr_ty51_Pool");
+static const uint64_t lyr_refmap_ty51[] = { UINT64_C(0x1a) };
+const LyrDesc lyr_desc_ty51_Pool = { sizeof(lyr_ty51_Pool), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty51, "std.task.Pool", NULL };
+struct lyr_ty52_Worker {
     LyrObj header;
     lyr_ty0_Scheduler *f_scheduler;
     lyr_ty2_Atomic_int_ *f_active;
     lyr_ty3_Atomic_bool_ *f_closing;
-    lyr_ty39_Channel_void_ *f_finished;
-    lyr_ty48_Worker *f_next;
+    lyr_ty43_Channel_void_ *f_finished;
+    lyr_ty52_Worker *f_next;
 };
-_Static_assert(sizeof(lyr_ty48_Worker) == 48, "layout of lyr_ty48_Worker");
-_Static_assert(offsetof(lyr_ty48_Worker, f_scheduler) == 8, "layout of lyr_ty48_Worker");
-_Static_assert(offsetof(lyr_ty48_Worker, f_active) == 16, "layout of lyr_ty48_Worker");
-_Static_assert(offsetof(lyr_ty48_Worker, f_closing) == 24, "layout of lyr_ty48_Worker");
-_Static_assert(offsetof(lyr_ty48_Worker, f_finished) == 32, "layout of lyr_ty48_Worker");
-_Static_assert(offsetof(lyr_ty48_Worker, f_next) == 40, "layout of lyr_ty48_Worker");
-static const uint64_t lyr_refmap_ty48[] = { UINT64_C(0x3e) };
-const LyrDesc lyr_desc_ty48_Worker = { sizeof(lyr_ty48_Worker), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty48, "std.task.Worker", NULL };
-struct lyr_ty49__env_std_task_Worker_start_ {
+_Static_assert(sizeof(lyr_ty52_Worker) == 48, "layout of lyr_ty52_Worker");
+_Static_assert(offsetof(lyr_ty52_Worker, f_scheduler) == 8, "layout of lyr_ty52_Worker");
+_Static_assert(offsetof(lyr_ty52_Worker, f_active) == 16, "layout of lyr_ty52_Worker");
+_Static_assert(offsetof(lyr_ty52_Worker, f_closing) == 24, "layout of lyr_ty52_Worker");
+_Static_assert(offsetof(lyr_ty52_Worker, f_finished) == 32, "layout of lyr_ty52_Worker");
+_Static_assert(offsetof(lyr_ty52_Worker, f_next) == 40, "layout of lyr_ty52_Worker");
+static const uint64_t lyr_refmap_ty52[] = { UINT64_C(0x3e) };
+const LyrDesc lyr_desc_ty52_Worker = { sizeof(lyr_ty52_Worker), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty52, "std.task.Worker", NULL };
+struct lyr_ty53__env_std_task_Worker_start_ {
     LyrObj header;
     lyr_ty0_Scheduler *f_s;
-    lyr_ty48_Worker *f_w;
+    lyr_ty52_Worker *f_w;
 };
-_Static_assert(sizeof(lyr_ty49__env_std_task_Worker_start_) == 24, "layout of lyr_ty49__env_std_task_Worker_start_");
-_Static_assert(offsetof(lyr_ty49__env_std_task_Worker_start_, f_s) == 8, "layout of lyr_ty49__env_std_task_Worker_start_");
-_Static_assert(offsetof(lyr_ty49__env_std_task_Worker_start_, f_w) == 16, "layout of lyr_ty49__env_std_task_Worker_start_");
-static const uint64_t lyr_refmap_ty49[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty49__env_std_task_Worker_start_ = { sizeof(lyr_ty49__env_std_task_Worker_start_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty49, "<env:std.task.Worker.start>", NULL };
-struct lyr_ty50__env_std_task_spawn_void__never__ {
+_Static_assert(sizeof(lyr_ty53__env_std_task_Worker_start_) == 24, "layout of lyr_ty53__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty53__env_std_task_Worker_start_, f_s) == 8, "layout of lyr_ty53__env_std_task_Worker_start_");
+_Static_assert(offsetof(lyr_ty53__env_std_task_Worker_start_, f_w) == 16, "layout of lyr_ty53__env_std_task_Worker_start_");
+static const uint64_t lyr_refmap_ty53[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty53__env_std_task_Worker_start_ = { sizeof(lyr_ty53__env_std_task_Worker_start_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty53, "<env:std.task.Worker.start>", NULL };
+struct lyr_ty54__env_std_task_spawn_void__never__ {
     LyrObj header;
     lyr_ty0_Scheduler *f_s;
-    lyr_ty46_Task_void_ *f_task;
+    lyr_ty50_Task_void_ *f_task;
 };
-_Static_assert(sizeof(lyr_ty50__env_std_task_spawn_void__never__) == 24, "layout of lyr_ty50__env_std_task_spawn_void__never__");
-_Static_assert(offsetof(lyr_ty50__env_std_task_spawn_void__never__, f_s) == 8, "layout of lyr_ty50__env_std_task_spawn_void__never__");
-_Static_assert(offsetof(lyr_ty50__env_std_task_spawn_void__never__, f_task) == 16, "layout of lyr_ty50__env_std_task_spawn_void__never__");
-static const uint64_t lyr_refmap_ty50[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty50__env_std_task_spawn_void__never__ = { sizeof(lyr_ty50__env_std_task_spawn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty50, "<env:std.task.spawn<void, never>>", NULL };
-struct lyr_ty51__env_std_task_launchOn_void__never__ {
+_Static_assert(sizeof(lyr_ty54__env_std_task_spawn_void__never__) == 24, "layout of lyr_ty54__env_std_task_spawn_void__never__");
+_Static_assert(offsetof(lyr_ty54__env_std_task_spawn_void__never__, f_s) == 8, "layout of lyr_ty54__env_std_task_spawn_void__never__");
+_Static_assert(offsetof(lyr_ty54__env_std_task_spawn_void__never__, f_task) == 16, "layout of lyr_ty54__env_std_task_spawn_void__never__");
+static const uint64_t lyr_refmap_ty54[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty54__env_std_task_spawn_void__never__ = { sizeof(lyr_ty54__env_std_task_spawn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty54, "<env:std.task.spawn<void, never>>", NULL };
+struct lyr_ty55__env_std_task_launchOn_void__never__ {
     LyrObj header;
-    lyr_ty46_Task_void_ *f_task;
+    lyr_ty50_Task_void_ *f_task;
     lyr_fn_to_void f_body;
     lyr_opt_fn_to_void f_ended;
 };
-_Static_assert(sizeof(lyr_ty51__env_std_task_launchOn_void__never__) == 56, "layout of lyr_ty51__env_std_task_launchOn_void__never__");
-_Static_assert(offsetof(lyr_ty51__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty51__env_std_task_launchOn_void__never__");
-_Static_assert(offsetof(lyr_ty51__env_std_task_launchOn_void__never__, f_body) == 16, "layout of lyr_ty51__env_std_task_launchOn_void__never__");
-_Static_assert(offsetof(lyr_ty51__env_std_task_launchOn_void__never__, f_ended) == 32, "layout of lyr_ty51__env_std_task_launchOn_void__never__");
-static const uint64_t lyr_refmap_ty51[] = { UINT64_C(0x2a) };
-const LyrDesc lyr_desc_ty51__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty51__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty51, "<env:std.task.launchOn<void, never>>", NULL };
-struct lyr_ty52__env_std_task_launchOn_void__never__ {
+_Static_assert(sizeof(lyr_ty55__env_std_task_launchOn_void__never__) == 56, "layout of lyr_ty55__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty55__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty55__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty55__env_std_task_launchOn_void__never__, f_body) == 16, "layout of lyr_ty55__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty55__env_std_task_launchOn_void__never__, f_ended) == 32, "layout of lyr_ty55__env_std_task_launchOn_void__never__");
+static const uint64_t lyr_refmap_ty55[] = { UINT64_C(0x2a) };
+const LyrDesc lyr_desc_ty55__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty55__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty55, "<env:std.task.launchOn<void, never>>", NULL };
+struct lyr_ty56__env_std_task_launchOn_void__never__ {
     LyrObj header;
-    lyr_ty46_Task_void_ *f_task;
+    lyr_ty50_Task_void_ *f_task;
     lyr_opt_fn_to_void f_ended;
 };
-_Static_assert(sizeof(lyr_ty52__env_std_task_launchOn_void__never__) == 40, "layout of lyr_ty52__env_std_task_launchOn_void__never__");
-_Static_assert(offsetof(lyr_ty52__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty52__env_std_task_launchOn_void__never__");
-_Static_assert(offsetof(lyr_ty52__env_std_task_launchOn_void__never__, f_ended) == 16, "layout of lyr_ty52__env_std_task_launchOn_void__never__");
-static const uint64_t lyr_refmap_ty52[] = { UINT64_C(0xa) };
-const LyrDesc lyr_desc_ty52__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty52__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty52, "<env:std.task.launchOn<void, never>>", NULL };
+_Static_assert(sizeof(lyr_ty56__env_std_task_launchOn_void__never__) == 40, "layout of lyr_ty56__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty56__env_std_task_launchOn_void__never__, f_task) == 8, "layout of lyr_ty56__env_std_task_launchOn_void__never__");
+_Static_assert(offsetof(lyr_ty56__env_std_task_launchOn_void__never__, f_ended) == 16, "layout of lyr_ty56__env_std_task_launchOn_void__never__");
+static const uint64_t lyr_refmap_ty56[] = { UINT64_C(0xa) };
+const LyrDesc lyr_desc_ty56__env_std_task_launchOn_void__never__ = { sizeof(lyr_ty56__env_std_task_launchOn_void__never__), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty56, "<env:std.task.launchOn<void, never>>", NULL };
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 
 /* module-level bindings */
@@ -660,7 +675,7 @@ lyr_ty1_Context * lyr_std_task_meld(lyr_ty1_Context *l0_top, lyr_ty1_Context *l1
 void lyr_std_task_fixRanks(lyr_ty1_Context *l0_from);
 int64_t lyr_std_task_rankOf(lyr_ty1_Context *l0_c);
 void lyr_std_task_runMain(LyrCoro *l0_main);
-LyrStr * lyr_std_task_Cancelled_message(lyr_ty32_Cancelled *l0_this);
+LyrStr * lyr_std_task_Cancelled_message(lyr_ty36_Cancelled *l0_this);
 void lyr_std_task_Context_beginWait(lyr_ty1_Context *l0_this);
 uint8_t lyr_std_task_Context_claim(lyr_ty1_Context *l0_this);
 void lyr_std_task_Context_endWait(lyr_ty1_Context *l0_this);
@@ -729,9 +744,9 @@ static const LyrDesc lyr_desc_coro_i64_to_void = { 0, 0, 0, 0, NULL, "Coroutine<
 static void lyr_corun41(void *lyr_arg) { (void)lyr_arg; LyrErr *lyr_e = NULL; lyr_main_numbers__body__38e43ecc(&lyr_e); LyrCoro *lyr_co = lyr_coro_current(); if (LYR_UNLIKELY(lyr_e != NULL)) { lyr_coro_set_error(lyr_co, lyr_e); lyr_coro_set_transfer(lyr_co, NULL); return; } lyr_coro_set_transfer(lyr_co, NULL); }
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty6_ty32_s0(LyrIface self) { return lyr_std_task_Cancelled_message((lyr_ty32_Cancelled *)self.data); }
-const lyr_vt_ty6 lyr_vt_ty6_ty32 = { &lyr_desc_ty32_Cancelled, lyr_vt_ty6_ty32_s0, lyr_std_core_Error_cause };
-const LyrItable lyr_itab_ty32[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty32 } , { NULL, NULL } };
+static LyrStr * lyr_vt_ty6_ty36_s0(LyrIface self) { return lyr_std_task_Cancelled_message((lyr_ty36_Cancelled *)self.data); }
+const lyr_vt_ty6 lyr_vt_ty6_ty36 = { &lyr_desc_ty36_Cancelled, lyr_vt_ty6_ty36_s0, lyr_std_core_Error_cause };
+const LyrItable lyr_itab_ty36[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty36 } , { NULL, NULL } };
 
 /* the members of Error the runtime reports through */
 const LyrStr *lyr_error_message(LyrIface e) { return ((const lyr_vt_ty6 *)e.vt)->s0(e); }
@@ -1084,7 +1099,7 @@ void lyr_std_task_spawnDetached(lyr_fn_to_void l0_body) {
     lyr_fn_to_void l1_run = {0};
     lyr_ty0_Scheduler *l2_s = NULL;
     lyr_fn_to_void t0 = {0};
-    lyr_ty31__env_std_task_spawnDetached_ *t1 = NULL;
+    lyr_ty35__env_std_task_spawnDetached_ *t1 = NULL;
     lyr_fn_to_void t2 = {0};
     lyr_ty0_Scheduler *t3 = NULL;
     lyr_ty0_Scheduler *t4 = NULL;
@@ -1118,7 +1133,7 @@ bb0:;
 #line 1290
     t0 = l0_body;
 #line 1290
-    t1 = (lyr_ty31__env_std_task_spawnDetached_ *)lyr_alloc(&lyr_desc_ty31__env_std_task_spawnDetached_);
+    t1 = (lyr_ty35__env_std_task_spawnDetached_ *)lyr_alloc(&lyr_desc_ty35__env_std_task_spawnDetached_);
 #line 1290
     LYR_WRITE_BARRIER_VALUE(t1, &t1->f_body, t0);
 #line 1290
@@ -2063,7 +2078,7 @@ bb3:;
 }
 
 #line 18 "stdlib5/std/task.lyr"
-LyrStr * lyr_std_task_Cancelled_message(lyr_ty32_Cancelled *l0_this) {
+LyrStr * lyr_std_task_Cancelled_message(lyr_ty36_Cancelled *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 18
@@ -2491,7 +2506,7 @@ void lyr_std_task_Scheduler_sleep(lyr_ty0_Scheduler *l0_this, int64_t l1_nanos, 
     lyr_ty1_Context *t6 = NULL;
     lyr_ty3_Atomic_bool_ *t7 = NULL;
     uint8_t t8 = 0;
-    lyr_ty32_Cancelled *t9 = NULL;
+    lyr_ty36_Cancelled *t9 = NULL;
     LyrIface t10 = {0};
     lyr_ty1_Context *t11 = NULL;
     lyr_ty0_Scheduler *t12 = NULL;
@@ -2505,7 +2520,7 @@ void lyr_std_task_Scheduler_sleep(lyr_ty0_Scheduler *l0_this, int64_t l1_nanos, 
     lyr_ty1_Context *t20 = NULL;
     lyr_ty3_Atomic_bool_ *t21 = NULL;
     uint8_t t22 = 0;
-    lyr_ty32_Cancelled *t23 = NULL;
+    lyr_ty36_Cancelled *t23 = NULL;
     LyrIface t24 = {0};
 bb0:;
 #line 1602
@@ -2545,9 +2560,9 @@ bb3:;
     if (t8) goto bb4; else goto bb5;
 bb4:;
 #line 1603
-    t9 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t9 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 1603
-    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty32 };
+    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty36 };
 #line 1603
     lyr_e = lyr_err_new(t10); goto bb6;
 bb5:;
@@ -2594,9 +2609,9 @@ bb6:;
     *lyr_err = lyr_e; return;
 bb7:;
 #line 1610
-    t23 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t23 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 1610
-    t24 = (LyrIface){ t23, &lyr_vt_ty6_ty32 };
+    t24 = (LyrIface){ t23, &lyr_vt_ty6_ty36 };
 #line 1610
     lyr_e = lyr_err_new(t24); goto bb6;
 bb8:;
@@ -3090,14 +3105,14 @@ void lyr_std_task_Scheduler_yieldNow(lyr_ty0_Scheduler *l0_this, LyrErr **lyr_er
     lyr_ty1_Context *t6 = NULL;
     lyr_ty3_Atomic_bool_ *t7 = NULL;
     uint8_t t8 = 0;
-    lyr_ty32_Cancelled *t9 = NULL;
+    lyr_ty36_Cancelled *t9 = NULL;
     LyrIface t10 = {0};
     lyr_ty0_Scheduler *t11 = NULL;
     lyr_ty1_Context *t12 = NULL;
     lyr_ty1_Context *t13 = NULL;
     lyr_ty3_Atomic_bool_ *t14 = NULL;
     uint8_t t15 = 0;
-    lyr_ty32_Cancelled *t16 = NULL;
+    lyr_ty36_Cancelled *t16 = NULL;
     LyrIface t17 = {0};
 bb0:;
 #line 1684
@@ -3137,9 +3152,9 @@ bb3:;
     if (t8) goto bb4; else goto bb5;
 bb4:;
 #line 1685
-    t9 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t9 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 1685
-    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty32 };
+    t10 = (LyrIface){ t9, &lyr_vt_ty6_ty36 };
 #line 1685
     lyr_e = lyr_err_new(t10); goto bb6;
 bb5:;
@@ -3164,9 +3179,9 @@ bb6:;
     *lyr_err = lyr_e; return;
 bb7:;
 #line 1688
-    t16 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t16 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 1688
-    t17 = (LyrIface){ t16, &lyr_vt_ty6_ty32 };
+    t17 = (LyrIface){ t16, &lyr_vt_ty6_ty36 };
 #line 1688
     lyr_e = lyr_err_new(t17); goto bb6;
 bb8:;
@@ -3938,14 +3953,14 @@ void lyr_main_numbers__body__38e43ecc(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     uint8_t t1 = 0;
-    lyr_ty32_Cancelled *t2 = NULL;
+    lyr_ty36_Cancelled *t2 = NULL;
     LyrIface t3 = {0};
     int64_t t4 = 0;
     lyr_ty24_Duration t5_s = {0};
     lyr_ty24_Duration *t5 = &t5_s;
     int64_t t6 = 0;
     uint8_t t7 = 0;
-    lyr_ty32_Cancelled *t8 = NULL;
+    lyr_ty36_Cancelled *t8 = NULL;
     LyrIface t9 = {0};
 bb0:;
 #line 26
@@ -3958,9 +3973,9 @@ bb0:;
     if (t1) goto bb1; else goto bb2;
 bb1:;
 #line 26
-    t2 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t2 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 26
-    t3 = (LyrIface){ t2, &lyr_vt_ty6_ty32 };
+    t3 = (LyrIface){ t2, &lyr_vt_ty6_ty36 };
 #line 26
     lyr_e = lyr_err_new(t3); goto bb3;
 bb2:;
@@ -3986,9 +4001,9 @@ bb4:;
     if (t7) goto bb5; else goto bb6;
 bb5:;
 #line 28
-    t8 = (lyr_ty32_Cancelled *)lyr_alloc(&lyr_desc_ty32_Cancelled);
+    t8 = (lyr_ty36_Cancelled *)lyr_alloc(&lyr_desc_ty36_Cancelled);
 #line 28
-    t9 = (LyrIface){ t8, &lyr_vt_ty6_ty32 };
+    t9 = (LyrIface){ t8, &lyr_vt_ty6_ty36 };
 #line 28
     lyr_e = lyr_err_new(t9); goto bb3;
 bb6:;
@@ -4340,10 +4355,10 @@ bb2:;
 
 #line 1292 "stdlib5/std/task.lyr"
 void lyr_std_task_spawnDetached__lambda11__30483b1d(void *lyr_env, LyrErr **lyr_err) {
-    lyr_ty31__env_std_task_spawnDetached_ *l0__env_ = (lyr_ty31__env_std_task_spawnDetached_ *)lyr_env;
+    lyr_ty35__env_std_task_spawnDetached_ *l0__env_ = (lyr_ty35__env_std_task_spawnDetached_ *)lyr_env;
     (void)lyr_err;
     LyrErr *lyr_e = NULL;
-    lyr_ty31__env_std_task_spawnDetached_ *t0 = NULL;
+    lyr_ty35__env_std_task_spawnDetached_ *t0 = NULL;
     lyr_fn_to_void t1 = {0};
     LyrIface t2 = {0};
     uint8_t t3 = 0;
@@ -4360,7 +4375,7 @@ bb1:;
 #line 1291
     t2 = lyr_e->value;
 #line 1293
-    t3 = ((*(const LyrDesc *const *)t2.vt) == &lyr_desc_ty32_Cancelled);
+    t3 = ((*(const LyrDesc *const *)t2.vt) == &lyr_desc_ty36_Cancelled);
 #line 1293
     if (t3) goto bb3; else goto bb4;
 bb2:;

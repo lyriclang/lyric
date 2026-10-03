@@ -1825,6 +1825,232 @@ extend<T :: [Display]> Slice<T> {
     }
 }
 
+// --- ordering (10 C10): `sort` and `sortBy` stable (K3), through a buffer of the length;
+// `sortUnstable` in place.
+extend<T> Slice<T> {
+    /// The elements in the order `cmp` gives, equal ones keeping theirs: a merge sort — runs of
+    /// 16 sorted by insertion, then merged pairwise through a buffer of the length.
+    pub fn sortBy(cmp: fn(T, T) -> Ordering): void {
+        let n = this.length();
+        var start = 0;
+        while (start < n) {
+            let end = if (start + 16 < n) start + 16 else n;
+            sortRunBy(this[start..end], cmp);
+            start = end;
+        }
+        if (n <= 16) {
+            return;
+        }
+        let buffer = arrayOf(n, (i: int) => this[i]);
+        var width = 16;
+        var inBuffer = false;
+        while (width < n) {
+            if (inBuffer) {
+                mergeRunsBy(buffer[..], this, width, cmp);
+            } else {
+                mergeRunsBy(this, buffer[..], width, cmp);
+            }
+            inBuffer = !inBuffer;
+            width = width * 2;
+        }
+        if (inBuffer) {
+            var i = 0;
+            while (i < n) {
+                this[i] = buffer[i];
+                i = i + 1;
+            }
+        }
+    }
+
+    /// The elements in the order of their keys, equal keys keeping theirs.
+    pub fn sortByKey<K :: [TotalOrder]>(key: fn(T) -> K): void {
+        this.sortBy((a: T, b: T) => key(a).totalCompare(key(b)));
+    }
+}
+
+extend<T :: [TotalOrder]> Slice<T> {
+    /// The elements in ascending order, equal ones keeping theirs.
+    pub fn sort(): void {
+        this.sortBy((a: T, b: T) => a.totalCompare(b));
+    }
+
+    /// The elements in ascending order, equal ones in any: in place, without a buffer — a
+    /// quicksort, a heap sort where it would go quadratic.
+    pub fn sortUnstable(): void {
+        var depth = 0;
+        var n = this.length();
+        while (n > 1) {
+            depth = depth + 2;
+            n = n / 2;
+        }
+        introSort(this, depth);
+    }
+}
+
+fn isLess(o: Ordering): bool {
+    return match (o) { .Less => true, _ => false };
+}
+
+fn isGreater(o: Ordering): bool {
+    return match (o) { .Greater => true, _ => false };
+}
+
+/// A run sorted by insertion: each element moved before the ones it is less than, so equal ones
+/// keep their order.
+fn sortRunBy<T>(xs: Slice<T>, cmp: fn(T, T) -> Ordering): void {
+    var i = 1;
+    while (i < xs.length()) {
+        let x = xs[i];
+        var j = i;
+        while (j > 0 && isLess(cmp(x, xs[j - 1]))) {
+            xs[j] = xs[j - 1];
+            j = j - 1;
+        }
+        xs[j] = x;
+        i = i + 1;
+    }
+}
+
+/// One pass of the merge sort: the runs of `width` in `src` merged pairwise into `dst`, the left
+/// one's element first where two are equal.
+fn mergeRunsBy<T>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ordering): void {
+    let n = src.length();
+    var lo = 0;
+    while (lo < n) {
+        let mid = if (lo + width < n) lo + width else n;
+        let hi = if (mid + width < n) mid + width else n;
+        var i = lo;
+        var j = mid;
+        var k = lo;
+        while (i < mid && j < hi) {
+            if (isLess(cmp(src[j], src[i]))) {
+                dst[k] = src[j];
+                j = j + 1;
+            } else {
+                dst[k] = src[i];
+                i = i + 1;
+            }
+            k = k + 1;
+        }
+        while (i < mid) {
+            dst[k] = src[i];
+            i = i + 1;
+            k = k + 1;
+        }
+        while (j < hi) {
+            dst[k] = src[j];
+            j = j + 1;
+            k = k + 1;
+        }
+        lo = hi;
+    }
+}
+
+/// The unstable sort: partitions around the median of three, the smaller side by recursion and
+/// the larger by the loop, insertion below 17 elements, a heap sort once `depth` partitions are
+/// spent.
+fn introSort<T :: [TotalOrder]>(xs: Slice<T>, depth: int): void {
+    var view = xs;
+    var left = depth;
+    while (view.length() > 16) {
+        if (left == 0) {
+            heapSort(view);
+            return;
+        }
+        left = left - 1;
+        let split = partitionHoare(view);
+        if (split < view.length() - split) {
+            introSort(view[..split], left);
+            view = view[split..];
+        } else {
+            introSort(view[split..], left);
+            view = view[..split];
+        }
+    }
+    sortRunBy(view, (a: T, b: T) => a.totalCompare(b));
+}
+
+/// Hoare's partition around the median of the first, middle and last element: every element
+/// before the answer is at most the pivot, every one from it at least, and both sides hold one.
+/// A sorted part is left as it is; equal elements are split between the sides.
+fn partitionHoare<T :: [TotalOrder]>(xs: Slice<T>): int {
+    let n = xs.length();
+    let pivot = medianOfThree(xs[0], xs[n / 2], xs[n - 1]);
+    var i = 0;
+    var j = n - 1;
+    var split = -1;
+    while (split < 0) {
+        while (isLess(xs[i].totalCompare(pivot))) {
+            i = i + 1;
+        }
+        while (isGreater(xs[j].totalCompare(pivot))) {
+            j = j - 1;
+        }
+        if (i >= j) {
+            split = j + 1;
+        } else {
+            xs.swap(i, j);
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+    return split;
+}
+
+fn medianOfThree<T :: [TotalOrder]>(a: T, b: T, c: T): T {
+    if (isLess(a.totalCompare(b))) {
+        if (isLess(b.totalCompare(c))) {
+            return b;
+        }
+        if (isLess(a.totalCompare(c))) {
+            return c;
+        }
+        return a;
+    }
+    if (isLess(a.totalCompare(c))) {
+        return a;
+    }
+    if (isLess(b.totalCompare(c))) {
+        return c;
+    }
+    return b;
+}
+
+/// A heap sort, `O(n log n)` whatever the order: a max-heap built in place, its top swapped to the
+/// end one at a time.
+fn heapSort<T :: [TotalOrder]>(xs: Slice<T>): void {
+    let n = xs.length();
+    var start = n / 2 - 1;
+    while (start >= 0) {
+        siftDown(xs, start, n);
+        start = start - 1;
+    }
+    var end = n - 1;
+    while (end > 0) {
+        xs.swap(0, end);
+        siftDown(xs, 0, end);
+        end = end - 1;
+    }
+}
+
+fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
+    var r = root;
+    while (true) {
+        var child = 2 * r + 1;
+        if (child >= end) {
+            return;
+        }
+        if (child + 1 < end && isLess(xs[child].totalCompare(xs[child + 1]))) {
+            child = child + 1;
+        }
+        if (!isLess(xs[r].totalCompare(xs[child]))) {
+            return;
+        }
+        xs.swap(r, child);
+        r = child;
+    }
+}
+
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
 /// Named for what it gives: `Map` is the collection's (C4).
 pub struct Mapped<I :: [Iterator], U> :: [Iterator] {
