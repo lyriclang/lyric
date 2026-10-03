@@ -291,12 +291,16 @@ public sealed class TypeResult
 
     /// <summary>A <c>for</c> over Lyric 5's protocol (design/v5/spec/10 B6 I2): the two calls the loop
     /// makes and the hidden variable the iterator lives in, checked as written calls are.</summary>
-    public sealed record ForInProtocol(CallExpr IterCall, CallExpr NextCall, LocalSymbol Cursor);
+    public sealed record ForInProtocol(CallExpr IterCall, CallExpr NextCall, LocalSymbol Cursor)
+    {
+        /// <summary>The close of a Closeable iterator (10 B6 I6), a defer of the loop's own.</summary>
+        public DeferStmt? Close { get; init; }
+    }
 
     private readonly Dictionary<ForInStmt, ForInProtocol> _forIns = new(ReferenceEqualityComparer.Instance);
 
-    public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor) =>
-        _forIns[loop] = new ForInProtocol(iter, next, cursor);
+    public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor, DeferStmt? close = null) =>
+        _forIns[loop] = new ForInProtocol(iter, next, cursor) { Close = close };
 
     public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
 

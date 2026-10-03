@@ -1864,6 +1864,18 @@ internal sealed class FunctionLowerer
         var cursor = _slots.DeclareFor(protocol.Cursor, cursorType);
         _b.Emit(new StoreLocal(cursor, iterator, stmt.Span));
 
+        // A Closeable iterator's close (10 B6 I6): a defer in a scope of the loop's own, below
+        // the loop's depth, so break and continue stay inside it — the exit runs it once, a return
+        // or an error leaving the loop unwinds it.
+        if (protocol.Close is { } close) _defers.Push(new List<DeferStmt> { close });
+        try { return LowerProtocolLoop(stmt, protocol, loopVar, cursor, cursorType); }
+        finally { if (protocol.Close is not null) _defers.Pop(); }
+    }
+
+    private bool LowerProtocolLoop(ForInStmt stmt, TypeResult.ForInProtocol protocol, LocalSymbol loopVar,
+        LocalId cursor, IrType cursorType)
+    {
+
         var condBlock = _b.NewBlock();
         _b.Seal(new Branch(condBlock, stmt.Span));
         _b.SwitchTo(condBlock);
@@ -1889,7 +1901,7 @@ internal sealed class FunctionLowerer
         _loops.Pop();
 
         _b.SwitchTo(exitBlock);
-        return true;
+        return protocol.Close is null || EmitLeavingDefers(1);
     }
 
     /// <summary>
