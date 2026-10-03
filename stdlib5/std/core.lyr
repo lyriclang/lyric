@@ -1557,11 +1557,16 @@ fn float32OfText(s: string): float32;
 // ---------------------------------------------------------------------------------------------
 
 /// A source of values, one at a time (10 B6 I1): `next()` gives the next, and `null` at the end —
-/// for good, once given. A struct iterator changes as it goes, so `next` writes it.
+/// for good, once given. A struct iterator changes as it goes, so `next` writes it. A walk that
+/// can fail — a file's lines — answers its `Error`, and `next()` throws it (I5): the loop over it
+/// is marked, `for (line in try lines)`.
 pub interface Iterator {
     type Item;
 
-    mut fn next(): ?Self.Item;
+    /// What a walk may throw: nothing, unless a conformer answers otherwise.
+    type Error :: [Error] = never;
+
+    mut fn next(): ?Self.Item throws Self.Error;
 
     /// How many values are left: at least the first, at most the second where that is known — for
     /// a collector that sizes its storage once.

@@ -13,9 +13,9 @@ struct Countdown :: [Iterator] {
     }
 }
 
-fn first<I :: [Iterable]>(i: I): ?I.Iter.Item {
+fn first<I :: [Iterable]>(i: I): ?I.Iter.Item throws I.Iter.Error {
     var it = i.iter();
-    return it.next();
+    return try it.next();
 }
 
 @Test

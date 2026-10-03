@@ -233,10 +233,23 @@ public sealed class SemaRules
     /// </summary>
     private void CheckNeverPositions(Node node, Node? parent)
     {
-        if (node is NamedType { Path: ["never"], TypeArguments.Length: 0 } never && !IsReturnType(never, parent))
+        if (node is NamedType { Path: ["never"], TypeArguments.Length: 0 } never && !IsReturnType(never, parent)
+            && !AnswersAnAssociatedType(never, parent))
             _de.Report("LYR-SEM0145", Severity.Error, never.Span,
                 "'never' stands only as a return type — no value of it can exist");
         foreach (var child in AstChildren.Of(node)) CheckNeverPositions(child, node);
+    }
+
+    /// <summary>An associated type's answer, written or fixed — <c>type Error = never</c>,
+    /// <c>Iterator&lt;Error = never&gt;</c>: an empty thrown set where the member's bound is
+    /// <c>Error</c> (05 E2 K4), which the checker asks, knowing the member.</summary>
+    private static bool AnswersAnAssociatedType(TypeNode type, Node? parent)
+    {
+        if (parent is AssociatedTypeDecl decl) return ReferenceEquals(decl.Type, type);
+        if (parent is not NamedType { ArgumentNames: { } names } fixing) return false;
+        for (var i = 0; i < fixing.TypeArguments.Length && i < names.Length; i++)
+            if (ReferenceEquals(fixing.TypeArguments[i], type)) return names[i] is not null;
+        return false;
     }
 
     private static bool IsReturnType(TypeNode type, Node? parent) => parent switch
