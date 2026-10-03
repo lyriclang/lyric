@@ -1,0 +1,94 @@
+// std.collections' walks (design/v5/spec/10 C4, C5, I4, I8, I9): a map's entries, keys and values,
+// the rest of its core, a set, a list from an iterator.
+import std.collections { List, Map, Set };
+import std.test { assertEq, assertFalse, assertPanics, assertTrue };
+
+fn sorted(xs: List<int>): string {
+    xs.asSlice().sort();
+    return xs.asSlice().join(",");
+}
+
+@Test
+fn aMapWalksEveryEntryOnce(): void {
+    let m = Map<int, int>.new();
+    for (i in 0..50) {
+        m.insert(i, i * 10);
+    }
+    m.remove(7);
+    var keys = 0;
+    var values = 0;
+    var pairs = 0;
+    for (e in m) {
+        let (k, v) = e;
+        if (v == k * 10) {
+            pairs = pairs + 1;
+        }
+    }
+    for (k in m.keys()) {
+        keys = keys + k;
+    }
+    for (v in m.values()) {
+        values = values + v;
+    }
+    assertEq(pairs, 49);
+    assertEq(keys, 49 * 50 / 2 - 7);
+    assertEq(values, (49 * 50 / 2 - 7) * 10);
+}
+
+@Test
+fn aChangeWhileWalkingPanics(): void {
+    let m = Map<int, int>.new();
+    m.insert(1, 1);
+    m.insert(2, 2);
+    let info = assertPanics(() => {
+        for (k in m.keys()) {
+            m.insert(k + 10, 0);
+        }
+    });
+    assertEq(info.message, "Map: changed while it was walked");
+}
+
+@Test
+fn getOrInsertUpdateAndRetain(): void {
+    let m = Map<string, int>.new();
+    assertEq(m.getOr("a", 5), 5);
+    assertEq(m.getOrInsert("a", () => 1), 1);
+    assertEq(m.getOrInsert("a", () => 9), 1);
+    assertTrue(m.update("a", (v) => v + 1));
+    assertFalse(m.update("b", (v) => v + 1));
+    assertEq(m.getOr("a", 0), 2);
+    m.insert("b", 3);
+    m.insert("c", 4);
+    assertEq(m.retain((k, v) => v % 2 == 0), 1);
+    assertEq(m.length(), 2);
+    assertFalse(m.containsKey("b"));
+}
+
+@Test
+fn aSetHoldsEachValueOnce(): void {
+    let s = Set<string>.new();
+    assertTrue(s.insert("x"));
+    assertFalse(s.insert("x"));
+    assertTrue(s.insert("y"));
+    assertEq(s.length(), 2);
+    assertTrue(s.contains("y"));
+    assertTrue(s.remove("x"));
+    assertFalse(s.remove("x"));
+    var n = 0;
+    for (v in s) {
+        n = n + 1;
+    }
+    assertEq(n, 1);
+}
+
+@Test
+fn toListCollectsAnIterator(): void {
+    let xs = (1..6).map((v) => v * v).toList();
+    assertEq(xs.length(), 5);
+    assertEq(xs[4], 25);
+    let ks = Map<int, int>.new();
+    ks.insert(3, 0);
+    ks.insert(1, 0);
+    ks.insert(2, 0);
+    assertEq(sorted(ks.keys().toList()), "1,2,3");
+}
