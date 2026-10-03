@@ -1703,6 +1703,143 @@ pub struct Filter<I :: [Iterator]> :: [Iterator] {
     }
 }
 
+/// `it.take(n)`: the first `n` values of `it`, or all where it has fewer.
+pub struct Take<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    var left: int,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        if (this.left <= 0) {
+            return null;
+        }
+        this.left = this.left - 1;
+        return try this.inner.next();
+    }
+}
+
+/// `it.skip(n)`: the values of `it` after its first `n`.
+pub struct Skip<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    var n: int,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        while (this.n > 0) {
+            this.n = this.n - 1;
+            if (try this.inner.next() == null) {
+                return null;
+            }
+        }
+        return try this.inner.next();
+    }
+}
+
+/// `it.takeWhile(p)`: the values of `it` up to the first `p` does not hold for.
+pub struct TakeWhile<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    p: fn(I.Item) -> bool,
+    var done: bool,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        if (this.done) {
+            return null;
+        }
+        let x = try this.inner.next();
+        if (x == null) {
+            this.done = true;
+            return null;
+        }
+        if (!this.p(x)) {
+            this.done = true;
+            return null;
+        }
+        return x;
+    }
+}
+
+/// `it.skipWhile(p)`: the values of `it` from the first `p` does not hold for.
+pub struct SkipWhile<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    p: fn(I.Item) -> bool,
+    var started: bool,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        if (this.started) {
+            return try this.inner.next();
+        }
+        this.started = true;
+        var x = try this.inner.next();
+        while (x != null && this.p(x)) {
+            x = try this.inner.next();
+        }
+        return x;
+    }
+}
+
+/// `it.stepBy(n)`: the first value of `it`, then every `n`th.
+pub struct StepBy<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    step: int,
+    var first: bool,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        if (this.first) {
+            this.first = false;
+            return try this.inner.next();
+        }
+        var gap = this.step - 1;
+        while (gap > 0) {
+            gap = gap - 1;
+            if (try this.inner.next() == null) {
+                return null;
+            }
+        }
+        return try this.inner.next();
+    }
+}
+
+/// `it.enumerate()`: each value of `it` with its position, from 0.
+pub struct Enumerate<I :: [Iterator]> :: [Iterator] {
+    type Item = (int, I.Item);
+    type Error = I.Error;
+    var inner: I,
+    var i: int,
+
+    pub mut fn next(): ?(int, I.Item) throws I.Error {
+        let x = try this.inner.next();
+        if (x == null) {
+            return null;
+        }
+        this.i = this.i + 1;
+        return (this.i - 1, x);
+    }
+}
+
+/// `it.inspect(f)`: the values of `it`, each shown to `f` on its way through.
+pub struct Inspect<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    f: fn(I.Item) -> void,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        let x = try this.inner.next();
+        if (x != null) {
+            this.f(x);
+        }
+        return x;
+    }
+}
+
 // The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
 // allocation, no interface value.
 extend<I :: [Iterator]> I {
@@ -1714,6 +1851,44 @@ extend<I :: [Iterator]> I {
     /// The values `p` holds for.
     pub fn filter(p: fn(I.Item) -> bool): Filter<I> {
         return Filter<I> { inner = this, p = p };
+    }
+
+    /// The first `n` values, or all where there are fewer.
+    pub fn take(n: int): Take<I> {
+        return Take<I> { inner = this, left = n };
+    }
+
+    /// The values after the first `n`.
+    pub fn skip(n: int): Skip<I> {
+        return Skip<I> { inner = this, n = n };
+    }
+
+    /// The values up to the first `p` does not hold for.
+    pub fn takeWhile(p: fn(I.Item) -> bool): TakeWhile<I> {
+        return TakeWhile<I> { inner = this, p = p, done = false };
+    }
+
+    /// The values from the first `p` does not hold for.
+    pub fn skipWhile(p: fn(I.Item) -> bool): SkipWhile<I> {
+        return SkipWhile<I> { inner = this, p = p, started = false };
+    }
+
+    /// The first value, then every `n`th; `n` below 1 panics.
+    pub fn stepBy(n: int): StepBy<I> {
+        if (n < 1) {
+            panic("stepBy needs a step of at least 1");
+        }
+        return StepBy<I> { inner = this, step = n, first = true };
+    }
+
+    /// Each value with its position, from 0.
+    pub fn enumerate(): Enumerate<I> {
+        return Enumerate<I> { inner = this, i = 0 };
+    }
+
+    /// The values, each shown to `f` on its way through.
+    pub fn inspect(f: fn(I.Item) -> void): Inspect<I> {
+        return Inspect<I> { inner = this, f = f };
     }
 }
 

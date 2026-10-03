@@ -145,6 +145,48 @@ fn adaptersPullLazily(): void {
     assertEq(c.pulls, 3);
 }
 
+fn text<I :: [Iterator<Item = int, Error = never>]>(it: I): string {
+    var out = "";
+    for (x in it) { out = out + f"{x}"; }
+    return out;
+}
+
+@Test
+fn takeAndSkip(): void {
+    assertEq(text((0..10).take(3)), "012");
+    assertEq(text((0..2).take(5)), "01");
+    assertEq(text((0..5).skip(3)), "34");
+    assertEq(text((0..2).skip(5)), "");
+    assertEq(text((0..10).skip(2).take(3)), "234");
+}
+
+@Test
+fn whileAdaptersStopAndStart(): void {
+    assertEq(text([1, 2, 5, 1].iter().takeWhile((v) => v < 3)), "12");
+    assertEq(text([1, 2, 5, 1].iter().skipWhile((v) => v < 3)), "51");
+    var t = [1, 5, 1].iter().takeWhile((v) => v < 3);
+    assertEq(t.next() ?? -1, 1);
+    assertNull(t.next());
+    assertNull(t.next());
+}
+
+@Test
+fn stepByTakesEveryNth(): void {
+    assertEq(text((0..10).stepBy(3)), "0369");
+    assertEq(text((0..3).stepBy(1)), "012");
+}
+
+@Test
+fn enumerateAndInspect(): void {
+    var seen = "";
+    for ((i, w) in ["a", "b"].iter().enumerate()) { seen = seen + f"{i}{w}"; }
+    assertEq(seen, "0a1b");
+    let c = Counting { n = 0, pulls = 0 };
+    let total = text((0..3).inspect((v) => { c.pulls = c.pulls + v; }));
+    assertEq(total, "012");
+    assertEq(c.pulls, 3);
+}
+
 @Test
 fn forWalksARangeAndAnIterator(): void {
     var seen = "";
