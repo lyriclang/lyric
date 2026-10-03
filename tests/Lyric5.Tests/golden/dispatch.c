@@ -564,7 +564,7 @@ bb0:;
     return t0;
 }
 
-#line 1305 "stdlib5/std/core.lyr"
+#line 1327 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     double t1 = 0;
@@ -575,62 +575,62 @@ void lyr__globals__9ee5f9b5(void) {
     uint64_t t6 = 0;
     float t7 = 0;
 bb0:;
-#line 1305
+#line 1327
     t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1305
+#line 1327
     t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1305
+#line 1327
     lyr_g0_float_infinity = t1;
-#line 1306
+#line 1328
     t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1306
+#line 1328
     t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1306
+#line 1328
     lyr_g1_float_nan = t3;
-#line 1326
+#line 1348
     t4 = (uint64_t)UINT64_C(2139095040);
-#line 1326
+#line 1348
     t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1326
+#line 1348
     lyr_g2_float32_infinity = t5;
-#line 1327
+#line 1349
     t6 = (uint64_t)UINT64_C(2143289344);
-#line 1327
+#line 1349
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1327
+#line 1349
     lyr_g3_float32_nan = t7;
     return;
 }
 
-#line 1312 "stdlib5/std/core.lyr"
+#line 1334 "stdlib5/std/core.lyr"
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
     uint64_t t0 = 0;
     double t1 = 0;
     double t2 = 0;
 bb0:;
-#line 1312
+#line 1334
     t0 = l0_b;
-#line 1302
+#line 1324
     t1 = (double)0.0;
-#line 1312
+#line 1334
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1312
+#line 1334
     return t2;
 }
 
-#line 1333 "stdlib5/std/core.lyr"
+#line 1355 "stdlib5/std/core.lyr"
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
     uint64_t t0 = 0;
     float t1 = 0;
     float t2 = 0;
 bb0:;
-#line 1333
+#line 1355
     t0 = l0_b;
-#line 1323
+#line 1345
     t1 = (float)0.0;
-#line 1333
+#line 1355
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1333
+#line 1355
     return t2;
 }
 
