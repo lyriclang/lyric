@@ -727,6 +727,9 @@ public sealed class SemaRules
 
             // An element is writable as soon as the container is a REFERENCE, exactly like a class
             // field. A 'let' pins the name, not the object behind it.
+            // A type's own index (04 D6): the checker desugared it and asked IndexSet of a write.
+            case IndexExpr ix when _types.OperatorCallOf(ix) is not null:
+                return null;
             case IndexExpr ix:
                 return IsIndexableTarget(_types.TypeOf(ix.Target)) ? null : "the target is not indexable";
 

@@ -614,7 +614,7 @@ bb0:;
     return t0;
 }
 
-#line 1375 "stdlib5/std/core.lyr"
+#line 1387 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     double t1 = 0;
@@ -628,29 +628,29 @@ void lyr__globals__9ee5f9b5(void) {
     uint64_t t9 = 0;
     uint64_t t10 = 0;
 bb0:;
-#line 1375
+#line 1387
     t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1375
+#line 1387
     t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1375
+#line 1387
     lyr_g0_float_infinity = t1;
-#line 1376
+#line 1388
     t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1376
+#line 1388
     t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1376
+#line 1388
     lyr_g1_float_nan = t3;
-#line 1396
+#line 1408
     t4 = (uint64_t)UINT64_C(2139095040);
-#line 1396
+#line 1408
     t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1396
+#line 1408
     lyr_g2_float32_infinity = t5;
-#line 1397
+#line 1409
     t6 = (uint64_t)UINT64_C(2143289344);
-#line 1397
+#line 1409
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1397
+#line 1409
     lyr_g3_float32_nan = t7;
 #line 14 "stdlib5/std/collections.lyr"
     t8 = (uint64_t)UINT64_C(9259542123273814144);
@@ -667,35 +667,35 @@ bb0:;
     return;
 }
 
-#line 1382 "stdlib5/std/core.lyr"
+#line 1394 "stdlib5/std/core.lyr"
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
     uint64_t t0 = 0;
     double t1 = 0;
     double t2 = 0;
 bb0:;
-#line 1382
+#line 1394
     t0 = l0_b;
-#line 1372
+#line 1384
     t1 = (double)0.0;
-#line 1382
+#line 1394
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1382
+#line 1394
     return t2;
 }
 
-#line 1403 "stdlib5/std/core.lyr"
+#line 1415 "stdlib5/std/core.lyr"
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
     uint64_t t0 = 0;
     float t1 = 0;
     float t2 = 0;
 bb0:;
-#line 1403
+#line 1415
     t0 = l0_b;
-#line 1393
+#line 1405
     t1 = (float)0.0;
-#line 1403
+#line 1415
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1403
+#line 1415
     return t2;
 }
 

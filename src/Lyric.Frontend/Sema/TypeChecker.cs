@@ -97,6 +97,8 @@ public sealed class TypeChecker
     private readonly TypeSymbol? _stringIterator;
     private readonly TypeSymbol? _iterable;
     private readonly TypeSymbol? _indexable;
+    private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]' (04 D6)
+    private readonly TypeSymbol? _coreIndexSet;  // and IndexSet<K>: 'x[k] = v'
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
@@ -160,6 +162,10 @@ public sealed class TypeChecker
         // from the stdlib.
         _indexable = comp.FindModule(["std", "collections"])?.Members
             .LookupLocal("Indexable") as TypeSymbol;
+        _coreIndex = comp.FindModule(["std", "core"])?.Members.LookupLocal("Index")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
+        _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndexSet ? coreIndexSet : null;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -4540,6 +4546,21 @@ public sealed class TypeChecker
     private LyrType CheckAssign(AssignExpr a, SymbolTable scope)
     {
         CheckExpr(a.Target, scope); // binds RefOf
+        // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)' (04 D6). A compound would read
+        // and write through the index, evaluating it twice: written out instead, as for every
+        // operator interface on a target that is no variable.
+        if (a.Target is IndexExpr { Index: not SliceRangeExpr } written && _coreIndex is { } readIndex
+            && _result.TypeOf(written.Target) is var holder && IndexesThrough(holder, readIndex))
+        {
+            if (a.Operator is not null)
+                return Report(a.Span, "LYR-SEM0003",
+                    "a compound assignment through an index reads and writes it — write it out: 'x[k] = x[k] op v'");
+            if (_coreIndexSet is not { } writeIndex || !IndexesThrough(holder, writeIndex))
+                return Report(a.Span, "LYR-SEM0019",
+                    $"'{TypeFacts.Display(holder)}' is read by index and not written — it conforms to 'Index', not to 'IndexSet'");
+            DesugarIndex(written, a, "setIndex", [written.Index, a.Value], scope);
+            return _result.TypeOf(written);
+        }
         var targetSym = a.Target is IdentifierExpr ? _result.RefOf(a.Target) : null;
         // The binding holds another iterator from here on: a loop that walked the old one says
         // nothing about the next (07 §2 rule 4).
@@ -4876,6 +4897,10 @@ public sealed class TypeChecker
             };
         }
 
+        // A type's own index (04 D6): 'x[k]' reads 'x.index(k)' through Index<K>.
+        if (_coreIndex is { } index && IndexesThrough(target, index))
+            return DesugarIndex(ix, ix, "index", [ix.Index], scope);
+
         CheckIndexValue(ix.Index, target, scope);
         return target switch
         {
@@ -4905,6 +4930,30 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(target)}' is not indexable — it must implement "
                      + "'Indexable<T>' from std.collections")
         };
+    }
+
+    /// <summary>Whether a value of the type is indexed through <paramref name="iface"/> of std.core
+    /// (04 D6): its own list or a block conforms, or a constraint of a type parameter does. An
+    /// array's, a view's and an inline array's index is built in.</summary>
+    private bool IndexesThrough(LyrType target, TypeSymbol iface) => target switch
+    {
+        ArrayOf or SliceOf or InlineArrayOf or ErrorType or PrimitiveType => false,
+        TypeParamType tp => tp.Param.Constraints.Any(c => ConstraintInterface(c) is { } ci
+            && Conformance.WithParents(ci, _binding).Any(p => ReferenceEquals(p, iface))),
+        _ => TypeFacts.SymbolOf(target) is { } symbol && ConformsTo(symbol, iface),
+    };
+
+    /// <summary><c>x[k]</c> as the call <c>x.{method}(…)</c>, checked as one written and stored on
+    /// <paramref name="at"/> for the lowering — the read on the index expression, the write on
+    /// the assignment.</summary>
+    private LyrType DesugarIndex(IndexExpr ix, Expr at, string method, Expr[] arguments, SymbolTable scope)
+    {
+        var member = new MemberExpr(ix.Target, method, IsOptional: false, ix.Span) { MemberSpan = default };
+        var call = new CallExpr(member, arguments, at.Span);
+        var type = CheckExpr(call, scope);
+        if (type.IsError) return LyrType.Error;
+        _result.DesugarOperator(at, call);
+        return type;
     }
 
     /// <summary>
