@@ -30,8 +30,8 @@ LyrStr *lyr_str_from_int(int64_t value);
 LyrStr *lyr_str_from_uint(uint64_t value);
 /* "true" or "false". */
 LyrStr *lyr_str_from_bool(bool value);
-/* The shortest decimal text that reads back as the same double: "1", "0.1", "1e+21", "-0",
- * "inf", "-inf", "NaN". An integral value has no ".0", as C#, Go and Rust print it. */
+/* The shortest decimal text that reads back as the same double (10 B5 Z5), as Python and Swift
+ * write it: "1.0", "0.1", "-0.0", "100.0", "1e+16", "1.5e-07", "inf", "-inf", "nan". */
 LyrStr *lyr_str_from_float(double value);
 /* The character as a string of one code point, UTF-8 encoded. The value is a Unicode scalar
  * value by the type's invariant (numeric.h checks the one conversion that could break it). */

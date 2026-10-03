@@ -53,7 +53,7 @@ public class NativeTests
         var main = "import std.io { println };\n\n" + declarations + "\n\nfn main(): void {\n    keep(7);\n"
                    + "    println(f\"{half(5.0)} {even(4)} {even(3)} {third(3.0f32)} {low(258)} {kept_value()}\");\n}\n";
         var dir = Package(("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"), ("native/scalars.c", c), ("src/main.lyr", main));
-        Assert.Equal("2.5 true false 1 2 7\n", BuildAndRun(dir, "app", "build", "-C", dir));
+        Assert.Equal("2.5 true false 1.0 2 7\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
     /// <summary>The operating system's table comes on top of the common one.</summary>

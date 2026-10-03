@@ -170,8 +170,8 @@ public class CEmitterTests
             data.Add("strings", profile, 0, "Grüße, Lyric!\nn=42 u=7 b=true\na-b-c\ntab\there\n");
             data.Add("arith", profile, 0,
                 "alias 42\nwiden 300\nwrap -128 255 0\nsat 127 -128 0 255\ntrunc -3 3\nchar 65 A ok\n"
-                + "shl 8 -1 255\nwrapop 0 255 1\nswrap -128 127\nfloat 1.5 2 0.09999999999999998 0.5\n"
-                + "fdiv inf -inf NaN\nf32 0.10000000149011612 0.30000001192092896\ncmp true false\n"
+                + "shl 8 -1 255\nwrapop 0 255 1\nswrap -128 127\nfloat 1.5 2.0 0.09999999999999998 0.5\n"
+                + "fdiv inf -inf nan\nf32 0.10000000149011612 0.30000001192092896\ncmp true false\n"
                 + "big 9007199254740993 1e+21\n");
             data.Add("objects", profile, 0,
                 "alice 150\nshared 175\nidentity true false\nteam alice+bob\nswapped alice\n"

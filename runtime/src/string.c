@@ -132,22 +132,59 @@ LyrStr *lyr_str_from_char(uint32_t value) {
     return lyr_str_from_bytes(bytes, n);
 }
 
-/* Shortest round trip by trial: the first number of significant digits whose `%g` text reads
- * back as the same double, from one digit up to the 17 that always suffice. Most values stop
- * early — an integer or a short decimal at its own length — and the worst case is 17 trials of
- * snprintf and strtod, both correctly rounded on every libc this toolchain links. Ryu answers
- * the same question without the trials and is the door if this shows up in a profile. */
+/* A float's text (10 B5 Z5): the SHORTEST digits that read back as the same double, laid out as
+ * Python's repr and Swift write them — plain for a decimal exponent from -4 up to below 16, with
+ * `.0` on an integral value (`1.0`, `-0.0`, `100.0`), an exponent beyond (`1e+16`, `1.5e-07`) —
+ * and `nan`, `inf`, `-inf`. The digits by trial: the first precision whose `%e` text reads back,
+ * from one digit up to the 17 that always suffice; snprintf and strtod are correctly rounded on
+ * every libc this toolchain links. Ryu answers the same without the trials and is the door if this
+ * shows up in a profile. */
 LyrStr *lyr_str_from_float(double value) {
-    if (value != value) return lyr_str_from_cstr("NaN");
+    if (value != value) return lyr_str_from_cstr("nan");
     if (value == (double)INFINITY) return lyr_str_from_cstr("inf");
     if (value == -(double)INFINITY) return lyr_str_from_cstr("-inf");
-    char text[32];
-    for (int precision = 1; precision <= 17; precision++) {
-        int n = snprintf(text, sizeof text, "%.*g", precision, value);
-        if (n <= 0 || (size_t)n >= sizeof text) break;
-        if (precision == 17 || strtod(text, NULL) == value) return lyr_str_from_bytes(text, n);
+
+    char sci[40];
+    for (int precision = 0; precision <= 16; precision++) {
+        snprintf(sci, sizeof sci, "%.*e", precision, value);
+        if (strtod(sci, NULL) == value) break;
     }
-    return lyr_str_from_cstr("?");
+    /* sci is [-]d[.ddd]e(+|-)xx: the sign, the digits without the point, the exponent */
+    const char *p = sci;
+    bool negative = *p == '-';
+    if (negative) p++;
+    char digits[24];
+    int count = 0;
+    for (; *p != 'e'; p++)
+        if (*p != '.') digits[count++] = *p;
+    while (count > 1 && digits[count - 1] == '0') count--; /* "1.50e+00" would read 1.5 as well */
+    int exponent = atoi(p + 1);
+
+    char text[48];
+    int n = 0;
+    if (negative) text[n++] = '-';
+    if (exponent < -4 || exponent >= 16) {
+        text[n++] = digits[0];
+        if (count > 1) {
+            text[n++] = '.';
+            for (int i = 1; i < count; i++) text[n++] = digits[i];
+        }
+        n += snprintf(text + n, sizeof text - (size_t)n, "e%c%02d", exponent < 0 ? '-' : '+',
+                      exponent < 0 ? -exponent : exponent);
+    } else if (exponent < 0) {
+        text[n++] = '0';
+        text[n++] = '.';
+        for (int i = 0; i < -exponent - 1; i++) text[n++] = '0';
+        for (int i = 0; i < count; i++) text[n++] = digits[i];
+    } else {
+        for (int i = 0; i <= exponent; i++) text[n++] = i < count ? digits[i] : '0';
+        text[n++] = '.';
+        if (count > exponent + 1)
+            for (int i = exponent + 1; i < count; i++) text[n++] = digits[i];
+        else
+            text[n++] = '0';
+    }
+    return lyr_str_from_bytes(text, n);
 }
 
 /* The text strtod reads: the string's own bytes (NUL-terminated, 11 X3) when it has no '_', else
