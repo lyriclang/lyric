@@ -1111,11 +1111,12 @@ internal sealed class TypeTable
     /// <summary>
     /// A written <c>T.Item</c> or <c>Self.Item</c> (03 T6): the associated type's binding for
     /// what the head is here — a type parameter through the substitution, the type itself in its
-    /// own body. <c>null</c> where the node is not such a path or the head is not known.
+    /// own body —, and on through every further segment, <c>A.Iter.Item</c> (05 §8 rule 4).
+    /// <c>null</c> where the node is not such a path or the head is not known.
     /// </summary>
     private LyrType? AssociatedOf(NamedType named)
     {
-        if (named.Path.Length != 2 || named.TypeArguments.Length != 0) return null;
+        if (named.Path.Length < 2 || named.TypeArguments.Length != 0) return null;
         var bound = _binding.Resolve(named);
         if (bound is ImportBindingSymbol import) bound = import.Target;
         LyrType head;
@@ -1140,26 +1141,50 @@ internal sealed class TypeTable
                         if (_substitutions.Count == 0 || !_substitutions.Peek().TryGetValue(ts.Generics[i].Name, out args[i]!)) return null;
                     head = new GenericInstance(ts, args);
                 }
-                var nodes = ts.Declaration switch
-                {
-                    StructDecl s => s.Interfaces,
-                    ClassDecl c => c.Interfaces,
-                    EnumDecl e => e.Interfaces,
-                    _ => [],
-                };
-                interfaces = nodes
-                    .Concat(Compilation.Extensions.Blocks.Where(b => ReferenceEquals(b.Target, ts)).SelectMany(b => b.Decl.Interfaces))
-                    .SelectMany(n => Conformance.InterfaceOf(n, _binding) is { } i
-                        ? Conformance.WithParents(i, _binding) : Enumerable.Empty<TypeSymbol>());
+                interfaces = ConformedInterfaces(ts);
                 break;
             }
             default: return null;
         }
-        foreach (var iface in interfaces)
-            if (iface.Members.LookupLocal(named.Path[1]) is AssociatedTypeSymbol member)
-                return TypeChecker.ResolveAssociated(head, member);
-        return null;
+        var member = Declaring(interfaces, named.Path[1]);
+        if (member is null) return null;
+        var reached = TypeChecker.ResolveAssociated(head, member);
+        for (var i = 2; i < named.Path.Length; i++)
+        {
+            // Through the step before's bound, as the checker reads an open path; or what the
+            // type reached conforms to, as it reads one on a type.
+            var through = member.Bounds
+                .Select(b => TypeFacts.SymbolOf(b)).OfType<TypeSymbol>()
+                .Where(b => b.Kind == TypeSymbolKind.Interface)
+                .SelectMany(b => Conformance.WithParents(b, _binding));
+            if (TypeFacts.SymbolOf(reached) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum } on)
+                through = through.Concat(ConformedInterfaces(on));
+            member = Declaring(through, named.Path[i]);
+            if (member is null) return null;
+            reached = TypeChecker.ResolveAssociated(reached, member);
+        }
+        return reached;
     }
+
+    /// <summary>The interfaces a type declares and its targeted blocks add, parents included.</summary>
+    private IEnumerable<TypeSymbol> ConformedInterfaces(TypeSymbol ts)
+    {
+        var nodes = ts.Declaration switch
+        {
+            StructDecl s => s.Interfaces,
+            ClassDecl c => c.Interfaces,
+            EnumDecl e => e.Interfaces,
+            _ => [],
+        };
+        return nodes
+            .Concat(Compilation.Extensions.Blocks.Where(b => ReferenceEquals(b.Target, ts)).SelectMany(b => b.Decl.Interfaces))
+            .SelectMany(n => Conformance.InterfaceOf(n, _binding) is { } i
+                ? Conformance.WithParents(i, _binding) : Enumerable.Empty<TypeSymbol>());
+    }
+
+    /// <summary>The associated type of that name the first of these interfaces declares.</summary>
+    private static AssociatedTypeSymbol? Declaring(IEnumerable<TypeSymbol> interfaces, string name) =>
+        interfaces.Select(i => i.Members.LookupLocal(name)).OfType<AssociatedTypeSymbol>().FirstOrDefault();
 
     private LyrType Resolve(TypeNode node, Core.Span span)
     {

@@ -32,14 +32,14 @@ pub class Box<T> {
 /// `a..b` (design/v5/spec/03 T13 A3): the values from `start` up to but not including `end`, a
 /// value holding its bounds. In a `for` head a range literal is the counted loop and no value.
 pub struct Range<T> {
-    pub start: T,
-    pub end: T,
+    pub var start: T,
+    pub var end: T,
 }
 
 /// `a..=b`: the values from `start` to `end`, both included.
 pub struct RangeInclusive<T> {
-    pub start: T,
-    pub end: T,
+    pub var start: T,
+    pub var end: T,
 }
 
 /// `a..`: from `start` on. Written inside `[…]` only, where it takes a view (03 T13 A2).
@@ -1550,6 +1550,102 @@ fn byteAt(s: string, i: int): int;
 fn asTypeOf<T, U>(v: T, like: U): U;
 fn floatOfText(s: string): float;
 fn float32OfText(s: string): float32;
+
+
+// ---------------------------------------------------------------------------------------------
+// Iteration (design/v5/spec/10 B6): a source of values, one at a time, and what `for` walks.
+// ---------------------------------------------------------------------------------------------
+
+/// A source of values, one at a time (10 B6 I1): `next()` gives the next, and `null` at the end —
+/// for good, once given. A struct iterator changes as it goes, so `next` writes it.
+pub interface Iterator {
+    type Item;
+
+    mut fn next(): ?Self.Item;
+
+    /// How many values are left: at least the first, at most the second where that is known — for
+    /// a collector that sizes its storage once.
+    fn sizeHint(): (int, ?int) {
+        let unknown: ?int = null;
+        return (0, unknown);
+    }
+}
+
+/// What `for` walks (I2): `iter()` gives an iterator over it, at every loop anew. Every iterator
+/// is iterable as itself: a struct iterator as a copy, a class iterator as the object — two loops
+/// over one go on from each other.
+pub interface Iterable {
+    type Iter :: [Iterator];
+
+    fn iter(): Self.Iter;
+}
+
+/// An iterator from both ends (I10): `nextBack()` gives the last value not yet given.
+pub interface DoubleEnded :: [Iterator] {
+    mut fn nextBack(): ?Self.Item;
+}
+
+extend<I :: [Iterator]> I :: [Iterable<Iter = I>] {
+    fn iter(): I {
+        return this;
+    }
+}
+
+// A range is an iterator of its own values, from both ends (I10): the value changes as it is
+// walked — a 'let' range is walked through a copy, as `for` takes one.
+extend<T :: [Integer]> Range<T> :: [Iterator, DoubleEnded] {
+    type Item = T;
+
+    mut fn next(): ?T {
+        if (this.start >= this.end) {
+            return null;
+        }
+        let value = this.start;
+        this.start = this.start + T.one;
+        return value;
+    }
+
+    mut fn nextBack(): ?T {
+        if (this.start >= this.end) {
+            return null;
+        }
+        this.end = this.end - T.one;
+        return this.end;
+    }
+}
+
+// An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
+// before `start` where that value is the type's `max` (`min` from the back), so neither bound
+// leaves the type.
+extend<T :: [Integer]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
+    type Item = T;
+
+    mut fn next(): ?T {
+        if (this.start > this.end) {
+            return null;
+        }
+        let value = this.start;
+        if (value == this.end && value == T.max) {
+            this.end = value - T.one;
+        } else {
+            this.start = value + T.one;
+        }
+        return value;
+    }
+
+    mut fn nextBack(): ?T {
+        if (this.start > this.end) {
+            return null;
+        }
+        let value = this.end;
+        if (value == this.start && value == T.min) {
+            this.start = value + T.one;
+        } else {
+            this.end = value - T.one;
+        }
+        return value;
+    }
+}
 
 /// The debug rendering of an array, element by element — the shape has no conformance of its
 /// own yet (05 §13.6), so a synthesized `debug()` reaches for this.

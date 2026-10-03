@@ -141,6 +141,10 @@ public sealed class TypeChecker
         _inclusiveUnsignedRangeIterator = iter?.LookupLocal("InclusiveUnsignedRangeIterator") as TypeSymbol;
         _stringIterator = iter?.LookupLocal("StringIterator") as TypeSymbol;
         _iterable = iter?.LookupLocal("Iterable") as TypeSymbol;
+        // Lyric 5's protocol (10 B6) is std.core's: what 'for' walks is an Iterable there.
+        _coreIterable = comp.Lyric5Modules
+            && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterable") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterable
+            ? coreIterable : null;
 
         // 'Indexable<T>' lives in std.collections and is to '[i]' what 'Iterator<T>' is to 'for-in':
         // the compiler knows ONE built-in form, the array, and binds everything else to an interface
@@ -2101,13 +2105,22 @@ public sealed class TypeChecker
     /// <c>for-in</c> currently being checked. See <see cref="CheckRange"/>.</summary>
     private Expr? _rangeInPosition;
 
+    /// <summary>std.core's <c>Iterable</c> (10 B6), what a Lyric 5 <c>for</c> walks.</summary>
+    private readonly TypeSymbol? _coreIterable;
+
     private void CheckForIn(ForInStmt fo, SymbolTable scope)
     {
         var outerRange = _rangeInPosition;
         _rangeInPosition = fo.Iterable;
         var iterType = CheckExpr(fo.Iterable, scope);
         _rangeInPosition = outerRange;
-        var elem = iterType switch
+        // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
+        // compiler walks itself goes through the protocol.
+        var protocol = _coreIterable is not null
+                       && !(fo.Iterable is RangeExpr && iterType is RangeOf)
+                       && iterType is not (ArrayOf or SliceOf or ErrorType)
+                       && iterType is not PrimitiveType { Kind: PrimitiveKind.String };
+        var elem = protocol ? CheckForInProtocol(fo, iterType, scope) : iterType switch
         {
             // The three built-in forms. They have no declaration a conformance could hang on, so the
             // compiler builds an adapter from std.iter for them. Semantically the same protocol; only
@@ -2136,8 +2149,9 @@ public sealed class TypeChecker
         // itself optional would need '??T' to be told apart from it — and '?' does not nest.
         // Refused here, where the source position is, rather than in the lowering: it produced
         // '??i64' in the IR, which crashed the verifier in debug and, in release, wrote a module
-        // the loader refuses. 'check' answered 'ok' either way.
-        if (elem is Optional)
+        // the loader refuses. 'check' answered 'ok' either way. Lyric 5's protocol has '??T' (10
+        // B6 I1): 'next()' answers '??T' for an Item '?T', and the loop gets the inner level.
+        if (elem is Optional && !protocol)
             _de.Report("LYR-SEM0091", Severity.Error, fo.Iterable.Span,
                 $"iterating this yields '{TypeFacts.Display(elem)}', and an iterator already "
                 + "answers null to mean the end — an optional element cannot be told apart from it",
@@ -2145,7 +2159,7 @@ public sealed class TypeChecker
                     "walk the indices instead: 'for (i in 0..xs.length) { let x = xs[i]; ... }'"));
 
         var loopScope = new SymbolTable(scope);
-        var loopVar = new LocalSymbol(fo.Variable, elem is Optional ? LyrType.Error : elem,
+        var loopVar = new LocalSymbol(fo.Variable, elem is Optional && !protocol ? LyrType.Error : elem,
             false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
@@ -2155,6 +2169,35 @@ public sealed class TypeChecker
         if (fo.Pattern is { } pattern) BindIrrefutable(pattern, loopVar.Type, loopScope, "a for-loop head");
 
         CheckBlock(fo.Body, loopScope);
+    }
+
+    /// <summary>
+    /// <c>for (x in e)</c> over Lyric 5's protocol (10 B6 I2): the two calls the loop makes, written
+    /// and checked as a program's — <c>e.iter()</c> once, then <c>next()</c> on a hidden variable
+    /// that holds the iterator, until it answers <c>null</c>. The element is what <c>next</c>
+    /// answers. Recorded for the lowering, which lowers them as the calls they are: an own member,
+    /// a block's, a blanket block's, through a constraint — no second way.
+    /// </summary>
+    private LyrType CheckForInProtocol(ForInStmt fo, LyrType iterType, SymbolTable scope)
+    {
+        var span = fo.Iterable.Span;
+        if (!Satisfies(iterType, _coreIterable!, new NamedRef(_coreIterable!)))
+            return Report(span, "LYR-SEM0007",
+                $"'{TypeFacts.Display(iterType)}' is not iterable — 'for' walks an Iterable, and every Iterator is one");
+        var iterMember = new MemberExpr(fo.Iterable, "iter", IsOptional: false, span) { MemberSpan = default };
+        _typedReceiver.Add(iterMember);
+        var iterCall = new CallExpr(iterMember, [], span);
+        var cursorType = CheckExpr(iterCall, scope);
+        if (cursorType.IsError) return LyrType.Error;
+        var cursor = new LocalSymbol("$iterator", cursorType, true, fo);
+        var cursorScope = new SymbolTable(scope);
+        cursorScope.TryDeclare(cursor);
+        var nextMember = new MemberExpr(new IdentifierExpr("$iterator", span), "next", IsOptional: false, span) { MemberSpan = default };
+        var nextCall = new CallExpr(nextMember, [], span);
+        var produced = CheckExpr(nextCall, cursorScope);
+        if (produced.IsError) return LyrType.Error;
+        _result.RecordForIn(fo, iterCall, nextCall, cursor);
+        return produced is Optional item ? item.Inner : produced;
     }
 
     /// <summary>Binds a pattern that is not allowed to fail — a for-loop head or a lambda
@@ -4306,7 +4349,13 @@ public sealed class TypeChecker
             // right, although the target type stands next to it.
             if (AdaptEmptyArray(b.Right, o.Inner)) return o.Inner;
 
-            if (IsAssignable(b.Right, r, o.Inner)) return o.Inner; // ?T ?? T yields T
+            // ?T ?? T yields T; a literal on the right is a T (03 §1.3), and noted as one — or
+            // the lowering stores an 'int' constant where the 'uint8' goes.
+            if (IsAssignable(b.Right, r, o.Inner))
+            {
+                AdaptLiteralType(b.Right, o.Inner);
+                return o.Inner;
+            }
             if (IsAssignable(b.Right, r, l)) return l;              // ?T ?? ?T yields ?T
             BadBinary(b, l, r);
             return o.Inner;
@@ -5429,7 +5478,7 @@ public sealed class TypeChecker
     /// </summary>
     private (LyrType, Symbol?)? BlanketMember(LyrType receiver, string member, Span span)
     {
-        if (receiver is not (NamedRef or GenericInstance or TypeParamType) && !IsShape(receiver)
+        if (receiver is not (NamedRef or GenericInstance or TypeParamType or AssocOf) && !IsShape(receiver)
             && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null))
             return null;
         foreach (var block in _comp.Extensions.Blocks)
@@ -5501,6 +5550,8 @@ public sealed class TypeChecker
             if (fn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(it)) continue;
             return (Substitute(FnTypeOf(fn), WithSelf(subst, it, assoc)), fn);
         }
+        // A blanket block whose constraints the bound reaches (04 R4), as on a type parameter.
+        if (BlanketMember(assoc, member, span) is { } blanket) return blanket;
         return (Report(span, "LYR-SEM0027",
             $"'{TypeFacts.Display(assoc)}' has no member '{member}' — "
             + (assoc.Member.Bounds.Length == 0
@@ -5791,7 +5842,7 @@ public sealed class TypeChecker
                 continue;
             }
             _currentModule = block.Module;
-            BindAssociatedTypes(target, block.Decl.Interfaces, block.MethodScope, block.Decl.Span);
+            BindAssociatedTypes(target, block.Decl.Interfaces, block.MethodScope, block.Decl.Span, BlockToTarget(block, target));
         }
         _currentModule = null;
         // Every answer meets its bound — asked once all are read, the answers of other types a
@@ -5928,7 +5979,22 @@ public sealed class TypeChecker
         }
     }
 
-    private void BindAssociatedTypes(TypeSymbol ts, TypeNode[] entries, SymbolTable answers, Span at)
+    /// <summary>A generic block's parameters read as its target's own (03 T7 X1): <c>extend&lt;U&gt;
+    /// Box&lt;U&gt;</c> answers in its <c>U</c>, and the type's answer is asked in Box's own <c>T</c>.
+    /// <c>null</c> for a block with no parameters.</summary>
+    private Dictionary<GenericParamSymbol, LyrType>? BlockToTarget(ExtensionBlock block, TypeSymbol target)
+    {
+        if (block.Generics.Length == 0 || BlockTargetType(block) is not GenericInstance written) return null;
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < written.Arguments.Length && i < target.Generics.Length; i++)
+            if (written.Arguments[i] is TypeParamType tp) map[tp.Param] = new TypeParamType(target.Generics[i]);
+        return map;
+    }
+
+    /// <param name="toTarget">A generic block's parameters as its target's own, its answers stored in the
+    /// type's terms.</param>
+    private void BindAssociatedTypes(TypeSymbol ts, TypeNode[] entries, SymbolTable answers, Span at,
+        Dictionary<GenericParamSymbol, LyrType>? toTarget = null)
     {
         var asked = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in entries)
@@ -5950,6 +6016,7 @@ public sealed class TypeChecker
                     if (answer.bound is { } written)
                     {
                         var resolved = ResolveType(written, answers);
+                        if (toTarget is not null) resolved = Substitute(resolved, toTarget);
                         member.Bind(ts, instance, resolved);
                         _boundChecks.Add((member, resolved, SelfType(ts), answer.own.Declaration?.Span ?? NodeSpan(node), $"'{ts.Name}'"));
                         continue;
@@ -6018,6 +6085,33 @@ public sealed class TypeChecker
             }
             default:
                 return Report(span, "LYR-SEM0011", $"unresolved type '{head.Name}.{name}'");
+        }
+    }
+
+    /// <summary>A further step of a path, <c>A.Iter.Item</c> (05 §8 rule 4): the associated type
+    /// of that name of what the path has reached — through the bound while that is an open
+    /// question, the answer on a type.</summary>
+    private LyrType ResolveAssociatedOn(LyrType reached, string name, Span span)
+    {
+        switch (reached)
+        {
+            case TypeParamType tp:
+                return ResolveAssociated(tp.Param, name, span);
+            case AssocOf assoc:
+                foreach (var (iface, _) in AssocBoundClosure(assoc))
+                    if (iface.Members.LookupLocal(name) is AssociatedTypeSymbol member)
+                        return new AssocOf(assoc, member);
+                return Report(span, "LYR-SEM0128",
+                    $"'{TypeFacts.Display(assoc)}' has no associated type '{name}' — "
+                    + (assoc.Member.Bounds.Length == 0
+                        ? $"'{assoc.Member.Owner?.Name}.{assoc.Member.Name}' has no bound to declare one"
+                        : $"the bound of '{assoc.Member.Owner?.Name}.{assoc.Member.Name}' declares none"));
+            default:
+                if (TypeFacts.SymbolOf(reached) is { } ts)
+                    foreach (var (iface, _) in InterfacesOf(ts))
+                        if (iface.Members.LookupLocal(name) is AssociatedTypeSymbol member)
+                            return ResolveAssociated(reached, member);
+                return Report(span, "LYR-SEM0128", $"'{TypeFacts.Display(reached)}' has no associated type '{name}'");
         }
     }
 
@@ -6290,9 +6384,10 @@ public sealed class TypeChecker
         // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
         NeverType => true,
 
-        // An associated type through a constraint conforms to what its bound reaches (10 B6), and
-        // to nothing else — its answer is anybody's until the type is known.
-        AssocOf assoc => AssocReaches(assoc, iface, wanted),
+        // An associated type through a constraint conforms to what its bound reaches (10 B6) —
+        // through a blanket block too, as a type parameter does (04 R4) — and to nothing else:
+        // its answer is anybody's until the type is known.
+        AssocOf assoc => AssocReaches(assoc, iface, wanted) || BlockConforms(assoc, iface, wanted, shapes: false),
 
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.
@@ -9615,15 +9710,21 @@ public sealed class TypeChecker
                 // ("what does this type name refer to") answered by one table, whoever asked it.
                 if (sym is not null && _binding.Resolve(n) is null) _binding.Bind(n, sym);
 
-                // 'T.Item' (03 T6): a two-segment path whose head is a type or a type parameter,
-                // not a module, names an associated type. The resolver bound such a node to its
+                // 'T.Item' (03 T6): a path whose head is a type or a type parameter, not a module,
+                // names an associated type, and every further segment one of what the path has
+                // reached ('A.Iter.Item', 05 §8 rule 4). The resolver bound such a node to its
                 // HEAD (a module path is bound to the type it reaches), and a signature is
                 // resolved against the builtins' scope, so the head is read off the binding when
                 // the scope does not have it.
-                if (n.Path.Length == 2 && n.TypeArguments.Length == 0
+                if (n.Path.Length >= 2 && n.TypeArguments.Length == 0
                     && (scope.Lookup(n.Path[0]) ?? (sym?.Name == n.Path[0] ? sym : null)) is { } pathHead
                     && (pathHead is ImportBindingSymbol { Target: not ModuleSymbol } or GenericParamSymbol or TypeSymbol))
-                    return ResolveAssociated(pathHead, n.Path[1], n.Span);
+                {
+                    var reached = ResolveAssociated(pathHead, n.Path[1], n.Span);
+                    for (var i = 2; i < n.Path.Length && !reached.IsError; i++)
+                        reached = ResolveAssociatedOn(reached, n.Path[i], n.Span);
+                    return reached;
+                }
                 if (sym is ImportBindingSymbol ibt) sym = ibt.Target;
                 if (sym is null)
                     return Report(n.Span, "LYR-SEM0011", $"unresolved type '{string.Join('.', n.Path)}'");
