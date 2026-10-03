@@ -289,6 +289,17 @@ public sealed class TypeResult
 
     public void DesugarOperator(Node op, CallExpr call) => _operatorCalls[op] = call;
 
+    /// <summary>A <c>for</c> over Lyric 5's protocol (design/v5/spec/10 B6 I2): the two calls the loop
+    /// makes and the hidden variable the iterator lives in, checked as written calls are.</summary>
+    public sealed record ForInProtocol(CallExpr IterCall, CallExpr NextCall, LocalSymbol Cursor);
+
+    private readonly Dictionary<ForInStmt, ForInProtocol> _forIns = new(ReferenceEqualityComparer.Instance);
+
+    public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor) =>
+        _forIns[loop] = new ForInProtocol(iter, next, cursor);
+
+    public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
+
     public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
 
     /// <summary>

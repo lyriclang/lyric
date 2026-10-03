@@ -1714,6 +1714,9 @@ internal sealed class FunctionLowerer
             && SubstituteType(_types.TypeOf(stmt.Iterable)) is RangeOf)
             return LowerCountedRange(stmt, literal, loopVar);
 
+        if (_types.ForInOf(stmt) is { } protocol)
+            return LowerForInProtocol(stmt, protocol, loopVar);
+
         var (iterator, iteratorType, owner, yieldOverride) = BuildIterator(stmt);
         var elementType = LowerType(loopVar.Type, stmt.Span);
         // What the iterator PRODUCES: the range adapters carry i64/u64 regardless of the
@@ -1773,6 +1776,46 @@ internal sealed class FunctionLowerer
         // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
         // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
         // once, with the last iteration's values (the 2.0.1 bug).
+        if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
+        _loops.Pop();
+
+        _b.SwitchTo(exitBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>for (x in e)</c> over Lyric 5's protocol (design/v5/spec/10 B6 I2): the iterator from
+    /// <c>e.iter()</c> into the loop's hidden variable, then <c>next()</c> on it before every pass,
+    /// the body while it answers a value — the two calls lowered as the calls the checker recorded.
+    /// </summary>
+    private bool LowerForInProtocol(ForInStmt stmt, TypeResult.ForInProtocol protocol, LocalSymbol loopVar)
+    {
+        var cursorType = LowerType(SubstituteType(protocol.Cursor.Type), stmt.Span);
+        var iterator = LowerExpr(protocol.IterCall);
+        var cursor = _slots.DeclareFor(protocol.Cursor, cursorType);
+        _b.Emit(new StoreLocal(cursor, iterator, stmt.Span));
+
+        var condBlock = _b.NewBlock();
+        _b.Seal(new Branch(condBlock, stmt.Span));
+        _b.SwitchTo(condBlock);
+        var produced = LowerExpr(protocol.NextCall);
+        var hasValue = _slots.NewTemp(BoolType);
+        _b.Emit(new OptIsSome(hasValue, produced, stmt.Span));
+        var bodyBlock = _b.NewBlock();
+        var exitBlock = _b.NewBlock();
+        _b.Seal(new CondBranch(hasValue, bodyBlock, exitBlock, stmt.Span));
+
+        _b.SwitchTo(bodyBlock);
+        var elementType = LowerType(SubstituteType(loopVar.Type), stmt.Span);
+        var value = _slots.NewTemp(elementType);
+        _b.Emit(new OptGet(value, produced, elementType, stmt.Span));
+        var variable = _slots.DeclareFor(loopVar, elementType);
+        _b.Emit(new StoreLocal(variable, value, stmt.Span));
+        if (stmt.Pattern is { } pattern)
+            LowerPattern(pattern, value, elementType,
+                () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
+
+        _loops.Push(new LoopScope(_b, condBlock, exitBlock) { DeferDepth = _defers.Count, Label = stmt.Label });
         if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
         _loops.Pop();
 
@@ -5455,10 +5498,17 @@ internal sealed class FunctionLowerer
             || method.Declaration is not FunctionDecl declaration
             || ConstraintNeedsTheInstance(member, owner))
         {
+            // A generic owner's block, 'extend<T :: [Integer]> Range<T> :: [Iterator]' (03 T7
+            // X1): the block's method for the receiver's instance, a direct call.
+            if (concrete is GenericInstance && !ConstraintNeedsTheInstance(member, owner)
+                && _typeTable.ExtensionMethod(owner, member.Member) is { } genericBlockMethod
+                && _typeTable.BlockOf(genericBlockMethod) is { } genericBlock)
+                return LowerBlockMethodCall(member, genericBlockMethod, genericBlock, concrete, expr);
+
             // The implementation stands in a conformance block, 'extend StrBox :: [Container]'
             // (05 §6): the same direct call as on a builtin above. A member typed by an
             // associated type (03 T6) has no slot to be lifted into, so the direct call is the
-            // only route; a GENERIC owner's block waits for the generic extends (T7).
+            // only route.
             if (concrete is NamedRef && !ConstraintNeedsTheInstance(member, owner)
                 && _typeTable.ExtensionMethod(owner, member.Member) is { } blockMethod
                 && blockMethod.Declaration is FunctionDecl blockDecl

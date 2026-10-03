@@ -648,8 +648,9 @@ public sealed class Resolver
         var file = node.Span.File;
         var head = scope.Lookup(path[0]);
         // 'T.Item', 'Self.Item', 'P.Item' (03 T6): the second segment names an associated type,
-        // which the sema reads off the head; the node is bound to the head.
-        if (path.Length == 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
+        // which the sema reads off the head, and a further one an associated type of that
+        // ('A.Iter.Item', 05 §8 rule 4); the node is bound to the head.
+        if (path.Length >= 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
             return head;
         if (head is null) return BuiltinType(path[0], file);
         if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0], file);
