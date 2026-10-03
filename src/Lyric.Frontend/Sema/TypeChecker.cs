@@ -1909,9 +1909,16 @@ public sealed class TypeChecker
     {
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
+        _walked.Add(new Dictionary<Symbol, Span>(ReferenceEqualityComparer.Instance));
         foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
+        _walked.RemoveAt(_walked.Count - 1); // a loop inside ran or did not: it speaks for no statement after the block
         EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
     }
+
+    /// <summary>The iterator bindings a loop walked, one frame per block being checked (07 §2
+    /// rule 4): a later loop over one of them, in that block or an inner one, goes on where the
+    /// earlier stopped.</summary>
+    private readonly List<Dictionary<Symbol, Span>> _walked = [];
 
     /// <summary>
     /// Leaves a region: the narrowings it ESTABLISHED end with it, the ones it ENDED stay ended.
@@ -2158,6 +2165,8 @@ public sealed class TypeChecker
                 new DiagnosticNote(
                     "walk the indices instead: 'for (i in 0..xs.length) { let x = xs[i]; ... }'"));
 
+        if (protocol && !elem.IsError) NoteWalk(fo, iterType);
+
         var loopScope = new SymbolTable(scope);
         var loopVar = new LocalSymbol(fo.Variable, elem is Optional && !protocol ? LyrType.Error : elem,
             false, fo);
@@ -2170,6 +2179,38 @@ public sealed class TypeChecker
 
         CheckBlock(fo.Body, loopScope);
     }
+
+    /// <summary>
+    /// A second loop over one iterator binding (07 §2 rule 4; design 10 B6 I2, COL-11 C). Where the
+    /// binding's <c>iter()</c> gives the iterator itself and that may be an object several bindings
+    /// reach — a class, or an open type a class may answer —, a loop after an earlier one over the
+    /// same binding goes on where that one stopped, often at the end, and runs no pass without a
+    /// word. Warned where the earlier loop stands before it in the same block or an enclosing one,
+    /// no assignment to the binding between: a loop in a branch may not have run. A struct is
+    /// walked as a copy per loop and warns not; an <c>Iterable</c> that makes a new iterator neither.
+    /// </summary>
+    private void NoteWalk(ForInStmt fo, LyrType iterType)
+    {
+        if (fo.Iterable is not IdentifierExpr id || _result.RefOf(id) is not Symbol binding
+            || binding is not (LocalSymbol or ParameterSymbol)) return;
+        if (_result.ForInOf(fo) is not { } walk || !LyrType.Equal(walk.Cursor.Type, iterType) || !MayBeShared(iterType)) return;
+        foreach (var frame in _walked)
+        {
+            if (!frame.TryGetValue(binding, out var earlier)) continue;
+            _de.Report("LYR-SEM0162", Severity.Warning, fo.Iterable.Span,
+                $"'{id.Name}' was walked by a loop before — an iterator is not reset, and this loop goes on "
+                + "where that one stopped",
+                new DiagnosticNote(earlier, "the loop that walked it; take a fresh iterator for each loop, or walk it once"));
+            return;
+        }
+        if (_walked.Count > 0) _walked[^1][binding] = fo.Iterable.Span;
+    }
+
+    /// <summary>Whether a value of the type may be an object several bindings reach: a class or an
+    /// interface value, a coroutine, or an open type a class may answer — no struct, enum or scalar.</summary>
+    private static bool MayBeShared(LyrType type) =>
+        type is TypeParamType or AssocOf or CoroutineOf
+        || TypeFacts.KindOf(type) is TypeSymbolKind.Class or TypeSymbolKind.Interface;
 
     /// <summary>
     /// <c>for (x in e)</c> over Lyric 5's protocol (10 B6 I2): the two calls the loop makes, written
@@ -4385,6 +4426,10 @@ public sealed class TypeChecker
     {
         CheckExpr(a.Target, scope); // binds RefOf
         var targetSym = a.Target is IdentifierExpr ? _result.RefOf(a.Target) : null;
+        // The binding holds another iterator from here on: a loop that walked the old one says
+        // nothing about the next (07 §2 rule 4).
+        if (targetSym is not null)
+            foreach (var frame in _walked) frame.Remove(targetSym);
         // For identifier targets take the DECLARED type rather than the narrowed one, or 'x = null' on
         // a narrowed ?T would wrongly be an error.
         var targetType = targetSym is not null ? DeclaredType(targetSym) ?? _result.TypeOf(a.Target) : _result.TypeOf(a.Target);
