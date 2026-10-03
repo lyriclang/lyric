@@ -2278,7 +2278,17 @@ public sealed class TypeChecker
         var nextCall = new CallExpr(nextMember, [], span);
         var produced = CheckExpr(nextCall, cursorScope);
         if (produced.IsError) return LyrType.Error;
-        _result.RecordForIn(fo, iterCall, nextCall, cursor);
+        // A Closeable iterator is closed on every way out but a panic (10 B6 I6, 05 E7 R7), as a
+        // 'using' binding closes what it binds — asked of the type the checked code knows.
+        DeferStmt? close = null;
+        if (cursorType is CoroutineOf && _cancelled is not null
+            || _closeable is not null && ThrownCoveredBy(cursorType, new NamedRef(_closeable), _currentModule))
+        {
+            var closeCall = new CallExpr(new MemberExpr(new IdentifierExpr("$iterator", span), "close", IsOptional: false, span) { MemberSpan = default }, [], span);
+            CheckExpr(closeCall, cursorScope);
+            close = new DeferStmt(new ExprStmt(closeCall, span), span);
+        }
+        _result.RecordForIn(fo, iterCall, nextCall, cursor, close);
         return produced is Optional item ? item.Inner : produced;
     }
 

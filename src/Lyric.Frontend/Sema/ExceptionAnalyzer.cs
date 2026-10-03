@@ -397,6 +397,8 @@ internal sealed class ExceptionAnalyzer
     {
         Site(_types.CallThrows(walk.IterCall), head, "the loop's 'iter()'");
         Site(_types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
+        if (walk.Close is { Body: ExprStmt { Expr: CallExpr close } })
+            Site(_types.CallThrows(close), head, "the loop's 'close()'");
     }
 
     /// <summary>A throw site: marked — unless it is a <c>throw</c>, which is its own mark — and every
