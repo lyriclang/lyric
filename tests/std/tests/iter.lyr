@@ -188,6 +188,24 @@ fn enumerateAndInspect(): void {
 }
 
 @Test
+fn zipStopsAtTheShorter(): void {
+    var seen = "";
+    for ((n, w) in (1..9).zip(["a", "b", "c"])) { seen = seen + f"{n}{w}"; }
+    assertEq(seen, "1a2b3c");
+    var z = [1, 2].iter().zip(10..11);
+    let first = z.next();
+    assertEq(first!.1, 10);
+    assertEq(z.next() == null, true);
+}
+
+@Test
+fn chainWalksOneThenTheOther(): void {
+    assertEq(text((0..2).chain(5..7)), "0156");
+    assertEq(text((0..0).chain(3..4)), "3");
+    assertEq(text([1, 2].iter().chain([3].iter())), "123");
+}
+
+@Test
 fn forWalksARangeAndAnIterator(): void {
     var seen = "";
     for (i in 2..5) { seen = seen + f"{i}"; }
