@@ -30,11 +30,15 @@ typedef struct lyr_ty19_Ordering_Greater lyr_ty19_Ordering_Greater;
 typedef struct lyr_ty20_Exception lyr_ty20_Exception;
 typedef struct lyr_vt_ty21 lyr_vt_ty21;
 const char lyr_ifid_ty21[] = "std.core.Hasher";
-typedef struct lyr_ty22_Chars lyr_ty22_Chars;
-typedef struct lyr_ty23_Sip lyr_ty23_Sip;
-typedef struct lyr_ty24_DefaultHasher lyr_ty24_DefaultHasher;
-typedef struct lyr_ty25_FixedHasher lyr_ty25_FixedHasher;
-typedef struct lyr_ty26_Fnv1a64 lyr_ty26_Fnv1a64;
+typedef struct lyr_ty22_Split lyr_ty22_Split;
+typedef struct lyr_ty23_Lines lyr_ty23_Lines;
+typedef struct lyr_ty24_StringBuilder lyr_ty24_StringBuilder;
+typedef struct lyr_ty25__env_std_core_StringBuilder_reserve_ lyr_ty25__env_std_core_StringBuilder_reserve_;
+typedef struct lyr_ty26_Chars lyr_ty26_Chars;
+typedef struct lyr_ty27_Sip lyr_ty27_Sip;
+typedef struct lyr_ty28_DefaultHasher lyr_ty28_DefaultHasher;
+typedef struct lyr_ty29_FixedHasher lyr_ty29_FixedHasher;
+typedef struct lyr_ty30_Fnv1a64 lyr_ty30_Fnv1a64;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     void (*s0)(LyrIface, int64_t);
@@ -133,11 +137,41 @@ struct lyr_vt_ty21 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
-struct lyr_ty22_Chars {
+struct lyr_ty22_Split {
+    LyrStr *f_s;
+    LyrStr *f_sep;
+    int64_t f_at;
+    uint8_t f_done;
+};
+struct lyr_ty23_Lines {
     LyrStr *f_s;
     int64_t f_at;
 };
-struct lyr_ty23_Sip {
+struct lyr_ty24_StringBuilder {
+    LyrObj header;
+    LyrArr *f_bytes;
+    int64_t f_count;
+};
+_Static_assert(sizeof(lyr_ty24_StringBuilder) == 24, "layout of lyr_ty24_StringBuilder");
+_Static_assert(offsetof(lyr_ty24_StringBuilder, f_bytes) == 8, "layout of lyr_ty24_StringBuilder");
+_Static_assert(offsetof(lyr_ty24_StringBuilder, f_count) == 16, "layout of lyr_ty24_StringBuilder");
+static const uint64_t lyr_refmap_ty24[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty24_StringBuilder = { sizeof(lyr_ty24_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty24, "std.core.StringBuilder", NULL };
+struct lyr_ty25__env_std_core_StringBuilder_reserve_ {
+    LyrObj header;
+    int64_t f_kept;
+    LyrArr *f_old;
+};
+_Static_assert(sizeof(lyr_ty25__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty25__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty25__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty25__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty25__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty25__env_std_core_StringBuilder_reserve_");
+static const uint64_t lyr_refmap_ty25[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty25__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty25__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty25, "<env:std.core.StringBuilder.reserve>", NULL };
+struct lyr_ty26_Chars {
+    LyrStr *f_s;
+    int64_t f_at;
+};
+struct lyr_ty27_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -146,18 +180,20 @@ struct lyr_ty23_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty24_DefaultHasher {
-    lyr_ty23_Sip f_state;
+struct lyr_ty28_DefaultHasher {
+    lyr_ty27_Sip f_state;
 };
-struct lyr_ty25_FixedHasher {
-    lyr_ty23_Sip f_state;
+struct lyr_ty29_FixedHasher {
+    lyr_ty27_Sip f_state;
 };
-struct lyr_ty26_Fnv1a64 {
+struct lyr_ty30_Fnv1a64 {
     uint64_t f_state;
 };
 _Static_assert(sizeof(LyrIface) == 16, "layout of main.Damageable[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
 const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Damageable[]", NULL };
+_Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
+const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 typedef struct { LyrObj header; lyr_ty3_Crate value; } lyr_box_ty3_Crate;
 _Static_assert(sizeof(lyr_box_ty3_Crate) == 16, "layout of lyr_box_ty3_Crate");
 _Static_assert(offsetof(lyr_box_ty3_Crate, value) == 8, "layout of lyr_box_ty3_Crate");

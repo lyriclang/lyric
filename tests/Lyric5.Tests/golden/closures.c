@@ -38,11 +38,15 @@ typedef struct lyr_ty29_Ordering_Greater lyr_ty29_Ordering_Greater;
 typedef struct lyr_ty30_Exception lyr_ty30_Exception;
 typedef struct lyr_vt_ty31 lyr_vt_ty31;
 const char lyr_ifid_ty31[] = "std.core.Hasher";
-typedef struct lyr_ty32_Chars lyr_ty32_Chars;
-typedef struct lyr_ty33_Sip lyr_ty33_Sip;
-typedef struct lyr_ty34_DefaultHasher lyr_ty34_DefaultHasher;
-typedef struct lyr_ty35_FixedHasher lyr_ty35_FixedHasher;
-typedef struct lyr_ty36_Fnv1a64 lyr_ty36_Fnv1a64;
+typedef struct lyr_ty32_Split lyr_ty32_Split;
+typedef struct lyr_ty33_Lines lyr_ty33_Lines;
+typedef struct lyr_ty34_StringBuilder lyr_ty34_StringBuilder;
+typedef struct lyr_ty35__env_std_core_StringBuilder_reserve_ lyr_ty35__env_std_core_StringBuilder_reserve_;
+typedef struct lyr_ty36_Chars lyr_ty36_Chars;
+typedef struct lyr_ty37_Sip lyr_ty37_Sip;
+typedef struct lyr_ty38_DefaultHasher lyr_ty38_DefaultHasher;
+typedef struct lyr_ty39_FixedHasher lyr_ty39_FixedHasher;
+typedef struct lyr_ty40_Fnv1a64 lyr_ty40_Fnv1a64;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -228,11 +232,41 @@ struct lyr_vt_ty31 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
-struct lyr_ty32_Chars {
+struct lyr_ty32_Split {
+    LyrStr *f_s;
+    LyrStr *f_sep;
+    int64_t f_at;
+    uint8_t f_done;
+};
+struct lyr_ty33_Lines {
     LyrStr *f_s;
     int64_t f_at;
 };
-struct lyr_ty33_Sip {
+struct lyr_ty34_StringBuilder {
+    LyrObj header;
+    LyrArr *f_bytes;
+    int64_t f_count;
+};
+_Static_assert(sizeof(lyr_ty34_StringBuilder) == 24, "layout of lyr_ty34_StringBuilder");
+_Static_assert(offsetof(lyr_ty34_StringBuilder, f_bytes) == 8, "layout of lyr_ty34_StringBuilder");
+_Static_assert(offsetof(lyr_ty34_StringBuilder, f_count) == 16, "layout of lyr_ty34_StringBuilder");
+static const uint64_t lyr_refmap_ty34[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty34_StringBuilder = { sizeof(lyr_ty34_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty34, "std.core.StringBuilder", NULL };
+struct lyr_ty35__env_std_core_StringBuilder_reserve_ {
+    LyrObj header;
+    int64_t f_kept;
+    LyrArr *f_old;
+};
+_Static_assert(sizeof(lyr_ty35__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty35__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty35__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
+static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty35__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty35__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "<env:std.core.StringBuilder.reserve>", NULL };
+struct lyr_ty36_Chars {
+    LyrStr *f_s;
+    int64_t f_at;
+};
+struct lyr_ty37_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -241,13 +275,13 @@ struct lyr_ty33_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty34_DefaultHasher {
-    lyr_ty33_Sip f_state;
+struct lyr_ty38_DefaultHasher {
+    lyr_ty37_Sip f_state;
 };
-struct lyr_ty35_FixedHasher {
-    lyr_ty33_Sip f_state;
+struct lyr_ty39_FixedHasher {
+    lyr_ty37_Sip f_state;
 };
-struct lyr_ty36_Fnv1a64 {
+struct lyr_ty40_Fnv1a64 {
     uint64_t f_state;
 };
 typedef struct { void (*fn)(void *, lyr_ty0__tuple_, LyrErr **); void *env; } lyr_fn_ty0_to_void;
@@ -268,6 +302,8 @@ const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_AR
 _Static_assert(sizeof(lyr_fn_to_i64) == 16, "layout of fn() -> int[]");
 static const uint64_t lyr_refmap_arr_fn_to_i64[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_arr_fn_to_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(lyr_fn_to_i64), 1, lyr_refmap_arr_fn_to_i64, "fn() -> int[]", NULL };
+_Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
+const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;

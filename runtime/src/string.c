@@ -70,6 +70,21 @@ bool lyr_str_eq(const LyrStr *a, const LyrStr *b) {
     return a == b || (a->len == b->len && memcmp(a->bytes, b->bytes, (size_t)a->len) == 0);
 }
 
+LyrStr *lyr_str_slice(const LyrStr *s, int64_t from, int64_t to) {
+    if (from < 0 || to < from || to > s->len) lyr_panic_range(from, to, s->len);
+    if ((from < s->len && ((unsigned char)s->bytes[from] & 0xC0) == 0x80)
+        || (to < s->len && ((unsigned char)s->bytes[to] & 0xC0) == 0x80)) {
+        lyr_panic(LYR_RT_INDEX, "byte range %lld..%lld does not fall on character boundaries",
+                  (long long)from, (long long)to);
+    }
+    return lyr_str_from_bytes(s->bytes + from, to - from);
+}
+
+LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count) {
+    if (count < 0 || count > bytes->len) lyr_panic_range(0, count, bytes->len);
+    return lyr_str_from_bytes(bytes->data, count);
+}
+
 int lyr_str_cmp(const LyrStr *a, const LyrStr *b) {
     int64_t common = a->len < b->len ? a->len : b->len;
     int order = memcmp(a->bytes, b->bytes, (size_t)common);
