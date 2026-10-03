@@ -1629,6 +1629,173 @@ fn isWord(s: string, i: int, a: int, b: int, c: int): bool {
 // that is a parameter's, a float's text read by C (`strtod`, `strtof`) once its form is checked.
 fn byteCount(s: string): int;
 fn byteAt(s: string, i: int): int;
+/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
+fn compareBytes(a: string, b: string): int;
+// --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
+// UTF-8, immutable, the length in bytes. Written over the string's bytes until `StringView` gives
+// the library its views (M8a S8): the search takes a string for its pattern — `Pattern` (S2) comes
+// with the views.
+
+extend string :: [Ordered, TotalOrder] {
+    /// Byte by byte (S1), which is the order of the code points.
+    fn compare(o: string): ?Ordering {
+        return this.totalCompare(o);
+    }
+
+    fn totalCompare(o: string): Ordering {
+        let c = compareBytes(this, o);
+        if (c < 0) {
+            return Ordering.Less;
+        }
+        if (c > 0) {
+            return Ordering.Greater;
+        }
+        return Ordering.Equal;
+    }
+}
+
+extend string {
+    /// The length in bytes, `O(1)` (S1); `charCount()` counts the characters.
+    pub fn length(): int {
+        return byteCount(this);
+    }
+
+    /// Whether it has no byte.
+    pub fn isEmpty(): bool {
+        return byteCount(this) == 0;
+    }
+
+    /// The characters, decoded from the bytes.
+    pub fn chars(): Chars {
+        return Chars { s = this, at = 0 };
+    }
+
+    /// How many characters it holds, `O(n)`.
+    pub fn charCount(): int {
+        let n = byteCount(this);
+        var count = 0;
+        var i = 0;
+        while (i < n) {
+            if ((byteAt(this, i) & 192) != 128) {
+                count = count + 1;
+            }
+            i = i + 1;
+        }
+        return count;
+    }
+
+    /// Whether `p` stands in it.
+    pub fn contains(p: string): bool {
+        return this.find(p) != null;
+    }
+
+    /// Whether it begins with `p`.
+    pub fn startsWith(p: string): bool {
+        return matchesAt(this, p, 0);
+    }
+
+    /// Whether it ends with `p`.
+    pub fn endsWith(p: string): bool {
+        let at = byteCount(this) - byteCount(p);
+        return at >= 0 && matchesAt(this, p, at);
+    }
+
+    /// The byte index of the first `p`, or `null`; an empty `p` stands at 0.
+    pub fn find(p: string): ?int {
+        let last = byteCount(this) - byteCount(p);
+        var at = 0;
+        while (at <= last) {
+            if (matchesAt(this, p, at)) {
+                return at;
+            }
+            at = at + 1;
+        }
+        return null;
+    }
+
+    /// The byte index of the last `p`, or `null`; an empty `p` stands at the length.
+    pub fn rfind(p: string): ?int {
+        var at = byteCount(this) - byteCount(p);
+        while (at >= 0) {
+            if (matchesAt(this, p, at)) {
+                return at;
+            }
+            at = at - 1;
+        }
+        return null;
+    }
+
+    /// How many times `p` stands in it, none overlapping another; an empty `p` stands between
+    /// every two characters and at both ends.
+    pub fn count(p: string): int {
+        let step = byteCount(p);
+        if (step == 0) {
+            return this.charCount() + 1;
+        }
+        let last = byteCount(this) - step;
+        var n = 0;
+        var at = 0;
+        while (at <= last) {
+            if (matchesAt(this, p, at)) {
+                n = n + 1;
+                at = at + step;
+            } else {
+                at = at + 1;
+            }
+        }
+        return n;
+    }
+}
+
+/// Whether `p`'s bytes stand in `s` from byte `at` on.
+fn matchesAt(s: string, p: string, at: int): bool {
+    let n = byteCount(p);
+    if (at < 0 || at + n > byteCount(s)) {
+        return false;
+    }
+    var i = 0;
+    while (i < n) {
+        if (byteAt(s, at + i) != byteAt(p, i)) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+/// A string's characters, decoded from its UTF-8 bytes.
+pub struct Chars :: [Iterator] {
+    type Item = char;
+    s: string,
+    var at: int,
+
+    pub mut fn next(): ?char {
+        if (this.at >= byteCount(this.s)) {
+            return null;
+        }
+        let first = byteAt(this.s, this.at);
+        var code = first;
+        var size = 1;
+        if (first >= 240) {
+            code = first & 7;
+            size = 4;
+        } else if (first >= 224) {
+            code = first & 15;
+            size = 3;
+        } else if (first >= 192) {
+            code = first & 31;
+            size = 2;
+        }
+        var k = 1;
+        while (k < size) {
+            code = (code << 6) | (byteAt(this.s, this.at + k) & 63);
+            k = k + 1;
+        }
+        this.at = this.at + size;
+        return (code as uint32) as char;
+    }
+}
+
 fn asTypeOf<T, U>(v: T, like: U): U;
 fn floatOfText(s: string): float;
 fn float32OfText(s: string): float32;

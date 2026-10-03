@@ -1,0 +1,56 @@
+// std.core's strings (design/v5/spec/10 B9 S1–S3): UTF-8, the length in bytes, the characters
+// decoded, the order of the bytes, the search over a string pattern.
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+@Test
+fn theLengthIsInBytes(): void {
+    assertEq("".length(), 0);
+    assertTrue("".isEmpty());
+    assertEq("héllo".length(), 6);
+    assertEq("héllo".charCount(), 5);
+    assertEq("añ€😀".length(), 1 + 2 + 3 + 4);
+    assertEq("añ€😀".charCount(), 4);
+}
+
+@Test
+fn charsDecodesEveryWidth(): void {
+    var out = "";
+    for (c in "añ€😀".chars()) {
+        out = out + f"[{c.toUint32()}]";
+    }
+    assertEq(out, "[97][241][8364][128512]");
+}
+
+@Test
+fn stringsAreOrderedByTheirBytes(): void {
+    assertTrue("a" < "b");
+    assertTrue("ab" < "abc");
+    assertFalse("b" < "a");
+    assertTrue("Z" < "a");
+    let words = ["pear", "apple", "fig"];
+    words.sort();
+    assertEq(words.join(","), "apple,fig,pear");
+    assertEq(["b", "a", "c"].iter().min() ?? "", "a");
+}
+
+@Test
+fn theSearchOverAStringPattern(): void {
+    let s = "one two one";
+    assertTrue(s.contains("two"));
+    assertFalse(s.contains("three"));
+    assertTrue(s.startsWith("one"));
+    assertFalse(s.startsWith("two"));
+    assertTrue(s.endsWith("one"));
+    assertTrue(s.endsWith(""));
+    assertFalse("one two".endsWith("one"));
+    assertTrue("one two".endsWith("two"));
+    assertEq(s.find("one") ?? -1, 0);
+    assertEq(s.rfind("one") ?? -1, 8);
+    assertNull(s.find("x"));
+    assertEq(s.find("") ?? -1, 0);
+    assertEq(s.rfind("") ?? -1, 11);
+    assertEq(s.count("one"), 2);
+    assertEq("aaaa".count("aa"), 2);
+    assertEq("ab".count(""), 3);
+    assertEq("é".find("é") ?? -1, 0);
+}
