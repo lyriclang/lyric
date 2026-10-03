@@ -1,0 +1,27 @@
+// Measurement point 3, 'sorting' (design/v5/spec/13): a million ints from a xorshift stream sorted
+// with std.core's stable sort (10 C2), then a checksum over the sorted order. Prints one checksum,
+// the same in every language.
+import std.io { println };
+
+fn main(): int {
+    let n = 1000000;
+    let xs = [0] * n;
+    var x: uint = 88172645463325252;
+    var i = 0;
+    while (i < n) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        xs[i] = (x % 1000000000) as int;
+        i = i + 1;
+    }
+    xs.sort();
+    var check = 0;
+    i = 0;
+    while (i < n) {
+        check = (check * 31 + xs[i]) % 1000000007;
+        i = i + 1;
+    }
+    println(f"{xs[0]} {xs[n / 2]} {xs[n - 1]} {check}");
+    return 0;
+}
