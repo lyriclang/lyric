@@ -145,6 +145,9 @@ public sealed class TypeChecker
         _coreIterable = comp.Lyric5Modules
             && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterable") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterable
             ? coreIterable : null;
+        _coreIterator = comp.Lyric5Modules
+            && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterator") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterator
+            ? coreIterator : null;
 
         // 'Indexable<T>' lives in std.collections and is to '[i]' what 'Iterator<T>' is to 'for-in':
         // the compiler knows ONE built-in form, the array, and binds everything else to an interface
@@ -2134,6 +2137,9 @@ public sealed class TypeChecker
 
     /// <summary>std.core's <c>Iterable</c> (10 B6), what a Lyric 5 <c>for</c> walks.</summary>
     private readonly TypeSymbol? _coreIterable;
+
+    /// <summary>std.core's <c>Iterator</c>, which a coroutine is built in (10 B6 I7).</summary>
+    private readonly TypeSymbol? _coreIterator;
 
     private void CheckForIn(ForInStmt fo, SymbolTable scope)
     {
@@ -5492,6 +5498,10 @@ public sealed class TypeChecker
 
         if (InstanceMemberOf(baseType, mem, mem.Span) is { } mt)
             return mem.IsOptional ? Optionalized(mt) : mt;
+        // A coroutine's members beside its built-in ones come from the blanket blocks its
+        // conformances admit — 'iter()' of every iterator (10 B6 I7).
+        if (baseType is CoroutineOf && BlanketMember(baseType, mem.Member, mem.Span) is { } blanket)
+            return BindMember(mem, blanket);
         if (targetType.IsError) return LyrType.Error;
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'");
     }
@@ -5575,7 +5585,7 @@ public sealed class TypeChecker
     /// </summary>
     private (LyrType, Symbol?)? BlanketMember(LyrType receiver, string member, Span span)
     {
-        if (receiver is not (NamedRef or GenericInstance or TypeParamType or AssocOf) && !IsShape(receiver)
+        if (receiver is not (NamedRef or GenericInstance or TypeParamType or AssocOf or CoroutineOf) && !IsShape(receiver)
             && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null))
             return null;
         foreach (var block in _comp.Extensions.Blocks)
@@ -5802,6 +5812,7 @@ public sealed class TypeChecker
             case GenericInstance gi when member.Answer(gi.Definition, instance) is { } bound:
                 return Substitute(bound, SubstMap(gi));
             case PrimitiveType p when member.BuiltinAnswer(TypeFacts.Display(p), instance) is { } bound: return bound;
+            case CoroutineOf co when CoroutineAnswer(co, member) is { } answered: return answered;
             case ErrorType: return LyrType.Error;
             // A conformance a blanket or shape block gives (05 §13 rules 6, 8) answers there.
             case var other when member.BlockAnswer?.Invoke(other) is { } fromBlock: return fromBlock;
@@ -6515,6 +6526,11 @@ public sealed class TypeChecker
         // its answer is anybody's until the type is known.
         AssocOf assoc => AssocReaches(assoc, iface, wanted) || BlockConforms(assoc, iface, wanted, shapes: false),
 
+        // A coroutine is an iterator of what it yields and Closeable (10 B6 I7), built in — the
+        // blanket block makes it Iterable — and conforms to nothing else: it passed every
+        // constraint here before.
+        CoroutineOf co => CoroutineConforms(co, iface, wanted) || BlockConforms(co, iface, wanted, shapes: false),
+
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.
         ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf => BlockConforms(arg, iface, wanted, shapes: true),
@@ -6525,6 +6541,23 @@ public sealed class TypeChecker
         OpaqueRef => false,
         _ => true // external or error: pass through opaquely
     };
+
+    /// <summary>A coroutine's built-in conformances (10 B6 I7): <c>Iterator</c> with its answers —
+    /// a fixation must name them — and <c>Closeable</c> where std.task gives its close.</summary>
+    private bool CoroutineConforms(CoroutineOf co, TypeSymbol iface, LyrType wanted)
+    {
+        if (ReferenceEquals(iface, _closeable)) return _cancelled is not null;
+        if (!ReferenceEquals(iface, _coreIterator)) return false;
+        if (wanted is not GenericInstance { Fixations: { } fixations }) return true;
+        return fixations.All(f => CoroutineAnswer(co, f.Member) is { } answer && LyrType.Equal(answer, f.Type));
+    }
+
+    /// <summary>A coroutine's answers as an iterator (10 B6 I7): its <c>Item</c> what it yields, its
+    /// <c>Error</c> what it throws, <c>never</c> where nothing.</summary>
+    internal static LyrType? CoroutineAnswer(CoroutineOf co, AssociatedTypeSymbol member) =>
+        member.Owner is { Name: "Iterator", Kind: TypeSymbolKind.Interface }
+            ? member.Name switch { "Item" => co.Yield, "Error" => co.Throws ?? LyrType.Never, _ => null }
+            : null;
 
     /// <summary>
     /// The argument IS the interface the constraint names.
