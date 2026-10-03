@@ -36,7 +36,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M5 | Errors | M | **done** 2026-10-02 |
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
 | M7 | Modules and packages | L | **done** 2026-10-02 |
-| M8a | std core | XL | **next** |
+| M8a | std core | XL | **in progress**: S1–S11a merged, measurement point 3 not met |
 | M8b | std I/O and system | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
@@ -508,7 +508,37 @@ the directory zig built it in; gcc maps the working directory, into its cache ke
 
 ### M8a — std core
 
-Next. Plan first (13, M8a), then slices.
+In progress. Merged, slice by slice (each PR says what it did and how it was checked):
+
+- **Tests:** `lyric test`, `@Test`, `std.test` with `@callerExpr`, subtests, the watchdog (S1).
+- **Language the library needs:** `&x: T` (S2a), `static let` in interfaces and blocks (S2b),
+  blanket and form blocks with their conformances (S2c), defaults per conformer (S2d), the
+  variadic parameter `nums: int...` (S9b).
+- **Numbers (B5):** the tower `Num`/`Signed`/`Integer`/`Float`, checked/saturating/wrapping,
+  `parse`, float methods, the shortest float text, `std.math` (S3).
+- **Iteration (B6):** `Iterator`/`Iterable` with `type Item` and `type Error`, `for` over every
+  iterable, closing, `for (x in try it)`, the adapters as blanket extends, the join of two
+  thrown types, the terminators (S4).
+- **Arrays and views (C2, C10):** their members, `arrayOf` in linear time, the sorts (S5).
+- **Hashing (K2, C4, C5):** `Hasher` with SipHash-1-3 and FNV, `Hashable` streaming into a
+  hasher, `Map` as a Swiss table (S6).
+- **Collections:** `Index`/`IndexSet` (B4), `List` (C3), a map's walks, `Set`, `toList` (S7);
+  `Deque` (C6) and `Heap` (C1), the greatest first (S11a).
+- **Strings, first and second part (B9 S1–S3):** search, split, trim, replace, pad,
+  `StringBuilder`; a `char` literal beyond the basic plane (S8).
+- **The prelude naming the collections (B2)** (S9a); **the format language (08 Y7, 10 S7)**,
+  checked where a spec is written (S9c).
+- **The artifact:** `lyric test` runs the std tests (147); the examples inventory, stats and
+  stack build and run as packages (S10a); measurement point 3 is measured (S10b, S10c) and
+  **not met**: maps 1.90×, sorting 1.53×, strings 2.53× Go, ahead of C# in all three. What
+  bounds it — no inlining across translation units, the map's three arrays, f-string
+  allocation — is in `bench/README.md`.
+
+Not built yet, of 13's list for M8a: `collect`/`FromIterator` and the
+collecting terminators; `StringView`, `Pattern`, the Unicode tables and `char`'s predicates;
+`showTo`/`debugTo` and f-strings writing into one builder (10 S6); `std.fmt.format` at run
+time; `@Bench` and `lyric bench`; `+`/`*` on collections. The open points of every slice are
+collected for the 5.0 review.
 
 ## Design decisions
 
