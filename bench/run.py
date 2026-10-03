@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Measurement point 2 (design/v5/spec/13, "Messpunkte"): loops, arith and struct arrays, Lyric
-against C, Go and C# on the same machine. Builds every twin, checks that all print the same
-checksum, times each as the minimum of several runs, prints a table, and with --ratchet fails
-when Lyric is slower than 3x C or 1.5x Go (the plan's bounds after M3).
+"""Measurement points 2 and 3 (design/v5/spec/13, "Messpunkte"): loops, arith and struct arrays
+(after M3); a Map, a sort and string work (after M8a) — Lyric against C, Go and C# on the same
+machine. Builds every twin, checks that all print the same checksum, times each as the minimum of
+several runs, prints a table, and with --ratchet fails when Lyric is slower than 3x C or 1.5x Go
+(the plan's bounds; point 3 has no C twin).
 
     python3 bench/run.py [--runs 5] [--lyric5 <exe>] [--ratchet]
 
@@ -13,7 +14,7 @@ import argparse, glob, os, pathlib, shutil, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-BENCHES = ['loops', 'arith', 'structs']
+BENCHES = ['loops', 'arith', 'structs', 'maps', 'sorting', 'strings']
 OUT = HERE / 'out'
 
 def run(cmd, cwd=None, env=None):
@@ -26,7 +27,7 @@ def must(result, what):
 
 def build_c(name):
     cc = shutil.which('zig')
-    if not cc: return None
+    if not cc or not (HERE / name / f'{name}.c').exists(): return None
     exe = OUT / 'c' / name
     exe.parent.mkdir(parents=True, exist_ok=True)
     must(run([cc, 'cc', '-std=c11', '-O2', '-g', '-DNDEBUG', '-ffp-contract=off', '-fno-sanitize=undefined',
@@ -72,10 +73,11 @@ def main():
     ap.add_argument('--runs', type=int, default=5)
     ap.add_argument('--lyric5', default=str(ROOT / 'src' / 'Lyric5' / 'bin' / 'Release' / 'net10.0' / 'lyric5'))
     ap.add_argument('--ratchet', action='store_true', help='exit 1 when Lyric exceeds 3x C or 1.5x Go')
+    ap.add_argument('benches', nargs='*', help='the programs to measure (default: all)')
     args = ap.parse_args()
 
     rows, bad = [], []
-    for name in BENCHES:
+    for name in args.benches or BENCHES:
         twins = {'Lyric': build_lyric(name, args.lyric5), 'C': build_c(name), 'Go': build_go(name), 'C#': build_cs(name)}
         times, outputs = {}, {}
         for lang, cmd in twins.items():

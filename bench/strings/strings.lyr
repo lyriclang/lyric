@@ -1,0 +1,30 @@
+// Measurement point 3, 'strings' (design/v5/spec/13): a text of 300 000 lines built with a
+// StringBuilder, walked by its lines, each split at its comma, the number parsed and summed, the
+// names holding "99" counted. Prints one checksum, the same in every language.
+import std.io { println };
+import std.string { StringBuilder };
+
+fn main(): int {
+    let sb = StringBuilder.new();
+    var i = 0;
+    while (i < 300000) {
+        sb.appendStr(f"item{i},{(i * 7919) % 100000}\n");
+        i = i + 1;
+    }
+    let text = sb.toString();
+    var lines = 0;
+    var named = 0;
+    var total = 0;
+    for (line in text.lines()) {
+        if (let pair = line.splitOnce(",")) {
+            let (name, value) = pair;
+            if (name.contains("99")) {
+                named = named + 1;
+            }
+            total = total + ((try? int.parse(value)) ?? 0);
+        }
+        lines = lines + 1;
+    }
+    println(f"{lines} {named} {total}");
+    return 0;
+}

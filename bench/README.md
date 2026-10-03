@@ -42,3 +42,29 @@ compile to a flag test the branch predictor never misses. The struct array is la
 C's (02 M1), and the index checks (03 T13) sit inside the loop's noise. The 14 % on `arith`
 is the loop's shape after the IR (blocks and `goto`, 01 C5), not the arithmetic; it is within
 the bound and stays a number to beat.
+
+## Measurement point 3 (after M8a): a Map, a sort, string work
+
+| Program | What it measures |
+|---|---|
+| `maps` | `Map<int, int>` under std.core's `DefaultHasher` (SipHash-1-3, 10 K2): a million insertions of keys from a xorshift stream, then two million lookups, most of them misses |
+| `sorting` | a million `int`s sorted by std.core's stable `sort()` (10 C2), then a checksum over the order |
+| `strings` | 300 000 lines built with a `StringBuilder` through f-strings, walked by `lines()`, each cut by `splitOnce`, its number read by `int.parse`, its name searched with `contains` |
+
+Bound: **≤ 1.5× Go**. The twins are Go and C#; C has no map, sort or string library to compare
+with, so the C column stays empty.
+
+Measured 2026-10-03, first (WSL2 x86-64, the release profile through `zig cc 0.16`, Go 1.27,
+.NET 10; minimum of 3 runs):
+
+| bench | Lyric | Go | C# | Lyric / Go |
+|---|---|---|---|---|
+| maps | 0.350 s | 0.222 s | 0.307 s | 1.58 |
+| sorting | 0.132 s | 0.078 s | 0.170 s | 1.68 |
+| strings | 0.084 s | 0.031 s | 0.101 s | 2.69 |
+
+Lyric is ahead of C# in all three and over the bound in all three. Where the time goes (`perf`):
+`strings` spends half of it growing the builder through `arrayOf` — a closure per byte — and in
+the collector behind it; `sorting` 40 % in the comparison's function value and the calls behind
+it, which C cannot inline through; `maps` half in `find`, whose three arrays (controls, keys,
+values) cost three cache misses where Go's groups cost one.

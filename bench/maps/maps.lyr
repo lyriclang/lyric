@@ -1,0 +1,30 @@
+// Measurement point 3, 'maps' (design/v5/spec/13): a Map<int, int> under std.core's
+// DefaultHasher (SipHash-1-3 with a process key, 10 K2) — a million insertions of keys from a
+// xorshift stream, then two million lookups over the even keys, most of them misses. Prints one
+// checksum, the same in every language.
+import std.io { println };
+
+fn main(): int {
+    let m = Map<int, int>.new();
+    var x: uint = 88172645463325252;
+    var i = 0;
+    while (i < 1000000) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        m.insert((x % 4000000) as int, i);
+        i = i + 1;
+    }
+    var hits = 0;
+    var total = 0;
+    var k = 0;
+    while (k < 4000000) {
+        if (let v = m.get(k)) {
+            hits = hits + 1;
+            total = total + v;
+        }
+        k = k + 2;
+    }
+    println(f"{m.length()} {hits} {total}");
+    return 0;
+}
