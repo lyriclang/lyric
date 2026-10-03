@@ -1,6 +1,34 @@
 namespace Lyric5.Tests;
 
 /// <summary>
+/// The test run's temporary directories, removed when the test process ends. Left behind, one per
+/// test, they filled a tmpfs <c>/tmp</c> within a day, and a build then failed for want of space.
+/// </summary>
+internal static class TestDirectories
+{
+    private static readonly System.Collections.Concurrent.ConcurrentBag<string> Made = new();
+
+    static TestDirectories() => AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+    {
+        foreach (var dir in Made)
+        {
+            try { Directory.Delete(dir, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    };
+
+    /// <summary>A new directory under the system's temporary one, named with the prefix.</summary>
+    public static string Fresh(string prefix)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), prefix + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        Made.Add(dir);
+        return dir;
+    }
+}
+
+/// <summary>
 /// A package on disk for a test, and the driver run over it through <c>Main</c> — with the console
 /// redirected, so a class that uses it belongs to the console collection.
 /// </summary>
@@ -12,7 +40,7 @@ internal static class PackageFixture
     /// <summary>A fresh directory holding <paramref name="files"/>.</summary>
     public static string Package(params (string Path, string Text)[] files)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "lyric5-package-" + Guid.NewGuid().ToString("N"));
+        var dir = TestDirectories.Fresh("lyric5-package-");
         foreach (var (path, text) in files)
         {
             var full = Path.Combine(dir, path);

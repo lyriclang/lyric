@@ -1,6 +1,7 @@
 // std.core: what the language binds without an import, and the helpers synthesized members call.
 import std.test { assertEq, assertTrue, assertFalse };
-import std.core { arrayOf, repeatArray, debugArray, debugOptional, equalArrays, equalOptionals, hashArray, cloneArray };
+import std.core { arrayOf, repeatArray, debugArray, debugOptional, equalArrays, equalOptionals, hashOptionalInto, cloneArray };
+import std.hash { FixedHasher };
 
 @Test
 fn arrayOfMakesEachElementFromItsIndex(): void {
@@ -39,9 +40,17 @@ fn debugWritesStringsQuoted(): void {
     assertEq(debugOptional(none), "null");
 }
 
+fn optionalHash(o: ?int): uint64 {
+    var h = FixedHasher.new();
+    hashOptionalInto(o, &h);
+    return h.finish();
+}
+
 @Test
-fn equalArraysHashEqual(): void {
-    assertEq(hashArray([1, 2, 3]), hashArray([1, 2, 3]));
+fn anOptionalHashesItsMarkAndValue(): void {
+    assertEq(optionalHash(3), optionalHash(3));
+    assertTrue(optionalHash(3) != optionalHash(null));
+    assertTrue(optionalHash(0) != optionalHash(null));
 }
 
 @Test

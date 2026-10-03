@@ -315,9 +315,10 @@ pub interface Hasher {
     fn finish(): uint64;
 }
 
-/// What a `Map` key and a `Set` element need. Equal values hash equal; nothing checks it.
+/// What a `Map` key and a `Set` element need (10 K2): the value's parts written into a hasher, in an
+/// order of the type's. Equal values write the same; nothing checks it.
 pub interface Hashable :: [Equatable] {
-    fn hash(): int;
+    fn hash<H :: [Hasher]>(&h: H): void;
 }
 
 /// `x in xs` is `xs.contains(x)` (04 D6; the operator comes with the collections).
@@ -344,7 +345,7 @@ extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul,
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: int): int { return this + rhs; }
     fn sub(rhs: int): int { return this - rhs; }
@@ -372,7 +373,7 @@ extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: int8): int8 { return this + rhs; }
     fn sub(rhs: int8): int8 { return this - rhs; }
@@ -400,7 +401,7 @@ extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: int16): int16 { return this + rhs; }
     fn sub(rhs: int16): int16 { return this - rhs; }
@@ -428,7 +429,7 @@ extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: int32): int32 { return this + rhs; }
     fn sub(rhs: int32): int32 { return this - rhs; }
@@ -456,7 +457,7 @@ extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: uint): uint { return this + rhs; }
     fn sub(rhs: uint): uint { return this - rhs; }
@@ -483,7 +484,7 @@ extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: uint8): uint8 { return this + rhs; }
     fn sub(rhs: uint8): uint8 { return this - rhs; }
@@ -510,7 +511,7 @@ extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: uint16): uint16 { return this + rhs; }
     fn sub(rhs: uint16): uint16 { return this - rhs; }
@@ -537,7 +538,7 @@ extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return this as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
     fn add(rhs: uint32): uint32 { return this + rhs; }
     fn sub(rhs: uint32): uint32 { return this - rhs; }
@@ -588,7 +589,7 @@ extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
 
 extend bool :: [Equatable, Hashable, Display] {
     fn equals(o: bool): bool { return this == o; }
-    fn hash(): int { return if (this) 1 else 0; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeByte(if (this) 1 else 0); }
     fn show(): string { return f"{this}"; }
 }
 
@@ -604,7 +605,7 @@ extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
         if (this > o) { return Ordering.Greater; }
         return Ordering.Equal;
     }
-    fn hash(): int { return (this as uint32) as int; }
+    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint((this as uint32) as uint64); }
     fn show(): string { return f"{this}"; }
 }
 
@@ -723,6 +724,20 @@ extend char {
             return null;
         }
         return n as char;
+    }
+}
+
+/// A string writes its bytes and then 255, which no UTF-8 text holds: ("ab", "c") and ("a", "bc")
+/// write differently (10 C8).
+extend string :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        let n = byteCount(this);
+        var i = 0;
+        while (i < n) {
+            h.writeByte(byteAt(this, i) as uint8);
+            i = i + 1;
+        }
+        h.writeByte(255);
     }
 }
 
@@ -2673,24 +2688,15 @@ pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
     return a == b;
 }
 
-/// The hash of an array, element by element.
-pub fn hashArray<T :: [Hashable]>(xs: T[]): int {
-    var h = 19;
-    for (i in 0..xs.length()) { h = h *% 31 +% xs[i].hash(); }
-    return h;
-}
-
-/// The same for a view.
-pub fn hashSlice<T :: [Hashable]>(xs: Slice<T>): int {
-    var h = 19;
-    for (i in 0..xs.length()) { h = h *% 31 +% xs[i].hash(); }
-    return h;
-}
-
-/// The hash of an optional: a constant for `null`, the value's otherwise.
-pub fn hashOptional<T :: [Hashable]>(o: ?T): int {
-    if (o == null) { return 23; }
-    return o.hash();
+/// An optional into a hasher: a 0 for `null`, a 1 and the value otherwise — a synthesized `hash`
+/// reaches for it. An array and a view are no `Hashable` (10 C8): their slots can be written.
+pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
+    if (o == null) {
+        h.writeByte(0);
+        return;
+    }
+    h.writeByte(1);
+    o.hash(&h);
 }
 
 /// A copy of an array with every element cloned — the clone of a reference field (04 D13).

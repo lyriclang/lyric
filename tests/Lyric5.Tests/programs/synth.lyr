@@ -1,6 +1,14 @@
 // Conformance synthesis (design/v5/spec/04 D7, 05 §14): the family written without a body,
 // generic types conditionally, enums, the implicit Debug, and what is withdrawn or refused.
+import std.hash { FixedHasher };
 import std.io { println };
+
+// what a value hashes to, reproducibly (10 K2)
+fn hashOf<T :: [Hashable]>(x: T): uint64 {
+    var h = FixedHasher.new();
+    x.hash(&h);
+    return h.finish();
+}
 
 struct P :: [Equatable, Hashable, Ordered, Clone, Default, Display] { x: int, y: int }
 struct Pair<T> :: [Equatable, Debug] { a: T, b: T }
@@ -33,7 +41,7 @@ fn main(): int {
     let p = P { x = 1, y = 2 };
     let q = P { x = 1, y = 2 };
     let r = P { x = 2, y = 2 };
-    println(f"eq {p == q} {p == r} lt {p < r} {r < p} hash {p.hash() == q.hash()}");
+    println(f"eq {p == q} {p == r} lt {p < r} {r < p} hash {hashOf(p) == hashOf(q)}");
     let c = p.clone();
     let d = P.default();
     println(f"clone {c.x} default {d.x} {d.y} show {p}");
@@ -49,7 +57,7 @@ fn main(): int {
     println(f"w {W { x = 1, y = 2 } == W { x = 1, y = 9 }}");
     let red = Color.Red;
     let g = Color.Green;
-    println(f"color {red == g} {red < g} {g < red} {red.hash() == Color.Red.hash()} {red.hash() == g.hash()} {g.clone().debug()}");
+    println(f"color {red == g} {red < g} {g < red} {hashOf(red) == hashOf(Color.Red)} {hashOf(red) == hashOf(g)} {g.clone().debug()}");
     let o1 = Outer { i = Inner { v = 1 }, s = "s", c = 'c', b = true, f = 1.5 };
     let o2 = Outer { i = Inner { v = 1 }, s = "s", c = 'c', b = true, f = 1.5 };
     println(f"outer {o1 == o2} {o1.debug()}");

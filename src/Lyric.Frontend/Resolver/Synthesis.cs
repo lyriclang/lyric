@@ -66,7 +66,7 @@ internal static class Synthesis
     /// <summary>The block for one request, as source; <c>null</c> where the form is not written
     /// yet (reported by the caller).</summary>
     public static string? Block(string iface, string name, GenericParam[] generics, FieldDecl[] fields,
-        EnumVariant[]? variants, SourceManager sm, out string? refusal)
+        EnumVariant[]? variants, SourceManager sm, bool streamsHash, out string? refusal)
     {
         refusal = null;
         var typeText = generics.Length == 0 ? name : $"{name}<{string.Join(", ", generics.Select(g => g.Name))}>";
@@ -75,15 +75,15 @@ internal static class Synthesis
             : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
         string Text(TypeNode t) => sm.Slice(t.Span).ToString();
         var body = variants is null
-            ? StructBody(iface, name, typeText, fields, Text, out refusal)
-            : EnumBody(iface, name, typeText, variants, Text, out refusal);
+            ? StructBody(iface, name, typeText, fields, Text, streamsHash, out refusal)
+            : EnumBody(iface, name, typeText, variants, Text, streamsHash, out refusal);
         return body is null ? null : head + body + "}\n";
     }
 
     // --- structs and classes ---------------------------------------------------------------
 
     private static string? StructBody(string iface, string name, string typeText, FieldDecl[] fields,
-        Func<TypeNode, string> text, out string? refusal)
+        Func<TypeNode, string> text, bool streamsHash, out string? refusal)
     {
         refusal = null;
         var sb = new StringBuilder();
@@ -93,6 +93,20 @@ internal static class Synthesis
                 sb.Append($"    fn equals(o: {typeText}): bool {{\n        return ");
                 sb.Append(fields.Length == 0 ? "true" : string.Join("\n            && ", fields.Select(f => EqOf($"this.{f.Name}", $"o.{f.Name}", f.Type, text))));
                 sb.Append(";\n    }\n");
+                break;
+            case "Hashable" when streamsHash:
+                // Every field into the hasher, in order, one line each (10 K2).
+                sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n");
+                foreach (var f in fields)
+                {
+                    if (HashInto($"this.{f.Name}", f.Type) is not { } written)
+                    {
+                        refusal = $"the field '{f.Name}' is an array or a view, which is no Hashable (10 C8)";
+                        return null;
+                    }
+                    sb.Append($"        {written}\n");
+                }
+                sb.Append("    }\n");
                 break;
             case "Hashable":
                 sb.Append("    fn hash(): int {\n        var h = 17;\n");
@@ -183,6 +197,21 @@ internal static class Synthesis
         _ => $"{expr}.hash()",
     };
 
+    /// <summary>A field written into the hasher <c>h</c> (10 K2): an optional through its mark, a tuple
+    /// and an inline array element by element; <c>null</c> for an array or a view, which is no
+    /// <c>Hashable</c> (C8).</summary>
+    private static string? HashInto(string expr, TypeNode type) => type switch
+    {
+        ArrayType { Length: null } => null,
+        ArrayType { Length: { } n, Element: var e } => Enumerable.Range(0, n).Select(i => HashInto($"{expr}[{i}]", e)).ToArray() is var parts && parts.All(p => p is not null)
+            ? string.Join(" ", parts) : null,
+        NullableType => $"hashOptionalInto({expr}, &h);",
+        NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => null,
+        AST.TupleType t => t.Elements.Select((e, i) => HashInto($"{expr}.{i}", e)).ToArray() is var items && items.All(p => p is not null)
+            ? string.Join(" ", items) : null,
+        _ => $"{expr}.hash(&h);",
+    };
+
     /// <summary><c>a.compare(b)</c> (or <c>totalCompare</c>) for a payload of this type; a shape
     /// has no ordering yet and falls to the method call, which the checker then refuses.</summary>
     private static string CompareOf(string a, string b, string method) => $"{a}.{method}({b})";
@@ -230,7 +259,7 @@ internal static class Synthesis
     // --- enums --------------------------------------------------------------------------------
 
     private static string? EnumBody(string iface, string name, string typeText, EnumVariant[] variants,
-        Func<TypeNode, string> text, out string? refusal)
+        Func<TypeNode, string> text, bool streamsHash, out string? refusal)
     {
         refusal = null;
         var sb = new StringBuilder();
@@ -266,6 +295,27 @@ internal static class Synthesis
                     sb.Append($"            {pa} => match (o) {{ {pb} => {same}, _ => false }},\n");
                 }
                 sb.Append("        };\n    }\n");
+                break;
+            case "Hashable" when streamsHash:
+                // The variant's position, then its payload (10 K2).
+                sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n        match (this) {\n");
+                for (var i = 0; i < variants.Length; i++)
+                {
+                    var (p, names, types) = Bind(variants[i], "a_");
+                    var parts = new List<string> { $"h.writeInt({i});" };
+                    for (var k = 0; k < names.Length; k++)
+                    {
+                        if (HashInto(names[k], types[k]) is not { } written)
+                        {
+                            refusal = $"a payload of '{variants[i].Name}' is an array or a view, which is no Hashable (10 C8)";
+                            return null;
+                        }
+                        parts.Add(written);
+                    }
+                    var joined = string.Join(" ", parts);
+                    sb.Append($"            {p} => {{ {joined} }},\n");
+                }
+                sb.Append("        }\n    }\n");
                 break;
             case "Hashable":
                 sb.Append("    fn hash(): int {\n        return match (this) {\n");
