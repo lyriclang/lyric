@@ -26,7 +26,11 @@ typedef struct lyr_ty18_ParseErrorKind_Invalid lyr_ty18_ParseErrorKind_Invalid;
 typedef struct lyr_ty19_ParseErrorKind_Overflow lyr_ty19_ParseErrorKind_Overflow;
 typedef struct lyr_vt_ty20 lyr_vt_ty20;
 const char lyr_ifid_ty20[] = "std.core.Error";
-typedef struct lyr_ty21_Exception lyr_ty21_Exception;
+typedef struct lyr_ty21_Ordering lyr_ty21_Ordering;
+typedef struct lyr_ty22_Ordering_Less lyr_ty22_Ordering_Less;
+typedef struct lyr_ty23_Ordering_Equal lyr_ty23_Ordering_Equal;
+typedef struct lyr_ty24_Ordering_Greater lyr_ty24_Ordering_Greater;
+typedef struct lyr_ty25_Exception lyr_ty25_Exception;
 struct lyr_ty2_Tree_Leaf {
     int64_t f_0;
 };
@@ -102,17 +106,28 @@ struct lyr_vt_ty20 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+struct lyr_ty22_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty23_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty24_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty21_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty21_Ordering) == 4, "layout of lyr_ty21_Ordering");
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface20;
-struct lyr_ty21_Exception {
+struct lyr_ty25_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface20 f_inner;
 };
-_Static_assert(sizeof(lyr_ty21_Exception) == 40, "layout of lyr_ty21_Exception");
-_Static_assert(offsetof(lyr_ty21_Exception, f_text) == 8, "layout of lyr_ty21_Exception");
-_Static_assert(offsetof(lyr_ty21_Exception, f_inner) == 16, "layout of lyr_ty21_Exception");
-static const uint64_t lyr_refmap_ty21[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty21_Exception = { sizeof(lyr_ty21_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty21, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty25_Exception) == 40, "layout of lyr_ty25_Exception");
+_Static_assert(offsetof(lyr_ty25_Exception, f_text) == 8, "layout of lyr_ty25_Exception");
+_Static_assert(offsetof(lyr_ty25_Exception, f_inner) == 16, "layout of lyr_ty25_Exception");
+static const uint64_t lyr_refmap_ty25[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty25_Exception = { sizeof(lyr_ty25_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty25, "std.core.Exception", NULL };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;

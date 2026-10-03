@@ -23,7 +23,11 @@ typedef struct lyr_ty13_ParseErrorKind_Invalid lyr_ty13_ParseErrorKind_Invalid;
 typedef struct lyr_ty14_ParseErrorKind_Overflow lyr_ty14_ParseErrorKind_Overflow;
 typedef struct lyr_vt_ty15 lyr_vt_ty15;
 const char lyr_ifid_ty15[] = "std.core.Error";
-typedef struct lyr_ty16_Exception lyr_ty16_Exception;
+typedef struct lyr_ty16_Ordering lyr_ty16_Ordering;
+typedef struct lyr_ty17_Ordering_Less lyr_ty17_Ordering_Less;
+typedef struct lyr_ty18_Ordering_Equal lyr_ty18_Ordering_Equal;
+typedef struct lyr_ty19_Ordering_Greater lyr_ty19_Ordering_Greater;
+typedef struct lyr_ty20_Exception lyr_ty20_Exception;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     void (*s0)(LyrIface, int64_t);
@@ -92,17 +96,28 @@ struct lyr_vt_ty15 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+struct lyr_ty17_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty18_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty19_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty16_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty16_Ordering) == 4, "layout of lyr_ty16_Ordering");
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface15;
-struct lyr_ty16_Exception {
+struct lyr_ty20_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface15 f_inner;
 };
-_Static_assert(sizeof(lyr_ty16_Exception) == 40, "layout of lyr_ty16_Exception");
-_Static_assert(offsetof(lyr_ty16_Exception, f_text) == 8, "layout of lyr_ty16_Exception");
-_Static_assert(offsetof(lyr_ty16_Exception, f_inner) == 16, "layout of lyr_ty16_Exception");
-static const uint64_t lyr_refmap_ty16[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty16_Exception = { sizeof(lyr_ty16_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty16, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty20_Exception) == 40, "layout of lyr_ty20_Exception");
+_Static_assert(offsetof(lyr_ty20_Exception, f_text) == 8, "layout of lyr_ty20_Exception");
+_Static_assert(offsetof(lyr_ty20_Exception, f_inner) == 16, "layout of lyr_ty20_Exception");
+static const uint64_t lyr_refmap_ty20[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty20_Exception = { sizeof(lyr_ty20_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty20, "std.core.Exception", NULL };
 _Static_assert(sizeof(LyrIface) == 16, "layout of main.Damageable[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
 const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Damageable[]", NULL };

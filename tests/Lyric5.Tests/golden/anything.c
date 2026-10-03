@@ -20,7 +20,11 @@ typedef struct lyr_ty9_ParseErrorKind_Invalid lyr_ty9_ParseErrorKind_Invalid;
 typedef struct lyr_ty10_ParseErrorKind_Overflow lyr_ty10_ParseErrorKind_Overflow;
 typedef struct lyr_vt_ty11 lyr_vt_ty11;
 const char lyr_ifid_ty11[] = "std.core.Error";
-typedef struct lyr_ty12_Exception lyr_ty12_Exception;
+typedef struct lyr_ty12_Ordering lyr_ty12_Ordering;
+typedef struct lyr_ty13_Ordering_Less lyr_ty13_Ordering_Less;
+typedef struct lyr_ty14_Ordering_Equal lyr_ty14_Ordering_Equal;
+typedef struct lyr_ty15_Ordering_Greater lyr_ty15_Ordering_Greater;
+typedef struct lyr_ty16_Exception lyr_ty16_Exception;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -67,18 +71,29 @@ struct lyr_vt_ty11 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
+struct lyr_ty13_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty14_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty15_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty12_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty12_Ordering) == 4, "layout of lyr_ty12_Ordering");
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface11;
-struct lyr_ty12_Exception {
+struct lyr_ty16_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface11 f_inner;
 };
-_Static_assert(sizeof(lyr_ty12_Exception) == 40, "layout of lyr_ty12_Exception");
-_Static_assert(offsetof(lyr_ty12_Exception, f_text) == 8, "layout of lyr_ty12_Exception");
-_Static_assert(offsetof(lyr_ty12_Exception, f_inner) == 16, "layout of lyr_ty12_Exception");
-extern const LyrItable lyr_itab_ty12[];
-static const uint64_t lyr_refmap_ty12[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty12_Exception = { sizeof(lyr_ty12_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty12, "std.core.Exception", lyr_itab_ty12 };
+_Static_assert(sizeof(lyr_ty16_Exception) == 40, "layout of lyr_ty16_Exception");
+_Static_assert(offsetof(lyr_ty16_Exception, f_text) == 8, "layout of lyr_ty16_Exception");
+_Static_assert(offsetof(lyr_ty16_Exception, f_inner) == 16, "layout of lyr_ty16_Exception");
+extern const LyrItable lyr_itab_ty16[];
+static const uint64_t lyr_refmap_ty16[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty16_Exception = { sizeof(lyr_ty16_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty16, "std.core.Exception", lyr_itab_ty16 };
 _Static_assert(sizeof(LyrIface) == 16, "layout of main.Shape[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
 const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Shape[]", NULL };
@@ -102,6 +117,11 @@ _Static_assert(sizeof(lyr_box_ty7_ParseErrorKind) == 16, "layout of lyr_box_ty7_
 _Static_assert(offsetof(lyr_box_ty7_ParseErrorKind, value) == 8, "layout of lyr_box_ty7_ParseErrorKind");
 extern const LyrItable lyr_itab_ty7[];
 const LyrDesc lyr_desc_box_ty7_ParseErrorKind = { sizeof(lyr_box_ty7_ParseErrorKind), 0, 0, 0, NULL, "box<ParseErrorKind>", lyr_itab_ty7 };
+typedef struct { LyrObj header; lyr_ty12_Ordering value; } lyr_box_ty12_Ordering;
+_Static_assert(sizeof(lyr_box_ty12_Ordering) == 16, "layout of lyr_box_ty12_Ordering");
+_Static_assert(offsetof(lyr_box_ty12_Ordering, value) == 8, "layout of lyr_box_ty12_Ordering");
+extern const LyrItable lyr_itab_ty12[];
+const LyrDesc lyr_desc_box_ty12_Ordering = { sizeof(lyr_box_ty12_Ordering), 0, 0, 0, NULL, "box<Ordering>", lyr_itab_ty12 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -148,13 +168,15 @@ const lyr_vt_ty0 lyr_vt_ty0_ty3 = { &lyr_desc_box_ty3_Tri, lyr_vt_ty0_ty3_s0 };
 const lyr_vt_ty4 lyr_vt_ty4_ty3 = { &lyr_desc_box_ty3_Tri,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty6 = { &lyr_desc_box_ty6_ParseError,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty7 = { &lyr_desc_box_ty7_ParseErrorKind,  };
-const lyr_vt_ty4 lyr_vt_ty4_ty12 = { &lyr_desc_ty12_Exception,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty12 = { &lyr_desc_box_ty12_Ordering,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty16 = { &lyr_desc_ty16_Exception,  };
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty1 }, { lyr_ifid_ty5, &lyr_vt_ty5_ty1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty2 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty3 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty3 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty6[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty6 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty7[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty7 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty12[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty12 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty16[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty16 } , { NULL, NULL } };
 
 #line 24 "programs/anything.lyr"
 LyrStr * lyr_main_describe(LyrIface l0_s) {

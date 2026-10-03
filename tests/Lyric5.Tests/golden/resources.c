@@ -13,6 +13,10 @@ typedef struct lyr_ty4_ParseErrorKind lyr_ty4_ParseErrorKind;
 typedef struct lyr_ty5_ParseErrorKind_Empty lyr_ty5_ParseErrorKind_Empty;
 typedef struct lyr_ty6_ParseErrorKind_Invalid lyr_ty6_ParseErrorKind_Invalid;
 typedef struct lyr_ty7_ParseErrorKind_Overflow lyr_ty7_ParseErrorKind_Overflow;
+typedef struct lyr_ty8_Ordering lyr_ty8_Ordering;
+typedef struct lyr_ty9_Ordering_Less lyr_ty9_Ordering_Less;
+typedef struct lyr_ty10_Ordering_Equal lyr_ty10_Ordering_Equal;
+typedef struct lyr_ty11_Ordering_Greater lyr_ty11_Ordering_Greater;
 struct lyr_ty0_Res {
     LyrObj header;
     LyrStr *f_name;
@@ -54,6 +58,17 @@ _Static_assert(sizeof(lyr_ty4_ParseErrorKind) == 4, "layout of lyr_ty4_ParseErro
 struct lyr_ty3_ParseError {
     lyr_ty4_ParseErrorKind f_kind;
 };
+struct lyr_ty9_Ordering_Less {
+    uint8_t lyr_unit;
+};
+struct lyr_ty10_Ordering_Equal {
+    uint8_t lyr_unit;
+};
+struct lyr_ty11_Ordering_Greater {
+    uint8_t lyr_unit;
+};
+struct lyr_ty8_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty8_Ordering) == 4, "layout of lyr_ty8_Ordering");
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
