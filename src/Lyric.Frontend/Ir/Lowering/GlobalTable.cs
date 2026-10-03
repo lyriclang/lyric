@@ -69,7 +69,7 @@ internal sealed class GlobalTable
                         when compilation.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, ext)) is { Target: { } target } block:
                         foreach (var sb in ext.Statics)
                             if (block.MethodScope.LookupLocal(sb.Binding.Name) is GlobalSymbol constant)
-                                Add(constant, sb.Binding, module, $"{target.Name}.{constant.Name}", types, typeTable);
+                                AddStatic(constant, sb.Binding, module, $"{target.Name}.{constant.Name}", types, typeTable);
                         break;
                 }
             }
@@ -94,9 +94,42 @@ internal sealed class GlobalTable
             if (member is not StaticBindingDecl binding) continue;
             if (owner.Members.LookupLocal(binding.Binding.Name) is not GlobalSymbol symbol) continue;
 
-            Add(symbol, binding.Binding, module, $"{typeName}.{symbol.Name}", types, typeTable);
+            AddStatic(symbol, binding.Binding, module, $"{typeName}.{symbol.Name}", types, typeTable);
         }
     }
+
+    /// <summary>
+    /// A <c>static let</c> whose initializer is a literal — <c>static let max: int8 = 127;</c> — is
+    /// that literal wherever it is read, and has no slot: no line in the init function, nothing a
+    /// program that never reads it carries (10 B5's number constants stood in every program as
+    /// globals). Any other initializer, and every module <c>let</c>, keeps its slot and runs in order.
+    /// </summary>
+    private void AddStatic(GlobalSymbol symbol, BindingStmt binding, ModuleSymbol module, string name,
+        TypeResult types, TypeTable typeTable)
+    {
+        if (_assigned.ContainsKey(symbol) || _constants.ContainsKey(symbol)) return;
+        if (IsLiteral(binding.Initializer))
+        {
+            _constants[symbol] = (binding.Initializer!, typeTable.Lower(types.TypeOfGlobal(symbol), binding.Span));
+            return;
+        }
+        Add(symbol, binding, module, name, types, typeTable);
+    }
+
+    private readonly Dictionary<GlobalSymbol, (Expr Literal, IrType Type)> _constants =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The literal a constant <c>static let</c> stands for, with its type; <c>null</c> for
+    /// a global with a slot.</summary>
+    public (Expr Literal, IrType Type)? ConstantOf(GlobalSymbol symbol) =>
+        _constants.TryGetValue(symbol, out var constant) ? constant : null;
+
+    private static bool IsLiteral(Expr? initializer) => initializer switch
+    {
+        IntLiteralExpr or FloatLiteralExpr or BoolLiteralExpr or CharLiteralExpr or StringLiteralExpr => true,
+        UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr } => true,
+        _ => false,
+    };
 
     private void Add(GlobalSymbol symbol, BindingStmt binding, ModuleSymbol module, string name,
         TypeResult types, TypeTable typeTable)

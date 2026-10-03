@@ -644,6 +644,137 @@ extend string :: [Debug, Clone, Default] {
     static fn default(): string { return ""; }
 }
 
+// ---------------------------------------------------------------------------------------------
+// The numbers (design/v5/spec/10 B5): ten types, one tower of interfaces with static members.
+// Arithmetic stays in the type — the parent lists fix 'Out' (05 §8 rule 7) — and the defaults are
+// each type's own (04 D9): 'int8.min.abs()' is a direct call, no value of an interface made.
+// ---------------------------------------------------------------------------------------------
+
+/// Every number type (10 B5 Z1): its zero and its one, arithmetic that stays in the type.
+pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<Out = Self>,
+    Div<Out = Self>, Rem<Out = Self>, Display, Debug, Default] {
+    static let zero: Self;
+    static let one: Self;
+
+    /// Whether this is the type's zero.
+    fn isZero(): bool {
+        return this == Self.zero;
+    }
+}
+
+/// A number with a sign: the signed integers and the floats. `uint` has no `abs`.
+pub interface Signed :: [Num, Neg<Out = Self>] {
+    /// The value without its sign.
+    fn abs(): Self {
+        return if (this < Self.zero) -this else this;
+    }
+
+    /// `-1`, `0` or `1` as a value of the type; a float's NaN stays NaN.
+    fn signum(): Self {
+        if (!(this == this)) {
+            return this;
+        }
+        if (this < Self.zero) {
+            return -Self.one;
+        }
+        if (this > Self.zero) {
+            return Self.one;
+        }
+        return Self.zero;
+    }
+}
+
+/// The eight integer types: their range, a total order, a hash, the bit operators.
+pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<Out = Self>,
+    BitXor<Out = Self>, BitNot<Out = Self>, Shl<Out = Self>, Shr<Out = Self>] {
+    static let min: Self;
+    static let max: Self;
+    static let bitWidth: int;
+    static let isSigned: bool;
+}
+
+extend int :: [Num, Signed, Integer] {
+    static let zero: int = 0;
+    static let one: int = 1;
+    static let min: int = -9223372036854775808;
+    static let max: int = 9223372036854775807;
+    static let bitWidth: int = 64;
+    static let isSigned: bool = true;
+}
+
+extend int8 :: [Num, Signed, Integer] {
+    static let zero: int8 = 0;
+    static let one: int8 = 1;
+    static let min: int8 = -128;
+    static let max: int8 = 127;
+    static let bitWidth: int = 8;
+    static let isSigned: bool = true;
+}
+
+extend int16 :: [Num, Signed, Integer] {
+    static let zero: int16 = 0;
+    static let one: int16 = 1;
+    static let min: int16 = -32768;
+    static let max: int16 = 32767;
+    static let bitWidth: int = 16;
+    static let isSigned: bool = true;
+}
+
+extend int32 :: [Num, Signed, Integer] {
+    static let zero: int32 = 0;
+    static let one: int32 = 1;
+    static let min: int32 = -2147483648;
+    static let max: int32 = 2147483647;
+    static let bitWidth: int = 32;
+    static let isSigned: bool = true;
+}
+
+extend uint :: [Num, Integer] {
+    static let zero: uint = 0;
+    static let one: uint = 1;
+    static let min: uint = 0;
+    static let max: uint = 18446744073709551615;
+    static let bitWidth: int = 64;
+    static let isSigned: bool = false;
+}
+
+extend uint8 :: [Num, Integer] {
+    static let zero: uint8 = 0;
+    static let one: uint8 = 1;
+    static let min: uint8 = 0;
+    static let max: uint8 = 255;
+    static let bitWidth: int = 8;
+    static let isSigned: bool = false;
+}
+
+extend uint16 :: [Num, Integer] {
+    static let zero: uint16 = 0;
+    static let one: uint16 = 1;
+    static let min: uint16 = 0;
+    static let max: uint16 = 65535;
+    static let bitWidth: int = 16;
+    static let isSigned: bool = false;
+}
+
+extend uint32 :: [Num, Integer] {
+    static let zero: uint32 = 0;
+    static let one: uint32 = 1;
+    static let min: uint32 = 0;
+    static let max: uint32 = 4294967295;
+    static let bitWidth: int = 32;
+    static let isSigned: bool = false;
+}
+
+extend float :: [Num, Signed] {
+    static let zero: float = 0.0;
+    static let one: float = 1.0;
+}
+
+extend float32 :: [Num, Signed] {
+    static let zero: float32 = 0.0;
+    static let one: float32 = 1.0;
+}
+
 /// The debug rendering of an array, element by element — the shape has no conformance of its
 /// own yet (05 §13.6), so a synthesized `debug()` reaches for this.
 pub fn debugArray<T :: [Debug]>(xs: T[]): string {

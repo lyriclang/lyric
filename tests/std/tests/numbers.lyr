@@ -1,0 +1,59 @@
+// std.core's numbers (design/v5/spec/10 B5): the tower, its static members, the defaults on it.
+import std.test { assertEq, assertTrue, assertFalse };
+import std.core { Num, Signed, Integer };
+
+fn total<T :: [Num]>(xs: T[]): T {
+    var sum = T.zero;
+    for (i in 0..xs.length()) {
+        sum = sum + xs[i];
+    }
+    return sum;
+}
+
+fn magnitude<T :: [Signed]>(x: T): T {
+    return x.abs();
+}
+
+fn span<T :: [Integer]>(sample: T): string {
+    return f"{T.min}..{T.max} in {T.bitWidth} bits, signed {T.isSigned}";
+}
+
+@Test
+fn aGenericSumStaysInTheType(): void {
+    assertEq(total([1, 2, 3]), 6);
+    assertEq(total([1.5, 2.25]), 3.75);
+    let none: int[] = [];
+    assertEq(total(none), 0);
+}
+
+@Test
+fn theIntegersKnowTheirRange(): void {
+    let small: int8 = 0;
+    let byte: uint8 = 0;
+    assertEq(span(small), "-128..127 in 8 bits, signed true");
+    assertEq(span(byte), "0..255 in 8 bits, signed false");
+    assertEq(span(0), "-9223372036854775808..9223372036854775807 in 64 bits, signed true");
+    assertEq(uint.max, 18446744073709551615);
+    assertEq(int32.min, -2147483648);
+}
+
+@Test
+fn absAndSignumAreDefaults(): void {
+    assertEq((-5).abs(), 5);
+    assertEq(magnitude(-7), 7);
+    assertEq(magnitude(-2.5), 2.5);
+    assertEq((-3).signum(), -1);
+    assertEq(0.signum(), 0);
+    assertEq(4.signum(), 1);
+    let x: int8 = -9;
+    assertEq(x.abs(), 9);
+}
+
+@Test
+fn zeroIsZero(): void {
+    assertTrue(0.isZero());
+    assertFalse(1.isZero());
+    assertTrue(0.0.isZero());
+    let z: uint16 = 0;
+    assertTrue(z.isZero());
+}

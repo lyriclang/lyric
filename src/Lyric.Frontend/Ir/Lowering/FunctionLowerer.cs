@@ -4705,7 +4705,7 @@ internal sealed class FunctionLowerer
         if (symbol is ImportBindingSymbol import) symbol = import.Target;
         if (symbol is not GlobalSymbol global) return null;
         // A module 'let' narrows like a local (03 §3.2): the read unwraps what the test proved.
-        var (_, type) = _globals.Resolve(global, expr.Span);
+        var type = _globals.ConstantOf(global)?.Type ?? _globals.Resolve(global, expr.Span).Type;
         return Narrow(expr, LowerGlobalRead(global, expr.Span), type);
     }
 
@@ -4713,6 +4713,8 @@ internal sealed class FunctionLowerer
     /// bytecode; the difference is only where the name is visible.</summary>
     private TempId LowerGlobalRead(GlobalSymbol symbol, Span span)
     {
+        // A constant, a 'static let' of a literal, is the literal where it is read (GlobalTable).
+        if (_globals.ConstantOf(symbol) is { } constant) return LowerExprAs(constant.Literal, constant.Type);
         var (id, type) = _globals.Resolve(symbol, span);
         var dest = _slots.NewTemp(type);
         _b.Emit(new LoadGlobal(dest, id, type, span));
