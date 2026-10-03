@@ -282,6 +282,39 @@ pub interface TotalOrder :: [Ordered] {
     fn totalCompare(o: Self): Ordering;
 }
 
+/// What a hash is computed with (design 10 Q3, K2): a value's parts are written in, the hash is
+/// read out. The hashers are `std.hash`'s.
+pub interface Hasher {
+    /// One byte.
+    mut fn writeByte(b: uint8): void;
+
+    /// The bytes, in order.
+    mut fn write(bytes: Slice<uint8>): void {
+        var i = 0;
+        while (i < bytes.length()) {
+            this.writeByte(bytes[i]);
+            i = i + 1;
+        }
+    }
+
+    /// The eight bytes of `v`, the lowest first.
+    mut fn writeUint(v: uint64): void {
+        var i = 0;
+        while (i < 8) {
+            this.writeByte((v >> ((8 * i) as uint64)) as uint8);
+            i = i + 1;
+        }
+    }
+
+    /// The eight bytes of `v` in two's complement, the lowest first.
+    mut fn writeInt(v: int): void {
+        this.writeUint(v as uint64);
+    }
+
+    /// What the bytes written so far hash to; more may be written after.
+    fn finish(): uint64;
+}
+
 /// What a `Map` key and a `Set` element need. Equal values hash equal; nothing checks it.
 pub interface Hashable :: [Equatable] {
     fn hash(): int;

@@ -32,6 +32,7 @@ public class RuntimeProgramTests
             data.Add("coro_panic", profile, 0, "coro panic ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
+            data.Add("random", profile, 0, "random ok\n", []);
         }
         return data;
     }

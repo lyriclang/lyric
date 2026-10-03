@@ -1,0 +1,104 @@
+// std.hash's hashers (design/v5/spec/10 Q3, K2). The expected values come from an implementation
+// independent of std.hash, checked against the SipHash paper's SipHash-2-4 vector before it gave
+// SipHash-1-3's.
+import std.hash { DefaultHasher, FixedHasher, Fnv1a64 };
+import std.test { assertEq, assertNotEq };
+
+@Test
+fn fixedHasherIsSipHash13UnderAZeroKey(): void {
+    let empty = FixedHasher.new();
+    assertEq(empty.finish(), 15130871412783076140);
+    var abc = FixedHasher.new();
+    abc.writeByte(97);
+    abc.writeByte(98);
+    abc.writeByte(99);
+    assertEq(abc.finish(), 13851880170939887858);
+    var nine = FixedHasher.new();
+    for (b in 0..9) {
+        nine.writeByte(b as uint8);
+    }
+    assertEq(nine.finish(), 8471974163824919394);
+}
+
+@Test
+fn aWordIsItsEightBytes(): void {
+    var one = FixedHasher.new();
+    one.writeUint(1);
+    assertEq(one.finish(), 2206609067086327257);
+    var minus = FixedHasher.new();
+    minus.writeInt(-1);
+    assertEq(minus.finish(), 3395815149532668813);
+    var after = FixedHasher.new();
+    after.writeUint(1);
+    after.writeByte(2);
+    assertEq(after.finish(), 16482863132411079682);
+    var unaligned = FixedHasher.new();
+    unaligned.writeByte(2);
+    unaligned.writeUint(1);
+    assertEq(unaligned.finish(), 17736263552798753480);
+    var carried = FixedHasher.new();
+    carried.writeByte(2);
+    carried.writeUint(0x0807060504030201);
+    assertEq(carried.finish(), 3593080403584000968);
+    var late = FixedHasher.new();
+    for (b in 2..9) {
+        late.writeByte(b as uint8);
+    }
+    late.writeUint(0x0807060504030201);
+    assertEq(late.finish(), 3065971624795017199);
+}
+
+@Test
+fn finishingLeavesTheHasherWritable(): void {
+    var h = FixedHasher.new();
+    h.writeByte(97);
+    let first = h.finish();
+    assertEq(h.finish(), first);
+    h.writeByte(98);
+    h.writeByte(99);
+    assertEq(h.finish(), 13851880170939887858);
+}
+
+@Test
+fn writeTakesTheBytesOfAView(): void {
+    let bytes: uint8[] = [97, 98, 99];
+    var h = FixedHasher.new();
+    h.write(bytes[..]);
+    assertEq(h.finish(), 13851880170939887858);
+}
+
+@Test
+fn defaultHasherKeepsOneKeyForTheProcess(): void {
+    var a = DefaultHasher.new();
+    var b = DefaultHasher.new();
+    a.writeUint(42);
+    b.writeUint(42);
+    assertEq(a.finish(), b.finish());
+    var fixed = FixedHasher.new();
+    fixed.writeUint(42);
+    assertNotEq(a.finish(), fixed.finish());
+}
+
+@Test
+fn theDefaultWordIsItsBytesLowestFirst(): void {
+    var word = Fnv1a64.new();
+    word.writeUint(0x0807060504030201);
+    var bytes = Fnv1a64.new();
+    for (b in 1..9) {
+        bytes.writeByte(b as uint8);
+    }
+    assertEq(word.finish(), bytes.finish());
+}
+
+@Test
+fn fnv1a64(): void {
+    assertEq(Fnv1a64.new().finish(), 14695981039346656037);
+    var a = Fnv1a64.new();
+    a.writeByte(97);
+    assertEq(a.finish(), 12638187200555641996);
+    var foobar = Fnv1a64.new();
+    for (c in [102, 111, 111, 98, 97, 114]) {
+        foobar.writeByte(c as uint8);
+    }
+    assertEq(foobar.finish(), 9625390261332436968);
+}
