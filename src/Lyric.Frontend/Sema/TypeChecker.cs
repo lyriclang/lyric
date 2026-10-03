@@ -2141,6 +2141,16 @@ public sealed class TypeChecker
         _rangeInPosition = fo.Iterable;
         var iterType = CheckExpr(fo.Iterable, scope);
         _rangeInPosition = outerRange;
+        // A head takes the plain mark (07 §2 rule 6): 'try?', 'try!' and the catching form would
+        // take the head's value, and the pulls at every pass would stand outside them. Refused, the
+        // loop walks nothing.
+        if (RefusedHead(fo) is { } refused)
+        {
+            _de.Report("LYR-SEM0163", Severity.Error, refused.KeywordSpan,
+                "a loop's head takes the plain 'try' mark — it covers the source and every 'next()'; "
+                + "to catch what they throw, put the loop in a 'try { … }' block");
+            iterType = LyrType.Error;
+        }
         // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
         // compiler walks itself goes through the protocol.
         var protocol = _coreIterable is not null
@@ -2205,6 +2215,11 @@ public sealed class TypeChecker
         CheckBlock(fo.Body, loopScope);
     }
 
+    /// <summary>A loop head's <c>try?</c>, <c>try!</c> or catching form (07 §2 rule 6), which only
+    /// the plain mark may be.</summary>
+    internal static TryExpr? RefusedHead(ForInStmt fo) =>
+        fo.Iterable is TryExpr head && (head.Kind != TryKind.Propagate || head.Catches.Length > 0) ? head : null;
+
     /// <summary>
     /// A second loop over one iterator binding (07 §2 rule 4; design 10 B6 I2, COL-11 C). Where the
     /// binding's <c>iter()</c> gives the iterator itself and that may be an object several bindings
@@ -2216,7 +2231,8 @@ public sealed class TypeChecker
     /// </summary>
     private void NoteWalk(ForInStmt fo, LyrType iterType)
     {
-        if (fo.Iterable is not IdentifierExpr id || _result.RefOf(id) is not Symbol binding
+        var walked = fo.Iterable is TryExpr { Value: var marked } ? marked : fo.Iterable;
+        if (walked is not IdentifierExpr id || _result.RefOf(id) is not Symbol binding
             || binding is not (LocalSymbol or ParameterSymbol)) return;
         if (_result.ForInOf(fo) is not { } walk || !LyrType.Equal(walk.Cursor.Type, iterType) || !MayBeShared(iterType)) return;
         foreach (var frame in _walked)
@@ -2489,7 +2505,8 @@ public sealed class TypeChecker
     {
         if (thrown.IsError || element.IsError || thrown is NeverType) return true;
         if (LyrType.Equal(thrown, element)) return true;
-        if (thrown is not (NamedRef or GenericInstance or TypeParamType or PrimitiveType)) return false;
+        // An associated type is thrown through its bound, 'type Error :: [Error]' (10 B6 I5).
+        if (thrown is not (NamedRef or GenericInstance or TypeParamType or PrimitiveType or AssocOf)) return false;
         if (TypeFacts.SymbolOf(element) is not { Kind: TypeSymbolKind.Interface } iface) return false;
         var saved = _currentModule;
         _currentModule = at ?? saved;
@@ -5675,7 +5692,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray(), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -5871,7 +5888,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray(), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -5939,7 +5956,12 @@ public sealed class TypeChecker
                 if (symbol is not TypeSymbol { Kind: TypeSymbolKind.Interface } iface || !DeclaredInModule(iface, module)) continue;
                 foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
                 {
-                    if (member.Declaration is not AssociatedTypeDecl { Bounds.Length: > 0 } decl) continue;
+                    if (member.Declaration is not AssociatedTypeDecl { Bounds.Length: > 0 } decl)
+                    {
+                        if (member.Declaration is AssociatedTypeDecl { Type: NamedType { Path: ["never"], TypeArguments.Length: 0 } unbounded })
+                            RefuseNever(member, unbounded.Span);
+                        continue;
+                    }
                     var bounds = new List<LyrType>();
                     foreach (var node in decl.Bounds)
                     {
@@ -5952,6 +5974,8 @@ public sealed class TypeChecker
                         bounds.Add(ResolveType(node, DeclarationScope(iface)));
                     }
                     member.Bounds = bounds.ToArray();
+                    if (decl.Type is NamedType { Path: ["never"], TypeArguments.Length: 0 } fallback && !NeverMayAnswer(member))
+                        RefuseNever(member, fallback.Span);
                 }
             }
         }
@@ -6040,6 +6064,11 @@ public sealed class TypeChecker
     private void CheckAnswerBounds(AssociatedTypeSymbol member, LyrType answer, LyrType conformer, Span at, string who)
     {
         if (answer.IsError || member.Owner is not { } owner) return;
+        if (answer is NeverType)
+        {
+            if (!NeverMayAnswer(member)) RefuseNever(member, at);
+            return;
+        }
         foreach (var bound in member.Bounds)
         {
             if (TypeFacts.SymbolOf(bound) is not { Kind: TypeSymbolKind.Interface } boundIface) continue;
@@ -6050,6 +6079,21 @@ public sealed class TypeChecker
                 + $"'{TypeFacts.Display(wanted)}' — the bound every answer of it meets");
         }
     }
+
+    /// <summary>Whether <c>never</c> may answer an associated type (05 E2 K4): an empty thrown
+    /// set, where the member's bound is <c>Error</c> — elsewhere it would type a value that cannot
+    /// exist. Before the bounds are bound, the written bound is read.</summary>
+    private bool NeverMayAnswer(AssociatedTypeSymbol member) =>
+        member.Bounds.Length > 0
+            ? _error is { } root && member.Bounds.Any(b => TypeFacts.SymbolOf(b) is { } bound
+                && Conformance.WithParents(bound, _binding).Any(p => ReferenceEquals(p, root)))
+            : member.Declaration is AssociatedTypeDecl { Bounds: var written }
+              && written.Any(n => n is NamedType { Path: [.., "Error"] });
+
+    private void RefuseNever(AssociatedTypeSymbol member, Span at) =>
+        _de.Report("LYR-SEM0145", Severity.Error, at,
+            $"'never' answers '{member.Owner?.Name}.{member.Name}' only where its bound is 'Error' — an empty thrown set "
+            + "(05 E2 K4); anywhere else it would type a value that cannot exist");
 
     /// <summary>A generic block's parameters read as its target's own (03 T7 X1): <c>extend&lt;U&gt;
     /// Box&lt;U&gt;</c> answers in its <c>U</c>, and the type's answer is asked in Box's own <c>T</c>.
@@ -9938,7 +9982,10 @@ public sealed class TypeChecker
             if (n.ArgumentNames is { } names && i < names.Length && names[i] is { } fixes)
             {
                 if (ts.Kind == TypeSymbolKind.Interface && FindAssociated(ts, fixes) is { } member)
+                {
+                    if (resolved is NeverType && !NeverMayAnswer(member)) RefuseNever(member, n.TypeArguments[i].Span);
                     (fixations ??= new()).Add((member, resolved));
+                }
                 else // the type is its own error: nothing further is asked of it
                     return Report(n.TypeArguments[i].Span, "LYR-SEM0128",
                         $"'{ts.Name}' declares no associated type '{fixes}' to fix");

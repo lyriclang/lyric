@@ -188,7 +188,34 @@ internal sealed class ExceptionAnalyzer
                 break;
             case WhileStmt w: AnalyzeExpr(w.Condition); AnalyzeStmt(w.Body); break;
             case DoWhileStmt d: AnalyzeStmt(d.Body); AnalyzeExpr(d.Condition); break;
-            case ForInStmt fo: AnalyzeExpr(fo.Iterable); AnalyzeStmt(fo.Body); break;
+            case ForInStmt fo:
+            {
+                // A loop over the protocol makes two calls of its own (design/v5/spec/10 B6 I5),
+                // 'iter()' once and 'next()' at every pass: throw sites at its head, which a 'try'
+                // there marks — it covers the source and every pull.
+                var walk = _types.ForInOf(fo);
+                if (walk is not null && fo.Iterable is TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } head)
+                {
+                    var frame = Open(head.Catches, takesAll: false);
+                    try
+                    {
+                        AnalyzeExpr(head.Value);
+                        LoopCalls(walk, head.Value.Span);
+                    }
+                    finally { Close(); }
+                    if (!frame.Reached)
+                        _de.Report("LYR-SEM0139", Severity.Warning, head.KeywordSpan,
+                            "nothing this loop walks throws — the mark says a pull may fail where none can");
+                }
+                else
+                {
+                    // A refused head (LYR-SEM0163) is one error: its operand alone is asked.
+                    AnalyzeExpr(TypeChecker.RefusedHead(fo) is { } refused ? refused.Value : fo.Iterable);
+                    if (walk is not null) LoopCalls(walk, fo.Iterable.Span);
+                }
+                AnalyzeStmt(fo.Body);
+                break;
+            }
             case ReturnStmt r: if (r.Value is not null) AnalyzeExpr(r.Value); break;
             case BreakStmt { Value: { } broken }: AnalyzeExpr(broken); break;
             case YieldStmt y:
@@ -363,6 +390,13 @@ internal sealed class ExceptionAnalyzer
         // What is no Error was refused where it is thrown (SEM0030); covering it is no question.
         if (_root is not null && !_covers(thrown, _root, _module)) return;
         Site([thrown], span, "'throw'", needsMark: false);
+    }
+
+    /// <summary>The two calls a loop over the protocol makes, sites at its head.</summary>
+    private void LoopCalls(TypeResult.ForInProtocol walk, Span head)
+    {
+        Site(_types.CallThrows(walk.IterCall), head, "the loop's 'iter()'");
+        Site(_types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
     }
 
     /// <summary>A throw site: marked — unless it is a <c>throw</c>, which is its own mark — and every
