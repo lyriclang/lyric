@@ -8,6 +8,41 @@ struct Tagged {
     at: int,
 }
 
+/// An order by `key` alone: equal keys, different tags — what makes `sort()`'s stability visible.
+struct Ranked :: [Equatable, Ordered, TotalOrder] {
+    key: int,
+    tag: int,
+
+    fn equals(o: Ranked): bool { return this.key == o.key; }
+    fn compare(o: Ranked): ?Ordering { return this.key.compare(o.key); }
+    fn totalCompare(o: Ranked): Ordering { return this.key.totalCompare(o.key); }
+}
+
+@Test
+fn sortKeepsEqualOnesInTheirOrder(): void {
+    // 50 elements, keys 2, 1, 0, 2, 1, 0, …: runs of 16 and the merges between them
+    var xs: Ranked[] = [];
+    var i = 0;
+    while (i < 50) {
+        xs = xs + [Ranked { key = 2 - i % 3, tag = i }];
+        i = i + 1;
+    }
+    xs.sort();
+    var ordered = true;
+    i = 1;
+    while (i < 50) {
+        let a = xs[i - 1];
+        let b = xs[i];
+        if (a.key > b.key || (a.key == b.key && a.tag > b.tag)) {
+            ordered = false;
+        }
+        i = i + 1;
+    }
+    assertTrue(ordered);
+    assertEq(xs[0].key, 0);
+    assertEq(xs[49].key, 2);
+}
+
 /// A fixed pseudo-random sequence (a linear congruential generator), duplicates included.
 fn scrambled(n: int, spread: int): int[] {
     var state = 12345;

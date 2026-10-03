@@ -1950,11 +1950,7 @@ pub class StringBuilder {
     pub mut fn appendStr(s: string): void {
         let n = byteCount(s);
         this.reserve(n);
-        var i = 0;
-        while (i < n) {
-            this.bytes[this.count + i] = byteAt(s, i) as uint8;
-            i = i + 1;
-        }
+        putBytes(this.bytes, this.count, s);
         this.count = this.count + n;
     }
 
@@ -2009,11 +2005,17 @@ pub class StringBuilder {
         while (room < need) {
             room = room * 2;
         }
-        let old = this.bytes;
-        let kept = this.count;
-        this.bytes = arrayOf(room, (i: int): uint8 => if (i < kept) old[i] else 0);
+        let zero: uint8 = 0;
+        let grown = [zero] * room;
+        copyBytes(grown, this.bytes, this.count);
+        this.bytes = grown;
     }
 }
+
+/// `s`'s bytes into `bytes` from `at` on, and the first `count` bytes of `from` into `into` — C's
+/// memcpy (measurement point 3), the ranges checked as an index is.
+fn putBytes(bytes: uint8[], at: int, s: string): void;
+fn copyBytes(into: uint8[], from: uint8[], count: int): void;
 
 // --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
 
@@ -2704,9 +2706,39 @@ extend<T> Slice<T> {
 }
 
 extend<T :: [TotalOrder]> Slice<T> {
-    /// The elements in ascending order, equal ones keeping theirs.
+    /// The elements in ascending order, equal ones keeping theirs: `sortBy`'s merge sort with
+    /// `totalCompare` called directly. A function value between kept C from inlining the
+    /// comparison — 40 % of the time at measurement point 3.
     pub fn sort(): void {
-        this.sortBy((a: T, b: T) => a.totalCompare(b));
+        let n = this.length();
+        var start = 0;
+        while (start < n) {
+            let end = if (start + 16 < n) start + 16 else n;
+            sortRun(this[start..end]);
+            start = end;
+        }
+        if (n <= 16) {
+            return;
+        }
+        let buffer = arrayOf(n, (i: int) => this[i]);
+        var width = 16;
+        var inBuffer = false;
+        while (width < n) {
+            if (inBuffer) {
+                mergeRuns(buffer[..], this, width);
+            } else {
+                mergeRuns(this, buffer[..], width);
+            }
+            inBuffer = !inBuffer;
+            width = width * 2;
+        }
+        if (inBuffer) {
+            var i = 0;
+            while (i < n) {
+                this[i] = buffer[i];
+                i = i + 1;
+            }
+        }
     }
 
     /// The elements in ascending order, equal ones in any: in place, without a buffer — a
@@ -2728,6 +2760,55 @@ fn isLess(o: Ordering): bool {
 
 fn isGreater(o: Ordering): bool {
     return match (o) { .Greater => true, _ => false };
+}
+
+/// `sortRunBy` under the type's own order.
+fn sortRun<T :: [TotalOrder]>(xs: Slice<T>): void {
+    var i = 1;
+    while (i < xs.length()) {
+        let x = xs[i];
+        var j = i;
+        while (j > 0 && isLess(x.totalCompare(xs[j - 1]))) {
+            xs[j] = xs[j - 1];
+            j = j - 1;
+        }
+        xs[j] = x;
+        i = i + 1;
+    }
+}
+
+/// `mergeRunsBy` under the type's own order.
+fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void {
+    let n = src.length();
+    var lo = 0;
+    while (lo < n) {
+        let mid = if (lo + width < n) lo + width else n;
+        let hi = if (mid + width < n) mid + width else n;
+        var i = lo;
+        var j = mid;
+        var k = lo;
+        while (i < mid && j < hi) {
+            if (isLess(src[j].totalCompare(src[i]))) {
+                dst[k] = src[j];
+                j = j + 1;
+            } else {
+                dst[k] = src[i];
+                i = i + 1;
+            }
+            k = k + 1;
+        }
+        while (i < mid) {
+            dst[k] = src[i];
+            i = i + 1;
+            k = k + 1;
+        }
+        while (j < hi) {
+            dst[k] = src[j];
+            j = j + 1;
+            k = k + 1;
+        }
+        lo = hi;
+    }
 }
 
 /// A run sorted by insertion: each element moved before the ones it is less than, so equal ones

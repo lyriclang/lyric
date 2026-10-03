@@ -87,6 +87,9 @@ public static class Intrinsics
         ["std.core.float32OfText"] = "lyr_str_to_float32",
         // The format language (08 Y7, 12 §2): a float with a precision, rounded by C.
         ["std.core.floatText"] = "lyr_str_float_text",
+        // The StringBuilder's bulk copies (measurement point 3): memcpy.
+        ["std.core.putBytes"] = "lyr_bytes_put_str",
+        ["std.core.copyBytes"] = "lyr_bytes_copy",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

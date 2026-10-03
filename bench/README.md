@@ -68,3 +68,20 @@ Lyric is ahead of C# in all three and over the bound in all three. Where the tim
 the collector behind it; `sorting` 40 % in the comparison's function value and the calls behind
 it, which C cannot inline through; `maps` half in `find`, whose three arrays (controls, keys,
 values) cost three cache misses where Go's groups cost one.
+
+After M8a S10c — the builder grows and copies through `memcpy`, `sort()` compares through
+`totalCompare` without a function value, `find` compares the key unwrapped (minimum of 5 runs):
+
+| bench | Lyric | Go | C# | Lyric / Go |
+|---|---|---|---|---|
+| maps | 0.340 s | 0.179 s | 0.218 s | 1.90 |
+| sorting | 0.128 s | 0.084 s | 0.162 s | 1.53 |
+| strings | 0.070 s | 0.028 s | 0.072 s | 2.53 |
+
+Still over the bound, and the runs vary by a fifth on this machine (Go's `maps` took 0.222 s in
+the first measurement); a second one, 7 runs each, gave 1.79, 1.63 and 2.27. What bounds the rest is the shape of the build, not the library alone:
+a generic instance is emitted into the program's translation unit and calls std.core's small
+non-generic functions — `int.totalCompare`, `isLess`, the hasher's steps — in std.core's, so C
+inlines none of them without link-time optimization (ThinLTO is off: it breaks the cross-link
+to Windows). `strings` spends 40 % in the collector's allocation: every f-string piece is a
+string of its own until f-strings write into one builder (10 S6, `showTo`).
