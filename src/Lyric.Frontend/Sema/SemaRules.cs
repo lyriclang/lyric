@@ -351,10 +351,20 @@ public sealed class SemaRules
         for (var i = 0; i < ps.Length; i++)
             if (ps[i].IsParams)
             {
+                // Lyric 5 writes the variadic parameter 'nums: int...' (design/v5/spec/08, 12 S01);
+                // 'params' is Lyric 4's word.
+                if (_comp.Lyric5Modules && !ps[i].IsEllipsis)
+                    _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span,
+                        $"'params' is Lyric 4's — the variadic parameter is written '{ps[i].Name}: T...'");
+                var what = ps[i].IsEllipsis ? $"the variadic parameter '{ps[i].Name}'" : "'params'";
                 if (i != ps.Length - 1)
-                    _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span, "'params' must be the last parameter");
+                    _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span, $"{what} must be the last parameter");
                 if (ps[i].Type is not ArrayType)
                     _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span, "'params' requires an array type");
+                // No argument is the empty array: a default would be a second meaning of none.
+                if (ps[i] is { IsEllipsis: true, Default: not null })
+                    _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span,
+                        $"{what} takes no default — a call without its arguments passes the empty array");
             }
 
         // A default may stand at any position (design/v5/spec/04 D5 F3): a call names what follows

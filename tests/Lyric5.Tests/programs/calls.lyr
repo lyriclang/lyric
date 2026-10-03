@@ -3,7 +3,7 @@
 //   arity 7 12 60          'of(hex)' and 'of(r, g, b)' — one name, told apart by the count
 //   named 1 2 3            arguments by name, in any order, after the positional ones
 //   default 10 2 3         a default reading an earlier parameter; a middle one skipped by name
-//   params 6 3             a 'params' tail after a positional head
+//   variadic 6 3           a variadic tail, 'xs: int...', after a positional head
 //   factory 3 4            Point(1, 2) is Point.new(1, 2); Point(4) picks the one-argument factory
 import std.io { println };
 
@@ -22,7 +22,7 @@ struct Point {
 
 fn connect(host: int, port: int = 80, retries: int = 3): int { return host + port + retries; }
 fn span(from: int, to: int = from + 10, step: int = to - from): int { return step; }
-fn sum(base: int, params xs: int[]): int {
+fn sum(base: int, xs: int...): int {
     var s = base;
     for (i in 0..xs.length()) { s = s + xs[i]; }
     return s;
@@ -35,7 +35,7 @@ fn main(): int {
     let c = connect(3, retries: 0, port: 0);
     println(f"named {a} {b} {c}");
     println(f"default {span(5)} {span(5, 7)} {span(5, step: 3)}");
-    println(f"params {sum(1, 2, 3)} {sum(3)}");
+    println(f"variadic {sum(1, 2, 3)} {sum(3)}");
     let p = Point(1, 2);
     println(f"factory {p.x + p.y} {Point(4).y}");
     return 0;

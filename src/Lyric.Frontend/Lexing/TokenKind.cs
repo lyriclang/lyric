@@ -135,6 +135,7 @@ public enum TokenKind
     
     //Range 
     DotDot, //..
+    DotDotDot, //... — a variadic parameter's mark (design/v5/spec/08)
     DotDotEqual, //..= 
     
     //Assignment

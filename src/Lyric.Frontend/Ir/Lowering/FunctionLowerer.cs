@@ -6251,7 +6251,7 @@ internal sealed class FunctionLowerer
             // parameter, so the rest really is the rest.
             if (parameter.IsParams)
             {
-                args[i] = CollectVariadic(parameter, provided, i, span);
+                args[i] = CollectVariadic(parameter, provided, i, span, calleeSubstitution);
                 return args;
             }
 
@@ -6304,9 +6304,15 @@ internal sealed class FunctionLowerer
     /// delegate to another. Recognisable from the type of the single remaining argument — nothing more
     /// is needed, because an element never has the same type as the array taking it.</para>
     /// </summary>
-    private TempId CollectVariadic(Param parameter, Expr?[] provided, int from, Span span)
+    private TempId CollectVariadic(Param parameter, Expr?[] provided, int from, Span span,
+        IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {
-        if (_typeTable.Lower(parameter.Type) is not IrArrayType array)
+        // Under the callee's substitution, as LowerArgument lowers a parameter type: in
+        // 'fn count<T>(xs: T...)' only the call knows which T the array holds.
+        IrType lowered;
+        using (calleeSubstitution is null ? null : _typeTable.PushSubstitution(calleeSubstitution))
+            lowered = _typeTable.Lower(parameter.Type);
+        if (lowered is not IrArrayType array)
             throw NotSupported($"'params {parameter.Name}' whose type is not an array",
                 parameter.Span);
 

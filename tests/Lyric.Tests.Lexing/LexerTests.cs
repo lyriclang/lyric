@@ -2047,22 +2047,23 @@ public class LexerTests
     }
 
     [Fact]
-    public void Four_dots_is_DotDot_then_DotDot()
+    public void Four_dots_is_DotDotDot_then_Dot()
     {
+        // The longest match first: the variadic mark, then what is left.
         var (tokens, _) = Tokenize("....");
         Assert.Equal(3, tokens.Count);
-        Assert.Equal(TokenKind.DotDot, tokens[0].TokenKind);
-        Assert.Equal(TokenKind.DotDot, tokens[1].TokenKind);
+        Assert.Equal(TokenKind.DotDotDot, tokens[0].TokenKind);
+        Assert.Equal(TokenKind.Dot, tokens[1].TokenKind);
     }
 
     [Fact]
-    public void Three_dots_is_DotDot_then_Dot()
+    public void Three_dots_is_DotDotDot()
     {
-        // '...' does not exist, so it is DotDot plus Dot and the parser rejects it.
+        // '...' marks a variadic parameter (design/v5/spec/08, 'nums: int...'). Before, it was
+        // DotDot plus Dot, which no grammar took either.
         var (tokens, _) = Tokenize("...");
-        Assert.Equal(3, tokens.Count);
-        Assert.Equal(TokenKind.DotDot, tokens[0].TokenKind);
-        Assert.Equal(TokenKind.Dot, tokens[1].TokenKind);
+        Assert.Equal(2, tokens.Count);
+        Assert.Equal(TokenKind.DotDotDot, tokens[0].TokenKind);
     }
 
     [Fact]

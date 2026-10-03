@@ -156,7 +156,7 @@ static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("arity ");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
 static const LyrStaticStr(7) lyr_lit2 = LYR_STR_INIT("named ");
 static const LyrStaticStr(9) lyr_lit3 = LYR_STR_INIT("default ");
-static const LyrStaticStr(8) lyr_lit4 = LYR_STR_INIT("params ");
+static const LyrStaticStr(10) lyr_lit4 = LYR_STR_INIT("variadic ");
 static const LyrStaticStr(9) lyr_lit5 = LYR_STR_INIT("factory ");
 
 /* prototypes */

@@ -825,6 +825,12 @@ public sealed class Lexer
                 _pos++;
                 return new Token(TokenKind.Tilde, new Span(_file, operatorStart, _pos));
             case '.':
+                if (PeekAt(1) == '.' && PeekAt(2) == '.')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.DotDotDot, new Span(_file, operatorStart, _pos));
+                }
+
                 if (PeekAt(1) == '.' && PeekAt(2) == '=')
                 {
                     _pos += 3;
