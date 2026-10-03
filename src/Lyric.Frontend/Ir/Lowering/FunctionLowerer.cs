@@ -5406,6 +5406,7 @@ internal sealed class FunctionLowerer
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
             throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
         FunctionId target;
+        Dictionary<string, LyrType>? byName = null;
         if (block.Generics.Length == 0 && !block.IsConstructorTarget && receiver is GenericInstance)
         {
             if (!TryResolveFunction(symbol, out target))
@@ -5416,9 +5417,14 @@ internal sealed class FunctionLowerer
             var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
             if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
                 throw NotSupported($"'{TypeFacts.Display(receiver)}' does not match the block's target", expr.Span);
-            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span);
+            // A generic method's own parameters (03 T7 X1), bound by the call beside the block's
+            // bound by the receiver: 'mapped<U>' in 'extend<I :: [Iterator]> I'.
+            var own = symbol.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+            for (var i = 0; i < symbol.Generics.Length && i < own.Length; i++) map[symbol.Generics[i]] = own[i];
+            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, own);
+            byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
         }
-        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
         var all = new TempId[passed.Length + 1];
         all[0] = LowerExpr(member.Target);
         passed.CopyTo(all, 1);
