@@ -245,10 +245,40 @@ public sealed class CBuild
         if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");
         if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");
         if (Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig) arguments.Add("-lunwind");
-        var result = ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
+        var result = RunLong(arguments, Path.GetDirectoryName(Path.GetFullPath(output))!);
         if (result.ExitCode != 0)
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
+        }
+    }
+
+    /// <summary>The longest command line passed as it is. Windows takes 32767 characters at most, and
+    /// a program of many modules links more object files than that holds ("The filename or
+    /// extension is too long").</summary>
+    private const int LongestCommandLine = 8000;
+
+    /// <summary>
+    /// Runs the compiler with <paramref name="arguments"/> — past <see cref="LongestCommandLine"/>
+    /// characters through a response file in <paramref name="directory"/>, which zig cc, clang and
+    /// gcc read: the driver's own arguments stay on the command line, the rest go into the file, each
+    /// quoted, a backslash doubled — the GNU reading takes it for an escape and gives one back; the
+    /// Windows reading keeps two, a separator twice, which Windows takes as one.
+    /// </summary>
+    private ProcessRunner.Result RunLong(List<string> arguments, string directory)
+    {
+        if (Command(arguments).Length <= LongestCommandLine)
+            return ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
+        var driver = Driver().Count;
+        var responseFile = Path.Combine(directory, $".link-{Guid.NewGuid():N}.rsp");
+        File.WriteAllLines(responseFile, arguments.Skip(driver)
+            .Select(a => "\"" + a.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""));
+        try
+        {
+            return ProcessRunner.Run(Compiler.Path, [.. arguments.Take(driver), "@" + responseFile], TimeSpan.FromMinutes(5));
+        }
+        finally
+        {
+            File.Delete(responseFile);
         }
     }
 
