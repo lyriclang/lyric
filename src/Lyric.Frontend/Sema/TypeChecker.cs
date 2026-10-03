@@ -5588,6 +5588,29 @@ public sealed class TypeChecker
     private LyrType? ConstructorMember(LyrType receiver, MemberExpr mem, Span span)
     {
         ExtensionBlock? shapeOnly = null; // the shape matched, the constraints did not
+        if (ShapeBlockMember(receiver, mem, span, ref shapeOnly) is { } direct) return direct;
+        // An array gives a view of itself (design 03 A2, 03 §5.2 rule 4): the members written
+        // once on 'Slice<T>' reach it after its own blocks' — the lowering passes the whole view.
+        if (receiver is ArrayOf whole && ShapeBlockMember(new SliceOf(whole.Element), mem, span, ref shapeOnly) is { } viewed)
+            return viewed;
+        if (shapeOnly is { } failed)
+            return Report(span, "LYR-SEM0134",
+                $"'{mem.Member}' is added to '{TypeFacts.Display(BlockTargetType(failed))}' under the block's constraints, "
+                + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
+        // A blanket member, where the shape satisfies the block's constraints (05 §13 rule 7).
+        if (BlanketMember(receiver, mem.Member, span) is { } blanket && blanket.Item2 is { } blanketSymbol)
+        {
+            _result.BindRef(mem, blanketSymbol);
+            return blanket.Item1;
+        }
+        return null;
+    }
+
+    /// <summary>The member of a block on a built-in constructor whose target matches the receiver
+    /// and whose constraints hold; <paramref name="shapeOnly"/> keeps the first block whose shape
+    /// matched and whose constraints did not.</summary>
+    private LyrType? ShapeBlockMember(LyrType receiver, MemberExpr mem, Span span, ref ExtensionBlock? shapeOnly)
+    {
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!(block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice)))) continue;
@@ -5603,16 +5626,6 @@ public sealed class TypeChecker
             if (found.IsStatic)
                 return Report(span, "LYR-SEM0074", $"'{mem.Member}' is a static extension and belongs to the type — the instance form is an error");
             return Substitute(FnTypeOf(found), map);
-        }
-        if (shapeOnly is { } failed)
-            return Report(span, "LYR-SEM0134",
-                $"'{mem.Member}' is added to '{TypeFacts.Display(BlockTargetType(failed))}' under the block's constraints, "
-                + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
-        // A blanket member, where the shape satisfies the block's constraints (05 §13 rule 7).
-        if (BlanketMember(receiver, mem.Member, span) is { } blanket && blanket.Item2 is { } blanketSymbol)
-        {
-            _result.BindRef(mem, blanketSymbol);
-            return blanket.Item1;
         }
         return null;
     }

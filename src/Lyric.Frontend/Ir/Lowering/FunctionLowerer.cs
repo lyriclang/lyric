@@ -5401,7 +5401,7 @@ internal sealed class FunctionLowerer
     /// requested for the receiver, a plain block's lowered as every extension is; the call is
     /// direct either way.</summary>
     private TempId? LowerBlockMethodCall(MemberExpr member, FunctionSymbol symbol, ExtensionBlock block,
-        LyrType receiver, CallExpr expr)
+        LyrType receiver, CallExpr expr, bool viewed = false)
     {
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
             throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
@@ -5430,7 +5430,9 @@ internal sealed class FunctionLowerer
         }
         var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
         var all = new TempId[passed.Length + 1];
-        all[0] = LowerExpr(member.Target);
+        all[0] = viewed
+            ? ViewOf(LowerExpr(member.Target), ((IrArrayType)TypeOfExpr(member.Target)).Element, member.Span)
+            : LowerExpr(member.Target);
         passed.CopyTo(all, 1);
         var resultType = TypeOfExpr(expr);
         if (IsVoid(resultType))
@@ -5961,7 +5963,13 @@ internal sealed class FunctionLowerer
                      && _typeTable.BlockOf(shapeMember) is { } shapeBlock
                      && (shapeBlock.IsConstructorTarget || shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
                      && SubstituteType(ReceiverType(member.Target)) is ArrayOf or SliceOf or InlineArrayOf or Optional or Sema.TupleOf:
-                return LowerBlockMethodCall(member, shapeMember, shapeBlock, SubstituteType(ReceiverType(member.Target)), expr);
+            {
+                // A view's member on an array (03 §5.2 rule 4): the array gives a view of itself.
+                var shapeReceiver = SubstituteType(ReceiverType(member.Target));
+                if (shapeReceiver is ArrayOf whole && shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
+                    return LowerBlockMethodCall(member, shapeMember, shapeBlock, new SliceOf(whole.Element), expr, viewed: true);
+                return LowerBlockMethodCall(member, shapeMember, shapeBlock, shapeReceiver, expr);
+            }
 
             // A GENERIC interface member on an instance of a generic type:
             // 'ArrayIterator<int>.zip<string>()'. It is not a member of the instance at all — it is
