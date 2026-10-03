@@ -21,7 +21,7 @@
 #define LYR_RT_TODO             "LYR-RT0013"  /* `todo(message)` reached (05 E8, 10 prelude) */
 #define LYR_RT_COROUTINE        "LYR-RT0014"  /* a coroutine resumed while it runs, after it ended or on another
                                                  thread; a yield with none running (06 A8) */
-#define LYR_RT_SYSTEM           "LYR-RT0015"  /* the system refused the runtime what it needs to go on: a poller */
+#define LYR_RT_SYSTEM           "LYR-RT0015"  /* the system refused the runtime what it needs to go on: a poller, random bytes */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))

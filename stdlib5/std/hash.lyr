@@ -1,0 +1,147 @@
+/// The hashers (design/v5/spec/10 Q3, K2). `DefaultHasher` is SipHash-1-3 under a key the system
+/// draws once per process: a `Map` hashes with it, its order differs from run to run, and no input
+/// from outside can aim collisions at it. `FixedHasher` is the same under a zero key, for what must
+/// hash alike in every run; `Fnv1a64` is fast and keyless, for trusted input.
+pub import std.core { Hasher };
+
+extern "C" fn lyr_hash_key(which: int): uint64;
+
+/// SipHash's state (Aumasson and Bernstein, 2012): four words, the bytes not yet a word, the
+/// length. One round a word, three at the end — SipHash-1-3.
+struct Sip {
+    var v0: uint64,
+    var v1: uint64,
+    var v2: uint64,
+    var v3: uint64,
+    var tail: uint64,
+    var pending: int,
+    var length: int,
+}
+
+fn sip(k0: uint64, k1: uint64): Sip {
+    return Sip {
+        v0 = k0 ^ 0x736f6d6570736575,
+        v1 = k1 ^ 0x646f72616e646f6d,
+        v2 = k0 ^ 0x6c7967656e657261,
+        v3 = k1 ^ 0x7465646279746573,
+        tail = 0,
+        pending = 0,
+        length = 0,
+    };
+}
+
+extend Sip {
+    mut fn round(): void {
+        this.v0 = this.v0 +% this.v1;
+        this.v1 = this.v1.rotateLeft(13) ^ this.v0;
+        this.v0 = this.v0.rotateLeft(32);
+        this.v2 = this.v2 +% this.v3;
+        this.v3 = this.v3.rotateLeft(16) ^ this.v2;
+        this.v0 = this.v0 +% this.v3;
+        this.v3 = this.v3.rotateLeft(21) ^ this.v0;
+        this.v2 = this.v2 +% this.v1;
+        this.v1 = this.v1.rotateLeft(17) ^ this.v2;
+        this.v2 = this.v2.rotateLeft(32);
+    }
+
+    mut fn absorb(m: uint64): void {
+        this.v3 = this.v3 ^ m;
+        this.round();
+        this.v0 = this.v0 ^ m;
+    }
+
+    mut fn writeByte(b: uint8): void {
+        this.tail = this.tail | ((b as uint64) << ((8 * this.pending) as uint64));
+        this.pending = this.pending + 1;
+        this.length = this.length + 1;
+        if (this.pending == 8) {
+            this.absorb(this.tail);
+            this.tail = 0;
+            this.pending = 0;
+        }
+    }
+
+    /// A word at once: whole where no bytes wait, else joined to them.
+    mut fn writeUint(v: uint64): void {
+        this.length = this.length + 8;
+        if (this.pending == 0) {
+            this.absorb(v);
+            return;
+        }
+        let shift = (8 * this.pending) as uint64;
+        this.absorb(this.tail | (v << shift));
+        this.tail = v >> (64 - shift);
+    }
+
+    /// The last word — the bytes left and the length's low byte at the top — and three rounds, on a
+    /// copy: the hasher goes on.
+    fn finish(): uint64 {
+        var s = this;
+        s.absorb(((s.length as uint64) << 56) | s.tail);
+        s.v2 = s.v2 ^ 0xff;
+        s.round();
+        s.round();
+        s.round();
+        return s.v0 ^ s.v1 ^ s.v2 ^ s.v3;
+    }
+}
+
+/// SipHash-1-3 under the process's key, drawn from the system at the first use (10 K2).
+pub struct DefaultHasher :: [Hasher] {
+    var state: Sip,
+
+    pub static fn new(): DefaultHasher {
+        return DefaultHasher { state = sip(lyr_hash_key(0), lyr_hash_key(1)) };
+    }
+
+    pub mut fn writeByte(b: uint8): void {
+        this.state.writeByte(b);
+    }
+
+    pub mut fn writeUint(v: uint64): void {
+        this.state.writeUint(v);
+    }
+
+    pub fn finish(): uint64 {
+        return this.state.finish();
+    }
+}
+
+/// SipHash-1-3 under a zero key: the same hash in every run, for what must reproduce — and for
+/// nothing an adversary feeds.
+pub struct FixedHasher :: [Hasher] {
+    var state: Sip,
+
+    pub static fn new(): FixedHasher {
+        return FixedHasher { state = sip(0, 0) };
+    }
+
+    pub mut fn writeByte(b: uint8): void {
+        this.state.writeByte(b);
+    }
+
+    pub mut fn writeUint(v: uint64): void {
+        this.state.writeUint(v);
+    }
+
+    pub fn finish(): uint64 {
+        return this.state.finish();
+    }
+}
+
+/// FNV-1a in 64 bits: a byte at a time, keyless.
+pub struct Fnv1a64 :: [Hasher] {
+    var state: uint64,
+
+    pub static fn new(): Fnv1a64 {
+        return Fnv1a64 { state = 0xcbf29ce484222325 };
+    }
+
+    pub mut fn writeByte(b: uint8): void {
+        this.state = (this.state ^ (b as uint64)) *% 0x100000001b3;
+    }
+
+    pub fn finish(): uint64 {
+        return this.state;
+    }
+}

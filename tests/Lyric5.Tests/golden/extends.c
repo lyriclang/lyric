@@ -23,6 +23,8 @@ typedef struct lyr_ty13_Ordering_Less lyr_ty13_Ordering_Less;
 typedef struct lyr_ty14_Ordering_Equal lyr_ty14_Ordering_Equal;
 typedef struct lyr_ty15_Ordering_Greater lyr_ty15_Ordering_Greater;
 typedef struct lyr_ty16_Exception lyr_ty16_Exception;
+typedef struct lyr_vt_ty17 lyr_vt_ty17;
+const char lyr_ifid_ty17[] = "std.core.Hasher";
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -95,6 +97,14 @@ _Static_assert(offsetof(lyr_ty16_Exception, f_text) == 8, "layout of lyr_ty16_Ex
 _Static_assert(offsetof(lyr_ty16_Exception, f_inner) == 16, "layout of lyr_ty16_Exception");
 static const uint64_t lyr_refmap_ty16[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty16_Exception = { sizeof(lyr_ty16_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty16, "std.core.Exception", NULL };
+struct lyr_vt_ty17 {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+    void (*s2)(LyrIface);
+    void (*s3)(LyrIface);
+    void (*s4)(LyrIface);
+};
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
 _Static_assert(sizeof(LyrStr *) == 8, "layout of string[]");
@@ -391,7 +401,7 @@ bb0:;
     return t3;
 }
 
-#line 1327 "stdlib5/std/core.lyr"
+#line 1360 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     double t1 = 0;
@@ -402,85 +412,85 @@ void lyr__globals__9ee5f9b5(void) {
     uint64_t t6 = 0;
     float t7 = 0;
 bb0:;
-#line 1327
+#line 1360
     t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1327
+#line 1360
     t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1327
+#line 1360
     lyr_g0_float_infinity = t1;
-#line 1328
+#line 1361
     t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1328
+#line 1361
     t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1328
+#line 1361
     lyr_g1_float_nan = t3;
-#line 1348
+#line 1381
     t4 = (uint64_t)UINT64_C(2139095040);
-#line 1348
+#line 1381
     t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1348
+#line 1381
     lyr_g2_float32_infinity = t5;
-#line 1349
+#line 1382
     t6 = (uint64_t)UINT64_C(2143289344);
-#line 1349
+#line 1382
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1349
+#line 1382
     lyr_g3_float32_nan = t7;
     return;
 }
 
-#line 1334 "stdlib5/std/core.lyr"
+#line 1367 "stdlib5/std/core.lyr"
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
     uint64_t t0 = 0;
     double t1 = 0;
     double t2 = 0;
 bb0:;
-#line 1334
+#line 1367
     t0 = l0_b;
-#line 1324
+#line 1357
     t1 = (double)0.0;
-#line 1334
+#line 1367
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1334
+#line 1367
     return t2;
 }
 
-#line 1355 "stdlib5/std/core.lyr"
+#line 1388 "stdlib5/std/core.lyr"
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
     uint64_t t0 = 0;
     float t1 = 0;
     float t2 = 0;
 bb0:;
-#line 1355
+#line 1388
     t0 = l0_b;
-#line 1345
+#line 1378
     t1 = (float)0.0;
-#line 1355
+#line 1388
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1355
+#line 1388
     return t2;
 }
 
-#line 315 "stdlib5/std/core.lyr"
+#line 348 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this) {
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 315
+#line 348
     t0 = l0_this;
-#line 315
+#line 348
     t1 = lyr_str_from_int(t0);
-#line 315
+#line 348
     return t1;
 }
 
-#line 580 "stdlib5/std/core.lyr"
+#line 613 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 580
+#line 613
     t0 = l0_this;
-#line 580
+#line 613
     return t0;
 }
 
