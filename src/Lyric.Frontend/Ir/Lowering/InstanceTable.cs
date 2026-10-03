@@ -128,9 +128,11 @@ internal sealed class InstanceTable
     /// <c>Iterator&lt;int&gt;.map&lt;string&gt;</c> takes its <c>T</c> from the interface instance
     /// and its <c>U</c> from the call, and needs BOTH bound to lower a body that mentions each.
     /// </param>
+    /// <param name="receiverType">The receiver as a type where no symbol names it — a builtin's
+    /// value for a generic method of a block on it: 'this' is that value.</param>
     public FunctionId Request(FunctionSymbol symbol, FunctionDecl decl, string baseName,
         TypeSymbol? receiver, IReadOnlyList<LyrType> typeArguments, TypeTable typeTable,
-        Core.Span span, GenericInstance? owner = null)
+        Core.Span span, GenericInstance? owner = null, LyrType? receiverType = null)
     {
         if (symbol.Generics.Length != typeArguments.Count)
             throw new UnsupportedConstructException(
@@ -181,7 +183,7 @@ internal sealed class InstanceTable
 
         var id = _ids.Next();
         _byKey[name] = id;
-        _pending.Add(new Pending(decl, name, id, receiver, substitution, owner));
+        _pending.Add(new Pending(decl, name, id, receiver, substitution, owner, receiverType));
         return id;
     }
 

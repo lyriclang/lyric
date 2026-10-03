@@ -238,6 +238,21 @@ pub enum Ordering { Less, Equal, Greater }
 /// of the four is false.
 pub interface Ordered :: [Equatable] {
     fn compare(o: Self): ?Ordering;
+
+    /// This held to `lo`…`hi` (10 B5 Z2): `lo` below it, `hi` above it. `lo` above `hi` is the
+    /// program's error and panics; a value unordered with the bounds — a NaN — comes back as it is.
+    fn clamp(lo: Self, hi: Self): Self {
+        if (hi < lo) {
+            panic("clamp: lo is above hi");
+        }
+        if (this < lo) {
+            return lo;
+        }
+        if (this > hi) {
+            return hi;
+        }
+        return this;
+    }
 }
 
 /// A total order, what sorting and keys need; `float` has none of its own (D6).
@@ -636,6 +651,24 @@ extend bool :: [Debug, Clone, Default] {
 extend char :: [Debug, Clone] {
     fn debug(): string { return f"'{this}'"; }
     fn clone(): char { return this; }
+}
+
+// A char's code point both ways (10 B5 Z8): outside the tower, and the way in answers `null`
+// where `as char` would panic — a number from data is no programmer's error (B3).
+extend char {
+    /// The Unicode scalar value, 0…0x10FFFF.
+    pub fn toUint32(): uint32 {
+        return this as uint32;
+    }
+
+    /// The character of a scalar value; `null` for a surrogate, 0xD800…0xDFFF, or beyond
+    /// 0x10FFFF.
+    pub static fn fromUint32(n: uint32): ?char {
+        if (n > 0x10FFFF || (n >= 0xD800 && n <= 0xDFFF)) {
+            return null;
+        }
+        return n as char;
+    }
 }
 
 extend string :: [Debug, Clone, Default] {
@@ -1050,6 +1083,16 @@ extend int :: [Num, Signed, Integer] {
     static fn parse(s: string, radix: int): int throws ParseError {
         return try parseInteger(s, radix);
     }
+
+    /// `v` as an `int` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?int {
+        return exactly(v);
+    }
+
+    /// `v` as an `int`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): int {
+        return clamped(v);
+    }
 }
 
 extend int8 :: [Num, Signed, Integer] {
@@ -1068,6 +1111,16 @@ extend int8 :: [Num, Signed, Integer] {
     /// The integer a text names in `radix`, 2…36.
     static fn parse(s: string, radix: int): int8 throws ParseError {
         return try parseInteger(s, radix);
+    }
+
+    /// `v` as an `int8` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?int8 {
+        return exactly(v);
+    }
+
+    /// `v` as an `int8`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): int8 {
+        return clamped(v);
     }
 }
 
@@ -1088,6 +1141,16 @@ extend int16 :: [Num, Signed, Integer] {
     static fn parse(s: string, radix: int): int16 throws ParseError {
         return try parseInteger(s, radix);
     }
+
+    /// `v` as an `int16` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?int16 {
+        return exactly(v);
+    }
+
+    /// `v` as an `int16`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): int16 {
+        return clamped(v);
+    }
 }
 
 extend int32 :: [Num, Signed, Integer] {
@@ -1106,6 +1169,16 @@ extend int32 :: [Num, Signed, Integer] {
     /// The integer a text names in `radix`, 2…36.
     static fn parse(s: string, radix: int): int32 throws ParseError {
         return try parseInteger(s, radix);
+    }
+
+    /// `v` as an `int32` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?int32 {
+        return exactly(v);
+    }
+
+    /// `v` as an `int32`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): int32 {
+        return clamped(v);
     }
 }
 
@@ -1126,6 +1199,16 @@ extend uint :: [Num, Integer] {
     static fn parse(s: string, radix: int): uint throws ParseError {
         return try parseInteger(s, radix);
     }
+
+    /// `v` as an `uint` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?uint {
+        return exactly(v);
+    }
+
+    /// `v` as an `uint`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): uint {
+        return clamped(v);
+    }
 }
 
 extend uint8 :: [Num, Integer] {
@@ -1144,6 +1227,16 @@ extend uint8 :: [Num, Integer] {
     /// The integer a text names in `radix`, 2…36.
     static fn parse(s: string, radix: int): uint8 throws ParseError {
         return try parseInteger(s, radix);
+    }
+
+    /// `v` as an `uint8` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?uint8 {
+        return exactly(v);
+    }
+
+    /// `v` as an `uint8`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): uint8 {
+        return clamped(v);
     }
 }
 
@@ -1164,6 +1257,16 @@ extend uint16 :: [Num, Integer] {
     static fn parse(s: string, radix: int): uint16 throws ParseError {
         return try parseInteger(s, radix);
     }
+
+    /// `v` as an `uint16` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?uint16 {
+        return exactly(v);
+    }
+
+    /// `v` as an `uint16`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): uint16 {
+        return clamped(v);
+    }
 }
 
 extend uint32 :: [Num, Integer] {
@@ -1182,6 +1285,16 @@ extend uint32 :: [Num, Integer] {
     /// The integer a text names in `radix`, 2…36.
     static fn parse(s: string, radix: int): uint32 throws ParseError {
         return try parseInteger(s, radix);
+    }
+
+    /// `v` as an `uint32` where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?uint32 {
+        return exactly(v);
+    }
+
+    /// `v` as an `uint32`, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): uint32 {
+        return clamped(v);
     }
 }
 
@@ -1325,6 +1438,22 @@ fn parseInteger<T :: [Integer]>(s: string, radix: int): T throws ParseError {
         throw ParseError { kind = ParseErrorKind.Overflow };
     }
     return value;
+}
+
+/// `v` in `U` where it fits, `null` where it does not (10 B5 Z4): converted as `as` wraps, it
+/// fits exactly when it comes back the same and keeps its sign.
+fn exactly<T :: [Integer], U :: [Integer]>(v: T): ?U {
+    let w = asTypeOf(v, U.zero);
+    if (asTypeOf(w, v) != v || (v < T.zero) != (w < U.zero)) {
+        return null;
+    }
+    return w;
+}
+
+/// `v` in `U`, held at `U.min` or `U.max` where it does not fit.
+fn clamped<T :: [Integer], U :: [Integer]>(v: T): U {
+    let w: ?U = exactly(v);
+    return w ?? (if (v < T.zero) U.min else U.max);
 }
 
 /// A byte's value as a digit — `0`…`9`, then `a`…`z` or `A`…`Z` for 10…35 — and 36 for any other.

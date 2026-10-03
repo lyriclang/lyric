@@ -1,0 +1,98 @@
+// std.math (design/v5/spec/10 B5 Z2), Ordered's clamp, char's code point (Z8).
+import std.test { assertEq, assertTrue, assertPanics, assertNull, assertNotNull, assertClose };
+import std.math;
+
+@Test
+fn theWorldsConstants(): void {
+    assertEq(math.pi, 3.141592653589793);
+    assertEq(math.tau, 2.0 * math.pi);
+    assertClose(math.e.ln(), 1.0, 1e-15);
+    assertClose((math.pi / 4.0).tan(), 1.0, 1e-15);
+    let narrow: float32 = 3.1415927;
+    assertEq(math.pi as float32, narrow);
+}
+
+@Test
+fn minAndMaxOfTwo(): void {
+    assertEq(math.min(3, 7), 3);
+    assertEq(math.max(3, 7), 7);
+    assertEq(math.min(2.5, -1.0), -1.0);
+    assertEq(math.max(-0.5, -1.0), -0.5);
+    let small: uint8 = 4;
+    let big: uint8 = 200;
+    assertEq(math.max(small, big), big);
+    assertTrue(math.min(float.nan, 1.0).isNan());
+    assertEq(math.min(1.0, float.nan), 1.0);
+}
+
+@Test
+fn gcdAndLcm(): void {
+    assertEq(math.gcd(12, 18), 6);
+    assertEq(math.gcd(-12, 18), 6);
+    assertEq(math.gcd(12, -18), 6);
+    assertEq(math.gcd(0, 5), 5);
+    assertEq(math.gcd(0, 0), 0);
+    assertEq(math.gcd(int.min, -1), 1);
+    let a: uint8 = 12;
+    let b: uint8 = 18;
+    assertEq(math.gcd(a, b), 6);
+    assertEq(math.lcm(4, 6), 12);
+    assertEq(math.lcm(-4, 6), 12);
+    assertEq(math.lcm(0, 3), 0);
+    assertPanics(() => { math.gcd(int.min, 0); });
+}
+
+@Test
+fn lerpHitsItsEnds(): void {
+    assertEq(math.lerp(1.0, 3.0, 0.0), 1.0);
+    assertEq(math.lerp(1.0, 3.0, 1.0), 3.0);
+    assertEq(math.lerp(1.0, 3.0, 0.5), 2.0);
+    assertEq(math.lerp(1e17, 0.1, 1.0), 0.1);
+    assertEq(math.lerp(0.0, 10.0, 2.0), 20.0);
+    let a: float32 = 0.0;
+    let b: float32 = 8.0;
+    let quarter: float32 = 0.25;
+    let two: float32 = 2.0;
+    assertEq(math.lerp(a, b, quarter), two);
+}
+
+@Test
+fn clampHoldsToTheBounds(): void {
+    assertEq(5.clamp(0, 3), 3);
+    assertEq((-2).clamp(0, 3), 0);
+    assertEq(2.clamp(0, 3), 2);
+    assertEq(2.5.clamp(0.0, 1.0), 1.0);
+    assertTrue(float.nan.clamp(0.0, 1.0).isNan());
+    let c = 'q';
+    assertEq(c.clamp('a', 'f'), 'f');
+    assertPanics(() => { 1.clamp(3, 0); });
+}
+
+@Test
+fn exactAndClampingNarrowAtTheTarget(): void {
+    assertNull(int8.exact(300));
+    assertEq(assertNotNull(int8.exact(-128)), int8.min);
+    assertNull(uint8.exact(-1));
+    assertEq(assertNotNull(uint8.exact(255)), uint8.max);
+    assertEq(assertNotNull(uint.exact(int.max)), 9223372036854775807);
+    assertNull(int.exact(uint.max));
+    let small: int8 = -1;
+    assertNull(uint.exact(small));
+    assertEq(int8.clamping(300), 127);
+    assertEq(int8.clamping(-300), -128);
+    assertEq(uint8.clamping(-5), 0);
+    assertEq(int.clamping(uint.max), int.max);
+    assertEq(uint16.clamping(70000), 65535);
+}
+
+@Test
+fn charsAndTheirCodePoints(): void {
+    assertEq('A'.toUint32(), 65);
+    assertEq(assertNotNull(char.fromUint32(0x20AC)), '€');
+    assertEq(assertNotNull(char.fromUint32(0)).toUint32(), 0);
+    assertNotNull(char.fromUint32(0x10FFFF));
+    assertNull(char.fromUint32(0xD800));
+    assertNull(char.fromUint32(0xDFFF));
+    assertNull(char.fromUint32(0x110000));
+    assertNotNull(char.fromUint32(0xD7FF));
+}

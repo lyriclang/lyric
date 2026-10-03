@@ -1,0 +1,54 @@
+/// What describes the world rather than a type (design/v5/spec/10 B5 Z2) — `math.pi`, typed
+/// `float`; `math.pi as float32` for the narrow width — and the functions of two numbers. What
+/// describes a type is that type's static member: `float.epsilon`, `int.max`.
+
+/// π, a half turn in radians.
+pub let pi: float = 3.141592653589793;
+
+/// *e*, the base of the natural logarithm.
+pub let e: float = 2.718281828459045;
+
+/// τ = 2π, a full turn in radians.
+pub let tau: float = 6.283185307179586;
+
+/// The lesser of two: `a` when they are equal, and when they are unordered — a NaN.
+pub fn min<T :: [Ordered]>(a: T, b: T): T {
+    return if (b < a) b else a;
+}
+
+/// The greater of two: `a` when they are equal or unordered.
+pub fn max<T :: [Ordered]>(a: T, b: T): T {
+    return if (b > a) b else a;
+}
+
+/// The greatest common divisor, never negative; `gcd(0, 0)` is `0`. A signed type's `min` has a
+/// magnitude beyond it, so `gcd(int.min, 0)` overflows and panics, as `abs` does.
+pub fn gcd<T :: [Integer]>(a: T, b: T): T {
+    var x = a;
+    var y = b;
+    while (y != T.zero) {
+        let r = x.wrappingRem(y);
+        x = y;
+        y = r;
+    }
+    return if (x < T.zero) T.zero - x else x;
+}
+
+/// The least common multiple, never negative; `0` where either is. A multiple beyond the type
+/// overflows and panics.
+pub fn lcm<T :: [Integer]>(a: T, b: T): T {
+    if (a == T.zero || b == T.zero) {
+        return T.zero;
+    }
+    let m = (a / gcd(a, b)) * b;
+    return if (m < T.zero) T.zero - m else m;
+}
+
+/// The value the fraction `t` of the way from `a` to `b`: `a` at `0` and `b` at `1`, exactly, and
+/// beyond the two outside 0…1.
+pub fn lerp<T :: [Float]>(a: T, b: T, t: T): T {
+    if (t + t < T.one) {
+        return a + (b - a) * t;
+    }
+    return b - (b - a) * (T.one - t);
+}
