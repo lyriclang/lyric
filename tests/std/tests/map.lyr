@@ -1,0 +1,155 @@
+// std.collections' Map (design/v5/spec/10 C4): a Swiss table — what goes in comes out, through
+// growth, deletions and colliding hashes.
+import std.collections { Map };
+import std.hash { FixedHasher, Hasher };
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+struct Point :: [Hashable] { x: int, y: int }
+
+/// Every key hashes alike: the probe runs through full groups.
+struct Same :: [Hasher] {
+    mut fn writeByte(b: uint8): void {
+    }
+
+    fn finish(): uint64 {
+        return 7;
+    }
+}
+
+@Test
+fn whatGoesInComesOut(): void {
+    let m = Map<string, int>.new();
+    assertTrue(m.isEmpty());
+    assertNull(m.insert("one", 1));
+    assertNull(m.insert("two", 2));
+    assertEq(m.length(), 2);
+    assertEq(m.get("one") ?? -1, 1);
+    assertEq(m.get("two") ?? -1, 2);
+    assertNull(m.get("three"));
+    assertTrue(m.containsKey("two"));
+    assertFalse(m.containsKey("three"));
+}
+
+@Test
+fn insertReplacesAndAnswersTheOldValue(): void {
+    let m = Map<string, int>.new();
+    m.insert("k", 1);
+    assertEq(m.insert("k", 2) ?? -1, 1);
+    assertEq(m.get("k") ?? -1, 2);
+    assertEq(m.length(), 1);
+}
+
+@Test
+fn removeTakesTheKeyOut(): void {
+    let m = Map<int, string>.new();
+    m.insert(1, "a");
+    m.insert(2, "b");
+    assertEq(m.remove(1) ?? "", "a");
+    assertNull(m.remove(1));
+    assertNull(m.get(1));
+    assertEq(m.get(2) ?? "", "b");
+    assertEq(m.length(), 1);
+}
+
+@Test
+fn aThousandKeysThroughGrowthAndDeletion(): void {
+    let m = Map<int, int>.new();
+    for (i in 0..1000) {
+        m.insert(i, i * i);
+    }
+    assertEq(m.length(), 1000);
+    var good = 0;
+    for (i in 0..1000) {
+        if ((m.get(i) ?? -1) == i * i) {
+            good = good + 1;
+        }
+    }
+    assertEq(good, 1000);
+    for (i in 0..1000) {
+        if (i % 2 == 0) {
+            m.remove(i);
+        }
+    }
+    assertEq(m.length(), 500);
+    var odd = 0;
+    var even = 0;
+    for (i in 0..1000) {
+        if (m.containsKey(i)) {
+            if (i % 2 == 1) {
+                odd = odd + 1;
+            } else {
+                even = even + 1;
+            }
+        }
+    }
+    assertEq(odd, 500);
+    assertEq(even, 0);
+    // growth after the removals rebuilds the table: what was taken out stays out
+    for (i in 1000..3000) {
+        m.insert(i, i);
+    }
+    assertEq(m.length(), 2500);
+    assertFalse(m.containsKey(0));
+    assertFalse(m.containsKey(998));
+    assertTrue(m.containsKey(999));
+}
+
+@Test
+fn churnOverAFewKeysStaysCorrect(): void {
+    let m = Map<int, int>.new();
+    for (i in 0..20000) {
+        m.insert(i, i);
+        if (i >= 3) {
+            m.remove(i - 3);
+        }
+    }
+    assertEq(m.length(), 3);
+    assertEq(m.get(19999) ?? -1, 19999);
+    assertEq(m.get(19997) ?? -1, 19997);
+    assertNull(m.get(19996));
+    // removed long before the last rebuilds: gone for good
+    assertFalse(m.containsKey(5));
+    assertFalse(m.containsKey(10000));
+}
+
+@Test
+fn collidingHashesProbeOn(): void {
+    let m = Map<int, int, Same>.withHasher(Same { });
+    for (i in 0..100) {
+        m.insert(i, -i);
+    }
+    var good = 0;
+    for (i in 0..100) {
+        if ((m.get(i) ?? 1) == -i) {
+            good = good + 1;
+        }
+    }
+    assertEq(good, 100);
+    for (i in 0..50) {
+        m.remove(i);
+    }
+    assertNull(m.get(10));
+    assertEq(m.get(77) ?? 1, -77);
+    assertEq(m.length(), 50);
+}
+
+@Test
+fn structKeysAndAFixedHasher(): void {
+    let m = Map<Point, string, FixedHasher>.withHasher(FixedHasher.new());
+    m.insert(Point { x = 1, y = 2 }, "a");
+    m.insert(Point { x = 2, y = 1 }, "b");
+    assertEq(m.get(Point { x = 1, y = 2 }) ?? "", "a");
+    assertEq(m.get(Point { x = 2, y = 1 }) ?? "", "b");
+    assertNull(m.get(Point { x = 1, y = 1 }));
+}
+
+@Test
+fn clearEmptiesIt(): void {
+    let m = Map<string, int>.new();
+    m.insert("a", 1);
+    m.clear();
+    assertTrue(m.isEmpty());
+    assertNull(m.get("a"));
+    m.insert("a", 2);
+    assertEq(m.get("a") ?? -1, 2);
+}
