@@ -56,14 +56,36 @@ pub struct RangeTo<T> {
 pub struct RangeFull { }
 
 /// `arrayOf(n, f)` (design/v5/spec/10 C7): an array of `n` elements, the element at `i` the value
-/// of `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot. A negative
-/// `n` panics.
+/// of `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot; `f` is
+/// called in order, once per index. A negative `n` panics.
 pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
-    var xs: T[] = [];
-    for (i in 0..n) {
-        xs = xs + [f(i)];
+    if (n < 0) {
+        panic("arrayOf: a negative length");
     }
-    return xs;
+    if (n == 0) {
+        return [];
+    }
+    // Built in linear time: the blocks of the length's binary digits, each twice the last, joined
+    // — every slot holds the first value until its own is written.
+    let first = f(0);
+    var whole: T[] = [];
+    var block: T[] = [first];
+    var left = n;
+    while (left > 0) {
+        if (left % 2 == 1) {
+            whole = whole + block;
+        }
+        left = left / 2;
+        if (left > 0) {
+            block = block + block;
+        }
+    }
+    var i = 1;
+    while (i < n) {
+        whole[i] = f(i);
+        i = i + 1;
+    }
+    return whole;
 }
 
 /// `[x] * n` over an element that is or holds an object (03 §5.1, 10 C7): every slot a `clone()`
@@ -1667,6 +1689,139 @@ extend<T> Slice<T> :: [Iterable] {
 
     fn iter(): SliceIter<T> {
         return SliceIter<T> { items = this, front = 0, back = this.length() };
+    }
+}
+
+// --- the members of arrays and views (10 C2): written once on `Slice<T>`, and reached on an
+// array through a view of the whole of it (03 §5.2 rule 4). A write goes to the array.
+extend<T> Slice<T> {
+    /// Whether there is no element.
+    pub fn isEmpty(): bool {
+        return this.length() == 0;
+    }
+
+    /// The element at `i`, or `null` outside `0 ≤ i < length()`.
+    pub fn get(i: int): ?T {
+        if (i < 0 || i >= this.length()) {
+            return null;
+        }
+        return this[i];
+    }
+
+    /// The first element, or `null` where there is none.
+    pub fn first(): ?T {
+        return this.get(0);
+    }
+
+    /// The last element, or `null` where there is none.
+    pub fn last(): ?T {
+        return this.get(this.length() - 1);
+    }
+
+    /// The elements at `i` and `j` exchanged; an index outside panics as `[i]` does.
+    pub fn swap(i: int, j: int): void {
+        let t = this[i];
+        this[i] = this[j];
+        this[j] = t;
+    }
+
+    /// The elements in place, the last first.
+    pub fn reverse(): void {
+        var i = 0;
+        var j = this.length() - 1;
+        while (i < j) {
+            this.swap(i, j);
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+
+    /// A new array of the elements, the last first.
+    pub fn reversed(): T[] {
+        let n = this.length();
+        return arrayOf(n, (i: int) => this[n - 1 - i]);
+    }
+
+    /// The first index whose element fails `p`, for elements that `p` partitions — every one it
+    /// holds for before every one it does not: a binary search.
+    pub fn partitionPoint(p: fn(T) -> bool): int {
+        var lo = 0;
+        var hi = this.length();
+        while (lo < hi) {
+            let mid = lo + (hi - lo) / 2;
+            if (p(this[mid])) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+}
+
+/// `x in xs` (10 C12): an element equal to `x`.
+extend<T :: [Equatable]> Slice<T> :: [Contains<T>] {
+    fn contains(x: T): bool {
+        return this.indexOf(x) != null;
+    }
+}
+
+extend<T :: [Equatable]> T[] :: [Contains<T>] {
+    fn contains(x: T): bool {
+        return this[..].contains(x);
+    }
+}
+
+extend<T :: [Equatable]> Slice<T> {
+    /// The index of the first element equal to `x`, or `null`.
+    pub fn indexOf(x: T): ?int {
+        var i = 0;
+        while (i < this.length()) {
+            if (this[i] == x) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return null;
+    }
+}
+
+extend<T :: [Clone]> Slice<T> {
+    /// Every element a clone of `v` — no object shared into several slots (10 C7).
+    pub fn fill(v: T): void {
+        var i = 0;
+        while (i < this.length()) {
+            this[i] = v.clone();
+            i = i + 1;
+        }
+    }
+}
+
+extend<T :: [TotalOrder]> Slice<T> {
+    /// The index of an element equal to `x` in sorted elements, or `null` (10 C10: a `NaN` would
+    /// break the order the search relies on, so a total one is asked).
+    pub fn binarySearch(x: T): ?int {
+        let at = this.partitionPoint((e: T) => e < x);
+        if (at < this.length() && this[at] == x) {
+            return at;
+        }
+        return null;
+    }
+}
+
+extend<T :: [Display]> Slice<T> {
+    /// The elements' texts, `sep` between each two.
+    pub fn join(sep: string): string {
+        var out = "";
+        var i = 0;
+        while (i < this.length()) {
+            if (i > 0) {
+                out = out + sep;
+            }
+            out = out + f"{this[i]}";
+            i = i + 1;
+        }
+        return out;
     }
 }
 

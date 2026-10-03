@@ -1,0 +1,113 @@
+// std.core's members of arrays and views (design/v5/spec/10 C2): written on the view, reached on
+// the array; the writes reach the array.
+import std.core { arrayOf };
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+class Cell :: [Clone] {
+    var n: int,
+
+    fn clone(): Cell {
+        return Cell { n = this.n };
+    }
+}
+
+@Test
+fn lookups(): void {
+    let xs = [4, 5, 6];
+    assertFalse(xs.isEmpty());
+    assertTrue(xs[..0].isEmpty());
+    assertEq(xs.get(1) ?? -1, 5);
+    assertNull(xs.get(3));
+    assertNull(xs.get(-1));
+    assertEq(xs.first() ?? -1, 4);
+    assertEq(xs.last() ?? -1, 6);
+    assertNull(xs[1..1].first());
+    assertEq(xs[1..].last() ?? -1, 6);
+}
+
+@Test
+fn containsAndIndexOf(): void {
+    let xs = [3, 1, 3];
+    assertTrue(xs.contains(1));
+    assertFalse(xs.contains(2));
+    assertTrue(xs[1..].contains(3));
+    assertEq(xs.indexOf(3) ?? -1, 0);
+    assertEq(xs[1..].indexOf(3) ?? -1, 1);
+    assertNull(xs.indexOf(7));
+    assertTrue(["a", "b"].contains("b"));
+}
+
+@Test
+fn writesReachTheArray(): void {
+    let xs = [1, 2, 3, 4, 5];
+    xs.swap(0, 4);
+    assertEq(xs.join(","), "5,2,3,4,1");
+    xs[1..4].reverse();
+    assertEq(xs.join(","), "5,4,3,2,1");
+    xs.reverse();
+    assertEq(xs.join(","), "1,2,3,4,5");
+    let zs = [1, 2, 3, 4];
+    zs.reverse();
+    assertEq(zs.join(","), "4,3,2,1");
+    let ys: int[] = [];
+    ys.reverse();
+    assertEq(ys.length(), 0);
+    xs[..2].fill(9);
+    assertEq(xs.join(","), "9,9,3,4,5");
+}
+
+@Test
+fn fillClonesEverySlot(): void {
+    let cells = [Cell { n = 0 }, Cell { n = 0 }];
+    cells.fill(Cell { n = 7 });
+    cells[0].n = 8;
+    assertEq(cells[1].n, 7);
+}
+
+@Test
+fn reversedIsANewArray(): void {
+    let xs = [1, 2, 3];
+    let ys = xs.reversed();
+    ys[0] = 9;
+    assertEq(xs.join(","), "1,2,3");
+    assertEq(ys.join(","), "9,2,1");
+    assertEq(xs[1..].reversed().join(","), "3,2");
+}
+
+@Test
+fn searchesInSortedElements(): void {
+    let xs = [1, 3, 3, 5, 8];
+    assertEq(xs.partitionPoint((x) => x < 4), 3);
+    assertEq(xs.partitionPoint((x) => x < 0), 0);
+    assertEq(xs.partitionPoint((x) => x < 9), 5);
+    assertEq(xs.binarySearch(5) ?? -1, 3);
+    assertEq(xs.binarySearch(1) ?? -1, 0);
+    assertEq(xs.binarySearch(8) ?? -1, 4);
+    assertNull(xs.binarySearch(4));
+    assertNull(xs.binarySearch(9));
+    let found = xs.binarySearch(3) ?? -1;
+    assertTrue(found == 1 || found == 2);
+}
+
+@Test
+fn joinShowsEachElement(): void {
+    assertEq([1, 2, 3].join(", "), "1, 2, 3");
+    assertEq(["x"].join("-"), "x");
+    let none: string[] = [];
+    assertEq(none.join("-"), "");
+}
+
+@Test
+fn arrayOfCallsInOrderOncePerIndex(): void {
+    var calls = "";
+    let xs = arrayOf(5, (i) => {
+        calls = calls + f"{i}";
+        return i * i;
+    });
+    assertEq(calls, "01234");
+    assertEq(xs.join(","), "0,1,4,9,16");
+    assertEq(arrayOf(0, (i) => i).length(), 0);
+    assertEq(arrayOf(1, (i) => i + 7).join(","), "7");
+    assertEq(arrayOf(6, (i) => i).join(","), "0,1,2,3,4,5");
+    assertEq(arrayOf(1000, (i) => i)[999], 999);
+}
