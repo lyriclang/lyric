@@ -8,6 +8,11 @@ typedef struct lyr_ty0_Res lyr_ty0_Res;
 typedef struct lyr_ty1_Exception lyr_ty1_Exception;
 typedef struct lyr_vt_ty2 lyr_vt_ty2;
 const char lyr_ifid_ty2[] = "std.core.Error";
+typedef struct lyr_ty3_ParseError lyr_ty3_ParseError;
+typedef struct lyr_ty4_ParseErrorKind lyr_ty4_ParseErrorKind;
+typedef struct lyr_ty5_ParseErrorKind_Empty lyr_ty5_ParseErrorKind_Empty;
+typedef struct lyr_ty6_ParseErrorKind_Invalid lyr_ty6_ParseErrorKind_Invalid;
+typedef struct lyr_ty7_ParseErrorKind_Overflow lyr_ty7_ParseErrorKind_Overflow;
 struct lyr_ty0_Res {
     LyrObj header;
     LyrStr *f_name;
@@ -35,6 +40,20 @@ _Static_assert(offsetof(lyr_ty1_Exception, f_inner) == 16, "layout of lyr_ty1_Ex
 extern const LyrItable lyr_itab_ty1[];
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty1_Exception = { sizeof(lyr_ty1_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "std.core.Exception", lyr_itab_ty1 };
+struct lyr_ty5_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty6_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty7_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty4_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty4_ParseErrorKind) == 4, "layout of lyr_ty4_ParseErrorKind");
+struct lyr_ty3_ParseError {
+    lyr_ty4_ParseErrorKind f_kind;
+};
 
 /* string literals */
 static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("a");

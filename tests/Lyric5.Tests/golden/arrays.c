@@ -6,9 +6,14 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty0_Point lyr_ty0_Point;
 typedef struct lyr_ty1_Person lyr_ty1_Person;
-typedef struct lyr_vt_ty2 lyr_vt_ty2;
-const char lyr_ifid_ty2[] = "std.core.Error";
-typedef struct lyr_ty3_Exception lyr_ty3_Exception;
+typedef struct lyr_ty2_ParseError lyr_ty2_ParseError;
+typedef struct lyr_ty3_ParseErrorKind lyr_ty3_ParseErrorKind;
+typedef struct lyr_ty4_ParseErrorKind_Empty lyr_ty4_ParseErrorKind_Empty;
+typedef struct lyr_ty5_ParseErrorKind_Invalid lyr_ty5_ParseErrorKind_Invalid;
+typedef struct lyr_ty6_ParseErrorKind_Overflow lyr_ty6_ParseErrorKind_Overflow;
+typedef struct lyr_vt_ty7 lyr_vt_ty7;
+const char lyr_ifid_ty7[] = "std.core.Error";
+typedef struct lyr_ty8_Exception lyr_ty8_Exception;
 struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
@@ -23,22 +28,36 @@ _Static_assert(offsetof(lyr_ty1_Person, f_name) == 8, "layout of lyr_ty1_Person"
 _Static_assert(offsetof(lyr_ty1_Person, f_age) == 16, "layout of lyr_ty1_Person");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_ty1_Person = { sizeof(lyr_ty1_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Person", NULL };
-struct lyr_vt_ty2 {
+struct lyr_ty4_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty5_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty6_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty3_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty3_ParseErrorKind) == 4, "layout of lyr_ty3_ParseErrorKind");
+struct lyr_ty2_ParseError {
+    lyr_ty3_ParseErrorKind f_kind;
+};
+struct lyr_vt_ty7 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface2;
-struct lyr_ty3_Exception {
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface7;
+struct lyr_ty8_Exception {
     LyrObj header;
     LyrStr *f_text;
-    lyr_opt_iface2 f_inner;
+    lyr_opt_iface7 f_inner;
 };
-_Static_assert(sizeof(lyr_ty3_Exception) == 40, "layout of lyr_ty3_Exception");
-_Static_assert(offsetof(lyr_ty3_Exception, f_text) == 8, "layout of lyr_ty3_Exception");
-_Static_assert(offsetof(lyr_ty3_Exception, f_inner) == 16, "layout of lyr_ty3_Exception");
-static const uint64_t lyr_refmap_ty3[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty3_Exception = { sizeof(lyr_ty3_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty3, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty8_Exception) == 40, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_text) == 8, "layout of lyr_ty8_Exception");
+_Static_assert(offsetof(lyr_ty8_Exception, f_inner) == 16, "layout of lyr_ty8_Exception");
+static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty8_Exception = { sizeof(lyr_ty8_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.core.Exception", NULL };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
 _Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of main.Point[]");

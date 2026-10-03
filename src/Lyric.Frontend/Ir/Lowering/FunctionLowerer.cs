@@ -5314,11 +5314,18 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>The static member the constraint promised, on the type the parameter stands for:
-    /// the type's own, or a static of a visible extend block — a builtin's through its symbol.</summary>
+    /// the type's own, or a static of a visible extend block — a builtin's through its symbol. Of
+    /// several of the name (08 §1.2: `parse(s)` beside `parse(s, radix)`) the one the conformance
+    /// chose, which the checker recorded.</summary>
     private TempId? LowerStaticConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         var owner = TypeFacts.SymbolOf(concrete) ?? _typeTable.BuiltinSymbolOf(concrete);
-        var function = owner?.Members.LookupLocal(member.Member) as FunctionSymbol
+        var chosen = owner is not null && _types.RefOf(member) is FunctionSymbol promised
+                     && TypeTable.InterfaceOwning(promised) is { } iface
+            ? _types.ConformanceImpl(owner, iface, member.Member, null)
+            : null;
+        var function = chosen
+                       ?? owner?.Members.LookupLocal(member.Member) as FunctionSymbol
                        ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, member.Member));
         if (function is not { IsStatic: true, Declaration: FunctionDecl declaration }
             || !TryResolveFunction(function, out var target))

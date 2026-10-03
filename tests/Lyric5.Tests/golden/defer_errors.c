@@ -9,7 +9,12 @@ typedef struct lyr_vt_ty1 lyr_vt_ty1;
 const char lyr_ifid_ty1[] = "std.core.Error";
 typedef struct lyr_ty2_Second lyr_ty2_Second;
 typedef struct lyr_ty3_Third lyr_ty3_Third;
-typedef struct lyr_ty4_Exception lyr_ty4_Exception;
+typedef struct lyr_ty4_ParseError lyr_ty4_ParseError;
+typedef struct lyr_ty5_ParseErrorKind lyr_ty5_ParseErrorKind;
+typedef struct lyr_ty6_ParseErrorKind_Empty lyr_ty6_ParseErrorKind_Empty;
+typedef struct lyr_ty7_ParseErrorKind_Invalid lyr_ty7_ParseErrorKind_Invalid;
+typedef struct lyr_ty8_ParseErrorKind_Overflow lyr_ty8_ParseErrorKind_Overflow;
+typedef struct lyr_ty9_Exception lyr_ty9_Exception;
 struct lyr_ty0_First {
     LyrObj header;
 };
@@ -34,16 +39,30 @@ struct lyr_ty3_Third {
 _Static_assert(sizeof(lyr_ty3_Third) == 8, "layout of lyr_ty3_Third");
 extern const LyrItable lyr_itab_ty3[];
 const LyrDesc lyr_desc_ty3_Third = { sizeof(lyr_ty3_Third), 0, 0, 0, NULL, "main.Third", lyr_itab_ty3 };
-struct lyr_ty4_Exception {
+struct lyr_ty6_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty7_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty8_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty5_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty5_ParseErrorKind) == 4, "layout of lyr_ty5_ParseErrorKind");
+struct lyr_ty4_ParseError {
+    lyr_ty5_ParseErrorKind f_kind;
+};
+struct lyr_ty9_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface1 f_inner;
 };
-_Static_assert(sizeof(lyr_ty4_Exception) == 40, "layout of lyr_ty4_Exception");
-_Static_assert(offsetof(lyr_ty4_Exception, f_text) == 8, "layout of lyr_ty4_Exception");
-_Static_assert(offsetof(lyr_ty4_Exception, f_inner) == 16, "layout of lyr_ty4_Exception");
-static const uint64_t lyr_refmap_ty4[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty4_Exception = { sizeof(lyr_ty4_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty4, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty9_Exception) == 40, "layout of lyr_ty9_Exception");
+_Static_assert(offsetof(lyr_ty9_Exception, f_text) == 8, "layout of lyr_ty9_Exception");
+_Static_assert(offsetof(lyr_ty9_Exception, f_inner) == 16, "layout of lyr_ty9_Exception");
+static const uint64_t lyr_refmap_ty9[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty9_Exception = { sizeof(lyr_ty9_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty9, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(18) lyr_lit0 = LYR_STR_INIT("earlier defer ran");

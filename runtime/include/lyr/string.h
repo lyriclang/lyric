@@ -1,8 +1,10 @@
 /* Strings in C, as far as design/v5/spec/01 L9 puts them there: layout, UTF-8 validation,
- * comparison, and integer <-> text. Search, split and case mapping are Lyric (std.string). */
+ * comparison, number -> text, and a float's text -> value. Search, split, case mapping and the
+ * integer parser are Lyric (std.string, std.core). */
 #ifndef LYR_STRING_H
 #define LYR_STRING_H
 
+#include "lyr/panic.h"
 #include "lyr/types.h"
 
 /* A copy of `len` bytes as a string. The bytes are taken as they are; callers that got them from
@@ -35,15 +37,21 @@ LyrStr *lyr_str_from_float(double value);
  * value by the type's invariant (numeric.h checks the one conversion that could break it). */
 LyrStr *lyr_str_from_char(uint32_t value);
 
-typedef enum LyrParseStatus {
-    LYR_PARSE_OK = 0,
-    LYR_PARSE_EMPTY,
-    LYR_PARSE_INVALID,
-    LYR_PARSE_OVERFLOW,
-} LyrParseStatus;
+/* The float a text names, the nearest one (10 B5 Z6): a text whose form std.core checked — sign,
+ * digits, '.', exponent, `inf`, `nan` — with the '_' between digits skipped; strtod and strtof round
+ * correctly. A value beyond the range is an infinity, one below it a zero or a subnormal. */
+double lyr_str_to_float64(const LyrStr *text);
+float lyr_str_to_float32(const LyrStr *text);
 
-/* ASCII digits in `radix` (2..36), an optional leading '+' or '-', '_' between digits; no
- * whitespace (design/v5/spec/10 Z6). `*error_offset` names the first byte that is not accepted. */
-LyrParseStatus lyr_str_to_int(const LyrStr *text, int radix, int64_t *out, int64_t *error_offset);
+/* A string's length and one byte of it (10 S1), for std.core until `StringView` gives the library
+ * its bytes (M8a S8); the index is checked as `xs[i]` is. */
+#define LYR_STR_LEN(s) ((int64_t)(s)->len)
+#define LYR_STR_BYTE(s, i)                                                                          \
+    __extension__({                                                                                 \
+        const LyrStr *lyr_s_ = (s);                                                                 \
+        const int64_t lyr_i_ = (i);                                                                 \
+        LYR_CHECK_INDEX(lyr_i_, lyr_s_->len);                                                       \
+        (int64_t)(unsigned char)lyr_s_->bytes[lyr_i_];                                              \
+    })
 
 #endif

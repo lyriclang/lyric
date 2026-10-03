@@ -8,9 +8,14 @@ typedef struct lyr_ty0_Point lyr_ty0_Point;
 typedef struct lyr_ty1_Line lyr_ty1_Line;
 typedef struct lyr_ty2_Holder lyr_ty2_Holder;
 typedef struct lyr_ty3_Pair_int_ lyr_ty3_Pair_int_;
-typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "std.core.Error";
-typedef struct lyr_ty5_Exception lyr_ty5_Exception;
+typedef struct lyr_ty4_ParseError lyr_ty4_ParseError;
+typedef struct lyr_ty5_ParseErrorKind lyr_ty5_ParseErrorKind;
+typedef struct lyr_ty6_ParseErrorKind_Empty lyr_ty6_ParseErrorKind_Empty;
+typedef struct lyr_ty7_ParseErrorKind_Invalid lyr_ty7_ParseErrorKind_Invalid;
+typedef struct lyr_ty8_ParseErrorKind_Overflow lyr_ty8_ParseErrorKind_Overflow;
+typedef struct lyr_vt_ty9 lyr_vt_ty9;
+const char lyr_ifid_ty9[] = "std.core.Error";
+typedef struct lyr_ty10_Exception lyr_ty10_Exception;
 struct lyr_ty0_Point {
     int64_t f_x;
     int64_t f_y;
@@ -31,22 +36,36 @@ struct lyr_ty3_Pair_int_ {
     int64_t f_first;
     LyrStr *f_second;
 };
-struct lyr_vt_ty4 {
+struct lyr_ty6_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty7_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty8_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty5_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty5_ParseErrorKind) == 4, "layout of lyr_ty5_ParseErrorKind");
+struct lyr_ty4_ParseError {
+    lyr_ty5_ParseErrorKind f_kind;
+};
+struct lyr_vt_ty9 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface4;
-struct lyr_ty5_Exception {
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface9;
+struct lyr_ty10_Exception {
     LyrObj header;
     LyrStr *f_text;
-    lyr_opt_iface4 f_inner;
+    lyr_opt_iface9 f_inner;
 };
-_Static_assert(sizeof(lyr_ty5_Exception) == 40, "layout of lyr_ty5_Exception");
-_Static_assert(offsetof(lyr_ty5_Exception, f_text) == 8, "layout of lyr_ty5_Exception");
-_Static_assert(offsetof(lyr_ty5_Exception, f_inner) == 16, "layout of lyr_ty5_Exception");
-static const uint64_t lyr_refmap_ty5[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty5_Exception = { sizeof(lyr_ty5_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty10_Exception) == 40, "layout of lyr_ty10_Exception");
+_Static_assert(offsetof(lyr_ty10_Exception, f_text) == 8, "layout of lyr_ty10_Exception");
+_Static_assert(offsetof(lyr_ty10_Exception, f_inner) == 16, "layout of lyr_ty10_Exception");
+static const uint64_t lyr_refmap_ty10[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty10_Exception = { sizeof(lyr_ty10_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty10, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("moved ");

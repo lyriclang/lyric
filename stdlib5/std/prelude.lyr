@@ -1,7 +1,7 @@
 /// The prelude (design/v5/spec/10 B2, 07 V3 I8): what every module names without an import —
 /// what signatures and the language itself need, not effects (U5: `println` is `std.io`'s).
 /// It passes on with `pub import` what other modules declare, and grows with the library:
-/// `Result`, `List`, `Map`, `Set`, the iterator and number interfaces come with theirs (M8a).
+/// `Result`, `List`, `Map`, `Set`, the iterator interfaces and `Float` come with theirs (M8a).
 /// `Exception` is here as 12 K05 has it; `Closeable` stands for what B2 calls `Resource`.
 pub import std.core {
     panic,
@@ -26,6 +26,8 @@ pub import std.core {
     Default,
     Clone,
     Closeable,
+    Num,
+    Integer,
     Test,
     callerExpr
 };

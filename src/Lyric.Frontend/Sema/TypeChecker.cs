@@ -3238,11 +3238,12 @@ public sealed class TypeChecker
             }
 
             // A STATIC method or an enum's, where the receiver NAMES the type rather than being
-            // a value of it: 'Id.of(7)'. The members are the same table; only the way in differs,
-            // and reading the receiver's type as a value type finds nothing here.
+            // a value of it: 'Id.of(7)'. The members are the same table and the same blocks; only
+            // the way in differs, and reading the receiver's type as a value type finds nothing
+            // here. A builtin's statics are all its blocks': 'int8.parse(s, 16)'. A generic type's
+            // are named with type arguments the set does not substitute, so its blocks stay out.
             case MemberExpr mem when ReceiverTypeOf(mem) is NonValueType { Symbol: TypeSymbol named }:
-                return named.Members.OverloadsLocal(mem.Member).Where(MayName)
-                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
+                return MemberOverloads(named, mem.Member, withBlocks: named.Generics.Length == 0);
 
             // A MODULE-qualified name ('net.localPort', alias or dotted path): the module's
             // members hold the whole overload set, and the qualified route must see the same
@@ -3258,27 +3259,40 @@ public sealed class TypeChecker
             // A method or an extension. Both scopes contribute, because both are searched when a
             // member is looked up: own members first, then the visible extensions.
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
-            {
-                var found = ts.Members.OverloadsLocal(mem.Member).Where(MayName)
-                    .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
-                // Members of several CONFORMANCE blocks are scoped to their interfaces (04 D3),
-                // not a set to choose from: the lookup refused the unqualified call already.
-                var blocks = _comp.Extensions.MethodsFor(ts)
-                    .Count(ext => ext.Symbol.Name == mem.Member && ext.InConformanceBlock);
-                foreach (var ext in _comp.Extensions.MethodsFor(ts))
-                    if (ext.Symbol.Name == mem.Member
-                        && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
-                        && MayName(ext.Symbol)
-                        && !(blocks > 1 && ext.InConformanceBlock)
-                        && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
-                        found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
-                return found;
-            }
+                return MemberOverloads(ts, mem.Member, withBlocks: true);
 
             default:
                 return [];
         }
     }
+
+    /// <summary>A type's members of one name, its own first, then its visible blocks' — the one
+    /// scope 08 §1.2 counts in. Members of several CONFORMANCE blocks are scoped to their
+    /// interfaces (04 D3), not a set to choose from: the lookup refused the unqualified call
+    /// already.</summary>
+    private List<OverloadCandidate> MemberOverloads(TypeSymbol ts, string member, bool withBlocks)
+    {
+        var found = ts.Members.OverloadsLocal(member).Where(MayName)
+            .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
+        if (!withBlocks) return found;
+        var scoped = ConformanceBlocksNaming(ts, member) > 1;
+        foreach (var ext in _comp.Extensions.MethodsFor(ts))
+            if (ext.Symbol.Name == member
+                && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
+                && MayName(ext.Symbol)
+                && !(scoped && ext.InConformanceBlock)
+                && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
+                found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
+        return found;
+    }
+
+    /// <summary>How many conformance BLOCKS implement a name — blocks, not members: one block that
+    /// holds the name at two counts is an overload set (08 §1.2), two blocks that hold it are the
+    /// scoped exception of 04 D3 (05 §3.4).</summary>
+    private int ConformanceBlocksNaming(TypeSymbol ts, string member) =>
+        _comp.Extensions.MethodsFor(ts)
+            .Where(ext => ext.Symbol.Name == member && ext.InConformanceBlock)
+            .Select(ext => ext.Block).Distinct().Count();
 
     /// <summary>One function a call could mean, and whether it came from an <c>extend</c> block
     /// rather than from the type itself. The second half decides only where the first cannot: an
@@ -6419,11 +6433,13 @@ public sealed class TypeChecker
         }
 
         // Two conformance blocks each implementing the name for their interface (04 D3): the
-        // name belongs to the block, and the unqualified call says nothing about which. Every
-        // other duplicate was refused at its declaration (LYR-SEM0121).
-        if (visible.Count > 1 && visible.All(v => v.InConformanceBlock))
+        // name belongs to the block, and the unqualified call says nothing about which. One block
+        // holding the name at two counts is an overload set the call's count settles (08 §1.2).
+        // Every other duplicate was refused at its declaration (LYR-SEM0121).
+        var blocks = visible.Select(v => v.Block).Distinct().ToList();
+        if (blocks.Count > 1 && visible.All(v => v.InConformanceBlock))
         {
-            var interfaces = visible.Select(v => Conformance.InterfaceOf(v.Block.Decl.Interfaces[0], _binding)?.Name ?? "?").ToList();
+            var interfaces = blocks.Select(b => Conformance.InterfaceOf(b.Decl.Interfaces[0], _binding)?.Name ?? "?").ToList();
             _de.Report("LYR-SEM0122", Severity.Error, span,
                 $"'{member}' is implemented on '{ts.Name}' for {string.Join(" and ", interfaces.Select(i => $"'{i}'"))} "
                 + $"separately — qualify the call: '{interfaces[0]}.{member}(…)'");

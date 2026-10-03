@@ -2,10 +2,12 @@
  * Expected: layout with byte length and a terminating NUL; a static literal works like a heap one;
  * concat, equality and byte-order comparison; the UTF-8 table accepts exactly the well-formed
  * sequences and names the first bad offset; integers round-trip through text including INT64_MIN
- * and INT64_MAX; parsing reports empty, invalid (with offset) and overflow. Prints "strings ok". */
+ * and INT64_MAX; a float's text reads back to the nearest value, '_' skipped, beyond the range an
+ * infinity. Prints "strings ok". */
 #include "lyr/lyr.h"
 #include "check.h"
 
+#include <math.h>
 #include <string.h>
 
 static const LyrStaticStr(sizeof("grüße")) greeting = LYR_STR_INIT("grüße");
@@ -61,23 +63,19 @@ static int64_t program(void) {
     CHECK(lyr_str_from_uint(UINT64_MAX)->len == 20);
     CHECK(strcmp(lyr_str_from_bool(true)->bytes, "true") == 0 && strcmp(lyr_str_from_bool(false)->bytes, "false") == 0);
 
-    /* text to integers */
-    int64_t v = 0;
-    CHECK(lyr_str_to_int(s("123"), 10, &v, &at) == LYR_PARSE_OK && v == 123);
-    CHECK(lyr_str_to_int(s("-9223372036854775808"), 10, &v, &at) == LYR_PARSE_OK && v == INT64_MIN);
-    CHECK(lyr_str_to_int(s("9223372036854775807"), 10, &v, &at) == LYR_PARSE_OK && v == INT64_MAX);
-    CHECK(lyr_str_to_int(s("+1_000_000"), 10, &v, &at) == LYR_PARSE_OK && v == 1000000);
-    CHECK(lyr_str_to_int(s("ff"), 16, &v, &at) == LYR_PARSE_OK && v == 255);
-    CHECK(lyr_str_to_int(s("-101"), 2, &v, &at) == LYR_PARSE_OK && v == -5);
-    CHECK(lyr_str_to_int(s(""), 10, &v, &at) == LYR_PARSE_EMPTY);
-    CHECK(lyr_str_to_int(s("-"), 10, &v, &at) == LYR_PARSE_INVALID && at == 1);
-    CHECK(lyr_str_to_int(s("12a"), 10, &v, &at) == LYR_PARSE_INVALID && at == 2);
-    CHECK(lyr_str_to_int(s(" 1"), 10, &v, &at) == LYR_PARSE_INVALID && at == 0);
-    CHECK(lyr_str_to_int(s("1__0"), 10, &v, &at) == LYR_PARSE_INVALID && at == 2);
-    CHECK(lyr_str_to_int(s("_1"), 10, &v, &at) == LYR_PARSE_INVALID && at == 0);
-    CHECK(lyr_str_to_int(s("1_"), 10, &v, &at) == LYR_PARSE_INVALID && at == 1);
-    CHECK(lyr_str_to_int(s("9223372036854775808"), 10, &v, &at) == LYR_PARSE_OVERFLOW);
-    CHECK(lyr_str_to_int(s("-9223372036854775809"), 10, &v, &at) == LYR_PARSE_OVERFLOW);
+    /* a float's text to its value: the form is std.core's to check, the value C's */
+    CHECK(lyr_str_to_float64(s("1.5")) == 1.5);
+    CHECK(lyr_str_to_float64(s("-0.1")) == -0.1);
+    CHECK(lyr_str_to_float64(s("1_000.25")) == 1000.25);
+    CHECK(lyr_str_to_float64(s("2.5e-3")) == 0.0025);
+    CHECK(lyr_str_to_float64(s("1e400")) == (double)INFINITY);
+    CHECK(lyr_str_to_float64(s("-inf")) == -(double)INFINITY);
+    double nan = lyr_str_to_float64(s("nan"));
+    CHECK(nan != nan);
+    CHECK(lyr_str_to_float32(s("0.1")) == 0.1f);
+    CHECK(lyr_str_to_float32(s("1e39")) == (float)INFINITY);
+    /* a copy beyond the stack buffer: 70 digits with '_' between pairs */
+    CHECK(lyr_str_to_float64(s("10_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00")) == 1e69);
 
     lyr_println(s("strings ok"));
     return 0;

@@ -1,6 +1,6 @@
 // std.core's numbers (design/v5/spec/10 B5): the tower, its static members, the defaults on it.
 import std.test { assertEq, assertTrue, assertFalse, assertNull, assertNotNull };
-import std.core { Num, Signed, Integer };
+import std.core { Signed };
 
 fn total<T :: [Num]>(xs: T[]): T {
     var sum = T.zero;
