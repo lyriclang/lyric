@@ -82,17 +82,27 @@ static int64_t program(void) {
         CHECK(LYR_CHAR_FROM_U32(last_scalar) == 0x10FFFF);
         CHECK(LYR_CHAR_FROM_U32(before_surrogates) == 0xD7FF && LYR_CHAR_FROM_U32(after_surrogates) == 0xE000);
 
-        /* text: shortest round trip, integral values without a fraction, the non-numbers */
+        /* text (10 B5 Z5): the shortest round trip, plain from 1e-4 to below 1e16 with .0 on an
+         * integral value, an exponent beyond; the non-numbers */
         CHECK(text_is(lyr_str_from_float(0.1), "0.1"));
-        CHECK(text_is(lyr_str_from_float(1.0), "1"));
-        CHECK(text_is(lyr_str_from_float(-0.0), "-0"));
+        CHECK(text_is(lyr_str_from_float(1.0), "1.0"));
+        CHECK(text_is(lyr_str_from_float(-0.0), "-0.0"));
+        CHECK(text_is(lyr_str_from_float(0.0), "0.0"));
+        CHECK(text_is(lyr_str_from_float(100.0), "100.0"));
+        CHECK(text_is(lyr_str_from_float(1234.5), "1234.5"));
+        CHECK(text_is(lyr_str_from_float(1e15), "1000000000000000.0"));
+        CHECK(text_is(lyr_str_from_float(1e16), "1e+16"));
+        CHECK(text_is(lyr_str_from_float(0.0001), "0.0001"));
+        CHECK(text_is(lyr_str_from_float(0.00001), "1e-05"));
+        CHECK(text_is(lyr_str_from_float(-1.5e-7), "-1.5e-07"));
         CHECK(text_is(lyr_str_from_float(0.1 + 0.2), "0.30000000000000004"));
         CHECK(text_is(lyr_str_from_float(1e21), "1e+21"));
         CHECK(text_is(lyr_str_from_float(1e-7), "1e-07"));
         CHECK(text_is(lyr_str_from_float(123456789012345680.0), "1.2345678901234568e+17"));
         CHECK(text_is(lyr_str_from_float(5e-324), "5e-324"));
         CHECK(text_is(lyr_str_from_float(1.7976931348623157e308), "1.7976931348623157e+308"));
-        CHECK(text_is(lyr_str_from_float(nan_value), "NaN"));
+        CHECK(text_is(lyr_str_from_float(nan_value), "nan"));
+        CHECK(text_is(lyr_str_from_float(-nan_value), "nan"));
         CHECK(text_is(lyr_str_from_float(huge * huge), "inf"));
         CHECK(text_is(lyr_str_from_float(-huge * huge), "-inf"));
         CHECK(text_is(lyr_str_from_char('A'), "A"));
