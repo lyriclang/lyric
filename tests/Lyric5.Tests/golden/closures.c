@@ -31,22 +31,23 @@ typedef struct lyr_ty23_ParseErrorKind_Invalid lyr_ty23_ParseErrorKind_Invalid;
 typedef struct lyr_ty24_ParseErrorKind_Overflow lyr_ty24_ParseErrorKind_Overflow;
 typedef struct lyr_vt_ty25 lyr_vt_ty25;
 const char lyr_ifid_ty25[] = "std.core.Error";
-typedef struct lyr_ty26_Ordering lyr_ty26_Ordering;
-typedef struct lyr_ty27_Ordering_Less lyr_ty27_Ordering_Less;
-typedef struct lyr_ty28_Ordering_Equal lyr_ty28_Ordering_Equal;
-typedef struct lyr_ty29_Ordering_Greater lyr_ty29_Ordering_Greater;
-typedef struct lyr_ty30_Exception lyr_ty30_Exception;
-typedef struct lyr_vt_ty31 lyr_vt_ty31;
-const char lyr_ifid_ty31[] = "std.core.Hasher";
-typedef struct lyr_ty32_Split lyr_ty32_Split;
-typedef struct lyr_ty33_Lines lyr_ty33_Lines;
-typedef struct lyr_ty34_StringBuilder lyr_ty34_StringBuilder;
-typedef struct lyr_ty35__env_std_core_StringBuilder_reserve_ lyr_ty35__env_std_core_StringBuilder_reserve_;
-typedef struct lyr_ty36_Chars lyr_ty36_Chars;
-typedef struct lyr_ty37_Sip lyr_ty37_Sip;
-typedef struct lyr_ty38_DefaultHasher lyr_ty38_DefaultHasher;
-typedef struct lyr_ty39_FixedHasher lyr_ty39_FixedHasher;
-typedef struct lyr_ty40_Fnv1a64 lyr_ty40_Fnv1a64;
+typedef struct lyr_ty26_FormatSpec lyr_ty26_FormatSpec;
+typedef struct lyr_ty27_Chars lyr_ty27_Chars;
+typedef struct lyr_ty28_StringBuilder lyr_ty28_StringBuilder;
+typedef struct lyr_ty29_Ordering lyr_ty29_Ordering;
+typedef struct lyr_ty30_Ordering_Less lyr_ty30_Ordering_Less;
+typedef struct lyr_ty31_Ordering_Equal lyr_ty31_Ordering_Equal;
+typedef struct lyr_ty32_Ordering_Greater lyr_ty32_Ordering_Greater;
+typedef struct lyr_ty33_Exception lyr_ty33_Exception;
+typedef struct lyr_vt_ty34 lyr_vt_ty34;
+const char lyr_ifid_ty34[] = "std.core.Hasher";
+typedef struct lyr_ty35_Split lyr_ty35_Split;
+typedef struct lyr_ty36_Lines lyr_ty36_Lines;
+typedef struct lyr_ty37__env_std_core_StringBuilder_reserve_ lyr_ty37__env_std_core_StringBuilder_reserve_;
+typedef struct lyr_ty38_Sip lyr_ty38_Sip;
+typedef struct lyr_ty39_DefaultHasher lyr_ty39_DefaultHasher;
+typedef struct lyr_ty40_FixedHasher lyr_ty40_FixedHasher;
+typedef struct lyr_ty41_Fnv1a64 lyr_ty41_Fnv1a64;
 struct lyr_ty0__tuple_ {
     int64_t f_0;
     int64_t f_1;
@@ -202,29 +203,53 @@ struct lyr_vt_ty25 {
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-struct lyr_ty27_Ordering_Less {
+struct lyr_ty26_FormatSpec {
+    uint32_t f_fill;
+    uint32_t f_align;
+    uint8_t f_plus;
+    uint8_t f_alternate;
+    int64_t f_width;
+    uint32_t f_grouping;
+    int64_t f_precision;
+    uint32_t f_kind;
+};
+struct lyr_ty27_Chars {
+    LyrStr *f_s;
+    int64_t f_at;
+};
+struct lyr_ty28_StringBuilder {
+    LyrObj header;
+    LyrArr *f_bytes;
+    int64_t f_count;
+};
+_Static_assert(sizeof(lyr_ty28_StringBuilder) == 24, "layout of lyr_ty28_StringBuilder");
+_Static_assert(offsetof(lyr_ty28_StringBuilder, f_bytes) == 8, "layout of lyr_ty28_StringBuilder");
+_Static_assert(offsetof(lyr_ty28_StringBuilder, f_count) == 16, "layout of lyr_ty28_StringBuilder");
+static const uint64_t lyr_refmap_ty28[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty28_StringBuilder = { sizeof(lyr_ty28_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty28, "std.core.StringBuilder", NULL };
+struct lyr_ty30_Ordering_Less {
     uint8_t lyr_unit;
 };
-struct lyr_ty28_Ordering_Equal {
+struct lyr_ty31_Ordering_Equal {
     uint8_t lyr_unit;
 };
-struct lyr_ty29_Ordering_Greater {
+struct lyr_ty32_Ordering_Greater {
     uint8_t lyr_unit;
 };
-struct lyr_ty26_Ordering { uint32_t tag; };
-_Static_assert(sizeof(lyr_ty26_Ordering) == 4, "layout of lyr_ty26_Ordering");
+struct lyr_ty29_Ordering { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty29_Ordering) == 4, "layout of lyr_ty29_Ordering");
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface25;
-struct lyr_ty30_Exception {
+struct lyr_ty33_Exception {
     LyrObj header;
     LyrStr *f_text;
     lyr_opt_iface25 f_inner;
 };
-_Static_assert(sizeof(lyr_ty30_Exception) == 40, "layout of lyr_ty30_Exception");
-_Static_assert(offsetof(lyr_ty30_Exception, f_text) == 8, "layout of lyr_ty30_Exception");
-_Static_assert(offsetof(lyr_ty30_Exception, f_inner) == 16, "layout of lyr_ty30_Exception");
-static const uint64_t lyr_refmap_ty30[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty30_Exception = { sizeof(lyr_ty30_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty30, "std.core.Exception", NULL };
-struct lyr_vt_ty31 {
+_Static_assert(sizeof(lyr_ty33_Exception) == 40, "layout of lyr_ty33_Exception");
+_Static_assert(offsetof(lyr_ty33_Exception, f_text) == 8, "layout of lyr_ty33_Exception");
+_Static_assert(offsetof(lyr_ty33_Exception, f_inner) == 16, "layout of lyr_ty33_Exception");
+static const uint64_t lyr_refmap_ty33[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty33_Exception = { sizeof(lyr_ty33_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty33, "std.core.Exception", NULL };
+struct lyr_vt_ty34 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
@@ -232,41 +257,27 @@ struct lyr_vt_ty31 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
-struct lyr_ty32_Split {
+struct lyr_ty35_Split {
     LyrStr *f_s;
     LyrStr *f_sep;
     int64_t f_at;
     uint8_t f_done;
 };
-struct lyr_ty33_Lines {
+struct lyr_ty36_Lines {
     LyrStr *f_s;
     int64_t f_at;
 };
-struct lyr_ty34_StringBuilder {
-    LyrObj header;
-    LyrArr *f_bytes;
-    int64_t f_count;
-};
-_Static_assert(sizeof(lyr_ty34_StringBuilder) == 24, "layout of lyr_ty34_StringBuilder");
-_Static_assert(offsetof(lyr_ty34_StringBuilder, f_bytes) == 8, "layout of lyr_ty34_StringBuilder");
-_Static_assert(offsetof(lyr_ty34_StringBuilder, f_count) == 16, "layout of lyr_ty34_StringBuilder");
-static const uint64_t lyr_refmap_ty34[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty34_StringBuilder = { sizeof(lyr_ty34_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty34, "std.core.StringBuilder", NULL };
-struct lyr_ty35__env_std_core_StringBuilder_reserve_ {
+struct lyr_ty37__env_std_core_StringBuilder_reserve_ {
     LyrObj header;
     int64_t f_kept;
     LyrArr *f_old;
 };
-_Static_assert(sizeof(lyr_ty35__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty35__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
-_Static_assert(offsetof(lyr_ty35__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty35__env_std_core_StringBuilder_reserve_");
-static const uint64_t lyr_refmap_ty35[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty35__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty35__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty35, "<env:std.core.StringBuilder.reserve>", NULL };
-struct lyr_ty36_Chars {
-    LyrStr *f_s;
-    int64_t f_at;
-};
-struct lyr_ty37_Sip {
+_Static_assert(sizeof(lyr_ty37__env_std_core_StringBuilder_reserve_) == 24, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty37__env_std_core_StringBuilder_reserve_, f_kept) == 8, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
+_Static_assert(offsetof(lyr_ty37__env_std_core_StringBuilder_reserve_, f_old) == 16, "layout of lyr_ty37__env_std_core_StringBuilder_reserve_");
+static const uint64_t lyr_refmap_ty37[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_ty37__env_std_core_StringBuilder_reserve_ = { sizeof(lyr_ty37__env_std_core_StringBuilder_reserve_), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty37, "<env:std.core.StringBuilder.reserve>", NULL };
+struct lyr_ty38_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -275,13 +286,13 @@ struct lyr_ty37_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty38_DefaultHasher {
-    lyr_ty37_Sip f_state;
+struct lyr_ty39_DefaultHasher {
+    lyr_ty38_Sip f_state;
 };
-struct lyr_ty39_FixedHasher {
-    lyr_ty37_Sip f_state;
+struct lyr_ty40_FixedHasher {
+    lyr_ty38_Sip f_state;
 };
-struct lyr_ty40_Fnv1a64 {
+struct lyr_ty41_Fnv1a64 {
     uint64_t f_state;
 };
 typedef struct { void (*fn)(void *, lyr_ty0__tuple_, LyrErr **); void *env; } lyr_fn_ty0_to_void;

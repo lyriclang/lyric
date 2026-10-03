@@ -2015,6 +2015,346 @@ pub class StringBuilder {
     }
 }
 
+// --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
+
+/// A type with formats of its own (10 S7): `{x:spec}` hands it the spec as written. The scalars
+/// conform with the format language, which the compiler checks where a spec is written; `string`
+/// stands where `StringView` will.
+pub interface Format {
+    fn format(spec: string, &out: StringBuilder): void;
+}
+
+/// What `{x:spec}` compiles to for a `Format` type (12 §2 rule 4): `x` in the spec's format.
+pub fn formatted<T :: [Format]>(value: T, spec: string): string {
+    var out = StringBuilder.new();
+    value.format(spec, &out);
+    return out.toString();
+}
+
+/// What `{x:spec}` compiles to for another `Display` type (12 §2 rule 4): `show()` in the spec's
+/// width, alignment and fill.
+pub fn padded<T :: [Display]>(value: T, spec: string): string {
+    var out = StringBuilder.new();
+    pad(value.show(), readSpec(spec), '<', &out);
+    return out.toString();
+}
+
+/// What `{x:?}` compiles to (12 §2 rule 4): `debug()` in the width, alignment and fill before the
+/// `?`.
+pub fn debugged<T :: [Debug]>(value: T, spec: string): string {
+    var out = StringBuilder.new();
+    pad(value.debug(), readSpec(spec), '<', &out);
+    return out.toString();
+}
+
+/// A spec read (12 §2 rule 1): `[[fill]align][sign][#][0][width][grouping][.precision][type]`.
+/// `align` is `<`, `>`, `^`, `=` for the zeros of `0` after the sign, or `'\0'` for the value's
+/// own; `grouping` and `kind` are `'\0'` where none is written, `precision` -1.
+struct FormatSpec {
+    fill: char,
+    align: char,
+    plus: bool,
+    alternate: bool,
+    width: int,
+    grouping: char,
+    precision: int,
+    kind: char,
+}
+
+/// The spec in `text`. The compiler checked a spec an f-string writes; what is no spec panics.
+fn readSpec(text: string): FormatSpec {
+    let cs = text.chars().toArray();
+    let n = cs.length();
+    var i = 0;
+    var fill = ' ';
+    var fillWritten = false;
+    var align = '\0';
+    if (n >= 2 && isAlignment(cs[1])) {
+        fill = cs[0];
+        fillWritten = true;
+        align = cs[1];
+        i = 2;
+    } else if (n >= 1 && isAlignment(cs[0])) {
+        align = cs[0];
+        i = 1;
+    }
+    var plus = false;
+    if (i < n && (cs[i] == '+' || cs[i] == '-')) {
+        plus = cs[i] == '+';
+        i = i + 1;
+    }
+    var alternate = false;
+    if (i < n && cs[i] == '#') {
+        alternate = true;
+        i = i + 1;
+    }
+    if (i < n && cs[i] == '0') {
+        if (!fillWritten) {
+            fill = '0';
+        }
+        if (align == '\0') {
+            align = '=';
+        }
+        i = i + 1;
+    }
+    var width = 0;
+    while (i < n && isDecimal(cs[i])) {
+        width = width * 10 + decimalOf(cs[i]);
+        i = i + 1;
+    }
+    var grouping = '\0';
+    if (i < n && (cs[i] == ',' || cs[i] == '_')) {
+        grouping = cs[i];
+        i = i + 1;
+    }
+    var precision = -1;
+    if (i < n && cs[i] == '.') {
+        i = i + 1;
+        precision = 0;
+        while (i < n && isDecimal(cs[i])) {
+            precision = precision * 10 + decimalOf(cs[i]);
+            i = i + 1;
+        }
+    }
+    var kind = '\0';
+    if (i < n) {
+        kind = cs[i];
+        i = i + 1;
+    }
+    if (i != n) {
+        panic(f"'{text}' is no format spec");
+    }
+    return FormatSpec { fill = fill, align = align, plus = plus, alternate = alternate, width = width,
+        grouping = grouping, precision = precision, kind = kind };
+}
+
+fn isAlignment(c: char): bool {
+    return c == '<' || c == '>' || c == '^';
+}
+
+fn isDecimal(c: char): bool {
+    return c >= '0' && c <= '9';
+}
+
+fn decimalOf(c: char): int {
+    return (c.toUint32() as int) - 48;
+}
+
+/// `text` in the spec's width, counted in characters: the fill before it, after it, or around it
+/// (the odd one after), as the spec aligns it or else as `natural` does.
+fn pad(text: string, s: FormatSpec, natural: char, &out: StringBuilder): void {
+    let room = s.width - text.charCount();
+    if (room <= 0) {
+        out.appendStr(text);
+        return;
+    }
+    let align = if (s.align == '\0') natural else s.align;
+    let before = if (align == '>') room else if (align == '^') room / 2 else 0;
+    fillOut(s.fill, before, &out);
+    out.appendStr(text);
+    fillOut(s.fill, room - before, &out);
+}
+
+/// `count` times `c`.
+fn fillOut(c: char, count: int, &out: StringBuilder): void {
+    var i = 0;
+    while (i < count) {
+        out.appendChar(c);
+        i = i + 1;
+    }
+}
+
+/// A number's parts in the spec's width: under `0` the zeros between the sign and the prefix and
+/// the digits; otherwise the whole padded, right-aligned unless the spec aligns it.
+fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, &out: StringBuilder): void {
+    if (s.align == '=') {
+        out.appendStr(sign);
+        out.appendStr(prefix);
+        fillOut(s.fill, s.width - byteCount(sign) - byteCount(prefix) - digits.charCount(), &out);
+        out.appendStr(digits);
+        return;
+    }
+    pad(sign + prefix + digits, s, '>', &out);
+}
+
+/// An integer by its sign and magnitude (12 §2 rule 3): the radix `b`, `o`, `x` or `X` names, the
+/// prefix under `#`, the digits grouped by three (decimal) or four (another radix).
+fn formatInteger(negative: bool, magnitude: uint, spec: string, &out: StringBuilder): void {
+    let s = readSpec(spec);
+    let radix = if (s.kind == 'b') 2 else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
+    var prefix = "";
+    if (s.alternate) {
+        prefix = if (s.kind == 'b') "0b" else if (s.kind == 'o') "0o" else if (s.kind == 'X') "0X" else "0x";
+    }
+    let sign = if (negative) "-" else if (s.plus) "+" else "";
+    let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, if (radix == 10) 3 else 4);
+    finishNumber(sign, prefix, digits, s, &out);
+}
+
+/// A signed integer: its magnitude in `uint`, where `int`'s least value has one.
+fn formatSigned(v: int, spec: string, &out: StringBuilder): void {
+    let magnitude = if (v < 0) (-(v + 1)) as uint + 1 else v as uint;
+    formatInteger(v < 0, magnitude, spec, &out);
+}
+
+/// The digits of `magnitude` in `radix`, most significant first, `grouping` between each `size`
+/// of them from the right.
+fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int): string {
+    var count = 1;
+    var rest = magnitude / radix;
+    while (rest != 0) {
+        count = count + 1;
+        rest = rest / radix;
+    }
+    let separators = if (grouping == '\0') 0 else (count - 1) / size;
+    let total = count + separators;
+    let zero: uint8 = 0;
+    let bytes = [zero] * total;
+    var at = total - 1;
+    var value = magnitude;
+    var placed = 0;
+    while (true) {
+        let d = (value % radix) as int;
+        bytes[at] = (if (d < 10) 48 + d else if (upper) 55 + d else 87 + d) as uint8;
+        at = at - 1;
+        placed = placed + 1;
+        value = value / radix;
+        if (value == 0) {
+            break;
+        }
+        if (grouping != '\0' && placed % size == 0) {
+            bytes[at] = grouping.toUint32() as uint8;
+            at = at - 1;
+        }
+    }
+    return stringOfBytes(bytes, total);
+}
+
+/// A float (12 §2 rule 3): its shortest text without a precision or a type (03 §1.7); fixed with a
+/// precision; `e`/`E` with an exponent; `%` a hundredfold and fixed — six digits where those three
+/// name none. Its sign, the integer part grouped, padded.
+fn formatFloat(v: float, spec: string, &out: StringBuilder): void {
+    let s = readSpec(spec);
+    let digits = if (s.precision < 0) 6 else s.precision;
+    var text = "";
+    if (s.kind == 'e') {
+        text = floatText(v, digits, 1);
+    } else if (s.kind == 'E') {
+        text = floatText(v, digits, 2);
+    } else if (s.kind == '%') {
+        text = floatText(v * 100.0, digits, 0) + "%";
+    } else if (s.kind == 'f' || s.precision >= 0) {
+        text = floatText(v, digits, 0);
+    } else {
+        text = f"{v}";
+    }
+    let negative = text.startsWith("-");
+    let body = if (negative) byteSlice(text, 1, byteCount(text)) else text;
+    finishNumber(if (negative) "-" else if (s.plus) "+" else "", "", grouped(body, s.grouping), s, &out);
+}
+
+/// `body`'s leading digits, a float's integer part, with `grouping` between each three.
+fn grouped(body: string, grouping: char): string {
+    let n = byteCount(body);
+    var end = 0;
+    while (end < n && byteAt(body, end) >= 48 && byteAt(body, end) <= 57) {
+        end = end + 1;
+    }
+    if (grouping == '\0' || end <= 3) {
+        return body;
+    }
+    let out = StringBuilder.new();
+    var i = 0;
+    while (i < end) {
+        if (i > 0 && (end - i) % 3 == 0) {
+            out.appendChar(grouping);
+        }
+        out.appendStr(byteSlice(body, i, i + 1));
+        i = i + 1;
+    }
+    out.appendStr(byteSlice(body, end, n));
+    return out.toString();
+}
+
+/// The first `count` characters of `text`, or all of them: cut where the next one starts, at a
+/// byte that is no continuation byte (`10xxxxxx`).
+fn firstChars(text: string, count: int): string {
+    let n = byteCount(text);
+    var at = 0;
+    var taken = 0;
+    while (at < n) {
+        if ((byteAt(text, at) & 192) != 128) {
+            if (taken == count) {
+                return byteSlice(text, 0, at);
+            }
+            taken = taken + 1;
+        }
+        at = at + 1;
+    }
+    return text;
+}
+
+/// A float with a precision, rounded by C (12 §2 rule 3): `form` 0 fixed, 1 with an exponent, 2 the
+/// same upper case.
+fn floatText(value: float, precision: int, form: int): string;
+
+extend int :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatSigned(this, spec, &out); }
+}
+
+extend int8 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+}
+
+extend int16 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+}
+
+extend int32 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+}
+
+extend uint :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this, spec, &out); }
+}
+
+extend uint8 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+}
+
+extend uint16 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+}
+
+extend uint32 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+}
+
+extend float :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatFloat(this, spec, &out); }
+}
+
+/// A `float32` is written as the `float` it widens to (03 §1.7).
+extend float32 :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { formatFloat(this as float, spec, &out); }
+}
+
+/// A string: fill, alignment, width, and the precision as the most characters it keeps.
+extend string :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void {
+        let s = readSpec(spec);
+        pad(if (s.precision >= 0) firstChars(this, s.precision) else this, s, '<', &out);
+    }
+}
+
+extend char :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+}
+
+extend bool :: [Format] {
+    fn format(spec: string, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+}
+
 /// Whether `p`'s bytes stand in `s` from byte `at` on.
 fn matchesAt(s: string, p: string, at: int): bool {
     let n = byteCount(p);

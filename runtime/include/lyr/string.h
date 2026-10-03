@@ -44,6 +44,10 @@ LyrStr *lyr_str_from_float(double value);
 /* The character as a string of one code point, UTF-8 encoded. The value is a Unicode scalar
  * value by the type's invariant (numeric.h checks the one conversion that could break it). */
 LyrStr *lyr_str_from_char(uint32_t value);
+/* A float with a precision (08 Y7; spec 12 §2): form 0 fixed (`%.*f`), 1 with an exponent (`%.*e`),
+ * 2 the same in upper case (`%.*E`) — rounded to nearest on the exact binary value. `nan` (`NAN`),
+ * `inf` and `-inf` keep their words. */
+LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form);
 
 /* The float a text names, the nearest one (10 B5 Z6): a text whose form std.core checked — sign,
  * digits, '.', exponent, `inf`, `nan` — with the '_' between digits skipped; strtod and strtof round
