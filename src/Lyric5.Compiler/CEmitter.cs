@@ -1302,7 +1302,13 @@ public sealed class CEmitter
         if (function.Throws || TakesEnvironment(function)) parameters.Add("LyrErr **lyr_err");
         // External linkage: an instance's unit calls the module's functions and the module the
         // instance's, and the names are unique by construction (01 C3, C4).
-        return $"{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
+        //
+        // The program's main stays a frame of its own: 'lyr_entry' calls it, and a trace ends at
+        // lyr_entry's frame — main folded into it took the program's frames with it (Windows,
+        // whose symbolizer gives the physical frame before the inlined ones).
+        var keep = _module.EntryFunction is { } entry && ReferenceEquals(_module.Functions[entry.Value], function)
+            ? "LYR_NOINLINE " : "";
+        return $"{keep}{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
     }
 
     /// <summary>Whether a function handles errors at all: the in-flight error local exists only

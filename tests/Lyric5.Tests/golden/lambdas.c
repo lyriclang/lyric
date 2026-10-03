@@ -100,6 +100,12 @@ const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_AR
 _Static_assert(sizeof(lyr_ty0__tuple_) == 16, "layout of <tuple>[]");
 const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0__tuple_), 0, NULL, "<tuple>[]", NULL };
 
+/* module-level bindings */
+double lyr_g0_float_infinity = 0;
+double lyr_g1_float_nan = 0;
+float lyr_g2_float32_infinity = 0;
+float lyr_g3_float32_nan = 0;
+
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("forms ");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
@@ -114,7 +120,7 @@ int64_t lyr_main_run(lyr_fn_to_i64 l0_f);
 int64_t lyr_main_fold(LyrArr *l0_xs, int64_t l1_seed, lyr_fn_i64_i64_to_i64 l2_f);
 void lyr_main_each(LyrArr *l0_xs, lyr_fn_i64_to_void l1_f);
 int64_t lyr_main_pairs(LyrArr *l0_ps, lyr_fn_i64_ty0_to_i64 l1_f);
-int64_t lyr_main_main(void);
+LYR_NOINLINE int64_t lyr_main_main(void);
 int64_t lyr_main_Pt_scaled(lyr_ty3_Pt *l0_this, int64_t l1_k);
 int64_t lyr_main_main__lambda0__1de246d4(int64_t l0_n);
 int64_t lyr_main_main__lambda1__1fe48891(int64_t l0_n);
@@ -127,6 +133,9 @@ int64_t lyr_main_main__lambda7__9fd64787(int64_t l0_acc, lyr_ty0__tuple_ l1__);
 int64_t lyr_main_main__lambda8__1df5ce8c(int64_t l0_acc, lyr_ty0__tuple_ l1__);
 int64_t lyr_main_main__bound_scaled0__6172adff(void *lyr_env, int64_t l1_p0, LyrErr **lyr_err);
 int64_t lyr_main_main__bound_scaled1__5f706c42(void *lyr_env, int64_t l1_p0, LyrErr **lyr_err);
+void lyr__globals__9ee5f9b5(void);
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* thunks: a function as a value, without an environment */
 static int64_t lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_main__lambda0__1de246d4(l0_n); }
@@ -422,7 +431,7 @@ bb4:;
 }
 
 #line 29 "programs/lambdas.lyr"
-int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_main_main(void) {
     lyr_fn_i64_to_i64 l0_long = {0};
     int64_t l1_a = 0;
     int64_t l2_b = 0;
@@ -1096,6 +1105,77 @@ bb0:;
     return t3;
 }
 
+#line 1192 "stdlib5/std/core.lyr"
+void lyr__globals__9ee5f9b5(void) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    uint64_t t2 = 0;
+    double t3 = 0;
+    uint64_t t4 = 0;
+    float t5 = 0;
+    uint64_t t6 = 0;
+    float t7 = 0;
+bb0:;
+#line 1192
+    t0 = (uint64_t)UINT64_C(9218868437227405312);
+#line 1192
+    t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
+#line 1192
+    lyr_g0_float_infinity = t1;
+#line 1193
+    t2 = (uint64_t)UINT64_C(9221120237041090560);
+#line 1193
+    t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
+#line 1193
+    lyr_g1_float_nan = t3;
+#line 1213
+    t4 = (uint64_t)UINT64_C(2139095040);
+#line 1213
+    t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
+#line 1213
+    lyr_g2_float32_infinity = t5;
+#line 1214
+    t6 = (uint64_t)UINT64_C(2143289344);
+#line 1214
+    t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
+#line 1214
+    lyr_g3_float32_nan = t7;
+    return;
+}
+
+#line 1199 "stdlib5/std/core.lyr"
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    double t2 = 0;
+bb0:;
+#line 1199
+    t0 = l0_b;
+#line 1189
+    t1 = (double)0.0;
+#line 1199
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1199
+    return t2;
+}
+
+#line 1220 "stdlib5/std/core.lyr"
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    float t1 = 0;
+    float t2 = 0;
+bb0:;
+#line 1220
+    t0 = l0_b;
+#line 1210
+    t1 = (float)0.0;
+#line 1220
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1220
+    return t2;
+}
+
 
 /* the program */
-int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

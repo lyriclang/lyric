@@ -664,9 +664,12 @@ pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<
 
 /// A number with a sign: the signed integers and the floats. `uint` has no `abs`.
 pub interface Signed :: [Num, Neg<Out = Self>] {
-    /// The value without its sign.
+    /// The value without its sign: `0.0` for `-0.0`, which `<` does not tell from `0.0`.
     fn abs(): Self {
-        return if (this < Self.zero) -this else this;
+        if (this < Self.zero) {
+            return -this;
+        }
+        return if (this == Self.zero) Self.zero else this;
     }
 
     /// `-1`, `0` or `1` as a value of the type; a float's NaN stays NaN.
@@ -829,6 +832,207 @@ fn countTrailingZeros<T>(x: T): int;
 fn countOnes<T>(x: T): int;
 fn rotateBitsLeft<T>(x: T, n: int): T;
 
+/// The two float types (10 B5 Z1, Z2): what describes the type is a static member, the elementary
+/// functions are methods — defaults written once over `Self`, computed in `float` by C's libm, so a
+/// `float32` is rounded once, at the end.
+pub interface Float :: [Signed] {
+    /// The distance from `1.0` to the next value above it.
+    static let epsilon: Self;
+    static let infinity: Self;
+    /// The quiet NaN with its sign clear — what `0.0 / 0.0` gives has the sign the hardware sets.
+    static let nan: Self;
+    /// The most negative finite value.
+    static let min: Self;
+    /// The greatest finite value.
+    static let max: Self;
+    /// The least positive value, a subnormal.
+    static let leastPositive: Self;
+
+    /// The value a bit pattern names: a `float` its 64 bits, a `float32` the low 32.
+    static fn fromBits(b: uint64): Self;
+
+    /// Whether this is NaN, the one value unequal to itself.
+    fn isNan(): bool {
+        return this != this;
+    }
+
+    /// Whether this is an infinity, of either sign.
+    fn isInfinite(): bool {
+        return this == Self.infinity || this == -Self.infinity;
+    }
+
+    /// Whether this is neither NaN nor an infinity.
+    fn isFinite(): bool {
+        return !this.isNan() && !this.isInfinite();
+    }
+
+    /// The greatest integral value not above this.
+    fn floor(): Self {
+        return this.narrowed(libmFloor(this.widened()));
+    }
+
+    /// The least integral value not below this.
+    fn ceil(): Self {
+        return this.narrowed(libmCeil(this.widened()));
+    }
+
+    /// The nearest integral value, a half away from zero.
+    fn round(): Self {
+        return this.narrowed(libmRound(this.widened()));
+    }
+
+    /// The integral part, toward zero.
+    fn trunc(): Self {
+        return this.narrowed(libmTrunc(this.widened()));
+    }
+
+    /// The square root; NaN below zero.
+    fn sqrt(): Self {
+        return this.narrowed(libmSqrt(this.widened()));
+    }
+
+    /// The cube root.
+    fn cbrt(): Self {
+        return this.narrowed(libmCbrt(this.widened()));
+    }
+
+    /// *e* to this power.
+    fn exp(): Self {
+        return this.narrowed(libmExp(this.widened()));
+    }
+
+    /// The natural logarithm; NaN below zero, `-infinity` at zero.
+    fn ln(): Self {
+        return this.narrowed(libmLn(this.widened()));
+    }
+
+    /// The logarithm to base 2.
+    fn log2(): Self {
+        return this.narrowed(libmLog2(this.widened()));
+    }
+
+    /// The logarithm to base 10.
+    fn log10(): Self {
+        return this.narrowed(libmLog10(this.widened()));
+    }
+
+    /// The sine, this in radians.
+    fn sin(): Self {
+        return this.narrowed(libmSin(this.widened()));
+    }
+
+    /// The cosine.
+    fn cos(): Self {
+        return this.narrowed(libmCos(this.widened()));
+    }
+
+    /// The tangent.
+    fn tan(): Self {
+        return this.narrowed(libmTan(this.widened()));
+    }
+
+    /// The arcsine, in radians.
+    fn asin(): Self {
+        return this.narrowed(libmAsin(this.widened()));
+    }
+
+    /// The arccosine.
+    fn acos(): Self {
+        return this.narrowed(libmAcos(this.widened()));
+    }
+
+    /// The arctangent.
+    fn atan(): Self {
+        return this.narrowed(libmAtan(this.widened()));
+    }
+
+    /// The hyperbolic sine.
+    fn sinh(): Self {
+        return this.narrowed(libmSinh(this.widened()));
+    }
+
+    /// The hyperbolic cosine.
+    fn cosh(): Self {
+        return this.narrowed(libmCosh(this.widened()));
+    }
+
+    /// The hyperbolic tangent.
+    fn tanh(): Self {
+        return this.narrowed(libmTanh(this.widened()));
+    }
+
+    /// The angle of the point (this, y) from the positive x axis, in radians, -π to π.
+    fn atan2(y: Self): Self {
+        return this.narrowed(libmAtan2(y.widened(), this.widened()));
+    }
+
+    /// The length of the hypotenuse, without the overflow of `sqrt(this * this + o * o)`.
+    fn hypot(o: Self): Self {
+        return this.narrowed(libmHypot(this.widened(), o.widened()));
+    }
+
+    /// This to the power `e`.
+    fn pow(e: Self): Self {
+        return this.narrowed(libmPow(this.widened(), e.widened()));
+    }
+
+    /// IEEE 754's total order, for sorting: -NaN, -infinity, the negatives, -0.0, 0.0, the
+    /// positives, infinity, NaN — every value in its one place.
+    fn totalCompare(o: Self): Ordering {
+        let a = totalOrderKey(this);
+        let b = totalOrderKey(o);
+        if (a < b) {
+            return Ordering.Less;
+        }
+        if (a > b) {
+            return Ordering.Greater;
+        }
+        return Ordering.Equal;
+    }
+
+    /// The bit pattern: a `float` its 64 bits, a `float32` its 32 in the low ones.
+    fn toBits(): uint64 {
+        return floatBits(this);
+    }
+
+    /// This as a `float`, exactly.
+    private fn widened(): float {
+        return asTypeOf(this, 0.0);
+    }
+
+    /// A `float` as this type: rounded to the nearest for a `float32`.
+    private fn narrowed(x: float): Self {
+        return asTypeOf(x, this);
+    }
+}
+
+// The C functions the defaults stand on, libm's in double (11 W4), and the bits as macros.
+extern "C" fn libmFloor(x: float): float = "floor";
+extern "C" fn libmCeil(x: float): float = "ceil";
+extern "C" fn libmRound(x: float): float = "round";
+extern "C" fn libmTrunc(x: float): float = "trunc";
+extern "C" fn libmSqrt(x: float): float = "sqrt";
+extern "C" fn libmCbrt(x: float): float = "cbrt";
+extern "C" fn libmExp(x: float): float = "exp";
+extern "C" fn libmLn(x: float): float = "log";
+extern "C" fn libmLog2(x: float): float = "log2";
+extern "C" fn libmLog10(x: float): float = "log10";
+extern "C" fn libmSin(x: float): float = "sin";
+extern "C" fn libmCos(x: float): float = "cos";
+extern "C" fn libmTan(x: float): float = "tan";
+extern "C" fn libmAsin(x: float): float = "asin";
+extern "C" fn libmAcos(x: float): float = "acos";
+extern "C" fn libmAtan(x: float): float = "atan";
+extern "C" fn libmSinh(x: float): float = "sinh";
+extern "C" fn libmCosh(x: float): float = "cosh";
+extern "C" fn libmTanh(x: float): float = "tanh";
+extern "C" fn libmAtan2(y: float, x: float): float = "atan2";
+extern "C" fn libmHypot(x: float, y: float): float = "hypot";
+extern "C" fn libmPow(x: float, e: float): float = "pow";
+fn floatBits<T>(x: T): uint64;
+fn floatFromBits<T>(b: uint64, like: T): T;
+fn totalOrderKey<T>(x: T): uint64;
+
 extend int :: [Num, Signed, Integer] {
     static let zero: int = 0;
     static let one: int = 1;
@@ -981,9 +1185,19 @@ extend uint32 :: [Num, Integer] {
     }
 }
 
-extend float :: [Num, Signed] {
+extend float :: [Num, Signed, Float] {
     static let zero: float = 0.0;
     static let one: float = 1.0;
+    static let epsilon: float = 2.220446049250313e-16;
+    static let infinity: float = float.fromBits(0x7FF0000000000000);
+    static let nan: float = float.fromBits(0x7FF8000000000000);
+    static let min: float = -1.7976931348623157e308;
+    static let max: float = 1.7976931348623157e308;
+    static let leastPositive: float = 5e-324;
+
+    static fn fromBits(b: uint64): float {
+        return floatFromBits(b, float.zero);
+    }
 
     /// The float a text names, the nearest one (`Parse`).
     static fn parse(s: string): float throws ParseError {
@@ -992,9 +1206,19 @@ extend float :: [Num, Signed] {
     }
 }
 
-extend float32 :: [Num, Signed] {
+extend float32 :: [Num, Signed, Float] {
     static let zero: float32 = 0.0;
     static let one: float32 = 1.0;
+    static let epsilon: float32 = 1.1920928955078125e-7;
+    static let infinity: float32 = float32.fromBits(0x7F800000);
+    static let nan: float32 = float32.fromBits(0x7FC00000);
+    static let min: float32 = -3.4028234663852886e38;
+    static let max: float32 = 3.4028234663852886e38;
+    static let leastPositive: float32 = 1.401298464324817e-45;
+
+    static fn fromBits(b: uint64): float32 {
+        return floatFromBits(b, float32.zero);
+    }
 
     /// The float a text names, the nearest one (`Parse`).
     static fn parse(s: string): float32 throws ParseError {
@@ -1063,7 +1287,7 @@ fn parseInteger<T :: [Integer]>(s: string, radix: int): T throws ParseError {
     if (i == n || (negative && !T.isSigned)) {
         throw ParseError { kind = ParseErrorKind.Invalid };
     }
-    let base = convertWrapping(radix, T.zero);
+    let base = asTypeOf(radix, T.zero);
     var value = T.zero;
     var overflowed = false;
     var afterDigit = false;
@@ -1083,7 +1307,7 @@ fn parseInteger<T :: [Integer]>(s: string, radix: int): T throws ParseError {
         }
         afterDigit = true;
         if (!overflowed) {
-            let digit = convertWrapping(d, T.zero);
+            let digit = asTypeOf(d, T.zero);
             let scaled = value.checkedMul(base);
             if (scaled == null) {
                 overflowed = true;
@@ -1190,11 +1414,11 @@ fn isWord(s: string, i: int, a: int, b: int, c: int): bool {
 }
 
 // The natives parsing stands on: a string's length and bytes until `StringView` gives the library
-// its bytes (M8a S8), a number converted as `as` converts it (03 T1d) where the target is a
-// parameter, a float's text read by C (`strtod`, `strtof`) once its form is checked.
+// its bytes (M8a S8), a number converted as `as` converts it (03 T1d) to the type of `like` where
+// that is a parameter's, a float's text read by C (`strtod`, `strtof`) once its form is checked.
 fn byteCount(s: string): int;
 fn byteAt(s: string, i: int): int;
-fn convertWrapping<T, U>(v: T, like: U): U;
+fn asTypeOf<T, U>(v: T, like: U): U;
 fn floatOfText(s: string): float;
 fn float32OfText(s: string): float32;
 

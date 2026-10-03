@@ -97,6 +97,12 @@ _Static_assert(offsetof(lyr_box_ty6_OutOfRange, value) == 8, "layout of lyr_box_
 extern const LyrItable lyr_itab_ty6[];
 const LyrDesc lyr_desc_box_ty6_OutOfRange = { sizeof(lyr_box_ty6_OutOfRange), 0, 0, 0, NULL, "box<main.OutOfRange>", lyr_itab_ty6 };
 
+/* module-level bindings */
+double lyr_g0_float_infinity = 0;
+double lyr_g1_float_nan = 0;
+float lyr_g2_float32_infinity = 0;
+float lyr_g3_float32_nan = 0;
+
 /* string literals */
 static const LyrStaticStr(8) lyr_lit0 = LYR_STR_INIT("defer 3");
 static const LyrStaticStr(8) lyr_lit1 = LYR_STR_INIT("defer 2");
@@ -149,13 +155,16 @@ void lyr_main_sister(void);
 int64_t lyr_main_safeDiv(int64_t l0_a, int64_t l1_b, LyrErr **lyr_err);
 void lyr_main_clean(void);
 int64_t lyr_main_ret(void);
-int64_t lyr_main_main(void);
+LYR_NOINLINE int64_t lyr_main_main(void);
 LyrStr * lyr_main_ParseError_message(lyr_ty0_ParseError *l0_this);
 LyrStr * lyr_main_Disk_message(lyr_ty4_Disk *l0_this);
 LyrStr * lyr_main_OutOfRange_message(lyr_ty6_OutOfRange *l0_this);
 LyrStr * lyr_main_Wrap_message(lyr_ty7_Wrap *l0_this);
 lyr_opt_iface3 lyr_main_Wrap_cause(lyr_ty7_Wrap *l0_this);
 lyr_opt_iface3 lyr_std_core_Error_cause(LyrIface l0_this);
+void lyr__globals__9ee5f9b5(void);
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
 static LyrStr * lyr_vt_ty3_ty0_s0(LyrIface self) { return lyr_main_ParseError_message(&((lyr_box_ty0_ParseError *)self.data)->value); }
@@ -1344,7 +1353,7 @@ bb6:;
 }
 
 #line 115 "programs/errors.lyr"
-int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_main_main(void) {
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -1456,6 +1465,77 @@ bb0:;
     return *t0;
 }
 
+#line 1192 "stdlib5/std/core.lyr"
+void lyr__globals__9ee5f9b5(void) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    uint64_t t2 = 0;
+    double t3 = 0;
+    uint64_t t4 = 0;
+    float t5 = 0;
+    uint64_t t6 = 0;
+    float t7 = 0;
+bb0:;
+#line 1192
+    t0 = (uint64_t)UINT64_C(9218868437227405312);
+#line 1192
+    t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
+#line 1192
+    lyr_g0_float_infinity = t1;
+#line 1193
+    t2 = (uint64_t)UINT64_C(9221120237041090560);
+#line 1193
+    t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
+#line 1193
+    lyr_g1_float_nan = t3;
+#line 1213
+    t4 = (uint64_t)UINT64_C(2139095040);
+#line 1213
+    t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
+#line 1213
+    lyr_g2_float32_infinity = t5;
+#line 1214
+    t6 = (uint64_t)UINT64_C(2143289344);
+#line 1214
+    t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
+#line 1214
+    lyr_g3_float32_nan = t7;
+    return;
+}
+
+#line 1199 "stdlib5/std/core.lyr"
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    double t2 = 0;
+bb0:;
+#line 1199
+    t0 = l0_b;
+#line 1189
+    t1 = (double)0.0;
+#line 1199
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1199
+    return t2;
+}
+
+#line 1220 "stdlib5/std/core.lyr"
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    float t1 = 0;
+    float t2 = 0;
+bb0:;
+#line 1220
+    t0 = l0_b;
+#line 1210
+    t1 = (float)0.0;
+#line 1220
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1220
+    return t2;
+}
+
 
 /* the program */
-int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_main_main); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

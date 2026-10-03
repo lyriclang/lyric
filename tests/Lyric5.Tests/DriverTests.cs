@@ -78,7 +78,9 @@ public class DriverTests
         Assert.True(exit == 0, err);
         // External linkage (01 C3, C4): an instance's unit may call it.
         Assert.Contains("\nint64_t lyr_fib_fib(int64_t l0_n)", output);
-        Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_fib_main); }", output);
+        // The module bindings first — std.core's float constants are every program's (M8a S3c).
+        Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }", output);
+        Assert.Contains("return lyr_fib_main(); }", output);
     }
 
     /// <summary>01 C3: the module's C is one unit, every generic instance another, named by its

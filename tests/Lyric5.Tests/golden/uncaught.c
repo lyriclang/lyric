@@ -62,6 +62,12 @@ _Static_assert(offsetof(lyr_ty8_Exception, f_inner) == 16, "layout of lyr_ty8_Ex
 static const uint64_t lyr_refmap_ty8[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty8_Exception = { sizeof(lyr_ty8_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty8, "std.core.Exception", NULL };
 
+/* module-level bindings */
+double lyr_g0_float_infinity = 0;
+double lyr_g1_float_nan = 0;
+float lyr_g2_float32_infinity = 0;
+float lyr_g3_float32_nan = 0;
+
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("config");
 static const LyrStaticStr(7) lyr_lit1 = LYR_STR_INIT("before");
@@ -70,11 +76,14 @@ static const LyrStaticStr(5) lyr_lit2 = LYR_STR_INIT("disk");
 /* prototypes */
 LyrStr * lyr_main_read(LyrErr **lyr_err);
 LyrStr * lyr_main_config(LyrErr **lyr_err);
-int64_t lyr_main_main(LyrErr **lyr_err);
+LYR_NOINLINE int64_t lyr_main_main(LyrErr **lyr_err);
 LyrStr * lyr_main_Disk_message(lyr_ty0_Disk *l0_this);
 LyrStr * lyr_main_Wrap_message(lyr_ty2_Wrap *l0_this);
 lyr_opt_iface1 lyr_main_Wrap_cause(lyr_ty2_Wrap *l0_this);
 lyr_opt_iface1 lyr_std_core_Error_cause(LyrIface l0_this);
+void lyr__globals__9ee5f9b5(void);
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
 static LyrStr * lyr_vt_ty1_ty0_s0(LyrIface self) { return lyr_main_Disk_message((lyr_ty0_Disk *)self.data); }
@@ -166,7 +175,7 @@ bb5:;
 }
 
 #line 18 "programs/uncaught.lyr"
-int64_t lyr_main_main(LyrErr **lyr_err) {
+LYR_NOINLINE int64_t lyr_main_main(LyrErr **lyr_err) {
     LyrStr *l0_s = NULL;
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
@@ -249,7 +258,77 @@ bb0:;
     return *t0;
 }
 
+#line 1192 "stdlib5/std/core.lyr"
+void lyr__globals__9ee5f9b5(void) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    uint64_t t2 = 0;
+    double t3 = 0;
+    uint64_t t4 = 0;
+    float t5 = 0;
+    uint64_t t6 = 0;
+    float t7 = 0;
+bb0:;
+#line 1192
+    t0 = (uint64_t)UINT64_C(9218868437227405312);
+#line 1192
+    t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
+#line 1192
+    lyr_g0_float_infinity = t1;
+#line 1193
+    t2 = (uint64_t)UINT64_C(9221120237041090560);
+#line 1193
+    t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
+#line 1193
+    lyr_g1_float_nan = t3;
+#line 1213
+    t4 = (uint64_t)UINT64_C(2139095040);
+#line 1213
+    t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
+#line 1213
+    lyr_g2_float32_infinity = t5;
+#line 1214
+    t6 = (uint64_t)UINT64_C(2143289344);
+#line 1214
+    t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
+#line 1214
+    lyr_g3_float32_nan = t7;
+    return;
+}
+
+#line 1199 "stdlib5/std/core.lyr"
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    double t2 = 0;
+bb0:;
+#line 1199
+    t0 = l0_b;
+#line 1189
+    t1 = (double)0.0;
+#line 1199
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1199
+    return t2;
+}
+
+#line 1220 "stdlib5/std/core.lyr"
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    float t1 = 0;
+    float t2 = 0;
+bb0:;
+#line 1220
+    t0 = l0_b;
+#line 1210
+    t1 = (float)0.0;
+#line 1220
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1220
+    return t2;
+}
+
 
 /* the program */
-static int64_t lyr_entry(void) { LyrErr *lyr_e = NULL; int64_t lyr_r = lyr_main_main(&lyr_e); if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, lyr_error_message, lyr_error_cause); return lyr_r; }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); LyrErr *lyr_e = NULL; int64_t lyr_r = lyr_main_main(&lyr_e); if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, lyr_error_message, lyr_error_cause); return lyr_r; }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

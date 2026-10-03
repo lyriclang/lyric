@@ -63,6 +63,43 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
 /* `v as U` where U is a type parameter's (03 T1d): the operand converted to the type of `like`,
  * which is not evaluated — std.core reads a digit into the integer type it parses. */
 #define LYR_CONVERT(v, like) ((LYR_VALUE_TYPE_(like))(v))
+
+/* A float's bits (10 B5): a `float` its 64, a `float32` its 32 in the low ones — and back, from the
+ * low 32 for a `float32`. */
+#define LYR_FLOAT_BITS(x)                                                                           \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(x) lyr_f_ = (x);                                                            \
+        uint64_t lyr_b_ = 0;                                                                        \
+        if (sizeof(lyr_f_) == 4) {                                                                  \
+            uint32_t lyr_n_;                                                                        \
+            __builtin_memcpy(&lyr_n_, &lyr_f_, 4);                                                  \
+            lyr_b_ = lyr_n_;                                                                        \
+        } else {                                                                                    \
+            __builtin_memcpy(&lyr_b_, &lyr_f_, 8);                                                  \
+        }                                                                                           \
+        lyr_b_;                                                                                     \
+    })
+#define LYR_FLOAT_FROM_BITS(bits, like)                                                             \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(like) lyr_f_;                                                               \
+        uint64_t lyr_b_ = (bits);                                                                   \
+        if (sizeof(lyr_f_) == 4) {                                                                  \
+            uint32_t lyr_n_ = (uint32_t)lyr_b_;                                                     \
+            __builtin_memcpy(&lyr_f_, &lyr_n_, 4);                                                  \
+        } else {                                                                                    \
+            __builtin_memcpy(&lyr_f_, &lyr_b_, 8);                                                  \
+        }                                                                                           \
+        lyr_f_;                                                                                     \
+    })
+/* IEEE 754 totalOrder as an unsigned key: a positive value's bits with the sign set, a negative
+ * one's flipped whole — so -NaN < -inf < ... < -0.0 < 0.0 < ... < inf < NaN compares as the keys do. */
+#define LYR_TOTAL_ORDER_KEY(x)                                                                      \
+    __extension__({                                                                                 \
+        uint64_t lyr_k_ = LYR_FLOAT_BITS(x);                                                        \
+        const uint64_t lyr_sign_ = sizeof(x) == 4 ? UINT64_C(0x80000000) : UINT64_C(0x8000000000000000); \
+        const uint64_t lyr_all_ = sizeof(x) == 4 ? UINT64_C(0xFFFFFFFF) : UINT64_MAX;              \
+        (lyr_k_ & lyr_sign_) ? (~lyr_k_ & lyr_all_) : (lyr_k_ | lyr_sign_);                         \
+    })
 #define LYR_WIDTH_(x) ((int64_t)(sizeof(x) * 8))
 #define LYR_MASK_(x) (sizeof(x) == 8 ? UINT64_MAX : ((UINT64_C(1) << (sizeof(x) * 8)) - 1))
 #define LYR_BITS_(x) ((uint64_t)(x) & LYR_MASK_(x))

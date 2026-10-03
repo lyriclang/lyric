@@ -25,10 +25,12 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
+#  define LYR_NOINLINE __attribute__((noinline))
 #  define LYR_PRINTF(f, a) __attribute__((format(printf, f, a)))
 #  define LYR_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
 #  define LYR_NORETURN _Noreturn
+#  define LYR_NOINLINE
 #  define LYR_PRINTF(f, a)
 #  define LYR_UNLIKELY(x) (x)
 #endif
