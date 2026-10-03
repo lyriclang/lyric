@@ -1936,7 +1936,7 @@ public sealed class TypeChecker
             // the call makes, no place anyone holds.
             if (p.IsPlace && (p.Default is not null || p.IsParams))
                 _de.Report("LYR-SEM0156", Severity.Error, p.Span, p.IsParams
-                    ? $"'{p.Name}' takes a place, and 'params' collects values into an array the call makes — no place of the caller's"
+                    ? $"'{p.Name}' takes a place, and {(p.IsEllipsis ? "a variadic parameter" : "'params'")} collects values into an array the call makes — no place of the caller's"
                     : $"'{p.Name}' takes a place, and a default is a value the call makes — no place of the caller's");
             if (p.Attributes.Length > 0) CheckParameterAttributes(fn, p, pt, outerScope);
             if (p.Default is not null)
@@ -5216,9 +5216,20 @@ public sealed class TypeChecker
                 if (!placeholders) CheckConstraints(fsym.Generics, explicitArgs, call.Span);
             }
 
+            var variadicAt = decl is { Parameters: { Length: > 0 } declared } && declared[^1].IsParams ? declared.Length - 1 : -1;
             var n = Math.Min(fn.Parameters.Length, args.Length);
             for (var i = 0; i < n; i++)
-                if (args[i] is { } given && given is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
+                if (i != variadicAt && args[i] is { } given && given is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
+            // The variadic tail (08 §1.1 rule 1) binds through its element, one argument at a time —
+            // or, a single array left, as the whole array, the reading CheckCallArgs gives it.
+            if (variadicAt >= 0 && variadicAt < fn.Parameters.Length && fn.Parameters[variadicAt] is ArrayOf tail)
+            {
+                if (args.Length == variadicAt + 1 && args[variadicAt] is { } whole and not LambdaExpr && argTypes[variadicAt] is ArrayOf)
+                    UnifyInfer(tail, argTypes[variadicAt]!, map, whole.Span);
+                else
+                    for (var i = variadicAt; i < args.Length; i++)
+                        if (args[i] is { } element && element is not LambdaExpr) UnifyInfer(tail.Element, argTypes[i]!, map, element.Span);
+            }
             substituted = (FnType)Substitute(fn, map);
         }
 
@@ -5457,7 +5468,7 @@ public sealed class TypeChecker
             if (variadic && index == parameters.Length - 1)
             {
                 _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
-                    $"'{name}' is the 'params' parameter, which takes the rest and is not named");
+                    $"'{name}' is the {(parameters[^1].IsEllipsis ? "variadic" : "'params'")} parameter, which takes the rest and is not named");
                 continue;
             }
             if (arranged[index] is not null)

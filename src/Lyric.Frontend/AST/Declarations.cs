@@ -99,6 +99,11 @@ public sealed record Param(bool IsParams, string Name, TypeNode Type, Expr? Defa
     /// <summary><c>&amp;x: T</c> (design/v5/spec/03 T12): the parameter takes a place of the
     /// caller, which the function reads and writes, not a value.</summary>
     public bool IsPlace { get; init; }
+
+    /// <summary><c>nums: int...</c> (design/v5/spec/08): Lyric 5's variadic parameter, written with
+    /// the element type — <see cref="Param.Type"/> is the array, as for 4.x's <c>params nums:
+    /// int[]</c>, and <see cref="Param.IsParams"/> holds for both.</summary>
+    public bool IsEllipsis { get; init; }
 }
 /// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c> (design/v5/spec/05 E2 K1,
 /// K2; 08 D9): a SET of thrown types, written in brackets from two on (the list rule, 08 D5/D6).

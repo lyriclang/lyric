@@ -122,7 +122,7 @@ public class CEmitterTests
         "hit 60 80\nalive alive alive down\nbox 3 10 3\nenum 1 0\narray 4 143 60 60\nchain 882\n";
 
     private const string CALLS_EXPECTED =
-        "arity 7 12 60\nnamed 1 2 3\ndefault 10 2 3\nparams 6 3\nfactory 3 4\n";
+        "arity 7 12 60\nnamed 1 2 3\ndefault 10 2 3\nvariadic 6 3\nfactory 3 4\n";
 
     private const string DISPATCH_EXPECTED =
         "paths 7 7 7\nblocks hello hi\nby 4 4 walk run\nouter run4\n";

@@ -369,10 +369,13 @@ public sealed class AstFormatter
         var parts = new List<Doc>();
         // '@callerExpr(actual)' (09 A11) stands before the name, on the parameter's line.
         foreach (var attribute in parameter.Attributes) parts.Add(Doc.Of(AttributeDoc(attribute), Doc.Space));
-        if (parameter.IsParams) parts.Add(Doc.From("params "));
+        if (parameter.IsParams && !parameter.IsEllipsis) parts.Add(Doc.From("params "));
         if (parameter.IsPlace) parts.Add(Doc.From("&"));
         parts.Add(Doc.From($"{parameter.Name}: "));
-        parts.Add(TypeDoc(parameter.Type));
+        if (parameter is { IsEllipsis: true, Type: ArrayType variadic })
+            parts.Add(Doc.Of(TypeDoc(variadic.Element), Doc.From("...")));
+        else
+            parts.Add(TypeDoc(parameter.Type));
         if (parameter.Default is { } fallback)
         {
             parts.Add(Doc.From(" = "));

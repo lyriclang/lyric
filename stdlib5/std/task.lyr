@@ -991,7 +991,7 @@ pub enum Signal {
 /// one, and one that finds the channel's buffer full — sixteen — is lost for it. Closing the channel
 /// ends the subscription with the next signal that would come; a signal no channel asks for any more
 /// is the system's again. KILL, STOP and the faults never come.
-pub fn signals(params wanted: Signal[]): Channel<Signal> {
+pub fn signals(wanted: Signal...): Channel<Signal> {
     let channel = Channel<Signal>.new(16);
     var mask = 0;
     for (i in 0..wanted.length()) {

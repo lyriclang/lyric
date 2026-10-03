@@ -543,9 +543,13 @@ public sealed partial class Parser
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
             _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after parameter name");
             var type = ParseType();
+            // 'nums: int...' (design/v5/spec/08): the variadic parameter names its element; it is
+            // an array of it, as 4.x's 'params nums: int[]' was, and the rules are the same ones.
+            var isEllipsis = _buffer.Check(TokenKind.DotDotDot);
+            if (isEllipsis) type = new ArrayType(type, Span.Union(type.Span, _buffer.Advance().Span));
             Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
-            parameters.Add(new Param(isParams, name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
-                { NameSpan = name.Span, Attributes = attributes, IsPlace = isPlace });
+            parameters.Add(new Param(isParams || isEllipsis, name.Name, type, def, Span.Union(start, def?.Span ?? type.Span))
+                { NameSpan = name.Span, Attributes = attributes, IsPlace = isPlace, IsEllipsis = isEllipsis });
         } while (_buffer.Match(TokenKind.Comma));
         return parameters.ToArray();
     }
