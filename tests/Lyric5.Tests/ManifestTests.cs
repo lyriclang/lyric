@@ -199,8 +199,7 @@ public class ManifestTests
 
     private static string Write(string text)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "lyric5-manifest-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
+        var dir = TestDirectories.Fresh("lyric5-manifest-");
         var file = Path.Combine(dir, "lyric.toml");
         File.WriteAllText(file, text);
         return file;

@@ -1976,7 +1976,7 @@ bb0:;
     return t4;
 }
 
-#line 1360 "stdlib5/std/core.lyr"
+#line 1375 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     double t1 = 0;
@@ -1987,78 +1987,78 @@ void lyr__globals__9ee5f9b5(void) {
     uint64_t t6 = 0;
     float t7 = 0;
 bb0:;
-#line 1360
+#line 1375
     t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1360
+#line 1375
     t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1360
+#line 1375
     lyr_g0_float_infinity = t1;
-#line 1361
+#line 1376
     t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1361
+#line 1376
     t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1361
+#line 1376
     lyr_g1_float_nan = t3;
-#line 1381
+#line 1396
     t4 = (uint64_t)UINT64_C(2139095040);
-#line 1381
+#line 1396
     t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1381
+#line 1396
     lyr_g2_float32_infinity = t5;
-#line 1382
+#line 1397
     t6 = (uint64_t)UINT64_C(2143289344);
-#line 1382
+#line 1397
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1382
+#line 1397
     lyr_g3_float32_nan = t7;
     return;
 }
 
-#line 1367 "stdlib5/std/core.lyr"
+#line 1382 "stdlib5/std/core.lyr"
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
     uint64_t t0 = 0;
     double t1 = 0;
     double t2 = 0;
 bb0:;
-#line 1367
+#line 1382
     t0 = l0_b;
-#line 1357
+#line 1372
     t1 = (double)0.0;
-#line 1367
+#line 1382
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1367
+#line 1382
     return t2;
 }
 
-#line 1388 "stdlib5/std/core.lyr"
+#line 1403 "stdlib5/std/core.lyr"
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
     uint64_t t0 = 0;
     float t1 = 0;
     float t2 = 0;
 bb0:;
-#line 1388
+#line 1403
     t0 = l0_b;
-#line 1378
+#line 1393
     t1 = (float)0.0;
-#line 1388
+#line 1403
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1388
+#line 1403
     return t2;
 }
 
-#line 349 "stdlib5/std/core.lyr"
+#line 350 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 349
+#line 350
     t0 = l0_this;
-#line 349
+#line 350
     t1 = l1_rhs;
-#line 349
+#line 350
     t2 = LYR_CHECKED_ADD(t0, t1);
-#line 349
+#line 350
     return t2;
 }
 
