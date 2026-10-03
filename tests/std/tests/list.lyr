@@ -1,0 +1,107 @@
+// std.collections' List (design/v5/spec/10 C3, I9): a growing array.
+import std.collections { List };
+import std.test { assertEq, assertFalse, assertNull, assertPanics, assertTrue };
+
+fn text(xs: List<int>): string {
+    return xs.asSlice().join(",");
+}
+
+@Test
+fn pushIndexAndLength(): void {
+    let xs = List<int>.new();
+    assertTrue(xs.isEmpty());
+    for (i in 0..20) {
+        xs.push(i * i);
+    }
+    assertEq(xs.length(), 20);
+    assertEq(xs[0], 0);
+    assertEq(xs[19], 361);
+    xs[3] = -1;
+    assertEq(xs[3], -1);
+    assertEq(xs.get(19) ?? 0, 361);
+    assertNull(xs.get(20));
+    assertNull(xs.get(-1));
+}
+
+@Test
+fn anIndexPastTheLengthPanics(): void {
+    // room for eight: the buffer reaches past the length, the index must not
+    let xs = List<int>.new();
+    xs.push(1);
+    xs.push(2);
+    let info = assertPanics(() => {
+        assertEq(xs[2], 0);
+    });
+    assertTrue(info.code == "LYR-RT0003");
+}
+
+@Test
+fn popInsertAndRemoveAt(): void {
+    let xs = List<int>.of([1, 2, 3]);
+    assertEq(xs.pop() ?? 0, 3);
+    assertEq(text(xs), "1,2");
+    xs.insert(0, 9);
+    xs.insert(3, 7);
+    xs.insert(2, 5);
+    assertEq(text(xs), "9,1,5,2,7");
+    assertEq(xs.removeAt(1), 1);
+    assertEq(text(xs), "9,5,2,7");
+    let none = List<int>.new();
+    assertNull(none.pop());
+}
+
+@Test
+fn removeWhereRemoveAndDedup(): void {
+    let xs = List<int>.of([1, 2, 2, 3, 3, 3, 4]);
+    xs.dedup();
+    assertEq(text(xs), "1,2,3,4");
+    let distinct = List<int>.of([5, 6, 7]);
+    distinct.dedup();
+    assertEq(text(distinct), "5,6,7");
+    assertEq(xs.removeWhere((x) => x % 2 == 0), 2);
+    assertEq(text(xs), "1,3");
+    assertTrue(xs.remove(3));
+    assertFalse(xs.remove(3));
+    assertTrue(xs.contains(1));
+    assertFalse(xs.contains(3));
+}
+
+@Test
+fn truncateClearAndToArray(): void {
+    let xs = List<string>.of(["a", "b", "c"]);
+    let copy = xs.toArray();
+    xs.truncate(1);
+    assertEq(xs.length(), 1);
+    assertEq(copy.length(), 3);
+    xs.clear();
+    assertTrue(xs.isEmpty());
+    xs.push("z");
+    assertEq(xs[0], "z");
+}
+
+@Test
+fn theSliceIsTheListsOwn(): void {
+    let xs = List<int>.of([3, 1, 2]);
+    xs.asSlice().sort();
+    assertEq(text(xs), "1,2,3");
+    xs.swap(0, 2);
+    assertEq(text(xs), "3,2,1");
+}
+
+@Test
+fn forWalksItAndAChangePanics(): void {
+    let xs = List<int>.of([1, 2, 3]);
+    var sum = 0;
+    for (x in xs) {
+        sum = sum + x;
+    }
+    assertEq(sum, 6);
+    let info = assertPanics(() => {
+        for (x in xs) {
+            if (x == 1) {
+                xs.push(4);
+            }
+        }
+    });
+    assertEq(info.message, "List: changed while it was walked");
+}

@@ -3,6 +3,239 @@
 import std.core { arrayOf, Hasher };
 import std.hash { DefaultHasher };
 
+// --- List (10 C3) --------------------------------------------------------------------------------
+// The elements lie at the front of a buffer that doubles when full. The slots past the length hold
+// copies of a value already there — never read, overwritten on the way back — so the buffer is a
+// `T[]` and `asSlice()` a view of it (C3: growth leaves an older view on the older buffer).
+
+/// A growing array (10 C3): its elements in order; `[i]` and `[i] = v` as an array's, panicking
+/// outside `0 ≤ i < length()`. Not safe across threads (C11).
+pub class List<T> :: [IndexSet<int>, Iterable] {
+    type Output = T;
+    type Iter = ListIter<T>;
+    var buffer: T[],
+    var count: int,
+    var changes: int,
+
+    /// An empty list.
+    pub static fn new(): List<T> {
+        return List<T> { buffer = [], count = 0, changes = 0 };
+    }
+
+    /// A list of the array's elements, copied.
+    pub static fn of(xs: T[]): List<T> {
+        return List<T> { buffer = arrayOf(xs.length(), (i: int) => xs[i]), count = xs.length(), changes = 0 };
+    }
+
+    /// How many elements it holds.
+    pub fn length(): int {
+        return this.count;
+    }
+
+    /// Whether it holds none.
+    pub fn isEmpty(): bool {
+        return this.count == 0;
+    }
+
+    /// The element at `i`; outside `0 ≤ i < length()` a panic (`LYR-RT0003`).
+    pub fn index(i: int): T {
+        return this.buffer[..this.count][i];
+    }
+
+    /// `v` at `i`, in place of the element there.
+    pub mut fn setIndex(i: int, v: T): void {
+        this.buffer[..this.count][i] = v;
+    }
+
+    /// The element at `i`, or `null` outside `0 ≤ i < length()`.
+    pub fn get(i: int): ?T {
+        if (i < 0 || i >= this.count) {
+            return null;
+        }
+        return this.buffer[i];
+    }
+
+    /// The elements as a view of the buffer: the members of arrays and views (C2) reach them — a
+    /// sort writes the list. A push past the room moves the list to a new buffer, the view not.
+    pub fn asSlice(): Slice<T> {
+        return this.buffer[..this.count];
+    }
+
+    /// The elements, copied into an array of their own.
+    pub fn toArray(): T[] {
+        let n = this.count;
+        return arrayOf(n, (i: int) => this.buffer[i]);
+    }
+
+    /// `v` at the end.
+    pub mut fn push(v: T): void {
+        if (this.count == this.buffer.length()) {
+            this.grow(v);
+        }
+        this.buffer[this.count] = v;
+        this.count = this.count + 1;
+        this.changes = this.changes + 1;
+    }
+
+    /// Every value `xs` gives, at the end, in order.
+    pub mut fn pushAll(xs: T[]): void {
+        for (x in xs) {
+            this.push(x);
+        }
+    }
+
+    /// The last element taken off, or `null` where there is none.
+    pub mut fn pop(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        this.count = this.count - 1;
+        this.changes = this.changes + 1;
+        return this.buffer[this.count];
+    }
+
+    /// `v` at `i`, the elements from `i` on one place further; `i` outside `0 ≤ i ≤ length()` panics.
+    pub mut fn insert(i: int, v: T): void {
+        if (i < 0 || i > this.count) {
+            panic(f"List.insert: index {i} outside 0..={this.count}");
+        }
+        this.push(v);
+        var j = this.count - 1;
+        while (j > i) {
+            this.buffer[j] = this.buffer[j - 1];
+            j = j - 1;
+        }
+        this.buffer[i] = v;
+    }
+
+    /// The element at `i` taken out, those after it one place nearer; outside `0 ≤ i < length()`
+    /// a panic.
+    pub mut fn removeAt(i: int): T {
+        let taken = this.index(i);
+        var j = i;
+        while (j < this.count - 1) {
+            this.buffer[j] = this.buffer[j + 1];
+            j = j + 1;
+        }
+        this.count = this.count - 1;
+        this.changes = this.changes + 1;
+        return taken;
+    }
+
+    /// The elements for which `p` holds taken out, the others kept in order; how many went.
+    pub mut fn removeWhere(p: fn(T) -> bool): int {
+        var kept = 0;
+        var i = 0;
+        while (i < this.count) {
+            let x = this.buffer[i];
+            if (!p(x)) {
+                this.buffer[kept] = x;
+                kept = kept + 1;
+            }
+            i = i + 1;
+        }
+        let gone = this.count - kept;
+        this.count = kept;
+        if (gone > 0) {
+            this.changes = this.changes + 1;
+        }
+        return gone;
+    }
+
+    /// Every element taken out; the room stays.
+    pub mut fn clear(): void {
+        this.count = 0;
+        this.changes = this.changes + 1;
+    }
+
+    /// The first `n` elements kept, the rest taken out; `n` at or past the length keeps all.
+    pub mut fn truncate(n: int): void {
+        if (n < 0) {
+            panic(f"List.truncate: a negative length {n}");
+        }
+        if (n < this.count) {
+            this.count = n;
+            this.changes = this.changes + 1;
+        }
+    }
+
+    /// The elements at `i` and `j` exchanged.
+    pub mut fn swap(i: int, j: int): void {
+        this.asSlice().swap(i, j);
+    }
+
+    /// The iterator over the elements, front to back (10 I9): a push, a pop or another change of the
+    /// length while it walks is the program's error, and the next pull panics.
+    pub fn iter(): ListIter<T> {
+        return ListIter<T> { list = this, at = 0, changes = this.changes };
+    }
+
+    /// Room for twice the elements, the slots past the length holding `filler`.
+    mut fn grow(filler: T): void {
+        let room = if (this.buffer.length() == 0) 8 else this.buffer.length() * 2;
+        let old = this.buffer;
+        let n = this.count;
+        this.buffer = arrayOf(room, (i: int) => if (i < n) old[i] else filler);
+    }
+}
+
+extend<T :: [Equatable]> List<T> {
+    /// Whether an element equals `x`.
+    pub fn contains(x: T): bool {
+        return this.asSlice().contains(x);
+    }
+
+    /// The first element equal to `x` taken out; whether there was one.
+    pub mut fn remove(x: T): bool {
+        let at = this.asSlice().indexOf(x);
+        if (at == null) {
+            return false;
+        }
+        this.removeAt(at);
+        return true;
+    }
+
+    /// Runs of equal elements kept once each.
+    pub mut fn dedup(): void {
+        if (this.count < 2) {
+            return;
+        }
+        var kept = 1;
+        var i = 1;
+        while (i < this.count) {
+            if (!(this.buffer[i] == this.buffer[kept - 1])) {
+                this.buffer[kept] = this.buffer[i];
+                kept = kept + 1;
+            }
+            i = i + 1;
+        }
+        if (kept < this.count) {
+            this.count = kept;
+            this.changes = this.changes + 1;
+        }
+    }
+}
+
+/// The iterator of a list (10 I9): it walks the list where it stands, and a change of the list's
+/// length since it began panics at the next pull.
+pub struct ListIter<T> :: [Iterator] {
+    type Item = T;
+    list: List<T>,
+    var at: int,
+    changes: int,
+
+    pub mut fn next(): ?T {
+        if (this.list.changes != this.changes) {
+            panic("List: changed while it was walked");
+        }
+        if (this.at >= this.list.count) {
+            return null;
+        }
+        this.at = this.at + 1;
+        return this.list.buffer[this.at - 1];
+    }
+}
+
 // --- Map (10 C4): a Swiss table ----------------------------------------------------------------
 // Groups of eight slots, each group with a control word of eight bytes, one a slot: 0x80 for an
 // empty slot, 0xFE for a deleted one, the low seven bits of the key's hash for a full one. A

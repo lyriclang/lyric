@@ -1531,17 +1531,17 @@ bb0:;
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
 #line 1409
     lyr_g3_float32_nan = t7;
-#line 14 "stdlib5/std/collections.lyr"
+#line 247 "stdlib5/std/collections.lyr"
     t8 = (uint64_t)UINT64_C(9259542123273814144);
-#line 14
+#line 247
     lyr_g4_emptyGroup = t8;
-#line 15
+#line 248
     t9 = (uint64_t)UINT64_C(72340172838076673);
-#line 15
+#line 248
     lyr_g5_lowBits = t9;
-#line 16
+#line 249
     t10 = (uint64_t)UINT64_C(9259542123273814144);
-#line 16
+#line 249
     lyr_g6_highBits = t10;
 #line 1510 "stdlib5/std/task.lyr"
     t11 = 0;
