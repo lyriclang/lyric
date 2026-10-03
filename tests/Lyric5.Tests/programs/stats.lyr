@@ -1,0 +1,39 @@
+// stats — an M8a program (design/v5/spec/13, M8a; after examples/stats.lyr): free functions, a
+// variadic parameter, arrays with length and index, an optional answer with '??', an 'as'
+// conversion, and a format spec (12 §2).
+import std.io { println };
+
+// 'nums: int...' takes any number of arguments as an int[] (08 §1.1).
+fn sum(nums: int...): int {
+    var total = 0;
+    for (n in nums) {
+        total += n;
+    }
+    return total;
+}
+
+// An empty array has no maximum, hence ?int.
+fn max(xs: int[]): ?int {
+    if (xs.length() == 0) {
+        return null;
+    }
+    var best = xs[0];
+    for (x in xs) {
+        if (x > best) {
+            best = x;
+        }
+    }
+    return best;
+}
+
+fn main(): int {
+    let total = sum(3, 7, 1, 9, 4);
+    let numbers = [3, 7, 1, 9, 4];
+    let biggest = max(numbers) ?? 0;
+    let avg = total as float / numbers.length() as float;
+
+    println(f"Summe:        {total}");
+    println(f"Maximum:      {biggest}");
+    println(f"Durchschnitt: {avg:.2f}");
+    return 0;
+}

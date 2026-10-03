@@ -1,0 +1,87 @@
+// inventory — an M8a program (design/v5/spec/13, M8a; after examples/inventory.lyr): an interface
+// with a default method, '::' conformance, an extend block on an own type, a closure as a filter
+// with its threshold captured, a generic function under a constraint, a match on an enum, and an
+// optional answer.
+import std.io { println };
+
+// An interface with one abstract and one default method.
+interface Priced {
+    fn price(): int;
+
+    fn isFree(): bool {
+        // the default asks the abstract member
+        return this.price() == 0;
+    }
+}
+
+enum Rarity {
+    Common,
+    Rare,
+    Legendary,
+}
+
+struct Item :: [Priced] {
+    name: string,
+    basePrice: int,
+    rarity: Rarity,
+
+    fn price(): int {
+        return this.basePrice * match (this.rarity) {
+            .Common => 1,
+            .Rare => 3,
+            .Legendary => 10,
+        };
+    }
+}
+
+// An extend block adds a method to an own type: inherent, nothing to activate.
+extend Item {
+    fn label(): string {
+        return f"{this.name} ({this.price()} gold)";
+    }
+}
+
+// A generic sum under a constraint: every Priced element counts.
+fn totalPrice<T :: [Priced]>(items: T[]): int {
+    var sum = 0;
+    for (it in items) {
+        sum += it.price();
+    }
+    return sum;
+}
+
+// A closure as the filter; the caller's threshold rides along in it.
+fn firstMatching(items: Item[], keep: fn(Item) -> bool): ?Item {
+    for (it in items) {
+        if (keep(it)) {
+            return it;
+        }
+    }
+    return null;
+}
+
+fn main(): int {
+    let items: Item[] = [
+        Item { name = "Bread", basePrice = 0, rarity = Rarity.Common },
+        Item { name = "Sword", basePrice = 5, rarity = Rarity.Rare },
+        Item { name = "Amulet", basePrice = 8, rarity = Rarity.Legendary },
+    ];
+
+    for (it in items) {
+        println(it.label());
+    }
+
+    println(f"Gesamtwert: {totalPrice(items)} gold");
+
+    let budget = 20;
+    let affordable = firstMatching(items, (it) => it.price() <= budget);
+    let name = match (affordable) {
+        null => "nichts Bezahlbares",
+        it => it.name,
+    };
+    println(f"Erstes im Budget ({budget}): {name}");
+
+    let free = items[0];
+    println(f"{free.name} gratis? {free.isFree()}");
+    return 0;
+}

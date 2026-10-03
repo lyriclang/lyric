@@ -5,7 +5,8 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// M7's artifacts (design/v5/spec/13): the multi-package example — <c>programs/three_packages</c>, a
+/// M8a's artifact (design/v5/spec/13): the examples inventory, stats and stack, 4.x's examples/ in
+/// Lyric 5, each built as a package and run. And M7's artifacts: the multi-package example — <c>programs/three_packages</c>, a
 /// path dependency and one from git — builds offline once the cache holds it, and builds for the
 /// other operating system; a dependency's globals are ready before the importer's (07 G2).
 /// Through <c>Main</c>, so in the console collection.
@@ -27,6 +28,22 @@ public class ExampleTests
     }
 
     private const string Report = "bed: 120000 cm2\npath: 40000 cm2\ntotal: 160000 cm2\n";
+
+    private static string ProgramText(string name, [System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        File.ReadAllText(Path.Combine(Path.GetDirectoryName(here)!, "programs", name + ".lyr"));
+
+    /// <summary>As a user meets them: <c>src/main.lyr</c> of a package, built and run — the prelude
+    /// and every module of the standard library at hand.</summary>
+    [Theory]
+    [InlineData("inventory", "Bread (0 gold)\nSword (15 gold)\nAmulet (80 gold)\nGesamtwert: 95 gold\n"
+        + "Erstes im Budget (20): Bread\nBread gratis? true\n")]
+    [InlineData("stats", "Summe:        24\nMaximum:      9\nDurchschnitt: 4.80\n")]
+    [InlineData("stack", "Groesse: 3\nSpitze:  3\npop -> 3\npop -> 2\npop -> 1\n")]
+    public void An_example_of_the_standard_library_runs(string name, string expected)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText(name)));
+        Assert.Equal(expected, BuildAndRun(dir, "app", "build", "-C", dir));
+    }
 
     /// <summary>As the example's README says: <c>units</c> made a repository, added by git, built
     /// online once — then offline with the repository gone.</summary>
