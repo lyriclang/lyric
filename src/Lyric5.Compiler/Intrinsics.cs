@@ -76,6 +76,8 @@ public static class Intrinsics
         ["std.core.byteCount"] = "LYR_STR_LEN",
         ["std.core.byteAt"] = "LYR_STR_BYTE",
         ["std.core.compareBytes"] = "lyr_str_cmp",
+        ["std.core.byteSlice"] = "lyr_str_slice",
+        ["std.core.stringOfBytes"] = "lyr_str_from_byte_array",
         ["std.core.asTypeOf"] = "LYR_CONVERT",
         // Float (10 B5): the bits of either width and IEEE's total order as a key.
         ["std.core.floatBits"] = "LYR_FLOAT_BITS",

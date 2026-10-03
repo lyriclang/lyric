@@ -597,8 +597,10 @@ public sealed class Lexer
             }
             else
             {
+                // A character beyond the basic plane is two UTF-16 units in the source, a
+                // surrogate pair, and one character of the language (a Unicode scalar value).
                 contentCount++;
-                _pos++;
+                _pos += char.IsHighSurrogate(Current) && char.IsLowSurrogate(PeekAt(1)) ? 2 : 1;
             }
         }
     }

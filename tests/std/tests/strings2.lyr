@@ -1,0 +1,82 @@
+// std.core's strings, second part (design/v5/spec/10 B9 S2, S3): split, the lines, trimming,
+// stripping, replacing, padding, StringBuilder.
+import std.string { StringBuilder };
+import std.test { assertEq, assertNull, assertTrue };
+
+fn joined<I :: [Iterator<Item = string, Error = never>]>(it: I): string {
+    let out = StringBuilder.new();
+    var first = true;
+    for (part in it) {
+        if (!first) {
+            out.appendStr("|");
+        }
+        first = false;
+        out.appendStr(part);
+    }
+    return out.toString();
+}
+
+@Test
+fn splitKeepsEmptyParts(): void {
+    assertEq(joined("a,b,,c".split(",")), "a|b||c");
+    assertEq(joined("abc".split(",")), "abc");
+    assertEq(joined(",a,".split(",")), "|a|");
+    assertEq(joined("a::b".split("::")), "a|b");
+    let pair = "key=value=more".splitOnce("=") ?? ("", "");
+    let (k, v) = pair;
+    assertEq(k, "key");
+    assertEq(v, "value=more");
+    assertTrue("plain".splitOnce("=") == null);
+}
+
+@Test
+fn linesTakeOffTheirBreaks(): void {
+    var n = 0;
+    let out = StringBuilder.new();
+    for (line in "one\r\ntwo\n\nfour\n".lines()) {
+        out.appendStr(f"[{line}]");
+        n = n + 1;
+    }
+    assertEq(out.toString(), "[one][two][][four]");
+    assertEq(n, 4);
+}
+
+@Test
+fn trimAndStrip(): void {
+    assertEq("  a b \t\n".trim(), "a b");
+    assertEq("  a ".trimStart(), "a ");
+    assertEq("  a ".trimEnd(), "  a");
+    assertEq("   ".trim(), "");
+    assertEq("v1.2".stripPrefix("v") ?? "", "1.2");
+    assertNull("1.2".stripPrefix("v"));
+    assertEq("main.lyr".stripSuffix(".lyr") ?? "", "main");
+    assertNull("main.c".stripSuffix(".lyr"));
+}
+
+@Test
+fn replaceAndPad(): void {
+    assertEq("a-b-c".replace("-", "+"), "a+b+c");
+    assertEq("aaaa".replace("aa", "b"), "bb");
+    assertEq("é".replace("é", "e"), "e");
+    assertEq("7".padStart(3, '0'), "007");
+    assertEq("ab".padEnd(4), "ab  ");
+    assertEq("abcd".padStart(2), "abcd");
+    assertEq("é".padStart(3), "  é");
+}
+
+@Test
+fn aBuilderCollectsItsParts(): void {
+    let b = StringBuilder.new();
+    for (i in 0..100) {
+        b.append(i);
+    }
+    assertEq(b.length(), 190);
+    b.clear();
+    b.appendStr("x");
+    b.appendChar('é');
+    b.appendChar('€');
+    b.appendChar('😀');
+    b.append(true);
+    assertEq(b.toString(), "xé€😀true");
+    assertEq(b.length(), 1 + 2 + 3 + 4 + 4);
+}

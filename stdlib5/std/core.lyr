@@ -1631,6 +1631,10 @@ fn byteCount(s: string): int;
 fn byteAt(s: string, i: int): int;
 /// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
 fn compareBytes(a: string, b: string): int;
+/// The bytes from..to as a string; out of bounds or off a character's boundary, a panic.
+fn byteSlice(s: string, from: int, to: int): string;
+/// A string of the array's first `count` bytes.
+fn stringOfBytes(bytes: uint8[], count: int): string;
 // --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
 // UTF-8, immutable, the length in bytes. Written over the string's bytes until `StringView` gives
 // the library its views (M8a S8): the search takes a string for its pattern — `Pattern` (S2) comes
@@ -1744,6 +1748,270 @@ extend string {
             }
         }
         return n;
+    }
+}
+
+extend string {
+    /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c`.
+    /// An empty separator panics.
+    pub fn split(sep: string): Split {
+        if (byteCount(sep) == 0) {
+            panic("split: an empty separator");
+        }
+        return Split { s = this, sep = sep, at = 0, done = false };
+    }
+
+    /// The part before the first `sep` and the part after it, or `null` where there is none.
+    pub fn splitOnce(sep: string): ?(string, string) {
+        let at = this.find(sep);
+        if (at == null) {
+            return null;
+        }
+        let parts: (string, string) = (byteSlice(this, 0, at), byteSlice(this, at + byteCount(sep), byteCount(this)));
+        return parts;
+    }
+
+    /// The lines: split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
+    pub fn lines(): Lines {
+        return Lines { s = this, at = 0 };
+    }
+
+    /// Without the white space at both ends (ASCII's for now: space, tab, the line breaks, vertical
+    /// tab and form feed).
+    pub fn trim(): string {
+        return this.trimStart().trimEnd();
+    }
+
+    /// Without the white space at the start.
+    pub fn trimStart(): string {
+        let n = byteCount(this);
+        var i = 0;
+        while (i < n && isAsciiSpace(byteAt(this, i))) {
+            i = i + 1;
+        }
+        return byteSlice(this, i, n);
+    }
+
+    /// Without the white space at the end.
+    pub fn trimEnd(): string {
+        var n = byteCount(this);
+        while (n > 0 && isAsciiSpace(byteAt(this, n - 1))) {
+            n = n - 1;
+        }
+        return byteSlice(this, 0, n);
+    }
+
+    /// The rest after `p` where it begins with `p`, or `null` (10 S2: absence is information).
+    pub fn stripPrefix(p: string): ?string {
+        if (!this.startsWith(p)) {
+            return null;
+        }
+        return byteSlice(this, byteCount(p), byteCount(this));
+    }
+
+    /// The rest before `p` where it ends with `p`, or `null`.
+    pub fn stripSuffix(p: string): ?string {
+        if (!this.endsWith(p)) {
+            return null;
+        }
+        return byteSlice(this, 0, byteCount(this) - byteCount(p));
+    }
+
+    /// Every `p` replaced by `with`, none overlapping another; an empty `p` panics.
+    pub fn replace(p: string, with: string): string {
+        let step = byteCount(p);
+        if (step == 0) {
+            panic("replace: an empty pattern");
+        }
+        let out = StringBuilder.new();
+        let n = byteCount(this);
+        var from = 0;
+        var at = 0;
+        while (at + step <= n) {
+            if (matchesAt(this, p, at)) {
+                out.appendStr(byteSlice(this, from, at));
+                out.appendStr(with);
+                at = at + step;
+                from = at;
+            } else {
+                at = at + 1;
+            }
+        }
+        out.appendStr(byteSlice(this, from, n));
+        return out.toString();
+    }
+
+    /// `fill` before it until it is `width` characters long; a longer one as it is.
+    pub fn padStart(width: int, fill: char = ' '): string {
+        let missing = width - this.charCount();
+        if (missing <= 0) {
+            return this;
+        }
+        let out = StringBuilder.new();
+        var i = 0;
+        while (i < missing) {
+            out.appendChar(fill);
+            i = i + 1;
+        }
+        out.appendStr(this);
+        return out.toString();
+    }
+
+    /// `fill` after it until it is `width` characters long; a longer one as it is.
+    pub fn padEnd(width: int, fill: char = ' '): string {
+        let missing = width - this.charCount();
+        if (missing <= 0) {
+            return this;
+        }
+        let out = StringBuilder.new();
+        out.appendStr(this);
+        var i = 0;
+        while (i < missing) {
+            out.appendChar(fill);
+            i = i + 1;
+        }
+        return out.toString();
+    }
+}
+
+fn isAsciiSpace(b: int): bool {
+    return b == 32 || (b >= 9 && b <= 13);
+}
+
+/// A string's parts between a separator's occurrences.
+pub struct Split :: [Iterator] {
+    type Item = string;
+    s: string,
+    sep: string,
+    var at: int,
+    var done: bool,
+
+    pub mut fn next(): ?string {
+        if (this.done) {
+            return null;
+        }
+        let n = byteCount(this.s);
+        let step = byteCount(this.sep);
+        var i = this.at;
+        while (i + step <= n) {
+            if (matchesAt(this.s, this.sep, i)) {
+                let part = byteSlice(this.s, this.at, i);
+                this.at = i + step;
+                return part;
+            }
+            i = i + 1;
+        }
+        this.done = true;
+        return byteSlice(this.s, this.at, n);
+    }
+}
+
+/// A string's lines.
+pub struct Lines :: [Iterator] {
+    type Item = string;
+    s: string,
+    var at: int,
+
+    pub mut fn next(): ?string {
+        let n = byteCount(this.s);
+        if (this.at >= n) {
+            return null;
+        }
+        var i = this.at;
+        while (i < n && byteAt(this.s, i) != 10) {
+            i = i + 1;
+        }
+        var end = i;
+        if (end > this.at && byteAt(this.s, end - 1) == 13) {
+            end = end - 1;
+        }
+        let line = byteSlice(this.s, this.at, end);
+        this.at = i + 1;
+        return line;
+    }
+}
+
+/// A string built a part at a time (10 S3), in a buffer that doubles: no quadratic chain of
+/// concatenations. `std.string` passes it on.
+pub class StringBuilder {
+    var bytes: uint8[],
+    var count: int,
+
+    pub static fn new(): StringBuilder {
+        return StringBuilder { bytes = [], count = 0 };
+    }
+
+    /// How many bytes it holds.
+    pub fn length(): int {
+        return this.count;
+    }
+
+    /// `s` at the end.
+    pub mut fn appendStr(s: string): void {
+        let n = byteCount(s);
+        this.reserve(n);
+        var i = 0;
+        while (i < n) {
+            this.bytes[this.count + i] = byteAt(s, i) as uint8;
+            i = i + 1;
+        }
+        this.count = this.count + n;
+    }
+
+    /// `c` at the end, as its UTF-8 bytes.
+    pub mut fn appendChar(c: char): void {
+        let code = c.toUint32() as int;
+        this.reserve(4);
+        if (code < 128) {
+            this.put(code);
+        } else if (code < 2048) {
+            this.put(192 | (code >> 6));
+            this.put(128 | (code & 63));
+        } else if (code < 65536) {
+            this.put(224 | (code >> 12));
+            this.put(128 | ((code >> 6) & 63));
+            this.put(128 | (code & 63));
+        } else {
+            this.put(240 | (code >> 18));
+            this.put(128 | ((code >> 12) & 63));
+            this.put(128 | ((code >> 6) & 63));
+            this.put(128 | (code & 63));
+        }
+    }
+
+    /// `v`'s text at the end.
+    pub mut fn append<T :: [Display]>(v: T): void {
+        this.appendStr(f"{v}");
+    }
+
+    /// Every byte taken out; the room stays.
+    pub mut fn clear(): void {
+        this.count = 0;
+    }
+
+    /// What it holds, as a string.
+    pub fn toString(): string {
+        return stringOfBytes(this.bytes, this.count);
+    }
+
+    mut fn put(b: int): void {
+        this.bytes[this.count] = b as uint8;
+        this.count = this.count + 1;
+    }
+
+    /// Room for `n` bytes more.
+    mut fn reserve(n: int): void {
+        let need = this.count + n;
+        if (need <= this.bytes.length()) {
+            return;
+        }
+        var room = if (this.bytes.length() == 0) 16 else this.bytes.length() * 2;
+        while (room < need) {
+            room = room * 2;
+        }
+        let old = this.bytes;
+        let kept = this.count;
+        this.bytes = arrayOf(room, (i: int): uint8 => if (i < kept) old[i] else 0);
     }
 }
 

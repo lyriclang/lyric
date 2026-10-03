@@ -25,6 +25,14 @@ bool lyr_str_eq(const LyrStr *a, const LyrStr *b);
 /* <0, 0, >0 in byte order, which is code point order for UTF-8. */
 int lyr_str_cmp(const LyrStr *a, const LyrStr *b);
 
+/* The bytes from..to as a string of its own (10 S1): out of 0 ≤ from ≤ to ≤ len, or off a
+ * character's boundary, a panic (LYR-RT0003). */
+LyrStr *lyr_str_slice(const LyrStr *s, int64_t from, int64_t to);
+
+/* A string of the first `count` bytes of a byte array (StringBuilder's): they are UTF-8, the
+ * builder wrote them; `count` past the array is a panic. */
+LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count);
+
 /* Decimal text of an integer. */
 LyrStr *lyr_str_from_int(int64_t value);
 LyrStr *lyr_str_from_uint(uint64_t value);
