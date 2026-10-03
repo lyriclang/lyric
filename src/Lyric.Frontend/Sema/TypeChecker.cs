@@ -1077,9 +1077,9 @@ public sealed class TypeChecker
         // their chains with methods of their own, so two of them meeting on one type are two
         // implementations, and the lowering asks for one by the interface alone: compared over
         // the chains, by interface rather than instance. A blanket block excludes a type's own
-        // conformance where it reaches the type (X4), and another blanket block or a shape's
-        // block anywhere, even where no type could meet both; a shape's block, another block on
-        // an overlapping shape.
+        // conformance and a shape's block where it reaches the type or the shape (X4), another
+        // blanket block anywhere, even where no type could meet both; a shape's block, another
+        // block on an overlapping shape.
         var blockSites = new List<(ExtensionBlock Block, LyrType Target, List<TypeSymbol> Chain)>();
         foreach (var block in _comp.Extensions.Blocks)
         {
@@ -1102,8 +1102,7 @@ public sealed class TypeChecker
                         { clash = $"'{TypeFacts.Display(instance)}' conforms to '{shared.Name}' on its own, and this block gives it to every type its constraints admit"; break; }
                 if (clash is null)
                     foreach (var (prior, priorTarget, priorChain) in blockSites)
-                        if ((block.IsBlanketTarget || prior.IsBlanketTarget || TypeFacts.Overlaps(priorTarget, target))
-                            && SharedWith(priorChain) is { } shared)
+                        if (Meets(block, target, prior, priorTarget) && SharedWith(priorChain) is { } shared)
                         { clash = $"another block gives '{shared.Name}' to '{TypeFacts.Display(priorTarget)}'"; break; }
                 if (clash is not null)
                     _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
@@ -1113,6 +1112,27 @@ public sealed class TypeChecker
             blockSites.Add((block, target, chain));
         }
         _currentModule = null;
+    }
+
+    /// <summary>
+    /// Whether two blocks without a target symbol can give a conformance to one type (05 §13 rules
+    /// 6, 8): two shapes' blocks where the shapes overlap; a blanket block and a shape's where the
+    /// blanket reaches the shape — the shape, or an overlapping one another block names, meeting
+    /// the blanket's constraints, which a shape does through a block naming them alone (rule 6);
+    /// two blanket blocks always, as no negative reasoning over every type is made.
+    /// </summary>
+    private bool Meets(ExtensionBlock a, LyrType aTarget, ExtensionBlock b, LyrType bTarget)
+    {
+        if (a.IsBlanketTarget && b.IsBlanketTarget) return true;
+        if (!a.IsBlanketTarget && !b.IsBlanketTarget) return TypeFacts.Overlaps(aTarget, bTarget);
+        var (blanket, shape) = a.IsBlanketTarget ? (a, bTarget) : (b, aTarget);
+        if (BlockSubstitution(blanket, shape) is not null) return true;
+        foreach (var other in _comp.Extensions.Blocks)
+            if (IsShapeBlock(other) && other.Decl.Interfaces.Length > 0
+                && BlockTargetType(other) is var named && TypeFacts.Overlaps(named, shape)
+                && BlockSubstitution(blanket, named) is not null)
+                return true;
+        return false;
     }
 
     /// <summary>
