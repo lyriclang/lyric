@@ -1840,6 +1840,56 @@ pub struct Inspect<I :: [Iterator]> :: [Iterator] {
     }
 }
 
+/// The join of two thrown types (design/v5/spec/05 E2 K7): what a walk over two sources throws.
+/// The compiler reduces it once both are known — one type where they are one, the other where
+/// one is `never`, the root `Error` where they differ; open, it covers each of its parts. No value
+/// of it is made.
+pub struct Join<A :: [Error], B :: [Error]> :: [Error] {
+    pub fn message(): string {
+        return "a joined error";
+    }
+}
+
+/// `it.zip(other)`: each value beside the other's at its position, as long as both have one.
+pub struct Zip<A :: [Iterator], B :: [Iterator]> :: [Iterator] {
+    type Item = (A.Item, B.Item);
+    type Error = Join<A.Error, B.Error>;
+    var a: A,
+    var b: B,
+
+    pub mut fn next(): ?(A.Item, B.Item) throws Join<A.Error, B.Error> {
+        let x = try this.a.next();
+        if (x == null) {
+            return null;
+        }
+        let y = try this.b.next();
+        if (y == null) {
+            return null;
+        }
+        return (x, y);
+    }
+}
+
+/// `it.chain(other)`: the values of `it`, then the other's.
+pub struct Chain<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] {
+    type Item = A.Item;
+    type Error = Join<A.Error, B.Error>;
+    var a: A,
+    var b: B,
+    var second: bool,
+
+    pub mut fn next(): ?A.Item throws Join<A.Error, B.Error> {
+        if (!this.second) {
+            let x = try this.a.next();
+            if (x != null) {
+                return x;
+            }
+            this.second = true;
+        }
+        return try this.b.next();
+    }
+}
+
 // The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
 // allocation, no interface value.
 extend<I :: [Iterator]> I {
@@ -1889,6 +1939,16 @@ extend<I :: [Iterator]> I {
     /// The values, each shown to `f` on its way through.
     pub fn inspect(f: fn(I.Item) -> void): Inspect<I> {
         return Inspect<I> { inner = this, f = f };
+    }
+
+    /// Each value beside the other's at its position, as long as both have one.
+    pub fn zip<B :: [Iterable]>(other: B): Zip<I, B.Iter> {
+        return Zip<I, B.Iter> { a = this, b = other.iter() };
+    }
+
+    /// The values, then the other's — an iterator of the same items.
+    pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): Chain<I, B> {
+        return Chain<I, B> { a = this, b = other, second = false };
     }
 }
 

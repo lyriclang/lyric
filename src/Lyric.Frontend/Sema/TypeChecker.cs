@@ -148,6 +148,12 @@ public sealed class TypeChecker
         _coreIterator = comp.Lyric5Modules
             && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterator") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterator
             ? coreIterator : null;
+        // Whatever the module mode: a build from a stdlib root alone (the emitter's tests) checks
+        // std.core's Zip as a package build does, and 'Join' is stdlib5's alone.
+        if (comp.FindModule(["std", "core"])?.Members is { } coreMembers
+            && coreMembers.LookupLocal("Join") is TypeSymbol { Kind: TypeSymbolKind.Struct } join
+            && coreMembers.LookupLocal("Error") is TypeSymbol { Kind: TypeSymbolKind.Interface } errorRoot)
+            JoinRoots.AddOrUpdate(join, errorRoot);
 
         // 'Indexable<T>' lives in std.collections and is to '[i]' what 'Iterator<T>' is to 'for-in':
         // the compiler knows ONE built-in form, the array, and binds everything else to an interface
@@ -2521,6 +2527,12 @@ public sealed class TypeChecker
     {
         if (thrown.IsError || element.IsError || thrown is NeverType) return true;
         if (LyrType.Equal(thrown, element)) return true;
+        // An open join covers each of its parts, and is covered where both of them are (05 E2 K7).
+        if (IsOpenJoin(element) && element is GenericInstance covering
+            && (ThrownCoveredBy(thrown, covering.Arguments[0], at) || ThrownCoveredBy(thrown, covering.Arguments[1], at)))
+            return true;
+        if (IsOpenJoin(thrown) && thrown is GenericInstance joined)
+            return ThrownCoveredBy(joined.Arguments[0], element, at) && ThrownCoveredBy(joined.Arguments[1], element, at);
         // An associated type is thrown through its bound, 'type Error :: [Error]' (10 B6 I5).
         if (thrown is not (NamedRef or GenericInstance or TypeParamType or PrimitiveType or AssocOf)) return false;
         if (TypeFacts.SymbolOf(element) is not { Kind: TypeSymbolKind.Interface } iface) return false;
@@ -5133,6 +5145,14 @@ public sealed class TypeChecker
             if (expected is not null && !expected.IsError && fsym!.Generics.Any(g => !map.ContainsKey(g)))
                 UnifyInfer(fn.Return, expected, map, call.Span);
 
+            // A block's member (05 §13 rules 2, 7): its own constraints may name the block's
+            // parameters, 'chain<B :: [Iterator<Item = I.Item>]>', which the receiver binds.
+            if (call.Callee is MemberExpr { Target: var receiverExpr }
+                && _comp.Extensions.Blocks.FirstOrDefault(b => b.Generics.Length > 0
+                    && ReferenceEquals(b.MethodScope.LookupLocal(fsym!.Name), fsym)) is { } owningBlock
+                && BlockSubstitution(owningBlock, _result.TypeOf(receiverExpr)) is { } blockMap)
+                foreach (var (param, bound) in blockMap) map.TryAdd(param, bound);
+
             CheckInferredConstraints(fsym!.Generics, map, call.Span);
             substituted = (FnType)Substitute(fn, map);
 
@@ -5785,12 +5805,13 @@ public sealed class TypeChecker
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
                 { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places },
-            GenericInstance gi => new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
+            // A join reduces once both its parts are known (05 E2 K7).
+            GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
             {
                 Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray(),
                 // 'Task<T> throws E' at 'E = never' throws nothing (05 E2 K4).
                 Throws = gi.Throws is { } thrown && Substitute(thrown, map) is not NeverType and var bound ? bound : null,
-            },
+            }),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
             CoroutineOf co => co with { Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map) },
             AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
@@ -6541,6 +6562,31 @@ public sealed class TypeChecker
         OpaqueRef => false,
         _ => true // external or error: pass through opaquely
     };
+
+    /// <summary>std.core's <c>Join</c> of each compilation, with the root it reduces to.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TypeSymbol, TypeSymbol> JoinRoots = new();
+
+    /// <summary>
+    /// The join of two thrown types (design/v5/spec/05 E2 K7), std.core's <c>Join&lt;A, B&gt;</c>,
+    /// once both are known: one type where they are one, the other where one is <c>never</c>, the
+    /// root <c>Error</c> where they differ. Open, it stays as it is.
+    /// </summary>
+    internal static LyrType ReduceJoin(GenericInstance gi)
+    {
+        if (gi.Arguments.Length != 2 || !JoinRoots.TryGetValue(gi.Definition, out var root)) return gi;
+        var (a, b) = (gi.Arguments[0], gi.Arguments[1]);
+        if (Open(a) || Open(b)) return gi;
+        if (a is NeverType) return b;
+        if (b is NeverType || LyrType.Equal(a, b)) return a;
+        return new NamedRef(root);
+
+        static bool Open(LyrType t) => t is TypeParamType or AssocOf
+            || t is GenericInstance g && g.Arguments.Any(Open) || t is Optional { Inner: var inner } && Open(inner);
+    }
+
+    /// <summary>Whether the type is an unreduced join, whose parts it covers (05 E2 K7).</summary>
+    internal static bool IsOpenJoin(LyrType t) =>
+        t is GenericInstance { Arguments.Length: 2 } gi && JoinRoots.TryGetValue(gi.Definition, out _);
 
     /// <summary>A coroutine's built-in conformances (10 B6 I7): <c>Iterator</c> with its answers —
     /// a fixation must name them — and <c>Closeable</c> where std.task gives its close.</summary>

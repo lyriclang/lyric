@@ -6909,8 +6909,8 @@ internal sealed class FunctionLowerer
             Result = SubstituteType(c.Result),
             Throws = c.Throws is { } thrown ? SubstituteType(thrown) : null,
         },
-        GenericInstance g => new GenericInstance(g.Definition,
-            g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations },
+        GenericInstance g => TypeChecker.ReduceJoin(new GenericInstance(g.Definition,
+            g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations }),
         AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member),
         _ => type,
     };
