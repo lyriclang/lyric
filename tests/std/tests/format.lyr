@@ -1,0 +1,108 @@
+// The format language (design/v5/spec/08 Y7, 10 S7; spec 12 §2): a hole's spec, checked where it
+// is written, applied by std.core — numbers, text, Debug, a Display type, a type's own formats.
+import std.core { Format, formatted };
+import std.string { StringBuilder };
+import std.test { assertEq };
+
+@Test
+fn widthAlignmentAndFill(): void {
+    assertEq(f"[{42:5}] [{42:<5}] [{42:^6}] [{42:^5}] [{42:*>5}]", "[   42] [42   ] [  42  ] [ 42  ] [***42]");
+    assertEq(f"[{"ab":4}] [{"ab":>4}] [{'x':^3}] [{true:>5}] [{false:6}]", "[ab  ] [  ab] [ x ] [ true] [false ]");
+    // counted in characters, not bytes; a fill beyond ASCII
+    assertEq(f"[{"héllo":>7}] [{7:é>3}] [{"ab":1}]", "[  héllo] [éé7] [ab]");
+}
+
+@Test
+fn integersInARadix(): void {
+    assertEq(f"{255:x} {255:X} {255:#x} {255:#X} {5:b} {5:#b} {8:o} {8:#o}", "ff FF 0xff 0XFF 101 0b101 10 0o10");
+    assertEq(f"{0xdeadbeef:_x} {255:#06x} {-255:x}", "dead_beef 0x00ff -ff");
+}
+
+@Test
+fn integersSignedZeroedAndGrouped(): void {
+    assertEq(f"{42:+} {-42:+} {0:+} {7:05} {-7:05} {-7:+05}", "+42 -42 +0 00007 -0007 -0007");
+    assertEq(f"{1234567:,} {1234567:_} {-1234:,} {999:,} {1000:,}", "1,234,567 1_234_567 -1,234 999 1,000");
+    assertEq(f"{1234:x<8,}", "1,234xxx");
+}
+
+@Test
+fn theExtremesOfEveryWidth(): void {
+    let least = int.min;
+    assertEq(f"{least} {least:x} {least:,}", "-9223372036854775808 -8000000000000000 -9,223,372,036,854,775,808");
+    let most: uint = 18446744073709551615;
+    assertEq(f"{most:x} {most:,}", "ffffffffffffffff 18,446,744,073,709,551,615");
+    let b: int8 = -128;
+    let w: uint8 = 255;
+    let s: int16 = -2;
+    let u: uint32 = 4096;
+    assertEq(f"{b:x} {w:08b} {w:#010b} {s:+} {u:_b}", "-80 11111111 0b11111111 -2 1_0000_0000_0000");
+}
+
+@Test
+fn floatsFixedAndWithAnExponent(): void {
+    assertEq(f"{3.14159:.2f} {3.14159:.2} {2.6:.0f} {2.675:.2f} {1.0:f}", "3.14 3.14 3 2.67 1.000000");
+    assertEq(f"{1234.5:e} {1234.5:.2E} {0.00012:.1e}", "1.234500e+03 1.23E+03 1.2e-04");
+    assertEq(f"{0.25:%} {0.256:.1%} {1.5:.0%}", "25.000000% 25.6% 150%");
+    let h: float32 = 0.1;
+    assertEq(f"{h:.3f} {h}", "0.100 0.10000000149011612");
+}
+
+@Test
+fn floatsSignedZeroedAndGrouped(): void {
+    assertEq(f"{1234567.891:,.2f} {-1234.5:_.1f} {123.4:,}", "1,234,567.89 -1_234.5 123.4");
+    assertEq(f"{-1.5:+.1f} {1.5:+.1f} {-0.0:.1f} {3.5:08.2f} {-3.5:08.2f}", "-1.5 +1.5 -0.0 00003.50 -0003.50");
+    assertEq(f"[{1.5:>8}] [{1.5:<6}] [{0.1:^7}]", "[     1.5] [1.5   ] [  0.1  ]");
+}
+
+@Test
+fn floatsThatAreNoNumber(): void {
+    let nan = float.nan;
+    let inf = float.infinity;
+    assertEq(f"{nan:.2f} {nan:E} {inf:e} {-inf:+.1f} {inf:+} {inf:>5}", "nan NAN inf -inf +inf   inf");
+}
+
+@Test
+fn stringsTakeAPrecision(): void {
+    assertEq(f"[{"hello":.3}] [{"hello":>6.2}] [{"héllo":.2}] [{"ab":.5}]", "[hel] [    he] [hé] [ab]");
+}
+
+struct Point {
+    x: int,
+    y: int,
+}
+
+class Badge :: [Display] {
+    name: string,
+
+    fn show(): string {
+        return f"<{this.name}>";
+    }
+}
+
+/// Formats of its own (10 S7): 'C' and 'F' name the scale.
+struct Celsius :: [Format] {
+    degrees: float,
+
+    fn format(spec: string, &out: StringBuilder): void {
+        if (spec == "F") {
+            out.appendStr(f"{this.degrees * 1.8 + 32.0}°F");
+        } else {
+            out.appendStr(f"{this.degrees}°C");
+        }
+    }
+}
+
+@Test
+fn debugDisplayAndOwnFormats(): void {
+    let p = Point { x = 1, y = -2 };
+    assertEq(f"{p:?} {"a":?} {'b':?} [{7:>4?}]", "Point { x = 1, y = -2 } \"a\" 'b' [   7]");
+    let badge = Badge { name = "ok" };
+    assertEq(f"[{badge:>6}] [{badge:-<6}] [{badge}]", "[  <ok>] [<ok>--] [<ok>]");
+    let warm = Celsius { degrees = 25.0 };
+    assertEq(f"{warm:F} {warm:C}", "77.0°F 25.0°C");
+}
+
+@Test
+fn theHelpersAreStdCores(): void {
+    assertEq(formatted(255, "#x"), "0xff");
+}

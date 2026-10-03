@@ -3,6 +3,7 @@
 #include "lyr/gc.h"
 #include "lyr/panic.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -200,6 +201,25 @@ LyrStr *lyr_str_from_float(double value) {
             text[n++] = '0';
     }
     return lyr_str_from_bytes(text, n);
+}
+
+/* A float with a precision (08 Y7): snprintf's `%.*f`, `%.*e`, `%.*E`, correctly rounded on every
+ * libc this toolchain links (as lyr_str_from_float relies on). A NaN is `nan` whatever its sign
+ * bit, as the shortest text writes it. The text on the stack while it fits, on the heap beyond. */
+LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form) {
+    if (value != value) return lyr_str_from_cstr(form == 2 ? "NAN" : "nan");
+    const char *pattern = form == 0 ? "%.*f" : form == 1 ? "%.*e" : "%.*E";
+    int digits = precision < 0 ? 0 : precision > INT_MAX ? INT_MAX : (int)precision;
+    char small[128];
+    int n = snprintf(small, sizeof small, pattern, digits, value);
+    if (n < 0) lyr_panic_message(lyr_str_from_cstr("a float's text failed"));
+    if ((size_t)n < sizeof small) return lyr_str_from_bytes(small, n);
+    char *large = malloc((size_t)n + 1);
+    if (large == NULL) lyr_panic_message(lyr_str_from_cstr("out of memory for a float's text"));
+    snprintf(large, (size_t)n + 1, pattern, digits, value);
+    LyrStr *text = lyr_str_from_bytes(large, n);
+    free(large);
+    return text;
 }
 
 /* The text strtod reads: the string's own bytes (NUL-terminated, 11 X3) when it has no '_', else

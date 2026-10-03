@@ -85,6 +85,8 @@ public static class Intrinsics
         ["std.core.totalOrderKey"] = "LYR_TOTAL_ORDER_KEY",
         ["std.core.floatOfText"] = "lyr_str_to_float64",
         ["std.core.float32OfText"] = "lyr_str_to_float32",
+        // The format language (08 Y7, 12 §2): a float with a precision, rounded by C.
+        ["std.core.floatText"] = "lyr_str_float_text",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

@@ -98,7 +98,11 @@ public sealed class TypeChecker
     private readonly TypeSymbol? _iterable;
     private readonly TypeSymbol? _indexable;
     private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]' (04 D6)
-    private readonly TypeSymbol? _coreIndexSet;  // and IndexSet<K>: 'x[k] = v'
+    private readonly TypeSymbol? _coreIndexSet;
+    // 'Format' (10 S7): std.core declaring it is Lyric 5's format language — a spec checked here,
+    // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
+    private readonly TypeSymbol? _coreFormat;
+    private readonly TypeSymbol? _debug;  // and IndexSet<K>: 'x[k] = v'
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
@@ -166,6 +170,10 @@ public sealed class TypeChecker
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
         _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndexSet ? coreIndexSet : null;
+        _coreFormat = comp.FindModule(["std", "core"])?.Members.LookupLocal("Format")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreFormat ? coreFormat : null;
+        _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -3239,6 +3247,8 @@ public sealed class TypeChecker
                                 $"'{TypeFacts.Display(hole)}' is opaque and does not render in "
                                 + "an f-string — convert explicitly: "
                                 + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
+                        else if (_coreFormat is { } format && h.FormatSpec is not null && !hole.IsError)
+                            CheckFormattedHole(h, hole, format, scope);
                         else if (hole is not PrimitiveType && !hole.IsError)
                             CheckDisplayHole(h, hole, scope);
                     }
@@ -4875,6 +4885,79 @@ public sealed class TypeChecker
         var call = new CallExpr(member, [], hole.Expr.Span);
         if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
     }
+
+    /// <summary>
+    /// A hole with a format (08 Y7, 10 S7; spec 12 §2): the spec read and checked against what the
+    /// value is (<c>LYR-SEM0164</c>), then the hole IS a call of std.core's, written by the compiler
+    /// as an operator's helper is — <c>formatted</c> for a <c>Format</c> type (the scalars, checked
+    /// here; another type reads its own specs), <c>padded</c> for another <c>Display</c> type,
+    /// <c>debugged</c> under <c>?</c>.
+    /// </summary>
+    private void CheckFormattedHole(InterpHole hole, LyrType type, TypeSymbol format, SymbolTable scope)
+    {
+        var text = hole.FormatSpec!;
+        var spec = FormatSpec.Read(text, out var malformed);
+        string helper;
+        string? misfit = null;
+        if (spec is { Type: '?' })
+        {
+            // Every scalar has its Debug in std.core.
+            if (type is not PrimitiveType && (_debug is not { } debug || !RendersThrough(type, debug)))
+            {
+                _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+                    $"'{TypeFacts.Display(type)}' has no 'Debug' for '?' to render through");
+                return;
+            }
+            helper = "debugged";
+            misfit = spec.MisfitForPadding("'?'");
+        }
+        else if (type is not PrimitiveType && RendersThrough(type, format))
+            helper = "formatted"; // formats of its own: the type reads the spec as written (10 S7)
+        else if (spec is null)
+        {
+            _de.Report("LYR-SEM0164", Severity.Error, hole.Span, $"':{text}' is no format: {malformed}");
+            return;
+        }
+        else if (type is PrimitiveType primitive)
+        {
+            helper = "formatted";
+            misfit = TypeFacts.IsInteger(type) ? spec.MisfitForInteger()
+                : TypeFacts.IsFloat(type) ? spec.MisfitForFloat()
+                : primitive.Kind is PrimitiveKind.String ? spec.MisfitForString()
+                : spec.MisfitForPadding($"'{TypeFacts.Display(type)}'");
+        }
+        else if (_display is { } display && RendersThrough(type, display))
+        {
+            helper = "padded";
+            misfit = spec.MisfitForPadding($"'{TypeFacts.Display(type)}', a 'Display' type,");
+        }
+        else
+        {
+            _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+                $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
+                + "through 'Display': give the type the conformance ':: [Display]' with a "
+                + "'fn show(): string', or narrow and convert it explicitly");
+            return;
+        }
+
+        if (misfit is not null)
+        {
+            _de.Report("LYR-SEM0164", Severity.Error, hole.Span, $"':{text}' does not apply here — {misfit}");
+            return;
+        }
+
+        var function = new IdentifierExpr(helper, hole.Span);
+        _compilerWritten.Add(function); // std.core's, whatever the program names so
+        var call = new CallExpr(function, [hole.Expr, new StringLiteralExpr(text, hole.Span)], hole.Span);
+        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
+    }
+
+    /// <summary>Whether a value of <paramref name="type"/> renders through <paramref name="iface"/>:
+    /// its conformance, or for an interface value its parents — the vtable dispatches.</summary>
+    private bool RendersThrough(LyrType type, TypeSymbol iface) =>
+        type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } value
+            ? Conformance.WithParents(value.Symbol, _binding).Any(i => ReferenceEquals(i, iface))
+            : CanConform(type) && Satisfies(type, iface, new NamedRef(iface));
 
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
     {
