@@ -5948,11 +5948,21 @@ internal sealed class FunctionLowerer
             // And its class goes into the instance's name: 'TaskScope.spawn<int, Oops>' and a free
             // 'spawn<int, Oops>' of the same module are two functions. Under the bare name they
             // were one key, and the free function's call landed on the method, one argument short.
+            //
+            // A block's member on a builtin or through a type's name has no holder here: the block's
+            // target goes into the name, or 'int8.exact<int>' and 'uint8.exact<int>' are one key
+            // and the second call lands on the first block's function.
             var instanceName = receiverOwner is { } holder && !calleeName.StartsWith(holder.Name + ".", StringComparison.Ordinal)
                 ? $"{holder.Name}.{calleeName}"
-                : calleeName;
+                : receiverOwner is null && _typeTable.BlockOf(symbol) is { Target: { } blockTarget }
+                    ? $"<extend>.{blockTarget.Name}.{calleeName}"
+                    : calleeName;
+            // A builtin's value has no symbol to be the receiver: its type is, for the 'this'.
+            var builtinReceiver = receiverOwner is null && receiver is not null && expr.Callee is MemberExpr { Target: var on }
+                ? SubstituteType(ReceiverType(on))
+                : null;
             target = _instances.Request(symbol, generic, instanceName, receiverOwner,
-                typeArguments, _typeTable, expr.Span);
+                typeArguments, _typeTable, expr.Span, receiverType: builtinReceiver);
         }
         else if (!TryResolveFunction(symbol, out target))
         {
