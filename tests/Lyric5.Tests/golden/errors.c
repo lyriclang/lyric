@@ -26,10 +26,11 @@ typedef struct lyr_ty16_Ordering_Greater lyr_ty16_Ordering_Greater;
 typedef struct lyr_ty17_Exception lyr_ty17_Exception;
 typedef struct lyr_vt_ty18 lyr_vt_ty18;
 const char lyr_ifid_ty18[] = "std.core.Hasher";
-typedef struct lyr_ty19_Sip lyr_ty19_Sip;
-typedef struct lyr_ty20_DefaultHasher lyr_ty20_DefaultHasher;
-typedef struct lyr_ty21_FixedHasher lyr_ty21_FixedHasher;
-typedef struct lyr_ty22_Fnv1a64 lyr_ty22_Fnv1a64;
+typedef struct lyr_ty19_Chars lyr_ty19_Chars;
+typedef struct lyr_ty20_Sip lyr_ty20_Sip;
+typedef struct lyr_ty21_DefaultHasher lyr_ty21_DefaultHasher;
+typedef struct lyr_ty22_FixedHasher lyr_ty22_FixedHasher;
+typedef struct lyr_ty23_Fnv1a64 lyr_ty23_Fnv1a64;
 struct lyr_ty1_ParseError_Empty {
     uint8_t lyr_unit;
 };
@@ -115,7 +116,11 @@ struct lyr_vt_ty18 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
-struct lyr_ty19_Sip {
+struct lyr_ty19_Chars {
+    LyrStr *f_s;
+    int64_t f_at;
+};
+struct lyr_ty20_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -124,13 +129,13 @@ struct lyr_ty19_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty20_DefaultHasher {
-    lyr_ty19_Sip f_state;
+struct lyr_ty21_DefaultHasher {
+    lyr_ty20_Sip f_state;
 };
-struct lyr_ty21_FixedHasher {
-    lyr_ty19_Sip f_state;
+struct lyr_ty22_FixedHasher {
+    lyr_ty20_Sip f_state;
 };
-struct lyr_ty22_Fnv1a64 {
+struct lyr_ty23_Fnv1a64 {
     uint64_t f_state;
 };
 typedef struct { LyrObj header; lyr_ty0_ParseError value; } lyr_box_ty0_ParseError;

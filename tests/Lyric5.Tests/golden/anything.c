@@ -27,10 +27,11 @@ typedef struct lyr_ty15_Ordering_Greater lyr_ty15_Ordering_Greater;
 typedef struct lyr_ty16_Exception lyr_ty16_Exception;
 typedef struct lyr_vt_ty17 lyr_vt_ty17;
 const char lyr_ifid_ty17[] = "std.core.Hasher";
-typedef struct lyr_ty18_Sip lyr_ty18_Sip;
-typedef struct lyr_ty19_DefaultHasher lyr_ty19_DefaultHasher;
-typedef struct lyr_ty20_FixedHasher lyr_ty20_FixedHasher;
-typedef struct lyr_ty21_Fnv1a64 lyr_ty21_Fnv1a64;
+typedef struct lyr_ty18_Chars lyr_ty18_Chars;
+typedef struct lyr_ty19_Sip lyr_ty19_Sip;
+typedef struct lyr_ty20_DefaultHasher lyr_ty20_DefaultHasher;
+typedef struct lyr_ty21_FixedHasher lyr_ty21_FixedHasher;
+typedef struct lyr_ty22_Fnv1a64 lyr_ty22_Fnv1a64;
 struct lyr_vt_ty0 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -108,7 +109,11 @@ struct lyr_vt_ty17 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
-struct lyr_ty18_Sip {
+struct lyr_ty18_Chars {
+    LyrStr *f_s;
+    int64_t f_at;
+};
+struct lyr_ty19_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
     uint64_t f_v2;
@@ -117,13 +122,13 @@ struct lyr_ty18_Sip {
     int64_t f_pending;
     int64_t f_length;
 };
-struct lyr_ty19_DefaultHasher {
-    lyr_ty18_Sip f_state;
+struct lyr_ty20_DefaultHasher {
+    lyr_ty19_Sip f_state;
 };
-struct lyr_ty20_FixedHasher {
-    lyr_ty18_Sip f_state;
+struct lyr_ty21_FixedHasher {
+    lyr_ty19_Sip f_state;
 };
-struct lyr_ty21_Fnv1a64 {
+struct lyr_ty22_Fnv1a64 {
     uint64_t f_state;
 };
 _Static_assert(sizeof(LyrIface) == 16, "layout of main.Shape[]");
@@ -154,26 +159,32 @@ _Static_assert(sizeof(lyr_box_ty12_Ordering) == 16, "layout of lyr_box_ty12_Orde
 _Static_assert(offsetof(lyr_box_ty12_Ordering, value) == 8, "layout of lyr_box_ty12_Ordering");
 extern const LyrItable lyr_itab_ty12[];
 const LyrDesc lyr_desc_box_ty12_Ordering = { sizeof(lyr_box_ty12_Ordering), 0, 0, 0, NULL, "box<Ordering>", lyr_itab_ty12 };
-typedef struct { LyrObj header; lyr_ty18_Sip value; } lyr_box_ty18_Sip;
-_Static_assert(sizeof(lyr_box_ty18_Sip) == 64, "layout of lyr_box_ty18_Sip");
-_Static_assert(offsetof(lyr_box_ty18_Sip, value) == 8, "layout of lyr_box_ty18_Sip");
+typedef struct { LyrObj header; lyr_ty18_Chars value; } lyr_box_ty18_Chars;
+_Static_assert(sizeof(lyr_box_ty18_Chars) == 24, "layout of lyr_box_ty18_Chars");
+_Static_assert(offsetof(lyr_box_ty18_Chars, value) == 8, "layout of lyr_box_ty18_Chars");
 extern const LyrItable lyr_itab_ty18[];
-const LyrDesc lyr_desc_box_ty18_Sip = { sizeof(lyr_box_ty18_Sip), 0, 0, 0, NULL, "box<std.hash.Sip>", lyr_itab_ty18 };
-typedef struct { LyrObj header; lyr_ty19_DefaultHasher value; } lyr_box_ty19_DefaultHasher;
-_Static_assert(sizeof(lyr_box_ty19_DefaultHasher) == 64, "layout of lyr_box_ty19_DefaultHasher");
-_Static_assert(offsetof(lyr_box_ty19_DefaultHasher, value) == 8, "layout of lyr_box_ty19_DefaultHasher");
+static const uint64_t lyr_refmap_box18[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty18_Chars = { sizeof(lyr_box_ty18_Chars), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box18, "box<std.core.Chars>", lyr_itab_ty18 };
+typedef struct { LyrObj header; lyr_ty19_Sip value; } lyr_box_ty19_Sip;
+_Static_assert(sizeof(lyr_box_ty19_Sip) == 64, "layout of lyr_box_ty19_Sip");
+_Static_assert(offsetof(lyr_box_ty19_Sip, value) == 8, "layout of lyr_box_ty19_Sip");
 extern const LyrItable lyr_itab_ty19[];
-const LyrDesc lyr_desc_box_ty19_DefaultHasher = { sizeof(lyr_box_ty19_DefaultHasher), 0, 0, 0, NULL, "box<std.hash.DefaultHasher>", lyr_itab_ty19 };
-typedef struct { LyrObj header; lyr_ty20_FixedHasher value; } lyr_box_ty20_FixedHasher;
-_Static_assert(sizeof(lyr_box_ty20_FixedHasher) == 64, "layout of lyr_box_ty20_FixedHasher");
-_Static_assert(offsetof(lyr_box_ty20_FixedHasher, value) == 8, "layout of lyr_box_ty20_FixedHasher");
+const LyrDesc lyr_desc_box_ty19_Sip = { sizeof(lyr_box_ty19_Sip), 0, 0, 0, NULL, "box<std.hash.Sip>", lyr_itab_ty19 };
+typedef struct { LyrObj header; lyr_ty20_DefaultHasher value; } lyr_box_ty20_DefaultHasher;
+_Static_assert(sizeof(lyr_box_ty20_DefaultHasher) == 64, "layout of lyr_box_ty20_DefaultHasher");
+_Static_assert(offsetof(lyr_box_ty20_DefaultHasher, value) == 8, "layout of lyr_box_ty20_DefaultHasher");
 extern const LyrItable lyr_itab_ty20[];
-const LyrDesc lyr_desc_box_ty20_FixedHasher = { sizeof(lyr_box_ty20_FixedHasher), 0, 0, 0, NULL, "box<std.hash.FixedHasher>", lyr_itab_ty20 };
-typedef struct { LyrObj header; lyr_ty21_Fnv1a64 value; } lyr_box_ty21_Fnv1a64;
-_Static_assert(sizeof(lyr_box_ty21_Fnv1a64) == 16, "layout of lyr_box_ty21_Fnv1a64");
-_Static_assert(offsetof(lyr_box_ty21_Fnv1a64, value) == 8, "layout of lyr_box_ty21_Fnv1a64");
+const LyrDesc lyr_desc_box_ty20_DefaultHasher = { sizeof(lyr_box_ty20_DefaultHasher), 0, 0, 0, NULL, "box<std.hash.DefaultHasher>", lyr_itab_ty20 };
+typedef struct { LyrObj header; lyr_ty21_FixedHasher value; } lyr_box_ty21_FixedHasher;
+_Static_assert(sizeof(lyr_box_ty21_FixedHasher) == 64, "layout of lyr_box_ty21_FixedHasher");
+_Static_assert(offsetof(lyr_box_ty21_FixedHasher, value) == 8, "layout of lyr_box_ty21_FixedHasher");
 extern const LyrItable lyr_itab_ty21[];
-const LyrDesc lyr_desc_box_ty21_Fnv1a64 = { sizeof(lyr_box_ty21_Fnv1a64), 0, 0, 0, NULL, "box<std.hash.Fnv1a64>", lyr_itab_ty21 };
+const LyrDesc lyr_desc_box_ty21_FixedHasher = { sizeof(lyr_box_ty21_FixedHasher), 0, 0, 0, NULL, "box<std.hash.FixedHasher>", lyr_itab_ty21 };
+typedef struct { LyrObj header; lyr_ty22_Fnv1a64 value; } lyr_box_ty22_Fnv1a64;
+_Static_assert(sizeof(lyr_box_ty22_Fnv1a64) == 16, "layout of lyr_box_ty22_Fnv1a64");
+_Static_assert(offsetof(lyr_box_ty22_Fnv1a64, value) == 8, "layout of lyr_box_ty22_Fnv1a64");
+extern const LyrItable lyr_itab_ty22[];
+const LyrDesc lyr_desc_box_ty22_Fnv1a64 = { sizeof(lyr_box_ty22_Fnv1a64), 0, 0, 0, NULL, "box<std.hash.Fnv1a64>", lyr_itab_ty22 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -225,10 +236,11 @@ const lyr_vt_ty4 lyr_vt_ty4_ty6 = { &lyr_desc_box_ty6_ParseError,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty7 = { &lyr_desc_box_ty7_ParseErrorKind,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty12 = { &lyr_desc_box_ty12_Ordering,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty16 = { &lyr_desc_ty16_Exception,  };
-const lyr_vt_ty4 lyr_vt_ty4_ty18 = { &lyr_desc_box_ty18_Sip,  };
-const lyr_vt_ty4 lyr_vt_ty4_ty19 = { &lyr_desc_box_ty19_DefaultHasher,  };
-const lyr_vt_ty4 lyr_vt_ty4_ty20 = { &lyr_desc_box_ty20_FixedHasher,  };
-const lyr_vt_ty4 lyr_vt_ty4_ty21 = { &lyr_desc_box_ty21_Fnv1a64,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty18 = { &lyr_desc_box_ty18_Chars,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty19 = { &lyr_desc_box_ty19_Sip,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty20 = { &lyr_desc_box_ty20_DefaultHasher,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty21 = { &lyr_desc_box_ty21_FixedHasher,  };
+const lyr_vt_ty4 lyr_vt_ty4_ty22 = { &lyr_desc_box_ty22_Fnv1a64,  };
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty1 }, { lyr_ifid_ty5, &lyr_vt_ty5_ty1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty2 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty3 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty3 } , { NULL, NULL } };
@@ -240,6 +252,7 @@ const LyrItable lyr_itab_ty18[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty18 } , { NULL,
 const LyrItable lyr_itab_ty19[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty19 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty20[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty20 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty21[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty21 } , { NULL, NULL } };
+const LyrItable lyr_itab_ty22[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty22 } , { NULL, NULL } };
 
 #line 24 "programs/anything.lyr"
 LyrStr * lyr_main_describe(LyrIface l0_s) {
