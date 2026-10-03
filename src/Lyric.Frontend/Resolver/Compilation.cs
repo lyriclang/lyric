@@ -165,6 +165,20 @@ public sealed class Compilation
     /// </summary>
     public bool IsNative(ModuleSymbol module) => _native.Contains(module);
 
+    private HashSet<ModuleSymbol>? _preludeSources;
+
+    /// <summary>The modules the prelude passes names on from, once.</summary>
+    private HashSet<ModuleSymbol> PreludeSources()
+    {
+        if (_preludeSources is { } known) return known;
+        var found = new HashSet<ModuleSymbol>(ReferenceEqualityComparer.Instance);
+        if (Prelude is { } prelude)
+            foreach (var decl in AstOf(prelude).Declarations)
+                if (decl is ImportDecl imp && FindModule(imp.Path) is { } source)
+                    found.Add(source);
+        return _preludeSources = found;
+    }
+
     /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
     /// The same module, or an import of <paramref name="to"/>.</summary>
     public bool Sees(ModuleSymbol from, ModuleSymbol to)
@@ -179,6 +193,9 @@ public sealed class Compilation
         // program would have to import 'std.core' just to satisfy the constraint of
         // does. The same model as Roslyn's well-known members.
         if (to.FullName == "std.core") return true;
+        // The prelude stands in every module (04 §4 rule 4): a module it takes names from is seen as
+        // std.core is, so a block on a collection the prelude names reaches whoever names it.
+        if (PreludeSources().Contains(to)) return true;
         foreach (var decl in AstOf(from).Declarations)
             if (decl is ImportDecl imp && FindModule(imp.Path) is { } t && ReferenceEquals(t, to))
                 return true;

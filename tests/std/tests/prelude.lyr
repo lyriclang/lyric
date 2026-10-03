@@ -1,0 +1,13 @@
+// The prelude (design/v5/spec/10 B2): the collections are named without an import.
+import std.test { assertEq };
+
+@Test
+fn theCollectionsNeedNoImport(): void {
+    let xs = List<int>.new();
+    xs.push(3);
+    let m = Map<string, int>.new();
+    m.insert("k", xs[0]);
+    let s = Set<int>.new();
+    s.insert(m.getOr("k", 0));
+    assertEq(s.length(), 1);
+}

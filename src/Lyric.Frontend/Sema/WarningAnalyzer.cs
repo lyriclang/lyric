@@ -128,6 +128,15 @@ internal sealed class WarningAnalyzer
     /// 'assert(x)' takes it for the one every module has. The standard library, which declares
     /// them, is not warned.
     /// </summary>
+    /// <summary>Whether the import binds the very symbol the prelude passes on under the name — it
+    /// hides nothing then (04 §4 rule 5).</summary>
+    private bool SameAsPrelude(ImportDecl import, ImportSelective selective, int i)
+    {
+        if (_comp.FindModule(import.Path)?.Members.LookupLocal(selective.Names[i]) is not { } found) return false;
+        var imported = found is ImportBindingSymbol binding ? binding.Target : found;
+        return ReferenceEquals(imported, _comp.PreludeMember(selective.BoundName(i)));
+    }
+
     private void WarnPreludeShadowing()
     {
         if (_comp.Prelude is not { } prelude) return;
@@ -143,9 +152,9 @@ internal sealed class WarningAnalyzer
                         _de.Report("LYR-SEM0153", Severity.Warning, named.NameSpan,
                             $"'{named.Name}' hides the prelude's '{named.Name}' in this module (07 I8)");
                         break;
-                    case ImportDecl { Clause: ImportSelective selective }:
+                    case ImportDecl { Clause: ImportSelective selective } import:
                         for (var i = 0; i < selective.Names.Length; i++)
-                            if (names.Contains(selective.BoundName(i)))
+                            if (names.Contains(selective.BoundName(i)) && !SameAsPrelude(import, selective, i))
                                 _de.Report("LYR-SEM0153", Severity.Warning, selective.NameSpans[i],
                                     $"'{selective.BoundName(i)}' hides the prelude's '{selective.BoundName(i)}' in this module (07 I8)");
                         break;
