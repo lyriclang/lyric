@@ -256,7 +256,8 @@ fn emptiesOf(word: uint64): uint64 {
 /// A map from keys to values, by the keys' hashes (10 C4): what it holds in no order of its own,
 /// the same key once. `H` hashes the keys — `DefaultHasher` under the process's key unless the map
 /// is given another; a hasher is a value, copied fresh for every key.
-pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> {
+pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
+    type Iter = MapEntries<K, V, H>;
     var controls: uint64[],
     var slotKeys: (?K)[],
     var slotValues: (?V)[],
@@ -336,6 +337,73 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> {
         this.count = this.count - 1;
         this.changes = this.changes + 1;
         return old;
+    }
+
+    /// The value under `k`, or `otherwise` where there is none.
+    pub fn getOr(k: K, otherwise: V): V {
+        let at = this.find(k, this.hashOf(k));
+        if (at < 0) {
+            return otherwise;
+        }
+        return this.slotValues[at]!;
+    }
+
+    /// The value under `k`; where there is none, `make()`'s, inserted first.
+    pub mut fn getOrInsert(k: K, make: fn() -> V): V {
+        let hash = this.hashOf(k);
+        let at = this.find(k, hash);
+        if (at >= 0) {
+            return this.slotValues[at]!;
+        }
+        let made = make();
+        if (this.free == 0) {
+            this.rebuild();
+        }
+        this.place(k, made, hash);
+        this.count = this.count + 1;
+        this.changes = this.changes + 1;
+        return made;
+    }
+
+    /// The value under `k` replaced by `f` of it; whether there was one.
+    pub mut fn update(k: K, f: fn(V) -> V): bool {
+        let at = this.find(k, this.hashOf(k));
+        if (at < 0) {
+            return false;
+        }
+        this.slotValues[at] = f(this.slotValues[at]!);
+        return true;
+    }
+
+    /// The entries for which `p` fails taken out; how many went.
+    pub mut fn retain(p: fn(K, V) -> bool): int {
+        var gone = 0;
+        var at = 0;
+        while (at < this.slotKeys.length()) {
+            let k = this.slotKeys[at];
+            if (k != null && !p(k, this.slotValues[at]!)) {
+                this.remove(k);
+                gone = gone + 1;
+            }
+            at = at + 1;
+        }
+        return gone;
+    }
+
+    /// The entries, in no order of the map's own (10 I8): a change of the map while they are walked
+    /// panics at the next pull (I9).
+    pub fn iter(): MapEntries<K, V, H> {
+        return MapEntries<K, V, H> { map = this, at = 0, changes = this.changes };
+    }
+
+    /// The keys, in the entries' order.
+    pub fn keys(): MapKeys<K, V, H> {
+        return MapKeys<K, V, H> { entries = this.iter() };
+    }
+
+    /// The values, in the entries' order.
+    pub fn values(): MapValues<K, V, H> {
+        return MapValues<K, V, H> { entries = this.iter() };
     }
 
     /// Every key taken out.
@@ -432,6 +500,130 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> {
             }
             i = i + 1;
         }
+    }
+}
+
+/// A map's entries, `(K, V)`, slot by slot.
+pub struct MapEntries<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+    type Item = (K, V);
+    map: Map<K, V, H>,
+    var at: int,
+    changes: int,
+
+    pub mut fn next(): ?(K, V) {
+        if (this.map.changes != this.changes) {
+            panic("Map: changed while it was walked");
+        }
+        while (this.at < this.map.slotKeys.length()) {
+            let k = this.map.slotKeys[this.at];
+            this.at = this.at + 1;
+            if (k != null) {
+                let entry: (K, V) = (k, this.map.slotValues[this.at - 1]!);
+                return entry;
+            }
+        }
+        return null;
+    }
+}
+
+/// A map's keys.
+pub struct MapKeys<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+    type Item = K;
+    var entries: MapEntries<K, V, H>,
+
+    pub mut fn next(): ?K {
+        let e = this.entries.next();
+        if (e == null) {
+            return null;
+        }
+        let (k, _) = e;
+        return k;
+    }
+}
+
+/// A map's values.
+pub struct MapValues<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+    type Item = V;
+    var entries: MapEntries<K, V, H>,
+
+    pub mut fn next(): ?V {
+        let e = this.entries.next();
+        if (e == null) {
+            return null;
+        }
+        let (_, v) = e;
+        return v;
+    }
+}
+
+// --- Set (10 C5): a Map's keys -----------------------------------------------------------------
+
+/// The values it holds, each once, in no order of its own — a map's keys, by the same table.
+pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable] {
+    type Iter = MapKeys<T, bool, H>;
+    var table: Map<T, bool, H>,
+
+    /// An empty set hashing with `seed`.
+    pub static fn withHasher(seed: H): Set<T, H> {
+        return Set<T, H> { table = Map<T, bool, H>.withHasher(seed) };
+    }
+
+    /// How many values it holds.
+    pub fn length(): int {
+        return this.table.length();
+    }
+
+    /// Whether it holds none.
+    pub fn isEmpty(): bool {
+        return this.table.isEmpty();
+    }
+
+    /// Whether it holds `v`.
+    pub fn contains(v: T): bool {
+        return this.table.containsKey(v);
+    }
+
+    /// `v` added; whether it was not there.
+    pub mut fn insert(v: T): bool {
+        return this.table.insert(v, true) == null;
+    }
+
+    /// `v` taken out; whether it was there.
+    pub mut fn remove(v: T): bool {
+        return this.table.remove(v) != null;
+    }
+
+    /// Every value taken out.
+    pub mut fn clear(): void {
+        this.table.clear();
+    }
+
+    /// The values, in no order of the set's own.
+    pub fn iter(): MapKeys<T, bool, H> {
+        return this.table.keys();
+    }
+}
+
+extend<T :: [Hashable]> Set<T, DefaultHasher> {
+    /// An empty set hashing with the process's key.
+    pub static fn new(): Set<T, DefaultHasher> {
+        return Set<T, DefaultHasher>.withHasher(DefaultHasher.new());
+    }
+}
+
+// --- from iterators (10 I4) ----------------------------------------------------------------------
+
+extend<I :: [Iterator]> I {
+    /// The values, in a list of their own.
+    pub fn toList(): List<I.Item> throws I.Error {
+        var it = this;
+        let out = List<I.Item>.new();
+        var x = try it.next();
+        while (x != null) {
+            out.push(x);
+            x = try it.next();
+        }
+        return out;
     }
 }
 
