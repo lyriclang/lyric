@@ -636,3 +636,226 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
         return Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
     }
 }
+
+// --- Deque (10 C6) -------------------------------------------------------------------------------
+// The values lie in a ring: `count` of them from `head` on, wrapping at the buffer's end; a full
+// ring is copied, in order, into one twice its size. A slot no value holds is `null`, so the buffer
+// keeps nothing alive.
+
+/// A double-ended queue (10 C6): values pushed and popped at either end; `[i]` counts from the
+/// front, panicking outside `0 ≤ i < length()`; walked front to back. Not safe across threads (C11).
+pub class Deque<T> :: [Index<int>, Iterable] {
+    type Output = T;
+    type Iter = DequeIter<T>;
+    var slots: (?T)[],
+    var head: int,
+    var count: int,
+    var changes: int,
+
+    /// An empty deque.
+    pub static fn new(): Deque<T> {
+        return Deque<T> { slots = [], head = 0, count = 0, changes = 0 };
+    }
+
+    /// How many values it holds.
+    pub fn length(): int {
+        return this.count;
+    }
+
+    /// Whether it holds none.
+    pub fn isEmpty(): bool {
+        return this.count == 0;
+    }
+
+    /// `v` at the back.
+    pub mut fn pushBack(v: T): void {
+        this.grow();
+        this.slots[this.slotOf(this.count)] = v;
+        this.count = this.count + 1;
+        this.changes = this.changes + 1;
+    }
+
+    /// `v` at the front.
+    pub mut fn pushFront(v: T): void {
+        this.grow();
+        this.head = this.slotOf(this.slots.length() - 1);
+        this.slots[this.head] = v;
+        this.count = this.count + 1;
+        this.changes = this.changes + 1;
+    }
+
+    /// The front value taken off, or `null` where there is none.
+    pub mut fn popFront(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        let v = this.slots[this.head];
+        this.slots[this.head] = null;
+        this.head = this.slotOf(1);
+        this.count = this.count - 1;
+        this.changes = this.changes + 1;
+        return v;
+    }
+
+    /// The back value taken off, or `null` where there is none.
+    pub mut fn popBack(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        let at = this.slotOf(this.count - 1);
+        let v = this.slots[at];
+        this.slots[at] = null;
+        this.count = this.count - 1;
+        this.changes = this.changes + 1;
+        return v;
+    }
+
+    /// The front value, or `null` where there is none.
+    pub fn peekFront(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        return this.slots[this.head];
+    }
+
+    /// The back value, or `null` where there is none.
+    pub fn peekBack(): ?T {
+        if (this.count == 0) {
+            return null;
+        }
+        return this.slots[this.slotOf(this.count - 1)];
+    }
+
+    /// The value `i` from the front; outside `0 ≤ i < length()` a panic (`LYR-RT0003`).
+    pub fn index(i: int): T {
+        if (i < 0 || i >= this.count) {
+            // the bounds checked as an array's are, on a view of `count` slots: it panics
+            return this.slots[..this.count][i] ?? unreachable();
+        }
+        return this.slots[this.slotOf(i)] ?? unreachable();
+    }
+
+    /// The iterator over the values, front to back (10 C6, I9): a change while it walks is the
+    /// program's error, and the next pull panics.
+    pub fn iter(): DequeIter<T> {
+        return DequeIter<T> { deque = this, at = 0, changes = this.changes };
+    }
+
+    /// The slot `offset` past the head, around the ring.
+    fn slotOf(offset: int): int {
+        return (this.head + offset) % this.slots.length();
+    }
+
+    /// Room for one more: a full ring copied, from its head on, into one twice its size.
+    mut fn grow(): void {
+        if (this.count < this.slots.length()) {
+            return;
+        }
+        let room = if (this.slots.length() == 0) 8 else this.slots.length() * 2;
+        let old = this.slots;
+        let n = this.count;
+        let start = this.head;
+        this.slots = arrayOf(room, (i: int): ?T => if (i < n) old[(start + i) % old.length()] else null);
+        this.head = 0;
+    }
+}
+
+/// A deque's values, front to back.
+pub struct DequeIter<T> :: [Iterator] {
+    type Item = T;
+    deque: Deque<T>,
+    var at: int,
+    changes: int,
+
+    pub mut fn next(): ?T {
+        if (this.deque.changes != this.changes) {
+            panic("Deque: changed while it was walked");
+        }
+        if (this.at >= this.deque.count) {
+            return null;
+        }
+        this.at = this.at + 1;
+        return this.deque.slots[this.deque.slotOf(this.at - 1)];
+    }
+}
+
+// --- Heap (10 C1) --------------------------------------------------------------------------------
+// A binary tree laid out in a list: the children of `i` at `2i + 1` and `2i + 2`, no value greater
+// than its parent.
+
+/// A binary heap (10 C1): the greatest value first — `push`, `pop` and `peek` — each in `log n`
+/// steps, over a list. Not safe across threads (C11).
+pub class Heap<T :: [TotalOrder]> {
+    var items: List<T>,
+
+    /// An empty heap.
+    pub static fn new(): Heap<T> {
+        return Heap<T> { items = List<T>.new() };
+    }
+
+    /// How many values it holds.
+    pub fn length(): int {
+        return this.items.length();
+    }
+
+    /// Whether it holds none.
+    pub fn isEmpty(): bool {
+        return this.items.isEmpty();
+    }
+
+    /// The greatest value, or `null` where there is none.
+    pub fn peek(): ?T {
+        return this.items.get(0);
+    }
+
+    /// `v`, risen to its place.
+    pub mut fn push(v: T): void {
+        this.items.push(v);
+        var at = this.items.length() - 1;
+        while (at > 0) {
+            let parent = (at - 1) / 2;
+            if (!greater(this.items[at], this.items[parent])) {
+                break;
+            }
+            this.items.swap(at, parent);
+            at = parent;
+        }
+    }
+
+    /// The greatest value taken off, or `null` where there is none: the last one put at the top
+    /// and sunk to its place.
+    pub mut fn pop(): ?T {
+        let n = this.items.length();
+        if (n == 0) {
+            return null;
+        }
+        this.items.swap(0, n - 1);
+        let top = this.items.pop();
+        let m = n - 1;
+        var at = 0;
+        while (true) {
+            let left = 2 * at + 1;
+            if (left >= m) {
+                break;
+            }
+            var child = left;
+            if (left + 1 < m && greater(this.items[left + 1], this.items[left])) {
+                child = left + 1;
+            }
+            if (!greater(this.items[child], this.items[at])) {
+                break;
+            }
+            this.items.swap(at, child);
+            at = child;
+        }
+        return top;
+    }
+}
+
+/// Whether `a` comes after `b` in their order.
+fn greater<T :: [TotalOrder]>(a: T, b: T): bool {
+    return match (a.totalCompare(b)) {
+        .Greater => true,
+        _ => false,
+    };
+}
