@@ -1149,7 +1149,8 @@ public sealed class TypeChecker
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
                         continue;
                     }
-                    var want = (FnType)Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, self));
+                    var want = (FnType)ApplyAnswers(Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, self)),
+                        self, BlockAnswersOf(block));
                     if (ContainsError(want)) continue;
                     if (SignatureMismatch(want, im, found, self) is { } reason)
                         _de.Report("LYR-SEM0042", Severity.Error, found.Declaration?.Span ?? NodeSpan(node),
@@ -5374,6 +5375,8 @@ public sealed class TypeChecker
                 return Substitute(t, SubstMap(gi));
             case TypeParamType tp:
                 return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span));
+            case AssocOf assoc:
+                return BindMember(mem, MemberOfAssoc(assoc, mem.Member, span));
             case PrimitiveType p when BuiltinSymbol(p) is { } bs: // extensions on builtins, such as string.shout()
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
             case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf:
@@ -5488,6 +5491,78 @@ public sealed class TypeChecker
             $"type parameter '{gp.Name}' has no member '{member}' (no constraint provides it)"), null);
     }
 
+    /// <summary>Members of an associated type through a constraint, <c>A.Iter</c> (10 B6): what its
+    /// bound provides, <c>Self</c> read as the associated type itself.</summary>
+    private (LyrType, Symbol?) MemberOfAssoc(AssocOf assoc, string member, Span span)
+    {
+        foreach (var (it, subst) in AssocBoundClosure(assoc))
+        {
+            if (it.Members.LookupLocal(member) is not FunctionSymbol fn || fn.IsStatic) continue;
+            if (fn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(it)) continue;
+            return (Substitute(FnTypeOf(fn), WithSelf(subst, it, assoc)), fn);
+        }
+        return (Report(span, "LYR-SEM0027",
+            $"'{TypeFacts.Display(assoc)}' has no member '{member}' — "
+            + (assoc.Member.Bounds.Length == 0
+                ? $"'{assoc.Member.Owner?.Name}.{assoc.Member.Name}' has no bound to provide one"
+                : $"the bound of '{assoc.Member.Owner?.Name}.{assoc.Member.Name}' provides none")), null);
+    }
+
+    /// <summary>The interfaces an associated type's bound reaches, parents included: the owner's
+    /// <c>Self</c> read as the type the question was asked on.</summary>
+    private IEnumerable<(TypeSymbol iface, Dictionary<GenericParamSymbol, LyrType> subst)> AssocBoundClosure(AssocOf assoc)
+    {
+        foreach (var bound in assoc.Member.Bounds)
+        {
+            var instance = assoc.Member.Owner is { } owner ? Substitute(bound, SelfMap(owner, assoc.Base)) : bound;
+            if (TypeFacts.SymbolOf(instance) is not { Kind: TypeSymbolKind.Interface } direct) continue;
+            foreach (var (it, inst) in InterfaceClosure(direct, instance))
+                yield return (it, inst is GenericInstance gi ? SubstMap(gi) : EmptySubst);
+        }
+    }
+
+    /// <summary>Whether an associated type's bound reaches a constraint's interface (10 B6) — the
+    /// one way it satisfies one.</summary>
+    private bool AssocReaches(AssocOf assoc, TypeSymbol iface, LyrType wanted)
+    {
+        foreach (var bound in assoc.Member.Bounds)
+        {
+            var instance = assoc.Member.Owner is { } owner ? Substitute(bound, SelfMap(owner, assoc.Base)) : bound;
+            if (TypeFacts.SymbolOf(instance) is not { Kind: TypeSymbolKind.Interface } direct) continue;
+            foreach (var (p, inst) in InterfaceClosure(direct, instance))
+            {
+                if (!ReferenceEquals(p, iface)) continue;
+                var selfMap = SelfMap(p, assoc);
+                if (Matches(Substitute(WithoutFixations(inst), selfMap), EmptySubst, Substitute(WithoutFixations(wanted), selfMap)))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>A block's answers in a type that names them on the block's target (05 §8 rule 3):
+    /// <c>I.Iter</c> in a blanket block whose body says <c>type Iter = I;</c> is <c>I</c>.</summary>
+    private static LyrType ApplyAnswers(LyrType type, LyrType self, (AssociatedTypeSymbol Member, LyrType Type)[] answers)
+    {
+        if (answers.Length == 0) return type;
+        LyrType Fix(LyrType t) => t switch
+        {
+            AssocOf a when LyrType.Equal(a.Base, self)
+                && Array.FindIndex(answers, f => ReferenceEquals(f.Member, a.Member)) is var i && i >= 0 => answers[i].Type,
+            Optional o => new Optional(Fix(o.Inner)),
+            ArrayOf ar => new ArrayOf(Fix(ar.Element)),
+            SliceOf s => new SliceOf(Fix(s.Element)),
+            InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
+            TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws.Select(Fix).ToArray(), Places = f.Places },
+            GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
+            RangeOf r => new RangeOf(Fix(r.Element)),
+            CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
+            _ => t,
+        };
+        return Fix(type);
+    }
+
     /// <summary><c>T.parse(s)</c> (03 T5): a STATIC member of an interface the type parameter is
     /// constrained by, reachable through the parameter alone — monomorphization makes it the
     /// concrete type's static, a direct call.</summary>
@@ -5580,6 +5655,8 @@ public sealed class TypeChecker
                 return Substitute(bound, SubstMap(gi));
             case PrimitiveType p when member.BuiltinAnswer(TypeFacts.Display(p), instance) is { } bound: return bound;
             case ErrorType: return LyrType.Error;
+            // A conformance a blanket or shape block gives (05 §13 rules 6, 8) answers there.
+            case var other when member.BlockAnswer?.Invoke(other) is { } fromBlock: return fromBlock;
             default: return new AssocOf(@base, member);
         }
     }
@@ -5690,6 +5767,7 @@ public sealed class TypeChecker
     /// </summary>
     private void BindAssociatedTypes()
     {
+        BindAssociatedBounds();
         foreach (var module in _comp.Modules)
         {
             _currentModule = module;
@@ -5702,11 +5780,152 @@ public sealed class TypeChecker
         {
             // A built-in conforms through its block alone ('extend int :: [Add]'): its answers
             // hang on the builtin's symbol, found by the type's name.
-            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target) continue;
+            if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target)
+            {
+                // A blanket or shape block answers for every type it reaches (05 §13 rules 6, 8).
+                if (block.Decl.Interfaces.Length > 0 && (block.IsBlanketTarget || block.IsConstructorTarget))
+                {
+                    _currentModule = block.Module;
+                    BindBlockAnswers(block);
+                }
+                continue;
+            }
             _currentModule = block.Module;
             BindAssociatedTypes(target, block.Decl.Interfaces, block.MethodScope, block.Decl.Span);
         }
         _currentModule = null;
+        // Every answer meets its bound — asked once all are read, the answers of other types a
+        // conformance may need among them.
+        foreach (var (member, answer, conformer, at, who) in _boundChecks)
+            CheckAnswerBounds(member, answer, conformer, at, who);
+        _boundChecks.Clear();
+    }
+
+    /// <summary>The answers to check against their bounds once every answer is read.</summary>
+    private readonly List<(AssociatedTypeSymbol Member, LyrType Answer, LyrType Conformer, Span At, string Who)> _boundChecks = new();
+
+    /// <summary>What every answer conforms to (10 B6): the bounds of <c>type Iter :: [Iterator];</c>,
+    /// resolved in the interface. A bound names an interface (<c>LYR-SEM0078</c> otherwise).</summary>
+    private void BindAssociatedBounds()
+    {
+        foreach (var module in _comp.Modules)
+        {
+            _currentModule = module;
+            foreach (var symbol in module.Members.Symbols)
+            {
+                if (symbol is not TypeSymbol { Kind: TypeSymbolKind.Interface } iface || !DeclaredInModule(iface, module)) continue;
+                foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
+                {
+                    if (member.Declaration is not AssociatedTypeDecl { Bounds.Length: > 0 } decl) continue;
+                    var bounds = new List<LyrType>();
+                    foreach (var node in decl.Bounds)
+                    {
+                        if (Conformance.InterfaceOf(node, _binding) is null)
+                        {
+                            _de.Report("LYR-SEM0078", Severity.Error, NodeSpan(node),
+                                $"only an interface can bound the associated type '{iface.Name}.{member.Name}'");
+                            continue;
+                        }
+                        bounds.Add(ResolveType(node, DeclarationScope(iface)));
+                    }
+                    member.Bounds = bounds.ToArray();
+                }
+            }
+        }
+        _currentModule = null;
+    }
+
+    /// <summary>Every answer a blanket or shape block gives (05 §13 rules 6, 8; 05 §8 rule 3): a
+    /// binding in its body, <c>type Iter = I;</c>, or a fixation in its list, <c>:: [Iterable&lt;Iter
+    /// = I&gt;]</c>, else the interface's default — in the block's own parameters, answered for
+    /// whatever type the block reaches.</summary>
+    private void BindBlockAnswers(ExtensionBlock block)
+    {
+        var target = BlockTargetType(block);
+        foreach (var node in block.Decl.Interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
+            var entry = ResolveType(node, block.MethodScope);
+            var written = entry is GenericInstance { Fixations: { } fixations } ? fixations : [];
+            foreach (var (iface, instance) in InterfaceClosure(direct, entry))
+            {
+                var subst = instance is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+                foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
+                {
+                    LyrType? answer = null;
+                    if (block.MethodScope.LookupLocal(member.Name) is AssociatedTypeSymbol own
+                        && own.Declaration is AssociatedTypeDecl { Type: { } bound })
+                    {
+                        answer = ResolveType(bound, block.MethodScope);
+                        RefuseAnswerBound(own);
+                    }
+                    else if (Array.FindIndex(written, f => ReferenceEquals(f.Member, member)) is var at && at >= 0)
+                        answer = written[at].Type;
+                    else if (member.Declaration is AssociatedTypeDecl { Type: { } fallback })
+                        answer = Substitute(ResolveType(fallback, DeclarationScope(iface)), WithSelf(subst, iface, target));
+                    if (answer is null)
+                    {
+                        _de.Report("LYR-SEM0128", Severity.Error, NodeSpan(node),
+                            $"the block on '{TypeFacts.Display(target)}' does not say what '{iface.Name}'s associated type '{member.Name}' is — write 'type {member.Name} = …;'");
+                        continue;
+                    }
+                    _blockAnswers.Add((member, block, answer));
+                    member.BlockAnswer ??= concrete => BlockAnswerFor(member, concrete);
+                    _boundChecks.Add((member, answer, target, NodeSpan(node), $"the block on '{TypeFacts.Display(target)}'"));
+                }
+            }
+        }
+    }
+
+    /// <summary>A bound belongs to the declaring interface (10 B6): an answer carries none
+    /// (<c>LYR-SEM0161</c>) — what it must conform to is the interface's to say.</summary>
+    private void RefuseAnswerBound(AssociatedTypeSymbol answer)
+    {
+        if (answer.Declaration is AssociatedTypeDecl { Bounds.Length: > 0 } decl)
+            _de.Report("LYR-SEM0161", Severity.Error, NodeSpan(decl.Bounds[0]),
+                $"'type {decl.Name}' answers an associated type and carries no bound — the interface that declares it says what every answer conforms to");
+    }
+
+    /// <summary>The answers blanket and shape blocks give, in their own parameters.</summary>
+    private readonly List<(AssociatedTypeSymbol Member, ExtensionBlock Block, LyrType Answer)> _blockAnswers = new();
+
+    /// <summary>The questions in flight: a block's constraints asked while answering may ask again.</summary>
+    private readonly HashSet<(AssociatedTypeSymbol, string)> _answerProbes = new();
+
+    /// <summary>A block's answer for a type with none of its own: the first block that reaches the
+    /// type, at the parameters the type binds.</summary>
+    private LyrType? BlockAnswerFor(AssociatedTypeSymbol member, LyrType concrete)
+    {
+        if (concrete is TypeParamType or AssocOf or ErrorType) return null;
+        var probe = (member, TypeFacts.Display(concrete));
+        if (!_answerProbes.Add(probe)) return null;
+        try
+        {
+            foreach (var (m, block, answer) in _blockAnswers)
+                if (ReferenceEquals(m, member) && BlockSubstitution(block, concrete) is { } map)
+                    return Substitute(answer, map);
+            return null;
+        }
+        finally { _answerProbes.Remove(probe); }
+    }
+
+    /// <summary>A block's own answers, as fixations of its target: its signatures read them.</summary>
+    private (AssociatedTypeSymbol Member, LyrType Type)[] BlockAnswersOf(ExtensionBlock block) =>
+        _blockAnswers.Where(a => ReferenceEquals(a.Block, block)).Select(a => (a.Member, a.Answer)).ToArray();
+
+    /// <summary>An answer that does not conform to its bound (10 B6): <c>LYR-SEM0160</c>.</summary>
+    private void CheckAnswerBounds(AssociatedTypeSymbol member, LyrType answer, LyrType conformer, Span at, string who)
+    {
+        if (answer.IsError || member.Owner is not { } owner) return;
+        foreach (var bound in member.Bounds)
+        {
+            if (TypeFacts.SymbolOf(bound) is not { Kind: TypeSymbolKind.Interface } boundIface) continue;
+            var wanted = Substitute(bound, SelfMap(owner, conformer));
+            if (Satisfies(answer, boundIface, wanted)) continue;
+            _de.Report("LYR-SEM0160", Severity.Error, at,
+                $"{who} answers '{owner.Name}.{member.Name}' with '{TypeFacts.Display(answer)}', which does not conform to "
+                + $"'{TypeFacts.Display(wanted)}' — the bound every answer of it meets");
+        }
     }
 
     private void BindAssociatedTypes(TypeSymbol ts, TypeNode[] entries, SymbolTable answers, Span at)
@@ -5730,7 +5949,9 @@ public sealed class TypeChecker
                     if (member.Answer(ts, instance, exact: true) is not null) continue;
                     if (answer.bound is { } written)
                     {
-                        member.Bind(ts, instance, ResolveType(written, answers));
+                        var resolved = ResolveType(written, answers);
+                        member.Bind(ts, instance, resolved);
+                        _boundChecks.Add((member, resolved, SelfType(ts), answer.own.Declaration?.Span ?? NodeSpan(node), $"'{ts.Name}'"));
                         continue;
                     }
                     if (member.Declaration is AssociatedTypeDecl { Type: { } fallback })
@@ -5746,9 +5967,12 @@ public sealed class TypeChecker
             }
         }
         foreach (var own in answers.Symbols.OfType<AssociatedTypeSymbol>())
+        {
             if (!asked.Contains(own.Name))
                 _de.Report("LYR-SEM0129", Severity.Error, own.Declaration?.Span ?? at,
                     $"'type {own.Name}' answers no interface — none that '{ts.Name}' conforms to here declares an associated type '{own.Name}'");
+            RefuseAnswerBound(own);
+        }
     }
 
     /// <summary>An interface's associated type of that name, its parents' included.</summary>
@@ -6065,6 +6289,10 @@ public sealed class TypeChecker
         // 'never' has no value and so every conformance vacuously: 'E = never', what a set of
         // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
         NeverType => true,
+
+        // An associated type through a constraint conforms to what its bound reaches (10 B6), and
+        // to nothing else — its answer is anybody's until the type is known.
+        AssocOf assoc => AssocReaches(assoc, iface, wanted),
 
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.

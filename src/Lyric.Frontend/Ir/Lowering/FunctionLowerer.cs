@@ -5016,10 +5016,7 @@ internal sealed class FunctionLowerer
     /// it -- correctly, since there is no instance to build for a name.</para>
     /// </summary>
     private LyrType[] SubstitutedTypeArguments(Node expr) =>
-        _types.TypeArgumentsOf(expr)
-            .Select(t => t is TypeParamType p && _substitution.TryGetValue(p.Param, out var bound)
-                ? bound : t)
-            .ToArray();
+        _types.TypeArgumentsOf(expr).Select(SubstituteType).ToArray();
 
     /// <summary>
     /// <c>ident&lt;int&gt;</c> as a value (design/v5/spec/03 T17): the instance the sema settled,
@@ -5732,6 +5729,12 @@ internal sealed class FunctionLowerer
                      && _substitution.ContainsKey(parameter.Param):
                 return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)),
                     expr);
+
+            // The receiver's type is an associated type through a constraint, 'A.Iter' (10 B6):
+            // under this instance's substitution it is the answer, and the call is that type's.
+            case MemberExpr member
+                when ReceiverType(member.Target) is AssocOf && _substitution.Count > 0:
+                return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)), expr);
 
             // A STATIC interface member through a constraint, 'T.parse(s)' (03 T5): under this
             // instance's substitution T is a type, and the call is that type's own static — direct.
