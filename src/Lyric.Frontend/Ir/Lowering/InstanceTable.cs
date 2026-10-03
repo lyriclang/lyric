@@ -213,9 +213,13 @@ internal sealed class InstanceTable
     /// receiver, as a method of a generic type is.
     /// </summary>
     public FunctionId RequestExtension(FunctionSymbol method, FunctionDecl decl, ExtensionBlock block,
-        Dictionary<GenericParamSymbol, LyrType> substitution, LyrType receiver, Core.Span span)
+        Dictionary<GenericParamSymbol, LyrType> substitution, LyrType receiver, Core.Span span,
+        IReadOnlyList<LyrType>? typeArguments = null)
     {
-        var name = Qualify(decl, $"<extend>.{NameOf(receiver)}.{method.Name}");
+        // A generic method's own arguments name its instance too: 'mapped<int>' and 'mapped<string>'
+        // on one receiver are two functions.
+        var own = typeArguments is { Count: > 0 } ? $"<{string.Join(", ", typeArguments.Select(NameOf))}>" : "";
+        var name = Qualify(decl, $"<extend>.{NameOf(receiver)}.{method.Name}{own}");
         if (_byKey.TryGetValue(name, out var existing)) return existing;
         Guard(name, span);
         var id = _ids.Next();

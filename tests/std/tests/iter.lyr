@@ -113,6 +113,38 @@ fn anArrayAndAViewAreIterable(): void {
     assertNull(it.nextBack());
 }
 
+class Counting :: [Iterator] {
+    type Item = int;
+    var n: int,
+    var pulls: int,
+
+    mut fn next(): ?int {
+        this.pulls = this.pulls + 1;
+        this.n = this.n + 1;
+        return this.n;
+    }
+}
+
+@Test
+fn mapAndFilterChain(): void {
+    var seen = "";
+    for (x in (1..7).filter((v) => v % 2 == 0).map((v) => v * 10)) { seen = seen + f"{x} "; }
+    assertEq(seen, "20 40 60 ");
+    var words = "";
+    for (w in [1, 2].iter().map((v) => f"<{v}>")) { words = words + w; }
+    assertEq(words, "<1><2>");
+}
+
+@Test
+fn adaptersPullLazily(): void {
+    let c = Counting { n = 0, pulls = 0 };
+    var m = c.map((v) => v * 2).filter((v) => v > 2);
+    assertEq(m.next() ?? -1, 4);
+    assertEq(c.pulls, 2);
+    assertEq(m.next() ?? -1, 6);
+    assertEq(c.pulls, 3);
+}
+
 @Test
 fn forWalksARangeAndAnIterator(): void {
     var seen = "";

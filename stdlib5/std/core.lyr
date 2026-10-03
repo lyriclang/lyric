@@ -1670,6 +1670,53 @@ extend<T> Slice<T> :: [Iterable] {
     }
 }
 
+/// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
+/// Named for what it gives: `Map` is the collection's (C4).
+pub struct Mapped<I :: [Iterator], U> :: [Iterator] {
+    type Item = U;
+    type Error = I.Error;
+    var inner: I,
+    f: fn(I.Item) -> U,
+
+    pub mut fn next(): ?U throws I.Error {
+        let x = try this.inner.next();
+        if (x == null) {
+            return null;
+        }
+        return this.f(x);
+    }
+}
+
+/// `it.filter(p)`: the values of `it` that `p` holds for.
+pub struct Filter<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    p: fn(I.Item) -> bool,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        var x = try this.inner.next();
+        while (x != null && !this.p(x)) {
+            x = try this.inner.next();
+        }
+        return x;
+    }
+}
+
+// The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
+// allocation, no interface value.
+extend<I :: [Iterator]> I {
+    /// The values, each through `f`.
+    pub fn map<U>(f: fn(I.Item) -> U): Mapped<I, U> {
+        return Mapped<I, U> { inner = this, f = f };
+    }
+
+    /// The values `p` holds for.
+    pub fn filter(p: fn(I.Item) -> bool): Filter<I> {
+        return Filter<I> { inner = this, p = p };
+    }
+}
+
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
 // before `start` where that value is the type's `max` (`min` from the back), so neither bound
 // leaves the type.
