@@ -4,6 +4,93 @@
 import std.hash { DefaultHasher, FixedHasher, Fnv1a64 };
 import std.test { assertEq, assertNotEq };
 
+struct Point :: [Hashable] { x: int, y: int }
+struct Two :: [Hashable] { a: string, b: string }
+enum Shape :: [Hashable] { Dot, Circle(int), Rect { w: int, h: int } }
+struct Tagged :: [Hashable] { name: string, at: ?int, pair: (int, bool), cells: int[2] }
+
+fn fixedOf<T :: [Hashable]>(x: T): uint64 {
+    var h = FixedHasher.new();
+    x.hash(&h);
+    return h.finish();
+}
+
+@Test
+fn scalarsWriteTheirWordOrByte(): void {
+    var i = FixedHasher.new();
+    i.writeInt(-1);
+    assertEq(fixedOf(-1), i.finish());
+    var u = FixedHasher.new();
+    u.writeUint(7);
+    let seven: uint8 = 7;
+    assertEq(fixedOf(seven), u.finish());
+    var b = FixedHasher.new();
+    b.writeByte(1);
+    assertEq(fixedOf(true), b.finish());
+    var c = FixedHasher.new();
+    c.writeUint(97);
+    assertEq(fixedOf('a'), c.finish());
+}
+
+@Test
+fn aStringWritesItsBytesAndAnEnd(): void {
+    var h = FixedHasher.new();
+    h.writeByte(97);
+    h.writeByte(98);
+    h.writeByte(99);
+    h.writeByte(255);
+    assertEq(fixedOf("abc"), h.finish());
+    assertNotEq(fixedOf(Two { a = "ab", b = "c" }), fixedOf(Two { a = "a", b = "bc" }));
+}
+
+@Test
+fn aSynthesizedHashWritesTheFieldsInOrder(): void {
+    var h = FixedHasher.new();
+    h.writeInt(1);
+    h.writeInt(2);
+    assertEq(fixedOf(Point { x = 1, y = 2 }), h.finish());
+    assertNotEq(fixedOf(Point { x = 1, y = 2 }), fixedOf(Point { x = 2, y = 1 }));
+}
+
+@Test
+fn anEnumWritesItsVariantFirst(): void {
+    var dot = FixedHasher.new();
+    dot.writeInt(0);
+    assertEq(fixedOf(Shape.Dot), dot.finish());
+    var circle = FixedHasher.new();
+    circle.writeInt(1);
+    circle.writeInt(5);
+    assertEq(fixedOf(Shape.Circle(5)), circle.finish());
+    var rect = FixedHasher.new();
+    rect.writeInt(2);
+    rect.writeInt(5);
+    rect.writeInt(0);
+    assertEq(fixedOf(Shape.Rect { w = 5, h = 0 }), rect.finish());
+}
+
+@Test
+fn optionalsTuplesAndInlineArraysAreWrittenInside(): void {
+    var none = FixedHasher.new();
+    none.writeByte(110);
+    none.writeByte(255);
+    none.writeByte(0);
+    none.writeInt(3);
+    none.writeByte(1);
+    none.writeInt(4);
+    none.writeInt(5);
+    assertEq(fixedOf(Tagged { name = "n", at = null, pair = (3, true), cells = [4, 5] }), none.finish());
+    var some = FixedHasher.new();
+    some.writeByte(110);
+    some.writeByte(255);
+    some.writeByte(1);
+    some.writeInt(9);
+    some.writeInt(3);
+    some.writeByte(1);
+    some.writeInt(4);
+    some.writeInt(5);
+    assertEq(fixedOf(Tagged { name = "n", at = 9, pair = (3, true), cells = [4, 5] }), some.finish());
+}
+
 @Test
 fn fixedHasherIsSipHash13UnderAZeroKey(): void {
     let empty = FixedHasher.new();

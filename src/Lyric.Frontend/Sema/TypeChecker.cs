@@ -709,15 +709,10 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0127", Severity.Error, fn.NameSpan,
                     $"'{fn.Name}' is a static member of an interface and declares only — it is implemented by every conforming type and reached as 'T.{fn.Name}(…)'; drop the body");
 
-            // A GENERIC interface member must have a body (2.17). It gets no vtable slot — a slot
-            // holds one function and this is one per instantiation — so it is reached by
-            // monomorphization alone, and an abstract one would promise a dispatch nothing can
-            // perform. As a DEFAULT it is complete in itself and needs no dispatch at all.
-            if (isInterface && fn.Generics.Length > 0 && fn.Body is null)
-                _de.Report("LYR-SEM0082", Severity.Error, fn.Span,
-                    $"'{typeName}.{fn.Name}' has type parameters of its own and no body — such a "
-                    + "member is reached by monomorphization rather than through the method table, "
-                    + "so it has to bring its own implementation");
+            // A GENERIC interface member gets no table slot — a slot holds one function and this is
+            // one per instantiation. Abstract, every conformer writes it and a constraint reaches it
+            // by monomorphization (04 D9), the interface no value type; as a default it is complete
+            // in itself and may not be overridden (below).
 
             CheckMemberModifiers(fn);
 
@@ -1523,7 +1518,7 @@ public sealed class TypeChecker
             if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
             foreach (var contributed in Conformance.WithParents(iface, _binding))
                 foreach (var symbol in contributed.Members.Symbols)
-                    if (symbol is FunctionSymbol { Generics.Length: > 0 } generic
+                    if (symbol is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl { Body: not null } } generic
                         && candidates.TryGetValue(generic.Name, out var owns))
                         foreach (var own in owns)
                         {
@@ -1611,12 +1606,10 @@ public sealed class TypeChecker
 
                 foreach (var im in idecl.Members)
                 {
-                    // A GENERIC member is not part of the contract: it always has a body, it
-                    // cannot be overridden, and it is reached by monomorphization rather than
-                    // through the table. Comparing signatures here would compare two different
-                    // U's that print identically, which is a confusing way to say what
-                    // LYR-SEM0082 says plainly.
-                    if (im.Generics.Length > 0) continue;
+                    // A generic DEFAULT is not part of the contract: it cannot be overridden and is
+                    // reached by monomorphization (LYR-SEM0082 above). An abstract generic member
+                    // is, and is compared below with the conformer's parameters read as its own.
+                    if (im.Generics.Length > 0 && im.Body is not null) continue;
                     // Nor is a PRIVATE helper (07 V2 S4): the interface's defaults call it, no
                     // conformer answers it, and a method of its name in a conformer is the
                     // conformer's own.
@@ -1637,6 +1630,16 @@ public sealed class TypeChecker
                     // An associated type the conformer did not answer was reported where it
                     // stands (SEM0128); the signature that reads it has nothing to compare.
                     if (ContainsError(want)) continue;
+
+                    if (im.Generics.Length > 0)
+                    {
+                        var promisedGeneric = FnSym(iface, im.Name)!;
+                        if (found.Any(candidate => GenericSignatureMismatch(want, promisedGeneric, candidate) is null)) continue;
+                        var differs = GenericSignatureMismatch(want, promisedGeneric, found[0])!;
+                        _de.Report("LYR-SEM0042", Severity.Error, found[0].Declaration?.Span ?? NodeSpan(node),
+                            $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {differs}");
+                        continue;
+                    }
 
                     // With several candidates the CONFORMANCE decides which one is meant, so a
                     // match anywhere in the list satisfies it. Only when none fits is there
@@ -1689,6 +1692,28 @@ public sealed class TypeChecker
                 }
             }
         }
+    }
+
+    /// <summary>Why a conformer's generic member does not answer an abstract generic one of the
+    /// interface (04 D9), or <c>null</c>: as many type parameters, the same constraints on each, and
+    /// the signature equal once the conformer's parameters are read as the interface's.</summary>
+    private string? GenericSignatureMismatch(FnType want, FunctionSymbol promised, FunctionSymbol candidate)
+    {
+        if (candidate.Generics.Length != promised.Generics.Length)
+            return $"it takes {candidate.Generics.Length} type parameter(s), the interface's member {promised.Generics.Length}";
+        var renamed = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < candidate.Generics.Length; i++)
+            renamed[candidate.Generics[i]] = new TypeParamType(promised.Generics[i]);
+        for (var i = 0; i < candidate.Generics.Length; i++)
+        {
+            var asked = promised.Generics[i].Constraints.Select(ConstraintInterface).OfType<TypeSymbol>().ToHashSet(ReferenceEqualityComparer.Instance);
+            var given = candidate.Generics[i].Constraints.Select(ConstraintInterface).OfType<TypeSymbol>().ToHashSet(ReferenceEqualityComparer.Instance);
+            if (!asked.SetEquals(given))
+                return $"its type parameter '{candidate.Generics[i].Name}' is constrained otherwise than the interface's '{promised.Generics[i].Name}'";
+        }
+        var have = Substitute(FnTypeOf(candidate), renamed);
+        return LyrType.Equal(want, have) ? null
+            : $"it is '{TypeFacts.Display(have)}', expected '{TypeFacts.Display(want)}'";
     }
 
     // The parent list of an interface: every entry an interface, no chain back to the declaring
@@ -9827,6 +9852,8 @@ public sealed class TypeChecker
                 { reason = $"it declares the static member '{constant.Name}'"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
+                if (fn.Generics.Length > 0 && fn.Declaration is FunctionDecl { Body: null })
+                { reason = $"its member '{fn.Name}' is generic, reached through a constraint alone"; return false; }
             }
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)

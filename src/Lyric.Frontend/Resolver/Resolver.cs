@@ -57,9 +57,14 @@ public sealed class Resolver
         var declarations = _comp.AstOf(module).Declarations;
         var coreHasDebug = _comp.Modules.Any(m => m.FullName == "std.core"
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Debug" }));
+        // The form std.core's Hashable asks for (10 K2): 'hash<H :: [Hasher]>(&h: H)' writes into a
+        // hasher; the 4.x library's 'hash(): int' answers a number, and keeps its form.
+        var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
+            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
+                && h.Members.Any(f => f.Name == "hash" && f.Generics.Length == 1)));
         for (var k = 0; k < declarations.Length; k++)
         {
-            declarations[k] = Synthesize(module, declarations[k], coreHasDebug);
+            declarations[k] = Synthesize(module, declarations[k], coreHasDebug, streamsHash);
             var decl = declarations[k];
             switch (decl)
             {
@@ -89,7 +94,7 @@ public sealed class Resolver
     /// leaves the type's own list (one conformance per type and interface, 03 T7 X3). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
-    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug)
+    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash)
     {
         string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
         switch (decl)
@@ -105,7 +110,7 @@ public sealed class Resolver
         var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
         foreach (var request in requests)
         {
-            var text = Synthesis.Block(request.Interface, name, generics, fields, variants, _sm, out var refusal);
+            var text = Synthesis.Block(request.Interface, name, generics, fields, variants, _sm, streamsHash, out var refusal);
             if (text is null)
             {
                 _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,

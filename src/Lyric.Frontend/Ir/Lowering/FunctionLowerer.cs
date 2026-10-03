@@ -5383,6 +5383,48 @@ internal sealed class FunctionLowerer
         return _typeTable.InterfaceOf(constraint, span);
     }
 
+    /// <summary>The concrete type's member of the name: its own, or its blocks'.</summary>
+    private FunctionSymbol? GenericImplementationOf(LyrType concrete, string name)
+    {
+        if (TypeFacts.SymbolOf(concrete) is { } owner)
+            return owner.Members.LookupLocal(name) as FunctionSymbol ?? _typeTable.ExtensionMethod(owner, name);
+        return _typeTable.BuiltinSymbolOf(concrete) is { } builtin ? _typeTable.ExtensionMethod(builtin, name) : null;
+    }
+
+    /// <summary>A generic member's implementation for the concrete receiver of a constraint call:
+    /// a generic type's block member by the block's route, else the instance a direct call
+    /// requests — the type's name before the member's, a builtin's block target where no symbol
+    /// holds it.</summary>
+    private TempId? LowerGenericImplementationCall(MemberExpr member, FunctionSymbol implementation,
+        FunctionDecl decl, LyrType concrete, CallExpr expr)
+    {
+        if (concrete is GenericInstance && _typeTable.BlockOf(implementation) is { } block)
+            return LowerBlockMethodCall(member, implementation, block, concrete, expr);
+        if (concrete is GenericInstance)
+            throw NotSupported($"'{member.Member}' written in the body of the generic '{TypeFacts.Display(concrete)}', through a constraint", expr.Span);
+        var owner = TypeFacts.SymbolOf(concrete);
+        var baseName = owner is not null ? $"{owner.Name}.{implementation.Name}"
+            : _typeTable.BlockOf(implementation) is { Target: { } blockTarget } ? $"<extend>.{blockTarget.Name}.{implementation.Name}"
+            : implementation.Name;
+        var target = _instances.Request(implementation, decl, baseName, owner, SubstitutedTypeArguments(expr), _typeTable,
+            expr.Span, receiverType: owner is null ? concrete : null);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span,
+            NamedSubstitutionFor(implementation, _types.TypeArgumentsOf(expr)));
+        var all = new TempId[passed.Length + 1];
+        all[0] = LowerExpr(member.Target);
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, all, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     /// <summary>Does the receiver's constraint name an interface the concrete type conforms to
     /// more than once? Then the member name does not identify the implementation and the call has
     /// to go through the instance-keyed dispatch table.</summary>
@@ -5535,6 +5577,13 @@ internal sealed class FunctionLowerer
                 ? LowerDefaultCall(member, viaBlock, concrete, expr)
                 : throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the default of a generic interface, through the block that gives the conformance", expr.Span);
         }
+
+        // An ABSTRACT generic member (04 D9): no slot, no default — the concrete type's own, its
+        // instance at the call's type arguments, named as a direct call on the type names it, so
+        // both reach one instance.
+        if (_types.RefOf(member) is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl { Body: null } }
+            && GenericImplementationOf(concrete, member.Member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
+            return LowerGenericImplementationCall(member, genericImplementation, genericDecl, concrete, expr);
 
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
         // no symbol in SymbolOf, and that stays so, because on it hangs the boundary that a scalar does
