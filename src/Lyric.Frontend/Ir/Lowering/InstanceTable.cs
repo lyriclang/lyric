@@ -95,6 +95,14 @@ internal sealed class InstanceTable
                 foreach (var member in members) index[member] = module.FullName;
             }
 
+        // The synthesized blocks (04 D7) stand in no module's AST: parsed apart and declared in the
+        // type's module. Without them, 'Point.hash<FixedHasher>' of two modules was one name.
+        foreach (var block in compilation.Extensions.Blocks)
+        {
+            index.TryAdd(block.Decl, block.Module.FullName);
+            foreach (var method in block.Decl.Methods) index.TryAdd(method, block.Module.FullName);
+        }
+
         return index;
     }
 

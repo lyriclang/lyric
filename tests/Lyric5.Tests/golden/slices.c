@@ -20,6 +20,10 @@ typedef struct lyr_ty11_Ordering_Greater lyr_ty11_Ordering_Greater;
 typedef struct lyr_ty12_Exception lyr_ty12_Exception;
 typedef struct lyr_vt_ty13 lyr_vt_ty13;
 const char lyr_ifid_ty13[] = "std.core.Hasher";
+typedef struct lyr_ty14_Sip lyr_ty14_Sip;
+typedef struct lyr_ty15_DefaultHasher lyr_ty15_DefaultHasher;
+typedef struct lyr_ty16_FixedHasher lyr_ty16_FixedHasher;
+typedef struct lyr_ty17_Fnv1a64 lyr_ty17_Fnv1a64;
 typedef struct { int64_t *ptr; int64_t len; } lyr_slice_i64;
 _Static_assert(sizeof(lyr_slice_i64) == 16, "layout of lyr_slice_i64");
 struct lyr_ty0_Holder {
@@ -83,6 +87,24 @@ struct lyr_vt_ty13 {
     void (*s3)(LyrIface);
     void (*s4)(LyrIface);
 };
+struct lyr_ty14_Sip {
+    uint64_t f_v0;
+    uint64_t f_v1;
+    uint64_t f_v2;
+    uint64_t f_v3;
+    uint64_t f_tail;
+    int64_t f_pending;
+    int64_t f_length;
+};
+struct lyr_ty15_DefaultHasher {
+    lyr_ty14_Sip f_state;
+};
+struct lyr_ty16_FixedHasher {
+    lyr_ty14_Sip f_state;
+};
+struct lyr_ty17_Fnv1a64 {
+    uint64_t f_state;
+};
 typedef struct { LyrStr * *ptr; int64_t len; } lyr_slice_str;
 _Static_assert(sizeof(lyr_slice_str) == 16, "layout of lyr_slice_str");
 typedef struct { lyr_ty1_Point *ptr; int64_t len; } lyr_slice_ty1;
@@ -100,6 +122,9 @@ double lyr_g0_float_infinity = 0;
 double lyr_g1_float_nan = 0;
 float lyr_g2_float32_infinity = 0;
 float lyr_g3_float32_nan = 0;
+uint64_t lyr_g4_emptyGroup = 0;
+uint64_t lyr_g5_lowBits = 0;
+uint64_t lyr_g6_highBits = 0;
 
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("empty");
@@ -1413,6 +1438,9 @@ void lyr__globals__9ee5f9b5(void) {
     float t5 = 0;
     uint64_t t6 = 0;
     float t7 = 0;
+    uint64_t t8 = 0;
+    uint64_t t9 = 0;
+    uint64_t t10 = 0;
 bb0:;
 #line 1375
     t0 = (uint64_t)UINT64_C(9218868437227405312);
@@ -1438,6 +1466,18 @@ bb0:;
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
 #line 1397
     lyr_g3_float32_nan = t7;
+#line 14 "stdlib5/std/collections.lyr"
+    t8 = (uint64_t)UINT64_C(9259542123273814144);
+#line 14
+    lyr_g4_emptyGroup = t8;
+#line 15
+    t9 = (uint64_t)UINT64_C(72340172838076673);
+#line 15
+    lyr_g5_lowBits = t9;
+#line 16
+    t10 = (uint64_t)UINT64_C(9259542123273814144);
+#line 16
+    lyr_g6_highBits = t10;
     return;
 }
 

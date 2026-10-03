@@ -1,0 +1,210 @@
+/// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
+/// that is shared.
+import std.core { arrayOf, Hasher };
+import std.hash { DefaultHasher };
+
+// --- Map (10 C4): a Swiss table ----------------------------------------------------------------
+// Groups of eight slots, each group with a control word of eight bytes, one a slot: 0x80 for an
+// empty slot, 0xFE for a deleted one, the low seven bits of the key's hash for a full one. A
+// lookup matches those seven bits against a whole group at once, and compares keys only where
+// they match; a group with an empty slot ends the probe. At most seven of every eight slots are
+// filled; the deleted ones are swept when the table is built anew.
+
+/// Eight empty slots.
+let emptyGroup: uint64 = 0x8080808080808080;
+let lowBits: uint64 = 0x0101010101010101;
+let highBits: uint64 = 0x8080808080808080;
+
+/// The slots of a control word that are empty: 0x80, the high bit set and bit 1 clear.
+fn emptiesOf(word: uint64): uint64 {
+    return word & ~(word << 6) & highBits;
+}
+
+/// A map from keys to values, by the keys' hashes (10 C4): what it holds in no order of its own,
+/// the same key once. `H` hashes the keys — `DefaultHasher` under the process's key unless the map
+/// is given another; a hasher is a value, copied fresh for every key.
+pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> {
+    var controls: uint64[],
+    var slotKeys: (?K)[],
+    var slotValues: (?V)[],
+    var count: int,
+    var free: int,
+    var changes: int,
+    seed: H,
+
+    /// An empty map hashing with `seed`: `Map<string, int, FixedHasher>.withHasher(FixedHasher.new())`
+    /// is the same in every run.
+    pub static fn withHasher(seed: H): Map<K, V, H> {
+        return Map<K, V, H> { controls = [], slotKeys = [], slotValues = [], count = 0, free = 0, changes = 0, seed = seed };
+    }
+
+    /// How many keys it holds.
+    pub fn length(): int {
+        return this.count;
+    }
+
+    /// Whether it holds none.
+    pub fn isEmpty(): bool {
+        return this.count == 0;
+    }
+
+    /// The value under `k`, or `null`.
+    pub fn get(k: K): ?V {
+        let at = this.find(k, this.hashOf(k));
+        if (at < 0) {
+            return null;
+        }
+        return this.slotValues[at];
+    }
+
+    /// Whether it holds `k`.
+    pub fn containsKey(k: K): bool {
+        return this.find(k, this.hashOf(k)) >= 0;
+    }
+
+    /// `v` under `k`; the value it replaces, or `null` where `k` was not there.
+    pub mut fn insert(k: K, v: V): ?V {
+        let hash = this.hashOf(k);
+        let at = this.find(k, hash);
+        if (at >= 0) {
+            let old = this.slotValues[at];
+            this.slotValues[at] = v;
+            return old;
+        }
+        if (this.free == 0) {
+            this.rebuild();
+        }
+        this.place(k, v, hash);
+        this.count = this.count + 1;
+        this.changes = this.changes + 1;
+        return null;
+    }
+
+    /// `k` and its value taken out; the value, or `null` where `k` was not there.
+    pub mut fn remove(k: K): ?V {
+        let at = this.find(k, this.hashOf(k));
+        if (at < 0) {
+            return null;
+        }
+        let g = at / 8;
+        let shift = ((at % 8) * 8) as uint64;
+        let word = this.controls[g];
+        // A group with an empty slot ends every probe through it, so no key lies beyond it on a
+        // probe that passed it: the slot can be empty again. Otherwise it marks a deletion.
+        var mark: uint64 = 254;
+        if (emptiesOf(word) != 0) {
+            mark = 128;
+            this.free = this.free + 1;
+        }
+        this.controls[g] = (word & ~(255 << shift)) | (mark << shift);
+        let old = this.slotValues[at];
+        this.slotKeys[at] = null;
+        this.slotValues[at] = null;
+        this.count = this.count - 1;
+        this.changes = this.changes + 1;
+        return old;
+    }
+
+    /// Every key taken out.
+    pub mut fn clear(): void {
+        this.controls = [];
+        this.slotKeys = [];
+        this.slotValues = [];
+        this.count = 0;
+        this.free = 0;
+        this.changes = this.changes + 1;
+    }
+
+    fn hashOf(k: K): uint64 {
+        var h = this.seed;
+        k.hash(&h);
+        return h.finish();
+    }
+
+    /// The slot holding `k`, or -1: the groups along the hash's probe, triangular — every group once
+    /// where their number is a power of two.
+    fn find(k: K, hash: uint64): int {
+        if (this.count == 0) {
+            return -1;
+        }
+        let mask = this.controls.length() - 1;
+        let pattern = (hash & 127) *% lowBits;
+        var g = ((hash >> 7) as int) & mask;
+        var step = 0;
+        while (step <= mask) {
+            let word = this.controls[g];
+            let x = word ^ pattern;
+            var hits = (x -% lowBits) & ~x & highBits;
+            while (hits != 0) {
+                let slot = g * 8 + hits.trailingZeros() / 8;
+                if (this.slotKeys[slot] == k) {
+                    return slot;
+                }
+                hits = hits & (hits -% 1);
+            }
+            if (emptiesOf(word) != 0) {
+                return -1;
+            }
+            step = step + 1;
+            g = (g + step) & mask;
+        }
+        return -1;
+    }
+
+    /// `k` and `v` into the first slot along the probe that is not full; `k` is not there.
+    mut fn place(k: K, v: ?V, hash: uint64): void {
+        let mask = this.controls.length() - 1;
+        let tag = hash & 127;
+        var g = ((hash >> 7) as int) & mask;
+        var step = 0;
+        while (step <= mask) {
+            let word = this.controls[g];
+            let open = word & highBits;
+            if (open != 0) {
+                let j = open.trailingZeros() / 8;
+                let shift = (8 * j) as uint64;
+                if (((word >> shift) & 255) == 128) {
+                    this.free = this.free - 1;
+                }
+                this.controls[g] = (word & ~(255 << shift)) | (tag << shift);
+                this.slotKeys[g * 8 + j] = k;
+                this.slotValues[g * 8 + j] = v;
+                return;
+            }
+            step = step + 1;
+            g = (g + step) & mask;
+        }
+        panic("Map: a full table");
+    }
+
+    /// The table built anew, every key placed again: twice the groups — one where there was none —
+    /// or as many where fewer than half the slots the load allows hold keys, the rest deletions.
+    mut fn rebuild(): void {
+        let groups = this.controls.length();
+        var next = 1;
+        if (groups > 0) {
+            next = if (this.count * 16 < groups * 56) groups else groups * 2;
+        }
+        let oldKeys = this.slotKeys;
+        let oldValues = this.slotValues;
+        this.controls = [emptyGroup] * next;
+        this.slotKeys = arrayOf(next * 8, (i: int): ?K => null);
+        this.slotValues = arrayOf(next * 8, (i: int): ?V => null);
+        this.free = next * 7;
+        var i = 0;
+        while (i < oldKeys.length()) {
+            let k = oldKeys[i];
+            if (k != null) {
+                this.place(k, oldValues[i], this.hashOf(k));
+            }
+            i = i + 1;
+        }
+    }
+}
+
+extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
+    /// An empty map hashing with the process's key (10 K2): its order differs from run to run.
+    pub static fn new(): Map<K, V, DefaultHasher> {
+        return Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
+    }
+}
