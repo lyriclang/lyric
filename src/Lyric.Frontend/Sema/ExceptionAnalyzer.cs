@@ -396,7 +396,9 @@ internal sealed class ExceptionAnalyzer
     private void LoopCalls(TypeResult.ForInProtocol walk, Span head)
     {
         Site(_types.CallThrows(walk.IterCall), head, "the loop's 'iter()'");
-        Site(_types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
+        // A coroutine's pull throws what its body throws, which the checker noted (#73).
+        var pulled = _types.ThrownByPull(walk.NextCall.Callee);
+        Site(pulled is { } thrown ? [thrown] : _types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
         if (walk.Close is { Body: ExprStmt { Expr: CallExpr close } })
             Site(_types.CallThrows(close), head, "the loop's 'close()'");
     }
