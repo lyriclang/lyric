@@ -38,6 +38,55 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
 #define LYR_WRAP_SUB(T, U, a, b) ((T)(U)((uint64_t)(U)(a) - (uint64_t)(U)(b)))
 #define LYR_WRAP_MUL(T, U, a, b) ((T)(U)((uint64_t)(U)(a) * (uint64_t)(U)(b)))
 
+/* std.core's number natives (design/v5/spec/10 B5): whether + - * leave the operand type, and
+ * the result wrapped to it — what the builtin stores either way, the `+%` of a builtin —, the bit
+ * counts, the rotation. One macro each serves every integer type, through the operand's own type
+ * and width; the operand's bits are taken zero-extended (a negative narrow value would
+ * sign-extend into the upper bits). */
+#define LYR_ADD_OVERFLOWS(a, b) LYR_OVERFLOWS_(__builtin_add_overflow, a, b)
+#define LYR_SUB_OVERFLOWS(a, b) LYR_OVERFLOWS_(__builtin_sub_overflow, a, b)
+#define LYR_MUL_OVERFLOWS(a, b) LYR_OVERFLOWS_(__builtin_mul_overflow, a, b)
+#define LYR_OVERFLOWS_(builtin, a, b)                                                               \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(a) lyr_result_;                                                             \
+        builtin((a), (b), &lyr_result_);                                                            \
+    })
+#define LYR_ADD_WRAPPING(a, b) LYR_WRAPPING_(__builtin_add_overflow, a, b)
+#define LYR_SUB_WRAPPING(a, b) LYR_WRAPPING_(__builtin_sub_overflow, a, b)
+#define LYR_MUL_WRAPPING(a, b) LYR_WRAPPING_(__builtin_mul_overflow, a, b)
+#define LYR_WRAPPING_(builtin, a, b)                                                                \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(a) lyr_result_;                                                             \
+        (void)builtin((a), (b), &lyr_result_);                                                      \
+        lyr_result_;                                                                                \
+    })
+#define LYR_WIDTH_(x) ((int64_t)(sizeof(x) * 8))
+#define LYR_MASK_(x) (sizeof(x) == 8 ? UINT64_MAX : ((UINT64_C(1) << (sizeof(x) * 8)) - 1))
+#define LYR_BITS_(x) ((uint64_t)(x) & LYR_MASK_(x))
+#define LYR_CLZ(x)                                                                                  \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(x) lyr_x_ = (x);                                                            \
+        lyr_x_ == 0 ? LYR_WIDTH_(lyr_x_)                                                            \
+                    : (int64_t)__builtin_clzll(LYR_BITS_(lyr_x_)) - (64 - LYR_WIDTH_(lyr_x_));     \
+    })
+#define LYR_CTZ(x)                                                                                  \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(x) lyr_x_ = (x);                                                            \
+        lyr_x_ == 0 ? LYR_WIDTH_(lyr_x_) : (int64_t)__builtin_ctzll(LYR_BITS_(lyr_x_));             \
+    })
+#define LYR_POPCOUNT(x) ((int64_t)__builtin_popcountll(LYR_BITS_(x)))
+/* A rotation by any count, taken modulo the width; a negative one turns the other way. */
+#define LYR_ROTL(x, n)                                                                              \
+    __extension__({                                                                                 \
+        LYR_VALUE_TYPE_(x) lyr_x_ = (x);                                                            \
+        const int64_t lyr_w_ = LYR_WIDTH_(lyr_x_);                                                  \
+        const int64_t lyr_s_ = (((int64_t)(n) % lyr_w_) + lyr_w_) % lyr_w_;                        \
+        const uint64_t lyr_b_ = LYR_BITS_(lyr_x_);                                                  \
+        lyr_s_ == 0 ? lyr_x_                                                                        \
+                    : (LYR_VALUE_TYPE_(x))(((lyr_b_ << lyr_s_) | (lyr_b_ >> (lyr_w_ - lyr_s_)))     \
+                                           & LYR_MASK_(lyr_x_));                                    \
+    })
+
 /* A float to an integer (T1d, Rust's rule): toward zero; beyond the range, the nearest bound;
  * NaN gives 0. C leaves an out-of-range conversion undefined, so the bounds are tested first,
  * on the double, against the first value OUTSIDE the range in each direction — those are exact
