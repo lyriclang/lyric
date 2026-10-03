@@ -2410,16 +2410,16 @@ _Static_assert(sizeof(lyr_fn_to_coro_i64_to_void) == 16, "layout of lyr_fn_to_co
 /* prototypes */
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body);
 
-#line 1737 "stdlib5/std/core.lyr"
+#line 1788 "stdlib5/std/core.lyr"
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body) {
     lyr_fn_to_coro_i64_to_void t0 = {0};
     LyrCoro *t1 = NULL;
 bb0:;
-#line 1737
+#line 1788
     t0 = l0_body;
-#line 1737
+#line 1788
     t1 = t0.fn(t0.env, NULL);
-#line 1737
+#line 1788
     return t1;
 }
 
