@@ -1950,6 +1950,143 @@ extend<I :: [Iterator]> I {
     pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): Chain<I, B> {
         return Chain<I, B> { a = this, b = other, second = false };
     }
+
+    /// How many values there are, walking them all.
+    pub fn count(): int throws I.Error {
+        var it = this;
+        var n = 0;
+        while (try it.next() != null) {
+            n = n + 1;
+        }
+        return n;
+    }
+
+    /// `f` over the values from `init`, the last result the answer.
+    pub fn fold<A>(init: A, f: fn(A, I.Item) -> A): A throws I.Error {
+        var it = this;
+        var acc = init;
+        var x = try it.next();
+        while (x != null) {
+            acc = f(acc, x);
+            x = try it.next();
+        }
+        return acc;
+    }
+
+    /// `f` over the values from the first; `null` where there is none.
+    pub fn reduce(f: fn(I.Item, I.Item) -> I.Item): ?I.Item throws I.Error {
+        var it = this;
+        let first = try it.next();
+        if (first == null) {
+            return null;
+        }
+        var acc = first;
+        var x = try it.next();
+        while (x != null) {
+            acc = f(acc, x);
+            x = try it.next();
+        }
+        return acc;
+    }
+
+    /// The first value, or `null`.
+    pub fn first(): ?I.Item throws I.Error {
+        var it = this;
+        return try it.next();
+    }
+
+    /// The last value, or `null` — walking them all.
+    pub fn last(): ?I.Item throws I.Error {
+        var it = this;
+        var last = try it.next();
+        if (last == null) {
+            return null;
+        }
+        var x = try it.next();
+        while (x != null) {
+            last = x;
+            x = try it.next();
+        }
+        return last;
+    }
+
+    /// The value at position `n` from 0, or `null` — a negative `n` included.
+    pub fn nth(n: int): ?I.Item throws I.Error {
+        if (n < 0) {
+            return null;
+        }
+        var it = this;
+        var left = n;
+        while (left > 0) {
+            if (try it.next() == null) {
+                return null;
+            }
+            left = left - 1;
+        }
+        return try it.next();
+    }
+
+    /// Whether `p` holds for some value; stops at the first.
+    pub fn any(p: fn(I.Item) -> bool): bool throws I.Error {
+        return try this.find(p) != null;
+    }
+
+    /// Whether `p` holds for every value; stops at the first it does not — `true` for none.
+    pub fn all(p: fn(I.Item) -> bool): bool throws I.Error {
+        return try this.find((v) => !p(v)) == null;
+    }
+
+    /// Whether `p` holds for no value.
+    pub fn none(p: fn(I.Item) -> bool): bool throws I.Error {
+        return try this.find(p) == null;
+    }
+
+    /// The first value `p` holds for, or `null`.
+    pub fn find(p: fn(I.Item) -> bool): ?I.Item throws I.Error {
+        var it = this;
+        var x = try it.next();
+        while (x != null && !p(x)) {
+            x = try it.next();
+        }
+        return x;
+    }
+
+    /// The position of the first value `p` holds for, from 0, or `null`.
+    pub fn position(p: fn(I.Item) -> bool): ?int throws I.Error {
+        var it = this;
+        var i = 0;
+        var x = try it.next();
+        while (x != null) {
+            if (p(x)) {
+                return i;
+            }
+            i = i + 1;
+            x = try it.next();
+        }
+        return null;
+    }
+
+    /// `f` for every value, in order.
+    pub fn forEach(f: fn(I.Item) -> void): void throws I.Error {
+        var it = this;
+        var x = try it.next();
+        while (x != null) {
+            f(x);
+            x = try it.next();
+        }
+    }
+
+    /// The values in an array, in order.
+    pub fn toArray(): I.Item[] throws I.Error {
+        var it = this;
+        var out: I.Item[] = [];
+        var x = try it.next();
+        while (x != null) {
+            out = out + [x];
+            x = try it.next();
+        }
+        return out;
+    }
 }
 
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
