@@ -15,9 +15,14 @@ typedef struct lyr_ty7_Shape_Empty lyr_ty7_Shape_Empty;
 typedef struct lyr_ty8_Opt_Shape_ lyr_ty8_Opt_Shape_;
 typedef struct lyr_ty9_Opt_Shape__Some lyr_ty9_Opt_Shape__Some;
 typedef struct lyr_ty10_Opt_Shape__None lyr_ty10_Opt_Shape__None;
-typedef struct lyr_vt_ty11 lyr_vt_ty11;
-const char lyr_ifid_ty11[] = "std.core.Error";
-typedef struct lyr_ty12_Exception lyr_ty12_Exception;
+typedef struct lyr_ty11_ParseError lyr_ty11_ParseError;
+typedef struct lyr_ty12_ParseErrorKind lyr_ty12_ParseErrorKind;
+typedef struct lyr_ty13_ParseErrorKind_Empty lyr_ty13_ParseErrorKind_Empty;
+typedef struct lyr_ty14_ParseErrorKind_Invalid lyr_ty14_ParseErrorKind_Invalid;
+typedef struct lyr_ty15_ParseErrorKind_Overflow lyr_ty15_ParseErrorKind_Overflow;
+typedef struct lyr_vt_ty16 lyr_vt_ty16;
+const char lyr_ifid_ty16[] = "std.core.Error";
+typedef struct lyr_ty17_Exception lyr_ty17_Exception;
 struct lyr_ty1_Signal_Red {
     uint8_t lyr_unit;
 };
@@ -49,22 +54,36 @@ struct lyr_ty10_Opt_Shape__None {
 };
 struct lyr_ty8_Opt_Shape_ { uint32_t tag; union { lyr_ty9_Opt_Shape__Some v0; } as; };
 _Static_assert(sizeof(lyr_ty8_Opt_Shape_) == 32, "layout of lyr_ty8_Opt_Shape_");
-struct lyr_vt_ty11 {
+struct lyr_ty13_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty14_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty15_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty12_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty12_ParseErrorKind) == 4, "layout of lyr_ty12_ParseErrorKind");
+struct lyr_ty11_ParseError {
+    lyr_ty12_ParseErrorKind f_kind;
+};
+struct lyr_vt_ty16 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface11;
-struct lyr_ty12_Exception {
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface16;
+struct lyr_ty17_Exception {
     LyrObj header;
     LyrStr *f_text;
-    lyr_opt_iface11 f_inner;
+    lyr_opt_iface16 f_inner;
 };
-_Static_assert(sizeof(lyr_ty12_Exception) == 40, "layout of lyr_ty12_Exception");
-_Static_assert(offsetof(lyr_ty12_Exception, f_text) == 8, "layout of lyr_ty12_Exception");
-_Static_assert(offsetof(lyr_ty12_Exception, f_inner) == 16, "layout of lyr_ty12_Exception");
-static const uint64_t lyr_refmap_ty12[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty12_Exception = { sizeof(lyr_ty12_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty12, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty17_Exception) == 40, "layout of lyr_ty17_Exception");
+_Static_assert(offsetof(lyr_ty17_Exception, f_text) == 8, "layout of lyr_ty17_Exception");
+_Static_assert(offsetof(lyr_ty17_Exception, f_inner) == 16, "layout of lyr_ty17_Exception");
+static const uint64_t lyr_refmap_ty17[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty17_Exception = { sizeof(lyr_ty17_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty17, "std.core.Exception", NULL };
 
 /* string literals */
 static const LyrStaticStr(4) lyr_lit0 = LYR_STR_INIT("red");

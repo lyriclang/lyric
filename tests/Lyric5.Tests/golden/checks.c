@@ -4,25 +4,44 @@
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "std.core.Error";
-typedef struct lyr_ty1_Exception lyr_ty1_Exception;
-struct lyr_vt_ty0 {
+typedef struct lyr_ty0_ParseError lyr_ty0_ParseError;
+typedef struct lyr_ty1_ParseErrorKind lyr_ty1_ParseErrorKind;
+typedef struct lyr_ty2_ParseErrorKind_Empty lyr_ty2_ParseErrorKind_Empty;
+typedef struct lyr_ty3_ParseErrorKind_Invalid lyr_ty3_ParseErrorKind_Invalid;
+typedef struct lyr_ty4_ParseErrorKind_Overflow lyr_ty4_ParseErrorKind_Overflow;
+typedef struct lyr_vt_ty5 lyr_vt_ty5;
+const char lyr_ifid_ty5[] = "std.core.Error";
+typedef struct lyr_ty6_Exception lyr_ty6_Exception;
+struct lyr_ty2_ParseErrorKind_Empty {
+    uint8_t lyr_unit;
+};
+struct lyr_ty3_ParseErrorKind_Invalid {
+    uint8_t lyr_unit;
+};
+struct lyr_ty4_ParseErrorKind_Overflow {
+    uint8_t lyr_unit;
+};
+struct lyr_ty1_ParseErrorKind { uint32_t tag; };
+_Static_assert(sizeof(lyr_ty1_ParseErrorKind) == 4, "layout of lyr_ty1_ParseErrorKind");
+struct lyr_ty0_ParseError {
+    lyr_ty1_ParseErrorKind f_kind;
+};
+struct lyr_vt_ty5 {
     const LyrDesc *desc;
     void (*s0)(LyrIface);
     void (*s1)(LyrIface);
 };
-typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface0;
-struct lyr_ty1_Exception {
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface5;
+struct lyr_ty6_Exception {
     LyrObj header;
     LyrStr *f_text;
-    lyr_opt_iface0 f_inner;
+    lyr_opt_iface5 f_inner;
 };
-_Static_assert(sizeof(lyr_ty1_Exception) == 40, "layout of lyr_ty1_Exception");
-_Static_assert(offsetof(lyr_ty1_Exception, f_text) == 8, "layout of lyr_ty1_Exception");
-_Static_assert(offsetof(lyr_ty1_Exception, f_inner) == 16, "layout of lyr_ty1_Exception");
-static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty1_Exception = { sizeof(lyr_ty1_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "std.core.Exception", NULL };
+_Static_assert(sizeof(lyr_ty6_Exception) == 40, "layout of lyr_ty6_Exception");
+_Static_assert(offsetof(lyr_ty6_Exception, f_text) == 8, "layout of lyr_ty6_Exception");
+_Static_assert(offsetof(lyr_ty6_Exception, f_inner) == 16, "layout of lyr_ty6_Exception");
+static const uint64_t lyr_refmap_ty6[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty6_Exception = { sizeof(lyr_ty6_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty6, "std.core.Exception", NULL };
 
 /* prototypes */
 int64_t lyr_main_add(int64_t l0_a, int64_t l1_b);

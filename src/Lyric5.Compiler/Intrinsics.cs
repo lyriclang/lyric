@@ -71,6 +71,13 @@ public static class Intrinsics
         ["std.core.countTrailingZeros"] = "LYR_CTZ",
         ["std.core.countOnes"] = "LYR_POPCOUNT",
         ["std.core.rotateBitsLeft"] = "LYR_ROTL",
+        // Parsing (10 B5 Z6): a string's length and bytes until StringView (M8a S8), the
+        // conversion of `as` toward a type parameter, a float's text read by C.
+        ["std.core.byteCount"] = "LYR_STR_LEN",
+        ["std.core.byteAt"] = "LYR_STR_BYTE",
+        ["std.core.convertWrapping"] = "LYR_CONVERT",
+        ["std.core.floatOfText"] = "lyr_str_to_float64",
+        ["std.core.float32OfText"] = "lyr_str_to_float32",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

@@ -1,0 +1,138 @@
+// std.core's parsing (design/v5/spec/10 B3, B5 Z6): a value read from a text, the reason thrown.
+import std.test { assertEq, assertTrue, assertThrows, assertPanics };
+import std.core { Parse, ParseError, ParseErrorKind };
+
+fn kindOf(f: fn() -> void throws ParseError): ParseErrorKind {
+    return assertThrows<ParseError>(f).kind;
+}
+
+fn read<T :: [Parse]>(s: string): T throws ParseError {
+    return try T.parse(s);
+}
+
+fn intIs(s: string, kind: ParseErrorKind): void {
+    assertEq(kindOf(() => { try int.parse(s); }), kind, s);
+}
+
+fn floatIs(s: string, kind: ParseErrorKind): void {
+    assertEq(kindOf(() => { try float.parse(s); }), kind, s);
+}
+
+@Test
+fn integersReadTheirDigits(): void throws ParseError {
+    assertEq(try int.parse("42"), 42);
+    assertEq(try int.parse("-42"), -42);
+    assertEq(try int.parse("+7"), 7);
+    assertEq(try int.parse("1_000_000"), 1000000);
+    assertEq(try int.parse("-0"), 0);
+    assertEq(try int.parse("007"), 7);
+    assertEq(try int.parse("9223372036854775807"), int.max);
+    assertEq(try int.parse("-9223372036854775808"), int.min);
+    assertEq(try uint.parse("18446744073709551615"), uint.max);
+    assertEq(try int8.parse("-128"), int8.min);
+    assertEq(try uint8.parse("+255"), uint8.max);
+}
+
+@Test
+fn aRadixReadsItsDigits(): void throws ParseError {
+    assertEq(try int.parse("ff", 16), 255);
+    assertEq(try int.parse("FF", 16), 255);
+    assertEq(try int.parse("-101", 2), -5);
+    assertEq(try int.parse("z", 36), 35);
+    assertEq(try uint8.parse("1111_1111", 2), 255);
+    assertEq(try int8.parse("-80", 16), -128);
+    assertEq(try int.parse("42", 10), 42);
+}
+
+@Test
+fn whatIsNotAnIntegerIsInvalid(): void {
+    intIs("", ParseErrorKind.Empty);
+    let texts = ["-", "+", "12a", " 1", "1 ", "1__0", "_1", "1_", "-_1", "0x10", "1.0", "--1", "+-1",
+                 "١", "ff"];
+    for (i in 0..texts.length()) {
+        intIs(texts[i], ParseErrorKind.Invalid);
+    }
+    assertEq(kindOf(() => { try int.parse("12", 2); }), ParseErrorKind.Invalid);
+    assertEq(kindOf(() => { try uint.parse("-1"); }), ParseErrorKind.Invalid);
+    assertEq(kindOf(() => { try uint8.parse("-0"); }), ParseErrorKind.Invalid);
+}
+
+@Test
+fn whatLeavesTheRangeOverflows(): void {
+    intIs("9223372036854775808", ParseErrorKind.Overflow);
+    intIs("-9223372036854775809", ParseErrorKind.Overflow);
+    intIs("99999999999999999999", ParseErrorKind.Overflow);
+    intIs("99999999999999999999x", ParseErrorKind.Invalid);
+    assertEq(kindOf(() => { try int8.parse("128"); }), ParseErrorKind.Overflow);
+    assertEq(kindOf(() => { try int8.parse("-129"); }), ParseErrorKind.Overflow);
+    assertEq(kindOf(() => { try uint8.parse("256"); }), ParseErrorKind.Overflow);
+    assertEq(kindOf(() => { try uint.parse("18446744073709551616"); }), ParseErrorKind.Overflow);
+    assertEq(kindOf(() => { try int16.parse("8000", 16); }), ParseErrorKind.Overflow);
+}
+
+@Test
+fn aRadixOutsideTwoToThirtySixPanics(): void {
+    assertPanics(() => { try int.parse("1", 1); });
+    assertPanics(() => { try int.parse("1", 37); });
+}
+
+@Test
+fn floatsReadTheNearestValue(): void throws ParseError {
+    assertEq(try float.parse("1.5"), 1.5);
+    assertEq(try float.parse("-0.25"), -0.25);
+    assertEq(try float.parse("0.1"), 0.1);
+    assertEq(try float.parse("42"), 42.0);
+    assertEq(try float.parse("1e3"), 1000.0);
+    assertEq(try float.parse("1E-2"), 0.01);
+    assertEq(try float.parse("2.5e+2"), 250.0);
+    assertEq(try float.parse(".5"), 0.5);
+    assertEq(try float.parse("5."), 5.0);
+    assertEq(try float.parse("1_000.000_5"), 1000.0005);
+    assertEq(try float.parse("1e400"), try float.parse("inf"));
+    assertEq(try float.parse("1e-400"), 0.0);
+    assertTrue(try float.parse("inf") > 1e308);
+    assertTrue(try float.parse("-inf") < -1e308);
+    let nan = try float.parse("nan");
+    assertTrue(nan != nan);
+    let tenth: float32 = 0.1;
+    assertEq(try float32.parse("0.1"), tenth);
+    assertTrue(try float32.parse("1e39") > 3.4e38);
+}
+
+@Test
+fn whatIsNotAFloatIsInvalid(): void {
+    floatIs("", ParseErrorKind.Empty);
+    let texts = [".", "e5", "1e", "1e+", "1.2.3", "0x1p3", " 1.0", "1.0 ", "--1", "+", "-",
+                 "infinity", "Inf", "NaN", "1_.5", "1._5", "_1", "1_", "1__0", "1e_5", "1e5_"];
+    for (i in 0..texts.length()) {
+        floatIs(texts[i], ParseErrorKind.Invalid);
+    }
+}
+
+@Test
+fn boolsAreTrueOrFalse(): void throws ParseError {
+    assertTrue(try bool.parse("true"));
+    assertEq(try bool.parse("false"), false);
+    assertEq(kindOf(() => { try bool.parse(""); }), ParseErrorKind.Empty);
+    assertEq(kindOf(() => { try bool.parse("True"); }), ParseErrorKind.Invalid);
+    assertEq(kindOf(() => { try bool.parse("1"); }), ParseErrorKind.Invalid);
+}
+
+@Test
+fn parseIsAConstraint(): void throws ParseError {
+    let small: int8 = try read("12");
+    assertEq(small, 12);
+    let wide: uint16 = try read("65535");
+    assertEq(wide, uint16.max);
+    let x: float = try read("2.5");
+    assertEq(x, 2.5);
+    let yes: bool = try read("true");
+    assertTrue(yes);
+}
+
+@Test
+fn theErrorSaysWhy(): void {
+    let e = assertThrows<ParseError>(() => { try int8.parse("300"); });
+    assertEq(e.kind, ParseErrorKind.Overflow);
+    assertEq(e.message(), "the number is beyond the type's range");
+}

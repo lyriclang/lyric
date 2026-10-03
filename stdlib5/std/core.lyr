@@ -652,7 +652,7 @@ extend string :: [Debug, Clone, Default] {
 
 /// Every number type (10 B5 Z1): its zero and its one, arithmetic that stays in the type.
 pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<Out = Self>,
-    Div<Out = Self>, Rem<Out = Self>, Display, Debug, Default] {
+    Div<Out = Self>, Rem<Out = Self>, Display, Debug, Parse, Default] {
     static let zero: Self;
     static let one: Self;
 
@@ -836,6 +836,16 @@ extend int :: [Num, Signed, Integer] {
     static let max: int = 9223372036854775807;
     static let bitWidth: int = 64;
     static let isSigned: bool = true;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): int throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): int throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend int8 :: [Num, Signed, Integer] {
@@ -845,6 +855,16 @@ extend int8 :: [Num, Signed, Integer] {
     static let max: int8 = 127;
     static let bitWidth: int = 8;
     static let isSigned: bool = true;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): int8 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): int8 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend int16 :: [Num, Signed, Integer] {
@@ -854,6 +874,16 @@ extend int16 :: [Num, Signed, Integer] {
     static let max: int16 = 32767;
     static let bitWidth: int = 16;
     static let isSigned: bool = true;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): int16 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): int16 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend int32 :: [Num, Signed, Integer] {
@@ -863,6 +893,16 @@ extend int32 :: [Num, Signed, Integer] {
     static let max: int32 = 2147483647;
     static let bitWidth: int = 32;
     static let isSigned: bool = true;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): int32 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): int32 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend uint :: [Num, Integer] {
@@ -872,6 +912,16 @@ extend uint :: [Num, Integer] {
     static let max: uint = 18446744073709551615;
     static let bitWidth: int = 64;
     static let isSigned: bool = false;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): uint throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): uint throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend uint8 :: [Num, Integer] {
@@ -881,6 +931,16 @@ extend uint8 :: [Num, Integer] {
     static let max: uint8 = 255;
     static let bitWidth: int = 8;
     static let isSigned: bool = false;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): uint8 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): uint8 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend uint16 :: [Num, Integer] {
@@ -890,6 +950,16 @@ extend uint16 :: [Num, Integer] {
     static let max: uint16 = 65535;
     static let bitWidth: int = 16;
     static let isSigned: bool = false;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): uint16 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): uint16 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend uint32 :: [Num, Integer] {
@@ -899,17 +969,234 @@ extend uint32 :: [Num, Integer] {
     static let max: uint32 = 4294967295;
     static let bitWidth: int = 32;
     static let isSigned: bool = false;
+
+    /// The decimal integer a text names (`Parse`).
+    static fn parse(s: string): uint32 throws ParseError {
+        return try parseInteger(s, 10);
+    }
+
+    /// The integer a text names in `radix`, 2…36.
+    static fn parse(s: string, radix: int): uint32 throws ParseError {
+        return try parseInteger(s, radix);
+    }
 }
 
 extend float :: [Num, Signed] {
     static let zero: float = 0.0;
     static let one: float = 1.0;
+
+    /// The float a text names, the nearest one (`Parse`).
+    static fn parse(s: string): float throws ParseError {
+        try checkFloatText(s);
+        return floatOfText(s);
+    }
 }
 
 extend float32 :: [Num, Signed] {
     static let zero: float32 = 0.0;
     static let one: float32 = 1.0;
+
+    /// The float a text names, the nearest one (`Parse`).
+    static fn parse(s: string): float32 throws ParseError {
+        try checkFloatText(s);
+        return float32OfText(s);
+    }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Parsing (design/v5/spec/10 B3, B4, B5 Z6): a value read from a text, and what is wrong with the
+// text thrown — the text is the data's, so it never panics. An integer is read here in Lyric over
+// the string's bytes; a float's form is checked here and its value read by C, correctly rounded.
+// ---------------------------------------------------------------------------------------------
+
+/// Why a text is not a value of the type.
+pub enum ParseErrorKind :: [Equatable, Debug] { Empty, Invalid, Overflow }
+
+/// What `parse` throws (10 B3): the text was empty, was not of the type's form, or named a number
+/// beyond the type's range.
+pub struct ParseError :: [Error] {
+    /// Why.
+    pub kind: ParseErrorKind,
+
+    pub fn message(): string {
+        return match (this.kind) {
+            .Empty => "cannot parse a value from an empty text",
+            .Invalid => "the text is not a value of the type",
+            .Overflow => "the number is beyond the type's range",
+        };
+    }
+}
+
+/// A type read from a text: `T.parse(s)`, throwing `ParseError` with the reason. The number types
+/// conform through `Num`, and `bool`.
+pub interface Parse {
+    static fn parse(s: string): Self throws ParseError;
+}
+
+extend bool :: [Parse] {
+    /// `true` or `false`, exactly.
+    static fn parse(s: string): bool throws ParseError {
+        if (s == "true") {
+            return true;
+        }
+        if (s == "false") {
+            return false;
+        }
+        throw ParseError { kind = if (s == "") ParseErrorKind.Empty else ParseErrorKind.Invalid };
+    }
+}
+
+/// The integer a text names in `radix` (10 B5 Z6): an optional `+` or `-`, ASCII digits, `_`
+/// between two of them, nothing else. A radix outside 2…36 is the program's error and panics (B3).
+/// A byte outside the form is `Invalid` however many digits run before it — only a well-formed
+/// number is an `Overflow`. Negative numbers accumulate downward, so `min` is reached.
+fn parseInteger<T :: [Integer]>(s: string, radix: int): T throws ParseError {
+    if (radix < 2 || radix > 36) {
+        panic(f"radix {radix} is outside 2..36");
+    }
+    let n = byteCount(s);
+    if (n == 0) {
+        throw ParseError { kind = ParseErrorKind.Empty };
+    }
+    let negative = byteAt(s, 0) == 45;
+    var i = if (negative || byteAt(s, 0) == 43) 1 else 0;
+    if (i == n || (negative && !T.isSigned)) {
+        throw ParseError { kind = ParseErrorKind.Invalid };
+    }
+    let base = convertWrapping(radix, T.zero);
+    var value = T.zero;
+    var overflowed = false;
+    var afterDigit = false;
+    while (i < n) {
+        let b = byteAt(s, i);
+        i = i + 1;
+        if (b == 95) {
+            if (!afterDigit || i == n) {
+                throw ParseError { kind = ParseErrorKind.Invalid };
+            }
+            afterDigit = false;
+            continue;
+        }
+        let d = digitValue(b);
+        if (d >= radix) {
+            throw ParseError { kind = ParseErrorKind.Invalid };
+        }
+        afterDigit = true;
+        if (!overflowed) {
+            let digit = convertWrapping(d, T.zero);
+            let scaled = value.checkedMul(base);
+            if (scaled == null) {
+                overflowed = true;
+            } else {
+                let next = if (negative) scaled.checkedSub(digit) else scaled.checkedAdd(digit);
+                if (next == null) {
+                    overflowed = true;
+                } else {
+                    value = next;
+                }
+            }
+        }
+    }
+    if (overflowed) {
+        throw ParseError { kind = ParseErrorKind.Overflow };
+    }
+    return value;
+}
+
+/// A byte's value as a digit — `0`…`9`, then `a`…`z` or `A`…`Z` for 10…35 — and 36 for any other.
+fn digitValue(b: int): int {
+    if (b >= 48 && b <= 57) {
+        return b - 48;
+    }
+    if (b >= 97 && b <= 122) {
+        return b - 87;
+    }
+    if (b >= 65 && b <= 90) {
+        return b - 55;
+    }
+    return 36;
+}
+
+/// Whether a byte is an ASCII digit.
+fn isDigit(b: int): bool {
+    return b >= 48 && b <= 57;
+}
+
+/// A float's form (10 B5 Z6), thrown where the text is not of it: an optional sign, then `inf`,
+/// `nan`, or digits with an optional `.` and fraction — one digit at least — and an optional
+/// exponent, `e` or `E` with its own sign and digits; `_` between two digits, nothing else.
+fn checkFloatText(s: string): void throws ParseError {
+    let n = byteCount(s);
+    if (n == 0) {
+        throw ParseError { kind = ParseErrorKind.Empty };
+    }
+    var i = if (byteAt(s, 0) == 43 || byteAt(s, 0) == 45) 1 else 0;
+    if (n - i == 3 && (isWord(s, i, 105, 110, 102) || isWord(s, i, 110, 97, 110))) {
+        return;
+    }
+    var digits = 0;
+    var point = false;
+    var afterDigit = false;
+    while (i < n) {
+        let b = byteAt(s, i);
+        if (isDigit(b)) {
+            digits = digits + 1;
+            afterDigit = true;
+        } else if (b == 95 && afterDigit && i + 1 < n && isDigit(byteAt(s, i + 1))) {
+            afterDigit = false;
+        } else if (b == 46 && !point) {
+            point = true;
+            afterDigit = false;
+        } else {
+            break;
+        }
+        i = i + 1;
+    }
+    if (digits == 0) {
+        throw ParseError { kind = ParseErrorKind.Invalid };
+    }
+    if (i == n) {
+        return;
+    }
+    if (byteAt(s, i) != 101 && byteAt(s, i) != 69) {
+        throw ParseError { kind = ParseErrorKind.Invalid };
+    }
+    i = i + 1;
+    if (i < n && (byteAt(s, i) == 43 || byteAt(s, i) == 45)) {
+        i = i + 1;
+    }
+    var exponent = 0;
+    afterDigit = false;
+    while (i < n) {
+        let b = byteAt(s, i);
+        if (isDigit(b)) {
+            exponent = exponent + 1;
+            afterDigit = true;
+        } else if (b == 95 && afterDigit && i + 1 < n && isDigit(byteAt(s, i + 1))) {
+            afterDigit = false;
+        } else {
+            throw ParseError { kind = ParseErrorKind.Invalid };
+        }
+        i = i + 1;
+    }
+    if (exponent == 0) {
+        throw ParseError { kind = ParseErrorKind.Invalid };
+    }
+}
+
+/// Whether the three bytes at `i` are `a`, `b`, `c`.
+fn isWord(s: string, i: int, a: int, b: int, c: int): bool {
+    return byteAt(s, i) == a && byteAt(s, i + 1) == b && byteAt(s, i + 2) == c;
+}
+
+// The natives parsing stands on: a string's length and bytes until `StringView` gives the library
+// its bytes (M8a S8), a number converted as `as` converts it (03 T1d) where the target is a
+// parameter, a float's text read by C (`strtod`, `strtof`) once its form is checked.
+fn byteCount(s: string): int;
+fn byteAt(s: string, i: int): int;
+fn convertWrapping<T, U>(v: T, like: U): U;
+fn floatOfText(s: string): float;
+fn float32OfText(s: string): float32;
 
 /// The debug rendering of an array, element by element — the shape has no conformance of its
 /// own yet (05 §13.6), so a synthesized `debug()` reaches for this.

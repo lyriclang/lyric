@@ -1,4 +1,4 @@
-/* Strings: construction, UTF-8 validation, comparison, integer <-> text. */
+/* Strings: construction, UTF-8 validation, comparison, number -> text, a float's text -> value. */
 #include "lyr/string.h"
 #include "lyr/gc.h"
 #include "lyr/panic.h"
@@ -150,46 +150,33 @@ LyrStr *lyr_str_from_float(double value) {
     return lyr_str_from_cstr("?");
 }
 
-static int digit_value(unsigned char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'z') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 10;
-    return 99;
+/* The text strtod reads: the string's own bytes (NUL-terminated, 11 X3) when it has no '_', else
+ * a copy without them — on the stack while it fits, on the heap beyond. */
+static const char *float_text(const LyrStr *text, char *buffer, size_t size, char **owned) {
+    *owned = NULL;
+    if (memchr(text->bytes, '_', (size_t)text->len) == NULL) return text->bytes;
+    char *out = buffer;
+    if ((size_t)text->len >= size) {
+        out = *owned = malloc((size_t)text->len + 1);
+        if (out == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "no memory for a float text of %lld bytes", (long long)text->len);
+    }
+    size_t n = 0;
+    for (int64_t i = 0; i < text->len; i++)
+        if (text->bytes[i] != '_') out[n++] = text->bytes[i];
+    out[n] = '\0';
+    return out;
 }
 
-LyrParseStatus lyr_str_to_int(const LyrStr *text, int radix, int64_t *out, int64_t *error_offset) {
-    if (radix < 2 || radix > 36) lyr_panic(LYR_RT_ARGUMENT, "radix %d is outside 2..36", radix);
+double lyr_str_to_float64(const LyrStr *text) {
+    char buffer[64], *owned;
+    double value = strtod(float_text(text, buffer, sizeof buffer, &owned), NULL);
+    free(owned);
+    return value;
+}
 
-    const unsigned char *s = (const unsigned char *)text->bytes;
-    int64_t len = text->len, i = 0;
-    if (len == 0) { if (error_offset) *error_offset = 0; return LYR_PARSE_EMPTY; }
-
-    int negative = 0;
-    if (s[0] == '+' || s[0] == '-') { negative = s[0] == '-'; i = 1; }
-    if (i == len) { if (error_offset) *error_offset = i; return LYR_PARSE_INVALID; }
-
-    /* Accumulate negatively: the negative range holds one more value than the positive one. */
-    int64_t acc = 0;
-    int digits = 0, last_was_digit = 0;
-    for (; i < len; i++) {
-        unsigned char c = s[i];
-        if (c == '_') {
-            if (!last_was_digit || i + 1 == len) { if (error_offset) *error_offset = i; return LYR_PARSE_INVALID; }
-            last_was_digit = 0;
-            continue;
-        }
-        int d = digit_value(c);
-        if (d >= radix) { if (error_offset) *error_offset = i; return LYR_PARSE_INVALID; }
-        if (acc < (INT64_MIN + d) / radix) { if (error_offset) *error_offset = i; return LYR_PARSE_OVERFLOW; }
-        acc = acc * radix - d;
-        digits++;
-        last_was_digit = 1;
-    }
-    if (digits == 0) { if (error_offset) *error_offset = i; return LYR_PARSE_INVALID; }
-    if (!negative) {
-        if (acc == INT64_MIN) { if (error_offset) *error_offset = 0; return LYR_PARSE_OVERFLOW; }
-        acc = -acc;
-    }
-    *out = acc;
-    return LYR_PARSE_OK;
+float lyr_str_to_float32(const LyrStr *text) {
+    char buffer[64], *owned;
+    float value = strtof(float_text(text, buffer, sizeof buffer, &owned), NULL);
+    free(owned);
+    return value;
 }

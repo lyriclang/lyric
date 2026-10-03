@@ -60,6 +60,9 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
         (void)builtin((a), (b), &lyr_result_);                                                      \
         lyr_result_;                                                                                \
     })
+/* `v as U` where U is a type parameter's (03 T1d): the operand converted to the type of `like`,
+ * which is not evaluated — std.core reads a digit into the integer type it parses. */
+#define LYR_CONVERT(v, like) ((LYR_VALUE_TYPE_(like))(v))
 #define LYR_WIDTH_(x) ((int64_t)(sizeof(x) * 8))
 #define LYR_MASK_(x) (sizeof(x) == 8 ? UINT64_MAX : ((UINT64_C(1) << (sizeof(x) * 8)) - 1))
 #define LYR_BITS_(x) ((uint64_t)(x) & LYR_MASK_(x))
