@@ -75,7 +75,11 @@ public static class Intrinsics
         // conversion of `as` toward a type parameter, a float's text read by C.
         ["std.core.byteCount"] = "LYR_STR_LEN",
         ["std.core.byteAt"] = "LYR_STR_BYTE",
-        ["std.core.convertWrapping"] = "LYR_CONVERT",
+        ["std.core.asTypeOf"] = "LYR_CONVERT",
+        // Float (10 B5): the bits of either width and IEEE's total order as a key.
+        ["std.core.floatBits"] = "LYR_FLOAT_BITS",
+        ["std.core.floatFromBits"] = "LYR_FLOAT_FROM_BITS",
+        ["std.core.totalOrderKey"] = "LYR_TOTAL_ORDER_KEY",
         ["std.core.floatOfText"] = "lyr_str_to_float64",
         ["std.core.float32OfText"] = "lyr_str_to_float32",
     };

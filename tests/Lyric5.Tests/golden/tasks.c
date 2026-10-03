@@ -612,9 +612,13 @@ const LyrDesc lyr_desc_ty52__env_std_task_launchOn_void__never__ = { sizeof(lyr_
 typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 
 /* module-level bindings */
-lyr_ty9_SignalHub *lyr_g0_signalHub = NULL;
-lyr_ty2_Atomic_int_ *lyr_g1_channelIds = NULL;
-LyrStr *lyr_g2_log = NULL;
+double lyr_g0_float_infinity = 0;
+double lyr_g1_float_nan = 0;
+float lyr_g2_float32_infinity = 0;
+float lyr_g3_float32_nan = 0;
+lyr_ty9_SignalHub *lyr_g4_signalHub = NULL;
+lyr_ty2_Atomic_int_ *lyr_g5_channelIds = NULL;
+LyrStr *lyr_g6_log = NULL;
 
 /* string literals */
 static const LyrStaticStr(1) lyr_lit0 = LYR_STR_INIT("");
@@ -645,7 +649,7 @@ static const LyrStaticStr(6) lyr_lit22 = LYR_STR_INIT("never");
 void lyr_main_note(LyrStr *l0_s);
 void lyr_main_flush(LyrStr *l0_title);
 LyrCoro * lyr_main_numbers(void);
-void lyr_main_main(LyrErr **lyr_err);
+LYR_NOINLINE void lyr_main_main(LyrErr **lyr_err);
 lyr_opt_iface6 lyr_std_core_Error_cause(LyrIface l0_this);
 void lyr_std_task_sleep(lyr_ty24_Duration l0_d, LyrErr **lyr_err);
 void lyr_std_task_yieldNow(LyrErr **lyr_err);
@@ -704,6 +708,8 @@ uint8_t lyr_std_sync_Atomic_int__compareAndSet_863a25cd(lyr_ty2_Atomic_int_ *l0_
 void lyr_std_sync_Atomic_bool__store_1ce39387(lyr_ty3_Atomic_bool_ *l0_this, uint8_t l1_value);
 uint8_t lyr_std_sync_Atomic_bool__compareAndSet_fb00c5b6(lyr_ty3_Atomic_bool_ *l0_this, uint8_t l1_expected, uint8_t l2_desired);
 void lyr__globals__9ee5f9b5(void);
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* thunks: a function as a value, without an environment */
 static void lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, LyrErr **lyr_err) { (void)lyr_env; lyr_main_main__lambda0__1de246d4(lyr_err); }
@@ -746,7 +752,7 @@ void lyr_main_note(LyrStr *l0_s) {
     LyrStr *t9 = NULL;
 bb0:;
 #line 17
-    t0 = lyr_g2_log;
+    t0 = lyr_g6_log;
 #line 17
     t1 = (LyrStr *)&lyr_lit0;
 #line 17
@@ -762,7 +768,7 @@ bb1:;
     goto bb3;
 bb2:;
 #line 17
-    t4 = lyr_g2_log;
+    t4 = lyr_g6_log;
 #line 17
     t5 = (LyrStr *)&lyr_lit1;
 #line 17
@@ -779,7 +785,7 @@ bb3:;
 #line 17
     t9 = l1__if0;
 #line 17
-    lyr_g2_log = t9;
+    lyr_g6_log = t9;
 #line 16
     return;
 }
@@ -800,7 +806,7 @@ bb0:;
 #line 21
     t2 = lyr_str_concat(t0, t1);
 #line 21
-    t3 = lyr_g2_log;
+    t3 = lyr_g6_log;
 #line 21
     t4 = lyr_str_concat(t2, t3);
 #line 21
@@ -808,7 +814,7 @@ bb0:;
 #line 22
     t5 = (LyrStr *)&lyr_lit0;
 #line 22
-    lyr_g2_log = t5;
+    lyr_g6_log = t5;
 #line 20
     return;
 }
@@ -824,7 +830,7 @@ bb0:;
 }
 
 #line 32 "programs/tasks.lyr"
-void lyr_main_main(LyrErr **lyr_err) {
+LYR_NOINLINE void lyr_main_main(LyrErr **lyr_err) {
     LyrCoro *l0_gen = NULL;
     int64_t l1_n = 0;
     LyrErr *lyr_e = NULL;
@@ -4376,56 +4382,120 @@ bb6:;
     return;
 }
 
-#line 1510 "stdlib5/std/task.lyr"
+#line 1192 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
-    uint8_t t0 = 0;
-    lyr_ty3_Atomic_bool_ *t1 = NULL;
-    lyr_ty8_SpinLock *t2 = NULL;
-    lyr_ty10_Subscription *t3 = NULL;
-    int64_t t4 = 0;
-    uint8_t t5 = 0;
-    lyr_ty9_SignalHub *t6 = NULL;
-    int64_t t7 = 0;
-    lyr_ty2_Atomic_int_ *t8 = NULL;
-    LyrStr *t9 = NULL;
+    uint64_t t0 = 0;
+    double t1 = 0;
+    uint64_t t2 = 0;
+    double t3 = 0;
+    uint64_t t4 = 0;
+    float t5 = 0;
+    uint64_t t6 = 0;
+    float t7 = 0;
+    uint8_t t8 = 0;
+    lyr_ty3_Atomic_bool_ *t9 = NULL;
+    lyr_ty8_SpinLock *t10 = NULL;
+    lyr_ty10_Subscription *t11 = NULL;
+    int64_t t12 = 0;
+    uint8_t t13 = 0;
+    lyr_ty9_SignalHub *t14 = NULL;
+    int64_t t15 = 0;
+    lyr_ty2_Atomic_int_ *t16 = NULL;
+    LyrStr *t17 = NULL;
 bb0:;
+#line 1192
+    t0 = (uint64_t)UINT64_C(9218868437227405312);
+#line 1192
+    t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
+#line 1192
+    lyr_g0_float_infinity = t1;
+#line 1193
+    t2 = (uint64_t)UINT64_C(9221120237041090560);
+#line 1193
+    t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
+#line 1193
+    lyr_g1_float_nan = t3;
+#line 1213
+    t4 = (uint64_t)UINT64_C(2139095040);
+#line 1213
+    t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
+#line 1213
+    lyr_g2_float32_infinity = t5;
+#line 1214
+    t6 = (uint64_t)UINT64_C(2143289344);
+#line 1214
+    t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
+#line 1214
+    lyr_g3_float32_nan = t7;
+#line 1510 "stdlib5/std/task.lyr"
+    t8 = 0;
 #line 1510
-    t0 = 0;
-#line 1510
-    t1 = lyr_std_sync_Atomic_bool__new_3915f520(t0);
+    t9 = lyr_std_sync_Atomic_bool__new_3915f520(t8);
 #line 1019
-    t2 = (lyr_ty8_SpinLock *)lyr_alloc(&lyr_desc_ty8_SpinLock);
+    t10 = (lyr_ty8_SpinLock *)lyr_alloc(&lyr_desc_ty8_SpinLock);
 #line 1019
-    LYR_WRITE_BARRIER(t2, &t2->f_held, t1);
+    LYR_WRITE_BARRIER(t10, &t10->f_held, t9);
 #line 1020
-    t3 = NULL;
+    t11 = NULL;
 #line 1021
-    t4 = (int64_t)INT64_C(0);
+    t12 = (int64_t)INT64_C(0);
 #line 1022
-    t5 = 0;
+    t13 = 0;
 #line 1090
-    t6 = (lyr_ty9_SignalHub *)lyr_alloc(&lyr_desc_ty9_SignalHub);
+    t14 = (lyr_ty9_SignalHub *)lyr_alloc(&lyr_desc_ty9_SignalHub);
 #line 1090
-    LYR_WRITE_BARRIER(t6, &t6->f_guard, t2);
+    LYR_WRITE_BARRIER(t14, &t14->f_guard, t10);
 #line 1090
-    LYR_WRITE_BARRIER(t6, &t6->f_first, t3);
+    LYR_WRITE_BARRIER(t14, &t14->f_first, t11);
 #line 1090
-    t6->f_caught = t4;
+    t14->f_caught = t12;
 #line 1090
-    t6->f_watching = t5;
+    t14->f_watching = t13;
 #line 1090
-    lyr_g0_signalHub = t6;
+    lyr_g4_signalHub = t14;
 #line 1788
-    t7 = (int64_t)INT64_C(0);
+    t15 = (int64_t)INT64_C(0);
 #line 1788
-    t8 = lyr_std_sync_Atomic_int__new_67eb632f(t7);
+    t16 = lyr_std_sync_Atomic_int__new_67eb632f(t15);
 #line 1788
-    lyr_g1_channelIds = t8;
+    lyr_g5_channelIds = t16;
 #line 14 "programs/tasks.lyr"
-    t9 = (LyrStr *)&lyr_lit0;
+    t17 = (LyrStr *)&lyr_lit0;
 #line 14
-    lyr_g2_log = t9;
+    lyr_g6_log = t17;
     return;
+}
+
+#line 1199 "stdlib5/std/core.lyr"
+double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    double t1 = 0;
+    double t2 = 0;
+bb0:;
+#line 1199
+    t0 = l0_b;
+#line 1189
+    t1 = (double)0.0;
+#line 1199
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1199
+    return t2;
+}
+
+#line 1220 "stdlib5/std/core.lyr"
+float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
+    uint64_t t0 = 0;
+    float t1 = 0;
+    float t2 = 0;
+bb0:;
+#line 1220
+    t0 = l0_b;
+#line 1210
+    t1 = (float)0.0;
+#line 1220
+    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
+#line 1220
+    return t2;
 }
 
 

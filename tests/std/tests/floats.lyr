@@ -1,0 +1,134 @@
+// std.core's floats (design/v5/spec/10 B5 Z1, Z2): the type's constants, the elementary functions,
+// IEEE's total order, the bits.
+import std.test { assertEq, assertTrue, assertFalse, assertClose };
+
+fn less(o: Ordering): bool {
+    return match (o) { .Less => true, _ => false };
+}
+
+fn tied(o: Ordering): bool {
+    return match (o) { .Equal => true, _ => false };
+}
+
+fn third<T :: [Float]>(x: T): T {
+    return x.cbrt();
+}
+
+@Test
+fn theConstantsDescribeTheType(): void {
+    assertEq((1.0 + float.epsilon) - 1.0, float.epsilon);
+    assertEq(1.0 + float.epsilon / 2.0, 1.0);
+    assertTrue(float.infinity > float.max);
+    assertEq(float.min, -float.max);
+    assertEq(float.max, 1.7976931348623157e308);
+    assertTrue(float.leastPositive > 0.0);
+    assertEq(float.leastPositive / 2.0, 0.0);
+    assertTrue(float.nan != float.nan);
+    let top: float32 = 3.4028234663852886e38;
+    assertEq(float32.max, top);
+    assertEq(float32.leastPositive / 2.0, float32.zero);
+    assertTrue(float32.infinity > float32.max);
+}
+
+@Test
+fn nanAndTheInfinitiesAreTold(): void {
+    assertTrue(float.nan.isNan());
+    assertFalse(float.nan.isFinite());
+    assertTrue(float.infinity.isInfinite());
+    assertTrue((-float.infinity).isInfinite());
+    assertFalse(float.infinity.isNan());
+    assertTrue(1.5.isFinite());
+    assertFalse(1.5.isInfinite());
+    assertTrue(float32.nan.isNan());
+    assertTrue(float32.max.isFinite());
+}
+
+@Test
+fn roundingGoesWhereItSays(): void {
+    assertEq(2.5.floor(), 2.0);
+    assertEq(2.5.ceil(), 3.0);
+    assertEq(2.5.round(), 3.0);
+    assertEq(2.5.trunc(), 2.0);
+    assertEq((-2.5).floor(), -3.0);
+    assertEq((-2.5).ceil(), -2.0);
+    assertEq((-2.5).round(), -3.0);
+    assertEq((-2.5).trunc(), -2.0);
+    assertEq(2.4.round(), 2.0);
+    let x: float32 = -1.5;
+    let y: float32 = -2.0;
+    assertEq(x.floor(), y);
+}
+
+@Test
+fn theElementaryFunctions(): void {
+    assertEq(2.0.sqrt(), 1.4142135623730951);
+    assertTrue((-1.0).sqrt().isNan());
+    assertClose(27.0.cbrt(), 3.0, 1e-15);
+    assertClose(third(8.0), 2.0, 1e-15);
+    assertEq(0.0.exp(), 1.0);
+    assertEq(1.0.ln(), 0.0);
+    assertEq(0.0.ln(), -float.infinity);
+    assertEq(8.0.log2(), 3.0);
+    assertClose(1000.0.log10(), 3.0, 1e-15);
+    assertEq(0.0.sin(), 0.0);
+    assertEq(0.0.cos(), 1.0);
+    assertClose(1.0.atan() * 4.0, 3.141592653589793, 1e-15);
+    assertClose(0.5.asin().sin(), 0.5, 1e-15);
+    assertClose(0.5.acos().cos(), 0.5, 1e-15);
+    assertClose(1.0.tan(), 1.5574077246549023, 1e-15);
+    assertClose(1.0.sinh(), 1.1752011936438014, 1e-15);
+    assertClose(1.0.cosh(), 1.5430806348152437, 1e-15);
+    assertClose(1.0.tanh(), 0.7615941559557649, 1e-15);
+    assertEq(3.0.hypot(4.0), 5.0);
+    assertEq(2.0.pow(10.0), 1024.0);
+    let two: float32 = 2.0;
+    let root: float32 = 1.4142135;
+    assertEq(two.sqrt(), root);
+    assertEq(third(two * 4.0), two);
+}
+
+@Test
+fn atan2TakesThePoint(): void {
+    let quarter = 1.0.atan();
+    assertClose(1.0.atan2(1.0), quarter, 1e-15);
+    assertClose((-1.0).atan2(0.0), quarter * 4.0, 1e-15);
+    assertClose(0.0.atan2(1.0), quarter * 2.0, 1e-15);
+    assertClose(0.0.atan2(-1.0), -quarter * 2.0, 1e-15);
+}
+
+@Test
+fn totalCompareOrdersEveryValue(): void {
+    let order = [-float.nan, -float.infinity, -1.0, -float.leastPositive, -0.0, 0.0,
+                 float.leastPositive, 1.0, float.infinity, float.nan];
+    for (i in 1..order.length()) {
+        assertTrue(less(order[i - 1].totalCompare(order[i])), f"{order[i - 1]} before {order[i]}");
+        assertFalse(less(order[i].totalCompare(order[i - 1])), f"{order[i]} not before {order[i - 1]}");
+    }
+    assertTrue(tied(float.nan.totalCompare(float.nan)));
+    let a: float32 = -0.0;
+    let b: float32 = 0.0;
+    assertTrue(less(a.totalCompare(b)));
+    assertTrue(less(float32.max.totalCompare(float32.infinity)));
+}
+
+@Test
+fn theBitsRoundTrip(): void {
+    assertEq(1.0.toBits(), 0x3FF0000000000000);
+    assertEq((-0.0).toBits(), 0x8000000000000000);
+    assertEq(float.fromBits(0x4000000000000000), 2.0);
+    assertTrue(float.fromBits(float.nan.toBits()).isNan());
+    let one: float32 = 1.0;
+    assertEq(one.toBits(), 0x3F800000);
+    assertEq(float32.fromBits(0x40000000), one + one);
+    assertEq(float32.fromBits(0xFFFFFFFF00000000), float32.zero);
+}
+
+@Test
+fn absClearsTheSign(): void {
+    assertEq((-0.0).abs().toBits(), 0);
+    assertEq((-2.5).abs(), 2.5);
+    assertTrue(float.nan.abs().isNan());
+    assertEq((-float.infinity).abs(), float.infinity);
+    assertEq((-3).abs(), 3);
+    assertEq(0.abs(), 0);
+}
