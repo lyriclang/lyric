@@ -2089,6 +2089,91 @@ extend<I :: [Iterator]> I {
     }
 }
 
+// The terminators of an element kind (10 B6 I4): blocks whose `T` the iterator's `Item` binds
+// (05 §13 rule 2), reaching the iterators of numbers, of ordered values, of shown ones.
+extend<I :: [Iterator<Item = T>], T :: [Num]> I {
+    /// The sum of the values; zero where there is none.
+    pub fn sum(): T throws I.Error {
+        var it = this;
+        var s = T.zero;
+        var x = try it.next();
+        while (x != null) {
+            s = s + x;
+            x = try it.next();
+        }
+        return s;
+    }
+
+    /// The product of the values; one where there is none.
+    pub fn product(): T throws I.Error {
+        var it = this;
+        var p = T.one;
+        var x = try it.next();
+        while (x != null) {
+            p = p * x;
+            x = try it.next();
+        }
+        return p;
+    }
+}
+
+extend<I :: [Iterator<Item = T>], T :: [Ordered]> I {
+    /// The least value, or `null`; the first of equal ones.
+    pub fn min(): ?T throws I.Error {
+        var it = this;
+        let first = try it.next();
+        if (first == null) {
+            return null;
+        }
+        var least = first;
+        var x = try it.next();
+        while (x != null) {
+            if (x < least) {
+                least = x;
+            }
+            x = try it.next();
+        }
+        return least;
+    }
+
+    /// The greatest value, or `null`; the first of equal ones.
+    pub fn max(): ?T throws I.Error {
+        var it = this;
+        let first = try it.next();
+        if (first == null) {
+            return null;
+        }
+        var most = first;
+        var x = try it.next();
+        while (x != null) {
+            if (x > most) {
+                most = x;
+            }
+            x = try it.next();
+        }
+        return most;
+    }
+}
+
+extend<I :: [Iterator<Item = T>], T :: [Display]> I {
+    /// The values' texts, `sep` between each two.
+    pub fn join(sep: string): string throws I.Error {
+        var it = this;
+        var out = "";
+        var x = try it.next();
+        var first = true;
+        while (x != null) {
+            if (!first) {
+                out = out + sep;
+            }
+            first = false;
+            out = out + f"{x}";
+            x = try it.next();
+        }
+        return out;
+    }
+}
+
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
 // before `start` where that value is the type's `max` (`min` from the back), so neither bound
 // leaves the type.

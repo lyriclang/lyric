@@ -1212,6 +1212,10 @@ public sealed class TypeChecker
     {
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (!TypeFacts.Match(BlockTargetType(block), receiver, map)) return null;
+        // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
+        foreach (var (bound, from, member) in FixationBindingsOf(block))
+            if (!map.ContainsKey(bound) && map.TryGetValue(from, out var source))
+                map[bound] = ResolveAssociated(source, member);
         foreach (var g in block.Generics)
         {
             if (!map.TryGetValue(g, out var bound)) return null;
@@ -1221,6 +1225,22 @@ public sealed class TypeChecker
                     return null;
         }
         return map;
+    }
+
+    /// <summary>The block's parameters named by a fixation of another's constraint, once per
+    /// block: <c>T</c> from <c>I :: [Iterator&lt;Item = T&gt;]</c> (05 §13 rule 2).</summary>
+    private (GenericParamSymbol, GenericParamSymbol, AssociatedTypeSymbol)[] FixationBindingsOf(ExtensionBlock block)
+    {
+        if (block.FixationBindings is { } known) return known;
+        var found = new List<(GenericParamSymbol, GenericParamSymbol, AssociatedTypeSymbol)>();
+        block.FixationBindings = []; // a constraint naming the block again finds nothing yet
+        foreach (var from in block.Generics)
+            foreach (var c in from.Constraints)
+                if (ResolveType(c, block.MethodScope) is GenericInstance { Fixations: { } fixations })
+                    foreach (var (member, fixedTo) in fixations)
+                        if (fixedTo is TypeParamType { Param: var p } && block.Generics.Contains(p) && !ReferenceEquals(p, from))
+                            found.Add((p, from, member));
+        return block.FixationBindings = found.ToArray();
     }
 
     private static Dictionary<GenericParamSymbol, LyrType> Merge(Dictionary<GenericParamSymbol, LyrType> a, Dictionary<GenericParamSymbol, LyrType> b)

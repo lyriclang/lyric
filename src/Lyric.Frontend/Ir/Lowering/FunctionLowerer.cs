@@ -5417,6 +5417,10 @@ internal sealed class FunctionLowerer
             var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
             if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
                 throw NotSupported($"'{TypeFacts.Display(receiver)}' does not match the block's target", expr.Span);
+            // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
+            foreach (var (bound, from, assocMember) in block.FixationBindings ?? [])
+                if (!map.ContainsKey(bound) && map.TryGetValue(from, out var source))
+                    map[bound] = TypeChecker.ResolveAssociated(source, assocMember);
             // A generic method's own parameters (03 T7 X1), bound by the call beside the block's
             // bound by the receiver: 'mapped<U>' in 'extend<I :: [Iterator]> I'.
             var own = symbol.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];

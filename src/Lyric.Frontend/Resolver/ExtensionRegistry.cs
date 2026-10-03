@@ -73,6 +73,11 @@ public sealed class ExtensionBlock
     /// no symbol of its own, matched by shape.</summary>
     public bool IsConstructorTarget { get; set; }
 
+    /// <summary>The block's parameters a fixation of another's constraint names (05 §13 rule 2):
+    /// <c>T</c> in <c>extend&lt;I :: [Iterator&lt;Item = T&gt;], T :: [Num]&gt; I</c>, the receiver's
+    /// answer for <c>Item</c> once <c>I</c> is bound. Set by the checker.</summary>
+    public (GenericParamSymbol Bound, GenericParamSymbol From, AssociatedTypeSymbol Member)[]? FixationBindings { get; set; }
+
     /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c> (04 D15): a
     /// blanket block, matched by its constraints alone.</summary>
     public bool IsBlanketTarget { get; set; }
