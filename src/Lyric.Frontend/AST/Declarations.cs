@@ -268,6 +268,10 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
 public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) : Decl(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary>What every answer conforms to, in an interface's declaration —
+    /// <c>type Iter :: [Iterator];</c> (10 B6) —, as a type parameter's constraints are written.</summary>
+    public TypeNode[] Bounds { get; init; } = [];
 }
 
 // --- global bindings and type aliases ---

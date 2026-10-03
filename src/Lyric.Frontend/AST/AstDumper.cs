@@ -185,6 +185,7 @@ public static class AstDumper
                 break;
             case AssociatedTypeDecl n:
                 Line(sb, indent, $"AssociatedType {n.Name}", n.Span);
+                foreach (var b in n.Bounds) Write(b, indent + 1, sb);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;
             case ArrayType n:

@@ -243,8 +243,11 @@ public sealed class AstFormatter
         TypeAliasDecl d => Doc.Of(Pub(d.Visibility),
             Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name} = "), TypeDoc(d.Aliased),
             Doc.From(";")),
-        // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6).
+        // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6); 'type Iter ::
+        // [Iterator];' bounds (10 B6).
         AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),
+            d.Bounds.Length == 0 ? Doc.Nil
+                : Doc.Of(Doc.From(" :: ["), Doc.Join(Doc.From(", "), d.Bounds.Select(TypeDoc).ToArray()), Doc.From("]")),
             d.Type is { } bound ? Doc.Of(Doc.From(" = "), TypeDoc(bound)) : Doc.Nil, Doc.From(";")),
         FieldDecl d => FieldDoc(d),
         _ => throw new InternalCompilationException($"unreachable: unformatted {decl.GetType().Name}"),

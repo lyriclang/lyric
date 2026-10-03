@@ -501,14 +501,14 @@ public sealed class Resolver
                     foreach (var f in v.StructFields ?? []) BindType(f.Type, es);
                 }
                 foreach (var m in e.Methods) BindFunctionTypes(m, es);
-                foreach (var t in e.Types) if (t.Type is not null) BindType(t.Type, es);
+                foreach (var t in e.Types) BindAssociatedType(t, es);
                 break;
             case InterfaceDecl i:
                 var isc = MemberScope(scope, i.Name);
                 BindGenerics(i.Generics, isc);
                 BindEach(i.Interfaces, isc);
                 foreach (var m in i.Members) BindFunctionTypes(m, isc);
-                foreach (var t in i.Types) if (t.Type is not null) BindType(t.Type, isc);
+                foreach (var t in i.Types) BindAssociatedType(t, isc);
                 break;
             // ExtendDecl goes to ResolveExtensionTargets, which needs the block method scope for
             // generics.
@@ -559,8 +559,15 @@ public sealed class Resolver
         {
             if (m is FieldDecl f) BindType(f.Type, scope);
             else if (m is FunctionDecl fn) BindFunctionTypes(fn, scope);
-            else if (m is AssociatedTypeDecl t && t.Type is not null) BindType(t.Type, scope);
+            else if (m is AssociatedTypeDecl t) BindAssociatedType(t, scope);
         }
+    }
+
+    /// <summary>An associated type's bound and its default or answer (03 T6, 10 B6).</summary>
+    private void BindAssociatedType(AssociatedTypeDecl t, SymbolTable scope)
+    {
+        foreach (var b in t.Bounds) BindType(b, scope);
+        if (t.Type is not null) BindType(t.Type, scope);
     }
 
     private void BindFunctionTypes(FunctionDecl fn, SymbolTable scope)

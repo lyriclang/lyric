@@ -159,6 +159,15 @@ public sealed class AssociatedTypeSymbol : Symbol
         return exact ? null : list[0].Answer;
     }
 
+    /// <summary>What every answer conforms to (design/v5/spec/10 B6): the interfaces of
+    /// <c>type Iter :: [Iterator];</c>, resolved in the declaring interface, whose <c>Self</c>
+    /// stands for the conformer.</summary>
+    public Sema.LyrType[] Bounds { get; set; } = [];
+
+    /// <summary>The answer a blanket or shape block gives a type that has none of its own (05 §13
+    /// rules 6, 8) — the block's answer at the parameters the type binds; set by the checker.</summary>
+    public Func<Sema.LyrType, Sema.LyrType?>? BlockAnswer { get; set; }
+
     /// <summary>A built-in conformer's answer, the builtin named by its type name ('int'):
     /// the primitive types have no symbol of their own in the types.</summary>
     public Sema.LyrType? BuiltinAnswer(string name, Sema.LyrType? instance)

@@ -841,15 +841,25 @@ public sealed partial class Parser
     }
 
     /// <summary><c>type Item;</c> or <c>type Item = T;</c> (03 T6): an associated type declared,
-    /// with its default, or bound.</summary>
+    /// with its default, or bound; <c>type Iter :: [Iterator];</c> with what every answer conforms
+    /// to (10 B6), written as a type parameter's constraints are.</summary>
     private AssociatedTypeDecl ParseAssociatedType()
     {
         var start = _buffer.Advance().Span; // contextual 'type'
         var name = ExpectNamed("LYR-PAR0026", "associated type name");
+        TypeNode[] bounds = [];
+        if (_buffer.Match(TokenKind.ColonColon))
+        {
+            _buffer.Expect(TokenKind.LBracket, "LYR-PAR0030", "expected '[' after '::' in a bound");
+            var list = new List<TypeNode>();
+            do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+            _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the bound");
+            bounds = list.ToArray();
+        }
         TypeNode? type = null;
         if (_buffer.Match(TokenKind.Equal)) type = ParseType();
         var semi = ExpectSemicolon();
-        return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span };
+        return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span, Bounds = bounds };
     }
 
     /// <summary>Recovery inside a member sequence: consumes up to the end of the member, so one

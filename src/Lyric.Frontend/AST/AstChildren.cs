@@ -132,6 +132,7 @@ public static class AstChildren
                 break;
 
             case AssociatedTypeDecl assoc:
+                foreach (var b in assoc.Bounds) yield return b;
                 if (assoc.Type is not null) yield return assoc.Type;
                 break;
             case TypeAliasDecl a:
