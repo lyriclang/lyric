@@ -31,6 +31,8 @@ pub import std.core {
     Float,
     Iterator,
     Iterable,
+    Index,
+    IndexSet,
     Test,
     callerExpr
 };

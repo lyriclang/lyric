@@ -321,6 +321,18 @@ pub interface Hashable :: [Equatable] {
     fn hash<H :: [Hasher]>(&h: H): void;
 }
 
+/// `x[k]` is `x.index(k)` (04 D6, 03 T14): the element a key or a position names, of the type the
+/// conformer answers. An array's and a view's index is built in.
+pub interface Index<K> {
+    type Output;
+    fn index(k: K): Self.Output;
+}
+
+/// `x[k] = v` is `x.setIndex(k, v)`. A compound assignment, `x[k] += 1`, is written out.
+pub interface IndexSet<K> :: [Index<K>] {
+    mut fn setIndex(k: K, v: Self.Output): void;
+}
+
 /// `x in xs` is `xs.contains(x)` (04 D6; the operator comes with the collections).
 pub interface Contains<T> {
     fn contains(x: T): bool;

@@ -2981,6 +2981,16 @@ internal sealed class FunctionLowerer
         }
 
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
+        // 'x[k] = v' through IndexSet (04 D6): the value first, as an element's store has it, then
+        // the desugared 'x.setIndex(k, v)' with that value, which is the assignment's.
+        if (expr.Target is IndexExpr && _types.OperatorCallOf(expr) is { } setCall)
+        {
+            var stored = LowerExpr(expr.Value);
+            _chainReceivers[expr.Value] = stored;
+            try { LowerCall(setCall); }
+            finally { _chainReceivers.Remove(expr.Value); }
+            return stored;
+        }
         if (expr.Target is IndexExpr indexed) return LowerElementAssign(indexed, expr);
 
         if (TryCapturedCell(expr.Target, out var cell, out var cellType, out var cellValueType))
@@ -4522,6 +4532,9 @@ internal sealed class FunctionLowerer
 
     private TempId LowerIndexRead(IndexExpr expr)
     {
+        // A type's own index (04 D6): the call the sema desugared, 'x.index(k)'.
+        if (_types.OperatorCallOf(expr) is { } indexCall)
+            return LowerCall(indexCall) ?? throw Bug("'index' returned no value");
         // A container from std.collections goes through 'Indexable<T>.get(i)' — the same division of
         // labour as for 'for-in': the compiler knows ONE built-in form, the array, and everything else
         // runs through the interface.
