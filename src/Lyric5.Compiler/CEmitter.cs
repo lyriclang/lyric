@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1c";
+    public const string Version = "r1d";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -767,14 +767,17 @@ public sealed class CEmitter
     /// </summary>
     private void Structs()
     {
-        // The module's unit defines every type and every descriptor, whichever unit uses them; an
-        // instance's unit defines the types its functions reach — the same text, since a C struct
-        // may be defined in every translation unit that needs it — and declares the descriptors,
-        // whose addresses are the identities and are defined once, in the module's unit.
-        var reachable = _main ? null : Reachable();
+        // The module's unit defines every type the PROGRAM reaches and its descriptor, whichever
+        // unit uses them; an instance's unit defines the types its functions reach — the same
+        // text, since a C struct may be defined in every translation unit that needs it — and
+        // declares the descriptors, whose addresses are the identities and are defined once, in
+        // the module's unit. A type nothing reaches is in neither: the type table holds every type
+        // the lowering came across, and a program that prints one line carried the string
+        // builder's struct and the hashers' descriptors.
+        var reachable = _main ? ReachedByProgram() : Reachable();
         var indices = Enumerable.Range(0, _module.Types.Count)
             .Where(i => (_module.Types[i].IsStruct || _module.Types[i].IsClass || _module.Types[i].IsEnum || _module.Types[i].IsInterface)
-                        && (reachable is null || reachable.Contains(i))).ToList();
+                        && reachable.Contains(i)).ToList();
         // Every type a function names, for the optionals among them: an optional outside the
         // niche is a C struct of its own and is defined once, wherever it is first needed.
         var named = (_main ? _module.Functions : Scope())
@@ -1233,7 +1236,17 @@ public sealed class CEmitter
     /// <summary>The composite types an instance unit's functions reach: named by a local, a temp
     /// or a return, or held by one of those through any field, at any depth. A variant brings
     /// its enum, an enum its variants.</summary>
-    private HashSet<int> Reachable()
+    private HashSet<int> Reachable() => Reached(Scope(), ScopeOps(), program: false);
+
+    /// <summary>
+    /// The types the program reaches: what any of its functions names — the pruning has left
+    /// only the functions its roots reach (01 L11) —, what its globals hold, every row of the
+    /// interface tables, and the table the report of an escaping error goes through.
+    /// </summary>
+    private HashSet<int> ReachedByProgram() =>
+        Reached(_module.Functions, _module.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts), program: true);
+
+    private HashSet<int> Reached(IEnumerable<IrFunction> functions, IEnumerable<IrOp> ops, bool program)
     {
         var reached = new HashSet<int>();
         void Visit(IrType type)
@@ -1263,7 +1276,7 @@ public sealed class CEmitter
             foreach (var variant in def.Variants) Add(variant.Value);
             if (_variants.TryGetValue(index, out var of)) Add(of.Enum);
         }
-        foreach (var function in Scope())
+        foreach (var function in functions)
         {
             foreach (var local in function.Locals) Visit(local.Type);
             foreach (var temp in function.Temps) Visit(temp.Type);
@@ -1271,10 +1284,19 @@ public sealed class CEmitter
         }
         // A test or a downcast names its target by id alone: a descriptor to declare — as does a
         // close, the Cancelled it drops.
-        foreach (var op in ScopeOps())
+        foreach (var op in ops)
             if (op is TypeTest tt) Add(tt.Target.Value);
             else if (op is Downcast dc) Add(dc.Target.Value);
             else if (op is CoroutineClose cc) Add(cc.Cancelled.Value);
+
+        if (program)
+        {
+            foreach (var global in _module.Globals) Visit(global.Type);
+            foreach (var row in _module.Impls) { Add(row.Type.Value); Add(row.Interface.Value); }
+            foreach (var attribute in _module.Attributes)
+                if (attribute.TargetKind == IrAttributeTarget.Type) Add(attribute.Target);
+            if (ErrorSlots().Index >= 0) Add(ErrorSlots().Index);
+        }
 
         return reached;
     }

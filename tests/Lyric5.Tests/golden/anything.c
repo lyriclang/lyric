@@ -28,8 +28,6 @@ typedef struct lyr_ty_17_std_core_Ordering_Less lyr_ty_17_std_core_Ordering_Less
 typedef struct lyr_ty_17_std_core_Ordering_Equal lyr_ty_17_std_core_Ordering_Equal;
 typedef struct lyr_ty_17_std_core_Ordering_Greater lyr_ty_17_std_core_Ordering_Greater;
 typedef struct lyr_ty_std_core_Exception lyr_ty_std_core_Exception;
-typedef struct lyr_vt_ty_std_core_Hasher lyr_vt_ty_std_core_Hasher;
-const char lyr_ifid_ty_std_core_Hasher[] = "std.core.Hasher";
 typedef struct lyr_ty_std_core_Split lyr_ty_std_core_Split;
 typedef struct lyr_ty_std_core_Lines lyr_ty_std_core_Lines;
 typedef struct lyr_ty_std_hash_Sip lyr_ty_std_hash_Sip;
@@ -130,14 +128,6 @@ _Static_assert(offsetof(lyr_ty_std_core_Exception, f_inner) == 16, "layout of ly
 extern const LyrItable lyr_itab_ty_std_core_Exception[];
 static const uint64_t lyr_refmap_ty_std_core_Exception[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty_std_core_Exception = { sizeof(lyr_ty_std_core_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_core_Exception, "std.core.Exception", lyr_itab_ty_std_core_Exception };
-struct lyr_vt_ty_std_core_Hasher {
-    const LyrDesc *desc;
-    void (*s0)(LyrIface);
-    void (*s1)(LyrIface);
-    void (*s2)(LyrIface);
-    void (*s3)(LyrIface);
-    void (*s4)(LyrIface);
-};
 struct lyr_ty_std_core_Split {
     LyrStr *f_s;
     LyrStr *f_sep;

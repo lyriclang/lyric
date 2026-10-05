@@ -9,27 +9,6 @@ typedef struct lyr_vt_ty_std_core_Error lyr_vt_ty_std_core_Error;
 const char lyr_ifid_ty_std_core_Error[] = "std.core.Error";
 typedef struct lyr_ty_app_main_Second lyr_ty_app_main_Second;
 typedef struct lyr_ty_app_main_Third lyr_ty_app_main_Third;
-typedef struct lyr_ty_std_core_ParseError lyr_ty_std_core_ParseError;
-typedef struct lyr_ty_std_core_ParseErrorKind lyr_ty_std_core_ParseErrorKind;
-typedef struct lyr_ty_23_std_core_ParseErrorKind_Empty lyr_ty_23_std_core_ParseErrorKind_Empty;
-typedef struct lyr_ty_23_std_core_ParseErrorKind_Invalid lyr_ty_23_std_core_ParseErrorKind_Invalid;
-typedef struct lyr_ty_23_std_core_ParseErrorKind_Overflow lyr_ty_23_std_core_ParseErrorKind_Overflow;
-typedef struct lyr_ty_std_core_FormatSpec lyr_ty_std_core_FormatSpec;
-typedef struct lyr_ty_std_core_Chars lyr_ty_std_core_Chars;
-typedef struct lyr_ty_std_core_StringBuilder lyr_ty_std_core_StringBuilder;
-typedef struct lyr_ty_std_core_Ordering lyr_ty_std_core_Ordering;
-typedef struct lyr_ty_17_std_core_Ordering_Less lyr_ty_17_std_core_Ordering_Less;
-typedef struct lyr_ty_17_std_core_Ordering_Equal lyr_ty_17_std_core_Ordering_Equal;
-typedef struct lyr_ty_17_std_core_Ordering_Greater lyr_ty_17_std_core_Ordering_Greater;
-typedef struct lyr_ty_std_core_Exception lyr_ty_std_core_Exception;
-typedef struct lyr_vt_ty_std_core_Hasher lyr_vt_ty_std_core_Hasher;
-const char lyr_ifid_ty_std_core_Hasher[] = "std.core.Hasher";
-typedef struct lyr_ty_std_core_Split lyr_ty_std_core_Split;
-typedef struct lyr_ty_std_core_Lines lyr_ty_std_core_Lines;
-typedef struct lyr_ty_std_hash_Sip lyr_ty_std_hash_Sip;
-typedef struct lyr_ty_std_hash_DefaultHasher lyr_ty_std_hash_DefaultHasher;
-typedef struct lyr_ty_std_hash_FixedHasher lyr_ty_std_hash_FixedHasher;
-typedef struct lyr_ty_std_hash_Fnv1a64 lyr_ty_std_hash_Fnv1a64;
 struct lyr_ty_app_main_First {
     LyrObj header;
 };
@@ -54,103 +33,6 @@ struct lyr_ty_app_main_Third {
 _Static_assert(sizeof(lyr_ty_app_main_Third) == 8, "layout of lyr_ty_app_main_Third");
 extern const LyrItable lyr_itab_ty_app_main_Third[];
 const LyrDesc lyr_desc_ty_app_main_Third = { sizeof(lyr_ty_app_main_Third), 0, 0, 0, NULL, "app.main.Third", lyr_itab_ty_app_main_Third };
-struct lyr_ty_23_std_core_ParseErrorKind_Empty {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_23_std_core_ParseErrorKind_Invalid {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_23_std_core_ParseErrorKind_Overflow {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_std_core_ParseErrorKind { uint32_t tag; };
-_Static_assert(sizeof(lyr_ty_std_core_ParseErrorKind) == 4, "layout of lyr_ty_std_core_ParseErrorKind");
-struct lyr_ty_std_core_ParseError {
-    lyr_ty_std_core_ParseErrorKind f_kind;
-};
-struct lyr_ty_std_core_FormatSpec {
-    uint32_t f_fill;
-    uint32_t f_align;
-    uint8_t f_plus;
-    uint8_t f_alternate;
-    int64_t f_width;
-    uint32_t f_grouping;
-    int64_t f_precision;
-    uint32_t f_kind;
-};
-struct lyr_ty_std_core_Chars {
-    LyrStr *f_s;
-    int64_t f_at;
-};
-struct lyr_ty_std_core_StringBuilder {
-    LyrObj header;
-    LyrArr *f_bytes;
-    int64_t f_count;
-};
-_Static_assert(sizeof(lyr_ty_std_core_StringBuilder) == 24, "layout of lyr_ty_std_core_StringBuilder");
-_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, f_bytes) == 8, "layout of lyr_ty_std_core_StringBuilder");
-_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, f_count) == 16, "layout of lyr_ty_std_core_StringBuilder");
-static const uint64_t lyr_refmap_ty_std_core_StringBuilder[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty_std_core_StringBuilder = { sizeof(lyr_ty_std_core_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_core_StringBuilder, "std.core.StringBuilder", NULL };
-struct lyr_ty_17_std_core_Ordering_Less {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_17_std_core_Ordering_Equal {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_17_std_core_Ordering_Greater {
-    uint8_t lyr_unit;
-};
-struct lyr_ty_std_core_Ordering { uint32_t tag; };
-_Static_assert(sizeof(lyr_ty_std_core_Ordering) == 4, "layout of lyr_ty_std_core_Ordering");
-struct lyr_ty_std_core_Exception {
-    LyrObj header;
-    LyrStr *f_text;
-    lyr_opt_iface14_std_core_Error f_inner;
-};
-_Static_assert(sizeof(lyr_ty_std_core_Exception) == 40, "layout of lyr_ty_std_core_Exception");
-_Static_assert(offsetof(lyr_ty_std_core_Exception, f_text) == 8, "layout of lyr_ty_std_core_Exception");
-_Static_assert(offsetof(lyr_ty_std_core_Exception, f_inner) == 16, "layout of lyr_ty_std_core_Exception");
-static const uint64_t lyr_refmap_ty_std_core_Exception[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty_std_core_Exception = { sizeof(lyr_ty_std_core_Exception), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_core_Exception, "std.core.Exception", NULL };
-struct lyr_vt_ty_std_core_Hasher {
-    const LyrDesc *desc;
-    void (*s0)(LyrIface);
-    void (*s1)(LyrIface);
-    void (*s2)(LyrIface);
-    void (*s3)(LyrIface);
-    void (*s4)(LyrIface);
-};
-struct lyr_ty_std_core_Split {
-    LyrStr *f_s;
-    LyrStr *f_sep;
-    int64_t f_at;
-    uint8_t f_done;
-};
-struct lyr_ty_std_core_Lines {
-    LyrStr *f_s;
-    int64_t f_at;
-};
-struct lyr_ty_std_hash_Sip {
-    uint64_t f_v0;
-    uint64_t f_v1;
-    uint64_t f_v2;
-    uint64_t f_v3;
-    uint64_t f_tail;
-    int64_t f_pending;
-    int64_t f_length;
-};
-struct lyr_ty_std_hash_DefaultHasher {
-    lyr_ty_std_hash_Sip f_state;
-};
-struct lyr_ty_std_hash_FixedHasher {
-    lyr_ty_std_hash_Sip f_state;
-};
-struct lyr_ty_std_hash_Fnv1a64 {
-    uint64_t f_state;
-};
-_Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
-const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
 /* module-level bindings */
 double lyr_g_std_core_float_infinity = 0;
