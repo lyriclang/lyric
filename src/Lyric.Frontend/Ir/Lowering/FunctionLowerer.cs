@@ -716,7 +716,7 @@ internal sealed class FunctionLowerer
     /// an array. What leads to it is evaluated here, once, as for a compound assignment:
     /// <c>next().n++</c> calls <c>next</c> once.
     /// </summary>
-    private (IrType Type, Func<TempId> Load, Action<TempId> Store) AccessOf(Expr target, Span span)
+    private (IrType Type, Func<TempId> Load, Action<TempId> Store) AccessOf(Expr target, Span span, CallExpr? write = null)
     {
         switch (target)
         {
@@ -740,6 +740,10 @@ internal sealed class FunctionLowerer
                     return loaded;
                 }, value => _b.Emit(new StoreElem(array, index, value, span)));
             }
+            // An index of a type's own (02 M8a-1): 'index' reads, the stored 'setIndex' writes,
+            // the receiver and the key evaluated once for the two.
+            case IndexExpr own when write is not null:
+                return OwnIndexAccess(own, write);
             // The read and the write with one index, which a container's get and set would each
             // evaluate — the question a compound assignment on one leaves open as well.
             case IndexExpr:
@@ -2719,13 +2723,15 @@ internal sealed class FunctionLowerer
     {
         if (expr.Operator is UnaryOp.Place) return LowerPlace(expr.Operand);
 
+        // '++x[k]' on a type's own index carries its write, 'x.setIndex(k, …)' (02 M8a-1): a call
+        // stored on the node as an operator's is, and not the operator — so before the next test.
+        if (expr.Operator is UnaryOp.PreInc or UnaryOp.PreDec)
+            return LowerIncDec(expr.Operand, expr.Operator is UnaryOp.PreInc,
+                yieldOldValue: false, expr.Span, _types.OperatorCallOf(expr));
+
         // '-v' and '~v' on a conforming type ARE their calls (04 D6).
         if (_types.OperatorCallOf(expr) is { } desugaredUnary)
             return LowerCall(desugaredUnary) ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
-
-        if (expr.Operator is UnaryOp.PreInc or UnaryOp.PreDec)
-            return LowerIncDec(expr.Operand, expr.Operator is UnaryOp.PreInc,
-                yieldOldValue: false, expr.Span);
 
         // '-128' as an int8 is one literal, not a negation of 128, which no int8 holds: the sema
         // typed both nodes with the adapted type (3.1), and the value folds here, into the
@@ -2756,17 +2762,17 @@ internal sealed class FunctionLowerer
 
     private TempId LowerPostfix(PostfixExpr expr) => expr.Operator switch
     {
-        PostfixOp.Inc => LowerIncDec(expr.Operand, increment: true, yieldOldValue: true, expr.Span),
-        PostfixOp.Dec => LowerIncDec(expr.Operand, increment: false, yieldOldValue: true, expr.Span),
+        PostfixOp.Inc => LowerIncDec(expr.Operand, increment: true, yieldOldValue: true, expr.Span, _types.OperatorCallOf(expr)),
+        PostfixOp.Dec => LowerIncDec(expr.Operand, increment: false, yieldOldValue: true, expr.Span, _types.OperatorCallOf(expr)),
         PostfixOp.ForceUnwrap => LowerForceUnwrap(expr.Operand, expr.Span),
         _ => throw Bug($"unhandled postfix operator {expr.Operator}")
     };
 
     /// <summary><c>++</c> and <c>--</c> in both positions: prefix yields the new value, postfix the old.
     /// Both write the same store.</summary>
-    private TempId LowerIncDec(Expr target, bool increment, bool yieldOldValue, Span span)
+    private TempId LowerIncDec(Expr target, bool increment, bool yieldOldValue, Span span, CallExpr? write = null)
     {
-        var (type, load, store) = AccessOf(target, span);
+        var (type, load, store) = AccessOf(target, span, write);
         var oldValue = load();
 
         var one = EmitConst(OneFor(type, span), type, span);
@@ -3070,16 +3076,10 @@ internal sealed class FunctionLowerer
         }
 
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
-        // 'x[k] = v' through IndexSet (04 D6): the value first, as an element's store has it, then
-        // the desugared 'x.setIndex(k, v)' with that value, which is the assignment's.
-        if (expr.Target is IndexExpr && _types.OperatorCallOf(expr) is { } setCall)
-        {
-            var stored = LowerExpr(expr.Value);
-            _chainReceivers[expr.Value] = stored;
-            try { LowerCall(setCall); }
-            finally { _chainReceivers.Remove(expr.Value); }
-            return stored;
-        }
+        // 'x[k] = v' and 'x[k] op= v' through IndexSet (04 D6; 02 M8a-1): the write the sema
+        // stored, 'x.setIndex(k, …)'.
+        if (expr.Target is IndexExpr own && _types.OperatorCallOf(expr) is { } setCall)
+            return LowerOwnIndexAssign(own, setCall, expr);
         if (expr.Target is IndexExpr indexed) return LowerElementAssign(indexed, expr);
 
         if (TryCapturedCell(expr.Target, out var cell, out var cellType, out var cellValueType))
@@ -3369,6 +3369,101 @@ internal sealed class FunctionLowerer
     /// right and wrong as soon as either has side effects: <c>xs[next()] += 1</c> must not call
     /// <c>next()</c> twice.</para>
     /// </summary>
+    /// <summary>
+    /// The place an index of a type's own names (04 D6; 02 M8a-1): <c>x.index(k)</c> reads it —
+    /// the call the sema stored on the index expression — and <c>x.setIndex(k, …)</c> writes it,
+    /// the call stored on the node that writes. The receiver and the key are evaluated HERE,
+    /// once and in that order; the two calls are lowered with them in hand
+    /// (<c>_chainReceivers</c>), and the value given to <c>Store</c> stands where the write's
+    /// value argument is. So <c>xs[next()] += 1</c> calls <c>next</c> once, as on an array's
+    /// element — read under one key and written under another is what twice would be.
+    /// </summary>
+    private (IrType Type, Func<TempId> Load, Action<TempId> Store) OwnIndexAccess(IndexExpr indexed, CallExpr write)
+    {
+        var read = _types.OperatorCallOf(indexed) ?? throw Bug($"the index at {indexed.Span} has a write and no read");
+        var type = TypeOfExpr(indexed);
+        var stands = write.Arguments[^1];
+        var receiver = LowerExpr(indexed.Target);
+        // A 'null' key has no type to be lowered bare with, and no effect to be held for.
+        TempId? key = indexed.Index is NullLiteralExpr ? null : LowerExpr(indexed.Index);
+
+        TempId? Held(CallExpr call, TempId? value)
+        {
+            _chainReceivers[indexed.Target] = receiver;
+            if (key is { } held) _chainReceivers[indexed.Index] = held;
+            if (value is { } stored)
+            {
+                _chainReceivers[stands] = stored;
+                _chainResults[stands] = type;
+            }
+            try { return LowerCall(call); }
+            finally
+            {
+                _chainReceivers.Remove(indexed.Target);
+                _chainReceivers.Remove(indexed.Index);
+                if (value is not null)
+                {
+                    _chainReceivers.Remove(stands);
+                    _chainResults.Remove(stands);
+                }
+            }
+        }
+
+        return (type,
+            () => Held(read, null) ?? throw Bug("'index' returned no value"),
+            value => Held(write, value));
+    }
+
+    /// <summary>
+    /// <c>x[k] = v</c> and <c>x[k] op= v</c> on a type's own index. THE TARGET BEFORE THE VALUE
+    /// (04 D6, as C# has it): receiver, key, then the value — the value came first, so
+    /// <c>xs[next()] = next()</c> stored the first count at the second, where an array stores the
+    /// second at the first. The value is lowered AT THE ELEMENT'S TYPE: bare, a <c>null</c> had
+    /// none to take, and the assignment as a value was the right side unconverted — a class
+    /// where the index holds an interface.
+    /// </summary>
+    private TempId LowerOwnIndexAssign(IndexExpr own, CallExpr setCall, AssignExpr expr)
+    {
+        var (element, load, store) = OwnIndexAccess(own, setCall);
+
+        if (expr.Operator is null)
+        {
+            var assigned = LowerExprAs(expr.Value, element);
+            store(assigned);
+            return assigned;
+        }
+
+        if (expr.Operator is BinaryOp.Coalesce or BinaryOp.LogicalAnd or BinaryOp.LogicalOr)
+        {
+            // Read once, written at most once: what the form is worth is kept in a slot rather
+            // than read back, which on an array is a load and here a call of the type's.
+            var kept = _slots.DeclareSynthetic("element", element);
+            var first = true;
+            return LowerShortCircuitAssign(expr, element,
+                () =>
+                {
+                    if (!first) return LoadValue(kept, expr.Span);
+                    first = false;
+                    var current = load();
+                    StoreValue(kept, current, expr.Span);
+                    return current;
+                },
+                value =>
+                {
+                    store(value);
+                    StoreValue(kept, value, expr.Span);
+                });
+        }
+
+        // As on an array's element: read, the right side, the operation, write.
+        var before = load();
+        var operand = LowerExpr(expr.Value);
+        var result = EmitBinary(IrBinKindExtensions.FromAst(expr.Operator.Value), element,
+            before, operand, expr.Span);
+        store(result);
+        return result;
+    }
+
     private TempId LowerElementAssign(IndexExpr indexed, AssignExpr expr)
     {
         // 'xs[i] = v' on a container is 'Indexable<T>.set(i, v)'. A compound assignment ('xs[i] += 1') is

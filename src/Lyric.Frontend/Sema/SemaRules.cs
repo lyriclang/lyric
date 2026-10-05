@@ -570,6 +570,7 @@ public sealed class SemaRules
             case AssignExpr a:
                 if (!_types.TypeOf(a.Target).IsError && WhyNotWritable(a.Target) is { } reason)
                     _de.Report("LYR-SEM0019", Severity.Error, a.Target.Span, $"cannot assign to this target — {reason}");
+                CheckIndexWrite(a);
                 WalkExpr(a.Value);
                 WalkExpr(a.Target);
                 return;
@@ -588,11 +589,13 @@ public sealed class SemaRules
             // §7.1: 'let x = 1; x++;' compiled without a word and answered 2.
             case PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } p:
                 CheckIncrementTarget(p.Operand);
+                CheckIndexWrite(p);
                 WalkExpr(p.Operand);
                 return;
 
             case UnaryExpr { Operator: UnaryOp.PreInc or UnaryOp.PreDec } u:
                 CheckIncrementTarget(u.Operand);
+                CheckIndexWrite(u);
                 WalkExpr(u.Operand);
                 return;
 
@@ -664,6 +667,25 @@ public sealed class SemaRules
                 case TypeNode or Pattern: break; // nothing in them is written or called
                 default: WalkInside(child); break; // an initializer's field, a string's hole, an arm
             }
+    }
+
+    /// <summary>
+    /// <c>x[k] = v</c>, <c>x[k] op= v</c> and <c>x[k]++</c> on a type's own index are
+    /// <c>x.setIndex(k, …)</c> (04 D6), the call the sema stored on the node: a <c>mut fn</c>
+    /// writes its receiver, by the rule of the call written out (M4). Read as it is written, the
+    /// node had a target and no receiver — and a <c>let</c> struct was written through
+    /// <c>r[0] = 9</c>, where <c>r.setIndex(0, 9)</c> was refused.
+    /// </summary>
+    private void CheckIndexWrite(Expr writer)
+    {
+        if (_types.OperatorCallOf(writer) is not { Callee: MemberExpr { Member: "setIndex" } setter }) return;
+        var bound = _types.RefOf(setter);
+        if (bound is ImportBindingSymbol import) bound = import.Target;
+        if (bound is not FunctionSymbol { Declaration: FunctionDecl { IsMut: true, IsStatic: false } }) return;
+        if (WhyNotAPlace(setter.Target) is not { } reason) return;
+
+        _de.Report("LYR-SEM0019", Severity.Error, writer.Span,
+            $"cannot write through this index — 'x[k] = v' is 'x.setIndex(k, v)', a 'mut fn': {reason}");
     }
 
     /// <summary>The target of <c>++</c> or <c>--</c>, which is written as much as read.</summary>

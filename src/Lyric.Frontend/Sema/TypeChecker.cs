@@ -4401,6 +4401,7 @@ public sealed class TypeChecker
                     "'&' hands a place to a place parameter, and this argument's parameter takes a value");
             default: // PreInc and PreDec
                 if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "++/--", t);
+                else if (!WriteThroughIndex(u.Operand, u, scope)) return LyrType.Error;
                 return t;
         }
     }
@@ -4444,6 +4445,7 @@ public sealed class TypeChecker
                 return t;
             default: // Inc and Dec
                 if (!TypeFacts.IsNumeric(t)) BadOp(p.Span, "++/--", t);
+                else if (!WriteThroughIndex(p.Operand, p, scope)) return LyrType.Error;
                 return t;
         }
     }
@@ -5153,20 +5155,56 @@ public sealed class TypeChecker
     private LyrType CheckAssign(AssignExpr a, SymbolTable scope)
     {
         CheckExpr(a.Target, scope); // binds RefOf
-        // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)' (04 D6). A compound would read
-        // and write through the index, evaluating it twice: written out instead, as for every
-        // operator interface on a target that is no variable.
+        // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)' (04 D6), and a compound
+        // 'x[k] op= v' reads and writes it with 'x' and 'k' evaluated ONCE (02 M8a-1, the
+        // review's decision), as on an array's element: the lowering holds the two, and what is
+        // stored here is the write — its value argument the operation, a node of its own.
         if (a.Target is IndexExpr { Index: not SliceRangeExpr } written && _coreIndex is { } readIndex
             && _result.TypeOf(written.Target) is var holder && IndexesThrough(holder, readIndex))
         {
-            if (a.Operator is not null)
-                return Report(a.Span, "LYR-SEM0003",
-                    "a compound assignment through an index reads and writes it — write it out: 'x[k] = x[k] op v'");
-            if (_coreIndexSet is not { } writeIndex || !IndexesThrough(holder, writeIndex))
-                return Report(a.Span, "LYR-SEM0019",
-                    $"'{TypeFacts.Display(holder)}' is read by index and not written — it conforms to 'Index', not to 'IndexSet'");
+            if (NotWrittenByIndex(holder) is { } readOnly) return Report(a.Span, "LYR-SEM0019", readOnly);
+            var element = _result.TypeOf(written) ?? LyrType.Error;
+            if (element.IsError) return LyrType.Error;
+
+            if (a.Operator is { } compound
+                and not (BinaryOp.LogicalAnd or BinaryOp.LogicalOr or BinaryOp.Coalesce))
+            {
+                // What 'x[k] op v' says, 'x[k] op= v' says: the operation is checked as the one
+                // written, its left side the target — typed where it stands, and not again.
+                var operation = new BinaryExpr(written, compound, a.Value, a.Span);
+                var outer = _typedTarget;
+                LyrType computed;
+                _typedTarget = written;
+                try { computed = CheckExpr(operation, scope); }
+                finally { _typedTarget = outer; }
+                if (computed.IsError) return LyrType.Error;
+
+                // Through an OPERATOR INTERFACE the rule of a field and of an array's element
+                // holds, a simple variable target (below): one question for the three targets,
+                // and not this one's to answer alone.
+                if (_result.OperatorCallOf(operation) is not null)
+                    return Report(a.Span, "LYR-SEM0003",
+                        "compound assignment through an operator interface needs a simple "
+                        + $"variable target — write it out: 'a = a {OperatorText(compound)} b'");
+                if (!IsAssignable(a.Value, computed, element))
+                {
+                    CheckAssignable(a.Value, computed, element, a.Span);
+                    return LyrType.Error;
+                }
+
+                _typedTarget = operation;
+                try { DesugarIndex(written, a, "setIndex", [written.Index, operation], scope); }
+                finally { _typedTarget = outer; }
+                return element;
+            }
+
+            // '??=' carries the rule of '??', as on a variable (below).
+            if (a.Operator is BinaryOp.Coalesce && element is not (Optional or NullType))
+                return Report(a.Span, "LYR-SEM0005",
+                    $"'??=' on '{TypeFacts.Display(element)}' — a value of this type is never null, so the "
+                    + "assignment can never happen");
             DesugarIndex(written, a, "setIndex", [written.Index, a.Value], scope);
-            return _result.TypeOf(written);
+            return element;
         }
         var targetSym = a.Target is IdentifierExpr ? _result.RefOf(a.Target) : null;
         // The binding holds another iterator from here on: a loop that walked the old one says
@@ -5637,6 +5675,35 @@ public sealed class TypeChecker
         if (type.IsError) return LyrType.Error;
         _result.DesugarOperator(at, call);
         return type;
+    }
+
+    /// <summary>Why a value of the type is not written through its index, or <c>null</c> where
+    /// it is: it conforms to <c>Index</c> and not to <c>IndexSet</c> (04 D6).</summary>
+    private string? NotWrittenByIndex(LyrType holder) =>
+        _coreIndexSet is { } writeIndex && IndexesThrough(holder, writeIndex)
+            ? null
+            : $"'{TypeFacts.Display(holder)}' is read by index and not written — it conforms to 'Index', not to 'IndexSet'";
+
+    /// <summary>
+    /// <c>x[k]++</c> and <c>x[k]--</c> on a type's own index (02 M8a-1): the read is the
+    /// <c>x.index(k)</c> the operand already is, the write <c>x.setIndex(k, …)</c> — stored on
+    /// the operator's node, the operand standing where the new value goes; the lowering
+    /// evaluates <c>x</c> and <c>k</c> once for the two. False where the type is not written
+    /// by index, said here.
+    /// </summary>
+    private bool WriteThroughIndex(Expr operand, Expr at, SymbolTable scope)
+    {
+        if (operand is not IndexExpr { Index: not SliceRangeExpr } ix || _result.OperatorCallOf(ix) is null) return true;
+        if (NotWrittenByIndex(_result.TypeOf(ix.Target) ?? LyrType.Error) is { } readOnly)
+        {
+            Report(at.Span, "LYR-SEM0019", readOnly);
+            return false;
+        }
+
+        var outer = _typedTarget;
+        _typedTarget = ix;
+        try { return !DesugarIndex(ix, at, "setIndex", [ix.Index, ix], scope).IsError; }
+        finally { _typedTarget = outer; }
     }
 
     /// <summary>
