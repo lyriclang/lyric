@@ -193,6 +193,29 @@ public static class TypeFacts
         return LyrType.Equal(a, b);
     }
 
+    /// <summary>Would this type, written bare before a suffix — '[]', '[3]' — take the suffix
+    /// for itself? An optional, a function type, and whatever ends in a set.</summary>
+    private static bool TakesTheSuffix(LyrType type) => type is Optional or FnType || EndsInASet(type);
+
+    /// <summary>Does the type's text end in a thrown set — its own, or, a '?' in front, that of
+    /// what it is the optional of?</summary>
+    private static bool EndsInASet(LyrType type) => type switch
+    {
+        Optional optional => EndsInASet(optional.Inner),
+        FnType { Throws.Length: > 0 } or GenericInstance { Throws: not null } or CoroutineOf { Throws: not null } => true,
+        _ => false,
+    };
+
+    /// <summary>Could a 'throws' written behind this type be the type's own (03 T17, 10 §2): a
+    /// function type, a coroutine, std.task's task — under any '?'.</summary>
+    private static bool CouldTakeASet(LyrType type) => type switch
+    {
+        Optional optional => CouldTakeASet(optional.Inner),
+        FnType or CoroutineOf => true,
+        GenericInstance { Definition: { Name: "Task", Home.FullName: "std.task" } } => true,
+        _ => false,
+    };
+
     /// <summary>A coroutine's result type in its display: ', R' where it is not void.</summary>
     private static string ResultText(CoroutineOf co, Func<TypeSymbol, string> name) =>
         IsVoid(co.Result) ? "" : ", " + Render(co.Result, name);
@@ -240,29 +263,33 @@ public static class TypeFacts
                            : "");
             case AssocOf a: return Render(a.Base, name) + "." + a.Member.Name;
             case Optional o: return "?" + Render(o.Inner, name);
-            // A function type as an element type MUST be parenthesized: 'fn(int) -> void[]' would
-            // otherwise read as a function returning 'void[]'. Without the parenthesis the sema
-            // reported "cannot assign 'fn(int) -> void[]' to '(fn(int) -> void)[]'" — two displays
-            // for types that ARE different but looked the same.
-            case ArrayOf { Element: FnType } fnArray:
-                return $"({Render(fnArray.Element, name)})[]";
-            case ArrayOf a: return Render(a.Element, name) + "[]";
+            // An element type that would take the suffix for itself MUST be parenthesized, as the
+            // source writes it: 'fn(int) -> void[]' reads as a function returning 'void[]',
+            // '?int[]' as the optional of an array, 'Task<int> throws E[]' as a task that throws
+            // an array. Without the parentheses two types that ARE different looked the same —
+            // "cannot assign '?int[]' to '?int[]'" — and were the same to the lowering, whose key
+            // for an instance this text is: 'Box<(?int)[]>' and 'Box<?int[]>' were one instance.
+            case ArrayOf a:
+                return (TakesTheSuffix(a.Element) ? $"({Render(a.Element, name)})" : Render(a.Element, name)) + "[]";
             case SliceOf s: return "Slice<" + Render(s.Element, name) + ">";
             case InlineArrayOf ia:
-                return (ia.Element is Optional or FnType ? $"({Render(ia.Element, name)})" : Render(ia.Element, name)) + $"[{ia.Length}]";
+                return (TakesTheSuffix(ia.Element) ? $"({Render(ia.Element, name)})" : Render(ia.Element, name)) + $"[{ia.Length}]";
             case TupleOf tu:
                 return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Render(e, name) : Render(e, name))) + ")";
             case FnType f:
-                // A function type returned by one with a set reads parenthesized: the nearest
-                // function type takes a 'throws' (03 T17).
+                // The return type in the parentheses that say whose a set is (03 T17; the review's
+                // M5-7, M6-6), as the source writes them: around one that ends in a set of its
+                // own, 'fn() -> (Task<int> throws E)', and around one that could have taken the
+                // set behind it, 'fn() -> (Task<int>) throws E'. Without them the two were one text.
                 return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Render(p, name))) + ") -> "
-                       + (f.Return is FnType && f.Throws.Length > 0 ? $"({Render(f.Return, name)})" : Render(f.Return, name))
+                       + (EndsInASet(f.Return) || (f.Throws.Length > 0 && CouldTakeASet(f.Return))
+                           ? $"({Render(f.Return, name)})" : Render(f.Return, name))
                        + ThrownText(f.Throws, name);
             case RangeOf r: return "range<" + Render(r.Element, name) + ">";
             case CoroutineOf { Throws: null } co: return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + ">";
             case CoroutineOf co:
-                return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + "> throws "
-                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : Render(co.Throws!, name));
+                return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + "> throws"
+                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : " " + Render(co.Throws!, name));
             case NullType: return "null";
             case NeverType: return "never";
             case ErrorType: return "<error>";
