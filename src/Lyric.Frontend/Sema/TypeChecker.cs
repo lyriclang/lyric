@@ -1023,7 +1023,8 @@ public sealed class TypeChecker
             // No orphan rule (03 T7 X3): coherence is checked whole-program, and an extend may
             // stand in any module.
             CheckTypeConformance(block.Target, block.Decl.Interfaces, block.Module, block.Target.Name,
-                self: block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : null);
+                self: block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : null,
+                from: block);
         }
         CheckCoherence();
     }
@@ -1503,12 +1504,31 @@ public sealed class TypeChecker
     /// satisfied by that.</param>
     /// <param name="self">What <c>Self</c> is for the conformer: the block's target instance for a
     /// generic block (<c>List&lt;T&gt;</c> with the block's own T, 03 T7), else the type itself.</param>
+    /// <param name="from">The block whose list this is, for a conformance an <c>extend</c> block
+    /// declares; <c>null</c> for the type's own list.</param>
     private void CheckTypeConformance(TypeSymbol implementer, TypeNode[] interfaces, ModuleSymbol module, string name,
-        string?[]? delegates = null, LyrType? self = null)
+        string?[]? delegates = null, LyrType? self = null, ExtensionBlock? from = null)
     {
         if (interfaces.Length == 0) return;
         RequireSealedInModule(interfaces, module, name);
         var candidates = CandidateMethods(implementer, module);
+
+        // Of several candidates of one name, those written where THIS conformance is declared
+        // come first (04 D3): two blocks of one type may each give a 'greet', one for 'Greeter'
+        // and one for 'Waver', and a block's member is its own interfaces'. The first that fit
+        // was the answer recorded for both conformances — and the record is what the lowering
+        // reads: a static through a constraint, 'T.label()', called the other block's.
+        if (from is not null)
+            foreach (var sameName in candidates.Values)
+            {
+                if (sameName.Count < 2) continue;
+                var here = sameName.Where(c => ReferenceEquals(_comp.Extensions.BlockOf(c), from)).ToList();
+                if (here.Count == 0 || here.Count == sameName.Count) continue;
+                var elsewhere = sameName.Where(c => !ReferenceEquals(_comp.Extensions.BlockOf(c), from)).ToList();
+                sameName.Clear();
+                sameName.AddRange(here);
+                sameName.AddRange(elsewhere);
+            }
         var delegated = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < interfaces.Length; i++)
         {
@@ -1697,6 +1717,10 @@ public sealed class TypeChecker
                         if (found.FirstOrDefault(candidate => GenericSignatureMismatch(want, promisedGeneric, candidate) is null)
                             is { } answering)
                         {
+                            // Recorded as a plain member's answer is: no table holds a generic
+                            // member, and the lowering asks which block's it is by the interface.
+                            _result.RecordConformanceImpl(implementer, iface, im.Name,
+                                InstanceOfConformance(iface, subst), answering);
                             CheckWitnessWord(answering, implementer, iface, name, NodeSpan(node));
                             continue;
                         }

@@ -5337,6 +5337,14 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
+        // A plain interface's member bound on the instance — written 'Walker.walk(c)' (05 §4), or
+        // a default the type leaves to the interface: what the instance's type has for the
+        // interface, found as a call through a constraint finds it at this instance — its own,
+        // its block's, the default's instance. Asked for as a method of the instance, the
+        // interface's member has no body, and its default ran past the member the type wrote.
+        if (TypeTable.InterfaceOwning(method) is { Generics.Length: 0 })
+            return LowerConstraintCall(member, owner, expr);
+
         // An interface's default on the instance: the default's instance for it (04 D9). As a
         // method of the type it was lowered with the interface's 'this' and failed the verifier.
         if (DirectDefault(member) is { } onInstance)
@@ -5539,13 +5547,30 @@ internal sealed class FunctionLowerer
         return _typeTable.InterfaceOf(constraint, span);
     }
 
-    /// <summary>The concrete type's member of the name: its own, or its blocks'.</summary>
-    private FunctionSymbol? GenericImplementationOf(LyrType concrete, string name)
+    /// <summary>The concrete type's member a call names: its own, or its blocks' — the block of
+    /// the interface the call's member belongs to (<see cref="BlockMemberFor"/>).</summary>
+    private FunctionSymbol? GenericImplementationOf(LyrType concrete, MemberExpr member)
     {
         if (TypeFacts.SymbolOf(concrete) is { } owner)
-            return owner.Members.LookupLocal(name) as FunctionSymbol ?? _typeTable.ExtensionMethod(owner, name);
-        return _typeTable.BuiltinSymbolOf(concrete) is { } builtin ? _typeTable.ExtensionMethod(builtin, name) : null;
+            return owner.Members.LookupLocal(member.Member) as FunctionSymbol ?? BlockMemberFor(owner, member);
+        return _typeTable.BuiltinSymbolOf(concrete) is { } builtin ? BlockMemberFor(builtin, member) : null;
     }
+
+    /// <summary>
+    /// The member a type's blocks give FOR the interface a call's member belongs to (04 D3): the
+    /// one the conformance check settled, where that stands in a block. A name does not say it —
+    /// two blocks of one type may each give a <c>greet</c>, one for <c>Greeter</c> and one for
+    /// <c>Waver</c>, and the first block that has the name answered every call through a
+    /// constraint, <c>T :: [Waver]</c> included. Where nothing single was settled — several
+    /// conformances to one interface, a member of no interface — the name decides, as before.
+    /// </summary>
+    private FunctionSymbol? BlockMemberFor(TypeSymbol owner, MemberExpr member) =>
+        _types.RefOf(member) is FunctionSymbol promised
+        && TypeTable.InterfaceOwning(promised) is { } iface
+        && _types.ConformanceImpl(owner, iface, member.Member, null) is { } settled
+        && _typeTable.BlockOf(settled) is not null
+            ? settled
+            : _typeTable.ExtensionMethod(owner, member.Member);
 
     /// <summary>A generic member's implementation for the concrete receiver of a constraint call:
     /// a generic type's block member by the block's route, else the instance a direct call
@@ -5803,7 +5828,7 @@ internal sealed class FunctionLowerer
         // below.
         if (_types.RefOf(member) is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl promisedDecl } promisedGeneric
             && (promisedDecl.Body is null || Replaceable(promisedGeneric))
-            && GenericImplementationOf(concrete, member.Member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
+            && GenericImplementationOf(concrete, member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
             return LowerGenericImplementationCall(member, genericImplementation, genericDecl, concrete, expr);
 
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
@@ -5814,7 +5839,7 @@ internal sealed class FunctionLowerer
         if (TypeFacts.SymbolOf(concrete) is not { } owner)
         {
             if (_typeTable.BuiltinSymbolOf(concrete) is { } builtin
-                && _typeTable.ExtensionMethod(builtin, member.Member) is { } extension
+                && BlockMemberFor(builtin, member) is { } extension
                 && extension.Declaration is FunctionDecl extensionDecl
                 && TryResolveFunction(extension, out var extensionTarget))
             {
@@ -5864,7 +5889,7 @@ internal sealed class FunctionLowerer
             // A generic owner's block, 'extend<T :: [Integer]> Range<T> :: [Iterator]' (03 T7
             // X1): the block's method for the receiver's instance, a direct call.
             if (concrete is GenericInstance && !ConstraintNeedsTheInstance(member, owner)
-                && _typeTable.ExtensionMethod(owner, member.Member) is { } genericBlockMethod
+                && BlockMemberFor(owner, member) is { } genericBlockMethod
                 && _typeTable.BlockOf(genericBlockMethod) is { } genericBlock)
                 return LowerBlockMethodCall(member, genericBlockMethod, genericBlock, concrete, expr);
 
@@ -5873,7 +5898,7 @@ internal sealed class FunctionLowerer
             // associated type (03 T6) has no slot to be lifted into, so the direct call is the
             // only route.
             if (concrete is NamedRef && !ConstraintNeedsTheInstance(member, owner)
-                && _typeTable.ExtensionMethod(owner, member.Member) is { } blockMethod
+                && BlockMemberFor(owner, member) is { } blockMethod
                 && blockMethod.Declaration is FunctionDecl blockDecl
                 && TryResolveFunction(blockMethod, out var blockTarget))
             {
@@ -6176,6 +6201,20 @@ internal sealed class FunctionLowerer
                      && !BoundToExtension(member)
                      && _typeTable.InterfaceDeclaring(concrete, promised) is { } declaring:
             {
+                // Own members win (05 §3), written 'Walker.walk(d)' too (§4): what the type has
+                // for the interface — in its body, or in the block that declares the conformance
+                // — is called as its member. Asked BEFORE the default: the default's instance
+                // ran past the 'walk' the type wrote.
+                if (declaring.Generics.Length == 0
+                    && _types.ConformanceImpl(concrete, declaring, member.Member, null) is { } answered)
+                {
+                    calleeName = member.Member;
+                    bound = answered;
+                    receiver = LowerExpr(member.Target);
+                    receiverOwner = concrete;
+                    break;
+                }
+
                 // A default, reached plainly or written 'Walker.walk(d)': its instance for the
                 // type (04 D9), direct — a constraint-only interface has no value to go through.
                 if (DirectDefault(member) is { } declared)
