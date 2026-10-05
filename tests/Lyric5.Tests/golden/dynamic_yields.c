@@ -658,7 +658,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 56
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb7:;
 #line 55
     return;

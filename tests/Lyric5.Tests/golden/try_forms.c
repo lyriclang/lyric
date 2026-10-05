@@ -928,7 +928,7 @@ bb33:;
     goto bb34;
 bb34:;
 #line 51
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb35:;
 #line 51
     t88 = l16__try9;

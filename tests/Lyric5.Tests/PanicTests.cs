@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Lyric5.Toolchain;
 
@@ -66,6 +67,44 @@ public partial class PanicTests
         var lines = Lines(result.Stderr);
         Assert.Equal(firstLine, lines[0]);
         Assert.StartsWith("    at program (panic_checks.c:", lines[1]);
+    }
+
+    /// <summary>
+    /// Code the compiler holds unreachable, reached (05 E8, the review's M5-4): the debug profile
+    /// panics with a code and a trace; the release profile stops at once with the processor's
+    /// trap — a crash, which the runtime reports as one (10 Q9) — and in neither does the program
+    /// go on. What stands before the place has run in both: an undefined place would let the C
+    /// compiler drop it.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Reaching_unreachable_code_stops_the_program(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("panic_checks", profile, args: ["floor"]);
+        var lines = Lines(result.Stderr);
+        Assert.True(lines.Length >= 2, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
+        if (profile == Profile.Debug)
+        {
+            Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+            Assert.Equal("panic [LYR-RT0017]: control reached code the compiler holds unreachable", lines[0]);
+        }
+        else if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(unchecked((int)0xC000001D), result.ExitCode);
+            Assert.Equal("crash: illegal instruction", lines[0]);
+        }
+        else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            Assert.Equal(128 + 5, result.ExitCode);  // killed by SIGTRAP: the trap is a breakpoint there
+            Assert.Equal("crash: SIGTRAP (trap)", lines[0]);
+        }
+        else
+        {
+            Assert.Equal(128 + 4, result.ExitCode);  // killed by SIGILL
+            Assert.Equal("crash: SIGILL (illegal instruction)", lines[0]);
+        }
+        Assert.True(lines[1].StartsWith("    at program (panic_checks.c:"), $"stderr:\n{result.Stderr}");
     }
 
     [Theory]

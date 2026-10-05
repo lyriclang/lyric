@@ -143,3 +143,7 @@ void lyr_panic_unreachable(const LyrStr *message) {
 void lyr_panic_todo(const LyrStr *message) {
     lyr_panic(LYR_RT_TODO, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
 }
+
+void lyr_panic_floor(void) {
+    lyr_panic(LYR_RT_FLOOR, "control reached code the compiler holds unreachable");
+}

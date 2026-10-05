@@ -274,7 +274,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 18
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb7:;
 #line 22
     t30 = l2_log;
@@ -414,7 +414,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 35
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb7:;
 #line 39
     t28 = l1_log;
@@ -558,7 +558,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 48
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb7:;
 #line 52
     t32 = l0_log;
@@ -722,7 +722,7 @@ bb7:;
     goto bb8;
 bb8:;
 #line 57
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb9:;
 #line 68
     t34 = l0_log;
@@ -916,7 +916,7 @@ bb12:;
     goto bb13;
 bb13:;
 #line 74
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb14:;
 #line 73
     goto bb3;
@@ -1105,7 +1105,7 @@ bb8:;
     goto bb9;
 bb9:;
 #line 97
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb10:;
 #line 93
     goto bb11;
@@ -1194,7 +1194,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 105
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 }
 
 #line 109 "programs/error_paths.lyr"
@@ -1407,7 +1407,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 86
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 }
 
 #line 1387 "stdlib5/std/core.lyr"

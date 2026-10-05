@@ -22,6 +22,7 @@
 #define LYR_RT_COROUTINE        "LYR-RT0014"  /* a coroutine resumed while it runs, after it ended or on another
                                                  thread; a yield with none running (06 A8) */
 #define LYR_RT_SYSTEM           "LYR-RT0015"  /* the system refused the runtime what it needs to go on: a poller, random bytes */
+#define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler (05 E8) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
@@ -66,6 +67,19 @@ LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_assert(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_unreachable(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_todo(const struct LyrStr *message);
+
+/* Where the compiler knows control cannot arrive — behind a call that does not return, behind a
+ * match that covers every case. That knowledge is the compiler's, and a compiler can be wrong: if
+ * control does arrive, the debug profile says so with a panic and a trace (RT0017), and the release
+ * profile stops at once with the processor's trap, which the runtime reports as a crash. In no
+ * profile is the place undefined behaviour, which would let the C compiler assume anything about
+ * the code that leads there — and delete it. */
+LYR_NORETURN void lyr_panic_floor(void);
+#ifdef NDEBUG
+#  define LYR_UNREACHABLE() __builtin_trap()
+#else
+#  define LYR_UNREACHABLE() lyr_panic_floor()
+#endif
 
 /* `assert(condition, message)`: the check at the call, so the trace starts in the program's own
  * frame; the message is the argument as evaluated, before the check. */

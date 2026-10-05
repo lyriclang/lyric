@@ -4,9 +4,10 @@
  *   overflow     a write one past a malloc block: "heap-buffer-overflow", exit 1
  *   signed       a signed int overflow in plain C: "runtime error: signed integer overflow", and
  *                the program ends there — exit not 0, "not reached" never printed
- *   unreachable  control reaching '__builtin_unreachable()' — the emitter's C for a block the
- *                lowering sealed as unreachable: "runtime error: execution reached an
- *                unreachable program point", and the program ends there
+ *   unreachable  control reaching 'LYR_UNREACHABLE()' — the emitter's C for a block the
+ *                lowering sealed as unreachable, and no undefined behaviour for UBSan to find:
+ *                "panic [LYR-RT0017]: control reached code the compiler holds unreachable",
+ *                and the program ends there
  * (Built in the other profiles, the faults go unnoticed; the program is only run under ASan.) */
 #include "lyr/lyr.h"
 
@@ -27,7 +28,7 @@ static int64_t program(void) {
         int sum = big + one;
         (void)sum;
     } else if (strcmp(which, "unreachable") == 0) {
-        if (one) __builtin_unreachable();
+        if (one) LYR_UNREACHABLE();
     }
     lyr_println(lyr_str_from_cstr("not reached"));
     return 0;

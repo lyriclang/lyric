@@ -816,7 +816,7 @@ bb11:;
     goto bb12;
 bb12:;
 #line 73
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb13:;
 #line 81
     t89 = l11_x;

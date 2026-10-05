@@ -391,7 +391,7 @@ bb7:;
     goto bb9;
 bb8:;
 #line 35
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb9:;
 #line 34
     return;
@@ -473,7 +473,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 48
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb6:;
 #line 47
     return;
@@ -714,7 +714,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 60
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb6:;
 #line 59
     return;
@@ -867,7 +867,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 67
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb6:;
 #line 66
     return;
@@ -956,7 +956,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 75
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb7:;
 #line 74
     return;
@@ -1150,7 +1150,7 @@ bb10:;
     goto bb11;
 bb11:;
 #line 92
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb12:;
 #line 91
     return;
@@ -1263,7 +1263,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 104
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb6:;
 #line 103
     return;
@@ -1322,7 +1322,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 108
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 }
 
 #line 115 "programs/errors.lyr"

@@ -420,7 +420,7 @@ bb10:;
     goto bb11;
 bb11:;
 #line 39
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb12:;
 #line 46
     t56 = (int64_t)INT64_C(5);

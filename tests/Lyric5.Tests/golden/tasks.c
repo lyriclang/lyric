@@ -957,7 +957,7 @@ bb2:;
 #line 1792
     lyr_panic_message(t3);
 #line 1792
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb3:;
 #line 1792
     t4 = l0__coalesce0;
@@ -2231,7 +2231,7 @@ bb2:;
 #line 1602
     lyr_panic_message(t4);
 #line 1602
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb3:;
 #line 1602
     t5 = l3__coalesce0;
@@ -2823,7 +2823,7 @@ bb2:;
 #line 1684
     lyr_panic_message(t4);
 #line 1684
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb3:;
 #line 1684
     t5 = l2__coalesce0;
@@ -3337,7 +3337,7 @@ bb11:;
 #line 1757
     lyr_task_repanic(t29, t31, t33);
 #line 1757
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb12:;
 #line 1755
     t26 = l6_handler;
@@ -4078,7 +4078,7 @@ bb4:;
     goto bb5;
 bb5:;
 #line 1291
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb6:;
 #line 1290
     return;
