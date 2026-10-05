@@ -747,6 +747,8 @@ internal sealed class FunctionLowerer
 
     public IrFunction Run()
     {
+        CompilerPosition.At("lowering", _name, _decl?.Span ?? _lambda!.Span);
+
         // A lambda has an expression OR a block instead of a body. The expression case is the common one
         // and needs no 'return' in the source; it is inserted here.
         if (_lambda is not null) return RunLambda();
@@ -6972,7 +6974,13 @@ internal sealed class FunctionLowerer
     /// like a new one. Whoever adds a type constructor here adds it here too: an unsubstituted parameter
     /// otherwise arrives as "unsubstituted" in the <see cref="TypeTable"/>, far from its cause.</para>
     /// </summary>
-    private LyrType SubstituteType(LyrType type) => type switch
+    private LyrType SubstituteType(LyrType type)
+    {
+        StackGuard.Check("substituting a type");
+        return SubstituteTypeOnce(type);
+    }
+
+    private LyrType SubstituteTypeOnce(LyrType type) => type switch
     {
         TypeParamType p when _substitution.TryGetValue(p.Param, out var bound) => bound,
         ArrayOf a => new ArrayOf(SubstituteType(a.Element)),
