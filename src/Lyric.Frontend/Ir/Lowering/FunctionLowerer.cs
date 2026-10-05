@@ -4796,6 +4796,36 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary><c>xs.isEmpty()</c> on an inline array: its length against zero — the receiver is
+    /// evaluated, as for any member.</summary>
+    private TempId LowerInlineIsEmpty(Expr array, Span span)
+    {
+        var i64 = new IrScalarType(IrScalar.I64);
+        var length = LowerArrayLength(array, span);
+        return EmitBinary(IrBinKind.Eq, BoolType, length, EmitConst(new IntConst(0), i64, span), span);
+    }
+
+    /// <summary>
+    /// <c>xs.toArray()</c> on an inline array (03 §5.3 rule 6): a new <c>T[]</c> of its
+    /// <c>N</c> elements, each copied as an array literal's element is — the way a
+    /// <c>T[N]</c> in a frame, of which no view exists, reaches the members of one.
+    /// </summary>
+    private TempId LowerInlineToArray(Expr array, IrInlineArrayType inline, Span span)
+    {
+        var source = LowerExpr(array);
+        var i64 = new IrScalarType(IrScalar.I64);
+        var elements = new TempId[inline.Length];
+        for (var i = 0; i < elements.Length; i++)
+        {
+            var element = _slots.NewTemp(inline.Element);
+            _b.Emit(new LoadElem(element, source, EmitConst(new IntConst((ulong)i), i64, span), inline.Element, span));
+            elements[i] = Coerce(element, inline.Element, inline.Element, span);
+        }
+        var dest = _slots.NewTemp(new IrArrayType(inline.Element));
+        _b.Emit(new NewArray(dest, inline.Element, elements, span));
+        return dest;
+    }
+
     // ------------------------------------------------------------------ objects
 
     /// <summary>
@@ -5738,7 +5768,12 @@ internal sealed class FunctionLowerer
         var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
         var all = new TempId[passed.Length + 1];
         all[0] = viewed
-            ? ViewOf(LowerExpr(member.Target), ((IrArrayType)TypeOfExpr(member.Target)).Element, member.Span)
+            ? ViewOf(LowerExpr(member.Target), TypeOfExpr(member.Target) switch
+            {
+                IrArrayType wholeArray => wholeArray.Element,
+                IrInlineArrayType wholeInline => wholeInline.Element,
+                var other => throw Bug($"a view of all of a '{other}' at {member.Span}"),
+            }, member.Span)
             : LowerExpr(member.Target);
         passed.CopyTo(all, 1);
         var resultType = TypeOfExpr(expr);
@@ -6168,6 +6203,14 @@ internal sealed class FunctionLowerer
             && TypeOfExpr(length.Target) is IrArrayType or IrSliceType or IrInlineArrayType)
             return LowerArrayLength(length.Target, expr.Span);
 
+        // 'xs.isEmpty()' and 'xs.toArray()' on an inline array are built in beside 'length()'
+        // (03 §5.3 rule 6): no block gives them, and the sema bound them to nothing.
+        if (expr.Callee is MemberExpr { Member: "isEmpty" or "toArray", IsOptional: false } builtIn
+            && _types.RefOf(builtIn) is null && TypeOfExpr(builtIn.Target) is IrInlineArrayType inlineReceiver)
+            return builtIn.Member == "isEmpty"
+                ? LowerInlineIsEmpty(builtIn.Target, expr.Span)
+                : LowerInlineToArray(builtIn.Target, inlineReceiver, expr.Span);
+
         if (expr.Callee is MemberExpr { Member: "next" } pull
             && SubstituteType(_types.TypeOf(pull.Target)) is CoroutineOf pulled)
             return LowerCoroutineNext(pull, pulled, expr.Span);
@@ -6399,6 +6442,9 @@ internal sealed class FunctionLowerer
                 var shapeReceiver = SubstituteType(ReceiverType(member.Target));
                 if (shapeReceiver is ArrayOf whole && shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
                     return LowerBlockMethodCall(member, shapeMember, shapeBlock, new SliceOf(whole.Element), expr, viewed: true);
+                // … and so does an inline array, where the sema found it in the heap (03 §5.3 rule 6).
+                if (shapeReceiver is InlineArrayOf inlineWhole && shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
+                    return LowerBlockMethodCall(member, shapeMember, shapeBlock, new SliceOf(inlineWhole.Element), expr, viewed: true);
                 return LowerBlockMethodCall(member, shapeMember, shapeBlock, shapeReceiver, expr);
             }
 
