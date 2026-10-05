@@ -127,6 +127,7 @@ public sealed class TypeChecker
         _result.SourceText = comp.TextOf;
         _result.ConformanceBlock = ConformanceBlockFor;
         _result.ValueInterface = iface => ValueUsable(iface, out _);
+        _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
@@ -1544,10 +1545,18 @@ public sealed class TypeChecker
         // default, through the concrete type the override — one name, two functions, chosen by
         // where the caller happens to stand. That is the failure SEM0079 refuses inside a chain,
         // and it is the same one here.
+        //
+        // That is the 4.x rule. In Lyric 5 (04 D9 whole, the review's A8) an interface with a
+        // generic member has no value, so nothing is chosen by one: a conformer's own takes the
+        // default's place, and is checked against it below. A GENERIC interface keeps the refusal
+        // for now — its defaults are still lowered for its value, and one of them calling the
+        // member on 'this' would run the default past the conformer's own.
         foreach (var node in interfaces)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
             foreach (var contributed in Conformance.WithParents(iface, _binding))
+            {
+                if (ReplacesGenericDefaults(contributed)) continue;
                 foreach (var symbol in contributed.Members.Symbols)
                     if (symbol is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl { Body: not null } } generic
                         && candidates.TryGetValue(generic.Name, out var owns))
@@ -1555,13 +1564,19 @@ public sealed class TypeChecker
                         {
                             if (own.Declaration is not { } ownDeclaration) continue;
                             _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
-                                $"'{name}.{generic.Name}' overrides a generic member of "
-                                + $"'{contributed.Name}', which cannot be overridden — it has no "
-                                + "slot to dispatch through, so the two would be chosen by the "
-                                + "static type of the receiver rather than by the value",
+                                _comp.Lyric5Modules
+                                    ? $"'{name}.{generic.Name}' stands in place of a generic default of the generic "
+                                      + $"interface '{contributed.Name}', which is not possible yet — a default of "
+                                      + $"'{contributed.Name}' that calls '{generic.Name}' on 'this' would not reach "
+                                      + "it; give it another name"
+                                    : $"'{name}.{generic.Name}' overrides a generic member of "
+                                      + $"'{contributed.Name}', which cannot be overridden — it has no "
+                                      + "slot to dispatch through, so the two would be chosen by the "
+                                      + "static type of the receiver rather than by the value",
                                 new DiagnosticNote(generic.Declaration?.Span ?? default,
                                     $"'{generic.Name}' is declared here"));
                         }
+            }
         }
 
         // The ENTRIES of this one list, resolved: an entry repeating an earlier one at the same
@@ -1637,10 +1652,11 @@ public sealed class TypeChecker
 
                 foreach (var im in idecl.Members)
                 {
-                    // A generic DEFAULT is not part of the contract: it cannot be overridden and is
-                    // reached by monomorphization (LYR-SEM0082 above). An abstract generic member
-                    // is, and is compared below with the conformer's parameters read as its own.
-                    if (im.Generics.Length > 0 && im.Body is not null) continue;
+                    // A generic DEFAULT that cannot be replaced (LYR-SEM0082 above) is no part of
+                    // the contract. One that can (04 D9 whole) is: a conformer's own of the name
+                    // answers it and has its signature — compared below, as an abstract generic
+                    // member's is, with the conformer's parameters read as the interface's.
+                    if (im.Generics.Length > 0 && im.Body is not null && !ReplacesGenericDefaults(iface)) continue;
                     // Nor is a PRIVATE helper (07 V2 S4): the interface's defaults call it, no
                     // conformer answers it, and a method of its name in a conformer is the
                     // conformer's own.
@@ -1649,7 +1665,20 @@ public sealed class TypeChecker
                     var found = candidates.TryGetValue(im.Name, out var c) ? c : null;
                     if (found is null)
                     {
-                        if (delegated.Contains(iface)) continue; // forwarded to the field (D1)
+                        if (delegated.Contains(iface))
+                        {
+                            // Forwarded to the field (D1) — but not a generic member: its
+                            // forwarder would be one function per instantiation, and none is
+                            // built. Said here, where the type delegates; at a call it was the
+                            // compiler's failure ("function has no body").
+                            if (im.Generics.Length > 0 && im.Body is null)
+                                _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
+                                    $"'{name}' does not implement the generic member '{im.Name}' of interface "
+                                    + $"'{iface.Name}'{implied} — a generic member is not forwarded to a field yet; "
+                                    + "write it on the type, calling the field's",
+                                    new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                            continue;
+                        }
                         if (im.Body is null) // abstract and not implemented
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                 $"'{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
@@ -1780,6 +1809,11 @@ public sealed class TypeChecker
     }
 
     private readonly HashSet<Symbol> _witnessWordsSaid = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Whether a conformer's own member takes the place of a generic default of this
+    /// interface (04 D9 whole, the review's A8): in Lyric 5, for an interface that is generic in
+    /// nothing — the one whose defaults are instantiated per conformer.</summary>
+    private bool ReplacesGenericDefaults(TypeSymbol iface) => _comp.Lyric5Modules && iface.Generics.Length == 0;
 
     /// <summary>Why a conformer's generic member does not answer an abstract generic one of the
     /// interface (04 D9), or <c>null</c>: as many type parameters, the same constraints on each, and
@@ -10566,16 +10600,22 @@ public sealed class TypeChecker
                 { reason = $"it declares the static member '{constant.Name}'"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
-                if (fn.Generics.Length > 0 && fn.Declaration is FunctionDecl { Body: null })
+                // A generic member, with a body too (D9 whole, the review's A8): one function per
+                // instantiation, and no slot holds that. Not a private helper, which is no member
+                // of the contract (07 V2 S4). The 4.x path keeps a generic default beside a value
+                // until it leaves main (M16).
+                if (fn.Generics.Length > 0
+                    && (fn.Declaration is FunctionDecl { Body: null }
+                        || (_comp.Lyric5Modules && fn.Declaration is FunctionDecl { IsPrivateHelper: false })))
                 { reason = $"its member '{fn.Name}' is generic, reached through a constraint alone"; return false; }
             }
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)
             {
                 if (symbol is not FunctionSymbol fn) continue;
-                // D9 names generic members too; the 4.x standard library reaches 'Iterator<T>'
-                // values with a generic 'map' (05 §5.2a of the 4.x text, monomorphized and not
-                // overridable), and it compiles until M8a rewrites it. That clause waits there.
+                // (D9's generic members are the first loop's. The 4.x library reaches
+                // 'Iterator<T>' values with a generic 'map' — 05 §5.2a of the 4.x text,
+                // monomorphized and not overridable — and keeps them in its own path.)
                 if (part.SelfParam is { } self && FnTypeOf(fn) is { } signature
                     && signature.Parameters.Append(signature.Return).Any(t => MentionsParam(t, self)))
                 { reason = $"its member '{fn.Name}' names 'Self'"; return false; }

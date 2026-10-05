@@ -332,15 +332,29 @@ internal sealed class InstanceTable
     /// An interface's default for one conformer (04 D9): 'Self' the conformer, 'this' its value,
     /// the call direct — one instance per default and conformer, as for a block's member. The
     /// interface has no parameters of its own here; a generic one's defaults go through its value.
+    /// A generic default's own arguments stand beside 'Self' (D9 whole): one instance per
+    /// conformer and argument list.
     /// </summary>
     public FunctionId RequestDefault(FunctionSymbol method, FunctionDecl decl, TypeSymbol iface,
-        LyrType conformer, Core.Span span)
+        LyrType conformer, Core.Span span, IReadOnlyList<LyrType>? typeArguments = null)
     {
-        var name = Qualify(decl, $"<default>.{iface.Name}.{NameOf(conformer)}.{method.Name}");
+        var own = typeArguments ?? [];
+        if (method.Generics.Length != own.Count)
+            throw new UnsupportedConstructException(
+                $"call to '{iface.Name}.{method.Name}' supplies {own.Count} type argument(s), "
+                + $"but it declares {method.Generics.Length}", span);
+        var written = own.Count > 0 ? $"<{string.Join(", ", own.Select(NameOf))}>" : "";
+        var name = Qualify(decl, $"<default>.{iface.Name}.{NameOf(conformer)}.{method.Name}{written}");
         if (Known(name, decl, out var existing)) return existing;
+        for (var i = 0; i < own.Count; i++)
+            if (own[i] is TypeParamType or Sema.ErrorType)
+                throw new UnsupportedConstructException(
+                    $"call to '{iface.Name}.{method.Name}': type argument {i} is not concrete "
+                    + $"('{TypeFacts.Display(own[i])}')", span);
         Guard(name, span);
         var substitution = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (iface.SelfParam is { } self) substitution[self] = conformer;
+        for (var i = 0; i < own.Count; i++) substitution[method.Generics[i]] = own[i];
         var id = _ids.Next();
         _byKey[name] = (id, decl);
         _pending.Add(new Pending(decl, name, id, null, substitution, null, conformer));

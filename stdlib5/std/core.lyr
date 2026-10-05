@@ -810,6 +810,12 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
     static let bitWidth: int;
     static let isSigned: bool;
 
+    /// `v` as this type where it fits, `null` where it does not (10 B5 Z4).
+    static fn exact<T :: [Integer]>(v: T): ?Self;
+
+    /// `v` as this type, held at `min` or `max` where it does not fit.
+    static fn clamping<T :: [Integer]>(v: T): Self;
+
     /// The sum, or `null` where it does not fit the type.
     fn checkedAdd(o: Self): ?Self {
         return if (addOverflows(this, o)) null else addWrapping(this, o);
