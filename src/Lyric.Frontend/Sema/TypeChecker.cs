@@ -710,10 +710,20 @@ public sealed class TypeChecker
             //
             // The field's type is the context: a literal adapts to it and '.Red' reads the enum
             // from it (08 Y9), as at every other coercion site.
+            //
+            // With the type's PARAMETERS in scope (03 T8; the review's R4a): 'items: List<T> =
+            // List<T>.new()'. The parameters alone — the type's members are no part of a
+            // default's scope: it has no 'this' (02 I2) and names a static through the type.
             if (m is FieldDecl { Default: not null } field)
             {
-                var fieldType = ResolveType(field.Type, module.Members);
-                CheckAssignable(field.Default, CheckExpr(field.Default, module.Members, fieldType),
+                var defaults = module.Members;
+                if (ts.Generics.Length > 0)
+                {
+                    defaults = new SymbolTable(module.Members);
+                    foreach (var parameter in ts.Generics) defaults.TryDeclare(parameter);
+                }
+                var fieldType = ResolveType(field.Type, defaults);
+                CheckAssignable(field.Default, CheckExpr(field.Default, defaults, fieldType),
                     fieldType, field.Default.Span);
                 continue;
             }
@@ -3343,7 +3353,7 @@ public sealed class TypeChecker
             case IndexExpr ix: return CheckIndex(ix, scope);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
             case WithExpr w: return CheckWith(w, scope);
-            case TupleLitExpr tu: return new TupleOf(tu.Elements.Select(e => CheckExpr(e, scope)).ToArray());
+            case TupleLitExpr tu: return CheckTupleLiteral(tu, scope, expected);
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments)
                     if (seg is InterpHole h)
@@ -3434,6 +3444,35 @@ public sealed class TypeChecker
             + "module in import order and in declaration order within a module, so an initializer "
             + "may read what its own module declared earlier and anything from a module it "
             + "imports");
+    }
+
+    /// <summary>
+    /// A tuple literal (design/v5/spec/03 §1.3, T8). Where the position expects a tuple of its
+    /// length, each element stands where its element type is expected — the place a binding's
+    /// value or an argument stands at: <c>return (0, null);</c> against <c>(int, ?int)</c>,
+    /// <c>(1, [])</c> against <c>(int, int[])</c>, <c>(.Red, 1)</c>. The literal then HAS the
+    /// type that was asked for, and the lowering builds each element as its element type. An
+    /// element that does not fit is the element's error, as a field's value is.
+    ///
+    /// <para>Until then the elements were typed alone: <c>(0, null)</c> was a
+    /// <c>(int, null)</c>, which no tuple type takes, and <c>(1, [])</c> a tuple with the empty
+    /// array's error type in it — which silenced the mismatch and reached the lowering
+    /// (<c>LYR-ICE0001</c>).</para>
+    ///
+    /// <para>The LITERAL's elements, not a tuple's: <c>let b: (int, ?int) = a;</c> with an
+    /// <c>a: (int, int)</c> converts nothing — a tuple is one value of its type.</para>
+    /// </summary>
+    private LyrType CheckTupleLiteral(TupleLitExpr tuple, SymbolTable scope, LyrType? expected)
+    {
+        var asked = (expected is Optional { Inner: var inner } ? inner : expected) as TupleOf;
+        if (asked is null || asked.Elements.Length != tuple.Elements.Length)
+            return new TupleOf(tuple.Elements.Select(e => CheckExpr(e, scope)).ToArray());
+        for (var i = 0; i < tuple.Elements.Length; i++)
+        {
+            var element = tuple.Elements[i];
+            CheckAssignable(element, CheckExpr(element, scope, asked.Elements[i]), asked.Elements[i], element.Span);
+        }
+        return asked;
     }
 
     private LyrType CheckIdentifier(IdentifierExpr id, SymbolTable scope, LyrType? expected = null)
