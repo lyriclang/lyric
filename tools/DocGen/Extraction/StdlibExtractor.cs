@@ -133,12 +133,14 @@ public static class StdlibExtractor
             return items.ToArray();
         }
 
-        /// <summary>The variants first, then the methods — the order a reader wants, and the one the
-        /// declaration itself keeps apart.</summary>
+        /// <summary>The variants first, then the constants and the methods — the order a reader
+        /// wants, and the one the declaration itself keeps apart.</summary>
         private DocItem[] EnumMembers(EnumDecl e) =>
         [
             .. e.Variants.Select(v =>
                 Make(ItemKind.Variant, v.Name, SignatureWriter.Variant(v), [], v)),
+            .. e.Statics.Where(sb => sb.IsPublic).Select(sb =>
+                Make(ItemKind.Binding, sb.Binding.Name, SignatureWriter.Binding(true, true, sb.Binding), [], sb)),
             .. Methods(e.Methods),
         ];
 

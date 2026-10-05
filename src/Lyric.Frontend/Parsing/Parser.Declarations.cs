@@ -673,8 +673,30 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open enum body");
 
         var variants = new List<EnumVariant>();
+        var membersBegin = false;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.Check(TokenKind.Semicolon) && !_buffer.AtEnd)
         {
+            // A member where a variant's name is expected: the ';' that ends the variants is
+            // missing. Said once, and the members are read as what they are — 'static' and 'let'
+            // were taken for two variants, and what was synthesized from those names failed to
+            // parse in turn (the review's M8a-10).
+            if (AtEnumMember())
+            {
+                _de.Report("LYR-PAR0057", Severity.Error, _buffer.Current.Span,
+                    "the variants of an enum end with ';' before its members — a ',' goes on to the next variant");
+                membersBegin = true;
+                break;
+            }
+            // No name: said, and nothing is made a variant of — a keyword read as one gave the
+            // enum a variant 'let'.
+            if (!_buffer.Check(TokenKind.Identifier) && WordOf(_buffer.Current.TokenKind) == VisibilityWord.None)
+            {
+                _de.Report("LYR-PAR0026", Severity.Error, _buffer.Current.Span,
+                    $"expected enum variant name, got {_buffer.Current.TokenKind}");
+                _buffer.Advance();
+                if (!_buffer.Match(TokenKind.Comma)) break;
+                continue;
+            }
             var before = _buffer.Position;
             variants.Add(ParseEnumVariant());
             if (_buffer.Position == before) { _buffer.Advance(); continue; }
@@ -683,12 +705,27 @@ public sealed partial class Parser
 
         var methods = new List<FunctionDecl>();
         var boundTypes = new List<AssociatedTypeDecl>();
-        if (_buffer.Match(TokenKind.Semicolon))
-            ParseMethodSequence(methods, allowStatic: true, types: boundTypes);
+        var statics = new List<StaticBindingDecl>();
+        if (_buffer.Match(TokenKind.Semicolon) || membersBegin)
+            ParseMethodSequence(methods, allowStatic: true, types: boundTypes, statics: statics);
 
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close enum body");
         return new EnumDecl(isPublic, name.Name, generics, interfaces, variants.ToArray(), methods.ToArray(),
-            Span.Union(start, close.Span)) { Types = boundTypes.ToArray(), NameSpan = name.Span };
+            Span.Union(start, close.Span))
+            { Types = boundTypes.ToArray(), Statics = statics.ToArray(), NameSpan = name.Span };
+    }
+
+    /// <summary>Does a member of an enum begin here — <c>fn</c>, <c>mut fn</c>, <c>static</c>,
+    /// either behind a visibility word, an attribute, <c>type Item =</c> — where the variants are
+    /// still being read? A visibility word before a NAME is a variant's (refused there,
+    /// LYR-PAR0053), and <c>type</c> alone is a name.</summary>
+    private bool AtEnumMember()
+    {
+        var at = WordOf(_buffer.Current.TokenKind) != VisibilityWord.None ? 1 : 0;
+        return _buffer.Peek(at).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static
+            || (at == 0 && AtAttributeStart)
+            || (at == 0 && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
+                && _buffer.Peek(2).TokenKind == TokenKind.Equal);
     }
 
     private EnumVariant ParseEnumVariant()
@@ -793,10 +830,11 @@ public sealed partial class Parser
     /// <param name="types">Where an associated type may stand (03 T6) — an interface's
     /// declaration <c>type Item;</c>, a conformance block's binding <c>type Item = int;</c> —
     /// the list it goes to.</param>
-    /// <param name="statics">Where a <c>static let</c> may stand — an interface's declaration
-    /// <c>static let zero: Self;</c> (03 T5), a block's constant (05 §6) — the list it goes to.</param>
-    private void ParseMethodSequence(List<FunctionDecl> methods, bool allowStatic,
-        bool allowAttributes = true, List<AssociatedTypeDecl>? types = null, List<StaticBindingDecl>? statics = null)
+    /// <param name="statics">The list a <c>static let</c> goes to: an interface's declaration
+    /// <c>static let zero: Self;</c> (03 T5), a block's constant (05 §6), an enum's (03 §4.1).
+    /// Every member sequence takes one — LYR-PAR0040, which refused it in an enum, is retired.</param>
+    private void ParseMethodSequence(List<FunctionDecl> methods, List<StaticBindingDecl> statics, bool allowStatic,
+        bool allowAttributes = true, List<AssociatedTypeDecl>? types = null)
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
@@ -821,21 +859,12 @@ public sealed partial class Parser
             {
                 var kw = _buffer.Advance();
 
-                // 'static let' is a StaticBinding: a member of a struct or a class body, an
-                // interface's declaration (03 T5), a block's constant (05 §6). Elsewhere it is
-                // reported here rather than left to ParseFunctionDecl, which would fail on the
-                // missing 'fn' and report three times about something else.
+                // 'static let' is a StaticBinding, as in a struct's or a class's body: an
+                // interface's declaration (03 T5), a block's constant (05 §6), an enum's.
                 if (_buffer.Check(TokenKind.Let) || _buffer.Check(TokenKind.Var))
                 {
-                    if (statics is not null)
-                    {
-                        var binding = RequireNamedBinding(ParseBinding(), "static let");
-                        statics.Add(new StaticBindingDecl(isPublic, binding, Span.Union(start, binding.Span)) { Attributes = attributes });
-                        continue;
-                    }
-                    _de.Report("LYR-PAR0040", Severity.Error, kw.Span,
-                        "a 'static let' is a member of a struct, a class, an interface or an extend block");
-                    SkipMember();
+                    var binding = RequireNamedBinding(ParseBinding(), "static let");
+                    statics.Add(new StaticBindingDecl(isPublic, binding, Span.Union(start, binding.Span)) { Attributes = attributes });
                     continue;
                 }
 
@@ -874,31 +903,6 @@ public sealed partial class Parser
         if (_buffer.Match(TokenKind.Equal)) type = ParseType();
         var semi = ExpectSemicolon();
         return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span, Bounds = bounds };
-    }
-
-    /// <summary>Recovery inside a member sequence: consumes up to the end of the member, so one
-    /// rejected member gives one message.</summary>
-    private void SkipMember()
-    {
-        var depth = 0;
-        while (!_buffer.AtEnd)
-        {
-            var kind = _buffer.Current.TokenKind;
-            if (kind == TokenKind.LBrace) depth++;
-            else if (kind == TokenKind.RBrace)
-            {
-                if (depth == 0) return; // the body's own '}'
-                depth--;
-            }
-            else if (kind == TokenKind.Semicolon && depth == 0)
-            {
-                _buffer.Advance();
-                return;
-            }
-
-            _buffer.Advance();
-            if (depth == 0 && kind == TokenKind.RBrace) return; // the member's block ended
-        }
     }
 
     // --- Global binding & type alias (§2) ---

@@ -77,7 +77,7 @@ public static class DocumentSymbolProvider
             Symbols(sources, i.Types.Cast<Node>().Concat(i.Members), inTypeBody: true)),
 
         EnumDecl e => (SymbolKind.Enum,
-            Symbols(sources, e.Variants.Cast<Node>().Concat(e.Types).Concat(e.Methods), inTypeBody: true)),
+            Symbols(sources, e.Variants.Cast<Node>().Concat(e.Types).Concat(e.Statics).Concat(e.Methods), inTypeBody: true)),
 
         EnumVariant => (SymbolKind.EnumMember, null),
         FieldDecl => (SymbolKind.Field, null),

@@ -97,7 +97,7 @@ internal sealed class WarningAnalyzer
                 {
                     StructDecl s => (s.Name, s.Members),
                     ClassDecl c => (c.Name, c.Members),
-                    EnumDecl e => (e.Name, e.Methods.Cast<Decl>().ToArray()),
+                    EnumDecl e => (e.Name, e.Methods.Cast<Decl>().Concat(e.Statics).ToArray()),
                     _ => (null, null),
                 };
                 if (name is null || members is null || module.Members.LookupLocal(name) is not TypeSymbol type) continue;
@@ -275,7 +275,7 @@ internal sealed class WarningAnalyzer
     {
         StructDecl s => s.Members,
         ClassDecl c => c.Members,
-        EnumDecl e => e.Methods,
+        EnumDecl e => e.Methods.Cast<Decl>().Concat(e.Statics),
         ExtendDecl x => x.Methods,
         // Since 2.15. A use that resolves to the interface's member warns; an IMPLEMENTATION
         // does not, because it is not a use and a conforming type has no choice about it.

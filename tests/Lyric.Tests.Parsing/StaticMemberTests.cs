@@ -125,22 +125,6 @@ public class StaticMemberTests
         Assert.Equal(["twice"], block.Methods.Select(m => m.Name));
     }
 
-    // ------------------------------------------------------------------ rejected
-
-    [Fact]
-    public void A_static_binding_does_not_belong_to_an_enum_body()
-    {
-        // It used to fall into ParseFunctionDecl, which failed on the missing 'fn' and reported
-        // through the rest of the file — 21 messages for one cause in the enum case.
-        var (_, de) = Parse("enum E { A; static let x: int = 1; }");
-        Assert.Equal(["LYR-PAR0040"], Codes(de));
-    }
-
-    [Fact]
-    public void A_rejected_static_binding_does_not_swallow_the_next_member()
-    {
-        var (module, de) = Parse("enum E { A; static let x: int = 1; fn tag(): int { return 1; } }");
-        Assert.Equal(["LYR-PAR0040"], Codes(de));
-        Assert.Equal(["tag"], Assert.IsType<EnumDecl>(module.Declarations[0]).Methods.Select(m => m.Name));
-    }
+    // An enum's body takes one too (the review's M8a-10): EnumBodyTests. LYR-PAR0040, which
+    // refused it there, is retired with the two tests that pinned it.
 }

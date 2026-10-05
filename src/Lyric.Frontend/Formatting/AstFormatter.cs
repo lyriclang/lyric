@@ -437,7 +437,7 @@ public sealed class AstFormatter
             Doc.From($"enum {decl.Name}"), GenericsDoc(decl.Generics),
             InterfaceListDoc(decl.Interfaces), Doc.Space);
 
-        var members = InOrder(decl.Types, decl.Methods);
+        var members = InOrder(decl.Types, decl.Methods, decl.Statics);
         var closing = decl.Span.End - 1;
         if (decl.Variants.Length == 0 && members.Length == 0 && !AnyCommentBefore(closing))
             return Doc.Of(head, Doc.From("{ }"));
