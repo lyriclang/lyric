@@ -810,15 +810,16 @@ internal sealed class FunctionLowerer
                 // A void context discards the value: '() => doStuff()' is allowed and only calls.
                 if (IsVoid(_returnType))
                 {
-                    LowerExprOrVoid(expr);
-                    if (!_b.IsSealed) _b.Seal(new Return(null, expr.Span));
+                    if (ComesOut(() => LowerExprOrVoid(expr))) _b.Seal(new Return(null, expr.Span));
                 }
                 // A body that gives no value — '(n: int): int => unreachable()' — ends as it stands.
                 else if (Diverges(expr)) LowerDiverging(expr);
                 else
                 {
-                    var value = LowerExprAs(expr, _returnType);
-                    _b.Seal(new Return(value, expr.Span));
+                    // … and so does one an operand of which gives none: nothing statement-like
+                    // stands around a lambda's expression body to end with it.
+                    TempId value = default;
+                    if (ComesOut(() => value = LowerExprAs(expr, _returnType))) _b.Seal(new Return(value, expr.Span));
                 }
                 break;
 
@@ -1168,8 +1169,30 @@ internal sealed class FunctionLowerer
     /// 'call') gets the 'unreachable' the sema's type promises.</summary>
     private void LowerDiverging(Expr expr)
     {
-        LowerExprOrVoid(expr);
+        ComesOut(() => LowerExprOrVoid(expr));
         if (!_b.IsSealed) _b.Seal(new Unreachable(expr.Span));
+    }
+
+    /// <summary>
+    /// One PATH of an expression that has several — a branch of an 'if', an arm, the right of
+    /// '??' or of a short circuit, the call behind '?.', the operand under a 'try' — lowered
+    /// where the builder stands. Answers whether control comes out of it.
+    ///
+    /// <para>A path can end inside itself: an operand of it gives no value. 'if (c) wrap(todo())
+    /// else 5' — the branch is a call and typed as one, and its argument ends it. That unwinds
+    /// through the lowering of the path as <see cref="Diverged"/>, and it stops HERE: the other
+    /// paths of the expression still run. Passed on, it took the whole expression with it and
+    /// left those paths' blocks without an end — "has no terminator", an internal error, for
+    /// every such program.</para>
+    ///
+    /// <para>An expression none of whose paths comes out throws <see cref="Diverged"/> itself,
+    /// for whatever holds IT.</para>
+    /// </summary>
+    private bool ComesOut(Action path)
+    {
+        try { path(); }
+        catch (Diverged) { return false; }
+        return !_b.IsSealed;
     }
 
     private bool LowerThrow(ThrowStmt stmt)
@@ -1354,8 +1377,14 @@ internal sealed class FunctionLowerer
     private TempId? LowerTryForce(TryExpr expr)
     {
         var frame = new TryFrame(_defers.Count);
-        var value = UnderFrame(frame, () => LowerExprOrVoid(expr.Value));
+        // The operand may end where it stands; the dispatch of the sites before that still gets
+        // its end, and then the expression ends as the operand did.
+        TempId? value = null;
+        var ended = false;
+        try { value = UnderFrame(frame, () => LowerExprOrVoid(expr.Value)); }
+        catch (Diverged) { ended = true; }
         if (frame.Dispatch is { } dispatch) _b.SealBlock(dispatch, new PanicError(expr.Span));
+        if (ended) throw new Diverged();
         return value;
     }
 
@@ -1373,7 +1402,14 @@ internal sealed class FunctionLowerer
         var type = TypeOfExpr(expr);
         if (IsVoid(type))
         {
-            UnderFrame(frame, () => LowerExprOrVoid(expr.Value));
+            // The operand's own way may end inside it; what is left then is an error's way.
+            if (!ComesOut(() => UnderFrame(frame, () => LowerExprOrVoid(expr.Value))))
+            {
+                if (frame.Dispatch is not { } only) throw new Diverged();
+                _b.SwitchTo(only);
+                _b.Emit(new ClearError(expr.Span));
+                return null;
+            }
             if (frame.Dispatch is not { } drop) return null;
             var after = _b.NewBlock();
             _b.Seal(new Branch(after, expr.Span));
@@ -1385,7 +1421,18 @@ internal sealed class FunctionLowerer
         }
 
         var inner = ((IrOptionalType)type).Inner;
-        var value = UnderFrame(frame, () => LowerExprAs(expr.Value, inner));
+        TempId value = default;
+        if (!ComesOut(() => value = UnderFrame(frame, () => LowerExprAs(expr.Value, inner))))
+        {
+            // The operand ended where it stands. What is left is the way of an error thrown
+            // before that: the expression is null there, and it is the only way out.
+            if (frame.Dispatch is not { } only) throw new Diverged();
+            _b.SwitchTo(only);
+            _b.Emit(new ClearError(expr.Span));
+            var absent = _slots.NewTemp(type);
+            _b.Emit(new OptNone(absent, inner, expr.Span));
+            return absent;
+        }
         var some = _slots.NewTemp(type);
         _b.Emit(new OptSome(some, value, inner, expr.Span));
         if (frame.Dispatch is not { } dispatch) return some;
@@ -1417,13 +1464,14 @@ internal sealed class FunctionLowerer
         LocalId? slot = type is null ? null : _slots.DeclareSynthetic("try", type);
 
         var frame = new TryFrame(_defers.Count);
-        UnderFrame(frame, () =>
+        // The operand's way; one that ends inside it leaves the clauses' ways standing.
+        ComesOut(() => UnderFrame(frame, () =>
         {
             if (Diverges(expr.Value)) { LowerDiverging(expr.Value); return 0; }
             var value = type is null ? LowerExprOrVoid(expr.Value) : LowerExprAs(expr.Value, type);
             if (slot is { } s && value is { } v) _b.Emit(new StoreLocal(s, v, expr.Value.Span));
             return 0;
-        });
+        }));
 
         var open = new List<BlockId>();
         if (!_b.IsSealed) open.Add(_b.CurrentId);
@@ -1436,7 +1484,9 @@ internal sealed class FunctionLowerer
                 finally { _tailSink = savedSink; }
             }));
 
-        if (open.Count == 0) return null; // every part leaves: the type is 'never', the block sealed
+        // Every part leaves: nothing comes out. The type says so where each part gives no value
+        // as a whole ('never'); where one ended inside itself, this is where the expression ends.
+        if (open.Count == 0) return Diverges(expr) ? null : throw new Diverged();
         var merge = _b.NewBlock();
         foreach (var id in open) _b.SealBlock(id, new Branch(merge, expr.Span));
         _b.SwitchTo(merge);
@@ -2390,8 +2440,9 @@ internal sealed class FunctionLowerer
         throw new Diverged();
     }
 
-    /// <summary>Returns null only for a call to a void function, the one expression without a value.
-    /// Otherwise always a temp.</summary>
+    /// <summary>Returns null for an expression that is worth nothing — a call of a void function,
+    /// an 'if' or a 'match' whose every branch is one — and for one that gives no value and has
+    /// sealed its block. Otherwise a temp.</summary>
     private TempId? LowerExprOrVoid(Expr expr) =>
         _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped : expr switch
     {
@@ -2419,12 +2470,7 @@ internal sealed class FunctionLowerer
         LambdaExpr e => LowerLambda(e),
         TupleLitExpr e => LowerTupleLiteral(e),
         WithExpr e => LowerWith(e),
-        // A match whose arms all leave has the type 'never' and no result slot: nothing ever
-        // flows out of it, and 'never' has no IR type to give a slot.
-        MatchExpr e => _types.TypeOf(e) is NeverType
-            ? LowerMatch(e.Scrutinee, e.Arms, null, e.Span) // null: it diverges, and the caller sees the sealed block
-            : LowerMatch(e.Scrutinee, e.Arms, TypeOfExpr(e), e.Span)
-              ?? throw Bug($"match expression produced no value at {e.Span}"),
+        MatchExpr e => LowerMatchExpr(e),
         MemberExpr e => LowerFieldRead(e),
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
@@ -2833,12 +2879,8 @@ internal sealed class FunctionLowerer
         // has the short edge alone, and the slot holds the left side's value.
         _b.SwitchTo(rhsBlock);
         if (Diverges(expr.Right)) LowerDiverging(expr.Right);
-        else
-        {
-            var right = LowerExpr(expr.Right);
-            _b.Emit(new StoreLocal(slot, right, expr.Right.Span));
+        else if (ComesOut(() => _b.Emit(new StoreLocal(slot, LowerExpr(expr.Right), expr.Right.Span))))
             _b.Seal(new Branch(mergeBlock, expr.Right.Span));
-        }
 
         _b.SwitchTo(mergeBlock);
         var dest = _slots.NewTemp(BoolType);
@@ -2846,65 +2888,57 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>Like <see cref="LowerShortCircuit"/>, but with two writing branches. Both branches are
-    /// expressions and are guaranteed to yield a value, so they always fall through — unlike the if
-    /// STATEMENT, no case distinction is needed here.</summary>
-    private TempId LowerIfExpr(IfExpr expr)
+    /// <summary>Like <see cref="LowerShortCircuit"/>, but with two writing branches. A branch
+    /// that comes out has stored its value and reaches the merge; one that gives no value — as a
+    /// whole ('else throw e'), or because an operand in it does — ends where it stands, and the
+    /// merge has the other as its only predecessor. An 'if' nobody takes a value from — both
+    /// branches give none (05 E12), or are worth nothing, as two calls of void functions are —
+    /// has no slot.</summary>
+    private TempId? LowerIfExpr(IfExpr expr)
     {
-        // Both branches give no value (05 E12): no slot and no merge — each branch ends its own
-        // block, and the expression ends where it stands.
-        if (Diverges(expr.Then) && Diverges(expr.Else))
-        {
-            var test = LowerExpr(expr.Condition);
-            var thenOnly = _b.NewBlock();
-            var elseOnly = _b.NewBlock();
-            _b.Seal(new CondBranch(test, thenOnly, elseOnly, expr.Span));
-            _b.SwitchTo(thenOnly);
-            LowerDiverging(expr.Then);
-            _b.SwitchTo(elseOnly);
-            LowerDiverging(expr.Else);
-            throw new Diverged();
-        }
-
-        var type = TypeOfExpr(expr);
-        var slot = _slots.DeclareSynthetic("if", type);
+        var sema = _types.TypeOf(expr);
+        var type = sema is NeverType || TypeFacts.IsVoid(sema) ? null : TypeOfExpr(expr);
+        LocalId? slot = type is null ? null : _slots.DeclareSynthetic("if", type);
 
         var condition = LowerExpr(expr.Condition);
         var thenBlock = _b.NewBlock();
         var elseBlock = _b.NewBlock();
         _b.Seal(new CondBranch(condition, thenBlock, elseBlock, expr.Span));
 
-        // `LowerExprAs` rather than `LowerExpr`: the branch type need not be the result type.
-        // `if (c) 5 else null` is `?int`, and both branches need the target type — the `null` because it
-        // has none of its own, and the `5` because it has to be wrapped.
-        // A diverging branch ('else throw e') stores nothing and never reaches the merge: it seals
-        // its own block, and the merge has the other branch as its only predecessor.
         _b.SwitchTo(thenBlock);
-        BlockId? thenExit = null;
-        if (Diverges(expr.Then)) LowerDiverging(expr.Then);
-        else
-        {
-            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Then, type), expr.Then.Span));
-            thenExit = _b.CurrentId;
-        }
-
+        var thenExit = Lowered(expr.Then);
         _b.SwitchTo(elseBlock);
-        BlockId? elseExit = null;
-        if (Diverges(expr.Else)) LowerDiverging(expr.Else);
-        else
-        {
-            _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Else, type), expr.Else.Span));
-            elseExit = _b.CurrentId;
-        }
+        var elseExit = Lowered(expr.Else);
+
+        // Neither branch comes out: no merge — it would have no predecessor — and the expression
+        // ends where it stands.
+        if (thenExit is null && elseExit is null) throw new Diverged();
 
         var mergeBlock = _b.NewBlock();
         if (thenExit is { } t) _b.SealBlock(t, new Branch(mergeBlock, expr.Then.Span));
         if (elseExit is { } e) _b.SealBlock(e, new Branch(mergeBlock, expr.Else.Span));
 
         _b.SwitchTo(mergeBlock);
+        if (slot is not { } result || type is null) return null;
         var dest = _slots.NewTemp(type);
-        _b.Emit(new LoadLocal(dest, slot, type, expr.Span));
+        _b.Emit(new LoadLocal(dest, result, type, expr.Span));
         return dest;
+
+        // A branch, where the builder stands: the block control leaves it from, or null.
+        //
+        // `LowerExprAs` rather than `LowerExpr`: the branch type need not be the result type.
+        // `if (c) 5 else null` is `?int`, and both branches need the target type — the `null`
+        // because it has none of its own, and the `5` because it has to be wrapped.
+        BlockId? Lowered(Expr branch)
+        {
+            if (Diverges(branch)) { LowerDiverging(branch); return null; }
+            var comesOut = ComesOut(() =>
+            {
+                if (slot is { } target && type is not null) _b.Emit(new StoreLocal(target, LowerExprAs(branch, type), branch.Span));
+                else LowerExprOrVoid(branch);
+            });
+            return comesOut ? _b.CurrentId : null;
+        }
     }
 
 
@@ -2962,8 +2996,7 @@ internal sealed class FunctionLowerer
             : new CondBranch(test, merge, assign, expr.Span));
 
         _b.SwitchTo(assign);
-        store(LowerExprAs(expr.Value, type));
-        _b.Seal(new Branch(merge, expr.Span));
+        if (ComesOut(() => store(LowerExprAs(expr.Value, type)))) _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(merge);
         return load();
@@ -3498,14 +3531,22 @@ internal sealed class FunctionLowerer
             // Tests and bindings come in one pass, and before the guard: 'n if n > 0' needs 'n'.
             LowerPattern(arm.Pattern, value, scrutineeType, Fail, assumeMatch: unconditional);
 
+            // A guard may end its arm where it stands: an operand of it gives no value. The
+            // arms after it are reached through the tests before it, as ever.
+            var reached = true;
             if (arm.Guard is { } guard)
             {
-                var guarded = _b.NewBlock();
-                _b.Seal(new CondBranch(LowerExpr(guard), guarded, Fail(), guard.Span));
-                _b.SwitchTo(guarded);
+                TempId test = default;
+                reached = ComesOut(() => test = LowerExpr(guard));
+                if (reached)
+                {
+                    var guarded = _b.NewBlock();
+                    _b.Seal(new CondBranch(test, guarded, Fail(), guard.Span));
+                    _b.SwitchTo(guarded);
+                }
             }
 
-            if (LowerArm(arm, value, slot, resultType))
+            if (reached && LowerArm(arm, value, slot, resultType))
             {
                 merge ??= _b.NewBlock();
                 _b.Seal(new Branch(merge.Value, arm.Span));
@@ -4002,17 +4043,34 @@ internal sealed class FunctionLowerer
         _b.Emit(new StoreLocal(slot, value, span));
     }
 
+    /// <summary>
+    /// A 'match' as an expression. One nobody takes a value from has no slot: its arms all leave
+    /// ('never' — nothing flows out, and 'never' has no IR type to give a slot), or each is worth
+    /// nothing, as a call of a void function is. Where no arm comes out, neither does the match.
+    /// </summary>
+    private TempId? LowerMatchExpr(MatchExpr expr)
+    {
+        var sema = _types.TypeOf(expr);
+        var type = sema is NeverType || TypeFacts.IsVoid(sema) ? null : TypeOfExpr(expr);
+        var value = LowerMatch(expr.Scrutinee, expr.Arms, type, expr.Span);
+        if (!_matchFellThrough) throw new Diverged();
+        return value;
+    }
+
     /// <summary>Lowers the body of an arm. Returns whether it falls through.</summary>
     private bool LowerArm(MatchArm arm, TempId value, LocalId? slot, IrType? resultType)
     {
         if (arm.Body is Expr expr)
         {
             // '_ => throw e' or '_ => panic(…)': the arm diverges, stores nothing, and does not
-            // fall through to the merge — exactly like a block arm ending in a 'throw'.
+            // fall through to the merge — exactly like a block arm ending in a 'throw'. And so
+            // does one an operand of which gives no value.
             if (Diverges(expr)) { LowerDiverging(expr); return false; }
-            var produced = resultType is null ? LowerExprOrVoid(expr) : LowerExprAs(expr, resultType);
-            if (slot is { } target && produced is { } v) _b.Emit(new StoreLocal(target, v, arm.Span));
-            return true;
+            return ComesOut(() =>
+            {
+                var produced = resultType is null ? LowerExprOrVoid(expr) : LowerExprAs(expr, resultType);
+                if (slot is { } target && produced is { } v) _b.Emit(new StoreLocal(target, v, arm.Span));
+            });
         }
 
         // A block arm: its tail, when it has one, lands in the result slot before the scope's
@@ -4281,12 +4339,12 @@ internal sealed class FunctionLowerer
         _b.SwitchTo(whenNone);
         // 'x ?? throw e': the absent path throws and never reaches the merge.
         if (Diverges(expr.Right)) LowerDiverging(expr.Right);
-        else
-        {
-            var fallback = LowerExpr(expr.Right);
-            _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
+        else if (ComesOut(() =>
+                 {
+                     var fallback = LowerExpr(expr.Right);
+                     _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
+                 }))
             _b.Seal(new Branch(merge, expr.Span));
-        }
 
         _b.SwitchTo(merge);
         var dest = _slots.NewTemp(type);
@@ -4319,8 +4377,8 @@ internal sealed class FunctionLowerer
         _b.Seal(new CondBranch(test, merge, whenNone, expr.Span));
 
         _b.SwitchTo(whenNone);
-        _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Value, type), expr.Span));
-        _b.Seal(new Branch(merge, expr.Span));
+        if (ComesOut(() => _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Value, type), expr.Span))))
+            _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(merge);
         var result = _slots.NewTemp(type);
@@ -4383,34 +4441,39 @@ internal sealed class FunctionLowerer
         // and extensions a second time. A first attempt did that through a special case in the 'switch'
         // and promptly hid the generics detection, so 'b?.get()' on a 'Box<int>' was reported as
         // 'external or bodiless'.
-        TempId? produced;
-        _chainReceivers[callee.Target] = unwrapped;
-        _chainResults[expr] = returned;
-        try
+        // The call's path. An argument of it may give no value and end it where it stands; the
+        // receiver's absence is the other path, and it still runs.
+        var called = ComesOut(() =>
         {
-            produced = LowerCall(expr);
-        }
-        finally
-        {
-            _chainReceivers.Remove(callee.Target);
-            _chainResults.Remove(expr);
-        }
+            TempId? produced;
+            _chainReceivers[callee.Target] = unwrapped;
+            _chainResults[expr] = returned;
+            try
+            {
+                produced = LowerCall(expr);
+            }
+            finally
+            {
+                _chainReceivers.Remove(callee.Target);
+                _chainResults.Remove(expr);
+            }
 
-        if (produced is not { } value)
-            throw NotSupported("'?.' with a call that returns nothing", expr.Span);
+            if (produced is not { } value)
+                throw NotSupported("'?.' with a call that returns nothing", expr.Span);
 
-        // When the METHOD itself already yields an optional ('fn empty(): ?int'), its result is already
-        // the result type: the sema collapsed '??int' to '?int'. Wrapping a second time would create a
-        // level the language does not have.
-        var stored = value;
-        if (returned is not IrOptionalType)
-        {
-            stored = _slots.NewTemp(result);
-            _b.Emit(new OptSome(stored, value, result.Inner, expr.Span));
-        }
+            // When the METHOD itself already yields an optional ('fn empty(): ?int'), its result is already
+            // the result type: the sema collapsed '??int' to '?int'. Wrapping a second time would create a
+            // level the language does not have.
+            var stored = value;
+            if (returned is not IrOptionalType)
+            {
+                stored = _slots.NewTemp(result);
+                _b.Emit(new OptSome(stored, value, result.Inner, expr.Span));
+            }
 
-        _b.Emit(new StoreLocal(slot, stored, expr.Span));
-        _b.Seal(new Branch(merge, expr.Span));
+            _b.Emit(new StoreLocal(slot, stored, expr.Span));
+        });
+        if (called) _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(whenNone);
         var none = _slots.NewTemp(result);

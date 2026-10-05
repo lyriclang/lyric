@@ -1,0 +1,4 @@
+// An operand that gives no value, on the path that IS taken: the program ends there (06 §9).
+fn pick(c: bool): int { return if (c) twice(panic("taken")) else 5; }
+fn main(): int { return pick(true) + twice(0); }
+fn twice(n: int): int { return n * 2; }

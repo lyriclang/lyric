@@ -1,0 +1,128 @@
+// An operand that gives no value — a call of a function returning 'never' — INSIDE one path of an
+// expression that has several (06 §9 rule 2): it ends that path and no other. Each function
+// below is called so that the path with the operand is not taken, and answers 5.
+//
+// The lowering unwound out of the whole expression when it met such an operand, and left the
+// other paths' blocks without an end: every one of these was an internal error.
+import std.io { println };
+
+struct Bad :: [Error] { fn message(): string { return "bad"; } }
+struct W { n: int, fn plus(k: int): int { return this.n + k; } }
+enum Step { More(int), Done }
+
+fn twice(n: int): int { return n * 2; }
+fn positive(n: int): bool { return n > 0; }
+fn risky(n: int): int throws Bad { if (n > 100) { throw Bad { }; } return n; }
+fn step(n: int): Step { return if (n > 0) Step.More(n) else Step.Done; }
+
+// --- one path of an expression ---
+
+fn ifBranch(c: bool): int { return if (c) twice(panic("if")) else 5; }
+
+fn matchArm(n: int): int { return match (n) { 0 => twice(panic("arm")), _ => 5 }; }
+
+fn matchGuard(n: int): int { return match (n) { 0 if positive(twice(panic("guard"))) => 1, _ => 5 }; }
+
+fn coalesce(v: ?int): int { return (v ?? twice(panic("??"))) + 2; }
+
+fn both(c: bool): int { return if (c && positive(twice(panic("&&")))) 1 else 5; }
+
+fn either(c: bool): int { return if (c || positive(twice(panic("||")))) 5 else 1; }
+
+fn chain(w: ?W): int { return (w?.plus(twice(panic("?.")))) ?? 5; }
+
+fn coalesceAssign(v: ?int): int {
+    var x: ?int = v;
+    x ??= twice(panic("??="));
+    return (x ?? 0) + 2;
+}
+
+fn andAssign(c: bool): int {
+    var ok = c;
+    ok &&= positive(twice(panic("&&=")));
+    return if (ok) 1 else 5;
+}
+
+fn orAssign(c: bool): int {
+    var ok = c;
+    ok ||= positive(twice(panic("||=")));
+    return if (ok) 5 else 1;
+}
+
+// A path that IS such an expression as a whole, nested in another: an 'if' whose branches both
+// give nothing, as a branch; a 'match' whose arms all do, as an arm.
+fn nestedIf(c: bool, n: int): int { return if (c) (if (n > 0) panic("then") else panic("else")) else 5; }
+
+fn nestedMatch(c: bool, n: int): int {
+    return match (n) {
+        0 => match (c) { true => panic("true"), false => panic("false") },
+        _ => 5,
+    };
+}
+
+// --- the same, where a statement's head or another expression holds it ---
+
+fn inArgument(c: bool): int { return twice(if (c) twice(panic("argument")) else 5) - 5; }
+
+fn inLambda(c: bool): int {
+    let pick = (b: bool) => if (b) twice(panic("lambda")) else 5;
+    return pick(c);
+}
+
+fn inCondition(c: bool): int {
+    if (c && positive(twice(panic("condition")))) { return 1; }
+    return 5;
+}
+
+fn inWhile(c: bool): int {
+    var i = 0;
+    while (i < 5 && !(c && positive(twice(panic("while"))))) { i = i + 1; }
+    return i;
+}
+
+fn inIfLet(c: bool): int {
+    if (let .More(k) = step(if (c) twice(panic("if let")) else 5)) { return k; }
+    return 0;
+}
+
+fn inLetElse(c: bool): int {
+    let .More(k) = step(if (c) twice(panic("let else")) else 5) else { return 0; };
+    return k;
+}
+
+fn inFor(c: bool): int {
+    var total = 0;
+    for (x in [1, if (c) twice(panic("for")) else 4]) { total = total + x; }
+    return total;
+}
+
+// --- under a 'try': the operand ends the value's way, and the clause still stands ---
+
+fn underCatch(c: bool): int {
+    return try (risky(5) + (if (c) twice(panic("catch")) else 0)) catch (_: Bad) 9;
+}
+
+fn underOptional(c: bool): int {
+    let x = try? (risky(5) + (if (c) twice(panic("try?")) else 0));
+    return x ?? 9;
+}
+
+// --- an 'if' and a 'match' nobody takes a value from ---
+
+fn say(c: bool, n: int): void {
+    let yesNo = (b: bool) => if (b) println("yes") else println("no");
+    let which = (k: int) => match (k) { 1 => println("one"), _ => println("other") };
+    yesNo(c);
+    which(n);
+}
+
+fn main(): void {
+    println(f"if {ifBranch(false)} match {matchArm(1)} guard {matchGuard(1)}");
+    println(f"coalesce {coalesce(3)} and {both(false)} or {either(true)} chain {chain(null)}");
+    println(f"assign {coalesceAssign(3)} {andAssign(false)} {orAssign(true)}");
+    println(f"nested {nestedIf(false, 1)} {nestedMatch(true, 1)}");
+    println(f"held {inArgument(false)} {inLambda(false)} {inCondition(false)} {inWhile(false)}");
+    println(f"bound {inIfLet(false)} {inLetElse(false)} {inFor(false)}");
+    println(f"try {underCatch(false)} {underOptional(false)}");
+    say(false, 2);
+}
