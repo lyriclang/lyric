@@ -2536,7 +2536,7 @@ extend<T> Slice<T> :: [Iterable] {
 }
 
 // --- the members of arrays and views (10 C2): written once on `Slice<T>`, and reached on an
-// array through a view of the whole of it (03 §5.2 rule 4). A write goes to the array.
+// array - and a `T[N]` in the heap (03 §5.3 rule 6) - through a view of all of it. A write goes there.
 extend<T> Slice<T> {
     /// Whether there is no element.
     pub fn isEmpty(): bool {

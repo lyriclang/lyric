@@ -1101,6 +1101,19 @@ public sealed class TypeChecker
 
             if (block.IsConstructorTarget)
             {
+                // An inline array is no target (03 T13 A4; the review's M4-2). Its members are
+                // the three it has built in and, where it lies in the heap, a view's — so a
+                // block on 'Slice<T>' is the block that reaches it. One on 'T[4]' was taken and
+                // added nothing: its member was "no member" at every call.
+                if (block.Decl.Target is ArrayType { Length: not null })
+                {
+                    _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
+                        $"an extend block does not target an inline array, '{TypeFacts.Display(BlockTargetType(block))}' — it has "
+                        + "'length()', 'isEmpty()' and 'toArray()', and where it lies in the heap the members of a view: "
+                        + "write the block on 'Slice<T>'");
+                    continue;
+                }
+
                 // A built-in constructor as the target (03 T7 X2): 'this' is the shape at the
                 // block's parameters, and a conformance it names is checked there (05 §13 rule 6).
                 CheckBlockConformance(block);
@@ -6467,6 +6480,30 @@ public sealed class TypeChecker
     private LyrType? ConstructorMember(LyrType receiver, MemberExpr mem, Span span)
     {
         ExtensionBlock? shapeOnly = null; // the shape matched, the constraints did not
+
+        // An inline array (03 T13 A4; the review's M4-2). 'isEmpty()' and 'toArray()' it has
+        // wherever it lies, beside 'length()' — built in, no block gives them. A view's members
+        // it has where a view of it can be taken: in the heap (§5.3 rule 4), called on a view of
+        // all of it, as an array has them. In a frame no view of it exists; the member is
+        // refused where it is called, with the way out — a copy.
+        if (receiver is InlineArrayOf inline)
+        {
+            if (mem.Member is "isEmpty" or "toArray")
+            {
+                if (!_calleePosition.Contains(mem))
+                    return Report(mem.MemberSpan, "LYR-SEM0012", $"'{mem.Member}' is called: write '{mem.Member}()'");
+                return mem.Member == "isEmpty" ? new FnType([], LyrType.Bool) : new FnType([], new ArrayOf(inline.Element));
+            }
+            if (ShapeBlockMember(new SliceOf(inline.Element), mem, span, ref shapeOnly) is { } ofView)
+            {
+                if (IsHeapResident(mem.Target)) return ofView;
+                return Report(mem.MemberSpan, "LYR-SEM0115",
+                    $"'{mem.Member}' is a member of a view, and a view of an inline array is taken only where the array lies "
+                    + "in the heap — a field of an object, an element of an array; this one lies in a frame. Copy it: "
+                    + $"'{_comp.TextOf(mem.Target.Span)}.toArray().{mem.Member}(…)'");
+            }
+        }
+
         if (ShapeBlockMember(receiver, mem, span, ref shapeOnly) is { } direct) return direct;
         // An array gives a view of itself (design 03 A2, 03 §5.2 rule 4): the members written
         // once on 'Slice<T>' reach it after its own blocks' — the lowering passes the whole view.
