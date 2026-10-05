@@ -64,12 +64,15 @@ internal sealed class GlobalTable
                         break;
 
                     // A block's constant (05 §6 rule 2) is its type's, at the block's place. A
-                    // generic block holds none; the sema refused it.
-                    case ExtendDecl { Generics.Length: 0 } ext
+                    // generic block's is one per instance of the block's parameters: folded.
+                    case ExtendDecl ext
                         when compilation.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, ext)) is { Target: { } target } block:
                         foreach (var sb in ext.Statics)
                             if (block.MethodScope.LookupLocal(sb.Binding.Name) is GlobalSymbol constant)
-                                AddStatic(constant, sb.Binding, module, $"{target.Name}.{constant.Name}", types, typeTable);
+                            {
+                                if (ext.Generics.Length > 0) AddFolded(constant, sb.Binding, target, block);
+                                else AddStatic(constant, sb.Binding, module, $"{target.Name}.{constant.Name}", types, typeTable);
+                            }
                         break;
                 }
             }
@@ -95,9 +98,31 @@ internal sealed class GlobalTable
             if (member is not StaticBindingDecl binding) continue;
             if (owner.Members.LookupLocal(binding.Binding.Name) is not GlobalSymbol symbol) continue;
 
-            AddStatic(symbol, binding.Binding, module, $"{typeName}.{symbol.Name}", types, typeTable);
+            // A generic type's constant is one per instance: folded where it is read.
+            if (owner.Generics.Length > 0) AddFolded(symbol, binding.Binding, owner, null);
+            else AddStatic(symbol, binding.Binding, module, $"{typeName}.{symbol.Name}", types, typeTable);
         }
     }
+
+    /// <summary>
+    /// A constant of a generic type or of a generic block (07 G2; the review's M8a-3): ONE PER
+    /// INSTANCE, and no slot — it could have none, its type names the type's parameter
+    /// (<c>static let none: ?T = null;</c>), and which instances a program has is known only
+    /// when the lowering has found them. Its initializer is a constant by the sema's rule
+    /// (<c>LYR-SEM0169</c>), so a read lowers it in place, under the instance the read names.
+    /// </summary>
+    private void AddFolded(GlobalSymbol symbol, BindingStmt binding, TypeSymbol owner, ExtensionBlock? block)
+    {
+        if (binding.Initializer is { } initializer) _folded.TryAdd(symbol, (initializer, owner, block));
+    }
+
+    private readonly Dictionary<GlobalSymbol, (Expr Initializer, TypeSymbol Owner, ExtensionBlock? Block)> _folded =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The initializer of a constant that is one per instance, with the type — and for a
+    /// generic block's the block — whose parameters it may name; <c>null</c> for any other.</summary>
+    public (Expr Initializer, TypeSymbol Owner, ExtensionBlock? Block)? FoldedOf(GlobalSymbol symbol) =>
+        _folded.TryGetValue(symbol, out var folded) ? folded : null;
 
     /// <summary>
     /// A <c>static let</c> whose initializer is a literal — <c>static let max: int8 = 127;</c> — is
@@ -114,7 +139,49 @@ internal sealed class GlobalTable
             _constants[symbol] = (binding.Initializer!, typeTable.Lower(types.TypeOfGlobal(symbol), binding.Span));
             return;
         }
+        if (FloatOfBits(binding.Initializer, types, typeTable.Lower(types.TypeOfGlobal(symbol), binding.Span)) is { } written)
+        {
+            _values[symbol] = written;
+            return;
+        }
         Add(symbol, binding, module, name, types, typeTable);
+    }
+
+    private readonly Dictionary<GlobalSymbol, (IrConstValue Value, IrType Type)> _values =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The value a constant <c>static let</c> stands for where its initializer is no
+    /// literal the language has but names one all the same — a float by its bits; <c>null</c> for
+    /// any other.</summary>
+    public (IrConstValue Value, IrType Type)? ValueOf(GlobalSymbol symbol) =>
+        _values.TryGetValue(symbol, out var value) ? value : null;
+
+    /// <summary>
+    /// <c>float.fromBits(0x7FF0000000000000)</c> — the library's own <c>fromBits</c> of an integer
+    /// literal — is the float those bits are. The language has no literal for an infinity or a
+    /// NaN, so the library's <c>infinity</c> and <c>nan</c> are written this way, and were four
+    /// globals with a call to initialize in every program. A NaN is taken only as the one quiet
+    /// NaN a C compiler's own constant is: any other payload keeps its slot and its call.
+    /// </summary>
+    private static (IrConstValue Value, IrType Type)? FloatOfBits(Expr? initializer, TypeResult types, IrType type)
+    {
+        if (initializer is not CallExpr { Arguments: [IntLiteralExpr bits], Callee: MemberExpr { Member: "fromBits" } callee }) return null;
+        if (types.RefOf(callee) is not FunctionSymbol { IsStatic: true, Home.FullName: "std.core" }) return null;
+        switch (type)
+        {
+            case IrScalarType { Kind: IrScalar.F64 }:
+            {
+                var value = BitConverter.UInt64BitsToDouble(bits.Value);
+                return double.IsNaN(value) && bits.Value != 0x7FF8000000000000UL ? null : (new FloatConst(value), type);
+            }
+            case IrScalarType { Kind: IrScalar.F32 } when bits.Value <= uint.MaxValue:
+            {
+                var value = BitConverter.UInt32BitsToSingle((uint)bits.Value);
+                return float.IsNaN(value) && bits.Value != 0x7FC00000UL ? null : (new FloatConst(value), type);
+            }
+            default:
+                return null;
+        }
     }
 
     private readonly Dictionary<GlobalSymbol, (Expr Literal, IrType Type)> _constants =

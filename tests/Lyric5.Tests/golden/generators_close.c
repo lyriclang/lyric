@@ -308,10 +308,6 @@ extern const LyrItable lyr_itab_ty_app_main_Oops[];
 const LyrDesc lyr_desc_box_ty_app_main_Oops = { sizeof(lyr_box_ty_app_main_Oops), 0, 0, 0, NULL, "box<app.main.Oops>", lyr_itab_ty_app_main_Oops };
 
 /* module-level bindings */
-double lyr_g_std_core_float_infinity = 0;
-double lyr_g_std_core_float_nan = 0;
-float lyr_g_std_core_float32_infinity = 0;
-float lyr_g_std_core_float32_nan = 0;
 uint64_t lyr_g_std_collections_emptyGroup = 0;
 uint64_t lyr_g_std_collections_lowBits = 0;
 uint64_t lyr_g_std_collections_highBits = 0;
@@ -355,8 +351,6 @@ void lyr_app_main_angry__body__ccc18ef4(LyrErr **lyr_err);
 lyr_ty_std_sync_Atomic_int__e9cb3e5b * lyr_std_sync_Atomic_int__new_67eb632f(int64_t l0_value);
 lyr_ty_std_sync_Atomic_bool__e2e4bd9c * lyr_std_sync_Atomic_bool__new_3915f520(uint8_t l0_value);
 void lyr__globals__9ee5f9b5(void);
-double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
-float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* coroutines: the environment a body starts from, and the body as the runtime runs it */
 static const LyrDesc lyr_desc_coro_i64_to_void = { 0, 0, 0, 0, NULL, "Coroutine<int>", NULL };
@@ -1121,130 +1115,66 @@ bb7:;
     return;
 }
 
-#line 1393 "stdlib5/std/core.lyr"
+#line 247 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
-    double t1 = 0;
+    uint64_t t1 = 0;
     uint64_t t2 = 0;
-    double t3 = 0;
-    uint64_t t4 = 0;
-    float t5 = 0;
-    uint64_t t6 = 0;
-    float t7 = 0;
-    uint64_t t8 = 0;
-    uint64_t t9 = 0;
-    uint64_t t10 = 0;
-    uint8_t t11 = 0;
-    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *t12 = NULL;
-    lyr_ty_std_task_SpinLock *t13 = NULL;
-    lyr_ty_std_task_Subscription *t14 = NULL;
-    int64_t t15 = 0;
-    uint8_t t16 = 0;
-    lyr_ty_std_task_SignalHub *t17 = NULL;
-    int64_t t18 = 0;
-    lyr_ty_std_sync_Atomic_int__e9cb3e5b *t19 = NULL;
+    uint8_t t3 = 0;
+    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *t4 = NULL;
+    lyr_ty_std_task_SpinLock *t5 = NULL;
+    lyr_ty_std_task_Subscription *t6 = NULL;
+    int64_t t7 = 0;
+    uint8_t t8 = 0;
+    lyr_ty_std_task_SignalHub *t9 = NULL;
+    int64_t t10 = 0;
+    lyr_ty_std_sync_Atomic_int__e9cb3e5b *t11 = NULL;
 bb0:;
-#line 1393
-    t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1393
-    t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1393
-    lyr_g_std_core_float_infinity = t1;
-#line 1394
-    t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1394
-    t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1394
-    lyr_g_std_core_float_nan = t3;
-#line 1414
-    t4 = (uint64_t)UINT64_C(2139095040);
-#line 1414
-    t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1414
-    lyr_g_std_core_float32_infinity = t5;
-#line 1415
-    t6 = (uint64_t)UINT64_C(2143289344);
-#line 1415
-    t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1415
-    lyr_g_std_core_float32_nan = t7;
-#line 247 "stdlib5/std/collections.lyr"
-    t8 = (uint64_t)UINT64_C(9259542123273814144);
 #line 247
-    lyr_g_std_collections_emptyGroup = t8;
+    t0 = (uint64_t)UINT64_C(9259542123273814144);
+#line 247
+    lyr_g_std_collections_emptyGroup = t0;
 #line 248
-    t9 = (uint64_t)UINT64_C(72340172838076673);
+    t1 = (uint64_t)UINT64_C(72340172838076673);
 #line 248
-    lyr_g_std_collections_lowBits = t9;
+    lyr_g_std_collections_lowBits = t1;
 #line 249
-    t10 = (uint64_t)UINT64_C(9259542123273814144);
+    t2 = (uint64_t)UINT64_C(9259542123273814144);
 #line 249
-    lyr_g_std_collections_highBits = t10;
+    lyr_g_std_collections_highBits = t2;
 #line 1486 "stdlib5/std/task.lyr"
-    t11 = 0;
+    t3 = 0;
 #line 1486
-    t12 = lyr_std_sync_Atomic_bool__new_3915f520(t11);
+    t4 = lyr_std_sync_Atomic_bool__new_3915f520(t3);
 #line 995
-    t13 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
+    t5 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
 #line 995
-    LYR_WRITE_BARRIER(t13, &t13->f_held, t12);
+    LYR_WRITE_BARRIER(t5, &t5->f_held, t4);
 #line 996
-    t14 = NULL;
+    t6 = NULL;
 #line 997
-    t15 = (int64_t)INT64_C(0);
+    t7 = (int64_t)INT64_C(0);
 #line 998
-    t16 = 0;
+    t8 = 0;
 #line 1066
-    t17 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
+    t9 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
 #line 1066
-    LYR_WRITE_BARRIER(t17, &t17->f_guard, t13);
+    LYR_WRITE_BARRIER(t9, &t9->f_guard, t5);
 #line 1066
-    LYR_WRITE_BARRIER(t17, &t17->f_first, t14);
+    LYR_WRITE_BARRIER(t9, &t9->f_first, t6);
 #line 1066
-    t17->f_caught = t15;
+    t9->f_caught = t7;
 #line 1066
-    t17->f_watching = t16;
+    t9->f_watching = t8;
 #line 1066
-    lyr_g_std_task_signalHub = t17;
+    lyr_g_std_task_signalHub = t9;
 #line 1764
-    t18 = (int64_t)INT64_C(0);
+    t10 = (int64_t)INT64_C(0);
 #line 1764
-    t19 = lyr_std_sync_Atomic_int__new_67eb632f(t18);
+    t11 = lyr_std_sync_Atomic_int__new_67eb632f(t10);
 #line 1764
-    lyr_g_std_task_channelIds = t19;
+    lyr_g_std_task_channelIds = t11;
     return;
-}
-
-#line 1400 "stdlib5/std/core.lyr"
-double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
-    uint64_t t0 = 0;
-    double t1 = 0;
-    double t2 = 0;
-bb0:;
-#line 1400
-    t0 = l0_b;
-#line 1390
-    t1 = (double)0.0;
-#line 1400
-    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1400
-    return t2;
-}
-
-#line 1421 "stdlib5/std/core.lyr"
-float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
-    uint64_t t0 = 0;
-    float t1 = 0;
-    float t2 = 0;
-bb0:;
-#line 1421
-    t0 = l0_b;
-#line 1411
-    t1 = (float)0.0;
-#line 1421
-    t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1421
-    return t2;
 }
 
 
