@@ -134,6 +134,14 @@ public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
     /// <c>@callerExpr</c> hands on the text the call wrote (09 A11). <c>null</c> where none is,
     /// which is nearly every call.</summary>
     public (Expr Argument, Span Written)[]? Parenthesized { get; init; }
+
+    /// <summary>The arguments written with <c>...</c> behind them, <c>sum(base, xs...)</c>
+    /// (design/v5/spec/08; the review's A2), each with where its dots stand: an array spread
+    /// over the variadic parameter — the parameter IS the array — where without the dots the
+    /// array would be one element. A call spreads one argument, the rest; the parser notes the
+    /// dots wherever they stand, and the checker says where they may not (LYR-SEM0166).
+    /// <c>null</c> where the call spreads nothing, which is nearly every call.</summary>
+    public (Expr Argument, Span Dots)[]? Spreads { get; init; }
 }
 public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
 /// <remarks>IsOptional means '?.' rather than '.'.</remarks>

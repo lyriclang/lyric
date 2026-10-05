@@ -112,6 +112,8 @@ public static class AstDumper
                         Write(n.Arguments[i], indent + 2, sb);
                     }
                     else Write(n.Arguments[i], indent + 1, sb);
+                    if (n.Spreads is { } spreads && Array.FindIndex(spreads, s => ReferenceEquals(s.Argument, n.Arguments[i])) is var at and >= 0)
+                        Line(sb, indent + 1, "Spread", spreads[at].Dots);
                 }
                 break;
             case IndexExpr n:

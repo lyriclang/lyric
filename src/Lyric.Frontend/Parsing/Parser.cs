@@ -454,22 +454,22 @@ public sealed partial class Parser
                     var typeArguments = ParseTypeArguments(out _);
                     _buffer.Expect(TokenKind.LParen, "LYR-PAR0008",
                         "expected '(' after type arguments");
-                    var typedArgs = ParseArguments(out var typedNames);
+                    var typedArgs = ParseArguments(out var typedNames, out var typedSpreads);
                     var typedClose = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008",
                         "expected ')' to close call");
                     operand = new CallExpr(operand, typedArgs,
                         Span.Union(Whole(operand), typedClose.Span), typeArguments)
-                        { ArgumentNames = typedNames, Parenthesized = Parenthesized(typedArgs) };
+                        { ArgumentNames = typedNames, Parenthesized = Parenthesized(typedArgs), Spreads = typedSpreads };
                     break;
                 }
 
                 case TokenKind.LParen:
                 {
                     _buffer.Advance();
-                    var args = ParseArguments(out var names);
+                    var args = ParseArguments(out var names, out var spreads);
                     var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close call");
                     operand = new CallExpr(operand, args, Span.Union(Whole(operand), close.Span))
-                        { ArgumentNames = names, Parenthesized = Parenthesized(args) };
+                        { ArgumentNames = names, Parenthesized = Parenthesized(args), Spreads = spreads };
                     break;
                 }
                 case TokenKind.Inc:
@@ -643,7 +643,7 @@ public sealed partial class Parser
                 if (_buffer.Check(TokenKind.LParen))
                 {
                     _buffer.Advance();
-                    var args = ParseArguments(out _);
+                    var args = ParseArguments(out _, out _, call: false);
                     var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close attribute arguments");
                     return new AtIdentifierExpr(name, args, Span.Union(cur.Span, close.Span));
                 }
@@ -754,11 +754,19 @@ public sealed partial class Parser
 
     /// <param name="names">The name each argument was written with, or <c>null</c> for every
     /// positional one — and <c>null</c> as a whole when none was named.</param>
-    private Expr[] ParseArguments(out string?[]? names)
+    /// <param name="spreads">The arguments with <c>...</c> behind them, <c>f(xs...)</c> (the
+    /// review's A2), each with where its dots stand — noted wherever they stand: that a call
+    /// spreads one argument, the rest, is the checker's to say, once, where it knows the
+    /// parameters.</param>
+    /// <param name="call">Whether these are a call's arguments: an attribute's are no call,
+    /// and dots there are not read.</param>
+    private Expr[] ParseArguments(out string?[]? names, out (Expr Argument, Span Dots)[]? spreads, bool call = true)
     {
         var args = new List<Expr>();
         List<string?>? written = null;
+        List<(Expr Argument, Span Dots)>? spread = null;
         names = null;
+        spreads = null;
         if (_buffer.Check(TokenKind.RParen)) return args.ToArray();
         while (true)
         {
@@ -780,10 +788,14 @@ public sealed partial class Parser
             args.Add(marked ? new UnaryExpr(UnaryOp.Place, argument, Span.Union(markSpan, Whole(argument))) : argument);
             if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
             written?.Add(name);
+            // 'xs...': this argument is spread over the variadic parameter.
+            if (call && _buffer.Check(TokenKind.DotDotDot))
+                (spread ??= new()).Add((args[^1], _buffer.Advance().Span));
             if (!_buffer.Match(TokenKind.Comma)) break;
             if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
         }
         names = written?.ToArray();
+        spreads = spread?.ToArray();
         return args.ToArray();
     }
 
