@@ -641,7 +641,25 @@ public sealed class SemaRules
                 return;
         }
 
-        foreach (var child in Children(expr)) WalkExpr(child);
+        WalkInside(expr);
+    }
+
+    /// <summary>
+    /// What stands inside a node, as <see cref="AstChildren"/> knows it — total over the node
+    /// types. A list of expression forms stood here with a default of nothing, and it had no line
+    /// for a type test or for a 'let' condition: an assignment in 'if (let .Some(v) = f(p.n = 2))'
+    /// wrote through a 'let' with no word from the compiler.
+    /// </summary>
+    private void WalkInside(Node node)
+    {
+        foreach (var child in AstChildren.Of(node))
+            switch (child)
+            {
+                case Expr expr: WalkExpr(expr); break;
+                case Stmt stmt: WalkStmt(stmt); break;
+                case TypeNode or Pattern: break; // nothing in them is written or called
+                default: WalkInside(child); break; // an initializer's field, a string's hole, an arm
+            }
     }
 
     /// <summary>The target of <c>++</c> or <c>--</c>, which is written as much as read.</summary>
@@ -830,31 +848,4 @@ public sealed class SemaRules
         return TypeFacts.SymbolOf(type) is { } symbol
                && Conformance.Implements(symbol, indexable, _binding);
     }
-
-    // The direct child expressions, used to spot nested assignments.
-    private static IEnumerable<Expr> Children(Expr e) => e switch
-    {
-        UnaryExpr u => [u.Operand],
-        PostfixExpr p => [p.Operand],
-        ComptimeExpr ct => [ct.Inner],
-        ThrowExpr te => [te.Value],
-        TryExpr tr => [tr.Value],
-        BinaryExpr b => [b.Left, b.Right],
-        RangeExpr r => [r.Low, r.High],
-        SliceRangeExpr sr => [.. new[] { sr.Low, sr.High }.OfType<Expr>()],
-        CastExpr c => [c.Operand],
-        CallExpr call => [call.Callee, .. call.Arguments],
-        IndexExpr ix => [ix.Target, ix.Index],
-        MemberExpr m => [m.Target],
-        ArrayLitExpr arr => arr.Elements,
-        TupleLitExpr tu => tu.Elements,
-        StructInitExpr si => si.Fields.Select(f => f.Value),
-        WithExpr w => [w.Target, .. w.Fields.Select(f => f.Value)],
-        InterpolatedStringExpr fs => fs.Segments.OfType<InterpHole>().Select(h => h.Expr),
-        IfExpr iff => [iff.Condition, iff.Then, iff.Else],
-        // MatchExpr and LambdaExpr are handled in WalkExpr: their block arms and block bodies are
-        // STATEMENTS, which this list cannot carry.
-        AssignExpr a => [a.Target, a.Value],
-        _ => []
-    };
 }

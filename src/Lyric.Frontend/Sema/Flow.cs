@@ -16,11 +16,17 @@ internal static class Flow
         ReturnStmt => true,
         ThrowStmt => true,
         ExprStmt es => types?.TypeOf(es.Expr) is NeverType, // panic(...) diverges
+        // The tail of a value block that gives no value: '{ log(); throw e }'.
+        TailExprStmt tail => types?.TypeOf(tail.Expr) is NeverType,
         // A binding whose value gives none never completes either: 'let n: int = fail();'.
         BindingStmt { Initializer: { } init } => types?.TypeOf(init) is NeverType,
         Block b => b.Statements.Any(st => AlwaysReturns(st, types)),
         IfStmt f => f.Else is not null && AlwaysReturns(f.Then, types) && AlwaysReturns(f.Else, types),
-        DoWhileStmt d => AlwaysReturns(d.Body, types) || Diverges(d.Condition, d.Body, d.Label),
+        // A block that ends every path speaks for its loop only when no jump of the loop stands
+        // in it: a 'break' is a way past the 'return' behind it, and so is a 'continue' — it
+        // reaches the condition, which may end the loop.
+        DoWhileStmt d => (AlwaysReturns(d.Body, types) && !Jumps(d.Body, d.Label, nested: false, breaks: true, continues: true))
+                         || Diverges(d.Condition, d.Body, d.Label),
         WhileStmt w => Diverges(w.Condition, w.Body, w.Label),
         ForInStmt => false, // the loop may not run at all
         TryStmt t => AlwaysReturns(t.Body, types) && t.Catches.All(c => AlwaysReturns(c.Body, types)),
@@ -103,27 +109,39 @@ internal static class Flow
     }
 
     private static bool Diverges(Expr cond, Block body, string? label) =>
-        cond is BoolLiteralExpr { Value: true } && !HasBreak(body, label, nested: false);
+        cond is BoolLiteralExpr { Value: true } && !Jumps(body, label, nested: false, breaks: true, continues: false);
 
     private static bool ArmReturns(MatchArm a, TypeResult? types) => a.Body is Block b && AlwaysReturns(b, types);
 
-    // A break that leaves THIS loop: a plain 'break' at this depth, or 'break L' naming this loop's
-    // label at ANY depth — inside a nested loop only the labeled form reaches out, so the descent
-    // into a nested loop counts labeled breaks alone.
-    private static bool HasBreak(Stmt s, string? label, bool nested) => s switch
+    /// <summary>
+    /// Does a jump to THIS loop stand anywhere in <paramref name="node"/>: a plain 'break' or
+    /// 'continue' at this depth, or one naming this loop's label at ANY depth — inside a nested
+    /// loop only the labeled form reaches out, so the descent into one counts labeled jumps alone.
+    ///
+    /// <para>ANYWHERE: the walk goes through <see cref="AstChildren"/>, which is total over the
+    /// node types. It was a list of statement forms with a default that said no, and so it
+    /// passed by every block an expression holds — the arm of a 'match' expression, a clause of
+    /// a 'try' expression — and the 'else' of a 'let … else'. 'while (true) { let .Some(v) =
+    /// next() else { break; }; … }' was then a loop nothing leaves: the 'return' behind it was
+    /// warned about as unreachable, and without that 'return' the function passed as one that
+    /// returns on every path, and ran off its end.</para>
+    ///
+    /// <para>A lambda's body is a function of its own (08 Y11 F5): its jumps are its loops'.</para>
+    /// </summary>
+    private static bool Jumps(Node node, string? label, bool nested, bool breaks, bool continues) => node switch
     {
-        BreakStmt b => b.Label is null ? !nested : label is not null && b.Label == label,
-        Block b => b.Statements.Any(st => HasBreak(st, label, nested)),
-        IfStmt f => HasBreak(f.Then, label, nested) || (f.Else is not null && HasBreak(f.Else, label, nested)),
-        TryStmt t => HasBreak(t.Body, label, nested) || t.Catches.Any(c => HasBreak(c.Body, label, nested)),
-        MatchStmt m => m.Arms.Any(a => a.Body is Block bl && HasBreak(bl, label, nested)),
-        DeferStmt d => HasBreak(d.Body, label, nested),
-        WhileStmt w => label is not null && HasBreak(w.Body, label, nested: true),
-        DoWhileStmt d => label is not null && HasBreak(d.Body, label, nested: true),
-        ForInStmt f => label is not null && HasBreak(f.Body, label, nested: true),
-        // A 'loop' nested here, as a statement or a binding's value: its labeled breaks reach out.
-        ExprStmt { Expr: LoopExpr l } => label is not null && HasBreak(l.Body, label, nested: true),
-        BindingStmt { Initializer: LoopExpr bl } => label is not null && HasBreak(bl.Body, label, nested: true),
-        _ => false
+        BreakStmt b => (breaks && Reaches(b.Label, label, nested))
+                       || (b.Value is { } value && Jumps(value, label, nested, breaks, continues)),
+        ContinueStmt c => continues && Reaches(c.Label, label, nested),
+        LambdaExpr => false,
+        WhileStmt or DoWhileStmt or ForInStmt or LoopExpr =>
+            label is not null && AstChildren.Of(node).Any(child => Jumps(child, label, nested: true, breaks, continues)),
+        _ => AstChildren.Of(node).Any(child => Jumps(child, label, nested, breaks, continues)),
     };
+
+    /// <summary>Does a jump carrying <paramref name="written"/> reach the loop labeled
+    /// <paramref name="own"/>? A plain one takes the innermost loop — this one unless the jump
+    /// stands in a loop nested in it.</summary>
+    private static bool Reaches(string? written, string? own, bool nested) =>
+        written is null ? !nested : own is not null && written == own;
 }

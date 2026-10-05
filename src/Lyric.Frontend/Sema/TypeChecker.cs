@@ -9585,24 +9585,16 @@ public sealed class TypeChecker
             return new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot, CancelledType).Escaping(body, _currentModule);
     }
 
-    // Does the block return a VALUE on any path (`return expr;`)? Descends through the statement
-    // structure but NOT into nested lambdas, whose returns belong to them. For the void default:
-    // only valueless block lambdas without context may become void.
-    private static bool HasValueReturn(Stmt s) => s switch
+    // Does the block return a VALUE on any path (`return expr;`)? Wherever the 'return' stands —
+    // the walk is AstChildren's, total over the node types, so the arm of a 'match' expression or
+    // a clause of a 'try' expression is not passed by — but NOT in a nested lambda, whose returns
+    // belong to it. For the void default: only valueless block lambdas without context may
+    // become void.
+    private static bool HasValueReturn(Node node) => node switch
     {
         ReturnStmt r => r.Value is not null,
-        Block b => b.Statements.Any(HasValueReturn),
-        IfStmt f => HasValueReturn(f.Then) || (f.Else is not null && HasValueReturn(f.Else)),
-        WhileStmt w => HasValueReturn(w.Body),
-        DoWhileStmt d => HasValueReturn(d.Body),
-        ForInStmt fo => HasValueReturn(fo.Body),
-        DeferStmt de => HasValueReturn(de.Body),
-        LetPatternStmt lp => lp.Else is not null && HasValueReturn(lp.Else),
-        TryStmt t => HasValueReturn(t.Body) || t.Catches.Any(c => HasValueReturn(c.Body)),
-        MatchStmt m => m.Arms.Any(a => a.Body is Block ab && HasValueReturn(ab)),
-        ExprStmt { Expr: LoopExpr l } => HasValueReturn(l.Body),
-        BindingStmt { Initializer: LoopExpr bl } => HasValueReturn(bl.Body),
-        _ => false
+        LambdaExpr => false,
+        _ => AstChildren.Of(node).Any(HasValueReturn),
     };
 
     private static bool ContainsTypeParam(LyrType t) => t switch
@@ -9701,6 +9693,12 @@ public sealed class TypeChecker
                     return;
                 case IfExpr iff: WalkNode(iff.Condition); WalkNode(iff.Then); WalkNode(iff.Else); return;
                 case LoopExpr lp: WalkNode(lp.Body); return;
+                // Every other node, through what AstChildren knows of it: the list above has
+                // no case for a view's range, and a local read only in 'xs[lo..]' was no capture
+                // — the lowering then met a name it had no slot for.
+                default:
+                    foreach (var child in AstChildren.Of(node)) WalkNode(child);
+                    return;
             }
         }
 
