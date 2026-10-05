@@ -1098,6 +1098,7 @@ public sealed class TypeChecker
         {
             _currentModule = block.Module;
             CheckConformanceWords(block);
+            CheckBlockParameters(block);
 
             if (block.IsConstructorTarget)
             {
@@ -1411,6 +1412,48 @@ public sealed class TypeChecker
                         if (fixedTo is TypeParamType { Param: var p } && block.Generics.Contains(p) && !ReferenceEquals(p, from))
                             found.Add((p, from, member));
         return block.FixationBindings = found.ToArray();
+    }
+
+    /// <summary>
+    /// The block's parameters that are bound by NOTHING: neither the target names them nor a
+    /// fixation of a bound parameter's constraint (05 §13 rule 2) — the two places
+    /// <see cref="BlockSubstitution"/> takes a parameter's answer from. With one such parameter
+    /// the block matches no receiver. Once per block.
+    /// </summary>
+    private GenericParamSymbol[] UnboundParametersOf(ExtensionBlock block)
+    {
+        if (block.UnboundParameters is { } known) return known;
+        if (block.Generics.Length == 0 || BlockTargetType(block) is not { IsError: false } target)
+            return block.UnboundParameters = [];
+        var bound = new HashSet<GenericParamSymbol>(ReferenceEqualityComparer.Instance);
+        foreach (var g in block.Generics)
+            if (MentionsParam(target, g)) bound.Add(g);
+        var fixations = FixationBindingsOf(block);
+        for (var grew = true; grew;)
+        {
+            grew = false;
+            foreach (var (named, from, _) in fixations)
+                if (bound.Contains(from) && bound.Add(named)) grew = true;
+        }
+        return block.UnboundParameters = block.Generics.Where(g => !bound.Contains(g)).ToArray();
+    }
+
+    /// <summary>
+    /// A block whose parameter is bound by nothing reaches no type, and none of its members can
+    /// be called: <c>extend&lt;T, U&gt; Box&lt;T&gt;</c>. Said where the parameter is declared
+    /// (LYR-SEM0170). It was said at a call, as constraints the receiver "does not satisfy"
+    /// (LYR-SEM0134) — of which the block may have none.
+    /// </summary>
+    private void CheckBlockParameters(ExtensionBlock block)
+    {
+        if (UnboundParametersOf(block) is not { Length: > 0 } unbound) return;
+        var names = string.Join(", ", unbound.Select(g => $"'{g.Name}'"));
+        var at = unbound[0].Declaration is INamedDecl { NameSpan: { IsEmpty: false } name } ? name : block.Decl.Target.Span;
+        var (parameter, it, binds) = unbound.Length == 1 ? ("parameter", "it", "binds") : ("parameters", "them", "bind");
+        _de.Report("LYR-SEM0170", Severity.Error, at,
+            $"nothing {binds} the block's {parameter} {names}: the target '{TypeFacts.Display(BlockTargetType(block))}' does not name {it}, "
+            + $"and no constraint of a parameter it names fixes {it} ('S :: [Source<Item = {unbound[0].Name}>]') — "
+            + "the block reaches no type");
     }
 
     private static Dictionary<GenericParamSymbol, LyrType> Merge(Dictionary<GenericParamSymbol, LyrType> a, Dictionary<GenericParamSymbol, LyrType> b)
@@ -3434,6 +3477,16 @@ public sealed class TypeChecker
     /// </summary>
     private (Dictionary<Symbol, LyrType> then, Dictionary<Symbol, LyrType> els) NarrowingFacts(Expr cond)
     {
+        // '!c' proves what 'c' refutes and refutes what it proves (03 T4 O3, T11): the two sets
+        // change places. So 'if (!(s is Circle)) { return; }' guards — a type test had no guard
+        // form but an empty branch — and De Morgan needs no line of its own: a negated '&&'
+        // refutes both sides where it is false, by the rule for '&&' below.
+        if (cond is UnaryExpr { Operator: UnaryOp.Not } negation)
+        {
+            var (whenTrue, whenFalse) = NarrowingFacts(negation.Operand);
+            return (whenFalse, whenTrue);
+        }
+
         var then = new Dictionary<Symbol, LyrType>(ReferenceEqualityComparer.Instance);
         var els = new Dictionary<Symbol, LyrType>(ReferenceEqualityComparer.Instance);
 
@@ -6597,6 +6650,8 @@ public sealed class TypeChecker
         // once on 'Slice<T>' reach it after its own blocks' — the lowering passes the whole view.
         if (receiver is ArrayOf whole && ShapeBlockMember(new SliceOf(whole.Element), mem, span, ref shapeOnly) is { } viewed)
             return viewed;
+        // A block that reaches no type has said so itself (LYR-SEM0170).
+        if (shapeOnly is { } unreachable && UnboundParametersOf(unreachable).Length > 0) return LyrType.Error;
         if (shapeOnly is { } failed)
             return Report(span, "LYR-SEM0134",
                 $"'{mem.Member}' is added to '{TypeFacts.Display(BlockTargetType(failed))}' under the block's constraints, "
@@ -7988,6 +8043,8 @@ public sealed class TypeChecker
         // not there. A generic block's constraints failing is worth the sentence.
         if (block.Generics.Length == 0)
             return Report(span, "LYR-SEM0012", $"'{TypeFacts.Display(receiver)}' has no member '{ext.Name}'");
+        // A block that reaches no type has said so itself (LYR-SEM0170).
+        if (UnboundParametersOf(block).Length > 0) return LyrType.Error;
         return Report(span, "LYR-SEM0134",
             $"'{ext.Name}' is added to '{TypeFacts.Display(BlockTargetType(block))}' under the block's constraints, "
             + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
@@ -8184,6 +8241,8 @@ public sealed class TypeChecker
                     + $"'{ts.Name}<{string.Join(", ", ts.Generics.Select(g => g.Name))}>.{member}'"), inBlock.Constant)
                 : BlockSubstitution(inBlock.Block, instance) is { } blockMap
                     ? (Substitute(TypeOfGlobalReference(inBlock.Constant, span), blockMap), inBlock.Constant)
+                    : UnboundParametersOf(inBlock.Block).Length > 0
+                        ? (LyrType.Error, inBlock.Constant) // the block said so itself (LYR-SEM0170)
                     : (Report(span, "LYR-SEM0134",
                         $"'{member}' is added to '{TypeFacts.Display(BlockTargetType(inBlock.Block))}' under the block's "
                         + $"constraints, which '{TypeFacts.Display(instance)}' does not satisfy"), inBlock.Constant),

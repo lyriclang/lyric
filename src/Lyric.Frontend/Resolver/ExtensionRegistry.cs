@@ -78,6 +78,10 @@ public sealed class ExtensionBlock
     /// answer for <c>Item</c> once <c>I</c> is bound. Set by the checker.</summary>
     public (GenericParamSymbol Bound, GenericParamSymbol From, AssociatedTypeSymbol Member)[]? FixationBindings { get; set; }
 
+    /// <summary>The block's parameters neither its target nor a fixation names: bound by nothing
+    /// (LYR-SEM0170), so the block reaches no type. Set by the checker; <c>null</c> until asked.</summary>
+    public GenericParamSymbol[]? UnboundParameters { get; set; }
+
     /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c> (04 D15): a
     /// blanket block, matched by its constraints alone.</summary>
     public bool IsBlanketTarget { get; set; }
