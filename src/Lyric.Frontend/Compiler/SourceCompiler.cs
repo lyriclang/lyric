@@ -78,6 +78,7 @@ public static class SourceCompiler
         {
             Lyric5Modules = options.PackageRoots is not null,
             PackageDependencies = options.PackageDependencies,
+            ModuleOnDisk = ModuleProbe(options),
             // The standard library is ordinary Lyric source and is loaded on demand.
             ModuleLoader = modulePath =>
             {
@@ -207,10 +208,12 @@ public static class SourceCompiler
                     && tests.TryGetValue(owner, out var testRoot) && NamedExactly(testRoot.Root, modulePath[2..])
                     && File.Exists(Path.Combine([testRoot.Root, .. modulePath[2..^1], modulePath[^1] + ".lyr"])))
                     return testRoot.Load(modulePath[2..]);
-                return modulePath.Length > 1 && packages.TryGetValue(modulePath[0], out var package)
-                       && NamedExactly(package.Root, modulePath[1..])
-                    ? package.Load(modulePath[1..])
-                    : null;
+                if (modulePath.Length == 0 || !packages.TryGetValue(modulePath[0], out var package)) return null;
+                // The root module (07 M1, the review's M7-1): 'src/lib.lyr' is the module of the
+                // package's own name, and there is no module '<package>.lib' beside it.
+                if (modulePath is [_, Compilation.RootModuleFile]) return null;
+                string[] file = modulePath.Length == 1 ? [Compilation.RootModuleFile] : modulePath[1..];
+                return NamedExactly(package.Root, file) ? package.Load(file) : null;
             }
 
             if (nativeRoots is not null && modulePath.Length > 0
@@ -279,6 +282,7 @@ public static class SourceCompiler
             ModuleLoader = loader,
             Lyric5Modules = options.PackageRoots is not null,
             PackageDependencies = options.PackageDependencies,
+            ModuleOnDisk = ModuleProbe(options),
         };
 
         Module? entry = null;
@@ -339,6 +343,17 @@ public static class SourceCompiler
         }
         return true;
     }
+
+    /// <summary>Whether a package of the program holds the module of a path as a file, named
+    /// exactly (<see cref="Compilation.ModuleOnDisk"/>); <c>null</c> without packages. The root
+    /// module's file is the module of the package's name, not one named <c>lib</c>.</summary>
+    private static Func<string[], bool>? ModuleProbe(CompilerOptions options) =>
+        options.PackageRoots is not { } roots
+            ? null
+            : path => path.Length > 1 && roots.TryGetValue(path[0], out var root)
+                      && path is not [_, Compilation.RootModuleFile]
+                      && File.Exists(Path.Combine([root, .. path[1..^1], path[^1] + ".lyr"]))
+                      && NamedExactly(root, path[1..]);
 
     private static string ModuleCount(List<string> loaded) =>
         loaded.Count == 0 ? "1 module" : $"{loaded.Count + 1} modules";

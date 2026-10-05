@@ -16,7 +16,8 @@ public sealed class LibraryException(Manifest manifest, PackageGraph graph)
 ///
 /// <para>A <b>package</b> has a manifest, <c>lyric.toml</c>: its modules live under <c>src/</c>,
 /// each named by its path with the package's name in front (07 M1) — <c>src/net/http.lyr</c> in
-/// <c>app</c> is <c>app.net.http</c> —, and its program is <c>src/main.lyr</c> (P2), or the module a
+/// <c>app</c> is <c>app.net.http</c>; <c>src/lib.lyr</c> alone is the package's root module,
+/// <c>app</c> —, and its program is <c>src/main.lyr</c> (P2), or the module a
 /// command names: a module is a library and a program at once (07 M7a). A <b>single file</b> outside
 /// every package is a package of its own, named after the file, which imports only <c>std</c> (C8).</para>
 ///
@@ -155,14 +156,17 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c> (07 M1), or <c>null</c>
-    /// where the file lies elsewhere.</summary>
+    /// where the file lies elsewhere. <c>src/lib.lyr</c> is the root module, named by the package
+    /// alone (the review's M7-1).</summary>
     public static string? ModulePathOf(Manifest manifest, string file)
     {
         if (!IsUnder(manifest.SourceRoot, file)) return null;
         var relative = Path.GetRelativePath(manifest.SourceRoot, file);
         if (!relative.EndsWith(".lyr", StringComparison.Ordinal)) return null;
         var segments = relative[..^4].Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Join('.', [manifest.Name, .. segments]);
+        return segments is [Lyric.Resolver.Compilation.RootModuleFile]
+            ? manifest.Name
+            : string.Join('.', [manifest.Name, .. segments]);
     }
 
     /// <summary>Whether <paramref name="file"/> lies below <paramref name="directory"/>.</summary>
