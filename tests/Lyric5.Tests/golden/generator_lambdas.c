@@ -1395,7 +1395,7 @@ bb0:;
     return t0;
 }
 
-#line 1387 "stdlib5/std/core.lyr"
+#line 1393 "stdlib5/std/core.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     double t1 = 0;
@@ -1418,29 +1418,29 @@ void lyr__globals__9ee5f9b5(void) {
     int64_t t18 = 0;
     lyr_ty_std_sync_Atomic_int__e9cb3e5b *t19 = NULL;
 bb0:;
-#line 1387
+#line 1393
     t0 = (uint64_t)UINT64_C(9218868437227405312);
-#line 1387
+#line 1393
     t1 = lyr_std_core__extend__float_fromBits_3825afc5(t0);
-#line 1387
+#line 1393
     lyr_g_std_core_float_infinity = t1;
-#line 1388
+#line 1394
     t2 = (uint64_t)UINT64_C(9221120237041090560);
-#line 1388
+#line 1394
     t3 = lyr_std_core__extend__float_fromBits_3825afc5(t2);
-#line 1388
+#line 1394
     lyr_g_std_core_float_nan = t3;
-#line 1408
+#line 1414
     t4 = (uint64_t)UINT64_C(2139095040);
-#line 1408
+#line 1414
     t5 = lyr_std_core__extend__float32_fromBits_bc3641ce(t4);
-#line 1408
+#line 1414
     lyr_g_std_core_float32_infinity = t5;
-#line 1409
+#line 1415
     t6 = (uint64_t)UINT64_C(2143289344);
-#line 1409
+#line 1415
     t7 = lyr_std_core__extend__float32_fromBits_bc3641ce(t6);
-#line 1409
+#line 1415
     lyr_g_std_core_float32_nan = t7;
 #line 247 "stdlib5/std/collections.lyr"
     t8 = (uint64_t)UINT64_C(9259542123273814144);
@@ -1489,35 +1489,35 @@ bb0:;
     return;
 }
 
-#line 1394 "stdlib5/std/core.lyr"
+#line 1400 "stdlib5/std/core.lyr"
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b) {
     uint64_t t0 = 0;
     double t1 = 0;
     double t2 = 0;
 bb0:;
-#line 1394
+#line 1400
     t0 = l0_b;
-#line 1384
+#line 1390
     t1 = (double)0.0;
-#line 1394
+#line 1400
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1394
+#line 1400
     return t2;
 }
 
-#line 1415 "stdlib5/std/core.lyr"
+#line 1421 "stdlib5/std/core.lyr"
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b) {
     uint64_t t0 = 0;
     float t1 = 0;
     float t2 = 0;
 bb0:;
-#line 1415
+#line 1421
     t0 = l0_b;
-#line 1405
+#line 1411
     t1 = (float)0.0;
-#line 1415
+#line 1421
     t2 = LYR_FLOAT_FROM_BITS(t0, t1);
-#line 1415
+#line 1421
     return t2;
 }
 
@@ -2112,16 +2112,16 @@ _Static_assert(sizeof(lyr_fn_to_coro_i64_to_void) == 16, "layout of lyr_fn_to_co
 /* prototypes */
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body);
 
-#line 3585 "stdlib5/std/core.lyr"
+#line 3591 "stdlib5/std/core.lyr"
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body) {
     lyr_fn_to_coro_i64_to_void t0 = {0};
     LyrCoro *t1 = NULL;
 bb0:;
-#line 3585
+#line 3591
     t0 = l0_body;
-#line 3585
+#line 3591
     t1 = t0.fn(t0.env, NULL);
-#line 3585
+#line 3591
     return t1;
 }
 

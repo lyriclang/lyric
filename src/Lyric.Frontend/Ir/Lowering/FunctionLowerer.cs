@@ -5203,6 +5203,14 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
+        // An abstract generic member has no body to instantiate for the interface's value. What
+        // comes here is one its type leaves to a field (05 §5): the forwarder would be one
+        // function per instantiation, and is not built. Asked here, an instance of nothing was
+        // requested and the compiler failed on it ("function has no body").
+        if (declaration.Body is null)
+            throw NotSupported($"the generic member '{member.Member}' of '{iface.Name}' where its type forwards it "
+                               + "to a field — write it on the type, calling the field's", expr.Span);
+
         var typeArguments = SubstitutedTypeArguments(expr);
 
         var owning = _typeTable.InstanceOf(interfaceId);
@@ -5548,8 +5556,29 @@ internal sealed class FunctionLowerer
     {
         if (concrete is GenericInstance && _typeTable.BlockOf(implementation) is { } block)
             return LowerBlockMethodCall(member, implementation, block, concrete, expr);
-        if (concrete is GenericInstance)
-            throw NotSupported($"'{member.Member}' written in the body of the generic '{TypeFacts.Display(concrete)}', through a constraint", expr.Span);
+        // In the body of a generic type: the instance's member at the call's own arguments, as a
+        // call on the instance asks for it (LowerGenericMethodCall) — one instance for both.
+        if (concrete is GenericInstance ofInstance)
+        {
+            var own = SubstitutedTypeArguments(expr);
+            var member0 = _instances.Request(implementation, decl, $"{ofInstance.Definition.Name}.{implementation.Name}",
+                ofInstance.Definition, own, _typeTable, expr.Span, ofInstance);
+            var given = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span,
+                InstanceSubstitution(ofInstance, implementation, own));
+            var withReceiver = new TempId[given.Length + 1];
+            withReceiver[0] = LowerExpr(member.Target);
+            given.CopyTo(withReceiver, 1);
+            var returns = TypeOfExpr(expr);
+            if (IsVoid(returns))
+            {
+                _b.Emit(new Call(null, member0, withReceiver, expr.Span));
+                return null;
+            }
+            var value = _slots.NewTemp(returns);
+            _b.Emit(new Call(value, member0, withReceiver, expr.Span));
+            _fresh.Add(value);
+            return value;
+        }
         var owner = TypeFacts.SymbolOf(concrete);
         var baseName = owner is not null ? $"{owner.Name}.{implementation.Name}"
             : _typeTable.BlockOf(implementation) is { Target: { } blockTarget } ? $"<extend>.{blockTarget.Name}.{implementation.Name}"
@@ -5650,11 +5679,35 @@ internal sealed class FunctionLowerer
         var function = chosen
                        ?? owner?.Members.LookupLocal(member.Member) as FunctionSymbol
                        ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, member.Member));
-        if (function is not { IsStatic: true, Declaration: FunctionDecl declaration }
-            || !TryResolveFunction(function, out var target))
+        if (function is not { IsStatic: true, Declaration: FunctionDecl declaration })
             throw NotSupported($"the static '{member.Member}' of '{TypeFacts.Display(concrete)}' through a constraint", expr.Span);
 
-        var passed = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span);
+        FunctionId target;
+        IReadOnlyDictionary<string, LyrType>? under = null;
+        if (concrete is GenericInstance instance && _typeTable.BlockOf(function) is null && declaration.Body is not null)
+        {
+            // A static of a generic type's body: the instance's, as 'Crate<string>.make()' asks
+            // for it (LowerGenericStaticCall) — one instance for both.
+            var own = function.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+            target = function.Generics.Length > 0
+                ? _instances.Request(function, declaration, $"{instance.Definition.Name}.{function.Name}", null, own,
+                    _typeTable, expr.Span, instance)
+                : _instances.RequestMethod(function, declaration, instance, expr.Span);
+            under = InstanceSubstitution(instance, function, own);
+        }
+        else if (function.Generics.Length > 0 && declaration.Body is not null && concrete is not GenericInstance)
+        {
+            // A generic static (04 D9 whole; 'U.exact(v)', the review's M8a-7): its instance at the
+            // call's type arguments, under the name a call through the type gives it — with
+            // 'U = int8' it is the function 'int8.exact(v)' calls.
+            target = _instances.Request(function, declaration, StaticBaseName(function, function.Name), null,
+                SubstitutedTypeArguments(expr), _typeTable, expr.Span);
+            under = NamedSubstitutionFor(function, _types.TypeArgumentsOf(expr));
+        }
+        else if (!TryResolveFunction(function, out target))
+            throw NotSupported($"the static '{member.Member}' of '{TypeFacts.Display(concrete)}' through a constraint", expr.Span);
+
+        var passed = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span, under);
         var resultType = TypeOfExpr(expr);
         if (IsVoid(resultType))
         {
@@ -5667,15 +5720,27 @@ internal sealed class FunctionLowerer
         return result;
     }
 
-    /// <summary>The member a call names, where it is the default of a non-generic interface and
-    /// generic itself in nothing — what <see cref="LowerDefaultCall"/> instantiates per conformer.
-    /// <c>null</c> for anything else: an own member, an abstract one, a generic one.</summary>
+    /// <summary>The member a call names, where it is the default of a non-generic interface —
+    /// what <see cref="LowerDefaultCall"/> instantiates per conformer. <c>null</c> for anything
+    /// else: an own member, an abstract one, a default of a generic interface — and, in the 4.x
+    /// path, a generic default, which is lowered for the interface's value there
+    /// (<see cref="LowerGenericInterfaceMethod"/>). In Lyric 5 a generic default is one instance
+    /// per conformer and argument list (04 D9 whole): its interface has no value.</summary>
     private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? DirectDefault(MemberExpr member) =>
-        _types.RefOf(member) is FunctionSymbol { Generics.Length: 0, IsStatic: false } promised
+        _types.RefOf(member) is FunctionSymbol { IsStatic: false } promised
+        && (promised.Generics.Length == 0 || _types.Lyric5Modules)
         && promised.Declaration is FunctionDecl { Body: not null } decl
         && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 } iface
             ? (promised, decl, iface)
             : null;
+
+    /// <summary>Whether a conformer's own member stands in place of this generic default (04 D9
+    /// whole): in Lyric 5, a member of the contract of a non-generic interface. The checker lets
+    /// one be written exactly there (<c>LYR-SEM0082</c> elsewhere).</summary>
+    private bool Replaceable(FunctionSymbol promised) =>
+        _types.Lyric5Modules
+        && promised.Declaration is FunctionDecl { Body: not null, IsPrivateHelper: false }
+        && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 };
 
     /// <summary>
     /// An interface's default called on a conformer (04 D9): the default's instance for the
@@ -5686,9 +5751,14 @@ internal sealed class FunctionLowerer
     private TempId? LowerDefaultCall(MemberExpr member, (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface) found,
         LyrType conformer, CallExpr expr)
     {
-        var target = _instances.RequestDefault(found.Default, found.Decl, found.Iface, conformer, expr.Span);
-        var passed = MaterializeArguments(found.Decl, ArgumentsOf(expr), member.Member, expr.Span,
-            new Dictionary<string, LyrType>(StringComparer.Ordinal) { ["Self"] = conformer });
+        // A generic default's own arguments beside 'Self' (D9 whole): the call's, through this
+        // instance's substitution.
+        var own = found.Default.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+        var target = _instances.RequestDefault(found.Default, found.Decl, found.Iface, conformer, expr.Span, own);
+        var under = new Dictionary<string, LyrType>(StringComparer.Ordinal) { ["Self"] = conformer };
+        for (var i = 0; i < Math.Min(found.Default.Generics.Length, own.Length); i++)
+            under[found.Default.Generics[i].Name] = own[i];
+        var passed = MaterializeArguments(found.Decl, ArgumentsOf(expr), member.Member, expr.Span, under);
         var all = new TempId[passed.Length + 1];
         all[0] = LowerExpr(member.Target);
         passed.CopyTo(all, 1);
@@ -5726,10 +5796,13 @@ internal sealed class FunctionLowerer
                 : throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the default of a generic interface, through the block that gives the conformance", expr.Span);
         }
 
-        // An ABSTRACT generic member (04 D9): no slot, no default — the concrete type's own, its
-        // instance at the call's type arguments, named as a direct call on the type names it, so
-        // both reach one instance.
-        if (_types.RefOf(member) is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl { Body: null } }
+        // A generic member (04 D9): no slot — the concrete type's own, its instance at the call's
+        // type arguments, named as a direct call on the type names it, so both reach one instance.
+        // An abstract one has nothing else. A default's place is the conformer's own where it
+        // wrote one (D9 whole); where it did not, the default's instance for the type follows
+        // below.
+        if (_types.RefOf(member) is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl promisedDecl } promisedGeneric
+            && (promisedDecl.Body is null || Replaceable(promisedGeneric))
             && GenericImplementationOf(concrete, member.Member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
             return LowerGenericImplementationCall(member, genericImplementation, genericDecl, concrete, expr);
 
@@ -6193,6 +6266,9 @@ internal sealed class FunctionLowerer
                      && _typeTable.InterfaceProviding(instanced.Definition, member.Member)
                          is { } providing:
             {
+                // A plain interface's generic default (D9 whole): its instance for this receiver.
+                if (DirectDefault(member) is { } forInstance)
+                    return LowerDefaultCall(member, forInstance, instanced, expr);
                 var into = InterfaceAsDeclaredBy(instanced, providing, expr.Span);
                 return LowerVirtualCall(member, providing, expr, into.Type,
                     LowerExprAs(member.Target, into));
@@ -6544,6 +6620,10 @@ internal sealed class FunctionLowerer
         // because such a member may not be overridden (LYR-SEM0082), so the default IS the
         // implementation for every receiver. Both routes here end up in the same place: a
         // constrained receiver arrives lifted, an interface value arrives as itself.
+        //
+        // In Lyric 5 that is a GENERIC interface's member alone. A plain interface's generic
+        // default never comes here: it is instantiated per conformer (DirectDefault), where the
+        // conformer's own may stand in its place (04 D9 whole).
         //
         // A PRIVATE helper (07 V2 S4) takes the same route for the same reason: it has no slot,
         // because no conformer may stand in for it.

@@ -72,6 +72,11 @@ public sealed class TypeResult
     /// table, and only its defaults are lowered once for it.</summary>
     public Func<TypeSymbol, bool>? ValueInterface { get; internal set; }
 
+    /// <summary>Whether the program is Lyric 5's (04 D9 whole): there a generic default of an
+    /// interface is instantiated per conformer, and a conformer's own may stand in its place. The
+    /// 4.x path keeps a generic default for the interface's value until it leaves main (M16).</summary>
+    public bool Lyric5Modules { get; internal set; }
+
     /// <summary>
     /// Which function satisfied which conformance: keyed by (implementing type, interface,
     /// member), holding one entry per INSTANCE.
