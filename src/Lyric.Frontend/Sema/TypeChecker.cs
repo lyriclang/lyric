@@ -1317,7 +1317,7 @@ public sealed class TypeChecker
         }
     }
 
-    private enum Provenance { Own, Inherent, Block, Default, Delegated }
+    private enum Provenance { Own, Inherent, Block, Default, Delegated, Blanket }
 
     private void CheckMethodSet(TypeSymbol ts)
     {
@@ -1333,8 +1333,9 @@ public sealed class TypeChecker
                 ext.InConformanceBlock ? $"the conformance block of '{ts.Name}'" : $"an extension of '{ts.Name}'"));
             blockOf[ext.Symbol] = ext.Block;
         }
-        // A blanket block's members reach the type where its constraints admit it (04 D15):
-        // one function of a name holds there as for any extension.
+        // A blanket block's members reach the type where its constraints admit it (04 D15) —
+        // BEHIND the type's own, as the lookup asks them: a kind of their own here, because one
+        // the type has a member for is hidden, not a collision (the review's A5).
         foreach (var block in _comp.Extensions.Blocks)
             if (block.IsBlanketTarget && BlockSubstitution(block, SelfType(ts)) is not null
                 // A conformance it gives that the type declares itself is the coherence check's
@@ -1342,7 +1343,7 @@ public sealed class TypeChecker
                 && !block.Decl.Interfaces.Any(node => Conformance.InterfaceOf(node, _binding) is { } given
                     && DeclaredInterfaceNodes(ts).Any(own => ReferenceEquals(Conformance.InterfaceOf(own, _binding), given))))
                 foreach (var m in block.Methods)
-                    entries.Add((m.Name, Provenance.Inherent, m, m.Declaration?.Span ?? default, "a blanket extension"));
+                    entries.Add((m.Name, Provenance.Blanket, m, m.Declaration?.Span ?? default, "a blanket extension"));
         // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
         // they are the ordinary defaults, and only the abstract members go to the field.
         foreach (var (iface, _) in InterfacesOf(ts))
@@ -1363,7 +1364,31 @@ public sealed class TypeChecker
             var blocks = list.Where(e => e.Kind == Provenance.Block).ToList();
             var defaults = list.Where(e => e.Kind == Provenance.Default).Select(e => e.Symbol).Distinct().ToList();
             var delegations = list.Where(e => e.Kind == Provenance.Delegated).ToList();
+            var blankets = list.Where(e => e.Kind == Provenance.Blanket).ToList();
             var name = group.Key;
+
+            // A blanket member (04 D15, the review's A5). A name the type has — its own, an
+            // extension's, a conformance block's, a default it inherits, a member it leaves to
+            // a field — comes first on the type, and the blanket member is HIDDEN for it: a call
+            // on the type reaches the type's, generic code that reaches the name through the
+            // block's constraints calls the block's. Two functions of one name for one type, so
+            // a warning where the type's stands. It was an error where the BLOCK stands — a
+            // library's blanket block made a user's type an error in the library.
+            if (blankets.Count > 0)
+            {
+                if (list.Count == blankets.Count)
+                {
+                    // Nothing of the type's: two blanket blocks that give it one name are two
+                    // functions with nothing to choose between them.
+                    for (var i = 1; i < blankets.Count; i++)
+                        _de.Report("LYR-SEM0121", Severity.Error, blankets[i].Span,
+                            $"'{name}' is added to '{ts.Name}' twice — a type holds one function of a name",
+                            new DiagnosticNote(blankets[0].Span, "the other one is here"));
+                    continue;
+                }
+                WarnHidden(ts, name, owns.Concat(inherent).Concat(blocks).ToList(), defaults, delegations.Count > 0,
+                    blankets.Select(b => b.Span).ToList());
+            }
 
             // An own member settles the name for every conformance; what else declares it collides
             // — except a block implementing ANOTHER INSTANCE of an interface the own member
@@ -1437,6 +1462,53 @@ public sealed class TypeChecker
         }
     }
 
+
+    /// <summary>
+    /// The warning for a blanket member a type's own hides (<c>LYR-SEM0168</c>, the review's
+    /// A5): where the type's member stands — the function the author wrote, in the body or in a
+    /// block of the type; for a default the type inherits, or a member it leaves to a field, at
+    /// the type, which is what its author wrote.
+    /// </summary>
+    private void WarnHidden(TypeSymbol ts, string name,
+        List<(string Name, Provenance Kind, Symbol Symbol, Span Span, string Where)> written, List<Symbol> defaults,
+        bool delegated, List<Span> hidden)
+    {
+        var (subject, at, reached) = written.Count > 0
+            ? ($"'{ts.Name}.{name}'", (written[0].Symbol.Declaration as FunctionDecl)?.NameSpan ?? written[0].Span, "this one")
+            : defaults.Count > 0
+                ? ($"'{name}', a default of '{InterfaceNameOf(defaults[0])}',", TypeNameSpan(ts), "the default")
+                : ($"'{name}', which '{ts.Name}' leaves to '{DelegatedTo(ts, name)}',", TypeNameSpan(ts), "the field's");
+        if (!delegated && written.Count == 0 && defaults.Count == 0) return;
+        _de.Report("LYR-SEM0168", Severity.Warning, at,
+            $"{subject} hides the blanket member '{name}' for '{ts.Name}': a call on a '{ts.Name}' reaches {reached}, "
+            + $"and generic code that reaches '{name}' through the block's constraints calls the block's — two "
+            + "functions of one name; rename one, unless they are meant to differ",
+            hidden.Select(span => new DiagnosticNote(span, "the blanket member is here")).ToArray());
+    }
+
+    /// <summary>The name of the interface a default belongs to.</summary>
+    private static string InterfaceNameOf(Symbol member) =>
+        (member as FunctionSymbol)?.Home?.Members.Symbols.OfType<TypeSymbol>()
+            .FirstOrDefault(t => t.Kind == TypeSymbolKind.Interface && t.Members.Symbols.Contains(member))?.Name
+        ?? "an interface";
+
+    /// <summary>The field a type leaves a member to (04 D1).</summary>
+    private string DelegatedTo(TypeSymbol ts, string name)
+    {
+        foreach (var (iface, field) in _result.DelegationsOf(ts))
+            if (iface.Members.LookupLocal(name) is FunctionSymbol) return field;
+        return "a field";
+    }
+
+    /// <summary>Where a type's name stands in its declaration.</summary>
+    private static Span TypeNameSpan(TypeSymbol ts) => ts.Declaration switch
+    {
+        StructDecl s => s.NameSpan,
+        ClassDecl c => c.NameSpan,
+        EnumDecl e => e.NameSpan,
+        { } other => other.Span,
+        null => default,
+    };
 
     private bool DeclaredInModule(TypeSymbol ts, ModuleSymbol module) =>
         ReferenceEquals(module.Members.LookupLocal(ts.Name), ts);

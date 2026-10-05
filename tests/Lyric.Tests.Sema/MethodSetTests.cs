@@ -36,6 +36,63 @@ public class MethodSetTests
         return errors[0].Message;
     }
 
+    // ------------------------------------------------------------------ a blanket member beside the type's (A5)
+
+    private const string Greeters = """
+        interface Named { fn name(): string; }
+        extend<T :: [Named]> T { fn greeting(): string { return "hello " + this.name(); } }
+
+        """;
+
+    private static List<Diagnostic> Hidden(string source)
+    {
+        var de = Check(Greeters + source);
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => $"{d.Code}: {d.Message}")));
+        return de.Diagnostics.Where(d => d.Code == "LYR-SEM0168").ToList();
+    }
+
+    /// <summary>
+    /// A blanket member of a name a type already has is hidden for that type (04 D15, the
+    /// review's A5): the type's comes first — its own, an extension's, a conformance block's, a
+    /// default it inherits, a member it leaves to a field. It was refused at the BLOCK
+    /// (<c>LYR-SEM0121</c>), so a library's blanket block made a user's type an error in the
+    /// library. A warning says, where the type's member stands, that two functions of the
+    /// name exist for it: a call on the type reaches its own, generic code the block's.
+    /// </summary>
+    [Theory]
+    [InlineData("struct Cat :: [Named] { fn name(): string { return \"cat\"; } fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
+    [InlineData("struct Cat :: [Named] { fn name(): string { return \"cat\"; } }\nextend Cat { fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
+    [InlineData("interface Loud { fn greeting(): string; }\nstruct Cat :: [Named] { fn name(): string { return \"cat\"; } }\nextend Cat :: [Loud] { fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
+    [InlineData("interface Loud { fn greeting(): string { return \"loud\"; } }\nstruct Cat :: [Named, Loud] { fn name(): string { return \"cat\"; } }", "'greeting', a default of 'Loud', hides")]
+    [InlineData("interface Loud { fn greeting(): string; }\nstruct Voice :: [Loud] { fn greeting(): string { return \"v\"; } }\nstruct Cat :: [Named, Loud by voice] { voice: Voice, fn name(): string { return \"cat\"; } }", "'greeting', which 'Cat' leaves to 'voice', hides")]
+    public void A_types_member_hides_a_blanket_member_and_says_so(string types, string says)
+    {
+        var warnings = Hidden(types + "\nfn main(): int { return 0; }");
+        Assert.True(warnings.Count == 1, $"{warnings.Count} warnings\n" + string.Join("\n", warnings.Select(d => d.Message)));
+        Assert.Equal(Severity.Warning, warnings[0].Severity);
+        Assert.Contains(says, warnings[0].Message);
+        Assert.Contains("the blanket member", warnings[0].Message);
+    }
+
+    /// <summary>Controls: a type the block reaches and that has no member of the name gets the
+    /// blanket's, without a word; a type the block does not reach is not concerned.</summary>
+    [Theory]
+    [InlineData("struct Dog :: [Named] { fn name(): string { return \"dog\"; } }\nfn main(): int { let d = Dog { }; return if (d.greeting() == \"x\") 0 else 1; }")]
+    [InlineData("struct Rock { fn greeting(): string { return \"…\"; } }\nfn main(): int { return 0; }")]
+    public void A_blanket_member_nothing_hides_says_nothing(string source) =>
+        Assert.Empty(Hidden(source));
+
+    /// <summary>Control: two blanket blocks that give one type one name are still two functions
+    /// of a name with nothing to choose between them.</summary>
+    [Fact]
+    public void Two_blanket_blocks_cannot_add_one_name() =>
+        Assert.Contains("twice", Rejected(Greeters + """
+            interface Seen { fn seen(): bool; }
+            extend<T :: [Seen]> T { fn greeting(): string { return "seen"; } }
+            struct Cat :: [Named, Seen] { fn name(): string { return "cat"; } fn seen(): bool { return true; } }
+            fn main(): int { return 0; }
+            """, "LYR-SEM0121"));
+
     // ------------------------------------------------------------------ one name, one function
 
     [Fact]
